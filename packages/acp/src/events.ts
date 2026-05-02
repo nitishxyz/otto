@@ -11,6 +11,7 @@ import {
 	handleToolResult,
 } from './tool-events';
 import type { AcpSession } from './types';
+import { isConnectionClosedError } from './errors';
 
 export async function handleOttoEvent(
 	client: AgentSideConnection,
@@ -200,6 +201,7 @@ export async function handleOttoEvent(
 				return;
 		}
 	} catch (err) {
+		if (isConnectionClosedError(err)) return;
 		console.error('[acp] Error handling event:', event.type, err);
 	}
 }

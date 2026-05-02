@@ -8,6 +8,7 @@ import {
 	filterDiscoveredSkills,
 	loadConfig,
 } from '@ottocode/sdk';
+import { isConnectionClosedError } from './errors';
 
 export function queueAvailableCommands(
 	client: AgentSideConnection,
@@ -17,6 +18,7 @@ export function queueAvailableCommands(
 	for (const delayMs of [0, 250]) {
 		setTimeout(() => {
 			void sendAvailableCommands(client, sessionId, cwd).catch((err) => {
+				if (isConnectionClosedError(err)) return;
 				console.error('[acp] Failed to send available commands:', err);
 			});
 		}, delayMs);
