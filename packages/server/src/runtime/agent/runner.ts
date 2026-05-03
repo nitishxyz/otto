@@ -26,7 +26,6 @@ import {
 } from '../stream/handlers.ts';
 import {
 	pruneSession,
-	getModelLimits,
 	shouldAutoCompactBeforeOverflow,
 } from '../message/compaction.ts';
 import { triggerDeferredTitleGeneration } from '../message/service.ts';
@@ -131,7 +130,6 @@ async function shouldPreemptivelyAutoCompact(
 	opts: RunOpts,
 	threshold: number | null | undefined,
 ): Promise<boolean> {
-	const limits = getModelLimits(opts.provider, opts.model);
 	const sessionRows = await db
 		.select({ currentContextTokens: sessions.currentContextTokens })
 		.from(sessions)
@@ -140,7 +138,6 @@ async function shouldPreemptivelyAutoCompact(
 
 	return shouldAutoCompactBeforeOverflow({
 		autoCompactThresholdTokens: threshold,
-		modelContextWindow: limits?.context ?? null,
 		currentContextTokens: sessionRows[0]?.currentContextTokens ?? 0,
 		estimatedInputTokens: opts.estimatedInputTokens ?? 0,
 		isCompactCommand: opts.isCompactCommand,

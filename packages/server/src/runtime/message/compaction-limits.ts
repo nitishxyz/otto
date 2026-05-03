@@ -14,7 +14,6 @@ export interface ModelLimits {
 
 export function shouldAutoCompactBeforeOverflow(args: {
 	autoCompactThresholdTokens?: number | null;
-	modelContextWindow?: number | null;
 	currentContextTokens?: number | null;
 	estimatedInputTokens?: number | null;
 	isCompactCommand?: boolean;
@@ -28,11 +27,6 @@ export function shouldAutoCompactBeforeOverflow(args: {
 		return false;
 	}
 	if ((args.compactionRetries ?? 0) > 0) {
-		return false;
-	}
-
-	const modelContextWindow = Number(args.modelContextWindow ?? 0);
-	if (!Number.isFinite(modelContextWindow) || modelContextWindow <= threshold) {
 		return false;
 	}
 
