@@ -33,12 +33,12 @@ import {
 	getRunnerState,
 } from '@ottocode/server/runtime/agent/runner';
 import {
-	createSession,
-	getSessionById,
-	listSessions,
-	updateSessionAgent,
-} from '@ottocode/server/runtime/session/manager';
-import { getDb } from '@ottocode/database';
+	createSession as apiCreateSession,
+	getSession as apiGetSession,
+	listSessions as apiListSessions,
+	updateSession as apiUpdateSession,
+	type Provider,
+} from '@ottocode/api';
 import {
 	createToolError,
 	loadConfig,
@@ -57,6 +57,7 @@ import {
 	handleShareCommand,
 	handleStageCommand,
 } from './slash-commands';
+import { ensureAcpServer } from './server';
 import { ACP_VERSION, DEFAULT_MODE, type AcpSession } from './types';
 
 export class OttoAcpAgent implements Agent {
@@ -113,14 +114,16 @@ export class OttoAcpAgent implements Agent {
 
 		try {
 			const cfg = await loadConfig(cwd);
-			const db = await getDb(cfg.projectRoot);
-			const row = await createSession({
-				db,
-				cfg,
-				agent: defaults.agent,
-				provider: defaults.provider,
-				model: defaults.model,
+			await ensureAcpServer();
+			const { data: row, error } = await apiCreateSession({
+				query: { project: cfg.projectRoot },
+				body: {
+					agent: defaults.agent,
+					provider: defaults.provider,
+					model: defaults.model,
+				},
 			});
+			if (error || !row) throw new Error('Failed to create session');
 			sessionId = row.id;
 			ottoSessionId = row.id;
 		} catch (err) {
@@ -175,12 +178,12 @@ export class OttoAcpAgent implements Agent {
 	): Promise<ListSessionsResponse> {
 		const cwd = params.cwd || process.cwd();
 		const cfg = await loadConfig(cwd);
-		const db = await getDb(cfg.projectRoot);
-		const rows = await listSessions({
-			db,
-			projectPath: cfg.projectRoot,
-			limit: 100,
+		await ensureAcpServer();
+		const { data, error } = await apiListSessions({
+			query: { project: cfg.projectRoot, limit: 100 },
 		});
+		if (error || !data) throw new Error('Failed to list sessions');
+		const rows = data.items;
 
 		return {
 			sessions: rows.map((row) => ({
@@ -229,7 +232,7 @@ export class OttoAcpAgent implements Agent {
 	): Promise<SetSessionModeResponse | undefined> {
 		const session = this.sessions.get(params.sessionId);
 		if (!session) throw new Error('Session not found');
-		await this.persistSessionAgent(session, params.modeId);
+		await this.persistSessionPreferences(session, { agent: params.modeId });
 		session.mode = params.modeId;
 		await this.client.sessionUpdate({
 			sessionId: params.sessionId,
@@ -247,6 +250,10 @@ export class OttoAcpAgent implements Agent {
 		const session = this.sessions.get(params.sessionId);
 		if (!session) throw new Error('Session not found');
 		const parsed = parseModelId(params.modelId);
+		await this.persistSessionPreferences(session, {
+			provider: parsed.provider,
+			model: parsed.model,
+		});
 		session.provider = parsed.provider;
 		session.model = parsed.model;
 		return undefined;
@@ -260,10 +267,14 @@ export class OttoAcpAgent implements Agent {
 
 		if (params.configId === 'agent' && 'value' in params) {
 			const mode = String(params.value);
-			await this.persistSessionAgent(session, mode);
+			await this.persistSessionPreferences(session, { agent: mode });
 			session.mode = mode;
 		} else if (params.configId === 'model' && 'value' in params) {
 			const parsed = parseModelId(String(params.value));
+			await this.persistSessionPreferences(session, {
+				provider: parsed.provider,
+				model: parsed.model,
+			});
 			session.provider = parsed.provider;
 			session.model = parsed.model;
 		}
@@ -449,12 +460,12 @@ export class OttoAcpAgent implements Agent {
 		cwd: string,
 		mcpServers: NewSessionRequest['mcpServers'] = [],
 	): Promise<ResumeSessionResponse> {
-		const db = await getDb(cwd);
-		const row = await getSessionById({
-			db,
-			sessionId,
+		await ensureAcpServer();
+		const { data: row, error } = await apiGetSession({
+			path: { sessionId },
+			query: { project: cwd },
 		});
-		if (!row) {
+		if (error || !row) {
 			console.error('[acp] Session not found while resuming:', sessionId);
 			throw new Error('Session not found');
 		}
@@ -506,11 +517,25 @@ export class OttoAcpAgent implements Agent {
 		);
 	}
 
-	private async persistSessionAgent(session: AcpSession, agent: string) {
+	private async persistSessionPreferences(
+		session: AcpSession,
+		preferences: { agent?: string; provider?: string; model?: string },
+	) {
 		if (!session.ottoSessionId) return;
 		const cfg = await loadConfig(session.cwd);
-		const db = await getDb(cfg.projectRoot);
-		await updateSessionAgent({ db, sessionId: session.ottoSessionId, agent });
+		await ensureAcpServer();
+		const { error } = await apiUpdateSession({
+			path: { sessionId: session.ottoSessionId },
+			query: { project: cfg.projectRoot },
+			body: {
+				...(preferences.agent ? { agent: preferences.agent } : {}),
+				...(preferences.provider
+					? { provider: preferences.provider as Provider }
+					: {}),
+				...(preferences.model ? { model: preferences.model } : {}),
+			},
+		});
+		if (error) throw new Error('Failed to update session preferences');
 	}
 
 	private async resolveResourceLink(

@@ -25,9 +25,9 @@
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "0.21.0",
+		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
-		"@ottocode/server": "workspace:*",
-		"@ottocode/database": "workspace:*"
+		"@ottocode/server": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

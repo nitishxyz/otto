@@ -2,8 +2,7 @@ import type {
 	AgentSideConnection,
 	SessionNotification,
 } from '@agentclientprotocol/sdk';
-import { getDb } from '@ottocode/database';
-import { getSessionHistoryMessages } from '@ottocode/server/runtime/session/manager';
+import { listMessages } from '@ottocode/api';
 import {
 	extractReplayText,
 	parseReplayImage,
@@ -16,6 +15,7 @@ import {
 	getToolKind,
 	getToolLocations,
 } from './tools';
+import { ensureAcpServer } from './server';
 import type { AcpSession } from './types';
 
 export async function replaySessionHistory(
@@ -23,20 +23,20 @@ export async function replaySessionHistory(
 	sessionId: string,
 	session: AcpSession,
 ): Promise<void> {
-	const db = await getDb(session.cwd);
-	const history = await getSessionHistoryMessages(db, session.ottoSessionId);
+	await ensureAcpServer();
+	const { data: history, error } = await listMessages({
+		path: { id: session.ottoSessionId },
+		query: { project: session.cwd },
+	});
+	if (error || !history) throw new Error('Failed to load session history');
 	for (const message of history) {
 		if (message.role !== 'user' && message.role !== 'assistant') continue;
+		const parts = message.parts ?? [];
 
 		if (message.role === 'user') {
-			await replayUserMessageParts(client, sessionId, message.parts);
+			await replayUserMessageParts(client, sessionId, parts);
 		} else {
-			await replayAssistantMessageParts(
-				client,
-				sessionId,
-				message.parts,
-				session,
-			);
+			await replayAssistantMessageParts(client, sessionId, parts, session);
 		}
 	}
 }
