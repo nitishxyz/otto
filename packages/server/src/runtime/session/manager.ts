@@ -131,6 +131,23 @@ export async function listSessions({
 		.limit(limit);
 }
 
+type UpdateSessionAgentInput = {
+	db: DB;
+	sessionId: string;
+	agent: string;
+};
+
+export async function updateSessionAgent({
+	db,
+	sessionId,
+	agent,
+}: UpdateSessionAgentInput): Promise<void> {
+	await db
+		.update(sessions)
+		.set({ agent, lastActiveAt: Date.now() })
+		.where(eq(sessions.id, sessionId));
+}
+
 export type SessionHistoryMessage = MessageRow & {
 	parts: MessagePartRow[];
 };

@@ -36,6 +36,7 @@ import {
 	createSession,
 	getSessionById,
 	listSessions,
+	updateSessionAgent,
 } from '@ottocode/server/runtime/session/manager';
 import { getDb } from '@ottocode/database';
 import {
@@ -228,6 +229,7 @@ export class OttoAcpAgent implements Agent {
 	): Promise<SetSessionModeResponse | undefined> {
 		const session = this.sessions.get(params.sessionId);
 		if (!session) throw new Error('Session not found');
+		await this.persistSessionAgent(session, params.modeId);
 		session.mode = params.modeId;
 		await this.client.sessionUpdate({
 			sessionId: params.sessionId,
@@ -257,7 +259,9 @@ export class OttoAcpAgent implements Agent {
 		if (!session) throw new Error('Session not found');
 
 		if (params.configId === 'agent' && 'value' in params) {
-			session.mode = String(params.value);
+			const mode = String(params.value);
+			await this.persistSessionAgent(session, mode);
+			session.mode = mode;
 		} else if (params.configId === 'model' && 'value' in params) {
 			const parsed = parseModelId(String(params.value));
 			session.provider = parsed.provider;
@@ -399,14 +403,9 @@ export class OttoAcpAgent implements Agent {
 		subscribeToPromptEvents(response.sessionId);
 
 		return new Promise<PromptResponse>((resolve) => {
-			session.resolvePrompt = resolve;
-
 			const checkInterval = setInterval(() => {
 				if (session.cancelled) {
-					clearInterval(checkInterval);
-					session.unsubscribe?.();
-					session.unsubscribe = null;
-					resolve({ stopReason: 'cancelled' });
+					finishPrompt({ stopReason: 'cancelled' });
 					return;
 				}
 
@@ -417,12 +416,20 @@ export class OttoAcpAgent implements Agent {
 				const hasQueued = (state?.queue.length ?? 0) > 0;
 
 				if (!isRunning && !hasQueued && session.assistantMessageId) {
-					clearInterval(checkInterval);
-					session.unsubscribe?.();
-					session.unsubscribe = null;
-					resolve({ stopReason: 'end_turn' });
+					finishPrompt({ stopReason: 'end_turn' });
 				}
 			}, 200);
+			checkInterval.unref?.();
+
+			const finishPrompt = (response: PromptResponse) => {
+				clearInterval(checkInterval);
+				session.unsubscribe?.();
+				session.unsubscribe = null;
+				session.resolvePrompt = null;
+				resolve(response);
+			};
+
+			session.resolvePrompt = finishPrompt;
 		});
 	}
 
@@ -497,6 +504,13 @@ export class OttoAcpAgent implements Agent {
 				);
 			},
 		);
+	}
+
+	private async persistSessionAgent(session: AcpSession, agent: string) {
+		if (!session.ottoSessionId) return;
+		const cfg = await loadConfig(session.cwd);
+		const db = await getDb(cfg.projectRoot);
+		await updateSessionAgent({ db, sessionId: session.ottoSessionId, agent });
 	}
 
 	private async resolveResourceLink(

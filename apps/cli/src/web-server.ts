@@ -100,7 +100,7 @@ export function createWebServer(
 					}
 				}
 
-				const embeddedIndex = getEmbeddedAsset('/index.html');
+				const embeddedIndex = await getEmbeddedAsset('/index.html');
 				if (embeddedIndex) {
 					let html = decoder.decode(embeddedIndex);
 					html = html.replace(
@@ -160,7 +160,7 @@ export function createWebServer(
 					});
 				}
 
-				const embeddedData = getEmbeddedAsset(pathname);
+				const embeddedData = await getEmbeddedAsset(pathname);
 				if (embeddedData) {
 					if (pathname.endsWith('.html')) {
 						let html = decoder.decode(embeddedData);

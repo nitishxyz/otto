@@ -20,12 +20,6 @@ import {
 	registerWebCommand,
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
-import { startApiServer } from './commands/serve.ts';
-import { handleServe } from './commands/serve.ts';
-import { startTui } from '@ottocode/tui';
-import { ensureAuth } from './middleware/with-auth.ts';
-
-import { ensureServer, stopEphemeralServer } from './ask/server.ts';
 
 const SKIP_SERVER_COMMANDS = new Set([
 	'serve',
@@ -43,6 +37,16 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'share',
 ]);
 
+const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
+	'serve',
+	'upgrade',
+	'help',
+	'auth',
+	'providers',
+	'debug',
+	'web',
+]);
+
 export function createCli(version: string): Command {
 	const program = new Command();
 
@@ -58,6 +62,7 @@ export function createCli(version: string): Command {
 		.hook('preAction', async (_thisCommand, actionCommand) => {
 			const cmdName = actionCommand.name();
 			if (!SKIP_SERVER_COMMANDS.has(cmdName)) {
+				const { ensureServer } = await import('./ask/server.ts');
 				await ensureServer();
 			}
 		});
@@ -86,6 +91,7 @@ export function createCli(version: string): Command {
 export async function runCli(argv: string[], version: string): Promise<void> {
 	const program = createCli(version);
 	const previousCiMode = process.env.OTTO_CI_MODE;
+	let shouldStopEphemeralServer = false;
 	if (argv.includes('--ci')) {
 		process.env.OTTO_CI_MODE = '1';
 	}
@@ -94,6 +100,9 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 		const projectRoot = projectIdx >= 0 ? argv[projectIdx + 1] : process.cwd();
 
 		const cmd = argv.find((arg) => !arg.startsWith('-'));
+		shouldStopEphemeralServer = Boolean(
+			cmd && !NO_EPHEMERAL_SERVER_COMMANDS.has(cmd),
+		);
 		if (cmd) {
 			const discovered = await runDiscoveredCommand(
 				cmd,
@@ -128,6 +137,7 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 			if (useWeb) {
 				const noOpen = argv.includes('--no-open');
 				const networkFlag = argv.includes('--network');
+				const { handleServe } = await import('./commands/serve.ts');
 				await handleServe(
 					{
 						project: projectRoot,
@@ -141,8 +151,11 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 				return;
 			}
 
+			const { ensureAuth } = await import('./middleware/with-auth.ts');
 			if (!(await ensureAuth(projectRoot))) return;
+			const { startApiServer } = await import('./commands/serve.ts');
 			const server = await startApiServer({ project: projectRoot, port });
+			const { startTui } = await import('@ottocode/tui');
 			await startTui(server.port, server.stop, server.webUrl);
 			return;
 		}
@@ -154,7 +167,10 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 		} else {
 			process.env.OTTO_CI_MODE = previousCiMode;
 		}
-		await stopEphemeralServer();
+		if (shouldStopEphemeralServer) {
+			const { stopEphemeralServer } = await import('./ask/server.ts');
+			await stopEphemeralServer();
+		}
 	}
 }
 
