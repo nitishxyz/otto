@@ -4,6 +4,7 @@ import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOllama } from 'ai-sdk-ollama';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createXai } from '@ai-sdk/xai';
 import {
 	catalog,
 	createOttoRouterModel,
@@ -39,6 +40,7 @@ export type ProviderName =
 	| 'opencode'
 	| 'copilot'
 	| 'ottorouter'
+	| 'xai'
 	| 'zai'
 	| 'zai-coding'
 	| 'moonshot'
@@ -199,6 +201,14 @@ export async function resolveModel(
 				rpcURL,
 			},
 		);
+	}
+
+	if (provider === 'xai') {
+		const entry = catalog[provider];
+		const apiKey = config.apiKey || process.env.XAI_API_KEY || '';
+		const baseURL = config.baseURL || entry?.api;
+		const instance = createXai({ apiKey, baseURL });
+		return instance(model);
 	}
 
 	if (provider === 'zai') {

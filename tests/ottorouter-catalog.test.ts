@@ -22,6 +22,7 @@ describe('ottorouter catalog entry', () => {
 				'@ai-sdk/anthropic',
 				'@ai-sdk/google',
 				'@ai-sdk/openai-compatible',
+				'@ai-sdk/xai',
 			]),
 		);
 	});

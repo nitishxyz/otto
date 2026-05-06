@@ -82,6 +82,9 @@ const pricingTable: Record<ProviderName, PricingEntry[]> = {
 	ottorouter: [
 		// Pricing from catalog entries; leave empty here
 	],
+	xai: [
+		// Pricing from catalog entries; leave empty here
+	],
 	zai: [
 		// Pricing from catalog entries; leave empty here
 	],

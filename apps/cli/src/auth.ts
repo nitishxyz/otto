@@ -77,6 +77,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://dash.ottorouter.org',
 		env: 'OTTOROUTER_PRIVATE_KEY',
 	},
+	xai: {
+		name: 'xAI',
+		url: 'https://console.x.ai/team/default/api-keys',
+		env: 'XAI_API_KEY',
+	},
 	zai: {
 		name: 'Z.AI (GLM)',
 		url: 'https://z.ai/manage-apikey/apikey-list',
@@ -364,6 +369,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				{ value: 'opencode', label: PROVIDER_LINKS.opencode.name },
 				{ value: 'copilot', label: PROVIDER_LINKS.copilot.name },
 				{ value: 'ottorouter', label: PROVIDER_LINKS.ottorouter.name },
+				{ value: 'xai', label: PROVIDER_LINKS.xai.name },
 				{ value: 'zai', label: PROVIDER_LINKS.zai.name },
 				{ value: 'zai-coding', label: PROVIDER_LINKS['zai-coding'].name },
 				{ value: 'moonshot', label: PROVIDER_LINKS.moonshot.name },
@@ -969,6 +975,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			opencode: { enabled: provider === 'opencode' },
 			copilot: { enabled: provider === 'copilot' },
 			ottorouter: { enabled: provider === 'ottorouter' },
+			xai: { enabled: provider === 'xai' },
 			zai: { enabled: provider === 'zai' },
 			'zai-coding': { enabled: provider === 'zai-coding' },
 			moonshot: { enabled: provider === 'moonshot' },

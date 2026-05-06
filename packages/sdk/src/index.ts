@@ -142,6 +142,8 @@ export {
 export type { AnthropicOAuthConfig } from './providers/src/index.ts';
 export { createGoogleModel } from './providers/src/index.ts';
 export type { GoogleProviderConfig } from './providers/src/index.ts';
+export { createXaiModel } from './providers/src/index.ts';
+export type { XaiProviderConfig } from './providers/src/index.ts';
 export { createZaiModel, createZaiCodingModel } from './providers/src/index.ts';
 export type { ZaiProviderConfig } from './providers/src/index.ts';
 export {

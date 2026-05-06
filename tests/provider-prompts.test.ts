@@ -299,6 +299,7 @@ describe('provider base prompts', () => {
 					'moonshot',
 					'google',
 					'minimax',
+					'xai',
 					'zai',
 				]).toContain(model.ownedBy);
 			}

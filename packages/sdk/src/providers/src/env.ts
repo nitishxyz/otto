@@ -9,6 +9,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	opencode: 'OPENCODE_API_KEY',
 	copilot: 'GITHUB_TOKEN',
 	ottorouter: 'OTTOROUTER_PRIVATE_KEY',
+	xai: 'XAI_API_KEY',
 	zai: 'ZAI_API_KEY',
 	'zai-coding': 'ZAI_CODING_API_KEY',
 	moonshot: 'MOONSHOT_API_KEY',

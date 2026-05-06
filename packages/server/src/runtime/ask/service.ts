@@ -140,6 +140,7 @@ async function processAskRequest(
 				opencode: { enabled: true },
 				copilot: { enabled: true },
 				ottorouter: { enabled: true },
+				xai: { enabled: true },
 				zai: { enabled: true },
 				'zai-coding': { enabled: true },
 				moonshot: { enabled: true },

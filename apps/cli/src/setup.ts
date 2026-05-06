@@ -29,6 +29,7 @@ export async function runSetup(projectRoot?: string) {
 			{ value: 'openrouter', label: 'OpenRouter' },
 			{ value: 'opencode', label: 'OpenCode' },
 			{ value: 'ottorouter', label: 'OttoRouter' },
+			{ value: 'xai', label: 'xAI' },
 			{ value: 'zai', label: 'Z.AI (GLM)' },
 			{ value: 'zai-coding', label: 'Z.AI Coding Plan' },
 			{ value: 'moonshot', label: 'Moonshot AI (Kimi)' },
@@ -49,6 +50,7 @@ export async function runSetup(projectRoot?: string) {
 		opencode: { enabled: false },
 		copilot: { enabled: false },
 		ottorouter: { enabled: false },
+		xai: { enabled: false },
 		zai: { enabled: false },
 		'zai-coding': { enabled: false },
 		moonshot: { enabled: false },
@@ -74,13 +76,15 @@ export async function runSetup(projectRoot?: string) {
 									? 'OPENCODE_API_KEY'
 									: p === 'ottorouter'
 										? 'OTTOROUTER_PRIVATE_KEY'
-										: p === 'zai'
-											? 'ZAI_API_KEY'
-											: p === 'zai-coding'
-												? 'ZAI_CODING_API_KEY'
-												: p === 'moonshot'
-													? 'MOONSHOT_API_KEY'
-													: 'MINIMAX_API_KEY';
+										: p === 'xai'
+											? 'XAI_API_KEY'
+											: p === 'zai'
+												? 'ZAI_API_KEY'
+												: p === 'zai-coding'
+													? 'ZAI_CODING_API_KEY'
+													: p === 'moonshot'
+														? 'MOONSHOT_API_KEY'
+														: 'MINIMAX_API_KEY';
 		const key = await text({
 			message: `Enter ${keyLabel} (leave empty to skip)`,
 			initialValue: '',
@@ -150,6 +154,7 @@ export async function runSetup(projectRoot?: string) {
 			opencode: providers.opencode,
 			copilot: providers.copilot,
 			ottorouter: providers.ottorouter,
+			xai: providers.xai,
 			zai: providers.zai,
 			'zai-coding': providers['zai-coding'],
 			moonshot: providers.moonshot,

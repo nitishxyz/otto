@@ -103,6 +103,8 @@ export {
 export type { AnthropicOAuthConfig } from './anthropic-oauth-client.ts';
 export { createGoogleModel } from './google-client.ts';
 export type { GoogleProviderConfig } from './google-client.ts';
+export { createXaiModel } from './xai-client.ts';
+export type { XaiProviderConfig } from './xai-client.ts';
 export { createZaiModel, createZaiCodingModel } from './zai-client.ts';
 export type { ZaiProviderConfig } from './zai-client.ts';
 export {

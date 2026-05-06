@@ -34,6 +34,7 @@ export async function ensureAuth(projectRoot: string): Promise<boolean> {
 			'openrouter',
 			'opencode',
 			'ottorouter',
+			'xai',
 		];
 		const statuses = await Promise.all(
 			providers.map((provider) => isProviderAuthorized(config, provider)),

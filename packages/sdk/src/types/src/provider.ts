@@ -10,6 +10,7 @@ export type BuiltInProviderId =
 	| 'opencode'
 	| 'copilot'
 	| 'ottorouter'
+	| 'xai'
 	| 'zai'
 	| 'zai-coding'
 	| 'moonshot'

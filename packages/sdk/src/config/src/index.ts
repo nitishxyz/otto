@@ -18,6 +18,7 @@ const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = {
 	opencode: { enabled: false },
 	copilot: { enabled: false },
 	ottorouter: { enabled: true },
+	xai: { enabled: false },
 	zai: { enabled: false },
 	'zai-coding': { enabled: false },
 	moonshot: { enabled: false },

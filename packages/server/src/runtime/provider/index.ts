@@ -19,6 +19,7 @@ import {
 	resolveOttoRouterModel,
 	type ResolveOttoRouterModelOptions,
 } from './ottorouter.ts';
+import { getXaiInstance } from './xai.ts';
 import { getZaiInstance, getZaiCodingInstance } from './zai.ts';
 import { resolveOpencodeModel } from './opencode.ts';
 import { getMoonshotInstance } from './moonshot.ts';
@@ -72,6 +73,9 @@ export async function resolveModel(
 			topupApprovalMode: options?.topupApprovalMode,
 			autoPayThresholdUsd: options?.autoPayThresholdUsd,
 		});
+	}
+	if (provider === 'xai') {
+		return getXaiInstance(cfg, model);
 	}
 	if (provider === 'zai') {
 		return getZaiInstance(cfg, model);

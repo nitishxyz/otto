@@ -190,6 +190,7 @@ function getReasoningProviderTarget(
 	const npmBinding = getModelNpmBinding(provider, model);
 	if (npmBinding === '@ai-sdk/anthropic') return 'anthropic';
 	if (npmBinding === '@ai-sdk/openai') return 'openai';
+	if (npmBinding === '@ai-sdk/xai') return 'openai';
 	if (npmBinding === '@ai-sdk/google') return 'google';
 	if (npmBinding === 'ai-sdk-ollama') return 'ollama';
 	if (npmBinding === '@ai-sdk/openai-compatible') return 'openai-compatible';

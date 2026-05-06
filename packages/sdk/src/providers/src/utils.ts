@@ -41,6 +41,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],
 	ottorouter: ['kimi-k2.5'],
+	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	copilot: ['gpt-4.1-mini'],
 };
@@ -152,6 +153,7 @@ const DIRECT_PROVIDER_FAMILY: Partial<
 	moonshot: 'moonshot',
 	minimax: 'minimax',
 	copilot: 'openai',
+	xai: 'openai',
 	zai: 'glm',
 	'zai-coding': 'glm',
 };
@@ -177,6 +179,7 @@ function inferFromModelId(model: string): UnderlyingProviderKey {
 	)
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
+	if (lower.includes('grok') || lower.startsWith('xai/')) return 'openai';
 	if (lower.includes('kimi') || lower.startsWith('moonshotai/'))
 		return 'moonshot';
 	if (
