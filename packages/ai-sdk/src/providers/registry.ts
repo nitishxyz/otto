@@ -13,6 +13,7 @@ const OWNER_API_FORMAT: Record<string, ProviderApiFormat> = {
 	moonshot: 'openai-chat',
 	openrouter: 'openrouter-chat',
 	zai: 'openai-chat',
+	xai: 'xai-chat',
 };
 
 export class ProviderRegistry {

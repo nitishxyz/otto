@@ -14,6 +14,7 @@ export type ProviderApiFormat =
 	| 'anthropic-messages'
 	| 'openai-chat'
 	| 'openrouter-chat'
+	| 'xai-chat'
 	| 'google-native';
 
 export type FetchFunction = (

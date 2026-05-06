@@ -50,10 +50,11 @@ function tryParseOttoRouterComment(
 	line: string,
 	onBalanceUpdate: (update: BalanceUpdate) => void,
 ) {
+	const prefix = ': ottorouter ';
 	const trimmed = line.replace(/\r$/, '');
-	if (!trimmed.startsWith(': ottorouter ')) return;
+	if (!trimmed.startsWith(prefix)) return;
 	try {
-		const data = JSON.parse(trimmed.slice(7));
+		const data = JSON.parse(trimmed.slice(prefix.length));
 		onBalanceUpdate({
 			costUsd: parseFloat(data.cost_usd ?? '0'),
 			balanceRemaining: parseFloat(data.balance_remaining ?? '0'),
