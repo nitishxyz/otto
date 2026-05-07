@@ -1,9 +1,5 @@
 import type { Tool } from 'ai';
-import { messageParts, sessions } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
-import { publish } from '../events/bus.ts';
-import { logger, type DiscoveredTool } from '@ottocode/sdk';
-import { getCwd, setCwd, joinRelative } from '../runtime/utils/cwd.ts';
+import type { DiscoveredTool } from '@ottocode/sdk';
 import type {
 	ToolAdapterContext,
 	StepExecutionState,
@@ -19,6 +15,37 @@ import {
 	skipsGuardApproval,
 } from '../runtime/tools/approval.ts';
 import { guardToolCall } from '../runtime/tools/guards.ts';
+import { consumeToolStream, executeBaseTool } from './adapter/execution.ts';
+import {
+	logToolCall,
+	logToolResult,
+	publishPlanUpdated,
+	publishToolCall,
+	publishToolDelta,
+	publishToolResult,
+} from './adapter/events.ts';
+import {
+	computeToolTiming,
+	persistToolCall,
+	persistToolErrorResult,
+	persistToolResultWithIndex,
+	updateToolSessionStats,
+} from './adapter/persistence.ts';
+import {
+	extractToolCallId,
+	getPendingQueue,
+	shiftPendingCall,
+	type PendingCallMeta,
+} from './adapter/pending.ts';
+import {
+	buildToolResultContent,
+	createBlockedToolResult,
+	createRejectedToolResult,
+	createToolExceptionResult,
+	markToolFailed,
+	markToolSucceeded,
+	type ToolFailureState,
+} from './adapter/results.ts';
 
 export type { ToolAdapterContext } from '../runtime/tools/context.ts';
 
@@ -33,57 +60,6 @@ type ToolExecuteOptions = ToolExecuteSignature['options'] extends never
 	? undefined
 	: ToolExecuteSignature['options'];
 type ToolExecuteReturn = ToolExecuteSignature['result'];
-
-type PendingCallMeta = {
-	callId: string;
-	startTs: number;
-	stepIndex?: number;
-	args?: unknown;
-	approvalPromise?: Promise<boolean>;
-	blocked?: boolean;
-	blockReason?: string;
-};
-
-function getPendingQueue(
-	map: Map<string, PendingCallMeta[]>,
-	name: string,
-): PendingCallMeta[] {
-	let queue = map.get(name);
-	if (!queue) {
-		queue = [];
-		map.set(name, queue);
-	}
-	return queue;
-}
-
-function extractToolCallId(options: unknown): string | undefined {
-	return (options as { toolCallId?: string } | undefined)?.toolCallId;
-}
-
-const DEFAULT_TRACED_TOOL_INPUTS = new Set([
-	'write',
-	'edit',
-	'multiedit',
-	'copy_into',
-	'apply_patch',
-]);
-
-function shouldTraceToolInput(name: string): boolean {
-	void DEFAULT_TRACED_TOOL_INPUTS;
-	void name;
-	return false;
-}
-
-function summarizeTraceValue(value: unknown, max = 160): string {
-	try {
-		const json = JSON.stringify(value);
-		if (typeof json === 'string') {
-			return json.length > max ? `${json.slice(0, max)}…` : json;
-		}
-	} catch {}
-	const fallback = String(value);
-	return fallback.length > max ? `${fallback.slice(0, max)}…` : fallback;
-}
 
 function unwrapDoubleWrappedArgs(
 	input: unknown,
@@ -117,7 +93,7 @@ export function adaptTools(
 ) {
 	const out: Record<string, Tool> = {};
 	const pendingCalls = new Map<string, PendingCallMeta[]>();
-	const failureState: { active: boolean; toolName?: string } = {
+	const failureState: ToolFailureState = {
 		active: false,
 		toolName: undefined,
 	};
@@ -150,67 +126,6 @@ export function adaptTools(
 
 		const processedToolErrors = new WeakSet<object>();
 
-		const persistToolErrorResult = async (
-			errorResult: unknown,
-			{
-				callId,
-				startTs,
-				stepIndexForEvent,
-				args,
-			}: {
-				callId?: string;
-				startTs?: number;
-				stepIndexForEvent?: number;
-				args?: unknown;
-			},
-		) => {
-			const resultPartId = crypto.randomUUID();
-			const endTs = Date.now();
-			const effectiveStepIndex = stepIndexForEvent ?? ctx.stepIndex;
-			const dur =
-				typeof startTs === 'number' ? Math.max(0, endTs - startTs) : null;
-
-			const contentObj: {
-				name: string;
-				result: unknown;
-				callId?: string;
-				args?: unknown;
-			} = {
-				name,
-				result: errorResult,
-				callId,
-			};
-
-			if (args !== undefined) {
-				contentObj.args = args;
-			}
-
-			const index = await ctx.nextIndex();
-
-			await ctx.db.insert(messageParts).values({
-				id: resultPartId,
-				messageId: ctx.messageId,
-				index,
-				stepIndex: effectiveStepIndex,
-				type: 'tool_result',
-				content: JSON.stringify(contentObj),
-				agent: ctx.agent,
-				provider: ctx.provider,
-				model: ctx.model,
-				startedAt: startTs,
-				completedAt: endTs,
-				toolName: name,
-				toolCallId: callId,
-				toolDurationMs: dur ?? undefined,
-			});
-
-			publish({
-				type: 'tool.result',
-				sessionId: ctx.sessionId,
-				payload: { ...contentObj, stepIndex: effectiveStepIndex },
-			});
-		};
-
 		// Add cache control for Anthropic to cache tool definitions (max 2 tools)
 		const shouldCache =
 			provider === 'anthropic' &&
@@ -236,9 +151,6 @@ export function adaptTools(
 					startTs: Date.now(),
 					stepIndex: ctx.stepIndex,
 				});
-				if (shouldTraceToolInput(name)) {
-					void (sdkCallId ?? queue[queue.length - 1]?.callId ?? 'unknown');
-				}
 				if (typeof base.onInputStart === 'function')
 					// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
 					await base.onInputStart(options as any);
@@ -246,25 +158,15 @@ export function adaptTools(
 			async onInputDelta(options: unknown) {
 				const delta = (options as { inputTextDelta?: string } | undefined)
 					?.inputTextDelta;
-				const sdkCallId = extractToolCallId(options);
 				const queue = pendingCalls.get(name);
 				const meta = queue?.length ? queue[queue.length - 1] : undefined;
-				if (shouldTraceToolInput(name)) {
-					void (sdkCallId ?? meta?.callId ?? 'unknown');
-					void summarizeTraceValue(delta ?? '');
-				}
 				// Stream tool argument deltas as events if needed
-				publish({
-					type: 'tool.delta',
-					sessionId: ctx.sessionId,
-					payload: {
-						name,
-						channel: 'input',
-						delta,
-						stepIndex: meta?.stepIndex ?? ctx.stepIndex,
-						callId: meta?.callId,
-						messageId: ctx.messageId,
-					},
+				publishToolDelta(ctx, {
+					name,
+					channel: 'input',
+					delta,
+					stepIndex: meta?.stepIndex ?? ctx.stepIndex,
+					callId: meta?.callId,
 				});
 				if (typeof base.onInputDelta === 'function')
 					// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
@@ -291,10 +193,6 @@ export function adaptTools(
 				const callId = meta.callId;
 				const callPartId = crypto.randomUUID();
 				const startTs = meta.startTs;
-				if (shouldTraceToolInput(name)) {
-					void callId;
-					void summarizeTraceValue(args);
-				}
 
 				if (
 					!firstToolCallReported &&
@@ -308,40 +206,22 @@ export function adaptTools(
 
 				// Special-case: progress updates must render instantly. Publish before any DB work.
 				if (name === 'progress_update') {
-					publish({
-						type: 'tool.call',
-						sessionId: ctx.sessionId,
-						payload: {
-							name,
-							args,
-							callId,
-							stepIndex: ctx.stepIndex,
-							messageId: ctx.messageId,
-						},
-					});
-					logger.debug(`[tools] call ${name}`, {
-						sessionId: ctx.sessionId,
-						messageId: ctx.messageId,
-						toolName: name,
+					publishToolCall(ctx, {
+						name,
+						input: args,
 						callId,
 						stepIndex: ctx.stepIndex,
 					});
+					logToolCall(ctx, { name, callId, stepIndex: ctx.stepIndex });
 					// Persist synchronously to maintain correct ordering
 					try {
-						const index = await ctx.nextIndex();
-						await ctx.db.insert(messageParts).values({
-							id: callPartId,
-							messageId: ctx.messageId,
-							index,
+						await persistToolCall(ctx, {
+							partId: callPartId,
+							name,
+							input: args,
+							callId,
+							startTs,
 							stepIndex: ctx.stepIndex,
-							type: 'tool_call',
-							content: JSON.stringify({ name, args, callId }),
-							agent: ctx.agent,
-							provider: ctx.provider,
-							model: ctx.model,
-							startedAt: startTs,
-							toolName: name,
-							toolCallId: callId,
 						});
 					} catch {}
 					if (typeof base.onInputAvailable === 'function') {
@@ -352,33 +232,21 @@ export function adaptTools(
 				}
 
 				// Publish promptly so UI shows the call header before results
-				publish({
-					type: 'tool.call',
-					sessionId: ctx.sessionId,
-					payload: {
-						name,
-						args,
-						callId,
-						stepIndex: ctx.stepIndex,
-						messageId: ctx.messageId,
-					},
+				publishToolCall(ctx, {
+					name,
+					input: args,
+					callId,
+					stepIndex: ctx.stepIndex,
 				});
 				// Persist synchronously to maintain correct ordering
 				try {
-					const index = await ctx.nextIndex();
-					await ctx.db.insert(messageParts).values({
-						id: callPartId,
-						messageId: ctx.messageId,
-						index,
+					await persistToolCall(ctx, {
+						partId: callPartId,
+						name,
+						input: args,
+						callId,
+						startTs,
 						stepIndex: ctx.stepIndex,
-						type: 'tool_call',
-						content: JSON.stringify({ name, args, callId }),
-						agent: ctx.agent,
-						provider: ctx.provider,
-						model: ctx.model,
-						startedAt: startTs,
-						toolName: name,
-						toolCallId: callId,
 					});
 				} catch {}
 				// Start approval request with full args
@@ -421,9 +289,7 @@ export function adaptTools(
 			async execute(input: ToolExecuteInput, options: ToolExecuteOptions) {
 				input = unwrapDoubleWrappedArgs(input, name);
 				const sdkCallId = extractToolCallId(options);
-				const queue = pendingCalls.get(name);
-				const meta = queue?.shift();
-				if (queue && queue.length === 0) pendingCalls.delete(name);
+				const meta = shiftPendingCall(pendingCalls, name);
 				const callIdFromQueue = sdkCallId || meta?.callId;
 				const startTsFromQueue = meta?.startTs;
 				const stepIndexForEvent = meta?.stepIndex ?? ctx.stepIndex;
@@ -446,16 +312,14 @@ export function adaptTools(
 				const executeWithGuards = async (): Promise<ToolExecuteReturn> => {
 					try {
 						if (meta?.blocked) {
-							const blockedResult = {
-								ok: false,
-								error: `Blocked: ${meta.blockReason}`,
-								details: { reason: 'safety_guard' },
-							};
-							await persistToolErrorResult(blockedResult, {
+							const blockedResult = createBlockedToolResult(meta.blockReason);
+							await persistToolErrorResult(ctx, {
+								name,
+								errorResult: blockedResult,
 								callId: callIdFromQueue,
 								startTs: startTsFromQueue,
 								stepIndexForEvent,
-								args: meta?.args,
+								input: meta?.args,
 							});
 							return blockedResult as ToolExecuteReturn;
 						}
@@ -463,143 +327,49 @@ export function adaptTools(
 						if (meta?.approvalPromise) {
 							const approved = await meta.approvalPromise;
 							if (!approved) {
-								const rejectedResult = {
-									ok: false,
-									error: 'Tool execution rejected by user',
-									details: { reason: 'user_rejected' },
-								};
-								await persistToolErrorResult(rejectedResult, {
+								const rejectedResult = createRejectedToolResult();
+								await persistToolErrorResult(ctx, {
+									name,
+									errorResult: rejectedResult,
 									callId: callIdFromQueue,
 									startTs: startTsFromQueue,
 									stepIndexForEvent,
-									args: meta?.args,
+									input: meta?.args,
 								});
 								return rejectedResult as ToolExecuteReturn;
 							}
 						}
 						// Handle session-relative paths and cwd tools
-						let res: ToolExecuteReturn | { cwd: string } | null | undefined;
-						const cwd = getCwd(ctx.sessionId);
-						if (name === 'pwd') {
-							res = { cwd };
-						} else if (name === 'cd') {
-							const next = joinRelative(
-								cwd,
-								String((input as Record<string, unknown>)?.path ?? '.'),
-							);
-							setCwd(ctx.sessionId, next);
-							res = { cwd: next };
-						} else if (
-							['read', 'write', 'ls', 'tree'].includes(name) &&
-							typeof (input as Record<string, unknown>)?.path === 'string'
-						) {
-							const rel = joinRelative(
-								cwd,
-								String((input as Record<string, unknown>).path),
-							);
-							const nextInput = {
-								...(input as Record<string, unknown>),
-								path: rel,
-							} as ToolExecuteInput;
-							// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-							res = base.execute?.(nextInput, options as any);
-						} else if (name === 'shell' || name === 'bash') {
-							const needsCwd =
-								!input ||
-								typeof (input as Record<string, unknown>).cwd !== 'string';
-							const nextInput = needsCwd
-								? ({
-										...(input as Record<string, unknown>),
-										cwd,
-									} as ToolExecuteInput)
-								: input;
-							// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-							res = base.execute?.(nextInput, options as any);
-						} else {
-							// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-							res = base.execute?.(input, options as any);
-						}
+						const res = executeBaseTool(ctx, {
+							base,
+							name,
+							input,
+							options,
+						});
 						let result: unknown = res;
 						// If tool returns an async iterable, stream deltas while accumulating
 						if (res && typeof res === 'object' && Symbol.asyncIterator in res) {
-							const chunks: unknown[] = [];
-							let streamedResult: unknown = null;
-							for await (const chunk of res as AsyncIterable<unknown>) {
-								chunks.push(chunk);
-								if (chunk && typeof chunk === 'object' && 'result' in chunk) {
-									streamedResult = (chunk as { result: unknown }).result;
-									continue;
-								}
-								if (
-									chunk &&
-									typeof chunk === 'object' &&
-									'terminalId' in chunk &&
-									typeof (chunk as { terminalId?: unknown }).terminalId ===
-										'string'
-								) {
-									publish({
-										type: 'tool.delta',
-										sessionId: ctx.sessionId,
-										payload: {
-											name,
-											channel: 'terminal',
-											delta: (chunk as { terminalId: string }).terminalId,
-											stepIndex: stepIndexForEvent,
-											callId: callIdFromQueue,
-											messageId: ctx.messageId,
-										},
-									});
-									continue;
-								}
-								const delta =
-									typeof chunk === 'string'
-										? chunk
-										: chunk &&
-												typeof chunk === 'object' &&
-												'delta' in chunk &&
-												typeof (chunk as { delta?: unknown }).delta === 'string'
-											? ((chunk as { delta: string }).delta ?? '')
-											: null;
-								if (!delta) continue;
-								const channel =
-									chunk &&
-									typeof chunk === 'object' &&
-									'channel' in chunk &&
-									typeof (chunk as { channel?: unknown }).channel === 'string'
-										? ((chunk as { channel: string }).channel ?? 'output')
-										: 'output';
-								publish({
-									type: 'tool.delta',
-									sessionId: ctx.sessionId,
-									payload: {
-										name,
-										channel,
-										delta,
-										stepIndex: stepIndexForEvent,
-										callId: callIdFromQueue,
-										messageId: ctx.messageId,
-									},
-								});
-							}
-							result =
-								streamedResult ??
-								(chunks.length > 0 ? chunks[chunks.length - 1] : null);
+							result = await consumeToolStream(ctx, {
+								stream: res as AsyncIterable<unknown>,
+								name,
+								stepIndex: stepIndexForEvent,
+								callId: callIdFromQueue,
+							});
 						} else {
 							// Await promise or passthrough value
 							result = await Promise.resolve(res as ToolExecuteReturn);
 						}
 
 						if (isToolError(result)) {
-							stepState.failed = true;
-							stepState.failedToolName = name;
-							failureState.active = true;
-							failureState.toolName = name;
+							markToolFailed(stepState, failureState, name);
 
-							await persistToolErrorResult(result, {
+							await persistToolErrorResult(ctx, {
+								name,
+								errorResult: result,
 								callId: callIdFromQueue,
 								startTs: startTsFromQueue,
 								stepIndexForEvent,
-								args: meta?.args,
+								input: meta?.args,
 							});
 							processedToolErrors.add(result as object);
 							return result as ToolExecuteReturn;
@@ -608,155 +378,66 @@ export function adaptTools(
 						const resultPartId = crypto.randomUUID();
 						const callId = callIdFromQueue;
 						const startTs = startTsFromQueue;
-						const contentObj: {
-							name: string;
-							result: unknown;
-							callId?: string;
-							artifact?: unknown;
-							args?: unknown;
-						} = {
+						const contentObj = buildToolResultContent({
 							name,
 							result,
 							callId,
-						};
-						if (meta?.args !== undefined) {
-							contentObj.args = meta.args;
-						}
-						if (result && typeof result === 'object' && 'artifact' in result) {
-							try {
-								const maybeArtifact = (result as { artifact?: unknown })
-									.artifact;
-								if (maybeArtifact !== undefined)
-									contentObj.artifact = maybeArtifact;
-							} catch {}
-						}
+							input: meta?.args,
+						});
 
 						const index = await ctx.nextIndex();
-						const endTs = Date.now();
-						const dur =
-							typeof startTs === 'number' ? Math.max(0, endTs - startTs) : null;
+						const { endTs, durationMs } = computeToolTiming(startTs);
 
 						// Special-case: keep progress_update result lightweight; publish first, persist best-effort
 						if (name === 'progress_update') {
-							stepState.failed = false;
-							stepState.failedToolName = undefined;
-							if (failureState.active && failureState.toolName === name) {
-								failureState.active = false;
-								failureState.toolName = undefined;
-							}
-							publish({
-								type: 'tool.result',
-								sessionId: ctx.sessionId,
-								payload: { ...contentObj, stepIndex: stepIndexForEvent },
-							});
+							markToolSucceeded(stepState, failureState, name);
+							publishToolResult(ctx, contentObj, stepIndexForEvent);
 							// Persist without blocking the event loop
 							(async () => {
 								try {
-									await ctx.db.insert(messageParts).values({
-										id: resultPartId,
-										messageId: ctx.messageId,
+									await persistToolResultWithIndex(ctx, {
+										partId: resultPartId,
 										index,
+										name,
+										content: contentObj,
+										startTs,
+										callId,
 										stepIndex: stepIndexForEvent,
-										type: 'tool_result',
-										content: JSON.stringify(contentObj),
-										agent: ctx.agent,
-										provider: ctx.provider,
-										model: ctx.model,
-										startedAt: startTs,
-										completedAt: endTs,
-										toolName: name,
-										toolCallId: callId,
-										toolDurationMs: dur ?? undefined,
+										endTs,
+										durationMs,
 									});
 								} catch {}
 							})();
 							return result as ToolExecuteReturn;
 						}
 
-						stepState.failed = false;
-						stepState.failedToolName = undefined;
-						if (failureState.active && failureState.toolName === name) {
-							failureState.active = false;
-							failureState.toolName = undefined;
-						}
+						markToolSucceeded(stepState, failureState, name);
 
-						await ctx.db.insert(messageParts).values({
-							id: resultPartId,
-							messageId: ctx.messageId,
+						await persistToolResultWithIndex(ctx, {
+							partId: resultPartId,
 							index,
-							stepIndex: stepIndexForEvent,
-							type: 'tool_result',
-							content: JSON.stringify(contentObj),
-							agent: ctx.agent,
-							provider: ctx.provider,
-							model: ctx.model,
-							startedAt: startTs,
-							completedAt: endTs,
-							toolName: name,
-							toolCallId: callId,
-							toolDurationMs: dur ?? undefined,
-						});
-						// Update session aggregates: total tool time and counts per tool
-						try {
-							const sessRows = await ctx.db
-								.select()
-								.from(sessions)
-								.where(eq(sessions.id, ctx.sessionId));
-							if (sessRows.length) {
-								const row = sessRows[0] as typeof sessions.$inferSelect;
-								const totalToolTimeMs =
-									Number(row.totalToolTimeMs || 0) + (dur ?? 0);
-								let counts: Record<string, number> = {};
-								try {
-									counts = row.toolCountsJson
-										? JSON.parse(row.toolCountsJson)
-										: {};
-								} catch {}
-								counts[name] = (counts[name] || 0) + 1;
-								await ctx.db
-									.update(sessions)
-									.set({
-										totalToolTimeMs,
-										toolCountsJson: JSON.stringify(counts),
-										lastActiveAt: endTs,
-									})
-									.where(eq(sessions.id, ctx.sessionId));
-							}
-						} catch {}
-						publish({
-							type: 'tool.result',
-							sessionId: ctx.sessionId,
-							payload: { ...contentObj, stepIndex: stepIndexForEvent },
-						});
-						logger.debug(`[tools] result ${name}`, {
-							sessionId: ctx.sessionId,
-							messageId: ctx.messageId,
-							toolName: name,
+							name,
+							content: contentObj,
+							startTs,
 							callId,
 							stepIndex: stepIndexForEvent,
+							endTs,
+							durationMs,
 						});
+						// Update session aggregates: total tool time and counts per tool
+						await updateToolSessionStats(ctx, {
+							name,
+							durationMs,
+							endTs,
+						});
+						publishToolResult(ctx, contentObj, stepIndexForEvent);
+						logToolResult(ctx, { name, callId, stepIndex: stepIndexForEvent });
 						if (name === 'update_todos') {
-							try {
-								const resultValue = (contentObj as { result?: unknown })
-									.result as { items?: unknown; note?: unknown } | undefined;
-								if (resultValue && Array.isArray(resultValue.items)) {
-									publish({
-										type: 'plan.updated',
-										sessionId: ctx.sessionId,
-										payload: {
-											items: resultValue.items,
-											note: resultValue.note,
-										},
-									});
-								}
-							} catch {}
+							publishPlanUpdated(ctx, contentObj.result);
 						}
 						return result as ToolExecuteReturn;
 					} catch (error) {
-						stepState.failed = true;
-						stepState.failedToolName = name;
-						failureState.active = true;
-						failureState.toolName = name;
+						markToolFailed(stepState, failureState, name);
 
 						// Tool execution failed
 						if (
@@ -768,23 +449,15 @@ export function adaptTools(
 
 						const errorResult = isToolError(error)
 							? error
-							: (() => {
-									const errorMessage =
-										error instanceof Error ? error.message : String(error);
-									const errorStack =
-										error instanceof Error ? error.stack : undefined;
-									return {
-										ok: false,
-										error: errorMessage,
-										stack: errorStack,
-									};
-								})();
+							: createToolExceptionResult(error);
 
-						await persistToolErrorResult(errorResult, {
+						await persistToolErrorResult(ctx, {
+							name,
+							errorResult,
 							callId: callIdFromQueue,
 							startTs: startTsFromQueue,
 							stepIndexForEvent,
-							args: meta?.args,
+							input: meta?.args,
 						});
 
 						if (isToolError(error)) {

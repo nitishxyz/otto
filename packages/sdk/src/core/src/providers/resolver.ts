@@ -4,32 +4,21 @@ import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOllama } from 'ai-sdk-ollama';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createXai } from '@ai-sdk/xai';
 import {
 	catalog,
+	createMinimaxModel,
+	createMoonshotModel,
 	createOttoRouterModel,
 	createOpenAIOAuthModel,
+	createXaiModel,
+	createZaiCodingModel,
+	createZaiModel,
 	normalizeOllamaBaseURL,
+	resolveOpenAIResponsesModel,
+	shouldUseOpenAIResponsesApi,
 } from '../../../providers/src/index.ts';
 import { createCopilotModel } from '../../../providers/src/copilot-client.ts';
 import type { OAuth } from '../../../types/src/index.ts';
-
-function needsResponsesApi(model: string): boolean {
-	const m = model.toLowerCase();
-	if (m.includes('gpt-5')) return true;
-	if (m.startsWith('o1')) return true;
-	if (m.startsWith('o3')) return true;
-	if (m.startsWith('o4')) return true;
-	if (m.includes('codex-mini')) return true;
-	return false;
-}
-
-function resolveOpenAIModel(
-	instance: ReturnType<typeof createOpenAI>,
-	model: string,
-) {
-	return needsResponsesApi(model) ? instance.responses(model) : instance(model);
-}
 
 export type ProviderName =
 	| 'openai'
@@ -71,13 +60,15 @@ export async function resolveModel(
 				apiKey: config.apiKey || 'oauth-token',
 				fetch: config.customFetch,
 			});
-			return resolveOpenAIModel(instance, model);
+			return resolveOpenAIResponsesModel(instance, model);
 		}
 		if (config.apiKey) {
 			const instance = createOpenAI({ apiKey: config.apiKey });
-			return resolveOpenAIModel(instance, model);
+			return resolveOpenAIResponsesModel(instance, model);
 		}
-		return needsResponsesApi(model) ? openai.responses(model) : openai(model);
+		return shouldUseOpenAIResponsesApi(model)
+			? openai.responses(model)
+			: openai(model);
 	}
 
 	if (provider === 'anthropic') {
@@ -204,70 +195,38 @@ export async function resolveModel(
 	}
 
 	if (provider === 'xai') {
-		const entry = catalog[provider];
-		const apiKey = config.apiKey || process.env.XAI_API_KEY || '';
-		const baseURL = config.baseURL || entry?.api;
-		const instance = createXai({ apiKey, baseURL });
-		return instance(model);
+		return createXaiModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+		});
 	}
 
 	if (provider === 'zai') {
-		const entry = catalog[provider];
-		const apiKey =
-			config.apiKey ||
-			process.env.ZAI_API_KEY ||
-			process.env.ZHIPU_API_KEY ||
-			'';
-		const baseURL =
-			config.baseURL || entry?.api || 'https://api.z.ai/api/paas/v4';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const instance = createOpenAICompatible({
-			name: entry?.label ?? 'Z.AI',
-			baseURL,
-			headers,
+		return createZaiModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
 		});
-		return instance(model);
 	}
 
 	if (provider === 'zai-coding') {
-		const entry = catalog[provider];
-		const apiKey =
-			config.apiKey ||
-			process.env.ZAI_CODING_API_KEY ||
-			process.env.ZHIPU_API_KEY ||
-			'';
-		const baseURL =
-			config.baseURL || entry?.api || 'https://api.z.ai/api/coding/paas/v4';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const instance = createOpenAICompatible({
-			name: entry?.label ?? 'Z.AI Coding',
-			baseURL,
-			headers,
+		return createZaiCodingModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
 		});
-		return instance(model);
 	}
 
 	if (provider === 'moonshot') {
-		const entry = catalog[provider];
-		const apiKey = config.apiKey || process.env.MOONSHOT_API_KEY || '';
-		const baseURL =
-			config.baseURL || entry?.api || 'https://api.moonshot.ai/v1';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const instance = createOpenAICompatible({
-			name: entry?.label ?? 'Moonshot AI',
-			baseURL,
-			headers,
+		return createMoonshotModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
 		});
-		return instance(model);
 	}
 
 	if (provider === 'minimax') {
-		const entry = catalog[provider];
-		const apiKey = config.apiKey || process.env.MINIMAX_API_KEY || '';
-		const baseURL =
-			config.baseURL || entry?.api || 'https://api.minimax.io/anthropic/v1';
-		const instance = createAnthropic({ apiKey, baseURL });
-		return instance(model);
+		return createMinimaxModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+		});
 	}
 
 	throw new Error(`Unsupported provider: ${provider}`);

@@ -72,6 +72,8 @@ export type { UnderlyingProviderKey } from './providers/src/index.ts';
 export {
 	discoverOllamaModels,
 	normalizeOllamaBaseURL,
+	resolveOpenAIResponsesModel,
+	shouldUseOpenAIResponsesApi,
 } from './providers/src/index.ts';
 export type {
 	DiscoverOllamaOptions,

@@ -1,16 +1,5 @@
 import type { OttoConfig, ProviderId } from '@ottocode/sdk';
-import {
-	getConfiguredProviderApiKey,
-	getProviderDefinition,
-	isBuiltInProviderId,
-	normalizeOllamaBaseURL,
-} from '@ottocode/sdk';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createOllama } from 'ai-sdk-ollama';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { getProviderDefinition, isBuiltInProviderId } from '@ottocode/sdk';
 import { getAnthropicInstance } from './anthropic.ts';
 import { resolveOpenAIModel } from './openai.ts';
 import { resolveGoogleModel } from './google.ts';
@@ -25,6 +14,7 @@ import { resolveOpencodeModel } from './opencode.ts';
 import { getMoonshotInstance } from './moonshot.ts';
 import { getMinimaxInstance } from './minimax.ts';
 import { resolveCopilotModel } from './copilot.ts';
+import { resolveCustomConfiguredModel } from './custom.ts';
 
 export type ProviderName = ProviderId;
 
@@ -95,77 +85,4 @@ export async function resolveModel(
 		return resolveCustomConfiguredModel(definition, cfg, model, options);
 	}
 	throw new Error(`Unsupported provider: ${provider}`);
-}
-
-function needsResponsesApi(model: string): boolean {
-	const lower = model.toLowerCase();
-	return (
-		lower.includes('gpt-5') ||
-		lower.startsWith('o1') ||
-		lower.startsWith('o3') ||
-		lower.startsWith('o4') ||
-		lower.includes('codex-mini')
-	);
-}
-
-function resolveCustomConfiguredModel(
-	definition: NonNullable<ReturnType<typeof getProviderDefinition>>,
-	cfg: OttoConfig,
-	model: string,
-	options?: {
-		reasoningText?: boolean;
-	},
-) {
-	const apiKey = getConfiguredProviderApiKey(cfg, definition.id) || '';
-	const baseURL =
-		definition.baseURL ||
-		(definition.id === 'ollama-cloud' ? 'https://ollama.com' : undefined);
-
-	if (!baseURL) {
-		throw new Error(
-			`Custom provider ${definition.id} requires a baseURL in config.`,
-		);
-	}
-
-	if (definition.compatibility === 'openai') {
-		const instance = createOpenAI({ apiKey, baseURL });
-		return needsResponsesApi(model)
-			? instance.responses(model)
-			: instance(model);
-	}
-
-	if (definition.compatibility === 'anthropic') {
-		const instance = createAnthropic({ apiKey, baseURL });
-		return instance(model);
-	}
-
-	if (definition.compatibility === 'google') {
-		const instance = createGoogleGenerativeAI({ apiKey, baseURL });
-		return instance(model);
-	}
-
-	if (definition.compatibility === 'openrouter') {
-		const instance = createOpenRouter({ apiKey, baseURL });
-		return instance.chat(model);
-	}
-
-	if (definition.compatibility === 'ollama') {
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const ollamaBaseURL = normalizeOllamaBaseURL(baseURL);
-		const instance = createOllama({
-			baseURL: ollamaBaseURL,
-			headers,
-		});
-		return instance(model, {
-			...(options?.reasoningText ? { think: true } : {}),
-		});
-	}
-
-	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-	const instance = createOpenAICompatible({
-		name: definition.label,
-		baseURL,
-		headers,
-	});
-	return instance(model);
 }

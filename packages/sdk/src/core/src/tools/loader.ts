@@ -24,11 +24,11 @@ import {
 	getMCPToolsRecord,
 	type MCPToolBrief,
 } from '../mcp/lazy-tools.ts';
-import fg from 'fast-glob';
 import { dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promises as fs } from 'node:fs';
 import { spawn as nodeSpawn } from 'node:child_process';
+import { discoverPluginFiles } from './plugin-discovery.ts';
 
 export type DiscoveredTool = { name: string; tool: Tool };
 
@@ -105,8 +105,6 @@ type FsHelpers = {
 	exists: (path: string) => Promise<boolean>;
 };
 
-const pluginPatterns = ['tools/*/tool.js', 'tools/*/tool.mjs'];
-
 let globalTerminalManager: TerminalManager | null = null;
 const staticToolDiscoveryCache = new Map<string, Promise<DiscoveredTool[]>>();
 
@@ -168,53 +166,12 @@ async function discoverStaticProjectTools(
 		tools.set(skillTool.name, skillTool.tool);
 
 		async function loadFromBase(base: string | null | undefined) {
-			if (!base) return;
-			try {
-				await fs.readdir(base);
-			} catch {
-				return;
+			for (const { absPath, folder } of await discoverPluginFiles(base)) {
+				try {
+					const plugin = await loadPlugin(absPath, folder, projectRoot);
+					if (plugin) tools.set(plugin.name, plugin.tool);
+				} catch {}
 			}
-			for (const pattern of pluginPatterns) {
-				const files = await fg(pattern, { cwd: base, absolute: false });
-				for (const rel of files) {
-					const match = rel.match(/^tools\/([^/]+)\/tool\.(m?js)$/);
-					if (!match || !match[1]) continue;
-					const folder = match[1];
-					const absPath = join(base, rel).replace(/\\/g, '/');
-					try {
-						const plugin = await loadPlugin(absPath, folder, projectRoot);
-						if (plugin) tools.set(plugin.name, plugin.tool);
-					} catch {}
-				}
-			}
-			// Fallback: manual directory scan
-			try {
-				const toolsDir = join(base, 'tools');
-				const entries = await fs.readdir(toolsDir).catch(() => [] as string[]);
-				for (const folder of entries) {
-					const js = join(toolsDir, folder, 'tool.js');
-					const mjs = join(toolsDir, folder, 'tool.mjs');
-					const candidate = await fs
-						.stat(js)
-						.then(() => js)
-						.catch(
-							async () =>
-								await fs
-									.stat(mjs)
-									.then(() => mjs)
-									.catch(() => null),
-						);
-					if (!candidate) continue;
-					try {
-						const plugin = await loadPlugin(
-							candidate.replace(/\\/g, '/'),
-							folder,
-							projectRoot,
-						);
-						if (plugin) tools.set(plugin.name, plugin.tool);
-					} catch {}
-				}
-			} catch {}
 		}
 
 		await loadFromBase(globalConfigDir);

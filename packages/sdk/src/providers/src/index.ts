@@ -42,6 +42,10 @@ export {
 	discoverOllamaModels,
 	normalizeOllamaBaseURL,
 } from './ollama-discovery.ts';
+export {
+	resolveOpenAIResponsesModel,
+	shouldUseOpenAIResponsesApi,
+} from './model-resolution.ts';
 export type {
 	DiscoverOllamaOptions,
 	DiscoverOllamaResult,

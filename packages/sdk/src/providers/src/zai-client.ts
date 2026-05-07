@@ -3,11 +3,13 @@ import { catalog } from './catalog-merged.ts';
 
 export type ZaiProviderConfig = {
 	apiKey?: string;
+	baseURL?: string;
 };
 
 export function createZaiModel(model: string, config?: ZaiProviderConfig) {
 	const entry = catalog.zai;
-	const baseURL = entry?.api || 'https://api.z.ai/api/paas/v4';
+	const baseURL =
+		config?.baseURL || entry?.api || 'https://api.z.ai/api/paas/v4';
 	const apiKey =
 		config?.apiKey ||
 		process.env.ZAI_API_KEY ||
@@ -29,7 +31,8 @@ export function createZaiCodingModel(
 	config?: ZaiProviderConfig,
 ) {
 	const entry = catalog['zai-coding'];
-	const baseURL = entry?.api || 'https://api.z.ai/api/coding/paas/v4';
+	const baseURL =
+		config?.baseURL || entry?.api || 'https://api.z.ai/api/coding/paas/v4';
 	const apiKey =
 		config?.apiKey ||
 		process.env.ZAI_CODING_API_KEY ||

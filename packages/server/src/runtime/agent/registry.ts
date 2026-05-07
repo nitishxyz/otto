@@ -3,26 +3,7 @@ import type { ProviderName } from '@ottocode/sdk';
 import { catalog } from '@ottocode/sdk';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-// Embed default agent prompts; only user overrides read from disk.
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import AGENT_BUILD from '@ottocode/sdk/prompts/agents/build.txt' with {
-	type: 'text',
-};
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import AGENT_PLAN from '@ottocode/sdk/prompts/agents/plan.txt' with {
-	type: 'text',
-};
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import AGENT_GENERAL from '@ottocode/sdk/prompts/agents/general.txt' with {
-	type: 'text',
-};
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import AGENT_INIT from '@ottocode/sdk/prompts/agents/init.txt' with {
-	type: 'text',
-};
-import AGENT_RESEARCH from '@ottocode/sdk/prompts/agents/research.txt' with {
-	type: 'text',
-};
+import { resolveAgentPrompt } from './registry-prompts.ts';
 
 export type AgentConfig = {
 	name: string;
@@ -291,109 +272,11 @@ export async function resolveAgentConfig(
 	}
 	const agents = await loadAgentsConfig(projectRoot);
 	const entry = agents[name];
-	let prompt = '';
-	let promptSource: string = 'none';
-
-	// Override files: project first, then global
-	const globalAgentsDir = getGlobalAgentsDir();
-	const localDirTxt = `${projectRoot}/.otto/agents/${name}/agent.txt`.replace(
-		/\\/g,
-		'/',
-	);
-	const localDirMd = `${projectRoot}/.otto/agents/${name}/agent.md`.replace(
-		/\\/g,
-		'/',
-	);
-	const localFlatTxt = `${projectRoot}/.otto/agents/${name}.txt`.replace(
-		/\\/g,
-		'/',
-	);
-	const localFlatMd = `${projectRoot}/.otto/agents/${name}.md`.replace(
-		/\\/g,
-		'/',
-	);
-	const globalDirTxt = `${globalAgentsDir}/${name}/agent.txt`.replace(
-		/\\/g,
-		'/',
-	);
-	const globalDirMd = `${globalAgentsDir}/${name}/agent.md`.replace(/\\/g, '/');
-	const globalFlatTxt = `${globalAgentsDir}/${name}.txt`.replace(/\\/g, '/');
-	const globalFlatMd = `${globalAgentsDir}/${name}.md`.replace(/\\/g, '/');
-	const files = [
-		localDirMd,
-		localFlatMd,
-		localDirTxt,
-		localFlatTxt,
-		globalDirMd,
-		globalFlatMd,
-		globalDirTxt,
-		globalFlatTxt,
-	];
-	for (const p of files) {
-		try {
-			const f = Bun.file(p);
-			if (await f.exists()) {
-				const text = await f.text();
-				if (text.trim()) {
-					prompt = text;
-					promptSource = `file:${p}`;
-					break;
-				}
-			}
-		} catch {}
-	}
-
-	// If agents.json provides a 'prompt' field, accept inline content or a relative/absolute path
-	if (entry?.prompt) {
-		const p = entry.prompt.trim();
-		if (
-			/[.](md|txt)$/i.test(p) ||
-			p.startsWith('.') ||
-			p.startsWith('/') ||
-			p.startsWith('~/')
-		) {
-			const candidates: string[] = [];
-			if (p.startsWith('~/')) {
-				const home = process.env.HOME || process.env.USERPROFILE || '';
-				candidates.push(`${home}/${p.slice(2)}`);
-			} else if (p.startsWith('/')) candidates.push(p);
-			else candidates.push(`${projectRoot}/${p}`.replace(/\\/g, '/'));
-			for (const candidate of candidates) {
-				const pf = Bun.file(candidate);
-				if (await pf.exists()) {
-					const t = await pf.text();
-					if (t.trim()) {
-						prompt = t;
-						promptSource = `agents.json:file:${candidate}`;
-						break;
-					}
-				}
-			}
-		} else {
-			prompt = p;
-			promptSource = 'agents.json:inline';
-		}
-	}
-
-	// Fallback: use embedded defaults (plan/build/general); else default to build
-	if (!prompt) {
-		const byName = (n: string): string | undefined => {
-			if (n === 'build') return AGENT_BUILD;
-			if (n === 'plan') return AGENT_PLAN;
-			if (n === 'general') return AGENT_GENERAL;
-			if (n === 'init') return AGENT_INIT;
-			if (n === 'research') return AGENT_RESEARCH;
-			return undefined;
-		};
-		const candidate = byName(name)?.trim();
-		if (candidate?.length) {
-			prompt = candidate;
-			promptSource = `fallback:embedded:${name}.txt`;
-		} else {
-			prompt = (AGENT_BUILD || '').trim();
-			promptSource = 'fallback:embedded:build.txt';
-		}
-	}
+	const { prompt } = await resolveAgentPrompt({
+		projectRoot,
+		name,
+		entryPrompt: entry?.prompt,
+	});
 
 	// Default tool access per agent if not explicitly configured
 	let tools = Array.isArray(entry?.tools)
@@ -411,7 +294,6 @@ export async function resolveAgentConfig(
 	const deduped = Array.from(new Set([...tools, ...baseToolSet]));
 	const provider = normalizeProvider(entry?.provider);
 	const model = normalizeModel(entry?.model);
-	void promptSource;
 	return {
 		name,
 		prompt,
