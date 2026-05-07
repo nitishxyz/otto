@@ -1,21 +1,18 @@
 import type { Hono } from 'hono';
-import type { Context } from 'hono';
-import { streamSSE } from 'hono/streaming';
-import {
-	OttoTunnel,
-	isTunnelBinaryInstalled,
-	generateQRCode,
-	killStaleTunnels,
-	logger,
-} from '@ottocode/sdk';
-import { getServerPort } from '../state.ts';
 import { openApiRoute } from '../openapi/route.ts';
+import {
+	getActiveTunnelUrl,
+	getTunnelQRCode,
+	getTunnelStatus,
+	handleTunnelStream,
+	registerExternalTunnel,
+	setExternalTunnel,
+	startTunnel,
+	stopActiveTunnel,
+	stopTunnel,
+} from './tunnel/service.ts';
 
-let activeTunnel: OttoTunnel | null = null;
-let tunnelUrl: string | null = null;
-let tunnelStatus: 'idle' | 'starting' | 'connected' | 'error' = 'idle';
-let tunnelError: string | null = null;
-let progressMessage: string | null = null;
+export { getActiveTunnelUrl, setExternalTunnel, stopActiveTunnel };
 
 export function registerTunnelRoutes(app: Hono) {
 	openApiRoute(
@@ -60,17 +57,7 @@ export function registerTunnelRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			const binaryInstalled = await isTunnelBinaryInstalled();
-
-			return c.json({
-				status: tunnelStatus,
-				url: tunnelUrl,
-				error: tunnelError,
-				binaryInstalled,
-				isRunning: activeTunnel?.isRunning ?? false,
-			});
-		},
+		async (c) => c.json(await getTunnelStatus()),
 	);
 
 	openApiRoute(
@@ -125,66 +112,11 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			if (activeTunnel?.isRunning) {
-				return c.json({
-					ok: true,
-					url: tunnelUrl,
-					message: 'Tunnel already running',
-				});
-			}
-
-			try {
-				const body = await c.req.json().catch(() => ({}));
-				let port = body.port;
-
-				// Use server's known port if not explicitly provided
-				if (!port) {
-					port = getServerPort() || 9100;
-				}
-
-				// Kill any stale tunnel processes first
-				await killStaleTunnels();
-
-				tunnelStatus = 'starting';
-				tunnelError = null;
-				progressMessage = 'Initializing...';
-
-				activeTunnel = new OttoTunnel();
-
-				const url = await activeTunnel.start(port, (msg) => {
-					progressMessage = msg;
-				});
-
-				tunnelUrl = url;
-				tunnelStatus = 'connected';
-				progressMessage = null;
-
-				activeTunnel.on('error', (err) => {
-					logger.error('Tunnel error:', err);
-					tunnelError = err.message;
-					tunnelStatus = 'error';
-				});
-
-				activeTunnel.on('exit', () => {
-					tunnelStatus = 'idle';
-					tunnelUrl = null;
-					activeTunnel = null;
-				});
-
-				return c.json({
-					ok: true,
-					url: tunnelUrl,
-					message: 'Tunnel started',
-				});
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				tunnelStatus = 'error';
-				tunnelError = message;
-				progressMessage = null;
-
-				logger.error('Failed to start tunnel:', error);
-				return c.json({ ok: false, error: message }, 500);
-			}
+			const body: { port?: number } = await c.req
+				.json<{ port?: number }>()
+				.catch(() => ({}));
+			const result = await startTunnel(body.port);
+			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
@@ -254,29 +186,11 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			try {
-				const body = await c.req.json().catch(() => ({}));
-				const { url } = body;
-
-				if (!url) {
-					return c.json({ ok: false, error: 'URL is required' }, 400);
-				}
-
-				tunnelUrl = url;
-				tunnelStatus = 'connected';
-				tunnelError = null;
-				progressMessage = null;
-
-				return c.json({
-					ok: true,
-					url: tunnelUrl,
-					message: 'External tunnel registered',
-				});
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				logger.error('Failed to register external tunnel:', error);
-				return c.json({ ok: false, error: message }, 500);
-			}
+			const body: { url?: string } = await c.req
+				.json<{ url?: string }>()
+				.catch(() => ({}));
+			const result = registerExternalTunnel(body.url);
+			return c.json(result, result.ok ? 200 : 400);
 		},
 	);
 
@@ -310,23 +224,9 @@ export function registerTunnelRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			if (!activeTunnel) {
-				return c.json({ ok: true, message: 'No tunnel running' });
-			}
-
-			try {
-				activeTunnel.stop();
-				activeTunnel = null;
-				tunnelUrl = null;
-				tunnelStatus = 'idle';
-				tunnelError = null;
-
-				return c.json({ ok: true, message: 'Tunnel stopped' });
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return c.json({ ok: false, error: message }, 500);
-			}
+		(c) => {
+			const result = stopTunnel();
+			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
@@ -380,68 +280,10 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			if (!tunnelUrl) {
-				return c.json({ ok: false, error: 'No tunnel URL available' }, 400);
-			}
-
-			try {
-				const qrCode = await generateQRCode(tunnelUrl);
-				return c.json({
-					ok: true,
-					url: tunnelUrl,
-					qrCode,
-				});
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				return c.json({ ok: false, error: message }, 500);
-			}
+			const result = await getTunnelQRCode();
+			return c.json(result, result.ok ? 200 : 400);
 		},
 	);
-
-	const handleTunnelStream = async (c: Context) => {
-		return streamSSE(c as Context, async (stream) => {
-			const sendEvent = async (data: Record<string, unknown>) => {
-				try {
-					await stream.write(`data: ${JSON.stringify(data)}\n\n`);
-				} catch (error) {
-					logger.error('SSE error writing event', error);
-				}
-			};
-
-			await sendEvent({
-				type: 'status',
-				status: tunnelStatus,
-				url: tunnelUrl,
-				error: tunnelError,
-				progress: progressMessage,
-			});
-
-			const interval = setInterval(async () => {
-				await sendEvent({
-					type: 'status',
-					status: tunnelStatus,
-					url: tunnelUrl,
-					error: tunnelError,
-					progress: progressMessage,
-				});
-			}, 1000);
-
-			const onAbort = () => {
-				clearInterval(interval);
-				stream.close();
-			};
-
-			c.req.raw.signal.addEventListener('abort', onAbort, { once: true });
-
-			await new Promise<void>((resolve) => {
-				c.req.raw.signal.addEventListener('abort', () => resolve(), {
-					once: true,
-				});
-			});
-
-			clearInterval(interval);
-		});
-	};
 
 	const tunnelStreamRoute = {
 		tags: ['tunnel'],
@@ -478,36 +320,4 @@ export function registerTunnelRoutes(app: Hono) {
 		},
 		handleTunnelStream,
 	);
-}
-
-export function stopActiveTunnel() {
-	if (activeTunnel) {
-		activeTunnel.stop();
-		activeTunnel = null;
-		tunnelUrl = null;
-		tunnelStatus = 'idle';
-	}
-}
-
-export function setExternalTunnel(tunnel: OttoTunnel, url: string) {
-	activeTunnel = tunnel;
-	tunnelUrl = url;
-	tunnelStatus = 'connected';
-	tunnelError = null;
-	progressMessage = null;
-
-	tunnel.on('error', (err) => {
-		tunnelError = err.message;
-		tunnelStatus = 'error';
-	});
-
-	tunnel.on('exit', () => {
-		tunnelStatus = 'idle';
-		tunnelUrl = null;
-		activeTunnel = null;
-	});
-}
-
-export function getActiveTunnelUrl(): string | null {
-	return tunnelUrl;
 }
