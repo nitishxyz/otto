@@ -1,94 +1,21 @@
-import type {
-	PatchAddOperation,
-	PatchDeleteOperation,
-	PatchHunk,
-	PatchHunkLine,
-	PatchOperation,
-	PatchUpdateOperation,
-} from './types.ts';
+import type { PatchHunk, PatchHunkLine, PatchOperation } from './types.ts';
 import { parseHunkHeader } from './hunk-header.ts';
-
-function stripPath(raw: string): string | null {
-	let trimmed = raw.trim();
-	if (!trimmed || trimmed === '/dev/null') return null;
-	if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-		trimmed = trimmed.slice(1, -1).replace(/\\"/g, '"');
-	}
-	if (trimmed.startsWith('a/') || trimmed.startsWith('b/')) {
-		trimmed = trimmed.slice(2);
-	}
-	if (trimmed.startsWith('./')) {
-		trimmed = trimmed.slice(2);
-	}
-	return trimmed || null;
-}
-
-function shouldIgnoreMetadata(line: string) {
-	const trimmed = line.trim();
-	if (trimmed === '') return true;
-	if (trimmed === '\\ No newline at end of file') return true;
-	const prefixes = [
-		'diff --git',
-		'index ',
-		'similarity index',
-		'dissimilarity index',
-		'rename from',
-		'rename to',
-		'copy from',
-		'copy to',
-		'new file mode',
-		'deleted file mode',
-		'old mode',
-		'new mode',
-		'Binary files',
-	];
-	return prefixes.some((prefix) => trimmed.startsWith(prefix));
-}
+import {
+	flushUnifiedBuilder,
+	shouldIgnoreUnifiedMetadata,
+	stripUnifiedPath,
+	type UnifiedBuilder,
+} from './unified-state.ts';
 
 export function parseUnifiedPatch(patch: string): PatchOperation[] {
 	const normalized = patch.replace(/\r\n/g, '\n');
 	const lines = normalized.split('\n');
 	const operations: PatchOperation[] = [];
 
-	type Builder =
-		| (PatchAddOperation & { kind: 'add' })
-		| (PatchDeleteOperation & { kind: 'delete' })
-		| (PatchUpdateOperation & {
-				kind: 'update';
-				currentHunk: PatchHunk | null;
-		  });
-
-	let builder: Builder | null = null;
+	let builder: UnifiedBuilder | null = null;
 
 	const flush = () => {
-		if (!builder) return;
-		if (builder.kind === 'update') {
-			if (builder.currentHunk && builder.currentHunk.lines.length === 0) {
-				builder.hunks.pop();
-			}
-			if (builder.hunks.length === 0) {
-				throw new Error(
-					`Update for ${builder.filePath} does not contain any diff hunks.`,
-				);
-			}
-			operations.push({
-				kind: 'update',
-				filePath: builder.filePath,
-				hunks: builder.hunks.map((hunk) => ({
-					header: { ...hunk.header },
-					lines: hunk.lines.map((line) => ({ ...line })),
-				})),
-			});
-		} else if (builder.kind === 'add') {
-			operations.push({
-				kind: 'add',
-				filePath: builder.filePath,
-				lines: [...builder.lines],
-			});
-		} else {
-			operations.push({ kind: 'delete', filePath: builder.filePath });
-		}
-		builder = null;
+		builder = flushUnifiedBuilder(builder, operations);
 	};
 
 	for (let i = 0; i < lines.length; i++) {
@@ -107,8 +34,8 @@ export function parseUnifiedPatch(patch: string): PatchOperation[] {
 
 			flush();
 
-			const oldPath = stripPath(oldPathRaw);
-			const newPath = stripPath(newPathRaw);
+			const oldPath = stripUnifiedPath(oldPathRaw);
+			const newPath = stripUnifiedPath(newPathRaw);
 
 			if (!oldPath && !newPath) {
 				throw new Error(
@@ -154,13 +81,13 @@ export function parseUnifiedPatch(patch: string): PatchOperation[] {
 		}
 
 		if (!builder) {
-			if (shouldIgnoreMetadata(line)) continue;
+			if (shouldIgnoreUnifiedMetadata(line)) continue;
 			if (line.trim() === '') continue;
 			throw new Error(`Unrecognized content in patch: "${line}"`);
 		}
 
 		if (builder.kind === 'add') {
-			if (shouldIgnoreMetadata(line) || line.startsWith('@@')) continue;
+			if (shouldIgnoreUnifiedMetadata(line) || line.startsWith('@@')) continue;
 			if (line.startsWith('+')) {
 				builder.lines.push(line.slice(1));
 			}
@@ -171,7 +98,7 @@ export function parseUnifiedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (shouldIgnoreMetadata(line)) continue;
+		if (shouldIgnoreUnifiedMetadata(line)) continue;
 
 		if (line.startsWith('@@')) {
 			const hunk: PatchHunk = { header: parseHunkHeader(line), lines: [] };

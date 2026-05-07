@@ -9,6 +9,12 @@ import {
 	PATCH_WITH_MARKER,
 } from './constants.ts';
 import { parseHunkHeader } from './hunk-header.ts';
+import {
+	createReplaceBuilder,
+	flushReplaceBuilder,
+	flushReplacePair,
+	type ReplaceBuilder,
+} from './replace-builder.ts';
 import type {
 	PatchAddOperation,
 	PatchDeleteOperation,
@@ -27,52 +33,6 @@ function parseDirectivePath(line: string, prefix: string): string {
 		throw new Error('Patch file paths must be relative to the project root.');
 	}
 	return filePath;
-}
-
-interface ReplaceBuilder {
-	kind: 'replace';
-	filePath: string;
-	hunks: PatchHunk[];
-	phase: 'idle' | 'find' | 'with';
-	findLines: string[];
-	withLines: string[];
-}
-
-function flushReplacePair(builder: ReplaceBuilder) {
-	if (builder.findLines.length === 0 && builder.withLines.length === 0) return;
-	if (builder.findLines.length === 0) {
-		throw new Error(
-			`Replace in ${builder.filePath}: *** Find: block is empty.`,
-		);
-	}
-	const lines: PatchHunkLine[] = [];
-	for (const line of builder.findLines) {
-		lines.push({ kind: 'remove', content: line });
-	}
-	for (const line of builder.withLines) {
-		lines.push({ kind: 'add', content: line });
-	}
-	builder.hunks.push({ header: {}, lines });
-	builder.findLines = [];
-	builder.withLines = [];
-	builder.phase = 'idle';
-}
-
-function flushReplaceBuilder(builder: ReplaceBuilder): PatchUpdateOperation {
-	flushReplacePair(builder);
-	if (builder.hunks.length === 0) {
-		throw new Error(
-			`Replace in ${builder.filePath} does not contain any *** Find:/*** With: pairs.`,
-		);
-	}
-	return {
-		kind: 'update',
-		filePath: builder.filePath,
-		hunks: builder.hunks.map((hunk) => ({
-			header: { ...hunk.header },
-			lines: hunk.lines.map((line) => ({ ...line })),
-		})),
-	};
 }
 
 export function parseEnvelopedPatch(patch: string): PatchOperation[] {
@@ -188,14 +148,9 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 
 		if (line.startsWith(PATCH_REPLACE_PREFIX)) {
 			flushBuilder();
-			builder = {
-				kind: 'replace',
-				filePath: parseDirectivePath(line, PATCH_REPLACE_PREFIX),
-				hunks: [],
-				phase: 'idle',
-				findLines: [],
-				withLines: [],
-			};
+			builder = createReplaceBuilder(
+				parseDirectivePath(line, PATCH_REPLACE_PREFIX),
+			);
 			continue;
 		}
 

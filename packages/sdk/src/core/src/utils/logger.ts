@@ -1,51 +1,6 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { isDebugEnabled, isTraceEnabled, getDebugScopes } from './debug.ts';
-import {
-	getGlobalDebugLogPath,
-	getSessionDebugDetailsLogPath,
-	getSessionDebugLogPath,
-} from '../../../config/src/paths.ts';
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-const ANSI_RESET = '\x1b[0m';
-const ANSI_DIM = '\x1b[2m';
-const ANSI_CYAN = '\x1b[36m';
-const ANSI_BLUE = '\x1b[34m';
-const ANSI_GREEN = '\x1b[32m';
-const ANSI_YELLOW = '\x1b[33m';
-const ANSI_RED = '\x1b[31m';
-
-function safeHasMeta(
-	meta?: Record<string, unknown>,
-): meta is Record<string, unknown> {
-	return Boolean(meta && Object.keys(meta).length);
-}
-
-function getDebugLogFilePath(): string | undefined {
-	if (!isDebugEnabled()) return undefined;
-	return getGlobalDebugLogPath();
-}
-
-function getSessionLogFilePath(
-	meta?: Record<string, unknown>,
-): string | undefined {
-	if (!isDebugEnabled()) return undefined;
-	if (meta?.debugDetail === true) return undefined;
-	const sessionId = meta?.sessionId;
-	if (typeof sessionId !== 'string' || !sessionId.trim()) return undefined;
-	return getSessionDebugLogPath(sessionId);
-}
-
-function getSessionDetailsLogFilePath(
-	meta?: Record<string, unknown>,
-): string | undefined {
-	if (!isDebugEnabled()) return undefined;
-	const sessionId = meta?.sessionId;
-	if (typeof sessionId !== 'string' || !sessionId.trim()) return undefined;
-	return getSessionDebugDetailsLogPath(sessionId);
-}
+import { colorizeLine, safeHasMeta, type LogLevel } from './logger/format.ts';
+import { writeLogLine } from './logger/sinks.ts';
 
 function shouldWriteDebugLog(message: string): boolean {
 	if (!isDebugEnabled()) return false;
@@ -54,41 +9,6 @@ function shouldWriteDebugLog(message: string): boolean {
 	const match = message.match(/^\[([^\]]+)\]/);
 	if (!match?.[1]) return true;
 	return scopes.includes(match[1]);
-}
-
-function serializeLogMeta(meta?: Record<string, unknown>): string {
-	if (!safeHasMeta(meta)) return '';
-	try {
-		const sanitized = { ...meta };
-		delete sanitized.debugDetail;
-		return Object.keys(sanitized).length ? ` ${JSON.stringify(sanitized)}` : '';
-	} catch {
-		return ' [unserializable-meta]';
-	}
-}
-
-function colorizeLine(line: string, level: LogLevel): string {
-	const levelColor =
-		level === 'debug'
-			? ANSI_CYAN
-			: level === 'info'
-				? ANSI_BLUE
-				: level === 'warn'
-					? ANSI_YELLOW
-					: ANSI_RED;
-	const scopeMatch = line.match(
-		/\[(debug|info|warn|error|timing)\]\s+\[([^\]]+)\]/i,
-	);
-	if (!scopeMatch) {
-		return `${levelColor}${line}${ANSI_RESET}`;
-	}
-	const rest = line.slice(24);
-	return `${ANSI_DIM}${line.slice(0, 24)}${ANSI_RESET}${rest
-		.replace(scopeMatch[1], `${levelColor}${scopeMatch[1]}${ANSI_RESET}`)
-		.replace(
-			`[${scopeMatch[2]}]`,
-			`${ANSI_GREEN}[${scopeMatch[2]}]${ANSI_RESET}`,
-		)}`;
 }
 
 function printLine(
@@ -106,43 +26,6 @@ function printLine(
 	if (level === 'warn') console.warn(colored);
 	else if (level === 'error') console.error(colored);
 	else console.log(colored);
-}
-
-function writeLogLine(line: string, meta?: Record<string, unknown>) {
-	const suffix = serializeLogMeta(meta);
-	const fullLine = `${new Date().toISOString()} ${line}${suffix}`;
-	const logFile = getDebugLogFilePath();
-
-	if (logFile) {
-		try {
-			mkdirSync(dirname(logFile), { recursive: true });
-			appendFileSync(logFile, `${fullLine}\n`, 'utf-8');
-		} catch {
-			// ignore file logging errors
-		}
-	}
-
-	const sessionLogFile = getSessionLogFilePath(meta);
-	if (sessionLogFile) {
-		try {
-			mkdirSync(dirname(sessionLogFile), { recursive: true });
-			appendFileSync(sessionLogFile, `${fullLine}\n`, 'utf-8');
-		} catch {
-			// ignore file logging errors
-		}
-	}
-
-	const sessionDetailsLogFile = getSessionDetailsLogFilePath(meta);
-	if (sessionDetailsLogFile) {
-		try {
-			mkdirSync(dirname(sessionDetailsLogFile), { recursive: true });
-			appendFileSync(sessionDetailsLogFile, `${fullLine}\n`, 'utf-8');
-		} catch {
-			// ignore file logging errors
-		}
-	}
-
-	return fullLine;
 }
 
 export function debug(message: string, meta?: Record<string, unknown>): void {

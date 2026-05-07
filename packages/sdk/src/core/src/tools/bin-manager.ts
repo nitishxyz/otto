@@ -1,73 +1,18 @@
 import { join } from 'node:path';
-import { promises as fs } from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import { homedir } from 'node:os';
+import {
+	clearCachedBinaries,
+	getCachedBinary,
+	setCachedBinary,
+} from './bin-manager/cache.ts';
+import { fileExists, isExecutable } from './bin-manager/filesystem.ts';
+import { getAgiBinDir, getBinaryFileName } from './bin-manager/paths.ts';
+import { extractFromVendor } from './bin-manager/vendor.ts';
 
-const OTTO_BIN_DIR_NAME = 'bin';
-
-let cachedBinDir: string | null = null;
-const resolvedPaths = new Map<string, string>();
 let cachedLoginPath: string | null = null;
 
-function getConfigHome(): string {
-	const cfgHome = process.env.XDG_CONFIG_HOME;
-	if (cfgHome?.trim()) return cfgHome.replace(/\\/g, '/');
-	const home = process.env.HOME || process.env.USERPROFILE || '';
-	return join(home, '.config');
-}
-
-export function getAgiBinDir(): string {
-	if (cachedBinDir) return cachedBinDir;
-	cachedBinDir = join(getConfigHome(), 'otto', OTTO_BIN_DIR_NAME);
-	return cachedBinDir;
-}
-
-function getPlatformKey(): string {
-	const platform = process.platform;
-	const arch = process.arch;
-	const os =
-		platform === 'darwin'
-			? 'darwin'
-			: platform === 'win32'
-				? 'windows'
-				: 'linux';
-	const cpu = arch === 'arm64' ? 'arm64' : 'x64';
-	return `${os}-${cpu}`;
-}
-
-function getBinaryFileName(name: string): string {
-	if (process.platform === 'win32') return `${name}.exe`;
-	return name;
-}
-
-async function ensureDir(dir: string): Promise<void> {
-	await fs.mkdir(dir, { recursive: true });
-}
-
-async function fileExists(p: string): Promise<boolean> {
-	try {
-		await fs.access(p);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-async function isExecutable(p: string): Promise<boolean> {
-	try {
-		await fs.access(p, 0o1);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-async function makeExecutable(p: string): Promise<void> {
-	if (process.platform === 'win32') return;
-	try {
-		await fs.chmod(p, 0o755);
-	} catch {}
-}
+export { getAgiBinDir } from './bin-manager/paths.ts';
 
 async function whichBinary(name: string): Promise<string | null> {
 	const cmd = process.platform === 'win32' ? 'where' : 'which';
@@ -85,79 +30,8 @@ async function whichBinary(name: string): Promise<string | null> {
 	});
 }
 
-function getVendorSearchPaths(binaryName: string): string[] {
-	const platformKey = getPlatformKey();
-	const paths: string[] = [];
-
-	const tauriResource = process.env.TAURI_RESOURCE_DIR;
-	if (tauriResource) {
-		paths.push(join(tauriResource, 'vendor', 'bin', platformKey, binaryName));
-		paths.push(join(tauriResource, 'vendor', 'bin', binaryName));
-	}
-
-	try {
-		const exePath = process.execPath;
-		if (exePath) {
-			const exeDir = join(exePath, '..');
-			paths.push(join(exeDir, 'vendor', 'bin', platformKey, binaryName));
-			paths.push(
-				join(
-					exeDir,
-					'..',
-					'Resources',
-					'vendor',
-					'bin',
-					platformKey,
-					binaryName,
-				),
-			);
-		}
-	} catch {}
-
-	if (process.env.CARGO_MANIFEST_DIR) {
-		paths.push(
-			join(
-				process.env.CARGO_MANIFEST_DIR,
-				'resources',
-				'vendor',
-				'bin',
-				platformKey,
-				binaryName,
-			),
-		);
-	}
-
-	const cwd = process.cwd();
-	paths.push(join(cwd, 'vendor', 'bin', platformKey, binaryName));
-
-	return paths;
-}
-
-async function extractFromVendor(name: string): Promise<string | null> {
-	const binaryName = getBinaryFileName(name);
-	const binDir = getAgiBinDir();
-	const targetPath = join(binDir, binaryName);
-
-	if ((await fileExists(targetPath)) && (await isExecutable(targetPath))) {
-		return targetPath;
-	}
-
-	const searchPaths = getVendorSearchPaths(binaryName);
-
-	for (const src of searchPaths) {
-		if (await fileExists(src)) {
-			await ensureDir(binDir);
-			await fs.copyFile(src, targetPath);
-			await makeExecutable(targetPath);
-			return targetPath;
-		}
-	}
-
-	return null;
-}
-
 export async function resolveBinary(name: string): Promise<string> {
-	const cached = resolvedPaths.get(name);
+	const cached = getCachedBinary(name);
 	if (cached) return cached;
 
 	const binaryName = getBinaryFileName(name);
@@ -167,19 +41,19 @@ export async function resolveBinary(name: string): Promise<string> {
 		(await fileExists(installedPath)) &&
 		(await isExecutable(installedPath))
 	) {
-		resolvedPaths.set(name, installedPath);
+		setCachedBinary(name, installedPath);
 		return installedPath;
 	}
 
 	const vendorPath = await extractFromVendor(name);
 	if (vendorPath) {
-		resolvedPaths.set(name, vendorPath);
+		setCachedBinary(name, vendorPath);
 		return vendorPath;
 	}
 
 	const systemPath = await whichBinary(binaryName);
 	if (systemPath) {
-		resolvedPaths.set(name, systemPath);
+		setCachedBinary(name, systemPath);
 		return systemPath;
 	}
 
@@ -187,7 +61,7 @@ export async function resolveBinary(name: string): Promise<string> {
 }
 
 export function clearBinaryCache(): void {
-	resolvedPaths.clear();
+	clearCachedBinaries();
 }
 
 function getLoginShellPath(): string | null {
