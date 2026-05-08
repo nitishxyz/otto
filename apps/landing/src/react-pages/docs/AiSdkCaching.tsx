@@ -6,7 +6,7 @@ export function AiSdkCaching() {
 		<DocPage>
 			<h1 className="text-3xl font-bold mb-2">Caching</h1>
 			<p className="text-otto-dim text-sm mb-8">
-				Prompt caching options for <code>@ottocode/ai-sdk</code>.
+				Prompt caching options for <code>@ottorouter/ai-sdk</code>.
 			</p>
 
 			<h2>Anthropic cache control</h2>

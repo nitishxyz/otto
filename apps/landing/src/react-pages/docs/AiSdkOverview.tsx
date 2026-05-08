@@ -6,7 +6,7 @@ export function AiSdkOverview() {
 		<DocPage>
 			<h1 className="text-3xl font-bold mb-2">AI SDK</h1>
 			<p className="text-otto-dim text-sm mb-8">
-				Use <code>@ottocode/ai-sdk</code> with Vercel AI SDK and OttoRouter.
+				Use <code>@ottorouter/ai-sdk</code> with Vercel AI SDK and OttoRouter.
 			</p>
 
 			<h2>What it is</h2>
@@ -17,10 +17,10 @@ export function AiSdkOverview() {
 			</p>
 
 			<h2>Install</h2>
-			<CodeBlock>{`bun add @ottocode/ai-sdk ai`}</CodeBlock>
+			<CodeBlock>{`bun add @ottorouter/ai-sdk ai`}</CodeBlock>
 
 			<h2>Basic usage</h2>
-			<CodeBlock>{`import { createOttoRouter } from "@ottocode/ai-sdk";
+			<CodeBlock>{`import { createOttoRouter } from "@ottorouter/ai-sdk";
 import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({

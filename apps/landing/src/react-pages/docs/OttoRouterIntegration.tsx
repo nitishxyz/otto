@@ -11,11 +11,11 @@ export function OttoRouterIntegration() {
 
 			<h2>Use the SDK</h2>
 			<p>
-				The supported integration path is <code>@ottocode/ai-sdk</code>. It
+				The supported integration path is <code>@ottorouter/ai-sdk</code>. It
 				wraps wallet auth and returns AI SDK-compatible models.
 			</p>
-			<CodeBlock>{`bun add @ottocode/ai-sdk ai`}</CodeBlock>
-			<CodeBlock>{`import { createOttoRouter } from "@ottocode/ai-sdk";
+			<CodeBlock>{`bun add @ottorouter/ai-sdk ai`}</CodeBlock>
+			<CodeBlock>{`import { createOttoRouter } from "@ottorouter/ai-sdk";
 import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({

@@ -12,7 +12,7 @@ export function OttoRouterOverview() {
 			<h2>What it is</h2>
 			<p>
 				OttoRouter is the provider route used by otto and the
-				<code>@ottocode/ai-sdk</code> package. It lets a client authenticate
+				<code>@ottorouter/ai-sdk</code> package. It lets a client authenticate
 				with a Solana wallet instead of a provider API key.
 			</p>
 
@@ -21,8 +21,8 @@ export function OttoRouterOverview() {
 otto ask "hello" --provider ottorouter`}</CodeBlock>
 
 			<h2>Use from an app</h2>
-			<CodeBlock>{`bun add @ottocode/ai-sdk ai`}</CodeBlock>
-			<CodeBlock>{`import { createOttoRouter } from "@ottocode/ai-sdk";
+			<CodeBlock>{`bun add @ottorouter/ai-sdk ai`}</CodeBlock>
+			<CodeBlock>{`import { createOttoRouter } from "@ottorouter/ai-sdk";
 
 const ottorouter = createOttoRouter({
   auth: { privateKey: process.env.OTTOROUTER_PRIVATE_KEY! },

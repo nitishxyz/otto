@@ -1196,7 +1196,7 @@ export function OttoRouter() {
 					<Reveal delay={80}>
 						<TerminalBlock
 							title="ai-sdk"
-							copyText={`import { createOttoRouter } from "@ottocode/ai-sdk";
+							copyText={`import { createOttoRouter } from "@ottorouter/ai-sdk";
 import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({
@@ -1215,7 +1215,7 @@ const { text } = await generateText({
 							<span className="text-purple-700 dark:text-purple-400">from</span>
 							<span className="text-green-700 dark:text-green-400">
 								{' '}
-								"@ottocode/ai-sdk"
+								"@ottorouter/ai-sdk"
 							</span>
 							<span className="text-otto-dim">;</span>
 							<br />

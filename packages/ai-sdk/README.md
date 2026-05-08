@@ -1,4 +1,4 @@
-# @ottocode/ai-sdk
+# @ottorouter/ai-sdk
 
 A drop-in SDK for accessing AI models (OpenAI, Anthropic, Google, Moonshot, MiniMax, Z.AI) through the [OttoRouter](https://github.com/slashforge/ottorouter) proxy with automatic x402 payments via Solana USDC.
 
@@ -9,24 +9,24 @@ Normal API requests use bearer auth. The SDK signs a wallet nonce once to exchan
 ## Install
 
 ```bash
-bun add @ottocode/ai-sdk ai
+bun add @ottorouter/ai-sdk ai
 # or
-npm install @ottocode/ai-sdk ai
+npm install @ottorouter/ai-sdk ai
 ```
 
 ## Quick Start
 
 ```ts
-import { createOttoRouter } from '@ottocode/ai-sdk';
-import { generateText } from 'ai';
+import { createOttoRouter } from "@ottorouter/ai-sdk";
+import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({
   auth: { privateKey: process.env.SOLANA_PRIVATE_KEY! },
 });
 
 const { text } = await generateText({
-  model: ottorouter.model('claude-sonnet-4-20250514'),
-  prompt: 'Hello!',
+  model: ottorouter.model("claude-sonnet-4-20250514"),
+  prompt: "Hello!",
 });
 
 console.log(text);
@@ -40,20 +40,20 @@ Under the hood, the first protected request exchanges wallet auth headers for a 
 
 Models are resolved to providers by prefix:
 
-| Prefix | Provider | API Format |
-|---|---|---|
-| `claude-` | Anthropic | Messages |
-| `gpt-`, `o1`, `o3`, `o4`, `codex-` | OpenAI | Responses |
-| `gemini-` | Google | Native |
-| `kimi-` | Moonshot | OpenAI Chat |
-| `MiniMax-` | MiniMax | Messages |
-| `z1-` | Z.AI | OpenAI Chat |
+| Prefix                             | Provider  | API Format  |
+| ---------------------------------- | --------- | ----------- |
+| `claude-`                          | Anthropic | Messages    |
+| `gpt-`, `o1`, `o3`, `o4`, `codex-` | OpenAI    | Responses   |
+| `gemini-`                          | Google    | Native      |
+| `kimi-`                            | Moonshot  | OpenAI Chat |
+| `MiniMax-`                         | MiniMax   | Messages    |
+| `z1-`                              | Z.AI      | OpenAI Chat |
 
 ```ts
-ottorouter.model('claude-sonnet-4-20250514');   // → anthropic
-ottorouter.model('gpt-4o');                      // → openai
-ottorouter.model('gemini-2.5-pro');             // → google
-ottorouter.model('kimi-k2');                    // → moonshot
+ottorouter.model("claude-sonnet-4-20250514"); // → anthropic
+ottorouter.model("gpt-4o"); // → openai
+ottorouter.model("gemini-2.5-pro"); // → google
+ottorouter.model("kimi-k2"); // → moonshot
 ```
 
 ## Explicit Provider
@@ -61,8 +61,10 @@ ottorouter.model('kimi-k2');                    // → moonshot
 Override auto-resolution when needed:
 
 ```ts
-const model = ottorouter.provider('openai').model('gpt-4o');
-const model = ottorouter.provider('anthropic', 'anthropic-messages').model('claude-sonnet-4-20250514');
+const model = ottorouter.provider("openai").model("gpt-4o");
+const model = ottorouter
+  .provider("anthropic", "anthropic-messages")
+  .model("claude-sonnet-4-20250514");
 ```
 
 ## Configuration
@@ -70,34 +72,40 @@ const model = ottorouter.provider('anthropic', 'anthropic-messages').model('clau
 ```ts
 const ottorouter = createOttoRouter({
   // Required: Solana wallet private key (base58)
-  auth: { privateKey: '...' },
+  auth: { privateKey: "..." },
 
   // Optional: OttoRouter API base URL (default: https://api.ottorouter.org)
-  baseURL: 'https://api.ottorouter.org',
+  baseURL: "https://api.ottorouter.org",
 
   // Optional: Solana RPC URL (default: https://api.mainnet-beta.solana.com)
-  rpcURL: 'https://api.mainnet-beta.solana.com',
+  rpcURL: "https://api.mainnet-beta.solana.com",
 
   // Optional: Payment callbacks
-  callbacks: { /* see Payment Callbacks */ },
+  callbacks: {
+    /* see Payment Callbacks */
+  },
 
   // Optional: Cache configuration
-  cache: { /* see Caching */ },
+  cache: {
+    /* see Caching */
+  },
 
   // Optional: Payment options
-  payment: { /* see Payment Options */ },
+  payment: {
+    /* see Payment Options */
+  },
 
   // Optional: Custom model→provider mappings
   modelMap: {
-    'my-custom-model': 'openai',
+    "my-custom-model": "openai",
   },
 
   // Optional: Register custom providers
   providers: [
     {
-      id: 'my-provider',
-      apiFormat: 'openai-chat',
-      modelPrefix: 'myp-',
+      id: "my-provider",
+      apiFormat: "openai-chat",
+      modelPrefix: "myp-",
     },
   ],
 });
@@ -111,7 +119,7 @@ Request authentication and payment signing are separate: bearer auth is used for
 
 ```ts
 const ottorouter = createOttoRouter({
-  auth: { privateKey: '...' },
+  auth: { privateKey: "..." },
   callbacks: {
     // Called when a 402 is received and payment is needed
     onPaymentRequired: (amountUsd, currentBalance) => {
@@ -120,7 +128,7 @@ const ottorouter = createOttoRouter({
 
     // Called when the SDK is signing a transaction
     onPaymentSigning: () => {
-      console.log('Signing payment...');
+      console.log("Signing payment...");
     },
 
     // Called after successful payment
@@ -130,18 +138,23 @@ const ottorouter = createOttoRouter({
 
     // Called on payment failure
     onPaymentError: (error) => {
-      console.error('Payment failed:', error);
+      console.error("Payment failed:", error);
     },
 
     // Called after each request with cost info (streaming & non-streaming)
-    onBalanceUpdate: ({ costUsd, balanceRemaining, inputTokens, outputTokens }) => {
+    onBalanceUpdate: ({
+      costUsd,
+      balanceRemaining,
+      inputTokens,
+      outputTokens,
+    }) => {
       console.log(`Cost: $${costUsd}, remaining: $${balanceRemaining}`);
     },
 
     // Optional: interactive approval before payment
     onPaymentApproval: async ({ amountUsd, currentBalance }) => {
       // return 'crypto' to pay, 'fiat' for fiat flow, 'cancel' to abort
-      return 'crypto';
+      return "crypto";
     },
   },
 });
@@ -151,11 +164,11 @@ const ottorouter = createOttoRouter({
 
 ```ts
 const ottorouter = createOttoRouter({
-  auth: { privateKey: '...' },
+  auth: { privateKey: "..." },
   payment: {
     // 'auto' (default) — pay automatically
     // 'approval' — call onPaymentApproval before each payment
-    topupApprovalMode: 'auto',
+    topupApprovalMode: "auto",
 
     // Auto-pay without approval if wallet USDC balance >= threshold
     autoPayThresholdUsd: 5.0,
@@ -183,17 +196,17 @@ createOttoRouter({ auth });
 createOttoRouter({ auth, cache: { anthropicCaching: false } });
 
 // Manual: SDK won't inject cache_control — set it yourself in messages
-createOttoRouter({ auth, cache: { anthropicCaching: { strategy: 'manual' } } });
+createOttoRouter({ auth, cache: { anthropicCaching: { strategy: "manual" } } });
 
 // Custom breakpoint count and placement
 createOttoRouter({
   auth,
   cache: {
     anthropicCaching: {
-      systemBreakpoints: 2,       // cache first 2 system blocks
-      systemPlacement: 'first',   // 'first' | 'last' | 'all'
-      messageBreakpoints: 3,      // cache last 3 messages
-      messagePlacement: 'last',   // 'first' | 'last' | 'all'
+      systemBreakpoints: 2, // cache first 2 system blocks
+      systemPlacement: "first", // 'first' | 'last' | 'all'
+      messageBreakpoints: 3, // cache last 3 messages
+      messagePlacement: "last", // 'first' | 'last' | 'all'
     },
   },
 });
@@ -203,7 +216,7 @@ createOttoRouter({
   auth,
   cache: {
     anthropicCaching: {
-      strategy: 'custom',
+      strategy: "custom",
       transform: (body) => {
         // modify body however you want
         return body;
@@ -213,14 +226,14 @@ createOttoRouter({
 });
 ```
 
-| Option | Default | Description |
-|---|---|---|
-| `strategy` | `'auto'` | `'auto'`, `'manual'`, `'custom'`, or `false` |
-| `systemBreakpoints` | `1` | Number of system blocks to cache |
-| `messageBreakpoints` | `1` | Number of messages to cache |
-| `systemPlacement` | `'first'` | Which system blocks: `'first'`, `'last'`, `'all'` |
-| `messagePlacement` | `'last'` | Which messages: `'first'`, `'last'`, `'all'` |
-| `cacheType` | `'ephemeral'` | The `cache_control.type` value |
+| Option               | Default       | Description                                       |
+| -------------------- | ------------- | ------------------------------------------------- |
+| `strategy`           | `'auto'`      | `'auto'`, `'manual'`, `'custom'`, or `false`      |
+| `systemBreakpoints`  | `1`           | Number of system blocks to cache                  |
+| `messageBreakpoints` | `1`           | Number of messages to cache                       |
+| `systemPlacement`    | `'first'`     | Which system blocks: `'first'`, `'last'`, `'all'` |
+| `messagePlacement`   | `'last'`      | Which messages: `'first'`, `'last'`, `'all'`      |
+| `cacheType`          | `'ephemeral'` | The `cache_control.type` value                    |
 
 ### OttoRouter Server-Side Caching
 
@@ -230,8 +243,8 @@ Provider-agnostic caching at the OttoRouter proxy layer:
 createOttoRouter({
   auth,
   cache: {
-    promptCacheKey: 'my-session-123',
-    promptCacheRetention: 'in_memory', // or '24h'
+    promptCacheKey: "my-session-123",
+    promptCacheRetention: "in_memory", // or '24h'
   },
 });
 ```
@@ -249,7 +262,7 @@ const balance = await ottorouter.balance();
 // { walletAddress, balance, totalSpent, totalTopups, requestCount }
 
 // On-chain USDC balance
-const wallet = await ottorouter.walletBalance('mainnet');
+const wallet = await ottorouter.walletBalance("mainnet");
 // { walletAddress, usdcBalance, network }
 
 // Wallet address
@@ -265,29 +278,29 @@ Register providers at init or runtime:
 const ottorouter = createOttoRouter({
   auth,
   providers: [
-    { id: 'my-provider', apiFormat: 'openai-chat', modelPrefix: 'myp-' },
+    { id: "my-provider", apiFormat: "openai-chat", modelPrefix: "myp-" },
   ],
 });
 
 // At runtime
 ottorouter.registry.register({
-  id: 'another-provider',
-  apiFormat: 'anthropic-messages',
-  models: ['specific-model-id'],
+  id: "another-provider",
+  apiFormat: "anthropic-messages",
+  models: ["specific-model-id"],
 });
 
 // Map a specific model to a provider
-ottorouter.registry.mapModel('some-model', 'openai');
+ottorouter.registry.mapModel("some-model", "openai");
 ```
 
 ### API Formats
 
-| Format | Description | Used by |
-|---|---|---|
-| `openai-responses` | OpenAI Responses API | OpenAI |
-| `anthropic-messages` | Anthropic Messages API | Anthropic, MiniMax |
-| `openai-chat` | OpenAI Chat Completions (compatible) | Moonshot, Z.AI |
-| `google-native` | Google GenerativeAI native | Google |
+| Format               | Description                          | Used by            |
+| -------------------- | ------------------------------------ | ------------------ |
+| `openai-responses`   | OpenAI Responses API                 | OpenAI             |
+| `anthropic-messages` | Anthropic Messages API               | Anthropic, MiniMax |
+| `openai-chat`        | OpenAI Chat Completions (compatible) | Moonshot, Z.AI     |
+| `google-native`      | Google GenerativeAI native           | Google             |
 
 ## Low-Level: Custom Fetch
 
@@ -315,7 +328,7 @@ import {
   addAnthropicCacheControl,
   createOttoRouterFetch,
   createWalletContext,
-} from '@ottocode/ai-sdk';
+} from "@ottorouter/ai-sdk";
 
 // Get wallet address from private key
 const address = getPublicKeyFromPrivate(privateKey);
@@ -324,12 +337,12 @@ const address = getPublicKeyFromPrivate(privateKey);
 const balance = await fetchBalance({ privateKey });
 
 // Fetch on-chain USDC
-const usdc = await fetchWalletUsdcBalance({ privateKey }, 'mainnet');
+const usdc = await fetchWalletUsdcBalance({ privateKey }, "mainnet");
 
 // Create a standalone x402-aware fetch
 const ottorouterFetch = createOttoRouterFetch({
   wallet: createWalletContext({ privateKey }),
-  baseURL: 'https://api.ottorouter.org',
+  baseURL: "https://api.ottorouter.org",
 });
 ```
 

@@ -21,7 +21,7 @@ x-wallet-nonce: <nonce>`}</CodeBlock>
 
 			<h2>Recommended payment path</h2>
 			<p>
-				Use <code>@ottocode/ai-sdk</code> so payment-required responses,
+				Use <code>@ottorouter/ai-sdk</code> so payment-required responses,
 				transaction signing, retries, and balance updates are handled in one
 				place.
 			</p>
