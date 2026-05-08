@@ -1,23 +1,12 @@
 import type { Hono } from 'hono';
-import { readdir, readFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
-import { serializeError } from '../runtime/errors/api-error.ts';
-import { logger } from '@ottocode/sdk';
 import { openApiRoute } from '../openapi/route.ts';
 import {
-	TREE_ENTRY_LIMIT,
-	clampNumber,
-	getChangedFiles,
-	getGitIgnoredFiles,
-	getSearchPolicy,
-	isHomeDirectory,
-	listFilesWithRg,
-	matchesGitignorePattern,
-	parseGitignore,
-	shouldExcludeDir,
-	shouldExcludeFile,
-	traverseDirectory,
-} from './files/service.ts';
+	handleFileTree,
+	handleListFiles,
+	handleRawFile,
+	handleReadFile,
+	handleSearchFiles,
+} from './files/handlers.ts';
 
 export function registerFilesRoutes(app: Hono) {
 	openApiRoute(
@@ -111,81 +100,7 @@ export function registerFilesRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const policy = getSearchPolicy(projectRoot);
-				const maxDepth = clampNumber(
-					Number.parseInt(
-						c.req.query('maxDepth') || String(policy.maxDepth),
-						10,
-					),
-					1,
-					policy.maxDepth,
-				);
-				const limit = clampNumber(
-					Number.parseInt(c.req.query('limit') || String(policy.limit), 10),
-					1,
-					policy.limit,
-				);
-
-				let result = await listFilesWithRg(
-					projectRoot,
-					maxDepth,
-					limit,
-					policy.includeIgnored,
-				);
-
-				if (result.files.length === 0) {
-					const gitignorePatterns = await parseGitignore(projectRoot);
-					result = await traverseDirectory(
-						projectRoot,
-						projectRoot,
-						maxDepth,
-						0,
-						limit,
-						[],
-						gitignorePatterns,
-					);
-				}
-
-				const [changedFiles, ignoredFiles] = await Promise.all([
-					getChangedFiles(projectRoot),
-					getGitIgnoredFiles(projectRoot, result.files),
-				]);
-
-				result.files.sort((a, b) => {
-					const aIgnored = ignoredFiles.has(a);
-					const bIgnored = ignoredFiles.has(b);
-					if (aIgnored !== bIgnored) return aIgnored ? 1 : -1;
-					const aChanged = changedFiles.has(a);
-					const bChanged = changedFiles.has(b);
-					if (aChanged && !bChanged) return -1;
-					if (!aChanged && bChanged) return 1;
-					return a.localeCompare(b);
-				});
-
-				return c.json({
-					files: result.files,
-					ignoredFiles: Array.from(ignoredFiles),
-					changedFiles: Array.from(changedFiles.entries()).map(
-						([path, status]) => ({
-							path,
-							status,
-						}),
-					),
-					truncated: result.truncated,
-					policy: {
-						maxDepth,
-						limit,
-						home: isHomeDirectory(projectRoot),
-					},
-				});
-			} catch (err) {
-				logger.error('Files route error:', err);
-				return c.json({ error: serializeError(err) }, 500);
-			}
-		},
+		handleListFiles,
 	);
 
 	openApiRoute(
@@ -278,93 +193,7 @@ export function registerFilesRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const query = c.req.query('q') || '';
-				const policy = getSearchPolicy(projectRoot);
-				const maxDepth = clampNumber(
-					Number.parseInt(
-						c.req.query('maxDepth') || String(policy.maxDepth),
-						10,
-					),
-					1,
-					policy.maxDepth,
-				);
-				const limit = clampNumber(
-					Number.parseInt(c.req.query('limit') || String(policy.limit), 10),
-					1,
-					policy.limit,
-				);
-
-				let result = await listFilesWithRg(
-					projectRoot,
-					maxDepth,
-					limit,
-					policy.includeIgnored,
-					query,
-				);
-
-				if (result.files.length === 0) {
-					const gitignorePatterns = await parseGitignore(projectRoot);
-					result = await traverseDirectory(
-						projectRoot,
-						projectRoot,
-						maxDepth,
-						0,
-						limit,
-						[],
-						gitignorePatterns,
-					);
-					const normalizedQuery = query.trim().toLowerCase();
-					if (normalizedQuery) {
-						const files = result.files.filter((file) =>
-							file.toLowerCase().includes(normalizedQuery),
-						);
-						result = {
-							files: files.slice(0, limit),
-							truncated: files.length > limit,
-						};
-					}
-				}
-
-				const [changedFiles, ignoredFiles] = await Promise.all([
-					getChangedFiles(projectRoot),
-					getGitIgnoredFiles(projectRoot, result.files),
-				]);
-
-				result.files.sort((a, b) => {
-					const aIgnored = ignoredFiles.has(a);
-					const bIgnored = ignoredFiles.has(b);
-					if (aIgnored !== bIgnored) return aIgnored ? 1 : -1;
-					const aChanged = changedFiles.has(a);
-					const bChanged = changedFiles.has(b);
-					if (aChanged && !bChanged) return -1;
-					if (!aChanged && bChanged) return 1;
-					return a.localeCompare(b);
-				});
-
-				return c.json({
-					files: result.files,
-					ignoredFiles: Array.from(ignoredFiles),
-					changedFiles: Array.from(changedFiles.entries()).map(
-						([path, status]) => ({
-							path,
-							status,
-						}),
-					),
-					truncated: result.truncated,
-					policy: {
-						maxDepth,
-						limit,
-						home: isHomeDirectory(projectRoot),
-					},
-				});
-			} catch (err) {
-				logger.error('Files search route error:', err);
-				return c.json({ error: serializeError(err) }, 500);
-			}
-		},
+		handleSearchFiles,
 	);
 
 	openApiRoute(
@@ -447,69 +276,7 @@ export function registerFilesRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const dirPath = c.req.query('path') || '.';
-				const targetDir = resolve(projectRoot, dirPath);
-				if (!targetDir.startsWith(resolve(projectRoot))) {
-					return c.json({ error: 'Path traversal not allowed' }, 403);
-				}
-
-				const gitignorePatterns = await parseGitignore(projectRoot);
-				const entries = await readdir(targetDir, { withFileTypes: true });
-				const truncated = entries.length > TREE_ENTRY_LIMIT;
-
-				const items: Array<{
-					name: string;
-					path: string;
-					type: 'file' | 'directory';
-					gitignored?: boolean;
-					vendor?: boolean;
-					searchable?: boolean;
-				}> = [];
-
-				for (const entry of entries.slice(0, TREE_ENTRY_LIMIT)) {
-					const relPath = relative(projectRoot, join(targetDir, entry.name));
-
-					if (entry.isDirectory()) {
-						const ignored = matchesGitignorePattern(relPath, gitignorePatterns);
-						const vendor = shouldExcludeDir(entry.name);
-						items.push({
-							name: entry.name,
-							path: relPath,
-							type: 'directory',
-							gitignored: ignored || undefined,
-							vendor: vendor || undefined,
-							searchable: vendor || ignored ? false : undefined,
-						});
-					} else if (entry.isFile()) {
-						if (shouldExcludeFile(entry.name)) continue;
-						const ignored = matchesGitignorePattern(relPath, gitignorePatterns);
-						items.push({
-							name: entry.name,
-							path: relPath,
-							type: 'file',
-							gitignored: ignored || undefined,
-							searchable: ignored ? false : undefined,
-						});
-					}
-				}
-
-				items.sort((a, b) => {
-					if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-					const aIgnored = a.gitignored ?? false;
-					const bIgnored = b.gitignored ?? false;
-					if (aIgnored !== bIgnored) return aIgnored ? 1 : -1;
-					return a.name.localeCompare(b.name);
-				});
-
-				return c.json({ items, path: dirPath, truncated });
-			} catch (err) {
-				logger.error('Files tree route error:', err);
-				return c.json({ error: serializeError(err) }, 500);
-			}
-		},
+		handleFileTree,
 	);
 
 	openApiRoute(
@@ -585,33 +352,7 @@ export function registerFilesRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => {
-			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const filePath = c.req.query('path');
-
-				if (!filePath) {
-					return c.json(
-						{ error: 'Missing required query parameter: path' },
-						400,
-					);
-				}
-
-				const absPath = join(projectRoot, filePath);
-				if (!absPath.startsWith(projectRoot)) {
-					return c.json({ error: 'Path traversal not allowed' }, 403);
-				}
-
-				const content = await readFile(absPath, 'utf-8');
-				const extension = filePath.split('.').pop()?.toLowerCase() ?? '';
-				const lineCount = content.split('\n').length;
-
-				return c.json({ content, path: filePath, extension, lineCount });
-			} catch (err) {
-				logger.error('Files read route error:', err);
-				return c.json({ error: serializeError(err) }, 500);
-			}
-		},
+		handleReadFile,
 	);
 
 	openApiRoute(
@@ -652,48 +393,6 @@ export function registerFilesRoutes(app: Hono) {
 				'403': { description: 'Path traversal not allowed' },
 			},
 		},
-		async (c) => {
-			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const filePath = c.req.query('path');
-
-				if (!filePath) {
-					return c.json(
-						{ error: 'Missing required query parameter: path' },
-						400,
-					);
-				}
-
-				const absPath = join(projectRoot, filePath);
-				if (!absPath.startsWith(projectRoot)) {
-					return c.json({ error: 'Path traversal not allowed' }, 403);
-				}
-
-				const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
-				const mimeTypes: Record<string, string> = {
-					png: 'image/png',
-					jpg: 'image/jpeg',
-					jpeg: 'image/jpeg',
-					gif: 'image/gif',
-					svg: 'image/svg+xml',
-					webp: 'image/webp',
-					ico: 'image/x-icon',
-					bmp: 'image/bmp',
-					avif: 'image/avif',
-				};
-				const contentType = mimeTypes[ext] || 'application/octet-stream';
-
-				const data = await readFile(absPath);
-				return new Response(data, {
-					headers: {
-						'Content-Type': contentType,
-						'Cache-Control': 'no-cache',
-					},
-				});
-			} catch (err) {
-				logger.error('Files raw route error:', err);
-				return c.json({ error: serializeError(err) }, 500);
-			}
-		},
+		handleRawFile,
 	);
 }

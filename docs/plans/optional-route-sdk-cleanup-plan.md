@@ -55,16 +55,20 @@ Completed in the current cleanup series:
 - Phase H — SDK bin manager/logger cleanup
   - Binary path/cache/filesystem/vendor helpers live under `tools/bin-manager/`.
   - Logger formatting and file sinks live under `utils/logger/`.
+- Final optional route/config/git cleanup
+  - Files route runtime handlers live in `files/handlers.ts`.
+  - Config model/provider route runtime handlers live in `config/*-service.ts`.
+  - Git staging/commit/remote runtime handlers live in `git/*-service.ts`.
 
-Latest validation run for Phases G/H:
+Latest validation run for final route/config/git cleanup:
 
 ```bash
 bun lint
-bun test tests/patch-parse.test.ts tests/patch-apply.test.ts tests/builtin-tools.test.ts
-bun run --filter @ottocode/sdk typecheck
+bun run --filter @ottocode/server typecheck
+bun test tests/config.test.ts tests/server-standalone.test.ts tests/reasoning-config.test.ts
 ```
 
-Remaining planned cleanup is limited to optional future route/config/git splits.
+Remaining planned cleanup is complete; future work should be behavior-driven rather than refactor-plan driven.
 
 ### Large route modules
 
@@ -78,15 +82,15 @@ Remaining planned cleanup is limited to optional future route/config/git splits.
 | `packages/server/src/routes/terminals.ts`  | Completed: route/spec orchestration with service extraction    | Optional future spec extraction only |
 | `packages/server/src/routes/tunnel.ts`     | Completed: route/spec orchestration with service extraction    | Optional future spec extraction only |
 
-### Medium route/config/git modules to consider later
+### Medium route/config/git modules
 
-- `packages/server/src/routes/files.ts` — already improved with `files/service.ts`, still route-spec heavy.
-- `packages/server/src/routes/skills.ts` — now clean registration-only file after optional cleanup.
-- `packages/server/src/routes/config/models.ts`
-- `packages/server/src/routes/config/providers.ts`
-- `packages/server/src/routes/git/staging.ts`
-- `packages/server/src/routes/git/commit.ts`
-- `packages/server/src/routes/git/remote.ts`
+- `packages/server/src/routes/files.ts` — completed: route/spec orchestration with runtime handlers in `files/handlers.ts` and shared helpers in `files/service.ts`.
+- `packages/server/src/routes/skills.ts` — completed: clean registration-only file after optional cleanup.
+- `packages/server/src/routes/config/models.ts` — completed: route/spec orchestration with runtime handlers in `config/models-service.ts`.
+- `packages/server/src/routes/config/providers.ts` — completed: route/spec orchestration with runtime handlers in `config/providers-service.ts`.
+- `packages/server/src/routes/git/staging.ts` — completed: route/spec orchestration with runtime handlers in `git/staging-service.ts`.
+- `packages/server/src/routes/git/commit.ts` — completed: route/spec orchestration with runtime handlers in `git/commit-service.ts`.
+- `packages/server/src/routes/git/remote.ts` — completed: route/spec orchestration with runtime handlers in `git/remote-service.ts`.
 
 ### SDK patch/tool utilities
 
