@@ -1,125 +1,69 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+
 export function GettingStarted() {
 	return (
 		<DocPage>
 			<h1 className="text-3xl font-bold mb-2">Getting Started</h1>
 			<p className="text-otto-dim text-sm mb-8">
-				Install otto and start coding with AI in under a minute.
+				Install otto, configure a model provider, and run your first prompt.
 			</p>
 
 			<h2>Install</h2>
-
-			<h3>Recommended: One-Liner</h3>
+			<p>Use the install script for the prebuilt CLI:</p>
 			<CodeBlock>{`curl -fsSL https://install.ottocode.io | sh`}</CodeBlock>
 			<p>
-				Detects your OS and architecture, downloads the prebuilt binary, and
-				installs to <code>~/.local/bin</code>.
+				Make sure the install directory is on your <code>PATH</code>, then check
+				the binary:
 			</p>
-			<p>Pin a specific version:</p>
-			<CodeBlock>{`OTTO_VERSION=v0.1.175 curl -fsSL https://install.ottocode.io | sh`}</CodeBlock>
+			<CodeBlock>{`otto --version`}</CodeBlock>
 
-			<h3>Alternative: npm or Bun</h3>
-			<CodeBlock>{`bun install -g @ottocode/install`}</CodeBlock>
-			<p>
-				The postinstall script downloads the correct binary for your platform.
-			</p>
-			<p>
-				<strong>Supported platforms:</strong> macOS (x64, ARM64), Linux (x64,
-				ARM64)
-			</p>
-
-			<h3>From Source</h3>
-			<p>
-				Requires <a href="https://bun.sh">Bun</a> v1.0+.
-			</p>
+			<h2>Build from source</h2>
+			<p>Use this if you are working on the repo locally.</p>
 			<CodeBlock>{`git clone https://github.com/nitishxyz/otto.git
 cd otto
 bun install
-bun run compile    # builds to dist/otto`}</CodeBlock>
+bun run compile`}</CodeBlock>
 
-			<h2>Setup</h2>
-
-			<h3>1. Configure a Provider</h3>
-			<CodeBlock>{`otto setup`}</CodeBlock>
+			<h2>Configure a provider</h2>
 			<p>
-				Walks you through provider selection and authentication interactively.
+				Run the setup flow, or configure credentials through the auth command.
 			</p>
-			<p>Or set API keys via environment variables:</p>
-			<CodeBlock>{`export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-export GOOGLE_GENERATIVE_AI_API_KEY="..."
-export OPENROUTER_API_KEY="sk-or-..."`}</CodeBlock>
+			<CodeBlock>{`otto setup
+otto auth login`}</CodeBlock>
+			<p>Environment variables also work for supported providers:</p>
+			<CodeBlock>{`ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+GOOGLE_GENERATIVE_AI_API_KEY=...
+OPENROUTER_API_KEY=...
+OTTOROUTER_PRIVATE_KEY=...`}</CodeBlock>
 
-			<h3>2. Start Using otto</h3>
-			<CodeBlock>{`otto                           # start interactive TUI (default)
-otto --web                     # start server + web UI (opens browser)
-otto ask "explain this error"  # one-shot question
-otto ask "write tests" --agent build
-otto ask "follow up" --last    # continue last session`}</CodeBlock>
+			<h2>Run otto</h2>
+			<CodeBlock>{`otto                         # interactive terminal UI
+otto ask "explain this file" # one-shot prompt
+otto serve --no-open         # local API + web UI server
+otto web                     # web UI command`}</CodeBlock>
 
-			<h3>3. Verify Installation</h3>
-			<CodeBlock>{`otto --version                 # check version
-otto doctor                    # check configuration
-otto agents                    # list available agents
-otto models                    # list available models`}</CodeBlock>
-
-			<h2>How It Works</h2>
-			<p>
-				When you run <code>otto</code>, it:
-			</p>
-			<ol>
-				<li>Starts a local HTTP server for the otto API</li>
-				<li>Launches the interactive TUI in your terminal</li>
-				<li>
-					With <code>otto --web</code> or <code>otto serve</code>, opens the web
-					UI in your browser
-				</li>
-			</ol>
-			<p>
-				All AI interactions, session storage, and tool execution happen locally
-				on your machine.
-			</p>
-			<p>
-				For one-shot usage (<code>otto ask "question"</code>), it starts the
-				server in the background, sends the prompt, streams the response, and
-				exits.
-			</p>
-
-			<h2>Server Mode</h2>
-			<CodeBlock>{`otto serve                     # start on a random port, open browser
-otto serve --port 3000         # specific port
-otto serve --network           # bind to 0.0.0.0 for LAN access
-otto serve --no-open           # don't open browser`}</CodeBlock>
-			<p>The server exposes:</p>
-			<ul>
-				<li>
-					<strong>API</strong> on the specified port (e.g.,{' '}
-					<code>http://localhost:3000</code>)
-				</li>
-				<li>
-					<strong>Web UI</strong> on port + 1 (e.g.,{' '}
-					<code>http://localhost:3001</code>)
-				</li>
-			</ul>
+			<h2>Useful checks</h2>
+			<CodeBlock>{`otto doctor      # diagnose local configuration
+otto models      # choose/list models
+otto agents      # choose/list agents
+otto --help      # show CLI help`}</CodeBlock>
 
 			<h2>Troubleshooting</h2>
-
-			<h3>
-				<code>otto</code> not found after installation
-			</h3>
-			<CodeBlock>{`echo $PATH | tr ':' '\\n' | grep local
-
-# If not present, add it:
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc`}</CodeBlock>
-
-			<h3>Provider authentication issues</h3>
-			<CodeBlock>{`otto auth login                # reconfigure credentials
-otto doctor                    # check what's configured`}</CodeBlock>
-
-			<h3>Binary not executable</h3>
-			<CodeBlock>{`chmod +x $(which otto)`}</CodeBlock>
+			<ul>
+				<li>
+					If <code>otto</code> is not found, add the install directory to{' '}
+					<code>PATH</code> or use the absolute path to the binary.
+				</li>
+				<li>
+					If model calls fail, run <code>otto doctor</code> and verify provider
+					credentials with <code>otto auth list</code>.
+				</li>
+				<li>
+					If you are developing locally, use Bun for all commands in this repo.
+				</li>
+			</ul>
 		</DocPage>
 	);
 }

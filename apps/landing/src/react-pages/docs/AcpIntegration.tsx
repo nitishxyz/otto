@@ -1,219 +1,131 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+
 export function AcpIntegration() {
 	return (
 		<DocPage>
 			<h1 className="text-3xl font-bold mb-2">ACP Integration</h1>
 			<p className="text-otto-dim text-sm mb-8">
-				Agent Client Protocol — use otto as a headless AI agent in any editor.
+				Run otto from an editor that supports Agent Client Protocol.
 			</p>
 
-			<h2>What is ACP?</h2>
+			<h2>What this does</h2>
 			<p>
-				The <strong>Agent Client Protocol</strong> is an open protocol (Apache
-				2.0) created by Zed Industries that standardizes communication between
-				code editors (Clients) and AI coding agents (Agents). Think of it as{' '}
-				<strong>&ldquo;LSP but for AI agents.&rdquo;</strong>
+				ACP lets an editor start otto as a background process and talk to it
+				over stdin/stdout. The editor owns the UI. Otto handles the agent
+				session, model calls, tools, slash commands, MCP servers, and session
+				history.
 			</p>
+			<p>
+				Use this when you want otto inside an ACP-compatible editor instead of
+				the otto terminal UI.
+			</p>
+
+			<h2>Requirements</h2>
 			<ul>
 				<li>
-					<strong>Protocol:</strong> JSON-RPC 2.0 over stdio
+					An installed <code>otto</code> CLI that is available on your{' '}
+					<code>PATH</code>
 				</li>
+				<li>An ACP-compatible editor or editor extension</li>
 				<li>
-					<strong>Version:</strong> 1 (integer-based, only bumped on breaking
-					changes)
-				</li>
-				<li>
-					<strong>SDK:</strong> <code>@agentclientprotocol/sdk</code> on npm
-				</li>
-				<li>
-					<strong>No TUI required</strong> — the editor provides the entire UI
+					At least one configured provider/model in otto, the same as normal CLI
+					usage
 				</li>
 			</ul>
 
-			<h2>How It Works</h2>
+			<h2>Editor setup</h2>
 			<p>
-				Otto runs as a <strong>headless subprocess</strong> that communicates
-				with the editor via JSON-RPC over stdin/stdout. The editor handles all
-				UI rendering including messages, diffs, tool calls, permission prompts,
-				and terminal management.
+				Add otto as a custom ACP agent in your editor. The command is always:
 			</p>
-			<CodeBlock>{`┌──────────────────────┐      stdio (JSON-RPC)      ┌──────────────────────┐
-│      Client          │ ─────────────────────────▶ │      Agent           │
-│  (Zed, JetBrains,   │ ◀───────────────────────── │  (otto)              │
-│   Neovim, VS Code)  │                            │                      │
-│                      │                            │  - Calls LLMs        │
-│  - UI rendering      │                            │  - Runs tools        │
-│  - File system       │                            │  - Sends updates     │
-│  - Terminal mgmt     │                            │  - Requests perms    │
-│  - Permission prompts│                            │                      │
-└──────────────────────┘                            └──────────────────────┘`}</CodeBlock>
-
-			<h2>Supported Editors</h2>
-			<table>
-				<thead>
-					<tr>
-						<th>Editor</th>
-						<th>Support</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td>Zed</td>
-						<td>Native (primary)</td>
-					</tr>
-					<tr>
-						<td>JetBrains IDEs</td>
-						<td>Native</td>
-					</tr>
-					<tr>
-						<td>Neovim</td>
-						<td>CodeCompanion, agentic.nvim, avante.nvim</td>
-					</tr>
-					<tr>
-						<td>VS Code</td>
-						<td>ACP Client extension</td>
-					</tr>
-					<tr>
-						<td>Emacs</td>
-						<td>agent-shell.el</td>
-					</tr>
-				</tbody>
-			</table>
-
-			<h2>Protocol Flow</h2>
-
-			<h3>1. Initialization</h3>
+			<CodeBlock>{`otto --acp`}</CodeBlock>
 			<p>
-				The client spawns otto as a subprocess and sends <code>initialize</code>{' '}
-				with protocol version, client capabilities, and client info. Otto
-				responds with its agent capabilities, info, and authentication methods.
+				The exact settings shape depends on your editor. A typical JSON-based
+				configuration looks like this:
+			</p>
+			<CodeBlock>{`{
+  "command": "otto",
+  "args": ["--acp"],
+  "env": {}
+}`}</CodeBlock>
+			<p>
+				If your editor cannot find <code>otto</code>, use the absolute path to
+				the binary instead of <code>otto</code>.
 			</p>
 
-			<h3>2. Authentication</h3>
-			<p>
-				If otto requires authentication (API keys, OAuth), the client calls{' '}
-				<code>authenticate</code>.
-			</p>
-
-			<h3>3. Session Setup</h3>
-			<p>
-				The client calls <code>session/new</code> with the working directory and
-				optional MCP server configurations. Otto responds with a session ID,
-				available models, and available modes.
-			</p>
-
-			<h3>4. Prompt Turn</h3>
+			<h2>How to use it</h2>
 			<ol>
-				<li>
-					Client sends <code>session/prompt</code> with user message (text,
-					images, files)
-				</li>
-				<li>
-					Otto streams back via <code>session/update</code> notifications:
-					<ul>
-						<li>
-							<code>agent_message_chunk</code> — text responses
-						</li>
-						<li>
-							<code>agent_thought_chunk</code> — reasoning
-						</li>
-						<li>
-							<code>tool_call</code> / <code>tool_call_update</code> — tool
-							invocations and progress
-						</li>
-						<li>
-							<code>plan</code> — TODO list entries
-						</li>
-					</ul>
-				</li>
-				<li>
-					Otto may call client methods like <code>fs/read_text_file</code>,{' '}
-					<code>fs/write_text_file</code>, <code>terminal/create</code>, and{' '}
-					<code>session/request_permission</code>
-				</li>
-				<li>
-					Turn ends with <code>session/prompt</code> response containing a{' '}
-					<code>stopReason</code>
-				</li>
+				<li>Open a project folder in your editor.</li>
+				<li>Select otto as the ACP agent.</li>
+				<li>Start a new agent session.</li>
+				<li>Send prompts the same way you would in the otto CLI.</li>
 			</ol>
-
-			<h3>5. Cancellation</h3>
 			<p>
-				The client sends <code>session/cancel</code>; otto stops and responds
-				with a <code>cancelled</code> stop reason.
+				The editor may show file edits, terminal output, tool calls, and
+				permission prompts using its own UI. That is expected; otto is running
+				headlessly behind it.
 			</p>
 
-			<h2>Package Structure</h2>
-			<CodeBlock>{`packages/acp/
-├── package.json          # @ottocode/acp
-├── src/
-│   ├── index.ts          # CLI entry point (stdio setup)
-│   ├── agent.ts          # OttoAcpAgent implements Agent
-│   └── utils.ts          # Helpers
-└── tsconfig.json`}</CodeBlock>
+			<h2>What otto supports over ACP</h2>
+			<ul>
+				<li>New, load, list, close, and resume session flows</li>
+				<li>Project working directories and additional directories</li>
+				<li>Text prompts, image prompts, and embedded context</li>
+				<li>Available models and agent modes from your otto configuration</li>
+				<li>Slash commands, including MCP-related commands</li>
+				<li>MCP servers passed by the ACP client</li>
+				<li>Tool call updates, file edits, terminal output, and plans</li>
+			</ul>
 
-			<h2>Usage</h2>
-
-			<h3>Option A: ACP Registry</h3>
-			<p>
-				The preferred distribution method. Once registered, otto becomes
-				available in Zed, JetBrains, and all ACP-compatible clients with
-				one-click install and auto-updates.
-			</p>
-
-			<h3>Option B: Manual Configuration</h3>
-			<p>
-				Add otto as a custom agent in your editor settings. For example, in
-				Zed&rsquo;s <code>settings.json</code>:
-			</p>
-			<CodeBlock>{`{
-  "agent_servers": {
-    "Otto": {
-      "type": "custom",
-      "command": "otto",
-      "args": ["--acp"],
-      "env": {}
-    }
-  }
-}`}</CodeBlock>
-
-			<h2>Implementation Details</h2>
+			<h2>Troubleshooting</h2>
+			<h3>The editor cannot start otto</h3>
 			<ul>
 				<li>
-					<strong>stdio transport:</strong> stdout is reserved for JSON-RPC
-					messages only — all logging goes to stderr
+					Run <code>otto --version</code> in a normal terminal to confirm the
+					CLI is installed.
 				</li>
 				<li>
-					<strong>File operations:</strong> When the client supports{' '}
-					<code>fs.readTextFile</code> / <code>fs.writeTextFile</code>, otto
-					delegates file I/O through the editor for better UX (inline diffs,
-					etc.)
+					If that works in your shell but not in the editor, configure the
+					editor with the absolute path to <code>otto</code>.
 				</li>
 				<li>
-					<strong>Terminal operations:</strong> Delegated to the client when{' '}
-					<code>terminal</code> capability is present
-				</li>
-				<li>
-					<strong>MCP support:</strong> Connects to MCP servers provided by the
-					client during session setup
-				</li>
-				<li>
-					<strong>Tool permissions:</strong> Uses{' '}
-					<code>client.requestPermission()</code> before executing destructive
-					operations
+					Do not wrap the command in an interactive shell unless your editor
+					requires it.
 				</li>
 			</ul>
 
-			<h2>Dependencies</h2>
-			<CodeBlock>{`{
-  "@agentclientprotocol/sdk": "0.14.1"
-}`}</CodeBlock>
+			<h3>The agent starts but cannot use a model</h3>
+			<ul>
+				<li>Check that your provider credentials are configured for otto.</li>
+				<li>
+					Open the same project in a terminal and run a normal otto prompt to
+					verify the configuration outside ACP.
+				</li>
+			</ul>
+
+			<h3>Output looks broken or the connection closes</h3>
+			<ul>
+				<li>
+					ACP uses stdout for protocol messages. Logs and errors should go to
+					stderr.
+				</li>
+				<li>
+					Avoid shell aliases or wrapper scripts that print banners, prompts, or
+					other text to stdout before starting otto.
+				</li>
+			</ul>
+
+			<h2>For maintainers</h2>
 			<p>
-				The SDK handles JSON-RPC framing, message types, and transport.
-				Everything else is powered by otto&rsquo;s existing SDK and server
-				infrastructure.
+				The ACP adapter lives in <code>packages/acp</code>. The public CLI entry
+				point is <code>otto --acp</code>, which calls <code>runAcp()</code> and
+				starts an <code>AgentSideConnection</code> using{' '}
+				<code>@agentclientprotocol/sdk</code>.
 			</p>
+			<CodeBlock>{`packages/acp/src/index.ts   # stdio transport setup
+packages/acp/src/agent.ts   # ACP Agent implementation
+packages/acp/src/events.ts  # otto stream events -> ACP updates
+packages/acp/src/tools.ts   # tool output mapping`}</CodeBlock>
 		</DocPage>
 	);
 }
