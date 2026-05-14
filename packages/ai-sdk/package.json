@@ -1,32 +1,32 @@
 {
-  "name": "@ottorouter/ai-sdk",
-  "version": "0.2.2",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./providers": "./src/providers/index.ts",
-    "./types": "./src/types.ts"
-  },
-  "files": [
-    "src"
-  ],
-  "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.72",
-    "@ai-sdk/google": "^3.0.0",
-    "@ai-sdk/openai": "^3.0.0",
-    "@ai-sdk/openai-compatible": "^2.0.0",
-    "@ai-sdk/xai": "^3.0.0",
-    "@openrouter/ai-sdk-provider": "^1.2.0",
-    "@solana/web3.js": "^1.98.0",
-    "bs58": "^6.0.0",
-    "mppx": "^0.4.6",
-    "mppx-solana": "^0.2.0",
-    "tweetnacl": "^1.0.3"
-  },
-  "peerDependencies": {
-    "ai": ">=6.0.0"
-  },
-  "devDependencies": {
-    "typescript": "~5.9.3"
-  }
+	"name": "@ottorouter/ai-sdk",
+	"version": "0.2.2",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./providers": "./src/providers/index.ts",
+		"./types": "./src/types.ts"
+	},
+	"files": [
+		"src"
+	],
+	"dependencies": {
+		"@ai-sdk/anthropic": "^3.0.72",
+		"@ai-sdk/google": "^3.0.0",
+		"@ai-sdk/openai": "^3.0.0",
+		"@ai-sdk/openai-compatible": "^2.0.0",
+		"@ai-sdk/xai": "^3.0.0",
+		"@openrouter/ai-sdk-provider": "^1.2.0",
+		"@solana/web3.js": "^1.98.0",
+		"bs58": "^6.0.0",
+		"mppx": "^0.4.6",
+		"mppx-solana": "^0.2.0",
+		"tweetnacl": "^1.0.3"
+	},
+	"peerDependencies": {
+		"ai": ">=6.0.0"
+	},
+	"devDependencies": {
+		"typescript": "~5.9.3"
+	}
 }
