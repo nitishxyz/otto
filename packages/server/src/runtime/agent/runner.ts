@@ -22,8 +22,9 @@ import {
 import { triggerDeferredTitleGeneration } from '../message/service.ts';
 import { setupRunner } from './runner-setup.ts';
 import {
-	createMCPPrepareStepState,
+	createLazyToolPrepareStepState,
 	buildPrepareStep,
+	getLoadedLazyToolsFromMessages,
 } from './mcp-prepare-step.ts';
 import { adaptTools as adaptToolsFn } from '../../tools/adapter.ts';
 import {
@@ -96,48 +97,75 @@ async function runAssistant(opts: RunOpts) {
 		providerOptions,
 		isOpenAIOAuth,
 		mcpToolsRecord,
+		builtinLazyToolsRecord,
 		timings,
 	} = setup;
 	let { toolset } = setup;
 
 	const hasMCPTools = Object.keys(mcpToolsRecord).length > 0;
+	const hasBuiltinLazyTools = Object.keys(builtinLazyToolsRecord).length > 0;
 	let prepareStep: ReturnType<typeof buildPrepareStep> | undefined;
 
-	if (hasMCPTools) {
+	if (hasMCPTools || hasBuiltinLazyTools) {
 		const baseToolNames = Object.keys(toolset);
 		const { getAuth: getAuthFn } = await import('@ottocode/sdk');
 		const providerAuth = await getAuthFn(opts.provider, cfg.projectRoot);
-		const adaptedMCP = adaptToolsFn(
-			Object.entries(mcpToolsRecord).map(([name, tool]) => ({ name, tool })),
+		const lazyToolEntries = {
+			...mcpToolsRecord,
+			...builtinLazyToolsRecord,
+		};
+		const adaptedLazyTools = adaptToolsFn(
+			Object.entries(lazyToolEntries).map(([name, tool]) => ({ name, tool })),
 			sharedCtx,
 			opts.provider,
 			providerAuth?.type,
 		);
-		toolset = { ...toolset, ...adaptedMCP };
-		const canonicalToRegistration: Record<string, string> = {};
-		for (const canonical of Object.keys(mcpToolsRecord)) {
-			const regKeys = Object.keys(adaptedMCP);
-			const regName = regKeys.find(
+		toolset = { ...toolset, ...adaptedLazyTools };
+
+		const buildCanonicalMap = (record: Record<string, unknown>) => {
+			const canonicalToRegistration: Record<string, string> = {};
+			for (const canonical of Object.keys(record)) {
+				const regKeys = Object.keys(adaptedLazyTools);
+				const regName = regKeys.find(
+					(k) =>
+						k === canonical ||
+						k.toLowerCase().replace(/_/g, '') ===
+							canonical.toLowerCase().replace(/_/g, ''),
+				);
+				canonicalToRegistration[canonical] = regName ?? canonical;
+			}
+			return canonicalToRegistration;
+		};
+
+		const findLoaderRegistration = (canonical: string) =>
+			Object.keys(toolset).find(
 				(k) =>
 					k === canonical ||
 					k.toLowerCase().replace(/_/g, '') ===
 						canonical.toLowerCase().replace(/_/g, ''),
-			);
-			canonicalToRegistration[canonical] = regName ?? canonical;
+			) ?? canonical;
+
+		const loaders: Parameters<typeof createLazyToolPrepareStepState>[1] = [];
+		if (hasMCPTools) {
+			loaders.push({
+				registrationName: findLoaderRegistration('load_mcp_tools'),
+				canonicalToRegistration: buildCanonicalMap(mcpToolsRecord),
+			});
 		}
-		const loadToolRegName =
-			Object.keys(toolset).find(
-				(k) =>
-					k === 'load_mcp_tools' ||
-					k.toLowerCase().replace(/_/g, '') === 'loadmcptools',
-			) ?? 'load_mcp_tools';
-		const mcpState = createMCPPrepareStepState(
-			mcpToolsRecord,
+		if (hasBuiltinLazyTools) {
+			loaders.push({
+				registrationName: findLoaderRegistration('load_builtin_toolset'),
+				canonicalToRegistration: buildCanonicalMap(builtinLazyToolsRecord),
+			});
+		}
+
+		const initialLoadedTools = getLoadedLazyToolsFromMessages(history, loaders);
+		const lazyState = createLazyToolPrepareStepState(
 			baseToolNames,
-			canonicalToRegistration,
-			loadToolRegName,
+			loaders,
+			initialLoadedTools,
 		);
-		prepareStep = buildPrepareStep(mcpState);
+		prepareStep = buildPrepareStep(lazyState);
 	}
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');

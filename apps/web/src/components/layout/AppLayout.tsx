@@ -19,6 +19,8 @@ import {
 	SettingsSidebarToggle,
 	TunnelSidebar,
 	TunnelSidebarToggle,
+	BrowserSidebar,
+	BrowserSidebarToggle,
 	FileBrowserSidebar,
 	FileBrowserSidebarToggle,
 	FileViewerPanel,
@@ -35,6 +37,7 @@ import {
 	useResearchStore,
 	useSettingsStore,
 	useTunnelStore,
+	useBrowserPanelStore,
 	useFileBrowserStore,
 	useMCPStore,
 	useSkillsStore,
@@ -68,6 +71,7 @@ export const AppLayout = memo(function AppLayout({
 	const researchExpanded = useResearchStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
+	const browserExpanded = useBrowserPanelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
@@ -77,6 +81,7 @@ export const AppLayout = memo(function AppLayout({
 		researchExpanded ||
 		settingsExpanded ||
 		tunnelExpanded ||
+		browserExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
@@ -107,24 +112,26 @@ export const AppLayout = memo(function AppLayout({
 						/>
 						<SettingsSidebar />
 						<TunnelSidebar />
+						<BrowserSidebar />
 						<FileBrowserSidebar />
 						<MCPSidebar />
 						<SkillsSidebar />
 
 						<div
-							className={`flex flex-col w-12 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
+							className={`flex flex-col w-10 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
 						>
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />
 							<ResearchSidebarToggle parentSessionId={sessionId} />
 							<FileBrowserSidebarToggle />
 							<TunnelSidebarToggle />
+							<BrowserSidebarToggle />
 							<MCPSidebarToggle />
 							<SkillsSidebarToggle />
 							<SettingsSidebarToggle />
 							<div className="flex-1" />
 							<TerminalPanelToggle />
-							<div className="h-12 border-t border-border flex items-center justify-center">
+							<div className="h-10 border-t border-border flex items-center justify-center">
 								<Button
 									variant="ghost"
 									size="icon"

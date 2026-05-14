@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod fonts;
 pub mod git;
 pub mod github;

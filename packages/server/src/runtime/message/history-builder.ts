@@ -9,6 +9,7 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
+import { sanitizeToolResultForModel } from '../tools/result-sanitizer.ts';
 
 /**
  * Builds the conversation history for a session from the database,
@@ -195,13 +196,17 @@ export async function buildHistoryMessages(
 							};
 						}
 
+						const sanitizedResult = summarizeImageResultForHistory(
+							obj.name,
+							result.result,
+						);
 						const part = {
 							type: toolType,
 							state: 'output-available',
 							toolCallId: obj.callId,
 							input: obj.args,
 							output: (() => {
-								const r = result.result;
+								const r = sanitizedResult;
 								if (typeof r === 'string') return r;
 								try {
 									return JSON.stringify(r);
@@ -215,7 +220,7 @@ export async function buildHistoryMessages(
 							toolName: obj.name,
 							callId: obj.callId,
 							args: obj.args,
-							result: result.result,
+							result: sanitizedResult,
 						});
 
 						assistantParts.push(part as never);
@@ -231,6 +236,40 @@ export async function buildHistoryMessages(
 	}
 
 	return history;
+}
+
+function summarizeImageResultForHistory(
+	toolName: string,
+	result: unknown,
+): unknown {
+	const sanitized = sanitizeToolResultForModel(result);
+	if (!resultHasImages(sanitized)) return sanitized;
+
+	const record = sanitized as Record<string, unknown>;
+	const images = record.images as Array<{ data?: string }>;
+	const approxBytes = images.reduce((sum, image) => {
+		return (
+			sum + (typeof image.data === 'string' ? image.data.length * 0.75 : 0)
+		);
+	}, 0);
+	return {
+		ok: record.ok,
+		message: `[${toolName} image result omitted from history; capture a fresh screenshot if visual detail is needed]`,
+		artifact: record.artifact,
+		omitted: true,
+		omittedReason:
+			'image tool result is only sent inline during the live tool turn',
+		approxBytes: Math.round(approxBytes),
+	};
+}
+
+function resultHasImages(result: unknown): boolean {
+	return Boolean(
+		result &&
+			typeof result === 'object' &&
+			Array.isArray((result as { images?: unknown }).images) &&
+			(result as { images: unknown[] }).images.length > 0,
+	);
 }
 
 async function _logPendingToolParts(

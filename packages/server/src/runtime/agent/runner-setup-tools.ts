@@ -98,6 +98,9 @@ export function buildAllowedTools(args: {
 		'finish',
 	]);
 	return args.allTools.filter(
-		(tool) => allowedNames.has(tool.name) || tool.name === 'load_mcp_tools',
+		(tool) =>
+			allowedNames.has(tool.name) ||
+			tool.name === 'load_mcp_tools' ||
+			tool.name === 'load_builtin_toolset',
 	);
 }

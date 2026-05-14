@@ -73,6 +73,8 @@ function describeToolResult(info: ToolResultInfo): TargetDescriptor | null {
 			return describeWrite(info);
 		case 'apply_patch':
 			return describePatch(info);
+		case 'simulator':
+			return describeSimulatorTool(info);
 		default:
 			if (toolName.includes('__')) {
 				return describeMcpTool(info);
@@ -200,6 +202,25 @@ function getNumber(value: unknown): number | undefined {
 
 function normalizePath(path: string): string {
 	return path.replace(/\\/g, '/');
+}
+
+function describeSimulatorTool(info: ToolResultInfo): TargetDescriptor | null {
+	const result = getRecord(info.result);
+	const args = getRecord(info.args);
+	if (!result || !Array.isArray(result.images) || result.images.length === 0) {
+		return null;
+	}
+
+	const operation = getString(args?.operation) ?? 'unknown';
+	const estimatedSize = estimateBase64Size(
+		result.images as Array<{ data: string }>,
+	);
+	const path = getString(result.screenshotPath);
+	const summary = `[previous simulator ${operation}] ${
+		path ? normalizePath(path) : 'screenshot'
+	} → ${result.images.length} image(s), ~${Math.round(estimatedSize / 1024)}KB`;
+
+	return { keys: ['simulator:screenshot'], summary };
 }
 
 function describeMcpTool(info: ToolResultInfo): TargetDescriptor | null {

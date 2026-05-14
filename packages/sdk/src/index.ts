@@ -288,6 +288,22 @@ export { createToolError } from './core/src/index.ts';
 export { buildFsTools } from './core/src/index.ts';
 export { buildGitTools } from './core/src/index.ts';
 export {
+	buildSimulatorTool,
+	buildBrowserPanelTool,
+	enqueueBrowserPanelCommand,
+	drainBrowserPanelCommands,
+	completeBrowserPanelCommand,
+	getBrowserPanelState,
+	updateBrowserPanelState,
+	waitForBrowserPanelCommandResult,
+} from './core/src/index.ts';
+export type {
+	BrowserPanelCommand,
+	BrowserPanelCommandResult,
+	BrowserPanelStateSnapshot,
+	BrowserPanelTabSnapshot,
+} from './core/src/index.ts';
+export {
 	appendCoAuthorTrailer,
 	injectCoAuthorIntoGitCommit,
 	OTTOCODE_BOT_NAME,

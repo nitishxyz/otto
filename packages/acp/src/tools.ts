@@ -430,7 +430,7 @@ export function formatToolTitle(
 			return 'Git diff';
 		case 'web_search':
 		case 'websearch':
-			return `Search web: ${args?.query || ''}`;
+			return `Search web: ${truncate(String(args?.query || args?.url || ''), 60)}`;
 		case 'web_fetch':
 			return `Fetch: ${truncate(String(args?.url || ''), 60)}`;
 		case 'terminal':

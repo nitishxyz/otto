@@ -34,6 +34,7 @@ export function buildCapabilitySummary(options?: {
 		? buildSkillLines(options.skills, options.skillSettings)
 		: [];
 	const mcpLines = buildMCPLines(options?.mcpTools);
+	const builtinToolsetLines = buildBuiltinToolsetLines();
 	const components = ['capabilities'];
 	const sections: string[] = [];
 
@@ -44,6 +45,12 @@ export function buildCapabilitySummary(options?: {
 	if (mcpLines.length > 0) {
 		sections.push(['Started MCP capabilities:', ...mcpLines].join('\n'));
 		components.push('capabilities:mcp');
+	}
+	if (builtinToolsetLines.length > 0) {
+		sections.push(
+			['Optional builtin toolsets:', ...builtinToolsetLines].join('\n'),
+		);
+		components.push('capabilities:builtin-toolsets');
 	}
 
 	if (sections.length === 0) {
@@ -62,6 +69,13 @@ export function buildCapabilitySummary(options?: {
 	].join('\n');
 
 	return { prompt, components };
+}
+
+function buildBuiltinToolsetLines(): string[] {
+	return [
+		'- browser: Open, navigate, reload, and close tabs in the right Browser panel. Load with `load_builtin_toolset` when a browser preview panel would help.',
+		'- simulator: Start/view/control iOS Simulator sessions, launch apps, open deep links, install .app bundles, capture screenshots, read logs, and send gestures/buttons. Load with `load_builtin_toolset` for iOS simulator workflows.',
+	];
 }
 
 function buildSkillLines(

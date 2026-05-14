@@ -52,6 +52,22 @@ export type {
 export { buildFsTools } from './tools/builtin/fs/index';
 export { buildGitTools } from './tools/builtin/git';
 export { buildTerminalTool } from './tools/builtin/terminal';
+export { buildSimulatorTool } from './tools/builtin/simulator';
+export { buildBrowserPanelTool } from './tools/builtin/browser-panel';
+export {
+	enqueueBrowserPanelCommand,
+	drainBrowserPanelCommands,
+	completeBrowserPanelCommand,
+	getBrowserPanelState,
+	updateBrowserPanelState,
+	waitForBrowserPanelCommandResult,
+} from './browser-panel/commands';
+export type {
+	BrowserPanelCommand,
+	BrowserPanelCommandResult,
+	BrowserPanelStateSnapshot,
+	BrowserPanelTabSnapshot,
+} from './browser-panel/commands';
 
 // =======================
 // Terminals

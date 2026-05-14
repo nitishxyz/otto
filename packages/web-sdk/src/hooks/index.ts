@@ -22,6 +22,7 @@ export * from './useToolApprovalShortcuts';
 export * from './useTopupCallback';
 export * from './useAuthStatus';
 export * from './useTunnel';
+export * from './useSimulator';
 export * from './useProviderUsage';
 export * from './useFileBrowser';
 export * from './useMCP';

@@ -14,6 +14,7 @@ export * from './topupApprovalStore';
 export * from './onboardingStore';
 export * from './panelWidthStore';
 export * from './tunnelStore';
+export * from './browserPanelStore';
 export * from './usageStore';
 export * from './fileBrowserStore';
 export * from './mcpStore';

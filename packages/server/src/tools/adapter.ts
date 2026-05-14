@@ -46,6 +46,7 @@ import {
 	markToolSucceeded,
 	type ToolFailureState,
 } from './adapter/results.ts';
+import { sanitizeToolResultForModel } from '../runtime/tools/result-sanitizer.ts';
 
 export type { ToolAdapterContext } from '../runtime/tools/context.ts';
 
@@ -378,9 +379,10 @@ export function adaptTools(
 						const resultPartId = crypto.randomUUID();
 						const callId = callIdFromQueue;
 						const startTs = startTsFromQueue;
+						const modelResult = sanitizeToolResultForModel(result);
 						const contentObj = buildToolResultContent({
 							name,
-							result,
+							result: modelResult,
 							callId,
 							input: meta?.args,
 						});
@@ -435,7 +437,7 @@ export function adaptTools(
 						if (name === 'update_todos') {
 							publishPlanUpdated(ctx, contentObj.result);
 						}
-						return result as ToolExecuteReturn;
+						return modelResult as ToolExecuteReturn;
 					} catch (error) {
 						markToolFailed(stepState, failureState, name);
 

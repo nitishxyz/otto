@@ -1,0 +1,9 @@
+Control the Otto Browser panel UI.
+
+This tool lists tabs, opens/navigates pages, reloads/closes tabs, scrolls pages, inspects visible DOM, and sends basic input to tabs in the right-side Browser panel. It is useful for showing local web apps, documentation, and serve-sim simulator previews to the user.
+
+Use `list` to inspect current tabs and get tab IDs. Use `inspect` before choosing selectors; it returns visible interactive elements, basic page text, active element, and viewport/scroll metrics. `scroll` accepts x/y pixel deltas. Control operations (`click`, `type`, `press`) target the active tab by default or `tabId` when provided.
+
+These controls work best for local app previews that allow same-origin iframe access. Some production sites block embedding or DOM access with browser security headers; when that happens the panel will show a fallback and the user can open the URL externally. `screenshot` currently reports that true pixel screenshots require a native/Playwright backend; use `inspect` for current web-panel observability.
+
+For iOS simulator gestures/buttons use the simulator tool. For deep DOM automation/testing, use project test commands or a dedicated browser automation tool when available.

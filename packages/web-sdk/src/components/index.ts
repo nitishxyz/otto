@@ -76,6 +76,10 @@ export * from './settings/OttoRouterTopupModal';
 export * from './tunnel/TunnelSidebar';
 export * from './tunnel/TunnelSidebarToggle';
 
+// Browser Components
+export * from './browser/BrowserSidebar';
+export * from './browser/BrowserSidebarToggle';
+
 // MCP Components
 export * from './mcp/MCPSidebar';
 export * from './mcp/MCPSidebarToggle';

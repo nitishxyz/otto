@@ -60,4 +60,22 @@ describe('discoverProjectTools', () => {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});
+
+	it('exposes browser and simulator tools through lazy builtin toolsets', async () => {
+		const workspaceRoot = await mkdtemp(join(tmpdir(), 'otto-tools-lazy-'));
+		try {
+			const result = await discoverProjectTools(workspaceRoot);
+			const names = result.tools.map((t) => t.name).sort();
+
+			expect(names).toContain('load_builtin_toolset');
+			expect(names).not.toContain('browser_panel');
+			expect(names).not.toContain('simulator');
+			expect(Object.keys(result.builtinLazyToolsRecord).sort()).toEqual([
+				'browser_panel',
+				'simulator',
+			]);
+		} finally {
+			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
 });

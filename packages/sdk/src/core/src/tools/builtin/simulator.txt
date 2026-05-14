@@ -1,0 +1,22 @@
+Control a local iOS Simulator through serve-sim and xcrun simctl.
+
+Use this instead of raw shell commands when the user asks to start, view, launch apps in, inspect, screenshot, or interact with an iOS Simulator. Requires macOS, Xcode command line tools, and a booted simulator.
+
+Operations:
+- start: Start a persistent serve-sim preview process, return the preview URL, usually http://localhost:3200, and automatically open it in the Browser panel.
+- list: List running serve-sim streams.
+- stop: Stop serve-sim streams.
+- button: Press a simulator button such as home.
+- gesture: Send a low-level touch gesture JSON payload supported by serve-sim, e.g. {"type":"begin","x":0.5,"y":0.5}. Prefer swipe for normal swipe requests.
+- swipe: Send a high-level left/right/up/down swipe. Use this when the user asks to swipe instead of manually constructing gesture events.
+- rotate: Rotate orientation: portrait, portrait_upside_down, landscape_left, landscape_right.
+- logs: Fetch logs from the active serve-sim preview URL when available.
+- launch: Launch an installed app by bundleId using xcrun simctl launch. Use this when asked to open/run a simulator app.
+- terminate: Terminate an installed app by bundleId.
+- open_url: Open a URL or deep link in the simulator using xcrun simctl openurl.
+- screenshot: Capture a PNG screenshot using xcrun simctl io booted screenshot. Returns screenshotPath and an inline image preview for chat/tool result rendering.
+- install: Install a .app bundle into the simulator using xcrun simctl install.
+- memory_warning: Simulate a memory warning.
+- ca_debug: Toggle CoreAnimation debug overlays: blended, copies, misaligned, offscreen, slow-animations.
+
+Prefer this simulator tool over shell for simulator-specific actions. After start succeeds, the simulator preview is automatically queued to open in the Browser panel. For visual inspection, use screenshot to capture the current simulator screen, or rely on the Browser panel preview for the human-visible stream.

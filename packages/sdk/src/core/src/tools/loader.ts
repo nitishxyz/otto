@@ -11,6 +11,10 @@ import { buildApplyPatchTool } from './builtin/patch.ts';
 import { updateTodosTool } from './builtin/todos.ts';
 import { buildWebSearchTool } from './builtin/websearch.ts';
 import { buildTerminalTool } from './builtin/terminal.ts';
+import {
+	buildLoadBuiltinToolsetTool,
+	getBuiltinLazyToolsRecord,
+} from './builtin/lazy-toolsets.ts';
 import type { TerminalManager } from '../terminals/index.ts';
 import {
 	initializeSkills,
@@ -35,6 +39,7 @@ export type DiscoveredTool = { name: string; tool: Tool };
 export type DiscoverResult = {
 	tools: DiscoveredTool[];
 	mcpToolsRecord: Record<string, Tool>;
+	builtinLazyToolsRecord: Record<string, Tool>;
 };
 
 type PluginParameter = {
@@ -160,6 +165,9 @@ async function discoverStaticProjectTools(
 		// Web search
 		const ws = buildWebSearchTool();
 		tools.set(ws.name, ws.tool);
+		// Optional builtin toolsets
+		const builtinToolsetLoader = buildLoadBuiltinToolsetTool();
+		tools.set(builtinToolsetLoader.name, builtinToolsetLoader.tool);
 		// Skills
 		await initializeSkills(projectRoot);
 		const skillTool = buildSkillTool();
@@ -226,6 +234,7 @@ export async function discoverProjectTools(
 	return {
 		tools: Array.from(tools.entries()).map(([name, tool]) => ({ name, tool })),
 		mcpToolsRecord,
+		builtinLazyToolsRecord: getBuiltinLazyToolsRecord(),
 	};
 }
 

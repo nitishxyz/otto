@@ -21,6 +21,8 @@ import { registerSessionApprovalRoute } from './routes/session-approval.ts';
 import { registerOttoRouterRoutes } from './routes/ottorouter.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerTunnelRoutes } from './routes/tunnel.ts';
+import { registerSimulatorRoutes } from './routes/simulator.ts';
+import { registerBrowserPanelRoutes } from './routes/browser-panel.ts';
 import { registerMCPRoutes } from './routes/mcp.ts';
 import { registerProviderUsageRoutes } from './routes/provider-usage.ts';
 import { registerDoctorRoutes } from './routes/doctor.ts';
@@ -85,6 +87,8 @@ function initApp() {
 	registerOttoRouterRoutes(app);
 	registerAuthRoutes(app);
 	registerTunnelRoutes(app);
+	registerSimulatorRoutes(app);
+	registerBrowserPanelRoutes(app);
 	registerMCPRoutes(app);
 	registerProviderUsageRoutes(app);
 	registerDoctorRoutes(app);
@@ -160,6 +164,8 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	registerOttoRouterRoutes(honoApp);
 	registerAuthRoutes(honoApp);
 	registerTunnelRoutes(honoApp);
+	registerSimulatorRoutes(honoApp);
+	registerBrowserPanelRoutes(honoApp);
 	registerMCPRoutes(honoApp);
 	registerProviderUsageRoutes(honoApp);
 
@@ -271,6 +277,8 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	registerOttoRouterRoutes(honoApp);
 	registerAuthRoutes(honoApp);
 	registerTunnelRoutes(honoApp);
+	registerSimulatorRoutes(honoApp);
+	registerBrowserPanelRoutes(honoApp);
 	registerMCPRoutes(honoApp);
 	registerProviderUsageRoutes(honoApp);
 
