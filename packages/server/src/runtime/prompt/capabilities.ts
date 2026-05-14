@@ -1,6 +1,5 @@
 import {
 	filterDiscoveredSkills,
-	getDiscoveredSkills,
 	getMCPManager,
 	summarizeDescription,
 	type DiscoveredSkill,
@@ -31,7 +30,9 @@ export function buildCapabilitySummary(options?: {
 	skills?: DiscoveredSkill[];
 	mcpTools?: CapabilitySummaryMCPTool[];
 }): CapabilitySummaryResult {
-	const skillLines = buildSkillLines(options?.skills, options?.skillSettings);
+	const skillLines = options?.skills
+		? buildSkillLines(options.skills, options.skillSettings)
+		: [];
 	const mcpLines = buildMCPLines(options?.mcpTools);
 	const components = ['capabilities'];
 	const sections: string[] = [];
@@ -64,13 +65,10 @@ export function buildCapabilitySummary(options?: {
 }
 
 function buildSkillLines(
-	providedSkills: DiscoveredSkill[] | undefined,
+	providedSkills: DiscoveredSkill[],
 	skillSettings: OttoConfig['skills'] | undefined,
 ): string[] {
-	const skills = filterDiscoveredSkills(
-		providedSkills ?? getDiscoveredSkills(),
-		skillSettings,
-	);
+	const skills = filterDiscoveredSkills(providedSkills, skillSettings);
 	const seen = new Set<string>();
 	const unique: DiscoveredSkill[] = [];
 
@@ -81,7 +79,14 @@ function buildSkillLines(
 		unique.push(skill);
 	}
 
-	unique.sort((a, b) => a.name.localeCompare(b.name));
+	unique.sort((a, b) => {
+		const aExplicitlyEnabled = skillSettings?.items?.[a.name]?.enabled === true;
+		const bExplicitlyEnabled = skillSettings?.items?.[b.name]?.enabled === true;
+		if (aExplicitlyEnabled !== bExplicitlyEnabled) {
+			return aExplicitlyEnabled ? -1 : 1;
+		}
+		return a.name.localeCompare(b.name);
+	});
 
 	const visible = unique.slice(0, MAX_SKILLS).map((skill) => {
 		const summary = finalizeSentence(summarizeDescription(skill.description));

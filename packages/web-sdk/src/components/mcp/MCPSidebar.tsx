@@ -15,6 +15,7 @@ import {
 	Wrench,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import { Modal } from '../ui/Modal';
 import { useMCPStore, type MCPServerInfo } from '../../stores/mcpStore';
 import { useQueryClient } from '@tanstack/react-query';
@@ -393,36 +394,30 @@ export const MCPSidebar = memo(function MCPSidebar() {
 
 	return (
 		<div className="w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
-			<div className="h-14 flex items-center justify-between px-3 border-b border-border">
-				<div className="flex items-center gap-2">
-					<Plug className="w-4 h-4 text-muted-foreground" />
-					<span className="font-medium text-sm">MCP Servers</span>
-					{connectedCount > 0 && (
-						<span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">
-							{connectedCount} active
-						</span>
-					)}
-				</div>
-				<div className="flex items-center gap-1">
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={() => setIsAddModalOpen(true)}
-						title="Add MCP server"
-						className="h-7 w-7"
-					>
-						<Plus className="w-4 h-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={collapseSidebar}
-						title="Close sidebar"
-					>
-						<ChevronRight className="w-4 h-4" />
-					</Button>
-				</div>
-			</div>
+			<SidebarHeader
+				icon={<Plug className="size-[15px]" />}
+				title={
+					<>
+						MCP Servers
+						{connectedCount > 0 && (
+							<span className="ml-2 text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">
+								{connectedCount} active
+							</span>
+						)}
+					</>
+				}
+				onClose={collapseSidebar}
+			>
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={() => setIsAddModalOpen(true)}
+					title="Add MCP server"
+					className="h-7 w-7"
+				>
+					<Plus className="w-4 h-4" />
+				</Button>
+			</SidebarHeader>
 
 			<div className="flex-1 overflow-y-auto">
 				{isFetching && servers.length === 0 ? (

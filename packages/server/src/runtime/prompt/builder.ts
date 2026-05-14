@@ -1,4 +1,4 @@
-import { providerBasePrompt } from '@ottocode/sdk';
+import { discoverSkills, findGitRoot, providerBasePrompt } from '@ottocode/sdk';
 import { composeEnvironmentAndInstructions } from '../context/environment.ts';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import BASE_PROMPT from '@ottocode/sdk/prompts/base.txt' with { type: 'text' };
@@ -130,8 +130,12 @@ export async function composeSystemPrompt(options: {
 		}
 	}
 
+	const repoRoot =
+		(await findGitRoot(options.projectRoot)) ?? options.projectRoot;
+	const skills = await discoverSkills(options.projectRoot, repoRoot);
 	const capabilitySummary = buildCapabilitySummary({
 		skillSettings: options.skillSettings,
+		skills,
 	});
 	if (capabilitySummary.prompt) {
 		parts.push(capabilitySummary.prompt);

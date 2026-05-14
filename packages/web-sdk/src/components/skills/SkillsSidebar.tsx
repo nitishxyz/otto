@@ -1,6 +1,5 @@
 import { memo, useMemo } from 'react';
 import {
-	ChevronRight,
 	Sparkles,
 	Loader2,
 	FolderDot,
@@ -11,6 +10,7 @@ import {
 	RefreshCw,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { useSkillsStore } from '../../stores/skillsStore';
 import {
@@ -74,29 +74,19 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 
 	return (
 		<div className="w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
-			<div className="h-14 flex items-center justify-between px-3 border-b border-border">
-				<div className="flex items-center gap-2">
-					<Sparkles className="w-4 h-4 text-muted-foreground" />
-					<span className="font-medium text-sm">Skills</span>
-				</div>
-				<div className="flex items-center gap-1">
-					<ToggleSwitch
-						checked={globalEnabled}
-						loading={updateSkillsConfig.isPending}
-						onChange={() =>
-							updateSkillsConfig.mutate({ enabled: !globalEnabled })
-						}
-					/>
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={collapseSidebar}
-						title="Close sidebar"
-					>
-						<ChevronRight className="w-4 h-4" />
-					</Button>
-				</div>
-			</div>
+			<SidebarHeader
+				icon={<Sparkles className="size-[15px]" />}
+				title="Skills"
+				onClose={collapseSidebar}
+			>
+				<ToggleSwitch
+					checked={globalEnabled}
+					loading={updateSkillsConfig.isPending}
+					onChange={() =>
+						updateSkillsConfig.mutate({ enabled: !globalEnabled })
+					}
+				/>
+			</SidebarHeader>
 
 			{selectedSkill && skillDetail ? (
 				<div className="flex-1 overflow-y-auto">
@@ -260,7 +250,7 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 				</div>
 			)}
 
-			<div className="h-12 px-4 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
+			<div className="h-9 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
 				<div className="flex items-center gap-2 min-w-0 flex-1">
 					<Sparkles className="w-3 h-3 flex-shrink-0" />
 					<span className="truncate">

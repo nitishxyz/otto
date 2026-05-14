@@ -31,6 +31,10 @@ export function getGlobalConfigPath(): string {
 	return joinPath(getGlobalConfigDir(), 'config.json');
 }
 
+export function getGlobalSkillsConfigPath(): string {
+	return joinPath(getGlobalConfigDir(), 'skills.json');
+}
+
 export function getGlobalAuthPath(): string {
 	return joinPath(getGlobalConfigDir(), 'auth.json');
 }

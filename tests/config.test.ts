@@ -1,8 +1,14 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'bun:test';
-import { loadConfig, setConfig } from '@ottocode/sdk';
+import {
+	getGlobalConfigPath,
+	getGlobalSkillsConfigPath,
+	loadConfig,
+	setConfig,
+	writeSkillSettings,
+} from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
 
 describe('config loader', () => {
@@ -32,6 +38,39 @@ describe('config loader', () => {
 			const cfg = await loadConfig(projectRoot);
 			expect(cfg.defaults.fullWidthContent).toBe(true);
 		} finally {
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('persists skill settings outside the main config file', async () => {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-config-skills-'));
+		const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+
+		try {
+			await writeSkillSettings('global', {
+				items: { 'disabled-skill': { enabled: false } },
+			});
+
+			const cfg = await loadConfig(projectRoot);
+			expect(cfg.skills?.items?.['disabled-skill']?.enabled).toBe(false);
+
+			const skillsFile = await readFile(getGlobalSkillsConfigPath(), 'utf8');
+			expect(JSON.parse(skillsFile).items['disabled-skill'].enabled).toBe(
+				false,
+			);
+
+			const mainConfig = Bun.file(getGlobalConfigPath());
+			if (await mainConfig.exists()) {
+				const mainConfigText = await mainConfig.text();
+				expect(mainConfigText).not.toContain('disabled-skill');
+			}
+		} finally {
+			if (previousXdgConfigHome === undefined) {
+				delete process.env.XDG_CONFIG_HOME;
+			} else {
+				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+			}
 			await rm(projectRoot, { recursive: true, force: true });
 		}
 	});

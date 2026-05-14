@@ -21,6 +21,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
@@ -755,15 +756,11 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
 				defaultWidth={SETTINGS_DEFAULT_WIDTH}
 			/>
 			<div className="flex-1 flex flex-col h-full min-w-0">
-				<div className="h-14 border-b border-border px-3 flex items-center justify-between shrink-0">
-					<div className="flex items-center gap-2">
-						<Settings className="w-4 h-4" />
-						<span className="font-medium">Settings</span>
-					</div>
-					<Button variant="ghost" size="icon" onClick={collapseSidebar}>
-						<ChevronRight className="w-4 h-4" />
-					</Button>
-				</div>
+				<SidebarHeader
+					icon={<Settings className="size-[15px]" />}
+					title="Settings"
+					onClose={collapseSidebar}
+				/>
 
 				<div className="flex-1 overflow-y-auto">
 					<SettingsSection
@@ -844,7 +841,7 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
 					type="button"
 					onClick={() => setIsPreferencesOpen(true)}
 					title="Open preferences"
-					className="group shrink-0 w-full h-12 px-4 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
+					className="group shrink-0 w-full h-10 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
 				>
 					<User className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
 					<span className="text-sm flex-1 text-muted-foreground group-hover:text-foreground transition-colors">

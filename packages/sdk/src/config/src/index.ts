@@ -1,5 +1,6 @@
 import {
 	getGlobalConfigPath,
+	getGlobalSkillsConfigPath,
 	getLocalDataDir,
 	ensureDir,
 	fileExists,
@@ -54,13 +55,16 @@ export async function loadConfig(
 	const dbPath = joinPath(dataDir, 'otto.sqlite');
 	const projectConfigPath = joinPath(dataDir, 'config.json');
 	const globalConfigPath = getGlobalConfigPath();
+	const globalSkillsConfigPath = getGlobalSkillsConfigPath();
 
 	const projectCfg = await readJsonOptional(projectConfigPath);
 	const globalCfg = await readJsonOptional(globalConfigPath);
+	const globalSkillsCfg = await readJsonOptional(globalSkillsConfigPath);
 
 	const merged = deepMerge(
 		DEFAULTS,
 		globalCfg,
+		globalSkillsCfg ? { skills: globalSkillsCfg } : undefined,
 		omitGlobalOnlySettings(projectCfg),
 	);
 

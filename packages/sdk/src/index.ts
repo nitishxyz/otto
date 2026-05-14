@@ -218,6 +218,7 @@ export {
 	getLocalDataDir,
 	getGlobalConfigDir,
 	getGlobalConfigPath,
+	getGlobalSkillsConfigPath,
 	getGlobalAgentsJsonPath,
 	getGlobalAgentsDir,
 	getGlobalToolsDir,

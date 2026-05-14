@@ -43,16 +43,16 @@ export const Sidebar = memo(function Sidebar({
 
 	if (isCollapsed) {
 		return (
-			<aside className="w-12 md:w-12 border-r border-border bg-background flex flex-col transition-all duration-300 ease-in-out hidden md:flex">
-				<div className="h-14 border-b border-border flex items-center justify-center">
+			<aside className="w-10 md:w-10 border-r border-border bg-background flex flex-col transition-all duration-300 ease-in-out hidden md:flex">
+				<div className="h-10 border-b border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={onNewSession}
 						title="New session"
-						className="rounded-full touch-manipulation text-muted-foreground hover:bg-muted/50"
+						className="h-8 w-8 rounded-md touch-manipulation text-muted-foreground hover:bg-muted/50"
 					>
-						<Plus className="w-4 h-4" />
+						<Plus className="size-[18px]" />
 					</Button>
 				</div>
 
@@ -64,16 +64,16 @@ export const Sidebar = memo(function Sidebar({
 					aria-label="Expand sidebar"
 				/>
 
-				<div className="h-12 border-t border-border flex items-center justify-center">
+				<div className="h-10 border-t border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={toggleCollapse}
 						title="Expand sidebar"
 						disabled={isDiffOpen}
-						className="transition-transform duration-200 hover:scale-110 touch-manipulation text-muted-foreground hover:bg-muted/50"
+						className="h-8 w-8 transition-transform duration-200 hover:scale-110 touch-manipulation text-muted-foreground hover:bg-muted/50"
 					>
-						<ChevronRight className="w-4 h-4" />
+						<ChevronRight className="size-[18px]" />
 					</Button>
 				</div>
 			</aside>

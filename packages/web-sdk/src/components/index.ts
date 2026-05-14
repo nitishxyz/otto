@@ -7,6 +7,7 @@ export * from './ui/ConfirmationDialog';
 export * from './ui/Toaster';
 export * from './ui/ToolApprovalDialog';
 export * from './ui/ResizeHandle';
+export * from './ui/SidebarHeader';
 
 // Chat Components
 export * from './chat/ChatInput';

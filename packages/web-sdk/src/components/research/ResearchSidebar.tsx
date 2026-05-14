@@ -1,6 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-	ChevronRight,
 	FlaskConical,
 	Plus,
 	History,
@@ -30,6 +29,7 @@ import { apiClient } from '../../lib/api-client';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import { UnifiedModelSelector } from '../chat/UnifiedModelSelector';
 import { AssistantMessageGroup } from '../messages/AssistantMessageGroup';
 import { UserMessageGroup } from '../messages/UserMessageGroup';
@@ -351,49 +351,35 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 				defaultWidth={DEFAULT_WIDTH}
 			/>
 			<div className="flex-1 flex flex-col h-full min-w-0">
-				{/* Header */}
-				<div className="h-14 border-b border-border px-3 flex items-center justify-between">
-					<div className="flex items-center gap-2 flex-1">
-						<FlaskConical className="w-4 h-4 text-teal-500" />
-						<span className="font-medium text-foreground text-sm">
-							Research
-						</span>
-					</div>
-					<div className="flex items-center gap-0.5">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() => setShowHistory(!showHistory)}
-							title="Research history"
-							className="h-8 w-8"
-						>
-							<History className="w-4 h-4" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={handleCreateNew}
-							disabled={!parentSessionId || createMutation.isPending}
-							title="New research session"
-							className="h-8 w-8"
-						>
-							{createMutation.isPending ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								<Plus className="w-4 h-4" />
-							)}
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={collapseSidebar}
-							title="Close sidebar"
-							className="h-8 w-8"
-						>
-							<ChevronRight className="w-4 h-4" />
-						</Button>
-					</div>
-				</div>
+				<SidebarHeader
+					icon={<FlaskConical className="size-[15px] text-teal-500" />}
+					title="Research"
+					onClose={collapseSidebar}
+				>
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={() => setShowHistory(!showHistory)}
+						title="Research history"
+						className="h-8 w-8"
+					>
+						<History className="w-4 h-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={handleCreateNew}
+						disabled={!parentSessionId || createMutation.isPending}
+						title="New research session"
+						className="h-8 w-8"
+					>
+						{createMutation.isPending ? (
+							<Loader2 className="w-4 h-4 animate-spin" />
+						) : (
+							<Plus className="w-4 h-4" />
+						)}
+					</Button>
+				</SidebarHeader>
 
 				{showHistory ? (
 					<div className="flex-1 overflow-y-auto">
@@ -623,7 +609,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 				)}
 
 				{/* Footer */}
-				<div className="h-12 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
+				<div className="h-9 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
 					<span className="text-[10px]">
 						{sessions.length} research session{sessions.length !== 1 ? 's' : ''}
 					</span>

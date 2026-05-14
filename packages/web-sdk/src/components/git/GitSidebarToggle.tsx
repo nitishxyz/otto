@@ -18,16 +18,16 @@ export const GitSidebarToggle = memo(function GitSidebarToggle() {
 		<button
 			type="button"
 			onClick={toggleSidebar}
-			className={`relative h-14 w-full transition-colors touch-manipulation flex items-center justify-center border-r-2 ${
+			className={`relative h-10 w-full transition-colors touch-manipulation flex items-center justify-center border-r-2 ${
 				isExpanded
 					? 'bg-muted border-primary'
 					: 'border-transparent hover:bg-muted/50'
 			}`}
 			title="Git"
 		>
-			<GitBranch className="w-5 h-5 text-muted-foreground mx-auto" />
+			<GitBranch className="size-[18px] text-muted-foreground mx-auto" />
 			{totalChanges > 0 && (
-				<span className="absolute top-1 right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center font-semibold">
+				<span className="absolute top-0.5 right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center font-semibold">
 					{totalChanges > 9 ? '9+' : totalChanges}
 				</span>
 			)}

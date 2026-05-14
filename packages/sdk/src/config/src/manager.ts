@@ -13,6 +13,7 @@ import type {
 import {
 	getGlobalConfigDir,
 	getGlobalConfigPath,
+	getGlobalSkillsConfigPath,
 	getGlobalDebugDir,
 	getGlobalDebugLogPath,
 	getGlobalDebugSessionsDir,
@@ -151,25 +152,18 @@ export async function writeSkillSettings(
 	updates: SkillSettings,
 	_projectRoot?: string,
 ) {
-	const filePath = getConfigFilePath('global');
+	const filePath = getGlobalSkillsConfigPath();
 	const existing = await readJsonFile(filePath);
-	const prevSkills =
-		existing && typeof existing.skills === 'object'
-			? (existing.skills as Record<string, unknown>)
-			: {};
 	const prevItems =
-		prevSkills.items && typeof prevSkills.items === 'object'
-			? (prevSkills.items as Record<string, unknown>)
+		existing?.items && typeof existing.items === 'object'
+			? (existing.items as Record<string, unknown>)
 			: {};
 	const next = {
 		...existing,
-		skills: {
-			...prevSkills,
-			...updates,
-			items: {
-				...prevItems,
-				...(updates.items ?? {}),
-			},
+		...updates,
+		items: {
+			...prevItems,
+			...(updates.items ?? {}),
 		},
 	};
 	await writeConfigFile(filePath, next);

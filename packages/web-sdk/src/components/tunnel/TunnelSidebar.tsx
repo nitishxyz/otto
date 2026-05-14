@@ -1,7 +1,6 @@
 import { memo, useState } from 'react';
 import {
 	Globe,
-	ChevronRight,
 	Loader2,
 	AlertCircle,
 	Copy,
@@ -10,7 +9,7 @@ import {
 	Clock,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button } from '../ui/Button';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import { useTunnelStore } from '../../stores/tunnelStore';
 import {
 	useStartTunnel,
@@ -68,20 +67,11 @@ export const TunnelSidebar = memo(function TunnelSidebar() {
 
 	return (
 		<div className="w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
-			<div className="h-14 flex items-center justify-between px-3 border-b border-border">
-				<div className="flex items-center gap-2">
-					<Globe className="w-4 h-4 text-muted-foreground" />
-					<span className="font-medium text-sm">Remote Access</span>
-				</div>
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={collapseSidebar}
-					title="Close sidebar"
-				>
-					<ChevronRight className="w-4 h-4" />
-				</Button>
-			</div>
+			<SidebarHeader
+				icon={<Globe className="size-[15px]" />}
+				title="Remote Access"
+				onClose={collapseSidebar}
+			/>
 
 			<div className="flex-1 overflow-y-auto p-4">
 				{status === 'idle' && (

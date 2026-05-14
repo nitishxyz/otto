@@ -1,16 +1,11 @@
 import { memo, useMemo } from 'react';
-import {
-	ChevronRight,
-	FilePen,
-	FilePlus,
-	FileEdit,
-	RefreshCw,
-} from 'lucide-react';
+import { FilePen, FilePlus, FileEdit, RefreshCw } from 'lucide-react';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
 import { useSessionFiles } from '../../hooks/useSessionFiles';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
+import { SidebarHeader } from '../ui/SidebarHeader';
 import type { SessionFile, SessionFileOperation } from '../../types/api';
 
 const PANEL_KEY = 'session-files';
@@ -154,20 +149,20 @@ export const SessionFilesSidebar = memo(function SessionFilesSidebar({
 				defaultWidth={DEFAULT_WIDTH}
 			/>
 			<div className="flex-1 flex flex-col h-full min-w-0">
-				<div className="h-14 border-b border-border px-3 flex items-center justify-between shrink-0">
-					<div className="flex items-center gap-2">
-						<FilePen className="w-4 h-4 text-muted-foreground" />
-						<span className="font-medium">Session Files</span>
-						{data && data.totalFiles > 0 && (
-							<span className="text-xs text-muted-foreground">
-								({data.totalFiles})
-							</span>
-						)}
-					</div>
-					<Button variant="ghost" size="icon" onClick={collapseSidebar}>
-						<ChevronRight className="w-4 h-4" />
-					</Button>
-				</div>
+				<SidebarHeader
+					icon={<FilePen className="size-[15px]" />}
+					title={
+						<>
+							Session Files
+							{data && data.totalFiles > 0 && (
+								<span className="ml-2 text-xs text-muted-foreground">
+									({data.totalFiles})
+								</span>
+							)}
+						</>
+					}
+					onClose={collapseSidebar}
+				/>
 
 				<div className="flex-1 overflow-y-auto">
 					{isLoading ? (
@@ -191,7 +186,7 @@ export const SessionFilesSidebar = memo(function SessionFilesSidebar({
 					)}
 				</div>
 
-				<div className="h-12 px-4 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
+				<div className="h-9 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
 					<div className="flex items-center gap-2 min-w-0 flex-1">
 						<FilePen className="w-3 h-3 flex-shrink-0" />
 						{data && data.totalOperations > 0 ? (
