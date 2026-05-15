@@ -15,7 +15,7 @@ export function appendRunnerReminderMessages(args: {
 		messages.push(
 			isOpenAIOAuth
 				? {
-						role: 'system',
+						role: 'user',
 						content:
 							'[system-reminder] Continuing an existing session. Execute directly, use tools as needed, and call `finish` at the end. For simple questions, your answer IS the response — do not add a "Summary:" recap.',
 					}
@@ -32,7 +32,7 @@ export function appendRunnerReminderMessages(args: {
 	messages.push(
 		isOpenAIOAuth
 			? {
-					role: 'system',
+					role: 'user',
 					content:
 						'[system-reminder] Your previous response stopped mid-task. Resume from where you left off and complete the actual work — not a plan-only update.',
 				}

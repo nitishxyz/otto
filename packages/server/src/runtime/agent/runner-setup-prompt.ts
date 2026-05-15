@@ -183,3 +183,13 @@ export function appendRunnerPromptMessages(args: {
 		additionalSystemMessages.push(...opts.additionalPromptMessages);
 	}
 }
+
+export function moveSystemMessagesToUserForOpenAIOAuth(
+	messages: Array<{ role: 'system' | 'user'; content: string }>,
+): void {
+	for (const message of messages) {
+		if (message.role !== 'system') continue;
+		message.role = 'user';
+		message.content = `<system-message>${message.content}</system-message>`;
+	}
+}

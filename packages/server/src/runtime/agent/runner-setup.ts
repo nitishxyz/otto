@@ -14,6 +14,7 @@ import { resolveAgentConfig } from './registry.ts';
 import {
 	appendRunnerPromptMessages,
 	buildRunnerPrompt,
+	moveSystemMessagesToUserForOpenAIOAuth,
 } from './runner-setup-prompt.ts';
 import {
 	buildAllowedTools,
@@ -134,6 +135,9 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		opts,
 		additionalSystemMessages: prompt.additionalSystemMessages,
 	});
+	if (prompt.isOpenAIOAuth) {
+		moveSystemMessagesToUserForOpenAIOAuth(prompt.additionalSystemMessages);
+	}
 
 	const gated = buildAllowedTools({
 		agentName: agentCfg.name,
