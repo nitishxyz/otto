@@ -221,10 +221,10 @@ jobs:
           printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > .npmrc
           echo "always-auth=true" >> .npmrc
 
-      - name: Install dependencies (all platforms)
+      - name: Install dependencies
         shell: bash
         run: |
-          bun install --os="*" --cpu="*"
+          bun install --os="${{ matrix.os }}" --cpu="${{ matrix.arch }}"
 
       - name: Download ripgrep binary
         shell: bash
