@@ -1,5 +1,5 @@
 import type { ProviderName } from '../provider/index.ts';
-import { publish } from '../../events/bus.ts';
+import { publish, publishClientEvent } from '../../events/bus.ts';
 import type { ToolApprovalMode } from '../tools/approval.ts';
 import type { ReasoningLevel } from '@ottocode/sdk';
 
@@ -234,6 +234,17 @@ export function setCurrentMessage(sessionId: string, messageId: string | null) {
 	if (state) {
 		state.currentMessageId = messageId;
 		publishQueueState(sessionId);
+		if (messageId) {
+			publishClientEvent({
+				type: 'session.status',
+				payload: {
+					sessionId,
+					status: 'running',
+					messageId,
+					createdAt: new Date().toISOString(),
+				},
+			});
+		}
 	}
 }
 
@@ -243,6 +254,15 @@ export function dequeueJob(sessionId: string): RunOpts | undefined {
 	if (job && state) {
 		state.currentMessageId = job.assistantMessageId;
 		publishQueueState(sessionId);
+		publishClientEvent({
+			type: 'session.status',
+			payload: {
+				sessionId,
+				status: 'running',
+				messageId: job.assistantMessageId,
+				createdAt: new Date().toISOString(),
+			},
+		});
 	}
 	return job;
 }

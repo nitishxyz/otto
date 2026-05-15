@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import {
+	isPermissionGranted,
+	onAction,
+	requestPermission,
+	sendNotification,
+} from '@tauri-apps/plugin-notification';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Sun, Moon, ArrowDownToLine, RotateCw } from 'lucide-react';
 import { useServer } from '../hooks/useServer';
 import { useUpdate } from '../hooks/useUpdate';
@@ -12,6 +19,55 @@ import { SetuLoader } from './SetuLoader';
 import { useDesktopTheme } from '../App';
 import { WindowControls } from './WindowControls';
 import { useVersion } from '../hooks/useVersion';
+
+type OttoNotificationMessage = {
+	type: 'otto-notification';
+	notification?: {
+		id: string;
+		title: string;
+		body?: string;
+		sessionId?: string;
+	};
+};
+
+const notificationSessions = new Map<number, string>();
+
+function notificationIdFromString(id: string) {
+	let hash = 0;
+	for (let i = 0; i < id.length; i++) {
+		hash = (hash * 31 + id.charCodeAt(i)) | 0;
+	}
+	return Math.abs(hash || Date.now()) % 2_147_483_647;
+}
+
+async function showNativeNotification(message: OttoNotificationMessage) {
+	const notification = message.notification;
+	if (!notification?.title) return;
+	const appWindow = getCurrentWindow();
+
+	let permissionGranted = await isPermissionGranted();
+	if (!permissionGranted) {
+		const permission = await requestPermission();
+		permissionGranted = permission === 'granted';
+	}
+
+	if (!permissionGranted) return;
+	const id = notificationIdFromString(notification.id);
+	if (notification.sessionId) {
+		notificationSessions.set(id, notification.sessionId);
+	}
+
+	sendNotification({
+		id,
+		title: notification.title,
+		body: notification.body,
+		autoCancel: true,
+		sound: 'Ping',
+		extra: notification.sessionId
+			? { sessionId: notification.sessionId, windowLabel: appWindow.label }
+			: undefined,
+	});
+}
 
 export function Workspace({
 	project,
@@ -44,8 +100,35 @@ export function Workspace({
 		if (!server) return null;
 		return `${server.url}?_t=${Date.now()}&_pid=${server.pid}&_project=${encodeURIComponent(project.path)}`;
 	}, [server, project.path]);
+	const focusIframe = useCallback(() => {
+		iframeRef.current?.contentWindow?.focus();
+	}, []);
 
 	const isRemote = !!project.remoteUrl;
+	const openSession = useCallback(
+		async (sessionId: string) => {
+			if (!server) return;
+			const appWindow = getCurrentWindow();
+			await appWindow.unminimize().catch(() => {});
+			await appWindow.show().catch(() => {});
+			await appWindow.setFocus().catch(() => {});
+
+			const target = iframeRef.current;
+			if (target?.contentWindow) {
+				target.contentWindow.postMessage(
+					{ type: 'otto-navigate-session', sessionId },
+					new URL(server.url).origin,
+				);
+				focusIframe();
+				return;
+			}
+
+			setIframeLoaded(false);
+			const url = `${server.url}/sessions/${sessionId}?_t=${Date.now()}&_pid=${server.pid}&_project=${encodeURIComponent(project.path)}`;
+			if (target) target.src = url;
+		},
+		[server, project.path, focusIframe],
+	);
 
 	const handleBack = async () => {
 		await stopServer();
@@ -73,10 +156,6 @@ export function Workspace({
 		if (!server) setIframeLoaded(false);
 	}, [server]);
 
-	const focusIframe = useCallback(() => {
-		iframeRef.current?.contentWindow?.focus();
-	}, []);
-
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
 			const target = e.target as HTMLElement;
@@ -93,17 +172,63 @@ export function Workspace({
 	}, [focusIframe]);
 
 	useEffect(() => {
+		let cancelled = false;
+		const currentWindowLabel = getCurrentWindow().label;
+		const listener = onAction((notification) => {
+			const notificationWindowLabel =
+				typeof notification.extra?.windowLabel === 'string'
+					? notification.extra.windowLabel
+					: undefined;
+			if (
+				notificationWindowLabel &&
+				notificationWindowLabel !== currentWindowLabel
+			) {
+				return;
+			}
+
+			const sessionId =
+				notification.id && notificationSessions.has(notification.id)
+					? notificationSessions.get(notification.id)
+					: notificationWindowLabel === currentWindowLabel &&
+							typeof notification.extra?.sessionId === 'string'
+						? notification.extra.sessionId
+						: undefined;
+			if (sessionId) {
+				openSession(sessionId).catch((error: unknown) => {
+					console.error('[otto] Failed to open notification session:', error);
+				});
+			}
+		});
+
+		return () => {
+			cancelled = true;
+			listener.then((l) => {
+				if (cancelled) void l.unregister();
+			});
+		};
+	}, [openSession]);
+
+	useEffect(() => {
 		const handler = (e: MessageEvent) => {
+			if (e.source !== iframeRef.current?.contentWindow) return;
+
 			if (e.data?.type === 'otto-open-url' && typeof e.data.url === 'string') {
 				openUrl(e.data.url).catch((err: unknown) => {
 					console.error('[otto] Failed to open URL:', err);
 				});
 			}
 
+			if (e.data?.type === 'otto-notification') {
+				showNativeNotification(e.data as OttoNotificationMessage).catch(
+					(error: unknown) => {
+						console.error('[otto] Failed to show notification:', error);
+					},
+				);
+			}
+
 			if (
 				e.data?.type === 'otto-font-family-changed' &&
-				typeof e.data.fontFamily === 'string' &&
-				e.source === iframeRef.current?.contentWindow
+				typeof e.data.fontFamily === 'string'
 			) {
 				document.documentElement.style.setProperty(
 					'--otto-font-family',
@@ -117,8 +242,7 @@ export function Workspace({
 
 			if (
 				e.data?.type === 'otto-list-system-fonts' &&
-				typeof e.data.requestId === 'string' &&
-				e.source === iframeRef.current?.contentWindow
+				typeof e.data.requestId === 'string'
 			) {
 				const source = iframeRef.current?.contentWindow;
 				if (!source) return;

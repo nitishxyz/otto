@@ -112,6 +112,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(ServerState::default())
         .manage(commands::updater::PendingUpdate(Mutex::new(None)))
         .manage(commands::updater::ReadyUpdate(Mutex::new(None)))

@@ -10,7 +10,8 @@ export interface Toast {
 	icon?: string;
 	action?: {
 		label: string;
-		href: string;
+		href?: string;
+		onClick?: () => void | Promise<void>;
 	};
 }
 
@@ -68,7 +69,11 @@ toast.loading = (message: string) => toast(message, 'loading', 0);
 
 toast.successWithAction = (
 	message: string,
-	action: { label: string; href: string },
+	action: {
+		label: string;
+		href?: string;
+		onClick?: () => void | Promise<void>;
+	},
 	duration = 6000,
 ) => {
 	const id = useToastStore.getState().addToast({

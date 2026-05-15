@@ -15,6 +15,7 @@ import {
 	useTheme,
 	useWorkingDirectory,
 	useKeyboardShortcuts,
+	useClientEvents,
 } from '@ottocode/web-sdk/hooks';
 import { useGitStore, useConfirmationStore } from '@ottocode/web-sdk/stores';
 import { apiClient } from '@ottocode/web-sdk/lib';
@@ -51,6 +52,7 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 	);
 
 	useWorkingDirectory();
+	useClientEvents(sessionId);
 	useSetuPayments(sessionId);
 	useOttoRouterBalance(config?.defaults?.provider);
 
@@ -181,6 +183,24 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 			focusInput();
 		}
 	}, [sessionId, focusInput]);
+
+	useEffect(() => {
+		const handler = (event: MessageEvent) => {
+			if (
+				event.data?.type === 'otto-navigate-session' &&
+				typeof event.data.sessionId === 'string'
+			) {
+				navigate({
+					to: '/sessions/$sessionId',
+					params: { sessionId: event.data.sessionId },
+				});
+				focusInput();
+			}
+		};
+
+		window.addEventListener('message', handler);
+		return () => window.removeEventListener('message', handler);
+	}, [navigate, focusInput]);
 
 	const mainContent = useMemo(() => {
 		if (!sessionId) {

@@ -51,9 +51,14 @@ function ToastItem({ toast }: { toast: Toast }) {
 			{toast.action && (
 				<button
 					type="button"
-					onClick={(e) => {
+					onClick={async (e) => {
 						e.stopPropagation();
-						openUrl(toast.action?.href);
+						if (toast.action?.onClick) {
+							await toast.action.onClick();
+						} else if (toast.action?.href) {
+							openUrl(toast.action.href);
+						}
+						handleDismiss();
 					}}
 					className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline"
 				>

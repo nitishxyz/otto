@@ -1,7 +1,7 @@
 import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
-import { publish } from '../../events/bus.ts';
+import { publish, publishClientEvent } from '../../events/bus.ts';
 import { estimateModelCostUsd } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
 import { markSessionCompacted } from '../message/compaction.ts';
@@ -82,6 +82,33 @@ export function createFinishHandler(
 				usage,
 				costUsd,
 				finishReason: fin.finishReason,
+			},
+		});
+
+		const createdAt = new Date().toISOString();
+		const status = fin.finishReason === 'error' ? 'failed' : 'completed';
+		publishClientEvent({
+			type: 'session.status',
+			payload: {
+				sessionId: opts.sessionId,
+				status,
+				messageId: opts.assistantMessageId,
+				createdAt,
+			},
+		});
+		publishClientEvent({
+			type: 'notification',
+			payload: {
+				id: crypto.randomUUID(),
+				level: status === 'failed' ? 'error' : 'success',
+				title: status === 'failed' ? 'Session failed' : 'Session completed',
+				body:
+					status === 'failed'
+						? 'An assistant run ended with an error.'
+						: 'An assistant run finished successfully.',
+				source: 'session',
+				sessionId: opts.sessionId,
+				createdAt,
 			},
 		});
 	};

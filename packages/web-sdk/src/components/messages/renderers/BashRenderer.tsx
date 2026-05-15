@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { Terminal } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
 	prism,
 	vscDarkPlus,
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { loadNerdFont, NERD_FONT_FAMILY } from '../../../lib/nerd-font';
 import type { RendererProps } from './types';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
@@ -23,6 +25,10 @@ export function BashRenderer({
 	onToggle,
 	compact,
 }: RendererProps) {
+	useEffect(() => {
+		void loadNerdFont();
+	}, []);
+
 	const result = contentJson.result || {};
 	const args = contentJson.args || {};
 
@@ -51,6 +57,20 @@ export function BashRenderer({
 	const isError = hasToolError || exitCode !== 0;
 	const hasStderr = stderr.length > 0;
 	const combinedOutput = stdout + (stdout && stderr ? '\n' : '') + stderr;
+	const outputStyle = {
+		margin: 0,
+		padding: '0.75rem',
+		fontFamily: NERD_FONT_FAMILY,
+		fontSize: '0.75rem',
+		lineHeight: '1.5',
+		background: 'transparent',
+		maxWidth: '100%',
+	};
+	const outputCodeProps = {
+		style: {
+			fontFamily: NERD_FONT_FAMILY,
+		},
+	};
 
 	return (
 		<div className="text-xs">
@@ -118,14 +138,8 @@ export function BashRenderer({
 								<SyntaxHighlighter
 									language="bash"
 									style={syntaxTheme}
-									customStyle={{
-										margin: 0,
-										padding: '0.75rem',
-										fontSize: '0.75rem',
-										lineHeight: '1.5',
-										background: 'transparent',
-										maxWidth: '100%',
-									}}
+									customStyle={outputStyle}
+									codeTagProps={outputCodeProps}
 									wrapLines
 									wrapLongLines
 								>
@@ -143,14 +157,8 @@ export function BashRenderer({
 										<SyntaxHighlighter
 											language="bash"
 											style={syntaxTheme}
-											customStyle={{
-												margin: 0,
-												padding: '0.75rem',
-												fontSize: '0.75rem',
-												lineHeight: '1.5',
-												background: 'transparent',
-												maxWidth: '100%',
-											}}
+											customStyle={outputStyle}
+											codeTagProps={outputCodeProps}
 											wrapLines
 											wrapLongLines
 										>
@@ -168,14 +176,8 @@ export function BashRenderer({
 										<SyntaxHighlighter
 											language="bash"
 											style={syntaxTheme}
-											customStyle={{
-												margin: 0,
-												padding: '0.75rem',
-												fontSize: '0.75rem',
-												lineHeight: '1.5',
-												background: 'transparent',
-												maxWidth: '100%',
-											}}
+											customStyle={outputStyle}
+											codeTagProps={outputCodeProps}
 											wrapLines
 											wrapLongLines
 										>

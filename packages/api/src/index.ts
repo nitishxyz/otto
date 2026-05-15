@@ -27,11 +27,25 @@ export * from './generated/schemas.gen';
 
 // Export SSE utilities
 export {
+	buildClientEventsStreamUrl,
 	buildSessionStreamUrl,
+	createClientEventsStream,
 	createSSEStream,
+	isClientEvent,
+	isServerEvent,
 	parseSSEEvent,
 } from './streaming';
-export type { SSEEvent, SSEStreamOptions } from './streaming';
+export type {
+	ClientEvent,
+	ClientEventsStreamOptions,
+	NotificationAction,
+	NotificationEvent,
+	NotificationLevel,
+	SSEEvent,
+	SSEStreamOptions,
+	ServerEvent,
+	SessionStatusEvent,
+} from './streaming';
 
 // Export helpers
 export { isApiError, handleApiError } from './utils';

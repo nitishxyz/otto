@@ -9,6 +9,7 @@ import { registerOpenApiRoute } from './routes/openapi.ts';
 import { registerSessionsRoutes } from './routes/sessions.ts';
 import { registerSessionMessagesRoutes } from './routes/session-messages.ts';
 import { registerSessionStreamRoute } from './routes/session-stream.ts';
+import { registerClientEventsRoute } from './routes/client-events.ts';
 import { registerAskRoutes } from './routes/ask.ts';
 import { registerConfigRoutes } from './routes/config/index.ts';
 import { registerFilesRoutes } from './routes/files.ts';
@@ -34,8 +35,23 @@ setTerminalManager(globalTerminalManager);
 // Suppress noisy AI SDK provider warnings unless debug mode is enabled.
 installAiSdkWarningHandler();
 
+const corsAllowHeaders = [
+	'Content-Type',
+	'Authorization',
+	'X-Requested-With',
+	'Access-Control-Request-Private-Network',
+];
+
+function applyPrivateNetworkAccessHeaders(app: OpenAPIHono<BlankEnv>) {
+	app.use('*', async (c, next) => {
+		c.header('Access-Control-Allow-Private-Network', 'true');
+		await next();
+	});
+}
+
 function initApp() {
 	const app = new OpenAPIHono<BlankEnv>();
+	applyPrivateNetworkAccessHeaders(app);
 
 	// Enable CORS for localhost and local network access
 	app.use(
@@ -61,7 +77,7 @@ function initApp() {
 				return origin;
 			},
 			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+			allowHeaders: corsAllowHeaders,
 			exposeHeaders: ['Content-Length', 'X-Request-Id'],
 			credentials: true,
 			maxAge: 600,
@@ -74,6 +90,7 @@ function initApp() {
 	registerSessionApprovalRoute(app);
 	registerSessionMessagesRoutes(app);
 	registerSessionStreamRoute(app);
+	registerClientEventsRoute(app);
 	registerAskRoutes(app);
 	registerConfigRoutes(app);
 	registerFilesRoutes(app);
@@ -112,6 +129,7 @@ export type StandaloneAppConfig = {
 
 export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	const honoApp = new OpenAPIHono<BlankEnv>();
+	applyPrivateNetworkAccessHeaders(honoApp);
 
 	honoApp.use(
 		'*',
@@ -136,7 +154,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 				return origin;
 			},
 			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+			allowHeaders: corsAllowHeaders,
 			exposeHeaders: ['Content-Length', 'X-Request-Id'],
 			credentials: true,
 			maxAge: 600,
@@ -149,6 +167,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	registerSessionApprovalRoute(honoApp);
 	registerSessionMessagesRoutes(honoApp);
 	registerSessionStreamRoute(honoApp);
+	registerClientEventsRoute(honoApp);
 	registerAskRoutes(honoApp);
 	registerConfigRoutes(honoApp);
 	registerFilesRoutes(honoApp);
@@ -205,6 +224,7 @@ export type EmbeddedAppConfig = {
 
 export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	const honoApp = new OpenAPIHono<BlankEnv>();
+	applyPrivateNetworkAccessHeaders(honoApp);
 
 	// Store injected config in Hono context for routes to access
 	// Config can be empty - routes will fall back to files/env
@@ -247,7 +267,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 				return origin;
 			},
 			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+			allowHeaders: corsAllowHeaders,
 			exposeHeaders: ['Content-Length', 'X-Request-Id'],
 			credentials: true,
 			maxAge: 600,
@@ -260,6 +280,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	registerSessionApprovalRoute(honoApp);
 	registerSessionMessagesRoutes(honoApp);
 	registerSessionStreamRoute(honoApp);
+	registerClientEventsRoute(honoApp);
 	registerAskRoutes(honoApp);
 	registerConfigRoutes(honoApp);
 	registerFilesRoutes(honoApp);

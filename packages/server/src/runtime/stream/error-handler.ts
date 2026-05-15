@@ -2,7 +2,7 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { APICallError } from 'ai';
-import { publish } from '../../events/bus.ts';
+import { publish, publishClientEvent } from '../../events/bus.ts';
 import { toErrorPayload } from '../errors/handling.ts';
 import type { RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
@@ -347,6 +347,29 @@ export function createErrorHandler(
 				details: errorPayload.details,
 				isAborted: false,
 				autoCompacted: isPromptTooLong && !opts.isCompactCommand,
+			},
+		});
+
+		const createdAt = new Date().toISOString();
+		publishClientEvent({
+			type: 'session.status',
+			payload: {
+				sessionId: opts.sessionId,
+				status: 'failed',
+				messageId: opts.assistantMessageId,
+				createdAt,
+			},
+		});
+		publishClientEvent({
+			type: 'notification',
+			payload: {
+				id: crypto.randomUUID(),
+				level: 'error',
+				title: 'Session failed',
+				body: displayMessage,
+				source: 'session',
+				sessionId: opts.sessionId,
+				createdAt,
 			},
 		});
 	};

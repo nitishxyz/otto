@@ -34,3 +34,34 @@ export interface OttoEvent<T = unknown> {
 	sessionId: string;
 	payload?: T;
 }
+
+export type NotificationLevel = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationAction {
+	label: string;
+	href: string;
+}
+
+export interface NotificationEvent {
+	id: string;
+	level: NotificationLevel;
+	title: string;
+	body?: string;
+	action?: NotificationAction;
+	createdAt: string;
+	expiresAt?: string;
+	source?: 'agent' | 'system' | 'session' | 'auth' | 'billing';
+	sessionId?: string;
+}
+
+export interface SessionStatusEvent {
+	sessionId: string;
+	status: 'running' | 'completed' | 'failed' | 'needs_attention';
+	messageId?: string;
+	createdAt: string;
+}
+
+export type ClientEvent =
+	| { type: 'notification'; payload: NotificationEvent }
+	| { type: 'session.status'; payload: SessionStatusEvent }
+	| { type: 'heartbeat'; payload: { createdAt: string } };

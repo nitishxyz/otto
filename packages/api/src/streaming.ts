@@ -51,6 +51,38 @@ export interface SSEStreamOptions {
 	onClose?: () => void;
 }
 
+export interface ClientEventsStreamOptions {
+	/**
+	 * Base URL of the API server
+	 */
+	baseUrl: string;
+
+	/**
+	 * Project path (optional)
+	 */
+	projectPath?: string;
+
+	/**
+	 * Custom fetch implementation
+	 */
+	fetch?: typeof fetch;
+
+	/**
+	 * Callback for each parsed SSE event
+	 */
+	onEvent: (event: SSEEvent) => void;
+
+	/**
+	 * Error handler
+	 */
+	onError?: (error: Error) => void;
+
+	/**
+	 * Connection closed handler
+	 */
+	onClose?: () => void;
+}
+
 export function buildSessionStreamUrl(options: {
 	baseUrl: string;
 	sessionId: string;
@@ -64,54 +96,36 @@ export function buildSessionStreamUrl(options: {
 	});
 }
 
-/**
- * Create an SSE stream connection to a session
- *
- * @example
- * ```typescript
- * import { createSSEStream } from '@ottocode/api';
- *
- * const controller = new AbortController();
- *
- * createSSEStream({
- *   baseUrl: 'http://localhost:9100',
- *   sessionId: 'session-123',
- *   onEvent: (event) => {
- *     console.log('Event:', event.event, event.data);
- *     const data = JSON.parse(event.data);
- *     // Handle different event types...
- *   },
- *   onError: (error) => {
- *     console.error('Stream error:', error);
- *   },
- *   onClose: () => {
- *     console.log('Stream closed');
- *   }
- * }, controller.signal);
- *
- * // Later: controller.abort() to close the stream
- * ```
- */
-export async function createSSEStream(
-	options: SSEStreamOptions,
+export function buildClientEventsStreamUrl(options: {
+	baseUrl: string;
+	projectPath?: string;
+}) {
+	return client.buildUrl({
+		baseURL: options.baseUrl,
+		url: '/v1/events/stream',
+		query: options.projectPath ? { project: options.projectPath } : undefined,
+	});
+}
+
+async function createStreamToUrl(
+	options: {
+		baseUrl: string;
+		url: string;
+		fetch?: typeof fetch;
+		onEvent: (event: SSEEvent) => void;
+		onError?: (error: Error) => void;
+		onClose?: () => void;
+	},
 	signal?: AbortSignal,
 ): Promise<void> {
 	const {
 		baseUrl,
-		sessionId,
-		projectPath,
+		url,
 		fetch: customFetch,
 		onEvent,
 		onError,
 		onClose,
 	} = options;
-
-	const url = buildSessionStreamUrl({
-		baseUrl,
-		sessionId,
-		projectPath,
-	});
-
 	const fetchImpl = customFetch || fetch;
 
 	const isTunnel =
@@ -171,6 +185,62 @@ export async function createSSEStream(
 			onError?.(error as Error);
 		}
 	}
+}
+
+/**
+ * Create an SSE stream connection to a session
+ *
+ * @example
+ * ```typescript
+ * import { createSSEStream } from '@ottocode/api';
+ *
+ * const controller = new AbortController();
+ *
+ * createSSEStream({
+ *   baseUrl: 'http://localhost:9100',
+ *   sessionId: 'session-123',
+ *   onEvent: (event) => {
+ *     console.log('Event:', event.event, event.data);
+ *     const data = JSON.parse(event.data);
+ *     // Handle different event types...
+ *   },
+ *   onError: (error) => {
+ *     console.error('Stream error:', error);
+ *   },
+ *   onClose: () => {
+ *     console.log('Stream closed');
+ *   }
+ * }, controller.signal);
+ *
+ * // Later: controller.abort() to close the stream
+ * ```
+ */
+export async function createSSEStream(
+	options: SSEStreamOptions,
+	signal?: AbortSignal,
+): Promise<void> {
+	const url = buildSessionStreamUrl({
+		baseUrl: options.baseUrl,
+		sessionId: options.sessionId,
+		projectPath: options.projectPath,
+	});
+
+	return createStreamToUrl({ ...options, url }, signal);
+}
+
+/**
+ * Create an app-level SSE stream connection for global client events.
+ */
+export async function createClientEventsStream(
+	options: ClientEventsStreamOptions,
+	signal?: AbortSignal,
+): Promise<void> {
+	const url = buildClientEventsStreamUrl({
+		baseUrl: options.baseUrl,
+		projectPath: options.projectPath,
+	});
+
+	return createStreamToUrl({ ...options, url }, signal);
 }
 
 /**
@@ -268,6 +338,37 @@ export interface ErrorEvent {
 	error: string;
 }
 
+export type NotificationLevel = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationAction {
+	label: string;
+	href: string;
+}
+
+export interface NotificationEvent {
+	id: string;
+	level: NotificationLevel;
+	title: string;
+	body?: string;
+	action?: NotificationAction;
+	createdAt: string;
+	expiresAt?: string;
+	source?: 'agent' | 'system' | 'session' | 'auth' | 'billing';
+	sessionId?: string;
+}
+
+export interface SessionStatusEvent {
+	sessionId: string;
+	status: 'running' | 'completed' | 'failed' | 'needs_attention';
+	messageId?: string;
+	createdAt: string;
+}
+
+export type ClientEvent =
+	| { type: 'notification'; payload: NotificationEvent }
+	| { type: 'session.status'; payload: SessionStatusEvent }
+	| { type: 'heartbeat'; payload: { createdAt: string } };
+
 /**
  * Type guard to check if an event is a specific type
  */
@@ -275,6 +376,21 @@ export function isServerEvent<T extends ServerEvent['type']>(
 	event: unknown,
 	type: T,
 ): event is Extract<ServerEvent, { type: T }> {
+	return (
+		typeof event === 'object' &&
+		event !== null &&
+		'type' in event &&
+		event.type === type
+	);
+}
+
+/**
+ * Type guard to check if a global client event is a specific type.
+ */
+export function isClientEvent<T extends ClientEvent['type']>(
+	event: unknown,
+	type: T,
+): event is Extract<ClientEvent, { type: T }> {
 	return (
 		typeof event === 'object' &&
 		event !== null &&

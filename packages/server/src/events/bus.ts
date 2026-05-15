@@ -1,8 +1,10 @@
-import type { OttoEvent } from './types.ts';
+import type { ClientEvent, NotificationEvent, OttoEvent } from './types.ts';
 
 type Subscriber = (evt: OttoEvent) => void;
+type ClientSubscriber = (evt: ClientEvent) => void;
 
 const subscribers = new Map<string, Set<Subscriber>>(); // sessionId -> subs
+const clientSubscribers = new Set<ClientSubscriber>();
 
 function sanitizeBigInt<T>(obj: T): T {
 	if (obj === null || obj === undefined) return obj;
@@ -34,6 +36,24 @@ export function publish(event: OttoEvent) {
 	}
 }
 
+export function publishClientEvent(event: ClientEvent) {
+	const sanitizedEvent = sanitizeBigInt(event);
+	for (const sub of clientSubscribers) {
+		try {
+			sub(sanitizedEvent);
+		} catch (err) {
+			console.error(
+				`[bus] Client subscriber threw on event ${event.type}:`,
+				err instanceof Error ? err.message : String(err),
+			);
+		}
+	}
+}
+
+export function publishNotification(payload: NotificationEvent) {
+	publishClientEvent({ type: 'notification', payload });
+}
+
 export function subscribe(sessionId: string, handler: Subscriber) {
 	let set = subscribers.get(sessionId);
 	if (!set) {
@@ -44,5 +64,12 @@ export function subscribe(sessionId: string, handler: Subscriber) {
 	return () => {
 		set?.delete(handler);
 		if (set && set.size === 0) subscribers.delete(sessionId);
+	};
+}
+
+export function subscribeClientEvents(handler: ClientSubscriber) {
+	clientSubscribers.add(handler);
+	return () => {
+		clientSubscribers.delete(handler);
 	};
 }

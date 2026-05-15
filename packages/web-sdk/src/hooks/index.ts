@@ -6,6 +6,7 @@ export * from './useGit';
 export * from './useMessages';
 export * from './useSessions';
 export * from './useSessionStream';
+export * from './useClientEvents';
 export * from './useTheme';
 export * from './useWorkingDirectory';
 export * from './useKeyboardShortcuts';
