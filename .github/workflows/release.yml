@@ -359,10 +359,10 @@ jobs:
             libgtk-3-dev \
             libfuse2
 
-      - name: Install dependencies (all platforms)
+      - name: Install dependencies
         shell: bash
         run: |
-          bun install --os="*" --cpu="*"
+          bun install --os="${{ matrix.os }}" --cpu="${{ matrix.arch }}"
 
       - name: Download ripgrep binary
         shell: bash
