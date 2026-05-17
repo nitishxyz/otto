@@ -125,6 +125,7 @@ private struct BlockSurface: View {
                             .font(.system(size: 12, weight: .semibold))
                     }
                     .buttonStyle(.plain)
+                    .pressableCursor()
                     .help("Add block to canvas")
                 }
                 Menu {
@@ -141,6 +142,7 @@ private struct BlockSurface: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .pressableCursor()
             }
             .padding(.horizontal, 14)
             .frame(height: 34)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct CustomCommandModalView: View {
@@ -72,9 +73,11 @@ struct CustomCommandModalView: View {
 
             HStack(spacing: 8) {
                 Button("Cancel", action: onCancel)
+                    .pressableCursor()
                     .keyboardShortcut(.escape, modifiers: [])
                 Spacer()
                 Button("Run Command", action: submit)
+                    .pressableCursor()
                     .keyboardShortcut(.return, modifiers: [])
                     .disabled(!canSubmit)
                     .buttonStyle(.borderedProminent)
@@ -93,6 +96,12 @@ struct CustomCommandModalView: View {
         .shadow(color: .black.opacity(0.24), radius: 28, y: 16)
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            TabKeyMonitor { isShiftPressed in
+                focusNextField(reverse: isShiftPressed)
+            }
+            .frame(width: 0, height: 0)
+        )
         .onAppear { focusedField = .command }
         .onExitCommand(perform: onCancel)
     }
@@ -109,6 +118,62 @@ struct CustomCommandModalView: View {
     private func submit() {
         guard canSubmit else { return }
         onSubmit(label, command)
+    }
+
+    private func focusNextField(reverse: Bool) {
+        switch (focusedField, reverse) {
+        case (.label, false), (.command, true):
+            focusedField = .command
+        case (.command, false), (.label, true), (.none, _):
+            focusedField = .label
+        }
+    }
+}
+
+private struct TabKeyMonitor: NSViewRepresentable {
+    let onTab: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTab: onTab)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.install()
+        return NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onTab = onTab
+        context.coordinator.install()
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator {
+        var onTab: (Bool) -> Void
+        private var monitor: Any?
+
+        init(onTab: @escaping (Bool) -> Void) {
+            self.onTab = onTab
+        }
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 48 else { return event }
+                self?.onTab(event.modifierFlags.contains(.shift))
+                return nil
+            }
+        }
+
+        func uninstall() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+            monitor = nil
+        }
     }
 }
 

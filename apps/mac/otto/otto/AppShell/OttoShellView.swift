@@ -27,6 +27,7 @@ struct OttoShellView: View {
                 Button(action: toggleSidebar) {
                     Image(systemName: sidebarCollapsed ? "sidebar.right" : "sidebar.left")
                 }
+                .pressableCursor()
                 .help("Toggle sidebar")
 
                 if let workspace = model.selectedWorkspace {
@@ -43,6 +44,7 @@ struct OttoShellView: View {
                 }
 
                 Button(currentBlockLabel) {}
+                    .pressableCursor()
                     .help("Current block type")
             }
 
@@ -54,11 +56,13 @@ struct OttoShellView: View {
                 } label: {
                     Label("New Block", systemImage: "plus")
                 }
+                .pressableCursor()
                 .help("New block (⌘N)")
 
                 Button {} label: {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
+                .pressableCursor()
                 .help("Export")
             }
         }

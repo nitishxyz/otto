@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceRail: View {
     @Bindable var model: AppModel
+    @State private var isAddWorkspaceHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,10 +30,16 @@ struct WorkspaceRail: View {
                     .frame(width: 36, height: 36)
                     .background(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.primary.opacity(0.06))
+                            .fill(isAddWorkspaceHovered ? Color.primary.opacity(0.10) : Color.primary.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(isAddWorkspaceHovered ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
                     )
             }
             .buttonStyle(.plain)
+            .pressableCursor()
+            .onHover { isAddWorkspaceHovered = $0 }
             .help("Add workspace")
             .padding(.bottom, 12)
         }
@@ -71,6 +78,7 @@ private struct WorkspaceRailButton: View {
                 .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isActive)
             }
             .buttonStyle(.plain)
+            .pressableCursor()
             .onHover { isHovered = $0 }
             .help("\(workspace.name)\n\(workspace.path)")
 

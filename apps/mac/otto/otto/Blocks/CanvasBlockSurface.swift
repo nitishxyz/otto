@@ -196,6 +196,7 @@ private struct CanvasChildBlockFrame: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pressableCursor()
                 .help("Close block")
             }
             .padding(.leading, 10)

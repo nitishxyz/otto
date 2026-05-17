@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceBlocksSidebar: View {
     @Bindable var model: AppModel
+    @State private var isAddBlockHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,10 +61,16 @@ struct WorkspaceBlocksSidebar: View {
             .frame(height: 36)
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.primary.opacity(0.06))
+                    .fill(isAddBlockHovered ? Color.primary.opacity(0.10) : Color.primary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(isAddBlockHovered ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
+        .pressableCursor()
+        .onHover { isAddBlockHovered = $0 }
         .keyboardShortcut("n", modifiers: .command)
         .help("New block (⌘N)")
         .padding(.horizontal, 10)
@@ -153,6 +160,7 @@ private struct BlockSidebarRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .pressableCursor()
         .onHover { isHovered = $0 }
         .padding(.horizontal, 8)
     }

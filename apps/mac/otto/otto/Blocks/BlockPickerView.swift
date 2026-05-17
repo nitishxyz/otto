@@ -161,6 +161,7 @@ private struct BlockPickerCard: View {
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
+        .pressableCursor()
         .onHover { isHovered = $0 }
     }
 
