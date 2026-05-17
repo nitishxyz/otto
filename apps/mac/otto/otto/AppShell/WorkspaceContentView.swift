@@ -160,6 +160,8 @@ private struct BlockSurface: View {
     private var content: some View {
         if block.kind == .canvas {
             CanvasBlockSurface(model: model, block: block)
+        } else if block.kind == .browser {
+            BrowserBlockView(block: block, session: model.browserSession(for: block), isFocused: isActive)
         } else if block.kind.runsInTerminal {
             TerminalBlockView(block: block, session: model.terminalSession(for: block), isFocused: isActive)
         } else {

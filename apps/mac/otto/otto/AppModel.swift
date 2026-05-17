@@ -20,6 +20,7 @@ final class AppModel {
     private var canvasPickerPreviousFocusedChildID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
     @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
+    @ObservationIgnored private var browserSessions: [CanvasBlock.ID: BrowserSession] = [:]
 
     init() {
         selectedWorkspaceID = workspaces.first?.id
@@ -106,6 +107,15 @@ final class AppModel {
         }
         let session = TerminalSession(command: block.launchCommand)
         terminalSessions[block.id] = session
+        return session
+    }
+
+    func browserSession(for block: CanvasBlock) -> BrowserSession {
+        if let session = browserSessions[block.id] {
+            return session
+        }
+        let session = BrowserSession()
+        browserSessions[block.id] = session
         return session
     }
 
@@ -240,9 +250,9 @@ final class AppModel {
         else { return }
         var canvas = workspaces[workspaceIndex].blocks[canvasIndex]
         if let removed = canvas.children.first(where: { $0.id == childID }) {
-            discardTerminalSessions(in: removed)
+            discardBlockSessions(in: removed)
         } else {
-            discardTerminalSession(for: childID)
+            discardBlockSession(for: childID)
         }
         canvas.children.removeAll { $0.id == childID }
         canvas.layout = CanvasLayoutNode.remove(blockID: childID, from: canvas.layout)
@@ -282,7 +292,7 @@ final class AppModel {
             return
         }
         if let block = workspaces[workspaceIndex].blocks.first(where: { $0.id == selectedBlockID }) {
-            discardTerminalSessions(in: block)
+            discardBlockSessions(in: block)
         }
         workspaces[workspaceIndex].blocks.removeAll { $0.id == selectedBlockID }
         self.selectedBlockID = workspaces[workspaceIndex].blocks.first?.id
@@ -402,10 +412,20 @@ final class AppModel {
         terminalSessions.removeValue(forKey: blockID)?.stop()
     }
 
-    private func discardTerminalSessions(in block: CanvasBlock) {
+    private func discardBrowserSession(for blockID: CanvasBlock.ID) {
+        browserSessions.removeValue(forKey: blockID)?.stop()
+    }
+
+    private func discardBlockSession(for blockID: CanvasBlock.ID) {
+        discardTerminalSession(for: blockID)
+        discardBrowserSession(for: blockID)
+    }
+
+    private func discardBlockSessions(in block: CanvasBlock) {
         discardTerminalSession(for: block.id)
+        discardBrowserSession(for: block.id)
         for child in block.children {
-            discardTerminalSessions(in: child)
+            discardBlockSessions(in: child)
         }
     }
 }

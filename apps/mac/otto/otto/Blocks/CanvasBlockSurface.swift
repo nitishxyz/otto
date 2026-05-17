@@ -248,6 +248,13 @@ private struct CanvasChildBlockFrame: View {
                 isFocused: isFocused,
                 onFocus: onFocus
             )
+        } else if block.kind == .browser {
+            BrowserBlockView(
+                block: block,
+                session: model.browserSession(for: block),
+                isFocused: isFocused,
+                onFocus: onFocus
+            )
         } else {
             VStack(spacing: 8) {
                 BlockKindIcon(kind: block.kind, size: 24)
