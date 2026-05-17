@@ -1,4 +1,5 @@
 import Combine
+import Darwin
 import Foundation
 import Network
 
@@ -27,6 +28,11 @@ private struct RuntimeURLs: Equatable {
 
 @MainActor
 final class OttoWorkspaceRuntimeSession: ObservableObject {
+    private nonisolated static let firstRuntimePort = 19100
+    private nonisolated static let lastRuntimePort = 60000
+    private nonisolated static let maxPortLaunchAttempts = 20
+    private nonisolated(unsafe) static var reservedPortPairs: Set<Int> = []
+
     let workspaceID: Workspace.ID
     let workspacePath: String
 
@@ -38,23 +44,35 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
     private var process: Process?
     private var readinessTask: Task<Void, Never>?
     private var isStopping = false
+    private var assignedAPIPort: Int
 
     init(workspaceID: Workspace.ID, workspacePath: String) {
         self.workspaceID = workspaceID
         self.workspacePath = Self.expandedPath(workspacePath)
+        self.assignedAPIPort = Self.reserveAvailablePortPair()
     }
 
     deinit {
         readinessTask?.cancel()
         process?.terminate()
+        Self.releaseReservedPortPair(assignedAPIPort)
     }
 
     func start() {
+        start(attempt: 0)
+    }
+
+    private func start(attempt: Int) {
         if status.isStarting { return }
         if let process, process.isRunning { return }
         isStopping = false
 
-        let apiPort = Self.findAvailablePort()
+        if !Self.isReservedPortPairUsable(assignedAPIPort) {
+            Self.releaseReservedPortPair(assignedAPIPort)
+            assignedAPIPort = Self.reserveAvailablePortPair(startingAt: assignedAPIPort + 1)
+        }
+
+        let apiPort = assignedAPIPort
         let apiURL = URL(string: "http://localhost:\(apiPort)")!
         let logPath = Self.runtimeLogPath(workspaceID: workspaceID, port: apiPort)
 
@@ -79,8 +97,12 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
                     guard runtime.process === exitedProcess, runtime.status.isStarting, !runtime.isStopping else {
                         return
                     }
+                    let tailLog = Self.tailLog(logPath: logPath)
+                    if Self.logIndicatesPortConflict(tailLog), runtime.retryWithNextPort(after: apiPort, attempt: attempt) {
+                        return
+                    }
                     runtime.status = .failed(
-                        "otto serve exited early with status \(exitedProcess.terminationStatus).\n\(Self.tailLog(logPath: logPath))"
+                        "otto serve exited early with status \(exitedProcess.terminationStatus).\n\(tailLog)"
                     )
                 }
             }
@@ -91,13 +113,13 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
             self.logPath = logPath
             status = .starting
             try process.run()
-            waitUntilReady(apiPort: apiPort, logPath: logPath)
+            waitUntilReady(apiPort: apiPort, logPath: logPath, attempt: attempt)
         } catch {
             status = .failed(error.localizedDescription)
         }
     }
 
-    func stop() {
+    func stop(waitUntilExit: Bool = false) {
         isStopping = true
         readinessTask?.cancel()
         readinessTask = nil
@@ -107,9 +129,19 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
         }
         if process.isRunning {
             process.terminate()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                if process.isRunning {
+            if waitUntilExit {
+                if !Self.waitForExit(process, timeout: 2) {
                     process.interrupt()
+                }
+                if !Self.waitForExit(process, timeout: 1) {
+                    Self.forceKill(process)
+                    _ = Self.waitForExit(process, timeout: 1)
+                }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if process.isRunning {
+                        process.interrupt()
+                    }
                 }
             }
         }
@@ -122,7 +154,19 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
         start()
     }
 
-    private func waitUntilReady(apiPort: Int, logPath: String) {
+    private func retryWithNextPort(after port: Int, attempt: Int) -> Bool {
+        guard attempt < Self.maxPortLaunchAttempts else { return false }
+        readinessTask?.cancel()
+        readinessTask = nil
+        process = nil
+        Self.releaseReservedPortPair(assignedAPIPort)
+        assignedAPIPort = Self.reserveAvailablePortPair(startingAt: port + 1)
+        status = .stopped
+        start(attempt: attempt + 1)
+        return true
+    }
+
+    private func waitUntilReady(apiPort: Int, logPath: String, attempt: Int) {
         readinessTask?.cancel()
         readinessTask = Task { [weak self] in
             let deadline = Date().addingTimeInterval(30)
@@ -151,6 +195,10 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
                 if !stillRunning {
                     await MainActor.run {
                         guard let self, self.status.isStarting else { return }
+                        let tailLog = Self.tailLog(logPath: logPath)
+                        if Self.logIndicatesPortConflict(tailLog), self.retryWithNextPort(after: apiPort, attempt: attempt) {
+                            return
+                        }
                         self.status = .failed("otto serve exited before becoming ready.")
                     }
                     return
@@ -219,6 +267,14 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
         return lines.suffix(40).joined(separator: "\n")
     }
 
+    private nonisolated static func logIndicatesPortConflict(_ value: String) -> Bool {
+        let lowercased = value.lowercased()
+        return lowercased.contains("address already in use") ||
+            lowercased.contains("eaddrinuse") ||
+            lowercased.contains("port") && lowercased.contains("in use") ||
+            lowercased.contains("failed to start server") && lowercased.contains("is port")
+    }
+
     private nonisolated static func stripANSI(_ value: String) -> String {
         value.replacingOccurrences(
             of: #"\x1B\[[0-?]*[ -/]*[@-~]"#,
@@ -227,11 +283,36 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
         )
     }
 
-    private static func findAvailablePort() -> Int {
-        for port in 19100..<60000 where isPortPairAvailable(port) {
+    private static func reserveAvailablePortPair(startingAt startPort: Int = firstRuntimePort) -> Int {
+        let firstCandidate = max(firstRuntimePort, startPort)
+        for port in firstCandidate..<lastRuntimePort where isPortPairUsable(port) {
+            reservedPortPairs.insert(port)
             return port
         }
-        return 19100
+        for port in firstRuntimePort..<firstCandidate where isPortPairUsable(port) {
+            reservedPortPairs.insert(port)
+            return port
+        }
+        reservedPortPairs.insert(firstRuntimePort)
+        return firstRuntimePort
+    }
+
+    private nonisolated static func releaseReservedPortPair(_ port: Int) {
+        reservedPortPairs.remove(port)
+    }
+
+    private static func isReservedPortPairUsable(_ port: Int) -> Bool {
+        reservedPortPairs.contains(port) && isPortPairAvailable(port)
+    }
+
+    private static func isPortPairUsable(_ port: Int) -> Bool {
+        !isPortPairReserved(port) && isPortPairAvailable(port)
+    }
+
+    private static func isPortPairReserved(_ port: Int) -> Bool {
+        reservedPortPairs.contains { reservedPort in
+            abs(reservedPort - port) <= 1
+        }
     }
 
     private static func isPortPairAvailable(_ port: Int) -> Bool {
@@ -239,9 +320,56 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
     }
 
     private static func isPortAvailable(_ port: Int) -> Bool {
-        let listener = try? NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: UInt16(port))!)
-        listener?.cancel()
-        return listener != nil
+        guard port > 0, port < 65536 else { return false }
+        return canBindIPv4Loopback(port) && canBindIPv6Loopback(port)
+    }
+
+    private static func canBindIPv4Loopback(_ port: Int) -> Bool {
+        let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { close(descriptor) }
+
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = in_port_t(port).bigEndian
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+
+        return withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+                Darwin.bind(descriptor, socketAddress, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+            }
+        }
+    }
+
+    private static func canBindIPv6Loopback(_ port: Int) -> Bool {
+        let descriptor = socket(AF_INET6, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { close(descriptor) }
+
+        var address = sockaddr_in6()
+        address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+        address.sin6_family = sa_family_t(AF_INET6)
+        address.sin6_port = in_port_t(port).bigEndian
+        address.sin6_addr = in6addr_loopback
+
+        return withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+                Darwin.bind(descriptor, socketAddress, socklen_t(MemoryLayout<sockaddr_in6>.size)) == 0
+            }
+        }
+    }
+
+    private static func waitForExit(_ process: Process, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        return !process.isRunning
+    }
+
+    private static func forceKill(_ process: Process) {
+        Darwin.kill(process.processIdentifier, SIGKILL)
     }
 
     private static func ottoExecutableURL() throws -> URL {

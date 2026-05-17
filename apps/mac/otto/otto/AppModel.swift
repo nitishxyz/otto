@@ -217,6 +217,23 @@ final class AppModel {
         ottoRuntimeSession(for: workspace).start()
     }
 
+    func shutdown() {
+        for session in ottoRuntimeSessions.values {
+            session.stop(waitUntilExit: true)
+        }
+        ottoRuntimeSessions.removeAll()
+
+        for session in terminalSessions.values {
+            session.stop()
+        }
+        terminalSessions.removeAll()
+
+        for session in browserSessions.values {
+            session.stop()
+        }
+        browserSessions.removeAll()
+    }
+
     func beginCanvasBlockCreation(in canvas: CanvasBlock, direction: SplitDirection? = nil) {
         guard canvas.kind == .canvas else { return }
         resetCanvasPicker(removePending: true)

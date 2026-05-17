@@ -10,6 +10,7 @@ import SwiftUI
 
 @main
 struct ottoApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
     var body: some Scene {
@@ -17,6 +18,9 @@ struct ottoApp: App {
             OttoShellView(model: model)
                 .frame(minWidth: 980, minHeight: 640)
                 .background(WindowMaterialConfigurator())
+                .onAppear {
+                    appDelegate.model = model
+                }
         }
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentMinSize)
@@ -131,6 +135,23 @@ struct ottoApp: App {
                 }
             }
         }
+    }
+}
+
+@MainActor
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var model: AppModel?
+    private var isTerminating = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isTerminating else { return .terminateNow }
+        isTerminating = true
+        model?.shutdown()
+        return .terminateNow
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model?.shutdown()
     }
 }
 
