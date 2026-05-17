@@ -21,7 +21,7 @@ struct OttoShellView: View {
         .padding(.trailing, 8)
         .padding(.bottom, 8)
         .frame(minWidth: 980, minHeight: 640)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.regularMaterial)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button(action: toggleSidebar) {

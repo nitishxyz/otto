@@ -6,7 +6,8 @@ struct WorkspaceContentView: View {
 
     var body: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            Rectangle()
+                .fill(.regularMaterial)
 
             if let workspace = model.selectedWorkspace {
                 RetainedBlockSurfaceStack(
@@ -57,7 +58,8 @@ struct WorkspaceContentView: View {
 
     private var commandModalOverlay: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            Rectangle()
+                .fill(.regularMaterial)
                 .opacity(0.72)
             Color.black.opacity(0.16)
             CustomCommandModalView(
@@ -88,7 +90,7 @@ private struct RetainedBlockSurfaceStack: View {
         ZStack {
             ForEach(visibleBlocks) { block in
                 let isActive = block.id == selectedBlockID
-                BlockSurface(model: model, block: block, isActive: isActive)
+                BlockSurface(model: model, workspace: workspace, block: block, isActive: isActive)
                     .opacity(isActive ? 1 : 0)
                     .allowsHitTesting(isActive)
                     .zIndex(isActive ? 1 : 0)
@@ -105,6 +107,7 @@ private struct RetainedBlockSurfaceStack: View {
 
 private struct BlockSurface: View {
     @Bindable var model: AppModel
+    let workspace: Workspace
     let block: CanvasBlock
     var isActive = true
 
@@ -159,11 +162,19 @@ private struct BlockSurface: View {
     @ViewBuilder
     private var content: some View {
         if block.kind == .canvas {
-            CanvasBlockSurface(model: model, block: block)
+            CanvasBlockSurface(model: model, workspace: workspace, block: block)
+        } else if block.kind == .otto {
+            OttoBlockView(
+                block: block,
+                workspace: workspace,
+                runtime: model.ottoRuntimeSession(for: workspace),
+                isFocused: isActive,
+                onFocus: { model.selectBlock(block) }
+            )
         } else if block.kind == .browser {
             BrowserBlockView(block: block, session: model.browserSession(for: block), isFocused: isActive)
         } else if block.kind.runsInTerminal {
-            TerminalBlockView(block: block, session: model.terminalSession(for: block), isFocused: isActive)
+            TerminalBlockView(block: block, session: model.terminalSession(for: block, in: workspace), isFocused: isActive)
         } else {
             placeholder
         }

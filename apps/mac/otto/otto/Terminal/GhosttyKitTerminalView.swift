@@ -94,7 +94,7 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
         }
         let view = GhosttyKitTerminalNSView(
             command: Self.shellWrappedCommand(block.launchCommand),
-            workingDirectory: FileManager.default.homeDirectoryForCurrentUser.path,
+            workingDirectory: session.workingDirectory,
             isFocused: isFocused,
             onFocus: onFocus
         )

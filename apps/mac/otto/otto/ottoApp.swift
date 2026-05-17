@@ -5,6 +5,7 @@
 //  Created by bat on 17/05/26.
 //
 
+import AppKit
 import SwiftUI
 
 @main
@@ -15,6 +16,7 @@ struct ottoApp: App {
         WindowGroup {
             OttoShellView(model: model)
                 .frame(minWidth: 980, minHeight: 640)
+                .background(WindowMaterialConfigurator())
         }
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentMinSize)
@@ -22,6 +24,11 @@ struct ottoApp: App {
             CommandGroup(replacing: .appVisibility) {}
 
             CommandGroup(after: .newItem) {
+                Button("Open Workspace…") {
+                    model.addWorkspaceFromOpenPanel()
+                }
+                .keyboardShortcut("o", modifiers: .command)
+
                 Button("New Block") {
                     model.beginBlockCreation()
                 }
@@ -100,5 +107,25 @@ struct ottoApp: App {
                 }
             }
         }
+    }
+}
+
+private struct WindowMaterialConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { configure(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { configure(nsView.window) }
+    }
+
+    private func configure(_ window: NSWindow?) {
+        guard let window else { return }
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
     }
 }

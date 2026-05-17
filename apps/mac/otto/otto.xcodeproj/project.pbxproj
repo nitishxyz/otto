@@ -66,6 +66,7 @@
 				4D6EBFE22FB9D4F000FA9988 /* Sources */,
 				4D6EBFE32FB9D4F000FA9988 /* Frameworks */,
 				4D6EBFE42FB9D4F000FA9988 /* Resources */,
+				4D6EC0102FBC000000FA9988 /* Copy Bundled Otto CLI */,
 			);
 			buildRules = (
 			);
@@ -125,6 +126,29 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		4D6EC0102FBC000000FA9988 /* Copy Bundled Otto CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Bundled Otto CLI";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/binaries/otto-darwin-$(CURRENT_ARCH)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nROOT=\"${SRCROOT}/../../..\"\nARCH=\"${CURRENT_ARCH:-}\"\nif [ -z \"$ARCH\" ] || [ \"$ARCH\" = \"undefined_arch\" ]; then\n  ARCH=\"${NATIVE_ARCH_ACTUAL:-$(uname -m)}\"\nfi\ncase \"$ARCH\" in\n  arm64) BIN=\"otto-darwin-arm64\"; SCRIPT=\"build:bin:darwin-arm64\" ;;\n  x86_64) BIN=\"otto-darwin-x64\"; SCRIPT=\"build:bin:darwin-x64\" ;;\n  *) echo \"error: unsupported architecture $ARCH for bundled otto CLI\"; exit 1 ;;\nesac\nSOURCE_BIN=\"$ROOT/dist/$BIN\"\nif [ ! -x \"$SOURCE_BIN\" ]; then\n  if ! command -v bun >/dev/null 2>&1; then\n    echo \"error: bun is required to build the bundled otto CLI\"\n    exit 1\n  fi\n  (cd \"$ROOT\" && bun run \"$SCRIPT\")\nfi\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/binaries\"\nDEST_BIN=\"$DEST_DIR/$BIN\"\nmkdir -p \"$DEST_DIR\"\ncp \"$SOURCE_BIN\" \"$DEST_BIN\"\nchmod 755 \"$DEST_BIN\"\nif [ \"${CODE_SIGNING_ALLOWED:-NO}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" != \"-\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp=none \"$DEST_BIN\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		4D6EBFE22FB9D4F000FA9988 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -174,7 +198,7 @@
 				DEVELOPMENT_TEAM = FRUHQC68JC;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -238,7 +262,7 @@
 				DEVELOPMENT_TEAM = FRUHQC68JC;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;

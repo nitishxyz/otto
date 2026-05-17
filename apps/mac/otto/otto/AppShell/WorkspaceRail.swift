@@ -12,7 +12,8 @@ struct WorkspaceRail: View {
                         WorkspaceRailButton(
                             workspace: workspace,
                             isActive: workspace.id == model.selectedWorkspaceID,
-                            action: { model.selectWorkspace(workspace) }
+                            action: { model.selectWorkspace(workspace) },
+                            onRemove: { model.removeWorkspace(workspace) }
                         )
                     }
                 }
@@ -22,7 +23,7 @@ struct WorkspaceRail: View {
             Spacer(minLength: 8)
 
             Button {
-                // Hook to NSOpenPanel next
+                model.addWorkspaceFromOpenPanel()
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 13, weight: .semibold))
@@ -51,6 +52,7 @@ private struct WorkspaceRailButton: View {
     let workspace: Workspace
     let isActive: Bool
     let action: () -> Void
+    let onRemove: () -> Void
 
     @State private var isHovered = false
 
@@ -81,6 +83,9 @@ private struct WorkspaceRailButton: View {
             .pressableCursor()
             .onHover { isHovered = $0 }
             .help("\(workspace.name)\n\(workspace.path)")
+            .contextMenu {
+                Button("Forget Workspace", role: .destructive, action: onRemove)
+            }
 
             Spacer(minLength: 0)
 

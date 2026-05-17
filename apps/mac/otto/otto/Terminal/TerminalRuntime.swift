@@ -10,11 +10,13 @@ import Foundation
 @Observable
 final class TerminalSession {
     let command: String?
+    let workingDirectory: String
     var error: String?
     @ObservationIgnored var ghosttyView: GhosttyKitTerminalNSView?
 
-    init(command: String? = nil) {
+    init(command: String? = nil, workingDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path) {
         self.command = command
+        self.workingDirectory = workingDirectory
     }
 
     func start() {}

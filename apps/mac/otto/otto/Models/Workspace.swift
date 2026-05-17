@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct Workspace: Identifiable, Hashable {
+struct Workspace: Codable, Identifiable, Hashable {
     let id: UUID
     var name: String
     var path: String
@@ -37,7 +37,7 @@ struct Workspace: Identifiable, Hashable {
     }
 }
 
-enum WorkspaceAccent: String, CaseIterable, Hashable {
+enum WorkspaceAccent: String, CaseIterable, Codable, Hashable {
     case indigo, pink, emerald, amber, blue, violet
 
     var color: Color {

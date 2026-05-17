@@ -1,6 +1,6 @@
 import Foundation
 
-struct CanvasBlock: Identifiable, Hashable {
+struct CanvasBlock: Codable, Identifiable, Hashable {
     let id: UUID
     var kind: BlockKind
     var title: String
@@ -34,7 +34,7 @@ struct CanvasBlock: Identifiable, Hashable {
     }
 }
 
-enum SplitDirection: String, Hashable {
+enum SplitDirection: String, Codable, Hashable {
     case horizontal
     case vertical
 
@@ -64,7 +64,7 @@ private struct CanvasLeafFrame: Hashable {
     var midY: Double { (minY + maxY) / 2 }
 }
 
-indirect enum CanvasLayoutNode: Hashable {
+indirect enum CanvasLayoutNode: Codable, Hashable {
     case leaf(blockID: CanvasBlock.ID)
     case split(
         id: UUID,
@@ -289,7 +289,57 @@ indirect enum CanvasLayoutNode: Hashable {
     }
 }
 
-enum BlockKind: String, CaseIterable, Identifiable, Hashable {
+extension CanvasLayoutNode {
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case blockID
+        case id
+        case direction
+        case ratio
+        case first
+        case second
+    }
+
+    private enum NodeType: String, Codable {
+        case leaf
+        case split
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(NodeType.self, forKey: .type)
+        switch type {
+        case .leaf:
+            self = .leaf(blockID: try container.decode(CanvasBlock.ID.self, forKey: .blockID))
+        case .split:
+            self = .split(
+                id: try container.decode(UUID.self, forKey: .id),
+                direction: try container.decode(SplitDirection.self, forKey: .direction),
+                ratio: try container.decode(Double.self, forKey: .ratio),
+                first: try container.decode(CanvasLayoutNode.self, forKey: .first),
+                second: try container.decode(CanvasLayoutNode.self, forKey: .second)
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .leaf(let blockID):
+            try container.encode(NodeType.leaf, forKey: .type)
+            try container.encode(blockID, forKey: .blockID)
+        case .split(let id, let direction, let ratio, let first, let second):
+            try container.encode(NodeType.split, forKey: .type)
+            try container.encode(id, forKey: .id)
+            try container.encode(direction, forKey: .direction)
+            try container.encode(ratio, forKey: .ratio)
+            try container.encode(first, forKey: .first)
+            try container.encode(second, forKey: .second)
+        }
+    }
+}
+
+enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
     case canvas
     case otto
     case neovim

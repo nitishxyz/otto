@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CanvasBlockSurface: View {
     @Bindable var model: AppModel
+    let workspace: Workspace
     let block: CanvasBlock
 
     var body: some View {
@@ -9,6 +10,7 @@ struct CanvasBlockSurface: View {
             if let layout = block.layout, !block.children.isEmpty {
                 CanvasLayoutRenderer(
                     model: model,
+                    workspace: workspace,
                     canvas: block,
                     node: layout
                 )
@@ -35,7 +37,8 @@ struct CanvasBlockSurface: View {
 
     private var pickerOverlay: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            Rectangle()
+                .fill(.regularMaterial)
                 .opacity(0.72)
             Color.black.opacity(0.16)
             picker
@@ -44,7 +47,8 @@ struct CanvasBlockSurface: View {
 
     private var commandModalOverlay: some View {
         ZStack {
-            Color(nsColor: .windowBackgroundColor)
+            Rectangle()
+                .fill(.regularMaterial)
                 .opacity(0.72)
             Color.black.opacity(0.16)
             CustomCommandModalView(
@@ -69,6 +73,7 @@ struct CanvasBlockSurface: View {
 
 private struct CanvasLayoutRenderer: View {
     @Bindable var model: AppModel
+    let workspace: Workspace
     let canvas: CanvasBlock
     let node: CanvasLayoutNode
 
@@ -78,6 +83,7 @@ private struct CanvasLayoutRenderer: View {
             if let child = canvas.children.first(where: { $0.id == blockID }) {
                 CanvasChildBlockFrame(
                     model: model,
+                    workspace: workspace,
                     block: child,
                     isFocused: canvas.focusedChildID == child.id,
                     onFocus: { model.focusCanvasChildBlock(child.id, in: canvas.id) },
@@ -93,6 +99,7 @@ private struct CanvasLayoutRenderer: View {
         case .split(let id, let direction, let ratio, let first, let second):
             CanvasSplitPane(
                 model: model,
+                workspace: workspace,
                 canvas: canvas,
                 splitID: id,
                 direction: direction,
@@ -106,6 +113,7 @@ private struct CanvasLayoutRenderer: View {
 
 private struct CanvasSplitPane: View {
     @Bindable var model: AppModel
+    let workspace: Workspace
     let canvas: CanvasBlock
     let splitID: UUID
     let direction: SplitDirection
@@ -126,12 +134,12 @@ private struct CanvasSplitPane: View {
                 let firstWidth = splitLength(availableLength: availableWidth, ratio: ratio)
                 let secondWidth = max(0, availableWidth - firstWidth)
                 HStack(spacing: 0) {
-                    CanvasLayoutRenderer(model: model, canvas: canvas, node: first)
+                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: first)
                         .frame(width: firstWidth)
                     divider
                         .frame(width: dividerThickness)
                         .gesture(resizeGesture(availableLength: availableWidth))
-                    CanvasLayoutRenderer(model: model, canvas: canvas, node: second)
+                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: second)
                         .frame(width: secondWidth)
                 }
                 .overlay(alignment: .topLeading) {
@@ -142,12 +150,12 @@ private struct CanvasSplitPane: View {
                 let firstHeight = splitLength(availableLength: availableHeight, ratio: ratio)
                 let secondHeight = max(0, availableHeight - firstHeight)
                 VStack(spacing: 0) {
-                    CanvasLayoutRenderer(model: model, canvas: canvas, node: first)
+                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: first)
                         .frame(height: firstHeight)
                     divider
                         .frame(height: dividerThickness)
                         .gesture(resizeGesture(availableLength: availableHeight))
-                    CanvasLayoutRenderer(model: model, canvas: canvas, node: second)
+                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: second)
                         .frame(height: secondHeight)
                 }
                 .overlay(alignment: .topLeading) {
@@ -227,6 +235,7 @@ private struct CanvasSplitPane: View {
 
 private struct CanvasChildBlockFrame: View {
     @Bindable var model: AppModel
+    let workspace: Workspace
     let block: CanvasBlock
     let isFocused: Bool
     let onFocus: () -> Void
@@ -262,7 +271,7 @@ private struct CanvasChildBlockFrame: View {
             childContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -297,7 +306,7 @@ private struct CanvasChildBlockFrame: View {
         } else if block.kind.runsInTerminal {
             TerminalBlockView(
                 block: block,
-                session: model.terminalSession(for: block),
+                session: model.terminalSession(for: block, in: workspace),
                 isFocused: isFocused,
                 onFocus: onFocus
             )
@@ -305,6 +314,14 @@ private struct CanvasChildBlockFrame: View {
             BrowserBlockView(
                 block: block,
                 session: model.browserSession(for: block),
+                isFocused: isFocused,
+                onFocus: onFocus
+            )
+        } else if block.kind == .otto {
+            OttoBlockView(
+                block: block,
+                workspace: workspace,
+                runtime: model.ottoRuntimeSession(for: workspace),
                 isFocused: isFocused,
                 onFocus: onFocus
             )
@@ -343,6 +360,7 @@ private struct CanvasChildBlockFrame: View {
 #Preview {
     CanvasBlockSurface(
         model: AppModel(),
+        workspace: Workspace.previewWorkspaces[0],
         block: CanvasBlock(
             kind: .canvas,
             children: [

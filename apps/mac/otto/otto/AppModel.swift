@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -6,11 +7,26 @@ struct CustomCommandRequest: Identifiable, Hashable {
     let canvasID: CanvasBlock.ID?
 }
 
-@Observable
-final class AppModel {
-    var workspaces: [Workspace] = Workspace.previewWorkspaces
+private struct PersistedAppState: Codable {
+    var workspaces: [Workspace]
     var selectedWorkspaceID: Workspace.ID?
     var selectedBlockID: CanvasBlock.ID?
+}
+
+@MainActor
+@Observable
+final class AppModel {
+    private static let persistedStateKey = "io.ottocode.otto.native.state.v1"
+
+    var workspaces: [Workspace] = [] {
+        didSet { persistState() }
+    }
+    var selectedWorkspaceID: Workspace.ID? {
+        didSet { persistState() }
+    }
+    var selectedBlockID: CanvasBlock.ID? {
+        didSet { persistState() }
+    }
     var followAgentEnabled = true
     var isBlockPickerPresented = false
     var canvasPickerBlockID: CanvasBlock.ID?
@@ -21,10 +37,11 @@ final class AppModel {
     private var blockSelectionBeforePicker: CanvasBlock.ID?
     @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
     @ObservationIgnored private var browserSessions: [CanvasBlock.ID: BrowserSession] = [:]
+    @ObservationIgnored private var ottoRuntimeSessions: [Workspace.ID: OttoWorkspaceRuntimeSession] = [:]
+    @ObservationIgnored private var isRestoringPersistedState = false
 
     init() {
-        selectedWorkspaceID = workspaces.first?.id
-        selectedBlockID = selectedWorkspace?.blocks.first?.id
+        restorePersistedState()
     }
 
     var selectedWorkspace: Workspace? {
@@ -37,6 +54,9 @@ final class AppModel {
             selectedWorkspaceID = newValue?.id
             selectedBlockID = newValue?.blocks.first?.id
             isBlockPickerPresented = false
+            if let newValue {
+                startOttoRuntime(for: newValue)
+            }
         }
     }
 
@@ -49,6 +69,47 @@ final class AppModel {
         selectedWorkspaceID = workspace.id
         selectedBlockID = workspace.blocks.first?.id
         isBlockPickerPresented = false
+        startOttoRuntime(for: workspace)
+    }
+
+    func addWorkspaceFromOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose project folder"
+        panel.prompt = "Open Workspace"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = selectedWorkspace.map { URL(fileURLWithPath: expandedPath($0.path), isDirectory: true) }
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        addWorkspace(path: url.path)
+    }
+
+    func addWorkspace(path: String) {
+        let expanded = expandedPath(path)
+        let workspace = Workspace(
+            name: Self.workspaceName(from: expanded),
+            path: expanded,
+            accent: WorkspaceAccent.allCases[workspaces.count % WorkspaceAccent.allCases.count],
+            blocks: []
+        )
+        workspaces.append(workspace)
+        selectWorkspace(workspace)
+    }
+
+    func removeWorkspace(_ workspace: Workspace) {
+        ottoRuntimeSessions.removeValue(forKey: workspace.id)?.stop()
+        for block in workspace.blocks {
+            discardBlockSessions(in: block)
+        }
+        workspaces.removeAll { $0.id == workspace.id }
+        if selectedWorkspaceID == workspace.id {
+            selectedWorkspaceID = workspaces.first?.id
+            selectedBlockID = selectedWorkspace?.blocks.first?.id
+            if let selectedWorkspace {
+                startOttoRuntime(for: selectedWorkspace)
+            }
+        }
     }
 
     func selectBlock(_ block: CanvasBlock) {
@@ -101,11 +162,14 @@ final class AppModel {
         blockSelectionBeforePicker = nil
     }
 
-    func terminalSession(for block: CanvasBlock) -> TerminalSession {
+    func terminalSession(for block: CanvasBlock, in workspace: Workspace? = nil) -> TerminalSession {
         if let session = terminalSessions[block.id] {
             return session
         }
-        let session = TerminalSession(command: block.launchCommand)
+        let session = TerminalSession(
+            command: block.launchCommand,
+            workingDirectory: expandedPath(workspace?.path ?? selectedWorkspace?.path ?? "~")
+        )
         terminalSessions[block.id] = session
         return session
     }
@@ -117,6 +181,20 @@ final class AppModel {
         let session = BrowserSession()
         browserSessions[block.id] = session
         return session
+    }
+
+    func ottoRuntimeSession(for workspace: Workspace) -> OttoWorkspaceRuntimeSession {
+        if let session = ottoRuntimeSessions[workspace.id], session.workspacePath == expandedPath(workspace.path) {
+            return session
+        }
+        ottoRuntimeSessions[workspace.id]?.stop()
+        let session = OttoWorkspaceRuntimeSession(workspaceID: workspace.id, workspacePath: workspace.path)
+        ottoRuntimeSessions[workspace.id] = session
+        return session
+    }
+
+    func startOttoRuntime(for workspace: Workspace) {
+        ottoRuntimeSession(for: workspace).start()
     }
 
     func beginCanvasBlockCreation(in canvas: CanvasBlock, direction: SplitDirection? = nil) {
@@ -387,6 +465,58 @@ final class AppModel {
         let firstLine = command.components(separatedBy: .newlines).first ?? command
         let trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Custom" : String(trimmed.prefix(36))
+    }
+
+    private static func workspaceName(from path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        let name = url.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "workspace" : name
+    }
+
+    private func expandedPath(_ path: String) -> String {
+        (path as NSString).expandingTildeInPath
+    }
+
+    private func restorePersistedState() {
+        isRestoringPersistedState = true
+        defer { isRestoringPersistedState = false }
+
+        guard let data = UserDefaults.standard.data(forKey: Self.persistedStateKey),
+              let state = try? JSONDecoder().decode(PersistedAppState.self, from: data)
+        else {
+            workspaces = []
+            selectedWorkspaceID = nil
+            selectedBlockID = nil
+            return
+        }
+
+        workspaces = state.workspaces
+        selectedWorkspaceID = state.selectedWorkspaceID.flatMap { selectedID in
+            workspaces.contains { $0.id == selectedID } ? selectedID : nil
+        } ?? workspaces.first?.id
+
+        if let selectedWorkspace,
+           let selectedBlockID = state.selectedBlockID,
+           selectedWorkspace.blocks.contains(where: { $0.id == selectedBlockID }) {
+            self.selectedBlockID = selectedBlockID
+        } else {
+            selectedBlockID = selectedWorkspace?.blocks.first?.id
+        }
+
+        if let selectedWorkspace {
+            startOttoRuntime(for: selectedWorkspace)
+        }
+    }
+
+    private func persistState() {
+        guard !isRestoringPersistedState else { return }
+        let state = PersistedAppState(
+            workspaces: workspaces,
+            selectedWorkspaceID: selectedWorkspaceID,
+            selectedBlockID: selectedBlockID
+        )
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        UserDefaults.standard.set(data, forKey: Self.persistedStateKey)
     }
 
     private func removePendingCanvasChild() {
