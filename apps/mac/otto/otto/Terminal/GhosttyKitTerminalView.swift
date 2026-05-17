@@ -11,6 +11,8 @@ private final class EmbeddedGhosttyRuntime {
     private var app: ghostty_app_t?
     private var config: ghostty_config_t?
     private var initialized = false
+    private var isTickScheduled = false
+    private var isTicking = false
 
     var appHandle: ghostty_app_t? {
         ensureStarted()
@@ -323,6 +325,16 @@ final class GhosttyKitTerminalNSView: NSView {
         }
     }
 
+    private func focusTerminalIfWindowHasNoResponder() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  self.isFocused,
+                  let window = self.window,
+                  window.firstResponder == nil else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
     private func sendText(_ text: String) {
         guard let surface else { return }
         text.withCString { pointer in
@@ -432,7 +444,7 @@ final class GhosttyKitTerminalNSView: NSView {
                 ghostty_surface_draw(surface)
             }
             if self.isFocused {
-                self.focusTerminal()
+                self.focusTerminalIfWindowHasNoResponder()
             }
         }
     }

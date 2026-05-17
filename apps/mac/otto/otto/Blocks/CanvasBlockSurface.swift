@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct CanvasBlockSurface: View {
@@ -128,8 +129,9 @@ private struct CanvasSplitPane: View {
 
     @State private var dragStartRatio: Double?
     @State private var liveRatio: Double?
+    @State private var isDividerHovered = false
 
-    private let dividerThickness: CGFloat = 4
+    private let dividerThickness: CGFloat = 8
     private let minimumPaneLength: CGFloat = 24
 
     var body: some View {
@@ -196,13 +198,21 @@ private struct CanvasSplitPane: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(Color.clear)
+            .fill(isDividerHovered ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.035))
             .contentShape(Rectangle())
             .onHover { hovering in
+                guard hovering != isDividerHovered else { return }
+                isDividerHovered = hovering
                 if hovering {
-                    resizeCursor.set()
+                    resizeCursor.push()
                 } else {
-                    NSCursor.arrow.set()
+                    NSCursor.pop()
+                }
+            }
+            .onDisappear {
+                if isDividerHovered {
+                    NSCursor.pop()
+                    isDividerHovered = false
                 }
             }
     }
@@ -374,7 +384,7 @@ private struct CanvasChildBlockFrame: View {
         switch block.kind {
         case .canvas: "Nested canvas surface."
         case .otto: "Native Otto session surface."
-        case .neovim: "Embedded Neovim editor surface."
+        case .neovim: "Runs `nvim` in this workspace."
         case .terminal: "PTY-backed terminal surface."
         case .browser: "WKWebView preview surface."
         case .command: "Custom command terminal surface."

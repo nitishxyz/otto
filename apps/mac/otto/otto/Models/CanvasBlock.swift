@@ -413,7 +413,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .canvas: "Arrange multiple Otto, terminal, browser, and command surfaces."
         case .otto: "Open a native Otto agent session."
-        case .neovim: "Open an embedded Neovim editor surface."
+        case .neovim: "Launch Neovim inside a terminal-backed surface."
         case .terminal: "Open a focused Ghostty-style terminal."
         case .browser: "Open a native web preview or docs browser."
         case .command: "Configure and run a shell command in a terminal surface."
@@ -426,6 +426,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
 
     nonisolated var defaultLaunchCommand: String? {
         switch self {
+        case .neovim: "nvim"
         case .claudeCode: "claude"
         case .codex: "codex"
         case .ottoTUI: "otto"
@@ -436,7 +437,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
 
     var runsInTerminal: Bool {
         switch self {
-        case .terminal, .command, .claudeCode, .codex, .ottoTUI, .openCode:
+        case .terminal, .command, .neovim, .claudeCode, .codex, .ottoTUI, .openCode:
             true
         default:
             false
@@ -482,6 +483,7 @@ enum BlockCatalog {
         .terminal,
         .browser,
         .otto,
+        .neovim,
         .claudeCode,
         .codex,
         .ottoTUI,

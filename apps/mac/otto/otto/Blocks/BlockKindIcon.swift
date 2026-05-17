@@ -38,6 +38,8 @@ private extension BlockKind {
             "OpenAIIcon"
         case .openCode:
             "OpenCodeIcon"
+        case .neovim:
+            "NeovimIcon"
         default:
             nil
         }

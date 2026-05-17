@@ -32,6 +32,7 @@ final class AppModel {
         }
     }
     var followAgentEnabled = true
+    var isSidebarCollapsed = false
     var isBlockPickerPresented = false
     var canvasPickerBlockID: CanvasBlock.ID?
     var canvasPickerSplitDirection: SplitDirection?
@@ -90,6 +91,10 @@ final class AppModel {
         let currentIndex = selectedWorkspaceID.flatMap { id in workspaces.firstIndex { $0.id == id } } ?? 0
         let nextIndex = (currentIndex + offset + workspaces.count) % workspaces.count
         selectWorkspace(workspaces[nextIndex])
+    }
+
+    func toggleSidebar() {
+        isSidebarCollapsed.toggle()
     }
 
     func addWorkspaceFromOpenPanel() {
@@ -284,12 +289,21 @@ final class AppModel {
 
     func createCanvasChildBlock(kind: BlockKind, in canvasID: CanvasBlock.ID) {
         guard BlockCatalog.isAvailableForCreation(kind) else { return }
+        guard canCreateCanvasChild(in: canvasID) else { return }
         guard kind != .command else {
             customCommandRequest = CustomCommandRequest(canvasID: canvasID)
             return
         }
         let child = CanvasBlock(kind: kind)
         insertCanvasChildBlock(child, in: canvasID)
+    }
+
+    private func canCreateCanvasChild(in canvasID: CanvasBlock.ID) -> Bool {
+        if canvasPickerBlockID == canvasID { return true }
+        guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
+              let canvas = workspaces[workspaceIndex].blocks.first(where: { $0.id == canvasID })
+        else { return false }
+        return canvas.kind == .canvas && canvas.children.isEmpty && canvas.layout == nil
     }
 
     func confirmCustomCommand(label: String, command: String) {

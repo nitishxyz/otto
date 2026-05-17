@@ -44,6 +44,13 @@ struct ottoApp: App {
                 .keyboardShortcut("w", modifiers: .command)
             }
 
+            CommandMenu("View") {
+                Button("Toggle Sidebar") {
+                    model.toggleSidebar()
+                }
+                .keyboardShortcut("b", modifiers: .command)
+            }
+
             CommandMenu("Workspaces") {
                 Button("Next Workspace") {
                     model.selectWorkspace(offset: 1)
@@ -176,6 +183,6 @@ private struct WindowMaterialConfigurator: NSViewRepresentable {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false
     }
 }

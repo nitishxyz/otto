@@ -132,12 +132,7 @@ private struct BlockPickerCard: View {
     @State private var isHovered = false
 
     var body: some View {
-        if let keyboardShortcut {
-            cardButton
-                .keyboardShortcut(keyboardShortcut, modifiers: [])
-        } else {
-            cardButton
-        }
+        cardButton
     }
 
     private var cardButton: some View {
@@ -196,13 +191,6 @@ private struct BlockPickerCard: View {
         .buttonStyle(.plain)
         .pressableCursor()
         .onHover { isHovered = $0 }
-    }
-
-    private var keyboardShortcut: KeyEquivalent? {
-        guard let keyEquivalent = option.keyEquivalent,
-              let character = keyEquivalent.first
-        else { return nil }
-        return KeyEquivalent(character)
     }
 }
 

@@ -294,7 +294,7 @@ private struct BlockSurface: View {
         switch block.kind {
         case .canvas: "Native multi-block canvas layout will render here."
         case .otto: "Native Otto session UI will render here once wired up."
-        case .neovim: "Embedded Neovim with follow-agent file opens."
+        case .neovim: "Launches `nvim` in this workspace."
         case .terminal: "PTY-backed native terminal surface."
         case .browser: "WKWebView preview for localhost apps and docs."
         case .command: "Command runner backed by a native terminal surface."

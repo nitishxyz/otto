@@ -3,7 +3,6 @@ import SwiftUI
 
 struct OttoShellView: View {
     @Bindable var model: AppModel
-    @State private var sidebarCollapsed = false
     @State private var showsWorkspaceShortcutNumbers = false
     @State private var modifierMonitor: Any?
 
@@ -23,10 +22,10 @@ struct OttoShellView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
-                    Image(systemName: sidebarCollapsed ? "sidebar.right" : "sidebar.left")
+                    Image(systemName: model.isSidebarCollapsed ? "sidebar.right" : "sidebar.left")
                 }
                 .pressableCursor()
-                .help("Toggle sidebar")
+                .help("Toggle sidebar (⌘B)")
             }
 
             ToolbarSpacer(.flexible, placement: .primaryAction)
@@ -59,7 +58,7 @@ struct OttoShellView: View {
 
     private var floatingSidebar: some View {
         HStack(spacing: 0) {
-            if sidebarCollapsed {
+            if model.isSidebarCollapsed {
                 CollapsedBlockRail(model: model)
                     .frame(width: 58)
                     .transition(.opacity)
@@ -79,7 +78,7 @@ struct OttoShellView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .frame(width: sidebarCollapsed ? 58 : 319)
+        .frame(width: model.isSidebarCollapsed ? 58 : 319)
         .frame(maxHeight: .infinity)
         .background {
             RoundedRectangle(cornerRadius: sidebarCornerRadius, style: .continuous)
@@ -95,11 +94,11 @@ struct OttoShellView: View {
         .shadow(color: Color.black.opacity(0.18), radius: 22, x: 0, y: 16)
         .padding(.leading, 8)
         .padding(.vertical, 8)
-        .animation(.easeInOut(duration: 0.2), value: sidebarCollapsed)
+        .animation(.easeInOut(duration: 0.2), value: model.isSidebarCollapsed)
     }
 
     private var sidebarCornerRadius: CGFloat {
-        sidebarCollapsed ? 16 : 26
+        model.isSidebarCollapsed ? 16 : 26
     }
 
     private var currentBlockLabel: String {
@@ -113,7 +112,7 @@ struct OttoShellView: View {
 
     private func toggleSidebar() {
         withAnimation(.easeInOut(duration: 0.2)) {
-            sidebarCollapsed.toggle()
+            model.toggleSidebar()
         }
     }
 
