@@ -53,7 +53,7 @@ struct WorkspaceBlocksSidebar: View {
             HStack(spacing: 6) {
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .semibold))
-                Text("New Block")
+                Text("New Tab")
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundStyle(.secondary)
@@ -72,7 +72,7 @@ struct WorkspaceBlocksSidebar: View {
         .pressableCursor()
         .onHover { isAddBlockHovered = $0 }
         .keyboardShortcut("n", modifiers: .command)
-        .help("New block (⌘N)")
+        .help("New tab (⌘N)")
         .padding(.horizontal, 10)
         .padding(.bottom, 12)
     }

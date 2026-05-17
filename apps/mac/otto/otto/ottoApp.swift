@@ -13,7 +13,7 @@ struct ottoApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup {
+        Window("otto", id: "main") {
             OttoShellView(model: model)
                 .frame(minWidth: 980, minHeight: 640)
                 .background(WindowMaterialConfigurator())
@@ -23,14 +23,14 @@ struct ottoApp: App {
         .commands {
             CommandGroup(replacing: .appVisibility) {}
 
-            CommandGroup(after: .newItem) {
+            CommandGroup(replacing: .newItem) {
                 Button("Open Workspace…") {
                     model.addWorkspaceFromOpenPanel()
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
-                Button("New Block") {
-                    model.beginBlockCreation()
+                Button("New Tab") {
+                    model.beginWorkspaceBlockCreation()
                 }
                 .keyboardShortcut("n", modifiers: .command)
 

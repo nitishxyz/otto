@@ -369,11 +369,27 @@ final class AppModel {
             closeCanvasChildBlock(focusedChildID, in: selectedBlockID)
             return
         }
-        if let block = workspaces[workspaceIndex].blocks.first(where: { $0.id == selectedBlockID }) {
+        closeWorkspaceBlock(selectedBlockID)
+    }
+
+    func closeWorkspaceBlock(_ blockID: CanvasBlock.ID) {
+        guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }) else { return }
+        if let block = workspaces[workspaceIndex].blocks.first(where: { $0.id == blockID }) {
             discardBlockSessions(in: block)
         }
-        workspaces[workspaceIndex].blocks.removeAll { $0.id == selectedBlockID }
-        self.selectedBlockID = workspaces[workspaceIndex].blocks.first?.id
+        workspaces[workspaceIndex].blocks.removeAll { $0.id == blockID }
+        if selectedBlockID == blockID {
+            selectedBlockID = workspaces[workspaceIndex].blocks.first?.id
+        }
+    }
+
+    func renameWorkspaceBlock(_ blockID: CanvasBlock.ID, title: String) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty,
+              let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
+              let blockIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == blockID })
+        else { return }
+        workspaces[workspaceIndex].blocks[blockIndex].title = trimmedTitle
     }
 
     func selectNextBlock() {

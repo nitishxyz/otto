@@ -16,41 +16,32 @@ struct OttoShellView: View {
         .frame(minWidth: 980, minHeight: 640)
         .background(.regularMaterial)
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
+            ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
                     Image(systemName: sidebarCollapsed ? "sidebar.right" : "sidebar.left")
                 }
                 .pressableCursor()
                 .help("Toggle sidebar")
-
-                if let workspace = model.selectedWorkspace {
-                    HStack(spacing: 8) {
-                        Text(workspace.name)
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        Text(workspace.path)
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    .frame(minWidth: 260, alignment: .leading)
-                }
-
-                Button(currentBlockLabel) {}
-                    .pressableCursor()
-                    .help("Current block type")
             }
 
             ToolbarSpacer(.flexible, placement: .primaryAction)
 
             ToolbarItemGroup(placement: .primaryAction) {
+                if let workspace = model.selectedWorkspace {
+                    ProjectPathText(path: workspace.path)
+                }
+
+                Button(currentBlockLabel) {}
+                    .pressableCursor()
+                    .help("Current block type")
+
                 Button {
-                    model.beginBlockCreation()
+                    model.beginWorkspaceBlockCreation()
                 } label: {
-                    Label("New Block", systemImage: "plus")
+                    Label("New Tab", systemImage: "plus")
                 }
                 .pressableCursor()
-                .help("New block (⌘N)")
+                .help("New tab (⌘N)")
 
                 Button {} label: {
                     Label("Export", systemImage: "square.and.arrow.up")
@@ -121,6 +112,21 @@ struct OttoShellView: View {
 
 #Preview {
     OttoShellView(model: AppModel())
+}
+
+private struct ProjectPathText: View {
+    let path: String
+
+    var body: some View {
+        Text(path)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: 280, alignment: .trailing)
+            .padding(.horizontal, 8)
+            .help(path)
+    }
 }
 
 private struct CollapsedBlockRail: View {

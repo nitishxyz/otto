@@ -2,7 +2,8 @@ import SwiftUI
 
 struct WorkspaceContentView: View {
     @Bindable var model: AppModel
-    @State private var retainedBlockIDs: Set<CanvasBlock.ID> = []
+    @State private var retainedWorkspaceIDs: Set<Workspace.ID> = []
+    @State private var retainedBlockIDsByWorkspace: [Workspace.ID: Set<CanvasBlock.ID>] = [:]
 
     var body: some View {
         ZStack {
@@ -10,11 +11,12 @@ struct WorkspaceContentView: View {
                 .fill(.regularMaterial)
 
             if let workspace = model.selectedWorkspace {
-                RetainedBlockSurfaceStack(
+                RetainedWorkspaceSurfaceStack(
                     model: model,
-                    workspace: workspace,
+                    selectedWorkspaceID: workspace.id,
                     selectedBlockID: model.selectedBlockID,
-                    retainedBlockIDs: retainedBlockIDs
+                    retainedWorkspaces: retainedWorkspaces,
+                    retainedBlockIDsByWorkspace: retainedBlockIDsByWorkspace
                 )
                 .opacity(model.isBlockPickerPresented || model.selectedBlockID == nil ? 0 : 1)
                 .allowsHitTesting(!model.isBlockPickerPresented && model.selectedBlockID != nil)
@@ -48,12 +50,10 @@ struct WorkspaceContentView: View {
                 .stroke(Color.primary.opacity(0.09), lineWidth: 1)
         )
         .padding(.vertical, 6)
-        .onAppear(perform: retainSelectedBlock)
-        .onChange(of: model.selectedBlockID) { _, _ in retainSelectedBlock() }
-        .onChange(of: model.selectedWorkspaceID) { _, _ in
-            retainedBlockIDs.removeAll()
-            retainSelectedBlock()
-        }
+        .onAppear(perform: retainSelectedSurface)
+        .onChange(of: model.selectedBlockID) { _, _ in retainSelectedSurface() }
+        .onChange(of: model.selectedWorkspaceID) { _, _ in retainSelectedSurface() }
+        .onChange(of: model.workspaces) { _, _ in pruneRetainedSurfaces() }
     }
 
     private var commandModalOverlay: some View {
@@ -69,14 +69,62 @@ struct WorkspaceContentView: View {
         }
     }
 
-    private func retainSelectedBlock() {
-        guard let selectedBlockID = model.selectedBlockID else { return }
-        retainedBlockIDs.insert(selectedBlockID)
+    private var retainedWorkspaces: [Workspace] {
+        model.workspaces.filter { workspace in
+            retainedWorkspaceIDs.contains(workspace.id) || workspace.id == model.selectedWorkspaceID
+        }
+    }
+
+    private func retainSelectedSurface() {
+        guard let selectedWorkspaceID = model.selectedWorkspaceID else { return }
+        retainedWorkspaceIDs.insert(selectedWorkspaceID)
+        if let selectedBlockID = model.selectedBlockID {
+            retainedBlockIDsByWorkspace[selectedWorkspaceID, default: []].insert(selectedBlockID)
+        }
+        pruneRetainedSurfaces()
+    }
+
+    private func pruneRetainedSurfaces() {
+        let workspaceIDs = Set(model.workspaces.map(\.id))
+        retainedWorkspaceIDs = retainedWorkspaceIDs.intersection(workspaceIDs)
+        retainedBlockIDsByWorkspace = retainedBlockIDsByWorkspace.reduce(into: [:]) { result, entry in
+            guard let workspace = model.workspaces.first(where: { $0.id == entry.key }) else { return }
+            let blockIDs = Set(workspace.blocks.map(\.id))
+            let retainedBlockIDs = entry.value.intersection(blockIDs)
+            if !retainedBlockIDs.isEmpty {
+                result[entry.key] = retainedBlockIDs
+            }
+        }
     }
 
     private func selectedBlock(in workspace: Workspace) -> CanvasBlock? {
         guard let selectedBlockID = model.selectedBlockID else { return nil }
         return workspace.blocks.first { $0.id == selectedBlockID }
+    }
+}
+
+private struct RetainedWorkspaceSurfaceStack: View {
+    @Bindable var model: AppModel
+    let selectedWorkspaceID: Workspace.ID
+    let selectedBlockID: CanvasBlock.ID?
+    let retainedWorkspaces: [Workspace]
+    let retainedBlockIDsByWorkspace: [Workspace.ID: Set<CanvasBlock.ID>]
+
+    var body: some View {
+        ZStack {
+            ForEach(retainedWorkspaces) { workspace in
+                let isActiveWorkspace = workspace.id == selectedWorkspaceID
+                RetainedBlockSurfaceStack(
+                    model: model,
+                    workspace: workspace,
+                    selectedBlockID: isActiveWorkspace ? selectedBlockID : nil,
+                    retainedBlockIDs: retainedBlockIDsByWorkspace[workspace.id] ?? []
+                )
+                .opacity(isActiveWorkspace ? 1 : 0)
+                .allowsHitTesting(isActiveWorkspace)
+                .zIndex(isActiveWorkspace ? 1 : 0)
+            }
+        }
     }
 }
 
@@ -111,13 +159,16 @@ private struct BlockSurface: View {
     let block: CanvasBlock
     var isActive = true
 
+    @State private var isRenaming = false
+    @State private var draftTitle = ""
+    @FocusState private var isTitleFieldFocused: Bool
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 BlockKindIcon(kind: block.kind, size: 12)
                     .foregroundStyle(.secondary)
-                Text(block.title)
-                    .font(.system(size: 12, weight: .medium))
+                titleView
                 Spacer()
                 if block.kind == .canvas {
                     Button {
@@ -132,10 +183,10 @@ private struct BlockSurface: View {
                     .help("Add block to canvas")
                 }
                 Menu {
-                    Button("Rename…") {}
+                    Button("Rename…") { beginRenaming() }
                     Button("Duplicate") {}
                     Divider()
-                    Button("Close Block", role: .destructive) { model.closeSelectedBlock() }
+                    Button("Close Block", role: .destructive) { model.closeWorkspaceBlock(block.id) }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 12, weight: .semibold))
@@ -157,6 +208,50 @@ private struct BlockSurface: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    @ViewBuilder
+    private var titleView: some View {
+        if isRenaming {
+            TextField("Block title", text: $draftTitle)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, weight: .medium))
+                .focused($isTitleFieldFocused)
+                .frame(minWidth: 120, maxWidth: 260)
+                .onSubmit(commitRename)
+                .onExitCommand(perform: cancelRename)
+        } else {
+            Button(action: beginRenaming) {
+                Text(block.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .pressableCursor()
+            .help("Rename block")
+        }
+    }
+
+    private func beginRenaming() {
+        draftTitle = block.title
+        isRenaming = true
+        DispatchQueue.main.async {
+            isTitleFieldFocused = true
+        }
+    }
+
+    private func commitRename() {
+        model.renameWorkspaceBlock(block.id, title: draftTitle)
+        isRenaming = false
+        isTitleFieldFocused = false
+    }
+
+    private func cancelRename() {
+        draftTitle = block.title
+        isRenaming = false
+        isTitleFieldFocused = false
     }
 
     @ViewBuilder
