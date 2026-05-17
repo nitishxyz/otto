@@ -79,6 +79,11 @@ struct ottoApp: App {
                 }
                 .keyboardShortcut("[", modifiers: .command)
 
+                Button("Switch to Recent Block") {
+                    model.selectRecentBlock()
+                }
+                .keyboardShortcut(.tab, modifiers: .control)
+
                 Divider()
 
                 Button("Split Right") {

@@ -27,7 +27,7 @@ final class AppModel {
     }
     var selectedBlockID: CanvasBlock.ID? {
         didSet {
-            rememberSelectedBlock()
+            rememberSelectedBlock(previousBlockID: oldValue)
             persistState()
         }
     }
@@ -42,6 +42,7 @@ final class AppModel {
     private var selectedBlockIDsByWorkspace: [Workspace.ID: CanvasBlock.ID] = [:] {
         didSet { persistState() }
     }
+    private var previousBlockIDsByWorkspace: [Workspace.ID: CanvasBlock.ID] = [:]
     @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
     @ObservationIgnored private var browserSessions: [CanvasBlock.ID: BrowserSession] = [:]
     @ObservationIgnored private var ottoRuntimeSessions: [Workspace.ID: OttoWorkspaceRuntimeSession] = [:]
@@ -122,6 +123,7 @@ final class AppModel {
             discardBlockSessions(in: block)
         }
         selectedBlockIDsByWorkspace.removeValue(forKey: workspace.id)
+        previousBlockIDsByWorkspace.removeValue(forKey: workspace.id)
         workspaces.removeAll { $0.id == workspace.id }
         if selectedWorkspaceID == workspace.id {
             selectedWorkspaceID = workspaces.first?.id
@@ -168,7 +170,9 @@ final class AppModel {
     }
 
     func createBlock(kind: BlockKind) {
-        guard let index = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }) else { return }
+        guard BlockCatalog.isAvailableForCreation(kind),
+              let index = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID })
+        else { return }
         guard kind != .command else {
             isBlockPickerPresented = false
             customCommandRequest = CustomCommandRequest(canvasID: nil)
@@ -279,6 +283,7 @@ final class AppModel {
     }
 
     func createCanvasChildBlock(kind: BlockKind, in canvasID: CanvasBlock.ID) {
+        guard BlockCatalog.isAvailableForCreation(kind) else { return }
         guard kind != .command else {
             customCommandRequest = CustomCommandRequest(canvasID: canvasID)
             return
@@ -419,6 +424,9 @@ final class AppModel {
         if selectedBlockIDsByWorkspace[workspaceID] == blockID {
             selectedBlockIDsByWorkspace.removeValue(forKey: workspaceID)
         }
+        if previousBlockIDsByWorkspace[workspaceID] == blockID {
+            previousBlockIDsByWorkspace.removeValue(forKey: workspaceID)
+        }
         if selectedBlockID == blockID {
             selectedBlockID = preferredSelectedBlockID(in: workspaces[workspaceIndex])
         }
@@ -434,13 +442,19 @@ final class AppModel {
     }
 
     func selectNextBlock() {
-        if focusCanvasChild(offset: 1) { return }
         selectBlock(offset: 1)
     }
 
     func selectPreviousBlock() {
-        if focusCanvasChild(offset: -1) { return }
         selectBlock(offset: -1)
+    }
+
+    func selectRecentBlock() {
+        guard let selectedWorkspace,
+              let previousBlockID = previousBlockIDsByWorkspace[selectedWorkspace.id],
+              let previousBlock = selectedWorkspace.blocks.first(where: { $0.id == previousBlockID })
+        else { return }
+        selectBlock(previousBlock)
     }
 
     func selectBlock(at index: Int) {
@@ -484,7 +498,7 @@ final class AppModel {
     }
 
     private func selectBlock(offset: Int) {
-        guard let blocks = selectedWorkspace?.blocks,
+        guard let blocks = selectedWorkspace?.sidebarOrderedBlocks,
               !blocks.isEmpty
         else { return }
         let currentIndex = selectedBlockID.flatMap { id in blocks.firstIndex { $0.id == id } } ?? 0
@@ -577,8 +591,13 @@ final class AppModel {
         UserDefaults.standard.set(data, forKey: Self.persistedStateKey)
     }
 
-    private func rememberSelectedBlock() {
+    private func rememberSelectedBlock(previousBlockID: CanvasBlock.ID?) {
         guard let selectedWorkspaceID, let selectedBlockID else { return }
+        if let previousBlockID,
+           previousBlockID != selectedBlockID,
+           selectedWorkspace?.blocks.contains(where: { $0.id == previousBlockID }) == true {
+            previousBlockIDsByWorkspace[selectedWorkspaceID] = previousBlockID
+        }
         selectedBlockIDsByWorkspace[selectedWorkspaceID] = selectedBlockID
     }
 
@@ -587,7 +606,7 @@ final class AppModel {
            workspace.blocks.contains(where: { $0.id == rememberedID }) {
             return rememberedID
         }
-        return workspace.blocks.first?.id
+        return workspace.sidebarOrderedBlocks.first?.id
     }
 
     private func validSelectedBlockIDsByWorkspace(

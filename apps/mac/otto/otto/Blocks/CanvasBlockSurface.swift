@@ -69,7 +69,7 @@ struct CanvasBlockSurface: View {
     }
 
     private var creationOptions: [BlockCreationOption] {
-        return BlockCatalog.creationOptions.filter { $0.kind != .canvas }
+        return BlockCatalog.creationOptions(includeCanvas: false)
     }
 }
 

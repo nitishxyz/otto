@@ -40,16 +40,25 @@ struct BlockPickerView: View {
         .shadow(color: .black.opacity(0.24), radius: 28, y: 16)
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(EscapeKeyMonitor(onEscape: onCancel).frame(width: 0, height: 0))
+        .background(
+            BlockPickerKeyMonitor(
+                options: options,
+                onSelect: onSelect,
+                onCancel: onCancel
+            )
+            .frame(width: 0, height: 0)
+        )
         .onExitCommand(perform: onCancel)
     }
 }
 
-private struct EscapeKeyMonitor: NSViewRepresentable {
-    let onEscape: () -> Void
+private struct BlockPickerKeyMonitor: NSViewRepresentable {
+    let options: [BlockCreationOption]
+    let onSelect: (BlockCreationOption) -> Void
+    let onCancel: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onEscape: onEscape)
+        Coordinator(options: options, onSelect: onSelect, onCancel: onCancel)
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -58,7 +67,9 @@ private struct EscapeKeyMonitor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.onEscape = onEscape
+        context.coordinator.options = options
+        context.coordinator.onSelect = onSelect
+        context.coordinator.onCancel = onCancel
         context.coordinator.install()
     }
 
@@ -67,20 +78,42 @@ private struct EscapeKeyMonitor: NSViewRepresentable {
     }
 
     final class Coordinator {
-        var onEscape: () -> Void
+        var options: [BlockCreationOption]
+        var onSelect: (BlockCreationOption) -> Void
+        var onCancel: () -> Void
         private var monitor: Any?
 
-        init(onEscape: @escaping () -> Void) {
-            self.onEscape = onEscape
+        init(
+            options: [BlockCreationOption],
+            onSelect: @escaping (BlockCreationOption) -> Void,
+            onCancel: @escaping () -> Void
+        ) {
+            self.options = options
+            self.onSelect = onSelect
+            self.onCancel = onCancel
         }
 
         func install() {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard event.keyCode == 53 else { return event }
-                self?.onEscape()
+                self?.handle(event) ?? event
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            if event.keyCode == 53 {
+                onCancel()
                 return nil
             }
+
+            let blockedModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
+            guard event.modifierFlags.intersection(blockedModifiers).isEmpty,
+                  let keyEquivalent = event.charactersIgnoringModifiers,
+                  let option = options.first(where: { $0.keyEquivalent == keyEquivalent })
+            else { return event }
+
+            onSelect(option)
+            return nil
         }
 
         func uninstall() {

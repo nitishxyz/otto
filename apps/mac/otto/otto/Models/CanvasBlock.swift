@@ -424,7 +424,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
         }
     }
 
-    var defaultLaunchCommand: String? {
+    nonisolated var defaultLaunchCommand: String? {
         switch self {
         case .claudeCode: "claude"
         case .codex: "codex"
@@ -478,15 +478,84 @@ struct BlockCreationOption: Identifiable, Hashable {
 }
 
 enum BlockCatalog {
-    static let creationOptions: [BlockCreationOption] = [
-        BlockCreationOption(kind: .terminal, keyEquivalent: "1"),
-        BlockCreationOption(kind: .browser, keyEquivalent: "2"),
-        BlockCreationOption(kind: .otto, keyEquivalent: "3"),
-        BlockCreationOption(kind: .claudeCode, keyEquivalent: "4"),
-        BlockCreationOption(kind: .codex, keyEquivalent: "5"),
-        BlockCreationOption(kind: .ottoTUI, keyEquivalent: "6"),
-        BlockCreationOption(kind: .openCode, keyEquivalent: "7"),
-        BlockCreationOption(kind: .command, keyEquivalent: "8"),
-        BlockCreationOption(kind: .canvas, keyEquivalent: "9")
+    private nonisolated static let creationKinds: [BlockKind] = [
+        .terminal,
+        .browser,
+        .otto,
+        .claudeCode,
+        .codex,
+        .ottoTUI,
+        .openCode,
+        .command,
+        .canvas
     ]
+
+    nonisolated static var creationOptions: [BlockCreationOption] {
+        creationOptions(includeCanvas: true)
+    }
+
+    nonisolated static func creationOptions(includeCanvas: Bool) -> [BlockCreationOption] {
+        creationKinds
+            .filter { includeCanvas || $0 != .canvas }
+            .filter(isAvailableForCreation)
+            .enumerated()
+            .map { offset, kind in
+                BlockCreationOption(kind: kind, keyEquivalent: String(offset + 1))
+            }
+    }
+
+    nonisolated static func isAvailableForCreation(_ kind: BlockKind) -> Bool {
+        guard let command = kind.defaultLaunchCommand else { return true }
+        return ShellCommandAvailability.isAvailable(command)
+    }
+}
+
+private enum ShellCommandAvailability {
+    nonisolated static func isAvailable(_ command: String) -> Bool {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCommand.isEmpty else { return false }
+
+        if trimmedCommand.contains("/") {
+            let expandedPath = (trimmedCommand as NSString).expandingTildeInPath
+            return FileManager.default.isExecutableFile(atPath: expandedPath)
+        }
+
+        return searchDirectories.contains { directory in
+            FileManager.default.isExecutableFile(atPath: "\(directory)/\(trimmedCommand)")
+        }
+    }
+
+    private nonisolated static var searchDirectories: [String] {
+        var directories: [String] = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin"
+        ]
+        let environment = ProcessInfo.processInfo.environment
+        if let path = environment["PATH"] {
+            directories.append(contentsOf: path.split(separator: ":").map(String.init))
+        }
+        if let home = environment["HOME"], !home.isEmpty {
+            directories.append(contentsOf: [
+                "\(home)/.bun/bin",
+                "\(home)/.local/bin",
+                "\(home)/.cargo/bin",
+                "\(home)/.npm-global/bin"
+            ])
+        }
+        return uniqueDirectories(directories)
+    }
+
+    private nonisolated static func uniqueDirectories(_ directories: [String]) -> [String] {
+        var seen: Set<String> = []
+        return directories.compactMap { directory in
+            let expandedDirectory = (directory as NSString).expandingTildeInPath
+            guard !expandedDirectory.isEmpty, !seen.contains(expandedDirectory) else { return nil }
+            seen.insert(expandedDirectory)
+            return expandedDirectory
+        }
+    }
 }
