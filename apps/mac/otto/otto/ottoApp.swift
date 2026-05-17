@@ -40,6 +40,30 @@ struct ottoApp: App {
                 .keyboardShortcut("w", modifiers: .command)
             }
 
+            CommandMenu("Workspaces") {
+                Button("Next Workspace") {
+                    model.selectWorkspace(offset: 1)
+                }
+                .keyboardShortcut("]", modifiers: [.command, .option])
+
+                Button("Previous Workspace") {
+                    model.selectWorkspace(offset: -1)
+                }
+                .keyboardShortcut("[", modifiers: [.command, .option])
+
+                Divider()
+
+                ForEach(0..<9, id: \.self) { index in
+                    Button("Select Workspace \(index + 1)") {
+                        model.selectWorkspace(at: index)
+                    }
+                    .keyboardShortcut(
+                        KeyEquivalent(Character("\(index + 1)")),
+                        modifiers: [.command, .option]
+                    )
+                }
+            }
+
             CommandMenu("Blocks") {
                 Button("Next Block") {
                     model.selectNextBlock()

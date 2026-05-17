@@ -2,16 +2,20 @@ import SwiftUI
 
 struct WorkspaceRail: View {
     @Bindable var model: AppModel
+    var showsShortcutNumbers = false
+
     @State private var isAddWorkspaceHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 8) {
-                    ForEach(model.workspaces) { workspace in
+                    ForEach(Array(model.workspaces.enumerated()), id: \.element.id) { index, workspace in
                         WorkspaceRailButton(
                             workspace: workspace,
                             isActive: workspace.id == model.selectedWorkspaceID,
+                            shortcutNumber: index + 1,
+                            showsShortcutNumber: showsShortcutNumbers && index < 9,
                             action: { model.selectWorkspace(workspace) },
                             onRemove: { model.removeWorkspace(workspace) }
                         )
@@ -51,6 +55,8 @@ struct WorkspaceRail: View {
 private struct WorkspaceRailButton: View {
     let workspace: Workspace
     let isActive: Bool
+    let shortcutNumber: Int
+    let showsShortcutNumber: Bool
     let action: () -> Void
     let onRemove: () -> Void
 
@@ -75,9 +81,14 @@ private struct WorkspaceRailButton: View {
                     Text(workspace.initials)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
+                    if showsShortcutNumber {
+                        shortcutBadge
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    }
                 }
                 .frame(width: 36, height: 36)
                 .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isActive)
+                .animation(.easeOut(duration: 0.12), value: showsShortcutNumber)
             }
             .buttonStyle(.plain)
             .pressableCursor()
@@ -92,5 +103,23 @@ private struct WorkspaceRailButton: View {
             Color.clear.frame(width: 3)
         }
         .frame(width: 56, height: 40)
+    }
+
+    private var shortcutBadge: some View {
+        Text("\(shortcutNumber)")
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.primary)
+            .frame(width: 15, height: 15)
+            .background(
+                Circle()
+                    .fill(.regularMaterial)
+                    .shadow(color: Color.black.opacity(0.24), radius: 2, y: 1)
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.white.opacity(0.45), lineWidth: 0.5)
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .offset(x: 3, y: 3)
     }
 }

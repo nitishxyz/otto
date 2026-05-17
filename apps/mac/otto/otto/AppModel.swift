@@ -79,6 +79,18 @@ final class AppModel {
         startOttoRuntime(for: workspace)
     }
 
+    func selectWorkspace(at index: Int) {
+        guard workspaces.indices.contains(index) else { return }
+        selectWorkspace(workspaces[index])
+    }
+
+    func selectWorkspace(offset: Int) {
+        guard !workspaces.isEmpty else { return }
+        let currentIndex = selectedWorkspaceID.flatMap { id in workspaces.firstIndex { $0.id == id } } ?? 0
+        let nextIndex = (currentIndex + offset + workspaces.count) % workspaces.count
+        selectWorkspace(workspaces[nextIndex])
+    }
+
     func addWorkspaceFromOpenPanel() {
         let panel = NSOpenPanel()
         panel.title = "Choose project folder"

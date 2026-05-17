@@ -1,8 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct OttoShellView: View {
     @Bindable var model: AppModel
     @State private var sidebarCollapsed = false
+    @State private var showsWorkspaceShortcutNumbers = false
+    @State private var modifierMonitor: Any?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -15,6 +18,8 @@ struct OttoShellView: View {
         .padding(.bottom, 8)
         .frame(minWidth: 980, minHeight: 640)
         .background(.regularMaterial)
+        .onAppear(perform: startModifierMonitor)
+        .onDisappear(perform: stopModifierMonitor)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
@@ -59,7 +64,10 @@ struct OttoShellView: View {
                     .frame(width: 58)
                     .transition(.opacity)
             } else {
-                WorkspaceRail(model: model)
+                WorkspaceRail(
+                    model: model,
+                    showsShortcutNumbers: showsWorkspaceShortcutNumbers
+                )
                     .frame(width: 58)
 
                 Divider()
@@ -107,6 +115,28 @@ struct OttoShellView: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             sidebarCollapsed.toggle()
         }
+    }
+
+    private func startModifierMonitor() {
+        guard modifierMonitor == nil else { return }
+        modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            updateWorkspaceShortcutNumbers(for: event.modifierFlags)
+            return event
+        }
+        updateWorkspaceShortcutNumbers(for: NSEvent.modifierFlags)
+    }
+
+    private func stopModifierMonitor() {
+        if let modifierMonitor {
+            NSEvent.removeMonitor(modifierMonitor)
+            self.modifierMonitor = nil
+        }
+        showsWorkspaceShortcutNumbers = false
+    }
+
+    private func updateWorkspaceShortcutNumbers(for flags: NSEvent.ModifierFlags) {
+        let relevantFlags = flags.intersection(.deviceIndependentFlagsMask)
+        showsWorkspaceShortcutNumbers = relevantFlags.contains(.command) && relevantFlags.contains(.option)
     }
 }
 
