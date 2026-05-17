@@ -70,6 +70,7 @@ private struct CanvasLayoutRenderer: View {
         case .leaf(let blockID):
             if let child = canvas.children.first(where: { $0.id == blockID }) {
                 CanvasChildBlockFrame(
+                    model: model,
                     block: child,
                     isFocused: canvas.focusedChildID == child.id,
                     onFocus: { model.focusCanvasChildBlock(child.id, in: canvas.id) },
@@ -159,6 +160,7 @@ private struct CanvasSplitPane: View {
 }
 
 private struct CanvasChildBlockFrame: View {
+    @Bindable var model: AppModel
     let block: CanvasBlock
     let isFocused: Bool
     let onFocus: () -> Void
@@ -209,19 +211,28 @@ private struct CanvasChildBlockFrame: View {
 
     @ViewBuilder
     private var childContent: some View {
-        VStack(spacing: 8) {
-            Image(systemName: block.kind.symbolName)
-                .font(.system(size: 24, weight: .light))
-                .foregroundStyle(.tertiary)
-            Text(block.kind.defaultTitle)
-                .font(.system(size: 13, weight: .semibold))
-            Text(description)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 260)
+        if block.kind.runsInTerminal {
+            TerminalBlockView(
+                block: block,
+                session: model.terminalSession(for: block),
+                isFocused: isFocused,
+                onFocus: onFocus
+            )
+        } else {
+            VStack(spacing: 8) {
+                Image(systemName: block.kind.symbolName)
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(.tertiary)
+                Text(block.kind.defaultTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 260)
+            }
+            .padding(18)
         }
-        .padding(18)
     }
 
     private var description: String {

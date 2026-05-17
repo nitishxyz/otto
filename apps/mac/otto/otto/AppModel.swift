@@ -10,6 +10,7 @@ final class AppModel {
     var isBlockPickerPresented = false
     var canvasPickerBlockID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
+    @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
 
     init() {
         selectedWorkspaceID = workspaces.first?.id
@@ -71,6 +72,15 @@ final class AppModel {
         blockSelectionBeforePicker = nil
     }
 
+    func terminalSession(for block: CanvasBlock) -> TerminalSession {
+        if let session = terminalSessions[block.id] {
+            return session
+        }
+        let session = TerminalSession(command: block.launchCommand)
+        terminalSessions[block.id] = session
+        return session
+    }
+
     func beginCanvasBlockCreation(in canvas: CanvasBlock) {
         guard canvas.kind == .canvas else { return }
         selectedBlockID = canvas.id
@@ -103,6 +113,11 @@ final class AppModel {
               let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvasID })
         else { return }
         var canvas = workspaces[workspaceIndex].blocks[canvasIndex]
+        if let removed = canvas.children.first(where: { $0.id == childID }) {
+            discardTerminalSessions(in: removed)
+        } else {
+            discardTerminalSession(for: childID)
+        }
         canvas.children.removeAll { $0.id == childID }
         canvas.layout = CanvasLayoutNode.remove(blockID: childID, from: canvas.layout)
         if canvas.focusedChildID == childID {
@@ -139,6 +154,9 @@ final class AppModel {
            let focusedChildID = workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID {
             closeCanvasChildBlock(focusedChildID, in: selectedBlockID)
             return
+        }
+        if let block = workspaces[workspaceIndex].blocks.first(where: { $0.id == selectedBlockID }) {
+            discardTerminalSessions(in: block)
         }
         workspaces[workspaceIndex].blocks.removeAll { $0.id == selectedBlockID }
         self.selectedBlockID = workspaces[workspaceIndex].blocks.first?.id
@@ -216,5 +234,16 @@ final class AppModel {
         let nextIndex = (currentIndex + offset + orderedIDs.count) % orderedIDs.count
         workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID = orderedIDs[nextIndex]
         return true
+    }
+
+    private func discardTerminalSession(for blockID: CanvasBlock.ID) {
+        terminalSessions.removeValue(forKey: blockID)?.stop()
+    }
+
+    private func discardTerminalSessions(in block: CanvasBlock) {
+        discardTerminalSession(for: block.id)
+        for child in block.children {
+            discardTerminalSessions(in: child)
+        }
     }
 }

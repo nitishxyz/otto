@@ -380,6 +380,15 @@ enum BlockKind: String, CaseIterable, Identifiable, Hashable {
         default: nil
         }
     }
+
+    var runsInTerminal: Bool {
+        switch self {
+        case .terminal, .command, .claudeCode, .codex, .ottoTUI, .openCode:
+            true
+        default:
+            false
+        }
+    }
 }
 
 enum BlockGroup: String, CaseIterable, Identifiable, Hashable {
