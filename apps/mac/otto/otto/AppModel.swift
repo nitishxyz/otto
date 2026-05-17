@@ -11,6 +11,7 @@ private struct PersistedAppState: Codable {
     var workspaces: [Workspace]
     var selectedWorkspaceID: Workspace.ID?
     var selectedBlockID: CanvasBlock.ID?
+    var selectedBlockIDsByWorkspace: [Workspace.ID: CanvasBlock.ID]?
 }
 
 @MainActor
@@ -25,7 +26,10 @@ final class AppModel {
         didSet { persistState() }
     }
     var selectedBlockID: CanvasBlock.ID? {
-        didSet { persistState() }
+        didSet {
+            rememberSelectedBlock()
+            persistState()
+        }
     }
     var followAgentEnabled = true
     var isBlockPickerPresented = false
@@ -35,6 +39,9 @@ final class AppModel {
     private var canvasPickerPendingChildID: CanvasBlock.ID?
     private var canvasPickerPreviousFocusedChildID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
+    private var selectedBlockIDsByWorkspace: [Workspace.ID: CanvasBlock.ID] = [:] {
+        didSet { persistState() }
+    }
     @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
     @ObservationIgnored private var browserSessions: [CanvasBlock.ID: BrowserSession] = [:]
     @ObservationIgnored private var ottoRuntimeSessions: [Workspace.ID: OttoWorkspaceRuntimeSession] = [:]
@@ -52,7 +59,7 @@ final class AppModel {
         set {
             resetCanvasPicker(removePending: true)
             selectedWorkspaceID = newValue?.id
-            selectedBlockID = newValue?.blocks.first?.id
+            selectedBlockID = newValue.flatMap { preferredSelectedBlockID(in: $0) }
             isBlockPickerPresented = false
             if let newValue {
                 startOttoRuntime(for: newValue)
@@ -67,7 +74,7 @@ final class AppModel {
     func selectWorkspace(_ workspace: Workspace) {
         resetCanvasPicker(removePending: true)
         selectedWorkspaceID = workspace.id
-        selectedBlockID = workspace.blocks.first?.id
+        selectedBlockID = preferredSelectedBlockID(in: workspace)
         isBlockPickerPresented = false
         startOttoRuntime(for: workspace)
     }
@@ -102,10 +109,11 @@ final class AppModel {
         for block in workspace.blocks {
             discardBlockSessions(in: block)
         }
+        selectedBlockIDsByWorkspace.removeValue(forKey: workspace.id)
         workspaces.removeAll { $0.id == workspace.id }
         if selectedWorkspaceID == workspace.id {
             selectedWorkspaceID = workspaces.first?.id
-            selectedBlockID = selectedWorkspace?.blocks.first?.id
+            selectedBlockID = selectedWorkspace.flatMap { preferredSelectedBlockID(in: $0) }
             if let selectedWorkspace {
                 startOttoRuntime(for: selectedWorkspace)
             }
@@ -374,12 +382,16 @@ final class AppModel {
 
     func closeWorkspaceBlock(_ blockID: CanvasBlock.ID) {
         guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }) else { return }
+        let workspaceID = workspaces[workspaceIndex].id
         if let block = workspaces[workspaceIndex].blocks.first(where: { $0.id == blockID }) {
             discardBlockSessions(in: block)
         }
         workspaces[workspaceIndex].blocks.removeAll { $0.id == blockID }
+        if selectedBlockIDsByWorkspace[workspaceID] == blockID {
+            selectedBlockIDsByWorkspace.removeValue(forKey: workspaceID)
+        }
         if selectedBlockID == blockID {
-            selectedBlockID = workspaces[workspaceIndex].blocks.first?.id
+            selectedBlockID = preferredSelectedBlockID(in: workspaces[workspaceIndex])
         }
     }
 
@@ -507,17 +519,17 @@ final class AppModel {
         }
 
         workspaces = state.workspaces
+        selectedBlockIDsByWorkspace = validSelectedBlockIDsByWorkspace(state.selectedBlockIDsByWorkspace ?? [:])
+        if let selectedWorkspaceID = state.selectedWorkspaceID,
+           let selectedBlockID = state.selectedBlockID,
+           selectedBlockIDsByWorkspace[selectedWorkspaceID] == nil {
+            selectedBlockIDsByWorkspace[selectedWorkspaceID] = selectedBlockID
+        }
         selectedWorkspaceID = state.selectedWorkspaceID.flatMap { selectedID in
             workspaces.contains { $0.id == selectedID } ? selectedID : nil
         } ?? workspaces.first?.id
 
-        if let selectedWorkspace,
-           let selectedBlockID = state.selectedBlockID,
-           selectedWorkspace.blocks.contains(where: { $0.id == selectedBlockID }) {
-            self.selectedBlockID = selectedBlockID
-        } else {
-            selectedBlockID = selectedWorkspace?.blocks.first?.id
-        }
+        selectedBlockID = selectedWorkspace.flatMap { preferredSelectedBlockID(in: $0) }
 
         if let selectedWorkspace {
             startOttoRuntime(for: selectedWorkspace)
@@ -529,10 +541,33 @@ final class AppModel {
         let state = PersistedAppState(
             workspaces: workspaces,
             selectedWorkspaceID: selectedWorkspaceID,
-            selectedBlockID: selectedBlockID
+            selectedBlockID: selectedBlockID,
+            selectedBlockIDsByWorkspace: validSelectedBlockIDsByWorkspace(selectedBlockIDsByWorkspace)
         )
         guard let data = try? JSONEncoder().encode(state) else { return }
         UserDefaults.standard.set(data, forKey: Self.persistedStateKey)
+    }
+
+    private func rememberSelectedBlock() {
+        guard let selectedWorkspaceID, let selectedBlockID else { return }
+        selectedBlockIDsByWorkspace[selectedWorkspaceID] = selectedBlockID
+    }
+
+    private func preferredSelectedBlockID(in workspace: Workspace) -> CanvasBlock.ID? {
+        if let rememberedID = selectedBlockIDsByWorkspace[workspace.id],
+           workspace.blocks.contains(where: { $0.id == rememberedID }) {
+            return rememberedID
+        }
+        return workspace.blocks.first?.id
+    }
+
+    private func validSelectedBlockIDsByWorkspace(
+        _ selectedBlockIDs: [Workspace.ID: CanvasBlock.ID]
+    ) -> [Workspace.ID: CanvasBlock.ID] {
+        selectedBlockIDs.filter { workspaceID, blockID in
+            guard let workspace = workspaces.first(where: { $0.id == workspaceID }) else { return false }
+            return workspace.blocks.contains { $0.id == blockID }
+        }
     }
 
     private func removePendingCanvasChild() {

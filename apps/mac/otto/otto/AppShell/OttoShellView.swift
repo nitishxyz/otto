@@ -33,7 +33,7 @@ struct OttoShellView: View {
 
                 Button(currentBlockLabel) {}
                     .pressableCursor()
-                    .help("Current block type")
+                    .help("Current block")
 
                 Button {
                     model.beginWorkspaceBlockCreation()
@@ -95,12 +95,12 @@ struct OttoShellView: View {
     }
 
     private var currentBlockLabel: String {
-        if model.isBlockPickerPresented { return "New Block" }
+        if model.isBlockPickerPresented { return "New Tab" }
         guard let workspace = model.selectedWorkspace,
               let blockID = model.selectedBlockID,
               let block = workspace.blocks.first(where: { $0.id == blockID })
         else { return "No Block" }
-        return block.kind.defaultTitle
+        return block.title
     }
 
     private func toggleSidebar() {

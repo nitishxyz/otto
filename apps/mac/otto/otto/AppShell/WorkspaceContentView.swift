@@ -257,7 +257,7 @@ private struct BlockSurface: View {
     @ViewBuilder
     private var content: some View {
         if block.kind == .canvas {
-            CanvasBlockSurface(model: model, workspace: workspace, block: block)
+            CanvasBlockSurface(model: model, workspace: workspace, block: block, isActive: isActive)
         } else if block.kind == .otto {
             OttoBlockView(
                 block: block,

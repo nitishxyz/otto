@@ -4,6 +4,7 @@ struct CanvasBlockSurface: View {
     @Bindable var model: AppModel
     let workspace: Workspace
     let block: CanvasBlock
+    var isActive = true
 
     var body: some View {
         ZStack {
@@ -12,7 +13,8 @@ struct CanvasBlockSurface: View {
                     model: model,
                     workspace: workspace,
                     canvas: block,
-                    node: layout
+                    node: layout,
+                    isCanvasActive: isActive
                 )
                 .padding(4)
 
@@ -76,6 +78,7 @@ private struct CanvasLayoutRenderer: View {
     let workspace: Workspace
     let canvas: CanvasBlock
     let node: CanvasLayoutNode
+    let isCanvasActive: Bool
 
     var body: some View {
         switch node {
@@ -85,7 +88,7 @@ private struct CanvasLayoutRenderer: View {
                     model: model,
                     workspace: workspace,
                     block: child,
-                    isFocused: canvas.focusedChildID == child.id,
+                    isFocused: isCanvasActive && canvas.focusedChildID == child.id,
                     onFocus: { model.focusCanvasChildBlock(child.id, in: canvas.id) },
                     onClose: {
                         if child.isPendingCreation {
@@ -101,6 +104,7 @@ private struct CanvasLayoutRenderer: View {
                 model: model,
                 workspace: workspace,
                 canvas: canvas,
+                isCanvasActive: isCanvasActive,
                 splitID: id,
                 direction: direction,
                 ratio: ratio,
@@ -115,6 +119,7 @@ private struct CanvasSplitPane: View {
     @Bindable var model: AppModel
     let workspace: Workspace
     let canvas: CanvasBlock
+    let isCanvasActive: Bool
     let splitID: UUID
     let direction: SplitDirection
     let ratio: Double
@@ -134,12 +139,24 @@ private struct CanvasSplitPane: View {
                 let firstWidth = splitLength(availableLength: availableWidth, ratio: ratio)
                 let secondWidth = max(0, availableWidth - firstWidth)
                 HStack(spacing: 0) {
-                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: first)
+                    CanvasLayoutRenderer(
+                        model: model,
+                        workspace: workspace,
+                        canvas: canvas,
+                        node: first,
+                        isCanvasActive: isCanvasActive
+                    )
                         .frame(width: firstWidth)
                     divider
                         .frame(width: dividerThickness)
                         .gesture(resizeGesture(availableLength: availableWidth))
-                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: second)
+                    CanvasLayoutRenderer(
+                        model: model,
+                        workspace: workspace,
+                        canvas: canvas,
+                        node: second,
+                        isCanvasActive: isCanvasActive
+                    )
                         .frame(width: secondWidth)
                 }
                 .overlay(alignment: .topLeading) {
@@ -150,12 +167,24 @@ private struct CanvasSplitPane: View {
                 let firstHeight = splitLength(availableLength: availableHeight, ratio: ratio)
                 let secondHeight = max(0, availableHeight - firstHeight)
                 VStack(spacing: 0) {
-                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: first)
+                    CanvasLayoutRenderer(
+                        model: model,
+                        workspace: workspace,
+                        canvas: canvas,
+                        node: first,
+                        isCanvasActive: isCanvasActive
+                    )
                         .frame(height: firstHeight)
                     divider
                         .frame(height: dividerThickness)
                         .gesture(resizeGesture(availableLength: availableHeight))
-                    CanvasLayoutRenderer(model: model, workspace: workspace, canvas: canvas, node: second)
+                    CanvasLayoutRenderer(
+                        model: model,
+                        workspace: workspace,
+                        canvas: canvas,
+                        node: second,
+                        isCanvasActive: isCanvasActive
+                    )
                         .frame(height: secondHeight)
                 }
                 .overlay(alignment: .topLeading) {
