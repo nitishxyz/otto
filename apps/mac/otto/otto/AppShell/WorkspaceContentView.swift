@@ -2,27 +2,35 @@ import SwiftUI
 
 struct WorkspaceContentView: View {
     @Bindable var model: AppModel
+    @State private var retainedBlockIDs: Set<CanvasBlock.ID> = []
 
     var body: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
 
-            if model.isBlockPickerPresented {
-                BlockPickerView(
-                    options: BlockCatalog.creationOptions,
-                    onSelect: { model.createBlock(kind: $0.kind) },
-                    onCancel: { model.cancelBlockCreation() }
+            if let workspace = model.selectedWorkspace {
+                RetainedBlockSurfaceStack(
+                    model: model,
+                    workspace: workspace,
+                    selectedBlockID: model.selectedBlockID,
+                    retainedBlockIDs: retainedBlockIDs
                 )
-            } else if let workspace = model.selectedWorkspace,
-               let blockID = model.selectedBlockID,
-               let block = workspace.blocks.first(where: { $0.id == blockID }) {
-                BlockSurface(model: model, block: block)
-            } else if model.selectedWorkspace != nil {
-                ContentUnavailableView(
-                    "No Block Selected",
-                    systemImage: "square.split.2x2",
-                    description: Text("Pick a block from the sidebar or create a new one with ⌘N.")
-                )
+                .opacity(model.isBlockPickerPresented || model.selectedBlockID == nil ? 0 : 1)
+                .allowsHitTesting(!model.isBlockPickerPresented && model.selectedBlockID != nil)
+
+                if model.isBlockPickerPresented {
+                    BlockPickerView(
+                        options: BlockCatalog.creationOptions,
+                        onSelect: { model.createBlock(kind: $0.kind) },
+                        onCancel: { model.cancelBlockCreation() }
+                    )
+                } else if selectedBlock(in: workspace) == nil {
+                    ContentUnavailableView(
+                        "No Block Selected",
+                        systemImage: "square.split.2x2",
+                        description: Text("Pick a block from the sidebar or create a new one with ⌘N.")
+                    )
+                }
             } else {
                 ContentUnavailableView(
                     "No Workspace",
@@ -37,12 +45,54 @@ struct WorkspaceContentView: View {
                 .stroke(Color.primary.opacity(0.09), lineWidth: 1)
         )
         .padding(.vertical, 6)
+        .onAppear(perform: retainSelectedBlock)
+        .onChange(of: model.selectedBlockID) { _, _ in retainSelectedBlock() }
+        .onChange(of: model.selectedWorkspaceID) { _, _ in
+            retainedBlockIDs.removeAll()
+            retainSelectedBlock()
+        }
+    }
+
+    private func retainSelectedBlock() {
+        guard let selectedBlockID = model.selectedBlockID else { return }
+        retainedBlockIDs.insert(selectedBlockID)
+    }
+
+    private func selectedBlock(in workspace: Workspace) -> CanvasBlock? {
+        guard let selectedBlockID = model.selectedBlockID else { return nil }
+        return workspace.blocks.first { $0.id == selectedBlockID }
+    }
+}
+
+private struct RetainedBlockSurfaceStack: View {
+    @Bindable var model: AppModel
+    let workspace: Workspace
+    let selectedBlockID: CanvasBlock.ID?
+    let retainedBlockIDs: Set<CanvasBlock.ID>
+
+    var body: some View {
+        ZStack {
+            ForEach(visibleBlocks) { block in
+                let isActive = block.id == selectedBlockID
+                BlockSurface(model: model, block: block, isActive: isActive)
+                    .opacity(isActive ? 1 : 0)
+                    .allowsHitTesting(isActive)
+                    .zIndex(isActive ? 1 : 0)
+            }
+        }
+    }
+
+    private var visibleBlocks: [CanvasBlock] {
+        workspace.blocks.filter { block in
+            retainedBlockIDs.contains(block.id) || block.id == selectedBlockID
+        }
     }
 }
 
 private struct BlockSurface: View {
     @Bindable var model: AppModel
     let block: CanvasBlock
+    var isActive = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -96,7 +146,7 @@ private struct BlockSurface: View {
         if block.kind == .canvas {
             CanvasBlockSurface(model: model, block: block)
         } else if block.kind.runsInTerminal {
-            TerminalBlockView(block: block, session: model.terminalSession(for: block), isFocused: true)
+            TerminalBlockView(block: block, session: model.terminalSession(for: block), isFocused: isActive)
         } else {
             placeholder
         }

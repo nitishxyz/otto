@@ -68,7 +68,25 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
     let isFocused: Bool
     let onFocus: () -> Void
 
-    func makeNSView(context: Context) -> GhosttyKitTerminalNSView {
+    func makeNSView(context: Context) -> GhosttyKitTerminalContainerNSView {
+        let container = GhosttyKitTerminalContainerNSView()
+        container.configure(
+            terminalView: terminalView(),
+            isFocused: isFocused,
+            onFocus: onFocus
+        )
+        return container
+    }
+
+    func updateNSView(_ nsView: GhosttyKitTerminalContainerNSView, context: Context) {
+        nsView.configure(
+            terminalView: terminalView(),
+            isFocused: isFocused,
+            onFocus: onFocus
+        )
+    }
+
+    private func terminalView() -> GhosttyKitTerminalNSView {
         if let view = session.ghosttyView {
             view.isFocused = isFocused
             view.onFocus = onFocus
@@ -84,12 +102,6 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: GhosttyKitTerminalNSView, context: Context) {
-        nsView.isFocused = isFocused
-        nsView.onFocus = onFocus
-        nsView.updateSurfaceSize()
-    }
-
     private static func shellWrappedCommand(_ command: String?) -> String? {
         guard let command, !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
@@ -100,6 +112,50 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
 
     private static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+}
+
+final class GhosttyKitTerminalContainerNSView: NSView {
+    private weak var terminalView: GhosttyKitTerminalNSView?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    func configure(terminalView nextView: GhosttyKitTerminalNSView, isFocused: Bool, onFocus: @escaping () -> Void) {
+        if terminalView !== nextView {
+            terminalView?.removeFromSuperview()
+            nextView.removeFromSuperview()
+            nextView.frame = bounds
+            nextView.autoresizingMask = [.width, .height]
+            addSubview(nextView)
+            terminalView = nextView
+        }
+
+        nextView.isFocused = isFocused
+        nextView.onFocus = onFocus
+        nextView.refreshAfterAttachment()
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        terminalView?.frame = bounds
+        terminalView?.refreshAfterAttachment()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        terminalView?.refreshAfterAttachment()
     }
 }
 
@@ -122,6 +178,7 @@ final class GhosttyKitTerminalNSView: NSView {
     private let command: String?
     private let workingDirectory: String
     private var surface: ghostty_surface_t?
+    private var pendingAttachmentRefresh = false
 
     init(command: String?, workingDirectory: String, isFocused: Bool, onFocus: @escaping () -> Void) {
         self.command = command
@@ -156,9 +213,7 @@ final class GhosttyKitTerminalNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        createSurfaceIfNeeded()
-        updateSurfaceSize()
-        if isFocused { focusTerminal() }
+        refreshAfterAttachment()
     }
 
     override func viewDidChangeBackingProperties() {
@@ -169,7 +224,7 @@ final class GhosttyKitTerminalNSView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        updateSurfaceSize()
+        refreshAfterAttachment()
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -344,6 +399,42 @@ final class GhosttyKitTerminalNSView: NSView {
         guard let surface else { return }
         let scale = Double(window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1)
         ghostty_surface_set_content_scale(surface, scale, scale)
+    }
+
+    private func updateSurfaceDisplay() {
+        guard let surface else {
+            return
+        }
+        let screenNumber = window?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
+        if let displayID = screenNumber as? UInt32 {
+            ghostty_surface_set_display_id(surface, displayID)
+        } else if let displayID = screenNumber as? NSNumber {
+            ghostty_surface_set_display_id(surface, displayID.uint32Value)
+        }
+    }
+
+    func refreshAfterAttachment() {
+        createSurfaceIfNeeded()
+        updateSurfaceDisplay()
+        updateSurfaceScale()
+        updateSurfaceSize()
+
+        guard window != nil, !pendingAttachmentRefresh else { return }
+        pendingAttachmentRefresh = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pendingAttachmentRefresh = false
+            guard self.window != nil else { return }
+            self.updateSurfaceDisplay()
+            self.updateSurfaceScale()
+            self.updateSurfaceSize()
+            if let surface = self.surface {
+                ghostty_surface_draw(surface)
+            }
+            if self.isFocused {
+                self.focusTerminal()
+            }
+        }
     }
 
     func updateSurfaceSize() {
