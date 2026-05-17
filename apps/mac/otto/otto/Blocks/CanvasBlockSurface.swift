@@ -6,57 +6,44 @@ struct CanvasBlockSurface: View {
 
     var body: some View {
         ZStack {
-            if model.canvasPickerBlockID == block.id {
-                BlockPickerView(
-                    options: BlockCatalog.creationOptions,
-                    onSelect: { model.createCanvasChildBlock(kind: $0.kind, in: block.id) },
-                    onCancel: { model.cancelCanvasBlockCreation() }
-                )
-            } else if block.children.isEmpty || block.layout == nil {
-                emptyState
-            } else if let layout = block.layout {
+            if let layout = block.layout, !block.children.isEmpty {
                 CanvasLayoutRenderer(
                     model: model,
                     canvas: block,
                     node: layout
                 )
                 .padding(4)
+
+                if model.canvasPickerBlockID == block.id {
+                    pickerOverlay
+                }
+            } else {
+                picker
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.primary.opacity(0.018))
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "square.split.2x2")
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(.tertiary)
-
-            VStack(spacing: 4) {
-                Text("No blocks yet")
-                    .font(.system(size: 15, weight: .semibold))
-                Text("Add Otto, terminal, browser, and command surfaces to this canvas.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button {
-                model.beginCanvasBlockCreation(in: block)
-            } label: {
-                Label("Add Block", systemImage: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-
-            Text("Press ⌘N while focused on this Canvas to add a split block.")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+    private var pickerOverlay: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.72)
+            Color.black.opacity(0.16)
+            picker
         }
-        .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var picker: some View {
+        BlockPickerView(
+            options: creationOptions,
+            onSelect: { model.createCanvasChildBlock(kind: $0.kind, in: block.id) },
+            onCancel: { model.cancelCanvasBlockCreation() }
+        )
+    }
+
+    private var creationOptions: [BlockCreationOption] {
+        return BlockCatalog.creationOptions.filter { $0.kind != .canvas }
     }
 }
 
@@ -74,7 +61,13 @@ private struct CanvasLayoutRenderer: View {
                     block: child,
                     isFocused: canvas.focusedChildID == child.id,
                     onFocus: { model.focusCanvasChildBlock(child.id, in: canvas.id) },
-                    onClose: { model.closeCanvasChildBlock(child.id, in: canvas.id) }
+                    onClose: {
+                        if child.isPendingCreation {
+                            model.cancelCanvasBlockCreation()
+                        } else {
+                            model.closeCanvasChildBlock(child.id, in: canvas.id)
+                        }
+                    }
                 )
             }
         case .split(let id, let direction, let ratio, let first, let second):
@@ -169,8 +162,7 @@ private struct CanvasChildBlockFrame: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: block.kind.symbolName)
-                    .font(.system(size: 12))
+                BlockKindIcon(kind: block.kind, size: 12)
                     .foregroundStyle(.secondary)
                 Text(block.title)
                     .font(.system(size: 12, weight: .medium))
@@ -211,7 +203,23 @@ private struct CanvasChildBlockFrame: View {
 
     @ViewBuilder
     private var childContent: some View {
-        if block.kind.runsInTerminal {
+        if block.isPendingCreation {
+            VStack(spacing: 8) {
+                Image(systemName: "plus.square.dashed")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(Color.accentColor)
+                Text("Choose block type")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("This split will be replaced by your selection.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 260)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.accentColor.opacity(0.08))
+        } else if block.kind.runsInTerminal {
             TerminalBlockView(
                 block: block,
                 session: model.terminalSession(for: block),
@@ -220,8 +228,7 @@ private struct CanvasChildBlockFrame: View {
             )
         } else {
             VStack(spacing: 8) {
-                Image(systemName: block.kind.symbolName)
-                    .font(.system(size: 24, weight: .light))
+                BlockKindIcon(kind: block.kind, size: 24)
                     .foregroundStyle(.tertiary)
                 Text(block.kind.defaultTitle)
                     .font(.system(size: 13, weight: .semibold))

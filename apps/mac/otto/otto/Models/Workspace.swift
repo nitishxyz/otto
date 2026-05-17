@@ -29,6 +29,12 @@ struct Workspace: Identifiable, Hashable {
         }
         return String(name.prefix(2)).uppercased()
     }
+
+    var sidebarOrderedBlocks: [CanvasBlock] {
+        BlockGroup.allCases.flatMap { group in
+            blocks.filter { $0.kind.group == group }
+        }
+    }
 }
 
 enum WorkspaceAccent: String, CaseIterable, Hashable {

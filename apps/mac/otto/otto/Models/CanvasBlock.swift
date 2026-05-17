@@ -9,6 +9,7 @@ struct CanvasBlock: Identifiable, Hashable {
     var children: [CanvasBlock]
     var layout: CanvasLayoutNode?
     var focusedChildID: CanvasBlock.ID?
+    var isPendingCreation: Bool
 
     init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ struct CanvasBlock: Identifiable, Hashable {
         launchCommand: String? = nil,
         children: [CanvasBlock] = [],
         layout: CanvasLayoutNode? = nil,
-        focusedChildID: CanvasBlock.ID? = nil
+        focusedChildID: CanvasBlock.ID? = nil,
+        isPendingCreation: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -28,6 +30,7 @@ struct CanvasBlock: Identifiable, Hashable {
         self.children = children
         self.layout = layout ?? CanvasLayoutNode.layout(for: children)
         self.focusedChildID = focusedChildID ?? children.first?.id
+        self.isPendingCreation = isPendingCreation
     }
 }
 
@@ -307,7 +310,7 @@ enum BlockKind: String, CaseIterable, Identifiable, Hashable {
         case .neovim: "Neovim"
         case .terminal: "Ghostty"
         case .browser: "Browser"
-        case .command: "Custom command"
+        case .command: "Custom"
         case .claudeCode: "Claude Code"
         case .codex: "Codex"
         case .ottoTUI: "Otto TUI"
@@ -318,15 +321,15 @@ enum BlockKind: String, CaseIterable, Identifiable, Hashable {
     var defaultSubtitle: String {
         switch self {
         case .canvas: "Multi-block workspace"
-        case .otto: "Agent session"
+        case .otto: "Agent"
         case .neovim: "Editor"
-        case .terminal: "Command surface"
+        case .terminal: "Terminal"
         case .browser: "Web preview"
         case .command: "Shell command"
-        case .claudeCode: "claude"
-        case .codex: "codex"
-        case .ottoTUI: "otto"
-        case .openCode: "opencode"
+        case .claudeCode: "Agent"
+        case .codex: "Agent"
+        case .ottoTUI: "Agent"
+        case .openCode: "Agent"
         }
     }
 
@@ -434,7 +437,6 @@ enum BlockCatalog {
         BlockCreationOption(kind: .ottoTUI, keyEquivalent: "6"),
         BlockCreationOption(kind: .openCode, keyEquivalent: "7"),
         BlockCreationOption(kind: .command, keyEquivalent: "8"),
-        BlockCreationOption(kind: .canvas, keyEquivalent: "9"),
-        BlockCreationOption(kind: .neovim, keyEquivalent: nil)
+        BlockCreationOption(kind: .canvas, keyEquivalent: "9")
     ]
 }

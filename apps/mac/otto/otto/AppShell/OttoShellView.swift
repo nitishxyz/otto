@@ -41,7 +41,12 @@ struct OttoShellView: View {
                     }
                     .frame(minWidth: 260, alignment: .leading)
                 }
+
+                Button(currentBlockLabel) {}
+                    .help("Current block type")
             }
+
+            ToolbarSpacer(.flexible, placement: .primaryAction)
 
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -55,9 +60,6 @@ struct OttoShellView: View {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
                 .help("Export")
-
-                Button(currentBlockLabel) {}
-                    .help("Current block type")
             }
         }
     }

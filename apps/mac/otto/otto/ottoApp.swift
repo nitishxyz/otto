@@ -19,6 +19,8 @@ struct ottoApp: App {
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentMinSize)
         .commands {
+            CommandGroup(replacing: .appVisibility) {}
+
             CommandGroup(after: .newItem) {
                 Button("New Block") {
                     model.beginBlockCreation()
@@ -44,30 +46,42 @@ struct ottoApp: App {
 
                 Divider()
 
+                Button("Split Right") {
+                    model.beginSelectedCanvasSplit(direction: .horizontal)
+                }
+                .keyboardShortcut("d", modifiers: .command)
+
+                Button("Split Down") {
+                    model.beginSelectedCanvasSplit(direction: .vertical)
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Divider()
+
                 Button("Focus Left") {
                     model.focusCanvasChild(direction: .left)
                 }
-                .keyboardShortcut("h", modifiers: .control)
+                .keyboardShortcut("h", modifiers: .command)
 
                 Button("Focus Down") {
                     model.focusCanvasChild(direction: .down)
                 }
-                .keyboardShortcut("j", modifiers: .control)
+                .keyboardShortcut("j", modifiers: .command)
 
                 Button("Focus Up") {
                     model.focusCanvasChild(direction: .up)
                 }
-                .keyboardShortcut("k", modifiers: .control)
+                .keyboardShortcut("k", modifiers: .command)
 
                 Button("Focus Right") {
                     model.focusCanvasChild(direction: .right)
                 }
-                .keyboardShortcut("l", modifiers: .control)
+                .keyboardShortcut("l", modifiers: .command)
 
                 Divider()
 
                 ForEach(0..<9, id: \.self) { index in
-                    Button("Select Block \(index + 1)") {
+                    Button("Select Tab \(index + 1)") {
                         model.selectBlock(at: index)
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)

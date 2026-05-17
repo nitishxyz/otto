@@ -97,8 +97,7 @@ private struct BlockSurface: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: block.kind.symbolName)
-                    .font(.system(size: 12))
+                BlockKindIcon(kind: block.kind, size: 12)
                     .foregroundStyle(.secondary)
                 Text(block.title)
                     .font(.system(size: 12, weight: .medium))
@@ -154,8 +153,7 @@ private struct BlockSurface: View {
 
     private var placeholder: some View {
         VStack(spacing: 10) {
-            Image(systemName: block.kind.symbolName)
-                .font(.system(size: 28, weight: .light))
+            BlockKindIcon(kind: block.kind, size: 28)
                 .foregroundStyle(.tertiary)
             Text(block.kind.defaultTitle)
                 .font(.system(size: 15, weight: .semibold))

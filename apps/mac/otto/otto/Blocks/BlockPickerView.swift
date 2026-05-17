@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct BlockPickerView: View {
     let options: [BlockCreationOption]
@@ -6,18 +7,13 @@ struct BlockPickerView: View {
     let onCancel: () -> Void
 
     private let columns = [
-        GridItem(.adaptive(minimum: 132, maximum: 160), spacing: 8, alignment: .top)
+        GridItem(.adaptive(minimum: 132, maximum: 132), spacing: 8, alignment: .top)
     ]
 
     var body: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 6) {
-                Text("New Block")
-                    .font(.system(size: 20, weight: .semibold))
-                Text("Choose the surface to add to this workspace.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
+        VStack(spacing: 16) {
+            Text("New Block")
+                .font(.system(size: 20, weight: .semibold))
 
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(options) { option in
@@ -28,13 +24,71 @@ struct BlockPickerView: View {
             }
             .frame(maxWidth: 720)
 
-            Text("press number to select · esc to cancel")
+            Text("number to select · esc to cancel")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.tertiary)
         }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.24), radius: 28, y: 16)
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(EscapeKeyMonitor(onEscape: onCancel).frame(width: 0, height: 0))
         .onExitCommand(perform: onCancel)
+    }
+}
+
+private struct EscapeKeyMonitor: NSViewRepresentable {
+    let onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onEscape: onEscape)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.install()
+        return NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onEscape = onEscape
+        context.coordinator.install()
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator {
+        var onEscape: () -> Void
+        private var monitor: Any?
+
+        init(onEscape: @escaping () -> Void) {
+            self.onEscape = onEscape
+        }
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53 else { return event }
+                self?.onEscape()
+                return nil
+            }
+        }
+
+        func uninstall() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+            monitor = nil
+        }
     }
 }
 
@@ -55,10 +109,9 @@ private struct BlockPickerCard: View {
 
     private var cardButton: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .top) {
-                    Image(systemName: option.symbolName)
-                        .font(.system(size: 18, weight: .medium))
+                    BlockKindIcon(kind: option.kind, size: 18)
                         .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
                         .background(
@@ -88,15 +141,15 @@ private struct BlockPickerCard: View {
                     Text(option.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
-                    Text(option.description)
+                        .lineLimit(2)
+                    Text(option.subtitle)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                 }
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+            .frame(width: 132, height: 118, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isHovered ? Color.primary.opacity(0.07) : Color.primary.opacity(0.035))

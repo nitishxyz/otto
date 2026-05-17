@@ -9,6 +9,9 @@ final class AppModel {
     var followAgentEnabled = true
     var isBlockPickerPresented = false
     var canvasPickerBlockID: CanvasBlock.ID?
+    var canvasPickerSplitDirection: SplitDirection?
+    private var canvasPickerPendingChildID: CanvasBlock.ID?
+    private var canvasPickerPreviousFocusedChildID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
     @ObservationIgnored private var terminalSessions: [CanvasBlock.ID: TerminalSession] = [:]
 
@@ -23,22 +26,28 @@ final class AppModel {
             return workspaces.first { $0.id == selectedWorkspaceID }
         }
         set {
+            resetCanvasPicker(removePending: true)
             selectedWorkspaceID = newValue?.id
             selectedBlockID = newValue?.blocks.first?.id
+            isBlockPickerPresented = false
         }
     }
 
+    var selectedWorkspaceSidebarBlocks: [CanvasBlock] {
+        selectedWorkspace?.sidebarOrderedBlocks ?? []
+    }
+
     func selectWorkspace(_ workspace: Workspace) {
+        resetCanvasPicker(removePending: true)
         selectedWorkspaceID = workspace.id
         selectedBlockID = workspace.blocks.first?.id
         isBlockPickerPresented = false
-        canvasPickerBlockID = nil
     }
 
     func selectBlock(_ block: CanvasBlock) {
+        resetCanvasPicker(removePending: true)
         selectedBlockID = block.id
         isBlockPickerPresented = false
-        canvasPickerBlockID = nil
     }
 
     func beginBlockCreation() {
@@ -49,7 +58,15 @@ final class AppModel {
             beginCanvasBlockCreation(in: selectedBlock)
             return
         }
-        canvasPickerBlockID = nil
+        resetCanvasPicker(removePending: true)
+        blockSelectionBeforePicker = selectedBlockID
+        selectedBlockID = nil
+        isBlockPickerPresented = true
+    }
+
+    func beginWorkspaceBlockCreation() {
+        guard selectedWorkspaceID != nil else { return }
+        resetCanvasPicker(removePending: true)
         blockSelectionBeforePicker = selectedBlockID
         selectedBlockID = nil
         isBlockPickerPresented = true
@@ -57,7 +74,7 @@ final class AppModel {
 
     func cancelBlockCreation() {
         isBlockPickerPresented = false
-        canvasPickerBlockID = nil
+        resetCanvasPicker(removePending: true)
         selectedBlockID = blockSelectionBeforePicker ?? selectedWorkspace?.blocks.first?.id
         blockSelectionBeforePicker = nil
     }
@@ -68,7 +85,7 @@ final class AppModel {
         workspaces[index].blocks.append(block)
         selectedBlockID = block.id
         isBlockPickerPresented = false
-        canvasPickerBlockID = nil
+        resetCanvasPicker(removePending: true)
         blockSelectionBeforePicker = nil
     }
 
@@ -81,31 +98,76 @@ final class AppModel {
         return session
     }
 
-    func beginCanvasBlockCreation(in canvas: CanvasBlock) {
+    func beginCanvasBlockCreation(in canvas: CanvasBlock, direction: SplitDirection? = nil) {
         guard canvas.kind == .canvas else { return }
+        resetCanvasPicker(removePending: true)
         selectedBlockID = canvas.id
         canvasPickerBlockID = canvas.id
+        canvasPickerSplitDirection = direction
+        guard let direction,
+              let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
+              let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvas.id })
+        else { return }
+        var currentCanvas = workspaces[workspaceIndex].blocks[canvasIndex]
+        guard !currentCanvas.children.isEmpty else { return }
+        canvasPickerPreviousFocusedChildID = currentCanvas.focusedChildID
+        let pendingChild = CanvasBlock(
+            kind: .command,
+            title: "New Block",
+            subtitle: "Choose block type",
+            launchCommand: nil,
+            isPendingCreation: true
+        )
+        currentCanvas.children.append(pendingChild)
+        currentCanvas.layout = CanvasLayoutNode.insert(
+            blockID: pendingChild.id,
+            into: currentCanvas.layout,
+            focusedID: currentCanvas.focusedChildID,
+            direction: direction
+        )
+        currentCanvas.focusedChildID = pendingChild.id
+        workspaces[workspaceIndex].blocks[canvasIndex] = currentCanvas
+        canvasPickerPendingChildID = pendingChild.id
+    }
+
+    func beginSelectedCanvasSplit(direction: SplitDirection) {
+        guard let selectedBlockID,
+              let selectedBlock = selectedWorkspace?.blocks.first(where: { $0.id == selectedBlockID }),
+              selectedBlock.kind == .canvas
+        else { return }
+        beginCanvasBlockCreation(in: selectedBlock, direction: direction)
     }
 
     func cancelCanvasBlockCreation() {
-        canvasPickerBlockID = nil
+        resetCanvasPicker(removePending: true)
     }
 
     func createCanvasChildBlock(kind: BlockKind, in canvasID: CanvasBlock.ID) {
         guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
               let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvasID })
-        else { return }
-        let child = CanvasBlock(kind: kind)
+        else {
+            resetCanvasPicker(removePending: false)
+            return
+        }
         var canvas = workspaces[workspaceIndex].blocks[canvasIndex]
-        canvas.children.append(child)
-        canvas.layout = CanvasLayoutNode.insert(
-            blockID: child.id,
-            into: canvas.layout,
-            focusedID: canvas.focusedChildID
-        )
-        canvas.focusedChildID = child.id
+        if let pendingChildID = canvasPickerPendingChildID,
+           let pendingIndex = canvas.children.firstIndex(where: { $0.id == pendingChildID }) {
+            let child = CanvasBlock(id: pendingChildID, kind: kind)
+            canvas.children[pendingIndex] = child
+            canvas.focusedChildID = child.id
+        } else {
+            let child = CanvasBlock(kind: kind)
+            canvas.children.append(child)
+            canvas.layout = CanvasLayoutNode.insert(
+                blockID: child.id,
+                into: canvas.layout,
+                focusedID: canvas.focusedChildID,
+                direction: canvasPickerSplitDirection
+            )
+            canvas.focusedChildID = child.id
+        }
         workspaces[workspaceIndex].blocks[canvasIndex] = canvas
-        canvasPickerBlockID = nil
+        resetCanvasPicker(removePending: false)
     }
 
     func closeCanvasChildBlock(_ childID: CanvasBlock.ID, in canvasID: CanvasBlock.ID) {
@@ -173,7 +235,7 @@ final class AppModel {
     }
 
     func selectBlock(at index: Int) {
-        guard let blocks = selectedWorkspace?.blocks,
+        guard let blocks = selectedWorkspace?.sidebarOrderedBlocks,
               blocks.indices.contains(index)
         else { return }
         selectBlock(blocks[index])
@@ -234,6 +296,35 @@ final class AppModel {
         let nextIndex = (currentIndex + offset + orderedIDs.count) % orderedIDs.count
         workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID = orderedIDs[nextIndex]
         return true
+    }
+
+    private func resetCanvasPicker(removePending: Bool) {
+        if removePending {
+            removePendingCanvasChild()
+        }
+        canvasPickerBlockID = nil
+        canvasPickerSplitDirection = nil
+        canvasPickerPendingChildID = nil
+        canvasPickerPreviousFocusedChildID = nil
+    }
+
+    private func removePendingCanvasChild() {
+        guard let canvasID = canvasPickerBlockID,
+              let pendingChildID = canvasPickerPendingChildID,
+              let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
+              let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvasID })
+        else { return }
+        var canvas = workspaces[workspaceIndex].blocks[canvasIndex]
+        canvas.children.removeAll { $0.id == pendingChildID }
+        canvas.layout = CanvasLayoutNode.remove(blockID: pendingChildID, from: canvas.layout)
+        let orderedIDs = CanvasLayoutNode.blockIDs(in: canvas.layout)
+        if let previousFocusedID = canvasPickerPreviousFocusedChildID,
+           orderedIDs.contains(previousFocusedID) {
+            canvas.focusedChildID = previousFocusedID
+        } else {
+            canvas.focusedChildID = orderedIDs.first
+        }
+        workspaces[workspaceIndex].blocks[canvasIndex] = canvas
     }
 
     private func discardTerminalSession(for blockID: CanvasBlock.ID) {

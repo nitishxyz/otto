@@ -28,6 +28,7 @@ struct WorkspaceBlocksSidebar: View {
                             group: group,
                             blocks: groupBlocks,
                             selectedBlockID: model.selectedBlockID,
+                            shortcuts: blockShortcuts,
                             onSelect: { model.selectBlock($0) }
                         )
                     }
@@ -38,9 +39,15 @@ struct WorkspaceBlocksSidebar: View {
         }
     }
 
+    private var blockShortcuts: [CanvasBlock.ID: Int] {
+        Dictionary(uniqueKeysWithValues: model.selectedWorkspaceSidebarBlocks.prefix(9).enumerated().map { index, block in
+            (block.id, index + 1)
+        })
+    }
+
     private var addBlockButton: some View {
         Button {
-            model.beginBlockCreation()
+            model.beginWorkspaceBlockCreation()
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "plus")
@@ -60,7 +67,7 @@ struct WorkspaceBlocksSidebar: View {
         .keyboardShortcut("n", modifiers: .command)
         .help("New block (⌘N)")
         .padding(.horizontal, 10)
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
     }
 }
 
@@ -68,6 +75,7 @@ private struct BlockGroupSection: View {
     let group: BlockGroup
     let blocks: [CanvasBlock]
     let selectedBlockID: CanvasBlock.ID?
+    let shortcuts: [CanvasBlock.ID: Int]
     let onSelect: (CanvasBlock) -> Void
 
     var body: some View {
@@ -90,6 +98,7 @@ private struct BlockGroupSection: View {
                     BlockSidebarRow(
                         block: block,
                         isSelected: block.id == selectedBlockID,
+                        shortcut: shortcuts[block.id],
                         action: { onSelect(block) }
                     )
                 }
@@ -101,6 +110,7 @@ private struct BlockGroupSection: View {
 private struct BlockSidebarRow: View {
     let block: CanvasBlock
     let isSelected: Bool
+    let shortcut: Int?
     let action: () -> Void
 
     @State private var isHovered = false
@@ -108,10 +118,9 @@ private struct BlockSidebarRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
-                Image(systemName: block.kind.symbolName)
-                    .font(.system(size: 13))
-                    .frame(width: 18, height: 18)
+                BlockKindIcon(kind: block.kind, size: 13)
                     .foregroundStyle(isSelected ? Color.white : .secondary)
+                    .frame(width: 18, height: 18)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(block.title)
@@ -125,6 +134,18 @@ private struct BlockSidebarRow: View {
                 }
 
                 Spacer(minLength: 0)
+
+                if let shortcut {
+                    Text("⌘\(shortcut)")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.72) : .secondary.opacity(0.7))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(isSelected ? Color.white.opacity(0.14) : Color.primary.opacity(0.05))
+                        )
+                }
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
