@@ -114,28 +114,44 @@ private struct CanvasSplitPane: View {
     let second: CanvasLayoutNode
 
     @State private var dragStartRatio: Double?
+    @State private var liveRatio: Double?
+
+    private let dividerThickness: CGFloat = 4
+    private let minimumPaneLength: CGFloat = 24
 
     var body: some View {
         GeometryReader { proxy in
             if direction == .horizontal {
+                let availableWidth = max(0, proxy.size.width - dividerThickness)
+                let firstWidth = splitLength(availableLength: availableWidth, ratio: ratio)
+                let secondWidth = max(0, availableWidth - firstWidth)
                 HStack(spacing: 0) {
                     CanvasLayoutRenderer(model: model, canvas: canvas, node: first)
-                        .frame(width: max(80, proxy.size.width * ratio))
+                        .frame(width: firstWidth)
                     divider
-                        .frame(width: 4)
-                        .gesture(resizeGesture(availableLength: proxy.size.width))
+                        .frame(width: dividerThickness)
+                        .gesture(resizeGesture(availableLength: availableWidth))
                     CanvasLayoutRenderer(model: model, canvas: canvas, node: second)
-                        .frame(maxWidth: .infinity)
+                        .frame(width: secondWidth)
+                }
+                .overlay(alignment: .topLeading) {
+                    liveDivider(availableLength: availableWidth, crossLength: proxy.size.height)
                 }
             } else {
+                let availableHeight = max(0, proxy.size.height - dividerThickness)
+                let firstHeight = splitLength(availableLength: availableHeight, ratio: ratio)
+                let secondHeight = max(0, availableHeight - firstHeight)
                 VStack(spacing: 0) {
                     CanvasLayoutRenderer(model: model, canvas: canvas, node: first)
-                        .frame(height: max(70, proxy.size.height * ratio))
+                        .frame(height: firstHeight)
                     divider
-                        .frame(height: 4)
-                        .gesture(resizeGesture(availableLength: proxy.size.height))
+                        .frame(height: dividerThickness)
+                        .gesture(resizeGesture(availableLength: availableHeight))
                     CanvasLayoutRenderer(model: model, canvas: canvas, node: second)
-                        .frame(maxHeight: .infinity)
+                        .frame(height: secondHeight)
+                }
+                .overlay(alignment: .topLeading) {
+                    liveDivider(availableLength: availableHeight, crossLength: proxy.size.width)
                 }
             }
         }
@@ -147,11 +163,33 @@ private struct CanvasSplitPane: View {
             .contentShape(Rectangle())
             .onHover { hovering in
                 if hovering {
-                    NSCursor.resizeLeftRight.set()
+                    resizeCursor.set()
                 } else {
                     NSCursor.arrow.set()
                 }
             }
+    }
+
+    private var resizeCursor: NSCursor {
+        direction == .horizontal ? .resizeLeftRight : .resizeUpDown
+    }
+
+    @ViewBuilder
+    private func liveDivider(availableLength: CGFloat, crossLength: CGFloat) -> some View {
+        if let liveRatio {
+            let position = splitLength(availableLength: availableLength, ratio: liveRatio)
+            Rectangle()
+                .fill(Color.accentColor.opacity(0.48))
+                .frame(
+                    width: direction == .horizontal ? dividerThickness : crossLength,
+                    height: direction == .horizontal ? crossLength : dividerThickness
+                )
+                .offset(
+                    x: direction == .horizontal ? position : 0,
+                    y: direction == .horizontal ? 0 : position
+                )
+                .allowsHitTesting(false)
+        }
     }
 
     private func resizeGesture(availableLength: CGFloat) -> some Gesture {
@@ -160,15 +198,30 @@ private struct CanvasSplitPane: View {
                 if dragStartRatio == nil { dragStartRatio = ratio }
                 let translation = direction == .horizontal ? value.translation.width : value.translation.height
                 let delta = availableLength > 0 ? Double(translation / availableLength) : 0
+                liveRatio = clampedRatio((dragStartRatio ?? ratio) + delta)
+            }
+            .onEnded { value in
+                let translation = direction == .horizontal ? value.translation.width : value.translation.height
+                let delta = availableLength > 0 ? Double(translation / availableLength) : 0
                 model.setCanvasSplitRatio(
                     splitID,
-                    ratio: (dragStartRatio ?? ratio) + delta,
+                    ratio: liveRatio ?? clampedRatio((dragStartRatio ?? ratio) + delta),
                     in: canvas.id
                 )
-            }
-            .onEnded { _ in
                 dragStartRatio = nil
+                liveRatio = nil
             }
+    }
+
+    private func splitLength(availableLength: CGFloat, ratio: Double) -> CGFloat {
+        guard availableLength > 0 else { return 0 }
+        guard availableLength >= minimumPaneLength * 2 else { return availableLength / 2 }
+        let rawLength = availableLength * CGFloat(ratio)
+        return min(max(minimumPaneLength, rawLength), availableLength - minimumPaneLength)
+    }
+
+    private func clampedRatio(_ value: Double) -> Double {
+        min(0.98, max(0.02, value))
     }
 }
 

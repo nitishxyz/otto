@@ -130,7 +130,7 @@ indirect enum CanvasLayoutNode: Hashable {
         case .leaf:
             return layout
         case .split(let id, let direction, _, let first, let second) where id == splitID:
-            return .split(id: id, direction: direction, ratio: min(0.85, max(0.15, ratio)), first: first, second: second)
+            return .split(id: id, direction: direction, ratio: min(0.98, max(0.02, ratio)), first: first, second: second)
         case .split(let id, let direction, let currentRatio, let first, let second):
             return .split(
                 id: id,
