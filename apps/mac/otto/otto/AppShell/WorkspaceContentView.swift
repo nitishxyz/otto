@@ -18,7 +18,9 @@ struct WorkspaceContentView: View {
                 .opacity(model.isBlockPickerPresented || model.selectedBlockID == nil ? 0 : 1)
                 .allowsHitTesting(!model.isBlockPickerPresented && model.selectedBlockID != nil)
 
-                if model.isBlockPickerPresented {
+                if model.customCommandRequest?.canvasID == nil, model.customCommandRequest != nil {
+                    commandModalOverlay
+                } else if model.isBlockPickerPresented {
                     BlockPickerView(
                         options: BlockCatalog.creationOptions,
                         onSelect: { model.createBlock(kind: $0.kind) },
@@ -50,6 +52,18 @@ struct WorkspaceContentView: View {
         .onChange(of: model.selectedWorkspaceID) { _, _ in
             retainedBlockIDs.removeAll()
             retainSelectedBlock()
+        }
+    }
+
+    private var commandModalOverlay: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.72)
+            Color.black.opacity(0.16)
+            CustomCommandModalView(
+                onSubmit: { model.confirmCustomCommand(label: $0, command: $1) },
+                onCancel: { model.cancelCustomCommandCreation() }
+            )
         }
     }
 

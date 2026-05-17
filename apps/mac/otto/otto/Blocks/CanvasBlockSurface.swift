@@ -15,10 +15,18 @@ struct CanvasBlockSurface: View {
                 .padding(4)
 
                 if model.canvasPickerBlockID == block.id {
-                    pickerOverlay
+                    if model.customCommandRequest?.canvasID == block.id {
+                        commandModalOverlay
+                    } else {
+                        pickerOverlay
+                    }
                 }
             } else {
-                picker
+                if model.customCommandRequest?.canvasID == block.id {
+                    commandModalOverlay
+                } else {
+                    picker
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -31,6 +39,18 @@ struct CanvasBlockSurface: View {
                 .opacity(0.72)
             Color.black.opacity(0.16)
             picker
+        }
+    }
+
+    private var commandModalOverlay: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.72)
+            Color.black.opacity(0.16)
+            CustomCommandModalView(
+                onSubmit: { model.confirmCustomCommand(label: $0, command: $1) },
+                onCancel: { model.cancelCustomCommandCreation() }
+            )
         }
     }
 
@@ -172,12 +192,13 @@ private struct CanvasChildBlockFrame: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Close block")
             }
-            .padding(.horizontal, 10)
+            .padding(.leading, 10)
             .frame(height: 32)
             .background(Color.primary.opacity(0.035))
 

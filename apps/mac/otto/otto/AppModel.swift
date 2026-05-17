@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+struct CustomCommandRequest: Identifiable, Hashable {
+    let id = UUID()
+    let canvasID: CanvasBlock.ID?
+}
+
 @Observable
 final class AppModel {
     var workspaces: [Workspace] = Workspace.previewWorkspaces
@@ -10,6 +15,7 @@ final class AppModel {
     var isBlockPickerPresented = false
     var canvasPickerBlockID: CanvasBlock.ID?
     var canvasPickerSplitDirection: SplitDirection?
+    var customCommandRequest: CustomCommandRequest?
     private var canvasPickerPendingChildID: CanvasBlock.ID?
     private var canvasPickerPreviousFocusedChildID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
@@ -81,6 +87,11 @@ final class AppModel {
 
     func createBlock(kind: BlockKind) {
         guard let index = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }) else { return }
+        guard kind != .command else {
+            isBlockPickerPresented = false
+            customCommandRequest = CustomCommandRequest(canvasID: nil)
+            return
+        }
         let block = CanvasBlock(kind: kind)
         workspaces[index].blocks.append(block)
         selectedBlockID = block.id
@@ -143,6 +154,51 @@ final class AppModel {
     }
 
     func createCanvasChildBlock(kind: BlockKind, in canvasID: CanvasBlock.ID) {
+        guard kind != .command else {
+            customCommandRequest = CustomCommandRequest(canvasID: canvasID)
+            return
+        }
+        let child = CanvasBlock(kind: kind)
+        insertCanvasChildBlock(child, in: canvasID)
+    }
+
+    func confirmCustomCommand(label: String, command: String) {
+        guard let customCommandRequest else { return }
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCommand.isEmpty else { return }
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = trimmedLabel.isEmpty ? Self.commandTitle(from: trimmedCommand) : trimmedLabel
+        let blockID = canvasPickerPendingChildID ?? UUID()
+        let block = CanvasBlock(
+            id: blockID,
+            kind: .command,
+            title: title,
+            subtitle: trimmedCommand,
+            launchCommand: trimmedCommand
+        )
+        if let canvasID = customCommandRequest.canvasID {
+            insertCanvasChildBlock(block, in: canvasID)
+        } else if let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }) {
+            workspaces[workspaceIndex].blocks.append(block)
+            selectedBlockID = block.id
+            isBlockPickerPresented = false
+            blockSelectionBeforePicker = nil
+            resetCanvasPicker(removePending: false)
+        }
+        self.customCommandRequest = nil
+    }
+
+    func cancelCustomCommandCreation() {
+        let isWorkspaceCommand = customCommandRequest?.canvasID == nil
+        customCommandRequest = nil
+        if isWorkspaceCommand {
+            cancelBlockCreation()
+        } else {
+            resetCanvasPicker(removePending: true)
+        }
+    }
+
+    private func insertCanvasChildBlock(_ child: CanvasBlock, in canvasID: CanvasBlock.ID) {
         guard let workspaceIndex = workspaces.firstIndex(where: { $0.id == selectedWorkspaceID }),
               let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvasID })
         else {
@@ -152,11 +208,19 @@ final class AppModel {
         var canvas = workspaces[workspaceIndex].blocks[canvasIndex]
         if let pendingChildID = canvasPickerPendingChildID,
            let pendingIndex = canvas.children.firstIndex(where: { $0.id == pendingChildID }) {
-            let child = CanvasBlock(id: pendingChildID, kind: kind)
-            canvas.children[pendingIndex] = child
-            canvas.focusedChildID = child.id
+            let replacement = CanvasBlock(
+                id: pendingChildID,
+                kind: child.kind,
+                title: child.title,
+                subtitle: child.subtitle,
+                launchCommand: child.launchCommand,
+                children: child.children,
+                layout: child.layout,
+                focusedChildID: child.focusedChildID
+            )
+            canvas.children[pendingIndex] = replacement
+            canvas.focusedChildID = replacement.id
         } else {
-            let child = CanvasBlock(kind: kind)
             canvas.children.append(child)
             canvas.layout = CanvasLayoutNode.insert(
                 blockID: child.id,
@@ -304,8 +368,15 @@ final class AppModel {
         }
         canvasPickerBlockID = nil
         canvasPickerSplitDirection = nil
+        customCommandRequest = nil
         canvasPickerPendingChildID = nil
         canvasPickerPreviousFocusedChildID = nil
+    }
+
+    private static func commandTitle(from command: String) -> String {
+        let firstLine = command.components(separatedBy: .newlines).first ?? command
+        let trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Custom" : String(trimmed.prefix(36))
     }
 
     private func removePendingCanvasChild() {
