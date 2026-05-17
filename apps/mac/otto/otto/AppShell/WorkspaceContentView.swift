@@ -1,0 +1,133 @@
+import SwiftUI
+
+struct WorkspaceContentView: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+
+            if model.isBlockPickerPresented {
+                BlockPickerView(
+                    options: BlockCatalog.creationOptions,
+                    onSelect: { model.createBlock(kind: $0.kind) },
+                    onCancel: { model.cancelBlockCreation() }
+                )
+            } else if let workspace = model.selectedWorkspace,
+               let blockID = model.selectedBlockID,
+               let block = workspace.blocks.first(where: { $0.id == blockID }) {
+                BlockSurface(model: model, block: block)
+            } else if model.selectedWorkspace != nil {
+                ContentUnavailableView(
+                    "No Block Selected",
+                    systemImage: "square.split.2x2",
+                    description: Text("Pick a block from the sidebar or create a new one with ⌘N.")
+                )
+            } else {
+                ContentUnavailableView(
+                    "No Workspace",
+                    systemImage: "folder",
+                    description: Text("Choose or add a workspace to begin.")
+                )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.09), lineWidth: 1)
+        )
+        .padding(.vertical, 6)
+    }
+}
+
+private struct BlockSurface: View {
+    @Bindable var model: AppModel
+    let block: CanvasBlock
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: block.kind.symbolName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Text(block.title)
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                if block.kind == .canvas {
+                    Button {
+                        model.beginCanvasBlockCreation(in: block)
+                    } label: {
+                        Label("Add Block", systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add block to canvas")
+                }
+                Menu {
+                    Button("Rename…") {}
+                    Button("Duplicate") {}
+                    Divider()
+                    Button("Close Block", role: .destructive) { model.closeSelectedBlock() }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .background(.bar)
+
+            Divider()
+                .opacity(0.4)
+
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if block.kind == .canvas {
+            CanvasBlockSurface(model: model, block: block)
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        VStack(spacing: 10) {
+            Image(systemName: block.kind.symbolName)
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text(block.kind.defaultTitle)
+                .font(.system(size: 15, weight: .semibold))
+            Text(placeholderSubtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var placeholderSubtitle: String {
+        switch block.kind {
+        case .canvas: "Native multi-block canvas layout will render here."
+        case .otto: "Native Otto session UI will render here once wired up."
+        case .neovim: "Embedded Neovim with follow-agent file opens."
+        case .terminal: "PTY-backed native terminal surface."
+        case .browser: "WKWebView preview for localhost apps and docs."
+        case .command: "Command runner backed by a native terminal surface."
+        case .claudeCode: "Launches `claude` in this workspace."
+        case .codex: "Launches `codex` in this workspace."
+        case .ottoTUI: "Launches `otto` in this workspace."
+        case .openCode: "Launches `opencode` in this workspace."
+        }
+    }
+}

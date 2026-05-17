@@ -34,6 +34,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # IntelliJ based IDEs
 .idea
 
+# Xcode user state
+xcuserdata
+*.xcuserstate
+
 # Finder (MacOS) folder config
 .DS_Store
 *-bak
