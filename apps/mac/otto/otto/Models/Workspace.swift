@@ -6,6 +6,7 @@ struct Workspace: Codable, Identifiable, Hashable {
     var name: String
     var path: String
     var accent: WorkspaceAccent
+    var logoPath: String?
     var blocks: [CanvasBlock]
 
     init(
@@ -13,12 +14,14 @@ struct Workspace: Codable, Identifiable, Hashable {
         name: String,
         path: String,
         accent: WorkspaceAccent = .indigo,
+        logoPath: String? = nil,
         blocks: [CanvasBlock] = []
     ) {
         self.id = id
         self.name = name
         self.path = path
         self.accent = accent
+        self.logoPath = logoPath
         self.blocks = blocks
     }
 

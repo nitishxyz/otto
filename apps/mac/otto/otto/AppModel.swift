@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 struct CustomCommandRequest: Identifiable, Hashable {
     let id = UUID()
@@ -123,10 +124,39 @@ final class AppModel {
             name: Self.workspaceName(from: expanded),
             path: expanded,
             accent: WorkspaceAccent.allCases[workspaces.count % WorkspaceAccent.allCases.count],
+            logoPath: WorkspaceLogoFinder.findLogoPath(in: expanded),
             blocks: []
         )
         workspaces.append(workspace)
         selectWorkspace(workspace)
+    }
+
+    func chooseWorkspaceLogo(_ workspace: Workspace) {
+        let panel = NSOpenPanel()
+        panel.title = "Choose workspace logo"
+        panel.prompt = "Set Logo"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.image, .pdf]
+        panel.directoryURL = URL(fileURLWithPath: expandedPath(workspace.path), isDirectory: true)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setWorkspaceLogo(workspace.id, logoPath: url.path)
+    }
+
+    func autoDetectWorkspaceLogo(_ workspace: Workspace) {
+        let expanded = expandedPath(workspace.path)
+        setWorkspaceLogo(workspace.id, logoPath: WorkspaceLogoFinder.findLogoPath(in: expanded))
+    }
+
+    func clearWorkspaceLogo(_ workspace: Workspace) {
+        setWorkspaceLogo(workspace.id, logoPath: nil)
+    }
+
+    func setWorkspaceLogo(_ workspaceID: Workspace.ID, logoPath: String?) {
+        guard let index = workspaces.firstIndex(where: { $0.id == workspaceID }) else { return }
+        workspaces[index].logoPath = logoPath
     }
 
     func removeWorkspace(_ workspace: Workspace) {
