@@ -12,7 +12,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		4D6EBFE62FB9D4F000FA9988 /* otto.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = otto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D6EBFE62FB9D4F000FA9988 /* Otto Canvas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Otto Canvas.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D6EC0012FB9F00000FA9988 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = ../../../vendor/ghostty/macos/GhosttyKit.xcframework; sourceTree = SOURCE_ROOT; };
 		4D6EC0032FB9F00000FA9988 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -51,7 +51,7 @@
 		4D6EBFE72FB9D4F000FA9988 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4D6EBFE62FB9D4F000FA9988 /* otto.app */,
+				4D6EBFE62FB9D4F000FA9988 /* Otto Canvas.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -79,7 +79,7 @@
 			packageProductDependencies = (
 			);
 			productName = otto;
-			productReference = 4D6EBFE62FB9D4F000FA9988 /* otto.app */;
+			productReference = 4D6EBFE62FB9D4F000FA9988 /* Otto Canvas.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -145,7 +145,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nROOT=\"${SRCROOT}/../../..\"\nARCH=\"${CURRENT_ARCH:-}\"\nif [ -z \"$ARCH\" ] || [ \"$ARCH\" = \"undefined_arch\" ]; then\n  ARCH=\"${NATIVE_ARCH_ACTUAL:-$(uname -m)}\"\nfi\ncase \"$ARCH\" in\n  arm64) BIN=\"otto-darwin-arm64\"; SCRIPT=\"build:bin:darwin-arm64\" ;;\n  x86_64) BIN=\"otto-darwin-x64\"; SCRIPT=\"build:bin:darwin-x64\" ;;\n  *) echo \"error: unsupported architecture $ARCH for bundled otto CLI\"; exit 1 ;;\nesac\nSOURCE_BIN=\"$ROOT/dist/$BIN\"\nif [ ! -x \"$SOURCE_BIN\" ]; then\n  if ! command -v bun >/dev/null 2>&1; then\n    echo \"error: bun is required to build the bundled otto CLI\"\n    exit 1\n  fi\n  (cd \"$ROOT\" && bun run \"$SCRIPT\")\nfi\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/binaries\"\nDEST_BIN=\"$DEST_DIR/$BIN\"\nmkdir -p \"$DEST_DIR\"\ncp \"$SOURCE_BIN\" \"$DEST_BIN\"\nchmod 755 \"$DEST_BIN\"\nif [ \"${CODE_SIGNING_ALLOWED:-NO}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" != \"-\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp=none \"$DEST_BIN\"\nfi\n";
+			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nROOT=\"${SRCROOT}/../../..\"\nARCH=\"${CURRENT_ARCH:-}\"\nif [ -z \"$ARCH\" ] || [ \"$ARCH\" = \"undefined_arch\" ]; then\n  ARCH=\"${NATIVE_ARCH_ACTUAL:-$(uname -m)}\"\nfi\ncase \"$ARCH\" in\n  arm64) BIN=\"otto-darwin-arm64\"; SCRIPT=\"build:bin:darwin-arm64\" ;;\n  x86_64) BIN=\"otto-darwin-x64\"; SCRIPT=\"build:bin:darwin-x64\" ;;\n  *) echo \"error: unsupported architecture $ARCH for bundled otto CLI\"; exit 1 ;;\nesac\nSOURCE_BIN=\"$ROOT/dist/$BIN\"\nif [ ! -x \"$SOURCE_BIN\" ]; then\n  if ! command -v bun >/dev/null 2>&1; then\n    echo \"error: bun is required to build the bundled otto CLI\"\n    exit 1\n  fi\n  (cd \"$ROOT\" && bun run \"$SCRIPT\")\nfi\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/binaries\"\nDEST_BIN=\"$DEST_DIR/$BIN\"\nmkdir -p \"$DEST_DIR\"\ncp \"$SOURCE_BIN\" \"$DEST_BIN\"\nchmod 755 \"$DEST_BIN\"\nif [ \"${CODE_SIGNING_ALLOWED:-NO}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" != \"-\" ]; then\n  SIGN_ARGS=(--force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\")\n  if [ \"${ENABLE_HARDENED_RUNTIME:-NO}\" = \"YES\" ]; then\n    SIGN_ARGS+=(--options runtime)\n  fi\n  case \"${EXPANDED_CODE_SIGN_IDENTITY_NAME:-}\" in\n    \"Developer ID Application:\"*) SIGN_ARGS+=(--timestamp) ;;\n    *) SIGN_ARGS+=(--timestamp=none) ;;\n  esac\n  codesign \"${SIGN_ARGS[@]}\" \"$DEST_BIN\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -214,7 +214,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -272,7 +272,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -297,6 +297,8 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Otto Canvas";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -309,7 +311,7 @@
 				MARKETING_VERSION = 1.0;
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = io.ottocode.canvas;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Otto Canvas";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -337,6 +339,8 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Otto Canvas";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -349,7 +353,7 @@
 				MARKETING_VERSION = 1.0;
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = io.ottocode.canvas;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Otto Canvas";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

@@ -356,14 +356,14 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
     var defaultTitle: String {
         switch self {
         case .canvas: "Canvas"
-        case .otto: "Otto"
+        case .otto: "otto"
         case .neovim: "Neovim"
         case .terminal: "Ghostty"
         case .browser: "Browser"
         case .command: "Custom"
         case .claudeCode: "Claude Code"
         case .codex: "Codex"
-        case .ottoTUI: "Otto TUI"
+        case .ottoTUI: "otto TUI"
         case .openCode: "OpenCode"
         }
     }
@@ -411,15 +411,15 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
 
     var pickerDescription: String {
         switch self {
-        case .canvas: "Arrange multiple Otto, terminal, browser, and command surfaces."
-        case .otto: "Open a native Otto agent session."
+        case .canvas: "Arrange multiple otto, terminal, browser, and command surfaces."
+        case .otto: "Open a native otto agent session."
         case .neovim: "Launch Neovim inside a terminal-backed surface."
         case .terminal: "Open a focused Ghostty-style terminal."
         case .browser: "Open a native web preview or docs browser."
         case .command: "Configure and run a shell command in a terminal surface."
         case .claudeCode: "Launch Claude Code inside a terminal-backed surface."
         case .codex: "Launch Codex inside a terminal-backed surface."
-        case .ottoTUI: "Launch the Otto terminal UI."
+        case .ottoTUI: "Launch the otto terminal UI."
         case .openCode: "Launch OpenCode inside a terminal-backed surface."
         }
     }

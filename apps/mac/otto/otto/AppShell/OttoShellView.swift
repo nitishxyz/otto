@@ -17,6 +17,7 @@ struct OttoShellView: View {
         .padding(.bottom, 8)
         .frame(minWidth: 980, minHeight: 640)
         .background(.regularMaterial)
+        .background(ToolbarFlexibleSpaceInstaller())
         .onAppear(perform: startModifierMonitor)
         .onDisappear(perform: stopModifierMonitor)
         .toolbar {
@@ -27,8 +28,6 @@ struct OttoShellView: View {
                 .pressableCursor()
                 .help("Toggle sidebar (⌘B)")
             }
-
-            ToolbarSpacer(.flexible, placement: .primaryAction)
 
             ToolbarItemGroup(placement: .primaryAction) {
                 if let workspace = model.selectedWorkspace {
@@ -141,6 +140,32 @@ struct OttoShellView: View {
 
 #Preview {
     OttoShellView(model: AppModel())
+}
+
+private struct ToolbarFlexibleSpaceInstaller: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        scheduleInstall(from: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        scheduleInstall(from: nsView)
+    }
+
+    private func scheduleInstall(from view: NSView, attempt: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) {
+            guard let toolbar = view.window?.toolbar else {
+                if attempt < 20 {
+                    scheduleInstall(from: view, attempt: attempt + 1)
+                }
+                return
+            }
+
+            guard !toolbar.items.contains(where: { $0.itemIdentifier == .flexibleSpace }) else { return }
+            toolbar.insertItem(withItemIdentifier: .flexibleSpace, at: min(1, toolbar.items.count))
+        }
+    }
 }
 
 private struct ProjectPathText: View {

@@ -383,7 +383,7 @@ private struct CanvasChildBlockFrame: View {
     private var description: String {
         switch block.kind {
         case .canvas: "Nested canvas surface."
-        case .otto: "Native Otto session surface."
+        case .otto: "Native otto session surface."
         case .neovim: "Runs `nvim` in this workspace."
         case .terminal: "PTY-backed terminal surface."
         case .browser: "WKWebView preview surface."

@@ -15,13 +15,13 @@ struct OttoBlockView: View {
             switch runtime.status {
             case .stopped, .starting:
                 OttoRuntimeStateView(
-                    title: "Starting Otto for this workspace",
+                    title: "Starting otto for this workspace",
                     message: "Using the workspace server for \(workspace.path).",
                     isLoading: true
                 )
             case .failed(let message):
                 OttoRuntimeStateView(
-                    title: "Otto runtime unavailable",
+                    title: "otto runtime unavailable",
                     message: message,
                     isLoading: false,
                     actionTitle: "Retry",
@@ -32,8 +32,8 @@ struct OttoBlockView: View {
                     OttoRuntimeWebView(url: webURL, isFocused: isFocused, onFocus: onFocus)
                 } else {
                     OttoRuntimeStateView(
-                        title: "Otto runtime unavailable",
-                        message: "The Otto web UI URL was not available.",
+                        title: "otto runtime unavailable",
+                        message: "The otto web UI URL was not available.",
                         isLoading: false,
                         actionTitle: "Retry",
                         action: runtime.restart
