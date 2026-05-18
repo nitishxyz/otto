@@ -50,7 +50,10 @@ struct WorkspaceContentView: View {
                 .stroke(Color.primary.opacity(0.09), lineWidth: 1)
         )
         .padding(.vertical, 6)
-        .onAppear(perform: retainSelectedSurface)
+        .onAppear {
+            retainSelectedSurface()
+            model.requestActiveBlockFocus()
+        }
         .onChange(of: model.selectedBlockID) { _, _ in retainSelectedSurface() }
         .onChange(of: model.selectedWorkspaceID) { _, _ in retainSelectedSurface() }
         .onChange(of: model.workspaces) { _, _ in pruneRetainedSurfaces() }
@@ -257,19 +260,38 @@ private struct BlockSurface: View {
     @ViewBuilder
     private var content: some View {
         if block.kind == .canvas {
-            CanvasBlockSurface(model: model, workspace: workspace, block: block, isActive: isActive)
+            CanvasBlockSurface(
+                model: model,
+                workspace: workspace,
+                block: block,
+                isActive: isActive,
+                focusRequestID: model.focusRequestID
+            )
         } else if block.kind == .otto {
             OttoBlockView(
                 block: block,
                 workspace: workspace,
                 runtime: model.ottoRuntimeSession(for: workspace),
                 isFocused: isActive,
+                focusRequestID: model.focusRequestID,
                 onFocus: { model.selectBlock(block) }
             )
         } else if block.kind == .browser {
-            BrowserBlockView(block: block, session: model.browserSession(for: block), isFocused: isActive)
+            BrowserBlockView(
+                block: block,
+                session: model.browserSession(for: block),
+                isFocused: isActive,
+                focusRequestID: model.focusRequestID,
+                onFocus: { model.selectBlock(block) }
+            )
         } else if block.kind.runsInTerminal {
-            TerminalBlockView(block: block, session: model.terminalSession(for: block, in: workspace), isFocused: isActive)
+            TerminalBlockView(
+                block: block,
+                session: model.terminalSession(for: block, in: workspace),
+                isFocused: isActive,
+                focusRequestID: model.focusRequestID,
+                onFocus: { model.selectBlock(block) }
+            )
         } else {
             placeholder
         }

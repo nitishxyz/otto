@@ -6,6 +6,7 @@ struct CanvasBlockSurface: View {
     let workspace: Workspace
     let block: CanvasBlock
     var isActive = true
+    var focusRequestID = 0
 
     var body: some View {
         ZStack {
@@ -15,7 +16,8 @@ struct CanvasBlockSurface: View {
                     workspace: workspace,
                     canvas: block,
                     node: layout,
-                    isCanvasActive: isActive
+                    isCanvasActive: isActive,
+                    focusRequestID: focusRequestID
                 )
                 .padding(4)
 
@@ -80,6 +82,7 @@ private struct CanvasLayoutRenderer: View {
     let canvas: CanvasBlock
     let node: CanvasLayoutNode
     let isCanvasActive: Bool
+    let focusRequestID: Int
 
     var body: some View {
         switch node {
@@ -90,6 +93,7 @@ private struct CanvasLayoutRenderer: View {
                     workspace: workspace,
                     block: child,
                     isFocused: isCanvasActive && canvas.focusedChildID == child.id,
+                    focusRequestID: focusRequestID,
                     onFocus: { model.focusCanvasChildBlock(child.id, in: canvas.id) },
                     onClose: {
                         if child.isPendingCreation {
@@ -106,6 +110,7 @@ private struct CanvasLayoutRenderer: View {
                 workspace: workspace,
                 canvas: canvas,
                 isCanvasActive: isCanvasActive,
+                focusRequestID: focusRequestID,
                 splitID: id,
                 direction: direction,
                 ratio: ratio,
@@ -121,6 +126,7 @@ private struct CanvasSplitPane: View {
     let workspace: Workspace
     let canvas: CanvasBlock
     let isCanvasActive: Bool
+    let focusRequestID: Int
     let splitID: UUID
     let direction: SplitDirection
     let ratio: Double
@@ -146,7 +152,8 @@ private struct CanvasSplitPane: View {
                         workspace: workspace,
                         canvas: canvas,
                         node: first,
-                        isCanvasActive: isCanvasActive
+                        isCanvasActive: isCanvasActive,
+                        focusRequestID: focusRequestID
                     )
                         .frame(width: firstWidth)
                     divider
@@ -157,7 +164,8 @@ private struct CanvasSplitPane: View {
                         workspace: workspace,
                         canvas: canvas,
                         node: second,
-                        isCanvasActive: isCanvasActive
+                        isCanvasActive: isCanvasActive,
+                        focusRequestID: focusRequestID
                     )
                         .frame(width: secondWidth)
                 }
@@ -174,7 +182,8 @@ private struct CanvasSplitPane: View {
                         workspace: workspace,
                         canvas: canvas,
                         node: first,
-                        isCanvasActive: isCanvasActive
+                        isCanvasActive: isCanvasActive,
+                        focusRequestID: focusRequestID
                     )
                         .frame(height: firstHeight)
                     divider
@@ -185,7 +194,8 @@ private struct CanvasSplitPane: View {
                         workspace: workspace,
                         canvas: canvas,
                         node: second,
-                        isCanvasActive: isCanvasActive
+                        isCanvasActive: isCanvasActive,
+                        focusRequestID: focusRequestID
                     )
                         .frame(height: secondHeight)
                 }
@@ -277,6 +287,7 @@ private struct CanvasChildBlockFrame: View {
     let workspace: Workspace
     let block: CanvasBlock
     let isFocused: Bool
+    let focusRequestID: Int
     let onFocus: () -> Void
     let onClose: () -> Void
 
@@ -347,6 +358,7 @@ private struct CanvasChildBlockFrame: View {
                 block: block,
                 session: model.terminalSession(for: block, in: workspace),
                 isFocused: isFocused,
+                focusRequestID: focusRequestID,
                 onFocus: onFocus
             )
         } else if block.kind == .browser {
@@ -354,6 +366,7 @@ private struct CanvasChildBlockFrame: View {
                 block: block,
                 session: model.browserSession(for: block),
                 isFocused: isFocused,
+                focusRequestID: focusRequestID,
                 onFocus: onFocus
             )
         } else if block.kind == .otto {
@@ -362,6 +375,7 @@ private struct CanvasChildBlockFrame: View {
                 workspace: workspace,
                 runtime: model.ottoRuntimeSession(for: workspace),
                 isFocused: isFocused,
+                focusRequestID: focusRequestID,
                 onFocus: onFocus
             )
         } else {

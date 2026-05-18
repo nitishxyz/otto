@@ -37,6 +37,7 @@ final class AppModel {
     var canvasPickerBlockID: CanvasBlock.ID?
     var canvasPickerSplitDirection: SplitDirection?
     var customCommandRequest: CustomCommandRequest?
+    var focusRequestID = 0
     private var canvasPickerPendingChildID: CanvasBlock.ID?
     private var canvasPickerPreviousFocusedChildID: CanvasBlock.ID?
     private var blockSelectionBeforePicker: CanvasBlock.ID?
@@ -66,6 +67,7 @@ final class AppModel {
             if let newValue {
                 startOttoRuntime(for: newValue)
             }
+            requestActiveBlockFocus()
         }
     }
 
@@ -79,6 +81,11 @@ final class AppModel {
         selectedBlockID = preferredSelectedBlockID(in: workspace)
         isBlockPickerPresented = false
         startOttoRuntime(for: workspace)
+        requestActiveBlockFocus()
+    }
+
+    func requestActiveBlockFocus() {
+        focusRequestID &+= 1
     }
 
     func selectWorkspace(at index: Int) {
@@ -136,6 +143,7 @@ final class AppModel {
             if let selectedWorkspace {
                 startOttoRuntime(for: selectedWorkspace)
             }
+            requestActiveBlockFocus()
         }
     }
 
@@ -143,6 +151,7 @@ final class AppModel {
         resetCanvasPicker(removePending: true)
         selectedBlockID = block.id
         isBlockPickerPresented = false
+        requestActiveBlockFocus()
     }
 
     func beginBlockCreation() {
@@ -172,6 +181,7 @@ final class AppModel {
         resetCanvasPicker(removePending: true)
         selectedBlockID = blockSelectionBeforePicker ?? selectedWorkspace?.blocks.first?.id
         blockSelectionBeforePicker = nil
+        requestActiveBlockFocus()
     }
 
     func createBlock(kind: BlockKind) {
@@ -189,6 +199,7 @@ final class AppModel {
         isBlockPickerPresented = false
         resetCanvasPicker(removePending: true)
         blockSelectionBeforePicker = nil
+        requestActiveBlockFocus()
     }
 
     func terminalSession(for block: CanvasBlock, in workspace: Workspace? = nil) -> TerminalSession {
@@ -328,6 +339,7 @@ final class AppModel {
             isBlockPickerPresented = false
             blockSelectionBeforePicker = nil
             resetCanvasPicker(removePending: false)
+            requestActiveBlockFocus()
         }
         self.customCommandRequest = nil
     }
@@ -376,6 +388,7 @@ final class AppModel {
         }
         workspaces[workspaceIndex].blocks[canvasIndex] = canvas
         resetCanvasPicker(removePending: false)
+        requestActiveBlockFocus()
     }
 
     func closeCanvasChildBlock(_ childID: CanvasBlock.ID, in canvasID: CanvasBlock.ID) {
@@ -401,6 +414,7 @@ final class AppModel {
               let canvasIndex = workspaces[workspaceIndex].blocks.firstIndex(where: { $0.id == canvasID })
         else { return }
         workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID = childID
+        requestActiveBlockFocus()
     }
 
     func setCanvasSplitRatio(_ splitID: UUID, ratio: Double, in canvasID: CanvasBlock.ID) {
@@ -443,6 +457,7 @@ final class AppModel {
         }
         if selectedBlockID == blockID {
             selectedBlockID = preferredSelectedBlockID(in: workspaces[workspaceIndex])
+            requestActiveBlockFocus()
         }
     }
 
@@ -494,6 +509,7 @@ final class AppModel {
         let orderedIDs = CanvasLayoutNode.blockIDs(in: workspaces[workspaceIndex].blocks[canvasIndex].layout)
         guard orderedIDs.indices.contains(index) else { return }
         workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID = orderedIDs[index]
+        requestActiveBlockFocus()
     }
 
     func focusCanvasChild(direction: CanvasFocusDirection) {
@@ -509,6 +525,7 @@ final class AppModel {
             in: canvas.layout
         ) else { return }
         workspaces[workspaceIndex].blocks[canvasIndex].focusedChildID = nextID
+        requestActiveBlockFocus()
     }
 
     private func selectBlock(offset: Int) {

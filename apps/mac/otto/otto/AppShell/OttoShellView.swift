@@ -5,6 +5,7 @@ struct OttoShellView: View {
     @Bindable var model: AppModel
     @State private var showsWorkspaceShortcutNumbers = false
     @State private var modifierMonitor: Any?
+    @State private var shortcutMonitor: Any?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -18,8 +19,14 @@ struct OttoShellView: View {
         .frame(minWidth: 980, minHeight: 640)
         .background(.regularMaterial)
         .background(ToolbarFlexibleSpaceInstaller())
-        .onAppear(perform: startModifierMonitor)
-        .onDisappear(perform: stopModifierMonitor)
+        .onAppear {
+            startModifierMonitor()
+            startShortcutMonitor()
+        }
+        .onDisappear {
+            stopModifierMonitor()
+            stopShortcutMonitor()
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
@@ -124,12 +131,116 @@ struct OttoShellView: View {
         updateWorkspaceShortcutNumbers(for: NSEvent.modifierFlags)
     }
 
+    private func startShortcutMonitor() {
+        guard shortcutMonitor == nil else { return }
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handleShortcut(event) ? nil : event
+        }
+    }
+
     private func stopModifierMonitor() {
         if let modifierMonitor {
             NSEvent.removeMonitor(modifierMonitor)
             self.modifierMonitor = nil
         }
         showsWorkspaceShortcutNumbers = false
+    }
+
+    private func stopShortcutMonitor() {
+        if let shortcutMonitor {
+            NSEvent.removeMonitor(shortcutMonitor)
+            self.shortcutMonitor = nil
+        }
+    }
+
+    private func handleShortcut(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        let hasCommand = flags.contains(.command)
+        let hasOption = flags.contains(.option)
+        let hasControl = flags.contains(.control)
+        let hasShift = flags.contains(.shift)
+
+        if hasCommand && hasOption && !hasControl && !hasShift {
+            if key == "]" {
+                model.selectWorkspace(offset: 1)
+                return true
+            }
+            if key == "[" {
+                model.selectWorkspace(offset: -1)
+                return true
+            }
+            if let index = shortcutNumberIndex(for: key) {
+                model.selectWorkspace(at: index)
+                return true
+            }
+        }
+
+        if hasCommand && !hasOption && !hasControl {
+            if !hasShift {
+                switch key {
+                case "o":
+                    model.addWorkspaceFromOpenPanel()
+                    return true
+                case "n":
+                    model.beginWorkspaceBlockCreation()
+                    return true
+                case "w":
+                    model.closeSelectedBlock()
+                    return true
+                case "b":
+                    toggleSidebar()
+                    return true
+                case "]":
+                    model.selectNextBlock()
+                    return true
+                case "[":
+                    model.selectPreviousBlock()
+                    return true
+                case "d":
+                    model.beginSelectedCanvasSplit(direction: .horizontal)
+                    return true
+                case "h":
+                    model.focusCanvasChild(direction: .left)
+                    return true
+                case "j":
+                    model.focusCanvasChild(direction: .down)
+                    return true
+                case "k":
+                    model.focusCanvasChild(direction: .up)
+                    return true
+                case "l":
+                    model.focusCanvasChild(direction: .right)
+                    return true
+                default:
+                    if let index = shortcutNumberIndex(for: key) {
+                        model.selectBlock(at: index)
+                        return true
+                    }
+                }
+            } else if key == "d" {
+                model.beginSelectedCanvasSplit(direction: .vertical)
+                return true
+            }
+        }
+
+        if hasControl && !hasCommand && !hasOption {
+            if !hasShift && event.keyCode == 48 {
+                model.selectRecentBlock()
+                return true
+            }
+            if hasShift, let index = shortcutNumberIndex(for: key) {
+                model.focusCanvasChild(at: index)
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func shortcutNumberIndex(for key: String) -> Int? {
+        guard let value = Int(key), (1...9).contains(value) else { return nil }
+        return value - 1
     }
 
     private func updateWorkspaceShortcutNumbers(for flags: NSEvent.ModifierFlags) {

@@ -71,7 +71,6 @@ struct WorkspaceBlocksSidebar: View {
         .buttonStyle(.plain)
         .pressableCursor()
         .onHover { isAddBlockHovered = $0 }
-        .keyboardShortcut("n", modifiers: .command)
         .help("New tab (⌘N)")
         .padding(.horizontal, 10)
         .padding(.bottom, 12)

@@ -6,6 +6,7 @@ struct OttoBlockView: View {
     let workspace: Workspace
     @ObservedObject var runtime: OttoWorkspaceRuntimeSession
     let isFocused: Bool
+    var focusRequestID = 0
     let onFocus: () -> Void
 
     var body: some View {
@@ -29,7 +30,12 @@ struct OttoBlockView: View {
                 )
             case .ready:
                 if let webURL = runtime.webURL {
-                    OttoRuntimeWebView(url: webURL, isFocused: isFocused, onFocus: onFocus)
+                    OttoRuntimeWebView(
+                        url: webURL,
+                        isFocused: isFocused,
+                        focusRequestID: focusRequestID,
+                        onFocus: onFocus
+                    )
                 } else {
                     OttoRuntimeStateView(
                         title: "otto runtime unavailable",
@@ -89,6 +95,7 @@ private struct OttoRuntimeStateView: View {
 private struct OttoRuntimeWebView: NSViewRepresentable {
     let url: URL
     let isFocused: Bool
+    let focusRequestID: Int
     let onFocus: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -120,6 +127,7 @@ private struct OttoRuntimeWebView: NSViewRepresentable {
             context.coordinator.url = url
             webView.load(URLRequest(url: url))
         }
+        context.coordinator.handleFocusRequest(focusRequestID, webView: webView, isFocused: isFocused)
         if isFocused, webView.window?.firstResponder == nil {
             webView.window?.makeFirstResponder(webView)
         }
@@ -128,6 +136,7 @@ private struct OttoRuntimeWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         var url: URL
         var onFocus: () -> Void
+        private var lastHandledFocusRequestID = 0
 
         init(url: URL, onFocus: @escaping () -> Void) {
             self.url = url
@@ -136,6 +145,13 @@ private struct OttoRuntimeWebView: NSViewRepresentable {
 
         @objc func focusBlock() {
             onFocus()
+        }
+
+        func handleFocusRequest(_ requestID: Int, webView: WKWebView, isFocused: Bool) {
+            guard requestID != lastHandledFocusRequestID else { return }
+            lastHandledFocusRequestID = requestID
+            guard isFocused, let window = webView.window else { return }
+            window.makeFirstResponder(webView)
         }
     }
 }

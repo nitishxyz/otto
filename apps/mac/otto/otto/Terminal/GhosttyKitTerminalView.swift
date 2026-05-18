@@ -68,6 +68,7 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
     let block: CanvasBlock
     let session: TerminalSession
     let isFocused: Bool
+    let focusRequestID: Int
     let onFocus: () -> Void
 
     func makeNSView(context: Context) -> GhosttyKitTerminalContainerNSView {
@@ -75,6 +76,7 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
         container.configure(
             terminalView: terminalView(),
             isFocused: isFocused,
+            focusRequestID: focusRequestID,
             onFocus: onFocus
         )
         return container
@@ -84,6 +86,7 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
         nsView.configure(
             terminalView: terminalView(),
             isFocused: isFocused,
+            focusRequestID: focusRequestID,
             onFocus: onFocus
         )
     }
@@ -133,7 +136,12 @@ final class GhosttyKitTerminalContainerNSView: NSView {
 
     override var isFlipped: Bool { true }
 
-    func configure(terminalView nextView: GhosttyKitTerminalNSView, isFocused: Bool, onFocus: @escaping () -> Void) {
+    func configure(
+        terminalView nextView: GhosttyKitTerminalNSView,
+        isFocused: Bool,
+        focusRequestID: Int,
+        onFocus: @escaping () -> Void
+    ) {
         if terminalView !== nextView {
             terminalView?.removeFromSuperview()
             nextView.removeFromSuperview()
@@ -146,6 +154,7 @@ final class GhosttyKitTerminalContainerNSView: NSView {
         nextView.isFocused = isFocused
         nextView.onFocus = onFocus
         nextView.refreshAfterAttachment()
+        nextView.handleFocusRequest(focusRequestID)
         needsLayout = true
     }
 
@@ -181,6 +190,7 @@ final class GhosttyKitTerminalNSView: NSView {
     private let workingDirectory: String
     private var surface: ghostty_surface_t?
     private var pendingAttachmentRefresh = false
+    private var lastHandledFocusRequestID = 0
 
     init(command: String?, workingDirectory: String, isFocused: Bool, onFocus: @escaping () -> Void) {
         self.command = command
@@ -199,6 +209,13 @@ final class GhosttyKitTerminalNSView: NSView {
 
     deinit {
         closeSurface()
+    }
+
+    func handleFocusRequest(_ requestID: Int) {
+        guard requestID != lastHandledFocusRequestID else { return }
+        lastHandledFocusRequestID = requestID
+        guard isFocused else { return }
+        focusTerminal()
     }
 
     func closeSurface() {

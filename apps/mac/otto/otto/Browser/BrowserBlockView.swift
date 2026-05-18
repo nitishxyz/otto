@@ -13,6 +13,7 @@ private let browserQuickLinks = [
 struct BrowserBlockView: View {
     let block: CanvasBlock
     let isFocused: Bool
+    let focusRequestID: Int
     let onFocus: () -> Void
 
     @ObservedObject private var controller: BrowserSession
@@ -22,11 +23,13 @@ struct BrowserBlockView: View {
         block: CanvasBlock,
         session: BrowserSession,
         isFocused: Bool = true,
+        focusRequestID: Int = 0,
         onFocus: @escaping () -> Void = {}
     ) {
         self.block = block
         self.controller = session
         self.isFocused = isFocused
+        self.focusRequestID = focusRequestID
         self.onFocus = onFocus
     }
 
@@ -46,6 +49,7 @@ struct BrowserBlockView: View {
                     BrowserWebView(
                         controller: controller,
                         isFocused: isFocused,
+                        focusRequestID: focusRequestID,
                         onFocus: onFocus
                     )
                 }
@@ -241,6 +245,7 @@ private struct BrowserUnavailableView: View {
 private struct BrowserWebView: NSViewRepresentable {
     @ObservedObject var controller: BrowserSession
     let isFocused: Bool
+    let focusRequestID: Int
     let onFocus: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -257,6 +262,7 @@ private struct BrowserWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.onFocus = onFocus
+        context.coordinator.handleFocusRequest(focusRequestID, webView: webView, isFocused: isFocused)
         if isFocused, let window = webView.window, window.firstResponder == nil {
             window.makeFirstResponder(webView)
         }
@@ -264,6 +270,7 @@ private struct BrowserWebView: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         var onFocus: () -> Void
+        private var lastHandledFocusRequestID = 0
 
         init(onFocus: @escaping () -> Void) {
             self.onFocus = onFocus
@@ -271,6 +278,13 @@ private struct BrowserWebView: NSViewRepresentable {
 
         @objc func focusBlock() {
             onFocus()
+        }
+
+        func handleFocusRequest(_ requestID: Int, webView: WKWebView, isFocused: Bool) {
+            guard requestID != lastHandledFocusRequestID else { return }
+            lastHandledFocusRequestID = requestID
+            guard isFocused, let window = webView.window else { return }
+            window.makeFirstResponder(webView)
         }
     }
 }
