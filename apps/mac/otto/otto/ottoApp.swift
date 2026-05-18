@@ -46,7 +46,9 @@ struct ottoApp: App {
 
             CommandMenu("View") {
                 Button("Toggle Sidebar") {
-                    model.toggleSidebar()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        model.toggleSidebar()
+                    }
                 }
                 .keyboardShortcut("b", modifiers: .command)
             }
