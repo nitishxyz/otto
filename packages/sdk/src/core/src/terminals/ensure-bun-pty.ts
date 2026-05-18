@@ -27,11 +27,35 @@ function tryUseExistingPath(path?: string | null): string | null {
 	return null;
 }
 
+async function extractEmbeddedLibrary(
+	filename: string,
+): Promise<string | null> {
+	const platformLibs =
+		RUST_PTY_LIBS[process.platform as keyof typeof RUST_PTY_LIBS];
+	const embeddedPath =
+		platformLibs?.[process.arch === 'arm64' ? 'arm64' : 'x64'];
+
+	if (!embeddedPath) return null;
+
+	const targetDir = join(getGlobalConfigDir(), 'runtime', 'bun-pty');
+	mkdirSync(targetDir, { recursive: true });
+	const targetPath = join(targetDir, filename);
+	const source = Bun.file(embeddedPath);
+	await Bun.write(targetPath, source);
+	process.env.BUN_PTY_LIB = targetPath;
+	return targetPath;
+}
+
 export async function ensureBunPtyLibrary(): Promise<string | null> {
+	const filename = resolveLibraryFilename();
+	if (process.env.OTTO_PREFER_BUNDLED_PTY === '1') {
+		const embedded = await extractEmbeddedLibrary(filename);
+		if (embedded) return embedded;
+	}
+
 	const already = tryUseExistingPath(process.env.BUN_PTY_LIB);
 	if (already) return already;
 
-	const filename = resolveLibraryFilename();
 	const candidates: string[] = [];
 
 	candidates.push(
@@ -51,20 +75,5 @@ export async function ensureBunPtyLibrary(): Promise<string | null> {
 		if (path) return path;
 	}
 
-	const platformLibs =
-		RUST_PTY_LIBS[process.platform as keyof typeof RUST_PTY_LIBS];
-	const embeddedPath =
-		platformLibs?.[process.arch === 'arm64' ? 'arm64' : 'x64'];
-
-	if (embeddedPath) {
-		const targetDir = join(getGlobalConfigDir(), 'runtime', 'bun-pty');
-		mkdirSync(targetDir, { recursive: true });
-		const targetPath = join(targetDir, filename);
-		const source = Bun.file(embeddedPath);
-		await Bun.write(targetPath, source);
-		process.env.BUN_PTY_LIB = targetPath;
-		return targetPath;
-	}
-
-	return null;
+	return extractEmbeddedLibrary(filename);
 }

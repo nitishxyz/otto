@@ -223,7 +223,8 @@ private struct WorkspaceLogoAnalysis {
 
         var brightness: CGFloat = 0
         var samples: CGFloat = 0
-        var hasTransparency = false
+        var transparentSamples: CGFloat = 0
+        var totalSamples: CGFloat = 0
         let sampleCount = 9
 
         for xStep in 0..<sampleCount {
@@ -242,8 +243,9 @@ private struct WorkspaceLogoAnalysis {
                     hasAlpha: hasAlpha
                 )
 
+                totalSamples += 1
                 if components.alpha < 0.92 {
-                    hasTransparency = true
+                    transparentSamples += 1
                 }
                 guard components.alpha > 0.12 else { continue }
 
@@ -252,7 +254,8 @@ private struct WorkspaceLogoAnalysis {
             }
         }
 
-        return (samples > 0 ? brightness / samples : 0.5, hasTransparency)
+        let transparentRatio = totalSamples > 0 ? transparentSamples / totalSamples : 0
+        return (samples > 0 ? brightness / samples : 0.5, transparentRatio > 0.22)
     }
 
     private static func components(

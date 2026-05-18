@@ -133,7 +133,12 @@ export function buildTerminalTool(
 
 						if (runInShell) {
 							command = shellPath;
-							args = process.platform === 'win32' ? [] : ['-i'];
+							args =
+								process.platform === 'win32'
+									? []
+									: process.platform === 'darwin'
+										? ['-il']
+										: ['-i'];
 							const providedCommand = params.command;
 							const providedArgs = params.args ?? [];
 

@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import GhosttyKit
 import SwiftUI
 
@@ -22,6 +23,8 @@ private final class EmbeddedGhosttyRuntime {
     private func ensureStarted() {
         guard !initialized else { return }
         initialized = true
+
+        MacProcessEnvironment.applyToCurrentProcess()
 
         guard ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) == GHOSTTY_SUCCESS else {
             return
@@ -98,7 +101,7 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
             return view
         }
         let view = GhosttyKitTerminalNSView(
-            command: Self.shellWrappedCommand(block.launchCommand),
+            command: Self.shellCommand(block.launchCommand),
             workingDirectory: session.workingDirectory,
             isFocused: isFocused,
             onFocus: onFocus
@@ -107,11 +110,11 @@ struct GhosttyKitTerminalView: NSViewRepresentable {
         return view
     }
 
-    private static func shellWrappedCommand(_ command: String?) -> String? {
+    private static func shellCommand(_ command: String?) -> String {
+        let shell = MacProcessEnvironment.defaultShellPath()
         guard let command, !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
+            return "\(shell) -il"
         }
-        let shell = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
         return "\(shell) -ilc \(shellQuote("exec \(command)"))"
     }
 
@@ -316,15 +319,32 @@ final class GhosttyKitTerminalNSView: NSView {
         config.font_size = ottoGhosttyFontSize
         config.context = GHOSTTY_SURFACE_CONTEXT_SPLIT
 
+        let environment = MacProcessEnvironment.environment()
+        let environmentPointers = ["PATH", "SHELL", "TERM"].compactMap { key -> ghostty_env_var_s? in
+            guard let value = environment[key] else { return nil }
+            return ghostty_env_var_s(key: strdup(key), value: strdup(value))
+        }
+        defer {
+            for pointer in environmentPointers {
+                free(UnsafeMutableRawPointer(mutating: pointer.key))
+                free(UnsafeMutableRawPointer(mutating: pointer.value))
+            }
+        }
+
         workingDirectory.withCString { cwd in
             config.working_directory = cwd
-            if let command {
-                command.withCString { commandPointer in
-                    config.command = commandPointer
+            var mutableEnvironmentPointers = environmentPointers
+            mutableEnvironmentPointers.withUnsafeMutableBufferPointer { envPointers in
+                config.env_vars = envPointers.baseAddress
+                config.env_var_count = envPointers.count
+                if let command {
+                    command.withCString { commandPointer in
+                        config.command = commandPointer
+                        surface = ghostty_surface_new(app, &config)
+                    }
+                } else {
                     surface = ghostty_surface_new(app, &config)
                 }
-            } else {
-                surface = ghostty_surface_new(app, &config)
             }
         }
 

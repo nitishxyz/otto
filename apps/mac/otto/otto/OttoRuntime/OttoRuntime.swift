@@ -403,14 +403,8 @@ final class OttoWorkspaceRuntimeSession: ObservableObject {
     }
 
     private static func runtimeEnvironment() -> [String: String] {
-        var environment = ProcessInfo.processInfo.environment
-        let paths = [
-            "/usr/bin",
-            "/bin",
-            environment["PATH"] ?? ""
-        ]
-        environment["PATH"] = paths.filter { !$0.isEmpty }.joined(separator: ":")
-        environment["TERM"] = "xterm-256color"
+        var environment = MacProcessEnvironment.environment()
+        environment["OTTO_PREFER_BUNDLED_PTY"] = "1"
         return environment
     }
 

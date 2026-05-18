@@ -24,17 +24,21 @@ export async function createTerminal(
 		}
 
 		let resolvedCommand = command;
+		let resolvedArgs = args || [];
 		if (command === 'bash' || command === 'sh' || command === 'shell') {
 			resolvedCommand =
 				process.platform === 'win32'
 					? process.env.COMSPEC || 'cmd.exe'
 					: process.env.SHELL || '/bin/bash';
+			if (resolvedArgs.length === 0 && process.platform !== 'win32') {
+				resolvedArgs = process.platform === 'darwin' ? ['-il'] : ['-i'];
+			}
 		}
 		const resolvedCwd = cwd || process.cwd();
 
 		const terminal = terminalManager.create({
 			command: resolvedCommand,
-			args: args || [],
+			args: resolvedArgs,
 			purpose,
 			cwd: resolvedCwd,
 			createdBy: 'user',
