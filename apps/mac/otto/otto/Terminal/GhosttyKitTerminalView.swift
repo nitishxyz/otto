@@ -2,8 +2,10 @@ import AppKit
 import Darwin
 import GhosttyKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private let ottoGhosttyFontSize: Float = 13
+private let ottoGhosttySelectionPasteboard = NSPasteboard(name: .init("codes.otto.ghostty.selection"))
 
 @MainActor
 private final class EmbeddedGhosttyRuntime {
@@ -37,16 +39,22 @@ private final class EmbeddedGhosttyRuntime {
 
         var runtimeConfig = ghostty_runtime_config_s(
             userdata: Unmanaged.passUnretained(self).toOpaque(),
-            supports_selection_clipboard: false,
+            supports_selection_clipboard: true,
             wakeup_cb: { userdata in
                 guard let userdata else { return }
                 let runtime = Unmanaged<EmbeddedGhosttyRuntime>.fromOpaque(userdata).takeUnretainedValue()
                 DispatchQueue.main.async { runtime.tick() }
             },
             action_cb: { _, _, _ in false },
-            read_clipboard_cb: { _, _, _ in false },
-            confirm_read_clipboard_cb: { _, _, _, _ in },
-            write_clipboard_cb: { _, _, _, _, _ in },
+            read_clipboard_cb: { userdata, location, state in
+                GhosttyKitTerminalNSView.readClipboard(userdata, location: location, state: state)
+            },
+            confirm_read_clipboard_cb: { userdata, text, state, _ in
+                GhosttyKitTerminalNSView.confirmReadClipboard(userdata, text: text, state: state)
+            },
+            write_clipboard_cb: { _, location, content, length, _ in
+                GhosttyKitTerminalNSView.writeClipboard(location: location, content: content, length: length)
+            },
             close_surface_cb: { _, _ in }
         )
 
@@ -174,6 +182,45 @@ final class GhosttyKitTerminalContainerNSView: NSView {
 }
 
 final class GhosttyKitTerminalNSView: NSView {
+    static func readClipboard(
+        _ userdata: UnsafeMutableRawPointer?,
+        location: ghostty_clipboard_e,
+        state: UnsafeMutableRawPointer?
+    ) -> Bool {
+        guard let terminalView = terminalView(from: userdata),
+              let surface = terminalView.surface,
+              let pasteboard = pasteboard(for: location),
+              let text = pasteboard.opinionatedTerminalString() else { return false }
+        completeClipboardRequest(surface, text: text, state: state, confirmed: false)
+        return true
+    }
+
+    static func confirmReadClipboard(
+        _ userdata: UnsafeMutableRawPointer?,
+        text: UnsafePointer<CChar>?,
+        state: UnsafeMutableRawPointer?
+    ) {
+        guard let terminalView = terminalView(from: userdata),
+              let surface = terminalView.surface,
+              let text else { return }
+        completeClipboardRequest(surface, text: String(cString: text), state: state, confirmed: true)
+    }
+
+    static func writeClipboard(
+        location: ghostty_clipboard_e,
+        content: UnsafePointer<ghostty_clipboard_content_s>?,
+        length: Int
+    ) {
+        guard let pasteboard = pasteboard(for: location), let content, length > 0 else { return }
+        let items = (0..<length).compactMap { ClipboardContent(content[$0]) }
+        guard !items.isEmpty else { return }
+
+        pasteboard.declareTypes(items.map(\.pasteboardType), owner: nil)
+        for item in items {
+            pasteboard.setString(item.text, forType: item.pasteboardType)
+        }
+    }
+
     var isFocused: Bool {
         didSet {
             guard oldValue != isFocused else { return }
@@ -287,6 +334,26 @@ final class GhosttyKitTerminalNSView: NSView {
         _ = keyAction(event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS, event: event)
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard isFocused,
+              event.type == .keyDown,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch key {
+        case "c":
+            copy(nil)
+            return true
+        case "v":
+            paste(nil)
+            return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
+
     override func keyUp(with event: NSEvent) {
         guard isFocused else { return }
         _ = keyAction(GHOSTTY_ACTION_RELEASE, event: event)
@@ -301,12 +368,18 @@ final class GhosttyKitTerminalNSView: NSView {
         }
     }
 
-    func paste(_ sender: Any?) {
-        guard isFocused, let text = NSPasteboard.general.string(forType: .string) else { return }
+    @objc func paste(_ sender: Any?) {
+        guard isFocused else { return }
+        if performBindingAction("paste_from_clipboard") { return }
+        guard let text = NSPasteboard.general.opinionatedTerminalString() else { return }
         sendText(text)
     }
 
-    func copy(_ sender: Any?) {}
+    @objc func copy(_ sender: Any?) {
+        guard isFocused else { return }
+        if performBindingAction("copy_to_clipboard") { return }
+        copySelectionToPasteboard()
+    }
 
     private func createSurfaceIfNeeded() {
         guard surface == nil, window != nil, let app = EmbeddedGhosttyRuntime.shared.appHandle else { return }
@@ -377,6 +450,25 @@ final class GhosttyKitTerminalNSView: NSView {
         text.withCString { pointer in
             ghostty_surface_text(surface, pointer, UInt(text.utf8.count))
         }
+    }
+
+    private func performBindingAction(_ action: String) -> Bool {
+        guard let surface else { return false }
+        return action.withCString { pointer in
+            ghostty_surface_binding_action(surface, pointer, UInt(action.utf8.count))
+        }
+    }
+
+    private func copySelectionToPasteboard() {
+        guard let surface else { return }
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_selection(surface, &text) else { return }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let pointer = text.text else { return }
+        let buffer = UnsafeRawBufferPointer(start: pointer, count: Int(text.text_len))
+        let selection = String(decoding: buffer, as: UTF8.self)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(selection, forType: .string)
     }
 
     private func keyAction(_ action: ghostty_input_action_e, event: NSEvent) -> Bool {
@@ -492,5 +584,74 @@ final class GhosttyKitTerminalNSView: NSView {
         let size = convertToBacking(bounds.size)
         ghostty_surface_set_size(surface, UInt32(max(size.width, 1)), UInt32(max(size.height, 1)))
         ghostty_surface_refresh(surface)
+    }
+}
+
+private struct ClipboardContent {
+    let pasteboardType: NSPasteboard.PasteboardType
+    let text: String
+
+    init?(_ content: ghostty_clipboard_content_s) {
+        guard let mime = content.mime, let data = content.data else { return nil }
+        self.pasteboardType = NSPasteboard.PasteboardType(mimeType: String(cString: mime))
+        self.text = String(cString: data)
+    }
+}
+
+private func completeClipboardRequest(
+    _ surface: ghostty_surface_t,
+    text: String,
+    state: UnsafeMutableRawPointer?,
+    confirmed: Bool
+) {
+    text.withCString { pointer in
+        ghostty_surface_complete_clipboard_request(surface, pointer, state, confirmed)
+    }
+}
+
+private func pasteboard(for clipboard: ghostty_clipboard_e) -> NSPasteboard? {
+    switch clipboard {
+    case GHOSTTY_CLIPBOARD_STANDARD:
+        NSPasteboard.general
+    case GHOSTTY_CLIPBOARD_SELECTION:
+        ottoGhosttySelectionPasteboard
+    default:
+        nil
+    }
+}
+
+private func terminalView(from userdata: UnsafeMutableRawPointer?) -> GhosttyKitTerminalNSView? {
+    guard let userdata else { return nil }
+    return Unmanaged<GhosttyKitTerminalNSView>.fromOpaque(userdata).takeUnretainedValue()
+}
+
+private func terminalShellEscape(_ value: String) -> String {
+    "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+private extension NSPasteboard {
+    func opinionatedTerminalString() -> String? {
+        if let urls = readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
+            return urls
+                .map { $0.isFileURL ? terminalShellEscape($0.path) : $0.absoluteString }
+                .joined(separator: " ")
+        }
+
+        return string(forType: .string)
+    }
+}
+
+private extension NSPasteboard.PasteboardType {
+    init(mimeType: String) {
+        switch mimeType {
+        case "text/plain":
+            self = .string
+        default:
+            if let type = UTType(mimeType: mimeType) {
+                self.init(type.identifier)
+            } else {
+                self.init(mimeType)
+            }
+        }
     }
 }
