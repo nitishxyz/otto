@@ -36,14 +36,16 @@ struct OttoShellView: View {
                 .help("Toggle sidebar (⌘B)")
             }
 
+            ToolbarItem(placement: .navigation) {
+                Button(currentBlockLabel) {}
+                    .pressableCursor()
+                    .help("Current block")
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 if let workspace = model.selectedWorkspace {
                     ProjectPathText(path: workspace.path)
                 }
-
-                Button(currentBlockLabel) {}
-                    .pressableCursor()
-                    .help("Current block")
 
                 Button {
                     model.beginWorkspaceBlockCreation()
@@ -274,7 +276,7 @@ private struct ToolbarFlexibleSpaceInstaller: NSViewRepresentable {
             }
 
             guard !toolbar.items.contains(where: { $0.itemIdentifier == .flexibleSpace }) else { return }
-            toolbar.insertItem(withItemIdentifier: .flexibleSpace, at: min(1, toolbar.items.count))
+            toolbar.insertItem(withItemIdentifier: .flexibleSpace, at: min(2, toolbar.items.count))
         }
     }
 }
