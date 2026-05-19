@@ -30,7 +30,7 @@ private extension BlockKind {
         switch self {
         case .terminal:
             "GhosttyIcon"
-        case .otto, .ottoTUI:
+        case .otto, .ottoNative, .ottoTUI:
             "OttoIcon"
         case .claudeCode:
             "ClaudeIcon"

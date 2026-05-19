@@ -342,6 +342,7 @@ extension CanvasLayoutNode {
 enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
     case canvas
     case otto
+    case ottoNative
     case neovim
     case terminal
     case browser
@@ -357,6 +358,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .canvas: "Canvas"
         case .otto: "otto"
+        case .ottoNative: "otto Native"
         case .neovim: "Neovim"
         case .terminal: "Ghostty"
         case .browser: "Browser"
@@ -372,6 +374,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .canvas: "Multi-block workspace"
         case .otto: "Agent"
+        case .ottoNative: "SwiftUI Agent"
         case .neovim: "Editor"
         case .terminal: "Terminal"
         case .browser: "Web preview"
@@ -387,6 +390,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .canvas: "square.split.2x2"
         case .otto: "sparkles"
+        case .ottoNative: "sparkles.rectangle.stack"
         case .neovim: "curlybraces.square"
         case .terminal: "terminal"
         case .browser: "safari"
@@ -401,7 +405,7 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
     var group: BlockGroup {
         switch self {
         case .canvas: .workspace
-        case .otto, .claudeCode, .codex, .ottoTUI, .openCode: .agents
+        case .otto, .ottoNative, .claudeCode, .codex, .ottoTUI, .openCode: .agents
         case .neovim: .editors
         case .terminal: .terminals
         case .browser: .browsers
@@ -412,7 +416,8 @@ enum BlockKind: String, CaseIterable, Codable, Identifiable, Hashable {
     var pickerDescription: String {
         switch self {
         case .canvas: "Arrange multiple otto, terminal, browser, and command surfaces."
-        case .otto: "Open a native otto agent session."
+        case .otto: "Open the current web-backed otto agent session."
+        case .ottoNative: "Open the SwiftUI otto session and message thread."
         case .neovim: "Launch Neovim inside a terminal-backed surface."
         case .terminal: "Open a focused Ghostty-style terminal."
         case .browser: "Open a native web preview or docs browser."
@@ -483,6 +488,7 @@ enum BlockCatalog {
         .terminal,
         .browser,
         .otto,
+        .ottoNative,
         .neovim,
         .claudeCode,
         .codex,

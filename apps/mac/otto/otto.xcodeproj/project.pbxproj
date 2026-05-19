@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4D6EC0022FB9F00000FA9988 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D6EC0032FB9F00000FA9988 /* Carbon.framework */; };
 		4D6EC0052FBA100000FA9988 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D6EC0012FB9F00000FA9988 /* GhosttyKit.xcframework */; };
+		4D70A0022FC0000000ABCDEF /* OttoGeneratedAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 4D70A0012FC0000000ABCDEF /* OttoGeneratedAPI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 			files = (
 				4D6EC0022FB9F00000FA9988 /* Carbon.framework in Frameworks */,
 				4D6EC0052FBA100000FA9988 /* GhosttyKit.xcframework in Frameworks */,
+				4D70A0022FC0000000ABCDEF /* OttoGeneratedAPI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +79,7 @@
 			);
 			name = otto;
 			packageProductDependencies = (
+				4D70A0012FC0000000ABCDEF /* OttoGeneratedAPI */,
 			);
 			productName = otto;
 			productReference = 4D6EBFE62FB9D4F000FA9988 /* Otto Canvas.app */;
@@ -106,6 +109,9 @@
 			);
 			mainGroup = 4D6EBFDD2FB9D4F000FA9988;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4D70A0002FC0000000ABCDEF /* XCLocalSwiftPackageReference "OttoGeneratedAPI" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4D6EBFE72FB9D4F000FA9988 /* Products */;
 			projectDirPath = "";
@@ -386,6 +392,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4D70A0002FC0000000ABCDEF /* XCLocalSwiftPackageReference "OttoGeneratedAPI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = OttoGeneratedAPI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4D70A0012FC0000000ABCDEF /* OttoGeneratedAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D70A0002FC0000000ABCDEF /* XCLocalSwiftPackageReference "OttoGeneratedAPI" */;
+			productName = OttoGeneratedAPI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4D6EBFDE2FB9D4F000FA9988 /* Project object */;
 }

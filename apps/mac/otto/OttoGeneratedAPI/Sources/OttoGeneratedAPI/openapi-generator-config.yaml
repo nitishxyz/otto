@@ -1,0 +1,13 @@
+generate:
+  - types
+  - client
+namingStrategy: idiomatic
+accessModifier: public
+filter:
+  operations:
+    - listSessions
+    - createSession
+    - listMessages
+    - createMessage
+additionalFileComments:
+  - swift-format-ignore-file

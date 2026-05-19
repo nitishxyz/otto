@@ -378,6 +378,15 @@ private struct CanvasChildBlockFrame: View {
                 focusRequestID: focusRequestID,
                 onFocus: onFocus
             )
+        } else if block.kind == .ottoNative {
+            OttoNativeBlockView(
+                block: block,
+                workspace: workspace,
+                runtime: model.ottoRuntimeSession(for: workspace),
+                isFocused: isFocused,
+                focusRequestID: focusRequestID,
+                onFocus: onFocus
+            )
         } else {
             VStack(spacing: 8) {
                 BlockKindIcon(kind: block.kind, size: 24)
@@ -397,7 +406,8 @@ private struct CanvasChildBlockFrame: View {
     private var description: String {
         switch block.kind {
         case .canvas: "Nested canvas surface."
-        case .otto: "Native otto session surface."
+        case .otto: "Web-backed otto session surface."
+        case .ottoNative: "SwiftUI otto session surface."
         case .neovim: "Runs `nvim` in this workspace."
         case .terminal: "PTY-backed terminal surface."
         case .browser: "WKWebView preview surface."
