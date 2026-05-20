@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from 'react';
+import { memo, useEffect, type CSSProperties } from 'react';
 import { ProviderSetupStep } from './steps/ProviderSetupStep';
 import { DefaultsStep } from './steps/DefaultsStep';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -40,6 +40,24 @@ export const OnboardingModal = memo(function OnboardingModal({
 		importCopilotTokenFromGh,
 		getCopilotDiagnostics,
 	} = useAuthStatus();
+
+	useEffect(() => {
+		if (!isOpen) return;
+
+		const handleNativeBack = (event: Event) => {
+			const customEvent = event as CustomEvent<{ handled?: boolean }>;
+			if (!customEvent.detail || customEvent.detail.handled) return;
+			if (document.querySelector('[data-otto-nested-modal="true"]')) return;
+
+			customEvent.detail.handled = true;
+			event.preventDefault();
+			reset();
+		};
+
+		window.addEventListener('otto:native-back', handleNativeBack);
+		return () =>
+			window.removeEventListener('otto:native-back', handleNativeBack);
+	}, [isOpen, reset]);
 
 	if (!isOpen || !authStatus) return null;
 

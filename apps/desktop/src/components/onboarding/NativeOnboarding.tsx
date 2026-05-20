@@ -189,23 +189,23 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 	return (
 		<>
 			<div
-				className="shrink-0 flex items-center px-4 h-10 border-b border-border cursor-default select-none fixed top-0 left-0 right-0 z-[10000] bg-background relative"
+				className="shrink-0 flex items-center px-4 h-12 border-b border-border cursor-default select-none fixed top-0 left-0 right-0 z-[10000] bg-background relative"
 				onMouseDown={handleTitleBarDrag}
 				data-tauri-drag-region
 				role="toolbar"
 			>
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-					<span className="font-semibold text-foreground">otto</span>
+					<span className="font-semibold text-base text-foreground">otto</span>
 				</div>
-				<div className="flex items-center gap-2 text-sm text-muted-foreground ml-auto">
+				<div className="flex items-center gap-2 text-base text-muted-foreground ml-auto">
 					<span
-						className={`w-2 h-2 rounded-full ${currentStep === 'wallet' ? 'bg-green-500' : 'bg-blue-500'}`}
+						className={`w-2.5 h-2.5 rounded-full ${currentStep === 'wallet' ? 'bg-green-500' : 'bg-blue-500'}`}
 					/>
 					{currentStep === 'wallet' ? 'Step 1 of 2' : 'Step 2 of 2'}
 					{platform === 'linux' && <WindowControls />}
 				</div>
 			</div>
-			<div className="pt-10">
+			<div className="pt-12">
 				<OnboardingModal hideHeader />
 				{!isOpen && !onboardingLoading && onboardingError && (
 					<div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">

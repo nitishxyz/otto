@@ -104,12 +104,12 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				{/* Header with just filename and stats */}
 				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
 					<span
-						className="font-mono text-[12px] text-foreground truncate"
+						className="font-mono text-[13px] text-foreground truncate"
 						title={diff.file}
 					>
 						{fileName}
 					</span>
-					<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
+					<div className="flex items-center gap-2 text-[11px] flex-shrink-0">
 						<span className="text-green-600 dark:text-green-500">
 							+{diff.insertions}
 						</span>
@@ -119,7 +119,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 
 				{/* New file banner */}
 				<div className="px-4 py-3 bg-green-500/10 border-b border-green-500/20">
-					<p className="text-[12px] text-green-600 dark:text-green-400 font-medium">
+					<p className="text-[13px] text-green-600 dark:text-green-400 font-medium">
 						New file: {diff.insertions} lines
 					</p>
 				</div>
@@ -170,12 +170,12 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				{/* Header with just filename */}
 				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
 					<span
-						className="font-mono text-[12px] text-foreground truncate"
+						className="font-mono text-[13px] text-foreground truncate"
 						title={diff.file}
 					>
 						{fileName}
 					</span>
-					<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
+					<div className="flex items-center gap-2 text-[11px] flex-shrink-0">
 						<span className="text-muted-foreground">Binary file</span>
 					</div>
 				</div>
@@ -191,7 +191,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				) : (
 					<div className="flex-1 flex items-center justify-center">
 						<div className="p-4 text-center">
-							<p className="text-[12px] text-muted-foreground">
+							<p className="text-[13px] text-muted-foreground">
 								Binary file - cannot display diff
 							</p>
 						</div>
@@ -272,9 +272,9 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	const renderLine = (diffLine: DiffLine, index: number) => {
 		let rowClassName = 'flex hover:bg-muted/20';
 		let lineNumberClassName =
-			'flex-shrink-0 w-20 px-2 py-0.5 text-xs font-mono select-none border-r border-border';
+			'flex-shrink-0 w-20 px-2 py-0.5 text-[13px] font-mono select-none border-r border-border';
 		let contentClassName =
-			'flex-1 px-4 py-0.5 font-mono text-xs whitespace-pre';
+			'flex-1 px-4 py-0.5 font-mono text-[13px] whitespace-pre';
 
 		// Apply background colors for add/delete/hunk
 		if (diffLine.type === 'hunk') {

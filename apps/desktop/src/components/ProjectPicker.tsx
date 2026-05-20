@@ -168,13 +168,13 @@ export function ProjectPicker({
 	return (
 		<div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
 			<div
-				className="shrink-0 flex items-center px-4 h-10 border-b border-border/50 cursor-default select-none relative"
+				className="shrink-0 flex items-center px-4 h-12 border-b border-border/50 cursor-default select-none relative"
 				onMouseDown={handleTitleBarDrag}
 				data-tauri-drag-region
 				role="toolbar"
 			>
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-					<OttoWordmark height={13} className="text-foreground" />
+					<OttoWordmark height={16} className="text-foreground" />
 				</div>
 				<div className="flex items-center gap-2 ml-auto">
 					{isAuthenticated && (
@@ -183,7 +183,7 @@ export function ProjectPicker({
 								<img
 									src={user.avatar_url}
 									alt=""
-									className="w-4 h-4 rounded-full"
+									className="w-5 h-5 rounded-full"
 								/>
 							)}
 							<span className="text-sm text-muted-foreground">
@@ -192,7 +192,7 @@ export function ProjectPicker({
 							<button
 								type="button"
 								onClick={logout}
-								className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 hover:bg-muted rounded"
+								className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 hover:bg-muted rounded"
 							>
 								Disconnect
 							</button>
@@ -203,10 +203,10 @@ export function ProjectPicker({
 							<button
 								type="button"
 								onClick={applyUpdate}
-								className="h-6 px-2.5 flex items-center gap-1.5 text-xs font-medium bg-green-600 text-white rounded-full hover:bg-green-500 transition-colors"
+								className="h-7 px-3 flex items-center gap-1.5 text-sm font-medium bg-green-600 text-white rounded-full hover:bg-green-500 transition-colors"
 								title={`Restart to update to v${updateVersion}`}
 							>
-								<RotateCw className="w-3 h-3" />
+								<RotateCw className="w-4 h-4" />
 								Restart
 							</button>
 						) : (
@@ -214,34 +214,34 @@ export function ProjectPicker({
 								type="button"
 								onClick={downloadUpdate}
 								disabled={downloading}
-								className="h-6 px-2.5 flex items-center gap-1.5 text-xs font-medium bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors disabled:opacity-60"
+								className="h-7 px-3 flex items-center gap-1.5 text-sm font-medium bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors disabled:opacity-60"
 								title={`Update to v${updateVersion}`}
 							>
-								<ArrowDownToLine className="w-3 h-3" />
+								<ArrowDownToLine className="w-4 h-4" />
 								{downloading ? `${updateProgress}%` : 'Update'}
 							</button>
 						))}
 					<button
 						type="button"
 						onClick={toggleTheme}
-						className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+						className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
 						title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
 					>
 						{theme === 'dark' ? (
-							<Sun className="w-3.5 h-3.5" />
+							<Sun className="w-4 h-4" />
 						) : (
-							<Moon className="w-3.5 h-3.5" />
+							<Moon className="w-4 h-4" />
 						)}
 					</button>
 					<button
 						type="button"
 						onClick={() => tauriBridge.createNewWindow()}
-						className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+						className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
 						title="New Window"
 					>
 						<svg
-							width="14"
-							height="14"
+							width="16"
+							height="16"
 							viewBox="0 0 16 16"
 							fill="none"
 							stroke="currentColor"

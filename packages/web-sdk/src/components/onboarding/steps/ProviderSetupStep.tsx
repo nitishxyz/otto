@@ -627,6 +627,107 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		setImportPrivateKey('');
 	};
 
+	useEffect(() => {
+		const handleNativeBack = (event: Event) => {
+			const customEvent = event as CustomEvent<{ handled?: boolean }>;
+			if (!customEvent.detail || customEvent.detail.handled) return;
+
+			const markHandled = () => {
+				customEvent.detail.handled = true;
+				event.preventDefault();
+			};
+
+			if (isCustomProviderModalOpen) {
+				markHandled();
+				if (!isAddingCustomProvider) {
+					setIsCustomProviderModalOpen(false);
+					setCustomProviderId('');
+					setCustomProviderLabel('');
+					setCustomProviderBaseURL('');
+					setCustomProviderApiKey('');
+					setCustomProviderModels('');
+					setCustomProviderCompatibility('openai-compatible');
+					setCustomProviderAllowAnyModel(true);
+					setCustomProviderError(null);
+					setDiscoveredCustomModels([]);
+					setCustomProviderDiscoveryMessage(null);
+				}
+				return;
+			}
+
+			if (isImportModalOpen) {
+				markHandled();
+				if (!isImportingWallet) {
+					setIsImportModalOpen(false);
+					setImportWalletError(null);
+					setImportPrivateKey('');
+				}
+				return;
+			}
+
+			if (oauthSession) {
+				markHandled();
+				if (!isExchangingCode && !isOpeningPopup) {
+					setOauthSession(null);
+					setOauthCodeInput('');
+				}
+				return;
+			}
+
+			if (copilotModalOpen) {
+				markHandled();
+				if (!copilotTokenSaving && !copilotGhImporting && !copilotLoading) {
+					setCopilotDevice(null);
+					setCopilotPolling(false);
+					setCopilotError(null);
+					setCopilotTokenInput('');
+					setCopilotTokenSaving(false);
+					setCopilotGhImporting(false);
+					setCopilotAuthMode('oauth');
+					setCopilotCodeCopied(false);
+					setCopilotModalOpen(false);
+					setCopilotLoading(false);
+					copilotCancelledRef.current = true;
+					if (copilotPollRef.current) {
+						clearTimeout(copilotPollRef.current);
+						copilotPollRef.current = undefined;
+					}
+				}
+				return;
+			}
+
+			if (addingProvider) {
+				markHandled();
+				setAddingProvider(null);
+				setApiKeyInput('');
+				return;
+			}
+
+			if (confirmingDelete) {
+				markHandled();
+				setConfirmingDelete(null);
+			}
+		};
+
+		window.addEventListener('otto:native-back', handleNativeBack);
+		return () =>
+			window.removeEventListener('otto:native-back', handleNativeBack);
+	}, [
+		addingProvider,
+		confirmingDelete,
+		copilotGhImporting,
+		copilotLoading,
+		copilotModalOpen,
+		copilotTokenSaving,
+		isAddingCustomProvider,
+		isCustomProviderModalOpen,
+		isExchangingCode,
+		isImportingWallet,
+		isImportModalOpen,
+		isOpeningPopup,
+		oauthSession,
+	]);
+
 	const handleImportWallet = async () => {
 		if (!importPrivateKey.trim() || isImportingWallet) return;
 		setIsImportingWallet(true);
@@ -1030,7 +1131,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			</div>
 
 			{isCustomProviderModalOpen && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
 					<div className="bg-background border border-border rounded-xl w-full max-w-2xl mx-6 shadow-2xl max-h-[90vh] overflow-y-auto">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
@@ -1255,7 +1359,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			)}
 
 			{isImportModalOpen && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<ProviderLogo provider="ottorouter" size={24} />
@@ -1312,7 +1419,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 
 			{/* OAuth Code Modal */}
 			{oauthSession && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<ProviderLogo provider={oauthSession.provider} size={24} />
@@ -1403,7 +1513,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 
 			{/* Copilot Device Flow Modal */}
 			{copilotModalOpen && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<ProviderLogo provider="copilot" size={24} />

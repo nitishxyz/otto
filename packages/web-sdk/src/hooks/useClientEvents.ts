@@ -10,7 +10,11 @@ import { toast, useToastStore } from '../stores/toastStore';
 import type { SessionsPage } from '../types/api';
 import { getBaseUrl } from '../lib/api-client/utils';
 import { openUrl } from '../lib/open-url';
-import { openPlatformSession, showPlatformNotification } from '../lib/platform';
+import {
+	hasPlatformOpenUrl,
+	openPlatformSession,
+	showPlatformNotification,
+} from '../lib/platform';
 import { sessionsQueryKey } from './useSessions';
 
 type DesktopNotificationMessage = {
@@ -177,6 +181,71 @@ async function requestLocalhostAccess(baseUrl: string) {
 	}
 }
 
+const localAccessToastIds = new Map<string, string>();
+const localAccessChecksInFlight = new Set<string>();
+
+function localAccessStorageKey(baseUrl: string) {
+	return `otto-local-access-confirmed:${baseUrl}`;
+}
+
+function hasConfirmedLocalAccess(baseUrl: string) {
+	try {
+		return window.localStorage.getItem(localAccessStorageKey(baseUrl)) === '1';
+	} catch {
+		return false;
+	}
+}
+
+function markLocalAccessConfirmed(baseUrl: string) {
+	try {
+		window.localStorage.setItem(localAccessStorageKey(baseUrl), '1');
+	} catch {
+		// Ignore storage failures; the in-memory toast map still prevents spam.
+	}
+}
+
+async function maybeShowLocalAccessToast(baseUrl: string) {
+	if (hasPlatformOpenUrl()) return;
+	if (!isLocalApiUrl(baseUrl) || hasConfirmedLocalAccess(baseUrl)) return;
+	if (
+		localAccessToastIds.has(baseUrl) ||
+		localAccessChecksInFlight.has(baseUrl)
+	) {
+		return;
+	}
+
+	localAccessChecksInFlight.add(baseUrl);
+	try {
+		await requestLocalhostAccess(baseUrl);
+		markLocalAccessConfirmed(baseUrl);
+		return;
+	} catch {
+		// Show the manual permission toast below.
+	} finally {
+		localAccessChecksInFlight.delete(baseUrl);
+	}
+
+	if (localAccessToastIds.has(baseUrl)) return;
+	const id = toast(
+		'Safari may need permission to access the local otto server.',
+		'default',
+		0,
+	);
+	localAccessToastIds.set(baseUrl, id);
+	useToastStore.getState().updateToast(id, {
+		action: {
+			label: 'Allow access',
+			onClick: async () => {
+				await requestLocalhostAccess(baseUrl);
+				markLocalAccessConfirmed(baseUrl);
+				useToastStore.getState().removeToast(id);
+				localAccessToastIds.delete(baseUrl);
+				toast.success('Local otto server access confirmed.');
+			},
+		},
+	});
+}
+
 export function useClientEvents(activeSessionId?: string) {
 	const queryClient = useQueryClient();
 	const activeSessionIdRef = useRef(activeSessionId);
@@ -217,7 +286,6 @@ export function useClientEvents(activeSessionId?: string) {
 
 	useEffect(() => {
 		const controller = new AbortController();
-		let hasShownLocalAccessToast = false;
 		const baseUrl = getBaseUrl();
 
 		void createClientEventsStream(
@@ -268,23 +336,7 @@ export function useClientEvents(activeSessionId?: string) {
 				onError: (error) => {
 					if (!controller.signal.aborted) {
 						console.error('[client-events] Stream error:', error);
-						if (!hasShownLocalAccessToast && isLocalApiUrl(baseUrl)) {
-							hasShownLocalAccessToast = true;
-							const id = toast(
-								'Safari may need permission to access the local otto server.',
-								'default',
-								0,
-							);
-							useToastStore.getState().updateToast(id, {
-								action: {
-									label: 'Allow access',
-									onClick: async () => {
-										await requestLocalhostAccess(baseUrl);
-										toast.success('Local otto server access confirmed.');
-									},
-								},
-							});
-						}
+						void maybeShowLocalAccessToast(baseUrl);
 					}
 				},
 			},

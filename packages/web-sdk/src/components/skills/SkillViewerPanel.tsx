@@ -114,18 +114,18 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 					<X className="size-[17px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span className="text-[12px] text-muted-foreground flex-shrink-0">
+					<span className="text-[13px] text-muted-foreground flex-shrink-0">
 						{selectedSkill}
 					</span>
-					<span className="text-[12px] text-muted-foreground">/</span>
+					<span className="text-[13px] text-muted-foreground">/</span>
 					<span
-						className="text-[12px] font-medium text-foreground font-mono truncate"
+						className="text-[13px] font-medium text-foreground font-mono truncate"
 						title={displayPath}
 					>
 						{displayPath}
 					</span>
 				</div>
-				<span className="text-[11px] text-muted-foreground pr-1">
+				<span className="text-[12px] text-muted-foreground pr-1">
 					{language}
 				</span>
 			</div>
@@ -149,8 +149,8 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 								margin: 0,
 								padding: '1rem',
 								background: 'transparent',
-								fontSize: '0.75rem',
-								lineHeight: '1.25rem',
+								fontSize: '0.8125rem',
+								lineHeight: '1.3125rem',
 							}}
 							codeTagProps={{
 								style: {

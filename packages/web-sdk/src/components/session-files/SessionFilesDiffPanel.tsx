@@ -226,7 +226,7 @@ function FullHeightDiffView({ patch }: { patch: string }) {
 
 	return (
 		<div className="bg-card/60 border border-border rounded-lg overflow-hidden h-full">
-			<div className="overflow-x-auto overflow-y-auto h-full text-xs font-mono">
+			<div className="overflow-x-auto overflow-y-auto h-full text-[13px] font-mono">
 				{diffLines.map((line, i) => {
 					const key = `line-${i}-${line.content.slice(0, 20)}`;
 
@@ -449,16 +449,16 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[12px] font-medium text-foreground font-mono truncate"
+						className="text-[13px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
-					<span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
+					<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
 						{selectedOperation.operation}
 					</span>
 					{selectedOperation.artifact?.summary && (
-						<div className="flex items-center gap-1 text-[11px] flex-shrink-0">
+						<div className="flex items-center gap-1 text-[12px] flex-shrink-0">
 							<span className="text-green-500">
 								+{selectedOperation.artifact.summary.additions}
 							</span>

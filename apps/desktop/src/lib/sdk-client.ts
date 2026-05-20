@@ -29,6 +29,7 @@ interface OttoPlatformNotification {
 }
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
+let hasRequestedNotificationPermission = false;
 
 function notificationIdFromString(id: string) {
 	let hash = 0;
@@ -38,16 +39,23 @@ function notificationIdFromString(id: string) {
 	return Math.abs(hash || Date.now()) % 2_147_483_647;
 }
 
+async function ensureNotificationPermission() {
+	if (await isPermissionGranted()) return true;
+	if (hasRequestedNotificationPermission) return false;
+
+	hasRequestedNotificationPermission = true;
+	const permission = await requestPermission();
+	return permission === 'granted' || (await isPermissionGranted());
+}
+
 async function showNativeNotification(notification: OttoPlatformNotification) {
 	if (!notification.title) return;
 
-	let permissionGranted = await isPermissionGranted();
+	const permissionGranted = await ensureNotificationPermission();
 	if (!permissionGranted) {
-		const permission = await requestPermission();
-		permissionGranted = permission === 'granted';
+		return;
 	}
 
-	if (!permissionGranted) return;
 	const appWindow = getCurrentWindow();
 	sendNotification({
 		id: notificationIdFromString(notification.id),

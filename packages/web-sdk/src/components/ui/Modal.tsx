@@ -53,6 +53,22 @@ export function Modal({
 	}, [isOpen, closeOnEscape, onClose]);
 
 	useEffect(() => {
+		if (!isOpen) return;
+
+		const handleNativeBack = (event: Event) => {
+			const customEvent = event as CustomEvent<{ handled?: boolean }>;
+			if (!customEvent.detail || customEvent.detail.handled) return;
+			customEvent.detail.handled = true;
+			event.preventDefault();
+			onClose();
+		};
+
+		window.addEventListener('otto:native-back', handleNativeBack);
+		return () =>
+			window.removeEventListener('otto:native-back', handleNativeBack);
+	}, [isOpen, onClose]);
+
+	useEffect(() => {
 		if (isOpen) {
 			// Prevent body scroll when modal is open
 			document.body.style.overflow = 'hidden';

@@ -400,7 +400,7 @@ export const MessagePartItem = memo(
 						</div>
 						<div
 							className={`${
-								isCompactThread ? 'text-[14px]' : 'text-base'
+								isCompactThread ? 'text-[15.5px]' : 'text-[17.5px]'
 							} text-foreground leading-relaxed markdown-content max-w-full overflow-x-auto`}
 						>
 							<ReactMarkdown

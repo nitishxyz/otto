@@ -81,13 +81,13 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[12px] font-medium text-foreground font-mono truncate"
+						className="text-[13px] font-medium text-foreground font-mono truncate"
 						title={`${selectedFile}\n${activeDiff?.absPath || ''}`}
 					>
 						{selectedFile}
 					</span>
 					{selectedFileStaged && (
-						<span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
+						<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
 							Staged
 						</span>
 					)}
@@ -99,7 +99,7 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 					title={
 						showFullFile ? 'Show diff only (f)' : 'Show full file with diff (f)'
 					}
-					className="flex items-center gap-1.5 text-[12px] h-8 px-2.5"
+					className="flex items-center gap-1.5 text-[13px] h-8 px-2.5"
 				>
 					{showFullFile ? (
 						<Minimize2 className="w-3.5 h-3.5" />

@@ -121,18 +121,18 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[12px] font-medium text-foreground font-mono truncate"
+						className="text-[13px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
 					{data && (
-						<span className="text-[11px] text-muted-foreground flex-shrink-0">
+						<span className="text-[12px] text-muted-foreground flex-shrink-0">
 							{data.lineCount} lines
 						</span>
 					)}
 				</div>
-				<span className="text-[11px] text-muted-foreground pr-1">
+				<span className="text-[12px] text-muted-foreground pr-1">
 					{language}
 				</span>
 			</div>
@@ -144,7 +144,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					</div>
 				) : data ? (
 					renderMarkdown ? (
-						<div className="p-4 text-[13px] text-foreground leading-5 markdown-content max-w-full overflow-x-auto">
+						<div className="p-4 text-[14px] text-foreground leading-6 markdown-content max-w-full overflow-x-auto">
 							<ReactMarkdown
 								remarkPlugins={[remarkGfm]}
 								components={{
@@ -201,8 +201,8 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 									margin: 0,
 									padding: '1rem',
 									background: 'transparent',
-									fontSize: '0.75rem',
-									lineHeight: '1.25rem',
+									fontSize: '0.8125rem',
+									lineHeight: '1.3125rem',
 								}}
 								codeTagProps={{
 									style: {
