@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
 import { ProviderSetupStep } from './steps/ProviderSetupStep';
 import { DefaultsStep } from './steps/DefaultsStep';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -7,10 +7,12 @@ import { useAuthStatus } from '../../hooks/useAuthStatus';
 
 interface OnboardingModalProps {
 	hideHeader?: boolean;
+	style?: CSSProperties;
 }
 
 export const OnboardingModal = memo(function OnboardingModal({
 	hideHeader = false,
+	style,
 }: OnboardingModalProps) {
 	const isOpen = useOnboardingStore((s) => s.isOpen);
 	const currentStep = useOnboardingStore((s) => s.currentStep);
@@ -42,7 +44,10 @@ export const OnboardingModal = memo(function OnboardingModal({
 	if (!isOpen || !authStatus) return null;
 
 	return (
-		<div className="fixed inset-0 z-[9999] bg-background text-foreground overflow-y-auto">
+		<div
+			className="fixed inset-0 z-[9999] bg-background text-foreground overflow-y-auto"
+			style={style}
+		>
 			{currentStep === 'wallet' && (
 				<ProviderSetupStep
 					authStatus={authStatus}

@@ -242,6 +242,7 @@ export const UserMessageGroup = memo(
 														href={href}
 														target="_blank"
 														rel="noopener noreferrer"
+														className="text-primary underline decoration-primary/35 underline-offset-2 transition-colors hover:text-primary/90 hover:decoration-primary"
 														onClick={(e) => {
 															if (window.self !== window.top && href) {
 																e.preventDefault();

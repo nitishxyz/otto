@@ -24,7 +24,7 @@ export function DesktopWorkspaceApp({
 		<DesktopWorkspaceProvider apiUrl={apiUrl}>
 			<div className="h-full min-h-0" data-project-path={project.path}>
 				<DesktopSessionsLayout theme={theme} onToggleTheme={onToggleTheme} />
-				<OnboardingModal />
+				<OnboardingModal hideHeader style={{ top: 40 }} />
 				<OttoRouterTopupModal />
 			</div>
 		</DesktopWorkspaceProvider>
