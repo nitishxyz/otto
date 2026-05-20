@@ -46,7 +46,13 @@ function inferLanguage(path: string): string {
 	return LANGUAGE_MAP[ext] ?? 'plaintext';
 }
 
-export const SkillViewerPanel = memo(function SkillViewerPanel() {
+interface SkillViewerPanelProps {
+	mode?: 'overlay' | 'pane';
+}
+
+export const SkillViewerPanel = memo(function SkillViewerPanel({
+	mode = 'overlay',
+}: SkillViewerPanelProps = {}) {
 	const isViewerOpen = useSkillsStore((s) => s.isViewerOpen);
 	const viewingFile = useSkillsStore((s) => s.viewingFile);
 	const selectedSkill = useSkillsStore((s) => s.selectedSkill);
@@ -90,29 +96,38 @@ export const SkillViewerPanel = memo(function SkillViewerPanel() {
 		: prism;
 
 	return (
-		<div className="absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300">
-			<div className="h-14 border-b border-border px-4 flex items-center gap-3">
+		<div
+			className={
+				mode === 'pane'
+					? 'h-full w-full bg-transparent flex flex-col'
+					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
+			}
+		>
+			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeViewer}
 					title="Close viewer (ESC)"
+					className="h-7 w-7"
 				>
-					<X className="w-4 h-4" />
+					<X className="size-[15px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span className="text-xs text-muted-foreground flex-shrink-0">
+					<span className="text-[11px] text-muted-foreground flex-shrink-0">
 						{selectedSkill}
 					</span>
-					<span className="text-xs text-muted-foreground">/</span>
+					<span className="text-[11px] text-muted-foreground">/</span>
 					<span
-						className="text-sm font-medium text-foreground font-mono truncate"
+						className="text-[11px] font-medium text-foreground font-mono truncate"
 						title={displayPath}
 					>
 						{displayPath}
 					</span>
 				</div>
-				<span className="text-xs text-muted-foreground">{language}</span>
+				<span className="text-[10px] text-muted-foreground pr-1">
+					{language}
+				</span>
 			</div>
 
 			<div className="flex-1 overflow-auto">

@@ -27,3 +27,4 @@ export * from './useProviderUsage';
 export * from './useFileBrowser';
 export * from './useMCP';
 export * from './useSkills';
+export * from './useContainerWidth';

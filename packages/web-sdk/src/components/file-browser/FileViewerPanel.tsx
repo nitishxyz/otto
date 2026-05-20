@@ -61,7 +61,13 @@ function isMarkdownFile(path: string): boolean {
 	return ext === 'md' || ext === 'markdown' || ext === 'mdx';
 }
 
-export const FileViewerPanel = memo(function FileViewerPanel() {
+interface FileViewerPanelProps {
+	mode?: 'overlay' | 'pane';
+}
+
+export const FileViewerPanel = memo(function FileViewerPanel({
+	mode = 'overlay',
+}: FileViewerPanelProps = {}) {
 	const isViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const selectedFile = useFileBrowserStore((s) => s.selectedFile);
 	const closeViewer = useFileBrowserStore((s) => s.closeViewer);
@@ -96,30 +102,39 @@ export const FileViewerPanel = memo(function FileViewerPanel() {
 	const renderMarkdown = isMarkdownFile(selectedFile);
 
 	return (
-		<div className="absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300">
-			<div className="h-14 border-b border-border px-4 flex items-center gap-3">
+		<div
+			className={
+				mode === 'pane'
+					? 'h-full w-full bg-transparent flex flex-col'
+					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
+			}
+		>
+			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeViewer}
 					title="Close file viewer (ESC)"
+					className="h-7 w-7"
 				>
-					<X className="w-4 h-4" />
+					<X className="size-[15px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-sm font-medium text-foreground font-mono truncate"
+						className="text-[11px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
 					{data && (
-						<span className="text-xs text-muted-foreground flex-shrink-0">
+						<span className="text-[10px] text-muted-foreground flex-shrink-0">
 							{data.lineCount} lines
 						</span>
 					)}
 				</div>
-				<span className="text-xs text-muted-foreground">{language}</span>
+				<span className="text-[10px] text-muted-foreground pr-1">
+					{language}
+				</span>
 			</div>
 
 			<div className="flex-1 overflow-auto">
@@ -129,7 +144,7 @@ export const FileViewerPanel = memo(function FileViewerPanel() {
 					</div>
 				) : data ? (
 					renderMarkdown ? (
-						<div className="p-4 text-sm text-foreground leading-6 markdown-content max-w-full overflow-x-auto">
+						<div className="p-4 text-[13px] text-foreground leading-5 markdown-content max-w-full overflow-x-auto">
 							<ReactMarkdown
 								remarkPlugins={[remarkGfm]}
 								components={{

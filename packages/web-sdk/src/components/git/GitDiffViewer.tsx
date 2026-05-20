@@ -100,16 +100,16 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	// Handle new files - show full content instead of diff
 	if (diff.isNewFile && diff.content) {
 		return (
-			<div className="flex flex-col h-full bg-background">
+			<div className="flex flex-col h-full bg-transparent">
 				{/* Header with just filename and stats */}
-				<div className="px-4 py-2 bg-muted/50 flex items-center justify-between min-h-10">
+				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
 					<span
-						className="font-mono text-sm text-foreground truncate"
+						className="font-mono text-[12px] text-foreground truncate"
 						title={diff.file}
 					>
 						{fileName}
 					</span>
-					<div className="flex items-center gap-3 text-xs flex-shrink-0">
+					<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
 						<span className="text-green-600 dark:text-green-500">
 							+{diff.insertions}
 						</span>
@@ -119,7 +119,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 
 				{/* New file banner */}
 				<div className="px-4 py-3 bg-green-500/10 border-b border-green-500/20">
-					<p className="text-sm text-green-600 dark:text-green-400 font-medium">
+					<p className="text-[12px] text-green-600 dark:text-green-400 font-medium">
 						New file: {diff.insertions} lines
 					</p>
 				</div>
@@ -166,16 +166,16 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 			: null;
 
 		return (
-			<div className="flex flex-col h-full bg-background">
+			<div className="flex flex-col h-full bg-transparent">
 				{/* Header with just filename */}
-				<div className="px-4 py-2 bg-muted/50 flex items-center justify-between min-h-10">
+				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
 					<span
-						className="font-mono text-sm text-foreground truncate"
+						className="font-mono text-[12px] text-foreground truncate"
 						title={diff.file}
 					>
 						{fileName}
 					</span>
-					<div className="flex items-center gap-3 text-xs flex-shrink-0">
+					<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
 						<span className="text-muted-foreground">Binary file</span>
 					</div>
 				</div>
@@ -191,7 +191,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				) : (
 					<div className="flex-1 flex items-center justify-center">
 						<div className="p-4 text-center">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-[12px] text-muted-foreground">
 								Binary file - cannot display diff
 							</p>
 						</div>
@@ -372,16 +372,16 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	};
 
 	return (
-		<div className="flex flex-col h-full bg-background">
+		<div className="flex flex-col h-full bg-transparent">
 			{/* Header with just filename and stats */}
-			<div className="px-4 py-2 bg-muted/50 flex items-center justify-between min-h-10">
+			<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
 				<span
-					className="font-mono text-sm text-foreground truncate"
+					className="font-mono text-[12px] text-foreground truncate"
 					title={diff.file}
 				>
 					{fileName}
 				</span>
-				<div className="flex items-center gap-3 text-xs flex-shrink-0">
+				<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
 					{diff.insertions > 0 && (
 						<span className="text-green-600 dark:text-green-500">
 							+{diff.insertions}
@@ -399,7 +399,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 			{/* Diff content */}
 			<div className="flex-1 overflow-auto">
 				{diff.diff.trim() === '' ? (
-					<div className="p-4 text-sm text-muted-foreground">
+					<div className="p-4 text-[12px] text-muted-foreground">
 						No changes to display
 					</div>
 				) : (

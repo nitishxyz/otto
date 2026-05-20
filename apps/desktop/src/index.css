@@ -58,7 +58,7 @@
 		--chart-4: 43 74% 66%;
 		--chart-5: 27 87% 67%;
 		--radius: 0.5rem;
-		--sidebar-background: 220 40% 93%;
+		--sidebar-background: 220 25% 91%;
 		--sidebar-foreground: 220 20% 15%;
 		--sidebar-primary: 222 50% 25%;
 		--sidebar-primary-foreground: 210 40% 98%;
@@ -105,10 +105,10 @@
 		--chart-4: 280 65% 60%;
 		--chart-5: 340 75% 55%;
 		--radius: 0.5rem;
-		--sidebar-background: 240 10% 7%;
+		--sidebar-background: 240 8% 11%;
 		--sidebar-foreground: 0 0% 92%;
 		--sidebar-primary: 0 0% 92%;
-		--sidebar-primary-foreground: 240 10% 7%;
+		--sidebar-primary-foreground: 240 8% 11%;
 		--sidebar-accent: 240 8% 12%;
 		--sidebar-accent-foreground: 0 0% 95%;
 		--sidebar-border: 240 5% 13%;
@@ -144,6 +144,7 @@ body {
 
 html {
 	overscroll-behavior: none;
+	font-size: 13px;
 }
 
 button:focus,

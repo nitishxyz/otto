@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import {
 	estimateModelCostUsd,
 	type ProviderId,
@@ -7,7 +7,6 @@ import {
 import type { Session } from '../../types/api';
 import {
 	DollarSign,
-	MessageSquare,
 	GitBranch,
 	ArrowUpRight,
 	Share2,
@@ -25,6 +24,7 @@ import { useProviderUsage } from '../../hooks/useProviderUsage';
 import { useAllModels } from '../../hooks/useConfig';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useUsageStore } from '../../stores/usageStore';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { EditableTitle } from './EditableTitle';
 
 interface LeanHeaderProps {
@@ -104,19 +104,22 @@ export function LeanHeader({
 	useOttoRouterBalance(isSetu ? 'ottorouter' : undefined);
 	const setuUsage = useUsageStore((s) => s.usage.ottorouter);
 
+	const rootRef = useRef<HTMLDivElement>(null);
+	const width = useContainerWidth(rootRef);
+	const isCompact = width > 0 && width < 640;
+
 	return (
 		<>
 			<div
+				ref={rootRef}
 				className={`absolute top-0 left-0 right-0 h-10 border-b border-border bg-background/40 backdrop-blur-xl supports-[backdrop-filter]:bg-background/20 z-10 transition-transform duration-200 ${
 					isVisible ? 'translate-y-0' : '-translate-y-full'
 				}`}
 			>
 				<div className="h-full px-2 flex items-center justify-between gap-3 text-xs">
 					<div className="flex-1 min-w-0 flex items-center gap-1.5 text-muted-foreground">
-						{isBranch ? (
+						{isBranch && (
 							<GitBranch className="size-3.5 flex-shrink-0 text-violet-500" />
-						) : (
-							<MessageSquare className="size-3.5 flex-shrink-0" />
 						)}
 						<EditableTitle
 							sessionId={session.id}
@@ -143,9 +146,9 @@ export function LeanHeader({
 						)}
 						{isBranch && parentSession && (
 							<>
-								<span className="text-muted-foreground hidden sm:inline">
-									from
-								</span>
+								{!isCompact && (
+									<span className="text-muted-foreground">from</span>
+								)}
 								<button
 									type="button"
 									onClick={() => onNavigateToSession?.(parentSession.id)}
@@ -188,7 +191,7 @@ export function LeanHeader({
 							</div>
 						</div>
 
-						{estimatedCost > 0 && (
+						{estimatedCost > 0 && !isCompact && (
 							<div className="flex items-center gap-1">
 								<DollarSign className="size-3.5" />
 								<span className="text-foreground font-medium">
@@ -197,11 +200,13 @@ export function LeanHeader({
 							</div>
 						)}
 
-						<div className="hidden sm:flex items-center gap-1.5">
+						<div className="flex items-center gap-1.5">
 							<ProviderLogo provider={session.provider} size={14} />
-							<span className="font-medium text-foreground">
-								{session.model}
-							</span>
+							{!isCompact && (
+								<span className="font-medium text-foreground">
+									{session.model}
+								</span>
+							)}
 						</div>
 					</div>
 				</div>

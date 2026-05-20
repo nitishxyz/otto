@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useEffect, useRef, type ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import type { Theme } from '@ottocode/web-sdk/hooks';
 import {
@@ -36,6 +36,7 @@ import {
 	useResearchStore,
 	useSessionFilesStore,
 	useSettingsStore,
+	useSidebarStore,
 	useSkillsStore,
 	useTunnelStore,
 } from '@ottocode/web-sdk/stores';
@@ -63,13 +64,18 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	onFixWithAI,
 }: DesktopAppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
+	const gitDiffOpen = useGitStore((s) => s.isDiffOpen);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
+	const sessionFilesDiffOpen = useSessionFilesStore((s) => s.isDiffOpen);
 	const researchExpanded = useResearchStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
+	const fileViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const skillViewerOpen = useSkillsStore((s) => s.isViewerOpen);
+	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
@@ -79,6 +85,26 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
+	const anyViewerOpen =
+		gitDiffOpen || sessionFilesDiffOpen || fileViewerOpen || skillViewerOpen;
+	const anyRightSurfaceOpen = anyRightPanelOpen || anyViewerOpen;
+
+	// Auto-collapse sessions list when any right-side surface is open,
+	// and restore the user's previous state when everything closes.
+	const prevRightSurfaceOpenRef = useRef(false);
+	const wasSessionsCollapsedRef = useRef<boolean | null>(null);
+	useEffect(() => {
+		if (anyRightSurfaceOpen && !prevRightSurfaceOpenRef.current) {
+			wasSessionsCollapsedRef.current = useSidebarStore.getState().isCollapsed;
+			setSessionsCollapsed(true);
+		} else if (!anyRightSurfaceOpen && prevRightSurfaceOpenRef.current) {
+			if (wasSessionsCollapsedRef.current !== null) {
+				setSessionsCollapsed(wasSessionsCollapsedRef.current);
+				wasSessionsCollapsedRef.current = null;
+			}
+		}
+		prevRightSurfaceOpenRef.current = anyRightSurfaceOpen;
+	}, [anyRightSurfaceOpen, setSessionsCollapsed]);
 
 	return (
 		<div className="h-full flex bg-background touch-manipulation border-t border-border/50">
@@ -86,13 +112,23 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 
 			<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
 				<div className="flex-1 flex overflow-hidden">
-					<main className="flex-1 flex flex-col overflow-hidden relative">
-						<GitDiffPanel />
-						<SessionFilesDiffPanel />
-						<FileViewerPanel />
-						<SkillViewerPanel />
+					<main
+						className={
+							anyViewerOpen
+								? 'relative hidden md:flex shrink-0 basis-[clamp(360px,28vw,520px)] min-w-[320px] flex-col overflow-hidden'
+								: 'relative flex-1 flex flex-col overflow-hidden min-w-0'
+						}
+					>
 						{children}
 					</main>
+					{anyViewerOpen && (
+						<section className="flex flex-1 min-w-0 md:border-l md:border-sidebar-border bg-sidebar">
+							<GitDiffPanel mode="pane" />
+							<SessionFilesDiffPanel mode="pane" />
+							<FileViewerPanel mode="pane" />
+							<SkillViewerPanel mode="pane" />
+						</section>
+					)}
 
 					<div className="hidden md:flex">
 						<GitSidebar onFixWithAI={onFixWithAI} />

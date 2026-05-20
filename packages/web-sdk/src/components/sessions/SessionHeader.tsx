@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import {
 	estimateModelCostUsd,
 	type ProviderId,
@@ -17,6 +17,7 @@ import {
 import { useParentSession } from '../../hooks/useBranch';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useShareStatus } from '../../hooks/useShareStatus';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { openUrl } from '../../lib/open-url';
 import { EditableTitle } from './EditableTitle';
@@ -35,6 +36,9 @@ export function SessionHeader({
 	);
 	const { preferences } = usePreferences();
 	const { data: shareStatus } = useShareStatus(session.id);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const width = useContainerWidth(rootRef);
+	const isCompact = width > 0 && width < 640;
 
 	const estimatedCost = useMemo(() => {
 		const inputTokens = session.totalInputTokens || 0;
@@ -103,7 +107,10 @@ export function SessionHeader({
 		: 'max-w-3xl mx-auto px-6 py-6';
 
 	return (
-		<div className="border-b border-border bg-background/95 backdrop-blur-sm">
+		<div
+			ref={rootRef}
+			className="border-b border-border bg-background/95 backdrop-blur-sm"
+		>
 			<div className={headerWidthClass}>
 				{isBranch && (
 					<div className="flex items-center gap-2 mb-3 text-sm">
@@ -172,25 +179,29 @@ export function SessionHeader({
 								{formatCompactNumber(contextTokens)}
 							</span>
 						</div>
-						<div
-							className="flex items-center gap-1.5"
-							title={`Total output: ${formatNumber(outputTokens)} tokens`}
-						>
-							<span className="text-xs opacity-70">out</span>
+						{!isCompact && (
+							<div
+								className="flex items-center gap-1.5"
+								title={`Total output: ${formatNumber(outputTokens)} tokens`}
+							>
+								<span className="text-xs opacity-70">out</span>
+								<span className="font-medium text-foreground">
+									{formatCompactNumber(outputTokens)}
+								</span>
+							</div>
+						)}
+					</div>
+
+					{!isCompact && (
+						<div className="flex items-center gap-2">
+							<Clock className="w-4 h-4" />
 							<span className="font-medium text-foreground">
-								{formatCompactNumber(outputTokens)}
+								{formatDuration(session.totalToolTimeMs)}
 							</span>
 						</div>
-					</div>
+					)}
 
-					<div className="flex items-center gap-2">
-						<Clock className="w-4 h-4" />
-						<span className="font-medium text-foreground">
-							{formatDuration(session.totalToolTimeMs)}
-						</span>
-					</div>
-
-					{estimatedCost > 0 && (
+					{estimatedCost > 0 && !isCompact && (
 						<div className="flex items-center gap-1.5">
 							<DollarSign className="w-4 h-4" />
 							<span className="font-medium text-foreground">
@@ -201,7 +212,11 @@ export function SessionHeader({
 
 					<div className="flex items-center gap-2 ml-auto">
 						<ProviderLogo provider={session.provider} size={18} />
-						<span className="font-medium text-foreground">{session.model}</span>
+						{!isCompact && (
+							<span className="font-medium text-foreground">
+								{session.model}
+							</span>
+						)}
 					</div>
 				</div>
 			</div>

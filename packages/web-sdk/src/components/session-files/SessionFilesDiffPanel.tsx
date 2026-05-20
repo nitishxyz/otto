@@ -1,4 +1,4 @@
-import { useEffect, useMemo, memo, useRef } from 'react';
+import { useEffect, useMemo, memo } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -6,7 +6,6 @@ import {
 	vscDarkPlus,
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
-import { useSidebarStore } from '../../stores/sidebarStore';
 import { Button } from '../ui/Button';
 
 function transformToUnifiedDiff(patch: string): string {
@@ -345,7 +344,13 @@ function formatTimestamp(timestamp: number): string {
 	return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
+interface SessionFilesDiffPanelProps {
+	mode?: 'overlay' | 'pane';
+}
+
+export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
+	mode = 'overlay',
+}: SessionFilesDiffPanelProps = {}) {
 	const isDiffOpen = useSessionFilesStore((state) => state.isDiffOpen);
 	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
 	const allOperations = useSessionFilesStore((state) => state.allOperations);
@@ -356,10 +361,6 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 		(state) => state.selectOperation,
 	);
 	const closeDiff = useSessionFilesStore((state) => state.closeDiff);
-
-	const setCollapsed = useSidebarStore((state) => state.setCollapsed);
-	const wasCollapsedRef = useRef<boolean | null>(null);
-	const prevDiffOpenRef = useRef(false);
 
 	const selectedOperation = allOperations[selectedOperationIndex];
 
@@ -388,23 +389,6 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 
 		return rawPatch;
 	}, [selectedOperation, selectedFile]);
-
-	useEffect(() => {
-		// Only act on transitions
-		if (isDiffOpen && !prevDiffOpenRef.current) {
-			// Diff just opened - save current state and collapse
-			const { isCollapsed } = useSidebarStore.getState();
-			wasCollapsedRef.current = isCollapsed;
-			setCollapsed(true);
-		} else if (!isDiffOpen && prevDiffOpenRef.current) {
-			// Diff just closed - restore previous state
-			if (wasCollapsedRef.current !== null) {
-				setCollapsed(wasCollapsedRef.current);
-				wasCollapsedRef.current = null;
-			}
-		}
-		prevDiffOpenRef.current = isDiffOpen;
-	}, [isDiffOpen, setCollapsed]);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -446,28 +430,35 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 	const hasMultipleOps = allOperations.length > 1;
 
 	return (
-		<div className="absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300">
-			<div className="h-14 border-b border-border px-4 flex items-center gap-3 shrink-0">
+		<div
+			className={
+				mode === 'pane'
+					? 'h-full w-full bg-transparent flex flex-col'
+					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
+			}
+		>
+			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeDiff}
 					title="Close diff viewer (ESC)"
+					className="h-7 w-7"
 				>
-					<X className="w-4 h-4" />
+					<X className="size-[15px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-sm font-medium text-foreground font-mono truncate"
+						className="text-[11px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
-					<span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
+					<span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
 						{selectedOperation.operation}
 					</span>
 					{selectedOperation.artifact?.summary && (
-						<div className="flex items-center gap-1 text-xs flex-shrink-0">
+						<div className="flex items-center gap-1 text-[10px] flex-shrink-0">
 							<span className="text-green-500">
 								+{selectedOperation.artifact.summary.additions}
 							</span>
@@ -479,7 +470,7 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 				</div>
 
 				{hasMultipleOps && (
-					<div className="flex items-center gap-2 shrink-0">
+					<div className="flex items-center gap-1 shrink-0">
 						<Button
 							variant="ghost"
 							size="icon"
@@ -488,10 +479,11 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 							}
 							disabled={selectedOperationIndex === 0}
 							title="Previous operation (←)"
+							className="h-7 w-7"
 						>
-							<ChevronLeft className="w-4 h-4" />
+							<ChevronLeft className="size-[15px]" />
 						</Button>
-						<span className="text-xs text-muted-foreground min-w-[60px] text-center">
+						<span className="text-[10px] text-muted-foreground min-w-[50px] text-center">
 							{selectedOperationIndex + 1} / {allOperations.length}
 						</span>
 						<Button
@@ -507,21 +499,22 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel() {
 							}
 							disabled={selectedOperationIndex === allOperations.length - 1}
 							title="Next operation (→)"
+							className="h-7 w-7"
 						>
-							<ChevronRight className="w-4 h-4" />
+							<ChevronRight className="size-[15px]" />
 						</Button>
 					</div>
 				)}
 			</div>
 
 			{hasMultipleOps && (
-				<div className="border-b border-border px-4 py-2 flex gap-2 overflow-x-auto shrink-0">
+				<div className="border-b border-border px-2 py-1.5 flex gap-1.5 overflow-x-auto shrink-0">
 					{allOperations.map((op, idx) => (
 						<button
 							type="button"
 							key={op.toolCallId}
 							onClick={() => selectOperation(idx)}
-							className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-2 shrink-0 transition-colors ${
+							className={`px-2 py-1 text-[11px] rounded-md flex items-center gap-1.5 shrink-0 transition-colors ${
 								idx === selectedOperationIndex
 									? 'bg-primary text-primary-foreground'
 									: 'bg-muted hover:bg-muted/80 text-muted-foreground'
