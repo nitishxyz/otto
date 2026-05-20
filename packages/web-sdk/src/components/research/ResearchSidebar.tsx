@@ -609,7 +609,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 				)}
 
 				{/* Footer */}
-				<div className="h-9 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
+				<div className="h-12 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
 					<span className="text-[10px]">
 						{sessions.length} research session{sessions.length !== 1 ? 's' : ''}
 					</span>

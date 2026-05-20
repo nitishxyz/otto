@@ -849,7 +849,7 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
 					type="button"
 					onClick={() => setIsPreferencesOpen(true)}
 					title="Open preferences"
-					className="group shrink-0 w-full h-10 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
+					className="group shrink-0 w-full h-12 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
 				>
 					<User className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
 					<span className="text-sm flex-1 text-muted-foreground group-hover:text-foreground transition-colors">

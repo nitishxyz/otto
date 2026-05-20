@@ -296,7 +296,7 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 				</div>
 			)}
 
-			<div className="h-9 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
+			<div className="h-12 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
 				<div className="flex items-center gap-2 min-w-0 flex-1">
 					<Sparkles className="w-3 h-3 flex-shrink-0" />
 					<span className="truncate">
