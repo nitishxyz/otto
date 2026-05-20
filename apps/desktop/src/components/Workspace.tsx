@@ -80,6 +80,10 @@ export function Workspace({
 		useServer();
 	const startedRef = useRef(false);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
+	const pendingNavigationRef = useRef<{
+		sessionId: string;
+		timer: ReturnType<typeof setTimeout> | null;
+	} | null>(null);
 	const [iframeLoaded, setIframeLoaded] = useState(false);
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
@@ -103,31 +107,87 @@ export function Workspace({
 	const focusIframe = useCallback(() => {
 		iframeRef.current?.contentWindow?.focus();
 	}, []);
+	const buildSessionUrl = useCallback(
+		(sessionId: string) => {
+			if (!server) return null;
+			const url = new URL(
+				`/sessions/${encodeURIComponent(sessionId)}`,
+				server.url,
+			);
+			url.searchParams.set('_t', Date.now().toString());
+			url.searchParams.set('_pid', server.pid.toString());
+			url.searchParams.set('_project', project.path);
+			return url.toString();
+		},
+		[server, project.path],
+	);
+	const loadSessionInIframe = useCallback(
+		(sessionId: string) => {
+			const url = buildSessionUrl(sessionId);
+			const target = iframeRef.current;
+			if (!url || !target) return false;
+
+			setIframeLoaded(false);
+			target.src = url;
+			return true;
+		},
+		[buildSessionUrl],
+	);
+	const postSessionNavigation = useCallback(
+		(sessionId: string) => {
+			if (!server) return false;
+			const target = iframeRef.current?.contentWindow;
+			if (!target) return false;
+
+			target.postMessage(
+				{ type: 'otto-navigate-session', sessionId },
+				new URL(server.url).origin,
+			);
+			return true;
+		},
+		[server],
+	);
+	const clearPendingNavigation = useCallback((sessionId?: string) => {
+		const pending = pendingNavigationRef.current;
+		if (!pending || (sessionId && pending.sessionId !== sessionId)) return;
+
+		if (pending.timer) clearTimeout(pending.timer);
+		pendingNavigationRef.current = null;
+	}, []);
 
 	const isRemote = !!project.remoteUrl;
 	const openSession = useCallback(
 		async (sessionId: string) => {
 			if (!server) return;
+			clearPendingNavigation();
+			pendingNavigationRef.current = { sessionId, timer: null };
 			const appWindow = getCurrentWindow();
 			await appWindow.unminimize().catch(() => {});
 			await appWindow.show().catch(() => {});
 			await appWindow.setFocus().catch(() => {});
 
-			const target = iframeRef.current;
-			if (target?.contentWindow) {
-				target.contentWindow.postMessage(
-					{ type: 'otto-navigate-session', sessionId },
-					new URL(server.url).origin,
-				);
-				focusIframe();
-				return;
+			if (postSessionNavigation(sessionId)) {
+				const timer = setTimeout(() => {
+					if (pendingNavigationRef.current?.sessionId === sessionId) {
+						loadSessionInIframe(sessionId);
+						clearPendingNavigation(sessionId);
+					}
+				}, 350);
+				pendingNavigationRef.current = { sessionId, timer };
+			} else {
+				loadSessionInIframe(sessionId);
+				clearPendingNavigation(sessionId);
 			}
 
-			setIframeLoaded(false);
-			const url = `${server.url}/sessions/${sessionId}?_t=${Date.now()}&_pid=${server.pid}&_project=${encodeURIComponent(project.path)}`;
-			if (target) target.src = url;
+			focusIframe();
 		},
-		[server, project.path, focusIframe],
+		[
+			server,
+			clearPendingNavigation,
+			postSessionNavigation,
+			loadSessionInIframe,
+			focusIframe,
+		],
 	);
 
 	const handleBack = async () => {
@@ -212,6 +272,14 @@ export function Workspace({
 		const handler = (e: MessageEvent) => {
 			if (e.source !== iframeRef.current?.contentWindow) return;
 
+			if (
+				e.data?.type === 'otto-navigate-session-ack' &&
+				typeof e.data.sessionId === 'string'
+			) {
+				clearPendingNavigation(e.data.sessionId);
+				return;
+			}
+
 			if (e.data?.type === 'otto-open-url' && typeof e.data.url === 'string') {
 				openUrl(e.data.url).catch((err: unknown) => {
 					console.error('[otto] Failed to open URL:', err);
@@ -276,7 +344,7 @@ export function Workspace({
 		};
 		window.addEventListener('message', handler);
 		return () => window.removeEventListener('message', handler);
-	}, []);
+	}, [clearPendingNavigation]);
 
 	useEffect(() => {
 		if (!iframeLoaded || !iframeRef.current?.contentWindow) return;
@@ -439,6 +507,10 @@ export function Workspace({
 								{ type: 'otto-set-theme', theme },
 								'*',
 							);
+							const pendingSessionId = pendingNavigationRef.current?.sessionId;
+							if (pendingSessionId) {
+								postSessionNavigation(pendingSessionId);
+							}
 						}}
 					/>
 				)}

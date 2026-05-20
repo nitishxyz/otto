@@ -74,6 +74,21 @@ function ToastItem({ toast }: { toast: Toast }) {
 		setTimeout(() => removeToast(toast.id), 180);
 	};
 
+	const runAction = async () => {
+		if (toast.action?.onClick) {
+			await toast.action.onClick();
+		} else if (toast.action?.href) {
+			openUrl(toast.action.href);
+		}
+	};
+
+	const handleToastClick = async () => {
+		if (toast.activateActionOnClick && toast.action) {
+			await runAction();
+		}
+		handleDismiss();
+	};
+
 	const style = typeStyles[toast.type];
 
 	const transitionClass =
@@ -95,10 +110,10 @@ function ToastItem({ toast }: { toast: Toast }) {
 				${style.accent ? `border-l-2 ${style.accent}` : ''}
 				${transitionClass}
 			`}
-			onClick={handleDismiss}
+			onClick={handleToastClick}
 			role="alert"
 		>
-		<div className="flex items-start gap-2.5 px-3 py-2.5">
+			<div className="flex items-start gap-2.5 px-3 py-2.5">
 				<span className="mt-px shrink-0">{style.icon}</span>
 
 				<div className="flex-1 min-w-0">
@@ -126,11 +141,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 						type="button"
 						onClick={async (e) => {
 							e.stopPropagation();
-							if (toast.action?.onClick) {
-								await toast.action.onClick();
-							} else if (toast.action?.href) {
-								openUrl(toast.action.href);
-							}
+							await runAction();
 							handleDismiss();
 						}}
 						className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors px-2.5 py-1 rounded-md"

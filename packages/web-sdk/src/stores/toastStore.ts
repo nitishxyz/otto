@@ -8,6 +8,7 @@ export interface Toast {
 	type: ToastType;
 	duration?: number;
 	icon?: string;
+	activateActionOnClick?: boolean;
 	action?: {
 		label: string;
 		href?: string;

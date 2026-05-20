@@ -190,6 +190,13 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 				event.data?.type === 'otto-navigate-session' &&
 				typeof event.data.sessionId === 'string'
 			) {
+				window.parent?.postMessage(
+					{
+						type: 'otto-navigate-session-ack',
+						sessionId: event.data.sessionId,
+					},
+					'*',
+				);
 				navigate({
 					to: '/sessions/$sessionId',
 					params: { sessionId: event.data.sessionId },

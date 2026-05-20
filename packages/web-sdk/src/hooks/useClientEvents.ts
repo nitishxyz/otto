@@ -22,14 +22,69 @@ function toastTypeForLevel(level: NotificationEvent['level']) {
 	return 'default';
 }
 
+function notificationTargetHref(notification: NotificationEvent) {
+	return (
+		notification.action?.href ??
+		(notification.sessionId
+			? `/sessions/${encodeURIComponent(notification.sessionId)}`
+			: undefined)
+	);
+}
+
+function openNotificationTarget(notification: NotificationEvent) {
+	const href = notificationTargetHref(notification);
+	if (!href || typeof window === 'undefined') return;
+
+	if (href.startsWith('/')) {
+		window.location.href = href;
+		return;
+	}
+
+	window.open(href, '_blank', 'noopener,noreferrer');
+}
+
+function requestNotificationPermission() {
+	return new Promise<NotificationPermission>((resolve) => {
+		let settled = false;
+		const finish = (permission?: NotificationPermission) => {
+			if (settled) return;
+			settled = true;
+			setTimeout(() => resolve(permission ?? Notification.permission), 100);
+		};
+
+		try {
+			const result = Notification.requestPermission(finish);
+			if (result && typeof result.then === 'function') {
+				result.then(finish).catch(() => finish());
+			}
+		} catch {
+			finish();
+		}
+
+		setTimeout(() => finish(), 1500);
+	});
+}
+
 function showInAppNotification(notification: NotificationEvent) {
 	const message = notification.body
 		? `${notification.title}: ${notification.body}`
 		: notification.title;
+	const targetHref = notificationTargetHref(notification);
 
-	if (notification.action) {
+	if (targetHref) {
 		const id = toast(message, toastTypeForLevel(notification.level), 6000);
-		useToastStore.getState().updateToast(id, { action: notification.action });
+		useToastStore.getState().updateToast(id, {
+			activateActionOnClick: true,
+			action: notification.action
+				? {
+						...notification.action,
+						onClick: () => openNotificationTarget(notification),
+					}
+				: {
+						label: 'Open session',
+						onClick: () => openNotificationTarget(notification),
+					},
+		});
 		return;
 	}
 
@@ -37,7 +92,7 @@ function showInAppNotification(notification: NotificationEvent) {
 }
 
 function sendBrowserNotification(notification: NotificationEvent) {
-	if (typeof window === 'undefined') return;
+	if (typeof window === 'undefined') return false;
 
 	if (window.parent && window.parent !== window) {
 		const message: DesktopNotificationMessage = {
@@ -45,23 +100,23 @@ function sendBrowserNotification(notification: NotificationEvent) {
 			notification,
 		};
 		window.parent.postMessage(message, '*');
-		return;
+		return true;
 	}
 
 	if (!('Notification' in window) || Notification.permission !== 'granted')
-		return;
+		return false;
 
 	const browserNotification = new Notification(notification.title, {
 		body: notification.body,
 		tag: notification.id,
+		data: { href: notificationTargetHref(notification) },
 	});
 	browserNotification.onclick = () => {
 		window.focus();
-		if (notification.sessionId) {
-			window.location.href = `/sessions/${notification.sessionId}`;
-		}
+		openNotificationTarget(notification);
 		browserNotification.close();
 	};
+	return true;
 }
 
 function updateSessionStatusInCache(
@@ -141,8 +196,9 @@ export function useClientEvents(activeSessionId?: string) {
 			action: {
 				label: 'Enable',
 				onClick: async () => {
-					const permission = await Notification.requestPermission();
-					if (permission === 'granted') {
+					const permission = await requestNotificationPermission();
+					const currentPermission = Notification.permission;
+					if (permission === 'granted' || currentPermission === 'granted') {
 						toast.success('Browser notifications enabled.');
 					} else {
 						toast.info('Browser notifications were not enabled.');
@@ -184,13 +240,21 @@ export function useClientEvents(activeSessionId?: string) {
 
 					if (event.event === 'notification') {
 						const notification = payload as NotificationEvent;
-						showInAppNotification(notification);
-
 						const isActiveVisibleSession =
 							notification.sessionId === activeSessionIdRef.current &&
 							document.visibilityState === 'visible';
+						const isSessionNotification =
+							notification.source === 'session' || !!notification.sessionId;
+						let sentSystemNotification = false;
 						if (!isActiveVisibleSession) {
-							sendBrowserNotification(notification);
+							sentSystemNotification = sendBrowserNotification(notification);
+						}
+
+						if (
+							!isSessionNotification ||
+							(!sentSystemNotification && !isActiveVisibleSession)
+						) {
+							showInAppNotification(notification);
 						}
 					}
 				},
