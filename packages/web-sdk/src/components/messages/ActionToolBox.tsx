@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { MessagePart } from '../../types/api';
 import { ToolResultRenderer, type ContentJson } from './renderers';
+import { useIsCompactThread } from './threadDensity';
 
 const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
@@ -170,6 +171,7 @@ interface ActionToolBoxProps {
 }
 
 export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
+	const isCompact = useIsCompactThread();
 	const contentMeasureRef = useRef<HTMLPreElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const scrollAnimationRef = useRef<number | null>(null);
@@ -294,8 +296,12 @@ export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
 	const resultContentJson = isComplete ? getResultContentJson(part) : null;
 
 	return (
-		<div className="flex gap-3 pb-2 relative max-w-full overflow-hidden">
-			<div className="flex-shrink-0 w-6 flex items-start justify-center relative pt-0.5">
+		<div
+			className={`flex ${isCompact ? 'gap-1.5' : 'gap-3'} pb-2 relative max-w-full overflow-hidden`}
+		>
+			<div
+				className={`flex-shrink-0 ${isCompact ? 'w-4' : 'w-6'} flex items-start justify-center relative pt-0.5`}
+			>
 				<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-background">
 					<config.Icon className={`h-4 w-4 ${config.color}`} />
 				</div>
@@ -315,7 +321,7 @@ export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
 							? '1px solid hsl(var(--border) / 0.6)'
 							: '1px solid transparent',
 						background: isLive ? 'hsl(var(--muted) / 0.2)' : 'transparent',
-						padding: isLive ? '8px 12px' : '0px 0px',
+						padding: isLive ? (isCompact ? '6px 8px' : '8px 12px') : '0px 0px',
 						transition: `border ${ANIM_MS}ms ${EASING}, background ${ANIM_MS}ms ${EASING}, padding ${ANIM_MS}ms ${EASING}`,
 					}}
 				>
@@ -327,7 +333,11 @@ export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
 							transition: `opacity ${ANIM_MS}ms ${EASING}, max-height ${ANIM_MS}ms ${EASING}`,
 						}}
 					>
-						<div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+						<div
+							className={`flex items-center gap-2 ${
+								isCompact ? 'text-[12px]' : 'text-[13px]'
+							} font-medium uppercase tracking-[0.18em] text-muted-foreground/70`}
+						>
 							<Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
 							<span className="flex-shrink-0">{config.label}</span>
 							{target && (

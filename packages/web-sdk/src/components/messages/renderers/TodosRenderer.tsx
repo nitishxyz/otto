@@ -17,7 +17,7 @@ export function TodosRenderer({ contentJson }: RendererProps) {
 	const note = result.note;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<div className="bg-blue-500/10 border border-blue-500/30 dark:bg-blue-500/5 dark:border-blue-500/20 rounded-lg p-3 space-y-2">
 				{note && (
 					<div className="text-blue-700 dark:text-blue-300 text-sm font-medium mb-3">

@@ -180,7 +180,7 @@ export function TerminalRenderer({
 			(operation === 'write' && (args.input || result.message)));
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName={headerLabel}
 				isExpanded={isExpanded}

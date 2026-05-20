@@ -47,7 +47,7 @@ export function GitDiffRenderer({
 	const hasChanges = files > 0;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="git diff"
 				isExpanded={isExpanded}

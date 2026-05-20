@@ -50,7 +50,7 @@ export function WebSearchRenderer({
 
 	if (isSearch) {
 		return (
-			<div className="text-xs">
+			<div className="text-[12px]">
 				<ToolHeader
 					toolName="web search"
 					isExpanded={isExpanded}
@@ -147,7 +147,7 @@ export function WebSearchRenderer({
 	const displayUrl = url && url.length > 50 ? `${url.slice(0, 50)}...` : url;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="web fetch"
 				isExpanded={isExpanded}

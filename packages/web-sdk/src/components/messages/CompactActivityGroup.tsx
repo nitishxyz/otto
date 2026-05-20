@@ -4,6 +4,7 @@ import {
 	type CompactActivityEntry,
 	summarizeCompactActivities,
 } from './compactActivity';
+import { useIsCompactThread } from './threadDensity';
 
 const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
@@ -22,6 +23,7 @@ export function CompactActivityGroup({
 	showLine,
 	collapsed,
 }: CompactActivityGroupProps) {
+	const isCompact = useIsCompactThread();
 	const mountedCollapsed = collapsed && entries.length > 0;
 	const [showSummary, setShowSummary] = useState(mountedCollapsed);
 	const [latched, setLatched] = useState(mountedCollapsed);
@@ -126,8 +128,12 @@ export function CompactActivityGroup({
 	const isLive = !showSummary;
 
 	return (
-		<div className="flex gap-3 pb-2 relative max-w-full overflow-hidden">
-			<div className="flex-shrink-0 w-6 flex items-start justify-center relative pt-0.5">
+		<div
+			className={`flex ${isCompact ? 'gap-1.5' : 'gap-3'} pb-2 relative max-w-full overflow-hidden`}
+		>
+			<div
+				className={`flex-shrink-0 ${isCompact ? 'w-4' : 'w-6'} flex items-start justify-center relative pt-0.5`}
+			>
 				<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-background">
 					{hasReasoning ? (
 						<Brain className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
@@ -151,7 +157,7 @@ export function CompactActivityGroup({
 							? '1px solid hsl(var(--border) / 0.6)'
 							: '1px solid transparent',
 						background: isLive ? 'hsl(var(--muted) / 0.2)' : 'transparent',
-						padding: isLive ? '8px 12px' : '0px 0px',
+						padding: isLive ? (isCompact ? '6px 8px' : '8px 12px') : '0px 0px',
 						transition: `border ${ANIM_MS}ms ${EASING}, background ${ANIM_MS}ms ${EASING}, padding ${ANIM_MS}ms ${EASING}`,
 					}}
 				>
@@ -221,7 +227,9 @@ export function CompactActivityGroup({
 									return (
 										<div
 											key={entry.id}
-											className={`flex items-center px-1 text-xs leading-5 h-7 ${
+											className={`flex items-center px-1 ${
+												isCompact ? 'text-[13px]' : 'text-[14px]'
+											} leading-5 h-7 ${
 												isLast ? 'text-foreground' : 'text-muted-foreground/70'
 											}`}
 											style={{
@@ -241,7 +249,9 @@ export function CompactActivityGroup({
 					</div>
 
 					<div
-						className="flex items-center text-xs"
+						className={`flex items-center ${
+							isCompact ? 'text-[11px]' : 'text-xs'
+						}`}
 						style={{
 							opacity: showSummary ? 1 : 0,
 							height: showSummary ? '20px' : '0px',
@@ -250,7 +260,7 @@ export function CompactActivityGroup({
 						}}
 					>
 						<span
-							className="block min-w-0 truncate leading-5 text-foreground"
+							className="block min-w-0 truncate leading-none text-foreground"
 							title={summaryText}
 						>
 							{summaryText}

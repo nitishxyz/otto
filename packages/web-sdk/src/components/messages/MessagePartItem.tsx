@@ -35,6 +35,7 @@ import {
 	type ContentJson,
 } from './renderers';
 import { CopyButton } from './renderers/shared';
+import { useIsCompactThread } from './threadDensity';
 
 function getToolCallPayload(part: MessagePart): Record<string, unknown> | null {
 	const fromJson = part.contentJson;
@@ -184,6 +185,7 @@ export const MessagePartItem = memo(
 		onRetry,
 		onCompact,
 	}: MessagePartItemProps) {
+		const isCompactThread = useIsCompactThread();
 		// Show tool_call if it's the last one OR if it has a pending approval
 		// Never show loading indicator for progress_update calls
 		if (part.type === 'tool_call') {
@@ -396,7 +398,11 @@ export const MessagePartItem = memo(
 								size="md"
 							/>
 						</div>
-						<div className="text-base text-foreground leading-relaxed markdown-content max-w-full overflow-x-auto">
+						<div
+							className={`${
+								isCompactThread ? 'text-[14px]' : 'text-base'
+							} text-foreground leading-relaxed markdown-content max-w-full overflow-x-auto`}
+						>
 							<ReactMarkdown
 								remarkPlugins={[remarkGfm]}
 								components={{
@@ -595,7 +601,9 @@ export const MessagePartItem = memo(
 				}
 
 				const containerClasses = [
-					'flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground/80 max-w-full',
+					`flex flex-wrap items-center gap-x-2 gap-y-1 ${
+						isCompactThread ? 'text-[12px]' : 'text-[13px]'
+					} text-foreground/80 max-w-full`,
 				];
 				if (part.ephemeral) containerClasses.push('animate-pulse');
 				return (
@@ -619,8 +627,12 @@ export const MessagePartItem = memo(
 		};
 
 		return (
-			<div className="flex gap-3 pb-2 relative max-w-full overflow-hidden">
-				<div className="flex-shrink-0 w-6 flex items-start justify-center relative pt-0.5">
+			<div
+				className={`flex ${isCompactThread ? 'gap-1.5' : 'gap-3'} pb-2 relative max-w-full overflow-hidden`}
+			>
+				<div
+					className={`flex-shrink-0 ${isCompactThread ? 'w-4' : 'w-6'} flex items-start justify-center relative pt-0.5`}
+				>
 					<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-background">
 						{renderIcon()}
 					</div>

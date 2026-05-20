@@ -88,7 +88,7 @@ export function ApplyPatchRenderer({
 			: undefined;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<button
 				type="button"
 				onClick={onToggle}

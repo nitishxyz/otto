@@ -5,7 +5,7 @@ export function DebugRenderer({
 	toolDurationMs,
 }: RendererProps & { toolName: string }) {
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<div className="text-muted-foreground">
 				<div>Tool: {contentJson.name}</div>
 				<div>Duration: {toolDurationMs}ms</div>

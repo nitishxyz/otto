@@ -73,7 +73,7 @@ export function BashRenderer({
 	};
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="shell"
 				isExpanded={isExpanded}

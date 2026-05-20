@@ -40,7 +40,7 @@ export function TreeRenderer({
 	const depth = typeof args.depth === 'number' ? args.depth : undefined;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="tree"
 				isExpanded={isExpanded}

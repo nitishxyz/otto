@@ -58,7 +58,7 @@ export function SkillRenderer({
 	const canExpand = !!content || hasToolError;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<button
 				type="button"
 				onClick={() => canExpand && onToggle()}

@@ -30,7 +30,7 @@ export function ListRenderer({
 	const path = typeof args.path === 'string' ? args.path : '.';
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="ls"
 				isExpanded={isExpanded}

@@ -31,7 +31,7 @@ export function LoadMcpToolsRenderer({
 	const hasContent = loaded.length > 0 || notFound.length > 0;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="load_mcp_tools"
 				isExpanded={isExpanded}

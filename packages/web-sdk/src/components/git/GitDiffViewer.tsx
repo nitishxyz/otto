@@ -274,7 +274,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 		let lineNumberClassName =
 			'flex-shrink-0 w-20 px-2 py-0.5 text-xs font-mono select-none border-r border-border';
 		let contentClassName =
-			'flex-1 px-4 py-0.5 font-mono text-xs overflow-x-auto';
+			'flex-1 px-4 py-0.5 font-mono text-xs whitespace-pre';
 
 		// Apply background colors for add/delete/hunk
 		if (diffLine.type === 'hunk') {
@@ -373,29 +373,6 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 
 	return (
 		<div className="flex flex-col h-full bg-transparent">
-			{/* Header with just filename and stats */}
-			<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
-				<span
-					className="font-mono text-[12px] text-foreground truncate"
-					title={diff.file}
-				>
-					{fileName}
-				</span>
-				<div className="flex items-center gap-2 text-[10px] flex-shrink-0">
-					{diff.insertions > 0 && (
-						<span className="text-green-600 dark:text-green-500">
-							+{diff.insertions}
-						</span>
-					)}
-					{diff.deletions > 0 && (
-						<span className="text-red-600 dark:text-red-500">
-							-{diff.deletions}
-						</span>
-					)}
-					<span className="text-muted-foreground">{resolvedLanguage}</span>
-				</div>
-			</div>
-
 			{/* Diff content */}
 			<div className="flex-1 overflow-auto">
 				{diff.diff.trim() === '' ? (
@@ -403,7 +380,32 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 						No changes to display
 					</div>
 				) : (
-					<div className="min-w-max">{diffLines.map(renderLine)}</div>
+					<div className="min-w-max">
+						<div className="sticky top-0 z-10 px-3 py-1.5 bg-sidebar-accent/95 border-b border-sidebar-border/60 flex items-center justify-between min-h-8 backdrop-blur-sm">
+							<span
+								className="font-mono text-[12px] text-foreground truncate"
+								title={diff.file}
+							>
+								{fileName}
+							</span>
+							<div className="flex items-center gap-2 text-[10px] flex-shrink-0 pl-3">
+								{diff.insertions > 0 && (
+									<span className="text-green-600 dark:text-green-500">
+										+{diff.insertions}
+									</span>
+								)}
+								{diff.deletions > 0 && (
+									<span className="text-red-600 dark:text-red-500">
+										-{diff.deletions}
+									</span>
+								)}
+								<span className="text-muted-foreground">
+									{resolvedLanguage}
+								</span>
+							</div>
+						</div>
+						{diffLines.map(renderLine)}
+					</div>
 				)}
 			</div>
 		</div>

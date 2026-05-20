@@ -92,7 +92,7 @@ export function ReadRenderer({
 	const canExpand = content.length > 0 || hasToolError;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<button
 				type="button"
 				onClick={() => canExpand && onToggle()}

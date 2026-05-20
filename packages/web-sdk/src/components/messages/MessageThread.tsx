@@ -9,6 +9,8 @@ import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useTopupApprovalStore } from '../../stores/topupApprovalStore';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
+import { ThreadDensityProvider } from './threadDensity';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
 
@@ -36,6 +38,10 @@ export const MessageThread = memo(function MessageThread({
 	const bottomRef = useRef<HTMLDivElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const sessionHeaderRef = useRef<HTMLDivElement>(null);
+	const threadRootRef = useRef<HTMLDivElement>(null);
+	const threadWidth = useContainerWidth(threadRootRef);
+	const density: 'normal' | 'compact' =
+		threadWidth > 0 && threadWidth < 640 ? 'compact' : 'normal';
 	const [autoScroll, setAutoScroll] = useState(true);
 	const autoScrollRef = useRef(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
@@ -283,110 +289,122 @@ export const MessageThread = memo(function MessageThread({
 	}
 
 	return (
-		<div className="absolute inset-0 flex flex-col">
-			{/* Lean Header - shows when session header scrolls off - positioned within thread */}
-			{session && (
-				<LeanHeader
-					session={session}
-					isVisible={showLeanHeader}
-					isGenerating={isGenerating}
-					onNavigateToSession={onSelectSession}
-				/>
-			)}
+		<div ref={threadRootRef} className="absolute inset-0 flex flex-col">
+			<ThreadDensityProvider density={density}>
+				{/* Lean Header - shows when session header scrolls off - positioned within thread */}
+				{session && (
+					<LeanHeader
+						session={session}
+						isVisible={showLeanHeader}
+						isGenerating={isGenerating}
+						onNavigateToSession={onSelectSession}
+					/>
+				)}
 
-			<div
-				ref={scrollContainerRef}
-				className="flex-1 overflow-y-auto"
-				onScroll={handleScroll}
-			>
-				{/* Session Header - scrolls with content */}
-				<div ref={sessionHeaderRef}>
-					{session && (
-						<SessionHeader
-							session={session}
-							onNavigateToSession={onSelectSession}
-						/>
-					)}
-				</div>
-
-				{/* Messages */}
-				<div className={compact ? 'p-4 pb-56' : 'p-6 pb-64'}>
-					<div className={contentWidthClass}>
-						{filteredMessages.map((message, idx) => {
-							const prevMessage = filteredMessages[idx - 1];
-							const nextMessage = filteredMessages[idx + 1];
-							const isLastMessage = idx === filteredMessages.length - 1;
-
-							if (message.role === 'user') {
-								const nextAssistantMessage =
-									nextMessage && nextMessage.role === 'assistant'
-										? nextMessage
-										: undefined;
-								return (
-									<UserMessageGroup
-										key={message.id}
-										sessionId={sessionId}
-										message={message}
-										isFirst={idx === 0}
-										nextAssistantMessageId={nextAssistantMessage?.id}
-									/>
-								);
-							}
-
-							if (message.role === 'assistant') {
-								const showHeader =
-									!prevMessage || prevMessage.role !== 'assistant';
-								const nextIsAssistant =
-									nextMessage && nextMessage.role === 'assistant';
-
-								return (
-									<AssistantMessageGroup
-										key={message.id}
-										sessionId={sessionId}
-										message={message}
-										showHeader={showHeader}
-										hasNextAssistantMessage={nextIsAssistant}
-										isLastMessage={isLastMessage}
-										onBranchCreated={onSelectSession}
-										onRetry={
-											isLastMessage ? createRetryHandler(message.id) : undefined
-										}
-										compact={compact}
-										onCompact={isLastMessage ? handleCompact : undefined}
-									/>
-								);
-							}
-
-							return null;
-						})}
-
-						{/* Topup Approval Card - shown when payment required */}
-						{showTopupApproval && pendingTopup && (
-							<div className="py-4">
-								<TopupApprovalCard
-									pendingTopup={pendingTopup}
-									onMethodSelected={() => clearPendingTopup()}
-									onCancel={() => clearPendingTopup()}
-								/>
-							</div>
+				<div
+					ref={scrollContainerRef}
+					className="flex-1 overflow-y-auto"
+					onScroll={handleScroll}
+				>
+					{/* Session Header - scrolls with content */}
+					<div ref={sessionHeaderRef}>
+						{session && (
+							<SessionHeader
+								session={session}
+								onNavigateToSession={onSelectSession}
+							/>
 						)}
+					</div>
 
-						<div ref={bottomRef} />
+					{/* Messages */}
+					<div
+						className={
+							density === 'compact'
+								? 'px-2 pt-3 pb-56'
+								: compact
+									? 'p-4 pb-56'
+									: 'p-6 pb-64'
+						}
+					>
+						<div className={contentWidthClass}>
+							{filteredMessages.map((message, idx) => {
+								const prevMessage = filteredMessages[idx - 1];
+								const nextMessage = filteredMessages[idx + 1];
+								const isLastMessage = idx === filteredMessages.length - 1;
+
+								if (message.role === 'user') {
+									const nextAssistantMessage =
+										nextMessage && nextMessage.role === 'assistant'
+											? nextMessage
+											: undefined;
+									return (
+										<UserMessageGroup
+											key={message.id}
+											sessionId={sessionId}
+											message={message}
+											isFirst={idx === 0}
+											nextAssistantMessageId={nextAssistantMessage?.id}
+										/>
+									);
+								}
+
+								if (message.role === 'assistant') {
+									const showHeader =
+										!prevMessage || prevMessage.role !== 'assistant';
+									const nextIsAssistant =
+										nextMessage && nextMessage.role === 'assistant';
+
+									return (
+										<AssistantMessageGroup
+											key={message.id}
+											sessionId={sessionId}
+											message={message}
+											showHeader={showHeader}
+											hasNextAssistantMessage={nextIsAssistant}
+											isLastMessage={isLastMessage}
+											onBranchCreated={onSelectSession}
+											onRetry={
+												isLastMessage
+													? createRetryHandler(message.id)
+													: undefined
+											}
+											compact={compact}
+											onCompact={isLastMessage ? handleCompact : undefined}
+										/>
+									);
+								}
+
+								return null;
+							})}
+
+							{/* Topup Approval Card - shown when payment required */}
+							{showTopupApproval && pendingTopup && (
+								<div className="py-4">
+									<TopupApprovalCard
+										pendingTopup={pendingTopup}
+										onMethodSelected={() => clearPendingTopup()}
+										onCancel={() => clearPendingTopup()}
+									/>
+								</div>
+							)}
+
+							<div ref={bottomRef} />
+						</div>
 					</div>
 				</div>
-			</div>
 
-			{/* Scroll to bottom button - only shown when user has scrolled up */}
-			{!autoScroll && (
-				<button
-					type="button"
-					onClick={scrollToBottom}
-					className="absolute bottom-36 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-full shadow-lg hover:bg-muted/50 transition-all text-sm text-foreground z-10"
-				>
-					<ArrowDown className="w-4 h-4" />
-					<span>Scroll to bottom</span>
-				</button>
-			)}
+				{/* Scroll to bottom button - only shown when user has scrolled up */}
+				{!autoScroll && (
+					<button
+						type="button"
+						onClick={scrollToBottom}
+						className="absolute bottom-36 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-full shadow-lg hover:bg-muted/50 transition-all text-sm text-foreground z-10"
+					>
+						<ArrowDown className="w-4 h-4" />
+						<span>Scroll to bottom</span>
+					</button>
+				)}
+			</ThreadDensityProvider>
 		</div>
 	);
 });

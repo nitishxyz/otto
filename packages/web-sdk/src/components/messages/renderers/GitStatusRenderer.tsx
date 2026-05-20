@@ -68,7 +68,7 @@ export function GitStatusRenderer({
 	const canExpand = statusLines.length > 0 || hasError || !!summary;
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<ToolHeader
 				toolName="git status"
 				isExpanded={isExpanded}

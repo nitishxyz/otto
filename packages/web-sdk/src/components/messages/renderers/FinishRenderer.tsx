@@ -5,7 +5,7 @@ export function FinishRenderer({ toolDurationMs }: RendererProps) {
 	const timeStr = formatDuration(toolDurationMs);
 
 	return (
-		<div className="text-xs">
+		<div className="text-[12px]">
 			<div className="flex items-center gap-2">
 				<span className="font-medium text-emerald-700 dark:text-emerald-300">
 					Done
