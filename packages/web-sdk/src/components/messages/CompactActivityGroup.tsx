@@ -169,7 +169,7 @@ export function CompactActivityGroup({
 							transition: `opacity ${ANIM_MS}ms ${EASING}, max-height ${ANIM_MS}ms ${EASING}`,
 						}}
 					>
-						<div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70 mb-1">
+						<div className="text-[12px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70 mb-1">
 							Exploring
 						</div>
 
@@ -212,7 +212,7 @@ export function CompactActivityGroup({
 												}}
 											>
 												<p
-													className={`text-[11px] leading-relaxed font-mono whitespace-pre-wrap ${
+													className={`text-[12px] leading-relaxed font-mono whitespace-pre-wrap ${
 														isLast
 															? 'text-foreground/80'
 															: 'text-muted-foreground/60'
@@ -228,7 +228,7 @@ export function CompactActivityGroup({
 										<div
 											key={entry.id}
 											className={`flex items-center px-1 ${
-												isCompact ? 'text-[13px]' : 'text-[14px]'
+												isCompact ? 'text-[14px]' : 'text-[15px]'
 											} leading-5 h-7 ${
 												isLast ? 'text-foreground' : 'text-muted-foreground/70'
 											}`}
@@ -250,7 +250,7 @@ export function CompactActivityGroup({
 
 					<div
 						className={`flex items-center ${
-							isCompact ? 'text-[11px]' : 'text-xs'
+							isCompact ? 'text-[12px]' : 'text-xs'
 						}`}
 						style={{
 							opacity: showSummary ? 1 : 0,

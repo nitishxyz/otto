@@ -335,7 +335,7 @@ export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
 					>
 						<div
 							className={`flex items-center gap-2 ${
-								isCompact ? 'text-[12px]' : 'text-[13px]'
+								isCompact ? 'text-[13px]' : 'text-[14px]'
 							} font-medium uppercase tracking-[0.18em] text-muted-foreground/70`}
 						>
 							<Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
@@ -387,7 +387,7 @@ export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
 									>
 										<pre
 											ref={contentMeasureRef}
-											className="px-1 pt-2.5 pb-1 text-[11px] leading-relaxed text-foreground/60 font-mono whitespace-pre-wrap break-all"
+											className="px-1 pt-2.5 pb-1 text-[12px] leading-relaxed text-foreground/60 font-mono whitespace-pre-wrap break-all"
 										>
 											{displayContent}
 										</pre>

@@ -400,7 +400,7 @@ export const MessagePartItem = memo(
 						</div>
 						<div
 							className={`${
-								isCompactThread ? 'text-[15.5px]' : 'text-[17.5px]'
+								isCompactThread ? 'text-[16.5px]' : 'text-[17px]'
 							} text-foreground leading-relaxed markdown-content max-w-full overflow-x-auto`}
 						>
 							<ReactMarkdown
@@ -602,7 +602,7 @@ export const MessagePartItem = memo(
 
 				const containerClasses = [
 					`flex flex-wrap items-center gap-x-2 gap-y-1 ${
-						isCompactThread ? 'text-[12px]' : 'text-[13px]'
+						isCompactThread ? 'text-[13px]' : 'text-[14px]'
 					} text-foreground/80 max-w-full`,
 				];
 				if (part.ephemeral) containerClasses.push('animate-pulse');

@@ -175,7 +175,7 @@ export const UserMessageGroup = memo(
 									</>
 								)}
 							</div>
-							<div className="inline-block max-w-full text-[15.5px] text-foreground leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3 [word-break:break-word] overflow-hidden">
+							<div className="inline-block max-w-full text-[16.5px] text-foreground leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3 [word-break:break-word] overflow-hidden">
 								{hasImages && (
 									<div className="flex flex-wrap gap-2 mb-2">
 										{images.map((img) => (
@@ -229,7 +229,7 @@ export const UserMessageGroup = memo(
 									</div>
 								)}
 								{hasContent && (
-									<div className="prose prose-invert prose-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:text-[15.5px] [&_li]:text-[15.5px] [&_*]:[word-break:break-word] [&_*]:overflow-wrap-anywhere whitespace-pre-wrap">
+									<div className="prose prose-invert prose-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:text-[16.5px] [&_li]:text-[16.5px] [&_*]:[word-break:break-word] [&_*]:overflow-wrap-anywhere whitespace-pre-wrap">
 										<ReactMarkdown
 											remarkPlugins={[remarkGfm]}
 											components={{
