@@ -1,12 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
-import {
-	isPermissionGranted,
-	onAction,
-	requestPermission,
-	sendNotification,
-} from '@tauri-apps/plugin-notification';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useRef } from 'react';
 import { Sun, Moon, ArrowDownToLine, RotateCw } from 'lucide-react';
 import { useServer } from '../hooks/useServer';
 import { useUpdate } from '../hooks/useUpdate';
@@ -19,55 +11,7 @@ import { SetuLoader } from './SetuLoader';
 import { useDesktopTheme } from '../App';
 import { WindowControls } from './WindowControls';
 import { useVersion } from '../hooks/useVersion';
-
-type OttoNotificationMessage = {
-	type: 'otto-notification';
-	notification?: {
-		id: string;
-		title: string;
-		body?: string;
-		sessionId?: string;
-	};
-};
-
-const notificationSessions = new Map<number, string>();
-
-function notificationIdFromString(id: string) {
-	let hash = 0;
-	for (let i = 0; i < id.length; i++) {
-		hash = (hash * 31 + id.charCodeAt(i)) | 0;
-	}
-	return Math.abs(hash || Date.now()) % 2_147_483_647;
-}
-
-async function showNativeNotification(message: OttoNotificationMessage) {
-	const notification = message.notification;
-	if (!notification?.title) return;
-	const appWindow = getCurrentWindow();
-
-	let permissionGranted = await isPermissionGranted();
-	if (!permissionGranted) {
-		const permission = await requestPermission();
-		permissionGranted = permission === 'granted';
-	}
-
-	if (!permissionGranted) return;
-	const id = notificationIdFromString(notification.id);
-	if (notification.sessionId) {
-		notificationSessions.set(id, notification.sessionId);
-	}
-
-	sendNotification({
-		id,
-		title: notification.title,
-		body: notification.body,
-		autoCancel: true,
-		sound: 'Ping',
-		extra: notification.sessionId
-			? { sessionId: notification.sessionId, windowLabel: appWindow.label }
-			: undefined,
-	});
-}
+import { DesktopWorkspaceApp } from './workspace/DesktopWorkspaceApp';
 
 export function Workspace({
 	project,
@@ -76,15 +20,8 @@ export function Workspace({
 	project: Project;
 	onBack: () => void;
 }) {
-	const { server, loading, error, startServer, startWebServer, stopServer } =
-		useServer();
+	const { server, loading, error, startServer, stopServer } = useServer();
 	const startedRef = useRef(false);
-	const iframeRef = useRef<HTMLIFrameElement>(null);
-	const pendingNavigationRef = useRef<{
-		sessionId: string;
-		timer: ReturnType<typeof setTimeout> | null;
-	} | null>(null);
-	const [iframeLoaded, setIframeLoaded] = useState(false);
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
 	const { theme, toggleTheme } = useDesktopTheme();
@@ -99,96 +36,12 @@ export function Workspace({
 		error: updateError,
 	} = useUpdate();
 	const appVersion = useVersion();
-
-	const iframeSrc = useMemo(() => {
-		if (!server) return null;
-		return `${server.url}?_t=${Date.now()}&_pid=${server.pid}&_project=${encodeURIComponent(project.path)}`;
-	}, [server, project.path]);
-	const focusIframe = useCallback(() => {
-		iframeRef.current?.contentWindow?.focus();
-	}, []);
-	const buildSessionUrl = useCallback(
-		(sessionId: string) => {
-			if (!server) return null;
-			const url = new URL(
-				`/sessions/${encodeURIComponent(sessionId)}`,
-				server.url,
-			);
-			url.searchParams.set('_t', Date.now().toString());
-			url.searchParams.set('_pid', server.pid.toString());
-			url.searchParams.set('_project', project.path);
-			return url.toString();
-		},
-		[server, project.path],
-	);
-	const loadSessionInIframe = useCallback(
-		(sessionId: string) => {
-			const url = buildSessionUrl(sessionId);
-			const target = iframeRef.current;
-			if (!url || !target) return false;
-
-			setIframeLoaded(false);
-			target.src = url;
-			return true;
-		},
-		[buildSessionUrl],
-	);
-	const postSessionNavigation = useCallback(
-		(sessionId: string) => {
-			if (!server) return false;
-			const target = iframeRef.current?.contentWindow;
-			if (!target) return false;
-
-			target.postMessage(
-				{ type: 'otto-navigate-session', sessionId },
-				new URL(server.url).origin,
-			);
-			return true;
-		},
-		[server],
-	);
-	const clearPendingNavigation = useCallback((sessionId?: string) => {
-		const pending = pendingNavigationRef.current;
-		if (!pending || (sessionId && pending.sessionId !== sessionId)) return;
-
-		if (pending.timer) clearTimeout(pending.timer);
-		pendingNavigationRef.current = null;
-	}, []);
-
 	const isRemote = !!project.remoteUrl;
-	const openSession = useCallback(
-		async (sessionId: string) => {
-			if (!server) return;
-			clearPendingNavigation();
-			pendingNavigationRef.current = { sessionId, timer: null };
-			const appWindow = getCurrentWindow();
-			await appWindow.unminimize().catch(() => {});
-			await appWindow.show().catch(() => {});
-			await appWindow.setFocus().catch(() => {});
-
-			if (postSessionNavigation(sessionId)) {
-				const timer = setTimeout(() => {
-					if (pendingNavigationRef.current?.sessionId === sessionId) {
-						loadSessionInIframe(sessionId);
-						clearPendingNavigation(sessionId);
-					}
-				}, 350);
-				pendingNavigationRef.current = { sessionId, timer };
-			} else {
-				loadSessionInIframe(sessionId);
-				clearPendingNavigation(sessionId);
-			}
-
-			focusIframe();
-		},
-		[
-			server,
-			clearPendingNavigation,
-			postSessionNavigation,
-			loadSessionInIframe,
-			focusIframe,
-		],
-	);
+	const workspaceApiUrl = isRemote
+		? project.remoteUrl
+		: server
+			? `http://localhost:${server.port}`
+			: null;
 
 	const handleBack = async () => {
 		await stopServer();
@@ -198,161 +51,10 @@ export function Workspace({
 	useEffect(() => {
 		if (startedRef.current) return;
 		startedRef.current = true;
-		if (isRemote && project.remoteUrl) {
-			startWebServer(project.remoteUrl, project.name);
-		} else {
+		if (!isRemote) {
 			startServer(project.path);
 		}
-	}, [
-		project.path,
-		project.name,
-		project.remoteUrl,
-		isRemote,
-		startServer,
-		startWebServer,
-	]);
-
-	useEffect(() => {
-		if (!server) setIframeLoaded(false);
-	}, [server]);
-
-	useEffect(() => {
-		const handler = (e: KeyboardEvent) => {
-			const target = e.target as HTMLElement;
-			const isInIframe = target.ownerDocument !== document;
-			if (isInIframe) return;
-
-			const isInteractive = target.closest('button, a, input, [role="button"]');
-			if (isInteractive) return;
-
-			focusIframe();
-		};
-		document.addEventListener('keydown', handler);
-		return () => document.removeEventListener('keydown', handler);
-	}, [focusIframe]);
-
-	useEffect(() => {
-		let cancelled = false;
-		const currentWindowLabel = getCurrentWindow().label;
-		const listener = onAction((notification) => {
-			const notificationWindowLabel =
-				typeof notification.extra?.windowLabel === 'string'
-					? notification.extra.windowLabel
-					: undefined;
-			if (
-				notificationWindowLabel &&
-				notificationWindowLabel !== currentWindowLabel
-			) {
-				return;
-			}
-
-			const sessionId =
-				notification.id && notificationSessions.has(notification.id)
-					? notificationSessions.get(notification.id)
-					: notificationWindowLabel === currentWindowLabel &&
-							typeof notification.extra?.sessionId === 'string'
-						? notification.extra.sessionId
-						: undefined;
-			if (sessionId) {
-				openSession(sessionId).catch((error: unknown) => {
-					console.error('[otto] Failed to open notification session:', error);
-				});
-			}
-		});
-
-		return () => {
-			cancelled = true;
-			listener.then((l) => {
-				if (cancelled) void l.unregister();
-			});
-		};
-	}, [openSession]);
-
-	useEffect(() => {
-		const handler = (e: MessageEvent) => {
-			if (e.source !== iframeRef.current?.contentWindow) return;
-
-			if (
-				e.data?.type === 'otto-navigate-session-ack' &&
-				typeof e.data.sessionId === 'string'
-			) {
-				clearPendingNavigation(e.data.sessionId);
-				return;
-			}
-
-			if (e.data?.type === 'otto-open-url' && typeof e.data.url === 'string') {
-				openUrl(e.data.url).catch((err: unknown) => {
-					console.error('[otto] Failed to open URL:', err);
-				});
-			}
-
-			if (e.data?.type === 'otto-notification') {
-				showNativeNotification(e.data as OttoNotificationMessage).catch(
-					(error: unknown) => {
-						console.error('[otto] Failed to show notification:', error);
-					},
-				);
-			}
-
-			if (
-				e.data?.type === 'otto-font-family-changed' &&
-				typeof e.data.fontFamily === 'string'
-			) {
-				document.documentElement.style.setProperty(
-					'--otto-font-family',
-					`"${e.data.fontFamily.replace(/"/g, '\\"')}", "IBM Plex Mono", monospace`,
-				);
-				window.localStorage.setItem(
-					'otto-desktop-font-family',
-					e.data.fontFamily,
-				);
-			}
-
-			if (
-				e.data?.type === 'otto-list-system-fonts' &&
-				typeof e.data.requestId === 'string'
-			) {
-				const source = iframeRef.current?.contentWindow;
-				if (!source) return;
-
-				tauriBridge
-					.listSystemFonts()
-					.then((fonts) => {
-						source.postMessage(
-							{
-								type: 'otto-system-fonts-result',
-								requestId: e.data.requestId,
-								fonts,
-							},
-							{ targetOrigin: e.origin },
-						);
-					})
-					.catch((error: unknown) => {
-						source.postMessage(
-							{
-								type: 'otto-system-fonts-result',
-								requestId: e.data.requestId,
-								error:
-									error instanceof Error
-										? error.message
-										: 'Failed to list system fonts',
-							},
-							{ targetOrigin: e.origin },
-						);
-					});
-			}
-		};
-		window.addEventListener('message', handler);
-		return () => window.removeEventListener('message', handler);
-	}, [clearPendingNavigation]);
-
-	useEffect(() => {
-		if (!iframeLoaded || !iframeRef.current?.contentWindow) return;
-		iframeRef.current.contentWindow.postMessage(
-			{ type: 'otto-set-theme', theme },
-			'*',
-		);
-	}, [theme, iframeLoaded]);
+	}, [project.path, isRemote, startServer]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background">
@@ -410,10 +112,10 @@ export function Workspace({
 						⚠ {updateError}
 					</span>
 				)}
-				{server && (
+				{server && !isRemote && (
 					<div className="flex items-center gap-1.5 text-xs">
 						<span className="w-2 h-2 rounded-full bg-green-500" />
-						<span className="text-muted-foreground">Port {server.webPort}</span>
+						<span className="text-muted-foreground">API {server.port}</span>
 						{appVersion && (
 							<span className="text-muted-foreground/50">· v{appVersion}</span>
 						)}
@@ -461,57 +163,38 @@ export function Workspace({
 				{platform === 'linux' && <WindowControls />}
 			</div>
 
-			<div className="flex-1 relative flex items-center justify-center bg-background">
-				{(loading || (server && !iframeLoaded)) && (
-					<SetuLoader
-						label={
-							loading
-								? isRemote
-									? 'Connecting to remote server...'
-									: 'Starting server...'
-								: 'Loading...'
-						}
-					/>
-				)}
-				{error && !loading && (
-					<div className="text-center max-w-md">
-						<div className="text-destructive mb-4">{error}</div>
-						<button
-							type="button"
-							onClick={() => {
-								startedRef.current = false;
-								if (isRemote && project.remoteUrl) {
-									startWebServer(project.remoteUrl, project.name);
-								} else {
-									startServer(project.path);
-								}
-							}}
-							className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-						>
-							Retry
-						</button>
+			<div className="flex-1 min-h-0 relative bg-background">
+				{loading && (
+					<div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+						<SetuLoader label="Starting server..." />
 					</div>
 				)}
-				{server && iframeSrc && (
-					<iframe
-						ref={iframeRef}
-						src={iframeSrc ?? ''}
-						className={`absolute inset-0 w-full h-full border-none transition-opacity duration-200 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
-						style={{ backgroundColor: 'hsl(var(--background))' }}
-						title="otto workspace"
-						allow="clipboard-write; clipboard-read"
-						onLoad={() => {
-							setIframeLoaded(true);
-							focusIframe();
-							iframeRef.current?.contentWindow?.postMessage(
-								{ type: 'otto-set-theme', theme },
-								'*',
-							);
-							const pendingSessionId = pendingNavigationRef.current?.sessionId;
-							if (pendingSessionId) {
-								postSessionNavigation(pendingSessionId);
-							}
-						}}
+				{error && !loading && (
+					<div className="h-full flex items-center justify-center">
+						<div className="text-center max-w-md">
+							<div className="text-destructive mb-4">{error}</div>
+							<button
+								type="button"
+								onClick={() => {
+									startedRef.current = false;
+									if (!isRemote) {
+										startServer(project.path);
+									}
+								}}
+								className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+							>
+								Retry
+							</button>
+						</div>
+					</div>
+				)}
+				{workspaceApiUrl && !error && (
+					<DesktopWorkspaceApp
+						key={`${workspaceApiUrl}:${project.path}`}
+						apiUrl={workspaceApiUrl}
+						project={project}
+						theme={theme}
+						onToggleTheme={toggleTheme}
 					/>
 				)}
 			</div>

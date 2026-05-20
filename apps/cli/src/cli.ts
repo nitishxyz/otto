@@ -145,6 +145,7 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 						network: networkFlag,
 						noOpen,
 						tunnel: false,
+						apiOnly: false,
 					},
 					version,
 				);

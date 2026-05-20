@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { openPlatformUrl } from '../lib/platform';
 import { useOnboardingStore } from '../stores/onboardingStore';
 
 const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -207,6 +208,11 @@ export function useAuthStatus() {
 	const startOAuth = useCallback(
 		(provider: string, mode?: string) => {
 			const url = apiClient.getOAuthStartUrl(provider, mode);
+			if (openPlatformUrl(url)) {
+				snapshotConfiguredProviders();
+				setOauthPolling(true);
+				return null;
+			}
 			if (isInIframe) {
 				snapshotConfiguredProviders();
 				window.parent.postMessage({ type: 'otto-open-url', url }, '*');
@@ -230,6 +236,12 @@ export function useAuthStatus() {
 	const startOAuthManual = useCallback(
 		async (provider: string, mode?: string) => {
 			const { url, sessionId } = await apiClient.getOAuthUrl(provider, mode);
+
+			if (openPlatformUrl(url)) {
+				snapshotConfiguredProviders();
+				setOauthPolling(true);
+				return { popup: null, sessionId };
+			}
 
 			if (isInIframe) {
 				snapshotConfiguredProviders();

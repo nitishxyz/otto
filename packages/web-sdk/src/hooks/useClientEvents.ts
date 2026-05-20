@@ -9,6 +9,8 @@ import {
 import { toast, useToastStore } from '../stores/toastStore';
 import type { SessionsPage } from '../types/api';
 import { getBaseUrl } from '../lib/api-client/utils';
+import { openUrl } from '../lib/open-url';
+import { openPlatformSession, showPlatformNotification } from '../lib/platform';
 import { sessionsQueryKey } from './useSessions';
 
 type DesktopNotificationMessage = {
@@ -35,12 +37,16 @@ function openNotificationTarget(notification: NotificationEvent) {
 	const href = notificationTargetHref(notification);
 	if (!href || typeof window === 'undefined') return;
 
+	if (notification.sessionId && openPlatformSession(notification.sessionId)) {
+		return;
+	}
+
 	if (href.startsWith('/')) {
 		window.location.href = href;
 		return;
 	}
 
-	window.open(href, '_blank', 'noopener,noreferrer');
+	openUrl(href);
 }
 
 function requestNotificationPermission() {
@@ -93,6 +99,7 @@ function showInAppNotification(notification: NotificationEvent) {
 
 function sendBrowserNotification(notification: NotificationEvent) {
 	if (typeof window === 'undefined') return false;
+	if (showPlatformNotification(notification)) return true;
 
 	if (window.parent && window.parent !== window) {
 		const message: DesktopNotificationMessage = {

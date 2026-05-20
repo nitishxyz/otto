@@ -38,6 +38,10 @@ import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { apiClient } from '../../lib/api-client';
+import {
+	hasPlatformSystemFonts,
+	listPlatformSystemFonts,
+} from '../../lib/platform';
 
 const SETTINGS_PANEL_KEY = 'settings';
 const SETTINGS_DEFAULT_WIDTH = 320;
@@ -80,6 +84,9 @@ interface SystemFontsResultMessage {
 }
 
 function requestDesktopSystemFonts(): Promise<string[] | null> {
+	const platformFonts = listPlatformSystemFonts();
+	if (platformFonts) return platformFonts;
+
 	if (typeof window === 'undefined' || window.self === window.top) {
 		return Promise.resolve(null);
 	}
@@ -314,7 +321,8 @@ const FontPickerRow = memo(function FontPickerRow({
 		typeof window !== 'undefined' &&
 		typeof (window as LocalFontWindow).queryLocalFonts === 'function';
 	const canRequestDesktopFonts =
-		typeof window !== 'undefined' && window.self !== window.top;
+		hasPlatformSystemFonts() ||
+		(typeof window !== 'undefined' && window.self !== window.top);
 
 	const fontOptions = useMemo(() => {
 		return Array.from(

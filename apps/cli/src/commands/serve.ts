@@ -131,6 +131,7 @@ export interface ServeOptions {
 	network: boolean;
 	noOpen: boolean;
 	tunnel: boolean;
+	apiOnly: boolean;
 }
 
 export async function handleServe(opts: ServeOptions, version: string) {
@@ -156,20 +157,21 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	// Register server port so tunnel routes can use it
 	setServerPort(serverPort);
 
-	const webPort = serverPort + 1;
 	let webServer: ReturnType<typeof createWebServer>['server'] | null = null;
 	let webUrl: string | null = null;
-	try {
-		const { port: actualWebPort, server } = createWebServer(
-			webPort,
-			serverPort,
-			opts.network,
-		);
-		webServer = server;
-		webUrl = `http://${displayHost}:${actualWebPort}`;
-	} catch (error) {
-		logger.error('Failed to start Web UI server', error);
-		console.log('   otto server is still running without Web UI');
+	if (!opts.apiOnly) {
+		try {
+			const { port: actualWebPort, server } = createWebServer(
+				serverPort + 1,
+				serverPort,
+				opts.network,
+			);
+			webServer = server;
+			webUrl = `http://${displayHost}:${actualWebPort}`;
+		} catch (error) {
+			logger.error('Failed to start Web UI server', error);
+			console.log('   otto server is still running without Web UI');
+		}
 	}
 
 	let tunnelUrl: string | null = null;
@@ -297,6 +299,7 @@ export function registerServeCommand(program: Command, version: string) {
 		)
 		.option('--network', 'Bind to 0.0.0.0 for network access', false)
 		.option('--tunnel', 'Enable Cloudflare tunnel for remote access', false)
+		.option('--api-only', 'Start only the API server without Web UI', false)
 		.option('--no-open', 'Do not open browser automatically')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
@@ -307,6 +310,7 @@ export function registerServeCommand(program: Command, version: string) {
 					network: opts.network,
 					tunnel: opts.tunnel,
 					noOpen: !opts.open,
+					apiOnly: opts.apiOnly,
 				},
 				version,
 			);

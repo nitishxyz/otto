@@ -4,6 +4,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+
+.animate-shimmer {
+	animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes sidebar-bg-fade-in {
+	from {
+		background-color: hsl(var(--background));
+	}
+	to {
+		background-color: hsl(var(--sidebar-background));
+	}
+}
+
+.sidebar-fade-in {
+	animation: sidebar-bg-fade-in 300ms ease-out forwards;
+}
+
 @layer base {
 	:root {
 		--otto-font-family: "IBM Plex Mono", monospace;
@@ -26,7 +52,30 @@
 		--border: 220 15% 89%;
 		--input: 220 15% 89%;
 		--ring: 222.2 84% 4.9%;
+		--chart-1: 222.2 47.4% 41.2%;
+		--chart-2: 173 58% 39%;
+		--chart-3: 197 37% 24%;
+		--chart-4: 43 74% 66%;
+		--chart-5: 27 87% 67%;
 		--radius: 0.5rem;
+		--sidebar-background: 220 40% 93%;
+		--sidebar-foreground: 220 20% 15%;
+		--sidebar-primary: 222 50% 25%;
+		--sidebar-primary-foreground: 210 40% 98%;
+		--sidebar-accent: 220 35% 88%;
+		--sidebar-accent-foreground: 222 35% 20%;
+		--sidebar-border: 220 30% 87%;
+		--sidebar-ring: 222 60% 30%;
+		--sidebar-muted-foreground: 220 20% 45%;
+		--code-background: hsl(220 25% 93%);
+		--code-foreground: hsl(220 10% 10%);
+		--code-keyword: hsl(300 85% 42%);
+		--code-class: hsl(120 60% 35%);
+		--code-function: hsl(220 95% 45%);
+		--code-string: hsl(120 60% 35%);
+		--code-comment: hsl(220 15% 35%);
+		--code-operator: hsl(180 85% 30%);
+		--code-punctuation: hsl(220 15% 20%);
 		color-scheme: light;
 	}
 
@@ -50,7 +99,30 @@
 		--border: 240 3.7% 15.9%;
 		--input: 240 3.7% 15.9%;
 		--ring: 240 4.9% 83.9%;
+		--chart-1: 220 70% 50%;
+		--chart-2: 160 60% 45%;
+		--chart-3: 30 80% 55%;
+		--chart-4: 280 65% 60%;
+		--chart-5: 340 75% 55%;
 		--radius: 0.5rem;
+		--sidebar-background: 240 10% 7%;
+		--sidebar-foreground: 0 0% 92%;
+		--sidebar-primary: 0 0% 92%;
+		--sidebar-primary-foreground: 240 10% 7%;
+		--sidebar-accent: 240 8% 12%;
+		--sidebar-accent-foreground: 0 0% 95%;
+		--sidebar-border: 240 5% 13%;
+		--sidebar-ring: 240 4.9% 83.9%;
+		--sidebar-muted-foreground: 240 5% 50%;
+		--code-background: hsl(240 10% 10%);
+		--code-foreground: hsl(0 0% 98%);
+		--code-keyword: #c678dd;
+		--code-class: #98c379;
+		--code-function: #61afef;
+		--code-string: #98c379;
+		--code-comment: #7f848e;
+		--code-operator: #56b6c2;
+		--code-punctuation: #abb2bf;
 		color-scheme: dark;
 	}
 }

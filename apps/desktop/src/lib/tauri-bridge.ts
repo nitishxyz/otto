@@ -11,8 +11,6 @@ export interface Project {
 export interface ServerInfo {
 	pid: number;
 	port: number;
-	webPort: number;
-	url: string;
 	projectPath: string;
 }
 
@@ -73,8 +71,6 @@ export const tauriBridge = {
 
 	startServer: (projectPath: string, port?: number) =>
 		invoke<ServerInfo>('start_server', { projectPath, port }),
-	startWebServer: (apiUrl: string, name: string, port?: number) =>
-		invoke<ServerInfo>('start_web_server', { apiUrl, name, port }),
 	stopServer: (pid: number) => invoke('stop_server', { pid }),
 	stopAllServers: () => invoke('stop_all_servers'),
 	listServers: () => invoke<ServerInfo[]>('list_servers'),

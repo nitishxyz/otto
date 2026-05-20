@@ -11,8 +11,6 @@ use tauri::{Manager, State};
 pub struct ServerInfo {
     pub pid: u32,
     pub port: u16,
-    pub web_port: u16,
-    pub url: String,
     pub project_path: String,
 }
 
@@ -104,7 +102,17 @@ fn get_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String>
     ))
 }
 
-fn find_available_port(tracked_ports: &[u16]) -> u16 {
+fn binary_supports_api_only(binary: &std::path::Path) -> bool {
+    Command::new(binary)
+        .args(["serve", "--help"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).contains("--api-only"))
+        .unwrap_or(false)
+}
+
+fn find_available_port(tracked_ports: &[u16], require_web_port: bool) -> u16 {
     let base = 19000u16;
     
     for offset in 0..500u16 {
@@ -117,7 +125,7 @@ fn find_available_port(tracked_ports: &[u16]) -> u16 {
         }
         
         let api_available = TcpListener::bind(("127.0.0.1", port)).is_ok();
-        let web_available = TcpListener::bind(("127.0.0.1", port + 1)).is_ok();
+        let web_available = !require_web_port || TcpListener::bind(("127.0.0.1", port + 1)).is_ok();
         
         if api_available && web_available {
             eprintln!("[otto] Found available port: {}", port);
@@ -129,25 +137,6 @@ fn find_available_port(tracked_ports: &[u16]) -> u16 {
     19100
 }
 
-fn find_single_available_port(tracked_ports: &[u16]) -> u16 {
-    let base = 19500u16;
-    
-    for offset in 0..500u16 {
-        let port = base + offset;
-        if port > 60000 { break; }
-        
-        if tracked_ports.contains(&port) {
-            continue;
-        }
-        
-        if TcpListener::bind(("127.0.0.1", port)).is_ok() {
-            eprintln!("[otto] Found available web port: {}", port);
-            return port;
-        }
-    }
-    19500
-}
-
 #[tauri::command]
 pub async fn start_server(
     project_path: String,
@@ -156,6 +145,7 @@ pub async fn start_server(
     app: tauri::AppHandle,
 ) -> Result<ServerInfo, String> {
     let binary = get_binary_path(&app)?;
+    let supports_api_only = binary_supports_api_only(&binary);
     
     // Get tracked ports from existing servers
     let tracked_ports: Vec<u16> = {
@@ -167,7 +157,7 @@ pub async fn start_server(
         }).collect()
     };
 
-    let actual_port = port.unwrap_or_else(|| find_available_port(&tracked_ports));
+    let actual_port = port.unwrap_or_else(|| find_available_port(&tracked_ports, !supports_api_only));
     let port_arg = actual_port.to_string();
     
    eprintln!("[otto] Starting server for project: {} on port: {}", project_path, actual_port);
@@ -194,9 +184,16 @@ pub async fn start_server(
        current_path
    );
 
+   let args = if supports_api_only {
+       vec!["serve", "--api-only", "--port", &port_arg, "--no-open"]
+   } else {
+       eprintln!("[otto] Bundled CLI does not support --api-only; falling back to full serve mode");
+       vec!["serve", "--port", &port_arg, "--no-open"]
+   };
+
    let child = Command::new(&binary)
        .current_dir(&project_path)
-       .args(["serve", "--port", &port_arg, "--no-open"])
+       .args(args)
        .env("PATH", &augmented_path)
         .env("TERM", "xterm-256color")
        .stdout(stdout)
@@ -207,82 +204,10 @@ pub async fn start_server(
     let info = ServerInfo {
         pid: child.id(),
         port: actual_port,
-        web_port: actual_port + 1,
-        url: format!("http://localhost:{}", actual_port + 1),
         project_path: project_path.clone(),
     };
     
-    eprintln!("[otto] Server started with pid: {}, url: {}", info.pid, info.url);
-
-    state
-        .servers
-        .lock()
-        .unwrap()
-        .insert(child.id(), (child, info.clone()));
-
-    Ok(info)
-}
-
-#[tauri::command]
-pub async fn start_web_server(
-    api_url: String,
-    name: String,
-    port: Option<u16>,
-    state: State<'_, ServerState>,
-    app: tauri::AppHandle,
-) -> Result<ServerInfo, String> {
-    let binary = get_binary_path(&app)?;
-
-    let tracked_ports: Vec<u16> = {
-        let servers = state.servers.lock().unwrap();
-        servers.values().map(|(_, info)| info.port).collect()
-    };
-
-    let actual_port = port.unwrap_or_else(|| find_single_available_port(&tracked_ports));
-    let port_arg = actual_port.to_string();
-
-    eprintln!("[otto] Starting web server for remote API: {} on port: {}", api_url, actual_port);
-
-    let log_path = format!("/tmp/otto-web-{}.log", actual_port);
-    let log_file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&log_path)
-        .ok();
-
-    let stdout = log_file.as_ref().map(|f| Stdio::from(f.try_clone().unwrap())).unwrap_or(Stdio::null());
-    let stderr = log_file.map(|f| Stdio::from(f)).unwrap_or(Stdio::null());
-
-    let otto_bin_dir = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-        .join("otto")
-        .join("bin");
-    let current_path = std::env::var("PATH").unwrap_or_default();
-    let augmented_path = format!(
-        "{}:/opt/homebrew/bin:/usr/local/bin:{}",
-        otto_bin_dir.display(),
-        current_path
-    );
-
-    let child = Command::new(&binary)
-        .args(["web", "--api", &api_url, "--port", &port_arg, "--no-open"])
-        .env("PATH", &augmented_path)
-        .env("TERM", "xterm-256color")
-        .stdout(stdout)
-        .stderr(stderr)
-        .spawn()
-        .map_err(|e| format!("Failed to start web server: {}", e))?;
-
-    let info = ServerInfo {
-        pid: child.id(),
-        port: actual_port,
-        web_port: actual_port,
-        url: format!("http://localhost:{}", actual_port),
-        project_path: name,
-    };
-
-    eprintln!("[otto] Web server started with pid: {}, url: {}", info.pid, info.url);
+    eprintln!("[otto] Server started with pid: {}, port: {}", info.pid, info.port);
 
     state
         .servers

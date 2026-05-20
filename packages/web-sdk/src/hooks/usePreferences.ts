@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useConfig, useUpdateDefaults } from './useConfig';
+import { notifyPlatformFontFamilyChanged } from '../lib/platform';
 
 interface StoredPreferences {
 	vimMode: boolean;
@@ -36,6 +37,9 @@ function applyFontFamily(fontFamily: string) {
 		cssFontFamily(fontFamily),
 	);
 	document.documentElement.dataset.ottoFontFamily = fontFamily;
+	if (notifyPlatformFontFamilyChanged(fontFamily)) {
+		return;
+	}
 	if (window.self !== window.top) {
 		window.parent.postMessage(
 			{ type: 'otto-font-family-changed', fontFamily },
