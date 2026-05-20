@@ -104,7 +104,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.106",
+      "version": "0.1.107",
       "dependencies": {
         "@ottocode/web-sdk": "workspace:*",
         "@tanstack/react-query": "^5.90.2",

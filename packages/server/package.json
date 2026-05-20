@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/server",
-	"version": "0.1.268",
+	"version": "0.1.269",
 	"description": "HTTP API server for ottocode",
 	"type": "module",
 	"main": "./src/index.ts",
