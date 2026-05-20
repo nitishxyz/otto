@@ -17,7 +17,7 @@ export function SidebarHeader({
 	closeTitle = 'Close sidebar',
 }: SidebarHeaderProps) {
 	return (
-		<div className="h-10 border-b border-border px-2 flex items-center gap-1.5 shrink-0 bg-background/95">
+		<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar">
 			<div className="flex items-center gap-1.5 min-w-0 shrink-0 pr-1">
 				<span className="text-muted-foreground shrink-0">{icon}</span>
 				<span className="text-[13px] font-medium text-foreground truncate">
