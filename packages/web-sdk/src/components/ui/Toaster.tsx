@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
 	CheckCircle,
 	XCircle,
 	Loader2,
-	CreditCard,
+	Info,
 	ExternalLink,
+	X,
 } from 'lucide-react';
 import {
 	useToastStore,
@@ -13,58 +14,143 @@ import {
 } from '../../stores/toastStore';
 import { openUrl } from '../../lib/open-url';
 
-const icons: Record<ToastType, React.ReactNode> = {
-	default: <CreditCard className="h-4 w-4" />,
-	success: <CheckCircle className="h-4 w-4 text-green-500" />,
-	error: <XCircle className="h-4 w-4 text-red-500" />,
-	loading: <Loader2 className="h-4 w-4 animate-spin" />,
+const typeStyles: Record<
+	ToastType,
+	{ icon: React.ReactNode; accent: string; bar: string }
+> = {
+	default: {
+		icon: <Info className="size-4 text-muted-foreground" />,
+		accent: '',
+		bar: 'bg-muted-foreground/40',
+	},
+	success: {
+		icon: <CheckCircle className="size-4 text-emerald-400" />,
+		accent: 'border-l-emerald-400',
+		bar: 'bg-emerald-400/40',
+	},
+	error: {
+		icon: <XCircle className="size-4 text-red-400" />,
+		accent: 'border-l-red-400',
+		bar: 'bg-red-400/40',
+	},
+	loading: {
+		icon: <Loader2 className="size-4 text-muted-foreground animate-spin" />,
+		accent: '',
+		bar: '',
+	},
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
-	const [isVisible, setIsVisible] = useState(false);
+	const [phase, setPhase] = useState<'enter' | 'visible' | 'exit'>('enter');
+	const [progress, setProgress] = useState(100);
 	const removeToast = useToastStore((s) => s.removeToast);
+	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	useEffect(() => {
-		requestAnimationFrame(() => setIsVisible(true));
-	}, []);
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => setPhase('visible'));
+		});
+
+		const duration = toast.duration;
+		if (duration && duration > 0) {
+			const start = Date.now();
+			timerRef.current = setInterval(() => {
+				const elapsed = Date.now() - start;
+				const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
+				setProgress(remaining);
+				if (remaining <= 0 && timerRef.current) {
+					clearInterval(timerRef.current);
+				}
+			}, 30);
+		}
+
+		return () => {
+			if (timerRef.current) clearInterval(timerRef.current);
+		};
+	}, [toast.duration]);
 
 	const handleDismiss = () => {
-		setIsVisible(false);
-		setTimeout(() => removeToast(toast.id), 150);
+		setPhase('exit');
+		setTimeout(() => removeToast(toast.id), 180);
 	};
 
+	const style = typeStyles[toast.type];
+
+	const transitionClass =
+		phase === 'enter'
+			? 'opacity-0 translate-y-2 scale-95'
+			: phase === 'exit'
+				? 'opacity-0 translate-y-1 scale-95'
+				: 'opacity-100 translate-y-0 scale-100';
+
 	return (
-		// biome-ignore lint/a11y/useKeyWithClickEvents: toast click-to-dismiss is supplementary
+		// biome-ignore lint/a11y/useKeyWithClickEvents: toast click-to-dismiss
 		<div
 			className={`
-				flex items-center gap-3 px-4 py-3
-				bg-card border border-border rounded-lg shadow-lg
-				transition-all duration-150 ease-out cursor-pointer
-				hover:bg-accent/50
-				${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
+				relative overflow-hidden
+				border border-border bg-card
+				rounded-lg shadow-md
+				transition-all duration-180 ease-out
+				cursor-pointer group
+				${style.accent ? `border-l-2 ${style.accent}` : ''}
+				${transitionClass}
 			`}
 			onClick={handleDismiss}
 			role="alert"
 		>
-			{icons[toast.type]}
-			<span className="text-sm text-foreground">{toast.message}</span>
-			{toast.action && (
+		<div className="flex items-start gap-2.5 px-3 py-2.5">
+				<span className="mt-px shrink-0">{style.icon}</span>
+
+				<div className="flex-1 min-w-0">
+					<span className="text-[13px] leading-relaxed text-foreground">
+						{toast.message}
+					</span>
+				</div>
+
 				<button
 					type="button"
-					onClick={async (e) => {
+					onClick={(e) => {
 						e.stopPropagation();
-						if (toast.action?.onClick) {
-							await toast.action.onClick();
-						} else if (toast.action?.href) {
-							openUrl(toast.action.href);
-						}
 						handleDismiss();
 					}}
-					className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline"
+					className="shrink-0 size-5 inline-flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 mt-px"
+					aria-label="Dismiss"
 				>
-					{toast.action.label}
-					<ExternalLink className="h-3 w-3" />
+					<X className="size-3" />
 				</button>
+			</div>
+
+			{toast.action && (
+				<div className="flex items-center px-3 pb-2.5 pt-0 pl-[34px]">
+					<button
+						type="button"
+						onClick={async (e) => {
+							e.stopPropagation();
+							if (toast.action?.onClick) {
+								await toast.action.onClick();
+							} else if (toast.action?.href) {
+								openUrl(toast.action.href);
+							}
+							handleDismiss();
+						}}
+						className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors px-2.5 py-1 rounded-md"
+					>
+						{toast.action.label}
+						<ExternalLink className="size-3" />
+					</button>
+				</div>
+			)}
+
+			{Number(toast.duration) > 0 && toast.type !== 'loading' && (
+				<div className="h-px w-full bg-border/50">
+					<div
+						className={`h-full ${style.bar}`}
+						style={{
+							width: `${progress}%`,
+							transition: 'width 80ms linear',
+						}}
+					/>
+				</div>
 			)}
 		</div>
 	);
@@ -76,7 +162,7 @@ export function Toaster() {
 	if (toasts.length === 0) return null;
 
 	return (
-		<div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
+		<div className="fixed bottom-3 right-3 z-[9999] flex flex-col-reverse gap-1.5 w-[340px]">
 			{toasts.map((toast) => (
 				<ToastItem key={toast.id} toast={toast} />
 			))}
