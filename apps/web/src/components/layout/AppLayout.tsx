@@ -13,8 +13,6 @@ import {
 	SessionFilesSidebarToggle,
 	SessionFilesSidebar,
 	SessionFilesDiffPanel,
-	ResearchSidebar,
-	ResearchSidebarToggle,
 	SettingsSidebar,
 	SettingsSidebarToggle,
 	TunnelSidebar,
@@ -32,7 +30,6 @@ import {
 import {
 	useGitStore,
 	useSessionFilesStore,
-	useResearchStore,
 	useSettingsStore,
 	useTunnelStore,
 	useFileBrowserStore,
@@ -61,14 +58,12 @@ export const AppLayout = memo(function AppLayout({
 	theme,
 	onToggleTheme,
 	sessionId,
-	onNavigateToSession,
 	onFixWithAI,
 }: AppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const gitDiffOpen = useGitStore((s) => s.isDiffOpen);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
 	const sessionFilesDiffOpen = useSessionFilesStore((s) => s.isDiffOpen);
-	const researchExpanded = useResearchStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
@@ -80,7 +75,6 @@ export const AppLayout = memo(function AppLayout({
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
-		researchExpanded ||
 		settingsExpanded ||
 		tunnelExpanded ||
 		fileBrowserExpanded ||
@@ -137,10 +131,6 @@ export const AppLayout = memo(function AppLayout({
 					<div className="hidden md:flex">
 						<GitSidebar onFixWithAI={onFixWithAI} />
 						<SessionFilesSidebar sessionId={sessionId} />
-						<ResearchSidebar
-							parentSessionId={sessionId ?? null}
-							onNavigateToSession={onNavigateToSession}
-						/>
 						<SettingsSidebar />
 						<TunnelSidebar />
 						<FileBrowserSidebar />
@@ -152,7 +142,6 @@ export const AppLayout = memo(function AppLayout({
 						>
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />
-							<ResearchSidebarToggle parentSessionId={sessionId} />
 							<FileBrowserSidebarToggle />
 							<TunnelSidebarToggle />
 							<MCPSidebarToggle />

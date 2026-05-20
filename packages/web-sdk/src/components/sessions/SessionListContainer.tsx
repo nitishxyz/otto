@@ -167,13 +167,13 @@ export const SessionListContainer = memo(function SessionListContainer({
 			ref={scrollContainerRef}
 			className="flex flex-col h-full overflow-y-auto scrollbar-hide"
 		>
-			<div className="h-14 shrink-0" aria-hidden="true" />
+			<div className="h-12 shrink-0" aria-hidden="true" />
 			{recentGroups.length > 0 && (
 				<div className="pt-3 pb-1">
 					<div className="space-y-3">
 						{recentGroups.map((group) => (
 							<div key={group.label}>
-								<h4 className="sticky top-14 z-10 px-3 py-2 mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
+								<h4 className="sticky top-12 z-10 px-3 py-2 mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
 									{group.label}
 								</h4>
 								<div className="flex flex-col gap-1 px-3">

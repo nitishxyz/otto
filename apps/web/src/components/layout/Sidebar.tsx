@@ -43,8 +43,8 @@ export const Sidebar = memo(function Sidebar({
 
 	if (isCollapsed) {
 		return (
-			<aside className="w-10 md:w-10 border-r border-border bg-background flex flex-col transition-all duration-300 ease-in-out hidden md:flex">
-				<div className="h-10 border-b border-border flex items-center justify-center">
+			<aside className="w-12 md:w-12 border-r border-border bg-background flex flex-col transition-all duration-300 ease-in-out hidden md:flex">
+				<div className="h-12 border-b border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
@@ -64,7 +64,7 @@ export const Sidebar = memo(function Sidebar({
 					aria-label="Expand sidebar"
 				/>
 
-				<div className="h-10 border-t border-border flex items-center justify-center">
+				<div className="h-12 border-t border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
@@ -115,14 +115,14 @@ export const Sidebar = memo(function Sidebar({
 
 					<div className="flex-1 relative overflow-hidden">
 						<div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
-							<div className="h-14 px-4 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/40 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/20">
+							<div className="h-12 px-3 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/40 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/20">
 								<div className="flex items-center text-sidebar-foreground/90">
 									<OttoWordmark height={14} className="select-none" />
 								</div>
 								<button
 									type="button"
 									onClick={onNewSession}
-									className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
+									className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
 									title="New session"
 								>
 									<Plus className="w-4 h-4 text-sidebar-primary-foreground" />

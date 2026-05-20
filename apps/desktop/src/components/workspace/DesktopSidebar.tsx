@@ -45,8 +45,8 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 
 	if (isCollapsed) {
 		return (
-			<aside className="w-10 border-r border-border bg-background flex-col transition-all duration-300 ease-in-out hidden md:flex">
-				<div className="h-10 border-b border-border flex items-center justify-center">
+			<aside className="w-12 border-r border-border bg-background flex-col transition-all duration-300 ease-in-out hidden md:flex">
+				<div className="h-12 border-b border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
@@ -66,7 +66,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 					aria-label="Expand sidebar"
 				/>
 
-				<div className="h-10 border-t border-border flex items-center justify-center">
+				<div className="h-12 border-t border-border flex items-center justify-center">
 					<Button
 						variant="ghost"
 						size="icon"
@@ -117,14 +117,14 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 
 					<div className="flex-1 relative overflow-hidden">
 						<div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
-							<div className="h-14 px-4 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/40 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/20">
+							<div className="h-12 px-3 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/40 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/20">
 								<div className="flex items-center text-sidebar-foreground/90">
 									<Wordmark />
 								</div>
 								<button
 									type="button"
 									onClick={onNewSession}
-									className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
+									className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
 									title="New session"
 								>
 									<Plus className="w-4 h-4 text-sidebar-primary-foreground" />

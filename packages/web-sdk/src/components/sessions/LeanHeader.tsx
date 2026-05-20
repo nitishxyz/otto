@@ -112,19 +112,19 @@ export function LeanHeader({
 		<>
 			<div
 				ref={rootRef}
-				className={`absolute top-0 left-0 right-0 h-10 border-b border-border bg-background/40 backdrop-blur-xl supports-[backdrop-filter]:bg-background/20 z-10 transition-transform duration-200 ${
+				className={`absolute top-0 left-0 right-0 h-12 border-b border-border bg-background/40 backdrop-blur-xl supports-[backdrop-filter]:bg-background/20 z-10 transition-transform duration-200 ${
 					isVisible ? 'translate-y-0' : '-translate-y-full'
 				}`}
 			>
-				<div className="h-full px-2 flex items-center justify-between gap-3 text-xs">
+				<div className="h-full px-2.5 flex items-center justify-between gap-3 text-sm">
 					<div className="flex-1 min-w-0 flex items-center gap-1.5 text-muted-foreground">
 						{isBranch && (
-							<GitBranch className="size-3.5 flex-shrink-0 text-violet-500" />
+							<GitBranch className="size-4 flex-shrink-0 text-violet-500" />
 						)}
 						<EditableTitle
 							sessionId={session.id}
 							title={session.title}
-							className="text-foreground font-medium text-xs"
+							className="text-foreground font-medium text-sm"
 						/>
 						{shareStatus?.shared && (
 							<button

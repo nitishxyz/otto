@@ -109,30 +109,30 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
+			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeViewer}
 					title="Close file viewer (ESC)"
-					className="h-7 w-7"
+					className="h-8 w-8"
 				>
-					<X className="size-[15px]" />
+					<X className="size-[17px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[11px] font-medium text-foreground font-mono truncate"
+						className="text-[12px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
 					{data && (
-						<span className="text-[10px] text-muted-foreground flex-shrink-0">
+						<span className="text-[11px] text-muted-foreground flex-shrink-0">
 							{data.lineCount} lines
 						</span>
 					)}
 				</div>
-				<span className="text-[10px] text-muted-foreground pr-1">
+				<span className="text-[11px] text-muted-foreground pr-1">
 					{language}
 				</span>
 			</div>

@@ -18,7 +18,7 @@ export const GitSidebarToggle = memo(function GitSidebarToggle() {
 		<button
 			type="button"
 			onClick={toggleSidebar}
-			className={`relative h-10 w-full transition-colors touch-manipulation flex items-center justify-center border-r-2 ${
+			className={`relative h-12 w-full transition-colors touch-manipulation flex items-center justify-center border-r-2 ${
 				isExpanded
 					? 'bg-muted border-primary'
 					: 'border-transparent hover:bg-muted/50'

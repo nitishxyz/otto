@@ -69,25 +69,25 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 			}
 		>
 			{/* Header - Full path display */}
-			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
+			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeDiff}
 					title="Close diff viewer (ESC)"
-					className="h-7 w-7"
+					className="h-8 w-8"
 				>
-					<X className="size-[15px]" />
+					<X className="size-[17px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[11px] font-medium text-foreground font-mono truncate"
+						className="text-[12px] font-medium text-foreground font-mono truncate"
 						title={`${selectedFile}\n${activeDiff?.absPath || ''}`}
 					>
 						{selectedFile}
 					</span>
 					{selectedFileStaged && (
-						<span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
+						<span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
 							Staged
 						</span>
 					)}
@@ -99,7 +99,7 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 					title={
 						showFullFile ? 'Show diff only (f)' : 'Show full file with diff (f)'
 					}
-					className="flex items-center gap-1.5 text-[11px] h-7 px-2"
+					className="flex items-center gap-1.5 text-[12px] h-8 px-2.5"
 				>
 					{showFullFile ? (
 						<Minimize2 className="w-3.5 h-3.5" />

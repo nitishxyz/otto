@@ -437,28 +437,28 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			<div className="h-10 border-b border-sidebar-border px-2 flex items-center gap-1.5 shrink-0 bg-sidebar-accent/40">
+			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={closeDiff}
 					title="Close diff viewer (ESC)"
-					className="h-7 w-7"
+					className="h-8 w-8"
 				>
-					<X className="size-[15px]" />
+					<X className="size-[17px]" />
 				</Button>
 				<div className="flex-1 flex items-center gap-2 min-w-0">
 					<span
-						className="text-[11px] font-medium text-foreground font-mono truncate"
+						className="text-[12px] font-medium text-foreground font-mono truncate"
 						title={selectedFile}
 					>
 						{selectedFile}
 					</span>
-					<span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
+					<span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
 						{selectedOperation.operation}
 					</span>
 					{selectedOperation.artifact?.summary && (
-						<div className="flex items-center gap-1 text-[10px] flex-shrink-0">
+						<div className="flex items-center gap-1 text-[11px] flex-shrink-0">
 							<span className="text-green-500">
 								+{selectedOperation.artifact.summary.additions}
 							</span>
@@ -479,11 +479,11 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 							}
 							disabled={selectedOperationIndex === 0}
 							title="Previous operation (←)"
-							className="h-7 w-7"
+							className="h-8 w-8"
 						>
-							<ChevronLeft className="size-[15px]" />
+							<ChevronLeft className="size-[17px]" />
 						</Button>
-						<span className="text-[10px] text-muted-foreground min-w-[50px] text-center">
+						<span className="text-[11px] text-muted-foreground min-w-[50px] text-center">
 							{selectedOperationIndex + 1} / {allOperations.length}
 						</span>
 						<Button
@@ -499,9 +499,9 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 							}
 							disabled={selectedOperationIndex === allOperations.length - 1}
 							title="Next operation (→)"
-							className="h-7 w-7"
+							className="h-8 w-8"
 						>
-							<ChevronRight className="size-[15px]" />
+							<ChevronRight className="size-[17px]" />
 						</Button>
 					</div>
 				)}

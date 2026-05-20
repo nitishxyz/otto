@@ -14,8 +14,6 @@ import {
 	MCPSidebar,
 	MCPSidebarToggle,
 	QuickFilePicker,
-	ResearchSidebar,
-	ResearchSidebarToggle,
 	SessionFilesDiffPanel,
 	SessionFilesSidebar,
 	SessionFilesSidebarToggle,
@@ -33,7 +31,6 @@ import {
 	useFileBrowserStore,
 	useGitStore,
 	useMCPStore,
-	useResearchStore,
 	useSessionFilesStore,
 	useSettingsStore,
 	useSidebarStore,
@@ -60,14 +57,12 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	theme,
 	onToggleTheme,
 	sessionId,
-	onNavigateToSession,
 	onFixWithAI,
 }: DesktopAppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const gitDiffOpen = useGitStore((s) => s.isDiffOpen);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
 	const sessionFilesDiffOpen = useSessionFilesStore((s) => s.isDiffOpen);
-	const researchExpanded = useResearchStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
@@ -79,7 +74,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
-		researchExpanded ||
 		settingsExpanded ||
 		tunnelExpanded ||
 		fileBrowserExpanded ||
@@ -133,10 +127,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 					<div className="hidden md:flex">
 						<GitSidebar onFixWithAI={onFixWithAI} />
 						<SessionFilesSidebar sessionId={sessionId} />
-						<ResearchSidebar
-							parentSessionId={sessionId ?? null}
-							onNavigateToSession={onNavigateToSession}
-						/>
 						<SettingsSidebar />
 						<TunnelSidebar />
 						<FileBrowserSidebar />
@@ -148,7 +138,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 						>
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />
-							<ResearchSidebarToggle parentSessionId={sessionId} />
 							<FileBrowserSidebarToggle />
 							<TunnelSidebarToggle />
 							<MCPSidebarToggle />
