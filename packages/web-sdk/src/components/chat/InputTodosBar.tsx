@@ -174,9 +174,7 @@ export const InputTodosBar = memo(function InputTodosBar({
 	const items = snapshot?.items ?? [];
 	const hasTodos = items.length > 0;
 	const visibleTodo = useMemo(() => pickVisibleTodo(items), [items]);
-	const visibleTodoIndex = visibleTodo
-		? items.findIndex((item) => item === visibleTodo)
-		: -1;
+	const visibleTodoIndex = visibleTodo ? items.indexOf(visibleTodo) : -1;
 	const completedCount = items.filter(
 		(item) => item.status === 'completed',
 	).length;
