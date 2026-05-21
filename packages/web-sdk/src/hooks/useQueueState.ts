@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../lib/api-client';
 
 export type QueueState = {
 	currentMessageId: string | null;
@@ -15,9 +16,17 @@ const defaultQueueState: QueueState = {
 export function useQueueState(sessionId: string | undefined): QueueState {
 	const { data } = useQuery<QueueState>({
 		queryKey: ['queueState', sessionId],
-		queryFn: () => defaultQueueState,
+		queryFn: async () => {
+			if (!sessionId) return defaultQueueState;
+			const queueState = await apiClient.getQueueState(sessionId);
+			return {
+				currentMessageId: queueState.currentMessageId,
+				queuedMessages: queueState.queuedMessages,
+				queueLength: queueState.queuedMessages.length,
+			};
+		},
 		enabled: !!sessionId,
-		initialData: defaultQueueState,
+		placeholderData: defaultQueueState,
 		staleTime: Infinity,
 	});
 

@@ -40,6 +40,7 @@ import {
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import type { FileAttachment } from '../../hooks/useFileUpload';
 import { InputApprovalBar } from './InputApprovalBar';
+import { InputQueueBar } from './InputQueueBar';
 import { InputTodosBar } from './InputTodosBar';
 
 interface ChatInputProps {
@@ -456,6 +457,10 @@ export const ChatInput = memo(
 							<div
 								className={`pointer-events-auto ${inputOverlayWidthClass} mx-auto relative z-0`}
 							>
+								<InputQueueBar
+									key={`${sessionId}-queue`}
+									sessionId={sessionId}
+								/>
 								<InputTodosBar key={sessionId} sessionId={sessionId} />
 								<InputApprovalBar sessionId={sessionId} />
 							</div>

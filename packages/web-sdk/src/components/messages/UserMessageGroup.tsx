@@ -126,6 +126,8 @@ export const UserMessageGroup = memo(
 		if (!hasContent && !hasImages && !hasFiles && !hasResearchContexts)
 			return null;
 
+		if (isQueued) return null;
+
 		const handleCancel = async () => {
 			if (!sessionId || !nextAssistantMessageId) return;
 			setPendingRestoreText(content);

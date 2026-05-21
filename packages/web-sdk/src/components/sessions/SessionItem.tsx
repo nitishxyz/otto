@@ -11,22 +11,24 @@ interface SessionItemProps {
 
 function RunningSpinner() {
 	return (
-		<span className="relative block h-5 w-5 animate-spin text-sidebar-muted-foreground">
-			{Array.from({ length: 8 }, (_, index) => {
-				const angle = index * 45;
-				return (
-					<span
-						key={angle}
-						className="absolute left-1/2 top-1/2 h-[3px] w-[7px] rounded-full bg-current"
-						style={{
-							opacity: 1 - index * 0.08,
-							transform: `rotate(${angle}deg) translateX(7px)`,
-							transformOrigin: '0 50%',
-						}}
-					/>
-				);
-			})}
-		</span>
+		<svg
+			className="h-[17px] w-[17px] animate-spin text-sidebar-muted-foreground"
+			viewBox="0 0 16 16"
+			fill="none"
+			aria-hidden="true"
+		>
+			<title>Running</title>
+			<g stroke="currentColor" strokeLinecap="round" strokeWidth="1.8">
+				<path d="M8 1.75v2" />
+				<path d="M12.42 3.58 11 5" />
+				<path d="M14.25 8h-2" />
+				<path d="M12.42 12.42 11 11" />
+				<path d="M8 14.25v-2" />
+				<path d="M3.58 12.42 5 11" />
+				<path d="M1.75 8h2" />
+				<path d="M3.58 3.58 5 5" />
+			</g>
+		</svg>
 	);
 }
 
@@ -74,7 +76,7 @@ export const SessionItem = memo(function SessionItem({
 					{title}
 				</span>
 				<span className="mt-0.5 flex items-center justify-between gap-3 text-[11px] leading-4 text-sidebar-muted-foreground">
-					<span className="truncate">
+					<span className="min-w-0 flex-1 truncate">
 						{showStats ? (
 							<span className="inline-flex min-w-0 items-center gap-1.5">
 								{fileStats.additions > 0 && (
@@ -85,15 +87,16 @@ export const SessionItem = memo(function SessionItem({
 								{fileStats.deletions > 0 && (
 									<span className="text-rose-500">-{fileStats.deletions}</span>
 								)}
-								{!isRunning && <span>· {metadata}</span>}
 							</span>
 						) : (
-							<span>
-								{session.agent}
-								{!isRunning && ` · ${metadata}`}
-							</span>
+							session.agent
 						)}
 					</span>
+					{!isRunning && (
+						<span className="shrink-0 text-sidebar-muted-foreground">
+							{metadata}
+						</span>
+					)}
 				</span>
 			</span>
 		</button>
