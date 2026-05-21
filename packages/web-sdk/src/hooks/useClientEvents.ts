@@ -11,6 +11,7 @@ import type { SessionsPage } from '../types/api';
 import { getBaseUrl } from '../lib/api-client/utils';
 import { openUrl } from '../lib/open-url';
 import {
+	getPlatformWindowFocused,
 	hasPlatformOpenUrl,
 	openPlatformSession,
 	showPlatformNotification,
@@ -132,6 +133,10 @@ function sendBrowserNotification(notification: NotificationEvent) {
 		browserNotification.close();
 	};
 	return true;
+}
+
+function isAppForeground() {
+	return getPlatformWindowFocused() ?? document.visibilityState === 'visible';
 }
 
 function updateSessionStatusInCache(
@@ -326,7 +331,7 @@ export function useClientEvents(activeSessionId?: string) {
 						const notification = payload as NotificationEvent;
 						const isActiveVisibleSession =
 							notification.sessionId === activeSessionIdRef.current &&
-							document.visibilityState === 'visible';
+							isAppForeground();
 						const isSessionNotification =
 							notification.source === 'session' || !!notification.sessionId;
 						let sentSystemNotification = false;

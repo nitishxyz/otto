@@ -13,6 +13,7 @@ interface OttoPlatformWindow extends Window {
 	OTTO_LIST_SYSTEM_FONTS?: () => Promise<string[]>;
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
+	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
 }
 
 function getPlatformWindow(): OttoPlatformWindow | null {
@@ -54,6 +55,12 @@ export function openPlatformSession(sessionId: string): boolean {
 	if (!win?.OTTO_OPEN_SESSION) return false;
 	void win.OTTO_OPEN_SESSION(sessionId);
 	return true;
+}
+
+export function getPlatformWindowFocused(): boolean | null {
+	const win = getPlatformWindow();
+	if (!win?.OTTO_IS_WINDOW_FOCUSED) return null;
+	return win.OTTO_IS_WINDOW_FOCUSED();
 }
 
 export function hasPlatformOpenUrl(): boolean {

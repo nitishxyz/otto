@@ -19,6 +19,8 @@ interface OttoWindow extends Window {
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
 	OTTO_NOTIFICATION_ACTION_LISTENER?: boolean;
+	OTTO_WINDOW_FOCUS_LISTENER?: boolean;
+	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
 }
 
 interface OttoPlatformNotification {
@@ -30,6 +32,7 @@ interface OttoPlatformNotification {
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
 let hasRequestedNotificationPermission = false;
+let isDesktopWindowFocused = document.hasFocus();
 
 function notificationIdFromString(id: string) {
 	let hash = 0;
@@ -76,9 +79,11 @@ function cssFontFamily(fontFamily: string) {
 
 function registerDesktopPlatformAdapters() {
 	const win = window as OttoWindow;
+	const appWindow = getCurrentWindow();
 	win.OTTO_OPEN_URL = (url) => openUrl(url);
 	win.OTTO_SHOW_NOTIFICATION = (notification) =>
 		showNativeNotification(notification);
+	win.OTTO_IS_WINDOW_FOCUSED = () => isDesktopWindowFocused;
 	win.OTTO_LIST_SYSTEM_FONTS = () => tauriBridge.listSystemFonts();
 	win.OTTO_SET_DESKTOP_FONT = (fontFamily) => {
 		document.documentElement.style.setProperty(
@@ -87,10 +92,27 @@ function registerDesktopPlatformAdapters() {
 		);
 		window.localStorage.setItem('otto-desktop-font-family', fontFamily);
 	};
+	void appWindow
+		.isFocused()
+		.then((focused) => {
+			isDesktopWindowFocused = focused;
+		})
+		.catch(() => {});
+
+	if (!win.OTTO_WINDOW_FOCUS_LISTENER) {
+		win.OTTO_WINDOW_FOCUS_LISTENER = true;
+		void appWindow
+			.onFocusChanged(({ payload }) => {
+				isDesktopWindowFocused = payload;
+			})
+			.catch((error: unknown) => {
+				console.error('[otto] Failed to register focus listener:', error);
+			});
+	}
 
 	if (!win.OTTO_NOTIFICATION_ACTION_LISTENER) {
 		win.OTTO_NOTIFICATION_ACTION_LISTENER = true;
-		const currentWindowLabel = getCurrentWindow().label;
+		const currentWindowLabel = appWindow.label;
 		onAction((notification) => {
 			const notificationWindowLabel =
 				typeof notification.extra?.windowLabel === 'string'
