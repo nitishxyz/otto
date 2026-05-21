@@ -9,7 +9,6 @@ const PANEL_KEY = 'left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
-const COLLAPSED_WIDTH = 48;
 
 interface SidebarProps {
 	children: ReactNode;
@@ -26,7 +25,6 @@ export const Sidebar = memo(function Sidebar({
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
 	const sidebarStyle = {
-		'--sidebar-width': `${isCollapsed ? COLLAPSED_WIDTH : panelWidth}px`,
 		'--expanded-sidebar-width': `${panelWidth}px`,
 		maxWidth: '100%',
 	} as CSSProperties;
@@ -45,15 +43,15 @@ export const Sidebar = memo(function Sidebar({
 	return (
 		<>
 			<aside
-				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full md:w-[var(--sidebar-width)] ${
+				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full ${
 					isCollapsed
-						? 'hidden md:flex border-border bg-background'
-						: 'flex border-sidebar-border sidebar-fade-in'
+						? 'hidden md:flex md:w-12 border-border bg-background'
+						: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
 				}`}
 				style={sidebarStyle}
 			>
 				{isCollapsed ? (
-					<div className="flex h-full w-12 flex-col">
+					<div className="flex h-full w-full flex-col">
 						<div className="h-12 border-b border-border flex items-center justify-center">
 							<Button
 								variant="ghost"
