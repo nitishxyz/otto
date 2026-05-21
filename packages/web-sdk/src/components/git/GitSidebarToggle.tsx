@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { GitBranch } from 'lucide-react';
 import { useGitStore } from '../../stores/gitStore';
 import { useGitStatus } from '../../hooks/useGit';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const GitSidebarToggle = memo(function GitSidebarToggle() {
 	// Use selectors to only subscribe to needed state
@@ -31,6 +32,7 @@ export const GitSidebarToggle = memo(function GitSidebarToggle() {
 					{totalChanges > 9 ? '9+' : totalChanges}
 				</span>
 			)}
+			<SidebarShortcutBadge shortcut="1" />
 		</button>
 	);
 });

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Settings } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const SettingsSidebarToggle = memo(function SettingsSidebarToggle() {
 	const isExpanded = useSettingsStore((state) => state.isExpanded);
@@ -18,6 +19,7 @@ export const SettingsSidebarToggle = memo(function SettingsSidebarToggle() {
 			title="Settings"
 		>
 			<Settings className="size-[18px] text-muted-foreground mx-auto" />
+			<SidebarShortcutBadge shortcut="7" />
 		</button>
 	);
 });

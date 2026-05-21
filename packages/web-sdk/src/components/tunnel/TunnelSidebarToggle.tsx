@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Globe } from 'lucide-react';
 import { useTunnelStore } from '../../stores/tunnelStore';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
 	const isExpanded = useTunnelStore((state) => state.isExpanded);
@@ -24,6 +25,7 @@ export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
 			{isConnected && (
 				<span className="absolute top-1.5 right-1.5 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
 			)}
+			<SidebarShortcutBadge shortcut="4" />
 		</button>
 	);
 });

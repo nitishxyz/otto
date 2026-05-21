@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useSkillsStore } from '../../stores/skillsStore';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const SkillsSidebarToggle = memo(function SkillsSidebarToggle() {
 	const isExpanded = useSkillsStore((state) => state.isExpanded);
@@ -18,6 +19,7 @@ export const SkillsSidebarToggle = memo(function SkillsSidebarToggle() {
 			title="Skills"
 		>
 			<Sparkles className="size-[18px] text-muted-foreground mx-auto" />
+			<SidebarShortcutBadge shortcut="6" />
 		</button>
 	);
 });

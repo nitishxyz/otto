@@ -20,6 +20,15 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
 
 - **Ctrl+\\** - Toggle right sidebar collapse/expand
 
+- **Ctrl/Cmd+1-7** - Toggle right rail panels in order
+  - 1 Git
+  - 2 Session Files
+  - 3 Files
+  - 4 Remote Access
+  - 5 MCP Servers
+  - 6 Skills
+  - 7 Settings
+
 - **Ctrl+J / Cmd+J** - Toggle terminal panel open/closed
 
 - **Ctrl+N** - Create new session
@@ -50,6 +59,7 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
 - Focused items show a blue ring highlight
 - Session list: ring around entire session item
 - Git panel: ring around file item
+- Right rail shortcut numbers appear at the bottom-right of each icon while Ctrl/Cmd is held
 - Auto-scrolls to keep focused item visible
 
 ## Implementation Details

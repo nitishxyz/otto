@@ -8,6 +8,7 @@ import { SessionHeader } from '../sessions/SessionHeader';
 import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
 import { usePreferences } from '../../hooks/usePreferences';
+import { useQueueState } from '../../hooks/useQueueState';
 import { useTopupApprovalStore } from '../../stores/topupApprovalStore';
 import {
 	useTodoStore,
@@ -103,8 +104,20 @@ function isTodoSnapshotDone(snapshot: Omit<TodoSnapshot, 'updatedAt'>) {
 	);
 }
 
+function isQueuedUserMessage(
+	messages: Message[],
+	messageIndex: number,
+	queuedMessageIds: Set<string>,
+) {
+	const nextAssistant = messages
+		.slice(messageIndex + 1)
+		.find((message) => message.role === 'assistant');
+	return Boolean(nextAssistant && queuedMessageIds.has(nextAssistant.id));
+}
+
 function findLatestTodoSnapshot(
 	messages: Message[],
+	queuedMessageIds: Set<string>,
 ): Omit<TodoSnapshot, 'updatedAt'> | null {
 	let hasNewerUserMessage = false;
 
@@ -114,7 +127,10 @@ function findLatestTodoSnapshot(
 		messageIndex--
 	) {
 		const message = messages[messageIndex];
-		if (message?.role === 'user') {
+		if (
+			message?.role === 'user' &&
+			!isQueuedUserMessage(messages, messageIndex, queuedMessageIds)
+		) {
 			hasNewerUserMessage = true;
 		}
 
@@ -172,14 +188,22 @@ export const MessageThread = memo(function MessageThread({
 	const pendingTopup = useTopupApprovalStore((s) => s.pendingTopup);
 	const clearPendingTopup = useTopupApprovalStore((s) => s.clearPendingTopup);
 	const setSessionTodos = useTodoStore((s) => s.setSessionTodos);
+	const queueState = useQueueState(sessionId);
+	const queuedMessageIds = useMemo(
+		() => new Set(queueState.queuedMessages.map((item) => item.messageId)),
+		[queueState.queuedMessages],
+	);
 
 	const showTopupApproval =
 		pendingTopup && pendingTopup.sessionId === sessionId;
 
 	useEffect(() => {
 		if (!sessionId) return;
-		setSessionTodos(sessionId, findLatestTodoSnapshot(messages));
-	}, [messages, sessionId, setSessionTodos]);
+		setSessionTodos(
+			sessionId,
+			findLatestTodoSnapshot(messages, queuedMessageIds),
+		);
+	}, [messages, queuedMessageIds, sessionId, setSessionTodos]);
 
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;
@@ -420,7 +444,7 @@ export const MessageThread = memo(function MessageThread({
 
 				<div
 					ref={scrollContainerRef}
-					className="flex-1 overflow-y-auto"
+					className="flex-1 overflow-y-auto scrollbar-hide"
 					onScroll={handleScroll}
 				>
 					{/* Session Header - scrolls with content */}

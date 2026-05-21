@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { FolderTree } from 'lucide-react';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const FileBrowserSidebarToggle = memo(
 	function FileBrowserSidebarToggle() {
@@ -19,6 +20,7 @@ export const FileBrowserSidebarToggle = memo(
 				title="Files"
 			>
 				<FolderTree className="size-[18px] text-muted-foreground mx-auto" />
+				<SidebarShortcutBadge shortcut="3" />
 			</button>
 		);
 	},

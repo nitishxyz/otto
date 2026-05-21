@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { FilePen } from 'lucide-react';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import { useSessionFiles } from '../../hooks/useSessionFiles';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 interface SessionFilesSidebarToggleProps {
 	sessionId?: string;
@@ -34,6 +35,7 @@ export const SessionFilesSidebarToggle = memo(
 						{fileCount > 9 ? '9+' : fileCount}
 					</span>
 				)}
+				<SidebarShortcutBadge shortcut="2" />
 			</button>
 		);
 	},

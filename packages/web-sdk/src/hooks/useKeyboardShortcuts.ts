@@ -2,6 +2,12 @@ import { useEffect, useCallback } from 'react';
 import { useFocusStore } from '../stores/focusStore';
 import { useSidebarStore } from '../stores/sidebarStore';
 import { useGitStore } from '../stores/gitStore';
+import { useSessionFilesStore } from '../stores/sessionFilesStore';
+import { useFileBrowserStore } from '../stores/fileBrowserStore';
+import { useTunnelStore } from '../stores/tunnelStore';
+import { useMCPStore } from '../stores/mcpStore';
+import { useSkillsStore } from '../stores/skillsStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { useResearchStore } from '../stores/researchStore';
 import { useFilePickerStore } from '../stores/filePickerStore';
 import { useTerminalStore } from '../stores/terminalStore';
@@ -54,6 +60,14 @@ export function useKeyboardShortcuts({
 	} = useSidebarStore();
 	const { isExpanded: isGitExpanded, toggleSidebar: toggleGit } = useGitStore();
 	const closeDiff = useGitStore((state) => state.closeDiff);
+	const toggleSessionFiles = useSessionFilesStore(
+		(state) => state.toggleSidebar,
+	);
+	const toggleFileBrowser = useFileBrowserStore((state) => state.toggleSidebar);
+	const toggleTunnel = useTunnelStore((state) => state.toggleSidebar);
+	const toggleMCP = useMCPStore((state) => state.toggleSidebar);
+	const toggleSkills = useSkillsStore((state) => state.toggleSidebar);
+	const toggleSettings = useSettingsStore((state) => state.toggleSidebar);
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
 	const toggleTerminalPanel = useTerminalStore((state) => state.togglePanel);
 
@@ -67,6 +81,55 @@ export function useKeyboardShortcuts({
 				target.tagName === 'TEXTAREA' ||
 				target.isContentEditable;
 			const isInTerminal = !!target.closest('[data-terminal-viewer]');
+			const isShortcutModifierPressed = e.ctrlKey || e.metaKey;
+
+			if (
+				isShortcutModifierPressed &&
+				!e.shiftKey &&
+				!e.altKey &&
+				e.key >= '1' &&
+				e.key <= '7'
+			) {
+				e.preventDefault();
+
+				switch (e.key) {
+					case '1':
+						toggleGit();
+						if (isGitExpanded && currentFocus === 'git') {
+							setFocus('input');
+						} else {
+							setFocus('git');
+							resetGitFileIndex();
+						}
+						break;
+					case '2':
+						toggleSessionFiles();
+						setFocus('input');
+						break;
+					case '3':
+						toggleFileBrowser();
+						setFocus('input');
+						break;
+					case '4':
+						toggleTunnel();
+						setFocus('input');
+						break;
+					case '5':
+						toggleMCP();
+						setFocus('input');
+						break;
+					case '6':
+						toggleSkills();
+						setFocus('input');
+						break;
+					case '7':
+						toggleSettings();
+						setFocus('input');
+						break;
+				}
+
+				return;
+			}
 
 			if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
 				e.preventDefault();
@@ -297,6 +360,12 @@ export function useKeyboardShortcuts({
 			resetGitFileIndex,
 			setSessionListCollapsed,
 			toggleGit,
+			toggleSessionFiles,
+			toggleFileBrowser,
+			toggleTunnel,
+			toggleMCP,
+			toggleSkills,
+			toggleSettings,
 			toggleTerminalPanel,
 			toggleResearch,
 			toggleSessionList,

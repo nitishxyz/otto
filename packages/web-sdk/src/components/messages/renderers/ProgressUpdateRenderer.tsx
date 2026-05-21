@@ -7,11 +7,13 @@ export function ProgressUpdateRenderer({ contentJson }: RendererProps) {
 	const pct = result.pct ? Number(result.pct) : undefined;
 
 	return (
-		<div className="flex items-center gap-2 text-sm text-violet-700 dark:text-violet-300 animate-pulse">
-			{stage && <span className="text-muted-foreground/80">[{stage}]</span>}
-			<span>{message}</span>
+		<div className="flex items-start gap-2 text-sm text-violet-700 dark:text-violet-300 animate-pulse">
+			{stage && (
+				<span className="shrink-0 text-muted-foreground/80">[{stage}]</span>
+			)}
+			<span className="min-w-0 flex-1">{message}</span>
 			{pct !== undefined && (
-				<span className="text-muted-foreground/80">({pct}%)</span>
+				<span className="shrink-0 text-muted-foreground/80">({pct}%)</span>
 			)}
 		</div>
 	);

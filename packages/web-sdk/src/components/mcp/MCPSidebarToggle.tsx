@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Plug } from 'lucide-react';
 import { useMCPStore } from '../../stores/mcpStore';
+import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const MCPSidebarToggle = memo(function MCPSidebarToggle() {
 	const isExpanded = useMCPStore((state) => state.isExpanded);
@@ -24,6 +25,7 @@ export const MCPSidebarToggle = memo(function MCPSidebarToggle() {
 			{connectedCount > 0 && (
 				<span className="absolute top-1.5 right-1.5 w-2 h-2 bg-green-500 rounded-full" />
 			)}
+			<SidebarShortcutBadge shortcut="5" />
 		</button>
 	);
 });
