@@ -28,6 +28,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const lastScrolledSessionId = useRef<string | undefined>(undefined);
 	const markedViewedRef = useRef<Map<string, number>>(new Map());
 	const previousActiveSessionId = useRef<string | undefined>(activeSessionId);
+	const runningOrderRef = useRef<string[]>([]);
 	const markSessionViewed = useMarkSessionViewed();
 
 	const handleSessionClick = useCallback(
@@ -57,10 +58,27 @@ export const SessionListContainer = memo(function SessionListContainer({
 		[sessions],
 	);
 
-	const runningSessions = useMemo(
-		() => sessionSnapshot.filter((session) => session.isRunning),
-		[sessionSnapshot],
-	);
+	const runningSessions = useMemo(() => {
+		const runningSessionMap = new Map(
+			sessionSnapshot
+				.filter((session) => session.isRunning)
+				.map((session) => [session.id, session]),
+		);
+
+		runningOrderRef.current = runningOrderRef.current.filter((id) =>
+			runningSessionMap.has(id),
+		);
+
+		for (const session of sessionSnapshot) {
+			if (session.isRunning && !runningOrderRef.current.includes(session.id)) {
+				runningOrderRef.current.push(session.id);
+			}
+		}
+
+		return runningOrderRef.current
+			.map((id) => runningSessionMap.get(id))
+			.filter((session) => Boolean(session));
+	}, [sessionSnapshot]);
 
 	const readyForReviewSessions = useMemo(
 		() =>
