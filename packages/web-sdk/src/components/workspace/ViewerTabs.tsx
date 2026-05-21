@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import {
 	Braces,
 	File,
@@ -209,6 +209,28 @@ export const ViewerTabs = memo(function ViewerTabs() {
 	const updateSessionFileOperationIndex = useViewerTabsStore(
 		(state) => state.updateSessionFileOperationIndex,
 	);
+
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			const isInInput =
+				target?.tagName === 'INPUT' ||
+				target?.tagName === 'TEXTAREA' ||
+				target?.isContentEditable;
+
+			if (isInInput || event.key.toLowerCase() !== 'w') return;
+			if (!event.metaKey && !event.ctrlKey) return;
+
+			const activeId = useViewerTabsStore.getState().activeTabId;
+			if (!activeId) return;
+
+			event.preventDefault();
+			useViewerTabsStore.getState().closeTab(activeId);
+		};
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => document.removeEventListener('keydown', handleKeyDown);
+	}, []);
 
 	if (tabs.length === 0) return null;
 
