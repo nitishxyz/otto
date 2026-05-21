@@ -12,7 +12,7 @@ export function getBaseUrl(): string {
 	const port =
 		overridePort ??
 		(process.env.OTTO_PORT ? Number(process.env.OTTO_PORT) : DEFAULT_PORT);
-	return `http://localhost:${port}`;
+	return `http://127.0.0.1:${port}`;
 }
 
 export function configureApi() {

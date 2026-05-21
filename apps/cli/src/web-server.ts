@@ -64,12 +64,12 @@ export function createWebServer(
 			const hostname = requestHost.split(':')[0];
 			return `http://${hostname}:${agiServerPortOrUrl}`;
 		}
-		return `http://localhost:${agiServerPortOrUrl}`;
+		return `http://127.0.0.1:${agiServerPortOrUrl}`;
 	};
 
 	const server = Bun.serve({
 		port,
-		hostname: network ? '0.0.0.0' : 'localhost',
+		hostname: network ? '0.0.0.0' : '127.0.0.1',
 
 		async fetch(req) {
 			const url = new URL(req.url);

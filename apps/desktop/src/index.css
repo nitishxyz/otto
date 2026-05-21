@@ -161,6 +161,157 @@ button:focus-visible {
 .scrollbar-hide::-webkit-scrollbar {
 	display: none;
 }
+.markdown-content {
+	max-width: 100%;
+	overflow-wrap: break-word;
+	word-wrap: break-word;
+	word-break: break-word;
+
+	h1 {
+		font-size: 1.875rem;
+		font-weight: 700;
+		margin-top: 1.5rem;
+		margin-bottom: 1rem;
+		line-height: 1.2;
+	}
+	h2 {
+		font-size: 1.5rem;
+		font-weight: 600;
+		margin-top: 1.5rem;
+		margin-bottom: 0.75rem;
+		line-height: 1.3;
+	}
+	h3 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin-top: 1.25rem;
+		margin-bottom: 0.5rem;
+		line-height: 1.4;
+	}
+	h4 {
+		font-size: 1.125rem;
+		font-weight: 600;
+		margin-top: 1rem;
+		margin-bottom: 0.5rem;
+		line-height: 1.4;
+	}
+	p {
+		margin-top: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+	ul,
+	ol {
+		margin-top: 0.75rem;
+		margin-bottom: 0.75rem;
+		padding-left: 1.5rem;
+	}
+	li {
+		margin-top: 0.25rem;
+		margin-bottom: 0.25rem;
+	}
+	pre {
+		background-color: var(--code-background);
+		border: 1px solid hsl(var(--border));
+		border-radius: 0.5rem;
+		padding: 1rem;
+		margin-top: 0.75rem;
+		margin-bottom: 0.75rem;
+		overflow-x: auto;
+		color: var(--code-foreground);
+		max-width: 100%;
+	}
+	code {
+		background-color: var(--code-background);
+		border: 1px solid hsl(var(--border));
+		border-radius: 0.25rem;
+		padding: 0.125rem 0.375rem;
+		font-size: 0.875rem;
+		color: var(--code-foreground);
+		word-break: break-all;
+	}
+	pre code {
+		background-color: transparent;
+		border: none;
+		padding: 0;
+		font-size: 0.875rem;
+		color: inherit;
+		word-break: normal;
+		overflow-wrap: normal;
+	}
+	blockquote {
+		border-left: 4px solid hsl(var(--border));
+		padding-left: 1rem;
+		margin-top: 0.75rem;
+		margin-bottom: 0.75rem;
+		color: hsl(var(--muted-foreground));
+		font-style: italic;
+	}
+	a {
+		color: hsl(var(--primary));
+		text-decoration: underline;
+		word-break: break-word;
+	}
+	a:hover {
+		color: hsl(var(--primary) / 0.85);
+	}
+	strong,
+	b {
+		font-weight: 600;
+	}
+	em,
+	i {
+		font-style: italic;
+	}
+	hr {
+		border: none;
+		border-top: 1px solid hsl(var(--border));
+		margin-top: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+	table {
+		border-collapse: collapse;
+		margin-top: 0.75rem;
+		margin-bottom: 0.75rem;
+		width: max-content;
+		min-width: 100%;
+	}
+	th,
+	td {
+		border: 1px solid hsl(var(--border));
+		padding: 0.5rem 0.75rem;
+		text-align: left;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		max-width: 32rem;
+	}
+	th {
+		white-space: nowrap;
+	}
+	th {
+		background-color: hsl(var(--muted));
+		font-weight: 600;
+	}
+	& > *:first-child {
+		margin-top: 0;
+	}
+	& > *:last-child {
+		margin-bottom: 0;
+	}
+	& > p:first-child,
+	& > ul:first-child,
+	& > ol:first-child,
+	& > pre:first-child,
+	& > blockquote:first-child {
+		margin-top: 0;
+	}
+	& > p:last-child,
+	& > ul:last-child,
+	& > ol:last-child,
+	& > pre:last-child,
+	& > blockquote:last-child {
+		margin-bottom: 0;
+	}
+}
 
 .setu-loader-ring {
 	position: relative;

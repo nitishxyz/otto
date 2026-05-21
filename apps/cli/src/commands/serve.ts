@@ -71,13 +71,14 @@ export async function startApiServer(opts: {
 
 	const agiServer = Bun.serve({
 		port: requestedPort,
-		hostname: 'localhost',
+		hostname: '127.0.0.1',
 		fetch: app.fetch,
 		idleTimeout: 240,
 		websocket: bunWebSocket,
 	});
 
 	const serverPort = agiServer.port ?? requestedPort;
+	const apiUrl = `http://127.0.0.1:${serverPort}`;
 	setServerPort(serverPort);
 
 	let webServer: ReturnType<typeof createWebServer>['server'] | null = null;
@@ -85,11 +86,11 @@ export async function startApiServer(opts: {
 	try {
 		const { port: actualWebPort, server } = createWebServer(
 			serverPort + 1,
-			serverPort,
+			apiUrl,
 			false,
 		);
 		webServer = server;
-		webUrl = `http://localhost:${actualWebPort}`;
+		webUrl = `http://127.0.0.1:${actualWebPort}`;
 	} catch (error) {
 		logger.error('Failed to start Web UI server', error);
 	}
@@ -140,7 +141,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	const app = createServer();
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
 	const requestedPort = opts.port ?? portEnv ?? 0;
-	const hostname = opts.network ? '0.0.0.0' : 'localhost';
+	const hostname = opts.network ? '0.0.0.0' : '127.0.0.1';
 
 	const agiServer = Bun.serve({
 		port: requestedPort,
@@ -150,7 +151,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		websocket: bunWebSocket,
 	});
 
-	const displayHost = opts.network ? getLocalIP() : 'localhost';
+	const displayHost = opts.network ? getLocalIP() : '127.0.0.1';
 	const serverPort = agiServer.port ?? requestedPort;
 	const apiUrl = `http://${displayHost}:${serverPort}`;
 
@@ -163,7 +164,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		try {
 			const { port: actualWebPort, server } = createWebServer(
 				serverPort + 1,
-				serverPort,
+				opts.network ? serverPort : apiUrl,
 				opts.network,
 			);
 			webServer = server;
@@ -181,7 +182,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 			console.log(colors.dim('  Starting tunnel...'));
 
 			const response = await startTunnel({
-				baseURL: `http://localhost:${serverPort}`,
+				baseURL: apiUrl,
 				body: {},
 			});
 			if (response.error) throw new Error(JSON.stringify(response.error));
@@ -254,7 +255,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		// Stop tunnel via server endpoint
 		try {
 			await stopTunnel({
-				baseURL: `http://localhost:${serverPort}`,
+				baseURL: apiUrl,
 			});
 		} catch {
 			// Ignore - server may already be stopping

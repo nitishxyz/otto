@@ -56,6 +56,7 @@ function openNotificationTarget(notification: NotificationEvent) {
 function requestNotificationPermission() {
 	return new Promise<NotificationPermission>((resolve) => {
 		let settled = false;
+		let hasNativeRequest = false;
 		const finish = (permission?: NotificationPermission) => {
 			if (settled) return;
 			settled = true;
@@ -65,13 +66,16 @@ function requestNotificationPermission() {
 		try {
 			const result = Notification.requestPermission(finish);
 			if (result && typeof result.then === 'function') {
+				hasNativeRequest = true;
 				result.then(finish).catch(() => finish());
 			}
 		} catch {
 			finish();
 		}
 
-		setTimeout(() => finish(), 1500);
+		if (!hasNativeRequest) {
+			setTimeout(() => finish(), 60_000);
+		}
 	});
 }
 
@@ -276,6 +280,11 @@ export function useClientEvents(activeSessionId?: string) {
 					const currentPermission = Notification.permission;
 					if (permission === 'granted' || currentPermission === 'granted') {
 						toast.success('Browser notifications enabled.');
+					} else if (
+						permission === 'default' &&
+						currentPermission === 'default'
+					) {
+						return;
 					} else {
 						toast.info('Browser notifications were not enabled.');
 					}
