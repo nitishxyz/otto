@@ -152,20 +152,24 @@ export const UserMessageGroup = memo(
 		return (
 			<>
 				<div className="relative pb-8 pt-6">
-					<div className="flex gap-3 md:gap-4 justify-end">
-						<div className="flex flex-col items-end min-w-0 flex-1 max-w-[calc(100%-3rem)] md:max-w-2xl">
-							<div className="flex items-center gap-2 text-xs text-muted-foreground pb-2 justify-end">
-								<span className="font-medium text-emerald-700 dark:text-emerald-300">
+					<div className="flex flex-col items-end min-w-0 w-full">
+						<div className="inline-flex items-center bg-emerald-500/10 border border-emerald-500/30 dark:bg-emerald-500/5 dark:border-emerald-500/20 rounded-full pl-3 md:pl-4 flex-shrink min-w-0 mb-2">
+							<div className="flex items-center gap-x-1.5 md:gap-x-2 text-xs md:text-sm text-muted-foreground pr-2 md:pr-3 min-w-0">
+								<span className="font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
 									You
 								</span>
-								{message.createdAt && <span>·</span>}
 								{message.createdAt && (
-									<span>{formatTime(message.createdAt)}</span>
+									<>
+										<span className="text-muted-foreground/50">·</span>
+										<span className="text-muted-foreground whitespace-nowrap">
+											{formatTime(message.createdAt)}
+										</span>
+									</>
 								)}
 								{isQueued && (
 									<>
-										<span>·</span>
-										<span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+										<span className="text-muted-foreground/50">·</span>
+										<span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 whitespace-nowrap">
 											<Clock className="h-3 w-3" />
 											Queued
 											{position !== null && position > 0
@@ -175,7 +179,12 @@ export const UserMessageGroup = memo(
 									</>
 								)}
 							</div>
-							<div className="inline-block max-w-full text-[16.5px] text-foreground leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3 [word-break:break-word] overflow-hidden">
+							<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/20 dark:bg-emerald-500/10">
+								<User className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
+							</div>
+						</div>
+						<div className="flex flex-col items-end min-w-0 max-w-full md:max-w-2xl">
+							<div className="inline-block max-w-full text-[16.5px] text-foreground leading-relaxed bg-card/80 border border-border rounded-xl px-4 py-3 [word-break:break-word] overflow-hidden">
 								{hasImages && (
 									<div className="flex flex-wrap gap-2 mb-2">
 										{images.map((img) => (
@@ -289,11 +298,6 @@ export const UserMessageGroup = memo(
 									</button>
 								</div>
 							)}
-						</div>
-						<div className="flex-shrink-0 w-8 flex items-start justify-center">
-							<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-emerald-500/50 bg-emerald-500/20 dark:bg-emerald-500/10 relative bg-background">
-								<User className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-							</div>
 						</div>
 					</div>
 				</div>
