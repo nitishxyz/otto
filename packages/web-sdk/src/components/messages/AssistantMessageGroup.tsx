@@ -423,6 +423,7 @@ export const AssistantMessageGroup = memo(
 									key={part.id}
 									part={part}
 									showLine={hasFollowingContent}
+									compact={compact}
 								/>
 							);
 						}

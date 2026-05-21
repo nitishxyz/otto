@@ -168,10 +168,12 @@ function getResultContentJson(part: MessagePart): ContentJson {
 interface ActionToolBoxProps {
 	part: MessagePart;
 	showLine: boolean;
+	compact?: boolean;
 }
 
-export function ActionToolBox({ part, showLine }: ActionToolBoxProps) {
-	const isCompact = useIsCompactThread();
+export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
+	const isCompactThread = useIsCompactThread();
+	const isCompact = Boolean(compact || isCompactThread);
 	const contentMeasureRef = useRef<HTMLPreElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const scrollAnimationRef = useRef<number | null>(null);

@@ -20,3 +20,4 @@ export * from './fileBrowserStore';
 export * from './mcpStore';
 export * from './skillsStore';
 export * from './filePickerStore';
+export * from './viewerTabsStore';

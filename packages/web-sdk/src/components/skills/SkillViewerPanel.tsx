@@ -48,15 +48,27 @@ function inferLanguage(path: string): string {
 
 interface SkillViewerPanelProps {
 	mode?: 'overlay' | 'pane';
+	open?: boolean;
+	skillName?: string | null;
+	file?: string | null;
+	onClose?: () => void;
 }
 
 export const SkillViewerPanel = memo(function SkillViewerPanel({
 	mode = 'overlay',
+	open,
+	skillName,
+	file,
+	onClose,
 }: SkillViewerPanelProps = {}) {
-	const isViewerOpen = useSkillsStore((s) => s.isViewerOpen);
-	const viewingFile = useSkillsStore((s) => s.viewingFile);
-	const selectedSkill = useSkillsStore((s) => s.selectedSkill);
-	const closeViewer = useSkillsStore((s) => s.closeViewer);
+	const storeIsViewerOpen = useSkillsStore((s) => s.isViewerOpen);
+	const storeViewingFile = useSkillsStore((s) => s.viewingFile);
+	const storeSelectedSkill = useSkillsStore((s) => s.selectedSkill);
+	const storeCloseViewer = useSkillsStore((s) => s.closeViewer);
+	const isViewerOpen = open ?? storeIsViewerOpen;
+	const viewingFile = file !== undefined ? file : storeViewingFile;
+	const selectedSkill = skillName ?? storeSelectedSkill;
+	const closeViewer = onClose ?? storeCloseViewer;
 
 	const { data: skillDetail } = useSkillDetail(selectedSkill);
 	const { data: fileData, isLoading: fileLoading } = useSkillFileContent(
@@ -103,32 +115,34 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={closeViewer}
-					title="Close viewer (ESC)"
-					className="h-8 w-8"
-				>
-					<X className="size-[17px]" />
-				</Button>
-				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span className="text-[13px] text-muted-foreground flex-shrink-0">
-						{selectedSkill}
-					</span>
-					<span className="text-[13px] text-muted-foreground">/</span>
-					<span
-						className="text-[13px] font-medium text-foreground font-mono truncate"
-						title={displayPath}
+			{mode !== 'pane' && (
+				<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={closeViewer}
+						title="Close viewer (ESC)"
+						className="h-8 w-8"
 					>
-						{displayPath}
+						<X className="size-[17px]" />
+					</Button>
+					<div className="flex-1 flex items-center gap-2 min-w-0">
+						<span className="text-[13px] text-muted-foreground flex-shrink-0">
+							{selectedSkill}
+						</span>
+						<span className="text-[13px] text-muted-foreground">/</span>
+						<span
+							className="text-[13px] font-medium text-foreground font-mono truncate"
+							title={displayPath}
+						>
+							{displayPath}
+						</span>
+					</div>
+					<span className="text-[12px] text-muted-foreground pr-1">
+						{language}
 					</span>
 				</div>
-				<span className="text-[12px] text-muted-foreground pr-1">
-					{language}
-				</span>
-			</div>
+			)}
 
 			<div className="flex-1 overflow-auto">
 				{isLoading ? (

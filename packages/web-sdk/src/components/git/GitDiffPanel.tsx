@@ -8,16 +8,30 @@ import { GitDiffViewer } from './GitDiffViewer';
 
 interface GitDiffPanelProps {
 	mode?: 'overlay' | 'pane';
+	open?: boolean;
+	file?: string | null;
+	staged?: boolean;
+	onClose?: () => void;
 }
 
 export const GitDiffPanel = memo(function GitDiffPanel({
 	mode = 'overlay',
+	open,
+	file,
+	staged,
+	onClose,
 }: GitDiffPanelProps = {}) {
 	// Use selectors to only subscribe to needed state
-	const isDiffOpen = useGitStore((state) => state.isDiffOpen);
-	const selectedFile = useGitStore((state) => state.selectedFile);
-	const selectedFileStaged = useGitStore((state) => state.selectedFileStaged);
-	const closeDiff = useGitStore((state) => state.closeDiff);
+	const storeIsDiffOpen = useGitStore((state) => state.isDiffOpen);
+	const storeSelectedFile = useGitStore((state) => state.selectedFile);
+	const storeSelectedFileStaged = useGitStore(
+		(state) => state.selectedFileStaged,
+	);
+	const storeCloseDiff = useGitStore((state) => state.closeDiff);
+	const isDiffOpen = open ?? storeIsDiffOpen;
+	const selectedFile = file ?? storeSelectedFile;
+	const selectedFileStaged = staged ?? storeSelectedFileStaged;
+	const closeDiff = onClose ?? storeCloseDiff;
 
 	const { data: diff, isLoading } = useGitDiff(
 		selectedFile,
@@ -68,47 +82,50 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			{/* Header - Full path display */}
-			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={closeDiff}
-					title="Close diff viewer (ESC)"
-					className="h-8 w-8"
-				>
-					<X className="size-[17px]" />
-				</Button>
-				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span
-						className="text-[13px] font-medium text-foreground font-mono truncate"
-						title={`${selectedFile}\n${activeDiff?.absPath || ''}`}
+			{mode !== 'pane' && (
+				<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={closeDiff}
+						title="Close diff viewer (ESC)"
+						className="h-8 w-8"
 					>
-						{selectedFile}
-					</span>
-					{selectedFileStaged && (
-						<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
-							Staged
+						<X className="size-[17px]" />
+					</Button>
+					<div className="flex-1 flex items-center gap-2 min-w-0">
+						<span
+							className="text-[13px] font-medium text-foreground font-mono truncate"
+							title={`${selectedFile}\n${activeDiff?.absPath || ''}`}
+						>
+							{selectedFile}
 						</span>
-					)}
+						{selectedFileStaged && (
+							<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
+								Staged
+							</span>
+						)}
+					</div>
+					<Button
+						variant={showFullFile ? 'secondary' : 'ghost'}
+						size="sm"
+						onClick={() => setShowFullFile((v) => !v)}
+						title={
+							showFullFile
+								? 'Show diff only (f)'
+								: 'Show full file with diff (f)'
+						}
+						className="flex items-center gap-1.5 text-[13px] h-8 px-2.5"
+					>
+						{showFullFile ? (
+							<Minimize2 className="w-3.5 h-3.5" />
+						) : (
+							<Maximize2 className="w-3.5 h-3.5" />
+						)}
+						{showFullFile ? 'Diff' : 'Full File'}
+					</Button>
 				</div>
-				<Button
-					variant={showFullFile ? 'secondary' : 'ghost'}
-					size="sm"
-					onClick={() => setShowFullFile((v) => !v)}
-					title={
-						showFullFile ? 'Show diff only (f)' : 'Show full file with diff (f)'
-					}
-					className="flex items-center gap-1.5 text-[13px] h-8 px-2.5"
-				>
-					{showFullFile ? (
-						<Minimize2 className="w-3.5 h-3.5" />
-					) : (
-						<Maximize2 className="w-3.5 h-3.5" />
-					)}
-					{showFullFile ? 'Diff' : 'Full File'}
-				</Button>
-			</div>
+			)}
 
 			<div className="flex-1 overflow-auto">
 				{activeLoading ? (

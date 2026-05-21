@@ -6,6 +6,7 @@ import { useSettingsStore } from './settingsStore';
 import { useTunnelStore } from './tunnelStore';
 import { useFileBrowserStore } from './fileBrowserStore';
 import { useMCPStore } from './mcpStore';
+import { useViewerTabsStore } from './viewerTabsStore';
 
 export interface SkillInfo {
 	name: string;
@@ -41,7 +42,7 @@ interface SkillsState {
 	closeViewer: () => void;
 }
 
-export const useSkillsStore = create<SkillsState>((set) => ({
+export const useSkillsStore = create<SkillsState>((set, get) => ({
 	isExpanded: false,
 	skills: [],
 	globalEnabled: true,
@@ -87,7 +88,13 @@ export const useSkillsStore = create<SkillsState>((set) => ({
 	selectSkill: (name) =>
 		set({ selectedSkill: name, isViewerOpen: false, viewingFile: null }),
 
-	openViewer: (file) => set({ isViewerOpen: true, viewingFile: file }),
+	openViewer: (file) => {
+		const selectedSkill = get().selectedSkill;
+		if (selectedSkill) {
+			useViewerTabsStore.getState().openSkillFileTab(selectedSkill, file);
+		}
+		set({ isViewerOpen: true, viewingFile: file });
+	},
 
 	closeViewer: () => set({ isViewerOpen: false, viewingFile: null }),
 }));

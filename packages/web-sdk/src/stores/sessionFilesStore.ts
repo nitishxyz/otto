@@ -6,6 +6,7 @@ import { useTunnelStore } from './tunnelStore';
 import { useFileBrowserStore } from './fileBrowserStore';
 import { useMCPStore } from './mcpStore';
 import { useSkillsStore } from './skillsStore';
+import { useViewerTabsStore } from './viewerTabsStore';
 import type { SessionFileOperation } from '../types/api';
 
 interface SessionFilesState {
@@ -63,14 +64,16 @@ export const useSessionFilesStore = create<SessionFilesState>((set) => ({
 			allOperations: [],
 			selectedOperationIndex: 0,
 		}),
-	openDiff: (file, operations) =>
+	openDiff: (file, operations) => {
+		useViewerTabsStore.getState().openSessionFileDiffTab(file, operations);
 		set({
 			selectedFile: file,
 			allOperations: operations,
 			selectedOperationIndex: operations.length - 1,
 			isDiffOpen: true,
 			isExpanded: true,
-		}),
+		});
+	},
 	selectOperation: (index) => set({ selectedOperationIndex: index }),
 	closeDiff: () =>
 		set({

@@ -63,14 +63,23 @@ function isMarkdownFile(path: string): boolean {
 
 interface FileViewerPanelProps {
 	mode?: 'overlay' | 'pane';
+	open?: boolean;
+	file?: string | null;
+	onClose?: () => void;
 }
 
 export const FileViewerPanel = memo(function FileViewerPanel({
 	mode = 'overlay',
+	open,
+	file,
+	onClose,
 }: FileViewerPanelProps = {}) {
-	const isViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
-	const selectedFile = useFileBrowserStore((s) => s.selectedFile);
-	const closeViewer = useFileBrowserStore((s) => s.closeViewer);
+	const storeIsViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
+	const storeSelectedFile = useFileBrowserStore((s) => s.selectedFile);
+	const storeCloseViewer = useFileBrowserStore((s) => s.closeViewer);
+	const isViewerOpen = open ?? storeIsViewerOpen;
+	const selectedFile = file ?? storeSelectedFile;
+	const closeViewer = onClose ?? storeCloseViewer;
 
 	const { data, isLoading } = useFileContent(selectedFile);
 
@@ -109,33 +118,35 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={closeViewer}
-					title="Close file viewer (ESC)"
-					className="h-8 w-8"
-				>
-					<X className="size-[17px]" />
-				</Button>
-				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span
-						className="text-[13px] font-medium text-foreground font-mono truncate"
-						title={selectedFile}
+			{mode !== 'pane' && (
+				<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={closeViewer}
+						title="Close file viewer (ESC)"
+						className="h-8 w-8"
 					>
-						{selectedFile}
-					</span>
-					{data && (
-						<span className="text-[12px] text-muted-foreground flex-shrink-0">
-							{data.lineCount} lines
+						<X className="size-[17px]" />
+					</Button>
+					<div className="flex-1 flex items-center gap-2 min-w-0">
+						<span
+							className="text-[13px] font-medium text-foreground font-mono truncate"
+							title={selectedFile}
+						>
+							{selectedFile}
 						</span>
-					)}
+						{data && (
+							<span className="text-[12px] text-muted-foreground flex-shrink-0">
+								{data.lineCount} lines
+							</span>
+						)}
+					</div>
+					<span className="text-[12px] text-muted-foreground pr-1">
+						{language}
+					</span>
 				</div>
-				<span className="text-[12px] text-muted-foreground pr-1">
-					{language}
-				</span>
-			</div>
+			)}
 
 			<div className="flex-1 overflow-auto">
 				{isLoading ? (

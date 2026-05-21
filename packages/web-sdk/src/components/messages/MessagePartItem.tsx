@@ -194,7 +194,8 @@ export const MessagePartItem = memo(
 		onRetry,
 		onCompact,
 	}: MessagePartItemProps) {
-		const isCompactThread = useIsCompactThread();
+		const isCompactDensity = useIsCompactThread();
+		const isCompactThread = Boolean(compact || isCompactDensity);
 		// Show tool_call if it's the last one OR if it has a pending approval
 		// Never show loading indicator for progress_update calls
 		if (part.type === 'tool_call') {

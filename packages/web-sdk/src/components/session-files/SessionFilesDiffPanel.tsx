@@ -6,6 +6,7 @@ import {
 	vscDarkPlus,
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
+import type { SessionFileOperation } from '../../types/api';
 import { Button } from '../ui/Button';
 
 function transformToUnifiedDiff(patch: string): string {
@@ -260,7 +261,7 @@ function FullHeightDiffView({ patch }: { patch: string }) {
 							lineClass = 'text-foreground/80';
 					}
 
-					let renderedContent: React.ReactNode = line.content;
+					let renderedContent: React.ReactNode = line.codeContent || ' ';
 					if (line.codeContent.trim() && language !== 'text') {
 						renderedContent = (
 							<SyntaxHighlighter
@@ -285,46 +286,27 @@ function FullHeightDiffView({ patch }: { patch: string }) {
 								{line.codeContent}
 							</SyntaxHighlighter>
 						);
-
-						if (line.type === 'add') {
-							renderedContent = (
-								<>
-									<span className="select-none">+</span>
-									{renderedContent}
-								</>
-							);
-						} else if (line.type === 'remove') {
-							renderedContent = (
-								<>
-									<span className="select-none">-</span>
-									{renderedContent}
-								</>
-							);
-						} else if (line.type === 'context') {
-							renderedContent = (
-								<>
-									<span className="select-none"> </span>
-									{renderedContent}
-								</>
-							);
-						}
 					}
+
+					const lineNumber = line.newLineNum ?? line.oldLineNum ?? '';
+					const sign =
+						line.type === 'add' ? '+' : line.type === 'remove' ? '-' : '';
 
 					return (
 						<div key={key} className={`flex ${bgClass}`}>
 							<div
-								className="px-2 py-0.5 text-right text-muted-foreground/40 select-none w-12 flex-shrink-0"
+								className="px-2 py-0.5 text-right text-muted-foreground/40 select-none w-14 flex-shrink-0"
 								aria-hidden="true"
 								style={{ pointerEvents: 'none' }}
 							>
-								{line.oldLineNum || ''}
+								{lineNumber}
 							</div>
 							<div
-								className="px-2 py-0.5 text-right text-muted-foreground/40 select-none w-12 flex-shrink-0 border-r border-border/50"
+								className={`px-2 py-0.5 text-center select-none w-8 flex-shrink-0 border-r border-border/50 ${lineClass}`}
 								aria-hidden="true"
 								style={{ pointerEvents: 'none' }}
 							>
-								{line.newLineNum || ''}
+								{sign}
 							</div>
 							<div
 								className={`px-3 py-0.5 flex-1 min-w-0 whitespace-pre-wrap break-all ${lineClass}`}
@@ -346,21 +328,41 @@ function formatTimestamp(timestamp: number): string {
 
 interface SessionFilesDiffPanelProps {
 	mode?: 'overlay' | 'pane';
+	open?: boolean;
+	file?: string | null;
+	operations?: SessionFileOperation[];
+	operationIndex?: number;
+	onOperationIndexChange?: (index: number) => void;
+	onClose?: () => void;
 }
 
 export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 	mode = 'overlay',
+	open,
+	file,
+	operations,
+	operationIndex,
+	onOperationIndexChange,
+	onClose,
 }: SessionFilesDiffPanelProps = {}) {
-	const isDiffOpen = useSessionFilesStore((state) => state.isDiffOpen);
-	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
-	const allOperations = useSessionFilesStore((state) => state.allOperations);
-	const selectedOperationIndex = useSessionFilesStore(
+	const storeIsDiffOpen = useSessionFilesStore((state) => state.isDiffOpen);
+	const storeSelectedFile = useSessionFilesStore((state) => state.selectedFile);
+	const storeAllOperations = useSessionFilesStore(
+		(state) => state.allOperations,
+	);
+	const storeSelectedOperationIndex = useSessionFilesStore(
 		(state) => state.selectedOperationIndex,
 	);
-	const selectOperation = useSessionFilesStore(
+	const storeSelectOperation = useSessionFilesStore(
 		(state) => state.selectOperation,
 	);
-	const closeDiff = useSessionFilesStore((state) => state.closeDiff);
+	const storeCloseDiff = useSessionFilesStore((state) => state.closeDiff);
+	const isDiffOpen = open ?? storeIsDiffOpen;
+	const selectedFile = file ?? storeSelectedFile;
+	const allOperations = operations ?? storeAllOperations;
+	const selectedOperationIndex = operationIndex ?? storeSelectedOperationIndex;
+	const selectOperation = onOperationIndexChange ?? storeSelectOperation;
+	const closeDiff = onClose ?? storeCloseDiff;
 
 	const selectedOperation = allOperations[selectedOperationIndex];
 
@@ -437,75 +439,77 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
-			<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={closeDiff}
-					title="Close diff viewer (ESC)"
-					className="h-8 w-8"
-				>
-					<X className="size-[17px]" />
-				</Button>
-				<div className="flex-1 flex items-center gap-2 min-w-0">
-					<span
-						className="text-[13px] font-medium text-foreground font-mono truncate"
-						title={selectedFile}
+			{mode !== 'pane' && (
+				<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={closeDiff}
+						title="Close diff viewer (ESC)"
+						className="h-8 w-8"
 					>
-						{selectedFile}
-					</span>
-					<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
-						{selectedOperation.operation}
-					</span>
-					{selectedOperation.artifact?.summary && (
-						<div className="flex items-center gap-1 text-[12px] flex-shrink-0">
-							<span className="text-green-500">
-								+{selectedOperation.artifact.summary.additions}
+						<X className="size-[17px]" />
+					</Button>
+					<div className="flex-1 flex items-center gap-2 min-w-0">
+						<span
+							className="text-[13px] font-medium text-foreground font-mono truncate"
+							title={selectedFile}
+						>
+							{selectedFile}
+						</span>
+						<span className="text-[12px] px-1.5 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0 capitalize">
+							{selectedOperation.operation}
+						</span>
+						{selectedOperation.artifact?.summary && (
+							<div className="flex items-center gap-1 text-[12px] flex-shrink-0">
+								<span className="text-green-500">
+									+{selectedOperation.artifact.summary.additions}
+								</span>
+								<span className="text-red-500">
+									-{selectedOperation.artifact.summary.deletions}
+								</span>
+							</div>
+						)}
+					</div>
+
+					{hasMultipleOps && (
+						<div className="flex items-center gap-1 shrink-0">
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={() =>
+									selectOperation(Math.max(0, selectedOperationIndex - 1))
+								}
+								disabled={selectedOperationIndex === 0}
+								title="Previous operation (←)"
+								className="h-8 w-8"
+							>
+								<ChevronLeft className="size-[17px]" />
+							</Button>
+							<span className="text-[11px] text-muted-foreground min-w-[50px] text-center">
+								{selectedOperationIndex + 1} / {allOperations.length}
 							</span>
-							<span className="text-red-500">
-								-{selectedOperation.artifact.summary.deletions}
-							</span>
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={() =>
+									selectOperation(
+										Math.min(
+											allOperations.length - 1,
+											selectedOperationIndex + 1,
+										),
+									)
+								}
+								disabled={selectedOperationIndex === allOperations.length - 1}
+								title="Next operation (→)"
+								className="h-8 w-8"
+							>
+								<ChevronRight className="size-[17px]" />
+							</Button>
 						</div>
 					)}
 				</div>
-
-				{hasMultipleOps && (
-					<div className="flex items-center gap-1 shrink-0">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() =>
-								selectOperation(Math.max(0, selectedOperationIndex - 1))
-							}
-							disabled={selectedOperationIndex === 0}
-							title="Previous operation (←)"
-							className="h-8 w-8"
-						>
-							<ChevronLeft className="size-[17px]" />
-						</Button>
-						<span className="text-[11px] text-muted-foreground min-w-[50px] text-center">
-							{selectedOperationIndex + 1} / {allOperations.length}
-						</span>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() =>
-								selectOperation(
-									Math.min(
-										allOperations.length - 1,
-										selectedOperationIndex + 1,
-									),
-								)
-							}
-							disabled={selectedOperationIndex === allOperations.length - 1}
-							title="Next operation (→)"
-							className="h-8 w-8"
-						>
-							<ChevronRight className="size-[17px]" />
-						</Button>
-					</div>
-				)}
-			</div>
+			)}
 
 			{hasMultipleOps && (
 				<div className="border-b border-border px-2 py-1.5 flex gap-1.5 overflow-x-auto shrink-0">

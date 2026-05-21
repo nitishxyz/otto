@@ -93,6 +93,9 @@ export * from './file-browser/FileBrowserSidebarToggle';
 export * from './file-browser/FileViewerPanel';
 export * from './file-browser/QuickFilePicker';
 
+// Workspace Components
+export * from './workspace/ViewerTabs';
+
 // Common Components
 export * from './common/ProviderLogo';
 export * from './common/StatusIndicator';

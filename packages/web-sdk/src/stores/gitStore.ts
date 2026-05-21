@@ -6,6 +6,7 @@ import { useTunnelStore } from './tunnelStore';
 import { useFileBrowserStore } from './fileBrowserStore';
 import { useMCPStore } from './mcpStore';
 import { useSkillsStore } from './skillsStore';
+import { useViewerTabsStore } from './viewerTabsStore';
 
 interface GitState {
 	// Sidebar state
@@ -75,13 +76,15 @@ export const useGitStore = create<GitState>((set) => ({
 		set({ isExpanded: false, isDiffOpen: false, selectedFile: null }),
 
 	// Diff panel actions
-	openDiff: (file, staged) =>
+	openDiff: (file, staged) => {
+		useViewerTabsStore.getState().openGitDiffTab(file, staged);
 		set({
 			selectedFile: file,
 			selectedFileStaged: staged,
 			isDiffOpen: true,
 			isExpanded: true,
-		}),
+		});
+	},
 	closeDiff: () =>
 		set({
 			isDiffOpen: false,

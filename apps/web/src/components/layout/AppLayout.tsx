@@ -6,26 +6,23 @@ import {
 	GitSidebar,
 	TerminalPanelToggle,
 	TerminalsPanel,
-	GitDiffPanel,
 	GitCommitModal,
 	ConfirmationDialog,
 	Button,
 	SessionFilesSidebarToggle,
 	SessionFilesSidebar,
-	SessionFilesDiffPanel,
 	SettingsSidebar,
 	SettingsSidebarToggle,
 	TunnelSidebar,
 	TunnelSidebarToggle,
 	FileBrowserSidebar,
 	FileBrowserSidebarToggle,
-	FileViewerPanel,
 	MCPSidebar,
 	MCPSidebarToggle,
 	SkillsSidebar,
 	SkillsSidebarToggle,
-	SkillViewerPanel,
 	QuickFilePicker,
+	ViewerTabs,
 } from '@ottocode/web-sdk/components';
 import {
 	useGitStore,
@@ -36,6 +33,7 @@ import {
 	useMCPStore,
 	useSkillsStore,
 	useSidebarStore,
+	useViewerTabsStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
 import { Moon, Sun } from 'lucide-react';
@@ -61,16 +59,13 @@ export const AppLayout = memo(function AppLayout({
 	onFixWithAI,
 }: AppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
-	const gitDiffOpen = useGitStore((s) => s.isDiffOpen);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
-	const sessionFilesDiffOpen = useSessionFilesStore((s) => s.isDiffOpen);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
-	const fileViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
-	const skillViewerOpen = useSkillsStore((s) => s.isViewerOpen);
+	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
 	const anyRightPanelOpen =
 		gitExpanded ||
@@ -80,8 +75,7 @@ export const AppLayout = memo(function AppLayout({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
-	const anyViewerOpen =
-		gitDiffOpen || sessionFilesDiffOpen || fileViewerOpen || skillViewerOpen;
+	const anyViewerOpen = viewerTabCount > 0;
 	const anyRightSurfaceOpen = anyRightPanelOpen || anyViewerOpen;
 
 	// Auto-collapse sessions list when any right-side surface is open,
@@ -120,10 +114,7 @@ export const AppLayout = memo(function AppLayout({
 					</main>
 					{anyViewerOpen && (
 						<section className="flex flex-1 min-w-0 md:border-l md:border-sidebar-border bg-sidebar">
-							<GitDiffPanel mode="pane" />
-							<SessionFilesDiffPanel mode="pane" />
-							<FileViewerPanel mode="pane" />
-							<SkillViewerPanel mode="pane" />
+							<ViewerTabs />
 						</section>
 					)}
 

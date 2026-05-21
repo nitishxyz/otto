@@ -94,29 +94,10 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 			? diff.language
 			: inferLanguageFromPath(diff.file);
 
-	// Get just the filename for the internal header
-	const fileName = getFileName(diff.file);
-
 	// Handle new files - show full content instead of diff
 	if (diff.isNewFile && diff.content) {
 		return (
 			<div className="flex flex-col h-full bg-transparent">
-				{/* Header with just filename and stats */}
-				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
-					<span
-						className="font-mono text-[13px] text-foreground truncate"
-						title={diff.file}
-					>
-						{fileName}
-					</span>
-					<div className="flex items-center gap-2 text-[11px] flex-shrink-0">
-						<span className="text-green-600 dark:text-green-500">
-							+{diff.insertions}
-						</span>
-						<span className="text-muted-foreground">{resolvedLanguage}</span>
-					</div>
-				</div>
-
 				{/* New file banner */}
 				<div className="px-4 py-3 bg-green-500/10 border-b border-green-500/20">
 					<p className="text-[13px] text-green-600 dark:text-green-400 font-medium">
@@ -167,24 +148,11 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 
 		return (
 			<div className="flex flex-col h-full bg-transparent">
-				{/* Header with just filename */}
-				<div className="px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/60 flex items-center justify-between min-h-8">
-					<span
-						className="font-mono text-[13px] text-foreground truncate"
-						title={diff.file}
-					>
-						{fileName}
-					</span>
-					<div className="flex items-center gap-2 text-[11px] flex-shrink-0">
-						<span className="text-muted-foreground">Binary file</span>
-					</div>
-				</div>
-
 				{imageUrl ? (
 					<div className="flex-1 flex items-center justify-center p-4 overflow-auto">
 						<img
 							src={imageUrl}
-							alt={fileName}
+							alt={getFileName(diff.file)}
 							className="max-w-full max-h-[60vh] object-contain rounded border border-border"
 						/>
 					</div>
@@ -209,6 +177,15 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	let newLineNum = 0;
 
 	for (const line of lines) {
+		const isMetadataLine =
+			line.startsWith('diff') ||
+			line.startsWith('index') ||
+			line.startsWith('---') ||
+			line.startsWith('+++');
+		if (isMetadataLine) {
+			continue;
+		}
+
 		if (line.startsWith('@@')) {
 			// Parse hunk header to get starting line numbers
 			const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -222,19 +199,6 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				content: line,
 				codeContent: line,
 				type: 'hunk',
-			});
-		} else if (
-			line.startsWith('diff') ||
-			line.startsWith('index') ||
-			line.startsWith('---') ||
-			line.startsWith('+++')
-		) {
-			diffLines.push({
-				oldLineNumber: null,
-				newLineNumber: null,
-				content: line,
-				codeContent: line,
-				type: 'meta',
 			});
 		} else if (line.startsWith('+')) {
 			diffLines.push({
@@ -272,38 +236,44 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	const renderLine = (diffLine: DiffLine, index: number) => {
 		let rowClassName = 'flex hover:bg-muted/20';
 		let lineNumberClassName =
-			'flex-shrink-0 w-20 px-2 py-0.5 text-[13px] font-mono select-none border-r border-border';
+			'flex-shrink-0 w-14 px-2 py-0.5 text-[13px] font-mono select-none text-right';
+		let signClassName =
+			'flex-shrink-0 w-8 px-2 py-0.5 text-[13px] font-mono select-none border-r border-border text-center';
 		let contentClassName =
-			'flex-1 px-4 py-0.5 font-mono text-[13px] whitespace-pre';
+			'flex-1 px-3 py-0.5 font-mono text-[13px] whitespace-pre';
 
 		// Apply background colors for add/delete/hunk
 		if (diffLine.type === 'hunk') {
 			rowClassName += ' bg-blue-500/10';
 			lineNumberClassName += ' text-blue-600 dark:text-blue-400';
+			signClassName += ' text-blue-600 dark:text-blue-400';
 			contentClassName += ' text-blue-600 dark:text-blue-400 font-semibold';
 		} else if (diffLine.type === 'add') {
 			rowClassName += ' bg-green-500/10';
 			lineNumberClassName += ' text-green-700 dark:text-green-400';
+			signClassName += ' text-green-700 dark:text-green-400';
 			contentClassName += ' text-green-700 dark:text-green-400';
 		} else if (diffLine.type === 'delete') {
 			rowClassName += ' bg-red-500/10';
 			lineNumberClassName += ' text-red-600 dark:text-red-400';
+			signClassName += ' text-red-600 dark:text-red-400';
 			contentClassName += ' text-red-600 dark:text-red-400';
 		} else if (diffLine.type === 'meta') {
 			contentClassName += ' text-muted-foreground';
 			lineNumberClassName += ' text-muted-foreground';
+			signClassName += ' text-muted-foreground';
 		} else {
 			contentClassName += ' text-foreground/80';
 			lineNumberClassName += ' text-muted-foreground';
+			signClassName += ' text-muted-foreground';
 		}
 
-		const oldNum =
-			diffLine.oldLineNumber !== null ? diffLine.oldLineNumber.toString() : '';
-		const newNum =
-			diffLine.newLineNumber !== null ? diffLine.newLineNumber.toString() : '';
+		const lineNumber = diffLine.newLineNumber ?? diffLine.oldLineNumber ?? '';
+		const sign =
+			diffLine.type === 'add' ? '+' : diffLine.type === 'delete' ? '-' : '';
 
 		// For code lines (not meta/hunk), apply syntax highlighting
-		let renderedContent: React.ReactNode = diffLine.content || ' ';
+		let renderedContent: React.ReactNode = diffLine.codeContent || ' ';
 
 		if (
 			diffLine.type !== 'meta' &&
@@ -334,37 +304,23 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 					{diffLine.codeContent}
 				</SyntaxHighlighter>
 			);
-
-			// Add back the +/- prefix if it was an add/delete
-			if (diffLine.type === 'add') {
-				renderedContent = (
-					<>
-						<span className="select-none">+</span>
-						{renderedContent}
-					</>
-				);
-			} else if (diffLine.type === 'delete') {
-				renderedContent = (
-					<>
-						<span className="select-none">-</span>
-						{renderedContent}
-					</>
-				);
-			}
 		}
 
 		return (
 			<div key={index} className={rowClassName}>
-				{/* Line numbers - using aria-hidden and pointer-events:none for better selection behavior */}
 				<div
 					className={lineNumberClassName}
 					aria-hidden="true"
 					style={{ pointerEvents: 'none' }}
 				>
-					<div className="flex justify-between gap-2">
-						<span className="text-right w-8">{oldNum}</span>
-						<span className="text-right w-8">{newNum}</span>
-					</div>
+					{diffLine.type === 'hunk' ? '' : lineNumber}
+				</div>
+				<div
+					className={signClassName}
+					aria-hidden="true"
+					style={{ pointerEvents: 'none' }}
+				>
+					{sign}
 				</div>
 				<div className={contentClassName}>{renderedContent}</div>
 			</div>
@@ -380,32 +336,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 						No changes to display
 					</div>
 				) : (
-					<div className="min-w-max">
-						<div className="sticky top-0 z-10 px-3 py-1.5 bg-sidebar-accent/95 border-b border-sidebar-border/60 flex items-center justify-between min-h-8 backdrop-blur-sm">
-							<span
-								className="font-mono text-[12px] text-foreground truncate"
-								title={diff.file}
-							>
-								{fileName}
-							</span>
-							<div className="flex items-center gap-2 text-[10px] flex-shrink-0 pl-3">
-								{diff.insertions > 0 && (
-									<span className="text-green-600 dark:text-green-500">
-										+{diff.insertions}
-									</span>
-								)}
-								{diff.deletions > 0 && (
-									<span className="text-red-600 dark:text-red-500">
-										-{diff.deletions}
-									</span>
-								)}
-								<span className="text-muted-foreground">
-									{resolvedLanguage}
-								</span>
-							</div>
-						</div>
-						{diffLines.map(renderLine)}
-					</div>
+					<div className="min-w-max">{diffLines.map(renderLine)}</div>
 				)}
 			</div>
 		</div>

@@ -6,6 +6,7 @@ import { useSettingsStore } from './settingsStore';
 import { useTunnelStore } from './tunnelStore';
 import { useMCPStore } from './mcpStore';
 import { useSkillsStore } from './skillsStore';
+import { useViewerTabsStore } from './viewerTabsStore';
 
 interface FileBrowserState {
 	isExpanded: boolean;
@@ -58,11 +59,13 @@ export const useFileBrowserStore = create<FileBrowserState>((set) => ({
 			isViewerOpen: false,
 			selectedFile: null,
 		}),
-	openFile: (path) =>
+	openFile: (path) => {
+		useViewerTabsStore.getState().openFileTab(path);
 		set({
 			selectedFile: path,
 			isViewerOpen: true,
-		}),
+		});
+	},
 	closeViewer: () =>
 		set({
 			isViewerOpen: false,
