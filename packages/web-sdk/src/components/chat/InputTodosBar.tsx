@@ -35,7 +35,7 @@ function TodoIcon({ status }: { status: TodoItem['status'] }) {
 
 function todoTextClass(status: TodoItem['status'], isCurrent = false) {
 	if (status === 'completed') return 'text-muted-foreground line-through';
-	if (isCurrent) return 'text-foreground';
+	if (isCurrent) return 'text-orange-600 dark:text-orange-300 font-medium';
 	if (status === 'in_progress') return 'text-foreground';
 	if (status === 'cancelled') {
 		return 'text-muted-foreground/50 line-through';
@@ -55,7 +55,9 @@ function TodoRow({
 	return (
 		<div
 			className={`flex items-center gap-2 min-w-0 px-3 py-2 ${
-				isCurrent ? 'bg-muted/50' : ''
+				isCurrent
+					? 'bg-orange-500/10 border-l-2 border-orange-500/70 pl-2.5'
+					: ''
 			} ${className ?? ''}`}
 		>
 			<TodoIcon status={item.status} />
@@ -172,10 +174,18 @@ export const InputTodosBar = memo(function InputTodosBar({
 	const items = snapshot?.items ?? [];
 	const hasTodos = items.length > 0;
 	const visibleTodo = useMemo(() => pickVisibleTodo(items), [items]);
+	const visibleTodoIndex = visibleTodo
+		? items.findIndex((item) => item === visibleTodo)
+		: -1;
 	const completedCount = items.filter(
 		(item) => item.status === 'completed',
 	).length;
-	const visibleTodoKey = visibleTodo ? getTodoKey(visibleTodo) : 'none';
+	const visibleTodoKey = visibleTodo
+		? getTodoKey(
+				visibleTodo,
+				visibleTodoIndex >= 0 ? visibleTodoIndex : undefined,
+			)
+		: 'none';
 	const canExpand = items.length > 1 || Boolean(snapshot?.note);
 
 	return (
