@@ -66,7 +66,7 @@ export const TunnelSidebar = memo(function TunnelSidebar() {
 	if (!isExpanded) return null;
 
 	return (
-		<div className="w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
+		<div className="w-full min-w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
 			<SidebarHeader
 				icon={<Globe className="size-[15px]" />}
 				title="Remote Access"
