@@ -170,7 +170,7 @@ export const InputQueueBar = memo(function InputQueueBar({
 									canExpand ? 'hover:bg-muted cursor-pointer' : 'cursor-default'
 								}`}
 							>
-								<Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+								<Clock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
 								<span className="text-xs font-medium text-foreground flex-shrink-0">
 									Queued
 								</span>
@@ -210,7 +210,7 @@ export const InputQueueBar = memo(function InputQueueBar({
 								onClick={() => setIsExpanded(false)}
 								className="flex w-full items-center gap-2 px-3 py-2 border-b border-border text-left transition-colors hover:bg-muted"
 							>
-								<ListOrdered className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+								<ListOrdered className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
 								<span className="text-xs font-medium text-foreground">
 									Queued messages
 								</span>

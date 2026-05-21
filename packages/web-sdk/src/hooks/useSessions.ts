@@ -109,7 +109,9 @@ export function useMarkSessionViewed() {
 						pages: old.pages.map((page) => ({
 							...page,
 							items: page.items.map((session) =>
-								session.id === updatedSession.id ? updatedSession : session,
+								session.id === updatedSession.id
+									? { ...session, ...updatedSession }
+									: session,
 							),
 						})),
 					};

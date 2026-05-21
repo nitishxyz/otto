@@ -35,6 +35,11 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Navigation',
 	},
 	{
+		keys: ['Ctrl', 'J'],
+		description: 'Toggle terminal panel',
+		category: 'Navigation',
+	},
+	{
 		keys: ['Ctrl', 'N'],
 		description: 'Create new session',
 		category: 'Navigation',

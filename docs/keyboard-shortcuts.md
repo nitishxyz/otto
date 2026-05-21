@@ -20,6 +20,8 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
 
 - **Ctrl+\\** - Toggle right sidebar collapse/expand
 
+- **Ctrl+J / Cmd+J** - Toggle terminal panel open/closed
+
 - **Ctrl+N** - Create new session
 
 - **ESC** - Close sidebar and return to center

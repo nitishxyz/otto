@@ -4,6 +4,7 @@ import { useSidebarStore } from '../stores/sidebarStore';
 import { useGitStore } from '../stores/gitStore';
 import { useResearchStore } from '../stores/researchStore';
 import { useFilePickerStore } from '../stores/filePickerStore';
+import { useTerminalStore } from '../stores/terminalStore';
 
 interface UseKeyboardShortcutsOptions {
 	sessionIds: string[];
@@ -54,6 +55,7 @@ export function useKeyboardShortcuts({
 	const { isExpanded: isGitExpanded, toggleSidebar: toggleGit } = useGitStore();
 	const closeDiff = useGitStore((state) => state.closeDiff);
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
+	const toggleTerminalPanel = useTerminalStore((state) => state.togglePanel);
 
 	const currentSessionIndex = sessionIds.indexOf(activeSessionId || '');
 
@@ -135,6 +137,12 @@ export function useKeyboardShortcuts({
 			if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
 				e.preventDefault();
 				toggleGit();
+				return;
+			}
+
+			if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
+				e.preventDefault();
+				toggleTerminalPanel();
 				return;
 			}
 
@@ -289,6 +297,7 @@ export function useKeyboardShortcuts({
 			resetGitFileIndex,
 			setSessionListCollapsed,
 			toggleGit,
+			toggleTerminalPanel,
 			toggleResearch,
 			toggleSessionList,
 			onSelectSession,
@@ -307,8 +316,8 @@ export function useKeyboardShortcuts({
 	);
 
 	useEffect(() => {
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
+		window.addEventListener('keydown', handleKeyDown, true);
+		return () => window.removeEventListener('keydown', handleKeyDown, true);
 	}, [handleKeyDown]);
 
 	return {
