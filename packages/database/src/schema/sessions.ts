@@ -10,6 +10,7 @@ export const sessions = sqliteTable('sessions', {
 	createdAt: integer('created_at', { mode: 'number' }).notNull(),
 	// Metadata
 	lastActiveAt: integer('last_active_at', { mode: 'number' }),
+	lastViewedAt: integer('last_viewed_at', { mode: 'number' }),
 	totalInputTokens: integer('total_input_tokens'),
 	totalOutputTokens: integer('total_output_tokens'),
 	totalCachedTokens: integer('total_cached_tokens'),

@@ -15,6 +15,7 @@ interface CompactActivityGroupProps {
 	titleOverride?: string;
 	showLine: boolean;
 	collapsed: boolean;
+	compact?: boolean;
 }
 
 export function CompactActivityGroup({
@@ -22,8 +23,10 @@ export function CompactActivityGroup({
 	titleOverride,
 	showLine,
 	collapsed,
+	compact,
 }: CompactActivityGroupProps) {
-	const isCompact = useIsCompactThread();
+	const isCompactThread = useIsCompactThread();
+	const isCompact = Boolean(compact || isCompactThread);
 	const mountedCollapsed = collapsed && entries.length > 0;
 	const [showSummary, setShowSummary] = useState(mountedCollapsed);
 	const [latched, setLatched] = useState(mountedCollapsed);
@@ -228,8 +231,8 @@ export function CompactActivityGroup({
 										<div
 											key={entry.id}
 											className={`flex items-center px-1 ${
-												isCompact ? 'text-[14px]' : 'text-[15px]'
-											} leading-5 h-7 ${
+												isCompact ? 'text-[13px] h-6' : 'text-[15px] h-7'
+											} leading-5 ${
 												isLast ? 'text-foreground' : 'text-muted-foreground/70'
 											}`}
 											style={{

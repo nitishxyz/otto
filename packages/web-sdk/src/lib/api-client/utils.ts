@@ -66,6 +66,10 @@ export function convertSession(apiSession: ApiSession): Session {
 			typeof apiSession.lastActiveAt === 'string'
 				? new Date(apiSession.lastActiveAt).getTime()
 				: apiSession.lastActiveAt,
+		lastViewedAt:
+			typeof apiSession.lastViewedAt === 'string'
+				? new Date(apiSession.lastViewedAt).getTime()
+				: apiSession.lastViewedAt,
 	} as Session;
 }
 

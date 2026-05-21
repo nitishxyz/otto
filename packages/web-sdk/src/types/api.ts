@@ -7,6 +7,7 @@ export interface Session {
 	projectPath: string;
 	createdAt: number;
 	lastActiveAt: number | null;
+	lastViewedAt?: number | null;
 	totalInputTokens: number | null;
 	totalOutputTokens: number | null;
 	totalCachedTokens?: number | null;
@@ -18,6 +19,12 @@ export interface Session {
 	branchPointMessageId?: string | null;
 	sessionType?: 'main' | 'branch';
 	isRunning?: boolean;
+	fileStats?: {
+		changedFiles: number;
+		additions: number;
+		deletions: number;
+		operations: number;
+	} | null;
 }
 
 export interface Message {

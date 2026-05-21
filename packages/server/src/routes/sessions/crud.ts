@@ -10,6 +10,7 @@ import {
 	buildSessionPreferenceUpdates,
 	deleteSessionMessagesAndParts,
 	findSessionById,
+	getSessionFileStats,
 	loadProjectDb,
 	normalizeSessionRow,
 } from './service.ts';
@@ -112,9 +113,16 @@ export function registerSessionCrudRoutes(app: Hono) {
 				.offset(offset);
 			const hasMore = rows.length > limit;
 			const page = hasMore ? rows.slice(0, limit) : rows;
-			const normalized = page.map((r) =>
-				normalizeSessionRow(r, { includeRunning: true }),
-			);
+			const fileStats = await getSessionFileStats(db, page);
+			const normalized = page.map((r) => {
+				const normalizedSession = normalizeSessionRow(r, {
+					includeRunning: true,
+				});
+				const stats = fileStats.get(r.id);
+				return stats && stats.changedFiles > 0
+					? { ...normalizedSession, fileStats: stats }
+					: normalizedSession;
+			});
 			return c.json({
 				items: normalized,
 				hasMore,
@@ -312,6 +320,83 @@ export function registerSessionCrudRoutes(app: Hono) {
 				return c.json(normalizeSessionRow(session));
 			} catch (err) {
 				logger.error('Failed to get session', err);
+				const errorResponse = serializeError(err);
+				return c.json(errorResponse, errorResponse.error.status || 500);
+			}
+		},
+	);
+
+	// Mark session as viewed by the user
+	openApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/sessions/{sessionId}/viewed',
+			tags: ['sessions'],
+			operationId: 'markSessionViewed',
+			summary: 'Mark a session as viewed',
+			parameters: [
+				{
+					in: 'path',
+					name: 'sessionId',
+					required: true,
+					schema: {
+						type: 'string',
+					},
+				},
+				{
+					in: 'query',
+					name: 'project',
+					required: false,
+					schema: {
+						type: 'string',
+					},
+					description:
+						'Project root override (defaults to current working directory).',
+				},
+			],
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': {
+							schema: {
+								$ref: '#/components/schemas/Session',
+							},
+						},
+					},
+				},
+				'404': {
+					description: 'Not Found',
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const sessionId = c.req.param('sessionId');
+				const projectRoot = c.req.query('project') || process.cwd();
+				const { cfg, db } = await loadProjectDb(projectRoot);
+				const existingSession = await findSessionById(db, sessionId);
+				if (
+					!existingSession ||
+					existingSession.projectPath !== cfg.projectRoot
+				) {
+					return c.json({ error: 'Session not found' }, 404);
+				}
+
+				await db
+					.update(sessions)
+					.set({ lastViewedAt: Date.now() })
+					.where(eq(sessions.id, sessionId));
+
+				const updatedSession = await findSessionById(db, sessionId);
+				return c.json(
+					normalizeSessionRow(updatedSession ?? existingSession, {
+						includeRunning: true,
+					}),
+				);
+			} catch (err) {
+				logger.error('Failed to mark session viewed', err);
 				const errorResponse = serializeError(err);
 				return c.json(errorResponse, errorResponse.error.status || 500);
 			}

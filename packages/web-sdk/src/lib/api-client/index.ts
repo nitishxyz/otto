@@ -15,6 +15,7 @@ class ApiClient {
 	getSessionsPage = sessionsMixin.getSessionsPage;
 	createSession = sessionsMixin.createSession;
 	updateSession = sessionsMixin.updateSession;
+	markSessionViewed = sessionsMixin.markSessionViewed;
 	deleteSession = sessionsMixin.deleteSession;
 	abortSession = sessionsMixin.abortSession;
 	abortMessage = sessionsMixin.abortMessage;

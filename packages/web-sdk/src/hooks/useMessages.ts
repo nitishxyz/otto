@@ -32,8 +32,10 @@ export function useSendMessage(sessionId: string) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (data: SendMessageRequest) =>
-			apiClient.sendMessage(sessionId, data),
+		mutationFn: async (data: SendMessageRequest) => {
+			await apiClient.markSessionViewed(sessionId).catch(() => undefined);
+			return apiClient.sendMessage(sessionId, data);
+		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });

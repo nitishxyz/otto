@@ -5,6 +5,7 @@ import {
 	createMessage as apiCreateMessage,
 	abortSession as apiAbortSession,
 	deleteSession as apiDeleteSession,
+	markSessionViewed as apiMarkSessionViewed,
 	updateSession as apiUpdateSession,
 	getSessionQueue as apiGetSessionQueue,
 	removeFromQueue as apiRemoveFromQueue,
@@ -70,6 +71,12 @@ export const sessionsMixin = {
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: data as any,
 		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return convertSession(response.data as ApiSession);
+	},
+
+	async markSessionViewed(sessionId: string): Promise<Session> {
+		const response = await apiMarkSessionViewed({ path: { sessionId } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return convertSession(response.data as ApiSession);
 	},

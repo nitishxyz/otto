@@ -1,5 +1,5 @@
 import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useSessions } from '../../hooks/useSessions';
+import { useMarkSessionViewed, useSessions } from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +25,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const lastScrolledSessionId = useRef<string | undefined>(undefined);
+	const markedViewedRef = useRef<Map<string, number>>(new Map());
+	const previousActiveSessionId = useRef<string | undefined>(activeSessionId);
+	const markSessionViewed = useMarkSessionViewed();
 
 	const handleSessionClick = useCallback(
 		(sessionId: string) => {
@@ -40,8 +43,10 @@ export const SessionListContainer = memo(function SessionListContainer({
 			index,
 			title: s.title,
 			agent: s.agent,
+			isRunning: s.isRunning ?? false,
 			createdAt: s.createdAt,
 			lastActiveAt: s.lastActiveAt,
+			lastViewedAt: s.lastViewedAt ?? null,
 			activityAt: s.lastActiveAt ?? s.createdAt,
 		}));
 	}, [sessions]);
@@ -51,10 +56,58 @@ export const SessionListContainer = memo(function SessionListContainer({
 		[sessions],
 	);
 
+	const runningSessions = useMemo(
+		() => sessionSnapshot.filter((session) => session.isRunning),
+		[sessionSnapshot],
+	);
+
+	const readyForReviewSessions = useMemo(
+		() =>
+			sessionSnapshot.filter(
+				(session) =>
+					!session.isRunning &&
+					session.activityAt > (session.lastViewedAt ?? 0),
+			),
+		[sessionSnapshot],
+	);
+
+	const statusSessionIds = useMemo(
+		() =>
+			new Set(
+				[...runningSessions, ...readyForReviewSessions].map(
+					(session) => session.id,
+				),
+			),
+		[readyForReviewSessions, runningSessions],
+	);
+
+	const statusGroups = useMemo(
+		() => [
+			...(runningSessions.length > 0
+				? [
+						{
+							label: 'Running',
+							sessions: runningSessions,
+						},
+					]
+				: []),
+			...(readyForReviewSessions.length > 0
+				? [
+						{
+							label: 'Ready for Review',
+							sessions: readyForReviewSessions,
+						},
+					]
+				: []),
+		],
+		[readyForReviewSessions, runningSessions],
+	);
+
 	const recentGroups = useMemo(() => {
 		const groups = new Map<string, typeof sessionSnapshot>();
 
 		for (const session of sessionSnapshot) {
+			if (statusSessionIds.has(session.id)) continue;
 			const label = getSessionGroupLabel(session.activityAt);
 			const existingSessions = groups.get(label) ?? [];
 			existingSessions.push(session);
@@ -65,7 +118,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 			label,
 			sessions: groupedSessions,
 		}));
-	}, [sessionSnapshot]);
+	}, [sessionSnapshot, statusSessionIds]);
 
 	useEffect(() => {
 		if (currentFocus === 'sessions') {
@@ -76,6 +129,31 @@ export const SessionListContainer = memo(function SessionListContainer({
 			}
 		}
 	}, [currentFocus, sessionIndex, sessionSnapshot]);
+
+	const markViewedIfReady = useCallback(
+		(sessionId: string) => {
+			const session = sessionSnapshot.find((item) => item.id === sessionId);
+			if (!session || session.isRunning) return;
+			if (session.activityAt <= (session.lastViewedAt ?? 0)) return;
+			if (markedViewedRef.current.get(session.id) === session.activityAt) {
+				return;
+			}
+
+			markedViewedRef.current.set(session.id, session.activityAt);
+			markSessionViewed.mutate(session.id, {
+				onError: () => markedViewedRef.current.delete(session.id),
+			});
+		},
+		[markSessionViewed, sessionSnapshot],
+	);
+
+	useEffect(() => {
+		const previousId = previousActiveSessionId.current;
+		if (previousId && previousId !== activeSessionId) {
+			markViewedIfReady(previousId);
+		}
+		previousActiveSessionId.current = activeSessionId;
+	}, [activeSessionId, markViewedIfReady]);
 
 	useEffect(() => {
 		if (
@@ -162,28 +240,35 @@ export const SessionListContainer = memo(function SessionListContainer({
 		);
 	};
 
+	const renderGroup = (group: {
+		label: string;
+		sessions: typeof sessionSnapshot;
+	}) => (
+		<div key={group.label}>
+			<h4 className="sticky top-12 z-10 px-3 py-2 mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
+				<span>{group.label}</span>
+				<span className="ml-2 text-sidebar-muted-foreground/60">
+					{group.sessions.length}
+				</span>
+			</h4>
+			<div className="flex flex-col gap-1 px-3">
+				{group.sessions.map((session) => renderSession(session))}
+			</div>
+		</div>
+	);
+
 	return (
 		<div
 			ref={scrollContainerRef}
 			className="flex flex-col h-full overflow-y-auto scrollbar-hide"
 		>
 			<div className="h-12 shrink-0" aria-hidden="true" />
-			{recentGroups.length > 0 && (
-				<div className="pt-3 pb-1">
-					<div className="space-y-3">
-						{recentGroups.map((group) => (
-							<div key={group.label}>
-								<h4 className="sticky top-12 z-10 px-3 py-2 mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
-									{group.label}
-								</h4>
-								<div className="flex flex-col gap-1 px-3">
-									{group.sessions.map((session) => renderSession(session))}
-								</div>
-							</div>
-						))}
-					</div>
+			<div className="pt-3 pb-1">
+				<div className="space-y-3">
+					{statusGroups.map((group) => renderGroup(group))}
+					{recentGroups.map((group) => renderGroup(group))}
 				</div>
-			)}
+			</div>
 
 			{isFetchingNextPage && (
 				<div className="flex justify-center py-3">

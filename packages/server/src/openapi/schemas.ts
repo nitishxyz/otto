@@ -90,6 +90,7 @@ export const schemas = {
 			projectPath: { type: 'string' },
 			createdAt: { type: 'integer', format: 'int64' },
 			lastActiveAt: { type: 'integer', format: 'int64', nullable: true },
+			lastViewedAt: { type: 'integer', format: 'int64', nullable: true },
 			totalInputTokens: { type: 'integer', nullable: true },
 			totalOutputTokens: { type: 'integer', nullable: true },
 			totalCachedTokens: { type: 'integer', nullable: true },
@@ -99,6 +100,17 @@ export const schemas = {
 			toolCounts: {
 				type: 'object',
 				additionalProperties: { type: 'integer' },
+				nullable: true,
+			},
+			fileStats: {
+				type: 'object',
+				properties: {
+					changedFiles: { type: 'integer' },
+					additions: { type: 'integer' },
+					deletions: { type: 'integer' },
+					operations: { type: 'integer' },
+				},
+				required: ['changedFiles', 'additions', 'deletions', 'operations'],
 				nullable: true,
 			},
 			isRunning: { type: 'boolean' },

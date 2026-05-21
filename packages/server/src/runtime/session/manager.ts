@@ -50,6 +50,7 @@ export async function createSession({
 		projectPath: cfg.projectRoot,
 		createdAt: now,
 		lastActiveAt: now,
+		lastViewedAt: now,
 		totalInputTokens: null,
 		totalOutputTokens: null,
 		totalCachedTokens: null,

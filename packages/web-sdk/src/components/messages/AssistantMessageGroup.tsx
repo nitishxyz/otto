@@ -396,6 +396,7 @@ export const AssistantMessageGroup = memo(
 										message.status !== 'pending' ||
 										renderIndex < renderItems.length - 1
 									}
+									compact={compact}
 								/>
 							);
 						}
