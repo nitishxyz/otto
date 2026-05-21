@@ -1,4 +1,5 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const RECENT_WINDOW_IN_MS = 15 * 60 * 1000;
 
 /**
  * Formats a timestamp into a compact relative label for session metadata.
@@ -31,6 +32,7 @@ export function formatRelativeSessionTime(timestamp: number): string {
  */
 export function getSessionGroupLabel(timestamp: number): string {
 	const now = new Date();
+	const diff = now.getTime() - timestamp;
 	const startOfToday = new Date(
 		now.getFullYear(),
 		now.getMonth(),
@@ -39,7 +41,8 @@ export function getSessionGroupLabel(timestamp: number): string {
 	const startOfYesterday = startOfToday - DAY_IN_MS;
 	const startOfLastWeek = startOfToday - DAY_IN_MS * 7;
 
-	if (timestamp >= startOfToday) return 'Today';
+	if (diff <= RECENT_WINDOW_IN_MS) return 'Recent';
+	if (timestamp >= startOfToday) return 'Earlier Today';
 	if (timestamp >= startOfYesterday) return 'Yesterday';
 	if (timestamp >= startOfLastWeek) return 'Earlier';
 	return 'Older';
