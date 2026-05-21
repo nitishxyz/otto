@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
 	ArrowRight,
 	CheckCircle2,
@@ -112,6 +112,58 @@ function shouldHighlightTodo(
 	);
 }
 
+function AnimatedCurrentTodo({
+	item,
+	itemKey,
+}: {
+	item: TodoItem | undefined;
+	itemKey: string;
+}) {
+	const [displayedItem, setDisplayedItem] = useState(item);
+	const [displayedKey, setDisplayedKey] = useState(itemKey);
+	const [phase, setPhase] = useState<'idle' | 'out' | 'in'>('idle');
+
+	useEffect(() => {
+		if (displayedKey === itemKey) return;
+
+		if (!displayedItem) {
+			setDisplayedItem(item);
+			setDisplayedKey(itemKey);
+			setPhase('in');
+			const frame = requestAnimationFrame(() => setPhase('idle'));
+			return () => cancelAnimationFrame(frame);
+		}
+
+		setPhase('out');
+		const timeout = setTimeout(() => {
+			setDisplayedItem(item);
+			setDisplayedKey(itemKey);
+			setPhase('in');
+			requestAnimationFrame(() => setPhase('idle'));
+		}, 140);
+
+		return () => clearTimeout(timeout);
+	}, [displayedItem, displayedKey, item, itemKey]);
+
+	if (!displayedItem) return null;
+
+	const animationClass =
+		phase === 'out'
+			? 'opacity-0 -translate-y-1'
+			: phase === 'in'
+				? 'opacity-0 translate-y-1'
+				: 'opacity-100 translate-y-0';
+
+	return (
+		<TodoInline
+			key={displayedKey}
+			item={displayedItem}
+			isCurrent={shouldHighlightTodo(displayedItem, displayedKey, displayedKey)}
+			className={`flex-1 transition-[opacity,transform] duration-150 ease-out ${animationClass}`}
+		/>
+	);
+}
+
 export const InputTodosBar = memo(function InputTodosBar({
 	sessionId,
 }: InputTodosBarProps) {
@@ -161,15 +213,9 @@ export const InputTodosBar = memo(function InputTodosBar({
 								{visibleTodo && (
 									<>
 										<span className="h-3 w-px bg-border flex-shrink-0" />
-										<TodoInline
-											key={visibleTodoKey}
+										<AnimatedCurrentTodo
 											item={visibleTodo}
-											isCurrent={shouldHighlightTodo(
-												visibleTodo,
-												visibleTodoKey,
-												visibleTodoKey,
-											)}
-											className="flex-1 animate-in fade-in slide-in-from-top-1 duration-200"
+											itemKey={visibleTodoKey}
 										/>
 									</>
 								)}
