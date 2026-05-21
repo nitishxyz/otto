@@ -461,10 +461,10 @@ export const MessageThread = memo(function MessageThread({
 					<div
 						className={
 							density === 'compact'
-								? 'px-2 pt-3 pb-56'
+								? 'px-2 pt-3 pb-80'
 								: compact
-									? 'p-4 pb-56'
-									: 'p-6 pb-64'
+									? 'p-4 pb-80'
+									: 'p-6 pb-96'
 						}
 					>
 						<div className={contentWidthClass}>

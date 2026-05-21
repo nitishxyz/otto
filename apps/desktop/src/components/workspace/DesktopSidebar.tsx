@@ -1,18 +1,13 @@
 import { memo, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRight, Plus, X } from 'lucide-react';
-import {
-	useGitStore,
-	usePanelWidthStore,
-	useSidebarStore,
-} from '@ottocode/web-sdk/stores';
+import { usePanelWidthStore, useSidebarStore } from '@ottocode/web-sdk/stores';
 import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
 
 const PANEL_KEY = 'desktop-left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
-const COLLAPSED_WIDTH = 48;
 
 interface DesktopSidebarProps {
 	children: ReactNode;
@@ -27,14 +22,12 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 	children,
 	onNewSession,
 }: DesktopSidebarProps) {
-	const isDiffOpen = useGitStore((state) => state.isDiffOpen);
 	const isCollapsed = useSidebarStore((state) => state.isCollapsed);
 	const toggleCollapse = useSidebarStore((state) => state.toggleCollapse);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
 	const sidebarStyle = {
-		'--sidebar-width': `${isCollapsed ? COLLAPSED_WIDTH : panelWidth}px`,
 		'--expanded-sidebar-width': `${panelWidth}px`,
 		maxWidth: '100%',
 	} as CSSProperties;
@@ -53,15 +46,15 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 	return (
 		<>
 			<aside
-				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full md:w-[var(--sidebar-width)] ${
+				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full ${
 					isCollapsed
-						? 'hidden md:flex border-border bg-background'
-						: 'flex border-sidebar-border sidebar-fade-in'
+						? 'hidden md:flex md:w-12 border-border bg-background'
+						: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
 				}`}
 				style={sidebarStyle}
 			>
 				{isCollapsed ? (
-					<div className="flex h-full w-12 flex-col">
+					<div className="flex h-full w-full flex-col">
 						<div className="h-12 border-b border-border flex items-center justify-center">
 							<Button
 								variant="ghost"
@@ -77,8 +70,8 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 						<button
 							type="button"
 							className="flex-1 cursor-pointer hover:bg-muted/50 transition-colors touch-manipulation"
-							onClick={!isDiffOpen ? toggleCollapse : undefined}
-							title={!isDiffOpen ? 'Expand sidebar' : undefined}
+							onClick={toggleCollapse}
+							title="Expand sidebar"
 							aria-label="Expand sidebar"
 						/>
 
@@ -88,7 +81,6 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 								size="icon"
 								onClick={toggleCollapse}
 								title="Expand sidebar"
-								disabled={isDiffOpen}
 								className="h-8 w-8 transition-transform duration-200 hover:scale-110 touch-manipulation text-muted-foreground hover:bg-muted/50"
 							>
 								<ChevronRight className="size-[18px]" />
@@ -141,7 +133,6 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 									size="icon"
 									onClick={toggleCollapse}
 									title="Collapse sidebar"
-									disabled={isDiffOpen}
 									className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
 								>
 									<svg

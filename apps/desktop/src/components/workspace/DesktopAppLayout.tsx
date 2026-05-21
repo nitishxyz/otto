@@ -7,26 +7,23 @@ import {
 	ConfirmationDialog,
 	FileBrowserSidebar,
 	FileBrowserSidebarToggle,
-	FileViewerPanel,
 	GitCommitModal,
-	GitDiffPanel,
 	GitSidebar,
 	GitSidebarToggle,
 	MCPSidebar,
 	MCPSidebarToggle,
 	QuickFilePicker,
-	SessionFilesDiffPanel,
 	SessionFilesSidebar,
 	SessionFilesSidebarToggle,
 	SettingsSidebar,
 	SettingsSidebarToggle,
-	SkillViewerPanel,
 	SkillsSidebar,
 	SkillsSidebarToggle,
 	TerminalPanelToggle,
 	TerminalsPanel,
 	TunnelSidebar,
 	TunnelSidebarToggle,
+	ViewerTabs,
 } from '@ottocode/web-sdk/components';
 import {
 	useFileBrowserStore,
@@ -38,6 +35,7 @@ import {
 	useSidebarStore,
 	useSkillsStore,
 	useTunnelStore,
+	useViewerTabsStore,
 } from '@ottocode/web-sdk/stores';
 import { DesktopSidebar } from './DesktopSidebar';
 
@@ -65,17 +63,14 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	onFixWithAI,
 }: DesktopAppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
-	const gitDiffOpen = useGitStore((s) => s.isDiffOpen);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
-	const sessionFilesDiffOpen = useSessionFilesStore((s) => s.isDiffOpen);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
 	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
-	const fileViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
-	const skillViewerOpen = useSkillsStore((s) => s.isViewerOpen);
 	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
+	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
 	const anyRightPanelOpen =
 		gitExpanded ||
@@ -85,8 +80,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
-	const anyViewerOpen =
-		gitDiffOpen || sessionFilesDiffOpen || fileViewerOpen || skillViewerOpen;
+	const anyViewerOpen = viewerTabCount > 0;
 	const anyRightSurfaceOpen = anyRightPanelOpen || anyViewerOpen;
 	const activeRightPanelWidth = gitExpanded
 		? (panelWidths.git ?? RIGHT_PANEL_DEFAULT_WIDTH)
@@ -206,14 +200,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							style={viewerPaneStyle}
 							aria-hidden={!anyViewerOpen}
 						>
-							{anyViewerOpen && (
-								<>
-									<GitDiffPanel mode="pane" />
-									<SessionFilesDiffPanel mode="pane" />
-									<FileViewerPanel mode="pane" />
-									<SkillViewerPanel mode="pane" />
-								</>
-							)}
+							{anyViewerOpen && <ViewerTabs />}
 						</section>
 					</div>
 
