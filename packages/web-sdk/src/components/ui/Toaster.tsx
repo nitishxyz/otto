@@ -104,7 +104,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 			className={`
 				relative overflow-hidden
 				border border-border bg-card
-				rounded-lg shadow-md
+				rounded-r-lg shadow-md
 				transition-all duration-180 ease-out
 				cursor-pointer group
 				${style.accent ? `border-l-2 ${style.accent}` : ''}

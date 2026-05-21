@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import type { ReactNode } from 'react';
 import type { Theme } from '@ottocode/web-sdk/hooks';
 import {
@@ -32,7 +32,6 @@ import {
 	useFileBrowserStore,
 	useMCPStore,
 	useSkillsStore,
-	useSidebarStore,
 	useViewerTabsStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
@@ -66,7 +65,6 @@ export const AppLayout = memo(function AppLayout({
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
-	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
@@ -76,24 +74,6 @@ export const AppLayout = memo(function AppLayout({
 		mcpExpanded ||
 		skillsExpanded;
 	const anyViewerOpen = viewerTabCount > 0;
-	const anyRightSurfaceOpen = anyRightPanelOpen || anyViewerOpen;
-
-	// Auto-collapse sessions list when any right-side surface is open,
-	// and restore the user's previous state when everything closes.
-	const prevRightSurfaceOpenRef = useRef(false);
-	const wasSessionsCollapsedRef = useRef<boolean | null>(null);
-	useEffect(() => {
-		if (anyRightSurfaceOpen && !prevRightSurfaceOpenRef.current) {
-			wasSessionsCollapsedRef.current = useSidebarStore.getState().isCollapsed;
-			setSessionsCollapsed(true);
-		} else if (!anyRightSurfaceOpen && prevRightSurfaceOpenRef.current) {
-			if (wasSessionsCollapsedRef.current !== null) {
-				setSessionsCollapsed(wasSessionsCollapsedRef.current);
-				wasSessionsCollapsedRef.current = null;
-			}
-		}
-		prevRightSurfaceOpenRef.current = anyRightSurfaceOpen;
-	}, [anyRightSurfaceOpen, setSessionsCollapsed]);
 
 	return (
 		<div className="h-screen flex bg-background touch-manipulation border-t border-border/50">

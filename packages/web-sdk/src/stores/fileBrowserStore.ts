@@ -18,8 +18,29 @@ interface FileBrowserState {
 	expandSidebar: () => void;
 	collapseSidebar: () => void;
 	openFile: (path: string) => void;
+	revealFile: (path: string) => void;
 	closeViewer: () => void;
 	toggleDir: (path: string) => void;
+}
+
+function getAncestorDirs(path: string): string[] {
+	const normalizedPath = path.replace(/\\/g, '/').replace(/^\.\//, '');
+	const parts = normalizedPath.split('/').filter(Boolean);
+	return parts
+		.slice(0, -1)
+		.map((_, index) => parts.slice(0, index + 1).join('/'));
+}
+
+function revealFileState(state: FileBrowserState, path: string) {
+	const expandedDirs = new Set(state.expandedDirs);
+	for (const dir of getAncestorDirs(path)) {
+		expandedDirs.add(dir);
+	}
+
+	return {
+		selectedFile: path,
+		expandedDirs,
+	};
 }
 
 export const useFileBrowserStore = create<FileBrowserState>((set) => ({
@@ -61,11 +82,12 @@ export const useFileBrowserStore = create<FileBrowserState>((set) => ({
 		}),
 	openFile: (path) => {
 		useViewerTabsStore.getState().openFileTab(path);
-		set({
-			selectedFile: path,
+		set((state) => ({
+			...revealFileState(state, path),
 			isViewerOpen: true,
-		});
+		}));
 	},
+	revealFile: (path) => set((state) => revealFileState(state, path)),
 	closeViewer: () =>
 		set({
 			isViewerOpen: false,

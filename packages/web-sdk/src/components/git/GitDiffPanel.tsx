@@ -78,7 +78,7 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 		<div
 			className={
 				mode === 'pane'
-					? 'h-full w-full bg-transparent flex flex-col'
+					? 'relative h-full w-full bg-transparent flex flex-col'
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
@@ -125,6 +125,24 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 						{showFullFile ? 'Diff' : 'Full File'}
 					</Button>
 				</div>
+			)}
+			{mode === 'pane' && (
+				<Button
+					variant={showFullFile ? 'secondary' : 'ghost'}
+					size="sm"
+					onClick={() => setShowFullFile((v) => !v)}
+					title={
+						showFullFile ? 'Show diff only (f)' : 'Show full file with diff (f)'
+					}
+					className="absolute right-3 top-3 z-20 h-8 gap-1.5 border border-border/70 bg-background/85 px-2.5 text-[12px] shadow-sm backdrop-blur hover:bg-muted"
+				>
+					{showFullFile ? (
+						<Minimize2 className="w-3.5 h-3.5" />
+					) : (
+						<Maximize2 className="w-3.5 h-3.5" />
+					)}
+					{showFullFile ? 'Diff' : 'Full file'}
+				</Button>
 			)}
 
 			<div className="flex-1 overflow-auto">

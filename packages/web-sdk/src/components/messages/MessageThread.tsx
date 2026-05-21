@@ -94,15 +94,31 @@ function parseTodoSnapshot(
 	return { items, note };
 }
 
+function isTodoSnapshotDone(snapshot: Omit<TodoSnapshot, 'updatedAt'>) {
+	return (
+		snapshot.items.length > 0 &&
+		snapshot.items.every(
+			(item) => item.status === 'completed' || item.status === 'cancelled',
+		)
+	);
+}
+
 function findLatestTodoSnapshot(
 	messages: Message[],
 ): Omit<TodoSnapshot, 'updatedAt'> | null {
+	let hasNewerUserMessage = false;
+
 	for (
 		let messageIndex = messages.length - 1;
 		messageIndex >= 0;
 		messageIndex--
 	) {
-		const parts = messages[messageIndex]?.parts ?? [];
+		const message = messages[messageIndex];
+		if (message?.role === 'user') {
+			hasNewerUserMessage = true;
+		}
+
+		const parts = message?.parts ?? [];
 		for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
 			const part = parts[partIndex];
 			if (part.type !== 'tool_result') continue;
@@ -110,7 +126,10 @@ function findLatestTodoSnapshot(
 			const toolName = getTodoToolName(part, content);
 			if (!toolName || !TODO_TOOL_NAMES.has(toolName)) continue;
 			if (!content) return null;
-			return parseTodoSnapshot(content);
+			const snapshot = parseTodoSnapshot(content);
+			if (!snapshot) return null;
+			if (hasNewerUserMessage && isTodoSnapshotDone(snapshot)) return null;
+			return snapshot;
 		}
 	}
 	return null;

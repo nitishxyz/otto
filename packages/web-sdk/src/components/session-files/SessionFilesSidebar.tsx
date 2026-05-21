@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { FilePen, FilePlus, FileEdit, RefreshCw } from 'lucide-react';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { useSessionFiles } from '../../hooks/useSessionFiles';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
@@ -30,6 +31,22 @@ function getOperationIcon(operation: string) {
 
 function getFileName(path: string): string {
 	return path.split('/').pop() || path;
+}
+
+function getViewerTabPath(
+	tab:
+		| ReturnType<typeof useViewerTabsStore.getState>['tabs'][number]
+		| undefined,
+): string | null {
+	if (!tab) return null;
+	switch (tab.type) {
+		case 'git-diff':
+		case 'session-file-diff':
+		case 'file':
+			return tab.path;
+		case 'skill-file':
+			return tab.file;
+	}
 }
 
 function countLinesFromPatch(op: SessionFileOperation): {
@@ -69,7 +86,12 @@ function countLinesFromPatch(op: SessionFileOperation): {
 function SessionFileItem({ file }: { file: SessionFile }) {
 	const openDiff = useSessionFilesStore((state) => state.openDiff);
 	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
-	const isSelected = selectedFile === file.path;
+	const activeViewerTab = useViewerTabsStore((state) =>
+		state.tabs.find((tab) => tab.id === state.activeTabId),
+	);
+	const activeViewerTabPath = getViewerTabPath(activeViewerTab);
+	const isSelected =
+		selectedFile === file.path || activeViewerTabPath === file.path;
 
 	const lastOp = file.operations[file.operations.length - 1];
 

@@ -1,5 +1,16 @@
 import { memo } from 'react';
-import { FileCode, FileText, GitCommit, X } from 'lucide-react';
+import {
+	Braces,
+	File,
+	FileCode,
+	FileJson,
+	FileText,
+	FileType,
+	GitCommit,
+	Image,
+	Settings,
+	X,
+} from 'lucide-react';
 import {
 	useViewerTabsStore,
 	type ViewerTab,
@@ -39,6 +50,81 @@ function getFileExtension(path: string): string {
 	return extension && extension !== path.toLowerCase() ? extension : '';
 }
 
+function renderLanguageIcon(extension: string) {
+	switch (extension) {
+		case 'ts':
+		case 'tsx':
+			return (
+				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center bg-[#3178c6] text-[7px] font-bold leading-none text-white">
+					TS
+				</span>
+			);
+		case 'js':
+		case 'jsx':
+		case 'mjs':
+		case 'cjs':
+			return (
+				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center bg-[#f7df1e] text-[7px] font-bold leading-none text-black">
+					JS
+				</span>
+			);
+		case 'py':
+			return (
+				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-gradient-to-br from-[#3776ab] to-[#ffd43b] text-[7px] font-bold leading-none text-white">
+					Py
+				</span>
+			);
+		case 'go':
+			return (
+				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#00add8] text-[7px] font-bold leading-none text-white">
+					Go
+				</span>
+			);
+		case 'rs':
+			return (
+				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#ce422b] text-[8px] font-bold leading-none text-white">
+					R
+				</span>
+			);
+		case 'json':
+			return <FileJson className="h-3.5 w-3.5 shrink-0 text-yellow-500" />;
+		case 'md':
+		case 'mdx':
+			return <FileText className="h-3.5 w-3.5 shrink-0 text-sky-500" />;
+		case 'env':
+		case 'toml':
+		case 'yaml':
+		case 'yml':
+			return <Settings className="h-3.5 w-3.5 shrink-0 text-violet-500" />;
+		case 'css':
+		case 'scss':
+		case 'sass':
+		case 'less':
+			return <Braces className="h-3.5 w-3.5 shrink-0 text-blue-500" />;
+		case 'html':
+		case 'xml':
+			return <FileType className="h-3.5 w-3.5 shrink-0 text-orange-500" />;
+		case 'png':
+		case 'jpg':
+		case 'jpeg':
+		case 'gif':
+		case 'svg':
+		case 'webp':
+			return <Image className="h-3.5 w-3.5 shrink-0 text-pink-500" />;
+		case 'txt':
+		case 'log':
+			return (
+				<FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+			);
+		default:
+			return extension ? (
+				<FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+			) : (
+				<File className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+			);
+	}
+}
+
 function renderTabIcon(tab: ViewerTab) {
 	if (tab.type === 'git-diff') {
 		return (
@@ -55,17 +141,10 @@ function renderTabIcon(tab: ViewerTab) {
 	}
 
 	const extension = getFileExtension(getTabPath(tab));
-	const isTextLike = ['md', 'mdx', 'txt', 'env'].includes(extension);
-	const Icon = isTextLike ? FileText : FileCode;
 
 	return (
-		<span className="shrink-0 inline-flex items-center gap-1 text-muted-foreground/80">
-			<Icon className="h-3.5 w-3.5" />
-			{extension && (
-				<span className="max-w-9 truncate rounded bg-muted px-1 py-0.5 text-[9px] uppercase leading-none text-muted-foreground">
-					{extension}
-				</span>
-			)}
+		<span className="shrink-0 inline-flex items-center text-muted-foreground/80">
+			{renderLanguageIcon(extension)}
 		</span>
 	);
 }

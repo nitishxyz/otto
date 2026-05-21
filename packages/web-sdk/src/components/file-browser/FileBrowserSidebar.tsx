@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import {
 	ChevronRight,
 	ChevronDown,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { useFileTree } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
@@ -19,6 +20,30 @@ const PANEL_KEY = 'file-browser';
 const DEFAULT_WIDTH = 320;
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
+
+function getViewerTabPath(
+	tab:
+		| ReturnType<typeof useViewerTabsStore.getState>['tabs'][number]
+		| undefined,
+): string | null {
+	if (!tab) return null;
+	switch (tab.type) {
+		case 'git-diff':
+		case 'session-file-diff':
+		case 'file':
+			return tab.path;
+		case 'skill-file':
+			return tab.file;
+	}
+}
+
+function getActiveFileTabPath(
+	tab:
+		| ReturnType<typeof useViewerTabsStore.getState>['tabs'][number]
+		| undefined,
+): string | null {
+	return tab?.type === 'file' ? tab.path : null;
+}
 
 function TreeDirectory({ dirPath }: { dirPath: string }) {
 	const expandedDirs = useFileBrowserStore((s) => s.expandedDirs);
@@ -66,8 +91,19 @@ function TreeItem({
 	const toggleDir = useFileBrowserStore((s) => s.toggleDir);
 	const openFile = useFileBrowserStore((s) => s.openFile);
 	const selectedFile = useFileBrowserStore((s) => s.selectedFile);
+	const activeViewerTab = useViewerTabsStore((state) =>
+		state.tabs.find((tab) => tab.id === state.activeTabId),
+	);
 	const isExpanded = expandedDirs.has(path);
-	const isSelected = selectedFile === path;
+	const activeViewerTabPath = getViewerTabPath(activeViewerTab);
+	const isSelected = selectedFile === path || activeViewerTabPath === path;
+	const itemRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (isSelected) {
+			itemRef.current?.scrollIntoView({ block: 'nearest' });
+		}
+	}, [isSelected]);
 
 	const handleClick = useCallback(() => {
 		if (type === 'directory') {
@@ -80,6 +116,7 @@ function TreeItem({
 	return (
 		<div>
 			<button
+				ref={itemRef}
 				type="button"
 				onClick={handleClick}
 				className={`w-full text-left flex items-center gap-1.5 px-2 py-1 text-sm hover:bg-muted/50 rounded transition-colors ${
@@ -115,11 +152,22 @@ function TreeItem({
 export const FileBrowserSidebar = memo(function FileBrowserSidebar() {
 	const isExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const collapseSidebar = useFileBrowserStore((s) => s.collapseSidebar);
+	const revealFile = useFileBrowserStore((s) => s.revealFile);
+	const activeFileTabPath = useViewerTabsStore((state) => {
+		const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+		return getActiveFileTabPath(activeTab);
+	});
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
 
 	const { data: rootData, isLoading, refetch } = useFileTree('.');
+
+	useEffect(() => {
+		if (isExpanded && activeFileTabPath) {
+			revealFile(activeFileTabPath);
+		}
+	}, [isExpanded, activeFileTabPath, revealFile]);
 
 	if (!isExpanded) return null;
 

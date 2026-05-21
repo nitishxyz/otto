@@ -1,11 +1,7 @@
 import { memo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Plus, ChevronRight, X } from 'lucide-react';
-import {
-	useGitStore,
-	useSidebarStore,
-	usePanelWidthStore,
-} from '@ottocode/web-sdk/stores';
+import { useSidebarStore, usePanelWidthStore } from '@ottocode/web-sdk/stores';
 import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
 import { OttoWordmark } from './OttoWordmark';
 
@@ -23,7 +19,6 @@ export const Sidebar = memo(function Sidebar({
 	children,
 	onNewSession,
 }: SidebarProps) {
-	const isDiffOpen = useGitStore((state) => state.isDiffOpen);
 	const isCollapsed = useSidebarStore((state) => state.isCollapsed);
 	const toggleCollapse = useSidebarStore((state) => state.toggleCollapse);
 	const panelWidth = usePanelWidthStore(
@@ -59,8 +54,8 @@ export const Sidebar = memo(function Sidebar({
 				<button
 					type="button"
 					className="flex-1 cursor-pointer hover:bg-muted/50 transition-colors touch-manipulation"
-					onClick={!isDiffOpen ? toggleCollapse : undefined}
-					title={!isDiffOpen ? 'Expand sidebar' : undefined}
+					onClick={toggleCollapse}
+					title="Expand sidebar"
 					aria-label="Expand sidebar"
 				/>
 
@@ -70,7 +65,6 @@ export const Sidebar = memo(function Sidebar({
 						size="icon"
 						onClick={toggleCollapse}
 						title="Expand sidebar"
-						disabled={isDiffOpen}
 						className="h-8 w-8 transition-transform duration-200 hover:scale-110 touch-manipulation text-muted-foreground hover:bg-muted/50"
 					>
 						<ChevronRight className="size-[18px]" />
@@ -138,7 +132,6 @@ export const Sidebar = memo(function Sidebar({
 							size="icon"
 							onClick={toggleCollapse}
 							title="Collapse sidebar"
-							disabled={isDiffOpen}
 							className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
 						>
 							<svg

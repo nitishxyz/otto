@@ -185,6 +185,23 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 	}, [sessionId, focusInput]);
 
 	useEffect(() => {
+		const win = window as Window & {
+			OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
+		};
+		const openSession = (nextSessionId: string) => {
+			handleSelectSession(nextSessionId);
+		};
+
+		win.OTTO_OPEN_SESSION = openSession;
+
+		return () => {
+			if (win.OTTO_OPEN_SESSION === openSession) {
+				delete win.OTTO_OPEN_SESSION;
+			}
+		};
+	}, [handleSelectSession]);
+
+	useEffect(() => {
 		const handler = (event: MessageEvent) => {
 			if (
 				event.data?.type === 'otto-navigate-session' &&

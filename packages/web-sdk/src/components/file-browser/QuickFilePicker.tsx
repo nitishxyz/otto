@@ -35,7 +35,6 @@ export const QuickFilePicker = memo(function QuickFilePicker() {
 	const isOpen = useFilePickerStore((s) => s.isOpen);
 	const close = useFilePickerStore((s) => s.close);
 	const openFile = useFileBrowserStore((s) => s.openFile);
-	const expandSidebar = useFileBrowserStore((s) => s.expandSidebar);
 
 	const [query, setQuery] = useState('');
 	const [selectedIndex, setSelectedIndex] = useState(0);
@@ -79,11 +78,10 @@ export const QuickFilePicker = memo(function QuickFilePicker() {
 
 	const handleSelect = useCallback(
 		(file: string) => {
-			expandSidebar();
 			openFile(file);
 			close();
 		},
-		[expandSidebar, openFile, close],
+		[openFile, close],
 	);
 
 	const handleKeyDown = useCallback(

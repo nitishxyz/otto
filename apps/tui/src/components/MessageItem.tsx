@@ -202,7 +202,15 @@ function StreamingIndicator({
 		const info = extractProgressInfo(progressPart);
 		if (info) {
 			return (
-				<box style={{ flexDirection: 'row', gap: 1, height: 1, marginTop: 1 }}>
+				<box
+					style={{
+						flexDirection: 'row',
+						alignItems: 'flex-start',
+						gap: 1,
+						height: 1,
+						marginTop: 1,
+					}}
+				>
 					<TinySpinner fg={colors.purple} />
 					{info.stage?.trim() && (
 						<text style={{ flexShrink: 0 }} fg={colors.fgDark}>
@@ -226,7 +234,15 @@ function StreamingIndicator({
 	}
 
 	return (
-		<box style={{ flexDirection: 'row', gap: 1, height: 1, marginTop: 1 }}>
+		<box
+			style={{
+				flexDirection: 'row',
+				alignItems: 'flex-start',
+				gap: 1,
+				height: 1,
+				marginTop: 1,
+			}}
+		>
 			<TinySpinner fg={colors.purple} />
 			<text fg={colors.fgDark}>thinking…</text>
 		</box>

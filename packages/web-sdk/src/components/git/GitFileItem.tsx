@@ -16,6 +16,7 @@ import {
 	useDeleteFiles,
 } from '../../hooks/useGit';
 import { useGitStore } from '../../stores/gitStore';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { useConfirmationStore } from '../../stores/confirmationStore';
 import { useState } from 'react';
 
@@ -47,6 +48,22 @@ function smartTruncatePath(path: string, maxParts = 2): string {
 	return `../${truncated.join('/')}`;
 }
 
+function getViewerTabPath(
+	tab:
+		| ReturnType<typeof useViewerTabsStore.getState>['tabs'][number]
+		| undefined,
+): string | null {
+	if (!tab) return null;
+	switch (tab.type) {
+		case 'git-diff':
+		case 'session-file-diff':
+		case 'file':
+			return tab.path;
+		case 'skill-file':
+			return tab.file;
+	}
+}
+
 export function GitFileItem({
 	file,
 	staged,
@@ -60,7 +77,14 @@ export function GitFileItem({
 	const openConfirmation = useConfirmationStore(
 		(state) => state.openConfirmation,
 	);
+	const activeViewerTab = useViewerTabsStore((state) =>
+		state.tabs.find((tab) => tab.id === state.activeTabId),
+	);
 	const [isChecked, setIsChecked] = useState(staged);
+	const activeViewerTabPath = getViewerTabPath(activeViewerTab);
+	const isActiveViewerFile =
+		activeViewerTabPath === file.path &&
+		(activeViewerTab?.type !== 'git-diff' || activeViewerTab.staged === staged);
 
 	const handleCheckChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		e.stopPropagation();
@@ -178,7 +202,9 @@ export function GitFileItem({
 	return (
 		<button
 			type="button"
-			className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 cursor-pointer group transition-colors w-full text-left h-9"
+			className={`flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 cursor-pointer group transition-colors w-full text-left h-9 ${
+				isActiveViewerFile ? 'bg-primary/10 text-foreground' : ''
+			}`}
 			onClick={handleClick}
 		>
 			<input
