@@ -96,6 +96,15 @@ function isShellTool(toolName: string): boolean {
 	return normalizeToolName(toolName) === 'shell';
 }
 
+function isTodoTool(toolName: string | null | undefined): boolean {
+	return (
+		toolName === 'update_todos' ||
+		toolName === 'update_plan' ||
+		toolName === 'UpdateTodos' ||
+		toolName === 'UpdatePlan'
+	);
+}
+
 function normalizeToolTarget(
 	toolName: string,
 	args: Record<string, unknown> | undefined,
@@ -199,6 +208,10 @@ export const MessagePartItem = memo(
 			part.toolName === 'progress_update' &&
 			!isLastProgressUpdate
 		) {
+			return null;
+		}
+
+		if (part.type === 'tool_result' && isTodoTool(part.toolName)) {
 			return null;
 		}
 

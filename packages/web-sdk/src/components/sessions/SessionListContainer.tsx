@@ -24,6 +24,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const { currentFocus, sessionIndex } = useFocusStore();
 	const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const paginationSentinelRef = useRef<HTMLDivElement>(null);
 	const lastScrolledSessionId = useRef<string | undefined>(undefined);
 	const markedViewedRef = useRef<Map<string, number>>(new Map());
 	const previousActiveSessionId = useRef<string | undefined>(activeSessionId);
@@ -181,20 +182,51 @@ export const SessionListContainer = memo(function SessionListContainer({
 	useEffect(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
-
-		const handleScroll = () => {
-			const { scrollTop, scrollHeight, clientHeight } = container;
-			if (
-				scrollHeight - scrollTop - clientHeight < 100 &&
-				hasNextPage &&
-				!isFetchingNextPage
-			) {
+		const loadMore = () => {
+			if (hasNextPage && !isFetchingNextPage) {
 				fetchNextPage();
 			}
 		};
 
+		const handleScroll = () => {
+			const { scrollTop, scrollHeight, clientHeight } = container;
+			if (scrollHeight - scrollTop - clientHeight < 160) {
+				loadMore();
+			}
+		};
+
+		if (container.scrollHeight <= container.clientHeight + 160) {
+			loadMore();
+		}
+
 		container.addEventListener('scroll', handleScroll, { passive: true });
 		return () => container.removeEventListener('scroll', handleScroll);
+	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+	useEffect(() => {
+		const container = scrollContainerRef.current;
+		const sentinel = paginationSentinelRef.current;
+		if (
+			!container ||
+			!sentinel ||
+			typeof IntersectionObserver === 'undefined'
+		) {
+			return;
+		}
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries.some((entry) => entry.isIntersecting)) {
+					if (hasNextPage && !isFetchingNextPage) {
+						fetchNextPage();
+					}
+				}
+			},
+			{ root: container, rootMargin: '160px 0px' },
+		);
+
+		observer.observe(sentinel);
+		return () => observer.disconnect();
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	if (isLoading) {
@@ -229,7 +261,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 					if (el) itemRefs.current.set(session.id, el);
 					else itemRefs.current.delete(session.id);
 				}}
-				className={isFocused ? 'ring-1 ring-sidebar-ring/40 rounded-md' : ''}
+				className={isFocused ? 'ring-1 ring-inset ring-sidebar-ring/40' : ''}
 			>
 				<SessionItem
 					session={fullSession}
@@ -245,13 +277,13 @@ export const SessionListContainer = memo(function SessionListContainer({
 		sessions: typeof sessionSnapshot;
 	}) => (
 		<div key={group.label}>
-			<h4 className="sticky top-12 z-10 px-3 py-2 mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
+			<h4 className="sticky top-12 z-10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
 				<span>{group.label}</span>
 				<span className="ml-2 text-sidebar-muted-foreground/60">
 					{group.sessions.length}
 				</span>
 			</h4>
-			<div className="flex flex-col gap-1 px-3">
+			<div className="flex flex-col">
 				{group.sessions.map((session) => renderSession(session))}
 			</div>
 		</div>
@@ -264,7 +296,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 		>
 			<div className="h-12 shrink-0" aria-hidden="true" />
 			<div className="pt-3 pb-1">
-				<div className="space-y-3">
+				<div className="space-y-4">
 					{statusGroups.map((group) => renderGroup(group))}
 					{recentGroups.map((group) => renderGroup(group))}
 				</div>
@@ -275,6 +307,11 @@ export const SessionListContainer = memo(function SessionListContainer({
 					<Loader2 className="h-4 w-4 animate-spin text-sidebar-muted-foreground" />
 				</div>
 			)}
+			<div
+				ref={paginationSentinelRef}
+				className="h-1 shrink-0"
+				aria-hidden="true"
+			/>
 		</div>
 	);
 });

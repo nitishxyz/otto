@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo, memo, useCallback } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Message, Session } from '../../types/api';
+import type { Message, MessagePart, Session } from '../../types/api';
 import { AssistantMessageGroup } from './AssistantMessageGroup';
 import { UserMessageGroup } from './UserMessageGroup';
 import { SessionHeader } from '../sessions/SessionHeader';
@@ -9,6 +9,11 @@ import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useTopupApprovalStore } from '../../stores/topupApprovalStore';
+import {
+	useTodoStore,
+	type TodoItem,
+	type TodoSnapshot,
+} from '../../stores/todoStore';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ThreadDensityProvider } from './threadDensity';
 import { apiClient } from '../../lib/api-client';
@@ -22,6 +27,93 @@ interface MessageThreadProps {
 	compact?: boolean;
 	disableAutoScroll?: boolean;
 	onSelectSession?: (sessionId: string) => void;
+}
+
+const TODO_TOOL_NAMES = new Set([
+	'update_todos',
+	'update_plan',
+	'UpdateTodos',
+	'UpdatePlan',
+]);
+
+function parseToolResultContent(
+	part: MessagePart,
+): Record<string, unknown> | null {
+	if (part.contentJson && typeof part.contentJson === 'object') {
+		return part.contentJson;
+	}
+	try {
+		const parsed = JSON.parse(part.content);
+		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+			return parsed as Record<string, unknown>;
+		}
+	} catch {}
+	return null;
+}
+
+function isTodoStatus(status: unknown): status is TodoItem['status'] {
+	return (
+		status === 'pending' ||
+		status === 'in_progress' ||
+		status === 'completed' ||
+		status === 'cancelled'
+	);
+}
+
+function getTodoToolName(
+	part: MessagePart,
+	content: Record<string, unknown> | null,
+) {
+	const name = part.toolName ?? content?.name;
+	return typeof name === 'string' ? name : null;
+}
+
+function parseTodoSnapshot(
+	content: Record<string, unknown>,
+): Omit<TodoSnapshot, 'updatedAt'> | null {
+	const rawResult = content.result;
+	const result =
+		rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
+			? (rawResult as Record<string, unknown>)
+			: content;
+	const rawItems = result.items;
+	if (!Array.isArray(rawItems)) return null;
+
+	const items = rawItems.flatMap((item): TodoItem[] => {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) {
+			return [];
+		}
+		const record = item as Record<string, unknown>;
+		if (typeof record.step !== 'string' || !isTodoStatus(record.status)) {
+			return [];
+		}
+		return [{ step: record.step, status: record.status }];
+	});
+	const note = typeof result.note === 'string' ? result.note : undefined;
+
+	return { items, note };
+}
+
+function findLatestTodoSnapshot(
+	messages: Message[],
+): Omit<TodoSnapshot, 'updatedAt'> | null {
+	for (
+		let messageIndex = messages.length - 1;
+		messageIndex >= 0;
+		messageIndex--
+	) {
+		const parts = messages[messageIndex]?.parts ?? [];
+		for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
+			const part = parts[partIndex];
+			if (part.type !== 'tool_result') continue;
+			const content = parseToolResultContent(part);
+			const toolName = getTodoToolName(part, content);
+			if (!toolName || !TODO_TOOL_NAMES.has(toolName)) continue;
+			if (!content) return null;
+			return parseTodoSnapshot(content);
+		}
+	}
+	return null;
 }
 
 export const MessageThread = memo(function MessageThread({
@@ -60,9 +152,15 @@ export const MessageThread = memo(function MessageThread({
 
 	const pendingTopup = useTopupApprovalStore((s) => s.pendingTopup);
 	const clearPendingTopup = useTopupApprovalStore((s) => s.clearPendingTopup);
+	const setSessionTodos = useTodoStore((s) => s.setSessionTodos);
 
 	const showTopupApproval =
 		pendingTopup && pendingTopup.sessionId === sessionId;
+
+	useEffect(() => {
+		if (!sessionId) return;
+		setSessionTodos(sessionId, findLatestTodoSnapshot(messages));
+	}, [messages, sessionId, setSessionTodos]);
 
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;

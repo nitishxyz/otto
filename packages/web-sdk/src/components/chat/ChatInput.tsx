@@ -40,6 +40,7 @@ import {
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import type { FileAttachment } from '../../hooks/useFileUpload';
 import { InputApprovalBar } from './InputApprovalBar';
+import { InputTodosBar } from './InputTodosBar';
 
 interface ChatInputProps {
 	onSend: (message: string) => void;
@@ -400,6 +401,9 @@ export const ChatInput = memo(
 		const inputWidthClass = preferences.fullWidthContent
 			? 'w-full pointer-events-auto relative'
 			: 'max-w-3xl mx-auto pointer-events-auto relative';
+		const inputOverlayWidthClass = preferences.fullWidthContent
+			? 'w-3/4'
+			: 'w-[90%]';
 
 		return (
 			<>
@@ -449,7 +453,10 @@ export const ChatInput = memo(
 							</div>
 						)}
 						{sessionId && (
-							<div className="pointer-events-auto w-3/4 mx-auto relative z-0">
+							<div
+								className={`pointer-events-auto ${inputOverlayWidthClass} mx-auto relative z-0`}
+							>
+								<InputTodosBar key={sessionId} sessionId={sessionId} />
 								<InputApprovalBar sessionId={sessionId} />
 							</div>
 						)}

@@ -13,7 +13,6 @@ import { SearchRenderer } from './SearchRenderer';
 import { FinishRenderer } from './FinishRenderer';
 import { GenericRenderer } from './GenericRenderer';
 import { DebugRenderer } from './DebugRenderer';
-import { TodosRenderer } from './TodosRenderer';
 import { ProgressUpdateRenderer } from './ProgressUpdateRenderer';
 import { WebSearchRenderer } from './WebSearchRenderer';
 import { ErrorRenderer } from './ErrorRenderer';
@@ -155,7 +154,7 @@ export function ToolResultRenderer({
 			return <FinishRenderer {...props} />;
 		case 'update_todos':
 		case 'update_plan':
-			return <TodosRenderer {...props} />;
+			return null;
 		case 'progress_update':
 			return <ProgressUpdateRenderer {...props} />;
 		case 'load_mcp_tools':

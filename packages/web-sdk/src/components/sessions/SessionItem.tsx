@@ -43,34 +43,39 @@ export const SessionItem = memo(function SessionItem({
 	const metadata = formatRelativeSessionTime(lastUpdatedAt);
 	const fileStats = session.fileStats;
 	const hasFileStats = fileStats && fileStats.changedFiles > 0;
+	const showStats =
+		hasFileStats && (fileStats.additions > 0 || fileStats.deletions > 0);
+	const statusIcon = isRunning ? (
+		<RunningSpinner />
+	) : isReadyForReview ? (
+		<CircleCheck className="h-4 w-4" />
+	) : null;
 
 	return (
 		<button
 			type="button"
 			onClick={onClick}
-			className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors duration-150 ${
+			className={`group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 ${
 				isActive
-					? 'bg-sidebar-accent text-sidebar-foreground'
-					: 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+					? 'bg-black/[0.08] text-sidebar-foreground dark:bg-white/[0.08]'
+					: 'text-sidebar-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.055]'
 			}`}
 			title={`${title} — ${metadata}`}
 		>
-			<span className="block min-w-0">
-				<span className="flex min-w-0 items-center gap-2">
-					<span
-						className={`block min-w-0 flex-1 truncate text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}
-					>
-						{title}
-					</span>
-					{!isRunning && (
-						<span className="shrink-0 text-[11px] leading-4 text-sidebar-muted-foreground">
-							{metadata}
-						</span>
-					)}
+			{statusIcon && (
+				<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80">
+					{statusIcon}
+				</span>
+			)}
+			<span className="block min-w-0 flex-1">
+				<span
+					className={`block min-w-0 truncate text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}
+				>
+					{title}
 				</span>
 				<span className="mt-0.5 flex items-center justify-between gap-3 text-[11px] leading-4 text-sidebar-muted-foreground">
 					<span className="truncate">
-						{hasFileStats ? (
+						{showStats ? (
 							<span className="inline-flex min-w-0 items-center gap-1.5">
 								{fileStats.additions > 0 && (
 									<span className="text-emerald-500">
@@ -80,24 +85,14 @@ export const SessionItem = memo(function SessionItem({
 								{fileStats.deletions > 0 && (
 									<span className="text-rose-500">-{fileStats.deletions}</span>
 								)}
-								<span>
-									{fileStats.additions > 0 || fileStats.deletions > 0
-										? '· '
-										: ''}
-									{fileStats.changedFiles} file
-									{fileStats.changedFiles === 1 ? '' : 's'} changed
-								</span>
+								{!isRunning && <span>· {metadata}</span>}
 							</span>
 						) : (
-							session.agent
+							<span>
+								{session.agent}
+								{!isRunning && ` · ${metadata}`}
+							</span>
 						)}
-					</span>
-					<span className="flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted-foreground">
-						{isRunning ? (
-							<RunningSpinner />
-						) : isReadyForReview ? (
-							<CircleCheck className="h-3.5 w-3.5" />
-						) : null}
 					</span>
 				</span>
 			</span>

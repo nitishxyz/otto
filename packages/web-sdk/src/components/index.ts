@@ -14,6 +14,7 @@ export * from './chat/ChatInput';
 export * from './chat/ChatInputContainer';
 export * from './chat/ConfigModal';
 export * from './chat/ConfigSelector';
+export * from './chat/InputTodosBar';
 export * from './chat/StopButton';
 export * from './chat/NewSessionLanding';
 

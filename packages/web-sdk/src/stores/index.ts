@@ -11,6 +11,7 @@ export * from './ottorouterStore';
 export * from './settingsStore';
 export * from './toolApprovalStore';
 export * from './topupApprovalStore';
+export * from './todoStore';
 export * from './onboardingStore';
 export * from './panelWidthStore';
 export * from './tunnelStore';
