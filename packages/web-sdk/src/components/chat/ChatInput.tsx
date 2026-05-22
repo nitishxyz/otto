@@ -472,6 +472,17 @@ export const ChatInput = memo(
 									: 'bg-card border border-border focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40'
 							}`}
 						>
+							{showCommandSuggestions && (
+								<CommandSuggestionsPopup
+									query={commandQuery}
+									selectedIndex={commandSelectedIndex}
+									onSelect={handleCommandSelect}
+									onEnterSelect={handleCommandEnterSelect}
+									onClose={handleCommandClose}
+									sessionId={sessionId}
+								/>
+							)}
+
 							{hasFiles && (
 								<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
 									{images.map((img) => (
@@ -704,17 +715,6 @@ export const ChatInput = memo(
 								onSelect={handleMentionSelect}
 								onEnterSelect={handleMentionEnterSelect}
 								onClose={handleMentionClose}
-							/>
-						)}
-
-						{showCommandSuggestions && (
-							<CommandSuggestionsPopup
-								query={commandQuery}
-								selectedIndex={commandSelectedIndex}
-								onSelect={handleCommandSelect}
-								onEnterSelect={handleCommandEnterSelect}
-								onClose={handleCommandClose}
-								sessionId={sessionId}
 							/>
 						)}
 
