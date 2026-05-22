@@ -15,13 +15,13 @@ interface ShortcutItem {
 
 const SHORTCUTS: ShortcutItem[] = [
 	{
-		keys: ['Ctrl', 'H'],
-		description: 'Navigate to left sidebar (sessions)',
+		keys: ['Ctrl', 'B'],
+		description: 'Toggle left sidebar (sessions)',
 		category: 'Navigation',
 	},
 	{
-		keys: ['Ctrl', 'L'],
-		description: 'Navigate to right sidebar (git)',
+		keys: ['Ctrl', 'R'],
+		description: 'Toggle right sidebar (git)',
 		category: 'Navigation',
 	},
 	{

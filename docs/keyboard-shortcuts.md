@@ -6,12 +6,12 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
 
 ### Global
 
-- **Ctrl+H** - Navigate to left sidebar (sessions)
+- **Ctrl+B** - Toggle left sidebar (sessions)
   - Opens left sidebar and focuses session list
   - Press again to return to center (collapses left sidebar)
   - Auto-collapses right sidebar if open
 
-- **Ctrl+L** - Navigate to right sidebar (git)
+- **Ctrl+R** - Toggle right sidebar (git)
   - Opens right sidebar and focuses file list
   - Press again to return to center (collapses right sidebar)
   - Auto-collapses left sidebar if open
@@ -37,13 +37,13 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
   - Closes current sidebar if focused on left or right
   - Returns focus to chat input
 
-### Session List (when focused with Ctrl+H)
+### Session List (when focused with Ctrl+B)
 
 - **J** - Navigate to next session
 - **K** - Navigate to previous session
 - **Enter** - Select focused session and return to input
 
-### Git Panel (when focused with Ctrl+L)
+### Git Panel (when focused with Ctrl+R)
 
 - **J** - Navigate to next file
 - **K** - Navigate to previous file

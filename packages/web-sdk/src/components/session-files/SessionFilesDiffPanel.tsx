@@ -1,13 +1,12 @@
 import { useEffect, useMemo, memo } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import {
-	prism,
-	vscDarkPlus,
-} from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import type { SessionFileOperation } from '../../types/api';
 import { Button } from '../ui/Button';
+import {
+	CodeMirrorViewer,
+	type CodeMirrorLineTone,
+} from '../ui/CodeMirrorViewer';
 
 function transformToUnifiedDiff(patch: string): string {
 	const lines = patch.split('\n');
@@ -81,242 +80,31 @@ function transformToUnifiedDiff(patch: string): string {
 	return result.join('\n');
 }
 
-function getLanguageFromPath(path: string): string {
-	const ext = path.split('.').pop()?.toLowerCase();
-	const langMap: Record<string, string> = {
-		js: 'javascript',
-		jsx: 'jsx',
-		ts: 'typescript',
-		tsx: 'tsx',
-		py: 'python',
-		rb: 'ruby',
-		go: 'go',
-		rs: 'rust',
-		java: 'java',
-		c: 'c',
-		cpp: 'cpp',
-		h: 'c',
-		hpp: 'cpp',
-		cs: 'csharp',
-		php: 'php',
-		sh: 'bash',
-		bash: 'bash',
-		zsh: 'bash',
-		sql: 'sql',
-		json: 'json',
-		yaml: 'yaml',
-		yml: 'yaml',
-		xml: 'xml',
-		html: 'html',
-		css: 'css',
-		scss: 'scss',
-		md: 'markdown',
-		txt: 'text',
-		svelte: 'svelte',
-	};
-	return langMap[ext || ''] || 'javascript';
-}
-
-interface DiffLine {
-	content: string;
-	codeContent: string;
-	type: 'add' | 'remove' | 'context' | 'meta' | 'header';
-	oldLineNum?: number;
-	newLineNum?: number;
-}
-
-function parseDiff(patch: string): { lines: DiffLine[]; filePath: string } {
+function getPatchLineTones(patch: string): Map<number, CodeMirrorLineTone> {
+	const tones = new Map<number, CodeMirrorLineTone>();
 	const lines = patch.split('\n');
-	const result: DiffLine[] = [];
-	let oldLineNum = 0;
-	let newLineNum = 0;
-	let inHunk = false;
-	let filePath = '';
-
-	for (const line of lines) {
-		if (line.startsWith('+++') || line.startsWith('*** Update File:')) {
-			const match =
-				line.match(/\+\+\+ b\/(.+)/) || line.match(/\*\*\* Update File: (.+)/);
-			if (match) filePath = match[1];
-		}
-
-		if (line.startsWith('*** Add File:')) {
-			const match = line.match(/\*\*\* Add File: (.+)/);
-			if (match) filePath = match[1];
-		}
-
-		const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-		if (hunkMatch) {
-			oldLineNum = Number.parseInt(hunkMatch[1], 10);
-			newLineNum = Number.parseInt(hunkMatch[2], 10);
-			inHunk = true;
-			result.push({
-				content: line,
-				codeContent: line,
-				type: 'header',
-			});
-			continue;
-		}
-
-		if (
-			line.startsWith('***') ||
-			line.startsWith('diff ') ||
-			line.startsWith('index ') ||
-			line.startsWith('---') ||
-			line.startsWith('+++') ||
-			(line.startsWith('@@') && !inHunk)
-		) {
-			result.push({
-				content: line,
-				codeContent: line,
-				type: 'meta',
-			});
-			continue;
-		}
-
-		if (inHunk) {
-			if (line.startsWith('+')) {
-				result.push({
-					content: line,
-					codeContent: line.slice(1),
-					type: 'add',
-					newLineNum: newLineNum++,
-				});
-			} else if (line.startsWith('-')) {
-				result.push({
-					content: line,
-					codeContent: line.slice(1),
-					type: 'remove',
-					oldLineNum: oldLineNum++,
-				});
-			} else if (line.startsWith(' ') || line === '') {
-				result.push({
-					content: line,
-					codeContent: line.startsWith(' ') ? line.slice(1) : line,
-					type: 'context',
-					oldLineNum: oldLineNum++,
-					newLineNum: newLineNum++,
-				});
-			} else {
-				result.push({
-					content: line,
-					codeContent: line,
-					type: 'context',
-					oldLineNum: oldLineNum++,
-					newLineNum: newLineNum++,
-				});
-			}
-		} else {
-			result.push({
-				content: line,
-				codeContent: line,
-				type: 'meta',
-			});
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index];
+		const lineNumber = index + 1;
+		if (line.startsWith('@@')) {
+			tones.set(lineNumber, 'primary');
+		} else if (line.startsWith('+') && !line.startsWith('+++')) {
+			tones.set(lineNumber, 'add');
+		} else if (line.startsWith('-') && !line.startsWith('---')) {
+			tones.set(lineNumber, 'remove');
 		}
 	}
-
-	return { lines: result, filePath };
+	return tones;
 }
 
 function FullHeightDiffView({ patch }: { patch: string }) {
-	const { lines: diffLines, filePath } = parseDiff(patch);
-	const language = getLanguageFromPath(filePath);
-	const syntaxTheme = document?.documentElement.classList.contains('dark')
-		? vscDarkPlus
-		: prism;
-
 	return (
 		<div className="bg-card/60 border border-border rounded-lg overflow-hidden h-full">
-			<div className="overflow-x-auto overflow-y-auto h-full text-[13px] font-mono">
-				{diffLines.map((line, i) => {
-					const key = `line-${i}-${line.content.slice(0, 20)}`;
-
-					if (line.type === 'meta' || line.type === 'header') {
-						return (
-							<div
-								key={key}
-								className={`px-3 py-0.5 whitespace-pre-wrap break-all ${
-									line.type === 'header'
-										? 'text-muted-foreground/80 bg-muted/20'
-										: 'text-muted-foreground/80'
-								}`}
-							>
-								{line.content}
-							</div>
-						);
-					}
-
-					let lineClass = '';
-					let bgClass = '';
-					switch (line.type) {
-						case 'add':
-							lineClass = 'text-emerald-700 dark:text-emerald-300';
-							bgClass = 'bg-emerald-500/10';
-							break;
-						case 'remove':
-							lineClass = 'text-red-600 dark:text-red-300';
-							bgClass = 'bg-red-500/10';
-							break;
-						default:
-							lineClass = 'text-foreground/80';
-					}
-
-					let renderedContent: React.ReactNode = line.codeContent || ' ';
-					if (line.codeContent.trim() && language !== 'text') {
-						renderedContent = (
-							<SyntaxHighlighter
-								language={language}
-								style={syntaxTheme}
-								customStyle={{
-									margin: 0,
-									padding: 0,
-									background: 'transparent',
-									display: 'inline',
-									fontSize: 'inherit',
-									lineHeight: 'inherit',
-								}}
-								codeTagProps={{
-									style: {
-										fontFamily: 'inherit',
-										background: 'transparent',
-									},
-								}}
-								PreTag="span"
-							>
-								{line.codeContent}
-							</SyntaxHighlighter>
-						);
-					}
-
-					const lineNumber = line.newLineNum ?? line.oldLineNum ?? '';
-					const sign =
-						line.type === 'add' ? '+' : line.type === 'remove' ? '-' : '';
-
-					return (
-						<div key={key} className={`flex ${bgClass}`}>
-							<div
-								className="px-2 py-0.5 text-right text-muted-foreground/40 select-none w-14 flex-shrink-0"
-								aria-hidden="true"
-								style={{ pointerEvents: 'none' }}
-							>
-								{lineNumber}
-							</div>
-							<div
-								className={`px-2 py-0.5 text-center select-none w-8 flex-shrink-0 border-r border-border/50 ${lineClass}`}
-								aria-hidden="true"
-								style={{ pointerEvents: 'none' }}
-							>
-								{sign}
-							</div>
-							<div
-								className={`px-3 py-0.5 flex-1 min-w-0 whitespace-pre-wrap break-all ${lineClass}`}
-							>
-								{renderedContent}
-							</div>
-						</div>
-					);
-				})}
-			</div>
+			<CodeMirrorViewer
+				content={patch}
+				path="session.patch"
+				lineTones={getPatchLineTones(patch)}
+			/>
 		</div>
 	);
 }

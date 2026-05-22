@@ -1,16 +1,23 @@
-import { memo, useEffect, useRef, type ComponentPropsWithoutRef } from 'react';
+import {
+	memo,
+	useEffect,
+	useMemo,
+	useRef,
+	type ComponentPropsWithoutRef,
+} from 'react';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import {
-	prism,
-	vscDarkPlus,
-} from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
-import type { ToolActivityHighlight } from '../../stores/viewerTabsStore';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
+import type {
+	ToolActivityHighlight,
+	ToolPatchPreview,
+} from '../../stores/viewerTabsStore';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
+import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
+import { buildLivePatchPreview } from '../workspace/ToolPreviewPanel';
 
 const LANGUAGE_MAP: Record<string, string> = {
 	js: 'javascript',
@@ -73,11 +80,18 @@ function formatReadHighlightLabel(highlight: ToolActivityHighlight): string {
 	return 'Reading file';
 }
 
+function formatPatchPreviewLabel(preview: ToolPatchPreview): string {
+	if (preview.status === 'success') return 'Patch applied';
+	if (preview.status === 'error') return 'Patch failed';
+	return 'Patching file';
+}
+
 interface FileViewerPanelProps {
 	mode?: 'overlay' | 'pane';
 	open?: boolean;
 	file?: string | null;
 	highlight?: ToolActivityHighlight;
+	patchPreview?: ToolPatchPreview;
 	onClose?: () => void;
 }
 
@@ -86,6 +100,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	open,
 	file,
 	highlight,
+	patchPreview,
 	onClose,
 }: FileViewerPanelProps = {}) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -117,12 +132,76 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		return () => document.removeEventListener('keydown', handleEscape);
 	}, [isViewerOpen, closeViewer]);
 
+	const effectiveHighlight = patchPreview ? undefined : highlight;
+	const persistedPatchPreview = useMemo(() => {
+		if (!patchPreview?.previewContent || !patchPreview.previewLineTones) {
+			return null;
+		}
+		return {
+			content: patchPreview.previewContent,
+			resultContent: patchPreview.resultContent ?? patchPreview.previewContent,
+			lineTones: new Map(patchPreview.previewLineTones),
+			firstLine: patchPreview.previewFirstLine,
+			latestLine: patchPreview.previewLatestLine,
+		};
+	}, [patchPreview]);
+	const livePatchPreview = useMemo(
+		() =>
+			data && selectedFile && patchPreview?.patch
+				? buildLivePatchPreview(
+						patchPreview.baseContent ?? data.content,
+						patchPreview.patch,
+						selectedFile,
+					)
+				: null,
+		[data, selectedFile, patchPreview?.baseContent, patchPreview?.patch],
+	);
+	const activePatchPreview =
+		patchPreview?.status === 'success'
+			? (persistedPatchPreview ?? livePatchPreview)
+			: (livePatchPreview ?? persistedPatchPreview);
+
 	useEffect(() => {
-		if (!data || !highlight?.startLine) return;
+		if (!selectedFile || !patchPreview || !livePatchPreview) return;
+		const baseContent = patchPreview.baseContent ?? data?.content;
+		const previewLineTones = [...livePatchPreview.lineTones.entries()];
+		const existingLineTones = patchPreview.previewLineTones ?? [];
+		const hasSameSnapshot =
+			patchPreview.baseContent === baseContent &&
+			patchPreview.previewContent === livePatchPreview.content &&
+			patchPreview.resultContent === livePatchPreview.resultContent &&
+			patchPreview.previewFirstLine === livePatchPreview.firstLine &&
+			patchPreview.previewLatestLine === livePatchPreview.latestLine &&
+			existingLineTones.length === previewLineTones.length &&
+			existingLineTones.every(
+				(entry, index) =>
+					entry[0] === previewLineTones[index]?.[0] &&
+					entry[1] === previewLineTones[index]?.[1],
+			);
+		if (hasSameSnapshot) return;
+		useViewerTabsStore.getState().openToolPreviewTab({
+			path: selectedFile,
+			toolName: 'apply_patch',
+			callId: patchPreview.callId,
+			baseContent,
+			patch: patchPreview.patch,
+			changedLines: patchPreview.changedLines,
+			previewContent: livePatchPreview.content,
+			resultContent: livePatchPreview.resultContent,
+			previewLineTones,
+			previewFirstLine: livePatchPreview.firstLine,
+			previewLatestLine: livePatchPreview.latestLine,
+			status: patchPreview.status,
+			error: patchPreview.error,
+		});
+	}, [selectedFile, data?.content, patchPreview, livePatchPreview]);
+
+	useEffect(() => {
+		if (!data || !effectiveHighlight?.startLine) return;
 
 		const frame = window.requestAnimationFrame(() => {
 			const target = scrollContainerRef.current?.querySelector(
-				`[data-line-number="${highlight.startLine}"]`,
+				`[data-line-number="${effectiveHighlight.startLine}"]`,
 			);
 			if (target instanceof HTMLElement) {
 				target.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -130,17 +209,28 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		});
 
 		return () => window.cancelAnimationFrame(frame);
-	}, [data, highlight?.startLine]);
+	}, [data, effectiveHighlight?.startLine]);
+
+	const highlightStart = effectiveHighlight?.startLine;
+	const highlightEnd = effectiveHighlight?.endLine ?? highlightStart;
+	const highlightedLines = useMemo(
+		() =>
+			highlightStart && highlightEnd
+				? new Set(
+						Array.from(
+							{ length: highlightEnd - highlightStart + 1 },
+							(_, index) => highlightStart + index,
+						),
+					)
+				: undefined,
+		[highlightStart, highlightEnd],
+	);
 
 	if (!isViewerOpen || !selectedFile) return null;
-	const highlightStart = highlight?.startLine;
-	const highlightEnd = highlight?.endLine ?? highlightStart;
 
-	const syntaxTheme = document?.documentElement.classList.contains('dark')
-		? vscDarkPlus
-		: prism;
 	const language = inferLanguage(selectedFile);
-	const renderMarkdown = isMarkdownFile(selectedFile) && !highlight;
+	const renderMarkdown =
+		isMarkdownFile(selectedFile) && !effectiveHighlight && !activePatchPreview;
 
 	return (
 		<div
@@ -179,11 +269,15 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					</span>
 				</div>
 			)}
-			{highlight && (
-				<div className="shrink-0 border-b border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
-					{formatReadHighlightLabel(highlight)}
+			{patchPreview ? (
+				<div className="shrink-0 border-b border-sidebar-border bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
+					{formatPatchPreviewLabel(patchPreview)}
 				</div>
-			)}
+			) : effectiveHighlight ? (
+				<div className="shrink-0 border-b border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
+					{formatReadHighlightLabel(effectiveHighlight)}
+				</div>
+			) : null}
 
 			<div ref={scrollContainerRef} className="flex-1 overflow-auto">
 				{isLoading ? (
@@ -236,47 +330,15 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 							</ReactMarkdown>
 						</div>
 					) : (
-						<div className="code-with-line-numbers">
-							<SyntaxHighlighter
-								language={language}
-								style={syntaxTheme}
-								wrapLines
-								wrapLongLines
-								lineProps={(lineNumber) => {
-									const isHighlighted = Boolean(
-										highlightStart &&
-											highlightEnd &&
-											lineNumber >= highlightStart &&
-											lineNumber <= highlightEnd,
-									);
-
-									return {
-										className: 'code-line',
-										'data-line-number': lineNumber,
-										style: isHighlighted
-											? {
-													backgroundColor: 'hsl(var(--primary) / 0.12)',
-													boxShadow: 'inset 3px 0 0 hsl(var(--primary))',
-												}
-											: undefined,
-									};
-								}}
-								customStyle={{
-									margin: 0,
-									padding: '1rem',
-									background: 'transparent',
-									fontSize: '0.8125rem',
-									lineHeight: '1.3125rem',
-								}}
-								codeTagProps={{
-									style: {
-										flex: 1,
-									},
-								}}
-							>
-								{data.content}
-							</SyntaxHighlighter>
-						</div>
+						<CodeMirrorViewer
+							content={activePatchPreview?.content ?? data.content}
+							path={selectedFile}
+							highlightedLines={
+								activePatchPreview ? undefined : highlightedLines
+							}
+							lineTones={activePatchPreview?.lineTones}
+							scrollToLine={activePatchPreview?.latestLine ?? highlightStart}
+						/>
 					)
 				) : (
 					<div className="h-full flex items-center justify-center text-muted-foreground">

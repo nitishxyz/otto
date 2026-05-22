@@ -7,6 +7,16 @@ import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import { sessionsQueryKey } from './useSessions';
 
+const TOOL_PREVIEW_THROTTLE_MS = 500;
+const TOOL_PREVIEW_THROTTLE_MIN_CHARS = 8_000;
+const TOOL_PREVIEW_THROTTLE_MIN_DELTA_CHARS = 16_000;
+const STREAMING_WRITE_CONTENT_PREVIEW_CHARS = 24_000;
+const STREAMING_PATCH_PREVIEW_HEAD_CHARS = 12_000;
+const STREAMING_PATCH_PREVIEW_TAIL_CHARS = 24_000;
+const STREAMING_TOOL_INPUT_HEAD_CHARS = 8_000;
+const STREAMING_TOOL_INPUT_TAIL_CHARS = 16_000;
+const STREAMING_TOOL_MESSAGE_THROTTLE_MS = 500;
+
 export function useSessionStream(
 	sessionId: string | undefined,
 	enabled = true,
@@ -15,6 +25,10 @@ export function useSessionStream(
 	const clientRef = useRef<SSEClient | null>(null);
 	const assistantMessageIdRef = useRef<string | null>(null);
 	const toolInputBuffersRef = useRef<Map<string, string>>(new Map());
+	const toolPreviewEmitRef = useRef<
+		Map<string, { emittedAt: number; contentLength: number }>
+	>(new Map());
+	const toolMessageEmitRef = useRef<Map<string, number>>(new Map());
 
 	const {
 		addPendingApproval,
@@ -30,6 +44,8 @@ export function useSessionStream(
 
 		assistantMessageIdRef.current = null;
 		toolInputBuffersRef.current.clear();
+		toolPreviewEmitRef.current.clear();
+		toolMessageEmitRef.current.clear();
 		let lastSessionInvalidation = 0;
 
 		// Fetch pending approvals from server for this session
@@ -160,6 +176,18 @@ export function useSessionStream(
 			};
 		};
 
+		const getBoundedStreamingToolInput = (value: string): string => {
+			const maxLength =
+				STREAMING_TOOL_INPUT_HEAD_CHARS + STREAMING_TOOL_INPUT_TAIL_CHARS;
+			if (value.length <= maxLength) return value;
+			return `${value.slice(
+				0,
+				STREAMING_TOOL_INPUT_HEAD_CHARS,
+			)}\n… streamed tool input truncated for UI responsiveness …\n${value.slice(
+				-STREAMING_TOOL_INPUT_TAIL_CHARS,
+			)}`;
+		};
+
 		const getToolArgsForViewer = (
 			payload: Record<string, unknown> | undefined,
 			delta?: string | null,
@@ -173,7 +201,7 @@ export function useSessionStream(
 			const previous = toolInputBuffersRef.current.get(key) ?? '';
 			if (!delta) return parseArgsRecord(previous);
 
-			const next = `${previous}${delta}`;
+			const next = getBoundedStreamingToolInput(`${previous}${delta}`);
 			toolInputBuffersRef.current.set(key, next);
 			return parseArgsRecord(next);
 		};
@@ -250,6 +278,100 @@ export function useSessionStream(
 			const value = args?.[field];
 			if (typeof value === 'string') return value;
 			return extractJsonStringField(buffer, field, requireClosed);
+		};
+
+		const getStreamingWritePreviewContent = (
+			args: Record<string, unknown> | null,
+			buffer: string,
+		): string | undefined => {
+			const argContent = args?.content;
+			if (typeof argContent === 'string') {
+				if (argContent.length <= STREAMING_WRITE_CONTENT_PREVIEW_CHARS) {
+					return argContent;
+				}
+
+				return `… showing latest streamed content only …\n${argContent.slice(
+					-STREAMING_WRITE_CONTENT_PREVIEW_CHARS,
+				)}`;
+			}
+
+			const marker = '"content"';
+			const markerIndex = buffer.indexOf(marker);
+			if (markerIndex === -1) return undefined;
+
+			const colonIndex = buffer.indexOf(':', markerIndex + marker.length);
+			if (colonIndex === -1) return undefined;
+
+			const quoteIndex = buffer.indexOf('"', colonIndex + 1);
+			if (quoteIndex === -1) return undefined;
+
+			const valueStart = quoteIndex + 1;
+			if (buffer.length - valueStart <= STREAMING_WRITE_CONTENT_PREVIEW_CHARS) {
+				return extractJsonStringField(buffer, 'content');
+			}
+
+			const rawTail = buffer.slice(
+				Math.max(
+					valueStart,
+					buffer.length - STREAMING_WRITE_CONTENT_PREVIEW_CHARS,
+				),
+			);
+			return `… showing latest streamed content only …\n${bestEffortUnescapeJsonString(
+				rawTail,
+			)}`;
+		};
+
+		const getStreamingPatchPreviewContent = (
+			args: Record<string, unknown> | null,
+			buffer: string,
+		): string | undefined => {
+			const argPatch = args?.patch;
+			if (typeof argPatch === 'string') {
+				if (
+					argPatch.length <=
+					STREAMING_PATCH_PREVIEW_HEAD_CHARS +
+						STREAMING_PATCH_PREVIEW_TAIL_CHARS
+				) {
+					return argPatch;
+				}
+
+				return `${argPatch.slice(
+					0,
+					STREAMING_PATCH_PREVIEW_HEAD_CHARS,
+				)}\n… patch preview truncated while streaming …\n${argPatch.slice(
+					-STREAMING_PATCH_PREVIEW_TAIL_CHARS,
+				)}`;
+			}
+
+			const marker = '"patch"';
+			const markerIndex = buffer.indexOf(marker);
+			if (markerIndex === -1) return undefined;
+
+			const colonIndex = buffer.indexOf(':', markerIndex + marker.length);
+			if (colonIndex === -1) return undefined;
+
+			const quoteIndex = buffer.indexOf('"', colonIndex + 1);
+			if (quoteIndex === -1) return undefined;
+
+			const valueStart = quoteIndex + 1;
+			const rawLength = buffer.length - valueStart;
+			if (
+				rawLength <=
+				STREAMING_PATCH_PREVIEW_HEAD_CHARS + STREAMING_PATCH_PREVIEW_TAIL_CHARS
+			) {
+				return extractJsonStringField(buffer, 'patch');
+			}
+
+			const rawHead = buffer.slice(
+				valueStart,
+				valueStart + STREAMING_PATCH_PREVIEW_HEAD_CHARS,
+			);
+			const rawTail = buffer.slice(-STREAMING_PATCH_PREVIEW_TAIL_CHARS);
+			return `${bestEffortUnescapeJsonString(
+				rawHead,
+			)}\n… patch preview truncated while streaming …\n${bestEffortUnescapeJsonString(
+				rawTail,
+			)}`;
 		};
 
 		const getResultRecord = (
@@ -416,16 +538,48 @@ export function useSessionStream(
 			if (!path) return;
 
 			const failed = result?.ok === false || eventType === 'error';
+			const callId = getToolEventCallId(payload) ?? undefined;
+			const status = failed
+				? 'error'
+				: eventType === 'tool.result'
+					? 'success'
+					: 'streaming';
+			const content =
+				status === 'streaming'
+					? getStreamingWritePreviewContent(args, buffer)
+					: getStringArg(args, buffer, 'content');
+
+			if (
+				status === 'streaming' &&
+				content !== undefined &&
+				content.length >= TOOL_PREVIEW_THROTTLE_MIN_CHARS
+			) {
+				const previewKey = callId ?? path;
+				const now = Date.now();
+				const last = toolPreviewEmitRef.current.get(previewKey);
+				const contentDelta = Math.abs(
+					content.length - (last?.contentLength ?? 0),
+				);
+				if (
+					last &&
+					now - last.emittedAt < TOOL_PREVIEW_THROTTLE_MS &&
+					contentDelta < TOOL_PREVIEW_THROTTLE_MIN_DELTA_CHARS
+				) {
+					return;
+				}
+
+				toolPreviewEmitRef.current.set(previewKey, {
+					emittedAt: now,
+					contentLength: content.length,
+				});
+			}
+
 			viewerStore.openToolPreviewTab({
 				path,
 				toolName: 'write',
-				callId: getToolEventCallId(payload) ?? undefined,
-				content: getStringArg(args, buffer, 'content'),
-				status: failed
-					? 'error'
-					: eventType === 'tool.result'
-						? 'success'
-						: 'streaming',
+				callId,
+				content,
+				status,
 				error: extractErrorMessage(payload),
 			});
 		};
@@ -444,25 +598,54 @@ export function useSessionStream(
 			const args = getToolArgsForViewer(payload, delta);
 			const buffer = getBufferedToolInput(payload);
 			const artifact = getArtifactRecord(payload);
-			const patch =
-				(typeof artifact?.patch === 'string' ? artifact.patch : undefined) ??
-				getStringArg(args, buffer, 'patch');
-			if (!patch) return;
-
 			const result = getResultRecord(payload);
 			const failed = result?.ok === false || eventType === 'error';
+			const status = failed
+				? 'error'
+				: eventType === 'tool.result'
+					? 'success'
+					: 'streaming';
+			const callId = getToolEventCallId(payload) ?? undefined;
+
+			if (
+				status === 'streaming' &&
+				buffer.length >= TOOL_PREVIEW_THROTTLE_MIN_CHARS
+			) {
+				const previewKey = callId ?? 'apply_patch';
+				const now = Date.now();
+				const last = toolPreviewEmitRef.current.get(previewKey);
+				const contentDelta = Math.abs(
+					buffer.length - (last?.contentLength ?? 0),
+				);
+				if (
+					last &&
+					now - last.emittedAt < TOOL_PREVIEW_THROTTLE_MS &&
+					contentDelta < TOOL_PREVIEW_THROTTLE_MIN_DELTA_CHARS
+				) {
+					return;
+				}
+
+				toolPreviewEmitRef.current.set(previewKey, {
+					emittedAt: now,
+					contentLength: buffer.length,
+				});
+			}
+
+			const patch =
+				(typeof artifact?.patch === 'string' ? artifact.patch : undefined) ??
+				(status === 'streaming'
+					? getStreamingPatchPreviewContent(args, buffer)
+					: getStringArg(args, buffer, 'patch'));
+			if (!patch) return;
+
 			for (const path of extractPathsFromPatch(patch)) {
 				viewerStore.openToolPreviewTab({
 					path,
 					toolName: 'apply_patch',
-					callId: getToolEventCallId(payload) ?? undefined,
+					callId,
 					patch,
 					changedLines: getChangedLinesForPath(result, path),
-					status: failed
-						? 'error'
-						: eventType === 'tool.result'
-							? 'success'
-							: 'streaming',
+					status,
 					error: extractErrorMessage(payload),
 				});
 			}
@@ -655,6 +838,21 @@ export function useSessionStream(
 			const callId = getToolEventCallId(payload);
 			const name = getToolEventName(payload);
 			if (!name) return;
+
+			if (name === 'write' || name === 'apply_patch') {
+				const bufferKey = getToolBufferKey(payload);
+				const bufferedLength = bufferKey
+					? (toolInputBuffersRef.current.get(bufferKey)?.length ?? 0)
+					: 0;
+				if (bufferedLength >= TOOL_PREVIEW_THROTTLE_MIN_CHARS) {
+					const emitKey = callId ?? `name:${name}`;
+					const now = Date.now();
+					const last = toolMessageEmitRef.current.get(emitKey) ?? 0;
+					if (now - last < STREAMING_TOOL_MESSAGE_THROTTLE_MS) return;
+					toolMessageEmitRef.current.set(emitKey, now);
+				}
+			}
+
 			queryClient.setQueryData<Message[]>(
 				['messages', sessionId],
 				(oldMessages) => {
@@ -775,7 +973,7 @@ export function useSessionStream(
 					if (partIndex === -1) {
 						const contentJsonBase: Record<string, unknown> = {
 							name,
-							_streamedInput: delta,
+							_streamedInput: getBoundedStreamingToolInput(delta),
 						};
 						if (callId) contentJsonBase.callId = callId;
 						const newPart: MessagePart = {
@@ -812,7 +1010,7 @@ export function useSessionStream(
 							!Array.isArray(existing.contentJson)
 								? (existing.contentJson as Record<string, unknown>)
 								: {}),
-							_streamedInput: prev + delta,
+							_streamedInput: getBoundedStreamingToolInput(prev + delta),
 						};
 						parts[partIndex] = {
 							...existing,

@@ -8,6 +8,7 @@ import { useIsCompactThread } from './threadDensity';
 const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
 const MAX_SCROLL_H = 140;
+const LIVE_TOOL_CONTENT_PREVIEW_CHARS = 8_000;
 
 function getPayload(part: MessagePart): Record<string, unknown> {
 	if (part.contentJson && typeof part.contentJson === 'object') {
@@ -193,13 +194,14 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 		getTargetFromArgs(toolName, args) ||
 		getTargetFromStream(toolName, streamedInput);
 	const streamedContent = getContentFromStream(toolName, streamedInput);
-	const displayContent = isShellTool(toolName)
+	const rawDisplayContent = isShellTool(toolName)
 		? streamedOutput ||
 			streamedContent ||
 			(args ? getContentFromArgs(toolName, args) : '')
 		: args
 			? getContentFromArgs(toolName, args)
 			: streamedContent;
+	const displayContent = getLiveToolContentPreview(toolName, rawDisplayContent);
 	const hasDisplayContent = displayContent.trim().length > 0;
 
 	useEffect(() => {
@@ -473,11 +475,42 @@ function extractJsonStringField(raw: string, field: string): string {
 	return result;
 }
 
+function extractJsonStringFieldPreview(raw: string, field: string): string {
+	const pattern = new RegExp(`"${field}"\\s*:\\s*"`);
+	const m = pattern.exec(raw);
+	if (!m) return '';
+	const start = m.index + m[0].length;
+	if (raw.length - start <= LIVE_TOOL_CONTENT_PREVIEW_CHARS) {
+		return extractJsonStringField(raw, field);
+	}
+
+	return `… showing latest streamed content only …\n${raw.slice(
+		-LIVE_TOOL_CONTENT_PREVIEW_CHARS,
+	)}`;
+}
+
+function getLiveToolContentPreview(toolName: string, content: string): string {
+	if (
+		toolName !== 'write' &&
+		toolName !== 'apply_patch' &&
+		content.length <= LIVE_TOOL_CONTENT_PREVIEW_CHARS
+	) {
+		return content;
+	}
+
+	if (content.length <= LIVE_TOOL_CONTENT_PREVIEW_CHARS) return content;
+	return `… showing latest content only …\n${content.slice(
+		-LIVE_TOOL_CONTENT_PREVIEW_CHARS,
+	)}`;
+}
+
 function getContentFromStream(toolName: string, raw: string): string {
 	if (!raw) return '';
 	if (isShellTool(toolName)) return extractJsonStringField(raw, 'cmd');
-	if (toolName === 'write') return extractJsonStringField(raw, 'content');
-	if (toolName === 'apply_patch') return extractJsonStringField(raw, 'patch');
+	if (toolName === 'write')
+		return extractJsonStringFieldPreview(raw, 'content');
+	if (toolName === 'apply_patch')
+		return extractJsonStringFieldPreview(raw, 'patch');
 	if (toolName === 'edit') return extractJsonStringField(raw, 'oldString');
 	if (toolName === 'multiedit') return '';
 	if (toolName === 'copy_into') return '';

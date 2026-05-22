@@ -204,6 +204,7 @@ function renderTabContent(
 					open
 					file={tab.path}
 					highlight={tab.highlight}
+					patchPreview={tab.patchPreview}
 					onClose={() => closeTab(tab.id)}
 				/>
 			);

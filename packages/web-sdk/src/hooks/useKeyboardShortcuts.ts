@@ -131,10 +131,10 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+			if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
 				e.preventDefault();
 
-				// Ctrl+H: center -> left, left -> center, right -> center
+				// Ctrl+B: center -> left, left -> center, right -> center
 				if (currentFocus === 'sessions') {
 					// Already on sessions, go back to center
 					(document.activeElement as HTMLElement)?.blur();
@@ -161,10 +161,10 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'r') {
 				e.preventDefault();
 
-				// Ctrl+L: center -> right, right -> center, left -> center
+				// Ctrl+R: center -> right, right -> center, left -> center
 				if (currentFocus === 'git') {
 					// Already on git, go back to center
 					(document.activeElement as HTMLElement)?.blur();

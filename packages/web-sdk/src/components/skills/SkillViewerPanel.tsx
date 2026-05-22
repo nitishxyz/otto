@@ -1,50 +1,9 @@
 import { memo, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import {
-	prism,
-	vscDarkPlus,
-} from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useSkillsStore } from '../../stores/skillsStore';
 import { useSkillDetail, useSkillFileContent } from '../../hooks/useSkills';
 import { Button } from '../ui/Button';
-
-const LANGUAGE_MAP: Record<string, string> = {
-	js: 'javascript',
-	jsx: 'jsx',
-	ts: 'typescript',
-	tsx: 'tsx',
-	py: 'python',
-	rb: 'ruby',
-	go: 'go',
-	rs: 'rust',
-	java: 'java',
-	c: 'c',
-	cpp: 'cpp',
-	h: 'c',
-	hpp: 'cpp',
-	cs: 'csharp',
-	php: 'php',
-	sh: 'bash',
-	bash: 'bash',
-	zsh: 'bash',
-	sql: 'sql',
-	json: 'json',
-	yaml: 'yaml',
-	yml: 'yaml',
-	xml: 'xml',
-	html: 'html',
-	css: 'css',
-	scss: 'scss',
-	md: 'markdown',
-	txt: 'plaintext',
-	toml: 'toml',
-};
-
-function inferLanguage(path: string): string {
-	const ext = path.split('.').pop()?.toLowerCase() ?? '';
-	return LANGUAGE_MAP[ext] ?? 'plaintext';
-}
+import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
 
 interface SkillViewerPanelProps {
 	mode?: 'overlay' | 'pane';
@@ -80,7 +39,6 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 	const content = isMainFile ? skillDetail?.content : fileData?.content;
 	const isLoading = isMainFile ? !skillDetail : fileLoading;
 	const displayPath = isMainFile ? 'SKILL.md' : (viewingFile ?? '');
-	const language = inferLanguage(displayPath);
 
 	useEffect(() => {
 		const handleEscape = (e: KeyboardEvent) => {
@@ -102,10 +60,6 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 	}, [isViewerOpen, closeViewer]);
 
 	if (!isViewerOpen || !selectedSkill) return null;
-
-	const syntaxTheme = document?.documentElement.classList.contains('dark')
-		? vscDarkPlus
-		: prism;
 
 	return (
 		<div
@@ -138,43 +92,17 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 							{displayPath}
 						</span>
 					</div>
-					<span className="text-[12px] text-muted-foreground pr-1">
-						{language}
-					</span>
+					<span className="text-[12px] text-muted-foreground pr-1">file</span>
 				</div>
 			)}
 
-			<div className="flex-1 overflow-auto">
+			<div className="flex-1 min-h-0">
 				{isLoading ? (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						Loading...
 					</div>
 				) : content ? (
-					<div className="code-with-line-numbers">
-						<SyntaxHighlighter
-							language={language}
-							style={syntaxTheme}
-							wrapLines
-							wrapLongLines
-							lineProps={() => ({
-								className: 'code-line',
-							})}
-							customStyle={{
-								margin: 0,
-								padding: '1rem',
-								background: 'transparent',
-								fontSize: '0.8125rem',
-								lineHeight: '1.3125rem',
-							}}
-							codeTagProps={{
-								style: {
-									flex: 1,
-								},
-							}}
-						>
-							{content}
-						</SyntaxHighlighter>
-					</div>
+					<CodeMirrorViewer content={content} path={displayPath} />
 				) : (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						Unable to load file

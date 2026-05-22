@@ -14,15 +14,24 @@ export interface ToolPreviewTabInput {
 	toolName: 'write' | 'apply_patch';
 	callId?: string;
 	content?: string;
+	baseContent?: string;
 	patch?: string;
 	changedLines?: number[];
 	previewContent?: string;
+	resultContent?: string;
 	previewLineTones?: Array<[number, 'add' | 'remove']>;
 	previewFirstLine?: number;
 	previewLatestLine?: number;
 	status: 'streaming' | 'success' | 'error';
 	error?: string;
 }
+
+export type ToolPatchPreview = Omit<
+	ToolPreviewTabInput,
+	'toolName' | 'content'
+> & {
+	toolName: 'apply_patch';
+};
 
 export type ViewerTab =
 	| {
@@ -46,6 +55,7 @@ export type ViewerTab =
 			title: string;
 			path: string;
 			highlight?: ToolActivityHighlight;
+			patchPreview?: ToolPatchPreview;
 	  }
 	| {
 			id: string;
@@ -55,9 +65,11 @@ export type ViewerTab =
 			toolName: 'write' | 'apply_patch';
 			callId?: string;
 			content?: string;
+			baseContent?: string;
 			patch?: string;
 			changedLines?: number[];
 			previewContent?: string;
+			resultContent?: string;
 			previewLineTones?: Array<[number, 'add' | 'remove']>;
 			previewFirstLine?: number;
 			previewLatestLine?: number;
@@ -110,6 +122,25 @@ function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
 	const next = [...tabs];
 	next[existingIndex] = tab;
 	return next;
+}
+
+function isSamePatchCall(
+	existing: Pick<ToolPatchPreview, 'callId' | 'patch' | 'status'> | undefined,
+	preview: Pick<ToolPreviewTabInput, 'callId' | 'patch' | 'status'>,
+): boolean {
+	if (!existing) return false;
+	if (preview.callId || existing.callId) {
+		return Boolean(preview.callId && existing.callId === preview.callId);
+	}
+	if (preview.status === 'streaming' && existing.status !== 'streaming') {
+		return false;
+	}
+	if (!preview.patch || !existing.patch) return existing.status === 'streaming';
+	return (
+		preview.patch === existing.patch ||
+		preview.patch.startsWith(existing.patch) ||
+		existing.patch.startsWith(preview.patch)
+	);
 }
 
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
@@ -193,6 +224,10 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openToolPreviewTab: (preview) => {
 		const id = fileTabId(preview.path);
 		set((state) => {
+			const existingFile = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
+					tab.id === id && tab.type === 'file',
+			);
 			const existing = state.tabs.find(
 				(tab): tab is Extract<ViewerTab, { type: 'tool-preview' }> =>
 					tab.id === id && tab.type === 'tool-preview',
@@ -206,6 +241,70 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							Boolean(preview.callId && tab.callId === preview.callId))
 					),
 			);
+			if (preview.toolName === 'apply_patch' && existingFile) {
+				const existingPatchPreview = existingFile.patchPreview;
+				const samePatchCall = isSamePatchCall(existingPatchPreview, preview);
+				const baseContent =
+					preview.baseContent ??
+					(samePatchCall
+						? existingPatchPreview?.baseContent
+						: (existingPatchPreview?.resultContent ??
+							existingPatchPreview?.baseContent));
+				return {
+					tabs: upsertTab(tabs, {
+						...existingFile,
+						highlight: undefined,
+						patchPreview: {
+							path: preview.path,
+							toolName: 'apply_patch',
+							callId: preview.callId ?? existingPatchPreview?.callId,
+							baseContent,
+							patch: preview.patch ?? existingPatchPreview?.patch,
+							changedLines:
+								preview.changedLines ??
+								(samePatchCall
+									? existingPatchPreview?.changedLines
+									: undefined),
+							previewContent:
+								preview.previewContent ??
+								(samePatchCall
+									? existingPatchPreview?.previewContent
+									: undefined),
+							resultContent:
+								preview.resultContent ??
+								(samePatchCall
+									? existingPatchPreview?.resultContent
+									: undefined),
+							previewLineTones:
+								preview.previewLineTones ??
+								(samePatchCall
+									? existingPatchPreview?.previewLineTones
+									: undefined),
+							previewFirstLine:
+								preview.previewFirstLine ??
+								(samePatchCall
+									? existingPatchPreview?.previewFirstLine
+									: undefined),
+							previewLatestLine:
+								preview.previewLatestLine ??
+								(samePatchCall
+									? existingPatchPreview?.previewLatestLine
+									: undefined),
+							status: preview.status,
+							error: preview.error ?? existingPatchPreview?.error,
+						},
+					}),
+					activeTabId: id,
+				};
+			}
+			const sameToolPreviewCall = isSamePatchCall(existing, preview);
+			const baseContent =
+				preview.toolName === 'apply_patch'
+					? (preview.baseContent ??
+						(sameToolPreviewCall
+							? existing?.baseContent
+							: (existing?.resultContent ?? existing?.baseContent)))
+					: undefined;
 			return {
 				tabs: upsertTab(tabs, {
 					id,
@@ -215,15 +314,24 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					toolName: preview.toolName,
 					callId: preview.callId,
 					content: preview.content ?? existing?.content,
+					baseContent,
 					patch: preview.patch ?? existing?.patch,
 					changedLines: preview.changedLines ?? existing?.changedLines,
-					previewContent: preview.previewContent ?? existing?.previewContent,
+					previewContent:
+						preview.previewContent ??
+						(sameToolPreviewCall ? existing?.previewContent : undefined),
+					resultContent:
+						preview.resultContent ??
+						(sameToolPreviewCall ? existing?.resultContent : undefined),
 					previewLineTones:
-						preview.previewLineTones ?? existing?.previewLineTones,
+						preview.previewLineTones ??
+						(sameToolPreviewCall ? existing?.previewLineTones : undefined),
 					previewFirstLine:
-						preview.previewFirstLine ?? existing?.previewFirstLine,
+						preview.previewFirstLine ??
+						(sameToolPreviewCall ? existing?.previewFirstLine : undefined),
 					previewLatestLine:
-						preview.previewLatestLine ?? existing?.previewLatestLine,
+						preview.previewLatestLine ??
+						(sameToolPreviewCall ? existing?.previewLatestLine : undefined),
 					status: preview.status,
 					error: preview.error ?? existing?.error,
 				}),

@@ -1,54 +1,12 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import {
-	prism,
-	vscDarkPlus,
-} from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import {
 	type ViewerTab,
 	useViewerTabsStore,
 } from '../../stores/viewerTabsStore';
+import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
 import { StableSpinner } from '../ui/StableSpinner';
-
-const LANGUAGE_MAP: Record<string, string> = {
-	js: 'javascript',
-	jsx: 'jsx',
-	ts: 'typescript',
-	tsx: 'tsx',
-	py: 'python',
-	rb: 'ruby',
-	go: 'go',
-	rs: 'rust',
-	java: 'java',
-	c: 'c',
-	cpp: 'cpp',
-	h: 'c',
-	hpp: 'cpp',
-	cs: 'csharp',
-	php: 'php',
-	sh: 'bash',
-	bash: 'bash',
-	zsh: 'bash',
-	sql: 'sql',
-	json: 'json',
-	yaml: 'yaml',
-	yml: 'yaml',
-	xml: 'xml',
-	html: 'html',
-	css: 'css',
-	scss: 'scss',
-	md: 'markdown',
-	markdown: 'markdown',
-	mdx: 'markdown',
-	txt: 'plaintext',
-	svelte: 'svelte',
-	toml: 'toml',
-	lock: 'plaintext',
-	diff: 'diff',
-};
-
 interface ToolPreviewPanelProps {
 	tab: Extract<ViewerTab, { type: 'tool-preview' }>;
 }
@@ -58,8 +16,9 @@ interface PatchLineHighlights {
 	firstLine?: number;
 }
 
-interface LivePatchPreview {
+export interface LivePatchPreview {
 	content: string;
+	resultContent: string;
 	lineTones: Map<number, 'add' | 'remove'>;
 	firstLine?: number;
 	latestLine?: number;
@@ -70,9 +29,74 @@ interface PatchOperation {
 	text: string;
 }
 
-function inferLanguage(path: string): string {
-	const ext = path.split('.').pop()?.toLowerCase() ?? '';
-	return LANGUAGE_MAP[ext] ?? 'plaintext';
+const LARGE_WRITE_PREVIEW_CHARS = 24_000;
+const LARGE_WRITE_PREVIEW_LINES = 500;
+const STREAMING_WRITE_PREVIEW_TAIL_LINES = 250;
+const LARGE_PATCH_PREVIEW_CHARS = 80_000;
+const LARGE_PATCH_FILE_CHARS = 120_000;
+const LARGE_PATCH_PREVIEW_TAIL_CHARS = 32_000;
+
+interface OptimizedWritePreview {
+	content: string;
+	notice?: string;
+	usePlainText: boolean;
+}
+
+function hasAtLeastLineCount(content: string, lineLimit: number): boolean {
+	let lines = 1;
+	for (let index = 0; index < content.length; index += 1) {
+		if (content[index] !== '\n') continue;
+		lines += 1;
+		if (lines >= lineLimit) return true;
+	}
+	return false;
+}
+
+function getTailByLineCount(content: string, lineLimit: number): string {
+	let lines = 0;
+	for (let index = content.length - 1; index >= 0; index -= 1) {
+		if (content[index] !== '\n') continue;
+		lines += 1;
+		if (lines >= lineLimit) return content.slice(index + 1);
+	}
+	return content;
+}
+
+function getTailByCharCount(content: string, charLimit: number): string {
+	if (content.length <= charLimit) return content;
+	return `… showing the latest ${charLimit.toLocaleString()} characters only …\n${content.slice(
+		-charLimit,
+	)}`;
+}
+
+function getOptimizedWritePreview(
+	content: string,
+	status: ToolPreviewPanelProps['tab']['status'],
+): OptimizedWritePreview {
+	const isLarge =
+		content.length >= LARGE_WRITE_PREVIEW_CHARS ||
+		hasAtLeastLineCount(content, LARGE_WRITE_PREVIEW_LINES);
+	if (!isLarge) return { content, usePlainText: false };
+
+	if (status !== 'streaming') {
+		return {
+			content,
+			notice:
+				'Large write preview: syntax highlighting is disabled to keep the app responsive.',
+			usePlainText: true,
+		};
+	}
+
+	const visibleContent = getTailByLineCount(
+		content,
+		STREAMING_WRITE_PREVIEW_TAIL_LINES,
+	);
+	return {
+		content: visibleContent,
+		notice:
+			'Large write streaming: showing the latest content only; syntax highlighting is disabled to keep the app responsive.',
+		usePlainText: true,
+	};
 }
 
 function normalizePatchPath(path: string): string {
@@ -102,6 +126,12 @@ function getPatchLineHighlights(
 ): PatchLineHighlights {
 	const highlighted = new Set(fallbackLines ?? []);
 	if (!patch) return { lines: highlighted };
+	if (patch.length >= LARGE_PATCH_PREVIEW_CHARS) {
+		return {
+			lines: highlighted,
+			firstLine: highlighted.size > 0 ? Math.min(...highlighted) : undefined,
+		};
+	}
 
 	let activeFile = false;
 	let sawFileDirective = false;
@@ -149,6 +179,26 @@ function getPatchLineHighlights(
 		lines: highlighted,
 		firstLine: highlighted.size > 0 ? Math.min(...highlighted) : undefined,
 	};
+}
+
+function getPatchTextLineTones(
+	patch: string | undefined,
+): Map<number, 'add' | 'remove' | 'primary'> | undefined {
+	if (!patch) return undefined;
+	const tones = new Map<number, 'add' | 'remove' | 'primary'>();
+	const lines = patch.split('\n');
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index];
+		const lineNumber = index + 1;
+		if (line.startsWith('@@') || line.startsWith('***')) {
+			tones.set(lineNumber, 'primary');
+		} else if (line.startsWith('+') && !line.startsWith('+++')) {
+			tones.set(lineNumber, 'add');
+		} else if (line.startsWith('-') && !line.startsWith('---')) {
+			tones.set(lineNumber, 'remove');
+		}
+	}
+	return tones.size > 0 ? tones : undefined;
 }
 
 function findPatternStart(
@@ -260,6 +310,7 @@ function buildEnvelopedPatchPreview(
 
 	const originalLines = content.split('\n');
 	const renderedLines: string[] = [];
+	const resultLines: string[] = [];
 	const lineTones = new Map<number, 'add' | 'remove'>();
 	let originalIndex = 0;
 
@@ -272,12 +323,14 @@ function buildEnvelopedPatchPreview(
 
 		while (originalIndex < start) {
 			renderedLines.push(originalLines[originalIndex]);
+			resultLines.push(originalLines[originalIndex]);
 			originalIndex += 1;
 		}
 
 		for (const operation of hunk) {
 			if (operation.type === 'add') {
 				renderedLines.push(operation.text);
+				resultLines.push(operation.text);
 				lineTones.set(renderedLines.length, 'add');
 				continue;
 			}
@@ -286,6 +339,8 @@ function buildEnvelopedPatchPreview(
 			renderedLines.push(originalLines[originalIndex] ?? fallbackText);
 			if (operation.type === 'remove') {
 				lineTones.set(renderedLines.length, 'remove');
+			} else {
+				resultLines.push(originalLines[originalIndex] ?? fallbackText);
 			}
 			originalIndex += 1;
 		}
@@ -295,19 +350,21 @@ function buildEnvelopedPatchPreview(
 
 	while (originalIndex < originalLines.length) {
 		renderedLines.push(originalLines[originalIndex]);
+		resultLines.push(originalLines[originalIndex]);
 		originalIndex += 1;
 	}
 
 	const changedLines = [...lineTones.keys()];
 	return {
 		content: renderedLines.join('\n'),
+		resultContent: resultLines.join('\n'),
 		lineTones,
 		firstLine: changedLines.length > 0 ? Math.min(...changedLines) : undefined,
 		latestLine: changedLines.length > 0 ? Math.max(...changedLines) : undefined,
 	};
 }
 
-function buildLivePatchPreview(
+export function buildLivePatchPreview(
 	content: string,
 	patch: string | undefined,
 	targetPath: string,
@@ -371,27 +428,37 @@ function buildLivePatchPreview(
 
 	const originalLines = content.split('\n');
 	const renderedLines: string[] = [];
+	const resultLines: string[] = [];
 	const lineTones = new Map<number, 'add' | 'remove'>();
 
-	const pushInsertions = (line: number) => {
+	const pushInsertions = (
+		line: number,
+		lines: string[],
+		toneInsertions: boolean,
+	) => {
 		for (const inserted of insertions.get(line) ?? []) {
-			renderedLines.push(inserted);
-			lineTones.set(renderedLines.length, 'add');
+			lines.push(inserted);
+			if (toneInsertions) lineTones.set(lines.length, 'add');
 		}
 	};
 
-	pushInsertions(0);
+	pushInsertions(0, renderedLines, true);
+	pushInsertions(0, resultLines, false);
 	for (let index = 0; index < originalLines.length; index += 1) {
 		const lineNumber = index + 1;
-		pushInsertions(lineNumber);
+		pushInsertions(lineNumber, renderedLines, true);
+		pushInsertions(lineNumber, resultLines, false);
 		renderedLines.push(originalLines[index]);
 		if (removals.has(lineNumber)) lineTones.set(renderedLines.length, 'remove');
+		else resultLines.push(originalLines[index]);
 	}
-	pushInsertions(originalLines.length + 1);
+	pushInsertions(originalLines.length + 1, renderedLines, true);
+	pushInsertions(originalLines.length + 1, resultLines, false);
 
 	const changedLines = [...lineTones.keys()];
 	return {
 		content: renderedLines.join('\n'),
+		resultContent: resultLines.join('\n'),
 		lineTones,
 		firstLine: changedLines.length > 0 ? Math.min(...changedLines) : undefined,
 		latestLine: changedLines.length > 0 ? Math.max(...changedLines) : undefined,
@@ -426,174 +493,56 @@ function StatusIcon({
 	);
 }
 
+function PlainSourceViewer({
+	content,
+	path,
+	notice,
+}: {
+	content: string;
+	path?: string;
+	notice?: string;
+}) {
+	return (
+		<div className="h-full min-h-0 flex flex-col">
+			{notice && (
+				<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
+					{notice}
+				</div>
+			)}
+			<CodeMirrorViewer content={content} path={path} />
+		</div>
+	);
+}
+
 interface SourceViewerProps {
 	content: string;
-	language: string;
-	syntaxTheme: Record<string, unknown>;
+	path?: string;
 	highlightedLines?: Set<number>;
 	highlightTone?: 'primary' | 'add';
 	lineTones?: Map<number, 'add' | 'remove' | 'primary'>;
-	mode?: 'plain' | 'diff';
+	scrollToLine?: number;
+	scrollToEndSignal?: string | number;
 }
 
 function SourceViewer({
 	content,
-	language,
-	syntaxTheme,
+	path,
 	highlightedLines,
 	highlightTone = 'primary',
 	lineTones,
-	mode = 'plain',
+	scrollToLine,
+	scrollToEndSignal,
 }: SourceViewerProps) {
-	if (mode === 'diff') {
-		const lines = content.split('\n');
-		return (
-			<div className="min-w-max">
-				{lines.map((line, index) => {
-					const lineNumber = index + 1;
-					const tone = lineTones?.get(lineNumber);
-					const isHighlighted =
-						Boolean(tone) || (highlightedLines?.has(lineNumber) ?? false);
-					const effectiveTone = tone ?? highlightTone;
-					const isAdd = isHighlighted && effectiveTone === 'add';
-					const isRemove = isHighlighted && effectiveTone === 'remove';
-					const rowClassName = `flex hover:bg-muted/20 ${
-						isAdd
-							? 'bg-green-500/15'
-							: isRemove
-								? 'bg-red-500/15'
-								: isHighlighted
-									? 'bg-blue-500/10'
-									: ''
-					}`;
-					const numberClassName = `flex-shrink-0 w-14 px-2 py-0.5 text-[13px] font-mono select-none text-right ${
-						isAdd
-							? 'text-green-700 dark:text-green-400'
-							: isRemove
-								? 'text-red-600 dark:text-red-400'
-								: 'text-muted-foreground'
-					}`;
-					const signClassName = `flex-shrink-0 w-8 px-2 py-0.5 text-[13px] font-mono select-none border-r border-border text-center ${
-						isAdd
-							? 'text-green-700 dark:text-green-400'
-							: isRemove
-								? 'text-red-600 dark:text-red-400'
-								: 'text-muted-foreground'
-					}`;
-					const contentClassName = `flex-1 px-3 py-0.5 font-mono text-[13px] whitespace-pre ${
-						isAdd
-							? 'text-green-700 dark:text-green-400'
-							: isRemove
-								? 'text-red-600 dark:text-red-400 line-through'
-								: 'text-foreground/80'
-					}`;
-					const sign = isAdd ? '+' : isRemove ? '-' : '';
-
-					let renderedContent: React.ReactNode = line || ' ';
-					if (language !== 'plaintext' && line.trim()) {
-						renderedContent = (
-							<SyntaxHighlighter
-								language={language}
-								style={syntaxTheme}
-								customStyle={{
-									margin: 0,
-									padding: 0,
-									background: 'transparent',
-									display: 'inline',
-									fontSize: 'inherit',
-									lineHeight: 'inherit',
-								}}
-								codeTagProps={{
-									style: {
-										fontFamily: 'inherit',
-										background: 'transparent',
-									},
-								}}
-								PreTag="span"
-							>
-								{line}
-							</SyntaxHighlighter>
-						);
-					}
-
-					return (
-						<div
-							key={lineNumber}
-							className={rowClassName}
-							data-line-number={lineNumber}
-						>
-							<div className={numberClassName}>{lineNumber}</div>
-							<div className={signClassName}>{sign}</div>
-							<div className={contentClassName}>{renderedContent}</div>
-						</div>
-					);
-				})}
-			</div>
-		);
-	}
-
 	return (
-		<div className="code-with-line-numbers">
-			<SyntaxHighlighter
-				language={language}
-				style={syntaxTheme}
-				wrapLines
-				wrapLongLines
-				lineProps={(lineNumber) => {
-					const tone = lineTones?.get(lineNumber);
-					const isHighlighted =
-						Boolean(tone) || (highlightedLines?.has(lineNumber) ?? false);
-					const effectiveTone = tone ?? highlightTone;
-					const highlightClass = isHighlighted
-						? effectiveTone === 'add'
-							? 'code-line diff-line-add'
-							: effectiveTone === 'remove'
-								? 'code-line diff-line-remove'
-								: 'code-line diff-line-highlight'
-						: 'code-line';
-					const highlightStyle =
-						effectiveTone === 'add'
-							? {
-									backgroundColor: 'rgb(16 185 129 / 0.22)',
-									boxShadow: 'inset 3px 0 0 rgb(16 185 129)',
-								}
-							: effectiveTone === 'remove'
-								? {
-										backgroundColor: 'rgb(239 68 68 / 0.2)',
-										boxShadow: 'inset 3px 0 0 rgb(239 68 68)',
-										textDecoration: 'line-through',
-									}
-								: {
-										backgroundColor: 'hsl(var(--primary) / 0.12)',
-										boxShadow: 'inset 3px 0 0 hsl(var(--primary))',
-									};
-					return {
-						className: highlightClass,
-						'data-line-number': lineNumber,
-						style: isHighlighted
-							? {
-									...highlightStyle,
-									width: '100%',
-								}
-							: undefined,
-					};
-				}}
-				customStyle={{
-					margin: 0,
-					padding: '1rem',
-					background: 'transparent',
-					fontSize: '0.8125rem',
-					lineHeight: '1.3125rem',
-				}}
-				codeTagProps={{
-					style: {
-						flex: 1,
-					},
-				}}
-			>
-				{content}
-			</SyntaxHighlighter>
-		</div>
+		<CodeMirrorViewer
+			content={content}
+			path={path}
+			highlightedLines={highlightedLines}
+			highlightTone={highlightTone}
+			lineTones={lineTones}
+			scrollToLine={scrollToLine}
+			scrollToEndSignal={scrollToEndSignal}
+		/>
 	);
 }
 
@@ -603,40 +552,74 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 		key: string;
 		preview: LivePatchPreview;
 	} | null>(null);
-	const syntaxTheme = document?.documentElement.classList.contains('dark')
-		? vscDarkPlus
-		: prism;
-	const language = inferLanguage(tab.path);
 	const statusLabel = getStatusLabel(tab);
 	const shouldLoadPatchFile = tab.toolName === 'apply_patch';
 	const shouldLoadAppliedFile = shouldLoadPatchFile && tab.status === 'success';
 	const { data: appliedFile, refetch: refetchAppliedFile } = useFileContent(
 		shouldLoadPatchFile ? tab.path : null,
 	);
+	const shouldUseLargePatchFallback = Boolean(
+		tab.toolName === 'apply_patch' &&
+			((tab.patch?.length ?? 0) >= LARGE_PATCH_PREVIEW_CHARS ||
+				(appliedFile?.content?.length ?? 0) >= LARGE_PATCH_FILE_CHARS),
+	);
+	const largePatchPreview = useMemo(() => {
+		if (!shouldUseLargePatchFallback) return null;
+		return getTailByCharCount(
+			tab.patch ?? 'Patch content is not available yet.',
+			LARGE_PATCH_PREVIEW_TAIL_CHARS,
+		);
+	}, [shouldUseLargePatchFallback, tab.patch]);
 	const patchHighlights = useMemo(
 		() => getPatchLineHighlights(tab.patch, tab.path, tab.changedLines),
 		[tab.patch, tab.path, tab.changedLines],
+	);
+	const patchTextLineTones = useMemo(
+		() => getPatchTextLineTones(tab.patch),
+		[tab.patch],
+	);
+	const writePreview = useMemo(
+		() =>
+			tab.toolName === 'write' && tab.content !== undefined
+				? getOptimizedWritePreview(tab.content, tab.status)
+				: null,
+		[tab.toolName, tab.content, tab.status],
 	);
 	const scrollSignal = `${tab.content?.length ?? 0}:${tab.patch?.length ?? 0}:${appliedFile?.content?.length ?? 0}`;
 	const livePatchPreview = useMemo(
 		() =>
 			tab.toolName === 'apply_patch' &&
 			tab.status !== 'success' &&
+			!shouldUseLargePatchFallback &&
 			appliedFile?.content !== undefined
-				? buildLivePatchPreview(appliedFile.content, tab.patch, tab.path)
+				? buildLivePatchPreview(
+						tab.baseContent ?? appliedFile.content,
+						tab.patch,
+						tab.path,
+					)
 				: null,
-		[tab.toolName, tab.status, tab.patch, tab.path, appliedFile?.content],
+		[
+			tab.toolName,
+			tab.status,
+			tab.baseContent,
+			tab.patch,
+			tab.path,
+			appliedFile?.content,
+			shouldUseLargePatchFallback,
+		],
 	);
 	const persistedPatchPreview = useMemo<LivePatchPreview | null>(() => {
 		if (!tab.previewContent || !tab.previewLineTones) return null;
 		return {
 			content: tab.previewContent,
+			resultContent: tab.resultContent ?? tab.previewContent,
 			lineTones: new Map(tab.previewLineTones),
 			firstLine: tab.previewFirstLine,
 			latestLine: tab.previewLatestLine,
 		};
 	}, [
 		tab.previewContent,
+		tab.resultContent,
 		tab.previewLineTones,
 		tab.previewFirstLine,
 		tab.previewLatestLine,
@@ -655,10 +638,13 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 
 	useEffect(() => {
 		if (tab.toolName !== 'apply_patch' || !livePatchPreview) return;
+		const baseContent = tab.baseContent ?? appliedFile?.content;
 		const previewLineTones = [...livePatchPreview.lineTones.entries()];
 		const existingLineTones = tab.previewLineTones ?? [];
 		const hasSameSnapshot =
+			tab.baseContent === baseContent &&
 			tab.previewContent === livePatchPreview.content &&
+			tab.resultContent === livePatchPreview.resultContent &&
 			tab.previewFirstLine === livePatchPreview.firstLine &&
 			tab.previewLatestLine === livePatchPreview.latestLine &&
 			existingLineTones.length === previewLineTones.length &&
@@ -672,16 +658,18 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 			path: tab.path,
 			toolName: 'apply_patch',
 			callId: tab.callId,
+			baseContent,
 			patch: tab.patch,
 			changedLines: tab.changedLines,
 			previewContent: livePatchPreview.content,
+			resultContent: livePatchPreview.resultContent,
 			previewLineTones,
 			previewFirstLine: livePatchPreview.firstLine,
 			previewLatestLine: livePatchPreview.latestLine,
 			status: tab.status,
 			error: tab.error,
 		});
-	}, [tab, livePatchPreview]);
+	}, [tab, appliedFile?.content, livePatchPreview]);
 
 	useEffect(() => {
 		if (shouldLoadAppliedFile) void refetchAppliedFile();
@@ -745,23 +733,33 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 			)}
 
 			<div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-				{tab.toolName === 'apply_patch' && stablePatchPreview ? (
+				{tab.toolName === 'apply_patch' && largePatchPreview ? (
+					<PlainSourceViewer
+						content={largePatchPreview}
+						path="preview.patch"
+						notice="Large patch/file preview: showing the patch text instead of rendering the full file to keep the app responsive."
+					/>
+				) : tab.toolName === 'apply_patch' && stablePatchPreview ? (
 					<SourceViewer
 						content={stablePatchPreview.content}
-						language={language}
-						syntaxTheme={syntaxTheme}
+						path={tab.path}
 						lineTones={stablePatchPreview.lineTones}
-						mode="diff"
+						scrollToLine={stablePatchPreview.latestLine}
+					/>
+				) : tab.toolName === 'apply_patch' && tab.patch ? (
+					<SourceViewer
+						content={tab.patch}
+						path="preview.patch"
+						lineTones={patchTextLineTones}
 					/>
 				) : shouldLoadAppliedFile ? (
 					appliedFile?.content !== undefined ? (
 						<SourceViewer
 							content={appliedFile.content}
-							language={language}
-							syntaxTheme={syntaxTheme}
+							path={tab.path}
 							highlightedLines={patchHighlights.lines}
 							highlightTone="add"
-							mode="diff"
+							scrollToLine={patchHighlights.firstLine}
 						/>
 					) : (
 						<div className="h-full flex items-center justify-center text-sm text-muted-foreground">
@@ -770,22 +768,26 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 					)
 				) : tab.toolName === 'apply_patch' ? (
 					appliedFile?.content !== undefined ? (
-						<SourceViewer
-							content={appliedFile.content}
-							language={language}
-							syntaxTheme={syntaxTheme}
-						/>
+						<SourceViewer content={appliedFile.content} path={tab.path} />
 					) : (
 						<div className="h-full flex items-center justify-center text-sm text-muted-foreground">
 							Loading file...
 						</div>
 					)
-				) : tab.content !== undefined ? (
-					<SourceViewer
-						content={tab.content}
-						language={language}
-						syntaxTheme={syntaxTheme}
-					/>
+				) : writePreview ? (
+					writePreview.usePlainText ? (
+						<PlainSourceViewer
+							content={writePreview.content}
+							path={tab.path}
+							notice={writePreview.notice}
+						/>
+					) : (
+						<SourceViewer
+							content={writePreview.content}
+							path={tab.path}
+							scrollToEndSignal={scrollSignal}
+						/>
+					)
 				) : (
 					<div className="h-full flex items-center justify-center text-sm text-muted-foreground">
 						Waiting for write content...
