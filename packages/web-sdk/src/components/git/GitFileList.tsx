@@ -37,9 +37,8 @@ export function GitFileList({ status }: GitFileListProps) {
 	const unstagedPaths = new Set(status.unstaged.map((f) => f.path));
 
 	const handleStageAll = () => {
-		const filesToStage = unstagedFiles.map((f) => f.path);
-		if (filesToStage.length > 0) {
-			stageFiles.mutate(filesToStage);
+		if (hasUnstagedFiles) {
+			stageFiles.mutate(['.']);
 		}
 	};
 

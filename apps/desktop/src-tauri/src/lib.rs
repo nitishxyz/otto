@@ -193,6 +193,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::clipboard::copy_to_clipboard,
             commands::project::open_project_dialog,
             commands::project::get_recent_projects,
             commands::project::save_recent_project,

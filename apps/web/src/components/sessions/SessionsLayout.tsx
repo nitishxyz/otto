@@ -166,8 +166,7 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 			});
 		},
 		onStageAll: () => {
-			const unstaged = gitFiles.filter((f) => !f.staged).map((f) => f.path);
-			if (unstaged.length > 0) stageFiles.mutate(unstaged);
+			if (gitFiles.some((f) => !f.staged)) stageFiles.mutate(['.']);
 		},
 		onUnstageAll: () => {
 			const staged = gitFiles.filter((f) => f.staged).map((f) => f.path);

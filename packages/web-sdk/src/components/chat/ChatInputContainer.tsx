@@ -16,7 +16,7 @@ import {
 	useDeleteSession,
 } from '../../hooks/useSessions';
 import { useAllModels, useConfig } from '../../hooks/useConfig';
-import { useGitStatus, useStageFiles } from '../../hooks/useGit';
+import { useStageFiles } from '../../hooks/useGit';
 import { useGitStore } from '../../stores/gitStore';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { useQueueStore } from '../../stores/queueStore';
@@ -33,6 +33,7 @@ interface ChatInputContainerProps {
 	userContext?: string;
 	onNewSession?: () => void;
 	onDeleteSession?: () => void;
+	onCopyText?: (text: string) => void | Promise<void>;
 	modalPosition?: 'fixed' | 'absolute';
 }
 
@@ -40,10 +41,33 @@ export interface ChatInputContainerRef {
 	focus: () => void;
 }
 
+async function copyTextToClipboard(
+	text: string,
+	onCopyText?: (text: string) => void | Promise<void>,
+) {
+	if (onCopyText) {
+		await onCopyText(text);
+		return;
+	}
+
+	if (!navigator.clipboard?.writeText) {
+		throw new Error('Clipboard is not available');
+	}
+
+	await navigator.clipboard.writeText(text);
+}
+
 export const ChatInputContainer = memo(
 	forwardRef<ChatInputContainerRef, ChatInputContainerProps>(
 		function ChatInputContainer(
-			{ sessionId, userContext, onNewSession, onDeleteSession, modalPosition },
+			{
+				sessionId,
+				userContext,
+				onNewSession,
+				onDeleteSession,
+				onCopyText,
+				modalPosition,
+			},
 			ref,
 		) {
 			const session = useSession(sessionId);
@@ -66,7 +90,6 @@ export const ChatInputContainer = memo(
 			const deleteSession = useDeleteSession();
 			const { data: allModels } = useAllModels();
 			const { data: config } = useConfig();
-			const { data: gitStatus } = useGitStatus();
 			const stageFiles = useStageFiles();
 			const openCommitModalForSession = useGitStore(
 				(state) => state.openCommitModalForSession,
@@ -261,12 +284,15 @@ export const ChatInputContainer = memo(
 					} else if (commandId === 'new') {
 						onNewSession?.();
 					} else if (commandId === 'stage') {
-						const unstagedPaths = gitStatus?.unstaged?.map((f) => f.path) ?? [];
-						const untrackedPaths =
-							gitStatus?.untracked?.map((f) => f.path) ?? [];
-						const allUnstaged = [...unstagedPaths, ...untrackedPaths];
-						if (allUnstaged.length > 0) {
-							stageFiles.mutate(allUnstaged);
+						try {
+							await stageFiles.mutateAsync(['.']);
+							toast.success('Staged all changes');
+						} catch (error) {
+							toast.error(
+								error instanceof Error
+									? error.message
+									: 'Failed to stage changes',
+							);
 						}
 					} else if (commandId === 'commit') {
 						openCommitModalForSession(sessionId);
@@ -285,12 +311,27 @@ export const ChatInputContainer = memo(
 						try {
 							const result = await apiClient.shareSession(sessionId);
 							if (result.shared) {
+								let copied = false;
+								try {
+									await copyTextToClipboard(result.url, onCopyText);
+									copied = true;
+								} catch (copyError) {
+									console.warn('Failed to copy share URL:', copyError);
+								}
+
 								toast.successWithAction(
 									result.message === 'Already shared'
-										? 'Already shared'
-										: 'Session shared!',
+										? copied
+											? 'Already shared — link copied'
+											: 'Already shared'
+										: copied
+											? 'Session shared — link copied!'
+											: 'Session shared!',
 									{ label: 'Open', href: result.url },
 								);
+								if (!copied) {
+									toast.error('Shared, but failed to copy link');
+								}
 								queryClient.invalidateQueries({
 									queryKey: ['share-status', sessionId],
 								});
@@ -307,14 +348,27 @@ export const ChatInputContainer = memo(
 						try {
 							const result = await apiClient.syncSession(sessionId);
 							if (result.synced) {
+								let copied = false;
+								try {
+									await copyTextToClipboard(result.url, onCopyText);
+									copied = true;
+								} catch (copyError) {
+									console.warn('Failed to copy sync URL:', copyError);
+								}
+
 								const msg =
 									result.newMessages > 0
-										? `Synced ${result.newMessages} new messages`
-										: 'Already synced';
+										? `Synced ${result.newMessages} new messages${copied ? ' — link copied' : ''}`
+										: copied
+											? 'Already synced — link copied'
+											: 'Already synced';
 								toast.successWithAction(msg, {
 									label: 'Open',
 									href: result.url,
 								});
+								if (!copied) {
+									toast.error('Synced, but failed to copy link');
+								}
 								queryClient.invalidateQueries({
 									queryKey: ['share-status', sessionId],
 								});
@@ -330,13 +384,13 @@ export const ChatInputContainer = memo(
 				},
 				[
 					onNewSession,
-					gitStatus,
 					stageFiles,
 					openCommitModalForSession,
 					handleSendMessage,
 					deleteSession,
 					sessionId,
 					onDeleteSession,
+					onCopyText,
 					queryClient,
 				],
 			);

@@ -24,7 +24,10 @@ const actionConfig: Record<
 > = {
 	stage: {
 		schema: gitStageSchema,
-		command: (files) => ['add', ...files],
+		command: (files) =>
+			files.length === 1 && files[0] === '.'
+				? ['add', '-A']
+				: ['add', '--', ...files],
 		dataKey: 'staged',
 		fallbackError: 'Failed to stage files',
 	},

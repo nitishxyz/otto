@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
 	ChatInputContainer,
@@ -108,6 +109,10 @@ export function DesktopSessionsLayout({
 		[createSession, config],
 	);
 
+	const handleCopyText = useCallback(async (text: string) => {
+		await invoke('copy_to_clipboard', { text });
+	}, []);
+
 	const gitFiles = useMemo(() => {
 		if (!gitStatus) return [];
 		return [
@@ -157,8 +162,7 @@ export function DesktopSessionsLayout({
 			});
 		},
 		onStageAll: () => {
-			const unstaged = gitFiles.filter((f) => !f.staged).map((f) => f.path);
-			if (unstaged.length > 0) stageFiles.mutate(unstaged);
+			if (gitFiles.some((f) => !f.staged)) stageFiles.mutate(['.']);
 		},
 		onUnstageAll: () => {
 			const staged = gitFiles.filter((f) => f.staged).map((f) => f.path);
@@ -210,6 +214,7 @@ export function DesktopSessionsLayout({
 					sessionId={sessionId}
 					onNewSession={handleNewSession}
 					onDeleteSession={handleDeleteSession}
+					onCopyText={handleCopyText}
 				/>
 			</>
 		);
@@ -218,6 +223,7 @@ export function DesktopSessionsLayout({
 		handleNewSession,
 		handleSelectSession,
 		handleDeleteSession,
+		handleCopyText,
 		handleSessionCreated,
 	]);
 
