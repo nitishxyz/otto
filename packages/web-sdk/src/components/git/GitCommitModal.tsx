@@ -1,10 +1,11 @@
 import { useState, useId, useEffect, useCallback } from 'react';
-import { GitCommit, Sparkles, Loader2 } from 'lucide-react';
+import { GitCommit, Sparkles } from 'lucide-react';
 import { useGitStore } from '../../stores/gitStore';
 import { useCommitChanges, useGenerateCommitMessage } from '../../hooks/useGit';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
+import { StableSpinner } from '../ui/StableSpinner';
 
 export function GitCommitModal() {
 	const { isCommitModalOpen, closeCommitModal } = useGitStore();
@@ -108,7 +109,10 @@ export function GitCommitModal() {
 				>
 					{generateMessage.isPending ? (
 						<>
-							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+							<StableSpinner
+								className="mr-2"
+								title="Generating commit message"
+							/>
 							Generating...
 						</>
 					) : (

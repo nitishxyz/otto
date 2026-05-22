@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Loader2 } from 'lucide-react';
+import { StableSpinner } from './StableSpinner';
 
 export const ToggleSwitch = memo(function ToggleSwitch({
 	checked,
@@ -32,7 +32,7 @@ export const ToggleSwitch = memo(function ToggleSwitch({
 				} ${loading ? 'bg-transparent' : 'bg-white'}`}
 			>
 				{loading ? (
-					<Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+					<StableSpinner size="sm" className="text-white" title="Updating" />
 				) : null}
 			</span>
 		</button>

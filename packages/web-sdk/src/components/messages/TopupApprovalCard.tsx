@@ -1,9 +1,10 @@
 import { memo, useState } from 'react';
-import { Wallet, CreditCard, AlertCircle, Loader2, X } from 'lucide-react';
+import { Wallet, CreditCard, AlertCircle, X } from 'lucide-react';
 import type { PendingTopupApproval } from '../../stores/topupApprovalStore';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
+import { StableSpinner } from '../ui/StableSpinner';
 
 interface TopupApprovalCardProps {
 	pendingTopup: PendingTopupApproval;
@@ -113,7 +114,7 @@ export const TopupApprovalCard = memo(function TopupApprovalCard({
 					className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
 				>
 					{selectedMethod === 'crypto' && isProcessing ? (
-						<Loader2 className="w-3 h-3 animate-spin" />
+						<StableSpinner size="xs" title="Processing payment" />
 					) : (
 						<Wallet className="w-3 h-3" />
 					)}
@@ -128,7 +129,7 @@ export const TopupApprovalCard = memo(function TopupApprovalCard({
 					className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-violet-500 text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors disabled:opacity-50"
 				>
 					{selectedMethod === 'fiat' && isProcessing ? (
-						<Loader2 className="w-3 h-3 animate-spin" />
+						<StableSpinner size="xs" title="Opening checkout" />
 					) : (
 						<CreditCard className="w-3 h-3" />
 					)}

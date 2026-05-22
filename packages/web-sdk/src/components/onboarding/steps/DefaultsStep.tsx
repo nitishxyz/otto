@@ -1,8 +1,9 @@
 import { memo, useState, useEffect, useId, useRef } from 'react';
-import { Loader2, ArrowLeft, Sparkles, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Sparkles, ChevronDown } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import type { AuthStatus } from '../../../stores/onboardingStore';
 import { ProviderLogo } from '../../common/ProviderLogo';
+import { StableSpinner } from '../../ui/StableSpinner';
 
 interface DefaultsStepProps {
 	authStatus: AuthStatus;
@@ -138,7 +139,11 @@ export const DefaultsStep = memo(function DefaultsStep({
 	if (isLoading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+				<StableSpinner
+					size="xl"
+					className="text-muted-foreground"
+					title="Loading defaults"
+				/>
 			</div>
 		);
 	}
@@ -349,7 +354,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 					>
 						{isSaving ? (
 							<>
-								<Loader2 className="w-4 h-4 animate-spin" />
+								<StableSpinner title="Setting up defaults" />
 								Setting up...
 							</>
 						) : (

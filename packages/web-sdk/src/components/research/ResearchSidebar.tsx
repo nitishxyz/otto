@@ -3,7 +3,6 @@ import {
 	FlaskConical,
 	Plus,
 	History,
-	Loader2,
 	ArrowUp,
 	ArrowDownToLine,
 	ExternalLink,
@@ -30,6 +29,7 @@ import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import { UnifiedModelSelector } from '../chat/UnifiedModelSelector';
 import { AssistantMessageGroup } from '../messages/AssistantMessageGroup';
 import { UserMessageGroup } from '../messages/UserMessageGroup';
@@ -374,7 +374,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 						className="h-8 w-8"
 					>
 						{createMutation.isPending ? (
-							<Loader2 className="w-4 h-4 animate-spin" />
+							<StableSpinner title="Creating research session" />
 						) : (
 							<Plus className="w-4 h-4" />
 						)}
@@ -516,7 +516,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 										}`}
 									>
 										{sendMessage.isPending || createMutation.isPending ? (
-											<Loader2 className="w-4 h-4 animate-spin" />
+											<StableSpinner title="Sending research message" />
 										) : (
 											<ArrowUp className="w-4 h-4" />
 										)}
@@ -577,7 +577,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 									}
 								>
 									{injectMutation.isPending ? (
-										<Loader2 className="w-3 h-3 animate-spin" />
+										<StableSpinner size="xs" title="Injecting context" />
 									) : isAlreadyInjected ? (
 										<Check className="w-3 h-3" />
 									) : (
@@ -597,7 +597,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 									title="Export to new main session"
 								>
 									{exportMutation.isPending ? (
-										<Loader2 className="w-3 h-3 animate-spin" />
+										<StableSpinner size="xs" title="Exporting research" />
 									) : (
 										<ExternalLink className="w-3 h-3" />
 									)}

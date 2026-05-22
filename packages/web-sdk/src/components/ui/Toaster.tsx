@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-	CheckCircle,
-	XCircle,
-	Loader2,
-	Info,
-	ExternalLink,
-	X,
-} from 'lucide-react';
+import { CheckCircle, XCircle, Info, ExternalLink, X } from 'lucide-react';
 import {
 	useToastStore,
 	type Toast,
 	type ToastType,
 } from '../../stores/toastStore';
 import { openUrl } from '../../lib/open-url';
+import { StableSpinner } from './StableSpinner';
 
 const typeStyles: Record<
 	ToastType,
@@ -34,7 +28,7 @@ const typeStyles: Record<
 		bar: 'bg-red-400/40',
 	},
 	loading: {
-		icon: <Loader2 className="size-4 text-muted-foreground animate-spin" />,
+		icon: <StableSpinner className="text-muted-foreground" title="Loading" />,
 		accent: '',
 		bar: '',
 	},

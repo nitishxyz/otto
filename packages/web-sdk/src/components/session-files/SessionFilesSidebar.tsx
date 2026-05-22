@@ -7,6 +7,7 @@ import { useSessionFiles } from '../../hooks/useSessionFiles';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import type { SessionFile, SessionFileOperation } from '../../types/api';
 
 const PANEL_KEY = 'session-files';
@@ -229,9 +230,11 @@ export const SessionFilesSidebar = memo(function SessionFilesSidebar({
 							className="h-6 w-6 transition-transform duration-200 hover:scale-110"
 							disabled={isLoading}
 						>
-							<RefreshCw
-								className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`}
-							/>
+							{isLoading ? (
+								<StableSpinner size="xs" title="Refreshing session files" />
+							) : (
+								<RefreshCw className="w-3 h-3" />
+							)}
 						</Button>
 					</div>
 				</div>

@@ -1,7 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import {
 	Sparkles,
-	Loader2,
 	FolderDot,
 	Laptop,
 	Globe,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { useSkillsStore } from '../../stores/skillsStore';
 import {
@@ -198,7 +198,10 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 				<div className="flex-1 overflow-y-auto">
 					{isLoading ? (
 						<div className="flex items-center justify-center py-8">
-							<Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+							<StableSpinner
+								className="text-muted-foreground"
+								title="Loading skills"
+							/>
 						</div>
 					) : totalCount === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full text-center p-4">
@@ -311,9 +314,11 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 					className="h-6 w-6 flex-shrink-0"
 					disabled={isFetching}
 				>
-					<RefreshCw
-						className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`}
-					/>
+					{isFetching ? (
+						<StableSpinner size="xs" title="Refreshing skills" />
+					) : (
+						<RefreshCw className="w-3 h-3" />
+					)}
 				</Button>
 			</div>
 		</div>

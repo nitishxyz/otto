@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { useConfig, useModels } from '../../hooks/useConfig';
 import { usePreferences } from '../../hooks/usePreferences';
+import { StableSpinner } from '../ui/StableSpinner';
 
 interface ConfigSelectorProps {
 	agent: string;
@@ -62,7 +63,10 @@ export function ConfigSelector({
 	if (configLoading) {
 		return (
 			<div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-background/50">
-				<Settings className="h-4 w-4 text-muted-foreground animate-spin" />
+				<StableSpinner
+					className="text-muted-foreground"
+					title="Loading config"
+				/>
 				<span className="text-xs text-muted-foreground">Loading config...</span>
 			</div>
 		);

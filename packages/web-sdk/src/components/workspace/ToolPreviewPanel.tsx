@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -10,6 +10,7 @@ import {
 	type ViewerTab,
 	useViewerTabsStore,
 } from '../../stores/viewerTabsStore';
+import { StableSpinner } from '../ui/StableSpinner';
 
 const LANGUAGE_MAP: Record<string, string> = {
 	js: 'javascript',
@@ -416,7 +417,13 @@ function StatusIcon({
 	if (status === 'error') {
 		return <XCircle className="h-3.5 w-3.5 text-red-500" />;
 	}
-	return <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />;
+	return (
+		<StableSpinner
+			size="sm"
+			className="text-blue-500"
+			title="Preview pending"
+		/>
+	);
 }
 
 interface SourceViewerProps {

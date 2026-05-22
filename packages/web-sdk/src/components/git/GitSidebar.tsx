@@ -29,6 +29,7 @@ import { Button } from '../ui/Button';
 import { GitFileList } from './GitFileList';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 
 const PANEL_KEY = 'git';
 const DEFAULT_WIDTH = 320;
@@ -230,9 +231,11 @@ export const GitSidebar = memo(function GitSidebar({
 								disabled={initMutation.isPending}
 								className="gap-1.5"
 							>
-								<GitBranch
-									className={`w-3.5 h-3.5 ${initMutation.isPending ? 'animate-spin' : ''}`}
-								/>
+								{initMutation.isPending ? (
+									<StableSpinner size="sm" title="Initializing repository" />
+								) : (
+									<GitBranch className="w-3.5 h-3.5" />
+								)}
 								{initMutation.isPending
 									? 'Initializing...'
 									: 'Initialize Repository'}
@@ -494,9 +497,11 @@ export const GitSidebar = memo(function GitSidebar({
 						className="h-6 w-6 flex-shrink-0"
 						disabled={isLoading}
 					>
-						<RefreshCw
-							className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`}
-						/>
+						{isLoading ? (
+							<StableSpinner size="xs" title="Refreshing git status" />
+						) : (
+							<RefreshCw className="w-3 h-3" />
+						)}
 					</Button>
 				</div>
 			</div>

@@ -14,7 +14,6 @@ import {
 	Copy,
 	Check,
 	Key,
-	Loader2,
 	Type,
 	Sparkles,
 } from 'lucide-react';
@@ -22,6 +21,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
@@ -1014,9 +1014,15 @@ const SetuWalletSection = memo(function SetuWalletSection({
 					className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
 					title="Refresh balances"
 				>
-					<RefreshCw
-						className={`w-3.5 h-3.5 text-muted-foreground ${ottorouterLoading ? 'animate-spin' : ''}`}
-					/>
+					{ottorouterLoading ? (
+						<StableSpinner
+							size="sm"
+							className="text-muted-foreground"
+							title="Refreshing balances"
+						/>
+					) : (
+						<RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+					)}
 				</button>
 			}
 		>
@@ -1115,7 +1121,7 @@ const SetuWalletSection = memo(function SetuWalletSection({
 
 							{isExportingPrivateKey && (
 								<div className="flex items-center gap-2 text-sm text-muted-foreground">
-									<Loader2 className="w-4 h-4 animate-spin" />
+									<StableSpinner title="Exporting private key" />
 									Exporting private key...
 								</div>
 							)}

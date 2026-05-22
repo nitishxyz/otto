@@ -1,7 +1,6 @@
 import { memo, useState } from 'react';
 import {
 	Globe,
-	Loader2,
 	AlertCircle,
 	Copy,
 	Check,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useTunnelStore } from '../../stores/tunnelStore';
 import {
 	useStartTunnel,
@@ -95,7 +95,11 @@ export const TunnelSidebar = memo(function TunnelSidebar() {
 
 				{status === 'starting' && (
 					<div className="flex flex-col items-center justify-center h-full text-center">
-						<Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+						<StableSpinner
+							size="xl"
+							className="mb-4 text-primary"
+							title="Starting tunnel"
+						/>
 						<h3 className="text-sm font-medium mb-2">Setting up...</h3>
 						{progress && (
 							<p className="text-xs text-muted-foreground max-w-[220px] break-words">

@@ -1,8 +1,9 @@
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
-import { Globe, Laptop, Loader2, FolderDot, Terminal } from 'lucide-react';
+import { Globe, Laptop, FolderDot, Terminal } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useAddMCPServer } from '../../hooks/useMCP';
 import type { MCPScope } from '../../stores/mcpStore';
 
@@ -369,7 +370,11 @@ export const AddMCPServerModal = memo(function AddMCPServerModal({
 						>
 							{addServer.isPending ? (
 								<>
-									<Loader2 className="w-3 h-3 animate-spin mr-1" />
+									<StableSpinner
+										size="xs"
+										className="mr-1"
+										title="Adding server"
+									/>
 									Adding...
 								</>
 							) : (

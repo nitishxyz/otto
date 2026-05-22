@@ -2,7 +2,7 @@ import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useMarkSessionViewed, useSessions } from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
-import { Loader2 } from 'lucide-react';
+import { StableSpinner } from '../ui/StableSpinner';
 import { getSessionGroupLabel } from './session-time';
 
 interface SessionListContainerProps {
@@ -322,7 +322,10 @@ export const SessionListContainer = memo(function SessionListContainer({
 
 			{isFetchingNextPage && (
 				<div className="flex justify-center py-3">
-					<Loader2 className="h-4 w-4 animate-spin text-sidebar-muted-foreground" />
+					<StableSpinner
+						className="text-sidebar-muted-foreground"
+						title="Loading more sessions"
+					/>
 				</div>
 			)}
 			<div

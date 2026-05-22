@@ -5,6 +5,7 @@ const SIZE_CLASS_NAMES = {
 	sm: 'h-3.5 w-3.5',
 	md: 'h-4 w-4',
 	lg: 'h-5 w-5',
+	xl: 'h-8 w-8',
 } as const;
 
 interface StableSpinnerProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {

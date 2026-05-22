@@ -7,7 +7,6 @@ import {
 	FolderDot,
 	Globe,
 	Laptop,
-	Loader2,
 	Lock,
 	Plug,
 	Plus,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 import { Modal } from '../ui/Modal';
 import { useMCPStore, type MCPServerInfo } from '../../stores/mcpStore';
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,7 +54,11 @@ const CopilotDeviceAuth = memo(function CopilotDeviceAuth({
 		<div className="px-3 pb-2.5 pt-0">
 			<div className="rounded-md bg-yellow-500/10 border border-yellow-500/20 p-2 space-y-1.5">
 				<div className="flex items-center gap-1.5 text-xs">
-					<Loader2 className="w-3 h-3 animate-spin text-yellow-500 flex-shrink-0" />
+					<StableSpinner
+						size="xs"
+						className="flex-shrink-0 text-yellow-500"
+						title="Waiting for GitHub auth"
+					/>
 					<span className="text-yellow-500/80">Enter code at GitHub:</span>
 				</div>
 				<div className="flex items-center gap-2">
@@ -211,7 +215,11 @@ const MCPServerCard = memo(function MCPServerCard({
 			{!copilotDevice && isAwaitingAuth && authUrl && (
 				<div className="px-3 pb-2.5 pt-0">
 					<div className="flex items-center gap-1.5 text-xs">
-						<Loader2 className="w-3 h-3 animate-spin text-yellow-500 flex-shrink-0" />
+						<StableSpinner
+							size="xs"
+							className="flex-shrink-0 text-yellow-500"
+							title="Waiting for auth"
+						/>
 						<span className="text-yellow-500/80">Waiting for auth...</span>
 						<a
 							href={authUrl}
@@ -461,7 +469,7 @@ export const MCPSidebar = memo(function MCPSidebar() {
 			<div className="flex-1 overflow-y-auto">
 				{isFetching && servers.length === 0 ? (
 					<div className="flex items-center justify-center h-32 text-muted-foreground">
-						<Loader2 className="w-4 h-4 animate-spin mr-2" />
+						<StableSpinner className="mr-2" title="Loading MCP servers" />
 						Loading...
 					</div>
 				) : servers.length === 0 ? (

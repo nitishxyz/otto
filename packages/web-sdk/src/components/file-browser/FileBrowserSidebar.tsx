@@ -15,6 +15,7 @@ import { useFileTree } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { SidebarHeader } from '../ui/SidebarHeader';
+import { StableSpinner } from '../ui/StableSpinner';
 
 const PANEL_KEY = 'file-browser';
 const DEFAULT_WIDTH = 320;
@@ -226,9 +227,11 @@ export const FileBrowserSidebar = memo(function FileBrowserSidebar() {
 						className="h-6 w-6 flex-shrink-0"
 						disabled={isLoading}
 					>
-						<RefreshCw
-							className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`}
-						/>
+						{isLoading ? (
+							<StableSpinner size="xs" title="Refreshing file tree" />
+						) : (
+							<RefreshCw className="w-3 h-3" />
+						)}
 					</Button>
 				</div>
 			</div>

@@ -1,6 +1,7 @@
 import { useState, useId } from 'react';
-import { GitBranch, Loader2 } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useCreateBranch } from '../../hooks/useBranch';
 import { useSession } from '../../hooks/useSessions';
 import type { Message } from '../../types/api';
@@ -141,7 +142,7 @@ export function BranchModal({
 					>
 						{createBranch.isPending ? (
 							<>
-								<Loader2 className="h-4 w-4 animate-spin" />
+								<StableSpinner title="Creating branch" />
 								Creating...
 							</>
 						) : (

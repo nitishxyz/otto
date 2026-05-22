@@ -1,12 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
-import {
-	CreditCard,
-	Wallet,
-	Loader2,
-	ExternalLink,
-	RefreshCw,
-} from 'lucide-react';
+import { CreditCard, Wallet, ExternalLink, RefreshCw } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
@@ -473,7 +468,7 @@ export const OttoRouterTopupModal = memo(function OttoRouterTopupModal() {
 								className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
 							>
 								{isManualChecking ? (
-									<Loader2 className="w-4 h-4 animate-spin" />
+									<StableSpinner title="Checking payment status" />
 								) : (
 									<RefreshCw className="w-4 h-4" />
 								)}
@@ -672,7 +667,7 @@ export const OttoRouterTopupModal = memo(function OttoRouterTopupModal() {
 							className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
 						>
 							{isCreatingCheckout ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
+								<StableSpinner title="Creating checkout" />
 							) : (
 								<CreditCard className="w-4 h-4" />
 							)}
