@@ -1,6 +1,5 @@
 import {
 	Sparkles,
-	Loader2,
 	GitBranch,
 	Diff,
 	GitCommit,
@@ -29,6 +28,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ToolApprovalCard } from './ToolApprovalCard';
 import type { MessagePart } from '../../types/api';
+import { StableSpinner } from '../ui/StableSpinner';
 import {
 	ToolResultRenderer,
 	ReasoningRenderer,
@@ -269,7 +269,10 @@ export const MessagePartItem = memo(
 
 			if (part.type === 'tool_call') {
 				return (
-					<Loader2 className="h-4 w-4 text-amber-600 dark:text-amber-300 animate-spin" />
+					<StableSpinner
+						className="text-amber-600 dark:text-amber-300"
+						title="Running tool"
+					/>
 				);
 			}
 

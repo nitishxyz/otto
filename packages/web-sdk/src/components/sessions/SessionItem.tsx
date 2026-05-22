@@ -1,35 +1,13 @@
 import { memo } from 'react';
 import { CircleCheck } from 'lucide-react';
 import type { Session } from '../../types/api';
+import { StableSpinner } from '../ui/StableSpinner';
 import { formatRelativeSessionTime } from './session-time';
 
 interface SessionItemProps {
 	session: Session;
 	isActive: boolean;
 	onClick: () => void;
-}
-
-function RunningSpinner() {
-	return (
-		<svg
-			className="h-[17px] w-[17px] animate-spin text-sidebar-muted-foreground"
-			viewBox="0 0 16 16"
-			fill="none"
-			aria-hidden="true"
-		>
-			<title>Running</title>
-			<g stroke="currentColor" strokeLinecap="round" strokeWidth="1.8">
-				<path d="M8 1.75v2" />
-				<path d="M12.42 3.58 11 5" />
-				<path d="M14.25 8h-2" />
-				<path d="M12.42 12.42 11 11" />
-				<path d="M8 14.25v-2" />
-				<path d="M3.58 12.42 5 11" />
-				<path d="M1.75 8h2" />
-				<path d="M3.58 3.58 5 5" />
-			</g>
-		</svg>
-	);
 }
 
 export const SessionItem = memo(function SessionItem({
@@ -48,7 +26,7 @@ export const SessionItem = memo(function SessionItem({
 	const showStats =
 		hasFileStats && (fileStats.additions > 0 || fileStats.deletions > 0);
 	const statusIcon = isRunning ? (
-		<RunningSpinner />
+		<StableSpinner className="text-sidebar-muted-foreground" title="Running" />
 	) : isReadyForReview ? (
 		<CircleCheck className="h-4 w-4" />
 	) : null;

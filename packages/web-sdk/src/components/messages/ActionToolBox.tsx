@@ -1,12 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-	Terminal,
-	FileEdit,
-	Diff,
-	Loader2,
-	type LucideIcon,
-} from 'lucide-react';
+import { Terminal, FileEdit, Diff, type LucideIcon } from 'lucide-react';
 import type { MessagePart } from '../../types/api';
+import { StableSpinner } from '../ui/StableSpinner';
 import { ToolResultRenderer, type ContentJson } from './renderers';
 import { useIsCompactThread } from './threadDensity';
 
@@ -340,7 +335,11 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 								isCompact ? 'text-[13px]' : 'text-[14px]'
 							} font-medium uppercase tracking-[0.18em] text-muted-foreground/70`}
 						>
-							<Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+							<StableSpinner
+								size="xs"
+								className="flex-shrink-0"
+								title={config.label}
+							/>
 							<span className="flex-shrink-0">{config.label}</span>
 							{target && (
 								<>

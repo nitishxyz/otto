@@ -8,6 +8,7 @@ export * from './ui/Toaster';
 export * from './ui/ToolApprovalDialog';
 export * from './ui/ResizeHandle';
 export * from './ui/SidebarHeader';
+export * from './ui/StableSpinner';
 
 // Chat Components
 export * from './chat/ChatInput';
