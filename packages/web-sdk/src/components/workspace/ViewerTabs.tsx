@@ -20,6 +20,7 @@ import { GitDiffPanel } from '../git/GitDiffPanel';
 import { SessionFilesDiffPanel } from '../session-files/SessionFilesDiffPanel';
 import { FileViewerPanel } from '../file-browser/FileViewerPanel';
 import { SkillViewerPanel } from '../skills/SkillViewerPanel';
+import { ToolPreviewPanel } from './ToolPreviewPanel';
 
 function tabKindLabel(tab: ViewerTab): string {
 	switch (tab.type) {
@@ -29,6 +30,8 @@ function tabKindLabel(tab: ViewerTab): string {
 			return 'session diff';
 		case 'file':
 			return 'file';
+		case 'tool-preview':
+			return tab.toolName === 'write' ? 'write preview' : 'patch preview';
 		case 'skill-file':
 			return tab.skill;
 	}
@@ -39,6 +42,7 @@ function getTabPath(tab: ViewerTab): string {
 		case 'git-diff':
 		case 'session-file-diff':
 		case 'file':
+		case 'tool-preview':
 			return tab.path;
 		case 'skill-file':
 			return tab.file ?? 'SKILL.md';
@@ -140,6 +144,20 @@ function renderTabIcon(tab: ViewerTab) {
 		return <GitCommit className="h-3.5 w-3.5 shrink-0 text-sky-500" />;
 	}
 
+	if (tab.type === 'tool-preview') {
+		return (
+			<GitCommit
+				className={`h-3.5 w-3.5 shrink-0 ${
+					tab.status === 'error'
+						? 'text-red-500'
+						: tab.status === 'success'
+							? 'text-emerald-500'
+							: 'text-blue-500'
+				}`}
+			/>
+		);
+	}
+
 	const extension = getFileExtension(getTabPath(tab));
 
 	return (
@@ -185,9 +203,12 @@ function renderTabContent(
 					mode="pane"
 					open
 					file={tab.path}
+					highlight={tab.highlight}
 					onClose={() => closeTab(tab.id)}
 				/>
 			);
+		case 'tool-preview':
+			return <ToolPreviewPanel tab={tab} />;
 		case 'skill-file':
 			return (
 				<SkillViewerPanel

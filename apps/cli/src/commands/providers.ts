@@ -5,12 +5,14 @@ import {
 	runProvidersRemove,
 } from '../providers.ts';
 
+/** Registers provider management subcommands on the root CLI program. */
 export function registerProvidersCommand(program: Command) {
 	const providers = program
 		.command('providers')
 		.alias('provider')
 		.description('Manage built-in overrides and custom providers');
 
+	// List shows configured providers and can optionally include model metadata.
 	providers
 		.command('list')
 		.alias('ls')
@@ -25,6 +27,7 @@ export function registerProvidersCommand(program: Command) {
 			});
 		});
 
+	// Add launches the interactive flow for creating a custom provider entry.
 	providers
 		.command('add')
 		.description('Add a custom provider')
@@ -33,6 +36,7 @@ export function registerProvidersCommand(program: Command) {
 			await runProvidersAdd(opts.project);
 		});
 
+	// Remove accepts either custom providers or overrides by provider id.
 	providers
 		.command('remove <provider>')
 		.alias('rm')

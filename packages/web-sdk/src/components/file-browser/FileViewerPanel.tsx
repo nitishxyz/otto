@@ -1,4 +1,4 @@
-import { memo, useEffect, type ComponentPropsWithoutRef } from 'react';
+import { memo, useEffect, useRef, type ComponentPropsWithoutRef } from 'react';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -8,6 +8,7 @@ import {
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
+import type { ToolActivityHighlight } from '../../stores/viewerTabsStore';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 
@@ -61,10 +62,22 @@ function isMarkdownFile(path: string): boolean {
 	return ext === 'md' || ext === 'markdown' || ext === 'mdx';
 }
 
+function formatReadHighlightLabel(highlight: ToolActivityHighlight): string {
+	if (highlight.startLine && highlight.endLine) {
+		return highlight.startLine === highlight.endLine
+			? `Reading line ${highlight.startLine}`
+			: `Reading lines ${highlight.startLine}-${highlight.endLine}`;
+	}
+
+	if (highlight.startLine) return `Reading line ${highlight.startLine}`;
+	return 'Reading file';
+}
+
 interface FileViewerPanelProps {
 	mode?: 'overlay' | 'pane';
 	open?: boolean;
 	file?: string | null;
+	highlight?: ToolActivityHighlight;
 	onClose?: () => void;
 }
 
@@ -72,8 +85,10 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	mode = 'overlay',
 	open,
 	file,
+	highlight,
 	onClose,
 }: FileViewerPanelProps = {}) {
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const storeIsViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const storeSelectedFile = useFileBrowserStore((s) => s.selectedFile);
 	const storeCloseViewer = useFileBrowserStore((s) => s.closeViewer);
@@ -102,13 +117,30 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		return () => document.removeEventListener('keydown', handleEscape);
 	}, [isViewerOpen, closeViewer]);
 
+	useEffect(() => {
+		if (!data || !highlight?.startLine) return;
+
+		const frame = window.requestAnimationFrame(() => {
+			const target = scrollContainerRef.current?.querySelector(
+				`[data-line-number="${highlight.startLine}"]`,
+			);
+			if (target instanceof HTMLElement) {
+				target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+			}
+		});
+
+		return () => window.cancelAnimationFrame(frame);
+	}, [data, highlight?.startLine]);
+
 	if (!isViewerOpen || !selectedFile) return null;
+	const highlightStart = highlight?.startLine;
+	const highlightEnd = highlight?.endLine ?? highlightStart;
 
 	const syntaxTheme = document?.documentElement.classList.contains('dark')
 		? vscDarkPlus
 		: prism;
 	const language = inferLanguage(selectedFile);
-	const renderMarkdown = isMarkdownFile(selectedFile);
+	const renderMarkdown = isMarkdownFile(selectedFile) && !highlight;
 
 	return (
 		<div
@@ -147,8 +179,13 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					</span>
 				</div>
 			)}
+			{highlight && (
+				<div className="shrink-0 border-b border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
+					{formatReadHighlightLabel(highlight)}
+				</div>
+			)}
 
-			<div className="flex-1 overflow-auto">
+			<div ref={scrollContainerRef} className="flex-1 overflow-auto">
 				{isLoading ? (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						Loading file...
@@ -205,9 +242,25 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 								style={syntaxTheme}
 								wrapLines
 								wrapLongLines
-								lineProps={() => ({
-									className: 'code-line',
-								})}
+								lineProps={(lineNumber) => {
+									const isHighlighted = Boolean(
+										highlightStart &&
+											highlightEnd &&
+											lineNumber >= highlightStart &&
+											lineNumber <= highlightEnd,
+									);
+
+									return {
+										className: 'code-line',
+										'data-line-number': lineNumber,
+										style: isHighlighted
+											? {
+													backgroundColor: 'hsl(var(--primary) / 0.12)',
+													boxShadow: 'inset 3px 0 0 hsl(var(--primary))',
+												}
+											: undefined,
+									};
+								}}
 								customStyle={{
 									margin: 0,
 									padding: '1rem',

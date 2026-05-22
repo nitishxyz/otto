@@ -1,6 +1,29 @@
 import { create } from 'zustand';
 import type { SessionFileOperation } from '../types/api';
 
+export interface ToolActivityHighlight {
+	startLine?: number;
+	endLine?: number;
+	reason: 'read' | 'write' | 'apply_patch';
+	callId?: string;
+	status: 'streaming' | 'success' | 'error';
+}
+
+export interface ToolPreviewTabInput {
+	path: string;
+	toolName: 'write' | 'apply_patch';
+	callId?: string;
+	content?: string;
+	patch?: string;
+	changedLines?: number[];
+	previewContent?: string;
+	previewLineTones?: Array<[number, 'add' | 'remove']>;
+	previewFirstLine?: number;
+	previewLatestLine?: number;
+	status: 'streaming' | 'success' | 'error';
+	error?: string;
+}
+
 export type ViewerTab =
 	| {
 			id: string;
@@ -22,6 +45,24 @@ export type ViewerTab =
 			type: 'file';
 			title: string;
 			path: string;
+			highlight?: ToolActivityHighlight;
+	  }
+	| {
+			id: string;
+			type: 'tool-preview';
+			title: string;
+			path: string;
+			toolName: 'write' | 'apply_patch';
+			callId?: string;
+			content?: string;
+			patch?: string;
+			changedLines?: number[];
+			previewContent?: string;
+			previewLineTones?: Array<[number, 'add' | 'remove']>;
+			previewFirstLine?: number;
+			previewLatestLine?: number;
+			status: 'streaming' | 'success' | 'error';
+			error?: string;
 	  }
 	| {
 			id: string;
@@ -34,12 +75,17 @@ export type ViewerTab =
 interface ViewerTabsState {
 	tabs: ViewerTab[];
 	activeTabId: string | null;
+	followToolActivity: boolean;
+	toggleFollowToolActivity: () => void;
+	setFollowToolActivity: (enabled: boolean) => void;
 	openGitDiffTab: (path: string, staged: boolean) => void;
 	openSessionFileDiffTab: (
 		path: string,
 		operations: SessionFileOperation[],
 	) => void;
 	openFileTab: (path: string) => void;
+	openToolReadTab: (path: string, highlight: ToolActivityHighlight) => void;
+	openToolPreviewTab: (preview: ToolPreviewTabInput) => void;
 	openSkillFileTab: (skill: string, file: string | null) => void;
 	setActiveTab: (id: string) => void;
 	closeTab: (id: string) => void;
@@ -49,6 +95,10 @@ interface ViewerTabsState {
 
 function titleFromPath(path: string): string {
 	return path.split('/').pop() || path;
+}
+
+function fileTabId(path: string): string {
+	return `file:${path}`;
 }
 
 function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
@@ -65,6 +115,12 @@ function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	tabs: [],
 	activeTabId: null,
+	followToolActivity: false,
+
+	toggleFollowToolActivity: () =>
+		set((state) => ({ followToolActivity: !state.followToolActivity })),
+
+	setFollowToolActivity: (enabled) => set({ followToolActivity: enabled }),
 
 	openGitDiffTab: (path, staged) => {
 		const id = `git-diff:${staged ? 'staged' : 'unstaged'}:${path}`;
@@ -96,16 +152,84 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	},
 
 	openFileTab: (path) => {
-		const id = `file:${path}`;
-		set((state) => ({
-			tabs: upsertTab(state.tabs, {
-				id,
-				type: 'file',
-				title: titleFromPath(path),
-				path,
-			}),
-			activeTabId: id,
-		}));
+		const id = fileTabId(path);
+		set((state) => {
+			const tabs = state.tabs.filter(
+				(tab) =>
+					!(tab.type === 'tool-preview' && tab.path === path && tab.id !== id),
+			);
+			return {
+				tabs: upsertTab(tabs, {
+					id,
+					type: 'file',
+					title: titleFromPath(path),
+					path,
+				}),
+				activeTabId: id,
+			};
+		});
+	},
+
+	openToolReadTab: (path, highlight) => {
+		const id = fileTabId(path);
+		set((state) => {
+			const tabs = state.tabs.filter(
+				(tab) =>
+					!(tab.type === 'tool-preview' && tab.path === path && tab.id !== id),
+			);
+			return {
+				tabs: upsertTab(tabs, {
+					id,
+					type: 'file',
+					title: titleFromPath(path),
+					path,
+					highlight,
+				}),
+				activeTabId: id,
+			};
+		});
+	},
+
+	openToolPreviewTab: (preview) => {
+		const id = fileTabId(preview.path);
+		set((state) => {
+			const existing = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'tool-preview' }> =>
+					tab.id === id && tab.type === 'tool-preview',
+			);
+			const tabs = state.tabs.filter(
+				(tab) =>
+					!(
+						tab.type === 'tool-preview' &&
+						tab.id !== id &&
+						(tab.path === preview.path ||
+							Boolean(preview.callId && tab.callId === preview.callId))
+					),
+			);
+			return {
+				tabs: upsertTab(tabs, {
+					id,
+					type: 'tool-preview',
+					title: titleFromPath(preview.path),
+					path: preview.path,
+					toolName: preview.toolName,
+					callId: preview.callId,
+					content: preview.content ?? existing?.content,
+					patch: preview.patch ?? existing?.patch,
+					changedLines: preview.changedLines ?? existing?.changedLines,
+					previewContent: preview.previewContent ?? existing?.previewContent,
+					previewLineTones:
+						preview.previewLineTones ?? existing?.previewLineTones,
+					previewFirstLine:
+						preview.previewFirstLine ?? existing?.previewFirstLine,
+					previewLatestLine:
+						preview.previewLatestLine ?? existing?.previewLatestLine,
+					status: preview.status,
+					error: preview.error ?? existing?.error,
+				}),
+				activeTabId: id,
+			};
+		});
 	},
 
 	openSkillFileTab: (skill, file) => {

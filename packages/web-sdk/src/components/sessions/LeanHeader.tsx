@@ -25,6 +25,7 @@ import { useAllModels } from '../../hooks/useConfig';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useUsageStore } from '../../stores/usageStore';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
+import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { EditableTitle } from './EditableTitle';
 
 interface LeanHeaderProps {
@@ -169,6 +170,7 @@ export function LeanHeader({
 					</div>
 
 					<div className="flex-shrink-0 flex items-center gap-3 text-muted-foreground">
+						<ToolActivityToggle compact />
 						{isGenerating && <StopButton sessionId={session.id} />}
 
 						{isOAuthProvider && usage && (

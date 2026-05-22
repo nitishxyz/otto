@@ -4,6 +4,7 @@ import { SSEClient } from '../lib/sse-client';
 import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
+import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import { sessionsQueryKey } from './useSessions';
 
 export function useSessionStream(
@@ -13,6 +14,7 @@ export function useSessionStream(
 	const queryClient = useQueryClient();
 	const clientRef = useRef<SSEClient | null>(null);
 	const assistantMessageIdRef = useRef<string | null>(null);
+	const toolInputBuffersRef = useRef<Map<string, string>>(new Map());
 
 	const {
 		addPendingApproval,
@@ -27,6 +29,7 @@ export function useSessionStream(
 		}
 
 		assistantMessageIdRef.current = null;
+		toolInputBuffersRef.current.clear();
 		let lastSessionInvalidation = 0;
 
 		// Fetch pending approvals from server for this session
@@ -104,6 +107,379 @@ export function useSessionStream(
 		const getToolEventArgs = (
 			payload: Record<string, unknown> | undefined,
 		): unknown => payload?.args ?? payload?.input;
+
+		const getToolBufferKey = (
+			payload: Record<string, unknown> | undefined,
+		): string | null => {
+			const callId = getToolEventCallId(payload);
+			if (callId) return callId;
+			const name = getToolEventName(payload);
+			return name ? `name:${name}` : null;
+		};
+
+		const parseArgsRecord = (
+			value: unknown,
+		): Record<string, unknown> | null => {
+			if (value && typeof value === 'object' && !Array.isArray(value)) {
+				return value as Record<string, unknown>;
+			}
+
+			if (typeof value !== 'string') return null;
+
+			try {
+				const parsed = JSON.parse(value);
+				return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+					? (parsed as Record<string, unknown>)
+					: null;
+			} catch {
+				return null;
+			}
+		};
+
+		const normalizeLineNumber = (value: unknown): number | undefined => {
+			const parsed =
+				typeof value === 'number'
+					? value
+					: typeof value === 'string'
+						? Number.parseInt(value, 10)
+						: Number.NaN;
+			return Number.isFinite(parsed) && parsed > 0
+				? Math.floor(parsed)
+				: undefined;
+		};
+
+		const parseLineRange = (
+			value: unknown,
+		): { startLine?: number; endLine?: number } => {
+			if (typeof value !== 'string') return {};
+			const match = value.match(/@(\d+)(?:-(\d+))?/);
+			if (!match) return {};
+			return {
+				startLine: normalizeLineNumber(match[1]),
+				endLine: normalizeLineNumber(match[2] ?? match[1]),
+			};
+		};
+
+		const getToolArgsForViewer = (
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		): Record<string, unknown> | null => {
+			const args = parseArgsRecord(getToolEventArgs(payload));
+			if (args) return args;
+
+			const key = getToolBufferKey(payload);
+			if (!key) return null;
+
+			const previous = toolInputBuffersRef.current.get(key) ?? '';
+			if (!delta) return parseArgsRecord(previous);
+
+			const next = `${previous}${delta}`;
+			toolInputBuffersRef.current.set(key, next);
+			return parseArgsRecord(next);
+		};
+
+		const bestEffortUnescapeJsonString = (value: string): string => {
+			try {
+				return JSON.parse(`"${value.replace(/\\$/, '')}"`) as string;
+			} catch {
+				return value
+					.replace(/\\n/g, '\n')
+					.replace(/\\t/g, '\t')
+					.replace(/\\r/g, '\r')
+					.replace(/\\"/g, '"')
+					.replace(/\\\\/g, '\\');
+			}
+		};
+
+		const extractJsonStringField = (
+			text: string,
+			field: string,
+			requireClosed = false,
+		): string | undefined => {
+			const marker = `"${field}"`;
+			const markerIndex = text.indexOf(marker);
+			if (markerIndex === -1) return undefined;
+
+			const colonIndex = text.indexOf(':', markerIndex + marker.length);
+			if (colonIndex === -1) return undefined;
+
+			const quoteIndex = text.indexOf('"', colonIndex + 1);
+			if (quoteIndex === -1) return undefined;
+
+			let escaped = '';
+			let escaping = false;
+			let closed = false;
+			for (let i = quoteIndex + 1; i < text.length; i += 1) {
+				const char = text[i];
+				if (escaping) {
+					escaped += `\\${char}`;
+					escaping = false;
+					continue;
+				}
+
+				if (char === '\\') {
+					escaping = true;
+					continue;
+				}
+
+				if (char === '"') {
+					closed = true;
+					break;
+				}
+				escaped += char;
+			}
+
+			if (requireClosed && !closed) return undefined;
+
+			return bestEffortUnescapeJsonString(escaped);
+		};
+
+		const getBufferedToolInput = (
+			payload: Record<string, unknown> | undefined,
+		): string => {
+			const key = getToolBufferKey(payload);
+			return key ? (toolInputBuffersRef.current.get(key) ?? '') : '';
+		};
+
+		const getStringArg = (
+			args: Record<string, unknown> | null,
+			buffer: string,
+			field: string,
+			requireClosed = false,
+		): string | undefined => {
+			const value = args?.[field];
+			if (typeof value === 'string') return value;
+			return extractJsonStringField(buffer, field, requireClosed);
+		};
+
+		const getResultRecord = (
+			payload: Record<string, unknown> | undefined,
+		): Record<string, unknown> | null =>
+			payload?.result &&
+			typeof payload.result === 'object' &&
+			!Array.isArray(payload.result)
+				? (payload.result as Record<string, unknown>)
+				: null;
+
+		const getArtifactRecord = (
+			payload: Record<string, unknown> | undefined,
+		): Record<string, unknown> | null =>
+			payload?.artifact &&
+			typeof payload.artifact === 'object' &&
+			!Array.isArray(payload.artifact)
+				? (payload.artifact as Record<string, unknown>)
+				: null;
+
+		const extractErrorMessage = (
+			payload: Record<string, unknown> | undefined,
+		): string | undefined => {
+			const result = getResultRecord(payload);
+			if (typeof payload?.error === 'string') return payload.error;
+			return typeof result?.error === 'string' ? result.error : undefined;
+		};
+
+		const normalizePatchPath = (path: string): string =>
+			path.replace(/^a\//, '').replace(/^b\//, '').trim();
+
+		const patchPathMatches = (
+			patchPath: string,
+			targetPath: string,
+		): boolean => {
+			const normalizedPatch = normalizePatchPath(patchPath);
+			const normalizedTarget = normalizePatchPath(targetPath);
+			return (
+				normalizedPatch === normalizedTarget ||
+				normalizedPatch.endsWith(`/${normalizedTarget}`) ||
+				normalizedTarget.endsWith(`/${normalizedPatch}`)
+			);
+		};
+
+		const extractPathsFromPatch = (patch: string): string[] => {
+			const paths = new Set<string>();
+			for (const line of patch.split('\n')) {
+				const directive = line.match(
+					/^\*\*\* (?:Update|Add|Delete) File: (.+)$/,
+				);
+				if (directive?.[1]) {
+					paths.add(directive[1].trim());
+					continue;
+				}
+
+				const unified = line.match(/^\+\+\+ (?:b\/)?(.+)$/);
+				if (unified?.[1] && unified[1] !== '/dev/null') {
+					paths.add(unified[1].trim());
+				}
+			}
+
+			return [...paths];
+		};
+
+		const getChangedLinesForPath = (
+			result: Record<string, unknown> | null,
+			path: string,
+		): number[] | undefined => {
+			const changes = Array.isArray(result?.changes) ? result.changes : [];
+			const lines = new Set<number>();
+
+			for (const change of changes) {
+				if (!change || typeof change !== 'object') continue;
+				const record = change as Record<string, unknown>;
+				if (typeof record.filePath !== 'string') continue;
+				if (!patchPathMatches(record.filePath, path)) continue;
+				if (!Array.isArray(record.hunks)) continue;
+
+				for (const hunk of record.hunks) {
+					if (!hunk || typeof hunk !== 'object') continue;
+					const hunkRecord = hunk as Record<string, unknown>;
+					const newStart =
+						typeof hunkRecord.newStart === 'number'
+							? hunkRecord.newStart
+							: undefined;
+					const newLines =
+						typeof hunkRecord.newLines === 'number'
+							? hunkRecord.newLines
+							: undefined;
+					if (!newStart || !newLines) continue;
+
+					for (let line = newStart; line < newStart + newLines; line += 1) {
+						lines.add(line);
+					}
+				}
+			}
+
+			return lines.size > 0 ? [...lines] : undefined;
+		};
+
+		const handleReadToolActivity = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		) => {
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
+
+			const name = getToolEventName(payload);
+			if (name !== 'read') return;
+
+			const args = getToolArgsForViewer(payload, delta);
+			const path = typeof args?.path === 'string' ? args.path : null;
+			if (!path) return;
+
+			const result =
+				payload?.result &&
+				typeof payload.result === 'object' &&
+				!Array.isArray(payload.result)
+					? (payload.result as Record<string, unknown>)
+					: null;
+			const rangeFromResult = parseLineRange(result?.lineRange);
+			const startLine =
+				normalizeLineNumber(args.startLine) ??
+				normalizeLineNumber(args.start_line) ??
+				rangeFromResult.startLine;
+			const endLine =
+				normalizeLineNumber(args.endLine) ??
+				normalizeLineNumber(args.end_line) ??
+				rangeFromResult.endLine ??
+				startLine;
+			const failed = result?.ok === false || eventType === 'error';
+
+			viewerStore.openToolReadTab(path, {
+				startLine,
+				endLine,
+				reason: 'read',
+				callId: getToolEventCallId(payload) ?? undefined,
+				status: failed
+					? 'error'
+					: eventType === 'tool.result'
+						? 'success'
+						: 'streaming',
+			});
+		};
+
+		const handleWriteToolActivity = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		) => {
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
+
+			const name = getToolEventName(payload);
+			if (name !== 'write') return;
+
+			const args = getToolArgsForViewer(payload, delta);
+			const buffer = getBufferedToolInput(payload);
+			const result = getResultRecord(payload);
+			const path =
+				(typeof result?.path === 'string' ? result.path : undefined) ??
+				getStringArg(args, buffer, 'path', true);
+			if (!path) return;
+
+			const failed = result?.ok === false || eventType === 'error';
+			viewerStore.openToolPreviewTab({
+				path,
+				toolName: 'write',
+				callId: getToolEventCallId(payload) ?? undefined,
+				content: getStringArg(args, buffer, 'content'),
+				status: failed
+					? 'error'
+					: eventType === 'tool.result'
+						? 'success'
+						: 'streaming',
+				error: extractErrorMessage(payload),
+			});
+		};
+
+		const handleApplyPatchToolActivity = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		) => {
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
+
+			const name = getToolEventName(payload);
+			if (name !== 'apply_patch') return;
+
+			const args = getToolArgsForViewer(payload, delta);
+			const buffer = getBufferedToolInput(payload);
+			const artifact = getArtifactRecord(payload);
+			const patch =
+				(typeof artifact?.patch === 'string' ? artifact.patch : undefined) ??
+				getStringArg(args, buffer, 'patch');
+			if (!patch) return;
+
+			const result = getResultRecord(payload);
+			const failed = result?.ok === false || eventType === 'error';
+			for (const path of extractPathsFromPatch(patch)) {
+				viewerStore.openToolPreviewTab({
+					path,
+					toolName: 'apply_patch',
+					callId: getToolEventCallId(payload) ?? undefined,
+					patch,
+					changedLines: getChangedLinesForPath(result, path),
+					status: failed
+						? 'error'
+						: eventType === 'tool.result'
+							? 'success'
+							: 'streaming',
+					error: extractErrorMessage(payload),
+				});
+			}
+		};
+
+		const handleToolActivityViewerEvent = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		) => {
+			const name = getToolEventName(payload);
+			if (name === 'read') handleReadToolActivity(eventType, payload, delta);
+			if (name === 'write') handleWriteToolActivity(eventType, payload, delta);
+			if (name === 'apply_patch') {
+				handleApplyPatchToolActivity(eventType, payload, delta);
+			}
+		};
 
 		const getToolInputDelta = (
 			payload: Record<string, unknown> | undefined,
@@ -785,8 +1161,10 @@ export function useSessionStream(
 					if (channel === 'input' || (channel == null && delta)) {
 						if (delta) {
 							accumulateToolInputDelta(payload, delta);
+							handleToolActivityViewerEvent('tool.delta', payload, delta);
 						} else {
 							upsertEphemeralToolCall(payload);
+							handleToolActivityViewerEvent('tool.delta', payload);
 						}
 					} else if (channel === 'output' && delta) {
 						accumulateToolOutputDelta(payload, delta);
@@ -795,10 +1173,14 @@ export function useSessionStream(
 				}
 				case 'tool.call': {
 					upsertEphemeralToolCall(payload);
+					handleToolActivityViewerEvent('tool.call', payload);
 					break;
 				}
 				case 'tool.result': {
 					resolveEphemeralToolCall(payload);
+					handleToolActivityViewerEvent('tool.result', payload);
+					const key = getToolBufferKey(payload);
+					if (key) toolInputBuffersRef.current.delete(key);
 					break;
 				}
 				case 'tool.approval.required': {
@@ -838,6 +1220,7 @@ export function useSessionStream(
 					break;
 				}
 				case 'error': {
+					handleToolActivityViewerEvent('error', payload);
 					removeEphemeralToolCall(payload);
 					const messageId =
 						typeof payload?.messageId === 'string' ? payload.messageId : null;

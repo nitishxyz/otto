@@ -20,6 +20,7 @@ import { useShareStatus } from '../../hooks/useShareStatus';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { openUrl } from '../../lib/open-url';
+import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { EditableTitle } from './EditableTitle';
 
 interface SessionHeaderProps {
@@ -211,6 +212,7 @@ export function SessionHeader({
 					)}
 
 					<div className="flex items-center gap-2 ml-auto">
+						<ToolActivityToggle compact={isCompact} />
 						<ProviderLogo provider={session.provider} size={18} />
 						{!isCompact && (
 							<span className="font-medium text-foreground">
