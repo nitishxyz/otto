@@ -1,7 +1,10 @@
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
+import { realpath, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { gitStatusSchema } from './schemas.ts';
+import { validateAndGetGitRoot } from './utils.ts';
 import { openApiRoute } from '../../openapi/route.ts';
 
 const execFileAsync = promisify(execFile);
@@ -89,7 +92,27 @@ export function registerInitRoute(app: Hono) {
 			try {
 				const body = await c.req.json().catch(() => ({}));
 				const { project } = gitStatusSchema.parse(body);
-				const requestedPath = project || process.cwd();
+				const requestedPath = await realpath(resolve(project || process.cwd()));
+
+				const pathStats = await stat(requestedPath);
+				if (!pathStats.isDirectory()) {
+					return c.json(
+						{
+							status: 'error',
+							error: 'Git repository can only be initialized in a directory',
+							code: 'NOT_A_DIRECTORY',
+						},
+						400,
+					);
+				}
+
+				const existing = await validateAndGetGitRoot(requestedPath);
+				if (!('error' in existing)) {
+					return c.json({
+						status: 'ok',
+						data: { initialized: false, path: existing.gitRoot },
+					});
+				}
 
 				await execFileAsync('git', ['init'], { cwd: requestedPath });
 

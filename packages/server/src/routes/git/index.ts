@@ -6,6 +6,7 @@ import { registerStagingRoutes } from './staging.ts';
 import { registerCommitRoutes } from './commit.ts';
 import { registerPushRoute } from './push.ts';
 import { registerPullRoute } from './pull.ts';
+import { registerRebaseRoute } from './rebase.ts';
 import { registerInitRoute } from './init.ts';
 import { registerRemoteRoutes } from './remote.ts';
 
@@ -19,6 +20,7 @@ export function registerGitRoutes(app: Hono) {
 	registerCommitRoutes(app);
 	registerPushRoute(app);
 	registerPullRoute(app);
+	registerRebaseRoute(app);
 	registerInitRoute(app);
 	registerRemoteRoutes(app);
 }

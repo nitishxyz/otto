@@ -161,8 +161,27 @@ export interface GitFileStatus {
 		| 'both-deleted';
 }
 
+export interface GitOperationState {
+	type:
+		| 'rebase'
+		| 'rebase-interactive'
+		| 'merge'
+		| 'cherry-pick'
+		| 'revert'
+		| 'bisect';
+	label: string;
+	current?: number;
+	total?: number;
+	headName?: string;
+	onto?: string;
+}
+
 export interface GitStatusResponse {
 	branch: string;
+	headSha: string;
+	shortHeadSha: string;
+	isDetached: boolean;
+	operation: GitOperationState | null;
 	ahead: number;
 	behind: number;
 	gitRoot: string; // NEW: Git repository root path
@@ -240,6 +259,11 @@ export interface GitPullResponse {
 	output: string;
 	branch: string;
 	rebase: boolean;
+}
+
+export interface GitRebaseActionResponse {
+	action: 'continue' | 'abort' | 'skip';
+	output: string;
 }
 
 export interface GitRemoteInfo {

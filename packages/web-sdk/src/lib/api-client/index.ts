@@ -39,6 +39,7 @@ class ApiClient {
 	getGitBranch = gitMixin.getGitBranch;
 	pushCommits = gitMixin.pushCommits;
 	pullChanges = gitMixin.pullChanges;
+	performRebaseAction = gitMixin.performRebaseAction;
 	getRemotes = gitMixin.getRemotes;
 	addRemote = gitMixin.addRemote;
 	removeRemote = gitMixin.removeRemote;

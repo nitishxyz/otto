@@ -127,6 +127,19 @@ export function usePullChanges() {
 	});
 }
 
+export function useGitRebaseAction() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (action: 'continue' | 'abort' | 'skip') =>
+			apiClient.performRebaseAction(action),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+		},
+	});
+}
+
 export function useGitInit() {
 	const queryClient = useQueryClient();
 

@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
-import { extname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { extname, isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
-import type { GitFile, GitRoot, GitError } from './types.ts';
+import type { GitFile, GitRoot, GitError, GitOperationState } from './types.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -163,7 +164,9 @@ export function parseGitStatus(
 			const xy = parts[1];
 			const x = xy[0];
 			const y = xy[1];
-			const path = parts.slice(8).join(' ');
+			const pathStartIndex = line.startsWith('2 ') ? 9 : 8;
+			const rawPath = parts.slice(pathStartIndex).join(' ');
+			const [path, oldPath] = rawPath.split('\t');
 			const absPath = join(gitRoot, path);
 
 			if (x !== '.') {
@@ -173,6 +176,7 @@ export function parseGitStatus(
 					status: getStatusFromCodeV2(x),
 					staged: true,
 					isNew: x === 'A',
+					oldPath,
 				});
 			}
 
@@ -183,6 +187,7 @@ export function parseGitStatus(
 					status: getStatusFromCodeV2(y),
 					staged: false,
 					isNew: false,
+					oldPath,
 				});
 			}
 		} else if (line.startsWith('? ')) {
@@ -246,4 +251,99 @@ export async function getCurrentBranch(gitRoot: string): Promise<string> {
 	} catch {
 		return 'unknown';
 	}
+}
+
+export async function getHeadInfo(gitRoot: string): Promise<{
+	branch: string;
+	headSha: string;
+	shortHeadSha: string;
+	isDetached: boolean;
+}> {
+	const [branchResult, headResult, shortHeadResult] = await Promise.allSettled([
+		execFileAsync('git', ['branch', '--show-current'], { cwd: gitRoot }),
+		execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: gitRoot }),
+		execFileAsync('git', ['rev-parse', '--short', 'HEAD'], { cwd: gitRoot }),
+	]);
+
+	const branch =
+		branchResult.status === 'fulfilled' ? branchResult.value.stdout.trim() : '';
+	const headSha =
+		headResult.status === 'fulfilled' ? headResult.value.stdout.trim() : '';
+	const shortHeadSha =
+		shortHeadResult.status === 'fulfilled'
+			? shortHeadResult.value.stdout.trim()
+			: headSha.slice(0, 7);
+
+	return {
+		branch: branch || 'HEAD',
+		headSha,
+		shortHeadSha,
+		isDetached: !branch,
+	};
+}
+
+async function getGitDir(gitRoot: string): Promise<string | null> {
+	try {
+		const { stdout } = await execFileAsync('git', ['rev-parse', '--git-dir'], {
+			cwd: gitRoot,
+		});
+		const gitDir = stdout.trim();
+		return isAbsolute(gitDir) ? gitDir : join(gitRoot, gitDir);
+	} catch {
+		return null;
+	}
+}
+
+function readGitStateFile(dir: string, file: string): string | undefined {
+	const path = join(dir, file);
+	if (!existsSync(path)) return undefined;
+	return readFileSync(path, 'utf8').trim() || undefined;
+}
+
+function readRebaseState(
+	gitDir: string,
+	dirName: 'rebase-merge' | 'rebase-apply',
+): GitOperationState | null {
+	const rebaseDir = join(gitDir, dirName);
+	if (!existsSync(rebaseDir)) return null;
+
+	const current = Number(readGitStateFile(rebaseDir, 'msgnum')) || undefined;
+	const total = Number(readGitStateFile(rebaseDir, 'end')) || undefined;
+	const isInteractive = existsSync(join(rebaseDir, 'interactive'));
+
+	return {
+		type: isInteractive ? 'rebase-interactive' : 'rebase',
+		label: isInteractive ? 'Interactive rebase' : 'Rebase',
+		current,
+		total,
+		headName: readGitStateFile(rebaseDir, 'head-name'),
+		onto: readGitStateFile(rebaseDir, 'onto'),
+	};
+}
+
+export async function getGitOperationState(
+	gitRoot: string,
+): Promise<GitOperationState | null> {
+	const gitDir = await getGitDir(gitRoot);
+	if (!gitDir) return null;
+
+	const rebaseState =
+		readRebaseState(gitDir, 'rebase-merge') ??
+		readRebaseState(gitDir, 'rebase-apply');
+	if (rebaseState) return rebaseState;
+
+	if (existsSync(join(gitDir, 'MERGE_HEAD'))) {
+		return { type: 'merge', label: 'Merge' };
+	}
+	if (existsSync(join(gitDir, 'CHERRY_PICK_HEAD'))) {
+		return { type: 'cherry-pick', label: 'Cherry-pick' };
+	}
+	if (existsSync(join(gitDir, 'REVERT_HEAD'))) {
+		return { type: 'revert', label: 'Revert' };
+	}
+	if (existsSync(join(gitDir, 'BISECT_LOG'))) {
+		return { type: 'bisect', label: 'Bisect' };
+	}
+
+	return null;
 }

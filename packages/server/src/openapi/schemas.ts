@@ -267,6 +267,13 @@ export const schemas = {
 		type: 'object',
 		properties: {
 			branch: { type: 'string' },
+			headSha: { type: 'string' },
+			shortHeadSha: { type: 'string' },
+			isDetached: { type: 'boolean' },
+			operation: {
+				$ref: '#/components/schemas/GitOperation',
+				nullable: true,
+			},
 			ahead: { type: 'integer' },
 			behind: { type: 'integer' },
 			staged: {
@@ -295,6 +302,10 @@ export const schemas = {
 		},
 		required: [
 			'branch',
+			'headSha',
+			'shortHeadSha',
+			'isDetached',
+			'operation',
 			'ahead',
 			'behind',
 			'staged',
@@ -306,6 +317,28 @@ export const schemas = {
 			'hasUpstream',
 			'remotes',
 		],
+	},
+	GitOperation: {
+		type: 'object',
+		properties: {
+			type: {
+				type: 'string',
+				enum: [
+					'rebase',
+					'rebase-interactive',
+					'merge',
+					'cherry-pick',
+					'revert',
+					'bisect',
+				],
+			},
+			label: { type: 'string' },
+			current: { type: 'integer' },
+			total: { type: 'integer' },
+			headName: { type: 'string' },
+			onto: { type: 'string' },
+		},
+		required: ['type', 'label'],
 	},
 	GitFile: {
 		type: 'object',

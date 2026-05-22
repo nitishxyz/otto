@@ -10,6 +10,7 @@ import {
 	generateCommitMessage as apiGenerateCommitMessage,
 	pushCommits as apiPushCommits,
 	pullChanges as apiPullChanges,
+	performGitRebaseAction as apiPerformGitRebaseAction,
 	initGitRepo as apiInitGitRepo,
 	getGitRemotes as apiGetGitRemotes,
 	addGitRemote as apiAddGitRemote,
@@ -25,13 +26,16 @@ import type {
 	GitBranchInfo,
 	GitPushResponse,
 	GitPullResponse,
+	GitRebaseActionResponse,
 	GitRemoteInfo,
 } from '../../types/api';
 import { extractErrorMessage } from './utils';
 
 export const gitMixin = {
 	async initGitRepo(): Promise<{ initialized: boolean; path: string }> {
-		const response = await apiInitGitRepo();
+		const response = await apiInitGitRepo({
+			body: {},
+		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data;
@@ -158,6 +162,17 @@ export const gitMixin = {
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitPullResponse;
+	},
+
+	async performRebaseAction(
+		action: 'continue' | 'abort' | 'skip',
+	): Promise<GitRebaseActionResponse> {
+		const response = await apiPerformGitRebaseAction({
+			body: { action },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return (response.data as any)?.data as GitRebaseActionResponse;
 	},
 
 	async getRemotes(): Promise<GitRemoteInfo[]> {

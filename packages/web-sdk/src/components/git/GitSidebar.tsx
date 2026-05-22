@@ -21,6 +21,7 @@ import {
 	usePullChanges,
 	usePushCommits,
 	useGitInit,
+	useGitRebaseAction,
 	useGitRemotes,
 	useAddRemote,
 	useRemoveRemote,
@@ -60,6 +61,7 @@ export const GitSidebar = memo(function GitSidebar({
 	const pushMutation = usePushCommits();
 	const pullMutation = usePullChanges();
 	const initMutation = useGitInit();
+	const rebaseMutation = useGitRebaseAction();
 	const addRemoteMutation = useAddRemote();
 	const removeRemoteMutation = useRemoveRemote();
 	const [errors, setErrors] = useState<GitError[]>([]);
@@ -108,6 +110,28 @@ export const GitSidebar = memo(function GitSidebar({
 			addError(
 				err instanceof Error ? err.message : 'Failed to pull',
 				'git pull',
+			);
+		}
+	};
+
+	const handleInit = async () => {
+		try {
+			await initMutation.mutateAsync();
+		} catch (err) {
+			addError(
+				err instanceof Error ? err.message : 'Failed to initialize repository',
+				'git init',
+			);
+		}
+	};
+
+	const handleRebaseAction = async (action: 'continue' | 'abort' | 'skip') => {
+		try {
+			await rebaseMutation.mutateAsync(action);
+		} catch (err) {
+			addError(
+				err instanceof Error ? err.message : `Failed to ${action} rebase`,
+				`git rebase --${action}`,
 			);
 		}
 	};
@@ -172,7 +196,17 @@ export const GitSidebar = memo(function GitSidebar({
 	const canPush = status && hasRemotes && (status.ahead > 0 || !hasUpstream);
 	const _canPull = !!status;
 	const hasPendingPulls = status && status.behind > 0;
-	const isActing = pushMutation.isPending || pullMutation.isPending;
+	const hasBlockingOperation = !!status?.operation;
+	const isRebaseOperation =
+		status?.operation?.type.startsWith('rebase') ?? false;
+	const operationProgress =
+		status?.operation?.current && status.operation.total
+			? ` ${status.operation.current}/${status.operation.total}`
+			: '';
+	const isActing =
+		pushMutation.isPending ||
+		pullMutation.isPending ||
+		rebaseMutation.isPending;
 	const isNotGitRepo =
 		error instanceof Error &&
 		error.message.toLowerCase().includes('not a git repository');
@@ -227,7 +261,7 @@ export const GitSidebar = memo(function GitSidebar({
 							<Button
 								variant="secondary"
 								size="sm"
-								onClick={() => initMutation.mutate()}
+								onClick={handleInit}
 								disabled={initMutation.isPending}
 								className="gap-1.5"
 							>
@@ -272,6 +306,63 @@ export const GitSidebar = memo(function GitSidebar({
 
 				{status && !isNotGitRepo && !error && (
 					<div className="border-t border-border">
+						{status.operation && (
+							<div className="px-3 py-2 border-b border-border bg-orange-50 dark:bg-orange-950/20 space-y-2">
+								<div className="flex items-center justify-between gap-2 text-xs">
+									<span className="font-medium text-orange-600 dark:text-orange-400">
+										{status.operation.label}
+										{operationProgress}
+									</span>
+									{status.operation.headName && (
+										<span className="truncate text-[10px] text-muted-foreground">
+											{status.operation.headName.replace('refs/heads/', '')}
+										</span>
+									)}
+								</div>
+								{isRebaseOperation ? (
+									<div className="grid grid-cols-3 gap-1">
+										<Button
+											variant="secondary"
+											size="sm"
+											onClick={() => handleRebaseAction('continue')}
+											disabled={isActing || status.hasConflicts}
+											title={
+												status.hasConflicts
+													? 'Resolve conflicts before continuing'
+													: 'git rebase --continue'
+											}
+											className="h-6 text-[10px]"
+										>
+											Continue
+										</Button>
+										<Button
+											variant="secondary"
+											size="sm"
+											onClick={() => handleRebaseAction('skip')}
+											disabled={isActing}
+											title="git rebase --skip"
+											className="h-6 text-[10px]"
+										>
+											Skip
+										</Button>
+										<Button
+											variant="secondary"
+											size="sm"
+											onClick={() => handleRebaseAction('abort')}
+											disabled={isActing}
+											title="git rebase --abort"
+											className="h-6 text-[10px] text-red-500"
+										>
+											Abort
+										</Button>
+									</div>
+								) : (
+									<p className="text-[10px] text-muted-foreground">
+										Resolve the operation in git, then refresh status.
+									</p>
+								)}
+							</div>
+						)}
 						<button
 							type="button"
 							onClick={() => setShowRemotes(!showRemotes)}
@@ -439,15 +530,19 @@ export const GitSidebar = memo(function GitSidebar({
 						variant="secondary"
 						size="sm"
 						onClick={handlePull}
-						disabled={isActing || !hasRemotes || !hasUpstream}
+						disabled={
+							isActing || hasBlockingOperation || !hasRemotes || !hasUpstream
+						}
 						title={
-							!hasRemotes
-								? 'No remote configured'
-								: !hasUpstream
-									? 'Branch not published yet'
-									: hasPendingPulls
-										? `Pull ${status?.behind} commit(s) from remote`
-										: 'Pull from remote'
+							hasBlockingOperation
+								? `Finish ${status.operation?.label.toLowerCase()} first`
+								: !hasRemotes
+									? 'No remote configured'
+									: !hasUpstream
+										? 'Branch not published yet'
+										: hasPendingPulls
+											? `Pull ${status?.behind} commit(s) from remote`
+											: 'Pull from remote'
 						}
 						className="flex-1 h-7 text-xs gap-1.5"
 					>
@@ -463,8 +558,12 @@ export const GitSidebar = memo(function GitSidebar({
 						variant="secondary"
 						size="sm"
 						onClick={handlePush}
-						disabled={!canPush || isActing}
-						title={pushTitle}
+						disabled={!canPush || isActing || hasBlockingOperation}
+						title={
+							hasBlockingOperation
+								? `Finish ${status.operation?.label.toLowerCase()} first`
+								: pushTitle
+						}
 						className="flex-1 h-7 text-xs gap-1.5"
 					>
 						<Upload
@@ -481,7 +580,16 @@ export const GitSidebar = memo(function GitSidebar({
 					<div className="flex items-center gap-2 min-w-0 flex-1">
 						<GitBranch className="w-3 h-3 flex-shrink-0" />
 						{status?.branch && (
-							<span className="truncate">{status.branch}</span>
+							<span className="truncate" title={status.headSha}>
+								{status.isDetached
+									? `HEAD ${status.shortHeadSha}`
+									: status.branch}
+							</span>
+						)}
+						{status?.isDetached && (
+							<span className="text-[10px] text-orange-500 flex-shrink-0">
+								detached
+							</span>
 						)}
 						{status && !hasUpstream && hasRemotes && (
 							<span className="text-[10px] text-orange-500 flex-shrink-0">

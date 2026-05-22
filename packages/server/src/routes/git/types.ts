@@ -21,6 +21,23 @@ export interface GitFile {
 		| 'both-deleted';
 }
 
+export type GitOperationType =
+	| 'rebase'
+	| 'rebase-interactive'
+	| 'merge'
+	| 'cherry-pick'
+	| 'revert'
+	| 'bisect';
+
+export interface GitOperationState {
+	type: GitOperationType;
+	label: string;
+	current?: number;
+	total?: number;
+	headName?: string;
+	onto?: string;
+}
+
 export interface GitRoot {
 	gitRoot: string;
 }

@@ -51,6 +51,11 @@ export const gitPullSchema = z.object({
 	project: z.string().optional(),
 });
 
+export const gitRebaseSchema = z.object({
+	project: z.string().optional(),
+	action: z.enum(['continue', 'abort', 'skip']),
+});
+
 export const gitRemoteAddSchema = z.object({
 	project: z.string().optional(),
 	name: z.string().min(1),

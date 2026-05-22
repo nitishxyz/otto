@@ -6,7 +6,8 @@ import {
 	validateAndGetGitRoot,
 	parseGitStatus,
 	getAheadBehind,
-	getCurrentBranch,
+	getHeadInfo,
+	getGitOperationState,
 } from './utils.ts';
 import { openApiRoute } from '../../openapi/route.ts';
 
@@ -133,9 +134,11 @@ export function registerStatusRoute(app: Hono) {
 					gitRoot,
 				);
 
-				const { ahead, behind } = await getAheadBehind(gitRoot);
-
-				const branch = await getCurrentBranch(gitRoot);
+				const [{ ahead, behind }, headInfo, operation] = await Promise.all([
+					getAheadBehind(gitRoot),
+					getHeadInfo(gitRoot),
+					getGitOperationState(gitRoot),
+				]);
 
 				let hasUpstream = false;
 				try {
@@ -168,7 +171,11 @@ export function registerStatusRoute(app: Hono) {
 				return c.json({
 					status: 'ok',
 					data: {
-						branch,
+						branch: headInfo.branch,
+						headSha: headInfo.headSha,
+						shortHeadSha: headInfo.shortHeadSha,
+						isDetached: headInfo.isDetached,
+						operation,
 						ahead,
 						behind,
 						hasUpstream,
