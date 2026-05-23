@@ -6,6 +6,9 @@ Rules:
 - Source and target paths must be relative paths within the project.
 - You must read the target file first in the current session before modifying it.
 - Line numbers are 1-indexed and inclusive.
-- `insertAtLine` inserts before that line. Use `insertAtLine: totalLines + 1` to append.
+- `endLine` may be a line number, `"end"`, or `"eof"`. Prefer `"end"` over guessed sentinel values like `999`.
+- `insertAtLine` inserts before that line. Use `"append"` to add to the end.
 - Use `mode: "replace_range"` with `targetStartLine` and `targetEndLine` to replace target lines.
+- `targetEndLine` may be a line number, `"end"`, or `"eof"`.
+- If an end line is past EOF, it is treated as EOF. Start lines must still exist.
 - This tool does not use the system clipboard.

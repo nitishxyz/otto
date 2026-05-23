@@ -244,10 +244,14 @@ export const MessagePartItem = memo(
 
 		const isToolMessage =
 			part.type === 'tool_call' || part.type === 'tool_result';
+		const isProgressUpdate =
+			part.type === 'tool_result' && part.toolName === 'progress_update';
 
 		const contentClasses = ['flex-1', 'min-w-0', 'max-w-full'];
 
-		if (isToolMessage || part.type === 'reasoning') {
+		if (isProgressUpdate) {
+			contentClasses.push('pt-0.5');
+		} else if (isToolMessage || part.type === 'reasoning') {
 			contentClasses.push(compact ? 'pt-0.5' : 'pt-1');
 		} else if (part.type === 'error') {
 			contentClasses.push('pt-0.5');
@@ -288,6 +292,13 @@ export const MessagePartItem = memo(
 
 			if (part.type === 'tool_result') {
 				const toolName = part.toolName || '';
+				if (toolName === 'progress_update')
+					return (
+						<StableSpinner
+							className="text-violet-700 dark:text-violet-300"
+							title="Assistant is working"
+						/>
+					);
 				if (toolName === 'read')
 					return (
 						<FileText className="h-4 w-4 text-blue-600 dark:text-blue-300" />

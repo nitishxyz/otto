@@ -7,7 +7,7 @@ export function ProgressUpdateRenderer({ contentJson }: RendererProps) {
 	const pct = result.pct ? Number(result.pct) : undefined;
 
 	return (
-		<div className="flex items-start gap-2 text-sm text-violet-700 dark:text-violet-300 animate-pulse">
+		<div className="flex min-h-5 items-start gap-2 text-sm leading-5 text-violet-700 dark:text-violet-300 animate-pulse">
 			{stage && (
 				<span className="shrink-0 text-muted-foreground/80">[{stage}]</span>
 			)}

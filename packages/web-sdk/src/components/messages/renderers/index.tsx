@@ -7,6 +7,7 @@ import { GitStatusRenderer } from './GitStatusRenderer';
 import { GitDiffRenderer } from './GitDiffRenderer';
 import { GitCommitRenderer } from './GitCommitRenderer';
 import { ApplyPatchRenderer } from './ApplyPatchRenderer';
+import { CopyIntoRenderer } from './CopyIntoRenderer';
 import { ListRenderer } from './ListRenderer';
 import { TreeRenderer } from './TreeRenderer';
 import { SearchRenderer } from './SearchRenderer';
@@ -124,8 +125,9 @@ export function ToolResultRenderer({
 			return <ReadRenderer {...props} />;
 		case 'edit':
 		case 'multiedit':
-		case 'copy_into':
 			return <ApplyPatchRenderer {...props} toolName={normalizedName} />;
+		case 'copy_into':
+			return <CopyIntoRenderer {...props} />;
 		case 'write':
 			return <WriteRenderer {...props} />;
 		case 'shell':

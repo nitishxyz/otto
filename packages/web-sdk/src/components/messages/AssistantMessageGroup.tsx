@@ -14,6 +14,7 @@ import { ActionToolBox } from './ActionToolBox';
 import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { BranchModal } from '../branch/BranchModal';
 import { ProviderLogo } from '../common/ProviderLogo';
+import { StableSpinner } from '../ui/StableSpinner';
 import { useToolApprovalStore } from '../../stores/toolApprovalStore';
 import { apiClient } from '../../lib/api-client';
 import {
@@ -21,6 +22,7 @@ import {
 	buildCompactActivityEntries,
 	isCompactActivityPart,
 } from './compactActivity';
+import { useIsCompactThread } from './threadDensity';
 
 interface AssistantMessageGroupProps {
 	sessionId?: string;
@@ -81,6 +83,8 @@ export const AssistantMessageGroup = memo(
 		onCompact,
 	}: AssistantMessageGroupProps) {
 		const { isQueued } = useMessageQueuePosition(sessionId, message.id);
+		const isCompactDensity = useIsCompactThread();
+		const isCompactThread = Boolean(compact || isCompactDensity);
 		const [isHovered, setIsHovered] = useState(false);
 		const [showBranchModal, setShowBranchModal] = useState(false);
 		const [copied, setCopied] = useState(false);
@@ -383,7 +387,8 @@ export const AssistantMessageGroup = memo(
 						const hasFollowingContent =
 							renderIndex < renderItems.length - 1 ||
 							hasNextAssistantMessage ||
-							shouldShowProgressUpdate;
+							shouldShowProgressUpdate ||
+							shouldShowLoadingFallback;
 
 						if (item.kind === 'group') {
 							return (
@@ -496,14 +501,28 @@ export const AssistantMessageGroup = memo(
 					)}
 
 					{shouldShowLoadingFallback && (
-						<div className="flex gap-3 pb-2 relative">
-							<div className="flex-shrink-0 w-6 flex items-start justify-center relative pt-0.5">
+						<div
+							className={`flex ${
+								isCompactThread ? 'gap-1.5' : 'gap-3'
+							} pb-2 relative max-w-full overflow-hidden`}
+						>
+							<div
+								className={`flex-shrink-0 ${
+									isCompactThread ? 'w-4' : 'w-6'
+								} flex items-center justify-center relative`}
+							>
 								<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-card text-violet-700 dark:bg-background dark:text-violet-300">
-									<Sparkles className="h-4 w-4" />
+									<StableSpinner title="Assistant is working" />
 								</div>
+								{hasNextAssistantMessage && (
+									<div
+										className="absolute left-1/2 -translate-x-1/2 w-[2px] bg-border z-0"
+										style={{ top: '1.25rem', bottom: '-0.5rem' }}
+									/>
+								)}
 							</div>
-							<div className="flex-1 pt-0.5">
-								<div className="text-base text-foreground animate-pulse">
+							<div className="flex-1 min-w-0">
+								<div className="text-base leading-5 text-foreground animate-pulse">
 									{getLoadingMessage(message.id)}
 								</div>
 							</div>

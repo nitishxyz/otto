@@ -48,6 +48,14 @@ export interface ToolCallArgs {
 	terminalId?: string;
 	purpose?: string;
 	path?: string;
+	sourcePath?: string;
+	targetPath?: string;
+	startLine?: number;
+	endLine?: number | 'end' | 'eof';
+	insertAtLine?: number | 'append' | 'end' | 'eof';
+	mode?: 'insert_before' | 'insert_after' | 'replace_range';
+	targetStartLine?: number;
+	targetEndLine?: number | 'end' | 'eof';
 }
 
 export interface ToolResultData {
@@ -65,9 +73,23 @@ export interface ToolResultData {
 	unstaged?: number;
 	raw?: string[];
 	path?: string;
+	sourcePath?: string;
+	targetPath?: string;
+	sourceRange?: string;
+	targetRange?: string;
+	mode?: string;
+	linesCopied?: number;
 	lineRange?: string;
 	content?: string;
 	bytes?: number;
+	artifact?: {
+		patch?: string;
+		summary?: {
+			files?: number;
+			additions?: number;
+			deletions?: number;
+		};
+	};
 	opsApplied?: number;
 	stdout?: string;
 	stderr?: string;

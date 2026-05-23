@@ -101,6 +101,11 @@ function isShellTool(toolName: string): boolean {
 	return normalizeToolName(toolName) === 'shell';
 }
 
+function formatCopyIntoTarget(sourcePath: string, targetPath: string): string {
+	if (sourcePath && targetPath) return `${sourcePath} → ${targetPath}`;
+	return targetPath || sourcePath;
+}
+
 function getTargetFromArgs(
 	toolName: string,
 	args: Record<string, unknown> | undefined,
@@ -113,7 +118,12 @@ function getTargetFromArgs(
 	if (toolName === 'write') return String(args.path || '');
 	if (toolName === 'edit' || toolName === 'multiedit')
 		return String(args.path || '');
-	if (toolName === 'copy_into') return String(args.targetPath || '');
+	if (toolName === 'copy_into') {
+		return formatCopyIntoTarget(
+			String(args.sourcePath || ''),
+			String(args.targetPath || ''),
+		);
+	}
 	if (toolName === 'apply_patch') {
 		const patch = String(args.patch || '');
 		return getPatchTarget(patch) || '';
@@ -138,7 +148,10 @@ function getTargetFromStream(toolName: string, raw: string): string {
 		return extractJsonStringField(raw, 'path');
 	}
 	if (toolName === 'copy_into') {
-		return extractJsonStringField(raw, 'targetPath');
+		return formatCopyIntoTarget(
+			extractJsonStringField(raw, 'sourcePath'),
+			extractJsonStringField(raw, 'targetPath'),
+		);
 	}
 	if (toolName === 'apply_patch') {
 		const m = raw.match(

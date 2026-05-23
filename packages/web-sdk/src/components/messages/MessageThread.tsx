@@ -494,6 +494,14 @@ export const MessageThread = memo(function MessageThread({
 										!prevMessage || prevMessage.role !== 'assistant';
 									const nextIsAssistant =
 										nextMessage && nextMessage.role === 'assistant';
+									const hasQueuedOrRunningLaterTurn = Boolean(
+										queueState.currentMessageId &&
+											queueState.currentMessageId !== message.id,
+									);
+									const canRetryTurn =
+										isLastMessage &&
+										!hasQueuedOrRunningLaterTurn &&
+										queueState.queueLength === 0;
 
 									return (
 										<AssistantMessageGroup
@@ -505,7 +513,7 @@ export const MessageThread = memo(function MessageThread({
 											isLastMessage={isLastMessage}
 											onBranchCreated={onSelectSession}
 											onRetry={
-												isLastMessage
+												canRetryTurn
 													? createRetryHandler(message.id)
 													: undefined
 											}

@@ -168,6 +168,60 @@ describe('Built-in Tools', () => {
 				await readFile(join(projectRoot, 'copy-replace-target.txt'), 'utf-8'),
 			).toBe('a\nX\nY\nc\n');
 		});
+
+		it('should accept end and append shorthands', async () => {
+			await writeFile(join(projectRoot, 'copy-end-source.txt'), 'A\nB\nC\n');
+			await writeFile(join(projectRoot, 'copy-end-target.txt'), 'one\n');
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+			const copyIntoTool = tools.find((t) => t.name === 'copy_into');
+
+			await readTool?.tool.execute({ path: 'copy-end-target.txt' });
+			const result = await copyIntoTool?.tool.execute({
+				sourcePath: 'copy-end-source.txt',
+				startLine: 2,
+				endLine: 'end',
+				targetPath: 'copy-end-target.txt',
+				insertAtLine: 'append',
+			});
+
+			expect(result).toMatchObject({
+				ok: true,
+				linesCopied: 2,
+				sourceRange: '2-3',
+			});
+			expect(
+				await readFile(join(projectRoot, 'copy-end-target.txt'), 'utf-8'),
+			).toBe('one\nB\nC\n');
+		});
+
+		it('should clamp end ranges that exceed file length', async () => {
+			await writeFile(join(projectRoot, 'copy-clamp-source.txt'), 'X\nY\n');
+			await writeFile(join(projectRoot, 'copy-clamp-target.txt'), 'a\nb\n');
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+			const copyIntoTool = tools.find((t) => t.name === 'copy_into');
+
+			await readTool?.tool.execute({ path: 'copy-clamp-target.txt' });
+			const result = await copyIntoTool?.tool.execute({
+				sourcePath: 'copy-clamp-source.txt',
+				startLine: 1,
+				endLine: 999,
+				targetPath: 'copy-clamp-target.txt',
+				mode: 'replace_range',
+				targetStartLine: 1,
+				targetEndLine: 999,
+			});
+
+			expect(result).toMatchObject({
+				ok: true,
+				sourceRange: '1-2',
+				targetRange: '1-2',
+			});
+			expect(
+				await readFile(join(projectRoot, 'copy-clamp-target.txt'), 'utf-8'),
+			).toBe('X\nY\n');
+		});
 	});
 
 	describe('ls tool', () => {
