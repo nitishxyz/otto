@@ -717,15 +717,6 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 
 	return (
 		<div className="h-full w-full bg-transparent flex flex-col">
-			<div className="shrink-0 border-b border-sidebar-border bg-sidebar-accent/30 px-3 py-1.5 text-[12px] text-muted-foreground flex items-center gap-2">
-				<StatusIcon status={tab.status} />
-				<span>{statusLabel}</span>
-				<span className="text-muted-foreground/60">·</span>
-				<span className="font-mono truncate" title={tab.path}>
-					{tab.path}
-				</span>
-			</div>
-
 			{tab.error && (
 				<div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-700 dark:text-red-300">
 					{tab.error}
@@ -793,6 +784,15 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 						Waiting for write content...
 					</div>
 				)}
+			</div>
+
+			<div className="shrink-0 border-t border-sidebar-border bg-sidebar-accent/30 px-3 py-1.5 text-[12px] text-muted-foreground flex items-center gap-2">
+				<StatusIcon status={tab.status} />
+				<span>{statusLabel}</span>
+				<span className="text-muted-foreground/60">·</span>
+				<span className="font-mono truncate" title={tab.path}>
+					{tab.path}
+				</span>
 			</div>
 		</div>
 	);

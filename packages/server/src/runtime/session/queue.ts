@@ -52,9 +52,9 @@ const messageAbortControllers = new Map<string, AbortController>();
 
 function publishQueueState(sessionId: string) {
 	const state = runners.get(sessionId);
-	if (!state) return;
+	const queue = state?.queue ?? [];
 
-	const queuedMessages: QueuedMessage[] = state.queue.map((opts, index) => ({
+	const queuedMessages: QueuedMessage[] = queue.map((opts, index) => ({
 		messageId: opts.assistantMessageId,
 		position: index,
 	}));
@@ -63,9 +63,10 @@ function publishQueueState(sessionId: string) {
 		type: 'queue.updated',
 		sessionId,
 		payload: {
-			currentMessageId: state.currentMessageId,
+			currentMessageId: state?.currentMessageId ?? null,
 			queuedMessages,
-			queueLength: state.queue.length,
+			queueLength: queue.length,
+			isRunning: state?.running ?? false,
 		},
 	});
 }

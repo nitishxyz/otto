@@ -1,7 +1,7 @@
 import { logger } from '@ottocode/sdk';
 import type { Context } from 'hono';
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	TREE_ENTRY_LIMIT,
@@ -229,14 +229,24 @@ export async function handleFileTree(c: Context) {
 	}
 }
 
+function isPathInsideRoot(path: string, root: string) {
+	const relativePath = relative(root, path);
+	return (
+		relativePath === '' ||
+		(!relativePath.startsWith('..') && !isAbsolute(relativePath))
+	);
+}
+
 function getSafeFilePath(c: Context) {
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = resolve(c.req.query('project') || process.cwd());
 	const filePath = c.req.query('path');
 	if (!filePath) {
 		return { error: 'Missing required query parameter: path' as const };
 	}
-	const absPath = join(projectRoot, filePath);
-	if (!absPath.startsWith(projectRoot)) {
+	const absPath = isAbsolute(filePath)
+		? resolve(filePath)
+		: resolve(projectRoot, filePath);
+	if (!isAbsolute(filePath) && !isPathInsideRoot(absPath, projectRoot)) {
 		return {
 			error: 'Path traversal not allowed' as const,
 			status: 403 as const,

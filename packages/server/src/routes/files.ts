@@ -305,7 +305,7 @@ export function registerFilesRoutes(app: Hono) {
 					schema: {
 						type: 'string',
 					},
-					description: 'File path relative to project root',
+					description: 'Absolute file path or path relative to project root',
 				},
 			],
 			responses: {
@@ -377,7 +377,7 @@ export function registerFilesRoutes(app: Hono) {
 					name: 'path',
 					required: true,
 					schema: { type: 'string' },
-					description: 'Relative file path to read.',
+					description: 'Absolute file path or path relative to project root.',
 				},
 			],
 			responses: {

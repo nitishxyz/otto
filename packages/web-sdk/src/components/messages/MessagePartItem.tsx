@@ -419,13 +419,6 @@ export const MessagePartItem = memo(
 
 				return (
 					<div className="relative group">
-						<div className="absolute -top-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-							<CopyButton
-								text={content}
-								className="bg-background/80 backdrop-blur-sm border border-border/50 shadow-sm"
-								size="md"
-							/>
-						</div>
 						<div
 							className={`${
 								isCompactThread ? 'text-[16.5px]' : 'text-[17px]'
@@ -510,15 +503,6 @@ export const MessagePartItem = memo(
 								{content}
 							</ReactMarkdown>
 						</div>
-						{content.length > 500 && (
-							<div className="absolute -bottom-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-								<CopyButton
-									text={content}
-									className="bg-background/80 backdrop-blur-sm border border-border/50 shadow-sm"
-									size="md"
-								/>
-							</div>
-						)}
 					</div>
 				);
 			}

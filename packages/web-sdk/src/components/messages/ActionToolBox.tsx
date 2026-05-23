@@ -403,7 +403,7 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 									>
 										<pre
 											ref={contentMeasureRef}
-											className="px-1 pt-2.5 pb-1 text-[12px] leading-relaxed text-foreground/60 font-mono whitespace-pre-wrap break-all"
+											className="px-1 pt-2.5 pb-1 text-[12px] leading-relaxed text-foreground/60 font-mono whitespace-pre-wrap break-words"
 										>
 											{displayContent}
 										</pre>
@@ -470,14 +470,10 @@ function extractJsonStringField(raw: string, field: string): string {
 	let result = '';
 	let i = start;
 	while (i < raw.length) {
-		if (raw[i] === '\\' && i + 1 < raw.length) {
-			const next = raw[i + 1];
-			if (next === 'n') result += '\n';
-			else if (next === 't') result += '\t';
-			else if (next === '"') result += '"';
-			else if (next === '\\') result += '\\';
-			else result += next;
-			i += 2;
+		const decoded = decodeJsonStringChar(raw, i);
+		if (decoded) {
+			result += decoded.value;
+			i = decoded.nextIndex;
 		} else if (raw[i] === '"') {
 			break;
 		} else {
@@ -486,6 +482,32 @@ function extractJsonStringField(raw: string, field: string): string {
 		}
 	}
 	return result;
+}
+
+function decodeJsonStringChar(
+	raw: string,
+	index: number,
+): { value: string; nextIndex: number } | null {
+	if (raw[index] !== '\\' || index + 1 >= raw.length) return null;
+	const next = raw[index + 1];
+	if (next === 'n') return { value: '\n', nextIndex: index + 2 };
+	if (next === 't') return { value: '\t', nextIndex: index + 2 };
+	if (next === 'r') return { value: '\r', nextIndex: index + 2 };
+	if (next === 'b') return { value: '\b', nextIndex: index + 2 };
+	if (next === 'f') return { value: '\f', nextIndex: index + 2 };
+	if (next === '"') return { value: '"', nextIndex: index + 2 };
+	if (next === '\\') return { value: '\\', nextIndex: index + 2 };
+	if (next === '/') return { value: '/', nextIndex: index + 2 };
+	if (next === 'u' && index + 5 < raw.length) {
+		const hex = raw.slice(index + 2, index + 6);
+		if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+			return {
+				value: String.fromCharCode(Number.parseInt(hex, 16)),
+				nextIndex: index + 6,
+			};
+		}
+	}
+	return { value: next, nextIndex: index + 2 };
 }
 
 function extractJsonStringFieldPreview(raw: string, field: string): string {
@@ -497,9 +519,26 @@ function extractJsonStringFieldPreview(raw: string, field: string): string {
 		return extractJsonStringField(raw, field);
 	}
 
-	return `… showing latest streamed content only …\n${raw.slice(
-		-LIVE_TOOL_CONTENT_PREVIEW_CHARS,
-	)}`;
+	let result = '';
+	let i = start;
+	while (i < raw.length) {
+		const decoded = decodeJsonStringChar(raw, i);
+		if (decoded) {
+			result += decoded.value;
+			i = decoded.nextIndex;
+		} else if (raw[i] === '"') {
+			break;
+		} else {
+			result += raw[i];
+			i += 1;
+		}
+
+		if (result.length > LIVE_TOOL_CONTENT_PREVIEW_CHARS) {
+			result = result.slice(-LIVE_TOOL_CONTENT_PREVIEW_CHARS);
+		}
+	}
+
+	return `… showing latest streamed content only …\n${result}`;
 }
 
 function getLiveToolContentPreview(toolName: string, content: string): string {

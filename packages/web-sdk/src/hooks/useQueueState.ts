@@ -5,13 +5,33 @@ export type QueueState = {
 	currentMessageId: string | null;
 	queuedMessages: Array<{ messageId: string; position: number }>;
 	queueLength: number;
+	isRunning: boolean;
 };
 
 const defaultQueueState: QueueState = {
 	currentMessageId: null,
 	queuedMessages: [],
 	queueLength: 0,
+	isRunning: false,
 };
+
+export function normalizeQueueState(state: {
+	currentMessageId: string | null;
+	queuedMessages: Array<{ messageId: string; position: number }>;
+	isRunning?: boolean;
+}): QueueState {
+	const isRunning = state.isRunning ?? Boolean(state.currentMessageId);
+	const currentMessageId = isRunning ? state.currentMessageId : null;
+	const hasActiveTurn = Boolean(currentMessageId);
+	const queuedMessages = hasActiveTurn ? state.queuedMessages : [];
+
+	return {
+		currentMessageId,
+		queuedMessages,
+		queueLength: queuedMessages.length,
+		isRunning: hasActiveTurn,
+	};
+}
 
 export function optimisticallyQueueMessage(
 	queryClient: QueryClient,
@@ -20,11 +40,7 @@ export function optimisticallyQueueMessage(
 ) {
 	queryClient.setQueryData<QueueState>(['queueState', sessionId], (current) => {
 		if (!current) return current;
-		const isBusy =
-			Boolean(current.currentMessageId) ||
-			current.queuedMessages.length > 0 ||
-			current.queueLength > 0;
-		if (!isBusy) return current;
+		if (!current.isRunning || !current.currentMessageId) return current;
 		if (current.currentMessageId === messageId) return current;
 		if (current.queuedMessages.some((item) => item.messageId === messageId)) {
 			return current;
@@ -48,11 +64,7 @@ export function useQueueState(sessionId: string | undefined): QueueState {
 		queryFn: async () => {
 			if (!sessionId) return defaultQueueState;
 			const queueState = await apiClient.getQueueState(sessionId);
-			return {
-				currentMessageId: queueState.currentMessageId,
-				queuedMessages: queueState.queuedMessages,
-				queueLength: queueState.queuedMessages.length,
-			};
+			return normalizeQueueState(queueState);
 		},
 		enabled: !!sessionId,
 		placeholderData: defaultQueueState,

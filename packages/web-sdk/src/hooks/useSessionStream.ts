@@ -5,7 +5,10 @@ import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
-import { optimisticallyQueueMessage } from './useQueueState';
+import {
+	normalizeQueueState,
+	optimisticallyQueueMessage,
+} from './useQueueState';
 import { sessionsQueryKey } from './useSessions';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
@@ -1395,6 +1398,19 @@ export function useSessionStream(
 					}
 					markMessageCompleted(payload);
 					clearEphemeralForMessage(id);
+					if (id) {
+						queryClient.setQueryData<ReturnType<typeof normalizeQueueState>>(
+							['queueState', sessionId],
+							(current) => {
+								if (!current || current.currentMessageId !== id) return current;
+								return normalizeQueueState({
+									currentMessageId: null,
+									queuedMessages: [],
+									isRunning: false,
+								});
+							},
+						);
+					}
 					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
 					break;
@@ -1539,14 +1555,17 @@ export function useSessionStream(
 					break;
 				}
 				case 'queue.updated': {
-					const queueState = {
+					const queueState = normalizeQueueState({
 						currentMessageId: payload?.currentMessageId as string | null,
 						queuedMessages: (payload?.queuedMessages ?? []) as Array<{
 							messageId: string;
 							position: number;
 						}>,
-						queueLength: (payload?.queueLength ?? 0) as number,
-					};
+						isRunning:
+							typeof payload?.isRunning === 'boolean'
+								? payload.isRunning
+								: undefined,
+					});
 					queryClient.setQueryData(['queueState', sessionId], queueState);
 					break;
 				}
