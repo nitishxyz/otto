@@ -199,9 +199,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -340,9 +341,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -542,9 +544,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -684,9 +687,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -823,9 +827,10 @@ jobs:
           VERSION="${{ needs.bump-version.outputs.cli_version }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
 
@@ -864,9 +869,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -1054,9 +1060,10 @@ jobs:
           VERSION="${{ needs.bump-version.outputs.desktop_version }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
           TAG="desktop-v${VERSION}"
           if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists; skipping tag creation"
@@ -1261,9 +1268,10 @@ jobs:
           VERSION="${{ needs.bump-version.outputs.launcher_version }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
           git tag "launcher-v${VERSION}"
           git push origin "launcher-v${VERSION}"
 
@@ -1324,9 +1332,10 @@ jobs:
       - name: Sync to latest branch tip
         shell: bash
         run: |
-          git fetch origin
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
           git checkout "${{ github.ref_name }}"
-          git pull --ff-only origin "${{ github.ref_name }}"
+          git merge --ff-only "origin/${{ github.ref_name }}"
 
       - name: Reset publish flags
         shell: bash
