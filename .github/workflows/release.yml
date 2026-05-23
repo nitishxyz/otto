@@ -317,15 +317,23 @@ jobs:
           - platform: macos-14
             target: aarch64-apple-darwin
             name: macOS-arm64
+            os: darwin
+            arch: arm64
           - platform: macos-15-intel
             target: x86_64-apple-darwin
             name: macOS-x64
+            os: darwin
+            arch: x64
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             name: Linux-x64
+            os: linux
+            arch: x64
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             name: Linux-arm64
+            os: linux
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
 
