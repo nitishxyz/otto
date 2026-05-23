@@ -45,7 +45,8 @@ export function CompactActivityGroup({
 	const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
 
 	useEffect(() => {
-		if (!collapsed && !latched) {
+		if (!collapsed) {
+			setLatched(false);
 			setShowSummary(false);
 			return;
 		}

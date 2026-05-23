@@ -488,6 +488,17 @@ async function runAssistant(opts: RunOpts) {
 	} catch (err) {
 		unsubscribeFinish();
 		dump?.recordError(err);
+		logger.warn('[agent] assistant run failed', {
+			sessionId: opts.sessionId,
+			messageId: opts.assistantMessageId,
+			agent: opts.agent,
+			provider: opts.provider,
+			model: opts.model,
+			error:
+				err instanceof Error
+					? { name: err.name, message: err.message }
+					: { message: String(err) },
+		});
 		const outcome = await handleRunnerError({
 			err,
 			opts,
@@ -495,6 +506,7 @@ async function runAssistant(opts: RunOpts) {
 			completeAssistantMessage,
 			updateSessionTokensIncremental,
 			updateMessageTokensIncremental,
+			nextPartIndex: sharedCtx.nextIndex,
 		});
 		if (outcome === 'handled') return;
 		throw err;

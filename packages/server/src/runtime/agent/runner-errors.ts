@@ -1,7 +1,7 @@
 import type { getDb } from '@ottocode/database';
-import { sessions } from '@ottocode/database/schema';
+import { messageParts, messages, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
-import { publish } from '../../events/bus.ts';
+import { publish, publishClientEvent } from '../../events/bus.ts';
 import { toErrorPayload } from '../errors/handling.ts';
 import {
 	pruneSession,
@@ -65,6 +65,7 @@ export async function handleRunnerError(args: {
 	completeAssistantMessage: CompleteAssistantMessage;
 	updateSessionTokensIncremental: UpdateSessionTokensIncremental;
 	updateMessageTokensIncremental: UpdateMessageTokensIncremental;
+	nextPartIndex?: () => number | Promise<number>;
 }): Promise<'handled' | 'rethrow'> {
 	const { err, opts, db } = args;
 	const payload = toErrorPayload(err);
@@ -94,7 +95,18 @@ export async function handleRunnerError(args: {
 	publish({
 		type: 'error',
 		sessionId: opts.sessionId,
-		payload,
+		payload: {
+			...payload,
+			messageId: opts.assistantMessageId,
+		},
+	});
+
+	const errorPartId = crypto.randomUUID();
+	const errorContent = JSON.stringify({
+		message: payload.message,
+		type: payload.type,
+		details: payload.details,
+		isAborted: false,
 	});
 
 	try {
@@ -110,7 +122,62 @@ export async function handleRunnerError(args: {
 			opts,
 			db,
 		);
-		await args.completeAssistantMessage({}, opts, db);
+		await db.insert(messageParts).values({
+			id: errorPartId,
+			messageId: opts.assistantMessageId,
+			index: args.nextPartIndex ? await args.nextPartIndex() : 0,
+			stepIndex: null,
+			type: 'error',
+			content: errorContent,
+			agent: opts.agent,
+			provider: opts.provider,
+			model: opts.model,
+			startedAt: Date.now(),
+			completedAt: Date.now(),
+		});
+		await db
+			.update(messages)
+			.set({
+				status: 'error',
+				completedAt: Date.now(),
+				error: payload.message,
+				errorType: payload.type,
+				errorDetails: JSON.stringify(payload.details ?? {}),
+				isAborted: false,
+			})
+			.where(eq(messages.id, opts.assistantMessageId));
 	} catch {}
+
+	publish({
+		type: 'message.part.delta',
+		sessionId: opts.sessionId,
+		payload: {
+			messageId: opts.assistantMessageId,
+			partId: errorPartId,
+			type: 'error',
+			content: errorContent,
+		},
+	});
+
+	publish({
+		type: 'message.updated',
+		sessionId: opts.sessionId,
+		payload: {
+			id: opts.assistantMessageId,
+			status: 'error',
+			error: payload.message,
+		},
+	});
+
+	const createdAt = new Date().toISOString();
+	publishClientEvent({
+		type: 'session.status',
+		payload: {
+			sessionId: opts.sessionId,
+			status: 'failed',
+			messageId: opts.assistantMessageId,
+			createdAt,
+		},
+	});
 	return 'rethrow';
 }

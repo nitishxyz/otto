@@ -275,6 +275,10 @@ export const AssistantMessageGroup = memo(
 			!hasFinish &&
 			!latestProgressUpdatePart &&
 			!isQueued;
+		const shouldShowErrorFallback =
+			message.status === 'error' &&
+			!hasVisibleNonProgressParts &&
+			message.error;
 		const formatTime = (ts?: number) => {
 			if (!ts) return '';
 			const date = new Date(ts);
@@ -498,6 +502,12 @@ export const AssistantMessageGroup = memo(
 							isLastProgressUpdate
 							compact={compact}
 						/>
+					)}
+
+					{shouldShowErrorFallback && (
+						<div className="ml-7 mb-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+							{message.error}
+						</div>
 					)}
 
 					{shouldShowLoadingFallback && (

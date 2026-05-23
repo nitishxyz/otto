@@ -31,12 +31,51 @@ export type OpenAIOAuthConfig = {
 };
 
 function shouldDebugOpenAIOAuth() {
-	return false;
+	return process.env.OTTO_OPENAI_OAUTH_DEBUG === '1';
 }
 
 function logOpenAIOAuth(message: string) {
 	if (shouldDebugOpenAIOAuth()) {
 		loggerDebug(`[openai-oauth] ${message}`);
+	}
+}
+
+function summarizeError(error: unknown): Record<string, unknown> {
+	if (error instanceof Error) {
+		return { name: error.name, message: error.message };
+	}
+	if (error && typeof error === 'object') {
+		const err = error as Record<string, unknown>;
+		return {
+			name: typeof err.name === 'string' ? err.name : undefined,
+			message: typeof err.message === 'string' ? err.message : undefined,
+			code: typeof err.code === 'string' ? err.code : undefined,
+		};
+	}
+	return { message: String(error) };
+}
+
+function getBodySize(body: unknown): number | undefined {
+	if (typeof body === 'string') return body.length;
+	if (body instanceof URLSearchParams) return body.toString().length;
+	if (body instanceof Blob) return body.size;
+	if (body instanceof ArrayBuffer) return body.byteLength;
+	if (ArrayBuffer.isView(body)) return body.byteLength;
+	return undefined;
+}
+
+async function previewResponseBody(
+	response: Response,
+): Promise<string | undefined> {
+	try {
+		const text = await response.clone().text();
+		const normalized = text.replace(/\s+/g, ' ').trim();
+		if (!normalized) return undefined;
+		return normalized.length > 500
+			? `${normalized.slice(0, 500)}…`
+			: normalized;
+	} catch {
+		return undefined;
 	}
 }
 
@@ -335,6 +374,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 		input: Parameters<typeof fetch>[0],
 		init?: Parameters<typeof fetch>[1],
 	): Promise<Response> => {
+		const requestStartedAt = Date.now();
 		const validated = await ensureValidToken(currentOAuth, config.projectRoot);
 		currentOAuth = validated.oauth;
 
@@ -373,18 +413,70 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 			validated.accountId,
 			config.sessionId,
 		);
-
-		const response = await fetch(targetUrl, {
-			...requestInit,
-			headers,
-			// @ts-expect-error Bun-specific fetch option
-			timeout: false,
+		const requestBodySize = getBodySize(requestInit?.body);
+		const method = requestInit?.method ?? 'POST';
+		loggerDebug('[openai-oauth] request start', {
+			sessionId: config.sessionId,
+			target: isResponsesRequest ? 'codex.responses' : 'other',
+			method,
+			bodyCharsApprox: requestBodySize,
+			model: requestModel,
 		});
+
+		let response: Response;
+		try {
+			response = await fetch(targetUrl, {
+				...requestInit,
+				headers,
+				// @ts-expect-error Bun-specific fetch option
+				timeout: false,
+			});
+		} catch (error) {
+			loggerWarn('[openai-oauth] request failed before response', {
+				sessionId: config.sessionId,
+				target: isResponsesRequest ? 'codex.responses' : 'other',
+				method,
+				bodyCharsApprox: requestBodySize,
+				model: requestModel,
+				durationMs: Date.now() - requestStartedAt,
+				error: summarizeError(error),
+			});
+			throw error;
+		}
+		loggerDebug('[openai-oauth] response received', {
+			sessionId: config.sessionId,
+			target: isResponsesRequest ? 'codex.responses' : 'other',
+			status: response.status,
+			statusText: response.statusText,
+			ok: response.ok,
+			durationMs: Date.now() - requestStartedAt,
+			bodyCharsApprox: requestBodySize,
+			model: requestModel,
+		});
+		if (!response.ok && response.status !== 401) {
+			loggerWarn('[openai-oauth] non-OK response', {
+				sessionId: config.sessionId,
+				target: isResponsesRequest ? 'codex.responses' : 'other',
+				status: response.status,
+				statusText: response.statusText,
+				durationMs: Date.now() - requestStartedAt,
+				bodyCharsApprox: requestBodySize,
+				model: requestModel,
+				bodyPreview: await previewResponseBody(response),
+			});
+		}
 		const trackedResponse = isResponsesRequest
 			? trackResponsesStream(response, config.sessionId)
 			: response;
 
 		if (response.status === 401) {
+			loggerWarn('[openai-oauth] 401 response, refreshing token and retrying', {
+				sessionId: config.sessionId,
+				target: isResponsesRequest ? 'codex.responses' : 'other',
+				durationMs: Date.now() - requestStartedAt,
+				bodyCharsApprox: requestBodySize,
+				model: requestModel,
+			});
 			try {
 				const refreshedFromDisk = await getAuth('openai', config.projectRoot);
 				if (
@@ -406,18 +498,48 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 					config.sessionId,
 				);
 
+				const retryStartedAt = Date.now();
 				const retryResponse = await fetch(targetUrl, {
 					...requestInit,
 					headers: retryHeaders,
 					// @ts-expect-error Bun-specific fetch option
 					timeout: false,
 				});
+				loggerDebug('[openai-oauth] retry response received', {
+					sessionId: config.sessionId,
+					target: isResponsesRequest ? 'codex.responses' : 'other',
+					status: retryResponse.status,
+					statusText: retryResponse.statusText,
+					ok: retryResponse.ok,
+					durationMs: Date.now() - retryStartedAt,
+					bodyCharsApprox: requestBodySize,
+					model: requestModel,
+				});
+				if (!retryResponse.ok) {
+					loggerWarn('[openai-oauth] retry non-OK response', {
+						sessionId: config.sessionId,
+						target: isResponsesRequest ? 'codex.responses' : 'other',
+						status: retryResponse.status,
+						statusText: retryResponse.statusText,
+						durationMs: Date.now() - retryStartedAt,
+						bodyCharsApprox: requestBodySize,
+						model: requestModel,
+						bodyPreview: await previewResponseBody(retryResponse),
+					});
+				}
 				return isResponsesRequest
 					? trackResponsesStream(retryResponse, config.sessionId)
 					: retryResponse;
-			} catch {
-				console.error(
+			} catch (error) {
+				loggerWarn(
 					'[openai-oauth] 401 retry failed, returning original 401 response',
+					{
+						sessionId: config.sessionId,
+						target: isResponsesRequest ? 'codex.responses' : 'other',
+						bodyCharsApprox: requestBodySize,
+						model: requestModel,
+						error: summarizeError(error),
+					},
 				);
 				return response;
 			}

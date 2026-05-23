@@ -78,7 +78,7 @@ export function useSessionStream(
 			}
 			for (let i = messages.length - 1; i >= 0; i -= 1) {
 				const candidate = messages[i];
-				if (candidate.role === 'assistant' && candidate.status !== 'complete') {
+				if (candidate.role === 'assistant' && candidate.status === 'pending') {
 					return i;
 				}
 			}
@@ -684,29 +684,12 @@ export function useSessionStream(
 
 		const getOptimisticPartIndex = (
 			parts: MessagePart[],
-			stepIndex: number | null,
+			_stepIndex: number | null,
 		): number => {
-			const appendIndex = (() => {
-				const indexes = parts
-					.map((part) => part.index)
-					.filter((index): index is number => Number.isFinite(index));
-				return indexes.length > 0 ? Math.max(...indexes) + 0.001 : 0;
-			})();
-
-			if (typeof stepIndex !== 'number') {
-				return appendIndex;
-			}
-
-			const sameStepIndexes = parts
-				.filter((part) => part.stepIndex === stepIndex)
+			const indexes = parts
 				.map((part) => part.index)
 				.filter((index): index is number => Number.isFinite(index));
-
-			if (sameStepIndexes.length > 0) {
-				return Math.max(...sameStepIndexes) + 0.001;
-			}
-
-			return appendIndex;
+			return indexes.length > 0 ? Math.max(...indexes) + 0.001 : 0;
 		};
 
 		const applyReasoningDelta = (
@@ -1423,7 +1406,32 @@ export function useSessionStream(
 					const messageId =
 						typeof payload?.messageId === 'string' ? payload.messageId : null;
 					if (messageId) {
+						if (assistantMessageIdRef.current === messageId) {
+							assistantMessageIdRef.current = null;
+						}
 						clearEphemeralForMessage(messageId);
+						const errorMessage =
+							typeof payload?.error === 'string'
+								? payload.error
+								: typeof payload?.message === 'string'
+									? payload.message
+									: 'Assistant run failed';
+						queryClient.setQueryData<Message[]>(
+							['messages', sessionId],
+							(oldMessages) => {
+								if (!oldMessages) return oldMessages;
+								const idx = oldMessages.findIndex((m) => m.id === messageId);
+								if (idx === -1) return oldMessages;
+								const next = [...oldMessages];
+								next[idx] = {
+									...next[idx],
+									status: 'error',
+									completedAt: next[idx].completedAt ?? Date.now(),
+									error: errorMessage,
+								};
+								return next;
+							},
+						);
 					}
 					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 					break;
@@ -1433,6 +1441,14 @@ export function useSessionStream(
 					const status =
 						typeof payload?.status === 'string' ? payload.status : null;
 					if (id && status) {
+						if (status !== 'pending' && assistantMessageIdRef.current === id) {
+							assistantMessageIdRef.current = null;
+						}
+						if (status !== 'pending') {
+							clearEphemeralForMessage(id);
+						}
+						const error =
+							typeof payload?.error === 'string' ? payload.error : undefined;
 						queryClient.setQueryData<Message[]>(
 							['messages', sessionId],
 							(oldMessages) => {
@@ -1443,6 +1459,11 @@ export function useSessionStream(
 								next[idx] = {
 									...next[idx],
 									status: status as Message['status'],
+									completedAt:
+										status === 'pending'
+											? next[idx].completedAt
+											: (next[idx].completedAt ?? Date.now()),
+									error: error ?? next[idx].error,
 								};
 								return next;
 							},
