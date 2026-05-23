@@ -17,6 +17,7 @@ import type {
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
+import { StableSpinner } from '../ui/StableSpinner';
 import { buildLivePatchPreview } from '../workspace/ToolPreviewPanel';
 
 const LANGUAGE_MAP: Record<string, string> = {
@@ -84,6 +85,29 @@ function formatPatchPreviewLabel(preview: ToolPatchPreview): string {
 	if (preview.status === 'success') return 'Patch applied';
 	if (preview.status === 'error') return 'Patch failed';
 	return 'Patching file';
+}
+
+function ActivityPathStrip({
+	label,
+	path,
+	showSpinner,
+	spinnerTitle,
+}: {
+	label: string;
+	path: string;
+	showSpinner?: boolean;
+	spinnerTitle: string;
+}) {
+	return (
+		<div className="flex min-w-0 items-center gap-2">
+			{showSpinner && <StableSpinner size="xs" title={spinnerTitle} />}
+			<span className="shrink-0">{label}</span>
+			<span className="shrink-0 opacity-60">·</span>
+			<span className="min-w-0 truncate font-mono" title={path}>
+				{path}
+			</span>
+		</div>
+	);
 }
 
 interface FileViewerPanelProps {
@@ -271,11 +295,21 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			)}
 			{patchPreview ? (
 				<div className="shrink-0 border-b border-sidebar-border bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-					{formatPatchPreviewLabel(patchPreview)}
+					<ActivityPathStrip
+						label={formatPatchPreviewLabel(patchPreview)}
+						path={selectedFile}
+						showSpinner={patchPreview.status === 'streaming'}
+						spinnerTitle="Patching file"
+					/>
 				</div>
 			) : effectiveHighlight ? (
 				<div className="shrink-0 border-b border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
-					{formatReadHighlightLabel(effectiveHighlight)}
+					<ActivityPathStrip
+						label={formatReadHighlightLabel(effectiveHighlight)}
+						path={selectedFile}
+						showSpinner={effectiveHighlight.status === 'streaming'}
+						spinnerTitle="Reading file"
+					/>
 				</div>
 			) : null}
 

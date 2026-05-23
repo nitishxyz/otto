@@ -1,4 +1,4 @@
-import { ExternalLink, Link2, Search, Filter } from 'lucide-react';
+import { ExternalLink, Link2, Search } from 'lucide-react';
 import type { RendererProps } from './types';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
@@ -6,7 +6,6 @@ import {
 	ToolHeader,
 	ToolHeaderSeparator,
 	ToolHeaderMeta,
-	ToolHeaderSuccess,
 	ToolHeaderError,
 	ToolContentBox,
 } from './shared';
@@ -73,60 +72,37 @@ function SessionLink({
 	onNavigate?: (id: string) => void;
 	compact?: boolean;
 }) {
-	if (compact) {
-		return (
-			<button
-				type="button"
-				onClick={() => onNavigate?.(session.id)}
-				disabled={!onNavigate}
-				className="w-full text-left py-1 px-2 rounded text-xs hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
-			>
-				<span className="truncate text-foreground">
-					{session.title || 'Untitled'}
-				</span>
-				{onNavigate && (
-					<ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-				)}
-			</button>
-		);
-	}
+	const meta = [
+		session.agent,
+		session.provider,
+		session.messageCount !== undefined ? `${session.messageCount} msgs` : null,
+		session.createdAt ? formatDate(session.createdAt) : null,
+	].filter(Boolean);
 
 	return (
 		<button
 			type="button"
 			onClick={() => onNavigate?.(session.id)}
 			disabled={!onNavigate}
-			className="w-full text-left p-2 rounded-md border border-border hover:bg-muted/50 transition-colors group"
+			className={`group flex w-full items-start justify-between gap-3 text-left transition-colors hover:bg-muted/30 disabled:cursor-default ${
+				compact ? 'rounded px-2 py-1 text-xs' : 'px-3 py-2'
+			}`}
 		>
-			<div className="flex items-center justify-between gap-2">
-				<span className="font-medium text-sm truncate text-foreground">
+			<div className="min-w-0 flex-1">
+				<div className="truncate font-medium text-foreground/90">
 					{session.title || 'Untitled'}
-				</span>
-				{onNavigate && (
-					<ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+				</div>
+				{!compact && meta.length > 0 && (
+					<div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+						{meta.map((item) => (
+							<span key={item}>{item}</span>
+						))}
+					</div>
 				)}
 			</div>
-			<div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-				{session.agent && (
-					<span className="text-violet-600 dark:text-violet-400">
-						{session.agent}
-					</span>
-				)}
-				{session.agent && session.provider && <span>·</span>}
-				{session.provider && <span>{session.provider}</span>}
-				{session.messageCount !== undefined && (
-					<>
-						<span>·</span>
-						<span>{session.messageCount} msgs</span>
-					</>
-				)}
-				{session.createdAt && (
-					<>
-						<span>·</span>
-						<span>{formatDate(session.createdAt)}</span>
-					</>
-				)}
-			</div>
+			{onNavigate && (
+				<ExternalLink className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100" />
+			)}
 		</button>
 	);
 }
@@ -150,54 +126,42 @@ function MessageLink({
 				: 'matchedContent' in message
 					? message.matchedContent
 					: '';
-
-	if (compact) {
-		return (
-			<button
-				type="button"
-				onClick={() => onNavigate?.(sessionId)}
-				disabled={!onNavigate || !sessionId}
-				className="w-full text-left py-1 px-2 rounded text-xs hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
-			>
-				<span className="truncate text-foreground/80">
-					{content?.slice(0, 50) || sessionTitle || sessionId.slice(0, 8)}
-				</span>
-				{onNavigate && sessionId && (
-					<ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-				)}
-			</button>
-		);
-	}
+	const meta = [
+		message.role,
+		message.createdAt ? formatDate(message.createdAt) : null,
+	].filter(Boolean);
 
 	return (
 		<button
 			type="button"
 			onClick={() => onNavigate?.(sessionId)}
 			disabled={!onNavigate || !sessionId}
-			className="w-full text-left p-2 rounded-md border border-border hover:bg-muted/50 transition-colors group"
+			className={`group flex w-full items-start justify-between gap-3 text-left transition-colors hover:bg-muted/30 disabled:cursor-default ${
+				compact ? 'rounded px-2 py-1 text-xs' : 'px-3 py-2'
+			}`}
 		>
-			<div className="flex items-center justify-between gap-2">
-				<span className="text-xs text-muted-foreground">
+			<div className="min-w-0 flex-1">
+				<div className="truncate text-xs text-muted-foreground">
 					{sessionTitle || sessionId.slice(0, 8)}
-				</span>
-				{onNavigate && sessionId && (
-					<ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-				)}
-			</div>
-			{content && (
-				<div className="text-xs text-foreground/80 mt-1 line-clamp-2">
-					{content}
 				</div>
-			)}
-			<div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-				{message.role && <span className="capitalize">{message.role}</span>}
-				{message.createdAt && (
-					<>
-						<span>·</span>
-						<span>{formatDate(message.createdAt)}</span>
-					</>
+				{content && (
+					<div className="mt-0.5 line-clamp-2 text-foreground/80">
+						{compact ? content.slice(0, 64) : content}
+					</div>
+				)}
+				{!compact && meta.length > 0 && (
+					<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+						{meta.map((item) => (
+							<span key={item} className="capitalize">
+								{item}
+							</span>
+						))}
+					</div>
 				)}
 			</div>
+			{onNavigate && sessionId && (
+				<ExternalLink className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100" />
+			)}
 		</button>
 	);
 }
@@ -215,12 +179,10 @@ function ArgsPreview({
 		if (Array.isArray(value) && value.length === 0) return null;
 
 		return (
-			<span
-				key={key}
-				className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-			>
-				<span className="opacity-60">{key}:</span>
-				<span className="text-foreground/80">
+			<span key={key} className="inline-flex items-center gap-1">
+				<span className="text-muted-foreground">{key}</span>
+				<span className="text-muted-foreground/60">=</span>
+				<span className="font-mono text-foreground/80">
 					{typeof value === 'string' ? value : JSON.stringify(value)}
 				</span>
 			</span>
@@ -244,8 +206,7 @@ function ArgsPreview({
 	if (argsToRender.length === 0) return null;
 
 	return (
-		<div className="flex items-center gap-1.5 flex-wrap text-xs mb-2 pb-2 border-b border-border">
-			<Filter className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+		<div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/60 px-3 py-2 text-xs">
 			{argsToRender}
 		</div>
 	);
@@ -280,40 +241,42 @@ export function DatabaseToolRenderer({
 		if (links.length === 0 && !summary) return null;
 
 		return (
-			<div className="mt-2 mb-1">
-				{title && (
-					<div className="text-sm font-medium text-foreground mb-1.5">
-						{title}
-					</div>
-				)}
-				{summary && (
-					<div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-						<Link2 className="w-3.5 h-3.5 text-teal-500" />
-						<span>{summary}</span>
+			<div className="mt-2 mb-1 rounded-lg border border-border bg-card/60 text-[12px]">
+				{(title || summary) && (
+					<div className="border-b border-border/60 px-3 py-2">
+						{title && (
+							<div className="font-medium text-foreground/90">{title}</div>
+						)}
+						{summary && (
+							<div className="mt-0.5 flex items-center gap-1.5 text-muted-foreground">
+								<Link2 className="h-3.5 w-3.5" />
+								<span>{summary}</span>
+							</div>
+						)}
 					</div>
 				)}
 				{links.length > 0 && (
-					<div className="space-y-1.5">
+					<div className="divide-y divide-border/60">
 						{links.map((link) => (
 							<button
 								type="button"
 								key={link.sessionId}
 								onClick={() => onNavigateToSession?.(link.sessionId)}
 								disabled={!onNavigateToSession}
-								className="w-full text-left px-3 py-2 rounded-lg border border-teal-500/30 bg-teal-500/5 hover:bg-teal-500/10 transition-colors group flex items-center justify-between gap-2"
+								className="group flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/30 disabled:cursor-default"
 							>
-								<div>
-									<div className="font-medium text-sm text-foreground">
+								<div className="min-w-0 flex-1">
+									<div className="truncate font-medium text-foreground/90">
 										{link.title}
 									</div>
 									{link.description && (
-										<div className="text-xs text-muted-foreground mt-0.5">
+										<div className="mt-0.5 text-muted-foreground">
 											{link.description}
 										</div>
 									)}
 								</div>
 								{onNavigateToSession && (
-									<ExternalLink className="w-4 h-4 text-teal-600 dark:text-teal-400 opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+									<ExternalLink className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100" />
 								)}
 							</button>
 						))}
@@ -370,14 +333,18 @@ export function DatabaseToolRenderer({
 				const sessions =
 					(result as { sessions?: SessionResult[] }).sessions || [];
 				return (
-					<div className={compact ? 'p-1' : 'p-2'}>
+					<div>
 						{hasArgs && <ArgsPreview args={args} toolName={toolName} />}
 						{sessions.length === 0 ? (
-							<div className="text-xs text-muted-foreground">
+							<div className="px-3 py-2 text-xs text-muted-foreground">
 								No sessions found
 							</div>
 						) : (
-							<div className={compact ? 'space-y-0.5' : 'space-y-2'}>
+							<div
+								className={
+									compact ? 'space-y-0.5 p-1' : 'divide-y divide-border/60'
+								}
+							>
 								{sessions.slice(0, compact ? 5 : 10).map((session) => (
 									<SessionLink
 										key={session.id}
@@ -401,14 +368,18 @@ export function DatabaseToolRenderer({
 				const messages =
 					(result as { messages?: MessageResult[] }).messages || [];
 				return (
-					<div className={compact ? 'p-1' : 'p-2'}>
+					<div>
 						{hasArgs && <ArgsPreview args={args} toolName={toolName} />}
 						{messages.length === 0 ? (
-							<div className="text-xs text-muted-foreground">
+							<div className="px-3 py-2 text-xs text-muted-foreground">
 								No messages found
 							</div>
 						) : (
-							<div className={compact ? 'space-y-0.5' : 'space-y-2'}>
+							<div
+								className={
+									compact ? 'space-y-0.5 p-1' : 'divide-y divide-border/60'
+								}
+							>
 								{messages.slice(0, compact ? 5 : 10).map((msg) => (
 									<MessageLink
 										key={msg.id}
@@ -432,20 +403,24 @@ export function DatabaseToolRenderer({
 				const results = (result as { results?: SearchResult[] }).results || [];
 				const query = args.query as string | undefined;
 				return (
-					<div className={compact ? 'p-1' : 'p-2'}>
+					<div>
 						{query && !compact && (
-							<div className="flex items-center gap-1.5 text-xs mb-2 pb-2 border-b border-border">
-								<Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-								<span className="text-muted-foreground">Query:</span>
-								<span className="text-foreground font-medium">"{query}"</span>
+							<div className="flex items-center gap-1.5 border-b border-border/60 px-3 py-2 text-xs">
+								<Search className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+								<span className="text-muted-foreground">query</span>
+								<span className="font-mono text-foreground/80">{query}</span>
 							</div>
 						)}
 						{results.length === 0 ? (
-							<div className="text-xs text-muted-foreground">
+							<div className="px-3 py-2 text-xs text-muted-foreground">
 								No results found
 							</div>
 						) : (
-							<div className={compact ? 'space-y-0.5' : 'space-y-2'}>
+							<div
+								className={
+									compact ? 'space-y-0.5 p-1' : 'divide-y divide-border/60'
+								}
+							>
 								{results.slice(0, compact ? 5 : 10).map((r, i) => (
 									<MessageLink
 										key={`${r.sessionId}-${r.messageId}-${i}`}
@@ -510,11 +485,11 @@ export function DatabaseToolRenderer({
 				}
 
 				return (
-					<div className="p-2 space-y-3">
+					<div>
 						<SessionLink session={session} onNavigate={onNavigateToSession} />
 
 						{stats && (
-							<div className="flex gap-4 text-xs text-muted-foreground">
+							<div className="flex gap-4 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
 								{stats.totalMessages !== undefined && (
 									<span>{stats.totalMessages} messages</span>
 								)}
@@ -525,20 +500,17 @@ export function DatabaseToolRenderer({
 						)}
 
 						{messages && messages.length > 0 && (
-							<div className="space-y-1">
-								<div className="text-xs font-medium text-muted-foreground">
-									Recent messages:
+							<div className="border-t border-border/60">
+								<div className="px-3 py-1.5 text-xs text-muted-foreground">
+									Recent messages
 								</div>
-								<div className="space-y-1 max-h-48 overflow-y-auto">
+								<div className="max-h-48 overflow-y-auto divide-y divide-border/60">
 									{messages.slice(0, 5).map((msg) => (
-										<div
-											key={msg.id}
-											className="text-xs p-1.5 rounded bg-muted/30"
-										>
-											<span className="font-medium capitalize text-foreground/70">
-												{msg.role}:{' '}
+										<div key={msg.id} className="px-3 py-2 text-xs">
+											<span className="mr-1 font-medium capitalize text-muted-foreground">
+												{msg.role}
 											</span>
-											<span className="text-foreground/60 line-clamp-2">
+											<span className="line-clamp-2 text-foreground/70">
 												{msg.content}
 											</span>
 										</div>
@@ -579,8 +551,6 @@ export function DatabaseToolRenderer({
 				)}
 				{!hasToolError && !compact && (
 					<>
-						<ToolHeaderSeparator />
-						<ToolHeaderSuccess>Done</ToolHeaderSuccess>
 						<ToolHeaderSeparator />
 						<ToolHeaderMeta>{timeStr}</ToolHeaderMeta>
 					</>

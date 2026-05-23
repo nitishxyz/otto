@@ -31,7 +31,7 @@ import {
 	type DecorationSet,
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export type CodeMirrorLineTone = 'add' | 'remove' | 'primary';
 
@@ -49,7 +49,7 @@ interface CodeMirrorViewerProps {
 const viewerTheme = EditorView.theme({
 	'&': {
 		height: '100%',
-		backgroundColor: 'transparent',
+		backgroundColor: 'hsl(var(--sidebar-background))',
 		color: 'hsl(var(--foreground))',
 		fontSize: '13px',
 		'--otto-cm-keyword': '#8b5cf6',
@@ -86,6 +86,13 @@ const viewerTheme = EditorView.theme({
 		fontFamily:
 			'var(--otto-font-family, "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
 		lineHeight: '1.3125rem',
+		scrollbarWidth: 'none',
+		msOverflowStyle: 'none',
+	},
+	'.cm-scroller::-webkit-scrollbar': {
+		display: 'none',
+		width: 0,
+		height: 0,
 	},
 	'.cm-content': {
 		padding: '1rem 0',
@@ -95,9 +102,13 @@ const viewerTheme = EditorView.theme({
 		padding: '0 0.75rem',
 	},
 	'.cm-gutters': {
-		backgroundColor: 'transparent',
+		backgroundColor: 'hsl(var(--sidebar-background))',
 		borderRight: '1px solid hsl(var(--border))',
 		color: 'hsl(var(--muted-foreground))',
+		zIndex: 5,
+	},
+	'.cm-gutter': {
+		backgroundColor: 'hsl(var(--sidebar-background))',
 	},
 	'.cm-lineNumbers .cm-gutterElement': {
 		padding: '0 0.625rem',
@@ -294,6 +305,22 @@ export function CodeMirrorViewer({
 		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
 		[highlightedLines, highlightTone, lineTones],
 	);
+	const createEditorState = useCallback(
+		(doc: string) =>
+			EditorState.create({
+				doc,
+				extensions: [
+					lineNumbers(),
+					EditorState.readOnly.of(true),
+					EditorView.editable.of(false),
+					viewerTheme,
+					syntaxHighlighting(syntaxTheme, { fallback: true }),
+					languageCompartmentRef.current.of(languageExtension),
+					decorationsCompartmentRef.current.of(decorationsExtension),
+				],
+			}),
+		[languageExtension, decorationsExtension],
+	);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -301,19 +328,7 @@ export function CodeMirrorViewer({
 
 		const view = new EditorView({
 			parent: host,
-			state: EditorState.create({
-				doc: contentRef.current,
-				extensions: [
-					lineNumbers(),
-					EditorState.readOnly.of(true),
-					EditorView.editable.of(false),
-					EditorView.lineWrapping,
-					viewerTheme,
-					syntaxHighlighting(syntaxTheme, { fallback: true }),
-					languageCompartmentRef.current.of([]),
-					decorationsCompartmentRef.current.of([]),
-				],
-			}),
+			state: createEditorState(contentRef.current),
 		});
 		viewRef.current = view;
 
@@ -321,42 +336,52 @@ export function CodeMirrorViewer({
 			view.destroy();
 			viewRef.current = null;
 		};
-	}, []);
+	}, [createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view) return;
-		view.dispatch({
-			effects: languageCompartmentRef.current.reconfigure(languageExtension),
-		});
-	}, [languageExtension]);
+		try {
+			view.dispatch({
+				effects: languageCompartmentRef.current.reconfigure(languageExtension),
+			});
+		} catch {
+			view.setState(createEditorState(contentRef.current));
+		}
+	}, [languageExtension, createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view) return;
-		view.dispatch({
-			effects:
-				decorationsCompartmentRef.current.reconfigure(decorationsExtension),
-		});
-	}, [decorationsExtension]);
+		try {
+			view.dispatch({
+				effects:
+					decorationsCompartmentRef.current.reconfigure(decorationsExtension),
+			});
+		} catch {
+			view.setState(createEditorState(contentRef.current));
+		}
+	}, [decorationsExtension, createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view) return;
-		const docLength = view.state.doc.length;
-		if (contentRef.current === content && docLength === content.length) return;
+		if (
+			contentRef.current === content &&
+			view.state.doc.length === content.length
+		) {
+			return;
+		}
 
-		const previous =
-			contentRef.current.length === docLength
-				? contentRef.current
-				: view.state.doc.toString();
-		const changes =
-			content.length >= previous.length && content.startsWith(previous)
-				? { from: previous.length, insert: content.slice(previous.length) }
-				: { from: 0, to: docLength, insert: content };
-		view.dispatch({ changes });
+		try {
+			view.dispatch({
+				changes: { from: 0, to: view.state.doc.length, insert: content },
+			});
+		} catch {
+			view.setState(createEditorState(content));
+		}
 		contentRef.current = content;
-	}, [content]);
+	}, [content, createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;
@@ -364,18 +389,26 @@ export function CodeMirrorViewer({
 		const line = view.state.doc.line(
 			Math.min(scrollToLine, view.state.doc.lines),
 		);
-		view.dispatch({
-			effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
-		});
-	}, [scrollToLine]);
+		try {
+			view.dispatch({
+				effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+			});
+		} catch {
+			view.setState(createEditorState(contentRef.current));
+		}
+	}, [scrollToLine, createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view || scrollToEndSignal === undefined) return;
-		view.dispatch({
-			effects: EditorView.scrollIntoView(view.state.doc.length, { y: 'end' }),
-		});
-	}, [scrollToEndSignal]);
+		try {
+			view.dispatch({
+				effects: EditorView.scrollIntoView(view.state.doc.length, { y: 'end' }),
+			});
+		} catch {
+			view.setState(createEditorState(contentRef.current));
+		}
+	}, [scrollToEndSignal, createEditorState]);
 
 	return <div ref={hostRef} className={className ?? 'h-full w-full'} />;
 }
