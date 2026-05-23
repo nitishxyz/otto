@@ -299,12 +299,16 @@ export function CodeMirrorViewer({
 	const contentRef = useRef(content);
 	const languageCompartmentRef = useRef(new Compartment());
 	const decorationsCompartmentRef = useRef(new Compartment());
+	const languageExtensionRef = useRef<Extension>([]);
+	const decorationsExtensionRef = useRef<Extension>([]);
 
 	const languageExtension = useMemo(() => getLanguageExtension(path), [path]);
 	const decorationsExtension = useMemo(
 		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
 		[highlightedLines, highlightTone, lineTones],
 	);
+	languageExtensionRef.current = languageExtension;
+	decorationsExtensionRef.current = decorationsExtension;
 	const createEditorState = useCallback(
 		(doc: string) =>
 			EditorState.create({
@@ -325,10 +329,22 @@ export function CodeMirrorViewer({
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
+		if (viewRef.current) return;
 
 		const view = new EditorView({
 			parent: host,
-			state: createEditorState(contentRef.current),
+			state: EditorState.create({
+				doc: contentRef.current,
+				extensions: [
+					lineNumbers(),
+					EditorState.readOnly.of(true),
+					EditorView.editable.of(false),
+					viewerTheme,
+					syntaxHighlighting(syntaxTheme, { fallback: true }),
+					languageCompartmentRef.current.of(languageExtensionRef.current),
+					decorationsCompartmentRef.current.of(decorationsExtensionRef.current),
+				],
+			}),
 		});
 		viewRef.current = view;
 
@@ -336,7 +352,7 @@ export function CodeMirrorViewer({
 			view.destroy();
 			viewRef.current = null;
 		};
-	}, [createEditorState]);
+	}, []);
 
 	useEffect(() => {
 		const view = viewRef.current;

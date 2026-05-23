@@ -230,10 +230,81 @@ export function getCompactActivityEntry(
 		};
 	}
 
+	if (part.toolName === 'query_sessions') {
+		const agent = getStringField(args, 'agent');
+		const sessionType = getStringField(args, 'sessionType');
+		const scope = agent
+			? `${agent} sessions`
+			: sessionType && sessionType !== 'main'
+				? `${sessionType} sessions`
+				: 'past sessions';
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: `Searching ${scope}`,
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'query_messages') {
+		const search = getStringField(args, 'search');
+		const toolName = getStringField(args, 'toolName');
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			query: search || toolName,
+			label: search
+				? `Searching messages for ${truncate(search, 42)}`
+				: toolName
+					? `Finding ${toolName} tool usage`
+					: 'Searching session messages',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'search_history') {
+		const query = getStringField(args, 'query');
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			query,
+			label: query
+				? `Searching history for ${truncate(query, 42)}`
+				: 'Searching session history',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'get_session_context') {
+		const sessionId = getStringField(args, 'sessionId');
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: sessionId
+				? `Opening session ${truncate(sessionId, 12)}`
+				: 'Opening session details',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'get_parent_session') {
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: 'Opening linked session',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
 	return {
 		id: part.id,
 		toolName: part.toolName,
-		label: 'Reviewing prior context',
+		label: 'Searching session history',
 		startedAt: part.startedAt,
 		completedAt: part.completedAt,
 	};
@@ -377,7 +448,7 @@ export function summarizeCompactActivities(
 				? 'Researched and reviewed the project'
 				: 'Researched references'
 			: historyLookups > 0 && searches > 0
-				? 'Reviewed context and searched code'
+				? 'Searched history and code'
 				: hasProjectReview && searches > 0
 					? 'Reviewed files and searched code'
 					: scans > 0
@@ -385,7 +456,7 @@ export function summarizeCompactActivities(
 						: files.size > 0
 							? 'Reviewed project files'
 							: historyLookups > 0
-								? 'Reviewed prior context'
+								? 'Searched session history'
 								: 'Thought through the approach';
 
 	const details: string[] = [];
@@ -406,8 +477,8 @@ export function summarizeCompactActivities(
 			`${webLookups} ${webLookups === 1 ? 'web lookup' : 'web lookups'}`,
 		);
 	}
-	if (historyLookups > 0 && title !== 'Reviewed prior context') {
-		details.push('prior context');
+	if (historyLookups > 0 && title !== 'Searched session history') {
+		details.push('session history');
 	}
 	if (reasoning > 0 && !isReasoningOnly) {
 		details.push('reasoning');

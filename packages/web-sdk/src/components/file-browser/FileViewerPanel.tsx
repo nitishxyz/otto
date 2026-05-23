@@ -13,6 +13,7 @@ import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import type {
 	ToolActivityHighlight,
 	ToolPatchPreview,
+	ToolWritePreview,
 } from '../../stores/viewerTabsStore';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
@@ -87,6 +88,12 @@ function formatPatchPreviewLabel(preview: ToolPatchPreview): string {
 	return 'Patching file';
 }
 
+function formatWritePreviewLabel(preview: ToolWritePreview): string {
+	if (preview.status === 'success') return 'Write applied';
+	if (preview.status === 'error') return 'Write failed';
+	return 'Writing file';
+}
+
 function ActivityPathStrip({
 	label,
 	path,
@@ -116,6 +123,7 @@ interface FileViewerPanelProps {
 	file?: string | null;
 	highlight?: ToolActivityHighlight;
 	patchPreview?: ToolPatchPreview;
+	writePreview?: ToolWritePreview;
 	onClose?: () => void;
 }
 
@@ -125,6 +133,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	file,
 	highlight,
 	patchPreview,
+	writePreview,
 	onClose,
 }: FileViewerPanelProps = {}) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -156,7 +165,8 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		return () => document.removeEventListener('keydown', handleEscape);
 	}, [isViewerOpen, closeViewer]);
 
-	const effectiveHighlight = patchPreview ? undefined : highlight;
+	const effectiveHighlight =
+		patchPreview || writePreview ? undefined : highlight;
 	const persistedPatchPreview = useMemo(() => {
 		if (!patchPreview?.previewContent || !patchPreview.previewLineTones) {
 			return null;
@@ -169,16 +179,19 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			latestLine: patchPreview.previewLatestLine,
 		};
 	}, [patchPreview]);
+	const patchBaseContent = patchPreview
+		? (patchPreview.baseContent ?? data?.content ?? '')
+		: undefined;
 	const livePatchPreview = useMemo(
 		() =>
-			data && selectedFile && patchPreview?.patch
+			selectedFile && patchPreview?.patch && patchBaseContent !== undefined
 				? buildLivePatchPreview(
-						patchPreview.baseContent ?? data.content,
+						patchBaseContent,
 						patchPreview.patch,
 						selectedFile,
 					)
 				: null,
-		[data, selectedFile, patchPreview?.baseContent, patchPreview?.patch],
+		[selectedFile, patchPreview?.patch, patchBaseContent],
 	);
 	const activePatchPreview =
 		patchPreview?.status === 'success'
@@ -237,24 +250,45 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 
 	const highlightStart = effectiveHighlight?.startLine;
 	const highlightEnd = effectiveHighlight?.endLine ?? highlightStart;
-	const highlightedLines = useMemo(
-		() =>
-			highlightStart && highlightEnd
-				? new Set(
-						Array.from(
-							{ length: highlightEnd - highlightStart + 1 },
-							(_, index) => highlightStart + index,
-						),
-					)
-				: undefined,
-		[highlightStart, highlightEnd],
-	);
+	const patchChangedLines = patchPreview?.changedLines;
+	const highlightedLines = useMemo(() => {
+		if (highlightStart && highlightEnd) {
+			return new Set(
+				Array.from(
+					{ length: highlightEnd - highlightStart + 1 },
+					(_, index) => highlightStart + index,
+				),
+			);
+		}
+
+		if (!activePatchPreview && patchChangedLines?.length) {
+			return new Set(patchChangedLines);
+		}
+
+		return undefined;
+	}, [highlightStart, highlightEnd, activePatchPreview, patchChangedLines]);
+	const fallbackPatchHighlightStart =
+		!activePatchPreview && patchChangedLines?.length
+			? Math.min(...patchChangedLines)
+			: undefined;
+	const scrollToHighlightLine = highlightStart ?? fallbackPatchHighlightStart;
+	const activePatchLineTones = useMemo(() => {
+		if (!activePatchPreview) return undefined;
+		const tones = new Map(activePatchPreview.lineTones);
+		for (const line of patchChangedLines ?? []) {
+			if (!tones.has(line)) tones.set(line, 'add');
+		}
+		return tones;
+	}, [activePatchPreview, patchChangedLines]);
 
 	if (!isViewerOpen || !selectedFile) return null;
 
 	const language = inferLanguage(selectedFile);
 	const renderMarkdown =
-		isMarkdownFile(selectedFile) && !effectiveHighlight && !activePatchPreview;
+		isMarkdownFile(selectedFile) &&
+		!effectiveHighlight &&
+		!activePatchPreview &&
+		!writePreview?.content;
 
 	return (
 		<div
@@ -293,28 +327,20 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					</span>
 				</div>
 			)}
-			{patchPreview ? (
-				<div className="shrink-0 border-b border-sidebar-border bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-					<ActivityPathStrip
-						label={formatPatchPreviewLabel(patchPreview)}
-						path={selectedFile}
-						showSpinner={patchPreview.status === 'streaming'}
-						spinnerTitle="Patching file"
-					/>
-				</div>
-			) : effectiveHighlight ? (
-				<div className="shrink-0 border-b border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
-					<ActivityPathStrip
-						label={formatReadHighlightLabel(effectiveHighlight)}
-						path={selectedFile}
-						showSpinner={effectiveHighlight.status === 'streaming'}
-						spinnerTitle="Reading file"
-					/>
-				</div>
-			) : null}
-
 			<div ref={scrollContainerRef} className="flex-1 overflow-auto">
-				{isLoading ? (
+				{writePreview?.content !== undefined ? (
+					<CodeMirrorViewer
+						content={writePreview.content}
+						path={selectedFile}
+					/>
+				) : activePatchPreview ? (
+					<CodeMirrorViewer
+						content={activePatchPreview.content}
+						path={selectedFile}
+						lineTones={activePatchLineTones}
+						scrollToLine={activePatchPreview.latestLine}
+					/>
+				) : isLoading ? (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						Loading file...
 					</div>
@@ -365,13 +391,10 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 						</div>
 					) : (
 						<CodeMirrorViewer
-							content={activePatchPreview?.content ?? data.content}
+							content={data.content}
 							path={selectedFile}
-							highlightedLines={
-								activePatchPreview ? undefined : highlightedLines
-							}
-							lineTones={activePatchPreview?.lineTones}
-							scrollToLine={activePatchPreview?.latestLine ?? highlightStart}
+							highlightedLines={highlightedLines}
+							scrollToLine={scrollToHighlightLine}
 						/>
 					)
 				) : (
@@ -380,6 +403,34 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					</div>
 				)}
 			</div>
+			{writePreview ? (
+				<div className="shrink-0 border-t border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
+					<ActivityPathStrip
+						label={formatWritePreviewLabel(writePreview)}
+						path={selectedFile}
+						showSpinner={writePreview.status === 'streaming'}
+						spinnerTitle="Writing file"
+					/>
+				</div>
+			) : patchPreview ? (
+				<div className="shrink-0 border-t border-sidebar-border bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
+					<ActivityPathStrip
+						label={formatPatchPreviewLabel(patchPreview)}
+						path={selectedFile}
+						showSpinner={patchPreview.status === 'streaming'}
+						spinnerTitle="Patching file"
+					/>
+				</div>
+			) : effectiveHighlight ? (
+				<div className="shrink-0 border-t border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
+					<ActivityPathStrip
+						label={formatReadHighlightLabel(effectiveHighlight)}
+						path={selectedFile}
+						showSpinner={effectiveHighlight.status === 'streaming'}
+						spinnerTitle="Reading file"
+					/>
+				</div>
+			) : null}
 		</div>
 	);
 });

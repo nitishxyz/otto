@@ -168,7 +168,6 @@ const defaultToolExtras: Record<string, string[]> = {
 		'query_messages',
 		'get_session_context',
 		'search_history',
-		'get_parent_session',
 		'present_action',
 	],
 };

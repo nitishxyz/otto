@@ -1,4 +1,4 @@
-import { ExternalLink, Link2, Search } from 'lucide-react';
+import { ExternalLink, Search } from 'lucide-react';
 import type { RendererProps } from './types';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
@@ -61,6 +61,23 @@ function formatDate(timestamp?: number): string {
 		hour: '2-digit',
 		minute: '2-digit',
 	});
+}
+
+function getToolDisplayName(toolName: string): string {
+	switch (toolName) {
+		case 'query_sessions':
+			return 'search sessions';
+		case 'query_messages':
+			return 'search messages';
+		case 'search_history':
+			return 'search history';
+		case 'get_session_context':
+			return 'open session';
+		case 'get_parent_session':
+			return 'open linked session';
+		default:
+			return toolName;
+	}
 }
 
 function SessionLink({
@@ -242,18 +259,12 @@ export function DatabaseToolRenderer({
 
 		return (
 			<div className="mt-2 mb-1 rounded-lg border border-border bg-card/60 text-[12px]">
-				{(title || summary) && (
-					<div className="border-b border-border/60 px-3 py-2">
-						{title && (
-							<div className="font-medium text-foreground/90">{title}</div>
-						)}
-						{summary && (
-							<div className="mt-0.5 flex items-center gap-1.5 text-muted-foreground">
-								<Link2 className="h-3.5 w-3.5" />
-								<span>{summary}</span>
-							</div>
-						)}
-					</div>
+				<div className="border-b border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+					{title ||
+						(links.length === 1 ? 'Relevant session' : 'Relevant sessions')}
+				</div>
+				{links.length === 0 && summary && (
+					<div className="px-3 py-2 text-muted-foreground">{summary}</div>
 				)}
 				{links.length > 0 && (
 					<div className="divide-y divide-border/60">
@@ -534,7 +545,7 @@ export function DatabaseToolRenderer({
 	return (
 		<div className="text-[12px]">
 			<ToolHeader
-				toolName={toolName}
+				toolName={getToolDisplayName(toolName)}
 				isExpanded={isExpanded}
 				onToggle={onToggle}
 				isError={hasToolError}

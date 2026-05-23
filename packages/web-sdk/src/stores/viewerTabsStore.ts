@@ -33,6 +33,21 @@ export type ToolPatchPreview = Omit<
 	toolName: 'apply_patch';
 };
 
+export type ToolWritePreview = Omit<
+	ToolPreviewTabInput,
+	| 'toolName'
+	| 'baseContent'
+	| 'patch'
+	| 'changedLines'
+	| 'previewContent'
+	| 'resultContent'
+	| 'previewLineTones'
+	| 'previewFirstLine'
+	| 'previewLatestLine'
+> & {
+	toolName: 'write';
+};
+
 export type ViewerTab =
 	| {
 			id: string;
@@ -56,6 +71,7 @@ export type ViewerTab =
 			path: string;
 			highlight?: ToolActivityHighlight;
 			patchPreview?: ToolPatchPreview;
+			writePreview?: ToolWritePreview;
 	  }
 	| {
 			id: string;
@@ -109,8 +125,28 @@ function titleFromPath(path: string): string {
 	return path.split('/').pop() || path;
 }
 
+function normalizeViewerPath(path: string): string {
+	return path
+		.trim()
+		.replace(/^a\//, '')
+		.replace(/^b\//, '')
+		.replace(/^\.\//, '')
+		.replace(/\/+/g, '/')
+		.replace(/\/+$/, '');
+}
+
+function viewerPathsMatch(left: string, right: string): boolean {
+	const normalizedLeft = normalizeViewerPath(left);
+	const normalizedRight = normalizeViewerPath(right);
+	return (
+		normalizedLeft === normalizedRight ||
+		normalizedLeft.endsWith(`/${normalizedRight}`) ||
+		normalizedRight.endsWith(`/${normalizedLeft}`)
+	);
+}
+
 function fileTabId(path: string): string {
-	return `file:${path}`;
+	return `file:${normalizeViewerPath(path)}`;
 }
 
 function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
@@ -141,6 +177,15 @@ function isSamePatchCall(
 		preview.patch.startsWith(existing.patch) ||
 		existing.patch.startsWith(preview.patch)
 	);
+}
+
+function mergeChangedLines(
+	existing: number[] | undefined,
+	incoming: number[] | undefined,
+): number[] | undefined {
+	if (!existing?.length) return incoming;
+	if (!incoming?.length) return existing;
+	return [...new Set([...existing, ...incoming])].sort((a, b) => a - b);
 }
 
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
@@ -185,18 +230,31 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openFileTab: (path) => {
 		const id = fileTabId(path);
 		set((state) => {
+			const matchingFileTabs = state.tabs.filter(
+				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
+					tab.type === 'file' && viewerPathsMatch(tab.path, path),
+			);
+			const existingFile =
+				matchingFileTabs.find((tab) => tab.id === state.activeTabId) ??
+				matchingFileTabs[0];
+			const targetId = existingFile?.id ?? id;
+			const targetPath = existingFile?.path ?? path;
 			const tabs = state.tabs.filter(
 				(tab) =>
-					!(tab.type === 'tool-preview' && tab.path === path && tab.id !== id),
+					!(
+						(tab.type === 'tool-preview' || tab.type === 'file') &&
+						tab.id !== targetId &&
+						viewerPathsMatch(tab.path, path)
+					),
 			);
 			return {
 				tabs: upsertTab(tabs, {
-					id,
+					id: targetId,
 					type: 'file',
-					title: titleFromPath(path),
-					path,
+					title: existingFile?.title ?? titleFromPath(targetPath),
+					path: targetPath,
 				}),
-				activeTabId: id,
+				activeTabId: targetId,
 			};
 		});
 	},
@@ -204,19 +262,34 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openToolReadTab: (path, highlight) => {
 		const id = fileTabId(path);
 		set((state) => {
+			const matchingFileTabs = state.tabs.filter(
+				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
+					tab.type === 'file' && viewerPathsMatch(tab.path, path),
+			);
+			const existingFile =
+				matchingFileTabs.find((tab) => tab.id === state.activeTabId) ??
+				matchingFileTabs[0];
+			const targetId = existingFile?.id ?? id;
+			const targetPath = existingFile?.path ?? path;
 			const tabs = state.tabs.filter(
 				(tab) =>
-					!(tab.type === 'tool-preview' && tab.path === path && tab.id !== id),
+					!(
+						(tab.type === 'tool-preview' || tab.type === 'file') &&
+						tab.id !== targetId &&
+						viewerPathsMatch(tab.path, path)
+					),
 			);
 			return {
 				tabs: upsertTab(tabs, {
-					id,
+					id: targetId,
 					type: 'file',
-					title: titleFromPath(path),
-					path,
+					title: existingFile?.title ?? titleFromPath(targetPath),
+					path: targetPath,
 					highlight,
+					patchPreview: undefined,
+					writePreview: undefined,
 				}),
-				activeTabId: id,
+				activeTabId: targetId,
 			};
 		});
 	},
@@ -224,25 +297,37 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openToolPreviewTab: (preview) => {
 		const id = fileTabId(preview.path);
 		set((state) => {
-			const existingFile = state.tabs.find(
+			const matchingFileTabs = state.tabs.filter(
 				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
-					tab.id === id && tab.type === 'file',
+					tab.type === 'file' && viewerPathsMatch(tab.path, preview.path),
 			);
+			const existingFile =
+				matchingFileTabs.find((tab) => tab.id === state.activeTabId) ??
+				matchingFileTabs[0];
+			const targetId = existingFile?.id ?? id;
+			const targetPath = existingFile?.path ?? preview.path;
 			const existing = state.tabs.find(
 				(tab): tab is Extract<ViewerTab, { type: 'tool-preview' }> =>
-					tab.id === id && tab.type === 'tool-preview',
+					tab.type === 'tool-preview' &&
+					viewerPathsMatch(tab.path, preview.path),
 			);
 			const tabs = state.tabs.filter(
 				(tab) =>
 					!(
-						tab.type === 'tool-preview' &&
-						tab.id !== id &&
-						(tab.path === preview.path ||
-							Boolean(preview.callId && tab.callId === preview.callId))
+						(tab.type === 'tool-preview' || tab.type === 'file') &&
+						tab.id !== targetId &&
+						(viewerPathsMatch(tab.path, preview.path) ||
+							Boolean(
+								preview.callId &&
+									'toolName' in tab &&
+									tab.callId === preview.callId,
+							))
 					),
 			);
-			if (preview.toolName === 'apply_patch' && existingFile) {
-				const existingPatchPreview = existingFile.patchPreview;
+			if (preview.toolName === 'apply_patch') {
+				const existingPatchPreview =
+					existingFile?.patchPreview ??
+					(existing?.toolName === 'apply_patch' ? existing : undefined);
 				const samePatchCall = isSamePatchCall(existingPatchPreview, preview);
 				const baseContent =
 					preview.baseContent ??
@@ -250,21 +335,27 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						? existingPatchPreview?.baseContent
 						: (existingPatchPreview?.resultContent ??
 							existingPatchPreview?.baseContent));
+				const changedLines = samePatchCall
+					? (preview.changedLines ?? existingPatchPreview?.changedLines)
+					: mergeChangedLines(
+							existingPatchPreview?.changedLines,
+							preview.changedLines,
+						);
 				return {
 					tabs: upsertTab(tabs, {
-						...existingFile,
+						id: targetId,
+						type: 'file',
+						title: existingFile?.title ?? titleFromPath(targetPath),
+						path: targetPath,
 						highlight: undefined,
+						writePreview: undefined,
 						patchPreview: {
-							path: preview.path,
+							path: targetPath,
 							toolName: 'apply_patch',
 							callId: preview.callId ?? existingPatchPreview?.callId,
 							baseContent,
 							patch: preview.patch ?? existingPatchPreview?.patch,
-							changedLines:
-								preview.changedLines ??
-								(samePatchCall
-									? existingPatchPreview?.changedLines
-									: undefined),
+							changedLines,
 							previewContent:
 								preview.previewContent ??
 								(samePatchCall
@@ -294,17 +385,30 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							error: preview.error ?? existingPatchPreview?.error,
 						},
 					}),
-					activeTabId: id,
+					activeTabId: targetId,
 				};
 			}
-			const sameToolPreviewCall = isSamePatchCall(existing, preview);
-			const baseContent =
-				preview.toolName === 'apply_patch'
-					? (preview.baseContent ??
-						(sameToolPreviewCall
-							? existing?.baseContent
-							: (existing?.resultContent ?? existing?.baseContent)))
-					: undefined;
+			if (existingFile) {
+				const existingWritePreview = existingFile.writePreview;
+				return {
+					tabs: upsertTab(tabs, {
+						...existingFile,
+						highlight: undefined,
+						patchPreview: undefined,
+						writePreview: {
+							path: targetPath,
+							toolName: 'write',
+							callId: preview.callId ?? existingWritePreview?.callId,
+							content: preview.content ?? existingWritePreview?.content,
+							status: preview.status,
+							error: preview.error ?? existingWritePreview?.error,
+						},
+					}),
+					activeTabId: targetId,
+				};
+			}
+			const existingWrite =
+				existing?.toolName === 'write' ? existing : undefined;
 			return {
 				tabs: upsertTab(tabs, {
 					id,
@@ -313,27 +417,17 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					path: preview.path,
 					toolName: preview.toolName,
 					callId: preview.callId,
-					content: preview.content ?? existing?.content,
-					baseContent,
-					patch: preview.patch ?? existing?.patch,
-					changedLines: preview.changedLines ?? existing?.changedLines,
-					previewContent:
-						preview.previewContent ??
-						(sameToolPreviewCall ? existing?.previewContent : undefined),
-					resultContent:
-						preview.resultContent ??
-						(sameToolPreviewCall ? existing?.resultContent : undefined),
-					previewLineTones:
-						preview.previewLineTones ??
-						(sameToolPreviewCall ? existing?.previewLineTones : undefined),
-					previewFirstLine:
-						preview.previewFirstLine ??
-						(sameToolPreviewCall ? existing?.previewFirstLine : undefined),
-					previewLatestLine:
-						preview.previewLatestLine ??
-						(sameToolPreviewCall ? existing?.previewLatestLine : undefined),
+					content: preview.content ?? existingWrite?.content,
+					baseContent: undefined,
+					patch: undefined,
+					changedLines: undefined,
+					previewContent: undefined,
+					resultContent: undefined,
+					previewLineTones: undefined,
+					previewFirstLine: undefined,
+					previewLatestLine: undefined,
 					status: preview.status,
-					error: preview.error ?? existing?.error,
+					error: preview.error ?? existingWrite?.error,
 				}),
 				activeTabId: id,
 			};

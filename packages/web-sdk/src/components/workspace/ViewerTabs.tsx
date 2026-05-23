@@ -205,6 +205,7 @@ function renderTabContent(
 					file={tab.path}
 					highlight={tab.highlight}
 					patchPreview={tab.patchPreview}
+					writePreview={tab.writePreview}
 					onClose={() => closeTab(tab.id)}
 				/>
 			);

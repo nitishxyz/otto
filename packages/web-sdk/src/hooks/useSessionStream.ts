@@ -5,6 +5,7 @@ import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
+import { optimisticallyQueueMessage } from './useQueueState';
 import { sessionsQueryKey } from './useSessions';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
@@ -26,7 +27,10 @@ export function useSessionStream(
 	const assistantMessageIdRef = useRef<string | null>(null);
 	const toolInputBuffersRef = useRef<Map<string, string>>(new Map());
 	const toolPreviewEmitRef = useRef<
-		Map<string, { emittedAt: number; contentLength: number }>
+		Map<
+			string,
+			{ emittedAt: number; contentLength: number; lineSignature?: string }
+		>
 	>(new Map());
 	const toolMessageEmitRef = useRef<Map<string, number>>(new Map());
 
@@ -416,6 +420,51 @@ export function useSessionStream(
 			);
 		};
 
+		const patchPathMayReferToTarget = (
+			patchPath: string,
+			targetPath: string,
+		): boolean => {
+			const normalizedPatch = normalizePatchPath(patchPath).replace(/\/+$/, '');
+			const normalizedTarget = normalizePatchPath(targetPath);
+			if (!normalizedPatch) return false;
+			return (
+				patchPathMatches(patchPath, targetPath) ||
+				normalizedTarget.startsWith(`${normalizedPatch}/`)
+			);
+		};
+
+		const isLikelyCompletePatchPath = (path: string): boolean => {
+			const normalized = normalizePatchPath(path);
+			if (!normalized || normalized.endsWith('/')) return false;
+			const name = normalized.split('/').pop() ?? '';
+			return name.includes('.');
+		};
+
+		const getCompletedPatchChangeLineSignature = (
+			patch: string,
+		): string | undefined => {
+			const stablePatch = patch.endsWith('\n')
+				? patch
+				: patch.slice(0, patch.lastIndexOf('\n') + 1);
+			if (!stablePatch) return undefined;
+
+			let changeLines = 0;
+			let stableChangeLength = 0;
+			for (const line of stablePatch.split('\n')) {
+				if (
+					(line.startsWith('+') && !line.startsWith('+++')) ||
+					(line.startsWith('-') && !line.startsWith('---'))
+				) {
+					changeLines += 1;
+					stableChangeLength += line.length;
+				}
+			}
+
+			return changeLines > 0
+				? `${changeLines}:${stableChangeLength}`
+				: undefined;
+		};
+
 		const extractPathsFromPatch = (patch: string): string[] => {
 			const paths = new Set<string>();
 			for (const line of patch.split('\n')) {
@@ -607,30 +656,6 @@ export function useSessionStream(
 					: 'streaming';
 			const callId = getToolEventCallId(payload) ?? undefined;
 
-			if (
-				status === 'streaming' &&
-				buffer.length >= TOOL_PREVIEW_THROTTLE_MIN_CHARS
-			) {
-				const previewKey = callId ?? 'apply_patch';
-				const now = Date.now();
-				const last = toolPreviewEmitRef.current.get(previewKey);
-				const contentDelta = Math.abs(
-					buffer.length - (last?.contentLength ?? 0),
-				);
-				if (
-					last &&
-					now - last.emittedAt < TOOL_PREVIEW_THROTTLE_MS &&
-					contentDelta < TOOL_PREVIEW_THROTTLE_MIN_DELTA_CHARS
-				) {
-					return;
-				}
-
-				toolPreviewEmitRef.current.set(previewKey, {
-					emittedAt: now,
-					contentLength: buffer.length,
-				});
-			}
-
 			const patch =
 				(typeof artifact?.patch === 'string' ? artifact.patch : undefined) ??
 				(status === 'streaming'
@@ -638,15 +663,56 @@ export function useSessionStream(
 					: getStringArg(args, buffer, 'patch'));
 			if (!patch) return;
 
-			for (const path of extractPathsFromPatch(patch)) {
-				viewerStore.openToolPreviewTab({
-					path,
-					toolName: 'apply_patch',
-					callId,
-					patch,
-					changedLines: getChangedLinesForPath(result, path),
-					status,
-					error: extractErrorMessage(payload),
+			const previewKey = callId ?? 'apply_patch';
+			const lineSignature =
+				status === 'streaming'
+					? getCompletedPatchChangeLineSignature(patch)
+					: undefined;
+			if (status === 'streaming') {
+				const last = toolPreviewEmitRef.current.get(previewKey);
+				if (last?.lineSignature === lineSignature) return;
+			}
+
+			const patchPaths = extractPathsFromPatch(patch);
+			if (patchPaths.length === 0) return;
+
+			const matchingFileTabs = viewerStore.tabs.filter(
+				(
+					tab,
+				): tab is Extract<
+					(typeof viewerStore.tabs)[number],
+					{ type: 'file' }
+				> =>
+					tab.type === 'file' &&
+					patchPaths.some((path) => patchPathMayReferToTarget(path, tab.path)),
+			);
+			const activeMatchingFileTab = matchingFileTabs.find(
+				(tab) => tab.id === viewerStore.activeTabId,
+			);
+			const fallbackPath = patchPaths.find(isLikelyCompletePatchPath);
+			if (!activeMatchingFileTab && !matchingFileTabs[0] && !fallbackPath)
+				return;
+			const targetPath =
+				activeMatchingFileTab?.path ??
+				matchingFileTabs[0]?.path ??
+				fallbackPath;
+			if (!targetPath) return;
+
+			viewerStore.openToolPreviewTab({
+				path: targetPath,
+				toolName: 'apply_patch',
+				callId,
+				patch,
+				changedLines: getChangedLinesForPath(result, targetPath),
+				status,
+				error: extractErrorMessage(payload),
+			});
+
+			if (status === 'streaming') {
+				toolPreviewEmitRef.current.set(previewKey, {
+					emittedAt: Date.now(),
+					contentLength: buffer.length,
+					lineSignature,
 				});
 			}
 		};
@@ -1251,6 +1317,7 @@ export function useSessionStream(
 					const id = typeof payload?.id === 'string' ? payload.id : null;
 					if (role === 'assistant' && id) {
 						assistantMessageIdRef.current = id;
+						optimisticallyQueueMessage(queryClient, sessionId, id);
 					}
 					if (id && role) {
 						const agent =

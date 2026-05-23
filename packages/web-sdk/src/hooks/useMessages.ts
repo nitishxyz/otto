@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import type { SendMessageRequest } from '../types/api';
+import { optimisticallyQueueMessage } from './useQueueState';
 import { sessionsQueryKey } from './useSessions';
 
 interface UseMessagesOptions {
@@ -36,7 +37,8 @@ export function useSendMessage(sessionId: string) {
 			await apiClient.markSessionViewed(sessionId).catch(() => undefined);
 			return apiClient.sendMessage(sessionId, data);
 		},
-		onSuccess: () => {
+		onSuccess: (result) => {
+			optimisticallyQueueMessage(queryClient, sessionId, result.messageId);
 			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
 		},

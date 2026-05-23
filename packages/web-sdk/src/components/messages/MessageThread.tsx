@@ -357,8 +357,54 @@ export const MessageThread = memo(function MessageThread({
 	};
 
 	const filteredMessages = useMemo(() => {
-		return messages.filter((message) => message.role !== 'system');
-	}, [messages]);
+		const visibleMessages = messages.filter(
+			(message) => message.role !== 'system',
+		);
+		const queueBusy =
+			Boolean(queueState.currentMessageId) || queueState.queueLength > 0;
+
+		if (!queueBusy) return visibleMessages;
+
+		return visibleMessages.filter((message, index) => {
+			if (message.role === 'assistant') {
+				const isPendingEmptyAssistant =
+					message.status === 'pending' &&
+					(message.parts?.length ?? 0) === 0 &&
+					message.id !== queueState.currentMessageId;
+				return !isPendingEmptyAssistant;
+			}
+
+			if (message.role !== 'user') return true;
+
+			const nextAssistant = visibleMessages
+				.slice(index + 1)
+				.find((candidate) => candidate.role === 'assistant');
+			if (nextAssistant) {
+				const nextAssistantIsQueued =
+					queuedMessageIds.has(nextAssistant.id) ||
+					(nextAssistant.status === 'pending' &&
+						(nextAssistant.parts?.length ?? 0) === 0 &&
+						nextAssistant.id !== queueState.currentMessageId);
+				return !nextAssistantIsQueued;
+			}
+
+			const hasEarlierActiveAssistant = visibleMessages
+				.slice(0, index)
+				.some(
+					(candidate) =>
+						candidate.role === 'assistant' &&
+						(candidate.id === queueState.currentMessageId ||
+							(candidate.status === 'pending' &&
+								!queuedMessageIds.has(candidate.id))),
+				);
+			return !hasEarlierActiveAssistant;
+		});
+	}, [
+		messages,
+		queueState.currentMessageId,
+		queueState.queueLength,
+		queuedMessageIds,
+	]);
 
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
@@ -512,6 +558,7 @@ export const MessageThread = memo(function MessageThread({
 											hasNextAssistantMessage={nextIsAssistant}
 											isLastMessage={isLastMessage}
 											onBranchCreated={onSelectSession}
+											onNavigateToSession={onSelectSession}
 											onRetry={
 												canRetryTurn
 													? createRetryHandler(message.id)

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 
 export type QueueState = {
@@ -12,6 +12,35 @@ const defaultQueueState: QueueState = {
 	queuedMessages: [],
 	queueLength: 0,
 };
+
+export function optimisticallyQueueMessage(
+	queryClient: QueryClient,
+	sessionId: string,
+	messageId: string,
+) {
+	queryClient.setQueryData<QueueState>(['queueState', sessionId], (current) => {
+		if (!current) return current;
+		const isBusy =
+			Boolean(current.currentMessageId) ||
+			current.queuedMessages.length > 0 ||
+			current.queueLength > 0;
+		if (!isBusy) return current;
+		if (current.currentMessageId === messageId) return current;
+		if (current.queuedMessages.some((item) => item.messageId === messageId)) {
+			return current;
+		}
+
+		const queuedMessages = [
+			...current.queuedMessages,
+			{ messageId, position: current.queuedMessages.length },
+		];
+		return {
+			...current,
+			queuedMessages,
+			queueLength: queuedMessages.length,
+		};
+	});
+}
 
 export function useQueueState(sessionId: string | undefined): QueueState {
 	const { data } = useQuery<QueueState>({
