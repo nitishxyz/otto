@@ -52,6 +52,7 @@ import {
 	handleRunnerError,
 	shouldPreemptivelyAutoCompact,
 } from './runner-errors.ts';
+import { markUnhandledAssistantRunFailure } from './runner-failures.ts';
 
 export {
 	enqueueAssistantRun,
@@ -71,7 +72,9 @@ export async function runSessionLoop(sessionId: string) {
 
 		try {
 			await runAssistant(job);
-		} catch {}
+		} catch (err) {
+			await markUnhandledAssistantRunFailure(job, err);
+		}
 	}
 
 	setRunning(sessionId, false);

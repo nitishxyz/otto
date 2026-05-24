@@ -181,6 +181,75 @@ describe('openai oauth client', () => {
 		});
 	});
 
+	test('strips response input ids for stateless Codex requests', async () => {
+		const requestBodies: string[] = [];
+		globalThis.fetch = async (_input, init) => {
+			requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-stateless',
+		});
+
+		await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: JSON.stringify({
+				model: 'gpt-5.5',
+				store: false,
+				input: [
+					{ id: 'msg_1', role: 'user', content: 'hello' },
+					{ role: 'assistant', content: 'hi' },
+				],
+			}),
+		});
+
+		const payload = JSON.parse(requestBodies[0] ?? '{}');
+		expect(payload.input[0]).not.toHaveProperty('id');
+		expect(payload.input[0]).toMatchObject({
+			role: 'user',
+			content: 'hello',
+		});
+		expect(payload.input[1]).toMatchObject({
+			role: 'assistant',
+			content: 'hi',
+		});
+	});
+
+	test('keeps response input ids when storage is explicitly enabled', async () => {
+		const requestBodies: string[] = [];
+		globalThis.fetch = async (_input, init) => {
+			requestBodies.push(typeof init?.body === 'string' ? init.body : '');
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-stored',
+		});
+
+		await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: JSON.stringify({
+				model: 'gpt-5.5',
+				store: true,
+				input: [{ id: 'msg_1', role: 'user', content: 'hello' }],
+			}),
+		});
+
+		const payload = JSON.parse(requestBodies[0] ?? '{}');
+		expect(payload.input[0]).toMatchObject({
+			id: 'msg_1',
+			role: 'user',
+			content: 'hello',
+		});
+	});
+
 	test('injects previous_response_id when explicitly enabled', async () => {
 		process.env.OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID = '1';
 		const requestBodies: string[] = [];

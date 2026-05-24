@@ -216,11 +216,11 @@ function rewriteRequestBody(
 	try {
 		const parsed = JSON.parse(body) as Record<string, unknown>;
 		const model = typeof parsed.model === 'string' ? parsed.model : undefined;
+		let changed = stripStatelessResponseInputIds(parsed);
 		if (!sessionId) {
-			return { body, model };
+			return { body: changed ? JSON.stringify(parsed) : body, model };
 		}
 
-		let changed = false;
 		const clientMetadata =
 			parsed.client_metadata && typeof parsed.client_metadata === 'object'
 				? (parsed.client_metadata as Record<string, unknown>)
@@ -265,6 +265,35 @@ function rewriteRequestBody(
 	} catch {
 		return { body };
 	}
+}
+
+function stripStatelessResponseInputIds(
+	parsed: Record<string, unknown>,
+): boolean {
+	if (parsed.store === true || !Array.isArray(parsed.input)) {
+		return false;
+	}
+
+	let changed = false;
+	const input = parsed.input.map((item) => {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) {
+			return item;
+		}
+		if (!('id' in item)) {
+			return item;
+		}
+
+		const next = { ...(item as Record<string, unknown>) };
+		delete next.id;
+		changed = true;
+		return next;
+	});
+
+	if (changed) {
+		parsed.input = input;
+	}
+
+	return changed;
 }
 
 function previewText(value: unknown, maxLength = 240): string | undefined {
