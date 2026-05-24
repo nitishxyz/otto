@@ -91,6 +91,9 @@ function ToastItem({ toast }: { toast: Toast }) {
 			: phase === 'exit'
 				? 'opacity-0 translate-y-1 scale-95'
 				: 'opacity-100 translate-y-0 scale-100';
+	const rowAlignmentClass =
+		toast.type === 'loading' ? 'items-center' : 'items-start';
+	const iconOffsetClass = toast.type === 'loading' ? '' : 'mt-px';
 
 	return (
 		// biome-ignore lint/a11y/useKeyWithClickEvents: toast click-to-dismiss
@@ -107,8 +110,8 @@ function ToastItem({ toast }: { toast: Toast }) {
 			onClick={handleToastClick}
 			role="alert"
 		>
-			<div className="flex items-start gap-2.5 px-3 py-2.5">
-				<span className="mt-px shrink-0">{style.icon}</span>
+			<div className={`flex ${rowAlignmentClass} gap-2.5 px-3 py-2.5`}>
+				<span className={`${iconOffsetClass} shrink-0`}>{style.icon}</span>
 
 				<div className="flex-1 min-w-0">
 					<span className="text-[13px] leading-relaxed text-foreground">
