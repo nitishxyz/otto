@@ -1,9 +1,10 @@
 import type { Hono } from 'hono';
 import {
 	authorize,
-	authorizeOpenAIWeb,
+	authorizeOpenAI,
 	authorizeWeb,
 	exchange,
+	exchangeOpenAI,
 	exchangeOpenAIWeb,
 	exchangeWeb,
 	setAuth,
@@ -336,10 +337,32 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					url = result.url;
 					verifier = result.verifier;
 				} else if (provider === 'openai') {
-					callbackUrl = `${protocol}://${host}/v1/auth/${provider}/oauth/callback`;
-					const result = authorizeOpenAIWeb(callbackUrl);
-					url = result.url;
-					verifier = result.verifier;
+					const oauthResult = await authorizeOpenAI();
+					void (async () => {
+						try {
+							const code = await oauthResult.waitForCallback();
+							oauthResult.close();
+							const tokens = await exchangeOpenAI(code, oauthResult.verifier);
+							await setAuth(
+								'openai',
+								{
+									type: 'oauth',
+									refresh: tokens.refresh,
+									access: tokens.access,
+									expires: tokens.expires,
+									accountId: tokens.accountId,
+									idToken: tokens.idToken,
+								},
+								undefined,
+								'global',
+							);
+						} catch (error) {
+							logger.error('OpenAI OAuth callback failed', error);
+							oauthResult.close();
+						}
+					})();
+
+					return c.redirect(oauthResult.url);
 				} else {
 					return c.json(
 						{ error: 'OAuth not supported for this provider' },
