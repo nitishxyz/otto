@@ -1,7 +1,8 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMessages } from '../../hooks/useMessages';
 import { useSessionStream } from '../../hooks/useSessionStream';
-import { useSessions } from '../../hooks/useSessions';
+import { sessionsQueryKey, useSessions } from '../../hooks/useSessions';
 import { usePreferences } from '../../hooks/usePreferences';
 import { MessageThread } from './MessageThread';
 import { useToolApprovalShortcuts } from '../../hooks/useToolApprovalShortcuts';
@@ -16,11 +17,18 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 	sessionId,
 	onSelectSession,
 }: MessageThreadContainerProps) {
+	const queryClient = useQueryClient();
 	const { data: messages = [], isLoading } = useMessages(sessionId);
 	const { data: sessions = [] } = useSessions();
 	const { preferences } = usePreferences();
 
 	useSessionStream(sessionId);
+
+	useEffect(() => {
+		queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+		queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
+		queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+	}, [queryClient, sessionId]);
 
 	// Enable keyboard shortcuts (Y/N/A) for tool approval in this session
 	useToolApprovalShortcuts(sessionId);
