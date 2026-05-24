@@ -14,12 +14,18 @@ const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const TOKEN_REFRESH_MAX_RETRIES = 2;
 const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;
+const CODEX_INSTALLATION_ID = crypto.randomUUID();
+const CODEX_REQUEST_TIMEOUT_MS = 120_000;
+const CODEX_STREAM_IDLE_TIMEOUT_MS = 120_000;
 
 type OpenAIOAuthSessionState = {
 	responseId?: string;
 	model?: string;
 	status?: string;
 	incompleteReason?: string;
+	turnState?: string;
+	installationId?: string;
+	windowId?: string;
 };
 
 const openAIOAuthSessionState = new Map<string, OpenAIOAuthSessionState>();
@@ -81,6 +87,27 @@ async function previewResponseBody(
 
 function shouldUsePreviousResponseId() {
 	return process.env.OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID === '1';
+}
+
+function parsePositiveIntegerEnv(name: string, fallback: number) {
+	const raw = process.env[name];
+	if (!raw) return fallback;
+	const parsed = Number.parseInt(raw, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getCodexRequestTimeoutMs() {
+	return parsePositiveIntegerEnv(
+		'OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS',
+		CODEX_REQUEST_TIMEOUT_MS,
+	);
+}
+
+function getCodexStreamIdleTimeoutMs() {
+	return parsePositiveIntegerEnv(
+		'OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS',
+		CODEX_STREAM_IDLE_TIMEOUT_MS,
+	);
 }
 
 export function clearOpenAIOAuthSessionState(sessionId?: string) {
@@ -171,6 +198,17 @@ function writeSessionState(sessionId: string, next: OpenAIOAuthSessionState) {
 	openAIOAuthSessionState.set(sessionId, next);
 }
 
+function mergeSessionState(sessionId: string, next: OpenAIOAuthSessionState) {
+	writeSessionState(sessionId, {
+		...readSessionState(sessionId),
+		...next,
+	});
+}
+
+function getCodexWindowId(sessionId: string) {
+	return `${sessionId}:0`;
+}
+
 function rewriteRequestBody(
 	body: string,
 	sessionId?: string,
@@ -180,6 +218,23 @@ function rewriteRequestBody(
 		const model = typeof parsed.model === 'string' ? parsed.model : undefined;
 		if (!sessionId) {
 			return { body, model };
+		}
+
+		let changed = false;
+		const clientMetadata =
+			parsed.client_metadata && typeof parsed.client_metadata === 'object'
+				? (parsed.client_metadata as Record<string, unknown>)
+				: {};
+		if (clientMetadata['x-codex-installation-id'] !== CODEX_INSTALLATION_ID) {
+			parsed.client_metadata = {
+				...clientMetadata,
+				'x-codex-installation-id': CODEX_INSTALLATION_ID,
+			};
+			changed = true;
+		}
+		if (typeof parsed.prompt_cache_key !== 'string') {
+			parsed.prompt_cache_key = sessionId;
+			changed = true;
 		}
 
 		const prior = readSessionState(sessionId);
@@ -192,9 +247,10 @@ function rewriteRequestBody(
 				logOpenAIOAuth(
 					`not injecting previous_response_id=${prior.responseId} for session=${sessionId} model=${model ?? 'unknown'} because Codex HTTP backend rejects it; enable OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID=1 only for validation`,
 				);
-				return { body, model };
+				return { body: changed ? JSON.stringify(parsed) : body, model };
 			}
 			parsed.previous_response_id = prior.responseId;
+			changed = true;
 			logOpenAIOAuth(
 				`injecting previous_response_id=${prior.responseId} for session=${sessionId} model=${model ?? 'unknown'}`,
 			);
@@ -205,7 +261,7 @@ function rewriteRequestBody(
 			};
 		}
 
-		return { body, model };
+		return { body: changed ? JSON.stringify(parsed) : body, model };
 	} catch {
 		return { body };
 	}
@@ -283,6 +339,9 @@ function trackResponseEvent(data: string, sessionId?: string) {
 				model: responseModel ?? prior?.model,
 				status: responseStatus ?? type,
 				incompleteReason,
+				turnState: prior?.turnState,
+				installationId: prior?.installationId,
+				windowId: prior?.windowId,
 			});
 			logOpenAIOAuth(
 				`tracked response event type=${type ?? 'unknown'} responseId=${responseId} session=${sessionId} status=${responseStatus ?? 'unknown'} incompleteReason=${incompleteReason ?? 'none'}`,
@@ -304,9 +363,29 @@ function trackResponsesStream(
 	const decoder = new TextDecoder();
 	const encoder = new TextEncoder();
 	let buffer = '';
+	let timeout: Timer | undefined;
+	const idleTimeoutMs = getCodexStreamIdleTimeoutMs();
+	const clearIdleTimeout = () => {
+		if (timeout) clearTimeout(timeout);
+		timeout = undefined;
+	};
+	const resetIdleTimeout = (controller: TransformStreamDefaultController) => {
+		clearIdleTimeout();
+		timeout = setTimeout(() => {
+			controller.error(
+				new Error(
+					`OpenAI OAuth Codex stream idle timeout after ${idleTimeoutMs}ms`,
+				),
+			);
+		}, idleTimeoutMs);
+	};
 
 	const transform = new TransformStream<Uint8Array, Uint8Array>({
+		start(controller) {
+			resetIdleTimeout(controller);
+		},
 		transform(chunk, controller) {
+			resetIdleTimeout(controller);
 			buffer += decoder.decode(chunk, { stream: true }).replace(/\r\n/g, '\n');
 			let boundary = buffer.indexOf('\n\n');
 			while (boundary !== -1) {
@@ -329,6 +408,7 @@ function trackResponsesStream(
 			}
 		},
 		flush(controller) {
+			clearIdleTimeout();
 			buffer += decoder.decode().replace(/\r\n/g, '\n');
 			if (buffer.length > 0) {
 				controller.enqueue(encoder.encode(buffer));
@@ -343,6 +423,72 @@ function trackResponsesStream(
 	});
 }
 
+async function fetchWithCodexRequestTimeout(
+	url: string,
+	init: RequestInit,
+	args: {
+		enabled: boolean;
+		sessionId?: string;
+		model?: string;
+		requestStartedAt: number;
+	},
+) {
+	if (!args.enabled) {
+		return fetch(url, {
+			...init,
+			// @ts-expect-error Bun-specific fetch option
+			timeout: false,
+		});
+	}
+
+	const timeoutMs = getCodexRequestTimeoutMs();
+	const controller = new AbortController();
+	const timeout = setTimeout(() => {
+		controller.abort(
+			new Error(
+				`OpenAI OAuth Codex request timeout before response after ${timeoutMs}ms`,
+			),
+		);
+	}, timeoutMs);
+	let abortedByParent = false;
+	const parentSignal = init.signal;
+	const abortFromParent = () => {
+		abortedByParent = true;
+		controller.abort(parentSignal?.reason);
+	};
+	if (parentSignal) {
+		if (parentSignal.aborted) {
+			abortFromParent();
+		} else {
+			parentSignal.addEventListener('abort', abortFromParent, { once: true });
+		}
+	}
+
+	try {
+		return await fetch(url, {
+			...init,
+			signal: controller.signal,
+			// @ts-expect-error Bun-specific fetch option
+			timeout: false,
+		});
+	} catch (error) {
+		if (!abortedByParent && controller.signal.aborted) {
+			loggerWarn('[openai-oauth] request timed out before response', {
+				sessionId: args.sessionId,
+				model: args.model,
+				timeoutMs,
+				durationMs: Date.now() - args.requestStartedAt,
+			});
+		}
+		throw error;
+	} finally {
+		clearTimeout(timeout);
+		if (parentSignal) {
+			parentSignal.removeEventListener('abort', abortFromParent);
+		}
+	}
+}
+
 function buildHeaders(
 	init: RequestInit | undefined,
 	accessToken: string,
@@ -350,10 +496,15 @@ function buildHeaders(
 	sessionId?: string,
 ): Headers {
 	const headers = new Headers(init?.headers);
+	const prior = readSessionState(sessionId);
+	const windowId = sessionId
+		? (prior?.windowId ?? getCodexWindowId(sessionId))
+		: undefined;
 	headers.delete('Authorization');
 	headers.delete('authorization');
 	headers.set('authorization', `Bearer ${accessToken}`);
 	headers.set('originator', 'otto');
+	headers.set('x-codex-installation-id', CODEX_INSTALLATION_ID);
 	headers.set(
 		'User-Agent',
 		`otto/1.0 (${os.platform()} ${os.release()}; ${os.arch()})`,
@@ -363,8 +514,28 @@ function buildHeaders(
 	}
 	if (sessionId) {
 		headers.set('session_id', sessionId);
+		headers.set('thread_id', sessionId);
+		headers.set('x-codex-window-id', windowId ?? getCodexWindowId(sessionId));
+		if (prior?.turnState) {
+			headers.set('x-codex-turn-state', prior.turnState);
+		}
 	}
 	return headers;
+}
+
+function trackCodexResponseHeaders(response: Response, sessionId?: string) {
+	if (!sessionId) return;
+	const turnState = response.headers.get('x-codex-turn-state') ?? undefined;
+	if (!turnState) return;
+	const windowId = getCodexWindowId(sessionId);
+	mergeSessionState(sessionId, {
+		turnState,
+		installationId: CODEX_INSTALLATION_ID,
+		windowId,
+	});
+	logOpenAIOAuth(
+		`tracked x-codex-turn-state for session=${sessionId} window=${windowId}`,
+	);
 }
 
 export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
@@ -403,6 +574,9 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 					model: requestModel,
 					status: prior?.status,
 					incompleteReason: prior?.incompleteReason,
+					turnState: prior?.turnState,
+					installationId: prior?.installationId,
+					windowId: prior?.windowId,
 				});
 			}
 		}
@@ -425,12 +599,19 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 
 		let response: Response;
 		try {
-			response = await fetch(targetUrl, {
-				...requestInit,
-				headers,
-				// @ts-expect-error Bun-specific fetch option
-				timeout: false,
-			});
+			response = await fetchWithCodexRequestTimeout(
+				targetUrl,
+				{
+					...requestInit,
+					headers,
+				},
+				{
+					enabled: isResponsesRequest,
+					sessionId: config.sessionId,
+					model: requestModel,
+					requestStartedAt,
+				},
+			);
 		} catch (error) {
 			loggerWarn('[openai-oauth] request failed before response', {
 				sessionId: config.sessionId,
@@ -453,6 +634,9 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 			bodyCharsApprox: requestBodySize,
 			model: requestModel,
 		});
+		if (isResponsesRequest) {
+			trackCodexResponseHeaders(response, config.sessionId);
+		}
 		if (!response.ok && response.status !== 401) {
 			loggerWarn('[openai-oauth] non-OK response', {
 				sessionId: config.sessionId,
@@ -499,12 +683,22 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 				);
 
 				const retryStartedAt = Date.now();
-				const retryResponse = await fetch(targetUrl, {
-					...requestInit,
-					headers: retryHeaders,
-					// @ts-expect-error Bun-specific fetch option
-					timeout: false,
-				});
+				const retryResponse = await fetchWithCodexRequestTimeout(
+					targetUrl,
+					{
+						...requestInit,
+						headers: retryHeaders,
+					},
+					{
+						enabled: isResponsesRequest,
+						sessionId: config.sessionId,
+						model: requestModel,
+						requestStartedAt: retryStartedAt,
+					},
+				);
+				if (isResponsesRequest) {
+					trackCodexResponseHeaders(retryResponse, config.sessionId);
+				}
 				loggerDebug('[openai-oauth] retry response received', {
 					sessionId: config.sessionId,
 					target: isResponsesRequest ? 'codex.responses' : 'other',
