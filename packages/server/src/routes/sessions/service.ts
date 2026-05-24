@@ -23,6 +23,7 @@ import {
 	getQueueState,
 	getRunnerState,
 	removeFromQueue,
+	sendQueuedMessageNow,
 } from '../../runtime/session/queue.ts';
 
 export const SHARE_API_URL =
@@ -314,6 +315,30 @@ async function deleteQueuedAssistantPair(
 		.delete(messageParts)
 		.where(inArray(messageParts.messageId, messageIdsToDelete));
 	await db.delete(messages).where(inArray(messages.id, messageIdsToDelete));
+}
+
+/** Promotes a queued assistant message and silently preempts the active run. */
+export function sendSessionQueuedMessageNow(
+	sessionId: string,
+	messageId: string,
+):
+	| {
+			body: {
+				success: true;
+				promoted: boolean;
+				wasQueued: boolean;
+				wasRunning: boolean;
+				preemptedMessageId: string | null;
+			};
+			status?: never;
+	  }
+	| { body: { success: false; promoted: false }; status: 404 } {
+	const result = sendQueuedMessageNow(sessionId, messageId, runSessionLoop);
+	if (!result.success) {
+		return { body: { success: false, promoted: false }, status: 404 };
+	}
+
+	return { body: result };
 }
 
 export async function removeSessionQueueMessage(

@@ -5,6 +5,7 @@ import {
 	Clock,
 	ListOrdered,
 	RotateCcw,
+	Send,
 	Trash2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -67,10 +68,12 @@ function getQueuedPreviews(
 
 function QueueRow({
 	item,
+	onSendNow,
 	onCancel,
 	onDelete,
 }: {
 	item: QueuedMessagePreview;
+	onSendNow: (item: QueuedMessagePreview) => void;
 	onCancel: (item: QueuedMessagePreview) => void;
 	onDelete: (item: QueuedMessagePreview) => void;
 }) {
@@ -83,6 +86,14 @@ function QueueRow({
 				{item.text}
 			</span>
 			<div className="flex items-center gap-1 flex-shrink-0">
+				<button
+					type="button"
+					onClick={() => onSendNow(item)}
+					className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+					title="Send now"
+				>
+					<Send className="h-3.5 w-3.5" />
+				</button>
 				<button
 					type="button"
 					onClick={() => onCancel(item)}
@@ -137,6 +148,16 @@ export const InputQueueBar = memo(function InputQueueBar({
 			queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
 		} catch (error) {
 			console.error('Failed to remove queued message:', error);
+		}
+	};
+
+	const sendQueuedItemNow = async (item: QueuedMessagePreview) => {
+		try {
+			await apiClient.sendQueuedMessageNow(sessionId, item.assistantMessageId);
+			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+			queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
+		} catch (error) {
+			console.error('Failed to send queued message now:', error);
 		}
 	};
 
@@ -224,6 +245,7 @@ export const InputQueueBar = memo(function InputQueueBar({
 									<QueueRow
 										key={item.assistantMessageId}
 										item={item}
+										onSendNow={sendQueuedItemNow}
 										onCancel={(queuedItem) =>
 											removeQueuedItem(queuedItem, true)
 										}

@@ -38,6 +38,23 @@ export type QueuedMessage = {
 	position: number;
 };
 
+export type SendNowPreemptReason = {
+	type: 'send-now-preempt';
+	nextMessageId: string;
+};
+
+/** Returns whether an abort reason came from the send-now preemption flow. */
+export function isSendNowPreemptReason(
+	value: unknown,
+): value is SendNowPreemptReason {
+	return (
+		Boolean(value) &&
+		typeof value === 'object' &&
+		(value as { type?: unknown }).type === 'send-now-preempt' &&
+		typeof (value as { nextMessageId?: unknown }).nextMessageId === 'string'
+	);
+}
+
 type RunnerState = {
 	queue: RunOpts[];
 	running: boolean;
@@ -196,6 +213,72 @@ export function removeFromQueue(sessionId: string, messageId: string): boolean {
 
 	publishQueueState(sessionId);
 	return true;
+}
+
+/**
+ * Moves a queued message to the front and silently preempts the active run.
+ */
+export function sendQueuedMessageNow(
+	sessionId: string,
+	messageId: string,
+	processQueueFn: (sessionId: string) => Promise<void>,
+):
+	| {
+			success: true;
+			promoted: boolean;
+			wasQueued: boolean;
+			wasRunning: boolean;
+			preemptedMessageId: string | null;
+	  }
+	| { success: false } {
+	const state = runners.get(sessionId);
+	if (!state) return { success: false };
+
+	if (state.currentMessageId === messageId) {
+		return {
+			success: true,
+			promoted: false,
+			wasQueued: false,
+			wasRunning: true,
+			preemptedMessageId: null,
+		};
+	}
+
+	const index = state.queue.findIndex(
+		(opts) => opts.assistantMessageId === messageId,
+	);
+	if (index === -1) return { success: false };
+
+	const [job] = state.queue.splice(index, 1);
+	state.queue.unshift(job);
+
+	const wasRunning = state.running && Boolean(state.currentMessageId);
+	const preemptedMessageId = wasRunning ? state.currentMessageId : null;
+
+	if (preemptedMessageId) {
+		const controller = messageAbortControllers.get(preemptedMessageId);
+		if (controller) {
+			controller.abort({
+				type: 'send-now-preempt',
+				nextMessageId: messageId,
+			} satisfies SendNowPreemptReason);
+			messageAbortControllers.delete(preemptedMessageId);
+		}
+	}
+
+	publishQueueState(sessionId);
+
+	if (!state.running) {
+		void processQueueFn(sessionId);
+	}
+
+	return {
+		success: true,
+		promoted: index > 0,
+		wasQueued: true,
+		wasRunning,
+		preemptedMessageId,
+	};
 }
 
 /**

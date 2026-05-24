@@ -4,6 +4,7 @@ import {
 	getSessionQueueState,
 	loadProjectDb,
 	removeSessionQueueMessage,
+	sendSessionQueuedMessageNow,
 } from './service.ts';
 
 export function registerSessionQueueRoutes(app: Hono) {
@@ -141,6 +142,96 @@ export function registerSessionQueueRoutes(app: Hono) {
 		async (c) => {
 			const sessionId = c.req.param('sessionId');
 			return c.json(getSessionQueueState(sessionId));
+		},
+	);
+
+	// Promote a queued message and preempt the active run without showing an abort error
+	openApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/sessions/{sessionId}/queue/{messageId}/send-now',
+			tags: ['sessions'],
+			operationId: 'sendQueuedMessageNow',
+			summary: 'Send a queued message now',
+			description:
+				'Promotes a queued message to run next and silently preempts the active assistant generation.',
+			parameters: [
+				{
+					in: 'path',
+					name: 'sessionId',
+					required: true,
+					schema: {
+						type: 'string',
+					},
+				},
+				{
+					in: 'path',
+					name: 'messageId',
+					required: true,
+					schema: {
+						type: 'string',
+					},
+				},
+			],
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								properties: {
+									success: {
+										type: 'boolean',
+									},
+									promoted: {
+										type: 'boolean',
+									},
+									wasQueued: {
+										type: 'boolean',
+									},
+									wasRunning: {
+										type: 'boolean',
+									},
+									preemptedMessageId: {
+										type: 'string',
+										nullable: true,
+									},
+								},
+								required: ['success', 'promoted'],
+							},
+						},
+					},
+				},
+				'404': {
+					description: 'Queued message not found',
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								properties: {
+									success: {
+										type: 'boolean',
+									},
+									promoted: {
+										type: 'boolean',
+									},
+								},
+								required: ['success', 'promoted'],
+							},
+						},
+					},
+				},
+			},
+		},
+		(c) => {
+			const sessionId = c.req.param('sessionId');
+			const messageId = c.req.param('messageId');
+			const result = sendSessionQueuedMessageNow(sessionId, messageId);
+			return result.status
+				? c.json(result.body, result.status)
+				: c.json(result.body);
 		},
 	);
 

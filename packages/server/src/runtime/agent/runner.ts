@@ -6,6 +6,7 @@ import {
 	setRunning,
 	dequeueJob,
 	cleanupSession,
+	isSendNowPreemptReason,
 } from '../session/queue.ts';
 import {
 	updateSessionTokensIncremental,
@@ -59,6 +60,7 @@ export {
 	abortSession,
 	abortMessage,
 	removeFromQueue,
+	sendQueuedMessageNow,
 	getQueueState,
 	getRunnerState,
 } from '../session/queue.ts';
@@ -182,6 +184,7 @@ async function runAssistant(opts: RunOpts) {
 	}
 
 	let _abortedByUser = false;
+	let sendNowPreemptHandled = false;
 	let titleGenerationTriggered = false;
 	const logFirstOutputLatency = createFirstOutputLatencyLogger({
 		opts,
@@ -280,8 +283,13 @@ async function runAssistant(opts: RunOpts) {
 
 	const baseOnAbort = createAbortHandler(opts, db, getStepIndex, sharedCtx);
 	const onAbort = async (event: Parameters<typeof baseOnAbort>[0]) => {
-		_abortedByUser = true;
+		const isSendNowPreempt = isSendNowPreemptReason(
+			(opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined)
+				?.reason,
+		);
+		_abortedByUser = !isSendNowPreempt;
 		await baseOnAbort(event);
+		sendNowPreemptHandled = isSendNowPreempt;
 	};
 
 	const onFinish = createFinishHandler(opts, db, completeAssistantMessage);
@@ -490,6 +498,24 @@ async function runAssistant(opts: RunOpts) {
 		}
 	} catch (err) {
 		unsubscribeFinish();
+		const isSendNowPreempt = isSendNowPreemptReason(
+			(opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined)
+				?.reason,
+		);
+		if (isSendNowPreempt) {
+			if (!sendNowPreemptHandled) {
+				await completeAssistantMessage({}, opts, db);
+				publish({
+					type: 'message.completed',
+					sessionId: opts.sessionId,
+					payload: {
+						id: opts.assistantMessageId,
+						finishReason: 'preempted',
+					},
+				});
+			}
+			return;
+		}
 		dump?.recordError(err);
 		logger.warn('[agent] assistant run failed', {
 			sessionId: opts.sessionId,

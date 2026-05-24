@@ -2,7 +2,7 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish } from '../../events/bus.ts';
-import type { RunOpts } from '../session/queue.ts';
+import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import type { AbortEvent } from './types.ts';
 
@@ -14,6 +14,38 @@ export function createAbortHandler(
 ) {
 	return async ({ steps }: AbortEvent) => {
 		const stepIndex = getStepIndex();
+		const abortReason = (
+			opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined
+		)?.reason;
+
+		if (isSendNowPreemptReason(abortReason)) {
+			await db
+				.update(messages)
+				.set({
+					status: 'complete',
+					completedAt: Date.now(),
+					error: null,
+					errorType: null,
+					errorDetails: JSON.stringify({
+						preemptedBy: abortReason.nextMessageId,
+						stepsCompleted: steps.length,
+						preemptedAt: Date.now(),
+					}),
+					isAborted: false,
+				})
+				.where(eq(messages.id, opts.assistantMessageId));
+
+			publish({
+				type: 'message.completed',
+				sessionId: opts.sessionId,
+				payload: {
+					id: opts.assistantMessageId,
+					finishReason: 'preempted',
+					preemptedBy: abortReason.nextMessageId,
+				},
+			});
+			return;
+		}
 
 		const abortPartId = crypto.randomUUID();
 		await db.insert(messageParts).values({

@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { APICallError } from 'ai';
 import { publish, publishClientEvent } from '../../events/bus.ts';
 import { toErrorPayload } from '../errors/handling.ts';
-import type { RunOpts } from '../session/queue.ts';
+import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import { pruneSession, performAutoCompaction } from '../message/compaction.ts';
 import { enqueueAssistantRun } from '../session/queue.ts';
@@ -18,6 +18,15 @@ export function createErrorHandler(
 	retryCallback?: (sessionId: string) => Promise<void>,
 ) {
 	return async (err: unknown) => {
+		if (
+			isSendNowPreemptReason(
+				(opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined)
+					?.reason,
+			)
+		) {
+			return;
+		}
+
 		const errorPayload = toErrorPayload(err);
 		const isApiError = APICallError.isInstance(err);
 		const stepIndex = getStepIndex();

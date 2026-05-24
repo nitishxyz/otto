@@ -358,7 +358,13 @@ export const MessageThread = memo(function MessageThread({
 
 	const filteredMessages = useMemo(() => {
 		const visibleMessages = messages.filter(
-			(message) => message.role !== 'system',
+			(message) =>
+				message.role !== 'system' &&
+				!(
+					message.role === 'assistant' &&
+					message.status === 'complete' &&
+					(message.parts?.length ?? 0) === 0
+				),
 		);
 		const queueBusy =
 			Boolean(queueState.currentMessageId) || queueState.queueLength > 0;

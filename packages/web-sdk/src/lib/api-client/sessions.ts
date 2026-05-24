@@ -159,6 +159,31 @@ export const sessionsMixin = {
 		return response.data as any;
 	},
 
+	async sendQueuedMessageNow(
+		sessionId: string,
+		messageId: string,
+	): Promise<{
+		success: boolean;
+		promoted: boolean;
+		wasQueued?: boolean;
+		wasRunning?: boolean;
+		preemptedMessageId?: string | null;
+	}> {
+		const response = await fetch(
+			`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/queue/${encodeURIComponent(messageId)}/send-now`,
+			{ method: 'POST' },
+		);
+		const data = await response.json().catch(() => null);
+		if (!response.ok) throw new Error(extractErrorMessage(data));
+		return data as {
+			success: boolean;
+			promoted: boolean;
+			wasQueued?: boolean;
+			wasRunning?: boolean;
+			preemptedMessageId?: string | null;
+		};
+	},
+
 	async getMessages(sessionId: string): Promise<Message[]> {
 		const response = await apiListMessages({ path: { id: sessionId } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
