@@ -97,12 +97,18 @@ function getPatchLineTones(patch: string): Map<number, CodeMirrorLineTone> {
 	return tones;
 }
 
-function FullHeightDiffView({ patch }: { patch: string }) {
+function FullHeightDiffView({
+	patch,
+	filePath,
+}: {
+	patch: string;
+	filePath: string;
+}) {
 	return (
 		<div className="bg-card/60 border border-border rounded-lg overflow-hidden h-full">
 			<CodeMirrorViewer
 				content={patch}
-				path="session.patch"
+				path={filePath}
 				lineTones={getPatchLineTones(patch)}
 			/>
 		</div>
@@ -329,7 +335,7 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 
 			<div className="flex-1 overflow-hidden p-4">
 				{patchContent ? (
-					<FullHeightDiffView patch={patchContent} />
+					<FullHeightDiffView patch={patchContent} filePath={selectedFile} />
 				) : (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						No diff content available

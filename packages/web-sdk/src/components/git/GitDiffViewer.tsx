@@ -114,7 +114,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				) : (
 					<CodeMirrorViewer
 						content={diff.diff}
-						path="diff.patch"
+						path={diff.file}
 						lineTones={getDiffLineTones(diff.diff)}
 					/>
 				)}
