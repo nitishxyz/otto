@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Hono } from 'hono';
 import {
 	getAuth,
@@ -10,6 +11,8 @@ import { setAuth } from '@ottocode/sdk';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import type { OAuth } from '@ottocode/sdk';
 import { openApiRoute } from '../openapi/route.ts';
+
+const USAGE_CACHE_TTL_MS = 60_000;
 
 async function ensureValidOAuth(
 	provider: ProviderId,
@@ -157,6 +160,74 @@ async function fetchOpenAIUsage(access: string, accountId?: string) {
 	};
 }
 
+type ProviderUsage =
+	| Awaited<ReturnType<typeof fetchAnthropicUsage>>
+	| Awaited<ReturnType<typeof fetchOpenAIUsage>>;
+
+type UsageCacheEntry = {
+	data?: ProviderUsage;
+	fetchedAt?: number;
+	inflight?: Promise<ProviderUsage>;
+};
+
+const usageCache = new Map<string, UsageCacheEntry>();
+
+function usageCacheIdentity(oauth: OAuth) {
+	return (
+		oauth.accountId ?? createHash('sha256').update(oauth.refresh).digest('hex')
+	);
+}
+
+function usageCacheKey(provider: ProviderId, oauth: OAuth) {
+	return [provider, usageCacheIdentity(oauth)].join(':');
+}
+
+async function fetchProviderUsage(
+	provider: ProviderId,
+	tokenResult: { access: string; oauth: OAuth },
+) {
+	const cacheKey = usageCacheKey(provider, tokenResult.oauth);
+	const now = Date.now();
+	const cached = usageCache.get(cacheKey);
+
+	if (
+		cached?.data &&
+		cached.fetchedAt &&
+		now - cached.fetchedAt < USAGE_CACHE_TTL_MS
+	) {
+		return cached.data;
+	}
+
+	if (cached?.inflight) return cached.inflight;
+
+	const inflight =
+		provider === 'anthropic'
+			? fetchAnthropicUsage(tokenResult.access)
+			: fetchOpenAIUsage(tokenResult.access, tokenResult.oauth.accountId);
+
+	usageCache.set(cacheKey, {
+		data: cached?.data,
+		fetchedAt: cached?.fetchedAt,
+		inflight,
+	});
+
+	try {
+		const data = await inflight;
+		usageCache.set(cacheKey, { data, fetchedAt: Date.now() });
+		return data;
+	} catch (error) {
+		if (cached?.data && cached.fetchedAt) {
+			usageCache.set(cacheKey, {
+				data: cached.data,
+				fetchedAt: cached.fetchedAt,
+			});
+		} else {
+			usageCache.delete(cacheKey);
+		}
+		throw error;
+	}
+}
+
 export function registerProviderUsageRoutes(app: Hono) {
 	openApiRoute(
 		app,
@@ -296,13 +367,8 @@ export function registerProviderUsageRoutes(app: Hono) {
 					);
 				}
 
-				const usage =
-					provider === 'anthropic'
-						? await fetchAnthropicUsage(tokenResult.access)
-						: await fetchOpenAIUsage(
-								tokenResult.access,
-								tokenResult.oauth.accountId,
-							);
+				const usage = await fetchProviderUsage(provider, tokenResult);
+				c.header('Cache-Control', 'private, max-age=60');
 
 				return c.json(usage);
 			} catch (error) {
