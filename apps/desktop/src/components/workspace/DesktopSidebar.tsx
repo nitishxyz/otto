@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePanelWidthStore, useSidebarStore } from '@ottocode/web-sdk/stores';
@@ -8,6 +8,9 @@ const PANEL_KEY = 'desktop-left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
+const LEFT_SIDEBAR_HOVER_RATIO = 0.05;
+const HOVER_SHOW_DELAY_MS = 260;
+const HOVER_HIDE_DELAY_MS = 120;
 
 interface DesktopSidebarProps {
 	children: ReactNode;
@@ -27,6 +30,13 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
+	const [isAutoVisible, setIsAutoVisible] = useState(false);
+	const [isHoverPending, setIsHoverPending] = useState(false);
+	const isAutoVisibleRef = useRef(false);
+	const autoShowTimeoutRef = useRef<number | null>(null);
+	const autoHideTimeoutRef = useRef<number | null>(null);
+	const shouldShowSidebar = !isCollapsed || isAutoVisible;
+	const shouldShowEdgeHint = isCollapsed && isHoverPending && !isAutoVisible;
 	const sidebarStyle = {
 		'--expanded-sidebar-width': `${panelWidth}px`,
 		maxWidth: '100%',
@@ -43,17 +53,112 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 		};
 	}, [isCollapsed]);
 
+	useEffect(() => {
+		const setAutoVisible = (visible: boolean) => {
+			isAutoVisibleRef.current = visible;
+			setIsAutoVisible(visible);
+		};
+
+		const clearHoverTimeouts = () => {
+			if (autoShowTimeoutRef.current !== null) {
+				window.clearTimeout(autoShowTimeoutRef.current);
+				autoShowTimeoutRef.current = null;
+			}
+			if (autoHideTimeoutRef.current !== null) {
+				window.clearTimeout(autoHideTimeoutRef.current);
+				autoHideTimeoutRef.current = null;
+			}
+		};
+
+		const scheduleAutoVisible = (visible: boolean) => {
+			if (isAutoVisibleRef.current === visible) {
+				setIsHoverPending(false);
+				return;
+			}
+
+			setIsHoverPending(visible);
+			const delay = visible ? HOVER_SHOW_DELAY_MS : HOVER_HIDE_DELAY_MS;
+			const targetRef = visible ? autoShowTimeoutRef : autoHideTimeoutRef;
+			const oppositeRef = visible ? autoHideTimeoutRef : autoShowTimeoutRef;
+
+			if (oppositeRef.current !== null) {
+				window.clearTimeout(oppositeRef.current);
+				oppositeRef.current = null;
+			}
+
+			if (targetRef.current !== null) return;
+
+			targetRef.current = window.setTimeout(() => {
+				setAutoVisible(visible);
+				setIsHoverPending(false);
+				targetRef.current = null;
+			}, delay);
+		};
+
+		if (!isCollapsed) {
+			clearHoverTimeouts();
+			setIsHoverPending(false);
+			setAutoVisible(false);
+			return;
+		}
+
+		const handleMouseMove = (event: MouseEvent) => {
+			const triggerWidth = window.innerWidth * LEFT_SIDEBAR_HOVER_RATIO;
+			const activeWidth = isAutoVisibleRef.current
+				? Math.max(triggerWidth, panelWidth)
+				: triggerWidth;
+			scheduleAutoVisible(event.clientX <= activeWidth);
+		};
+		const handleMouseLeave = () => {
+			clearHoverTimeouts();
+			setIsHoverPending(false);
+			setAutoVisible(false);
+		};
+		const handleMouseOut = (event: MouseEvent) => {
+			if (!event.relatedTarget) {
+				handleMouseLeave();
+			}
+		};
+
+		window.addEventListener('mousemove', handleMouseMove);
+		window.addEventListener('mouseout', handleMouseOut);
+		window.addEventListener('blur', handleMouseLeave);
+		document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+		return () => {
+			clearHoverTimeouts();
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseout', handleMouseOut);
+			window.removeEventListener('blur', handleMouseLeave);
+			document.documentElement.removeEventListener(
+				'mouseleave',
+				handleMouseLeave,
+			);
+		};
+	}, [isCollapsed, panelWidth]);
+
 	return (
 		<>
+			<div
+				className={`pointer-events-none fixed inset-y-0 left-0 z-40 hidden w-24 origin-left transition-[opacity,transform] duration-300 ease-out md:block ${
+					shouldShowEdgeHint
+						? 'opacity-50 scale-x-100'
+						: 'opacity-0 scale-x-[0.35]'
+				}`}
+				aria-hidden="true"
+			>
+				<div className="h-full w-full bg-[radial-gradient(ellipse_at_left,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
+			</div>
 			<aside
 				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full ${
-					isCollapsed
-						? 'hidden md:flex md:w-0 md:border-transparent md:bg-background md:pointer-events-none'
-						: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+					shouldShowSidebar
+						? isCollapsed
+							? 'hidden md:flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+							: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+						: 'hidden md:flex md:w-0 md:border-transparent md:bg-background md:pointer-events-none'
 				}`}
 				style={sidebarStyle}
-				aria-hidden={isCollapsed}
-				inert={isCollapsed ? true : undefined}
+				aria-hidden={!shouldShowSidebar}
+				inert={!shouldShowSidebar ? true : undefined}
 			>
 				<div className="flex h-full w-full shrink-0 flex-col min-w-0 relative md:w-[var(--expanded-sidebar-width)] md:min-w-[var(--expanded-sidebar-width)]">
 					<div className="h-14 border-b border-sidebar-border px-4 flex items-center gap-2 md:hidden bg-sidebar">

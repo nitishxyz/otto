@@ -41,6 +41,9 @@ import { DesktopSidebar } from './DesktopSidebar';
 
 const VIEWER_CHAT_WIDTH = 'clamp(360px, 28vw, 520px)';
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
+const RIGHT_RAIL_HOVER_RATIO = 0.1;
+const HOVER_SHOW_DELAY_MS = 260;
+const HOVER_HIDE_DELAY_MS = 120;
 
 interface DesktopAppLayoutProps {
 	sidebar: ReactNode;
@@ -93,6 +96,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 					: RIGHT_PANEL_DEFAULT_WIDTH;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousRightPanelOpenRef = useRef(anyRightPanelOpen);
+	const isRightRailVisibleRef = useRef(false);
+	const rightRailShowTimeoutRef = useRef<number | null>(null);
+	const rightRailHideTimeoutRef = useRef<number | null>(null);
 	const [isRightPanelMounted, setIsRightPanelMounted] =
 		useState(anyRightPanelOpen);
 	const [rightPanelWidth, setRightPanelWidth] = useState(
@@ -100,6 +106,8 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	);
 	const [isRightPanelTransitioning, setIsRightPanelTransitioning] =
 		useState(false);
+	const [isRightRailVisible, setIsRightRailVisible] = useState(false);
+	const [isRightRailHoverPending, setIsRightRailHoverPending] = useState(false);
 	const shouldAnimateViewer = previousViewerOpenRef.current !== anyViewerOpen;
 	const mainPaneStyle = {
 		width: anyViewerOpen ? VIEWER_CHAT_WIDTH : '100%',
@@ -111,6 +119,8 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		width: `${rightPanelWidth}px`,
 	} as CSSProperties;
 	const shouldRenderRightPanel = anyRightPanelOpen || isRightPanelMounted;
+	const shouldShowRightRail = anyRightPanelOpen || isRightRailVisible;
+	const shouldShowRightEdgeHint = isRightRailHoverPending || isRightRailVisible;
 
 	// Auto-collapse sessions list when any right-side surface is open,
 	// and restore the user's previous state when everything closes.
@@ -170,12 +180,99 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		previousViewerOpenRef.current = anyViewerOpen;
 	}, [anyViewerOpen]);
 
+	useEffect(() => {
+		const setRailVisible = (visible: boolean) => {
+			isRightRailVisibleRef.current = visible;
+			setIsRightRailVisible(visible);
+		};
+
+		const clearHoverTimeouts = () => {
+			if (rightRailShowTimeoutRef.current !== null) {
+				window.clearTimeout(rightRailShowTimeoutRef.current);
+				rightRailShowTimeoutRef.current = null;
+			}
+			if (rightRailHideTimeoutRef.current !== null) {
+				window.clearTimeout(rightRailHideTimeoutRef.current);
+				rightRailHideTimeoutRef.current = null;
+			}
+		};
+
+		const scheduleRailVisible = (visible: boolean) => {
+			if (isRightRailVisibleRef.current === visible) {
+				setIsRightRailHoverPending(false);
+				return;
+			}
+
+			setIsRightRailHoverPending(visible);
+			const delay = visible ? HOVER_SHOW_DELAY_MS : HOVER_HIDE_DELAY_MS;
+			const targetRef = visible
+				? rightRailShowTimeoutRef
+				: rightRailHideTimeoutRef;
+			const oppositeRef = visible
+				? rightRailHideTimeoutRef
+				: rightRailShowTimeoutRef;
+
+			if (oppositeRef.current !== null) {
+				window.clearTimeout(oppositeRef.current);
+				oppositeRef.current = null;
+			}
+
+			if (targetRef.current !== null) return;
+
+			targetRef.current = window.setTimeout(() => {
+				setRailVisible(visible);
+				setIsRightRailHoverPending(false);
+				targetRef.current = null;
+			}, delay);
+		};
+
+		const handleMouseMove = (event: MouseEvent) => {
+			const hoverWidth = window.innerWidth * RIGHT_RAIL_HOVER_RATIO;
+			scheduleRailVisible(window.innerWidth - event.clientX <= hoverWidth);
+		};
+		const handleMouseLeave = () => {
+			clearHoverTimeouts();
+			setIsRightRailHoverPending(false);
+			setRailVisible(false);
+		};
+		const handleMouseOut = (event: MouseEvent) => {
+			if (!event.relatedTarget) {
+				handleMouseLeave();
+			}
+		};
+
+		window.addEventListener('mousemove', handleMouseMove);
+		window.addEventListener('mouseout', handleMouseOut);
+		window.addEventListener('blur', handleMouseLeave);
+		document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+		return () => {
+			clearHoverTimeouts();
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseout', handleMouseOut);
+			window.removeEventListener('blur', handleMouseLeave);
+			document.documentElement.removeEventListener(
+				'mouseleave',
+				handleMouseLeave,
+			);
+		};
+	}, []);
+
 	return (
 		<div className="h-full flex bg-background touch-manipulation border-t border-border/50">
 			<DesktopSidebar onNewSession={onNewSession}>{sidebar}</DesktopSidebar>
 
 			<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
-				<div className="flex-1 flex overflow-hidden">
+				<div className="flex-1 flex overflow-hidden relative">
+					<div
+						className={`pointer-events-none absolute inset-y-0 right-0 z-30 hidden w-12 origin-right transition-[opacity,transform] duration-300 ease-out md:block ${
+							shouldShowRightEdgeHint
+								? 'opacity-50 scale-x-100'
+								: 'opacity-0 scale-x-[0.35]'
+						}`}
+						aria-hidden="true"
+					>
+						<div className="h-full w-full bg-[radial-gradient(ellipse_at_right,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
+					</div>
 					<div className="flex min-w-0 flex-1 overflow-hidden">
 						<main
 							className={`relative shrink-0 flex-col overflow-hidden min-w-0 ${
@@ -224,9 +321,25 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								<SkillsSidebar />
 							</div>
 						</div>
+					</div>
 
+					<div
+						className={`relative z-40 hidden h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out md:block ${
+							shouldShowRightRail
+								? 'w-12 pointer-events-auto'
+								: 'w-0 pointer-events-none'
+						}`}
+					>
 						<div
-							className={`flex flex-col w-12 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
+							className={`flex h-full w-12 flex-col border-l shadow-xl transition-[opacity,transform] duration-150 ease-out ${
+								shouldShowRightRail
+									? 'translate-x-0 opacity-100 pointer-events-auto'
+									: 'translate-x-2 opacity-0 pointer-events-none'
+							} ${
+								anyRightPanelOpen
+									? 'sidebar-fade-in border-sidebar-border'
+									: 'bg-background border-border'
+							}`}
 						>
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />

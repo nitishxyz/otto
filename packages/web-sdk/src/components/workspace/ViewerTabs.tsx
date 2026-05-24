@@ -380,7 +380,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 
 	return (
 		<section className="h-full w-full min-w-0 bg-sidebar flex flex-col">
-			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden overscroll-x-contain">
+			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
 				{tabs.map((tab) => {
 					const isActive = tab.id === activeTab.id;
 					return (
