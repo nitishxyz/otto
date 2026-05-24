@@ -829,6 +829,12 @@ export function useSessionStream(
 				typeof payload?.messageId === 'string' ? payload.messageId : null;
 			const partId =
 				typeof payload?.partId === 'string' ? payload.partId : null;
+			const payloadType =
+				typeof payload?.type === 'string' ? payload.type : undefined;
+			if (payloadType === 'error') {
+				upsertErrorPart(payload);
+				return;
+			}
 			const delta = typeof payload?.delta === 'string' ? payload.delta : null;
 			if (!messageId || !partId || delta === null) return;
 			queryClient.setQueryData<Message[]>(
@@ -878,6 +884,115 @@ export function useSessionStream(
 						};
 					}
 					nextMessages[messageIndex] = { ...targetMessage, parts };
+					return nextMessages;
+				},
+			);
+		};
+
+		const toRecord = (value: unknown): Record<string, unknown> | null => {
+			if (value && typeof value === 'object' && !Array.isArray(value)) {
+				return value as Record<string, unknown>;
+			}
+			return null;
+		};
+
+		const parseErrorContent = (
+			payload: Record<string, unknown>,
+		): Record<string, unknown> => {
+			const contentRecord = toRecord(payload.content);
+			if (contentRecord) return contentRecord;
+
+			if (typeof payload.content === 'string') {
+				try {
+					const parsed = JSON.parse(payload.content);
+					const parsedRecord = toRecord(parsed);
+					if (parsedRecord) return parsedRecord;
+				} catch {}
+			}
+
+			const message =
+				typeof payload.error === 'string'
+					? payload.error
+					: typeof payload.message === 'string'
+						? payload.message
+						: 'Assistant run failed';
+			return {
+				message,
+				type:
+					typeof payload.errorType === 'string' ? payload.errorType : 'error',
+				details: toRecord(payload.details) ?? undefined,
+				isAborted: payload.isAborted === true,
+				autoCompacted: payload.autoCompacted === true,
+			};
+		};
+
+		const upsertErrorPart = (payload: Record<string, unknown> | undefined) => {
+			const messageId =
+				typeof payload?.messageId === 'string' ? payload.messageId : null;
+			if (!payload || !messageId) return;
+
+			const contentJson = parseErrorContent(payload);
+			const content = JSON.stringify(contentJson);
+			const errorMessage =
+				typeof contentJson.message === 'string'
+					? contentJson.message
+					: typeof payload.error === 'string'
+						? payload.error
+						: 'Assistant run failed';
+			const stepIndex =
+				typeof payload.stepIndex === 'number' ? payload.stepIndex : null;
+			const partId =
+				typeof payload.partId === 'string'
+					? payload.partId
+					: `error-${messageId}`;
+
+			queryClient.setQueryData<Message[]>(
+				['messages', sessionId],
+				(oldMessages) => {
+					if (!oldMessages) return oldMessages;
+					const nextMessages = [...oldMessages];
+					const messageIndex = nextMessages.findIndex(
+						(message) => message.id === messageId,
+					);
+					if (messageIndex === -1) return oldMessages;
+					const targetMessage = nextMessages[messageIndex];
+					const parts = targetMessage.parts ? [...targetMessage.parts] : [];
+					const partIndex = parts.findIndex((part) => part.id === partId);
+					if (partIndex === -1) {
+						const newPart: MessagePart = {
+							id: partId,
+							messageId,
+							index: getOptimisticPartIndex(parts, stepIndex),
+							stepIndex,
+							type: 'error',
+							content,
+							contentJson,
+							agent: targetMessage.agent,
+							provider: targetMessage.provider,
+							model: targetMessage.model,
+							startedAt: Date.now(),
+							completedAt: Date.now(),
+							toolName: null,
+							toolCallId: null,
+							toolDurationMs: null,
+						};
+						parts.push(newPart);
+					} else {
+						parts[partIndex] = {
+							...parts[partIndex],
+							content,
+							contentJson,
+							stepIndex: stepIndex ?? parts[partIndex].stepIndex ?? null,
+							completedAt: Date.now(),
+						};
+					}
+					nextMessages[messageIndex] = {
+						...targetMessage,
+						status: 'error',
+						completedAt: targetMessage.completedAt ?? Date.now(),
+						error: errorMessage,
+						parts,
+					};
 					return nextMessages;
 				},
 			);
@@ -1493,28 +1608,7 @@ export function useSessionStream(
 							assistantMessageIdRef.current = null;
 						}
 						clearEphemeralForMessage(messageId);
-						const errorMessage =
-							typeof payload?.error === 'string'
-								? payload.error
-								: typeof payload?.message === 'string'
-									? payload.message
-									: 'Assistant run failed';
-						queryClient.setQueryData<Message[]>(
-							['messages', sessionId],
-							(oldMessages) => {
-								if (!oldMessages) return oldMessages;
-								const idx = oldMessages.findIndex((m) => m.id === messageId);
-								if (idx === -1) return oldMessages;
-								const next = [...oldMessages];
-								next[idx] = {
-									...next[idx],
-									status: 'error',
-									completedAt: next[idx].completedAt ?? Date.now(),
-									error: errorMessage,
-								};
-								return next;
-							},
-						);
+						upsertErrorPart(payload);
 					}
 					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 					break;
