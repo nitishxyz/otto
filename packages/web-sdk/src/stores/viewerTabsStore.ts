@@ -233,9 +233,11 @@ function buildAnnotation(
 	}
 
 	const lineTones: Array<[number, 'add' | 'remove']> | undefined = preview
-		.changedLines?.length
-		? preview.changedLines.map((line) => [line, 'add'])
-		: preview.previewLineTones;
+		.previewLineTones?.length
+		? preview.previewLineTones
+		: preview.changedLines?.length
+			? preview.changedLines.map((line) => [line, 'add'])
+			: existing?.lineTones;
 	if (!lineTones?.length) return existing;
 	return {
 		id,

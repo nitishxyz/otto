@@ -1,16 +1,7 @@
+import { Icon, addCollection } from '@iconify/react';
+import { icons as materialIconTheme } from '@iconify-json/material-icon-theme';
 import { memo, useEffect } from 'react';
-import {
-	Braces,
-	File,
-	FileCode,
-	FileJson,
-	FileText,
-	FileType,
-	GitCommit,
-	Image,
-	Settings,
-	X,
-} from 'lucide-react';
+import { GitCommit, X } from 'lucide-react';
 import {
 	useViewerTabsStore,
 	type ViewerTab,
@@ -21,6 +12,169 @@ import { SessionFilesDiffPanel } from '../session-files/SessionFilesDiffPanel';
 import { FileViewerPanel } from '../file-browser/FileViewerPanel';
 import { SkillViewerPanel } from '../skills/SkillViewerPanel';
 import { ToolPreviewPanel } from './ToolPreviewPanel';
+
+addCollection(materialIconTheme);
+
+const ICON_CLASS = 'h-3.5 w-3.5 shrink-0';
+
+const FILENAME_ICON_MAP: Record<string, string> = {
+	'.dockerignore': 'docker',
+	'.editorconfig': 'editorconfig',
+	'.env': 'settings',
+	'.env.example': 'settings',
+	'.env.local': 'settings',
+	'.eslintignore': 'eslint',
+	'.eslintrc': 'eslint',
+	'.gitattributes': 'git',
+	'.gitignore': 'git',
+	'.prettierrc': 'prettier',
+	'astro.config.mjs': 'astro-config',
+	'astro.config.ts': 'astro-config',
+	'biome.json': 'biome',
+	'bun.lock': 'bun',
+	'bun.lockb': 'bun',
+	'bunfig.toml': 'bun',
+	'cargo.lock': 'lock',
+	'cargo.toml': 'rust',
+	'compose.yaml': 'docker',
+	'compose.yml': 'docker',
+	'docker-compose.yaml': 'docker',
+	'docker-compose.yml': 'docker',
+	dockerfile: 'docker',
+	'eslint.config.js': 'eslint',
+	'eslint.config.mjs': 'eslint',
+	'eslint.config.ts': 'eslint',
+	gemfile: 'gemfile',
+	'go.mod': 'go-mod',
+	'go.sum': 'go-mod',
+	'jsconfig.json': 'jsconfig',
+	license: 'license',
+	makefile: 'makefile',
+	'next.config.js': 'next',
+	'next.config.mjs': 'next',
+	'next.config.ts': 'next',
+	'package-lock.json': 'npm',
+	'package.json': 'npm',
+	'pnpm-lock.yaml': 'pnpm',
+	'postcss.config.js': 'postcss',
+	'postcss.config.mjs': 'postcss',
+	'postcss.config.ts': 'postcss',
+	'prettier.config.js': 'prettier',
+	'prettier.config.mjs': 'prettier',
+	'prettier.config.ts': 'prettier',
+	'readme.md': 'readme',
+	'readme.mdx': 'readme',
+	'rollup.config.js': 'rollup',
+	'rollup.config.mjs': 'rollup',
+	'rollup.config.ts': 'rollup',
+	'svelte.config.js': 'svelte',
+	'svelte.config.ts': 'svelte',
+	'tailwind.config.js': 'tailwindcss',
+	'tailwind.config.ts': 'tailwindcss',
+	'tauri.conf.json': 'tauri',
+	'tsconfig.json': 'tsconfig',
+	'vite.config.js': 'vite',
+	'vite.config.mjs': 'vite',
+	'vite.config.ts': 'vite',
+	'vitest.config.js': 'vitest',
+	'vitest.config.mjs': 'vitest',
+	'vitest.config.ts': 'vitest',
+	'vue.config.js': 'vue-config',
+	'vue.config.ts': 'vue-config',
+	'yarn.lock': 'lock',
+};
+
+const EXTENSION_ICON_MAP: Record<string, string> = {
+	ai: 'image',
+	astro: 'astro',
+	avif: 'image',
+	bash: 'console',
+	bmp: 'image',
+	c: 'c',
+	cc: 'cpp',
+	clj: 'clojure',
+	cljc: 'clojure',
+	cljs: 'clojure',
+	cpp: 'cpp',
+	cs: 'csharp',
+	css: 'css',
+	cxx: 'cpp',
+	dart: 'dart',
+	dockerfile: 'docker',
+	ex: 'elixir',
+	exs: 'elixir',
+	erl: 'erlang',
+	fish: 'console',
+	gif: 'image',
+	go: 'go',
+	graphql: 'graphql',
+	gql: 'graphql',
+	groovy: 'groovy',
+	h: 'c',
+	hpp: 'cpp',
+	hrl: 'erlang',
+	hs: 'haskell',
+	htm: 'html',
+	html: 'html',
+	hxx: 'cpp',
+	ico: 'favicon',
+	java: 'java',
+	jpeg: 'image',
+	jpg: 'image',
+	js: 'javascript',
+	json: 'json',
+	jsonc: 'json',
+	jsx: 'react',
+	jl: 'julia',
+	kt: 'kotlin',
+	kts: 'kotlin',
+	less: 'less',
+	log: 'log',
+	lua: 'lua',
+	luau: 'luau',
+	mjs: 'javascript',
+	ml: 'ocaml',
+	mli: 'ocaml',
+	mov: 'video',
+	mp3: 'audio',
+	mp4: 'video',
+	md: 'markdown',
+	mdx: 'markdown',
+	nim: 'nim',
+	pdf: 'pdf',
+	php: 'php-elephant',
+	png: 'image',
+	prisma: 'prisma',
+	proto: 'proto',
+	ps1: 'powershell',
+	py: 'python',
+	pyw: 'python',
+	r: 'r',
+	rb: 'ruby',
+	rs: 'rust',
+	sass: 'sass',
+	scala: 'scala',
+	scss: 'sass',
+	sh: 'console',
+	sql: 'database',
+	svg: 'svg',
+	svelte: 'svelte',
+	swift: 'swift',
+	toml: 'toml',
+	ts: 'typescript',
+	tsx: 'react-ts',
+	txt: 'document',
+	vue: 'vue',
+	wav: 'audio',
+	webm: 'video',
+	webp: 'image',
+	xml: 'xml',
+	yaml: 'yaml',
+	yml: 'yaml',
+	zig: 'zig',
+	zip: 'zip',
+	zsh: 'console',
+};
 
 function tabKindLabel(tab: ViewerTab): string {
 	switch (tab.type) {
@@ -54,79 +208,43 @@ function getFileExtension(path: string): string {
 	return extension && extension !== path.toLowerCase() ? extension : '';
 }
 
-function renderLanguageIcon(extension: string) {
-	switch (extension) {
-		case 'ts':
-		case 'tsx':
-			return (
-				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center bg-[#3178c6] text-[7px] font-bold leading-none text-white">
-					TS
-				</span>
-			);
-		case 'js':
-		case 'jsx':
-		case 'mjs':
-		case 'cjs':
-			return (
-				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center bg-[#f7df1e] text-[7px] font-bold leading-none text-black">
-					JS
-				</span>
-			);
-		case 'py':
-			return (
-				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] bg-gradient-to-br from-[#3776ab] to-[#ffd43b] text-[7px] font-bold leading-none text-white">
-					Py
-				</span>
-			);
-		case 'go':
-			return (
-				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#00add8] text-[7px] font-bold leading-none text-white">
-					Go
-				</span>
-			);
-		case 'rs':
-			return (
-				<span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#ce422b] text-[8px] font-bold leading-none text-white">
-					R
-				</span>
-			);
-		case 'json':
-			return <FileJson className="h-3.5 w-3.5 shrink-0 text-yellow-500" />;
-		case 'md':
-		case 'mdx':
-			return <FileText className="h-3.5 w-3.5 shrink-0 text-sky-500" />;
-		case 'env':
-		case 'toml':
-		case 'yaml':
-		case 'yml':
-			return <Settings className="h-3.5 w-3.5 shrink-0 text-violet-500" />;
-		case 'css':
-		case 'scss':
-		case 'sass':
-		case 'less':
-			return <Braces className="h-3.5 w-3.5 shrink-0 text-blue-500" />;
-		case 'html':
-		case 'xml':
-			return <FileType className="h-3.5 w-3.5 shrink-0 text-orange-500" />;
-		case 'png':
-		case 'jpg':
-		case 'jpeg':
-		case 'gif':
-		case 'svg':
-		case 'webp':
-			return <Image className="h-3.5 w-3.5 shrink-0 text-pink-500" />;
-		case 'txt':
-		case 'log':
-			return (
-				<FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-			);
-		default:
-			return extension ? (
-				<FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-			) : (
-				<File className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-			);
+function getFileName(path: string): string {
+	return path.split(/[\\/]/).pop()?.toLowerCase() ?? path.toLowerCase();
+}
+
+function getIconNameForPath(path: string): string {
+	const fileName = getFileName(path);
+	const fileIcon = FILENAME_ICON_MAP[fileName];
+	if (fileIcon) return fileIcon;
+
+	if (fileName.endsWith('.d.ts')) return 'typescript-def';
+	if (fileName.endsWith('.test.ts') || fileName.endsWith('.spec.ts')) {
+		return 'test-ts';
 	}
+	if (fileName.endsWith('.test.js') || fileName.endsWith('.spec.js')) {
+		return 'test-js';
+	}
+	if (
+		fileName.endsWith('.test.jsx') ||
+		fileName.endsWith('.spec.jsx') ||
+		fileName.endsWith('.test.tsx') ||
+		fileName.endsWith('.spec.tsx')
+	) {
+		return 'test-jsx';
+	}
+
+	const extension = getFileExtension(fileName);
+	return EXTENSION_ICON_MAP[extension] ?? 'document';
+}
+
+function renderFileIcon(path: string) {
+	return (
+		<Icon
+			aria-hidden="true"
+			className={ICON_CLASS}
+			icon={`material-icon-theme:${getIconNameForPath(path)}`}
+		/>
+	);
 }
 
 function renderTabIcon(tab: ViewerTab) {
@@ -158,11 +276,11 @@ function renderTabIcon(tab: ViewerTab) {
 		);
 	}
 
-	const extension = getFileExtension(getTabPath(tab));
+	const path = getTabPath(tab);
 
 	return (
 		<span className="shrink-0 inline-flex items-center text-muted-foreground/80">
-			{renderLanguageIcon(extension)}
+			{renderFileIcon(path)}
 		</span>
 	);
 }

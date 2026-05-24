@@ -634,7 +634,8 @@ function getResultChangePaths(
 
 export function extractPathsFromPatch(patch: string): string[] {
 	const paths: string[] = [];
-	const regex = /\*\*\* (?:Update|Add|Delete) File: (.+)/g;
+	const regex =
+		/\*\*\* (?:(?:Update|Add|Delete) File|Replace in|Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)/g;
 	let match: RegExpExecArray | null = regex.exec(patch);
 	while (match !== null) {
 		paths.push(match[1].trim());

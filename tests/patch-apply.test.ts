@@ -34,6 +34,84 @@ async function applyPatch(
 	});
 }
 
+describe('patch apply — line-number mode', () => {
+	it('deletes an inclusive line range without requiring removed text', async () => {
+		await writeTestFile(
+			'lines.txt',
+			['one', 'two', 'three', 'four', 'five'].join('\n'),
+		);
+
+		const result = await applyPatch(
+			[
+				'*** Begin Patch',
+				'*** Delete Lines in: lines.txt',
+				'*** Lines: 2-4',
+				'*** End Patch',
+			].join('\n'),
+		);
+
+		expect(await readTestFile('lines.txt')).toBe('one\nfive\n');
+		expect(result.summary).toMatchObject({
+			files: 1,
+			additions: 0,
+			deletions: 3,
+		});
+		expect(result.normalizedPatch).toContain('-two');
+		expect(result.normalizedPatch).toContain('-four');
+	});
+
+	it('replaces a line range through eof with new content', async () => {
+		await writeTestFile(
+			'replace.txt',
+			['alpha', 'beta', 'gamma', 'delta'].join('\n'),
+		);
+
+		const result = await applyPatch(
+			[
+				'*** Begin Patch',
+				'*** Replace Lines in: replace.txt',
+				'*** Lines: 3-eof',
+				'*** With:',
+				'GAMMA',
+				'DELTA',
+				'*** End Patch',
+			].join('\n'),
+		);
+
+		expect(await readTestFile('replace.txt')).toBe(
+			'alpha\nbeta\nGAMMA\nDELTA\n',
+		);
+		expect(result.summary).toMatchObject({
+			files: 1,
+			additions: 2,
+			deletions: 2,
+		});
+	});
+
+	it('inserts content before and after explicit line numbers', async () => {
+		await writeTestFile('before.txt', ['a', 'b', 'c'].join('\n'));
+		await writeTestFile('after.txt', ['a', 'b', 'c'].join('\n'));
+
+		await applyPatch(
+			[
+				'*** Begin Patch',
+				'*** Insert Before in: before.txt',
+				'*** Line: 2',
+				'*** With:',
+				'x',
+				'*** Insert After in: after.txt',
+				'*** Line: 2',
+				'*** With:',
+				'y',
+				'*** End Patch',
+			].join('\n'),
+		);
+
+		expect(await readTestFile('before.txt')).toBe('a\nx\nb\nc\n');
+		expect(await readTestFile('after.txt')).toBe('a\nb\ny\nc\n');
+	});
+});
+
 describe('patch apply — stale context rejection', () => {
 	it('rejects patch when context line has extra content (the || bug)', async () => {
 		await writeTestFile(

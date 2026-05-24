@@ -2,8 +2,14 @@ import {
 	PATCH_ADD_PREFIX,
 	PATCH_BEGIN_MARKER,
 	PATCH_DELETE_PREFIX,
+	PATCH_DELETE_LINES_PREFIX,
 	PATCH_END_MARKER,
 	PATCH_FIND_MARKER,
+	PATCH_INSERT_AFTER_PREFIX,
+	PATCH_INSERT_BEFORE_PREFIX,
+	PATCH_LINE_MARKER,
+	PATCH_LINES_MARKER,
+	PATCH_REPLACE_LINES_PREFIX,
 	PATCH_REPLACE_PREFIX,
 	PATCH_UPDATE_PREFIX,
 	PATCH_WITH_MARKER,
@@ -20,6 +26,9 @@ import type {
 	PatchDeleteOperation,
 	PatchHunk,
 	PatchHunkLine,
+	PatchLineDeleteOperation,
+	PatchLineInsertOperation,
+	PatchLineReplaceOperation,
 	PatchOperation,
 	PatchUpdateOperation,
 } from './types.ts';
@@ -35,6 +44,62 @@ function parseDirectivePath(line: string, prefix: string): string {
 	return filePath;
 }
 
+function parsePositiveLineNumber(value: string, label: string): number {
+	const trimmed = value.trim();
+	if (!/^\d+$/.test(trimmed)) {
+		throw new Error(`${label} must be a positive integer.`);
+	}
+	const line = Number.parseInt(trimmed, 10);
+	if (line < 1) {
+		throw new Error(`${label} must be a positive integer.`);
+	}
+	return line;
+}
+
+function parseLineRange(value: string): {
+	startLine: number;
+	endLine: number | 'end';
+} {
+	const trimmed = value.trim();
+	const match = /^(\d+)(?:\s*-\s*(\d+|end|eof|\$))?$/i.exec(trimmed);
+	if (!match) {
+		throw new Error(
+			'Line ranges must use "start" or "start-end" with 1-indexed positive integers.',
+		);
+	}
+
+	const startLine = parsePositiveLineNumber(match[1], 'Line range start');
+	const endLineToken = match[2];
+	if (!endLineToken) return { startLine, endLine: startLine };
+	const endLine = /^(end|eof|\$)$/i.test(endLineToken)
+		? 'end'
+		: parsePositiveLineNumber(endLineToken, 'Line range end');
+	if (typeof endLine === 'number' && endLine < startLine) {
+		throw new Error('Line range end must be greater than or equal to start.');
+	}
+	return { startLine, endLine };
+}
+
+type LineDeleteBuilder = Partial<PatchLineDeleteOperation> & {
+	kind: 'line-delete';
+	filePath: string;
+};
+
+type LineReplaceBuilder = Partial<PatchLineReplaceOperation> & {
+	kind: 'line-replace';
+	filePath: string;
+	lines: string[];
+	phase: 'range' | 'with';
+};
+
+type LineInsertBuilder = Partial<PatchLineInsertOperation> & {
+	kind: 'line-insert';
+	filePath: string;
+	position: 'before' | 'after';
+	lines: string[];
+	phase: 'line' | 'with';
+};
+
 export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 	const normalized = patch.replace(/\r\n/g, '\n');
 	const lines = normalized.split('\n');
@@ -47,6 +112,9 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 				kind: 'update';
 				currentHunk: PatchHunk | null;
 		  })
+		| LineDeleteBuilder
+		| LineReplaceBuilder
+		| LineInsertBuilder
 		| ReplaceBuilder;
 
 	let builder: Builder | null = null;
@@ -78,6 +146,54 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			operations.push({
 				kind: 'add',
 				filePath: builder.filePath,
+				lines: [...builder.lines],
+			});
+		} else if (builder.kind === 'line-delete') {
+			if (!builder.startLine || !builder.endLine) {
+				throw new Error(
+					`Delete Lines in ${builder.filePath}: missing required *** Lines: directive.`,
+				);
+			}
+			operations.push({
+				kind: 'line-delete',
+				filePath: builder.filePath,
+				startLine: builder.startLine,
+				endLine: builder.endLine,
+			});
+		} else if (builder.kind === 'line-replace') {
+			if (!builder.startLine || !builder.endLine) {
+				throw new Error(
+					`Replace Lines in ${builder.filePath}: missing required *** Lines: directive.`,
+				);
+			}
+			if (builder.phase !== 'with') {
+				throw new Error(
+					`Replace Lines in ${builder.filePath}: missing required *** With: directive.`,
+				);
+			}
+			operations.push({
+				kind: 'line-replace',
+				filePath: builder.filePath,
+				startLine: builder.startLine,
+				endLine: builder.endLine,
+				lines: [...builder.lines],
+			});
+		} else if (builder.kind === 'line-insert') {
+			if (!builder.line) {
+				throw new Error(
+					`Insert ${builder.position} in ${builder.filePath}: missing required *** Line: directive.`,
+				);
+			}
+			if (builder.phase !== 'with') {
+				throw new Error(
+					`Insert ${builder.position} in ${builder.filePath}: missing required *** With: directive.`,
+				);
+			}
+			operations.push({
+				kind: 'line-insert',
+				filePath: builder.filePath,
+				position: builder.position,
+				line: builder.line,
 				lines: [...builder.lines],
 			});
 		} else {
@@ -154,6 +270,50 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
+		if (line.startsWith(PATCH_DELETE_LINES_PREFIX)) {
+			flushBuilder();
+			builder = {
+				kind: 'line-delete',
+				filePath: parseDirectivePath(line, PATCH_DELETE_LINES_PREFIX),
+			};
+			continue;
+		}
+
+		if (line.startsWith(PATCH_REPLACE_LINES_PREFIX)) {
+			flushBuilder();
+			builder = {
+				kind: 'line-replace',
+				filePath: parseDirectivePath(line, PATCH_REPLACE_LINES_PREFIX),
+				lines: [],
+				phase: 'range',
+			};
+			continue;
+		}
+
+		if (line.startsWith(PATCH_INSERT_BEFORE_PREFIX)) {
+			flushBuilder();
+			builder = {
+				kind: 'line-insert',
+				filePath: parseDirectivePath(line, PATCH_INSERT_BEFORE_PREFIX),
+				position: 'before',
+				lines: [],
+				phase: 'line',
+			};
+			continue;
+		}
+
+		if (line.startsWith(PATCH_INSERT_AFTER_PREFIX)) {
+			flushBuilder();
+			builder = {
+				kind: 'line-insert',
+				filePath: parseDirectivePath(line, PATCH_INSERT_AFTER_PREFIX),
+				position: 'after',
+				lines: [],
+				phase: 'line',
+			};
+			continue;
+		}
+
 		if (builder && builder.kind === 'replace') {
 			if (line.startsWith(PATCH_FIND_MARKER)) {
 				flushReplacePair(builder);
@@ -186,6 +346,74 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 		if (!builder) {
 			if (line.trim() === '') continue;
 			throw new Error(`Unexpected content in patch: "${line}"`);
+		}
+
+		if (builder.kind === 'line-delete') {
+			if (line.startsWith(PATCH_LINES_MARKER)) {
+				const range = parseLineRange(line.slice(PATCH_LINES_MARKER.length));
+				builder.startLine = range.startLine;
+				builder.endLine = range.endLine;
+				continue;
+			}
+			if (line.trim() !== '') {
+				throw new Error(
+					`Delete Lines in ${builder.filePath}: expected *** Lines: directive, got "${line}"`,
+				);
+			}
+			continue;
+		}
+
+		if (builder.kind === 'line-replace') {
+			if (builder.phase === 'with') {
+				builder.lines.push(line);
+				continue;
+			}
+			if (line.startsWith(PATCH_LINES_MARKER)) {
+				const range = parseLineRange(line.slice(PATCH_LINES_MARKER.length));
+				builder.startLine = range.startLine;
+				builder.endLine = range.endLine;
+				continue;
+			}
+			if (line.startsWith(PATCH_WITH_MARKER)) {
+				if (!builder.startLine || !builder.endLine) {
+					throw new Error(
+						`Replace Lines in ${builder.filePath}: *** With: must follow *** Lines:.`,
+					);
+				}
+				builder.phase = 'with';
+				continue;
+			}
+			if (line.trim() === '') continue;
+			throw new Error(
+				`Replace Lines in ${builder.filePath}: expected *** Lines: or *** With: directive, got "${line}"`,
+			);
+		}
+
+		if (builder.kind === 'line-insert') {
+			if (builder.phase === 'with') {
+				builder.lines.push(line);
+				continue;
+			}
+			if (line.startsWith(PATCH_LINE_MARKER)) {
+				builder.line = parsePositiveLineNumber(
+					line.slice(PATCH_LINE_MARKER.length),
+					'Insert line',
+				);
+				continue;
+			}
+			if (line.startsWith(PATCH_WITH_MARKER)) {
+				if (!builder.line) {
+					throw new Error(
+						`Insert ${builder.position} in ${builder.filePath}: *** With: must follow *** Line:.`,
+					);
+				}
+				builder.phase = 'with';
+				continue;
+			}
+			if (line.trim() === '') continue;
+			throw new Error(
+				`Insert ${builder.position} in ${builder.filePath}: expected *** Line: or *** With: directive, got "${line}"`,
+			);
 		}
 
 		if (builder.kind === 'add') {

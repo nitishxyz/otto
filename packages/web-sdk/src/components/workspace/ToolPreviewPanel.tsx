@@ -29,6 +29,28 @@ interface PatchOperation {
 	text: string;
 }
 
+type LineNumberPatchOperation =
+	| {
+			kind: 'delete' | 'replace';
+			filePath: string;
+			startLine?: number;
+			endLine?: number | 'end';
+			lines: string[];
+	  }
+	| {
+			kind: 'insert';
+			filePath: string;
+			position: 'before' | 'after';
+			line?: number;
+			lines: string[];
+	  };
+
+interface RenderedPatchLine {
+	text: string;
+	tone?: 'add' | 'remove';
+	removed?: boolean;
+}
+
 const LARGE_WRITE_PREVIEW_CHARS = 24_000;
 const LARGE_WRITE_PREVIEW_LINES = 500;
 const STREAMING_WRITE_PREVIEW_TAIL_LINES = 250;
@@ -119,6 +141,41 @@ function getStablePatchLines(patch: string): string[] {
 	return lines;
 }
 
+function getEnvelopedPatchPath(line: string): string | undefined {
+	const directive = line.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/);
+	const replaceDirective = line.match(/^\*\*\* Replace in: (.+)$/);
+	const lineDirective = line.match(
+		/^\*\*\* (?:Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/,
+	);
+	return directive?.[1] ?? replaceDirective?.[1] ?? lineDirective?.[1];
+}
+
+function parsePatchLineNumber(value: string): number | undefined {
+	const trimmed = value.trim();
+	if (!/^\d+$/.test(trimmed)) return undefined;
+	const line = Number.parseInt(trimmed, 10);
+	return line > 0 ? line : undefined;
+}
+
+function parsePatchLineRange(value: string):
+	| {
+			startLine: number;
+			endLine: number | 'end';
+	  }
+	| undefined {
+	const match = /^(\d+)(?:\s*-\s*(\d+|end|eof|\$))?$/i.exec(value.trim());
+	if (!match) return undefined;
+	const startLine = parsePatchLineNumber(match[1]);
+	if (!startLine) return undefined;
+	if (!match[2]) return { startLine, endLine: startLine };
+	const endLine = /^(end|eof|\$)$/i.test(match[2])
+		? 'end'
+		: parsePatchLineNumber(match[2]);
+	if (!endLine) return undefined;
+	if (typeof endLine === 'number' && endLine < startLine) return undefined;
+	return { startLine, endLine };
+}
+
 function getPatchLineHighlights(
 	patch: string | undefined,
 	targetPath: string,
@@ -139,9 +196,9 @@ function getPatchLineHighlights(
 	let newLine = 0;
 
 	for (const line of getStablePatchLines(patch)) {
-		const directive = line.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/);
-		if (directive?.[1]) {
-			activeFile = patchPathMatches(directive[1], targetPath);
+		const directivePath = getEnvelopedPatchPath(line);
+		if (directivePath) {
+			activeFile = patchPathMatches(directivePath, targetPath);
 			sawFileDirective = true;
 			inHunk = false;
 			newLine = 0;
@@ -257,10 +314,10 @@ function collectEnvelopedPatchHunks(
 	};
 
 	for (const line of getStablePatchLines(patch)) {
-		const directive = line.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/);
-		if (directive?.[1]) {
+		const directivePath = getEnvelopedPatchPath(line);
+		if (directivePath) {
 			flush();
-			activeFile = patchPathMatches(directive[1], targetPath);
+			activeFile = patchPathMatches(directivePath, targetPath);
 			sawFileDirective = true;
 			inHunk = activeFile;
 			continue;
@@ -364,12 +421,187 @@ function buildEnvelopedPatchPreview(
 	};
 }
 
+function collectLineNumberPatchOperations(
+	patch: string,
+	targetPath: string,
+): LineNumberPatchOperation[] {
+	const operations: LineNumberPatchOperation[] = [];
+	let current: LineNumberPatchOperation | null = null;
+	let activeFile = false;
+	let phase: 'directives' | 'with' = 'directives';
+
+	const flush = () => {
+		if (current && activeFile) operations.push(current);
+		current = null;
+		phase = 'directives';
+	};
+
+	for (const line of getStablePatchLines(patch)) {
+		const directive = line.match(
+			/^\*\*\* (Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/,
+		);
+		if (directive?.[1] && directive[2]) {
+			flush();
+			activeFile = patchPathMatches(directive[2], targetPath);
+			if (directive[1] === 'Delete Lines in') {
+				current = { kind: 'delete', filePath: directive[2], lines: [] };
+			} else if (directive[1] === 'Replace Lines in') {
+				current = { kind: 'replace', filePath: directive[2], lines: [] };
+			} else {
+				current = {
+					kind: 'insert',
+					filePath: directive[2],
+					position: directive[1] === 'Insert Before in' ? 'before' : 'after',
+					lines: [],
+				};
+			}
+			continue;
+		}
+
+		if (!current) continue;
+		if (line.startsWith('*** End Patch')) {
+			flush();
+			continue;
+		}
+		if (line.startsWith('*** Begin Patch')) continue;
+		if (phase === 'with') {
+			current.lines.push(line);
+			continue;
+		}
+
+		if (line.startsWith('*** Lines:') && current.kind !== 'insert') {
+			const range = parsePatchLineRange(line.slice('*** Lines:'.length));
+			if (range) {
+				current.startLine = range.startLine;
+				current.endLine = range.endLine;
+			}
+			continue;
+		}
+
+		if (line.startsWith('*** Line:') && current.kind === 'insert') {
+			current.line = parsePatchLineNumber(line.slice('*** Line:'.length));
+			continue;
+		}
+
+		if (line.startsWith('*** With:')) {
+			phase = 'with';
+		}
+	}
+
+	flush();
+	return operations;
+}
+
+function getCurrentRecordPosition(
+	records: RenderedPatchLine[],
+	currentIndex: number,
+): number {
+	let seen = 0;
+	for (let index = 0; index < records.length; index += 1) {
+		if (records[index].removed) continue;
+		if (seen === currentIndex) return index;
+		seen += 1;
+	}
+	return records.length;
+}
+
+function buildLineNumberPatchPreview(
+	content: string,
+	patch: string,
+	targetPath: string,
+): LivePatchPreview | null {
+	const operations = collectLineNumberPatchOperations(patch, targetPath);
+	if (operations.length === 0) return null;
+
+	const contentLines = content.split('\n');
+	if (contentLines.at(-1) === '') contentLines.pop();
+	const records: RenderedPatchLine[] = contentLines.map((line) => ({
+		text: line,
+	}));
+
+	for (const operation of operations) {
+		const currentLines = records.filter((record) => !record.removed);
+		if (operation.kind === 'insert') {
+			if (!operation.line) continue;
+			const insertIndex =
+				operation.position === 'before' ? operation.line - 1 : operation.line;
+			if (insertIndex < 0 || insertIndex > currentLines.length) continue;
+			const recordIndex = getCurrentRecordPosition(records, insertIndex);
+			records.splice(
+				recordIndex,
+				0,
+				...operation.lines.map((line) => ({
+					text: line,
+					tone: 'add' as const,
+				})),
+			);
+			continue;
+		}
+
+		if (!operation.startLine || !operation.endLine) continue;
+		const endLine =
+			operation.endLine === 'end' ? currentLines.length : operation.endLine;
+		if (
+			operation.startLine > currentLines.length ||
+			endLine > currentLines.length
+		)
+			continue;
+
+		const startIndex = operation.startLine - 1;
+		const endIndex = endLine - 1;
+		const recordIndex = getCurrentRecordPosition(records, startIndex);
+		for (let index = startIndex; index <= endIndex; index += 1) {
+			const position = getCurrentRecordPosition(records, startIndex);
+			if (!records[position]) continue;
+			records[position].tone = 'remove';
+			records[position].removed = true;
+		}
+
+		if (operation.kind === 'replace') {
+			records.splice(
+				recordIndex,
+				0,
+				...operation.lines.map((line) => ({
+					text: line,
+					tone: 'add' as const,
+				})),
+			);
+		}
+	}
+
+	const lineTones = new Map<number, 'add' | 'remove'>();
+	const renderedLines = records.map((record, index) => {
+		if (record.tone) lineTones.set(index + 1, record.tone);
+		return record.text;
+	});
+	if (lineTones.size === 0) return null;
+
+	const resultLines = records
+		.filter((record) => !record.removed)
+		.map((record) => record.text);
+	const changedLines = [...lineTones.keys()];
+	return {
+		content: renderedLines.join('\n'),
+		resultContent: resultLines.join('\n'),
+		lineTones,
+		firstLine: Math.min(...changedLines),
+		latestLine: Math.max(...changedLines),
+	};
+}
+
 export function buildLivePatchPreview(
 	content: string,
 	patch: string | undefined,
 	targetPath: string,
 ): LivePatchPreview | null {
 	if (!patch) return null;
+
+	const lineNumberPreview = buildLineNumberPatchPreview(
+		content,
+		patch,
+		targetPath,
+	);
+	if (lineNumberPreview) return lineNumberPreview;
 
 	const insertions = new Map<number, string[]>();
 	const removals = new Set<number>();

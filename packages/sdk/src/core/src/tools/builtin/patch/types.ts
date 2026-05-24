@@ -1,4 +1,10 @@
-export type PatchOperationKind = 'add' | 'update' | 'delete';
+export type AppliedPatchOperationKind = 'add' | 'update' | 'delete';
+
+export type PatchOperationKind =
+	| AppliedPatchOperationKind
+	| 'line-delete'
+	| 'line-replace'
+	| 'line-insert';
 
 export interface PatchHunkLine {
 	kind: 'context' | 'add' | 'remove';
@@ -35,10 +41,36 @@ export interface PatchUpdateOperation {
 	hunks: PatchHunk[];
 }
 
+export interface PatchLineDeleteOperation {
+	kind: 'line-delete';
+	filePath: string;
+	startLine: number;
+	endLine: number | 'end';
+}
+
+export interface PatchLineReplaceOperation {
+	kind: 'line-replace';
+	filePath: string;
+	startLine: number;
+	endLine: number | 'end';
+	lines: string[];
+}
+
+export interface PatchLineInsertOperation {
+	kind: 'line-insert';
+	filePath: string;
+	position: 'before' | 'after';
+	line: number;
+	lines: string[];
+}
+
 export type PatchOperation =
 	| PatchAddOperation
 	| PatchDeleteOperation
-	| PatchUpdateOperation;
+	| PatchUpdateOperation
+	| PatchLineDeleteOperation
+	| PatchLineReplaceOperation
+	| PatchLineInsertOperation;
 
 export interface AppliedPatchHunk {
 	header: PatchHunkHeader;
@@ -52,7 +84,7 @@ export interface AppliedPatchHunk {
 }
 
 export interface AppliedPatchOperation {
-	kind: PatchOperationKind;
+	kind: AppliedPatchOperationKind;
 	filePath: string;
 	stats: {
 		additions: number;

@@ -453,6 +453,7 @@ export function useSessionStream(
 
 			let changeLines = 0;
 			let stableChangeLength = 0;
+			let lineDirectiveCount = 0;
 			for (const line of stablePatch.split('\n')) {
 				if (
 					(line.startsWith('+') && !line.startsWith('+++')) ||
@@ -460,11 +461,21 @@ export function useSessionStream(
 				) {
 					changeLines += 1;
 					stableChangeLength += line.length;
+				} else if (
+					/^\*\*\* (?:Delete Lines in|Replace Lines in|Insert Before in|Insert After in): /.test(
+						line,
+					) ||
+					line.startsWith('*** Lines:') ||
+					line.startsWith('*** Line:') ||
+					line.startsWith('*** With:')
+				) {
+					lineDirectiveCount += 1;
 				}
 			}
 
-			return changeLines > 0
-				? `${changeLines}:${stableChangeLength}`
+			if (changeLines > 0) return `${changeLines}:${stableChangeLength}`;
+			return lineDirectiveCount > 0
+				? `lines:${lineDirectiveCount}:${stablePatch.length}`
 				: undefined;
 		};
 
@@ -474,8 +485,14 @@ export function useSessionStream(
 				const directive = line.match(
 					/^\*\*\* (?:Update|Add|Delete) File: (.+)$/,
 				);
-				if (directive?.[1]) {
-					paths.add(directive[1].trim());
+				const replaceDirective = line.match(/^\*\*\* Replace in: (.+)$/);
+				const lineDirective = line.match(
+					/^\*\*\* (?:Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/,
+				);
+				const path =
+					directive?.[1] ?? replaceDirective?.[1] ?? lineDirective?.[1];
+				if (path) {
+					paths.add(path.trim());
 					continue;
 				}
 
@@ -486,6 +503,63 @@ export function useSessionStream(
 			}
 
 			return [...paths];
+		};
+
+		type FileContentCache = {
+			content: string;
+			path: string;
+			extension: string;
+			lineCount: number;
+		};
+
+		const getExtension = (path: string): string =>
+			path.split('.').pop()?.toLowerCase() ?? '';
+
+		const updateFileContentCache = (path: string, content: string) => {
+			queryClient.setQueryData<FileContentCache>(['files', 'read', path], {
+				content,
+				path,
+				extension: getExtension(path),
+				lineCount: content.split('\n').length,
+			});
+		};
+
+		const mergeReadResultIntoFileCache = (
+			path: string,
+			result: Record<string, unknown> | null,
+			startLine: number | undefined,
+			endLine: number | undefined,
+		) => {
+			if (typeof result?.content !== 'string') return;
+			const readContent = result.content;
+			if (!startLine || !endLine) {
+				updateFileContentCache(path, readContent);
+				return;
+			}
+
+			queryClient.setQueryData<FileContentCache | undefined>(
+				['files', 'read', path],
+				(current) => {
+					if (!current?.content) return current;
+					const lines = current.content.split('\n');
+					if (lines.at(-1) === '') lines.pop();
+					const readLines = readContent.split('\n');
+					lines.splice(startLine - 1, endLine - startLine + 1, ...readLines);
+					const content = `${lines.join('\n')}\n`;
+					return {
+						...current,
+						content,
+						lineCount:
+							typeof result.totalLines === 'number'
+								? result.totalLines
+								: lines.length,
+					};
+				},
+			);
+		};
+
+		const invalidateFileContentCache = (path: string) => {
+			void queryClient.invalidateQueries({ queryKey: ['files', 'read', path] });
 		};
 
 		const getChangedLinesForPath = (
@@ -529,9 +603,6 @@ export function useSessionStream(
 			payload: Record<string, unknown> | undefined,
 			delta?: string | null,
 		) => {
-			const viewerStore = useViewerTabsStore.getState();
-			if (!viewerStore.followToolActivity) return;
-
 			const name = getToolEventName(payload);
 			if (name !== 'read') return;
 
@@ -556,6 +627,12 @@ export function useSessionStream(
 				rangeFromResult.endLine ??
 				startLine;
 			const failed = result?.ok === false || eventType === 'error';
+			if (eventType === 'tool.result' && !failed) {
+				mergeReadResultIntoFileCache(path, result, startLine, endLine);
+			}
+
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
 
 			viewerStore.openToolReadTab(path, {
 				startLine,
@@ -575,9 +652,6 @@ export function useSessionStream(
 			payload: Record<string, unknown> | undefined,
 			delta?: string | null,
 		) => {
-			const viewerStore = useViewerTabsStore.getState();
-			if (!viewerStore.followToolActivity) return;
-
 			const name = getToolEventName(payload);
 			if (name !== 'write') return;
 
@@ -600,6 +674,13 @@ export function useSessionStream(
 				status === 'streaming'
 					? getStreamingWritePreviewContent(args, buffer)
 					: getStringArg(args, buffer, 'content');
+			if (status === 'success') {
+				if (content !== undefined) updateFileContentCache(path, content);
+				else invalidateFileContentCache(path);
+			}
+
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
 
 			if (
 				status === 'streaming' &&
@@ -641,9 +722,6 @@ export function useSessionStream(
 			payload: Record<string, unknown> | undefined,
 			delta?: string | null,
 		) => {
-			const viewerStore = useViewerTabsStore.getState();
-			if (!viewerStore.followToolActivity) return;
-
 			const name = getToolEventName(payload);
 			if (name !== 'apply_patch') return;
 
@@ -678,6 +756,12 @@ export function useSessionStream(
 
 			const patchPaths = extractPathsFromPatch(patch);
 			if (patchPaths.length === 0) return;
+			if (status === 'success') {
+				for (const path of patchPaths) invalidateFileContentCache(path);
+			}
+
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
 
 			const matchingFileTabs = viewerStore.tabs.filter(
 				(

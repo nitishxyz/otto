@@ -63,6 +63,14 @@ function parseDiff(patch: string): { lines: DiffLine[]; filePath: string } {
 	for (const line of lines) {
 		// Extract file path from diff headers
 		// Also enter hunk mode for enveloped format
+		const lineModePath = line.match(
+			/^\*\*\* (?:Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/,
+		);
+		if (lineModePath?.[1]) {
+			filePath = lineModePath[1];
+			inHunk = false;
+		}
+
 		if (
 			line.startsWith('*** Update File:') ||
 			line.startsWith('*** Add File:')

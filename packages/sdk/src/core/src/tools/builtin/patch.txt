@@ -20,6 +20,46 @@ You can include multiple `*** Find:` / `*** With:` pairs under one `*** Replace 
 
 ---
 
+## Line-number mode: Delete / Replace / Insert
+
+Use line-number directives for large removals or replacements after reading the
+target file. Lines are 1-indexed and ranges are inclusive. `end`, `eof`, and `$`
+can be used as a range end.
+
+```text
+*** Begin Patch
+*** Delete Lines in: path/to/file.ts
+*** Lines: 120-184
+*** End Patch
+```
+
+```text
+*** Begin Patch
+*** Replace Lines in: path/to/file.ts
+*** Lines: 120-184
+*** With:
+new replacement block
+*** End Patch
+```
+
+```text
+*** Begin Patch
+*** Insert Before in: path/to/file.ts
+*** Line: 120
+*** With:
+new block before line 120
+*** Insert After in: path/to/file.ts
+*** Line: 200
+*** With:
+new block after line 200
+*** End Patch
+```
+
+Line-number mode is concise but fragile if the file changes after you read it.
+Prefer text/context patches for small edits.
+
+---
+
 ## Standard mode: Add / Update / Delete
 
 ```text
@@ -48,9 +88,9 @@ For multiple edits in the same file, use **one** `*** Update File:` block with m
 - File uses tabs → patch uses tabs.
 - File uses 2 spaces → patch uses 2 spaces (not 4, not tabs).
 
-**4. Include Sufficient Context.** Minimum 2 context lines before AND after each change (3+ for YAML). A single context line is fragile — it may match multiple locations.
+**4. Include Sufficient Context.** Minimum 2 context lines before AND after each change (3+ for YAML). A single context line is fragile — it may match multiple locations. For line-number mode, verify the exact line numbers from the latest `read` output instead.
 
-**5. Markers Required.** Every patch MUST start with `*** Begin Patch` and end with `*** End Patch`. Use `*** Update File:`, `*** Add File:`, or `*** Delete File:`.
+**5. Markers Required.** Every patch MUST start with `*** Begin Patch` and end with `*** End Patch`. Use `*** Update File:`, `*** Add File:`, `*** Delete File:`, or a line-number directive.
 
 **6. One `apply_patch` Call Per File.** For multiple edits in the same file, use multiple `@@` hunks in ONE call. Never make separate `apply_patch` calls for the same file in one turn.
 

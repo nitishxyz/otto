@@ -8,6 +8,9 @@ import type {
 	PatchAddOperation,
 	PatchApplicationResult,
 	PatchDeleteOperation,
+	PatchLineDeleteOperation,
+	PatchLineInsertOperation,
+	PatchLineReplaceOperation,
 	PatchOperation,
 	PatchUpdateOperation,
 	RejectedPatch,
@@ -161,6 +164,174 @@ async function applyUpdateOperation(
 	return makeAppliedRecord('update', operation.filePath, appliedHunks);
 }
 
+function resolveLineRange(
+	filePath: string,
+	lineCount: number,
+	startLine: number,
+	endLine: number | 'end',
+) {
+	const resolvedEndLine = endLine === 'end' ? lineCount : endLine;
+	if (startLine > lineCount) {
+		throw new Error(
+			`Line range ${startLine}-${resolvedEndLine} is outside ${filePath} (${lineCount} lines).`,
+		);
+	}
+	if (resolvedEndLine > lineCount) {
+		throw new Error(
+			`Line range ${startLine}-${resolvedEndLine} is outside ${filePath} (${lineCount} lines).`,
+		);
+	}
+	if (resolvedEndLine < startLine) {
+		throw new Error('Line range end must be greater than or equal to start.');
+	}
+	return {
+		startIndex: startLine - 1,
+		endIndexExclusive: resolvedEndLine,
+		resolvedEndLine,
+	};
+}
+
+async function readUpdateTarget(projectRoot: string, filePath: string) {
+	const target = resolveProjectPath(projectRoot, filePath);
+	let original: string;
+	try {
+		original = await readFile(target, 'utf-8');
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+			throw new Error(`File not found: ${filePath}`);
+		}
+		throw error;
+	}
+	return { target, ...splitLines(original) };
+}
+
+async function applyLineDeleteOperation(
+	projectRoot: string,
+	operation: PatchLineDeleteOperation,
+): Promise<AppliedPatchOperation> {
+	const { target, lines, newline } = await readUpdateTarget(
+		projectRoot,
+		operation.filePath,
+	);
+	const { startIndex, endIndexExclusive, resolvedEndLine } = resolveLineRange(
+		operation.filePath,
+		lines.length,
+		operation.startLine,
+		operation.endLine,
+	);
+	const removed = lines.slice(startIndex, endIndexExclusive);
+	const workingLines = [...lines];
+	workingLines.splice(startIndex, removed.length);
+	ensureTrailingNewline(workingLines);
+	await writeFile(target, joinLines(workingLines, newline), 'utf-8');
+
+	const appliedHunk: AppliedPatchHunk = {
+		header: {
+			oldStart: operation.startLine,
+			oldLines: removed.length,
+			newStart: operation.startLine,
+			newLines: 0,
+			context: `lines ${operation.startLine}-${resolvedEndLine}`,
+		},
+		lines: removed.map((line) => ({ kind: 'remove', content: line })),
+		oldStart: operation.startLine,
+		oldLines: removed.length,
+		newStart: operation.startLine,
+		newLines: 0,
+		additions: 0,
+		deletions: removed.length,
+	};
+
+	return makeAppliedRecord('update', operation.filePath, [appliedHunk]);
+}
+
+async function applyLineReplaceOperation(
+	projectRoot: string,
+	operation: PatchLineReplaceOperation,
+): Promise<AppliedPatchOperation> {
+	const { target, lines, newline } = await readUpdateTarget(
+		projectRoot,
+		operation.filePath,
+	);
+	const { startIndex, endIndexExclusive, resolvedEndLine } = resolveLineRange(
+		operation.filePath,
+		lines.length,
+		operation.startLine,
+		operation.endLine,
+	);
+	const removed = lines.slice(startIndex, endIndexExclusive);
+	const added = [...operation.lines];
+	const workingLines = [...lines];
+	workingLines.splice(startIndex, removed.length, ...added);
+	ensureTrailingNewline(workingLines);
+	await writeFile(target, joinLines(workingLines, newline), 'utf-8');
+
+	const appliedHunk: AppliedPatchHunk = {
+		header: {
+			oldStart: operation.startLine,
+			oldLines: removed.length,
+			newStart: operation.startLine,
+			newLines: added.length,
+			context: `lines ${operation.startLine}-${resolvedEndLine}`,
+		},
+		lines: [
+			...removed.map((line) => ({ kind: 'remove' as const, content: line })),
+			...added.map((line) => ({ kind: 'add' as const, content: line })),
+		],
+		oldStart: operation.startLine,
+		oldLines: removed.length,
+		newStart: operation.startLine,
+		newLines: added.length,
+		additions: added.length,
+		deletions: removed.length,
+	};
+
+	return makeAppliedRecord('update', operation.filePath, [appliedHunk]);
+}
+
+async function applyLineInsertOperation(
+	projectRoot: string,
+	operation: PatchLineInsertOperation,
+): Promise<AppliedPatchOperation> {
+	const { target, lines, newline } = await readUpdateTarget(
+		projectRoot,
+		operation.filePath,
+	);
+	const insertIndex =
+		operation.position === 'before' ? operation.line - 1 : operation.line;
+	if (insertIndex < 0 || insertIndex > lines.length) {
+		throw new Error(
+			`Insert ${operation.position} line ${operation.line} is outside ${operation.filePath} (${lines.length} lines).`,
+		);
+	}
+	const added = [...operation.lines];
+	const workingLines = [...lines];
+	workingLines.splice(insertIndex, 0, ...added);
+	ensureTrailingNewline(workingLines);
+	await writeFile(target, joinLines(workingLines, newline), 'utf-8');
+
+	const oldStart = insertIndex;
+	const newStart = insertIndex + 1;
+	const appliedHunk: AppliedPatchHunk = {
+		header: {
+			oldStart,
+			oldLines: 0,
+			newStart,
+			newLines: added.length,
+			context: `${operation.position} line ${operation.line}`,
+		},
+		lines: added.map((line) => ({ kind: 'add', content: line })),
+		oldStart,
+		oldLines: 0,
+		newStart,
+		newLines: added.length,
+		additions: added.length,
+		deletions: 0,
+	};
+
+	return makeAppliedRecord('update', operation.filePath, [appliedHunk]);
+}
+
 export async function applyPatchOperations(
 	projectRoot: string,
 	operations: PatchOperation[],
@@ -175,6 +346,12 @@ export async function applyPatchOperations(
 				applied.push(await applyAddOperation(projectRoot, operation));
 			} else if (operation.kind === 'delete') {
 				applied.push(await applyDeleteOperation(projectRoot, operation));
+			} else if (operation.kind === 'line-delete') {
+				applied.push(await applyLineDeleteOperation(projectRoot, operation));
+			} else if (operation.kind === 'line-replace') {
+				applied.push(await applyLineReplaceOperation(projectRoot, operation));
+			} else if (operation.kind === 'line-insert') {
+				applied.push(await applyLineInsertOperation(projectRoot, operation));
 			} else {
 				applied.push(
 					await applyUpdateOperation(
