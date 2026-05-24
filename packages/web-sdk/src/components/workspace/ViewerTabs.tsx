@@ -204,6 +204,7 @@ function renderTabContent(
 					open
 					file={tab.path}
 					highlight={tab.highlight}
+					annotations={tab.annotations}
 					patchPreview={tab.patchPreview}
 					writePreview={tab.writePreview}
 					onClose={() => closeTab(tab.id)}

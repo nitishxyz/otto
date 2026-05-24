@@ -9,6 +9,15 @@ export interface ToolActivityHighlight {
 	status: 'streaming' | 'success' | 'error';
 }
 
+export interface ToolActivityAnnotation {
+	id: string;
+	reason: 'write' | 'apply_patch';
+	callId?: string;
+	status: 'streaming' | 'success' | 'error';
+	lineTones: Array<[number, 'add' | 'remove']>;
+	createdAt: number;
+}
+
 export interface ToolPreviewTabInput {
 	path: string;
 	toolName: 'write' | 'apply_patch';
@@ -70,6 +79,7 @@ export type ViewerTab =
 			title: string;
 			path: string;
 			highlight?: ToolActivityHighlight;
+			annotations?: ToolActivityAnnotation[];
 			patchPreview?: ToolPatchPreview;
 			writePreview?: ToolWritePreview;
 	  }
@@ -188,6 +198,68 @@ function mergeChangedLines(
 	return [...new Set([...existing, ...incoming])].sort((a, b) => a - b);
 }
 
+function countContentLines(content: string): number {
+	return content.length === 0 ? 1 : content.split('\n').length;
+}
+
+function annotationId(
+	preview: ToolPreviewTabInput,
+	targetPath: string,
+): string {
+	return `${preview.toolName}:${preview.callId ?? `${normalizeViewerPath(targetPath)}:${preview.patch ?? preview.content ?? ''}`}`;
+}
+
+function buildAnnotation(
+	preview: ToolPreviewTabInput,
+	targetPath: string,
+	existing?: ToolActivityAnnotation,
+): ToolActivityAnnotation | undefined {
+	if (preview.status === 'error') return existing;
+	const id = annotationId(preview, targetPath);
+	if (preview.toolName === 'write') {
+		const content = preview.content;
+		if (content === undefined) return existing;
+		return {
+			id,
+			reason: 'write',
+			callId: preview.callId,
+			status: preview.status,
+			lineTones: Array.from(
+				{ length: countContentLines(content) },
+				(_, index) => [index + 1, 'add' as const],
+			),
+			createdAt: existing?.createdAt ?? Date.now(),
+		};
+	}
+
+	const lineTones: Array<[number, 'add' | 'remove']> | undefined = preview
+		.changedLines?.length
+		? preview.changedLines.map((line) => [line, 'add'])
+		: preview.previewLineTones;
+	if (!lineTones?.length) return existing;
+	return {
+		id,
+		reason: 'apply_patch',
+		callId: preview.callId,
+		status: preview.status,
+		lineTones,
+		createdAt: existing?.createdAt ?? Date.now(),
+	};
+}
+
+function upsertAnnotation(
+	annotations: ToolActivityAnnotation[] | undefined,
+	annotation: ToolActivityAnnotation | undefined,
+): ToolActivityAnnotation[] | undefined {
+	if (!annotation) return annotations;
+	const existing = annotations ?? [];
+	const index = existing.findIndex((item) => item.id === annotation.id);
+	if (index === -1) return [...existing, annotation];
+	const next = [...existing];
+	next[index] = annotation;
+	return next;
+}
+
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	tabs: [],
 	activeTabId: null,
@@ -253,6 +325,10 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					type: 'file',
 					title: existingFile?.title ?? titleFromPath(targetPath),
 					path: targetPath,
+					highlight: existingFile?.highlight,
+					annotations: existingFile?.annotations,
+					patchPreview: existingFile?.patchPreview,
+					writePreview: existingFile?.writePreview,
 				}),
 				activeTabId: targetId,
 			};
@@ -286,6 +362,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					title: existingFile?.title ?? titleFromPath(targetPath),
 					path: targetPath,
 					highlight,
+					annotations: existingFile?.annotations,
 					patchPreview: undefined,
 					writePreview: undefined,
 				}),
@@ -341,6 +418,18 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							existingPatchPreview?.changedLines,
 							preview.changedLines,
 						);
+				const annotationPreview = {
+					...preview,
+					changedLines: preview.changedLines,
+				};
+				const existingAnnotation = existingFile?.annotations?.find(
+					(annotation) =>
+						annotation.id === annotationId(annotationPreview, targetPath),
+				);
+				const annotations = upsertAnnotation(
+					existingFile?.annotations,
+					buildAnnotation(annotationPreview, targetPath, existingAnnotation),
+				);
 				return {
 					tabs: upsertTab(tabs, {
 						id: targetId,
@@ -348,6 +437,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						title: existingFile?.title ?? titleFromPath(targetPath),
 						path: targetPath,
 						highlight: undefined,
+						annotations,
 						writePreview: undefined,
 						patchPreview: {
 							path: targetPath,
@@ -390,10 +480,18 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			}
 			if (existingFile) {
 				const existingWritePreview = existingFile.writePreview;
+				const existingAnnotation = existingFile.annotations?.find(
+					(annotation) => annotation.id === annotationId(preview, targetPath),
+				);
+				const annotations = upsertAnnotation(
+					existingFile.annotations,
+					buildAnnotation(preview, targetPath, existingAnnotation),
+				);
 				return {
 					tabs: upsertTab(tabs, {
 						...existingFile,
 						highlight: undefined,
+						annotations,
 						patchPreview: undefined,
 						writePreview: {
 							path: targetPath,
@@ -409,25 +507,24 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			}
 			const existingWrite =
 				existing?.toolName === 'write' ? existing : undefined;
+			const annotation = buildAnnotation(preview, preview.path);
 			return {
 				tabs: upsertTab(tabs, {
 					id,
-					type: 'tool-preview',
+					type: 'file',
 					title: titleFromPath(preview.path),
 					path: preview.path,
-					toolName: preview.toolName,
-					callId: preview.callId,
-					content: preview.content ?? existingWrite?.content,
-					baseContent: undefined,
-					patch: undefined,
-					changedLines: undefined,
-					previewContent: undefined,
-					resultContent: undefined,
-					previewLineTones: undefined,
-					previewFirstLine: undefined,
-					previewLatestLine: undefined,
-					status: preview.status,
-					error: preview.error ?? existingWrite?.error,
+					highlight: undefined,
+					annotations: annotation ? [annotation] : undefined,
+					patchPreview: undefined,
+					writePreview: {
+						path: preview.path,
+						toolName: 'write',
+						callId: preview.callId,
+						content: preview.content ?? existingWrite?.content,
+						status: preview.status,
+						error: preview.error ?? existingWrite?.error,
+					},
 				}),
 				activeTabId: id,
 			};

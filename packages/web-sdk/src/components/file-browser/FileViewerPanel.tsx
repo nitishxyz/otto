@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import type {
+	ToolActivityAnnotation,
 	ToolActivityHighlight,
 	ToolPatchPreview,
 	ToolWritePreview,
@@ -122,6 +123,7 @@ interface FileViewerPanelProps {
 	open?: boolean;
 	file?: string | null;
 	highlight?: ToolActivityHighlight;
+	annotations?: ToolActivityAnnotation[];
 	patchPreview?: ToolPatchPreview;
 	writePreview?: ToolWritePreview;
 	onClose?: () => void;
@@ -132,6 +134,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	open,
 	file,
 	highlight,
+	annotations,
 	patchPreview,
 	writePreview,
 	onClose,
@@ -251,6 +254,26 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	const highlightStart = effectiveHighlight?.startLine;
 	const highlightEnd = effectiveHighlight?.endLine ?? highlightStart;
 	const patchChangedLines = patchPreview?.changedLines;
+	const persistentLineTones = useMemo(() => {
+		if (!annotations?.length) return undefined;
+		const tones = new Map<number, 'add' | 'remove'>();
+		for (const annotation of annotations) {
+			for (const [line, tone] of annotation.lineTones) {
+				if (line > 0) tones.set(line, tone);
+			}
+		}
+		return tones.size > 0 ? tones : undefined;
+	}, [annotations]);
+	const writePreviewLineTones = useMemo(() => {
+		if (writePreview?.content === undefined) return undefined;
+		const tones = new Map<number, 'add' | 'remove'>();
+		const lineCount =
+			writePreview.content.length === 0
+				? 1
+				: writePreview.content.split('\n').length;
+		for (let line = 1; line <= lineCount; line += 1) tones.set(line, 'add');
+		return tones;
+	}, [writePreview?.content]);
 	const highlightedLines = useMemo(() => {
 		if (highlightStart && highlightEnd) {
 			return new Set(
@@ -273,13 +296,16 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			: undefined;
 	const scrollToHighlightLine = highlightStart ?? fallbackPatchHighlightStart;
 	const activePatchLineTones = useMemo(() => {
-		if (!activePatchPreview) return undefined;
-		const tones = new Map(activePatchPreview.lineTones);
+		if (!activePatchPreview) return persistentLineTones;
+		const tones = new Map(persistentLineTones);
+		for (const [line, tone] of activePatchPreview.lineTones) {
+			tones.set(line, tone);
+		}
 		for (const line of patchChangedLines ?? []) {
 			if (!tones.has(line)) tones.set(line, 'add');
 		}
 		return tones;
-	}, [activePatchPreview, patchChangedLines]);
+	}, [activePatchPreview, patchChangedLines, persistentLineTones]);
 
 	if (!isViewerOpen || !selectedFile) return null;
 
@@ -287,6 +313,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	const renderMarkdown =
 		isMarkdownFile(selectedFile) &&
 		!effectiveHighlight &&
+		!persistentLineTones &&
 		!activePatchPreview &&
 		!writePreview?.content;
 
@@ -332,6 +359,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					<CodeMirrorViewer
 						content={writePreview.content}
 						path={selectedFile}
+						lineTones={writePreviewLineTones}
 					/>
 				) : activePatchPreview ? (
 					<CodeMirrorViewer
@@ -394,6 +422,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 							content={data.content}
 							path={selectedFile}
 							highlightedLines={highlightedLines}
+							lineTones={persistentLineTones}
 							scrollToLine={scrollToHighlightLine}
 						/>
 					)
