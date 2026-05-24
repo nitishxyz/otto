@@ -311,6 +311,27 @@ export function App({
 						await sendMessage(activeSession.id, '/init');
 					}
 					break;
+				case 'handoff':
+					if (activeSession) {
+						showStatus({ type: 'loading', label: 'creating handoff…' });
+						try {
+							const response = await fetch(
+								`${getBaseUrl()}/v1/sessions/${encodeURIComponent(activeSession.id)}/handoff`,
+								{ method: 'POST' },
+							);
+							const data = await response.json().catch(() => null);
+							if (!response.ok || typeof data?.sessionId !== 'string') {
+								throw new Error('handoff failed');
+							}
+							const updatedSessions = await loadSessions();
+							const next = updatedSessions.find((s) => s.id === data.sessionId);
+							if (next) switchSession(next);
+							showStatus({ type: 'success', label: 'handoff created' }, 3000);
+						} catch {
+							showStatus({ type: 'error', label: 'handoff failed' }, 3000);
+						}
+					}
+					break;
 				case 'stop':
 					if (activeSession) {
 						await abortSession(activeSession.id);
@@ -379,6 +400,7 @@ export function App({
 			abortSession,
 			showStatus,
 			setOverlay,
+			switchSession,
 			updateSessionPrefs,
 		],
 	);

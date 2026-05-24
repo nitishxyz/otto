@@ -14,6 +14,10 @@ const AVAILABLE_SLASH_COMMANDS: AvailableSlashCommand[] = [
 		description: 'Generate AGENTS.md and .agents docs from the repo structure',
 	},
 	{
+		name: 'handoff',
+		description: 'Create a new session with current context',
+	},
+	{
 		name: 'share',
 		description: 'Share the current session publicly',
 	},

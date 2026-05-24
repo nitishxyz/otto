@@ -14,6 +14,7 @@ import {
 	Share2,
 	RefreshCw,
 	FileText,
+	ArrowRightLeft,
 } from 'lucide-react';
 
 export interface Command {
@@ -100,6 +101,12 @@ export const COMMANDS: Command[] = [
 		description:
 			'Generate AGENTS.md and .agents docs from the real repo structure',
 		icon: FileText,
+	},
+	{
+		id: 'handoff',
+		label: '/handoff',
+		description: 'Create a new session with current context',
+		icon: ArrowRightLeft,
 	},
 	{
 		id: 'branch',

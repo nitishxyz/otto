@@ -87,6 +87,29 @@ export const sessionsMixin = {
 		return response.data as { success: boolean };
 	},
 
+	async createHandoff(sessionId: string): Promise<{
+		session: Session;
+		sessionId: string;
+		sourceSessionId: string;
+		message: string;
+	}> {
+		const response = await fetch(
+			`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/handoff`,
+			{ method: 'POST' },
+		);
+		const data = await response.json().catch(() => null);
+		if (!response.ok) throw new Error(extractErrorMessage(data));
+		if (!data?.session || !data?.sessionId) {
+			throw new Error('No data returned from handoff');
+		}
+		return {
+			session: convertSession(data.session as ApiSession),
+			sessionId: String(data.sessionId),
+			sourceSessionId: String(data.sourceSessionId),
+			message: String(data.message ?? ''),
+		};
+	},
+
 	async abortSession(sessionId: string): Promise<{ success: boolean }> {
 		const response = await apiAbortSession({ path: { sessionId } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));

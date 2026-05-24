@@ -155,12 +155,20 @@ export async function composeSystemPrompt(options: {
 
 	// Add compacted conversation summary if present
 	if (options.contextSummary?.trim()) {
+		const contextSummary = options.contextSummary.trim();
+		const isHandoff = contextSummary.startsWith('# Session Handoff');
 		const summaryBlock = [
-			'<compacted-conversation-summary>',
-			'The conversation was compacted to save context. Here is a summary of the previous context:',
+			isHandoff
+				? '<session-handoff-context>'
+				: '<compacted-conversation-summary>',
+			isHandoff
+				? 'This session was created from a handoff. Here is the inherited context from the previous session:'
+				: 'The conversation was compacted to save context. Here is a summary of the previous context:',
 			'',
-			options.contextSummary.trim(),
-			'</compacted-conversation-summary>',
+			contextSummary,
+			isHandoff
+				? '</session-handoff-context>'
+				: '</compacted-conversation-summary>',
 		].join('\n');
 		parts.push(summaryBlock);
 		components.push('context-summary');

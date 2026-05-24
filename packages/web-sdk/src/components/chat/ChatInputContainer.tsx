@@ -25,6 +25,7 @@ import { formatResearchContextForMessage } from '../../lib/parseResearchContext'
 import { toast } from '../../stores/toastStore';
 import { useToastStore } from '../../stores/toastStore';
 import { apiClient } from '../../lib/api-client';
+import { openPlatformSession } from '../../lib/platform';
 import { ChatInput } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
 
@@ -300,6 +301,28 @@ export const ChatInputContainer = memo(
 						handleSendMessage('/compact');
 					} else if (commandId === 'init') {
 						handleSendMessage('/init');
+					} else if (commandId === 'handoff') {
+						const toastId = toast.loading('Creating handoff...');
+						try {
+							const result = await apiClient.createHandoff(sessionId);
+							queryClient.invalidateQueries({ queryKey: ['sessions'] });
+							queryClient.invalidateQueries({
+								queryKey: ['messages', sessionId],
+							});
+							queryClient.invalidateQueries({
+								queryKey: ['messages', result.sessionId],
+							});
+							openPlatformSession(result.sessionId);
+							toast.success('Handoff created');
+						} catch (error) {
+							toast.error(
+								error instanceof Error
+									? error.message
+									: 'Failed to create handoff',
+							);
+						} finally {
+							useToastStore.getState().removeToast(toastId);
+						}
 					} else if (commandId === 'delete') {
 						deleteSession.mutate(sessionId, {
 							onSuccess: () => {

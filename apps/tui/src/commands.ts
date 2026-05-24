@@ -60,6 +60,11 @@ export const COMMANDS = [
 		alias: '',
 		description: 'Generate AGENTS.md and .agents docs from the repo structure',
 	},
+	{
+		name: 'handoff',
+		alias: '',
+		description: 'Create a new session with current context',
+	},
 	{ name: 'delete', alias: '', description: 'Delete current session' },
 	{ name: 'share', alias: '', description: 'Share session publicly' },
 	{

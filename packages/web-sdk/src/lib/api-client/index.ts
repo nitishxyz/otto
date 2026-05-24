@@ -17,6 +17,7 @@ class ApiClient {
 	updateSession = sessionsMixin.updateSession;
 	markSessionViewed = sessionsMixin.markSessionViewed;
 	deleteSession = sessionsMixin.deleteSession;
+	createHandoff = sessionsMixin.createHandoff;
 	abortSession = sessionsMixin.abortSession;
 	abortMessage = sessionsMixin.abortMessage;
 	getQueueState = sessionsMixin.getQueueState;
