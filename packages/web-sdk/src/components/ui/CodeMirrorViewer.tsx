@@ -208,7 +208,7 @@ function lineDecorationsExtension(
 	highlightTone: CodeMirrorLineTone = 'primary',
 	lineTones?: Map<number, CodeMirrorLineTone>,
 ): Extension {
-	return EditorView.decorations.compute([], (state): DecorationSet => {
+	return EditorView.decorations.compute(['doc'], (state): DecorationSet => {
 		const decorations: Array<{ line: number; tone: CodeMirrorLineTone }> = [];
 		for (const [line, tone] of lineTones ?? []) {
 			if (line > 0) decorations.push({ line, tone });
