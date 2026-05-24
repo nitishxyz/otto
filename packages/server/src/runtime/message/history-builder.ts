@@ -8,6 +8,7 @@ import {
 import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
+import { stripToolResultArtifactsForModel } from '../../tools/adapter/results.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
 
 /**
@@ -201,7 +202,7 @@ export async function buildHistoryMessages(
 							toolCallId: obj.callId,
 							input: obj.args,
 							output: (() => {
-								const r = result.result;
+								const r = stripToolResultArtifactsForModel(result.result);
 								if (typeof r === 'string') return r;
 								try {
 									return JSON.stringify(r);
@@ -215,7 +216,7 @@ export async function buildHistoryMessages(
 							toolName: obj.name,
 							callId: obj.callId,
 							args: obj.args,
-							result: result.result,
+							result: stripToolResultArtifactsForModel(result.result),
 						});
 
 						assistantParts.push(part as never);

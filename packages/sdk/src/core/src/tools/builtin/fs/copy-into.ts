@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './copy-into.txt' with { type: 'text' };
-import { buildWriteArtifact, isAbsoluteLike, resolveSafePath } from './util.ts';
+import {
+	buildMutationMetadata,
+	buildWriteArtifact,
+	isAbsoluteLike,
+	resolveSafePath,
+} from './util.ts';
 import {
 	convertToLineEnding,
 	detectLineEnding,
@@ -199,6 +204,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 		inputSchema: copyIntoSchema,
 		async execute(input: CopyIntoInput): Promise<
 			ToolResponse<{
+				operation: 'copy_into';
 				sourcePath: string;
 				targetPath: string;
 				sourceRange: string;
@@ -206,6 +212,10 @@ export function buildCopyIntoTool(projectRoot: string): {
 				mode: string;
 				linesCopied: number;
 				bytes: number;
+				bytesWritten: number;
+				changed: boolean;
+				sha256: string;
+				summary: { files: number; additions: number; deletions: number };
 				artifact: unknown;
 			}>
 		> {
@@ -271,6 +281,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 
 				await writeFile(targetAbs, nextContent, 'utf-8');
 				await rememberFileWrite(projectRoot, targetAbs);
+				const metadata = buildMutationMetadata(targetContent, nextContent);
 				const artifact = await buildWriteArtifact(
 					input.targetPath,
 					true,
@@ -279,13 +290,18 @@ export function buildCopyIntoTool(projectRoot: string): {
 				);
 				return {
 					ok: true,
+					operation: 'copy_into',
 					sourcePath: input.sourcePath,
 					targetPath: input.targetPath,
 					sourceRange: `${input.startLine}-${sourceRange.endLine}`,
 					targetRange: applied.targetRange,
 					mode: input.mode ?? 'insert_before',
 					linesCopied: sourceRange.copied.length,
-					bytes: nextContent.length,
+					bytes: metadata.bytesWritten,
+					bytesWritten: metadata.bytesWritten,
+					changed: metadata.changed,
+					sha256: metadata.sha256,
+					summary: metadata.summary,
 					artifact,
 				};
 			} catch (error: unknown) {

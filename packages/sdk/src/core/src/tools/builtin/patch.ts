@@ -41,10 +41,6 @@ function serializeRejected(rejected: RejectedPatch[]) {
 						newStart: hunk.header.newStart,
 						newLines: hunk.header.newLines,
 						context: hunk.header.context,
-						lines: hunk.lines.map((line) => ({
-							kind: line.kind,
-							content: line.content,
-						})),
 					}))
 				: undefined,
 	}));
@@ -83,7 +79,10 @@ export function buildApplyPatchTool(projectRoot: string): {
 			fuzzyMatch?: boolean;
 		}): Promise<
 			ToolResponse<{
+				operation: 'apply_patch';
 				output: string;
+				changed: boolean;
+				summary: { files: number; additions: number; deletions: number };
 				changes: unknown[];
 				artifact: unknown;
 				rejected?: unknown[];
@@ -142,7 +141,10 @@ export function buildApplyPatchTool(projectRoot: string): {
 
 				return {
 					ok: true,
+					operation: 'apply_patch',
 					output: output.join('; '),
+					changed: result.operations.length > 0,
+					summary: result.summary,
 					changes,
 					artifact: {
 						kind: 'file_diff',

@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './edit.txt' with { type: 'text' };
-import { buildWriteArtifact, isAbsoluteLike, resolveSafePath } from './util.ts';
+import {
+	buildMutationMetadata,
+	buildWriteArtifact,
+	isAbsoluteLike,
+	resolveSafePath,
+} from './util.ts';
 import { applyStringEdit } from './edit-shared.ts';
 import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
 import { createToolError, type ToolResponse } from '../../error.ts';
@@ -42,8 +47,13 @@ export function buildEditTool(projectRoot: string): {
 		}): Promise<
 			ToolResponse<{
 				path: string;
+				operation: 'edit';
 				occurrences: number;
 				bytes: number;
+				bytesWritten: number;
+				changed: boolean;
+				sha256: string;
+				summary: { files: number; additions: number; deletions: number };
 				artifact: unknown;
 			}>
 		> {
@@ -89,6 +99,7 @@ export function buildEditTool(projectRoot: string): {
 
 				await writeFile(abs, updated.content, 'utf-8');
 				await rememberFileWrite(projectRoot, abs);
+				const metadata = buildMutationMetadata(original, updated.content);
 				const artifact = await buildWriteArtifact(
 					path,
 					true,
@@ -98,8 +109,13 @@ export function buildEditTool(projectRoot: string): {
 				return {
 					ok: true,
 					path,
+					operation: 'edit',
 					occurrences: updated.occurrences,
-					bytes: updated.content.length,
+					bytes: metadata.bytesWritten,
+					bytesWritten: metadata.bytesWritten,
+					changed: metadata.changed,
+					sha256: metadata.sha256,
+					summary: metadata.summary,
 					artifact,
 				};
 			} catch (error: unknown) {

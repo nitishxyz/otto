@@ -1,5 +1,7 @@
 import type { Tool } from 'ai';
 import type { DiscoveredTool } from '@ottocode/sdk';
+import type { JSONValue } from '@ai-sdk/provider';
+import type { ToolResultOutput } from '@ai-sdk/provider-utils';
 import type {
 	ToolAdapterContext,
 	StepExecutionState,
@@ -44,6 +46,7 @@ import {
 	createToolExceptionResult,
 	markToolFailed,
 	markToolSucceeded,
+	stripToolResultArtifactsForModel,
 	type ToolFailureState,
 } from './adapter/results.ts';
 
@@ -60,6 +63,17 @@ type ToolExecuteOptions = ToolExecuteSignature['options'] extends never
 	? undefined
 	: ToolExecuteSignature['options'];
 type ToolExecuteReturn = ToolExecuteSignature['result'];
+type ToModelOutputOptions = { output: unknown; [key: string]: unknown };
+type ToModelOutputFn = (options: ToModelOutputOptions) => ToolResultOutput;
+
+function toJsonValue(value: unknown): JSONValue {
+	if (value === undefined) return null;
+	try {
+		return JSON.parse(JSON.stringify(value)) as JSONValue;
+	} catch {
+		return String(value) as JSONValue;
+	}
+}
 
 function unwrapDoubleWrappedArgs(
 	input: unknown,
@@ -143,6 +157,20 @@ export function adaptTools(
 		out[registrationName] = {
 			...base,
 			...(providerOptions ? { providerOptions } : {}),
+			toModelOutput(options: ToModelOutputOptions): ToolResultOutput {
+				const sanitizedOutput = stripToolResultArtifactsForModel(
+					options.output,
+				);
+				const baseToModelOutput = (base as { toModelOutput?: ToModelOutputFn })
+					.toModelOutput;
+				if (typeof baseToModelOutput === 'function') {
+					return baseToModelOutput({ ...options, output: sanitizedOutput });
+				}
+				return {
+					type: 'json',
+					value: toJsonValue(sanitizedOutput),
+				};
+			},
 			async onInputStart(options: unknown) {
 				const sdkCallId = extractToolCallId(options);
 				const queue = getPendingQueue(pendingCalls, name);

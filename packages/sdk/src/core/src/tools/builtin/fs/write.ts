@@ -3,6 +3,7 @@ import { z } from 'zod/v3';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import {
+	buildMutationMetadata,
 	buildWriteArtifact,
 	resolveSafePath,
 	expandTilde,
@@ -38,7 +39,13 @@ export function buildWriteTool(projectRoot: string): {
 		}): Promise<
 			ToolResponse<{
 				path: string;
+				operation: 'write';
 				bytes: number;
+				bytesWritten: number;
+				created: boolean;
+				changed: boolean;
+				sha256: string;
+				summary: { files: number; additions: number; deletions: number };
 				artifact: unknown;
 			}>
 		> {
@@ -81,6 +88,7 @@ export function buildWriteTool(projectRoot: string): {
 				} catch {}
 				await writeFile(abs, content);
 				await rememberFileWrite(projectRoot, abs);
+				const metadata = buildMutationMetadata(oldText, content);
 				const artifact = await buildWriteArtifact(
 					req,
 					existed,
@@ -90,7 +98,13 @@ export function buildWriteTool(projectRoot: string): {
 				return {
 					ok: true,
 					path: req,
-					bytes: content.length,
+					operation: 'write',
+					bytes: metadata.bytesWritten,
+					bytesWritten: metadata.bytesWritten,
+					created: !existed,
+					changed: metadata.changed,
+					sha256: metadata.sha256,
+					summary: metadata.summary,
 					artifact,
 				};
 			} catch (error: unknown) {

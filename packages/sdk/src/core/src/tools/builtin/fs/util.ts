@@ -1,5 +1,6 @@
-import { createTwoFilesPatch } from 'diff';
+import { createHash } from 'node:crypto';
 import { resolve as resolvePath } from 'node:path';
+import { createTwoFilesPatch, diffLines } from 'diff';
 
 function normalizeForComparison(value: string) {
 	const withForwardSlashes = value.replace(/\\/g, '/');
@@ -36,6 +37,17 @@ export function isAbsoluteLike(p: string): boolean {
 	return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p);
 }
 
+export function buildMutationMetadata(oldText: string, newText: string) {
+	const bytesWritten = Buffer.byteLength(newText, 'utf-8');
+	const { additions, deletions } = summarizeTextChanges(oldText, newText);
+	return {
+		bytesWritten,
+		changed: oldText !== newText,
+		sha256: createHash('sha256').update(newText).digest('hex'),
+		summary: { files: 1, additions, deletions },
+	} as const;
+}
+
 export async function buildWriteArtifact(
 	relPath: string,
 	existed: boolean,
@@ -67,7 +79,7 @@ export async function buildWriteArtifact(
 		lines.push('*** End Patch');
 		patch = lines.join('\n');
 	}
-	const { additions, deletions } = summarizePatchCounts(patch);
+	const { additions, deletions } = summarizeTextChanges(oldText, newText);
 	return {
 		kind: 'file_diff',
 		patch,
@@ -75,21 +87,26 @@ export async function buildWriteArtifact(
 	} as const;
 }
 
-export function summarizePatchCounts(patch: string): {
+function countDiffLines(value: string): number {
+	if (value.length === 0) return 0;
+	const lines = value.split('\n');
+	if (value.endsWith('\n')) lines.pop();
+	return lines.length;
+}
+
+export function summarizeTextChanges(
+	oldText: string,
+	newText: string,
+): {
 	additions: number;
 	deletions: number;
 } {
-	let adds = 0;
-	let dels = 0;
-	for (const line of String(patch || '').split('\n')) {
-		if (
-			line.startsWith('+++') ||
-			line.startsWith('---') ||
-			line.startsWith('diff ')
-		)
-			continue;
-		if (line.startsWith('+')) adds += 1;
-		else if (line.startsWith('-')) dels += 1;
+	let additions = 0;
+	let deletions = 0;
+	for (const part of diffLines(String(oldText ?? ''), String(newText ?? ''))) {
+		const lineCount = countDiffLines(part.value);
+		if (part.added) additions += lineCount;
+		else if (part.removed) deletions += lineCount;
 	}
-	return { additions: adds, deletions: dels };
+	return { additions, deletions };
 }

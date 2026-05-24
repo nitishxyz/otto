@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './multiedit.txt' with { type: 'text' };
-import { buildWriteArtifact, isAbsoluteLike, resolveSafePath } from './util.ts';
+import {
+	buildMutationMetadata,
+	buildWriteArtifact,
+	isAbsoluteLike,
+	resolveSafePath,
+} from './util.ts';
 import { applyStringEdit } from './edit-shared.ts';
 import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
 import { createToolError, type ToolResponse } from '../../error.ts';
@@ -39,8 +44,13 @@ export function buildMultiEditTool(projectRoot: string): {
 		async execute({ path, edits }: z.infer<typeof multiEditSchema>): Promise<
 			ToolResponse<{
 				path: string;
+				operation: 'multiedit';
 				editsApplied: number;
 				bytes: number;
+				bytesWritten: number;
+				changed: boolean;
+				sha256: string;
+				summary: { files: number; additions: number; deletions: number };
 				artifact: unknown;
 			}>
 		> {
@@ -97,6 +107,7 @@ export function buildMultiEditTool(projectRoot: string): {
 
 				await writeFile(abs, nextContent, 'utf-8');
 				await rememberFileWrite(projectRoot, abs);
+				const metadata = buildMutationMetadata(original, nextContent);
 				const artifact = await buildWriteArtifact(
 					path,
 					true,
@@ -106,8 +117,13 @@ export function buildMultiEditTool(projectRoot: string): {
 				return {
 					ok: true,
 					path,
+					operation: 'multiedit',
 					editsApplied: edits.length,
-					bytes: nextContent.length,
+					bytes: metadata.bytesWritten,
+					bytesWritten: metadata.bytesWritten,
+					changed: metadata.changed,
+					sha256: metadata.sha256,
+					summary: metadata.summary,
 					artifact,
 				};
 			} catch (error: unknown) {

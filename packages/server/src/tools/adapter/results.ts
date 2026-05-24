@@ -40,6 +40,15 @@ export function createToolExceptionResult(error: unknown): unknown {
 	};
 }
 
+export function stripToolResultArtifactsForModel(result: unknown): unknown {
+	if (!result || typeof result !== 'object' || Array.isArray(result)) {
+		return result;
+	}
+	if (!('artifact' in result)) return result;
+	const { artifact: _artifact, ...rest } = result as Record<string, unknown>;
+	return rest;
+}
+
 export function buildToolResultContent(args: {
 	name: string;
 	result: unknown;

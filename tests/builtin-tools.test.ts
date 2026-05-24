@@ -116,6 +116,9 @@ describe('Built-in Tools', () => {
 			});
 			expect(result).toHaveProperty('bytes');
 			expect((result as { bytes: number }).bytes).toBe(12);
+			expect(
+				(result as { artifact?: { kind?: string; patch?: string } }).artifact,
+			).toMatchObject({ kind: 'file_diff' });
 		});
 	});
 
@@ -423,7 +426,12 @@ describe('Built-in Tools', () => {
 *** End Patch`;
 
 			const result = await patchTool?.tool.execute({ patch });
-			expect(result).toHaveProperty('ok');
+			expect(result).toMatchObject({
+				ok: true,
+				operation: 'apply_patch',
+				changed: true,
+				summary: { files: 1, additions: 1, deletions: 0 },
+			});
 			expect(
 				(result as { artifact?: { patch?: string } }).artifact?.patch,
 			).toContain('@@ -0,0 +1');
@@ -470,6 +478,11 @@ describe('Built-in Tools', () => {
 				newLines: 3,
 				additions: 1,
 				deletions: 1,
+			});
+			expect(result).toMatchObject({
+				operation: 'apply_patch',
+				changed: true,
+				summary: { files: 1, additions: 1, deletions: 1 },
 			});
 			expect(
 				(result as { artifact?: { patch?: string } }).artifact?.patch,
