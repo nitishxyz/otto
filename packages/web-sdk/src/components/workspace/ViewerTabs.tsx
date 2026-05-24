@@ -380,13 +380,13 @@ export const ViewerTabs = memo(function ViewerTabs() {
 
 	return (
 		<section className="h-full w-full min-w-0 bg-sidebar flex flex-col">
-			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden">
+			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden overscroll-x-contain">
 				{tabs.map((tab) => {
 					const isActive = tab.id === activeTab.id;
 					return (
 						<div
 							key={tab.id}
-							className={`group h-12 max-w-56 min-w-0 px-3 border-r border-sidebar-border flex items-center gap-2 text-left transition-colors ${
+							className={`group h-12 w-44 max-w-56 shrink-0 px-3 border-r border-sidebar-border flex items-center gap-2 text-left transition-colors ${
 								isActive
 									? 'bg-sidebar text-sidebar-foreground'
 									: 'border-b bg-background text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/40'

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Sun, Moon, ArrowDownToLine, RotateCw } from 'lucide-react';
+import { useSidebarStore } from '@ottocode/web-sdk/stores';
 import { useServer } from '../hooks/useServer';
 import { useUpdate } from '../hooks/useUpdate';
 import { usePlatform } from '../hooks/usePlatform';
@@ -34,6 +35,8 @@ export function Workspace({
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
 	const { theme, toggleTheme } = useDesktopTheme();
+	const isSidebarCollapsed = useSidebarStore((state) => state.isCollapsed);
+	const toggleSidebar = useSidebarStore((state) => state.toggleCollapse);
 	const {
 		available,
 		version,
@@ -84,6 +87,29 @@ export function Workspace({
 						className="w-8 h-8 flex items-center justify-center text-base text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
 					>
 						←
+					</button>
+					<button
+						type="button"
+						onClick={toggleSidebar}
+						className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+						title={`${isSidebarCollapsed ? 'Show' : 'Hide'} sidebar`}
+						aria-label={`${isSidebarCollapsed ? 'Show' : 'Hide'} sidebar`}
+						aria-pressed={!isSidebarCollapsed}
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.5"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							aria-hidden="true"
+						>
+							<rect x="2" y="2" width="12" height="12" rx="2" />
+							<path d="M6 2v12" />
+						</svg>
 					</button>
 				</div>
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
