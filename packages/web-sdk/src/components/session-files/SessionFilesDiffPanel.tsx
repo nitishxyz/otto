@@ -110,6 +110,7 @@ function FullHeightDiffView({
 				content={patch}
 				path={filePath}
 				lineTones={getPatchLineTones(patch)}
+				disableMarkdownSyntax
 			/>
 		</div>
 	);

@@ -360,6 +360,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 						content={writePreview.content}
 						path={selectedFile}
 						lineTones={writePreviewLineTones}
+						disableMarkdownSyntax
 					/>
 				) : activePatchPreview ? (
 					<CodeMirrorViewer
@@ -367,6 +368,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 						path={selectedFile}
 						lineTones={activePatchLineTones}
 						scrollToLine={activePatchPreview.latestLine}
+						disableMarkdownSyntax
 					/>
 				) : isLoading ? (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
@@ -424,6 +426,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 							highlightedLines={highlightedLines}
 							lineTones={persistentLineTones}
 							scrollToLine={scrollToHighlightLine}
+							disableMarkdownSyntax={isMarkdownFile(selectedFile)}
 						/>
 					)
 				) : (

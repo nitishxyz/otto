@@ -44,6 +44,7 @@ interface CodeMirrorViewerProps {
 	lineTones?: Map<number, CodeMirrorLineTone>;
 	scrollToLine?: number;
 	scrollToEndSignal?: string | number;
+	disableMarkdownSyntax?: boolean;
 }
 
 const viewerTheme = EditorView.theme({
@@ -233,7 +234,10 @@ function lineDecorationsExtension(
 	});
 }
 
-function getLanguageExtension(path?: string): Extension {
+function getLanguageExtension(
+	path?: string,
+	disableMarkdownSyntax = false,
+): Extension {
 	const ext = path?.split('.').pop()?.toLowerCase() ?? '';
 	switch (ext) {
 		case 'js':
@@ -265,6 +269,7 @@ function getLanguageExtension(path?: string): Extension {
 		case 'md':
 		case 'markdown':
 		case 'mdx':
+			if (disableMarkdownSyntax) return [];
 			return markdown();
 		case 'sql':
 			return sql();
@@ -293,6 +298,7 @@ export function CodeMirrorViewer({
 	lineTones,
 	scrollToLine,
 	scrollToEndSignal,
+	disableMarkdownSyntax = false,
 }: CodeMirrorViewerProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const viewRef = useRef<EditorView | null>(null);
@@ -302,7 +308,10 @@ export function CodeMirrorViewer({
 	const languageExtensionRef = useRef<Extension>([]);
 	const decorationsExtensionRef = useRef<Extension>([]);
 
-	const languageExtension = useMemo(() => getLanguageExtension(path), [path]);
+	const languageExtension = useMemo(
+		() => getLanguageExtension(path, disableMarkdownSyntax),
+		[path, disableMarkdownSyntax],
+	);
 	const decorationsExtension = useMemo(
 		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
 		[highlightedLines, highlightTone, lineTones],

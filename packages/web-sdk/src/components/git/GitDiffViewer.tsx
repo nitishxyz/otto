@@ -64,7 +64,11 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 				</div>
 
 				<div className="flex-1 min-h-0">
-					<CodeMirrorViewer content={diff.content} path={diff.file} />
+					<CodeMirrorViewer
+						content={diff.content}
+						path={diff.file}
+						disableMarkdownSyntax
+					/>
 				</div>
 			</div>
 		);
@@ -116,6 +120,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 						content={diff.diff}
 						path={diff.file}
 						lineTones={getDiffLineTones(diff.diff)}
+						disableMarkdownSyntax
 					/>
 				)}
 			</div>

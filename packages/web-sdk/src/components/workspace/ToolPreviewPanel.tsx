@@ -741,7 +741,7 @@ function PlainSourceViewer({
 					{notice}
 				</div>
 			)}
-			<CodeMirrorViewer content={content} path={path} />
+			<CodeMirrorViewer content={content} path={path} disableMarkdownSyntax />
 		</div>
 	);
 }
@@ -774,6 +774,7 @@ function SourceViewer({
 			lineTones={lineTones}
 			scrollToLine={scrollToLine}
 			scrollToEndSignal={scrollToEndSignal}
+			disableMarkdownSyntax
 		/>
 	);
 }

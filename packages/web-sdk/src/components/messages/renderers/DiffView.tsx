@@ -45,7 +45,9 @@ function getLanguageFromPath(path: string): string {
 		html: 'html',
 		css: 'css',
 		scss: 'scss',
-		md: 'markdown',
+		md: 'text',
+		markdown: 'text',
+		mdx: 'text',
 		txt: 'text',
 		svelte: 'svelte',
 	};
