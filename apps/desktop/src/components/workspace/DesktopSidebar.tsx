@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePanelWidthStore, useSidebarStore } from '@ottocode/web-sdk/stores';
 import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
+import { usePreferences } from '@ottocode/web-sdk/hooks';
 
 const PANEL_KEY = 'desktop-left-sidebar';
 const DEFAULT_WIDTH = 272;
@@ -30,6 +31,8 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
+	const { preferences } = usePreferences();
+	const smartEdges = preferences.smartEdges;
 	const [isAutoVisible, setIsAutoVisible] = useState(false);
 	const [isHoverPending, setIsHoverPending] = useState(false);
 	const isAutoVisibleRef = useRef(false);
@@ -95,7 +98,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 			}, delay);
 		};
 
-		if (!isCollapsed) {
+		if (!isCollapsed || !smartEdges) {
 			clearHoverTimeouts();
 			setIsHoverPending(false);
 			setAutoVisible(false);
@@ -134,7 +137,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 				handleMouseLeave,
 			);
 		};
-	}, [isCollapsed, panelWidth]);
+	}, [isCollapsed, panelWidth, smartEdges]);
 
 	return (
 		<>

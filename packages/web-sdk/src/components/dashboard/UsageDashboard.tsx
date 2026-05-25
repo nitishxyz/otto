@@ -636,58 +636,61 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 	return (
 		<div className="fixed inset-0 flex flex-col bg-background text-foreground">
 			{/* Header */}
-			<header className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur">
-				<div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
-					<div className="flex items-center gap-3 min-w-0">
+			<header className="shrink-0 h-10 border-b border-border/60 bg-background/80 backdrop-blur">
+				<div className="h-full max-w-5xl mx-auto px-6 flex items-center justify-between gap-3">
+					<div className="flex items-center gap-2 min-w-0">
 						<button
 							type="button"
 							onClick={handleBack}
-							className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+							className="inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+							title="Back"
+							aria-label="Back"
 						>
 							<ArrowLeft className="size-3.5" />
-							Back
 						</button>
-						<div className="h-4 w-px bg-border" />
-						<div className="min-w-0">
-							<div className="text-xs text-muted-foreground/70">
-								{scope === 'global' ? 'Usage · all projects' : 'Usage'}
-							</div>
-							<div className="text-sm font-medium truncate font-mono">
+						<div className="min-w-0 flex items-baseline gap-1.5 text-xs">
+							<span className="text-muted-foreground/70 uppercase tracking-[0.1em] text-[10px]">
+								Usage
+							</span>
+							<span className="text-muted-foreground/40">/</span>
+							<span className="font-medium truncate text-foreground">
 								{projectName || '—'}
-							</div>
+							</span>
 						</div>
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-1.5">
 						<div className="inline-flex p-0.5 rounded-md border border-border bg-muted/30 text-[11px]">
 							<button
 								type="button"
 								onClick={() => setScope('project')}
-								className={`px-2.5 py-1 rounded transition-colors ${
+								className={`px-2 py-0.5 rounded transition-colors ${
 									scope === 'project'
 										? 'bg-background text-foreground shadow-sm'
 										: 'text-muted-foreground hover:text-foreground'
 								}`}
 							>
-								This project
+								Project
 							</button>
 							<button
 								type="button"
 								onClick={() => setScope('global')}
-								className={`px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 ${
+								className={`px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 ${
 									scope === 'global'
 										? 'bg-background text-foreground shadow-sm'
 										: 'text-muted-foreground hover:text-foreground'
 								}`}
 							>
 								<Globe2 className="size-3" />
-								All projects
+								Global
 							</button>
 						</div>
 						<button
 							type="button"
 							onClick={() => void fetchStats()}
 							disabled={loading}
-							className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+							className="inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+							title="Refresh"
+							aria-label="Refresh"
 						>
 							<RefreshCw
 								className={`size-3.5 ${loading ? 'animate-spin' : ''}`}

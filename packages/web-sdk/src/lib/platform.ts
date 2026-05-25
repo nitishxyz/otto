@@ -70,3 +70,16 @@ export function hasPlatformOpenUrl(): boolean {
 export function hasPlatformSystemFonts(): boolean {
 	return !!getPlatformWindow()?.OTTO_LIST_SYSTEM_FONTS;
 }
+
+export function isPlatformDesktop(): boolean {
+	if (typeof window === 'undefined') return false;
+	try {
+		return (
+			'__TAURI__' in window ||
+			'__TAURI_INTERNALS__' in window ||
+			'__TAURI_METADATA__' in window
+		);
+	} catch {
+		return false;
+	}
+}

@@ -42,6 +42,7 @@ import { apiClient } from '../../lib/api-client';
 import {
 	hasPlatformSystemFonts,
 	listPlatformSystemFonts,
+	isPlatformDesktop,
 } from '../../lib/platform';
 
 const SETTINGS_PANEL_KEY = 'settings';
@@ -552,6 +553,7 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	const { data: config } = useConfig();
 	const { preferences, updatePreferences } = usePreferences();
 	const updateDefaults = useUpdateDefaults();
+	const isDesktop = isPlatformDesktop();
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="lg">
@@ -579,6 +581,13 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 							updatePreferences({ fullWidthContent: checked })
 						}
 					/>
+					{isDesktop ? (
+						<ToggleRow
+							label="Smart Sidebar Edges"
+							checked={preferences.smartEdges}
+							onChange={(checked) => updatePreferences({ smartEdges: checked })}
+						/>
+					) : null}
 					<FontPickerRow
 						value={preferences.fontFamily}
 						onChange={(fontFamily) => updatePreferences({ fontFamily })}
@@ -675,7 +684,19 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	);
 }
 
-export const SettingsSidebar = memo(function SettingsSidebar() {
+interface SettingsSidebarProps {
+	/**
+	 * Override navigation for the "Usage Dashboard" button. When provided,
+	 * this is called instead of `window.location.assign('/dashboard')` so
+	 * embedders (e.g. the Tauri desktop app, which has no URL routing) can
+	 * render the dashboard inline.
+	 */
+	onOpenDashboard?: () => void;
+}
+
+export const SettingsSidebar = memo(function SettingsSidebar({
+	onOpenDashboard,
+}: SettingsSidebarProps = {}) {
 	const isExpanded = useSettingsStore((state) => state.isExpanded);
 	const collapseSidebar = useSettingsStore((state) => state.collapseSidebar);
 	const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -849,6 +870,10 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
 				<button
 					type="button"
 					onClick={() => {
+						if (onOpenDashboard) {
+							onOpenDashboard();
+							return;
+						}
 						if (typeof window === 'undefined') return;
 						const basePathRaw =
 							(globalThis as { OTTO_ROUTER_BASEPATH?: string })

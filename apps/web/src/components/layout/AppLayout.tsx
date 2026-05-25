@@ -37,6 +37,7 @@ import {
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
 import { Moon, Sun } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
 
 const VIEWER_CHAT_WIDTH = 'clamp(360px, 28vw, 520px)';
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
@@ -78,6 +79,7 @@ export const AppLayout = memo(function AppLayout({
 	sessionId,
 	onFixWithAI,
 }: AppLayoutProps) {
+	const navigate = useNavigate();
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
@@ -236,7 +238,9 @@ export const AppLayout = memo(function AppLayout({
 							<div className="h-full w-full">
 								<GitSidebar onFixWithAI={onFixWithAI} />
 								<SessionFilesSidebar sessionId={sessionId} />
-								<SettingsSidebar />
+								<SettingsSidebar
+									onOpenDashboard={() => navigate({ to: '/dashboard' })}
+								/>
 								<TunnelSidebar />
 								<FileBrowserSidebar />
 								<MCPSidebar />

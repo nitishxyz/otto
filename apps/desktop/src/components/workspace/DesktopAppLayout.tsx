@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
-import type { Theme } from '@ottocode/web-sdk/hooks';
+import { usePreferences, type Theme } from '@ottocode/web-sdk/hooks';
 import {
 	Button,
 	ConfirmationDialog,
@@ -23,6 +23,7 @@ import {
 	TerminalsPanel,
 	TunnelSidebar,
 	TunnelSidebarToggle,
+	UsageDashboard,
 	ViewerTabs,
 } from '@ottocode/web-sdk/components';
 import {
@@ -83,6 +84,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	sessionId,
 	onFixWithAI,
 }: DesktopAppLayoutProps) {
+	const [showDashboard, setShowDashboard] = useState(false);
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
@@ -94,6 +96,8 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
+	const { preferences } = usePreferences();
+	const smartEdges = preferences.smartEdges;
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
@@ -273,6 +277,13 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 			}
 		};
 
+		if (!smartEdges) {
+			clearHoverTimeouts();
+			setIsRightRailHoverPending(false);
+			setRailVisible(false);
+			return;
+		}
+
 		window.addEventListener('mousemove', handleMouseMove);
 		window.addEventListener('mouseout', handleMouseOut);
 		window.addEventListener('blur', handleMouseLeave);
@@ -287,7 +298,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 				handleMouseLeave,
 			);
 		};
-	}, []);
+	}, [smartEdges]);
 
 	return (
 		<div className="h-full flex bg-background touch-manipulation border-t border-border/50">
@@ -354,7 +365,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<div className="h-full w-full">
 								<GitSidebar onFixWithAI={onFixWithAI} />
 								<SessionFilesSidebar sessionId={sessionId} />
-								<SettingsSidebar />
+								<SettingsSidebar
+									onOpenDashboard={() => setShowDashboard(true)}
+								/>
 								<TunnelSidebar />
 								<FileBrowserSidebar />
 								<MCPSidebar />
@@ -416,6 +429,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 			<GitCommitModal />
 			<ConfirmationDialog />
 			<QuickFilePicker />
+			{showDashboard && (
+				<UsageDashboard onBack={() => setShowDashboard(false)} />
+			)}
 		</div>
 	);
 });

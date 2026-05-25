@@ -6,6 +6,7 @@ interface StoredPreferences {
 	vimMode: boolean;
 	compactThread: boolean;
 	fontFamily: string;
+	smartEdges: boolean;
 }
 
 interface Preferences extends StoredPreferences {
@@ -18,6 +19,7 @@ const DEFAULT_STORED_PREFERENCES: StoredPreferences = {
 	vimMode: false,
 	compactThread: true,
 	fontFamily: DEFAULT_FONT_FAMILY,
+	smartEdges: true,
 };
 
 function cssFontFamily(fontFamily: string): string {
@@ -69,6 +71,10 @@ function resolveInitialPreferences(): StoredPreferences {
 					typeof parsed.fontFamily === 'string' && parsed.fontFamily.trim()
 						? parsed.fontFamily.trim()
 						: DEFAULT_STORED_PREFERENCES.fontFamily,
+				smartEdges:
+					typeof parsed.smartEdges === 'boolean'
+						? parsed.smartEdges
+						: DEFAULT_STORED_PREFERENCES.smartEdges,
 			};
 		}
 	} catch (error) {
@@ -137,6 +143,9 @@ export function usePreferences() {
 			if (updates.fontFamily !== undefined) {
 				localUpdates.fontFamily =
 					updates.fontFamily.trim() || DEFAULT_FONT_FAMILY;
+			}
+			if (updates.smartEdges !== undefined) {
+				localUpdates.smartEdges = updates.smartEdges;
 			}
 
 			if (Object.keys(localUpdates).length > 0) {
