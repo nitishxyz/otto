@@ -19,7 +19,7 @@ describe('config loader', () => {
 		expect(cfg.defaults.agent).toBeDefined();
 		expect(cfg.defaults.provider).toBeDefined();
 		expect(cfg.defaults.model).toBeDefined();
-		expect(cfg.defaults.fullWidthContent).toBe(true);
+		expect(cfg.defaults.fullWidthContent).toBe(false);
 		expect(cfg.paths.dbPath.endsWith('.otto/otto.sqlite')).toBe(true);
 	});
 

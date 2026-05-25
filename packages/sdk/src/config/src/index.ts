@@ -38,7 +38,7 @@ const DEFAULTS: {
 		guidedMode: false,
 		reasoningText: true,
 		reasoningLevel: 'high',
-		fullWidthContent: true,
+		fullWidthContent: false,
 		autoCompactThresholdTokens: null,
 	},
 	providers: DEFAULT_PROVIDER_SETTINGS,
