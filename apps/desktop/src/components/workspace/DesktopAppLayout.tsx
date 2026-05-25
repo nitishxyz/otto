@@ -73,6 +73,9 @@ interface DesktopAppLayoutProps {
 	sessionId?: string;
 	onNavigateToSession?: (sessionId: string) => void;
 	onFixWithAI?: (errorMessage: string) => void;
+	dashboardOpen: boolean;
+	onOpenDashboard: () => void;
+	onCloseDashboard: () => void;
 }
 
 export const DesktopAppLayout = memo(function DesktopAppLayout({
@@ -83,8 +86,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	onToggleTheme,
 	sessionId,
 	onFixWithAI,
+	dashboardOpen,
+	onOpenDashboard,
+	onCloseDashboard,
 }: DesktopAppLayoutProps) {
-	const [showDashboard, setShowDashboard] = useState(false);
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
 	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
@@ -365,9 +370,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<div className="h-full w-full">
 								<GitSidebar onFixWithAI={onFixWithAI} />
 								<SessionFilesSidebar sessionId={sessionId} />
-								<SettingsSidebar
-									onOpenDashboard={() => setShowDashboard(true)}
-								/>
+								<SettingsSidebar onOpenDashboard={onOpenDashboard} />
 								<TunnelSidebar />
 								<FileBrowserSidebar />
 								<MCPSidebar />
@@ -429,9 +432,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 			<GitCommitModal />
 			<ConfirmationDialog />
 			<QuickFilePicker />
-			{showDashboard && (
-				<UsageDashboard onBack={() => setShowDashboard(false)} />
-			)}
+			{dashboardOpen && <UsageDashboard onBack={onCloseDashboard} />}
 		</div>
 	);
 });

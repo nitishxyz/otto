@@ -1,15 +1,12 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { RouterProvider } from '@tanstack/react-router';
+import { useTheme } from '@ottocode/web-sdk/hooks';
 import { tauriBridge, type Project } from './lib/tauri-bridge';
 import { tauriOnboarding } from './lib/tauri-onboarding';
-import { ProjectPicker } from './components/ProjectPicker';
-import { Workspace } from './components/Workspace';
-import { NativeOnboarding } from './components/onboarding/NativeOnboarding';
-import { SetuLoader } from './components/SetuLoader';
-import { useTheme } from '@ottocode/web-sdk/hooks';
-import type { Theme } from '@ottocode/web-sdk/hooks';
+import { router } from './router';
 import './index.css';
 
-type View = 'loading' | 'onboarding' | 'picker' | 'workspace';
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
 const DESKTOP_FONT_STORAGE_KEY = 'otto-desktop-font-family';
 
@@ -21,22 +18,8 @@ function applyDesktopFontFamily(fontFamily: string) {
 	);
 }
 
-interface ThemeContextValue {
-	theme: Theme;
-	setTheme: (theme: Theme) => void;
-	toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-	theme: 'dark',
-	setTheme: () => {},
-	toggleTheme: () => {},
-});
-
-export const useDesktopTheme = () => useContext(ThemeContext);
-
 function App() {
-	const [view, setView] = useState<View>('loading');
+	const [initialized, setInitialized] = useState(false);
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 	const { theme, setTheme, toggleTheme } = useTheme();
 
@@ -51,44 +34,47 @@ function App() {
 		const init = async () => {
 			const initialPath = await tauriBridge.getInitialProject();
 			const initialRemote = await tauriBridge.getInitialRemote();
+			let nextRoute: '/onboarding' | '/projects' | '/sessions' = '/projects';
 
 			try {
 				const status = await tauriOnboarding.getStatus();
 
 				if (!status.onboardingComplete) {
-					setView('onboarding');
-					return;
+					nextRoute = '/onboarding';
 				}
 			} catch {
-				setView('onboarding');
-				return;
+				nextRoute = '/onboarding';
 			}
 
-			if (initialRemote) {
+			let nextProject: Project | null = null;
+
+			if (nextRoute !== '/onboarding' && initialRemote) {
 				const [remoteUrl, remoteName] = initialRemote;
-				const project: Project = {
+				nextProject = {
 					path: remoteName,
 					name: remoteName,
 					lastOpened: new Date().toISOString(),
 					pinned: false,
 					remoteUrl,
 				};
-				setSelectedProject(project);
-				setView('workspace');
-			} else if (initialPath) {
+				nextRoute = '/sessions';
+			} else if (nextRoute !== '/onboarding' && initialPath) {
 				const name = initialPath.split('/').pop() || initialPath;
-				const project: Project = {
+				nextProject = {
 					path: initialPath,
 					name,
 					lastOpened: new Date().toISOString(),
 					pinned: false,
 				};
-				tauriBridge.saveRecentProject(project).catch(() => {});
-				setSelectedProject(project);
-				setView('workspace');
-			} else {
-				setView('picker');
+				tauriBridge.saveRecentProject(nextProject).catch(() => {});
+				nextRoute = '/sessions';
 			}
+
+			flushSync(() => {
+				setSelectedProject(nextProject);
+				setInitialized(true);
+			});
+			await router.navigate({ to: nextRoute, replace: true });
 		};
 
 		init();
@@ -100,43 +86,38 @@ function App() {
 			lastOpened: new Date().toISOString(),
 		};
 		tauriBridge.saveRecentProject(updatedProject).catch(() => {});
-		setSelectedProject(updatedProject);
-		setView('workspace');
+		flushSync(() => {
+			setSelectedProject(updatedProject);
+		});
+		router.navigate({ to: '/sessions' }).catch(() => {});
 	};
 
-	const handleBack = () => {
-		setView('picker');
+	const handleBack = async () => {
 		setSelectedProject(null);
+		await router.navigate({ to: '/projects' });
 	};
 
 	const handleOnboardingComplete = () => {
-		setView('picker');
+		flushSync(() => {
+			setInitialized(true);
+		});
+		router.navigate({ to: '/projects', replace: true }).catch(() => {});
 	};
 
-	if (view === 'loading') {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<SetuLoader />
-			</div>
-		);
-	}
-
 	return (
-		<ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-			{view === 'onboarding' && (
-				<NativeOnboarding onComplete={handleOnboardingComplete} />
-			)}
-			{view === 'picker' && (
-				<ProjectPicker onSelectProject={handleSelectProject} />
-			)}
-			{view === 'workspace' && selectedProject && (
-				<Workspace
-					key={selectedProject.path}
-					project={selectedProject}
-					onBack={handleBack}
-				/>
-			)}
-		</ThemeContext.Provider>
+		<RouterProvider
+			router={router}
+			context={{
+				initialized,
+				selectedProject,
+				theme,
+				setTheme,
+				toggleTheme,
+				onSelectProject: handleSelectProject,
+				onBackToProjects: handleBack,
+				onOnboardingComplete: handleOnboardingComplete,
+			}}
+		/>
 	);
 }
 

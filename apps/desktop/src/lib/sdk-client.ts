@@ -1,4 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { onAction } from '@tauri-apps/plugin-notification';
 import {
 	isPermissionGranted,
@@ -113,22 +114,35 @@ function registerDesktopPlatformAdapters() {
 	if (!win.OTTO_NOTIFICATION_ACTION_LISTENER) {
 		win.OTTO_NOTIFICATION_ACTION_LISTENER = true;
 		const currentWindowLabel = appWindow.label;
-		onAction((notification) => {
+		onAction(async (notification) => {
 			const notificationWindowLabel =
 				typeof notification.extra?.windowLabel === 'string'
 					? notification.extra.windowLabel
+					: undefined;
+			const sessionId =
+				typeof notification.extra?.sessionId === 'string'
+					? notification.extra.sessionId
 					: undefined;
 			if (
 				notificationWindowLabel &&
 				notificationWindowLabel !== currentWindowLabel
 			) {
+				const targetWindow = await WebviewWindow.getByLabel(
+					notificationWindowLabel,
+				).catch(() => null);
+				if (targetWindow) {
+					await targetWindow.unminimize().catch(() => {});
+					await targetWindow.show().catch(() => {});
+					await targetWindow.setFocus().catch(() => {});
+					if (sessionId) {
+						await targetWindow
+							.emit('otto-open-session', sessionId)
+							.catch(() => {});
+					}
+				}
 				return;
 			}
 
-			const sessionId =
-				typeof notification.extra?.sessionId === 'string'
-					? notification.extra.sessionId
-					: undefined;
 			if (sessionId) {
 				void win.OTTO_OPEN_SESSION?.(sessionId);
 			}

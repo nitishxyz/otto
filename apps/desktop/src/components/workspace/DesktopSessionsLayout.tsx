@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
@@ -32,13 +33,19 @@ import { DesktopAppLayout } from './DesktopAppLayout';
 interface DesktopSessionsLayoutProps {
 	theme: Theme;
 	onToggleTheme: () => void;
+	sessionId?: string;
+	dashboardOpen: boolean;
+	onCloseDashboard: () => void;
 }
 
 export function DesktopSessionsLayout({
 	theme,
 	onToggleTheme,
+	sessionId,
+	dashboardOpen,
+	onCloseDashboard,
 }: DesktopSessionsLayoutProps) {
-	const [sessionId, setSessionId] = useState<string | undefined>();
+	const navigate = useNavigate();
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
@@ -65,29 +72,40 @@ export function DesktopSessionsLayout({
 	}, []);
 
 	const handleNewSession = useCallback(() => {
-		setSessionId(undefined);
+		navigate({ to: '/sessions' });
 		focusInput();
-	}, [focusInput]);
+	}, [navigate, focusInput]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
-			setSessionId(newSessionId);
+			navigate({
+				to: '/sessions/$sessionId',
+				params: { sessionId: newSessionId },
+				replace: false,
+			});
 			focusInput();
 		},
-		[focusInput],
+		[navigate, focusInput],
 	);
 
 	const handleDeleteSession = useCallback(() => {
-		setSessionId(undefined);
-	}, []);
+		navigate({ to: '/sessions' });
+	}, [navigate]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
-			setSessionId(id);
+			navigate({
+				to: '/sessions/$sessionId',
+				params: { sessionId: id },
+			});
 			focusInput();
 		},
-		[focusInput],
+		[navigate, focusInput],
 	);
+
+	const handleOpenDashboard = useCallback(() => {
+		navigate({ to: '/dashboard' });
+	}, [navigate]);
 
 	const handleFixWithAI = useCallback(
 		async (errorMessage: string) => {
@@ -98,7 +116,10 @@ export function DesktopSessionsLayout({
 					model: config?.defaults.model,
 					title: 'Fix Git Error',
 				});
-				setSessionId(session.id);
+				navigate({
+					to: '/sessions/$sessionId',
+					params: { sessionId: session.id },
+				});
 				await apiClient.sendMessage(session.id, {
 					content: errorMessage,
 				});
@@ -106,7 +127,7 @@ export function DesktopSessionsLayout({
 				console.error('Failed to create fix session:', error);
 			}
 		},
-		[createSession, config],
+		[createSession, config, navigate],
 	);
 
 	const handleCopyText = useCallback(async (text: string) => {
@@ -177,6 +198,7 @@ export function DesktopSessionsLayout({
 		const win = window as Window & {
 			OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
 		};
+		let unlisten: (() => void) | undefined;
 		win.OTTO_OPEN_SESSION = async (nextSessionId: string) => {
 			const appWindow = getCurrentWindow();
 			await appWindow.unminimize().catch(() => {});
@@ -184,8 +206,19 @@ export function DesktopSessionsLayout({
 			await appWindow.setFocus().catch(() => {});
 			handleSelectSession(nextSessionId);
 		};
+		getCurrentWindow()
+			.listen<string>('otto-open-session', (event) => {
+				void win.OTTO_OPEN_SESSION?.(event.payload);
+			})
+			.then((nextUnlisten) => {
+				unlisten = nextUnlisten;
+			})
+			.catch((error: unknown) => {
+				console.error('[otto] Failed to listen for session opens:', error);
+			});
 
 		return () => {
+			unlisten?.();
 			if (win.OTTO_OPEN_SESSION) {
 				delete win.OTTO_OPEN_SESSION;
 			}
@@ -236,6 +269,9 @@ export function DesktopSessionsLayout({
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}
+				dashboardOpen={dashboardOpen}
+				onOpenDashboard={handleOpenDashboard}
+				onCloseDashboard={onCloseDashboard}
 				sidebar={
 					<SessionListContainer
 						activeSessionId={sessionId}

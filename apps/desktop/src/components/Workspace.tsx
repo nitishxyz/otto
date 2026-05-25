@@ -9,7 +9,7 @@ import { handleTitleBarDrag } from '../utils/title-bar';
 import type { Project } from '../lib/tauri-bridge';
 import { tauriBridge } from '../lib/tauri-bridge';
 import { SetuLoader } from './SetuLoader';
-import { useDesktopTheme } from '../App';
+import { useDesktopTheme } from '../theme';
 import { WindowControls } from './WindowControls';
 import { useVersion } from '../hooks/useVersion';
 import { DesktopWorkspaceApp } from './workspace/DesktopWorkspaceApp';
@@ -26,9 +26,15 @@ function closeActiveWorkspaceOverlay() {
 export function Workspace({
 	project,
 	onBack,
+	sessionId,
+	dashboardOpen,
+	onCloseDashboard,
 }: {
 	project: Project;
-	onBack: () => void;
+	onBack: () => void | Promise<void>;
+	sessionId?: string;
+	dashboardOpen: boolean;
+	onCloseDashboard: () => void;
 }) {
 	const { server, loading, error, startServer, stopServer } = useServer();
 	const startedRef = useRef(false);
@@ -257,6 +263,9 @@ export function Workspace({
 						project={project}
 						theme={theme}
 						onToggleTheme={toggleTheme}
+						sessionId={sessionId}
+						dashboardOpen={dashboardOpen}
+						onCloseDashboard={onCloseDashboard}
 					/>
 				)}
 			</div>

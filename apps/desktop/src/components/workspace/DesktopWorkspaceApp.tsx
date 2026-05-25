@@ -12,6 +12,9 @@ interface DesktopWorkspaceAppProps {
 	project: Project;
 	theme: Theme;
 	onToggleTheme: () => void;
+	sessionId?: string;
+	dashboardOpen: boolean;
+	onCloseDashboard: () => void;
 }
 
 export function DesktopWorkspaceApp({
@@ -19,12 +22,21 @@ export function DesktopWorkspaceApp({
 	project,
 	theme,
 	onToggleTheme,
+	sessionId,
+	dashboardOpen,
+	onCloseDashboard,
 }: DesktopWorkspaceAppProps) {
 	return (
 		<DesktopWorkspaceProvider apiUrl={apiUrl}>
 			<div className="h-full min-h-0" data-project-path={project.path}>
-				<DesktopSessionsLayout theme={theme} onToggleTheme={onToggleTheme} />
-				<OnboardingModal hideHeader style={{ top: 48 }} />
+				<DesktopSessionsLayout
+					theme={theme}
+					onToggleTheme={onToggleTheme}
+					sessionId={sessionId}
+					dashboardOpen={dashboardOpen}
+					onCloseDashboard={onCloseDashboard}
+				/>
+				<OnboardingModal hideHeader />
 				<OttoRouterTopupModal />
 			</div>
 		</DesktopWorkspaceProvider>

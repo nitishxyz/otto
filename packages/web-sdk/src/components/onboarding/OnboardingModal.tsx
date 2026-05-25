@@ -4,6 +4,7 @@ import { DefaultsStep } from './steps/DefaultsStep';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
+import { StableSpinner } from '../ui/StableSpinner';
 
 interface OnboardingModalProps {
 	hideHeader?: boolean;
@@ -17,6 +18,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 	const isOpen = useOnboardingStore((s) => s.isOpen);
 	const currentStep = useOnboardingStore((s) => s.currentStep);
 	const manageMode = useOnboardingStore((s) => s.manageMode);
+	const isLoading = useOnboardingStore((s) => s.isLoading);
+	const error = useOnboardingStore((s) => s.error);
 	const authStatus = useOnboardingStore((s) => s.authStatus);
 	const nextStep = useOnboardingStore((s) => s.nextStep);
 	const prevStep = useOnboardingStore((s) => s.prevStep);
@@ -59,14 +62,29 @@ export const OnboardingModal = memo(function OnboardingModal({
 			window.removeEventListener('otto:native-back', handleNativeBack);
 	}, [isOpen, reset]);
 
-	if (!isOpen || !authStatus) return null;
+	if (!isOpen) return null;
 
 	return (
 		<div
 			className="fixed inset-0 z-[9999] bg-background text-foreground overflow-y-auto"
 			style={style}
 		>
-			{currentStep === 'wallet' && (
+			{!authStatus ? (
+				<div className="min-h-full flex items-center justify-center p-6">
+					<div className="flex flex-col items-center gap-3 text-center">
+						<StableSpinner size="xl" title="Loading providers" />
+						<div>
+							<p className="font-medium">Loading providers…</p>
+							<p className="mt-1 text-sm text-muted-foreground">
+								Fetching your current provider configuration.
+							</p>
+							{error && !isLoading && (
+								<p className="mt-3 text-sm text-destructive">{error}</p>
+							)}
+						</div>
+					</div>
+				</div>
+			) : currentStep === 'wallet' ? (
 				<ProviderSetupStep
 					authStatus={authStatus}
 					onSetupWallet={setupWallet}
@@ -89,15 +107,18 @@ export const OnboardingModal = memo(function OnboardingModal({
 					onImportCopilotTokenFromGh={importCopilotTokenFromGh}
 					onGetCopilotDiagnostics={getCopilotDiagnostics}
 				/>
-			)}
-
-			{currentStep === 'defaults' && (
+			) : currentStep === 'defaults' ? (
 				<DefaultsStep
 					authStatus={authStatus}
 					onComplete={completeOnboarding}
 					onBack={prevStep}
 					hideHeader={hideHeader}
 				/>
+			) : null}
+			{authStatus && error && !isLoading && (
+				<div className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-destructive/30 bg-background px-4 py-2 text-sm text-destructive shadow-lg">
+					{error}
+				</div>
 			)}
 		</div>
 	);

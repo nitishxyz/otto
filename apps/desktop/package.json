@@ -13,6 +13,7 @@
 	"dependencies": {
 		"@ottocode/web-sdk": "workspace:*",
 		"@tanstack/react-query": "^5.90.2",
+		"@tanstack/react-router": "^1.132.47",
 		"@tauri-apps/api": "^2.9.1",
 		"@tauri-apps/plugin-dialog": "^2",
 		"@tauri-apps/plugin-fs": "^2",

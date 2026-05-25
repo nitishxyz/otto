@@ -19,7 +19,7 @@ import {
 	Star,
 	X,
 } from 'lucide-react';
-import { useDesktopTheme } from '../App';
+import { useDesktopTheme } from '../theme';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';

@@ -827,11 +827,10 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 							<button
 								type="button"
 								onClick={() => {
-									fetchAuthStatus().then(() => {
-										setStep('wallet');
-										setManageMode(true);
-										setOnboardingOpen(true);
-									});
+									setStep('wallet');
+									setManageMode(true);
+									setOnboardingOpen(true);
+									fetchAuthStatus();
 								}}
 								className="p-1 hover:bg-muted rounded transition-colors"
 								title="Manage providers"
