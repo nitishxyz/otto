@@ -1,0 +1,5 @@
+- Read a local image file and send it to the language model as image content
+- Accepts project-relative paths by default; absolute and home paths are allowed
+- Uses Bun.Image to downscale/compress supported images before model submission when possible
+- Returns metadata plus the visual image payload; use when you need to inspect screenshots, icons, diagrams, or other images
+- For text files, use the read tool instead

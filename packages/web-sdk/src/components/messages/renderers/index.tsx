@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ContentJson } from './types';
 import { ReadRenderer } from './ReadRenderer';
+import { ReadImageRenderer } from './ReadImageRenderer';
 import { WriteRenderer } from './WriteRenderer';
 import { BashRenderer } from './BashRenderer';
 import { GitStatusRenderer } from './GitStatusRenderer';
@@ -41,6 +42,7 @@ interface ToolResultRendererProps {
  */
 const TOOL_NAME_ALIASES: Record<string, string> = {
 	Read: 'read',
+	ReadImage: 'read_image',
 	Edit: 'edit',
 	MultiEdit: 'multiedit',
 	Write: 'write',
@@ -123,6 +125,8 @@ export function ToolResultRenderer({
 	switch (normalizedName) {
 		case 'read':
 			return <ReadRenderer {...props} />;
+		case 'read_image':
+			return <ReadImageRenderer {...props} />;
 		case 'edit':
 		case 'multiedit':
 			return <ApplyPatchRenderer {...props} toolName={normalizedName} />;

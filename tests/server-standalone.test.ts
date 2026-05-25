@@ -1,9 +1,34 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import {
+	describe,
+	expect,
+	test,
+	beforeEach,
+	afterEach,
+	beforeAll,
+} from 'bun:test';
 import {
 	createApp,
 	createStandaloneApp,
 	createEmbeddedApp,
 } from '@ottocode/server';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const tempProjectBase = join(tmpdir(), 'otto-server-standalone-tests');
+
+beforeAll(async () => {
+	await rm(tempProjectBase, { recursive: true, force: true });
+	await mkdir(tempProjectBase, { recursive: true });
+});
+
+function createTempProjectRoot() {
+	return mkdtemp(join(tempProjectBase, 'project-'));
+}
+
+function askUrl(projectRoot: string) {
+	return `http://localhost/v1/ask?project=${encodeURIComponent(projectRoot)}`;
+}
 
 describe('Server Factory Functions', () => {
 	describe('createApp', () => {
@@ -87,8 +112,10 @@ describe('Server Factory Functions', () => {
 
 describe('AskService with Config Injection', () => {
 	let originalEnv: Record<string, string | undefined>;
+	let tempProjectRoot: string;
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		tempProjectRoot = await createTempProjectRoot();
 		originalEnv = {
 			OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 			ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
@@ -112,6 +139,7 @@ describe('AskService with Config Injection', () => {
 
 		try {
 			await handleAskRequest({
+				projectRoot: tempProjectRoot,
 				prompt: 'Test prompt',
 				skipFileConfig: true,
 				config: {
@@ -129,6 +157,7 @@ describe('AskService with Config Injection', () => {
 
 		try {
 			await handleAskRequest({
+				projectRoot: tempProjectRoot,
 				prompt: 'Test prompt',
 				skipFileConfig: true,
 				config: {
@@ -147,6 +176,7 @@ describe('AskService with Config Injection', () => {
 
 		try {
 			await handleAskRequest({
+				projectRoot: tempProjectRoot,
 				prompt: 'Test prompt',
 				skipFileConfig: true,
 				credentials: {
@@ -167,6 +197,7 @@ describe('AskService with Config Injection', () => {
 
 		try {
 			await handleAskRequest({
+				projectRoot: tempProjectRoot,
 				prompt: 'Test prompt',
 				skipFileConfig: true,
 				config: {
@@ -188,6 +219,7 @@ describe('AskService with Config Injection', () => {
 
 		try {
 			await handleAskRequest({
+				projectRoot: tempProjectRoot,
 				prompt: 'Test prompt',
 				skipFileConfig: true,
 				config: {
@@ -234,10 +266,16 @@ describe('Agent Config Injection', () => {
 });
 
 describe('API Route Integration', () => {
+	let tempProjectRoot: string;
+
+	beforeEach(async () => {
+		tempProjectRoot = await createTempProjectRoot();
+	});
+
 	test('POST /v1/ask accepts skipFileConfig in body', async () => {
 		const app = createStandaloneApp();
 
-		const res = await app.request('http://localhost/v1/ask', {
+		const res = await app.request(askUrl(tempProjectRoot), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -257,7 +295,7 @@ describe('API Route Integration', () => {
 	test('POST /v1/ask accepts agentPrompt in body', async () => {
 		const app = createStandaloneApp();
 
-		const res = await app.request('http://localhost/v1/ask', {
+		const res = await app.request(askUrl(tempProjectRoot), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -279,7 +317,7 @@ describe('API Route Integration', () => {
 	test('POST /v1/ask accepts credentials in body', async () => {
 		const app = createStandaloneApp();
 
-		const res = await app.request('http://localhost/v1/ask', {
+		const res = await app.request(askUrl(tempProjectRoot), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({

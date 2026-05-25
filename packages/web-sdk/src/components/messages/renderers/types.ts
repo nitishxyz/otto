@@ -82,6 +82,14 @@ export interface ToolResultData {
 	lineRange?: string;
 	content?: string;
 	bytes?: number;
+	mediaType?: string;
+	data?: string;
+	size?: number;
+	transmittedSize?: number;
+	sha256?: string;
+	compressed?: boolean;
+	width?: number;
+	height?: number;
 	artifact?: {
 		patch?: string;
 		summary?: {

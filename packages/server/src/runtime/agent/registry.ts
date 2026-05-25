@@ -106,6 +106,7 @@ const defaultToolExtras: Record<string, string[]> = {
 	build: [
 		'skill',
 		'read',
+		'read_image',
 		'edit',
 		'multiedit',
 		'write',
@@ -121,10 +122,20 @@ const defaultToolExtras: Record<string, string[]> = {
 		'apply_patch',
 		'websearch',
 	],
-	plan: ['skill', 'read', 'ls', 'tree', 'ripgrep', 'update_todos', 'websearch'],
+	plan: [
+		'skill',
+		'read',
+		'read_image',
+		'ls',
+		'tree',
+		'ripgrep',
+		'update_todos',
+		'websearch',
+	],
 	general: [
 		'skill',
 		'read',
+		'read_image',
 		'edit',
 		'multiedit',
 		'write',
@@ -140,6 +151,7 @@ const defaultToolExtras: Record<string, string[]> = {
 	init: [
 		'skill',
 		'read',
+		'read_image',
 		'edit',
 		'multiedit',
 		'write',
@@ -159,6 +171,7 @@ const defaultToolExtras: Record<string, string[]> = {
 	commit: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'],
 	research: [
 		'read',
+		'read_image',
 		'ls',
 		'tree',
 		'ripgrep',

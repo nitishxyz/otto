@@ -634,7 +634,7 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 		(stats?.totals.inputTokens ?? 0) + (stats?.totals.outputTokens ?? 0);
 
 	return (
-		<div className="fixed inset-0 flex flex-col bg-background text-foreground">
+		<div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
 			{/* Header */}
 			<header className="shrink-0 h-10 border-b border-border/60 bg-background/80 backdrop-blur">
 				<div className="h-full max-w-5xl mx-auto px-6 flex items-center justify-between gap-3">

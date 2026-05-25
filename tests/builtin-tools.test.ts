@@ -7,6 +7,8 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
+const onePixelPngBase64 =
+	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lUdGqwAAAABJRU5ErkJggg==';
 
 async function resolveStreamedResult(value: unknown): Promise<unknown> {
 	if (!value || typeof value !== 'object' || !(Symbol.asyncIterator in value)) {
@@ -46,6 +48,10 @@ beforeAll(async () => {
 	);
 	await mkdir(join(projectRoot, 'subdir'), { recursive: true });
 	await writeFile(join(projectRoot, 'subdir', 'file.ts'), 'const x = 1;\n');
+	await writeFile(
+		join(projectRoot, 'pixel.png'),
+		Buffer.from(onePixelPngBase64, 'base64'),
+	);
 });
 
 afterAll(async () => {
@@ -58,6 +64,7 @@ describe('Built-in Tools', () => {
 		const names = tools.map((t) => t.name);
 
 		expect(names).toContain('read');
+		expect(names).toContain('read_image');
 		expect(names).toContain('edit');
 		expect(names).toContain('multiedit');
 		expect(names).toContain('write');
@@ -102,6 +109,31 @@ describe('Built-in Tools', () => {
 				'Hello World\nLine 2',
 			);
 			expect((result as { lineRange: string }).lineRange).toBe('@1-2');
+		});
+	});
+
+	describe('read_image tool', () => {
+		it('should read image content for vision models', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const imageTool = tools.find((t) => t.name === 'read_image');
+			expect(imageTool).toBeDefined();
+
+			const result = await imageTool?.tool.execute({ path: 'pixel.png' });
+			expect(result).toHaveProperty('mediaType');
+			expect((result as { mediaType: string }).mediaType).toBe('image/png');
+			expect((result as { data: string }).data.length).toBeGreaterThan(0);
+
+			const modelOutput = await imageTool?.tool.toModelOutput?.({
+				toolCallId: 'call-1',
+				input: { path: 'pixel.png' },
+				output: result,
+			});
+			expect(modelOutput).toHaveProperty('type', 'content');
+			expect(
+				(modelOutput as { value: Array<{ type: string }> }).value.some(
+					(part) => part.type === 'image-data',
+				),
+			).toBe(true);
 		});
 	});
 

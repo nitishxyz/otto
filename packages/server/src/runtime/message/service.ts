@@ -17,6 +17,10 @@ import {
 import { estimateTokens } from './compaction.ts';
 import { detectOAuth, adaptSimpleCall } from '../provider/oauth-adapter.ts';
 import { prepareBuiltinCommand } from '../commands/builtins.ts';
+import {
+	compressFileImageAttachments,
+	compressImageAttachments,
+} from './image-compression.ts';
 
 type SessionRow = typeof sessions.$inferSelect;
 
@@ -63,6 +67,8 @@ export async function dispatchAssistantMessage(
 
 	const sessionId = session.id;
 	const now = Date.now();
+	const compressedImages = await compressImageAttachments(images);
+	const compressedFiles = await compressFileImageAttachments(files);
 	const builtinCommand = await prepareBuiltinCommand({
 		cfg,
 		db,
@@ -105,9 +111,9 @@ export async function dispatchAssistantMessage(
 		model,
 	});
 
-	if (images && images.length > 0) {
-		for (let i = 0; i < images.length; i++) {
-			const img = images[i];
+	if (compressedImages && compressedImages.length > 0) {
+		for (let i = 0; i < compressedImages.length; i++) {
+			const img = compressedImages[i];
 			await db.insert(messageParts).values({
 				id: crypto.randomUUID(),
 				messageId: userMessageId,
@@ -121,9 +127,9 @@ export async function dispatchAssistantMessage(
 		}
 	}
 
-	let nextIndex = (images?.length ?? 0) + 1;
-	if (files && files.length > 0) {
-		for (const file of files) {
+	let nextIndex = (compressedImages?.length ?? 0) + 1;
+	if (compressedFiles && compressedFiles.length > 0) {
+		for (const file of compressedFiles) {
 			const partType = file.type === 'image' ? 'image' : 'file';
 			await db.insert(messageParts).values({
 				id: crypto.randomUUID(),
