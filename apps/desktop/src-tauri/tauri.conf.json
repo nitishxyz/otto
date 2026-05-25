@@ -15,7 +15,7 @@
 				"title": "otto",
 				"width": 1200,
 				"height": 800,
-				"minWidth": 800,
+				"minWidth": 640,
 				"minHeight": 600,
 				"resizable": true,
 				"fullscreen": false,
