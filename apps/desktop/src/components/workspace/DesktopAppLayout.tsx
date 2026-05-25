@@ -30,6 +30,7 @@ import {
 	useGitStore,
 	useMCPStore,
 	usePanelWidthStore,
+	useRightRailStore,
 	useSessionFilesStore,
 	useSettingsStore,
 	useSidebarStore,
@@ -90,6 +91,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
 	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
+	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
 	const anyRightPanelOpen =
@@ -147,8 +149,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		width: `${rightPanelWidth}px`,
 	} as CSSProperties;
 	const shouldRenderRightPanel = anyRightPanelOpen || isRightPanelMounted;
-	const shouldShowRightRail = anyRightPanelOpen || isRightRailVisible;
-	const shouldShowRightEdgeHint = isRightRailHoverPending || isRightRailVisible;
+	const shouldShowRightRail =
+		anyRightPanelOpen || isRightRailVisible || isRightRailPinned;
+	const shouldShowRightEdgeHint =
+		(isRightRailHoverPending || isRightRailVisible) && !isRightRailPinned;
 
 	// Auto-collapse sessions list when any right-side surface is open,
 	// and restore the user's previous state when everything closes.

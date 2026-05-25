@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Sun, Moon, ArrowDownToLine, RotateCw } from 'lucide-react';
-import { useSidebarStore } from '@ottocode/web-sdk/stores';
+import { useRightRailStore, useSidebarStore } from '@ottocode/web-sdk/stores';
 import { useServer } from '../hooks/useServer';
 import { useUpdate } from '../hooks/useUpdate';
 import { usePlatform } from '../hooks/usePlatform';
@@ -37,6 +37,8 @@ export function Workspace({
 	const { theme, toggleTheme } = useDesktopTheme();
 	const isSidebarCollapsed = useSidebarStore((state) => state.isCollapsed);
 	const toggleSidebar = useSidebarStore((state) => state.toggleCollapse);
+	const isRightRailPinned = useRightRailStore((state) => state.isPinned);
+	const toggleRightRail = useRightRailStore((state) => state.togglePinned);
 	const {
 		available,
 		version,
@@ -164,6 +166,29 @@ export function Workspace({
 						<span className="text-muted-foreground">Remote</span>
 					</div>
 				)}
+				<button
+					type="button"
+					onClick={toggleRightRail}
+					className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+					title={`${isRightRailPinned ? 'Hide' : 'Show'} right sidebar`}
+					aria-label={`${isRightRailPinned ? 'Hide' : 'Show'} right sidebar`}
+					aria-pressed={isRightRailPinned}
+				>
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.5"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						aria-hidden="true"
+					>
+						<rect x="2" y="2" width="12" height="12" rx="2" />
+						<path d="M10 2v12" />
+					</svg>
+				</button>
 				<button
 					type="button"
 					onClick={toggleTheme}

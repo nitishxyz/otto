@@ -161,6 +161,59 @@ button:focus-visible {
 .scrollbar-hide::-webkit-scrollbar {
 	display: none;
 }
+
+/* macOS-style overlay scrollbars: only visible while scrolling */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: transparent transparent;
+}
+
+.is-scrolling {
+	scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+	background: transparent;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece {
+	background: transparent;
+	border: none;
+}
+
+::-webkit-scrollbar-thumb {
+	background-color: transparent;
+	border-radius: 10px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+	min-height: 24px;
+	transition: background-color 400ms ease;
+}
+
+.is-scrolling::-webkit-scrollbar-thumb {
+	background-color: rgba(155, 155, 155, 0.5);
+	background-clip: padding-box;
+	transition: background-color 80ms ease;
+}
+
+.is-scrolling::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(155, 155, 155, 0.7);
+	background-clip: padding-box;
+}
+
+.is-scrolling::-webkit-scrollbar-thumb:active {
+	background-color: rgba(155, 155, 155, 0.85);
+	background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-button {
+	background: transparent;
+	display: none;
+}
 .markdown-content {
 	max-width: 100%;
 	overflow-wrap: break-word;

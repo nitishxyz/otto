@@ -2,6 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ReactDOM from 'react-dom/client';
 import { App } from './app/App';
 import './index.css';
+import { initAutoHideScrollbar } from './lib/auto-hide-scrollbar';
+
+initAutoHideScrollbar();
 
 const queryClient = new QueryClient({
 	defaultOptions: {
