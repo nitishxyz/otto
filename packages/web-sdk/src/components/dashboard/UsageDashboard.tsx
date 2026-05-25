@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Globe2, RefreshCw } from 'lucide-react';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { apiClient } from '../../lib/api-client';
 import type {
@@ -28,7 +28,7 @@ function formatUsd(n: number): string {
 	return `$${n.toFixed(0)}`;
 }
 
-function authLabel(t: UsageProviderAgg['authType']) {
+function authLabel(t: string) {
 	if (t === 'oauth') return 'oauth';
 	if (t === 'subscription') return 'sub';
 	if (t === 'wallet') return 'wallet';
@@ -36,7 +36,7 @@ function authLabel(t: UsageProviderAgg['authType']) {
 	return '—';
 }
 
-function authColor(t: UsageProviderAgg['authType']) {
+function authColor(t: string) {
 	if (t === 'oauth') return 'text-emerald-400';
 	if (t === 'subscription') return 'text-violet-400';
 	if (t === 'wallet') return 'text-fuchsia-400';
@@ -475,8 +475,64 @@ function ModelList({ models }: { models: UsageModelAgg[] }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Card primitive                                                      */
+/* Project list (global scope)                                         */
 /* ------------------------------------------------------------------ */
+
+function ProjectList({
+	projects,
+}: {
+	projects: NonNullable<UsageStats['projects']>;
+}) {
+	if (projects.included.length === 0 && projects.unavailable.length === 0) {
+		return (
+			<div className="py-10 text-center text-xs text-muted-foreground">
+				No projects registered yet
+			</div>
+		);
+	}
+	return (
+		<div className="divide-y divide-border/60">
+			{projects.included.map((p) => (
+				<div
+					key={p.id}
+					className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/20 transition-colors"
+				>
+					<div className="flex-1 min-w-0">
+						<div className="text-sm text-foreground truncate">{p.name}</div>
+						<div className="text-[10px] text-muted-foreground tabular-nums truncate font-mono">
+							{p.path}
+						</div>
+					</div>
+					<div className="text-right tabular-nums shrink-0">
+						<div className="text-sm font-medium text-foreground">
+							{formatUsd(p.notionalCostUsd)}
+						</div>
+						<div className="text-[10px] text-muted-foreground">
+							{formatNumber(p.messages)} msgs
+						</div>
+					</div>
+				</div>
+			))}
+			{projects.unavailable.map((p) => (
+				<div
+					key={p.id}
+					className="flex items-center gap-3 py-2.5 px-1 opacity-60"
+					title={p.reason}
+				>
+					<AlertTriangle className="size-3.5 text-amber-400 shrink-0" />
+					<div className="flex-1 min-w-0">
+						<div className="text-sm text-foreground/80 truncate">{p.name}</div>
+						<div className="text-[10px] text-muted-foreground truncate font-mono">
+							{p.path} · {p.reason}
+						</div>
+					</div>
+					<div className="text-[10px] text-amber-400 shrink-0">unavailable</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
 /* ------------------------------------------------------------------ */
 /* Card primitive                                                      */
 /* ------------------------------------------------------------------ */
@@ -528,19 +584,23 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 	const [stats, setStats] = useState<UsageStats | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [scope, setScope] = useState<'project' | 'global'>('project');
 
 	const fetchStats = useCallback(async () => {
 		setLoading(true);
 		setError(null);
 		try {
-			const data = await apiClient.getUsageStats();
+			const data =
+				scope === 'global'
+					? await apiClient.getGlobalUsageStats()
+					: await apiClient.getUsageStats();
 			setStats(data);
 		} catch (e) {
 			setError(e instanceof Error ? e.message : 'Failed to load usage stats');
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [scope]);
 
 	useEffect(() => {
 		void fetchStats();
@@ -554,10 +614,19 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 	}, [onBack]);
 
 	const projectName = useMemo(() => {
+		if (scope === 'global') {
+			const included = stats?.projects?.included.length ?? 0;
+			const unavailable = stats?.projects?.unavailable.length ?? 0;
+			const total = included + unavailable;
+			if (total === 0) return 'all projects';
+			return unavailable > 0
+				? `${included} of ${total} projects`
+				: `${total} project${total === 1 ? '' : 's'}`;
+		}
 		if (!stats?.project) return '';
 		const parts = stats.project.split('/').filter(Boolean);
 		return parts[parts.length - 1] ?? stats.project;
-	}, [stats?.project]);
+	}, [scope, stats?.project, stats?.projects]);
 
 	const totalSpend = stats?.totals.costUsd ?? 0;
 	const totalMessages = stats?.totals.messages ?? 0;
@@ -580,22 +649,51 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 						</button>
 						<div className="h-4 w-px bg-border" />
 						<div className="min-w-0">
-							<div className="text-xs text-muted-foreground/70">Usage</div>
+							<div className="text-xs text-muted-foreground/70">
+								{scope === 'global' ? 'Usage · all projects' : 'Usage'}
+							</div>
 							<div className="text-sm font-medium truncate font-mono">
 								{projectName || '—'}
 							</div>
 						</div>
 					</div>
-					<button
-						type="button"
-						onClick={() => void fetchStats()}
-						disabled={loading}
-						className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
-					>
-						<RefreshCw
-							className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
-						/>
-					</button>
+					<div className="flex items-center gap-2">
+						<div className="inline-flex p-0.5 rounded-md border border-border bg-muted/30 text-[11px]">
+							<button
+								type="button"
+								onClick={() => setScope('project')}
+								className={`px-2.5 py-1 rounded transition-colors ${
+									scope === 'project'
+										? 'bg-background text-foreground shadow-sm'
+										: 'text-muted-foreground hover:text-foreground'
+								}`}
+							>
+								This project
+							</button>
+							<button
+								type="button"
+								onClick={() => setScope('global')}
+								className={`px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 ${
+									scope === 'global'
+										? 'bg-background text-foreground shadow-sm'
+										: 'text-muted-foreground hover:text-foreground'
+								}`}
+							>
+								<Globe2 className="size-3" />
+								All projects
+							</button>
+						</div>
+						<button
+							type="button"
+							onClick={() => void fetchStats()}
+							disabled={loading}
+							className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+						>
+							<RefreshCw
+								className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
+							/>
+						</button>
+					</div>
 				</div>
 			</header>
 
@@ -749,6 +847,20 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 									<ModelList models={stats.models} />
 								</Section>
 							</div>
+
+							{/* Projects (global scope only) */}
+							{scope === 'global' && stats.projects && (
+								<Section
+									title="Projects"
+									subtitle={
+										stats.projects.unavailable.length > 0
+											? `${stats.projects.included.length} included · ${stats.projects.unavailable.length} unavailable`
+											: `${stats.projects.included.length} included`
+									}
+								>
+									<ProjectList projects={stats.projects} />
+								</Section>
+							)}
 
 							{stats.notes.missingPricing.length > 0 && (
 								<div className="text-[10px] text-muted-foreground/70 text-center font-mono py-2">

@@ -110,6 +110,7 @@ class ApiClient {
 	updateSkillsConfig = skillsMixin.updateSkillsConfig;
 
 	getUsageStats = usageMixin.getUsageStats;
+	getGlobalUsageStats = usageMixin.getGlobalUsageStats;
 }
 
 export const apiClient = new ApiClient();

@@ -1,4 +1,5 @@
 import { getDb } from '@ottocode/database';
+import { touchProject } from '../../runtime/projects/registry.ts';
 import {
 	messageParts,
 	messages,
@@ -243,6 +244,9 @@ export async function loadProjectDb(
 ): Promise<ProjectDbContext> {
 	const cfg = await loadConfig(projectRoot);
 	const db = await getDb(cfg.projectRoot);
+	// Best-effort: record this project in the global registry so the cross-
+	// project usage dashboard can discover it. Debounced per-process.
+	void touchProject(cfg.projectRoot, cfg.paths.dbPath);
 	return { cfg, db };
 }
 

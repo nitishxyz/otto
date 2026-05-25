@@ -1,90 +1,41 @@
-import { extractErrorMessage, getBaseUrl } from './utils';
+import {
+	getUsageStats as apiGetUsageStats,
+	getGlobalUsageStats as apiGetGlobalUsageStats,
+	type UsageStats,
+	type UsageProviderAgg,
+	type UsageModelAgg,
+	type UsageDailyAgg,
+	type UsageProjectInfo,
+	type UsageProjectUnavailable,
+	type UsageProjectsBreakdown,
+	type UsageTotals,
+} from '@ottocode/api';
+import { extractErrorMessage } from './utils';
+
+export type {
+	UsageStats,
+	UsageProviderAgg,
+	UsageModelAgg,
+	UsageDailyAgg,
+	UsageProjectInfo,
+	UsageProjectUnavailable,
+	UsageProjectsBreakdown,
+	UsageTotals,
+};
 
 export type UsageAuthBucket = 'oauth' | 'api' | 'subscription';
 
-export interface UsageProviderAgg {
-	provider: string;
-	authType: 'oauth' | 'api' | 'wallet' | 'subscription' | 'unknown';
-	messages: number;
-	sessions: number;
-	inputTokens: number;
-	outputTokens: number;
-	cachedInputTokens: number;
-	cacheCreationInputTokens: number;
-	reasoningTokens: number;
-	costUsd: number;
-	notionalCostUsd: number;
-}
-
-export interface UsageModelAgg {
-	provider: string;
-	model: string;
-	authType: UsageProviderAgg['authType'];
-	messages: number;
-	inputTokens: number;
-	outputTokens: number;
-	cachedInputTokens: number;
-	cacheCreationInputTokens: number;
-	reasoningTokens: number;
-	costUsd: number;
-	notionalCostUsd: number;
-}
-
-export interface UsageDailyAgg {
-	date: string;
-	messages: number;
-	inputTokens: number;
-	outputTokens: number;
-	costUsd: number;
-	notionalCostUsd: number;
-	costByAuth: { oauth: number; api: number; subscription: number };
-	notionalByAuth: { oauth: number; api: number; subscription: number };
-}
-
-export interface UsageStats {
-	project: string;
-	generatedAt: number;
-	totals: {
-		messages: number;
-		sessions: number;
-		inputTokens: number;
-		outputTokens: number;
-		cachedInputTokens: number;
-		cacheCreationInputTokens: number;
-		reasoningTokens: number;
-		costUsd: number;
-		notionalCostUsd: number;
-		savedUsd: number;
-		costByAuth: { oauth: number; api: number; subscription: number };
-		messagesByAuth: { oauth: number; api: number; subscription: number };
-	};
-	providers: UsageProviderAgg[];
-	models: UsageModelAgg[];
-	daily: UsageDailyAgg[];
-	notes: {
-		oauthProviders: string[];
-		subscriptionProviders: string[];
-		missingPricing: string[];
-	};
-}
-
 export const usageMixin = {
 	async getUsageStats(): Promise<UsageStats> {
-		const base = getBaseUrl().replace(/\/+$/, '');
-		const res = await fetch(`${base}/v1/usage/stats`, {
-			method: 'GET',
-			headers: { 'Content-Type': 'application/json' },
-			credentials: 'include',
-		});
-		if (!res.ok) {
-			let body: unknown;
-			try {
-				body = await res.json();
-			} catch {
-				body = await res.text().catch(() => '');
-			}
-			throw new Error(extractErrorMessage(body) || `HTTP ${res.status}`);
-		}
-		return (await res.json()) as UsageStats;
+		const { data, error } = await apiGetUsageStats();
+		if (error) throw new Error(extractErrorMessage(error));
+		if (!data) throw new Error('Empty response from /v1/usage/stats');
+		return data;
+	},
+	async getGlobalUsageStats(): Promise<UsageStats> {
+		const { data, error } = await apiGetGlobalUsageStats();
+		if (error) throw new Error(extractErrorMessage(error));
+		if (!data) throw new Error('Empty response from /v1/usage/stats/global');
+		return data;
 	},
 };
