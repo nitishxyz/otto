@@ -40,6 +40,23 @@ import { Moon, Sun } from 'lucide-react';
 
 const VIEWER_CHAT_WIDTH = 'clamp(360px, 28vw, 520px)';
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
+const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
+
+function useMediaQuery(query: string): boolean {
+	const [matches, setMatches] = useState(() => {
+		if (typeof window === 'undefined' || !window.matchMedia) return false;
+		return window.matchMedia(query).matches;
+	});
+	useEffect(() => {
+		if (typeof window === 'undefined' || !window.matchMedia) return;
+		const mql = window.matchMedia(query);
+		const handler = (event: MediaQueryListEvent) => setMatches(event.matches);
+		setMatches(mql.matches);
+		mql.addEventListener('change', handler);
+		return () => mql.removeEventListener('change', handler);
+	}, [query]);
+	return matches;
+}
 
 interface AppLayoutProps {
 	sidebar: ReactNode;
@@ -79,6 +96,8 @@ export const AppLayout = memo(function AppLayout({
 		mcpExpanded ||
 		skillsExpanded;
 	const anyViewerOpen = viewerTabCount > 0;
+	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
+	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
 	const activeRightPanelWidth = gitExpanded
 		? (panelWidths.git ?? RIGHT_PANEL_DEFAULT_WIDTH)
 		: sessionFilesExpanded
@@ -99,10 +118,19 @@ export const AppLayout = memo(function AppLayout({
 		useState(false);
 	const shouldAnimateViewer = previousViewerOpenRef.current !== anyViewerOpen;
 	const mainPaneStyle = {
-		width: anyViewerOpen ? VIEWER_CHAT_WIDTH : '100%',
+		width:
+			anyViewerOpen && viewerSideBySide
+				? VIEWER_CHAT_WIDTH
+				: anyViewerOpen
+					? '0px'
+					: '100%',
 	} as CSSProperties;
 	const viewerPaneStyle = {
-		width: anyViewerOpen ? `calc(100% - ${VIEWER_CHAT_WIDTH})` : '0px',
+		width: anyViewerOpen
+			? viewerSideBySide
+				? `calc(100% - ${VIEWER_CHAT_WIDTH})`
+				: '100%'
+			: '0px',
 	} as CSSProperties;
 	const rightPanelStyle = {
 		width: `${rightPanelWidth}px`,
@@ -164,13 +192,21 @@ export const AppLayout = memo(function AppLayout({
 								shouldAnimateViewer
 									? 'transition-[width] duration-300 ease-out'
 									: 'transition-none'
-							} ${anyViewerOpen ? 'hidden md:flex md:min-w-[320px]' : 'flex'}`}
+							} ${
+								!anyViewerOpen
+									? 'flex'
+									: showChatBesideViewer
+										? 'hidden md:flex md:min-w-[360px]'
+										: 'hidden'
+							}`}
 							style={mainPaneStyle}
 						>
 							{children}
 						</main>
 						<section
-							className={`hidden md:flex shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+							className={`shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+								anyViewerOpen ? 'flex' : 'hidden md:flex'
+							} ${
 								anyViewerOpen
 									? 'border-sidebar-border opacity-100'
 									: 'border-transparent opacity-0'
@@ -186,8 +222,8 @@ export const AppLayout = memo(function AppLayout({
 						</section>
 					</div>
 
-					{/* Right sidebar - Git (hidden on mobile) */}
-					<div className="hidden md:flex">
+					{/* Right sidebar - Git (rail hidden on narrow; panel shows when opened via keybind) */}
+					<div className="flex">
 						<div
 							className={`h-full shrink-0 overflow-hidden bg-sidebar ${
 								isRightPanelTransitioning
@@ -209,7 +245,7 @@ export const AppLayout = memo(function AppLayout({
 						</div>
 
 						<div
-							className={`flex flex-col w-12 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
+							className={`hidden md:flex flex-col w-12 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
 						>
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />

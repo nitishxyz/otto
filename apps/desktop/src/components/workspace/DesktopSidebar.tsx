@@ -8,7 +8,7 @@ const PANEL_KEY = 'desktop-left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
-const LEFT_SIDEBAR_HOVER_RATIO = 0.05;
+const LEFT_SIDEBAR_HOVER_RATIO = 0.03;
 const HOVER_SHOW_DELAY_MS = 260;
 const HOVER_HIDE_DELAY_MS = 120;
 
