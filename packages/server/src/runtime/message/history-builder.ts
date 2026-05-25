@@ -65,6 +65,30 @@ export async function buildHistoryMessages(
 
 		if (m.role === 'user') {
 			const userParts: Array<TextPart | FilePart> = [];
+			const pushAttachmentReference = (obj: {
+				attachmentId?: string;
+				name?: string;
+				mediaType?: string;
+				type?: string;
+				original?: { filename?: string; size?: number; sha256?: string };
+			}) => {
+				if (!obj.attachmentId) return;
+				const name = obj.original?.filename || obj.name || 'attachment';
+				const attrs = [
+					`id="${obj.attachmentId}"`,
+					`name="${name.replace(/"/g, '&quot;')}"`,
+					obj.type ? `type="${obj.type}"` : undefined,
+					obj.mediaType ? `mimeType="${obj.mediaType}"` : undefined,
+					obj.original?.size ? `size="${obj.original.size}"` : undefined,
+					obj.original?.sha256 ? `sha256="${obj.original.sha256}"` : undefined,
+				]
+					.filter(Boolean)
+					.join(' ');
+				userParts.push({
+					type: 'text',
+					text: `<uploaded_attachment ${attrs}>Use copy_attachment_to_project to copy the untouched original upload into the project when needed.</uploaded_attachment>`,
+				});
+			};
 			for (const p of parts) {
 				if (p.type === 'text') {
 					try {
@@ -77,7 +101,11 @@ export async function buildHistoryMessages(
 						const obj = JSON.parse(p.content ?? '{}') as {
 							data?: string;
 							mediaType?: string;
+							attachmentId?: string;
+							name?: string;
+							original?: { filename?: string; size?: number; sha256?: string };
 						};
+						pushAttachmentReference({ ...obj, type: 'image' });
 						if (obj.data && obj.mediaType) {
 							userParts.push({
 								type: 'file',
@@ -89,12 +117,15 @@ export async function buildHistoryMessages(
 				} else if (p.type === 'file') {
 					try {
 						const obj = JSON.parse(p.content ?? '{}') as {
-							type?: 'image' | 'pdf' | 'text';
+							type?: 'image' | 'pdf' | 'text' | 'binary';
 							name?: string;
 							data?: string;
 							mediaType?: string;
 							textContent?: string;
+							attachmentId?: string;
+							original?: { filename?: string; size?: number; sha256?: string };
 						};
+						pushAttachmentReference(obj);
 						if (obj.type === 'text' && obj.textContent) {
 							userParts.push({
 								type: 'text',

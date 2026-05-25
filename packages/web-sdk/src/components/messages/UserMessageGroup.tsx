@@ -26,14 +26,15 @@ interface UserMessageGroupProps {
 }
 
 interface ImageData {
-	data: string;
+	data?: string;
 	mediaType: string;
+	name?: string;
 }
 
 interface FileData {
-	type: 'image' | 'pdf' | 'text';
+	type: 'image' | 'pdf' | 'text' | 'binary';
 	name: string;
-	data: string;
+	data?: string;
 	mediaType: string;
 	textContent?: string;
 }
@@ -83,8 +84,10 @@ export const UserMessageGroup = memo(
 				const data = part.contentJson || JSON.parse(part.content || '{}');
 				if (data && typeof data === 'object' && 'data' in data) {
 					const imgData = data as ImageData;
-					const src = `data:${imgData.mediaType};base64,${imgData.data}`;
-					images.push({ id: part.id, src });
+					if (imgData.data) {
+						const src = `data:${imgData.mediaType};base64,${imgData.data}`;
+						images.push({ id: part.id, src });
+					}
 				}
 			} catch {}
 		}

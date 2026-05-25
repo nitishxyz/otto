@@ -7,6 +7,7 @@ import {
 	Terminal,
 	FileText,
 	FileEdit,
+	ImageIcon,
 	Search,
 	FolderTree,
 	List,
@@ -302,6 +303,10 @@ export const MessagePartItem = memo(
 				if (toolName === 'read')
 					return (
 						<FileText className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+					);
+				if (toolName === 'copy_attachment_to_project')
+					return (
+						<ImageIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
 					);
 				if (toolName === 'write' || toolName === 'copy_into')
 					return (

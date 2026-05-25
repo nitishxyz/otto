@@ -126,6 +126,7 @@ export const ChatInputContainer = memo(
 			} = useFileUpload({
 				supportsImages: !!modelSupportsVision,
 				supportsFileAttachments: !!modelSupportsAttachment,
+				sessionId,
 				onError: toast.error,
 			});
 
@@ -203,6 +204,20 @@ export const ChatInputContainer = memo(
 			const handleSendMessage = useCallback(
 				async (content: string) => {
 					try {
+						const allAttachments = [...images, ...documents];
+						if (
+							allAttachments.some((file) => file.uploadStatus === 'uploading')
+						) {
+							toast.error(
+								'Still uploading attachments. Try again in a moment.',
+							);
+							return;
+						}
+						if (allAttachments.some((file) => file.uploadStatus === 'failed')) {
+							toast.error('Remove failed attachments before sending.');
+							return;
+						}
+
 						const researchCtxs = consumeResearchContexts(sessionId);
 						const researchPrefix =
 							formatResearchContextForMessage(researchCtxs);
@@ -210,28 +225,28 @@ export const ChatInputContainer = memo(
 							? `${researchPrefix}\n\n${content}`
 							: content;
 
-						const imageData =
-							images.length > 0
-								? images.map((img) => ({
-										data: img.data,
-										mediaType: img.mediaType,
-									}))
-								: undefined;
-
 						const fileData =
-							documents.length > 0
-								? documents.map((f) => ({
+							allAttachments.length > 0
+								? allAttachments.map((f) => ({
 										type: f.type,
 										name: f.name,
 										data: f.data,
 										mediaType: f.mediaType,
 										textContent: f.textContent,
+										attachmentId: f.uploadedAttachment?.id,
+										original: f.uploadedAttachment
+											? {
+													filename: f.uploadedAttachment.filename,
+													size: f.uploadedAttachment.size,
+													sha256: f.uploadedAttachment.sha256,
+													mimeType: f.uploadedAttachment.mimeType,
+												}
+											: undefined,
 									}))
 								: undefined;
 
 						await sendMessage.mutateAsync({
 							content: finalContent,
-							images: imageData,
 							files: fileData,
 							agent: agent || undefined,
 							provider: provider || undefined,

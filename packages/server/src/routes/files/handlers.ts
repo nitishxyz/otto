@@ -255,6 +255,35 @@ function getSafeFilePath(c: Context) {
 	return { projectRoot, filePath, absPath };
 }
 
+function sniffImageMimeType(data: Buffer): string | undefined {
+	if (
+		data.length >= 8 &&
+		data[0] === 0x89 &&
+		data[1] === 0x50 &&
+		data[2] === 0x4e &&
+		data[3] === 0x47 &&
+		data[4] === 0x0d &&
+		data[5] === 0x0a &&
+		data[6] === 0x1a &&
+		data[7] === 0x0a
+	) {
+		return 'image/png';
+	}
+	if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8) {
+		return 'image/jpeg';
+	}
+	if (data.subarray(0, 6).toString('ascii') === 'GIF87a') return 'image/gif';
+	if (data.subarray(0, 6).toString('ascii') === 'GIF89a') return 'image/gif';
+	if (
+		data.length >= 12 &&
+		data.subarray(0, 4).toString('ascii') === 'RIFF' &&
+		data.subarray(8, 12).toString('ascii') === 'WEBP'
+	) {
+		return 'image/webp';
+	}
+	return undefined;
+}
+
 export async function handleReadFile(c: Context) {
 	try {
 		const target = getSafeFilePath(c);
@@ -280,6 +309,8 @@ export async function handleRawFile(c: Context) {
 		const target = getSafeFilePath(c);
 		if ('error' in target)
 			return c.json({ error: target.error }, target.status ?? 400);
+		const data = await readFile(target.absPath);
+		const sniffedType = sniffImageMimeType(data);
 		const ext = target.filePath.split('.').pop()?.toLowerCase() ?? '';
 		const mimeTypes: Record<string, string> = {
 			png: 'image/png',
@@ -292,8 +323,8 @@ export async function handleRawFile(c: Context) {
 			bmp: 'image/bmp',
 			avif: 'image/avif',
 		};
-		const contentType = mimeTypes[ext] || 'application/octet-stream';
-		const data = await readFile(target.absPath);
+		const contentType =
+			sniffedType || mimeTypes[ext] || 'application/octet-stream';
 		return new Response(data, {
 			headers: {
 				'Content-Type': contentType,

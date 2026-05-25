@@ -416,6 +416,7 @@ export const ChatInput = memo(
 							...(attachmentEnabled ? ['PDF'] : []),
 							'Markdown',
 							'Text',
+							'Other files',
 						].join(', ');
 						return (
 							<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
@@ -434,7 +435,7 @@ export const ChatInput = memo(
 											Drop files here
 										</p>
 										<p className="text-sm text-muted-foreground">
-											{fileTypes} up to 10MB
+											{fileTypes} up to 100MB
 										</p>
 									</div>
 								</div>
@@ -490,11 +491,26 @@ export const ChatInput = memo(
 											key={img.id}
 											className="relative group w-12 h-12 rounded-lg overflow-hidden bg-muted"
 										>
-											<img
-												src={img.preview}
-												alt="Attachment"
-												className="w-full h-full object-cover"
-											/>
+											{img.preview ? (
+												<img
+													src={img.preview}
+													alt="Attachment"
+													className="w-full h-full object-cover"
+												/>
+											) : (
+												<div className="w-full h-full flex items-center justify-center">
+													<ImageIcon className="w-5 h-5 text-muted-foreground" />
+												</div>
+											)}
+											{img.uploadStatus !== 'ready' && (
+												<div className="absolute inset-0 flex items-end justify-center bg-black/45 pb-0.5">
+													<span className="text-[9px] font-medium text-white">
+														{img.uploadStatus === 'uploading'
+															? 'uploading'
+															: 'failed'}
+													</span>
+												</div>
+											)}
 											<button
 												type="button"
 												onClick={() => onFileRemove?.(img.id)}
@@ -509,12 +525,16 @@ export const ChatInput = memo(
 											key={doc.id}
 											className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted max-w-[200px]"
 										>
-											{doc.type === 'pdf' ? (
+											{doc.type === 'pdf' || doc.type === 'binary' ? (
 												<FileIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
 											) : (
 												<FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
 											)}
-											<span className="text-xs truncate">{doc.name}</span>
+											<span className="text-xs truncate">
+												{doc.name}
+												{doc.uploadStatus === 'uploading' ? ' · uploading' : ''}
+												{doc.uploadStatus === 'failed' ? ' · failed' : ''}
+											</span>
 											<button
 												type="button"
 												onClick={() => onFileRemove?.(doc.id)}

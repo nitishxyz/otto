@@ -27,6 +27,7 @@ import { registerProviderUsageRoutes } from './routes/provider-usage.ts';
 import { registerDoctorRoutes } from './routes/doctor.ts';
 import { registerSkillsRoutes } from './routes/skills.ts';
 import { registerUsageRoutes } from './routes/usage.ts';
+import { registerAttachmentRoutes } from './routes/attachments.ts';
 import type { AgentConfigEntry } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
 
@@ -108,6 +109,7 @@ function initApp() {
 	registerDoctorRoutes(app);
 	registerSkillsRoutes(app);
 	registerUsageRoutes(app);
+	registerAttachmentRoutes(app);
 
 	return app;
 }
@@ -184,6 +186,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	registerMCPRoutes(honoApp);
 	registerProviderUsageRoutes(honoApp);
 	registerUsageRoutes(honoApp);
+	registerAttachmentRoutes(honoApp);
 
 	return honoApp;
 }
@@ -298,6 +301,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	registerMCPRoutes(honoApp);
 	registerProviderUsageRoutes(honoApp);
 	registerUsageRoutes(honoApp);
+	registerAttachmentRoutes(honoApp);
 
 	return honoApp;
 }

@@ -94,11 +94,18 @@ export interface SendMessageRequest {
 	content: string;
 	images?: Array<{ data: string; mediaType: string }>;
 	files?: Array<{
-		type: 'image' | 'pdf' | 'text';
+		type: 'image' | 'pdf' | 'text' | 'binary';
 		name: string;
-		data: string;
+		data?: string;
 		mediaType: string;
 		textContent?: string;
+		attachmentId?: string;
+		original?: {
+			filename?: string;
+			size?: number;
+			sha256?: string;
+			mimeType?: string;
+		};
 	}>;
 	agent?: string;
 	provider?: string;

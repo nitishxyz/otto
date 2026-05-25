@@ -1,0 +1,9 @@
+Copy an original uploaded chat attachment into the project.
+
+Use this when the user drops/uploads a file and asks you to add it to the repo. The copied bytes are the untouched original upload, not the compressed image sent to the model.
+
+Rules:
+- `targetPath` must be project-relative and cannot escape the project root.
+- Existing files are not overwritten unless `overwrite: true` is provided.
+- For known file types, the tool uses the original MIME type to ensure the final extension is correct. For example, if `targetPath` is `.jpg` but the upload is `image/png`, the file is written as `.png` and the returned `path` is the actual path.
+- Prefer sensible asset paths such as `public/`, `src/assets/`, or an existing app asset directory.

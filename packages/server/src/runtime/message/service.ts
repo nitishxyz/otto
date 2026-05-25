@@ -38,11 +38,18 @@ type DispatchOptions = {
 	reasoningLevel?: ReasoningLevel;
 	images?: Array<{ data: string; mediaType: string }>;
 	files?: Array<{
-		type: 'image' | 'pdf' | 'text';
+		type: 'image' | 'pdf' | 'text' | 'binary';
 		name: string;
-		data: string;
+		data?: string;
 		mediaType: string;
 		textContent?: string;
+		attachmentId?: string;
+		original?: {
+			filename?: string;
+			size?: number;
+			sha256?: string;
+			mimeType?: string;
+		};
 	}>;
 };
 
@@ -142,6 +149,8 @@ export async function dispatchAssistantMessage(
 					data: file.data,
 					mediaType: file.mediaType,
 					textContent: file.textContent,
+					attachmentId: file.attachmentId,
+					original: file.original,
 				}),
 				agent: effectiveAgent,
 				provider,

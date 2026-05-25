@@ -28,11 +28,18 @@ export type ImageAttachmentPayload = {
 };
 
 export type FileAttachmentPayload = {
-	type: 'image' | 'pdf' | 'text';
+	type: 'image' | 'pdf' | 'text' | 'binary';
 	name: string;
-	data: string;
+	data?: string;
 	mediaType: string;
 	textContent?: string;
+	attachmentId?: string;
+	original?: {
+		filename?: string;
+		size?: number;
+		sha256?: string;
+		mimeType?: string;
+	};
 };
 
 type CompressImageOptions = {
@@ -153,12 +160,12 @@ export async function compressFileImageAttachments(
 
 	return Promise.all(
 		attachments.map(async (attachment) => {
-			if (attachment.type !== 'image') {
+			if (attachment.type !== 'image' || !attachment.data) {
 				return attachment;
 			}
 
 			const compressed = await compressImageAttachment(
-				attachment,
+				{ data: attachment.data, mediaType: attachment.mediaType },
 				resolvedOptions,
 			);
 			if (compressed === attachment) {

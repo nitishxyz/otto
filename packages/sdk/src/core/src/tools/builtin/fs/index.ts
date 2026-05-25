@@ -5,6 +5,7 @@ import { buildReadImageTool } from './read-image.ts';
 import { buildMultiEditTool } from './multiedit.ts';
 import { buildWriteTool } from './write.ts';
 import { buildCopyIntoTool } from './copy-into.ts';
+import { buildCopyAttachmentTool } from './copy-attachment.ts';
 import { buildLsTool } from './ls.ts';
 import { buildTreeTool } from './tree.ts';
 import { buildPwdTool } from './pwd.ts';
@@ -20,6 +21,7 @@ export function buildFsTools(
 	out.push(buildMultiEditTool(projectRoot));
 	out.push(buildWriteTool(projectRoot));
 	out.push(buildCopyIntoTool(projectRoot));
+	out.push(buildCopyAttachmentTool(projectRoot));
 	out.push(buildLsTool(projectRoot));
 	out.push(buildTreeTool(projectRoot));
 	out.push(buildPwdTool());

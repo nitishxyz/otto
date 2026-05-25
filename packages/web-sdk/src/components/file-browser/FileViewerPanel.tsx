@@ -21,6 +21,19 @@ import { Button } from '../ui/Button';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
 import { StableSpinner } from '../ui/StableSpinner';
 import { buildLivePatchPreview } from '../workspace/ToolPreviewPanel';
+import { getBaseUrl } from '../../lib/api-client/utils';
+
+const IMAGE_EXTENSIONS = new Set([
+	'avif',
+	'bmp',
+	'gif',
+	'ico',
+	'jpeg',
+	'jpg',
+	'png',
+	'svg',
+	'webp',
+]);
 
 const LANGUAGE_MAP: Record<string, string> = {
 	js: 'javascript',
@@ -70,6 +83,10 @@ function inferLanguage(path: string): string {
 function isMarkdownFile(path: string): boolean {
 	const ext = getFileExtension(path);
 	return ext === 'md' || ext === 'markdown' || ext === 'mdx';
+}
+
+function isImageFile(path: string): boolean {
+	return IMAGE_EXTENSIONS.has(getFileExtension(path));
 }
 
 function formatReadHighlightLabel(highlight: ToolActivityHighlight): string {
@@ -146,8 +163,11 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	const isViewerOpen = open ?? storeIsViewerOpen;
 	const selectedFile = file ?? storeSelectedFile;
 	const closeViewer = onClose ?? storeCloseViewer;
+	const selectedFileIsImage = selectedFile ? isImageFile(selectedFile) : false;
 
-	const { data, isLoading } = useFileContent(selectedFile);
+	const { data, isLoading } = useFileContent(
+		selectedFileIsImage ? null : selectedFile,
+	);
 
 	useEffect(() => {
 		const handleEscape = (e: KeyboardEvent) => {
@@ -309,7 +329,10 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 
 	if (!isViewerOpen || !selectedFile) return null;
 
-	const language = inferLanguage(selectedFile);
+	const language = selectedFileIsImage ? 'image' : inferLanguage(selectedFile);
+	const rawImageUrl = selectedFileIsImage
+		? `${getBaseUrl()}/v1/files/raw?path=${encodeURIComponent(selectedFile)}`
+		: null;
 	const renderMarkdown =
 		isMarkdownFile(selectedFile) &&
 		!effectiveHighlight &&
@@ -373,6 +396,14 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 				) : isLoading ? (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
 						Loading file...
+					</div>
+				) : rawImageUrl ? (
+					<div className="h-full w-full flex items-center justify-center bg-muted/20 p-6">
+						<img
+							src={rawImageUrl}
+							alt={selectedFile}
+							className="max-h-full max-w-full object-contain rounded-md shadow-sm"
+						/>
 					</div>
 				) : data ? (
 					renderMarkdown ? (

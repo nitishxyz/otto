@@ -9,6 +9,7 @@ import { GitDiffRenderer } from './GitDiffRenderer';
 import { GitCommitRenderer } from './GitCommitRenderer';
 import { ApplyPatchRenderer } from './ApplyPatchRenderer';
 import { CopyIntoRenderer } from './CopyIntoRenderer';
+import { CopyAttachmentRenderer } from './CopyAttachmentRenderer';
 import { ListRenderer } from './ListRenderer';
 import { TreeRenderer } from './TreeRenderer';
 import { SearchRenderer } from './SearchRenderer';
@@ -47,6 +48,7 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
 	MultiEdit: 'multiedit',
 	Write: 'write',
 	CopyInto: 'copy_into',
+	CopyAttachmentToProject: 'copy_attachment_to_project',
 	Ls: 'ls',
 	Tree: 'tree',
 	Cd: 'cd',
@@ -88,6 +90,7 @@ const COMPACT_DETAIL_TOOL_NAMES = new Set([
 	'multiedit',
 	'write',
 	'copy_into',
+	'copy_attachment_to_project',
 	'apply_patch',
 	'terminal',
 ]);
@@ -132,6 +135,8 @@ export function ToolResultRenderer({
 			return <ApplyPatchRenderer {...props} toolName={normalizedName} />;
 		case 'copy_into':
 			return <CopyIntoRenderer {...props} />;
+		case 'copy_attachment_to_project':
+			return <CopyAttachmentRenderer {...props} />;
 		case 'write':
 			return <WriteRenderer {...props} />;
 		case 'shell':

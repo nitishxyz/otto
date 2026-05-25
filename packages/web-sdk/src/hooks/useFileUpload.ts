@@ -5,8 +5,23 @@ import {
 	type DragEvent,
 	type ClipboardEvent,
 } from 'react';
+import { getBaseUrl, extractErrorMessage } from '../lib/api-client/utils';
 
-export type FileAttachmentType = 'image' | 'pdf' | 'text';
+export type FileAttachmentType = 'image' | 'pdf' | 'text' | 'binary';
+export type FileUploadStatus = 'uploading' | 'ready' | 'failed';
+
+export interface UploadedAttachment {
+	id: string;
+	filename: string;
+	mimeType: string;
+	size: number;
+	sha256: string;
+	kind: FileAttachmentType;
+	originalPath: string;
+	originalUrl: string;
+	metadataUrl: string;
+	status: 'ready';
+}
 
 export interface FileAttachment {
 	id: string;
@@ -14,9 +29,12 @@ export interface FileAttachment {
 	type: FileAttachmentType;
 	name: string;
 	preview?: string;
-	data: string;
+	data?: string;
 	mediaType: string;
 	textContent?: string;
+	uploadStatus: FileUploadStatus;
+	uploadedAttachment?: UploadedAttachment;
+	uploadError?: string;
 }
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -77,25 +95,21 @@ const TEXT_EXTENSIONS = [
 	'.vue',
 ];
 
-const SUPPORTED_TYPES = [...IMAGE_TYPES, ...PDF_TYPES, ...TEXT_TYPES];
-
 function generateId(): string {
 	return `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function getFileType(file: File): FileAttachmentType | null {
+function getExtension(file: File): string {
+	const index = file.name.lastIndexOf('.');
+	return index >= 0 ? file.name.toLowerCase().slice(index) : '';
+}
+
+function getFileType(file: File): FileAttachmentType {
 	if (IMAGE_TYPES.includes(file.type)) return 'image';
 	if (PDF_TYPES.includes(file.type)) return 'pdf';
 	if (TEXT_TYPES.includes(file.type)) return 'text';
-	const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-	if (TEXT_EXTENSIONS.includes(ext)) return 'text';
-	return null;
-}
-
-function isSupported(file: File): boolean {
-	if (SUPPORTED_TYPES.includes(file.type)) return true;
-	const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-	return TEXT_EXTENSIONS.includes(ext);
+	if (TEXT_EXTENSIONS.includes(getExtension(file))) return 'text';
+	return 'binary';
 }
 
 async function fileToBase64(file: File): Promise<string> {
@@ -129,22 +143,43 @@ async function fileToPreview(file: File): Promise<string> {
 	});
 }
 
+async function uploadOriginalFile(
+	file: File,
+	sessionId?: string,
+): Promise<UploadedAttachment> {
+	const form = new FormData();
+	form.set('file', file);
+	if (sessionId) form.set('sessionId', sessionId);
+
+	const response = await fetch(`${getBaseUrl()}/v1/attachments`, {
+		method: 'POST',
+		body: form,
+	});
+	const data = await response.json().catch(() => null);
+	if (!response.ok) {
+		throw new Error(extractErrorMessage(data));
+	}
+	return data as UploadedAttachment;
+}
+
 interface UseFileUploadOptions {
 	maxFiles?: number;
 	maxSizeMB?: number;
 	pageWide?: boolean;
 	supportsImages?: boolean;
 	supportsFileAttachments?: boolean;
+	sessionId?: string;
 	onError?: (message: string) => void;
 }
 
 export function useFileUpload(options: UseFileUploadOptions = {}) {
 	const {
 		maxFiles = 10,
-		maxSizeMB = 10,
+		maxSizeMB = 100,
 		pageWide = true,
 		supportsImages = true,
 		supportsFileAttachments = true,
+		sessionId,
 		onError,
 	} = options;
 
@@ -156,22 +191,12 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
 	const validateFile = useCallback(
 		(file: File): string | null => {
-			if (!supportsImages && IMAGE_TYPES.includes(file.type)) {
-				return 'This model does not support image attachments';
-			}
-			if (!supportsFileAttachments && PDF_TYPES.includes(file.type)) {
-				return 'This model does not support PDF attachments';
-			}
-			if (!isSupported(file)) {
-				const ext = file.name.slice(file.name.lastIndexOf('.'));
-				return `Unsupported file type: ${ext || file.type || 'unknown'}`;
-			}
 			if (file.size > maxSizeBytes) {
 				return `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Max: ${maxSizeMB}MB`;
 			}
 			return null;
 		},
-		[maxSizeBytes, maxSizeMB, supportsImages, supportsFileAttachments],
+		[maxSizeBytes, maxSizeMB],
 	);
 
 	const addFiles = useCallback(
@@ -199,26 +224,31 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 				}
 
 				const fileType = getFileType(file);
-				if (!fileType) continue;
 
 				try {
 					let preview: string | undefined;
-					let data: string;
+					let data: string | undefined;
 					let textContent: string | undefined;
-					let mediaType = file.type;
+					let mediaType = file.type || 'application/octet-stream';
 
 					if (fileType === 'image') {
-						[preview, data] = await Promise.all([
-							fileToPreview(file),
-							fileToBase64(file),
-						]);
+						if (supportsImages) {
+							[preview, data] = await Promise.all([
+								fileToPreview(file),
+								fileToBase64(file),
+							]);
+						} else {
+							preview = await fileToPreview(file);
+						}
 					} else if (fileType === 'pdf') {
-						data = await fileToBase64(file);
 						mediaType = 'application/pdf';
-					} else {
+						if (supportsFileAttachments) {
+							data = await fileToBase64(file);
+						}
+					} else if (fileType === 'text') {
 						textContent = await fileToText(file);
 						data = textContent;
-						if (!mediaType) {
+						if (!file.type) {
 							const ext = file.name.toLowerCase();
 							mediaType =
 								ext.endsWith('.md') || ext.endsWith('.markdown')
@@ -227,8 +257,9 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 						}
 					}
 
+					const id = generateId();
 					newFiles.push({
-						id: generateId(),
+						id,
 						file,
 						type: fileType,
 						name: file.name,
@@ -236,6 +267,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 						data,
 						mediaType,
 						textContent,
+						uploadStatus: 'uploading',
 					});
 				} catch {
 					const msg = `Failed to process file: ${file.name}`;
@@ -246,9 +278,52 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
 			if (newFiles.length > 0) {
 				setFiles((prev) => [...prev, ...newFiles]);
+				for (const item of newFiles) {
+					void uploadOriginalFile(item.file, sessionId)
+						.then((uploadedAttachment) => {
+							setFiles((prev) =>
+								prev.map((existing) =>
+									existing.id === item.id
+										? {
+												...existing,
+												uploadStatus: 'ready',
+												uploadedAttachment,
+												uploadError: undefined,
+											}
+										: existing,
+								),
+							);
+						})
+						.catch((uploadError: unknown) => {
+							const msg =
+								uploadError instanceof Error
+									? uploadError.message
+									: `Failed to upload ${item.name}`;
+							setFiles((prev) =>
+								prev.map((existing) =>
+									existing.id === item.id
+										? {
+												...existing,
+												uploadStatus: 'failed',
+												uploadError: msg,
+											}
+										: existing,
+								),
+							);
+							onError?.(msg);
+						});
+				}
 			}
 		},
-		[files.length, maxFiles, validateFile, onError],
+		[
+			files.length,
+			maxFiles,
+			validateFile,
+			onError,
+			sessionId,
+			supportsImages,
+			supportsFileAttachments,
+		],
 	);
 
 	const removeFile = useCallback((id: string) => {
@@ -374,7 +449,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 	}, [pageWide, addFiles]);
 
 	const images = files.filter((f) => f.type === 'image');
-	const documents = files.filter((f) => f.type === 'pdf' || f.type === 'text');
+	const documents = files.filter((f) => f.type !== 'image');
 
 	return {
 		files,
