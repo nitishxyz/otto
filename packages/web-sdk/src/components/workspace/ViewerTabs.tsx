@@ -348,6 +348,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
 	const setActiveTab = useViewerTabsStore((state) => state.setActiveTab);
 	const closeTab = useViewerTabsStore((state) => state.closeTab);
+	const closeAllTabs = useViewerTabsStore((state) => state.closeAllTabs);
 	const updateSessionFileOperationIndex = useViewerTabsStore(
 		(state) => state.updateSessionFileOperationIndex,
 	);
@@ -381,6 +382,17 @@ export const ViewerTabs = memo(function ViewerTabs() {
 	return (
 		<section className="h-full w-full min-w-0 bg-sidebar flex flex-col">
 			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
+				<div className="h-12 w-12 shrink-0 border-r border-b border-sidebar-border bg-background">
+					<button
+						type="button"
+						onClick={closeAllTabs}
+						title="Close all tabs"
+						aria-label="Close all tabs"
+						className="h-full w-full inline-flex items-center justify-center rounded-none text-muted-foreground/70 transition-colors hover:bg-muted/50 hover:text-foreground"
+					>
+						<X className="h-3.5 w-3.5" />
+					</button>
+				</div>
 				{tabs.map((tab) => {
 					const isActive = tab.id === activeTab.id;
 					return (

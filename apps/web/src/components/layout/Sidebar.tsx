@@ -107,8 +107,8 @@ export const Sidebar = memo(function Sidebar({
 							</div>
 
 							<div className="flex-1 relative overflow-hidden">
-								<div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
-									<div className="h-12 px-3 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/40 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/20">
+								<div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
+									<div className="h-12 px-3 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/95 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/90">
 										<div className="flex items-center text-sidebar-foreground/90">
 											<OttoWordmark height={14} className="select-none" />
 										</div>
