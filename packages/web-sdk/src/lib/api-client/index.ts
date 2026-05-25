@@ -7,6 +7,7 @@ import { approvalMixin } from './approval';
 import { ottorouterMixin } from './ottorouter';
 import { authMixin } from './auth';
 import { skillsMixin } from './skills';
+import { usageMixin } from './usage';
 
 export { configureApiClient } from './utils';
 
@@ -107,6 +108,8 @@ class ApiClient {
 	getSkillFileContent = skillsMixin.getSkillFileContent;
 	getSkillsConfig = skillsMixin.getSkillsConfig;
 	updateSkillsConfig = skillsMixin.updateSkillsConfig;
+
+	getUsageStats = usageMixin.getUsageStats;
 }
 
 export const apiClient = new ApiClient();

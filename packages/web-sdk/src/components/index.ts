@@ -105,3 +105,6 @@ export * from './common/UsageModal';
 
 // Onboarding Components
 export * from './onboarding';
+
+// Dashboard Components
+export * from './dashboard/UsageDashboard';

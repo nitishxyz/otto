@@ -16,6 +16,7 @@ import {
 	Key,
 	Type,
 	Sparkles,
+	BarChart3,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
@@ -844,6 +845,27 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
 
 					<OttoRouterTopupModal />
 				</div>
+
+				<button
+					type="button"
+					onClick={() => {
+						if (typeof window === 'undefined') return;
+						const basePathRaw =
+							(globalThis as { OTTO_ROUTER_BASEPATH?: string })
+								.OTTO_ROUTER_BASEPATH ?? '/';
+						const basePath = basePathRaw.replace(/\/+$/, '');
+						const target = `${basePath}/dashboard`.replace(/\/+/g, '/');
+						window.location.assign(target || '/dashboard');
+					}}
+					title="Open usage dashboard"
+					className="group shrink-0 w-full h-12 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
+				>
+					<BarChart3 className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+					<span className="text-sm flex-1 text-muted-foreground group-hover:text-foreground transition-colors">
+						Usage Dashboard
+					</span>
+					<ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+				</button>
 
 				<button
 					type="button"
