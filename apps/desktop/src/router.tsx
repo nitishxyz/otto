@@ -152,13 +152,19 @@ function WorkspaceRouteComponent() {
 	const dashboardOpen = matches.some(
 		(match) => match.routeId === dashboardRoute.id,
 	);
-	const sessionId = matchedSessionId ?? lastSessionIdRef.current;
+	const sessionId = dashboardOpen
+		? (matchedSessionId ?? lastSessionIdRef.current)
+		: matchedSessionId;
 
 	useEffect(() => {
 		if (matchedSessionId) {
 			lastSessionIdRef.current = matchedSessionId;
+			return;
 		}
-	}, [matchedSessionId]);
+		if (!dashboardOpen) {
+			lastSessionIdRef.current = undefined;
+		}
+	}, [matchedSessionId, dashboardOpen]);
 
 	if (!selectedProject) {
 		return <Navigate to="/projects" replace />;
