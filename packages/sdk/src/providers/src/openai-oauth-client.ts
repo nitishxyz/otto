@@ -15,8 +15,10 @@ const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const TOKEN_REFRESH_MAX_RETRIES = 2;
 const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;
 const CODEX_INSTALLATION_ID = crypto.randomUUID();
-const CODEX_REQUEST_TIMEOUT_MS = 120_000;
-const CODEX_STREAM_IDLE_TIMEOUT_MS = 120_000;
+const CODEX_REQUEST_TIMEOUT_MS = 20_000;
+const CODEX_STREAM_IDLE_TIMEOUT_MS = 20_000;
+const CODEX_REQUEST_MAX_RETRIES = 3;
+const CODEX_REQUEST_RETRY_DELAY_MS = 500;
 
 type OpenAIOAuthSessionState = {
 	responseId?: string;
@@ -107,6 +109,20 @@ function getCodexStreamIdleTimeoutMs() {
 	return parsePositiveIntegerEnv(
 		'OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS',
 		CODEX_STREAM_IDLE_TIMEOUT_MS,
+	);
+}
+
+function getCodexRequestMaxRetries() {
+	return parsePositiveIntegerEnv(
+		'OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES',
+		CODEX_REQUEST_MAX_RETRIES,
+	);
+}
+
+function getCodexRequestRetryDelayMs() {
+	return parsePositiveIntegerEnv(
+		'OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS',
+		CODEX_REQUEST_RETRY_DELAY_MS,
 	);
 }
 
@@ -470,6 +486,49 @@ async function fetchWithCodexRequestTimeout(
 		});
 	}
 
+	const maxRetries = getCodexRequestMaxRetries();
+	let lastError: unknown;
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		const attemptStartedAt = Date.now();
+		try {
+			return await fetchCodexRequestAttemptWithTimeout(url, init, {
+				...args,
+				requestStartedAt: attemptStartedAt,
+			});
+		} catch (error) {
+			lastError = error;
+			if (init.signal?.aborted || attempt >= maxRetries) {
+				throw error;
+			}
+
+			const retryDelayMs = getCodexRequestRetryDelayMs() * (attempt + 1);
+			loggerWarn('[openai-oauth] request attempt failed before response', {
+				sessionId: args.sessionId,
+				model: args.model,
+				attempt: attempt + 1,
+				maxRetries,
+				nextAttempt: attempt + 2,
+				timeoutMs: getCodexRequestTimeoutMs(),
+				durationMs: Date.now() - attemptStartedAt,
+				retryDelayMs,
+				error: summarizeError(error),
+			});
+			await sleep(retryDelayMs);
+		}
+	}
+
+	throw lastError;
+}
+
+async function fetchCodexRequestAttemptWithTimeout(
+	url: string,
+	init: RequestInit,
+	args: {
+		sessionId?: string;
+		model?: string;
+		requestStartedAt: number;
+	},
+) {
 	const timeoutMs = getCodexRequestTimeoutMs();
 	const controller = new AbortController();
 	const timeout = setTimeout(() => {
