@@ -18,7 +18,7 @@ export function ToolActivityToggle({
 
 	return (
 		<Button
-			variant={followToolActivity ? 'secondary' : 'ghost'}
+			variant="ghost"
 			size="icon"
 			onClick={toggleFollowToolActivity}
 			title={

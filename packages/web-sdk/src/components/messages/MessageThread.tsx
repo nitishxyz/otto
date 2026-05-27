@@ -504,6 +504,7 @@ export const MessageThread = memo(function MessageThread({
 						{session && (
 							<SessionHeader
 								session={session}
+								isGenerating={isGenerating}
 								onNavigateToSession={onSelectSession}
 							/>
 						)}

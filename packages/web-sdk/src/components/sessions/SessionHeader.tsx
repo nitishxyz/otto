@@ -21,15 +21,18 @@ import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { openUrl } from '../../lib/open-url';
 import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
+import { StopButton } from '../chat/StopButton';
 import { EditableTitle } from './EditableTitle';
 
 interface SessionHeaderProps {
 	session: Session;
+	isGenerating?: boolean;
 	onNavigateToSession?: (sessionId: string) => void;
 }
 
 export function SessionHeader({
 	session,
+	isGenerating,
 	onNavigateToSession,
 }: SessionHeaderProps) {
 	const { data: parentData } = useParentSession(
@@ -213,6 +216,7 @@ export function SessionHeader({
 
 					<div className="flex items-center gap-2 ml-auto">
 						<ToolActivityToggle compact={isCompact} />
+						{isGenerating && <StopButton sessionId={session.id} />}
 						<ProviderLogo provider={session.provider} size={18} />
 						{!isCompact && (
 							<span className="font-medium text-foreground">
