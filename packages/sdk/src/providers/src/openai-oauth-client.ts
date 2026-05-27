@@ -468,6 +468,108 @@ function trackResponsesStream(
 	});
 }
 
+async function waitForCodexStreamStart(
+	response: Response,
+	args: {
+		sessionId?: string;
+		model?: string;
+		parentSignal?: AbortSignal | null;
+	},
+): Promise<Response> {
+	if (!response.ok || !response.body) {
+		return response;
+	}
+
+	const reader = response.body.getReader();
+	const idleTimeoutMs = getCodexStreamIdleTimeoutMs();
+	let timeout: Timer | undefined;
+	let removeAbortListener: (() => void) | undefined;
+	const cleanup = () => {
+		if (timeout) clearTimeout(timeout);
+		timeout = undefined;
+		removeAbortListener?.();
+		removeAbortListener = undefined;
+	};
+
+	try {
+		const first = await Promise.race([
+			reader.read(),
+			new Promise<never>((_resolve, reject) => {
+				timeout = setTimeout(() => {
+					reject(
+						new Error(
+							`OpenAI OAuth Codex stream idle timeout before first chunk after ${idleTimeoutMs}ms`,
+						),
+					);
+				}, idleTimeoutMs);
+
+				if (args.parentSignal) {
+					const onAbort = () => {
+						reject(args.parentSignal?.reason ?? new Error('Request aborted'));
+					};
+					if (args.parentSignal.aborted) {
+						onAbort();
+					} else {
+						args.parentSignal.addEventListener('abort', onAbort, {
+							once: true,
+						});
+						removeAbortListener = () =>
+							args.parentSignal?.removeEventListener('abort', onAbort);
+					}
+				}
+			}),
+		]);
+		cleanup();
+
+		if (first.done) {
+			return new Response(null, {
+				status: response.status,
+				statusText: response.statusText,
+				headers: response.headers,
+			});
+		}
+
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(first.value);
+			},
+			async pull(controller) {
+				try {
+					const next = await reader.read();
+					if (next.done) {
+						controller.close();
+						return;
+					}
+					controller.enqueue(next.value);
+				} catch (error) {
+					controller.error(error);
+				}
+			},
+			async cancel(reason) {
+				await reader.cancel(reason);
+			},
+		});
+
+		return new Response(body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers: response.headers,
+		});
+	} catch (error) {
+		cleanup();
+		loggerWarn('[openai-oauth] response stream did not start before timeout', {
+			sessionId: args.sessionId,
+			model: args.model,
+			timeoutMs: idleTimeoutMs,
+			error: summarizeError(error),
+		});
+		try {
+			await reader.cancel(error);
+		} catch {}
+		throw error;
+	}
+}
+
 async function fetchWithCodexRequestTimeout(
 	url: string,
 	init: RequestInit,
@@ -491,9 +593,14 @@ async function fetchWithCodexRequestTimeout(
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
 		const attemptStartedAt = Date.now();
 		try {
-			return await fetchCodexRequestAttemptWithTimeout(url, init, {
+			const response = await fetchCodexRequestAttemptWithTimeout(url, init, {
 				...args,
 				requestStartedAt: attemptStartedAt,
+			});
+			return await waitForCodexStreamStart(response, {
+				sessionId: args.sessionId,
+				model: args.model,
+				parentSignal: init.signal,
 			});
 		} catch (error) {
 			lastError = error;
@@ -502,13 +609,14 @@ async function fetchWithCodexRequestTimeout(
 			}
 
 			const retryDelayMs = getCodexRequestRetryDelayMs() * (attempt + 1);
-			loggerWarn('[openai-oauth] request attempt failed before response', {
+			loggerWarn('[openai-oauth] request attempt failed before stream start', {
 				sessionId: args.sessionId,
 				model: args.model,
 				attempt: attempt + 1,
 				maxRetries,
 				nextAttempt: attempt + 2,
-				timeoutMs: getCodexRequestTimeoutMs(),
+				requestTimeoutMs: getCodexRequestTimeoutMs(),
+				streamIdleTimeoutMs: getCodexStreamIdleTimeoutMs(),
 				durationMs: Date.now() - attemptStartedAt,
 				retryDelayMs,
 				error: summarizeError(error),

@@ -23,6 +23,7 @@ describe('openai oauth client', () => {
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS;
+		delete process.env.OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS;
 	});
 
 	afterEach(() => {
@@ -32,6 +33,7 @@ describe('openai oauth client', () => {
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS;
+		delete process.env.OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS;
 	});
 
 	test('tracks response ids from the Codex responses stream', async () => {
@@ -282,6 +284,42 @@ describe('openai oauth client', () => {
 		const customFetch = createOpenAIOAuthFetch({
 			oauth: TEST_OAUTH,
 			sessionId: 'session-retry',
+		});
+
+		const response = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: JSON.stringify({ model: 'gpt-5.3-codex', input: [] }),
+		});
+
+		expect(await response.text()).toBe('data: [DONE]\n\n');
+		expect(callCount).toBe(3);
+	});
+
+	test('retries Codex responses that return headers but no stream chunks', async () => {
+		process.env.OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS = '1';
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES = '3';
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS = '1';
+
+		let callCount = 0;
+		globalThis.fetch = async () => {
+			callCount += 1;
+			if (callCount < 3) {
+				return new Response(
+					new ReadableStream<Uint8Array>({
+						start() {},
+					}),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				);
+			}
+
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-stream-start-retry',
 		});
 
 		const response = await customFetch('https://api.openai.com/v1/responses', {
