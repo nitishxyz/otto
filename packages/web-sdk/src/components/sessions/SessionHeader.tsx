@@ -215,8 +215,8 @@ export function SessionHeader({
 					)}
 
 					<div className="flex items-center gap-2 ml-auto">
-						<ToolActivityToggle compact={isCompact} />
 						{isGenerating && <StopButton sessionId={session.id} />}
+						<ToolActivityToggle compact={isCompact} />
 						<ProviderLogo provider={session.provider} size={18} />
 						{!isCompact && (
 							<span className="font-medium text-foreground">

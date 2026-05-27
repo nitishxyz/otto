@@ -170,8 +170,8 @@ export function LeanHeader({
 					</div>
 
 					<div className="flex-shrink-0 flex items-center gap-3 text-muted-foreground">
-						<ToolActivityToggle compact />
 						{isGenerating && <StopButton sessionId={session.id} />}
+						<ToolActivityToggle compact />
 
 						{isOAuthProvider && usage && (
 							<UsageRing usage={usage} provider={session.provider} />

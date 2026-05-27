@@ -31,11 +31,11 @@ export function StopButton({ sessionId, onStop, disabled }: StopButtonProps) {
 			type="button"
 			onClick={handleStop}
 			disabled={disabled || isAborting}
-			className="flex items-center gap-1.5 text-sm text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-			title="Stop generation"
+			className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+			title={isAborting ? 'Stopping generation' : 'Stop generation'}
+			aria-label={isAborting ? 'Stopping generation' : 'Stop generation'}
 		>
-			<StopCircle className="w-4 h-4" />
-			<span className="font-medium">{isAborting ? 'Stopping...' : 'Stop'}</span>
+			<StopCircle className="h-4 w-4" />
 		</button>
 	);
 }

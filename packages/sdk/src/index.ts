@@ -192,6 +192,14 @@ export {
 } from './auth/src/index.ts';
 export type { OpenAIOAuthResult } from './auth/src/index.ts';
 export {
+	authorizeXai,
+	exchangeXai,
+	refreshXaiToken,
+	openXaiAuthUrl,
+	readGrokCliAuth,
+} from './auth/src/index.ts';
+export type { XaiOAuthResult, XaiOAuthTokens } from './auth/src/index.ts';
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

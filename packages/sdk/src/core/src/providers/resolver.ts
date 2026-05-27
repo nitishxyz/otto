@@ -196,8 +196,9 @@ export async function resolveModel(
 
 	if (provider === 'xai') {
 		return createXaiModel(model, {
-			apiKey: config.apiKey,
+			apiKey: config.oauth?.access ?? config.apiKey,
 			baseURL: config.baseURL,
+			useResponses: !!config.oauth,
 		});
 	}
 

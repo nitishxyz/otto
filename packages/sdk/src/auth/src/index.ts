@@ -83,6 +83,16 @@ export {
 } from './openai-oauth.ts';
 
 export {
+	authorizeXai,
+	exchangeXai,
+	refreshXaiToken,
+	openXaiAuthUrl,
+	readGrokCliAuth,
+	type XaiOAuthResult,
+	type XaiOAuthTokens,
+} from './xai-oauth.ts';
+
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

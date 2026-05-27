@@ -23,6 +23,11 @@ otto auth list            # List configured providers
 otto auth logout          # Remove provider credentials
 ```
 
+`otto auth login xai` supports both `XAI_API_KEY` and browser OAuth for
+SuperGrok / X Premium+ accounts. If xAI accepts the login but model calls return
+`403`, your subscription tier may not be allowlisted for OAuth API access; use an
+`XAI_API_KEY` fallback.
+
 ### Agent & Tool Management
 
 ```bash

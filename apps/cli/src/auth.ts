@@ -27,6 +27,10 @@ import {
 	exchangeOpenAI,
 	openOpenAIAuthUrl,
 	obtainOpenAIApiKey,
+	authorizeXai,
+	exchangeXai,
+	openXaiAuthUrl,
+	readGrokCliAuth,
 	generateWallet,
 	importWallet,
 	authorizeCopilot,
@@ -112,6 +116,7 @@ const PROVIDER_LINKS: Record<
 const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
 
 type CopilotLoginMethod = 'oauth' | 'token' | 'gh';
+type XaiLoginMethod = 'oauth' | 'key' | 'grok-cli';
 
 function parseOptionValue(
 	args: string[],
@@ -407,6 +412,10 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 		return runAuthLoginCopilot(cfg, wantLocal, _args);
 	}
 
+	if (provider === 'xai') {
+		return runAuthLoginXai(cfg, wantLocal);
+	}
+
 	const meta = PROVIDER_LINKS[provider];
 	log.info(`Open in browser: ${meta.url}`);
 	const key = await password({
@@ -578,6 +587,162 @@ async function runAuthLoginOpenAI(
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		log.error(`Failed to initialize authentication: ${message}`);
+		outro('Failed');
+		return false;
+	}
+}
+
+async function runAuthLoginXai(
+	cfg: Awaited<ReturnType<typeof loadConfig>>,
+	wantLocal: boolean,
+): Promise<boolean> {
+	try {
+		const grokCliAuth = readGrokCliAuth();
+		const options: Array<{ value: XaiLoginMethod; label: string }> = [
+			{
+				value: 'oauth',
+				label: 'SuperGrok / X Premium+ OAuth (no API key)',
+			},
+			{ value: 'key', label: 'Manually enter XAI_API_KEY' },
+		];
+		if (grokCliAuth?.access && grokCliAuth.refresh) {
+			options.unshift({
+				value: 'grok-cli',
+				label: 'Reuse existing official Grok CLI login',
+			});
+		}
+
+		const authMethod = (await select({
+			message: 'Select xAI authentication method',
+			options,
+		})) as XaiLoginMethod | symbol;
+
+		if (isCancel(authMethod)) {
+			cancel('Cancelled');
+			return false;
+		}
+
+		if (authMethod === 'key') {
+			const meta = PROVIDER_LINKS.xai;
+			log.info(`Open in browser: ${meta.url}`);
+			const key = await password({
+				message: `Paste ${meta.env} here`,
+				validate: (v) =>
+					v && String(v).trim().length > 0 ? undefined : 'Required',
+			});
+			if (isCancel(key)) {
+				cancel('Cancelled');
+				return false;
+			}
+			await setAuth(
+				'xai',
+				{ type: 'api', key: String(key) },
+				cfg.projectRoot,
+				'global',
+			);
+			if (wantLocal)
+				log.warn(
+					'Local credential storage is disabled; saved to secure global location.',
+				);
+			await finalizeSuccessfulLogin('xai');
+			log.success('Saved');
+			log.info(`Tip: you can also set ${meta.env} in your environment.`);
+			outro('Done');
+			return true;
+		}
+
+		if (
+			authMethod === 'grok-cli' &&
+			grokCliAuth?.access &&
+			grokCliAuth.refresh
+		) {
+			await setAuth(
+				'xai',
+				{
+					type: 'oauth',
+					refresh: grokCliAuth.refresh,
+					access: grokCliAuth.access,
+					expires: grokCliAuth.expires,
+					idToken: grokCliAuth.idToken,
+					scopes: grokCliAuth.scopes,
+				},
+				cfg.projectRoot,
+				'global',
+			);
+			if (wantLocal)
+				log.warn(
+					'Local credential storage is disabled; saved to secure global location.',
+				);
+			await finalizeSuccessfulLogin('xai');
+			log.success('Reused Grok CLI OAuth credentials!');
+			outro('Done');
+			return true;
+		}
+
+		log.info('Starting xAI OAuth flow...');
+		log.info(
+			'⚠️  If the official Grok CLI is logging in, stop it first (both use port 56121).\n',
+		);
+
+		const oauthResult = await authorizeXai();
+
+		log.info('Opening browser for xAI authorization...');
+		log.info(`URL: ${oauthResult.url}\n`);
+
+		const opened = await openXaiAuthUrl(oauthResult.url);
+		if (!opened) {
+			log.warn(
+				'⚠️  Could not open browser automatically. Please visit the URL above manually.\n',
+			);
+		}
+
+		log.info('Waiting for xAI authorization callback...');
+		log.info('(Complete the login in your browser)\n');
+
+		try {
+			const code = await oauthResult.waitForCallback();
+			oauthResult.close();
+
+			log.info('🔄 Exchanging xAI authorization code for tokens...');
+			const tokens = await exchangeXai(code, oauthResult.verifier);
+
+			await setAuth(
+				'xai',
+				{
+					type: 'oauth',
+					refresh: tokens.refresh,
+					access: tokens.access,
+					expires: tokens.expires,
+					idToken: tokens.idToken,
+					scopes: tokens.scopes,
+				},
+				cfg.projectRoot,
+				'global',
+			);
+
+			if (wantLocal)
+				log.warn(
+					'Local credential storage is disabled; saved to secure global location.',
+				);
+
+			await finalizeSuccessfulLogin('xai');
+			log.success('xAI OAuth tokens saved!');
+			log.info(
+				'💡 If inference returns 403, your subscription tier may not be allowlisted for OAuth API access. Use XAI_API_KEY as a fallback.',
+			);
+			outro('Done');
+			return true;
+		} catch (error: unknown) {
+			oauthResult.close();
+			const message =
+				error instanceof Error ? error.message : 'Unknown error occurred';
+			log.error(`Authentication failed: ${message}`);
+			outro('Failed');
+			return false;
+		}
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		log.error(`Failed to initialize xAI authentication: ${message}`);
 		outro('Failed');
 		return false;
 	}
@@ -955,6 +1120,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 		? (catalog[provider]?.models ?? [])
 		: [];
 	const defaultModel =
+		(provider === 'xai' ? 'grok-4.3' : undefined) ||
 		models[0]?.id ||
 		(provider === 'anthropic'
 			? 'claude-3-haiku'
