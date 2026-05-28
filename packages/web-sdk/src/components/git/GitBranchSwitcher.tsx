@@ -26,21 +26,25 @@ type BranchRow = {
 	checkoutTarget: string;
 };
 
-function buildRows(branches: GitBranchListItem[]): BranchRow[] {
+function buildRows(
+	branches: GitBranchListItem[],
+	currentBranch?: string,
+): BranchRow[] {
 	return branches.map((branch) => {
+		const current = !branch.remote && branch.name === currentBranch;
 		if (branch.remote) {
 			const remote = branch.remoteName ? `${branch.remoteName}/` : '';
 			return {
 				key: branch.fullName,
 				displayName: `${remote}${branch.name}`,
-				branch,
-				checkoutTarget: branch.name,
+				branch: { ...branch, current: false },
+				checkoutTarget: `${remote}${branch.name}`,
 			};
 		}
 		return {
 			key: branch.fullName,
 			displayName: branch.name,
-			branch,
+			branch: { ...branch, current },
 			checkoutTarget: branch.name,
 		};
 	});
@@ -71,7 +75,10 @@ export function GitBranchSwitcher({
 	} = useGitBranches(isOpen);
 	const checkoutBranch = useCheckoutBranch();
 
-	const rows = useMemo(() => buildRows(data?.branches ?? []), [data]);
+	const rows = useMemo(
+		() => buildRows(data?.branches ?? [], currentBranch),
+		[data, currentBranch],
+	);
 	const filteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return rows;
@@ -119,6 +126,7 @@ export function GitBranchSwitcher({
 		setActionError(null);
 		try {
 			await checkoutBranch.mutateAsync(target);
+			await refetch();
 			setIsOpen(false);
 		} catch (err) {
 			setActionError(

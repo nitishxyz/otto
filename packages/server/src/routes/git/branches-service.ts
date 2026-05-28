@@ -101,16 +101,22 @@ export async function handleListBranches(c: Context) {
 		}
 
 		const branches: GitBranchListItem[] = [];
+		const localBranchNames = new Set<string>();
 		for (const line of stdout.split('\n')) {
 			if (!line) continue;
 			const parsed = parseBranchLine(line);
 			if (!parsed) continue;
 			if (!parsed.remote && parsed.name === current) parsed.current = true;
+			if (!parsed.remote) localBranchNames.add(parsed.name);
 			branches.push(parsed);
 		}
 
+		const visibleBranches = branches.filter(
+			(branch) => !branch.remote || !localBranchNames.has(branch.name),
+		);
+
 		// Sort: current first, then locals alphabetical, then remotes alphabetical
-		branches.sort((a, b) => {
+		visibleBranches.sort((a, b) => {
 			if (a.current && !b.current) return -1;
 			if (!a.current && b.current) return 1;
 			if (a.remote !== b.remote) return a.remote ? 1 : -1;
@@ -121,7 +127,7 @@ export async function handleListBranches(c: Context) {
 			status: 'ok',
 			data: {
 				current,
-				branches,
+				branches: visibleBranches,
 			},
 		});
 	} catch (error) {
@@ -152,7 +158,26 @@ export async function handleCheckoutBranch(c: Context) {
 
 		const { gitRoot } = validation;
 
-		await execFileAsync('git', ['checkout', branch], { cwd: gitRoot });
+		const isRemoteBranch = await execFileAsync(
+			'git',
+			['show-ref', '--verify', '--quiet', `refs/remotes/${branch}`],
+			{ cwd: gitRoot },
+		)
+			.then(() => true)
+			.catch(() => false);
+
+		if (isRemoteBranch) {
+			const localName = branch.split('/').slice(1).join('/');
+			await execFileAsync(
+				'git',
+				['checkout', '--track', '-b', localName, branch],
+				{
+					cwd: gitRoot,
+				},
+			);
+		} else {
+			await execFileAsync('git', ['checkout', branch], { cwd: gitRoot });
+		}
 
 		return c.json({
 			status: 'ok',

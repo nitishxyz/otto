@@ -205,7 +205,9 @@ export function useCheckoutBranch() {
 	return useMutation({
 		mutationFn: (branch: string) => apiClient.checkoutBranch(branch),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'branches'] });
 		},
 	});
 }
@@ -224,7 +226,9 @@ export function useCreateGitBranch() {
 			checkout?: boolean;
 		}) => apiClient.createGitBranch(name, { startPoint, checkout }),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: ['git', 'branches'] });
 		},
 	});
 }
