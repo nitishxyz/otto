@@ -164,7 +164,7 @@ export function adaptTools(
 				const baseToModelOutput = (base as { toModelOutput?: ToModelOutputFn })
 					.toModelOutput;
 				if (typeof baseToModelOutput === 'function') {
-					return baseToModelOutput({ ...options, output: sanitizedOutput });
+					return baseToModelOutput(options);
 				}
 				return {
 					type: 'json',

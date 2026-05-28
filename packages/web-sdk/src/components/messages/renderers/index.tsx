@@ -23,6 +23,8 @@ import { DatabaseToolRenderer } from './DatabaseToolRenderer';
 import { TerminalRenderer } from './TerminalRenderer';
 import { McpToolRenderer, isMcpTool } from './McpToolRenderer';
 import { LoadMcpToolsRenderer } from './LoadMcpToolsRenderer';
+import { LoadToolsRenderer } from './LoadToolsRenderer';
+import { SimulatorRenderer } from './SimulatorRenderer';
 import { SkillRenderer } from './SkillRenderer';
 
 interface ToolResultRendererProps {
@@ -75,7 +77,9 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
 
 	WebSearch: 'websearch',
 
+	LoadTools: 'load_tools',
 	LoadMcpTools: 'load_mcp_tools',
+	Simulator: 'simulator',
 
 	Skill: 'skill',
 };
@@ -168,8 +172,12 @@ export function ToolResultRenderer({
 			return null;
 		case 'progress_update':
 			return <ProgressUpdateRenderer {...props} />;
+		case 'load_tools':
+			return <LoadToolsRenderer {...props} />;
 		case 'load_mcp_tools':
 			return <LoadMcpToolsRenderer {...props} toolName={toolName} />;
+		case 'simulator':
+			return <SimulatorRenderer {...props} />;
 		case 'skill':
 			return <SkillRenderer {...props} />;
 		case 'error':

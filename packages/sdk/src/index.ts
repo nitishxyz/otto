@@ -296,6 +296,11 @@ export { createToolError } from './core/src/index.ts';
 export { buildFsTools } from './core/src/index.ts';
 export { buildGitTools } from './core/src/index.ts';
 export {
+	buildLazyToolsRecord,
+	buildLoadFirstPartyToolsTool,
+	buildSimulatorTool,
+} from './core/src/index.ts';
+export {
 	appendCoAuthorTrailer,
 	injectCoAuthorIntoGitCommit,
 	OTTOCODE_BOT_NAME,

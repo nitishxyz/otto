@@ -446,7 +446,11 @@ export async function listAvailableTools(
 	const { tools: discovered } = await discoverProjectTools(
 		_projectRoot,
 		globalConfigDir,
-	).catch(() => ({ tools: [] as { name: string }[], mcpToolsRecord: {} }));
+	).catch(() => ({
+		tools: [] as { name: string }[],
+		lazyToolsRecord: {},
+		mcpToolsRecord: {},
+	}));
 	const names = new Set<string>();
 	const curatedBuiltIns = [
 		'read',

@@ -24,6 +24,10 @@ import {
 	getMCPToolsRecord,
 	type MCPToolBrief,
 } from '../mcp/lazy-tools.ts';
+import {
+	buildLazyToolsRecord,
+	buildLoadFirstPartyToolsTool,
+} from './lazy/index.ts';
 import { dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promises as fs } from 'node:fs';
@@ -34,6 +38,7 @@ export type DiscoveredTool = { name: string; tool: Tool };
 
 export type DiscoverResult = {
 	tools: DiscoveredTool[];
+	lazyToolsRecord: Record<string, Tool>;
 	mcpToolsRecord: Record<string, Tool>;
 };
 
@@ -211,6 +216,10 @@ export async function discoverProjectTools(
 		tools.set(term.name, term.tool);
 	}
 
+	const lazyToolsRecord = buildLazyToolsRecord(projectRoot);
+	const loadFirstPartyTools = buildLoadFirstPartyToolsTool();
+	tools.set(loadFirstPartyTools.name, loadFirstPartyTools.tool);
+
 	const mcpManager = getMCPManager();
 	let mcpToolsRecord: Record<string, Tool> = {};
 	let mcpBriefs: MCPToolBrief[] = [];
@@ -225,6 +234,7 @@ export async function discoverProjectTools(
 
 	return {
 		tools: Array.from(tools.entries()).map(([name, tool]) => ({ name, tool })),
+		lazyToolsRecord,
 		mcpToolsRecord,
 	};
 }

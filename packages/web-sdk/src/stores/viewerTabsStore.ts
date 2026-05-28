@@ -115,14 +115,28 @@ export type ViewerTab =
 			title: string;
 			skill: string;
 			file: string | null;
+	  }
+	| {
+			id: string;
+			type: 'browser';
+			title: string;
+			url: string;
+			kind: 'browser' | 'simulator';
+			reloadKey: number;
 	  };
+
+export type ViewerMode = 'work' | 'preview';
 
 interface ViewerTabsState {
 	tabs: ViewerTab[];
 	activeTabId: string | null;
+	activeMode: ViewerMode;
+	activeWorkTabId: string | null;
+	activePreviewTabId: string | null;
 	followToolActivity: boolean;
 	toggleFollowToolActivity: () => void;
 	setFollowToolActivity: (enabled: boolean) => void;
+	setViewerMode: (mode: ViewerMode) => void;
 	openGitDiffTab: (path: string, staged: boolean) => void;
 	openSessionFileDiffTab: (
 		path: string,
@@ -132,6 +146,16 @@ interface ViewerTabsState {
 	openToolReadTab: (path: string, highlight: ToolActivityHighlight) => void;
 	openToolPreviewTab: (preview: ToolPreviewTabInput) => void;
 	openSkillFileTab: (skill: string, file: string | null) => void;
+	openBrowserTab: (
+		url?: string,
+		options?: {
+			kind?: 'browser' | 'simulator';
+			title?: string;
+			newTab?: boolean;
+		},
+	) => void;
+	updateBrowserTabUrl: (id: string, url: string) => void;
+	reloadBrowserTab: (id: string) => void;
 	setActiveTab: (id: string) => void;
 	closeTab: (id: string) => void;
 	updateSessionFileOperationIndex: (id: string, index: number) => void;
@@ -164,6 +188,41 @@ function viewerPathsMatch(left: string, right: string): boolean {
 
 function fileTabId(path: string): string {
 	return `file:${normalizeViewerPath(path)}`;
+}
+
+function browserTabId(kind: 'browser' | 'simulator'): string {
+	return `browser:${kind}`;
+}
+
+function newBrowserTabId(): string {
+	return `browser:browser:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function modeForTab(tab: ViewerTab): ViewerMode {
+	return tab.type === 'browser' ? 'preview' : 'work';
+}
+
+function findFallbackTabId(
+	tabs: ViewerTab[],
+	mode: ViewerMode,
+	closingIndex: number,
+): string | null {
+	const next = tabs.slice(closingIndex).find((tab) => modeForTab(tab) === mode);
+	if (next) return next.id;
+	const previous = [...tabs]
+		.slice(0, closingIndex)
+		.reverse()
+		.find((tab) => modeForTab(tab) === mode);
+	return previous?.id ?? null;
+}
+
+function activeIdForWorkUpdate(
+	state: ViewerTabsState,
+	targetId: string,
+): string {
+	return state.activeMode === 'preview' && state.activePreviewTabId
+		? state.activePreviewTabId
+		: targetId;
 }
 
 function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
@@ -272,12 +331,25 @@ function upsertAnnotation(
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	tabs: [],
 	activeTabId: null,
+	activeMode: 'work',
+	activeWorkTabId: null,
+	activePreviewTabId: null,
 	followToolActivity: false,
 
 	toggleFollowToolActivity: () =>
 		set((state) => ({ followToolActivity: !state.followToolActivity })),
 
 	setFollowToolActivity: (enabled) => set({ followToolActivity: enabled }),
+
+	setViewerMode: (mode) =>
+		set((state) => {
+			const activeTabId =
+				mode === 'preview' ? state.activePreviewTabId : state.activeWorkTabId;
+			return {
+				activeMode: mode,
+				activeTabId: activeTabId ?? null,
+			};
+		}),
 
 	openGitDiffTab: (path, staged) => {
 		const id = `git-diff:${staged ? 'staged' : 'unstaged'}:${path}`;
@@ -289,6 +361,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				path,
 				staged,
 			}),
+			activeMode: 'work',
+			activeWorkTabId: id,
 			activeTabId: id,
 		}));
 	},
@@ -304,6 +378,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				operations,
 				selectedOperationIndex: Math.max(0, operations.length - 1),
 			}),
+			activeMode: 'work',
+			activeWorkTabId: id,
 			activeTabId: id,
 		}));
 	},
@@ -339,6 +415,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					patchPreview: existingFile?.patchPreview,
 					writePreview: existingFile?.writePreview,
 				}),
+				activeMode: 'work',
+				activeWorkTabId: targetId,
 				activeTabId: targetId,
 			};
 		});
@@ -375,7 +453,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					patchPreview: undefined,
 					writePreview: undefined,
 				}),
-				activeTabId: targetId,
+				activeWorkTabId: targetId,
+				activeTabId: activeIdForWorkUpdate(state, targetId),
 			};
 		});
 	},
@@ -484,7 +563,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							error: preview.error ?? existingPatchPreview?.error,
 						},
 					}),
-					activeTabId: targetId,
+					activeWorkTabId: targetId,
+					activeTabId: activeIdForWorkUpdate(state, targetId),
 				};
 			}
 			if (existingFile) {
@@ -513,7 +593,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							error: preview.error ?? existingWritePreview?.error,
 						},
 					}),
-					activeTabId: targetId,
+					activeWorkTabId: targetId,
+					activeTabId: activeIdForWorkUpdate(state, targetId),
 				};
 			}
 			const existingWrite =
@@ -538,7 +619,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						error: preview.error ?? existingWrite?.error,
 					},
 				}),
-				activeTabId: id,
+				activeWorkTabId: id,
+				activeTabId: activeIdForWorkUpdate(state, id),
 			};
 		});
 	},
@@ -554,24 +636,112 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				skill,
 				file,
 			}),
+			activeMode: 'work',
+			activeWorkTabId: id,
 			activeTabId: id,
 		}));
 	},
 
-	setActiveTab: (id) => set({ activeTabId: id }),
+	openBrowserTab: (url = '', options = {}) => {
+		const kind = options.kind ?? 'browser';
+		set((state) => {
+			const shouldCreate = kind === 'browser' && options.newTab === true;
+			const id = shouldCreate ? newBrowserTabId() : browserTabId(kind);
+			const existing = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'browser' }> =>
+					!shouldCreate && tab.type === 'browser' && tab.id === id,
+			);
+			return {
+				tabs: upsertTab(state.tabs, {
+					id,
+					type: 'browser',
+					title: options.title ?? existing?.title ?? 'Browser',
+					url: url || existing?.url || '',
+					kind,
+					reloadKey: existing?.reloadKey ?? 0,
+				}),
+				activeMode: 'preview',
+				activePreviewTabId: id,
+				activeTabId: id,
+			};
+		});
+	},
+
+	updateBrowserTabUrl: (id, url) =>
+		set((state) => ({
+			tabs: state.tabs.map((tab) =>
+				tab.id === id && tab.type === 'browser'
+					? {
+							...tab,
+							url,
+							title: tab.kind === 'simulator' ? 'Simulator' : 'Browser',
+						}
+					: tab,
+			),
+		})),
+
+	reloadBrowserTab: (id) =>
+		set((state) => ({
+			tabs: state.tabs.map((tab) =>
+				tab.id === id && tab.type === 'browser'
+					? { ...tab, reloadKey: tab.reloadKey + 1 }
+					: tab,
+			),
+		})),
+
+	setActiveTab: (id) =>
+		set((state) => {
+			const tab = state.tabs.find((item) => item.id === id);
+			const mode = tab ? modeForTab(tab) : state.activeMode;
+			return {
+				activeMode: mode,
+				activeWorkTabId: mode === 'work' ? id : state.activeWorkTabId,
+				activePreviewTabId: mode === 'preview' ? id : state.activePreviewTabId,
+				activeTabId: id,
+			};
+		}),
 
 	closeTab: (id) =>
 		set((state) => {
 			const closingIndex = state.tabs.findIndex((tab) => tab.id === id);
+			const closingTab = state.tabs[closingIndex];
 			const tabs = state.tabs.filter((tab) => tab.id !== id);
-			let activeTabId = state.activeTabId;
+			let activeMode = state.activeMode;
+			let activeWorkTabId = state.activeWorkTabId;
+			let activePreviewTabId = state.activePreviewTabId;
 
-			if (state.activeTabId === id) {
-				activeTabId =
-					tabs[closingIndex]?.id ?? tabs[closingIndex - 1]?.id ?? null;
+			if (
+				closingTab &&
+				modeForTab(closingTab) === 'work' &&
+				activeWorkTabId === id
+			) {
+				activeWorkTabId = findFallbackTabId(tabs, 'work', closingIndex);
 			}
 
-			return { tabs, activeTabId };
+			if (
+				closingTab &&
+				modeForTab(closingTab) === 'preview' &&
+				activePreviewTabId === id
+			) {
+				activePreviewTabId = findFallbackTabId(tabs, 'preview', closingIndex);
+			}
+
+			if (activeMode === 'work' && !activeWorkTabId && activePreviewTabId) {
+				activeMode = 'preview';
+			}
+
+			if (activeMode === 'preview' && !activePreviewTabId && activeWorkTabId) {
+				activeMode = 'work';
+			}
+
+			return {
+				tabs,
+				activeMode,
+				activeWorkTabId,
+				activePreviewTabId,
+				activeTabId:
+					activeMode === 'preview' ? activePreviewTabId : activeWorkTabId,
+			};
 		}),
 
 	updateSessionFileOperationIndex: (id, index) =>
@@ -583,5 +753,12 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			),
 		})),
 
-	closeAllTabs: () => set({ tabs: [], activeTabId: null }),
+	closeAllTabs: () =>
+		set({
+			tabs: [],
+			activeTabId: null,
+			activeMode: 'work',
+			activeWorkTabId: null,
+			activePreviewTabId: null,
+		}),
 }));

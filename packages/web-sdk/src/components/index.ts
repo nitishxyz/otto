@@ -97,6 +97,10 @@ export * from './file-browser/FileBrowserSidebarToggle';
 export * from './file-browser/FileViewerPanel';
 export * from './file-browser/QuickFilePicker';
 
+// Browser Components
+export * from './browser/BrowserPanelToggle';
+export * from './browser/BrowserViewerPanel';
+
 // Workspace Components
 export * from './workspace/ViewerTabs';
 

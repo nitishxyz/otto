@@ -17,11 +17,13 @@ import {
 	TunnelSidebarToggle,
 	FileBrowserSidebar,
 	FileBrowserSidebarToggle,
+	BrowserPanelToggle,
 	MCPSidebar,
 	MCPSidebarToggle,
 	SkillsSidebar,
 	SkillsSidebarToggle,
 	QuickFilePicker,
+	ResizeHandle,
 	ViewerTabs,
 } from '@ottocode/web-sdk/components';
 import {
@@ -39,7 +41,11 @@ import { Sidebar } from './Sidebar';
 import { Moon, Sun } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
-const VIEWER_CHAT_WIDTH = 'clamp(360px, 28vw, 520px)';
+const VIEWER_MIN_CHAT_WIDTH = 360;
+const VIEWER_PANEL_KEY = 'viewer';
+const VIEWER_DEFAULT_WIDTH = 720;
+const VIEWER_MIN_WIDTH = 320;
+const VIEWER_MAX_WIDTH = 1200;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
 
@@ -109,6 +115,9 @@ export const AppLayout = memo(function AppLayout({
 				: fileBrowserExpanded
 					? (panelWidths['file-browser'] ?? RIGHT_PANEL_DEFAULT_WIDTH)
 					: RIGHT_PANEL_DEFAULT_WIDTH;
+	const viewerPanelWidth =
+		panelWidths[VIEWER_PANEL_KEY] ?? VIEWER_DEFAULT_WIDTH;
+	const viewerSideBySideWidth = `clamp(${VIEWER_MIN_WIDTH}px, ${viewerPanelWidth}px, calc(100% - ${VIEWER_MIN_CHAT_WIDTH}px))`;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousRightPanelOpenRef = useRef(anyRightPanelOpen);
 	const [isRightPanelMounted, setIsRightPanelMounted] =
@@ -122,7 +131,7 @@ export const AppLayout = memo(function AppLayout({
 	const mainPaneStyle = {
 		width:
 			anyViewerOpen && viewerSideBySide
-				? VIEWER_CHAT_WIDTH
+				? `calc(100% - ${viewerSideBySideWidth})`
 				: anyViewerOpen
 					? '0px'
 					: '100%',
@@ -130,7 +139,7 @@ export const AppLayout = memo(function AppLayout({
 	const viewerPaneStyle = {
 		width: anyViewerOpen
 			? viewerSideBySide
-				? `calc(100% - ${VIEWER_CHAT_WIDTH})`
+				? viewerSideBySideWidth
 				: '100%'
 			: '0px',
 	} as CSSProperties;
@@ -206,7 +215,7 @@ export const AppLayout = memo(function AppLayout({
 							{children}
 						</main>
 						<section
-							className={`shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+							className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
 								anyViewerOpen ? 'flex' : 'hidden md:flex'
 							} ${
 								anyViewerOpen
@@ -220,6 +229,15 @@ export const AppLayout = memo(function AppLayout({
 							style={viewerPaneStyle}
 							aria-hidden={!anyViewerOpen}
 						>
+							{anyViewerOpen && viewerSideBySide && (
+								<ResizeHandle
+									panelKey={VIEWER_PANEL_KEY}
+									side="right"
+									minWidth={VIEWER_MIN_WIDTH}
+									maxWidth={VIEWER_MAX_WIDTH}
+									defaultWidth={VIEWER_DEFAULT_WIDTH}
+								/>
+							)}
 							{anyViewerOpen && <ViewerTabs />}
 						</section>
 					</div>
@@ -254,6 +272,7 @@ export const AppLayout = memo(function AppLayout({
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />
 							<FileBrowserSidebarToggle />
+							<BrowserPanelToggle />
 							<TunnelSidebarToggle />
 							<MCPSidebarToggle />
 							<SkillsSidebarToggle />

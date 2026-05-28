@@ -23,9 +23,12 @@ import {
 import { triggerDeferredTitleGeneration } from '../message/service.ts';
 import { setupRunner } from './runner-setup.ts';
 import {
-	createMCPPrepareStepState,
-	buildPrepareStep,
-} from './mcp-prepare-step.ts';
+	buildLazyPrepareStep,
+	collectLoadedToolsFromHistory,
+	collectLoadedToolsFromSession,
+	createLazyPrepareStepState,
+	createLazyToolLoaderState,
+} from './lazy-prepare-step.ts';
 import { adaptTools as adaptToolsFn } from '../../tools/adapter.ts';
 import {
 	type ReasoningState,
@@ -65,6 +68,24 @@ export {
 	getRunnerState,
 } from '../session/queue.ts';
 
+function buildCanonicalRegistrationMap(
+	canonicalRecord: Record<string, unknown>,
+	adaptedRecord: Record<string, unknown>,
+): Record<string, string> {
+	const registrationKeys = Object.keys(adaptedRecord);
+	const canonicalToRegistration: Record<string, string> = {};
+	for (const canonical of Object.keys(canonicalRecord)) {
+		const regName = registrationKeys.find(
+			(k) =>
+				k === canonical ||
+				k.toLowerCase().replace(/_/g, '') ===
+					canonical.toLowerCase().replace(/_/g, ''),
+		);
+		canonicalToRegistration[canonical] = regName ?? canonical;
+	}
+	return canonicalToRegistration;
+}
+
 export async function runSessionLoop(sessionId: string) {
 	setRunning(sessionId, true);
 
@@ -100,49 +121,92 @@ async function runAssistant(opts: RunOpts) {
 		firstToolSeen,
 		providerOptions,
 		isOpenAIOAuth,
+		lazyToolsRecord,
 		mcpToolsRecord,
 		timings,
 	} = setup;
 	let { toolset } = setup;
 
+	const hasLazyTools = Object.keys(lazyToolsRecord).length > 0;
 	const hasMCPTools = Object.keys(mcpToolsRecord).length > 0;
-	let prepareStep: ReturnType<typeof buildPrepareStep> | undefined;
+	let prepareStep: ReturnType<typeof buildLazyPrepareStep> | undefined;
 
-	if (hasMCPTools) {
+	if (hasLazyTools || hasMCPTools) {
 		const baseToolNames = Object.keys(toolset);
 		const { getAuth: getAuthFn } = await import('@ottocode/sdk');
 		const providerAuth = await getAuthFn(opts.provider, cfg.projectRoot);
-		const adaptedMCP = adaptToolsFn(
-			Object.entries(mcpToolsRecord).map(([name, tool]) => ({ name, tool })),
-			sharedCtx,
-			opts.provider,
-			providerAuth?.type,
-		);
-		toolset = { ...toolset, ...adaptedMCP };
-		const canonicalToRegistration: Record<string, string> = {};
-		for (const canonical of Object.keys(mcpToolsRecord)) {
-			const regKeys = Object.keys(adaptedMCP);
-			const regName = regKeys.find(
-				(k) =>
-					k === canonical ||
-					k.toLowerCase().replace(/_/g, '') ===
-						canonical.toLowerCase().replace(/_/g, ''),
+		const loaders = [];
+		const collectInitialLoadedTools = async (loadToolRegName: string) =>
+			Array.from(
+				new Set([
+					...collectLoadedToolsFromHistory(history, loadToolRegName),
+					...(await collectLoadedToolsFromSession(
+						db,
+						opts.sessionId,
+						loadToolRegName,
+					)),
+				]),
 			);
-			canonicalToRegistration[canonical] = regName ?? canonical;
+
+		if (hasLazyTools) {
+			const adaptedLazy = adaptToolsFn(
+				Object.entries(lazyToolsRecord).map(([name, tool]) => ({ name, tool })),
+				sharedCtx,
+				opts.provider,
+				providerAuth?.type,
+			);
+			toolset = { ...toolset, ...adaptedLazy };
+			const canonicalToRegistration = buildCanonicalRegistrationMap(
+				lazyToolsRecord,
+				adaptedLazy,
+			);
+			const loadToolRegName =
+				Object.keys(toolset).find(
+					(k) =>
+						k === 'load_tools' ||
+						k.toLowerCase().replace(/_/g, '') === 'loadtools',
+				) ?? 'load_tools';
+			loaders.push(
+				createLazyToolLoaderState(
+					lazyToolsRecord,
+					canonicalToRegistration,
+					loadToolRegName,
+					await collectInitialLoadedTools(loadToolRegName),
+				),
+			);
 		}
-		const loadToolRegName =
-			Object.keys(toolset).find(
-				(k) =>
-					k === 'load_mcp_tools' ||
-					k.toLowerCase().replace(/_/g, '') === 'loadmcptools',
-			) ?? 'load_mcp_tools';
-		const mcpState = createMCPPrepareStepState(
-			mcpToolsRecord,
-			baseToolNames,
-			canonicalToRegistration,
-			loadToolRegName,
+
+		if (hasMCPTools) {
+			const adaptedMCP = adaptToolsFn(
+				Object.entries(mcpToolsRecord).map(([name, tool]) => ({ name, tool })),
+				sharedCtx,
+				opts.provider,
+				providerAuth?.type,
+			);
+			toolset = { ...toolset, ...adaptedMCP };
+			const canonicalToRegistration = buildCanonicalRegistrationMap(
+				mcpToolsRecord,
+				adaptedMCP,
+			);
+			const loadToolRegName =
+				Object.keys(toolset).find(
+					(k) =>
+						k === 'load_mcp_tools' ||
+						k.toLowerCase().replace(/_/g, '') === 'loadmcptools',
+				) ?? 'load_mcp_tools';
+			loaders.push(
+				createLazyToolLoaderState(
+					mcpToolsRecord,
+					canonicalToRegistration,
+					loadToolRegName,
+					await collectInitialLoadedTools(loadToolRegName),
+				),
+			);
+		}
+
+		prepareStep = buildLazyPrepareStep(
+			createLazyPrepareStepState(baseToolNames, loaders),
 		);
-		prepareStep = buildPrepareStep(mcpState);
 	}
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');

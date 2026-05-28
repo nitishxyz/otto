@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { usePreferences, type Theme } from '@ottocode/web-sdk/hooks';
 import {
+	BrowserPanelToggle,
 	Button,
 	ConfirmationDialog,
 	FileBrowserSidebar,
@@ -13,6 +14,7 @@ import {
 	MCPSidebar,
 	MCPSidebarToggle,
 	QuickFilePicker,
+	ResizeHandle,
 	SessionFilesSidebar,
 	SessionFilesSidebarToggle,
 	SettingsSidebar,
@@ -41,7 +43,11 @@ import {
 } from '@ottocode/web-sdk/stores';
 import { DesktopSidebar } from './DesktopSidebar';
 
-const VIEWER_CHAT_WIDTH = 'clamp(360px, 28vw, 520px)';
+const VIEWER_MIN_CHAT_WIDTH = 360;
+const VIEWER_PANEL_KEY = 'viewer';
+const VIEWER_DEFAULT_WIDTH = 720;
+const VIEWER_MIN_WIDTH = 320;
+const VIEWER_MAX_WIDTH = 1200;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const RIGHT_RAIL_HOVER_RATIO = 0.05;
 const HOVER_SHOW_DELAY_MS = 260;
@@ -124,6 +130,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 				: fileBrowserExpanded
 					? (panelWidths['file-browser'] ?? RIGHT_PANEL_DEFAULT_WIDTH)
 					: RIGHT_PANEL_DEFAULT_WIDTH;
+	const viewerPanelWidth =
+		panelWidths[VIEWER_PANEL_KEY] ?? VIEWER_DEFAULT_WIDTH;
+	const viewerSideBySideWidth = `clamp(${VIEWER_MIN_WIDTH}px, ${viewerPanelWidth}px, calc(100% - ${VIEWER_MIN_CHAT_WIDTH}px))`;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousRightPanelOpenRef = useRef(anyRightPanelOpen);
 	const isRightRailVisibleRef = useRef(false);
@@ -142,7 +151,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const mainPaneStyle = {
 		width:
 			anyViewerOpen && viewerSideBySide
-				? VIEWER_CHAT_WIDTH
+				? `calc(100% - ${viewerSideBySideWidth})`
 				: anyViewerOpen
 					? '0px'
 					: '100%',
@@ -150,7 +159,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const viewerPaneStyle = {
 		width: anyViewerOpen
 			? viewerSideBySide
-				? `calc(100% - ${VIEWER_CHAT_WIDTH})`
+				? viewerSideBySideWidth
 				: '100%'
 			: '0px',
 	} as CSSProperties;
@@ -339,7 +348,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							{children}
 						</main>
 						<section
-							className={`shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+							className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
 								anyViewerOpen ? 'flex' : 'hidden md:flex'
 							} ${
 								anyViewerOpen
@@ -353,6 +362,15 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							style={viewerPaneStyle}
 							aria-hidden={!anyViewerOpen}
 						>
+							{anyViewerOpen && viewerSideBySide && (
+								<ResizeHandle
+									panelKey={VIEWER_PANEL_KEY}
+									side="right"
+									minWidth={VIEWER_MIN_WIDTH}
+									maxWidth={VIEWER_MAX_WIDTH}
+									defaultWidth={VIEWER_DEFAULT_WIDTH}
+								/>
+							)}
 							{anyViewerOpen && <ViewerTabs />}
 						</section>
 					</div>
@@ -400,6 +418,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<GitSidebarToggle />
 							<SessionFilesSidebarToggle sessionId={sessionId} />
 							<FileBrowserSidebarToggle />
+							<BrowserPanelToggle />
 							<TunnelSidebarToggle />
 							<MCPSidebarToggle />
 							<SkillsSidebarToggle />

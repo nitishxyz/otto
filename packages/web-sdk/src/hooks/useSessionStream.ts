@@ -131,6 +131,10 @@ export function useSessionStream(
 			payload: Record<string, unknown> | undefined,
 		): unknown => payload?.args ?? payload?.input;
 
+		const getToolEventResult = (
+			payload: Record<string, unknown> | undefined,
+		): unknown => payload?.result ?? payload?.output;
+
 		const getToolBufferKey = (
 			payload: Record<string, unknown> | undefined,
 		): string | null => {
@@ -817,6 +821,36 @@ export function useSessionStream(
 			}
 		};
 
+		const handleSimulatorToolActivity = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+		) => {
+			if (eventType !== 'tool.result') return;
+			const result = getToolEventResult(payload);
+			if (!result || typeof result !== 'object' || Array.isArray(result))
+				return;
+			const resultRecord = result as Record<string, unknown>;
+			const firstStream = Array.isArray(resultRecord.streams)
+				? resultRecord.streams[0]
+				: undefined;
+			const stream = resultRecord.stream ?? firstStream;
+			const previewUrl = resultRecord.previewUrl;
+			if (typeof previewUrl === 'string' && previewUrl.trim()) {
+				useViewerTabsStore.getState().openBrowserTab(previewUrl, {
+					kind: 'simulator',
+					title: 'Simulator',
+				});
+				return;
+			}
+			if (!stream || typeof stream !== 'object' || Array.isArray(stream))
+				return;
+
+			useViewerTabsStore.getState().openBrowserTab('http://localhost:3200', {
+				kind: 'simulator',
+				title: 'Simulator',
+			});
+		};
+
 		const handleToolActivityViewerEvent = (
 			eventType: string,
 			payload: Record<string, unknown> | undefined,
@@ -827,6 +861,9 @@ export function useSessionStream(
 			if (name === 'write') handleWriteToolActivity(eventType, payload, delta);
 			if (name === 'apply_patch') {
 				handleApplyPatchToolActivity(eventType, payload, delta);
+			}
+			if (name === 'simulator') {
+				handleSimulatorToolActivity(eventType, payload);
 			}
 		};
 

@@ -1,7 +1,7 @@
 import { Icon, addCollection } from '@iconify/react';
 import { icons as materialIconTheme } from '@iconify-json/material-icon-theme';
 import { memo, useEffect } from 'react';
-import { GitCommit, X } from 'lucide-react';
+import { Code2, GitCommit, Globe2, Smartphone, X } from 'lucide-react';
 import {
 	useViewerTabsStore,
 	type ViewerTab,
@@ -11,6 +11,7 @@ import { GitDiffPanel } from '../git/GitDiffPanel';
 import { SessionFilesDiffPanel } from '../session-files/SessionFilesDiffPanel';
 import { FileViewerPanel } from '../file-browser/FileViewerPanel';
 import { SkillViewerPanel } from '../skills/SkillViewerPanel';
+import { BrowserViewerPanel } from '../browser/BrowserViewerPanel';
 import { ToolPreviewPanel } from './ToolPreviewPanel';
 
 addCollection(materialIconTheme);
@@ -188,6 +189,8 @@ function tabKindLabel(tab: ViewerTab): string {
 			return tab.toolName === 'write' ? 'write preview' : 'patch preview';
 		case 'skill-file':
 			return tab.skill;
+		case 'browser':
+			return tab.kind === 'simulator' ? 'simulator' : 'browser';
 	}
 }
 
@@ -200,7 +203,13 @@ function getTabPath(tab: ViewerTab): string {
 			return tab.path;
 		case 'skill-file':
 			return tab.file ?? 'SKILL.md';
+		case 'browser':
+			return tab.url || tab.title;
 	}
+}
+
+function isPreviewTab(tab: ViewerTab): boolean {
+	return tab.type === 'browser';
 }
 
 function getFileExtension(path: string): string {
@@ -273,6 +282,14 @@ function renderTabIcon(tab: ViewerTab) {
 							: 'text-blue-500'
 				}`}
 			/>
+		);
+	}
+
+	if (tab.type === 'browser') {
+		return tab.kind === 'simulator' ? (
+			<Smartphone className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+		) : (
+			<Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-500" />
 		);
 	}
 
@@ -425,12 +442,17 @@ function renderTabContent(
 					onClose={() => closeTab(tab.id)}
 				/>
 			);
+		case 'browser':
+			return <BrowserViewerPanel tab={tab} />;
 	}
 }
 
 export const ViewerTabs = memo(function ViewerTabs() {
 	const tabs = useViewerTabsStore((state) => state.tabs);
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
+	const activeMode = useViewerTabsStore((state) => state.activeMode);
+	const setViewerMode = useViewerTabsStore((state) => state.setViewerMode);
+	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
 	const setActiveTab = useViewerTabsStore((state) => state.setActiveTab);
 	const closeTab = useViewerTabsStore((state) => state.closeTab);
 	const closeAllTabs = useViewerTabsStore((state) => state.closeAllTabs);
@@ -462,65 +484,136 @@ export const ViewerTabs = memo(function ViewerTabs() {
 
 	if (tabs.length === 0) return null;
 
-	const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+	const workTabs = tabs.filter((tab) => !isPreviewTab(tab));
+	const previewTabs = tabs.filter(isPreviewTab);
+	const visibleTabs = activeMode === 'preview' ? previewTabs : workTabs;
+	const activeTab =
+		visibleTabs.find((tab) => tab.id === activeTabId) ?? visibleTabs[0] ?? null;
+	const showWorkActivityDot = activeMode === 'preview' && workTabs.length > 0;
+	const handlePreviewMode = () => {
+		if (previewTabs.length === 0) {
+			openBrowserTab();
+			return;
+		}
+		setViewerMode('preview');
+	};
 
 	return (
 		<section className="h-full w-full min-w-0 bg-sidebar flex flex-col">
-			<div className="h-12 shrink-0 bg-background flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
-				<div className="h-12 w-12 shrink-0 border-r border-b border-sidebar-border bg-background">
-					<button
-						type="button"
-						onClick={closeAllTabs}
-						title="Close all tabs"
-						aria-label="Close all tabs"
-						className="h-full w-full inline-flex items-center justify-center rounded-none text-muted-foreground/70 transition-colors hover:bg-muted/50 hover:text-foreground"
+			<div className="h-12 shrink-0 bg-background flex overflow-hidden">
+				<div className="h-12 shrink-0 border-r border-b border-sidebar-border bg-background flex items-center px-2">
+					<div
+						role="tablist"
+						aria-label="Viewer mode"
+						className="relative h-8 inline-flex items-center rounded-full ring-1 ring-inset ring-sidebar-border bg-muted/40 p-0.5"
 					>
-						<X className="h-3.5 w-3.5" />
-					</button>
-				</div>
-				{tabs.map((tab) => {
-					const isActive = tab.id === activeTab.id;
-					const activityKind = getTabActivityKind(tab);
-					return (
-						<div
-							key={tab.id}
-							className={`group h-12 w-44 max-w-56 shrink-0 px-3 border-r border-sidebar-border flex items-center gap-2 text-left transition-colors ${
-								isActive
-									? 'bg-sidebar text-sidebar-foreground'
-									: 'border-b bg-background text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/40'
+						<span
+							aria-hidden="true"
+							className={`absolute left-0.5 inset-y-0.5 w-9 rounded-full bg-background shadow-sm ring-1 ring-sidebar-border transition-transform duration-200 ease-out pointer-events-none ${
+								activeMode === 'preview'
+									? 'translate-x-9'
+									: 'translate-x-0'
 							}`}
-							title={`${tab.title}\n${tabKindLabel(tab)}`}
+						/>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activeMode === 'work'}
+							onClick={() => setViewerMode('work')}
+							title="Work tabs"
+							aria-label="Work tabs"
+							className={`relative z-10 h-7 w-9 inline-flex items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
+								activeMode === 'work'
+									? 'text-foreground'
+									: 'text-muted-foreground/70 hover:text-foreground'
+							}`}
 						>
-							<button
-								type="button"
-								onClick={() => setActiveTab(tab.id)}
-								className="min-w-0 flex-1 h-full flex items-center gap-2 text-left"
+							<Code2 className="h-4 w-4" />
+							{showWorkActivityDot && (
+								<span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />
+							)}
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={activeMode === 'preview'}
+							onClick={handlePreviewMode}
+							title="Preview tabs"
+							aria-label="Preview tabs"
+							className={`relative z-10 h-7 w-9 inline-flex items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
+								activeMode === 'preview'
+									? 'text-foreground'
+									: 'text-muted-foreground/70 hover:text-foreground'
+							}`}
+						>
+							<Globe2 className="h-4 w-4" />
+						</button>
+					</div>
+				</div>
+				<div className="h-12 min-w-0 flex-1 flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
+					{visibleTabs.map((tab) => {
+						const isActive = tab.id === activeTab.id;
+						const activityKind = getTabActivityKind(tab);
+						return (
+							<div
+								key={tab.id}
+								className={`group h-12 w-44 max-w-56 shrink-0 px-3 border-r border-sidebar-border flex items-center gap-2 text-left transition-colors ${
+									isActive
+										? 'bg-sidebar text-sidebar-foreground'
+										: 'border-b bg-background text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/40'
+								}`}
+								title={`${tab.title}\n${tabKindLabel(tab)}`}
 							>
-								{renderTabIcon(tab)}
-								<span className="min-w-0 flex-1 truncate text-[12px] font-mono">
-									{tab.title}
-								</span>
-								{renderTabActivityBadge(activityKind)}
-							</button>
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={() => {
-									closeTab(tab.id);
-								}}
-								title="Close tab"
-								className="h-6 w-6 opacity-60 group-hover:opacity-100 shrink-0"
-							>
-								<X className="h-3.5 w-3.5" />
-							</Button>
-						</div>
-					);
-				})}
-				<div className="min-w-8 flex-1 border-b border-sidebar-border bg-background" />
+								<button
+									type="button"
+									onClick={() => setActiveTab(tab.id)}
+									className="min-w-0 flex-1 h-full flex items-center gap-2 text-left"
+								>
+									{renderTabIcon(tab)}
+									<span className="min-w-0 flex-1 truncate text-[12px] font-mono">
+										{tab.title}
+									</span>
+									{renderTabActivityBadge(activityKind)}
+								</button>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										closeTab(tab.id);
+									}}
+									title="Close tab"
+									className="h-6 w-6 opacity-60 group-hover:opacity-100 shrink-0"
+								>
+									<X className="h-3.5 w-3.5" />
+								</Button>
+							</div>
+						);
+					})}
+					<div className="min-w-8 flex-1 border-b border-sidebar-border bg-background" />
+					<div className="h-12 shrink-0 border-b border-l border-sidebar-border bg-background flex items-center px-1.5">
+						<button
+							type="button"
+							onClick={closeAllTabs}
+							title="Close all tabs and collapse viewer"
+							aria-label="Close all tabs and collapse viewer"
+							className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+						>
+							<X className="h-3.5 w-3.5" />
+						</button>
+					</div>
+				</div>
 			</div>
 
 			<div className="flex-1 min-h-0 overflow-hidden">
-				{renderTabContent(activeTab, closeTab, updateSessionFileOperationIndex)}
+				{activeTab ? (
+					renderTabContent(activeTab, closeTab, updateSessionFileOperationIndex)
+				) : (
+					<div className="flex h-full items-center justify-center bg-sidebar text-muted-foreground/60 text-sm">
+						{activeMode === 'work'
+							? 'No work tabs open'
+							: 'No preview tabs open'}
+					</div>
+				)}
 			</div>
 		</section>
 	);

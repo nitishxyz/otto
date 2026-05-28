@@ -60,6 +60,7 @@ export interface SetupResult {
 	providerOptions: Record<string, unknown>;
 	needsSpoof: boolean;
 	isOpenAIOAuth: boolean;
+	lazyToolsRecord: Record<string, Tool>;
 	mcpToolsRecord: Record<string, Tool>;
 	timings: RunnerSetupTimings;
 }
@@ -104,7 +105,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const { value: discovered, durationMs: discoverToolsMs } =
 		await discoveredToolsPromise;
 	const allTools = discovered.tools;
-	const { mcpToolsRecord } = discovered;
+	const { lazyToolsRecord, mcpToolsRecord } = discovered;
 
 	if (opts.agent === 'research') {
 		const currentSession = sessionRows[0];
@@ -116,7 +117,10 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	}
 
 	toolsTimer.end({
-		count: allTools.length + Object.keys(mcpToolsRecord).length,
+		count:
+			allTools.length +
+			Object.keys(lazyToolsRecord).length +
+			Object.keys(mcpToolsRecord).length,
 	});
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');
@@ -216,6 +220,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		providerOptions,
 		needsSpoof: prompt.needsSpoof,
 		isOpenAIOAuth: prompt.isOpenAIOAuth,
+		lazyToolsRecord,
 		mcpToolsRecord,
 		timings,
 	};
