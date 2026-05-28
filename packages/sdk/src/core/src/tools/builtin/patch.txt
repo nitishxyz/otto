@@ -58,6 +58,17 @@ new block after line 200
 Line-number mode is concise but fragile if the file changes after you read it.
 Prefer text/context patches for small edits.
 
+When deleting a contiguous block larger than 10 lines, prefer line-number deletion:
+
+```text
+*** Begin Patch
+*** Delete Lines in: path/to/file.ts
+*** Lines: start-end
+*** End Patch
+```
+
+Do not reproduce the whole deleted block unless line numbers are unavailable or uncertain.
+
 ---
 
 ## Standard mode: Add / Update / Delete
