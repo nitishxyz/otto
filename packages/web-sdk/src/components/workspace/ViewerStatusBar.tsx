@@ -175,10 +175,13 @@ export function ChangeCountSlot({ count }: { count: ChangeCount }) {
 export function InlineChangeCount({
 	count,
 	className,
+	weight = 'bold',
 }: {
 	count: ChangeCount;
 	className?: string;
+	weight?: 'bold' | 'normal';
 }) {
+	const weightClass = weight === 'bold' ? 'font-semibold' : 'font-normal';
 	return (
 		<span
 			className={`inline-flex shrink-0 items-center gap-1.5 font-mono ${className ?? ''}`}
@@ -187,12 +190,12 @@ export function InlineChangeCount({
 			<AnimatedSignedCount
 				prefix="+"
 				value={count.additions}
-				className="inline-flex font-semibold text-emerald-600 dark:text-emerald-400"
+				className={`inline-flex ${weightClass} text-emerald-600 dark:text-emerald-400`}
 			/>
 			<AnimatedSignedCount
 				prefix="-"
 				value={count.removals}
-				className="inline-flex font-semibold text-red-600 dark:text-red-400"
+				className={`inline-flex ${weightClass} text-red-600 dark:text-red-400`}
 			/>
 		</span>
 	);

@@ -3,6 +3,7 @@ import { CircleCheck } from 'lucide-react';
 import type { Session } from '../../types/api';
 import { StableSpinner } from '../ui/StableSpinner';
 import { formatRelativeSessionTime } from './session-time';
+import { InlineChangeCount } from '../workspace/ViewerStatusBar';
 
 interface SessionItemProps {
 	session: Session;
@@ -56,16 +57,14 @@ export const SessionItem = memo(function SessionItem({
 				<span className="mt-0.5 flex items-center justify-between gap-3 text-[11px] leading-4 text-sidebar-muted-foreground">
 					<span className="min-w-0 flex-1 truncate">
 						{showStats ? (
-							<span className="inline-flex min-w-0 items-center gap-1.5">
-								{fileStats.additions > 0 && (
-									<span className="text-emerald-500">
-										+{fileStats.additions}
-									</span>
-								)}
-								{fileStats.deletions > 0 && (
-									<span className="text-rose-500">-{fileStats.deletions}</span>
-								)}
-							</span>
+							<InlineChangeCount
+								count={{
+									additions: fileStats.additions,
+									removals: fileStats.deletions,
+								}}
+								className="text-[11px]"
+								weight={isActive || isReadyForReview ? 'bold' : 'normal'}
+							/>
 						) : (
 							session.agent
 						)}
