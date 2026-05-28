@@ -44,7 +44,9 @@ function getTabPath(tab: ViewerTab): string {
 	}
 }
 
-function isPreviewTab(tab: ViewerTab): boolean {
+function isPreviewTab(
+	tab: ViewerTab,
+): tab is Extract<ViewerTab, { type: 'browser' }> {
 	return tab.type === 'browser';
 }
 
@@ -347,10 +349,10 @@ export const ViewerTabs = memo(function ViewerTabs() {
 						return (
 							<div
 								key={tab.id}
-								className={`group h-12 w-44 max-w-56 shrink-0 px-3 border-r border-sidebar-border flex items-center gap-2 text-left transition-colors ${
+								className={`group h-12 w-44 max-w-56 shrink-0 px-3 border-r border-b border-sidebar-border flex items-center gap-2 text-left transition-colors ${
 									isActive
-										? 'bg-sidebar text-sidebar-foreground'
-										: 'border-b bg-background text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/40'
+										? 'border-b-transparent bg-sidebar text-sidebar-foreground'
+										: 'bg-background text-muted-foreground/70 hover:text-foreground hover:bg-sidebar-accent/40'
 								}`}
 								title={`${tab.title}\n${tabKindLabel(tab)}`}
 							>
@@ -394,11 +396,30 @@ export const ViewerTabs = memo(function ViewerTabs() {
 				</div>
 			</div>
 
-			<div className="flex-1 min-h-0 overflow-hidden">
-				{activeTab ? (
-					renderTabContent(activeTab, closeTab, updateSessionFileOperationIndex)
-				) : (
-					<div className="flex h-full items-center justify-center bg-sidebar text-muted-foreground/60 text-sm">
+			<div className="relative flex-1 min-h-0 overflow-hidden">
+				{previewTabs.map((tab) => {
+					const isActive = activeMode === 'preview' && tab.id === activeTab?.id;
+					return (
+						<div
+							key={tab.id}
+							aria-hidden={!isActive}
+							className={`absolute inset-0 ${isActive ? 'block' : 'hidden'}`}
+						>
+							<BrowserViewerPanel tab={tab} />
+						</div>
+					);
+				})}
+				{activeMode === 'work' && activeTab && (
+					<div className="absolute inset-0">
+						{renderTabContent(
+							activeTab,
+							closeTab,
+							updateSessionFileOperationIndex,
+						)}
+					</div>
+				)}
+				{!activeTab && (
+					<div className="absolute inset-0 flex items-center justify-center bg-sidebar text-muted-foreground/60 text-sm">
 						{activeMode === 'work'
 							? 'No work tabs open'
 							: 'No preview tabs open'}

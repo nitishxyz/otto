@@ -83,12 +83,12 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 
 	return (
 		<div className="h-full w-full min-w-0 bg-background flex flex-col">
-			<div className="shrink-0 border-b border-border bg-[#0b0b0d] text-zinc-400">
+			<div className="shrink-0 border-b border-border bg-sidebar text-muted-foreground">
 				<div className="flex h-11 items-center gap-1 px-3">
 					<button
 						type="button"
 						disabled
-						className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600"
+						className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground/40"
 						title="Back"
 					>
 						<ChevronLeft className="h-4 w-4" />
@@ -96,7 +96,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 					<button
 						type="button"
 						disabled
-						className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600"
+						className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground/40"
 						title="Forward"
 					>
 						<ChevronRight className="h-4 w-4" />
@@ -106,7 +106,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 						onClick={() => reloadBrowserTab(tab.id)}
 						disabled={!canRenderUrl}
 						title="Reload"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:text-zinc-600 disabled:hover:bg-transparent"
+						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
 					>
 						<RefreshCw className="h-4 w-4" />
 					</button>
@@ -121,7 +121,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 							value={draftUrl}
 							onChange={(event) => setDraftUrl(event.target.value)}
 							placeholder="localhost:3000 or https://example.com"
-							className="h-8 w-full rounded-md border border-zinc-800 bg-black/30 px-3 font-mono text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-600"
+							className="h-8 w-full rounded-md border border-input bg-muted/30 px-3 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-ring"
 						/>
 					</form>
 					<button
@@ -131,7 +131,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 						}
 						disabled={!canRenderUrl}
 						title="Open externally"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:text-zinc-600 disabled:hover:bg-transparent"
+						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
 					>
 						<ExternalLink className="h-4 w-4" />
 					</button>
@@ -145,7 +145,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 							})
 						}
 						title="New browser preview"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-white/5 hover:text-zinc-200"
+						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
 					>
 						<Plus className="h-4 w-4" />
 					</button>
@@ -158,7 +158,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 							})
 						}
 						title="Simulator preview"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-white/5 hover:text-zinc-200"
+						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
 					>
 						<Smartphone className="h-4 w-4" />
 					</button>
