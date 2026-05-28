@@ -105,6 +105,7 @@ export * from './browser/BrowserViewerPanel';
 export * from './workspace/ViewerTabs';
 
 // Common Components
+export * from './common/FileTypeIcon';
 export * from './common/ProviderLogo';
 export * from './common/StatusIndicator';
 export * from './common/UsageRing';

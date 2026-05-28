@@ -4,7 +4,6 @@ import {
 	ChevronDown,
 	FolderOpen,
 	Folder,
-	FileCode,
 	FolderTree,
 	RefreshCw,
 } from 'lucide-react';
@@ -12,6 +11,7 @@ import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { useFileTree } from '../../hooks/useFileBrowser';
+import { FileTypeIcon } from '../common/FileTypeIcon';
 import { Button } from '../ui/Button';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { SidebarHeader } from '../ui/SidebarHeader';
@@ -140,7 +140,7 @@ function TreeItem({
 				) : (
 					<>
 						<span className="w-3 flex-shrink-0" />
-						<FileCode className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+						<FileTypeIcon path={path} className="w-3.5 h-3.5 flex-shrink-0" />
 					</>
 				)}
 				<span className="truncate">{name}</span>
