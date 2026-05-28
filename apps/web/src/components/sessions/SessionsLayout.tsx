@@ -151,8 +151,10 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 		gitFiles,
 		onSelectSession: handleSelectSession,
 		onNewSession: handleNewSession,
-		onStageFile: (path) => stageFiles.mutate([path]),
-		onUnstageFile: (path) => unstageFiles.mutate([path]),
+		onStageFile: (paths) =>
+			stageFiles.mutate(Array.isArray(paths) ? paths : [paths]),
+		onUnstageFile: (paths) =>
+			unstageFiles.mutate(Array.isArray(paths) ? paths : [paths]),
 		onRestoreFile: (path) => restoreFiles.mutate([path]),
 		onDeleteFile: (path) => {
 			openConfirmation({

@@ -24,6 +24,8 @@ interface GitFileItemProps {
 	file: GitFileStatus;
 	staged: boolean;
 	showModifiedIndicator?: boolean;
+	displayPath?: string;
+	indent?: number;
 }
 
 /**
@@ -68,6 +70,8 @@ export function GitFileItem({
 	file,
 	staged,
 	showModifiedIndicator = false,
+	displayPath: displayPathOverride,
+	indent = 0,
 }: GitFileItemProps) {
 	const { openDiff } = useGitStore();
 	const stageFiles = useStageFiles();
@@ -197,7 +201,7 @@ export function GitFileItem({
 	const Icon = config.icon;
 
 	// Smart truncation: show enough context without wrapping
-	const displayPath = smartTruncatePath(file.path, 2);
+	const displayPath = displayPathOverride ?? smartTruncatePath(file.path, 2);
 
 	return (
 		<button
@@ -207,6 +211,9 @@ export function GitFileItem({
 			}`}
 			onClick={handleClick}
 		>
+			{indent > 0 && (
+				<span style={{ width: indent }} className="flex-shrink-0" />
+			)}
 			<input
 				type="checkbox"
 				checked={isChecked}

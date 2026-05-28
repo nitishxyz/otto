@@ -45,6 +45,7 @@ export * from './branch/BranchModal';
 export * from './git/GitDiffViewer';
 export * from './git/GitFileList';
 export * from './git/GitFileItem';
+export * from './git/GitFileTree';
 export * from './git/GitSidebar';
 export * from './git/GitSidebarToggle';
 export * from './git/GitDiffPanel';

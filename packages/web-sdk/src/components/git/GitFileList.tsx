@@ -1,40 +1,49 @@
 import { GitCommit, CheckSquare, AlertTriangle } from 'lucide-react';
 import type { GitStatusResponse } from '../../types/api';
 import { Button } from '../ui/Button';
-import { GitFileItem } from './GitFileItem';
+import { GitFileTree } from './GitFileTree';
 import { useGitStore } from '../../stores/gitStore';
 import { useStageFiles, useUnstageFiles } from '../../hooks/useGit';
-import { useFocusStore } from '../../stores/focusStore';
-import { useEffect, useRef, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 interface GitFileListProps {
 	status: GitStatusResponse;
 }
 
 export function GitFileList({ status }: GitFileListProps) {
-	const { openCommitModal, openDiff } = useGitStore();
+	const { openCommitModal } = useGitStore();
 	const stageFiles = useStageFiles();
 	const unstageFiles = useUnstageFiles();
-	const { currentFocus, gitFileIndex } = useFocusStore();
-	const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
 	const hasConflicts = (status.conflicted?.length ?? 0) > 0;
 	const hasStaged = status.staged.length > 0;
 	const hasUnstaged = status.unstaged.length > 0 || status.untracked.length > 0;
 
-	const unstagedFiles = [...status.unstaged, ...status.untracked];
+	const unstagedFiles = useMemo(
+		() => [...status.unstaged, ...status.untracked],
+		[status.unstaged, status.untracked],
+	);
 	const hasUnstagedFiles = unstagedFiles.length > 0;
 
-	const _allFiles = useMemo(() => {
-		return [
-			...(status.conflicted ?? []),
-			...status.staged,
-			...status.unstaged,
-			...status.untracked,
-		];
-	}, [status]);
+	const unstagedPaths = useMemo(
+		() => new Set(status.unstaged.map((f) => f.path)),
+		[status.unstaged],
+	);
 
-	const unstagedPaths = new Set(status.unstaged.map((f) => f.path));
+	const handleStagePaths = useCallback(
+		(paths: string[]) => stageFiles.mutate(paths),
+		[stageFiles],
+	);
+
+	const handleUnstagePaths = useCallback(
+		(paths: string[]) => unstageFiles.mutate(paths),
+		[unstageFiles],
+	);
+
+	const showStagedModifiedIndicator = useCallback(
+		(file: { path: string }) => unstagedPaths.has(file.path),
+		[unstagedPaths],
+	);
 
 	const handleStageAll = () => {
 		if (hasUnstagedFiles) {
@@ -42,41 +51,7 @@ export function GitFileList({ status }: GitFileListProps) {
 		}
 	};
 
-	const _handleUnstageAll = () => {
-		const filesToUnstage = status.staged.map((f) => f.path);
-		if (filesToUnstage.length > 0) {
-			unstageFiles.mutate(filesToUnstage);
-		}
-	};
-
 	const conflictedLength = status.conflicted?.length ?? 0;
-
-	useEffect(() => {
-		if (currentFocus === 'git' && gitFileIndex >= 0) {
-			const element = itemRefs.current.get(gitFileIndex);
-			element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-
-			const allFiles = [
-				...(status.conflicted ?? []),
-				...status.staged,
-				...status.unstaged,
-				...status.untracked,
-			];
-			const focusedFile = allFiles[gitFileIndex];
-			if (focusedFile) {
-				const isStaged = status.staged.includes(focusedFile);
-				openDiff(focusedFile.path, isStaged);
-			}
-		}
-	}, [
-		currentFocus,
-		gitFileIndex,
-		status.conflicted,
-		status.staged,
-		status.unstaged,
-		status.untracked,
-		openDiff,
-	]);
 
 	return (
 		<div className="flex flex-col">
@@ -88,26 +63,13 @@ export function GitFileList({ status }: GitFileListProps) {
 							Conflicts ({conflictedLength})
 						</span>
 					</div>
-					<div className="divide-y divide-border">
-						{status.conflicted?.map((file, index) => {
-							const globalIndex = index;
-							const isFocused =
-								currentFocus === 'git' && gitFileIndex === globalIndex;
-							return (
-								<div
-									key={file.path}
-									ref={(el) => {
-										if (el) itemRefs.current.set(globalIndex, el);
-										else itemRefs.current.delete(globalIndex);
-									}}
-									className={
-										isFocused ? 'ring-1 ring-inset ring-primary/40' : ''
-									}
-								>
-									<GitFileItem file={file} staged={false} />
-								</div>
-							);
-						})}
+					<div>
+						<GitFileTree
+							sectionId="conflicts"
+							files={status.conflicted ?? []}
+							staged={false}
+							onToggleFolder={handleStagePaths}
+						/>
 					</div>
 				</div>
 			)}
@@ -137,30 +99,14 @@ export function GitFileList({ status }: GitFileListProps) {
 							)}
 						</div>
 					</div>
-					<div className="divide-y divide-border">
-						{status.staged.map((file, index) => {
-							const globalIndex = conflictedLength + index;
-							const isFocused =
-								currentFocus === 'git' && gitFileIndex === globalIndex;
-							return (
-								<div
-									key={file.path}
-									ref={(el) => {
-										if (el) itemRefs.current.set(globalIndex, el);
-										else itemRefs.current.delete(globalIndex);
-									}}
-									className={
-										isFocused ? 'ring-1 ring-inset ring-primary/40' : ''
-									}
-								>
-									<GitFileItem
-										file={file}
-										staged={true}
-										showModifiedIndicator={unstagedPaths.has(file.path)}
-									/>
-								</div>
-							);
-						})}
+					<div>
+						<GitFileTree
+							sectionId="staged"
+							files={status.staged}
+							staged={true}
+							onToggleFolder={handleUnstagePaths}
+							showModifiedIndicator={showStagedModifiedIndicator}
+						/>
 					</div>
 				</div>
 			)}
@@ -184,50 +130,13 @@ export function GitFileList({ status }: GitFileListProps) {
 							</Button>
 						)}
 					</div>
-					<div className="divide-y divide-border">
-						{status.unstaged.map((file, index) => {
-							const globalIndex =
-								conflictedLength + status.staged.length + index;
-							const isFocused =
-								currentFocus === 'git' && gitFileIndex === globalIndex;
-							return (
-								<div
-									key={file.path}
-									ref={(el) => {
-										if (el) itemRefs.current.set(globalIndex, el);
-										else itemRefs.current.delete(globalIndex);
-									}}
-									className={
-										isFocused ? 'ring-1 ring-inset ring-primary/40' : ''
-									}
-								>
-									<GitFileItem file={file} staged={false} />
-								</div>
-							);
-						})}
-						{status.untracked.map((file, index) => {
-							const globalIndex =
-								conflictedLength +
-								status.staged.length +
-								status.unstaged.length +
-								index;
-							const isFocused =
-								currentFocus === 'git' && gitFileIndex === globalIndex;
-							return (
-								<div
-									key={file.path}
-									ref={(el) => {
-										if (el) itemRefs.current.set(globalIndex, el);
-										else itemRefs.current.delete(globalIndex);
-									}}
-									className={
-										isFocused ? 'ring-1 ring-inset ring-primary/40' : ''
-									}
-								>
-									<GitFileItem file={file} staged={false} />
-								</div>
-							);
-						})}
+					<div>
+						<GitFileTree
+							sectionId="changes"
+							files={unstagedFiles}
+							staged={false}
+							onToggleFolder={handleStagePaths}
+						/>
 					</div>
 				</div>
 			)}

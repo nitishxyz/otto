@@ -8,6 +8,41 @@ import { useMCPStore } from './mcpStore';
 import { useSkillsStore } from './skillsStore';
 import { useViewerTabsStore } from './viewerTabsStore';
 
+export interface GitTreeRow {
+	id: string;
+	type: 'file' | 'folder';
+	path: string;
+	staged: boolean;
+	status?: string;
+	actionPaths: string[];
+	open?: () => void;
+	toggleExpanded?: () => void;
+}
+
+const GIT_TREE_SECTION_ORDER = ['conflicts', 'staged', 'changes'];
+
+function areGitTreeRowsEqual(
+	left: GitTreeRow[] = [],
+	right: GitTreeRow[] = [],
+) {
+	if (left.length !== right.length) return false;
+
+	return left.every((row, index) => {
+		const other = right[index];
+		return (
+			row.id === other.id &&
+			row.type === other.type &&
+			row.path === other.path &&
+			row.staged === other.staged &&
+			row.status === other.status &&
+			row.actionPaths.length === other.actionPaths.length &&
+			row.actionPaths.every(
+				(path, pathIndex) => path === other.actionPaths[pathIndex],
+			)
+		);
+	});
+}
+
 interface GitState {
 	// Sidebar state
 	isExpanded: boolean;
@@ -27,6 +62,10 @@ interface GitState {
 	// Session list collapse state (when diff is open)
 	wasSessionListCollapsed: boolean;
 
+	// Visible Git tree rows for keyboard navigation
+	gitTreeSections: Record<string, GitTreeRow[]>;
+	gitTreeRows: GitTreeRow[];
+
 	// Actions
 	toggleSidebar: () => void;
 	expandSidebar: () => void;
@@ -42,6 +81,7 @@ interface GitState {
 
 	setActiveSessionId: (sessionId: string | null) => void;
 	setSessionListCollapsed: (collapsed: boolean) => void;
+	setGitTreeSectionRows: (sectionId: string, rows: GitTreeRow[]) => void;
 }
 
 export const useGitStore = create<GitState>((set) => ({
@@ -54,6 +94,8 @@ export const useGitStore = create<GitState>((set) => ({
 	isCommitModalOpen: false,
 	commitSessionId: null,
 	wasSessionListCollapsed: false,
+	gitTreeSections: {},
+	gitTreeRows: [],
 
 	// Sidebar actions
 	toggleSidebar: () => {
@@ -111,4 +153,20 @@ export const useGitStore = create<GitState>((set) => ({
 	setActiveSessionId: (sessionId) => set({ activeSessionId: sessionId }),
 	setSessionListCollapsed: (collapsed) =>
 		set({ wasSessionListCollapsed: collapsed }),
+	setGitTreeSectionRows: (sectionId, rows) =>
+		set((state) => {
+			if (areGitTreeRowsEqual(state.gitTreeSections[sectionId], rows)) {
+				return state;
+			}
+
+			const gitTreeSections = {
+				...state.gitTreeSections,
+				[sectionId]: rows,
+			};
+			const gitTreeRows = GIT_TREE_SECTION_ORDER.flatMap(
+				(id) => gitTreeSections[id] ?? [],
+			);
+
+			return { gitTreeSections, gitTreeRows };
+		}),
 }));

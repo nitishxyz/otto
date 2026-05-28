@@ -125,7 +125,7 @@ export function registerStatusRoute(app: Hono) {
 
 				const { stdout: statusOutput } = await execFileAsync(
 					'git',
-					['status', '--porcelain=v2'],
+					['status', '--porcelain=v2', '--untracked-files=all'],
 					{ cwd: gitRoot },
 				);
 

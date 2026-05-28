@@ -18,8 +18,8 @@ interface UseKeyboardShortcutsOptions {
 	gitFiles: Array<{ path: string; staged: boolean; status?: string }>;
 	onSelectSession: (sessionId: string) => void;
 	onNewSession: () => void;
-	onStageFile?: (path: string) => void;
-	onUnstageFile?: (path: string) => void;
+	onStageFile?: (paths: string[]) => void;
+	onUnstageFile?: (paths: string[]) => void;
 	onRestoreFile?: (path: string) => void;
 	onDeleteFile?: (path: string) => void;
 	onStageAll?: () => void;
@@ -32,7 +32,6 @@ interface UseKeyboardShortcutsOptions {
 export function useKeyboardShortcuts({
 	sessionIds,
 	activeSessionId,
-	gitFiles,
 	onSelectSession,
 	onNewSession,
 	onStageFile,
@@ -60,6 +59,7 @@ export function useKeyboardShortcuts({
 	} = useSidebarStore();
 	const { isExpanded: isGitExpanded, toggleSidebar: toggleGit } = useGitStore();
 	const closeDiff = useGitStore((state) => state.closeDiff);
+	const gitTreeRows = useGitStore((state) => state.gitTreeRows);
 	const toggleSessionFiles = useSessionFilesStore(
 		(state) => state.toggleSidebar,
 	);
@@ -271,27 +271,28 @@ export function useKeyboardShortcuts({
 			}
 
 			if (currentFocus === 'git' && !isInInput) {
-				if (e.key === 'j' && gitFiles.length > 0) {
+				const focusedGitRow = gitTreeRows[gitFileIndex];
+
+				if (e.key === 'j' && gitTreeRows.length > 0) {
 					e.preventDefault();
-					const nextIndex = Math.min(gitFileIndex + 1, gitFiles.length - 1);
+					const nextIndex = Math.min(gitFileIndex + 1, gitTreeRows.length - 1);
 					setGitFileIndex(nextIndex);
 					return;
 				}
 
-				if (e.key === 'k' && gitFiles.length > 0) {
+				if (e.key === 'k' && gitTreeRows.length > 0) {
 					e.preventDefault();
 					const prevIndex = Math.max(gitFileIndex - 1, 0);
 					setGitFileIndex(prevIndex);
 					return;
 				}
 
-				if (e.key === ' ' && gitFiles[gitFileIndex]) {
+				if (e.key === ' ' && focusedGitRow) {
 					e.preventDefault();
-					const file = gitFiles[gitFileIndex];
-					if (file.staged) {
-						onUnstageFile?.(file.path);
+					if (focusedGitRow.staged) {
+						onUnstageFile?.(focusedGitRow.actionPaths);
 					} else {
-						onStageFile?.(file.path);
+						onStageFile?.(focusedGitRow.actionPaths);
 					}
 					return;
 				}
@@ -308,16 +309,15 @@ export function useKeyboardShortcuts({
 					return;
 				}
 
-				if (e.key === 'R' && gitFiles[gitFileIndex]) {
+				if (e.key === 'R' && focusedGitRow?.type === 'file') {
 					e.preventDefault();
-					const file = gitFiles[gitFileIndex];
 					// Only allow restore for unstaged, tracked files (not new/untracked)
 					const canRestore =
-						!file.staged &&
-						file.status !== 'untracked' &&
-						file.status !== 'added';
+						!focusedGitRow.staged &&
+						focusedGitRow.status !== 'untracked' &&
+						focusedGitRow.status !== 'added';
 					if (canRestore) {
-						onRestoreFile?.(file.path);
+						onRestoreFile?.(focusedGitRow.path);
 					}
 					return;
 				}
@@ -325,9 +325,12 @@ export function useKeyboardShortcuts({
 				// Delete file - Shift+D or Delete (only for untracked files)
 				if ((e.shiftKey && e.key === 'D') || e.key === 'Backspace') {
 					e.preventDefault();
-					const file = gitFiles[gitFileIndex];
-					if (file && !file.staged && file.status === 'untracked') {
-						onDeleteFile?.(file.path);
+					if (
+						focusedGitRow?.type === 'file' &&
+						!focusedGitRow.staged &&
+						focusedGitRow.status === 'untracked'
+					) {
+						onDeleteFile?.(focusedGitRow.path);
 					}
 					return;
 				}
@@ -338,10 +341,14 @@ export function useKeyboardShortcuts({
 					return;
 				}
 
-				if (e.key === 'Enter' && gitFiles[gitFileIndex]) {
+				if (e.key === 'Enter' && focusedGitRow) {
 					e.preventDefault();
-					const file = gitFiles[gitFileIndex];
-					onViewDiff?.(file.path, file.staged);
+					if (focusedGitRow.type === 'folder') {
+						focusedGitRow.toggleExpanded?.();
+					} else {
+						focusedGitRow.open?.();
+						onViewDiff?.(focusedGitRow.path, focusedGitRow.staged);
+					}
 					return;
 				}
 			}
@@ -351,7 +358,7 @@ export function useKeyboardShortcuts({
 			sessionIndex,
 			gitFileIndex,
 			sessionIds,
-			gitFiles,
+			gitTreeRows,
 			currentSessionIndex,
 			isGitExpanded,
 			setFocus,
