@@ -15,6 +15,9 @@ import {
 	getGitRemotes as apiGetGitRemotes,
 	addGitRemote as apiAddGitRemote,
 	removeGitRemote as apiRemoveGitRemote,
+	listGitBranches as apiListGitBranches,
+	checkoutGitBranch as apiCheckoutGitBranch,
+	createGitBranch as apiCreateGitBranch,
 } from '@ottocode/api';
 import type {
 	GitStatusResponse,
@@ -28,6 +31,7 @@ import type {
 	GitPullResponse,
 	GitRebaseActionResponse,
 	GitRemoteInfo,
+	GitBranchListResponse,
 } from '../../types/api';
 import { extractErrorMessage } from './utils';
 
@@ -203,5 +207,44 @@ export const gitMixin = {
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { removed: string };
+	},
+
+	async listGitBranches(): Promise<GitBranchListResponse> {
+		const response = await apiListGitBranches();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return (response.data as any)?.data as GitBranchListResponse;
+	},
+
+	async checkoutBranch(branch: string): Promise<{ branch: string }> {
+		const response = await apiCheckoutGitBranch({
+			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
+			body: { branch } as any,
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return (response.data as any)?.data as { branch: string };
+	},
+
+	async createGitBranch(
+		name: string,
+		options?: { startPoint?: string; checkout?: boolean },
+	): Promise<{ branch: string; checkedOut: boolean }> {
+		const response = await apiCreateGitBranch({
+			body: {
+				name,
+				...(options?.startPoint ? { startPoint: options.startPoint } : {}),
+				...(options?.checkout !== undefined
+					? { checkout: options.checkout }
+					: {}),
+				// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
+			} as any,
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return (response.data as any)?.data as {
+			branch: string;
+			checkedOut: boolean;
+		};
 	},
 };

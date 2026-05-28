@@ -66,3 +66,15 @@ export const gitRemoteRemoveSchema = z.object({
 	project: z.string().optional(),
 	name: z.string().min(1),
 });
+
+export const gitCheckoutBranchSchema = z.object({
+	project: z.string().optional(),
+	branch: z.string().min(1),
+});
+
+export const gitCreateBranchSchema = z.object({
+	project: z.string().optional(),
+	name: z.string().min(1),
+	startPoint: z.string().optional(),
+	checkout: z.boolean().optional().default(true),
+});

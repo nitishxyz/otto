@@ -50,6 +50,8 @@ export * from './git/GitSidebar';
 export * from './git/GitSidebarToggle';
 export * from './git/GitDiffPanel';
 export * from './git/GitCommitModal';
+export * from './git/GitBranchSwitcher';
+export * from './git/GitCreateBranchModal';
 
 // Terminal Components
 export * from './terminals/TerminalsPanel';

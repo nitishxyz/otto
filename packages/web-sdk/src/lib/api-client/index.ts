@@ -46,6 +46,9 @@ class ApiClient {
 	getRemotes = gitMixin.getRemotes;
 	addRemote = gitMixin.addRemote;
 	removeRemote = gitMixin.removeRemote;
+	listGitBranches = gitMixin.listGitBranches;
+	checkoutBranch = gitMixin.checkoutBranch;
+	createGitBranch = gitMixin.createGitBranch;
 
 	getConfig = configMixin.getConfig;
 	getModels = configMixin.getModels;

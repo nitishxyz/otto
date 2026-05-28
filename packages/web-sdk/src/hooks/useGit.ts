@@ -188,3 +188,43 @@ export function useRemoveRemote() {
 		},
 	});
 }
+
+export function useGitBranches(enabled = true) {
+	return useQuery({
+		queryKey: ['git', 'branches'],
+		queryFn: () => apiClient.listGitBranches(),
+		enabled,
+		retry: 1,
+		staleTime: 5000,
+	});
+}
+
+export function useCheckoutBranch() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (branch: string) => apiClient.checkoutBranch(branch),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['git'] });
+		},
+	});
+}
+
+export function useCreateGitBranch() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({
+			name,
+			startPoint,
+			checkout,
+		}: {
+			name: string;
+			startPoint?: string;
+			checkout?: boolean;
+		}) => apiClient.createGitBranch(name, { startPoint, checkout }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['git'] });
+		},
+	});
+}

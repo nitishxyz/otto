@@ -36,19 +36,18 @@ export const SessionItem = memo(function SessionItem({
 		<button
 			type="button"
 			onClick={onClick}
-			className={`group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 ${
+			className={`group flex w-full items-start gap-2 px-4 py-3 text-left transition-colors duration-150 ${
 				isActive
 					? 'bg-black/[0.08] text-sidebar-foreground dark:bg-white/[0.08]'
 					: 'text-sidebar-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.055]'
 			}`}
 			title={`${title} — ${metadata}`}
 		>
-			<span
-				className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80 ${statusIcon ? '' : 'opacity-0'}`}
-				aria-hidden={!statusIcon}
-			>
-				{statusIcon ?? <CircleCheck className="h-4 w-4" />}
-			</span>
+			{statusIcon && (
+				<span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80">
+					{statusIcon}
+				</span>
+			)}
 			<span className="block min-w-0 flex-1">
 				<span
 					className={`block min-w-0 truncate text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}

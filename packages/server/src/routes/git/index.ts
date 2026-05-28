@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { registerStatusRoute } from './status.ts';
 import { registerBranchRoute } from './branch.ts';
+import { registerBranchesRoutes } from './branches.ts';
 import { registerDiffRoute } from './diff.ts';
 import { registerStagingRoutes } from './staging.ts';
 import { registerCommitRoutes } from './commit.ts';
@@ -15,6 +16,7 @@ export type { GitFile } from './types.ts';
 export function registerGitRoutes(app: Hono) {
 	registerStatusRoute(app);
 	registerBranchRoute(app);
+	registerBranchesRoutes(app);
 	registerDiffRoute(app);
 	registerStagingRoutes(app);
 	registerCommitRoutes(app);

@@ -279,6 +279,22 @@ export interface GitRemoteInfo {
 	type: string;
 }
 
+export interface GitBranchListItem {
+	name: string;
+	fullName: string;
+	current: boolean;
+	remote: boolean;
+	remoteName?: string;
+	upstream?: string;
+	sha?: string;
+	subject?: string;
+}
+
+export interface GitBranchListResponse {
+	current: string;
+	branches: GitBranchListItem[];
+}
+
 export interface SessionFileOperation {
 	path: string;
 	operation: 'write' | 'patch' | 'create';

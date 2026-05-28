@@ -31,6 +31,7 @@ import { GitFileList } from './GitFileList';
 import { ResizeHandle } from '../ui/ResizeHandle';
 import { SidebarHeader } from '../ui/SidebarHeader';
 import { StableSpinner } from '../ui/StableSpinner';
+import { GitBranchSwitcher } from './GitBranchSwitcher';
 
 const PANEL_KEY = 'git';
 const DEFAULT_WIDTH = 320;
@@ -578,13 +579,17 @@ export const GitSidebar = memo(function GitSidebar({
 
 				<div className="h-12 px-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between gap-2">
 					<div className="flex items-center gap-2 min-w-0 flex-1">
-						<GitBranch className="w-3 h-3 flex-shrink-0" />
-						{status?.branch && (
-							<span className="truncate" title={status.headSha}>
-								{status.isDetached
-									? `HEAD ${status.shortHeadSha}`
-									: status.branch}
-							</span>
+						{status?.branch ? (
+							<GitBranchSwitcher
+								currentBranch={status.branch}
+								isDetached={status.isDetached}
+								shortHeadSha={status.shortHeadSha}
+							/>
+						) : (
+							<>
+								<GitBranch className="w-3 h-3 flex-shrink-0" />
+								<span className="truncate">No branch</span>
+							</>
 						)}
 						{status?.isDetached && (
 							<span className="text-[10px] text-orange-500 flex-shrink-0">
