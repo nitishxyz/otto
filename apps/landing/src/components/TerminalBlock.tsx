@@ -4,10 +4,14 @@ export function TerminalBlock({
 	children,
 	title,
 	copyText,
+	copyEventName,
+	copyEventProps,
 }: {
 	children: React.ReactNode;
 	title?: string;
 	copyText?: string;
+	copyEventName?: string;
+	copyEventProps?: string;
 }) {
 	return (
 		<div className="relative bg-otto-surface border border-otto-border rounded-lg overflow-hidden group/term">
@@ -22,6 +26,8 @@ export function TerminalBlock({
 					<CopyButton
 						text={copyText}
 						className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/term:opacity-100"
+						eventName={copyEventName}
+						eventProps={copyEventProps}
 					/>
 				)}
 			</div>

@@ -360,6 +360,8 @@ export function HeroSection() {
 							<a
 								href="#desktop"
 								className="px-5 py-2.5 bg-otto-text text-otto-bg text-sm font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-2"
+								data-s-event="Click desktop CTA"
+								data-s-event-props="source=hero"
 							>
 								<svg
 									className="w-4 h-4"
@@ -379,6 +381,8 @@ export function HeroSection() {
 							<a
 								href="/docs"
 								className="px-5 py-2.5 border border-otto-border text-otto-muted text-sm rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
+								data-s-event="Click docs CTA"
+								data-s-event-props="source=hero"
 							>
 								Docs
 							</a>

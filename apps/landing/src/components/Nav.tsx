@@ -104,6 +104,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						<a
 							href="/docs"
 							className="text-otto-muted hover:text-otto-text transition-colors"
+							data-s-event="Click docs CTA"
+							data-s-event-props="source=nav"
 						>
 							Docs
 						</a>
@@ -112,6 +114,8 @@ export function Nav({ pathname }: { pathname: string }) {
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-otto-muted hover:text-otto-text transition-colors"
+							data-s-event="Click GitHub CTA"
+							data-s-event-props="source=nav"
 						>
 							GitHub
 						</a>
@@ -130,6 +134,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						<a
 							href="https://ottorouter.org"
 							className="px-3.5 py-1.5 border border-blue-400/50 text-blue-400 text-xs font-medium rounded-sm hover:border-blue-400 transition-colors inline-flex items-center gap-1.5"
+							data-s-event="Click OttoRouter CTA"
+							data-s-event-props="source=nav"
 						>
 							<OttoRouterIcon />
 							OttoRouter
@@ -138,6 +144,8 @@ export function Nav({ pathname }: { pathname: string }) {
 							type="button"
 							onClick={handleSectionLink('install')}
 							className="px-3.5 py-1.5 border border-otto-border text-otto-muted text-xs rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
+							data-s-event="Click install CTA"
+							data-s-event-props="source=nav"
 						>
 							Install
 						</button>
@@ -145,6 +153,8 @@ export function Nav({ pathname }: { pathname: string }) {
 							type="button"
 							onClick={handleSectionLink('desktop')}
 							className="px-3.5 py-1.5 bg-otto-text text-otto-bg text-xs font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-1.5"
+							data-s-event="Click desktop CTA"
+							data-s-event-props="source=nav"
 						>
 							<svg
 								aria-hidden="true"
@@ -213,6 +223,8 @@ export function Nav({ pathname }: { pathname: string }) {
 					<a
 						href="https://ottorouter.org"
 						className="flex items-center gap-1.5 text-otto-muted hover:text-otto-text"
+						data-s-event="Click OttoRouter CTA"
+						data-s-event-props="source=mobile-nav"
 					>
 						<span className="text-otto-muted">
 							<OttoRouterIcon />
@@ -222,6 +234,8 @@ export function Nav({ pathname }: { pathname: string }) {
 					<a
 						href="/docs"
 						className="block text-otto-muted hover:text-otto-text"
+						data-s-event="Click docs CTA"
+						data-s-event-props="source=mobile-nav"
 					>
 						Docs
 					</a>
@@ -230,6 +244,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						target="_blank"
 						rel="noopener noreferrer"
 						className="block text-otto-muted hover:text-otto-text"
+						data-s-event="Click GitHub CTA"
+						data-s-event-props="source=mobile-nav"
 					>
 						GitHub
 					</a>
@@ -237,6 +253,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						type="button"
 						onClick={handleSectionLink('install')}
 						className="block text-otto-muted hover:text-otto-text"
+						data-s-event="Click install CTA"
+						data-s-event-props="source=mobile-nav"
 					>
 						Install
 					</button>
@@ -244,6 +262,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						type="button"
 						onClick={handleSectionLink('desktop')}
 						className="block text-otto-muted hover:text-otto-text"
+						data-s-event="Click desktop CTA"
+						data-s-event-props="source=mobile-nav"
 					>
 						Desktop App
 					</button>

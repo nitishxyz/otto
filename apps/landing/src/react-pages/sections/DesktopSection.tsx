@@ -30,6 +30,8 @@ function DesktopDownloads() {
 							<a
 								href={release.macosArm.url}
 								className="flex items-center justify-between px-4 py-3 bg-otto-surface border border-otto-border rounded-sm hover:bg-otto-text hover:text-otto-bg hover:border-otto-text transition-all group"
+								data-s-event="Download desktop app"
+								data-s-event-props="platform=macos;arch=arm64;format=dmg"
 							>
 								<div className="flex items-center gap-3">
 									<svg
@@ -63,6 +65,8 @@ function DesktopDownloads() {
 							<a
 								href={release.macosIntel.url}
 								className="flex items-center justify-between px-4 py-3 bg-otto-surface border border-otto-border rounded-sm hover:bg-otto-text hover:text-otto-bg hover:border-otto-text transition-all group"
+								data-s-event="Download desktop app"
+								data-s-event-props="platform=macos;arch=x64;format=dmg"
 							>
 								<div className="flex items-center gap-3">
 									<svg
@@ -114,6 +118,8 @@ function DesktopDownloads() {
 							<a
 								href={release.linuxDeb.url}
 								className="flex items-center justify-between px-4 py-3 bg-otto-surface border border-otto-border rounded-sm hover:bg-otto-text hover:text-otto-bg hover:border-otto-text transition-all group"
+								data-s-event="Download desktop app"
+								data-s-event-props="platform=linux;arch=x64;format=deb"
 							>
 								<div className="flex items-center gap-3">
 									<svg
@@ -147,6 +153,8 @@ function DesktopDownloads() {
 							<a
 								href={release.linuxDebArm.url}
 								className="flex items-center justify-between px-4 py-3 bg-otto-surface border border-otto-border rounded-sm hover:bg-otto-text hover:text-otto-bg hover:border-otto-text transition-all group"
+								data-s-event="Download desktop app"
+								data-s-event-props="platform=linux;arch=arm64;format=deb"
 							>
 								<div className="flex items-center gap-3">
 									<svg
@@ -189,6 +197,8 @@ function DesktopDownloads() {
 					target="_blank"
 					rel="noopener noreferrer"
 					className="text-xs text-otto-dim hover:text-otto-muted transition-colors"
+					data-s-event="Click release notes"
+					data-s-event-props="source=desktop"
 				>
 					Release notes →
 				</a>
@@ -197,6 +207,8 @@ function DesktopDownloads() {
 					target="_blank"
 					rel="noopener noreferrer"
 					className="text-xs text-otto-dim hover:text-otto-muted transition-colors"
+					data-s-event="Click all releases"
+					data-s-event-props="source=desktop"
 				>
 					All releases →
 				</a>

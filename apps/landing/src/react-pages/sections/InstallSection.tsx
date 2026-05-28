@@ -17,7 +17,11 @@ export function InstallSection() {
 				</Reveal>
 
 				<Reveal delay={80}>
-					<TerminalBlock copyText="curl -fsSL https://install.ottocode.io | sh">
+					<TerminalBlock
+						copyText="curl -fsSL https://install.ottocode.io | sh"
+						copyEventName="Copy install command"
+						copyEventProps="source=install;method=curl"
+					>
 						<div>
 							<span className="text-otto-dim">$</span> curl -fsSL
 							https://install.ottocode.io | sh
@@ -27,7 +31,11 @@ export function InstallSection() {
 
 				<Reveal delay={120}>
 					<p className="text-otto-dim text-xs mt-6 mb-4">or</p>
-					<TerminalBlock copyText="bun install -g @ottocode/install">
+					<TerminalBlock
+						copyText="bun install -g @ottocode/install"
+						copyEventName="Copy install command"
+						copyEventProps="source=install;method=bun"
+					>
 						<div>
 							<span className="text-otto-dim">$</span> bun install -g
 							@ottocode/install
@@ -40,6 +48,8 @@ export function InstallSection() {
 						<a
 							href="#desktop"
 							className="px-5 py-2.5 bg-otto-text text-otto-bg text-sm font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-2"
+							data-s-event="Click desktop CTA"
+							data-s-event-props="source=install"
 						>
 							<svg
 								className="w-4 h-4"
@@ -59,6 +69,8 @@ export function InstallSection() {
 						<a
 							href="/docs"
 							className="px-5 py-2.5 border border-otto-border text-otto-muted text-sm rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
+							data-s-event="Click docs CTA"
+							data-s-event-props="source=install"
 						>
 							Docs
 						</a>
@@ -67,6 +79,8 @@ export function InstallSection() {
 							target="_blank"
 							rel="noopener noreferrer"
 							className="px-5 py-2.5 border border-otto-border text-otto-muted text-sm rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
+							data-s-event="Click GitHub CTA"
+							data-s-event-props="source=install"
 						>
 							GitHub
 						</a>

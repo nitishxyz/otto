@@ -3,9 +3,13 @@ import { useState, useCallback } from 'react';
 export function CopyButton({
 	text,
 	className = '',
+	eventName,
+	eventProps,
 }: {
 	text: string;
 	className?: string;
+	eventName?: string;
+	eventProps?: string;
 }) {
 	const [copied, setCopied] = useState(false);
 
@@ -22,6 +26,8 @@ export function CopyButton({
 			onClick={copy}
 			className={`p-1.5 rounded-sm text-otto-dim hover:text-otto-text hover:bg-otto-card transition-colors ${className}`}
 			title="Copy to clipboard"
+			data-s-event={eventName}
+			data-s-event-props={eventProps}
 		>
 			{copied ? (
 				<svg
