@@ -40,6 +40,10 @@ describe('oauth model filtering', () => {
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-sonnet-4-5-20251001'),
 		).toBe(true);
+		expect(isModelAllowedForOAuth('anthropic', 'claude-opus-4-8')).toBe(true);
+		expect(
+			isModelAllowedForOAuth('anthropic', 'claude-opus-4-8-20260529'),
+		).toBe(true);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-3-5-sonnet-latest'),
 		).toBe(false);
