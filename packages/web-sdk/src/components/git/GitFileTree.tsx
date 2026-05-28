@@ -39,6 +39,10 @@ type TreeNode = TreeFileNode | TreeFolderNode;
 const INDENT_SIZE = 12;
 const FILE_CARET_OFFSET = 32;
 
+function getFileIndent(depth: number) {
+	return depth === 0 ? 0 : FILE_CARET_OFFSET + (depth - 1) * INDENT_SIZE;
+}
+
 function createFolder(name: string, path: string): TreeFolderNode {
 	return {
 		type: 'folder',
@@ -262,7 +266,7 @@ export function GitFileTree({
 						file={node.file}
 						staged={staged}
 						displayPath={node.name}
-						indent={FILE_CARET_OFFSET + depth * INDENT_SIZE}
+						indent={getFileIndent(depth)}
 						showModifiedIndicator={showModifiedIndicator?.(node.file) ?? false}
 					/>
 				</div>
