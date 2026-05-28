@@ -1,8 +1,12 @@
 import { hasToolCall, streamText } from 'ai';
 import { logger } from '@ottocode/sdk';
+import type { getDb } from '@ottocode/database';
+import { messages } from '@ottocode/database/schema';
+import { eq } from 'drizzle-orm';
 import { publish } from '../../events/bus.ts';
 import {
 	type RunOpts,
+	enqueueAssistantRun,
 	setRunning,
 	dequeueJob,
 	cleanupSession,
@@ -67,6 +71,106 @@ export {
 	getQueueState,
 	getRunnerState,
 } from '../session/queue.ts';
+
+const OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX = 2;
+
+function parsePositiveIntegerEnv(name: string, fallback: number) {
+	const raw = process.env[name];
+	if (!raw) return fallback;
+	const parsed = Number.parseInt(raw, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getOpenAIOAuthCodexStreamIdleRetryMax() {
+	return parsePositiveIntegerEnv(
+		'OTTO_OPENAI_OAUTH_STREAM_IDLE_RETRY_MAX',
+		OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX,
+	);
+}
+
+function isOpenAIOAuthCodexStreamIdleTimeout(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return message.includes('OpenAI OAuth Codex stream idle timeout');
+}
+
+async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
+	err: unknown;
+	opts: RunOpts;
+	db: Awaited<ReturnType<typeof getDb>>;
+	isOpenAIOAuth: boolean;
+}): Promise<boolean> {
+	const { err, opts, db, isOpenAIOAuth } = args;
+	if (opts.provider !== 'openai' || !isOpenAIOAuth) return false;
+	if (!isOpenAIOAuthCodexStreamIdleTimeout(err)) return false;
+	if (opts.abortSignal?.aborted) return false;
+
+	const continuationCount = opts.continuationCount ?? 0;
+	const maxRetries = getOpenAIOAuthCodexStreamIdleRetryMax();
+	if (continuationCount >= maxRetries) return false;
+
+	const retryMessageId = crypto.randomUUID();
+	await cleanupEmptyTextParts(opts, db);
+	await db
+		.update(messages)
+		.set({ status: 'complete', completedAt: Date.now() })
+		.where(eq(messages.id, opts.assistantMessageId));
+	publish({
+		type: 'message.completed',
+		sessionId: opts.sessionId,
+		payload: {
+			id: opts.assistantMessageId,
+			finishReason: 'stream-idle-retry',
+			codexStreamRetry: true,
+		},
+	});
+
+	await db.insert(messages).values({
+		id: retryMessageId,
+		sessionId: opts.sessionId,
+		role: 'assistant',
+		status: 'pending',
+		agent: opts.agent,
+		provider: opts.provider,
+		model: opts.model,
+		createdAt: Date.now(),
+	});
+	publish({
+		type: 'message.created',
+		sessionId: opts.sessionId,
+		payload: {
+			id: retryMessageId,
+			role: 'assistant',
+			agent: opts.agent,
+			provider: opts.provider,
+			model: opts.model,
+			codexStreamRetry: true,
+		},
+	});
+
+	const { abortSignal: _abortSignal, queuedAt: _queuedAt, ...retryOpts } = opts;
+	enqueueAssistantRun(
+		{
+			...retryOpts,
+			assistantMessageId: retryMessageId,
+			continuationCount: continuationCount + 1,
+		},
+		runSessionLoop,
+	);
+	logger.warn(
+		'[agent] retrying OpenAI OAuth Codex run after stream idle timeout',
+		{
+			sessionId: opts.sessionId,
+			messageId: opts.assistantMessageId,
+			retryMessageId,
+			agent: opts.agent,
+			model: opts.model,
+			attempt: continuationCount + 1,
+			maxRetries,
+			error: err instanceof Error ? err.message : String(err),
+		},
+	);
+	return true;
+}
 
 function buildCanonicalRegistrationMap(
 	canonicalRecord: Record<string, unknown>,
@@ -578,6 +682,16 @@ async function runAssistant(opts: RunOpts) {
 					},
 				});
 			}
+			return;
+		}
+		if (
+			await retryOpenAIOAuthCodexAfterStreamIdleTimeout({
+				err,
+				opts,
+				db,
+				isOpenAIOAuth,
+			})
+		) {
 			return;
 		}
 		dump?.recordError(err);
