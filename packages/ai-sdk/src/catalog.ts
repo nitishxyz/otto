@@ -1825,5 +1825,5 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 		'xai',
 		'zai',
 	],
-	lastUpdated: '2026-05-06',
+	lastUpdated: '2026-05-28',
 } as const satisfies OttoRouterCatalog;
