@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { init, Terminal, FitAddon } from 'ghostty-web';
+import {
+	init,
+	Terminal,
+	FitAddon,
+	OSC8LinkProvider,
+	UrlRegexProvider,
+	type ILinkProvider,
+} from 'ghostty-web';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
+import { openUrl } from '../../lib/open-url';
 import { client } from '@ottocode/api';
 import { StableSpinner } from '../ui/StableSpinner';
 
@@ -92,6 +100,44 @@ function resolveApiBaseUrl(): string {
 
 function httpToWs(url: string): string {
 	return url.replace(/^http/, 'ws');
+}
+
+function shouldOpenTerminalLink(event: MouseEvent): boolean {
+	return event.ctrlKey || event.metaKey;
+}
+
+function withPlatformLinkActivation(provider: ILinkProvider): ILinkProvider {
+	return {
+		provideLinks(y, callback) {
+			provider.provideLinks(y, (links) => {
+				callback(
+					links?.map((link) => ({
+						...link,
+						activate(event) {
+							if (shouldOpenTerminalLink(event)) {
+								openUrl(link.text);
+								event.preventDefault();
+								return;
+							}
+							link.activate(event);
+						},
+					})),
+				);
+			});
+		},
+		dispose() {
+			provider.dispose?.();
+		},
+	};
+}
+
+function registerPlatformLinkProviders(term: Terminal) {
+	term.registerLinkProvider(
+		withPlatformLinkActivation(new OSC8LinkProvider(term)),
+	);
+	term.registerLinkProvider(
+		withPlatformLinkActivation(new UrlRegexProvider(term)),
+	);
 }
 
 interface TerminalViewerProps {
@@ -277,6 +323,7 @@ export function TerminalViewer({
 			fitAddon = new FitAddon();
 			term.loadAddon(fitAddon);
 			term.open(containerRef.current);
+			registerPlatformLinkProviders(term);
 
 			term.onData(() => {
 				if (!termRef.current?.renderer) return;
