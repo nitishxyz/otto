@@ -1,5 +1,5 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const RECENT_WINDOW_IN_MS = 15 * 60 * 1000;
+const RECENT_WINDOW_IN_MS = 60 * 60 * 1000;
 
 /**
  * Formats a timestamp into a compact relative label for session metadata.

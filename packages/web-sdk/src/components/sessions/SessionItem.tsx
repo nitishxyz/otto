@@ -43,11 +43,12 @@ export const SessionItem = memo(function SessionItem({
 			}`}
 			title={`${title} — ${metadata}`}
 		>
-			{statusIcon && (
-				<span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80">
-					{statusIcon}
-				</span>
-			)}
+			<span
+				className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80 ${statusIcon ? '' : 'opacity-0'}`}
+				aria-hidden={!statusIcon}
+			>
+				{statusIcon ?? <CircleCheck className="h-4 w-4" />}
+			</span>
 			<span className="block min-w-0 flex-1">
 				<span
 					className={`block min-w-0 truncate text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}

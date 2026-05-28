@@ -80,24 +80,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 			.filter((session) => Boolean(session));
 	}, [sessionSnapshot]);
 
-	const readyForReviewSessions = useMemo(
-		() =>
-			sessionSnapshot.filter(
-				(session) =>
-					!session.isRunning &&
-					session.activityAt > (session.lastViewedAt ?? 0),
-			),
-		[sessionSnapshot],
-	);
-
-	const statusSessionIds = useMemo(
-		() =>
-			new Set(
-				[...runningSessions, ...readyForReviewSessions].map(
-					(session) => session.id,
-				),
-			),
-		[readyForReviewSessions, runningSessions],
+	const runningSessionIds = useMemo(
+		() => new Set(runningSessions.map((session) => session.id)),
+		[runningSessions],
 	);
 
 	const statusGroups = useMemo(
@@ -110,23 +95,15 @@ export const SessionListContainer = memo(function SessionListContainer({
 						},
 					]
 				: []),
-			...(readyForReviewSessions.length > 0
-				? [
-						{
-							label: 'Ready for Review',
-							sessions: readyForReviewSessions,
-						},
-					]
-				: []),
 		],
-		[readyForReviewSessions, runningSessions],
+		[runningSessions],
 	);
 
 	const recentGroups = useMemo(() => {
 		const groups = new Map<string, typeof sessionSnapshot>();
 
 		for (const session of sessionSnapshot) {
-			if (statusSessionIds.has(session.id)) continue;
+			if (runningSessionIds.has(session.id)) continue;
 			const label = getSessionGroupLabel(session.activityAt);
 			const existingSessions = groups.get(label) ?? [];
 			existingSessions.push(session);
@@ -137,7 +114,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 			label,
 			sessions: groupedSessions,
 		}));
-	}, [sessionSnapshot, statusSessionIds]);
+	}, [sessionSnapshot, runningSessionIds]);
 
 	useEffect(() => {
 		if (currentFocus === 'sessions') {
