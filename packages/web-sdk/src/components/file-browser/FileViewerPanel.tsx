@@ -19,8 +19,13 @@ import type {
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
-import { StableSpinner } from '../ui/StableSpinner';
 import { buildLivePatchPreview } from '../workspace/ToolPreviewPanel';
+import {
+	ViewerStatusBar,
+	countLineTones,
+	countPatchTextChanges,
+	normalizeChangeCount,
+} from '../workspace/ViewerStatusBar';
 import { getBaseUrl } from '../../lib/api-client/utils';
 
 const IMAGE_EXTENSIONS = new Set([
@@ -112,27 +117,9 @@ function formatWritePreviewLabel(preview: ToolWritePreview): string {
 	return 'Writing file';
 }
 
-function ActivityPathStrip({
-	label,
-	path,
-	showSpinner,
-	spinnerTitle,
-}: {
-	label: string;
-	path: string;
-	showSpinner?: boolean;
-	spinnerTitle: string;
-}) {
-	return (
-		<div className="flex min-w-0 items-center gap-2">
-			{showSpinner && <StableSpinner size="xs" title={spinnerTitle} />}
-			<span className="shrink-0">{label}</span>
-			<span className="shrink-0 opacity-60">·</span>
-			<span className="min-w-0 truncate font-mono" title={path}>
-				{path}
-			</span>
-		</div>
-	);
+function countTextLines(content: string | undefined): number {
+	if (content === undefined) return 0;
+	return content.length === 0 ? 1 : content.split('\n').length;
 }
 
 interface FileViewerPanelProps {
@@ -326,6 +313,38 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		}
 		return tones;
 	}, [activePatchPreview, patchChangedLines, persistentLineTones]);
+	const patchChangeCount = useMemo(() => {
+		const patchTextCount = countPatchTextChanges(
+			patchPreview?.patch,
+			selectedFile,
+		);
+		if (patchTextCount) return patchTextCount;
+
+		const counts = countLineTones(
+			activePatchPreview?.lineTones ?? patchPreview?.previewLineTones,
+		);
+		const lineToneCount = normalizeChangeCount(counts);
+		if (!lineToneCount) {
+			return patchChangedLines?.length
+				? { additions: patchChangedLines.length, removals: 0 }
+				: undefined;
+		}
+		return lineToneCount;
+	}, [
+		patchPreview?.patch,
+		selectedFile,
+		activePatchPreview?.lineTones,
+		patchPreview?.previewLineTones,
+		patchChangedLines,
+	]);
+	const writeChangeCount = useMemo(() => {
+		if (writePreview?.changeCount) return writePreview.changeCount;
+		if (writePreview?.content === undefined) return undefined;
+		return {
+			additions: countTextLines(writePreview.content),
+			removals: data?.lineCount ?? 0,
+		};
+	}, [writePreview?.changeCount, writePreview?.content, data?.lineCount]);
 
 	if (!isViewerOpen || !selectedFile) return null;
 
@@ -467,33 +486,46 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 				)}
 			</div>
 			{writePreview ? (
-				<div className="shrink-0 border-t border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
-					<ActivityPathStrip
-						label={formatWritePreviewLabel(writePreview)}
-						path={selectedFile}
-						showSpinner={writePreview.status === 'streaming'}
-						spinnerTitle="Writing file"
-					/>
-				</div>
+				<ViewerStatusBar
+					tone={
+						writePreview.status === 'error'
+							? 'error'
+							: writePreview.status === 'success'
+								? 'success'
+								: 'write'
+					}
+					label={formatWritePreviewLabel(writePreview)}
+					path={selectedFile}
+					changeCount={writeChangeCount}
+					showSpinner={writePreview.status === 'streaming'}
+					spinnerTitle="Writing file"
+				/>
 			) : patchPreview ? (
-				<div className="shrink-0 border-t border-sidebar-border bg-emerald-500/10 px-3 py-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-					<ActivityPathStrip
-						label={formatPatchPreviewLabel(patchPreview)}
-						path={selectedFile}
-						showSpinner={patchPreview.status === 'streaming'}
-						spinnerTitle="Patching file"
-					/>
-				</div>
+				<ViewerStatusBar
+					tone={
+						patchPreview.status === 'error'
+							? 'error'
+							: patchPreview.status === 'success'
+								? 'success'
+								: 'patch'
+					}
+					label={formatPatchPreviewLabel(patchPreview)}
+					path={selectedFile}
+					changeCount={patchChangeCount}
+					showSpinner={patchPreview.status === 'streaming'}
+					spinnerTitle="Patching file"
+				/>
 			) : effectiveHighlight ? (
-				<div className="shrink-0 border-t border-sidebar-border bg-blue-500/10 px-3 py-1.5 text-[12px] text-blue-700 dark:text-blue-300">
-					<ActivityPathStrip
-						label={formatReadHighlightLabel(effectiveHighlight)}
-						path={selectedFile}
-						showSpinner={effectiveHighlight.status === 'streaming'}
-						spinnerTitle="Reading file"
-					/>
-				</div>
-			) : null}
+				<ViewerStatusBar
+					tone="read"
+					label={formatReadHighlightLabel(effectiveHighlight)}
+					path={selectedFile}
+					showSpinner={effectiveHighlight.status === 'streaming'}
+					spinnerTitle="Reading file"
+				/>
+			) : (
+				<ViewerStatusBar tone="neutral" path={selectedFile} />
+			)}
 		</div>
 	);
 });

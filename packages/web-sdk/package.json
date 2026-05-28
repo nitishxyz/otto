@@ -79,6 +79,7 @@
 		"axios": "^1.7.9",
 		"fuse.js": "^7.1.0",
 		"ghostty-web": "^0.4.0",
+		"motion": "^12.40.0",
 		"qrcode.react": "^4.2.0"
 	},
 	"peerDependencies": {

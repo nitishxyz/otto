@@ -18,6 +18,11 @@ export interface ToolActivityAnnotation {
 	createdAt: number;
 }
 
+export interface ToolChangeCount {
+	additions: number;
+	removals: number;
+}
+
 export interface ToolPreviewTabInput {
 	path: string;
 	toolName: 'write' | 'apply_patch';
@@ -31,6 +36,7 @@ export interface ToolPreviewTabInput {
 	previewLineTones?: Array<[number, 'add' | 'remove']>;
 	previewFirstLine?: number;
 	previewLatestLine?: number;
+	changeCount?: ToolChangeCount;
 	status: 'streaming' | 'success' | 'error';
 	error?: string;
 }
@@ -99,6 +105,7 @@ export type ViewerTab =
 			previewLineTones?: Array<[number, 'add' | 'remove']>;
 			previewFirstLine?: number;
 			previewLatestLine?: number;
+			changeCount?: ToolChangeCount;
 			status: 'streaming' | 'success' | 'error';
 			error?: string;
 	  }
@@ -500,6 +507,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							toolName: 'write',
 							callId: preview.callId ?? existingWritePreview?.callId,
 							content: preview.content ?? existingWritePreview?.content,
+							changeCount:
+								preview.changeCount ?? existingWritePreview?.changeCount,
 							status: preview.status,
 							error: preview.error ?? existingWritePreview?.error,
 						},
@@ -524,6 +533,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						toolName: 'write',
 						callId: preview.callId,
 						content: preview.content ?? existingWrite?.content,
+						changeCount: preview.changeCount ?? existingWrite?.changeCount,
 						status: preview.status,
 						error: preview.error ?? existingWrite?.error,
 					},

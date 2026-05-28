@@ -34,6 +34,7 @@ import { tags } from '@lezer/highlight';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export type CodeMirrorLineTone = 'add' | 'remove' | 'primary';
+type CodeMirrorLineNumberFormatter = (lineNumber: number) => string;
 
 interface CodeMirrorViewerProps {
 	content: string;
@@ -45,6 +46,7 @@ interface CodeMirrorViewerProps {
 	scrollToLine?: number;
 	scrollToEndSignal?: string | number;
 	disableMarkdownSyntax?: boolean;
+	lineNumberFormatter?: CodeMirrorLineNumberFormatter;
 }
 
 const viewerTheme = EditorView.theme({
@@ -289,6 +291,13 @@ function getLanguageExtension(
 	}
 }
 
+function lineNumbersExtension(
+	lineNumberFormatter?: CodeMirrorLineNumberFormatter,
+): Extension {
+	if (!lineNumberFormatter) return lineNumbers();
+	return lineNumbers({ formatNumber: lineNumberFormatter });
+}
+
 export function CodeMirrorViewer({
 	content,
 	path,
@@ -299,15 +308,22 @@ export function CodeMirrorViewer({
 	scrollToLine,
 	scrollToEndSignal,
 	disableMarkdownSyntax = false,
+	lineNumberFormatter,
 }: CodeMirrorViewerProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const contentRef = useRef(content);
+	const lineNumbersCompartmentRef = useRef(new Compartment());
 	const languageCompartmentRef = useRef(new Compartment());
 	const decorationsCompartmentRef = useRef(new Compartment());
+	const lineNumbersExtensionRef = useRef<Extension>([]);
 	const languageExtensionRef = useRef<Extension>([]);
 	const decorationsExtensionRef = useRef<Extension>([]);
 
+	const lineNumberExtension = useMemo(
+		() => lineNumbersExtension(lineNumberFormatter),
+		[lineNumberFormatter],
+	);
 	const languageExtension = useMemo(
 		() => getLanguageExtension(path, disableMarkdownSyntax),
 		[path, disableMarkdownSyntax],
@@ -316,6 +332,7 @@ export function CodeMirrorViewer({
 		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
 		[highlightedLines, highlightTone, lineTones],
 	);
+	lineNumbersExtensionRef.current = lineNumberExtension;
 	languageExtensionRef.current = languageExtension;
 	decorationsExtensionRef.current = decorationsExtension;
 	const createEditorState = useCallback(
@@ -323,7 +340,7 @@ export function CodeMirrorViewer({
 			EditorState.create({
 				doc,
 				extensions: [
-					lineNumbers(),
+					lineNumbersCompartmentRef.current.of(lineNumberExtension),
 					EditorState.readOnly.of(true),
 					EditorView.editable.of(false),
 					viewerTheme,
@@ -332,7 +349,7 @@ export function CodeMirrorViewer({
 					decorationsCompartmentRef.current.of(decorationsExtension),
 				],
 			}),
-		[languageExtension, decorationsExtension],
+		[lineNumberExtension, languageExtension, decorationsExtension],
 	);
 
 	useEffect(() => {
@@ -345,7 +362,7 @@ export function CodeMirrorViewer({
 			state: EditorState.create({
 				doc: contentRef.current,
 				extensions: [
-					lineNumbers(),
+					lineNumbersCompartmentRef.current.of(lineNumbersExtensionRef.current),
 					EditorState.readOnly.of(true),
 					EditorView.editable.of(false),
 					viewerTheme,
@@ -362,6 +379,19 @@ export function CodeMirrorViewer({
 			viewRef.current = null;
 		};
 	}, []);
+
+	useEffect(() => {
+		const view = viewRef.current;
+		if (!view) return;
+		try {
+			view.dispatch({
+				effects:
+					lineNumbersCompartmentRef.current.reconfigure(lineNumberExtension),
+			});
+		} catch {
+			view.setState(createEditorState(contentRef.current));
+		}
+	}, [lineNumberExtension, createEditorState]);
 
 	useEffect(() => {
 		const view = viewRef.current;

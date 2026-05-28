@@ -5,6 +5,7 @@ import { useGitDiff } from '../../hooks/useGit';
 import { useGitDiffFullFile } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { GitDiffViewer } from './GitDiffViewer';
+import { ViewerStatusBar } from '../workspace/ViewerStatusBar';
 
 interface GitDiffPanelProps {
 	mode?: 'overlay' | 'pane';
@@ -158,6 +159,25 @@ export const GitDiffPanel = memo(function GitDiffPanel({
 					</div>
 				)}
 			</div>
+			<ViewerStatusBar
+				tone={selectedFileStaged ? 'success' : 'patch'}
+				label={
+					activeDiff?.isNewFile
+						? 'New file'
+						: selectedFileStaged
+							? 'Staged diff'
+							: 'Working diff'
+				}
+				path={selectedFile}
+				changeCount={
+					activeDiff && (activeDiff.insertions > 0 || activeDiff.deletions > 0)
+						? {
+								additions: activeDiff.insertions,
+								removals: activeDiff.deletions,
+							}
+						: undefined
+				}
+			/>
 		</div>
 	);
 });

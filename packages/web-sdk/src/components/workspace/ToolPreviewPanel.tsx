@@ -7,6 +7,13 @@ import {
 } from '../../stores/viewerTabsStore';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
 import { StableSpinner } from '../ui/StableSpinner';
+import {
+	ViewerStatusBar,
+	countLineTones,
+	countPatchTextChanges,
+	normalizeChangeCount,
+	type ChangeCount,
+} from './ViewerStatusBar';
 interface ToolPreviewPanelProps {
 	tab: Extract<ViewerTab, { type: 'tool-preview' }>;
 }
@@ -1019,14 +1026,35 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 				)}
 			</div>
 
-			<div className="shrink-0 border-t border-sidebar-border bg-sidebar-accent/30 px-3 py-1.5 text-[12px] text-muted-foreground flex items-center gap-2">
-				<StatusIcon status={tab.status} />
-				<span>{statusLabel}</span>
-				<span className="text-muted-foreground/60">·</span>
-				<span className="font-mono truncate" title={tab.path}>
-					{tab.path}
-				</span>
-			</div>
+			<ViewerStatusBar
+				tone={
+					tab.status === 'error'
+						? 'error'
+						: tab.status === 'success'
+							? 'success'
+							: tab.toolName === 'write'
+								? 'write'
+								: 'patch'
+				}
+				label={statusLabel}
+				path={tab.path}
+				leading={<StatusIcon status={tab.status} />}
+				changeCount={(() => {
+					if (tab.toolName === 'write') {
+						const content = tab.content;
+						if (content === undefined) return undefined;
+						const additions =
+							content.length === 0 ? 0 : content.split('\n').length;
+						return additions > 0 ? { additions, removals: 0 } : undefined;
+					}
+					const fromPatch = countPatchTextChanges(tab.patch, tab.path);
+					if (fromPatch) return fromPatch;
+					const fromTones: ChangeCount | undefined = normalizeChangeCount(
+						countLineTones(stablePatchPreview?.lineTones),
+					);
+					return fromTones;
+				})()}
+			/>
 		</div>
 	);
 }

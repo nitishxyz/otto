@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Outlet, createRootRoute } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import {
 	OnboardingModal,
 	OttoRouterTopupModal,
@@ -23,9 +22,6 @@ function RootComponent() {
 			<Outlet />
 			<OnboardingModal />
 			<OttoRouterTopupModal />
-			{import.meta.env.DEV ? (
-				<TanStackRouterDevtools position="bottom-right" />
-			) : null}
 		</>
 	);
 }

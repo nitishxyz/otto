@@ -285,6 +285,91 @@ function renderTabIcon(tab: ViewerTab) {
 	);
 }
 
+type TabActivityKind = 'write' | 'patch' | 'delete';
+
+function patchTargetsDelete(
+	patch: string | undefined,
+	targetPath: string,
+): boolean {
+	if (!patch) return false;
+	const normalize = (path: string) =>
+		path
+			.trim()
+			.replace(/^a\//, '')
+			.replace(/^b\//, '')
+			.replace(/^\.\//, '')
+			.replace(/\/+/g, '/')
+			.replace(/\/+$/, '');
+	const normalizedTarget = normalize(targetPath);
+	for (const rawLine of patch.split('\n')) {
+		const line = rawLine.trim();
+		const deleteEnveloped = line.match(/^\*\*\* Delete File: (.+)$/);
+		if (deleteEnveloped?.[1]) {
+			const directivePath = normalize(deleteEnveloped[1]);
+			if (
+				directivePath === normalizedTarget ||
+				directivePath.endsWith(`/${normalizedTarget}`) ||
+				normalizedTarget.endsWith(`/${directivePath}`)
+			) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+function getTabActivityKind(tab: ViewerTab): TabActivityKind | null {
+	if (tab.type !== 'file') return null;
+
+	const latestAnnotation = tab.annotations?.at(-1);
+	const reason =
+		tab.writePreview?.toolName ??
+		tab.patchPreview?.toolName ??
+		latestAnnotation?.reason;
+	if (!reason) return null;
+
+	if (reason === 'write') return 'write';
+
+	if (
+		tab.patchPreview &&
+		patchTargetsDelete(tab.patchPreview.patch, tab.path)
+	) {
+		return 'delete';
+	}
+	return 'patch';
+}
+
+const ACTIVITY_BADGE_CLASSES: Record<TabActivityKind, string> = {
+	write: 'border-blue-400/50 bg-blue-500/10 text-blue-600 dark:text-blue-300',
+	patch:
+		'border-emerald-400/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
+	delete: 'border-red-400/50 bg-red-500/10 text-red-600 dark:text-red-300',
+};
+
+const ACTIVITY_BADGE_LETTERS: Record<TabActivityKind, string> = {
+	write: 'W',
+	patch: 'P',
+	delete: 'D',
+};
+
+const ACTIVITY_TITLES: Record<TabActivityKind, string> = {
+	write: 'Written',
+	patch: 'Patched',
+	delete: 'Deleted',
+};
+
+function renderTabActivityBadge(kind: TabActivityKind | null) {
+	if (!kind) return null;
+	return (
+		<span
+			className={`shrink-0 rounded-[4px] border px-1 py-0.5 font-mono text-[9px] font-semibold leading-none ${ACTIVITY_BADGE_CLASSES[kind]}`}
+			title={ACTIVITY_TITLES[kind]}
+		>
+			{ACTIVITY_BADGE_LETTERS[kind]}
+		</span>
+	);
+}
+
 function renderTabContent(
 	tab: ViewerTab,
 	closeTab: (id: string) => void,
@@ -395,6 +480,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 				</div>
 				{tabs.map((tab) => {
 					const isActive = tab.id === activeTab.id;
+					const activityKind = getTabActivityKind(tab);
 					return (
 						<div
 							key={tab.id}
@@ -414,6 +500,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 								<span className="min-w-0 flex-1 truncate text-[12px] font-mono">
 									{tab.title}
 								</span>
+								{renderTabActivityBadge(activityKind)}
 							</button>
 							<Button
 								variant="ghost"

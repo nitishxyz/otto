@@ -4,6 +4,7 @@ import { useSkillsStore } from '../../stores/skillsStore';
 import { useSkillDetail, useSkillFileContent } from '../../hooks/useSkills';
 import { Button } from '../ui/Button';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
+import { ViewerStatusBar } from '../workspace/ViewerStatusBar';
 
 interface SkillViewerPanelProps {
 	mode?: 'overlay' | 'pane';
@@ -109,6 +110,11 @@ export const SkillViewerPanel = memo(function SkillViewerPanel({
 					</div>
 				)}
 			</div>
+			<ViewerStatusBar
+				tone="neutral"
+				label={selectedSkill}
+				path={displayPath}
+			/>
 		</div>
 	);
 });

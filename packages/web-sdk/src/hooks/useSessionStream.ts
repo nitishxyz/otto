@@ -674,6 +674,18 @@ export function useSessionStream(
 				status === 'streaming'
 					? getStreamingWritePreviewContent(args, buffer)
 					: getStringArg(args, buffer, 'content');
+			const summary =
+				result?.summary && typeof result.summary === 'object'
+					? (result.summary as Record<string, unknown>)
+					: undefined;
+			const changeCount =
+				typeof summary?.additions === 'number' &&
+				typeof summary.deletions === 'number'
+					? {
+							additions: summary.additions,
+							removals: summary.deletions,
+						}
+					: undefined;
 			if (status === 'success') {
 				if (content !== undefined) updateFileContentCache(path, content);
 				else invalidateFileContentCache(path);
@@ -712,6 +724,7 @@ export function useSessionStream(
 				toolName: 'write',
 				callId,
 				content,
+				changeCount,
 				status,
 				error: extractErrorMessage(payload),
 			});

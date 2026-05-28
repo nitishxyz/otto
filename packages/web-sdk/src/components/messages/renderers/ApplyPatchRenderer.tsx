@@ -3,6 +3,7 @@ import type { GenericRendererProps } from './types';
 import { DiffView } from './DiffView';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
+import { InlineChangeCount } from '../../workspace/ViewerStatusBar';
 
 interface ApplyPatchChangeHunk {
 	oldStart: number;
@@ -119,12 +120,10 @@ export function ApplyPatchRenderer({
 						{files} {files === 1 ? 'file' : 'files'}
 					</span>
 				)}
-				<span className="text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-					+{additions}
-				</span>
-				<span className="text-red-600 dark:text-red-400 flex-shrink-0">
-					-{deletions}
-				</span>
+				<InlineChangeCount
+					count={{ additions, removals: deletions }}
+					className="text-[12px] flex-shrink-0"
+				/>
 				<span className="text-muted-foreground/80 flex-shrink-0">
 					· {timeStr}
 				</span>

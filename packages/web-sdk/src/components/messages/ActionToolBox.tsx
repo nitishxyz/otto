@@ -4,6 +4,12 @@ import type { MessagePart } from '../../types/api';
 import { StableSpinner } from '../ui/StableSpinner';
 import { ToolResultRenderer, type ContentJson } from './renderers';
 import { useIsCompactThread } from './threadDensity';
+import {
+	InlineChangeCount,
+	countPatchTextChanges,
+	normalizeChangeCount,
+	type ChangeCount,
+} from '../workspace/ViewerStatusBar';
 
 const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
@@ -217,6 +223,22 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 	const displayContent = getLiveToolContentPreview(toolName, rawDisplayContent);
 	const hasDisplayContent = displayContent.trim().length > 0;
 
+	const liveChangeCount: ChangeCount | undefined = (() => {
+		if (toolName === 'apply_patch') {
+			const patch = String(args?.patch ?? streamedContent ?? '');
+			return countPatchTextChanges(patch, target || undefined);
+		}
+		if (toolName === 'write') {
+			const content = String(args?.content ?? streamedContent ?? '');
+			if (!content) return undefined;
+			return normalizeChangeCount({
+				additions: content.length === 0 ? 0 : content.split('\n').length,
+				removals: 0,
+			});
+		}
+		return undefined;
+	})();
+
 	useEffect(() => {
 		if (!isComplete && !latched) {
 			setShowSummary(false);
@@ -364,6 +386,17 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 									<span className="truncate text-foreground/60 lowercase tracking-normal font-normal font-mono">
 										{target}
 									</span>
+								</>
+							)}
+							{liveChangeCount && (
+								<>
+									<span className="text-muted-foreground/40 flex-shrink-0">
+										·
+									</span>
+									<InlineChangeCount
+										count={liveChangeCount}
+										className="text-[11px] tracking-normal normal-case"
+									/>
 								</>
 							)}
 							{!args && !streamedContent && !streamedOutput && (

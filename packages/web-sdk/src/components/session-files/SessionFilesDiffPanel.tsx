@@ -7,6 +7,11 @@ import {
 	CodeMirrorViewer,
 	type CodeMirrorLineTone,
 } from '../ui/CodeMirrorViewer';
+import {
+	ViewerStatusBar,
+	countPatchTextChanges,
+	normalizeChangeCount,
+} from '../workspace/ViewerStatusBar';
 
 function transformToUnifiedDiff(patch: string): string {
 	const lines = patch.split('\n');
@@ -343,6 +348,37 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 					</div>
 				)}
 			</div>
+			{(() => {
+				const summary = selectedOperation.artifact?.summary;
+				const summaryCount = summary
+					? normalizeChangeCount({
+							additions: summary.additions,
+							removals: summary.deletions,
+						})
+					: undefined;
+				const patchCount = summaryCount
+					? undefined
+					: countPatchTextChanges(patchContent ?? undefined, selectedFile);
+				const operation = selectedOperation.operation;
+				const tone =
+					operation === 'write' || operation === 'create' ? 'write' : 'patch';
+				const label =
+					operation === 'write'
+						? 'Write'
+						: operation === 'create'
+							? 'Create'
+							: operation === 'patch'
+								? 'Patch'
+								: operation;
+				return (
+					<ViewerStatusBar
+						tone={tone}
+						label={typeof label === 'string' ? label : 'Change'}
+						path={selectedFile}
+						changeCount={summaryCount ?? patchCount}
+					/>
+				);
+			})()}
 		</div>
 	);
 });

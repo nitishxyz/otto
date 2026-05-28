@@ -3,6 +3,7 @@ import type { RendererProps } from './types';
 import { DiffView } from './DiffView';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
+import { InlineChangeCount } from '../../workspace/ViewerStatusBar';
 
 export function WriteRenderer({
 	contentJson,
@@ -30,6 +31,15 @@ export function WriteRenderer({
 	const bytes = Number(result.bytes || 0);
 	const patch = artifact?.patch ? String(artifact.patch) : '';
 	const timeStr = formatDuration(toolDurationMs);
+	const summary =
+		artifact?.summary && typeof artifact.summary === 'object'
+			? (artifact.summary as Record<string, unknown>)
+			: undefined;
+	const additions =
+		typeof summary?.additions === 'number' ? summary.additions : 0;
+	const deletions =
+		typeof summary?.deletions === 'number' ? summary.deletions : 0;
+	const hasChangeCount = !hasToolError && (additions > 0 || deletions > 0);
 
 	const canExpand = patch.length > 0 || hasToolError;
 
@@ -77,6 +87,15 @@ export function WriteRenderer({
 					<span className="text-muted-foreground/80 whitespace-nowrap flex-shrink-0">
 						· {bytes} bytes · {timeStr}
 					</span>
+				)}
+				{hasChangeCount && !compact && (
+					<>
+						<span className="text-muted-foreground/70 flex-shrink-0">·</span>
+						<InlineChangeCount
+							count={{ additions, removals: deletions }}
+							className="text-[12px] flex-shrink-0"
+						/>
+					</>
 				)}
 				{hasToolError && !compact && (
 					<span className="text-muted-foreground/80 flex-shrink-0">
