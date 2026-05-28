@@ -31,7 +31,12 @@ pub struct ChangedFile {
 }
 
 #[tauri::command]
-pub async fn git_clone(app: tauri::AppHandle, url: String, path: String, token: String) -> Result<String, String> {
+pub async fn git_clone(
+    app: tauri::AppHandle,
+    url: String,
+    path: String,
+    token: String,
+) -> Result<String, String> {
     let path = if path.starts_with("~/") {
         let home = dirs::home_dir().ok_or_else(|| "No home directory".to_string())?;
         home.join(&path[2..]).to_string_lossy().to_string()
@@ -63,13 +68,16 @@ pub async fn git_clone(app: tauri::AppHandle, url: String, path: String, token: 
             } else {
                 "Receiving objects".to_string()
             };
-            let _ = app_clone.emit("clone-progress", CloneProgress {
-                received_objects: received,
-                total_objects: total,
-                received_bytes: stats.received_bytes() as u64,
-                percent: pct,
-                phase,
-            });
+            let _ = app_clone.emit(
+                "clone-progress",
+                CloneProgress {
+                    received_objects: received,
+                    total_objects: total,
+                    received_bytes: stats.received_bytes() as u64,
+                    percent: pct,
+                    phase,
+                },
+            );
         }
         true
     });
@@ -136,9 +144,9 @@ pub async fn git_status(path: String) -> Result<GitStatus, String> {
 
 fn calculate_ahead_behind(repo: &Repository) -> Result<(usize, usize), git2::Error> {
     let head = repo.head()?;
-    let local_oid = head.target().ok_or_else(|| {
-        git2::Error::from_str("No local HEAD target")
-    })?;
+    let local_oid = head
+        .target()
+        .ok_or_else(|| git2::Error::from_str("No local HEAD target"))?;
 
     let branch_name = head.shorthand().unwrap_or("main");
     let upstream_name = format!("refs/remotes/origin/{}", branch_name);
@@ -148,9 +156,9 @@ fn calculate_ahead_behind(repo: &Repository) -> Result<(usize, usize), git2::Err
         Err(_) => return Ok((0, 0)),
     };
 
-    let upstream_oid = upstream_ref.target().ok_or_else(|| {
-        git2::Error::from_str("No upstream target")
-    })?;
+    let upstream_oid = upstream_ref
+        .target()
+        .ok_or_else(|| git2::Error::from_str("No upstream target"))?;
 
     repo.graph_ahead_behind(local_oid, upstream_oid)
 }

@@ -32,9 +32,14 @@ pub struct UpdateInfo {
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 pub enum DownloadEvent {
     #[serde(rename_all = "camelCase")]
-    Started { content_length: Option<u64> },
+    Started {
+        content_length: Option<u64>,
+    },
     #[serde(rename_all = "camelCase")]
-    Progress { chunk_length: usize, downloaded: u64 },
+    Progress {
+        chunk_length: usize,
+        downloaded: u64,
+    },
     Finished,
 }
 
@@ -52,20 +57,30 @@ struct LatestJson {
 
 fn current_platform_key() -> &'static str {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "darwin-aarch64" }
+    {
+        "darwin-aarch64"
+    }
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "darwin-x86_64" }
+    {
+        "darwin-x86_64"
+    }
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "linux-x86_64" }
+    {
+        "linux-x86_64"
+    }
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    { "linux-aarch64" }
+    {
+        "linux-aarch64"
+    }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "aarch64"),
     )))]
-    { "unsupported" }
+    {
+        "unsupported"
+    }
 }
 
 fn serve_json_once(json_bytes: Vec<u8>) -> Result<u16, String> {
@@ -202,9 +217,7 @@ pub async fn download_update(
 }
 
 #[tauri::command]
-pub async fn apply_update(
-    ready: tauri::State<'_, ReadyUpdate>,
-) -> Result<(), String> {
+pub async fn apply_update(ready: tauri::State<'_, ReadyUpdate>) -> Result<(), String> {
     let data = ready
         .0
         .lock()

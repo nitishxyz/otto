@@ -1,5 +1,5 @@
-use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
 use std::sync::atomic::{AtomicU32, Ordering};
+use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
 
 static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(1);
 

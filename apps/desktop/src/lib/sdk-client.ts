@@ -8,6 +8,7 @@ import {
 } from '@tauri-apps/plugin-notification';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { configureApiClient } from '@ottocode/web-sdk/lib';
+import { registerNativeBrowserBridge } from './native-browser';
 import { tauriBridge } from './tauri-bridge';
 
 interface OttoWindow extends Window {
@@ -82,6 +83,7 @@ function registerDesktopPlatformAdapters() {
 	const win = window as OttoWindow;
 	const appWindow = getCurrentWindow();
 	win.OTTO_OPEN_URL = (url) => openUrl(url);
+	registerNativeBrowserBridge();
 	win.OTTO_SHOW_NOTIFICATION = (notification) =>
 		showNativeNotification(notification);
 	win.OTTO_IS_WINDOW_FOCUSED = () => isDesktopWindowFocused;

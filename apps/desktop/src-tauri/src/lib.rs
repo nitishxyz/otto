@@ -156,13 +156,9 @@ pub fn run() {
                 .select_all()
                 .build()?;
 
-            let view_menu = SubmenuBuilder::new(app, "View")
-                .fullscreen()
-                .build()?;
+            let view_menu = SubmenuBuilder::new(app, "View").fullscreen().build()?;
 
-            let window_menu = SubmenuBuilder::new(app, "Window")
-                .minimize()
-                .build()?;
+            let window_menu = SubmenuBuilder::new(app, "Window").minimize().build()?;
 
             let menu = MenuBuilder::new(app)
                 .item(&file_menu)
@@ -210,6 +206,9 @@ pub fn run() {
             commands::github::github_list_repos,
             commands::github::github_device_code_request,
             commands::github::github_device_code_poll,
+            commands::native_browser::native_browser_mount,
+            commands::native_browser::native_browser_set_visible,
+            commands::native_browser::native_browser_unmount,
             commands::git::git_clone,
             commands::git::git_status,
             commands::git::git_commit,

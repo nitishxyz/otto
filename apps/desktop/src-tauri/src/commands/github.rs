@@ -179,7 +179,10 @@ pub async fn github_device_code_request() -> Result<DeviceCodeResponse, String> 
         .map_err(|e| e.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("GitHub device code request failed: {}", response.status()));
+        return Err(format!(
+            "GitHub device code request failed: {}",
+            response.status()
+        ));
     }
 
     let raw: GitHubDeviceCodeRaw = response.json().await.map_err(|e| e.to_string())?;
@@ -280,7 +283,11 @@ pub async fn github_get_user(token: String) -> Result<GitHubUser, String> {
 }
 
 #[tauri::command]
-pub async fn github_list_repos(token: String, page: Option<u32>, search: Option<String>) -> Result<Vec<GitHubRepo>, String> {
+pub async fn github_list_repos(
+    token: String,
+    page: Option<u32>,
+    search: Option<String>,
+) -> Result<Vec<GitHubRepo>, String> {
     let client = reqwest::Client::new();
     let page_num = page.unwrap_or(1);
 

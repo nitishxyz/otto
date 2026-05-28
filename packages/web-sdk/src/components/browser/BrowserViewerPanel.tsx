@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	ChevronLeft,
 	ChevronRight,
@@ -16,14 +16,51 @@ import { Button } from '../ui/Button';
 
 const DEFAULT_BROWSER_URL = 'http://localhost:3000';
 const SIMULATOR_URL = 'http://localhost:3200';
+const IFRAME_EMBED_TIMEOUT_MS = 6000;
 
 type BrowserViewerTab = Extract<ViewerTab, { type: 'browser' }>;
+
+interface NativeBrowserBounds {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+interface NativeBrowserMountOptions {
+	id: string;
+	url: string;
+	reloadKey: number;
+	bounds: NativeBrowserBounds;
+	visible: boolean;
+}
+
+interface NativeBrowserBridge {
+	isAvailable: true;
+	mount: (options: NativeBrowserMountOptions) => Promise<void>;
+	unmount: (id: string) => Promise<void>;
+	setVisible: (id: string, visible: boolean) => Promise<void>;
+	openWindow?: (url: string) => Promise<void>;
+}
+
+declare global {
+	interface Window {
+		OTTO_NATIVE_BROWSER?: NativeBrowserBridge;
+	}
+}
 
 function normalizeBrowserUrl(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed) return '';
 	if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
-	return `http://${trimmed}`;
+	if (
+		/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:\/|$)/i.test(
+			trimmed,
+		)
+	) {
+		return `http://${trimmed}`;
+	}
+	return `https://${trimmed}`;
 }
 
 function isEmbeddableUrl(value: string): boolean {
@@ -48,10 +85,15 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		(state) => state.reloadBrowserTab,
 	);
 	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
+	const contentRef = useRef<HTMLDivElement>(null);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const loadingDoneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
 	);
+	const iframeEmbedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+	const isLoadingRef = useRef(false);
 	const [draftUrl, setDraftUrl] = useState(tab.url);
 	const [historyEntries, setHistoryEntries] = useState<string[]>(() =>
 		tab.url ? [normalizeBrowserUrl(tab.url)] : [],
@@ -63,14 +105,45 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	const [loadingProgress, setLoadingProgress] = useState(() =>
 		isEmbeddableUrl(normalizeBrowserUrl(tab.url)) ? 12 : 0,
 	);
+	const [embedError, setEmbedError] = useState<string | null>(null);
 	const simulatorStatus = useSimulatorStatus();
+	const nativeBrowser =
+		typeof window !== 'undefined' ? window.OTTO_NATIVE_BROWSER : undefined;
+	const normalizedUrl = normalizeBrowserUrl(tab.url);
+	const canRenderUrl = isEmbeddableUrl(normalizedUrl);
+	const useNativeBrowser = Boolean(nativeBrowser?.isAvailable && canRenderUrl);
 	const canGoBack = historyIndex > 0;
 	const canGoForward =
 		historyIndex >= 0 && historyIndex < historyEntries.length - 1;
 
+	const clearIframeEmbedTimeout = useCallback(() => {
+		if (iframeEmbedTimeoutRef.current) {
+			clearTimeout(iframeEmbedTimeoutRef.current);
+			iframeEmbedTimeoutRef.current = null;
+		}
+	}, []);
+
+	const completeLoading = useCallback(() => {
+		clearIframeEmbedTimeout();
+		setEmbedError(null);
+		setLoadingProgress(100);
+		if (loadingDoneTimeoutRef.current) {
+			clearTimeout(loadingDoneTimeoutRef.current);
+		}
+		loadingDoneTimeoutRef.current = setTimeout(() => {
+			setIsLoading(false);
+			setLoadingProgress(0);
+			loadingDoneTimeoutRef.current = null;
+		}, 180);
+	}, [clearIframeEmbedTimeout]);
+
 	useEffect(() => {
 		setDraftUrl(tab.url);
 	}, [tab.url]);
+
+	useEffect(() => {
+		isLoadingRef.current = isLoading;
+	}, [isLoading]);
 
 	useEffect(() => {
 		if (!isLoading) return;
@@ -93,8 +166,36 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 			if (loadingDoneTimeoutRef.current) {
 				clearTimeout(loadingDoneTimeoutRef.current);
 			}
+			clearIframeEmbedTimeout();
 		},
-		[],
+		[clearIframeEmbedTimeout],
+	);
+
+	useEffect(() => {
+		if (!isLoading || !canRenderUrl || useNativeBrowser) {
+			clearIframeEmbedTimeout();
+			return;
+		}
+
+		clearIframeEmbedTimeout();
+		iframeEmbedTimeoutRef.current = setTimeout(() => {
+			setEmbedError(
+				'This site may block embedding in Otto, or it took too long to load.',
+			);
+			setIsLoading(false);
+			setLoadingProgress(0);
+		}, IFRAME_EMBED_TIMEOUT_MS);
+
+		return clearIframeEmbedTimeout;
+	}, [canRenderUrl, clearIframeEmbedTimeout, isLoading, useNativeBrowser]);
+
+	useEffect(
+		() => () => {
+			if (nativeBrowser?.isAvailable) {
+				void nativeBrowser.unmount(tab.id);
+			}
+		},
+		[nativeBrowser, tab.id],
 	);
 
 	useEffect(() => {
@@ -125,12 +226,70 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		}
 	}, [openBrowserTab, simulatorStatus.data, tab.kind, tab.url]);
 
-	const normalizedUrl = normalizeBrowserUrl(tab.url);
-	const canRenderUrl = isEmbeddableUrl(normalizedUrl);
+	useEffect(() => {
+		if (!useNativeBrowser || !nativeBrowser?.isAvailable) return;
+		const content = contentRef.current;
+		if (!content) return;
+
+		let cancelled = false;
+		const mountNativeBrowser = () => {
+			const rect = content.getBoundingClientRect();
+			const visible = rect.width > 1 && rect.height > 1;
+			if (!visible) {
+				void nativeBrowser.setVisible(tab.id, false);
+				return;
+			}
+
+			void nativeBrowser
+				.mount({
+					id: tab.id,
+					url: normalizedUrl,
+					reloadKey: tab.reloadKey,
+					bounds: {
+						x: rect.x,
+						y: rect.y,
+						width: rect.width,
+						height: rect.height,
+					},
+					visible,
+				})
+				.then(() => {
+					if (!cancelled && isLoadingRef.current) completeLoading();
+				})
+				.catch((error) => {
+					if (cancelled) return;
+					const message =
+						error instanceof Error
+							? error.message
+							: 'Unable to open the native desktop webview.';
+					setEmbedError(message);
+					setIsLoading(false);
+					setLoadingProgress(0);
+				});
+		};
+
+		mountNativeBrowser();
+		const resizeObserver = new ResizeObserver(mountNativeBrowser);
+		resizeObserver.observe(content);
+		window.addEventListener('resize', mountNativeBrowser);
+		return () => {
+			cancelled = true;
+			resizeObserver.disconnect();
+			window.removeEventListener('resize', mountNativeBrowser);
+		};
+	}, [
+		completeLoading,
+		nativeBrowser,
+		normalizedUrl,
+		tab.id,
+		tab.reloadKey,
+		useNativeBrowser,
+	]);
 
 	const navigate = (value: string) => {
 		const nextUrl = normalizeBrowserUrl(value);
 		if (!nextUrl) return;
+		setEmbedError(null);
 		setIsLoading(isEmbeddableUrl(nextUrl));
 		setLoadingProgress(isEmbeddableUrl(nextUrl) ? 12 : 0);
 		setHistoryEntries((entries) => {
@@ -148,21 +307,10 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		const nextUrl = historyEntries[index];
 		if (!nextUrl) return;
 		setHistoryIndex(index);
+		setEmbedError(null);
 		setIsLoading(isEmbeddableUrl(nextUrl));
 		setLoadingProgress(isEmbeddableUrl(nextUrl) ? 12 : 0);
 		updateBrowserTabUrl(tab.id, nextUrl);
-	};
-
-	const completeLoading = () => {
-		setLoadingProgress(100);
-		if (loadingDoneTimeoutRef.current) {
-			clearTimeout(loadingDoneTimeoutRef.current);
-		}
-		loadingDoneTimeoutRef.current = setTimeout(() => {
-			setIsLoading(false);
-			setLoadingProgress(0);
-			loadingDoneTimeoutRef.current = null;
-		}, 180);
 	};
 
 	const stopLoading = () => {
@@ -173,6 +321,10 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		}
 		setIsLoading(false);
 		setLoadingProgress(0);
+		clearIframeEmbedTimeout();
+		if (nativeBrowser?.isAvailable) {
+			void nativeBrowser.setVisible(tab.id, false);
+		}
 	};
 
 	const simulatorError =
@@ -209,6 +361,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 								stopLoading();
 								return;
 							}
+							setEmbedError(null);
 							setIsLoading(true);
 							setLoadingProgress(12);
 							reloadBrowserTab(tab.id);
@@ -291,8 +444,10 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 				</div>
 			)}
 
-			<div className="min-h-0 flex-1 bg-muted/20">
-				{canRenderUrl ? (
+			<div ref={contentRef} className="min-h-0 flex-1 bg-muted/20">
+				{useNativeBrowser && canRenderUrl ? (
+					<div className="h-full w-full bg-background" />
+				) : canRenderUrl && !embedError ? (
 					<iframe
 						ref={iframeRef}
 						key={`${tab.id}:${tab.reloadKey}`}
@@ -302,6 +457,53 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 						className="h-full w-full border-0 bg-background"
 						allow="clipboard-read; clipboard-write; fullscreen; microphone; camera; geolocation; autoplay"
 					/>
+				) : embedError ? (
+					<div className="h-full w-full flex items-center justify-center p-6 text-center">
+						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
+							<Globe2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+							<h2 className="mb-2 text-sm font-semibold text-foreground">
+								This site can't be embedded
+							</h2>
+							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+								{embedError}
+							</p>
+							<div className="flex flex-wrap justify-center gap-2">
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => {
+										setEmbedError(null);
+										setIsLoading(true);
+										setLoadingProgress(12);
+										reloadBrowserTab(tab.id);
+									}}
+								>
+									Try again
+								</Button>
+								{nativeBrowser?.openWindow && (
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onClick={() => nativeBrowser.openWindow?.(normalizedUrl)}
+									>
+										Open in desktop window
+									</Button>
+								)}
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() =>
+										window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
+									}
+								>
+									Open externally
+								</Button>
+							</div>
+						</div>
+					</div>
 				) : (
 					<div className="h-full w-full flex items-center justify-center p-6 text-center">
 						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">

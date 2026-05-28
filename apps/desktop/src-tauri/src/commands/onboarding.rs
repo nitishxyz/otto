@@ -47,12 +47,12 @@ pub struct SetuStatus {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderStatus {
-   pub configured: bool,
+    pub configured: bool,
     #[serde(rename = "type")]
     pub auth_type: Option<String>,
-   pub label: String,
+    pub label: String,
     pub supports_oauth: bool,
-   pub model_count: usize,
+    pub model_count: usize,
 }
 
 #[derive(Serialize)]
@@ -212,7 +212,7 @@ pub async fn get_onboarding_status() -> Result<OnboardingStatus, String> {
         },
     };
 
-   let mut providers = HashMap::new();
+    let mut providers = HashMap::new();
     for (id, label, model_count, supports_oauth) in PROVIDER_META {
         let provider_auth = auth.get(*id);
         providers.insert(

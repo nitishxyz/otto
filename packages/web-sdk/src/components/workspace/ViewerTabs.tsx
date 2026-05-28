@@ -241,6 +241,12 @@ function renderTabContent(
 	}
 }
 
+const VIEWER_MODE_TAB_BUTTON_BASE =
+	'absolute top-0.5 z-20 h-7 w-9 rounded-full p-0 leading-none transform-none select-none bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring active:transform-none';
+
+const VIEWER_MODE_ICON_BASE_CLASS =
+	'pointer-events-none absolute top-1/2 z-10 block h-4 w-4 -translate-x-1/2 -translate-y-1/2 shrink-0 transition-colors';
+
 export const ViewerTabs = memo(function ViewerTabs() {
 	const tabs = useViewerTabsStore((state) => state.tabs);
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
@@ -299,7 +305,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 					<div
 						role="tablist"
 						aria-label="Viewer mode"
-						className="relative h-8 inline-flex items-center rounded-full ring-1 ring-inset ring-sidebar-border bg-muted/40 p-0.5"
+						className="relative h-8 w-[4.75rem] shrink-0 rounded-full ring-1 ring-inset ring-sidebar-border bg-muted/40 p-0.5"
 					>
 						<span
 							aria-hidden="true"
@@ -307,6 +313,25 @@ export const ViewerTabs = memo(function ViewerTabs() {
 								activeMode === 'preview' ? 'translate-x-9' : 'translate-x-0'
 							}`}
 						/>
+						<Code2
+							aria-hidden="true"
+							className={`${VIEWER_MODE_ICON_BASE_CLASS} left-5 ${
+								activeMode === 'work'
+									? 'text-foreground'
+									: 'text-muted-foreground/70'
+							}`}
+						/>
+						<Globe2
+							aria-hidden="true"
+							className={`${VIEWER_MODE_ICON_BASE_CLASS} left-14 ${
+								activeMode === 'preview'
+									? 'text-foreground'
+									: 'text-muted-foreground/70'
+							}`}
+						/>
+						{showWorkActivityDot && (
+							<span className="pointer-events-none absolute left-[2rem] top-1 z-10 h-1.5 w-1.5 rounded-full bg-primary" />
+						)}
 						<button
 							type="button"
 							role="tab"
@@ -314,17 +339,8 @@ export const ViewerTabs = memo(function ViewerTabs() {
 							onClick={() => setViewerMode('work')}
 							title="Work tabs"
 							aria-label="Work tabs"
-							className={`relative z-10 h-7 w-9 inline-flex items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
-								activeMode === 'work'
-									? 'text-foreground'
-									: 'text-muted-foreground/70 hover:text-foreground'
-							}`}
-						>
-							<Code2 className="h-4 w-4" />
-							{showWorkActivityDot && (
-								<span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />
-							)}
-						</button>
+							className={`${VIEWER_MODE_TAB_BUTTON_BASE} left-0.5`}
+						/>
 						<button
 							type="button"
 							role="tab"
@@ -332,14 +348,8 @@ export const ViewerTabs = memo(function ViewerTabs() {
 							onClick={handlePreviewMode}
 							title="Preview tabs"
 							aria-label="Preview tabs"
-							className={`relative z-10 h-7 w-9 inline-flex items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
-								activeMode === 'preview'
-									? 'text-foreground'
-									: 'text-muted-foreground/70 hover:text-foreground'
-							}`}
-						>
-							<Globe2 className="h-4 w-4" />
-						</button>
+							className={`${VIEWER_MODE_TAB_BUTTON_BASE} left-[2.375rem]`}
+						/>
 					</div>
 				</div>
 				<div className="h-12 min-w-0 flex-1 flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
