@@ -97,6 +97,8 @@ class ApiClient {
 	getOAuthStartUrl = authMixin.getOAuthStartUrl;
 	getOAuthUrl = authMixin.getOAuthUrl;
 	exchangeOAuthCode = authMixin.exchangeOAuthCode;
+	startOpenAIDeviceFlow = authMixin.startOpenAIDeviceFlow;
+	pollOpenAIDeviceFlow = authMixin.pollOpenAIDeviceFlow;
 	startCopilotDeviceFlow = authMixin.startCopilotDeviceFlow;
 	pollCopilotDeviceFlow = authMixin.pollCopilotDeviceFlow;
 	getCopilotAuthMethods = authMixin.getCopilotAuthMethods;

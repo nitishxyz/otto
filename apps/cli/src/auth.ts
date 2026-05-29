@@ -24,9 +24,12 @@ import {
 	createApiKey,
 	providerIds,
 	authorizeOpenAI,
+	exchangeOpenAIDeviceCode,
 	exchangeOpenAI,
 	openOpenAIAuthUrl,
 	obtainOpenAIApiKey,
+	pollOpenAIDeviceCodeOnce,
+	requestOpenAIDeviceCode,
 	authorizeXai,
 	exchangeXai,
 	openXaiAuthUrl,
@@ -496,33 +499,107 @@ async function runAuthLoginOpenAI(
 			return true;
 		}
 
-		log.info('Starting OpenAI OAuth flow...');
-		log.info(
-			'⚠️  If the official Codex CLI is running, please stop it first (both use port 1455).\n',
-		);
+		const oauthFlow = (await select({
+			message: 'Select OpenAI OAuth flow',
+			options: [
+				{
+					value: 'callback',
+					label: 'Browser callback OAuth (localhost callback)',
+				},
+				{
+					value: 'device',
+					label: 'Device code OAuth (SSH, tunnels, remote browsers)',
+				},
+			],
+		})) as 'callback' | 'device' | symbol;
 
-		const oauthResult = await authorizeOpenAI();
-
-		log.info('Opening browser for authorization...');
-		log.info(`URL: ${oauthResult.url}\n`);
-
-		const opened = await openOpenAIAuthUrl(oauthResult.url);
-		if (!opened) {
-			log.warn(
-				'⚠️  Could not open browser automatically. Please visit the URL above manually.\n',
-			);
+		if (isCancel(oauthFlow)) {
+			cancel('Cancelled');
+			return false;
 		}
 
-		log.info('Waiting for authorization callback...');
-		log.info('(Complete the login in your browser)\n');
-
 		try {
-			const code = await oauthResult.waitForCallback();
-			oauthResult.close();
+			let tokens: Awaited<ReturnType<typeof exchangeOpenAIDeviceCode>>;
 
-			log.info('🔄 Exchanging authorization code for tokens...');
+			if (oauthFlow === 'callback') {
+				log.info('Starting OpenAI browser callback OAuth flow...');
+				log.info(
+					'⚠️  This uses localhost port 1455 and only works when your browser can reach the machine running otto.\n',
+				);
 
-			const tokens = await exchangeOpenAI(code, oauthResult.verifier);
+				const oauthResult = await authorizeOpenAI();
+				try {
+					log.info('Opening browser for authorization...');
+					log.info(`URL: ${oauthResult.url}\n`);
+
+					const opened = await openOpenAIAuthUrl(oauthResult.url);
+					if (!opened) {
+						log.warn(
+							'⚠️  Could not open browser automatically. Please visit the URL above manually.\n',
+						);
+					}
+
+					log.info('Waiting for authorization callback...');
+					log.info('(Complete the login in your browser)\n');
+
+					const code = await oauthResult.waitForCallback();
+					log.info('🔄 Exchanging authorization code for tokens...');
+					tokens = await exchangeOpenAI(code, oauthResult.verifier);
+				} finally {
+					oauthResult.close();
+				}
+			} else {
+				log.info('Starting OpenAI device authorization...');
+				const deviceData = await requestOpenAIDeviceCode();
+
+				log.info('Open this URL in your browser:');
+				log.info(`${deviceData.verificationUri}\n`);
+				log.info('Enter this one-time code:');
+				log.info(`${deviceData.userCode}\n`);
+
+				const opened = await openOpenAIAuthUrl(deviceData.verificationUri);
+				if (!opened) {
+					log.warn(
+						'⚠️  Could not open browser automatically. Please visit the URL above manually.\n',
+					);
+				}
+
+				log.info('Waiting for authorization...');
+				log.info(
+					'(Complete the login in your browser; this code expires in 15 minutes)\n',
+				);
+
+				const startedAt = Date.now();
+				let authorization: { code: string; codeVerifier: string } | undefined;
+				while (Date.now() - startedAt < 15 * 60 * 1000) {
+					const result = await pollOpenAIDeviceCodeOnce(
+						deviceData.deviceAuthId,
+						deviceData.userCode,
+					);
+					if (result.status === 'complete') {
+						authorization = {
+							code: result.code,
+							codeVerifier: result.codeVerifier,
+						};
+						break;
+					}
+					if (result.status === 'error') {
+						throw new Error(result.error);
+					}
+					await Bun.sleep(Math.max(deviceData.interval, 5) * 1000);
+				}
+
+				if (!authorization) {
+					throw new Error('OpenAI device authorization timed out');
+				}
+
+				log.info('🔄 Exchanging authorization code for tokens...');
+
+				tokens = await exchangeOpenAIDeviceCode(
+					authorization.code,
+					authorization.codeVerifier,
+				);
+			}
 
 			let useApiKey = false;
 			let apiKey = '';
@@ -577,7 +654,6 @@ async function runAuthLoginOpenAI(
 			outro('Done');
 			return true;
 		} catch (error: unknown) {
-			oauthResult.close();
 			const message =
 				error instanceof Error ? error.message : 'Unknown error occurred';
 			log.error(`Authentication failed: ${message}`);

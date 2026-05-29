@@ -8,6 +8,8 @@ import {
 	completeOnboarding as apiCompleteOnboarding,
 	getOAuthUrl as apiGetOAuthUrl,
 	exchangeOAuthCode as apiExchangeOAuthCode,
+	startOpenAiDeviceFlow as apiStartOpenAiDeviceFlow,
+	pollOpenAiDeviceFlow as apiPollOpenAiDeviceFlow,
 	startCopilotDeviceFlow as apiStartCopilotDeviceFlow,
 	pollCopilotDeviceFlow as apiPollCopilotDeviceFlow,
 	getCopilotAuthMethods as apiGetCopilotAuthMethods,
@@ -141,6 +143,29 @@ export const authMixin = {
 		const response = await apiExchangeOAuthCode({
 			path: { provider },
 			body: { code, sessionId },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async startOpenAIDeviceFlow(): Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}> {
+		const response = await apiStartOpenAiDeviceFlow();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async pollOpenAIDeviceFlow(
+		sessionId: string,
+	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
+		const response = await apiPollOpenAiDeviceFlow({
+			body: { sessionId },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure

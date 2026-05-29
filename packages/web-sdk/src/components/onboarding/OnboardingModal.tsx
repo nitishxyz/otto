@@ -36,6 +36,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 		startOAuth,
 		startOAuthManual,
 		exchangeOAuthCode,
+		startOpenAIDeviceFlow,
+		pollOpenAIDeviceFlow,
 		startCopilotDeviceFlow,
 		pollCopilotDeviceFlow,
 		getCopilotAuthMethods,
@@ -95,6 +97,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 					onStartOAuth={startOAuth}
 					onStartOAuthManual={startOAuthManual}
 					onExchangeOAuthCode={exchangeOAuthCode}
+					onStartOpenAIDeviceFlow={startOpenAIDeviceFlow}
+					onPollOpenAIDeviceFlow={pollOpenAIDeviceFlow}
 					onOpenTopup={openTopupModal}
 					onNext={nextStep}
 					manageMode={manageMode}

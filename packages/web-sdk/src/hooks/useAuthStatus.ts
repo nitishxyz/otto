@@ -333,6 +333,17 @@ export function useAuthStatus() {
 		[fetchAuthStatus],
 	);
 
+	const pollOpenAIDeviceFlow = useCallback(
+		async (sessionId: string) => {
+			const result = await apiClient.pollOpenAIDeviceFlow(sessionId);
+			if (result.status === 'complete') {
+				await fetchAuthStatus();
+			}
+			return result;
+		},
+		[fetchAuthStatus],
+	);
+
 	const saveCopilotToken = useCallback(
 		async (token: string) => {
 			setLoading(true);
@@ -387,6 +398,8 @@ export function useAuthStatus() {
 		startOAuth,
 		startOAuthManual,
 		exchangeOAuthCode,
+		startOpenAIDeviceFlow: apiClient.startOpenAIDeviceFlow.bind(apiClient),
+		pollOpenAIDeviceFlow,
 		startCopilotDeviceFlow: apiClient.startCopilotDeviceFlow.bind(apiClient),
 		pollCopilotDeviceFlow,
 		getCopilotAuthMethods: apiClient.getCopilotAuthMethods.bind(apiClient),

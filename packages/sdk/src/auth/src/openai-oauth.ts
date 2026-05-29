@@ -5,6 +5,9 @@ import { createServer } from 'node:http';
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const OPENAI_ISSUER = 'https://auth.openai.com';
 const OPENAI_CALLBACK_PORT = 1455;
+const OPENAI_DEVICE_CALLBACK_URI = `${OPENAI_ISSUER}/deviceauth/callback`;
+const OPENAI_DEVICE_AUTH_URL = `${OPENAI_ISSUER}/api/accounts/deviceauth`;
+const OPENAI_DEVICE_VERIFICATION_URI = `${OPENAI_ISSUER}/codex/device`;
 
 function generatePKCE() {
 	const verifier = randomBytes(32)
@@ -63,6 +66,180 @@ export type OpenAIOAuthResult = {
 	waitForCallback: () => Promise<string>;
 	close: () => void;
 };
+
+export type OpenAIDeviceCodeResponse = {
+	verificationUri: string;
+	userCode: string;
+	deviceAuthId: string;
+	interval: number;
+};
+
+export type OpenAIDevicePollResult =
+	| {
+			status: 'complete';
+			code: string;
+			codeVerifier: string;
+			codeChallenge: string;
+	  }
+	| { status: 'pending' }
+	| { status: 'error'; error: string };
+
+function parseOpenAIDeviceInterval(interval: unknown): number {
+	if (
+		typeof interval === 'number' &&
+		Number.isFinite(interval) &&
+		interval > 0
+	) {
+		return interval;
+	}
+	if (typeof interval === 'string') {
+		const parsed = Number.parseInt(interval, 10);
+		if (Number.isFinite(parsed) && parsed > 0) return parsed;
+	}
+	return 5;
+}
+
+function parseOpenAITokenPayload(accessToken: string): string | undefined {
+	try {
+		const payload = JSON.parse(
+			Buffer.from(accessToken.split('.')[1], 'base64').toString(),
+		);
+		return payload['https://api.openai.com/auth']?.chatgpt_account_id;
+	} catch {}
+}
+
+export async function requestOpenAIDeviceCode(): Promise<OpenAIDeviceCodeResponse> {
+	const response = await fetch(`${OPENAI_DEVICE_AUTH_URL}/usercode`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			client_id: OPENAI_CLIENT_ID,
+		}),
+	});
+
+	if (!response.ok) {
+		const error = await response.text().catch(() => '');
+		throw new Error(
+			`Failed to initiate OpenAI device authorization${error ? `: ${error}` : ''}`,
+		);
+	}
+
+	const data = (await response.json()) as {
+		device_auth_id?: string;
+		user_code?: string;
+		usercode?: string;
+		interval?: number | string;
+	};
+
+	const deviceAuthId = data.device_auth_id;
+	const userCode = data.user_code ?? data.usercode;
+	if (!deviceAuthId || !userCode) {
+		throw new Error(
+			'OpenAI device authorization response was missing code data',
+		);
+	}
+
+	return {
+		verificationUri: OPENAI_DEVICE_VERIFICATION_URI,
+		userCode,
+		deviceAuthId,
+		interval: parseOpenAIDeviceInterval(data.interval),
+	};
+}
+
+export async function pollOpenAIDeviceCodeOnce(
+	deviceAuthId: string,
+	userCode: string,
+): Promise<OpenAIDevicePollResult> {
+	const response = await fetch(`${OPENAI_DEVICE_AUTH_URL}/token`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			device_auth_id: deviceAuthId,
+			user_code: userCode,
+		}),
+	});
+
+	if (response.status === 403 || response.status === 404) {
+		return { status: 'pending' };
+	}
+
+	if (!response.ok) {
+		const error = await response.text().catch(() => '');
+		return {
+			status: 'error',
+			error: `OpenAI device authorization failed${error ? `: ${error}` : ''}`,
+		};
+	}
+
+	const data = (await response.json()) as {
+		authorization_code?: string;
+		code_verifier?: string;
+		code_challenge?: string;
+	};
+
+	if (!data.authorization_code || !data.code_verifier || !data.code_challenge) {
+		return {
+			status: 'error',
+			error: 'OpenAI device authorization response was missing token data',
+		};
+	}
+
+	return {
+		status: 'complete',
+		code: data.authorization_code,
+		codeVerifier: data.code_verifier,
+		codeChallenge: data.code_challenge,
+	};
+}
+
+export async function exchangeOpenAIDeviceCode(code: string, verifier: string) {
+	return exchangeOpenAIWithRedirect(code, verifier, OPENAI_DEVICE_CALLBACK_URI);
+}
+
+async function exchangeOpenAIWithRedirect(
+	code: string,
+	verifier: string,
+	redirectUri: string,
+) {
+	const response = await fetch(`${OPENAI_ISSUER}/oauth/token`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+		},
+		body: new URLSearchParams({
+			grant_type: 'authorization_code',
+			code,
+			redirect_uri: redirectUri,
+			client_id: OPENAI_CLIENT_ID,
+			code_verifier: verifier,
+		}).toString(),
+	});
+
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`Token exchange failed: ${error}`);
+	}
+
+	const json = (await response.json()) as {
+		id_token: string;
+		access_token: string;
+		refresh_token: string;
+		expires_in?: number;
+	};
+
+	return {
+		idToken: json.id_token,
+		access: json.access_token,
+		refresh: json.refresh_token,
+		expires: Date.now() + (json.expires_in || 3600) * 1000,
+		accountId: parseOpenAITokenPayload(json.access_token),
+	};
+}
 
 export async function authorizeOpenAI(): Promise<OpenAIOAuthResult> {
 	const pkce = generatePKCE();
@@ -222,48 +399,7 @@ export async function authorizeOpenAI(): Promise<OpenAIOAuthResult> {
 
 export async function exchangeOpenAI(code: string, verifier: string) {
 	const redirectUri = `http://localhost:${OPENAI_CALLBACK_PORT}/auth/callback`;
-
-	const response = await fetch(`${OPENAI_ISSUER}/oauth/token`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/x-www-form-urlencoded',
-		},
-		body: new URLSearchParams({
-			grant_type: 'authorization_code',
-			code,
-			redirect_uri: redirectUri,
-			client_id: OPENAI_CLIENT_ID,
-			code_verifier: verifier,
-		}).toString(),
-	});
-
-	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(`Token exchange failed: ${error}`);
-	}
-
-	const json = (await response.json()) as {
-		id_token: string;
-		access_token: string;
-		refresh_token: string;
-		expires_in?: number;
-	};
-
-	let accountId: string | undefined;
-	try {
-		const payload = JSON.parse(
-			Buffer.from(json.access_token.split('.')[1], 'base64').toString(),
-		);
-		accountId = payload['https://api.openai.com/auth']?.chatgpt_account_id;
-	} catch {}
-
-	return {
-		idToken: json.id_token,
-		access: json.access_token,
-		refresh: json.refresh_token,
-		expires: Date.now() + (json.expires_in || 3600) * 1000,
-		accountId,
-	};
+	return exchangeOpenAIWithRedirect(code, verifier, redirectUri);
 }
 
 export async function refreshOpenAIToken(refreshToken: string) {
@@ -367,45 +503,5 @@ export async function exchangeOpenAIWeb(
 	verifier: string,
 	redirectUri: string,
 ) {
-	const response = await fetch(`${OPENAI_ISSUER}/oauth/token`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/x-www-form-urlencoded',
-		},
-		body: new URLSearchParams({
-			grant_type: 'authorization_code',
-			code,
-			redirect_uri: redirectUri,
-			client_id: OPENAI_CLIENT_ID,
-			code_verifier: verifier,
-		}).toString(),
-	});
-
-	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(`Token exchange failed: ${error}`);
-	}
-
-	const json = (await response.json()) as {
-		id_token: string;
-		access_token: string;
-		refresh_token: string;
-		expires_in?: number;
-	};
-
-	let accountId: string | undefined;
-	try {
-		const payload = JSON.parse(
-			Buffer.from(json.access_token.split('.')[1], 'base64').toString(),
-		);
-		accountId = payload['https://api.openai.com/auth']?.chatgpt_account_id;
-	} catch {}
-
-	return {
-		idToken: json.id_token,
-		access: json.access_token,
-		refresh: json.refresh_token,
-		expires: Date.now() + (json.expires_in || 3600) * 1000,
-		accountId,
-	};
+	return exchangeOpenAIWithRedirect(code, verifier, redirectUri);
 }

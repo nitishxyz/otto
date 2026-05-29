@@ -184,13 +184,20 @@ export {
 export {
 	authorizeOpenAI,
 	exchangeOpenAI,
+	exchangeOpenAIDeviceCode,
 	refreshOpenAIToken,
 	openOpenAIAuthUrl,
 	obtainOpenAIApiKey,
+	pollOpenAIDeviceCodeOnce,
+	requestOpenAIDeviceCode,
 	authorizeOpenAIWeb,
 	exchangeOpenAIWeb,
 } from './auth/src/index.ts';
-export type { OpenAIOAuthResult } from './auth/src/index.ts';
+export type {
+	OpenAIDeviceCodeResponse,
+	OpenAIDevicePollResult,
+	OpenAIOAuthResult,
+} from './auth/src/index.ts';
 export {
 	authorizeXai,
 	exchangeXai,

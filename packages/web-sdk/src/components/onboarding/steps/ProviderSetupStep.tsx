@@ -9,6 +9,9 @@ import {
 	ArrowRight,
 	RefreshCw,
 	Plus,
+	ChevronRight,
+	Laptop,
+	Globe,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { ProviderLogo } from '../../common/ProviderLogo';
@@ -71,6 +74,15 @@ interface ProviderSetupStepProps {
 		code: string,
 		sessionId: string,
 	) => Promise<boolean>;
+	onStartOpenAIDeviceFlow?: () => Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}>;
+	onPollOpenAIDeviceFlow?: (
+		sessionId: string,
+	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
 	onOpenTopup: () => void;
 	onNext: () => void;
 	manageMode?: boolean;
@@ -134,6 +146,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	onStartOAuth,
 	onStartOAuthManual,
 	onExchangeOAuthCode,
+	onStartOpenAIDeviceFlow,
+	onPollOpenAIDeviceFlow,
 	onOpenTopup,
 	onNext,
 	manageMode = false,
@@ -188,6 +202,20 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const [oauthCodeInput, setOauthCodeInput] = useState('');
 	const [isExchangingCode, setIsExchangingCode] = useState(false);
 	const [isOpeningPopup, setIsOpeningPopup] = useState(false);
+	const [openAIDevice, setOpenAIDevice] = useState<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	} | null>(null);
+	const [openAIPolling, setOpenAIPolling] = useState(false);
+	const [openAIError, setOpenAIError] = useState<string | null>(null);
+	const [openAICodeCopied, setOpenAICodeCopied] = useState(false);
+	const [openAIModalOpen, setOpenAIModalOpen] = useState(false);
+	const [openAIAuthMode, setOpenAIAuthMode] = useState<'choice' | 'device'>(
+		'choice',
+	);
+	const [openAILoading, setOpenAILoading] = useState(false);
 	const [copilotDevice, setCopilotDevice] = useState<{
 		sessionId: string;
 		userCode: string;
@@ -225,6 +253,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const copilotCancelledRef = useRef(false);
 	const copilotPollFnRef = useRef(onPollCopilotDeviceFlow);
 	copilotPollFnRef.current = onPollCopilotDeviceFlow;
+	const openAIPollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+	const openAICancelledRef = useRef(false);
+	const openAIPollFnRef = useRef(onPollOpenAIDeviceFlow);
+	openAIPollFnRef.current = onPollOpenAIDeviceFlow;
 	const balance = useOttoRouterStore((s) => s.balance);
 	const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 	const payg = useOttoRouterStore((s) => s.payg);
@@ -317,6 +349,52 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			clearTimeout(timeout);
 		};
 	}, [copilotPolling, copilotDevice]);
+
+	useEffect(() => {
+		if (!openAIPolling || !openAIDevice || !openAIPollFnRef.current) return;
+		openAICancelledRef.current = false;
+		const pollIntervalMs = Math.max(
+			(openAIDevice.interval || 5) * 1000 + 2000,
+			7000,
+		);
+		const schedulePoll = () => {
+			openAIPollRef.current = setTimeout(async () => {
+				if (openAICancelledRef.current) return;
+				try {
+					const pollFn = openAIPollFnRef.current;
+					if (!pollFn) return;
+					const result = await pollFn(openAIDevice.sessionId);
+					if (openAICancelledRef.current) return;
+					if (result.status === 'complete') {
+						setOpenAIDevice(null);
+						setOpenAIPolling(false);
+						setOpenAIError(null);
+						setOpenAIModalOpen(false);
+					} else if (result.status === 'error') {
+						setOpenAIError(result.error || 'Authorization failed');
+						setOpenAIPolling(false);
+					} else {
+						schedulePoll();
+					}
+				} catch {
+					if (!openAICancelledRef.current) schedulePoll();
+				}
+			}, pollIntervalMs);
+		};
+		schedulePoll();
+		const timeout = setTimeout(
+			() => {
+				setOpenAIPolling(false);
+				setOpenAIError('Authorization timed out. Please try again.');
+			},
+			15 * 60 * 1000,
+		);
+		return () => {
+			openAICancelledRef.current = true;
+			if (openAIPollRef.current) clearTimeout(openAIPollRef.current);
+			clearTimeout(timeout);
+		};
+	}, [openAIPolling, openAIDevice]);
 
 	const handleCopy = async () => {
 		if (authStatus.ottorouter.publicKey) {
@@ -471,9 +549,33 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			});
 	};
 
+	const startOpenAIDeviceAuthorization = () => {
+		if (!onStartOpenAIDeviceFlow) return;
+		setOpenAILoading(true);
+		setOpenAIError(null);
+		onStartOpenAIDeviceFlow()
+			.then((data) => {
+				setOpenAIDevice(data);
+				setOpenAILoading(false);
+			})
+			.catch((err) => {
+				setOpenAIError(
+					err instanceof Error ? err.message : 'Failed to start device flow',
+				);
+				setOpenAILoading(false);
+			});
+	};
+
 	const handleStartOAuth = async (providerId: string, mode?: string) => {
 		if (providerId === 'anthropic') {
 			setOauthSession({ provider: providerId, sessionId: null, mode });
+		} else if (providerId === 'openai' && onStartOpenAIDeviceFlow) {
+			setOpenAIPolling(false);
+			setOpenAIDevice(null);
+			setOpenAIError(null);
+			setOpenAICodeCopied(false);
+			setOpenAIAuthMode('choice');
+			setOpenAIModalOpen(true);
 		} else if (providerId === 'copilot') {
 			setCopilotAuthMode('oauth');
 			setCopilotTokenInput('');
@@ -536,6 +638,44 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const handleCancelOAuth = () => {
 		setOauthSession(null);
 		setOauthCodeInput('');
+	};
+
+	const handleOpenAIOpenAuth = () => {
+		if (!openAIDevice) return;
+		openUrl(openAIDevice.verificationUri);
+		setOpenAIPolling(true);
+	};
+
+	const handleOpenAIDeviceChoice = () => {
+		setOpenAIAuthMode('device');
+		startOpenAIDeviceAuthorization();
+	};
+
+	const handleOpenAILocalCallbackChoice = () => {
+		handleCancelOpenAI();
+		onStartOAuth('openai');
+	};
+
+	const handleOpenAICopyCode = async () => {
+		if (!openAIDevice) return;
+		await navigator.clipboard.writeText(openAIDevice.userCode);
+		setOpenAICodeCopied(true);
+		setTimeout(() => setOpenAICodeCopied(false), 2000);
+	};
+
+	const handleCancelOpenAI = () => {
+		setOpenAIDevice(null);
+		setOpenAIPolling(false);
+		setOpenAIError(null);
+		setOpenAICodeCopied(false);
+		setOpenAIAuthMode('choice');
+		setOpenAIModalOpen(false);
+		setOpenAILoading(false);
+		openAICancelledRef.current = true;
+		if (openAIPollRef.current) {
+			clearTimeout(openAIPollRef.current);
+			openAIPollRef.current = undefined;
+		}
 	};
 
 	const handleCopilotOpenGithub = () => {
@@ -1514,6 +1654,133 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 											<StableSpinner title="Connecting provider" />
 										) : (
 											'Connect'
+										)}
+									</button>
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* OpenAI Device Flow Modal */}
+			{openAIModalOpen && (
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
+					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
+						<div className="flex items-center gap-3 p-6 border-b border-border">
+							<ProviderLogo provider="openai" size={24} />
+							<h3 className="text-lg font-semibold">Connect OpenAI</h3>
+						</div>
+						{openAIAuthMode === 'choice' ? (
+							<div className="p-4 space-y-2">
+								<button
+									type="button"
+									onClick={handleOpenAILocalCallbackChoice}
+									className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+								>
+									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+										<Laptop className="w-4 h-4" />
+									</div>
+									<div className="min-w-0 flex-1">
+										<div className="font-medium">Browser callback</div>
+										<div className="text-xs text-muted-foreground">
+											Same machine as otto
+										</div>
+									</div>
+									<ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+								</button>
+								<button
+									type="button"
+									onClick={handleOpenAIDeviceChoice}
+									className="group w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+								>
+									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+										<Globe className="w-4 h-4" />
+									</div>
+									<div className="min-w-0 flex-1">
+										<div className="font-medium">Device code</div>
+										<div className="text-xs text-muted-foreground">
+											Remote, tunnel, or SSH
+										</div>
+									</div>
+									<ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+								</button>
+								<button
+									type="button"
+									onClick={handleCancelOpenAI}
+									className="w-full h-10 mt-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+								>
+									Cancel
+								</button>
+							</div>
+						) : (
+							<div className="p-6 space-y-4">
+								<p className="text-sm text-muted-foreground">
+									Open the device sign-in page, then enter this one-time code.
+									This works from remote browsers, tunnels, and SSH sessions.
+								</p>
+								<div className="flex items-center justify-center gap-3">
+									{openAILoading ? (
+										<div className="bg-muted px-6 py-3 rounded-lg animate-pulse">
+											<div className="h-9 w-48 bg-muted-foreground/20 rounded" />
+										</div>
+									) : openAIDevice ? (
+										<>
+											<code className="text-3xl font-mono font-bold tracking-widest text-foreground bg-muted px-6 py-3 rounded-lg select-all">
+												{openAIDevice.userCode}
+											</code>
+											<button
+												type="button"
+												onClick={handleOpenAICopyCode}
+												className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+											>
+												{openAICodeCopied ? (
+													<Check className="w-5 h-5 text-green-500" />
+												) : (
+													<Copy className="w-5 h-5" />
+												)}
+											</button>
+										</>
+									) : null}
+								</div>
+
+								{openAIError && (
+									<p className="text-sm text-red-500 text-center">
+										{openAIError}
+									</p>
+								)}
+
+								{openAIPolling && (
+									<div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+										<StableSpinner title="Waiting for OpenAI authorization" />
+										Waiting for authorization...
+									</div>
+								)}
+
+								<div className="flex gap-3">
+									<button
+										type="button"
+										onClick={handleCancelOpenAI}
+										className="flex-1 h-11 px-4 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors"
+									>
+										Cancel
+									</button>
+									<button
+										type="button"
+										onClick={handleOpenAIOpenAuth}
+										disabled={openAIPolling || openAILoading}
+										className="flex-1 h-11 px-4 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+									>
+										{openAIPolling || openAILoading ? (
+											<StableSpinner title="Opening OpenAI" />
+										) : (
+											<>
+												Open OpenAI
+												<ExternalLink className="w-4 h-4" />
+											</>
 										)}
 									</button>
 								</div>

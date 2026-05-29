@@ -74,11 +74,16 @@ export {
 export {
 	authorizeOpenAI,
 	exchangeOpenAI,
+	exchangeOpenAIDeviceCode,
 	refreshOpenAIToken,
 	openOpenAIAuthUrl,
 	obtainOpenAIApiKey,
+	pollOpenAIDeviceCodeOnce,
+	requestOpenAIDeviceCode,
 	authorizeOpenAIWeb,
 	exchangeOpenAIWeb,
+	type OpenAIDeviceCodeResponse,
+	type OpenAIDevicePollResult,
 	type OpenAIOAuthResult,
 } from './openai-oauth.ts';
 

@@ -28,6 +28,11 @@ SuperGrok / X Premium+ accounts. If xAI accepts the login but model calls return
 `403`, your subscription tier may not be allowlisted for OAuth API access; use an
 `XAI_API_KEY` fallback.
 
+`otto auth login openai` offers both OpenAI browser-callback OAuth and
+device-code OAuth for ChatGPT Plus/Pro accounts. Device-code OAuth works from SSH
+sessions, headless machines, and the web UI over a tunnel because it does not
+depend on a `localhost` callback.
+
 ### Agent & Tool Management
 
 ```bash
