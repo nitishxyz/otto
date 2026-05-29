@@ -6,6 +6,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "AppWeb": {
+      "type": "sst.cloudflare.StaticSite"
+      "url": string
+    }
     "Landing": {
       "type": "sst.cloudflare.Astro"
       "url": string

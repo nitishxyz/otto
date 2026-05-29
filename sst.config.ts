@@ -21,10 +21,12 @@ export default $config({
     const { previewApiUrl } = await import("./infra/preview-api");
     const { previewWeb } = await import("./infra/preview-web");
     const { ogFunctionUrl } = await import("./infra/og");
+    const { appWeb } = await import("./infra/app-web");
 
     return {
       script: script.url,
       landing: landing.url,
+      appWeb: appWeb.url,
       previewApi: previewApiUrl,
       previewWeb: previewWeb.url,
       ogFunction: ogFunctionUrl,

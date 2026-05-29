@@ -3,12 +3,11 @@ import type {
 	Session as ApiSession,
 	Message as ApiMessage,
 } from '@ottocode/api';
-import { API_BASE_URL } from '../config';
+import {
+	getRuntimeApiBaseUrl,
+	setRuntimeApiBaseUrl as persistRuntimeApiBaseUrl,
+} from '../config';
 import type { Session, Message } from '../../types/api';
-
-interface WindowWithAgiServerUrl extends Window {
-	OTTO_SERVER_URL?: string;
-}
 
 function getClientAdapter(): 'fetch' | undefined {
 	if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
@@ -38,8 +37,7 @@ export function extractErrorMessage(error: unknown): string {
 }
 
 export function configureApiClient() {
-	const win = window as WindowWithAgiServerUrl;
-	const baseURL = win.OTTO_SERVER_URL || API_BASE_URL;
+	const baseURL = getRuntimeApiBaseUrl();
 	client.setConfig({
 		baseURL,
 		adapter: getClientAdapter(),
@@ -49,9 +47,13 @@ export function configureApiClient() {
 configureApiClient();
 
 export function getBaseUrl(): string {
-	const win = window as WindowWithAgiServerUrl;
-	if (win.OTTO_SERVER_URL) return win.OTTO_SERVER_URL;
-	return API_BASE_URL;
+	return getRuntimeApiBaseUrl();
+}
+
+export function setRuntimeApiBaseUrl(value: string): string {
+	const baseUrl = persistRuntimeApiBaseUrl(value);
+	configureApiClient();
+	return baseUrl;
 }
 
 export function convertSession(apiSession: ApiSession): Session {
