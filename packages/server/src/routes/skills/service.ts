@@ -176,7 +176,10 @@ export async function listSkillFiles(c: Context) {
 export async function getSkillFile(c: Context) {
 	try {
 		const name = c.req.param('name');
-		const filePath = c.req.path.replace(`/v1/skills/${name}/files/`, '');
+		const rawFilePath =
+			c.req.param('filePath') ||
+			c.req.path.replace(`/v1/skills/${name}/files/`, '');
+		const filePath = decodeURIComponent(rawFilePath);
 		await ensureSkillsDiscovered(projectRootFromQuery(c));
 
 		const result = await loadSkillFile(name, filePath);

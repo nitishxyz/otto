@@ -9,6 +9,7 @@ import {
 	clearSkillCache,
 } from '../packages/sdk/src/skills/index.ts';
 import { scanContent } from '../packages/sdk/src/skills/security.ts';
+import { createApp } from '../packages/server/src/index.ts';
 
 describe('Skills Enhanced', () => {
 	let tempDir: string;
@@ -173,6 +174,35 @@ Content.
 		test('returns empty for unknown skill', async () => {
 			const files = await discoverSkillFiles('nonexistent');
 			expect(files).toEqual([]);
+		});
+	});
+
+	describe('skill file routes', () => {
+		test('loads nested skill files from encoded route params', async () => {
+			const skillDir = join(tempDir, '.otto/skills/my-skill');
+			const rulesDir = join(skillDir, 'rules');
+			await fs.mkdir(rulesDir, { recursive: true });
+			await fs.writeFile(
+				join(skillDir, 'SKILL.md'),
+				`---
+name: my-skill
+description: Test
+---
+
+Content.
+`,
+			);
+			await fs.writeFile(join(rulesDir, 'animations.md'), '# Animations');
+
+			const app = createApp();
+			const response = await app.request(
+				`/v1/skills/my-skill/files/${encodeURIComponent('rules/animations.md')}?project=${encodeURIComponent(tempDir)}`,
+			);
+
+			expect(response.status).toBe(200);
+			const body = (await response.json()) as { content: string; path: string };
+			expect(body.content).toContain('# Animations');
+			expect(body.path).toContain('rules/animations.md');
 		});
 	});
 

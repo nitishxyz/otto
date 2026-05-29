@@ -85,8 +85,14 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
 	setSkillsConfig: ({ skills, globalEnabled, totalCount, enabledCount }) =>
 		set({ skills, globalEnabled, totalCount, enabledCount }),
 
-	selectSkill: (name) =>
-		set({ selectedSkill: name, isViewerOpen: false, viewingFile: null }),
+	selectSkill: (name) => {
+		if (name) {
+			useViewerTabsStore.getState().openSkillFileTab(name, null);
+			set({ selectedSkill: name, isViewerOpen: true, viewingFile: null });
+			return;
+		}
+		set({ selectedSkill: null, isViewerOpen: false, viewingFile: null });
+	},
 
 	openViewer: (file) => {
 		const selectedSkill = get().selectedSkill;
