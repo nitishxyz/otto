@@ -258,48 +258,40 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 										</div>
 										{scopeSkills.map((skill) => (
 											<div
-												role="button"
-												tabIndex={0}
 												key={`${skill.scope}-${skill.name}`}
-												onClick={() => selectSkill(skill.name)}
-												onKeyDown={(event) => {
-													if (event.key !== 'Enter' && event.key !== ' ') return;
-													event.preventDefault();
-													selectSkill(skill.name);
-												}}
-												className={`w-full cursor-pointer text-left px-3 py-2 hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+												className={`w-full px-3 py-2 hover:bg-accent transition-colors ${
 													selectedSkill === skill.name ? 'bg-accent' : ''
 												}`}
 											>
 												<div className="flex items-start gap-2">
-													<FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-													<div className="min-w-0 flex-1">
-														<div className="text-sm font-medium truncate">
-															{skill.name}
-														</div>
-														<div className="text-xs text-muted-foreground truncate">
-															{skill.description}
-														</div>
-													</div>
-													<div
-														onPointerDown={(event) => event.stopPropagation()}
-														onClick={(event) => event.stopPropagation()}
-														onKeyDown={(event) => event.stopPropagation()}
+													<button
+														type="button"
+														onClick={() => selectSkill(skill.name)}
+														className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 													>
-														<ToggleSwitch
-															checked={skill.enabled !== false}
-															loading={updateSkillsConfig.isPending}
-															onChange={() =>
-																updateSkillsConfig.mutate({
-																	items: {
-																		[skill.name]: {
-																			enabled: skill.enabled === false,
-																		},
+														<FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+														<div className="min-w-0 flex-1">
+															<div className="text-sm font-medium truncate">
+																{skill.name}
+															</div>
+															<div className="text-xs text-muted-foreground truncate">
+																{skill.description}
+															</div>
+														</div>
+													</button>
+													<ToggleSwitch
+														checked={skill.enabled !== false}
+														loading={updateSkillsConfig.isPending}
+														onChange={() =>
+															updateSkillsConfig.mutate({
+																items: {
+																	[skill.name]: {
+																		enabled: skill.enabled === false,
 																	},
-																})
-															}
-														/>
-													</div>
+																},
+															})
+														}
+													/>
 												</div>
 											</div>
 										))}

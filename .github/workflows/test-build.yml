@@ -294,9 +294,9 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/desktop && bun run tauri build --target ${{ matrix.target }} --bundles deb
             else
-              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }}
+              cd apps/desktop && bun run tauri build --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -543,11 +543,11 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/launcher && bun run tauri build --target ${{ matrix.target }} --bundles deb
             elif [[ "${{ matrix.target }}" == *"windows"* ]]; then
-              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
+              cd apps/launcher && bun run tauri build --target ${{ matrix.target }} --bundles msi,nsis
             else
-              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }}
+              cd apps/launcher && bun run tauri build --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

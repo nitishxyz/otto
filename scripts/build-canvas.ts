@@ -173,7 +173,7 @@ async function buildCanvasApp(options: ReturnType<typeof parseArgs>) {
 
 	if (options.devMode) {
 		if (options.targetArg) {
-			await $`bun run tauri dev -- --target ${options.targetArg}`;
+			await $`bun run tauri dev --target ${options.targetArg}`;
 			return;
 		}
 		await $`bun run tauri dev`;
@@ -181,7 +181,7 @@ async function buildCanvasApp(options: ReturnType<typeof parseArgs>) {
 	}
 
 	if (options.targetArg) {
-		await $`bun run tauri build -- --target ${options.targetArg}`;
+		await $`bun run tauri build --target ${options.targetArg}`;
 		return;
 	}
 	await $`bun run tauri build`;
