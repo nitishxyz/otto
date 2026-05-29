@@ -383,7 +383,7 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 									<span className="text-muted-foreground/40 flex-shrink-0">
 										·
 									</span>
-									<span className="truncate text-foreground/60 lowercase tracking-normal font-normal font-mono">
+									<span className="truncate text-foreground/60 normal-case tracking-normal font-normal font-mono">
 										{target}
 									</span>
 								</>
