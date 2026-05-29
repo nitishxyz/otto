@@ -87,7 +87,6 @@ bun run build:bin:darwin-arm64
 bun run build:bin:darwin-x64
 bun run build:bin:linux-x64
 bun run build:bin:linux-arm64
-bun run build:bin:windows-x64
 ```
 
 ## Repo conventions

@@ -192,7 +192,7 @@ jobs:
             runner: ubuntu-latest
           - os: linux
             arch: arm64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v4
 
@@ -227,6 +227,19 @@ jobs:
         run: |
           bun install --os="${{ matrix.os }}" --cpu="${{ matrix.arch }}"
 
+      - name: Install Whisper build dependencies (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Install Whisper build dependencies (macOS)
+        if: matrix.os == 'darwin'
+        shell: bash
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
+
       - name: Download ripgrep binary
         shell: bash
         run: |
@@ -251,6 +264,8 @@ jobs:
 
       - name: Build binary
         shell: bash
+        env:
+          OTTO_REQUIRE_EMBEDDED_WHISPER: "1"
         run: |
           set -euo pipefail
           cd apps/cli
@@ -304,7 +319,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: otto-${{ matrix.os }}-${{ matrix.arch }}
-          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
+          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}
 
   build-desktop:
     needs: [check-flags, bump-version]
@@ -367,7 +382,15 @@ jobs:
             patchelf \
             libssl-dev \
             libgtk-3-dev \
-            libfuse2
+            libfuse2 \
+            cmake \
+            build-essential
+
+      - name: Install Whisper build dependencies (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
 
       - name: Install dependencies
         shell: bash
@@ -409,6 +432,8 @@ jobs:
 
       - name: Build CLI binary for desktop
         shell: bash
+        env:
+          OTTO_REQUIRE_EMBEDDED_WHISPER: "1"
         run: |
           set -euo pipefail
           case "${{ matrix.target }}" in
@@ -474,9 +499,9 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/desktop && npm run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
             else
-              cd apps/desktop && npm run tauri build -- --target ${{ matrix.target }}
+              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -749,11 +774,11 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
             elif [[ "${{ matrix.target }}" == *"windows"* ]]; then
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
             else
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }}
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1156,7 +1181,6 @@ jobs:
           DARWIN_X64_SIG=""
           LINUX_X64_SIG=""
           LINUX_ARM64_SIG=""
-          WINDOWS_X64_SIG=""
 
           for f in ./release/*.app.tar.gz.sig; do
             [ -f "$f" ] || continue

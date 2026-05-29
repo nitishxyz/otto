@@ -27,7 +27,7 @@ jobs:
             runner: ubuntu-latest
           - os: linux
             arch: arm64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04-arm
     steps:
       - name: Checkout tag
         uses: actions/checkout@v4
@@ -42,8 +42,23 @@ jobs:
       - name: Install deps
         run: bun install
 
+      - name: Install Whisper build dependencies (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Install Whisper build dependencies (macOS)
+        if: matrix.os == 'darwin'
+        shell: bash
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
+
       - name: Build platform binary
         shell: bash
+        env:
+          OTTO_REQUIRE_EMBEDDED_WHISPER: "1"
         run: |
           set -euo pipefail
           cd apps/cli
@@ -66,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: otto-${{ matrix.os }}-${{ matrix.arch }}
-          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
+          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}
 
   github-release-from-tag:
     needs: build-binaries-from-tag

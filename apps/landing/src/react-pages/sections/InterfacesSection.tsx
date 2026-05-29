@@ -22,7 +22,7 @@ const INTERFACES = [
 	{
 		tag: 'Desktop',
 		headline: 'Native app',
-		body: 'Tauri v2 app that embeds the CLI binary and web UI. macOS, Linux, Windows.',
+		body: 'Tauri v2 app that embeds the CLI binary and web UI. macOS and Linux.',
 		cmd: 'otto',
 	},
 	{

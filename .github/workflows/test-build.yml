@@ -57,12 +57,8 @@ jobs:
             enabled: ${{ inputs.platform_linux }}
           - os: linux
             arch: arm64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04-arm
             enabled: ${{ inputs.platform_linux }}
-          - os: windows
-            arch: x64
-            runner: windows-latest
-            enabled: ${{ inputs.platform_windows }}
     steps:
       - name: Skip if platform disabled
         if: matrix.enabled != true
@@ -80,6 +76,19 @@ jobs:
         if: matrix.enabled
         run: bun install
 
+      - name: Install Whisper build dependencies (Linux)
+        if: matrix.enabled && matrix.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Install Whisper build dependencies (macOS)
+        if: matrix.enabled && matrix.os == 'darwin'
+        shell: bash
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
+
       - name: Download ripgrep binary
         if: matrix.enabled
         shell: bash
@@ -92,36 +101,28 @@ jobs:
             darwin-x64)   RG_TARGET="x86_64-apple-darwin" ;;
             linux-x64)    RG_TARGET="x86_64-unknown-linux-musl" ;;
             linux-arm64)  RG_TARGET="aarch64-unknown-linux-gnu" ;;
-            windows-x64)  RG_TARGET="x86_64-pc-windows-msvc" ;;
             *) echo "Unknown platform: $PLATFORM"; exit 1 ;;
           esac
           VENDOR_DST="vendor/bin/${PLATFORM}"
           mkdir -p "$VENDOR_DST"
           ARCHIVE="ripgrep-${RIPGREP_VERSION}-${RG_TARGET}"
-          if [[ "$PLATFORM" == windows-* ]]; then
-            URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.zip"
-            curl -fsSL "$URL" -o /tmp/rg.zip
-            unzip -q /tmp/rg.zip -d /tmp
-            cp "/tmp/${ARCHIVE}/rg.exe" "$VENDOR_DST/rg.exe"
-          else
-            URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.tar.gz"
-            curl -fsSL "$URL" | tar -xz -C /tmp
-            cp "/tmp/${ARCHIVE}/rg" "$VENDOR_DST/rg"
-            chmod +x "$VENDOR_DST/rg"
-          fi
+          URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.tar.gz"
+          curl -fsSL "$URL" | tar -xz -C /tmp
+          cp "/tmp/${ARCHIVE}/rg" "$VENDOR_DST/rg"
+          chmod +x "$VENDOR_DST/rg"
 
       - name: Build CLI binary
         if: matrix.enabled
         shell: bash
+        env:
+          OTTO_REQUIRE_EMBEDDED_WHISPER: "1"
         run: |
           set -euo pipefail
           cd apps/cli
           bun run ../../scripts/build-web.ts
           bun run ../../scripts/prepare-embedded-bins.ts "${{ matrix.os }}-${{ matrix.arch }}"
           mkdir -p dist
-          EXT=""
-          if [[ "${{ matrix.os }}" == "windows" ]]; then EXT=".exe"; fi
-          bun build --compile --minify --target="bun-${{ matrix.os }}-${{ matrix.arch }}" ./index.ts --outfile "dist/otto-${{ matrix.os }}-${{ matrix.arch }}${EXT}"
+          bun build --compile --minify --target="bun-${{ matrix.os }}-${{ matrix.arch }}" ./index.ts --outfile "dist/otto-${{ matrix.os }}-${{ matrix.arch }}"
           ls -la dist/
 
       - name: Upload artifact
@@ -129,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-otto-${{ matrix.os }}-${{ matrix.arch }}
-          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }}
+          path: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }}
 
   test-build-desktop:
     if: inputs.build_desktop
@@ -189,7 +190,15 @@ jobs:
             patchelf \
             libssl-dev \
             libgtk-3-dev \
-            libfuse2
+            libfuse2 \
+            cmake \
+            build-essential
+
+      - name: Install Whisper build dependencies (macOS)
+        if: matrix.enabled && startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
 
       - name: Install dependencies
         if: matrix.enabled
@@ -212,21 +221,16 @@ jobs:
           VENDOR_DST="vendor/bin/${PLATFORM}"
           mkdir -p "$VENDOR_DST"
           ARCHIVE="ripgrep-${RIPGREP_VERSION}-${RG_TARGET}"
-          if [[ "$PLATFORM" == windows-* ]]; then
-            URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.zip"
-            curl -fsSL "$URL" -o /tmp/rg.zip
-            unzip -q /tmp/rg.zip -d /tmp
-            cp "/tmp/${ARCHIVE}/rg.exe" "$VENDOR_DST/rg.exe"
-          else
-            URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.tar.gz"
-            curl -fsSL "$URL" | tar -xz -C /tmp
-            cp "/tmp/${ARCHIVE}/rg" "$VENDOR_DST/rg"
-            chmod +x "$VENDOR_DST/rg"
-          fi
+          URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${ARCHIVE}.tar.gz"
+          curl -fsSL "$URL" | tar -xz -C /tmp
+          cp "/tmp/${ARCHIVE}/rg" "$VENDOR_DST/rg"
+          chmod +x "$VENDOR_DST/rg"
 
       - name: Build CLI binary for desktop
         if: matrix.enabled
         shell: bash
+        env:
+          OTTO_REQUIRE_EMBEDDED_WHISPER: "1"
         run: |
           set -euo pipefail
           PLATFORM="${{ matrix.cli_platform }}"
@@ -290,9 +294,9 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/desktop && npm run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
             else
-              cd apps/desktop && npm run tauri build -- --target ${{ matrix.target }}
+              cd apps/desktop && bun run tauri build -- --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -539,11 +543,11 @@ jobs:
           shell: bash
           command: |
             if [[ "${{ matrix.target }}" == *"linux"* ]]; then
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }} --bundles deb
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles deb
             elif [[ "${{ matrix.target }}" == *"windows"* ]]; then
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
             else
-              cd apps/launcher && npm run tauri build -- --target ${{ matrix.target }}
+              cd apps/launcher && bun run tauri build -- --target ${{ matrix.target }}
             fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

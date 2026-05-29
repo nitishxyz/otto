@@ -43,7 +43,11 @@ function getPlatformKey(target?: string): string {
 	return `${os}-${cpu}`;
 }
 
-const targetArg = process.argv[2];
+const scriptArgs = process.argv.slice(2);
+const requireWhisperCli =
+	process.env.OTTO_REQUIRE_EMBEDDED_WHISPER === '1' ||
+	scriptArgs.includes('--require-whisper');
+const targetArg = scriptArgs.find((arg) => !arg.startsWith('--'));
 const platformKey = getPlatformKey(targetArg);
 const isWindows = platformKey.startsWith('windows');
 const rgName = isWindows ? 'rg.exe' : 'rg';
@@ -72,7 +76,7 @@ async function ensureVendorRipgrep() {
 	console.log(
 		`Vendor ripgrep missing for ${platformKey}; downloading vendor binaries...`,
 	);
-	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')}`;
+	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')} ${platformKey}`;
 	return existsSync(rgSource);
 }
 
@@ -84,7 +88,7 @@ async function ensureVendorWhisperCli() {
 	console.log(
 		`Vendor whisper-cli missing for ${platformKey}; preparing vendor binaries...`,
 	);
-	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')}`;
+	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')} ${platformKey}`;
 	return existsSync(whisperCliSource);
 }
 
@@ -109,6 +113,10 @@ if (await ensureVendorWhisperCli()) {
 	console.log(
 		`No vendor binary at ${whisperCliSource} — embedded whisper-cli will be null`,
 	);
+	if (requireWhisperCli) {
+		console.error(`Required whisper-cli binary missing for ${platformKey}`);
+		process.exit(1);
+	}
 }
 
 const generatedFile = join(GENERATED_DIR, 'embedded-rg.ts');

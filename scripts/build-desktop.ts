@@ -32,7 +32,6 @@ const PLATFORMS = {
 	'darwin-x64': 'bun-darwin-x64',
 	'linux-x64': 'bun-linux-x64',
 	'linux-arm64': 'bun-linux-arm64',
-	'windows-x64': 'bun-windows-x64',
 } as const;
 
 function detectPlatform(): keyof typeof PLATFORMS {
@@ -43,7 +42,6 @@ function detectPlatform(): keyof typeof PLATFORMS {
 	if (os === 'darwin' && arch === 'x64') return 'darwin-x64';
 	if (os === 'linux' && arch === 'x64') return 'linux-x64';
 	if (os === 'linux' && arch === 'arm64') return 'linux-arm64';
-	if (os === 'win32' && arch === 'x64') return 'windows-x64';
 
 	throw new Error(`Unsupported platform: ${os}-${arch}`);
 }
@@ -93,7 +91,8 @@ async function buildCliBinary(platform: keyof typeof PLATFORMS) {
 	const target = PLATFORMS[platform];
 	const outfile = join(CLI_DIR, 'dist', `otto-${platform}`);
 
-	await $`cd ${CLI_DIR} && bun run prebuild`;
+	await $`cd ${CLI_DIR} && bun run ../../scripts/build-web.ts`;
+	await $`cd ${CLI_DIR} && bun run ../../scripts/prepare-embedded-bins.ts ${platform}`;
 	await $`cd ${CLI_DIR} && bun build --compile --minify --target=${target} ./index.ts --outfile ${outfile}`;
 
 	return outfile;
@@ -106,13 +105,9 @@ async function copyBinaryToDesktop(binaryPath: string, platform: string) {
 		mkdirSync(BINARIES_DIR, { recursive: true });
 	}
 
-	const isWin = platform.startsWith('windows');
-	const destPath = join(BINARIES_DIR, `otto-${platform}${isWin ? '.exe' : ''}`);
+	const destPath = join(BINARIES_DIR, `otto-${platform}`);
 	copyFileSync(binaryPath, destPath);
-
-	if (process.platform !== 'win32') {
-		await $`chmod +x ${destPath}`;
-	}
+	await $`chmod +x ${destPath}`;
 
 	console.log(`   ✅ Copied to ${destPath}`);
 	return destPath;
@@ -174,9 +169,6 @@ async function main() {
 			);
 			console.log(
 				'   macOS App:    apps/desktop/src-tauri/target/release/bundle/macos/',
-			);
-			console.log(
-				'   Windows MSI:  apps/desktop/src-tauri/target/release/bundle/msi/',
 			);
 			console.log(
 				'   Linux:        apps/desktop/src-tauri/target/release/bundle/appimage/',

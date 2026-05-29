@@ -6,6 +6,7 @@ WHISPER_CPP_VERSION="v1.8.5"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VENDOR_BIN="$ROOT/vendor/bin"
+REQUESTED_PLATFORMS=("$@")
 
 PLATFORMS=(
   "darwin-arm64:aarch64-apple-darwin"
@@ -15,9 +16,27 @@ PLATFORMS=(
   "windows-x64:x86_64-pc-windows-msvc"
 )
 
+platform_requested() {
+  local platform="$1"
+  if [[ ${#REQUESTED_PLATFORMS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  for requested in "${REQUESTED_PLATFORMS[@]}"; do
+    if [[ "$requested" == "$platform" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 echo "=== Downloading vendor binaries ==="
 echo "ripgrep v${RIPGREP_VERSION}"
 echo "whisper.cpp ${WHISPER_CPP_VERSION}"
+if [[ ${#REQUESTED_PLATFORMS[@]} -gt 0 ]]; then
+  echo "platforms ${REQUESTED_PLATFORMS[*]}"
+fi
 echo ""
 
 detect_host_platform() {
@@ -79,6 +98,10 @@ for entry in "${PLATFORMS[@]}"; do
   PLATFORM="${entry%%:*}"
   RG_TARGET="${entry##*:}"
 
+  if ! platform_requested "$PLATFORM"; then
+    continue
+  fi
+
   DIR="$VENDOR_BIN/$PLATFORM"
   mkdir -p "$DIR"
 
@@ -120,6 +143,11 @@ HOST_PLATFORM="$(detect_host_platform)"
 
 for entry in "${PLATFORMS[@]}"; do
   PLATFORM="${entry%%:*}"
+
+  if ! platform_requested "$PLATFORM"; then
+    continue
+  fi
+
   DIR="$VENDOR_BIN/$PLATFORM"
   mkdir -p "$DIR"
 
