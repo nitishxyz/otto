@@ -100,12 +100,12 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Chat',
 	},
 	{
-		keys: ['Fn', 'hold'],
+		keys: ['Globe', 'hold'],
 		description: 'Record voice while held',
 		category: 'Chat',
 	},
 	{
-		keys: ['Fn', 'Fn'],
+		keys: ['Globe', 'Globe'],
 		description: 'Toggle hands-free voice recording',
 		category: 'Chat',
 	},

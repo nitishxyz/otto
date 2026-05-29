@@ -55,10 +55,12 @@ import { DictationInstallPrompt } from './DictationInstallPrompt';
 
 const VOICE_SHORTCUT_DOUBLE_PRESS_WINDOW_MS = 280;
 
-function isFunctionKeyEvent(event: KeyboardEvent): boolean {
+function isGlobeKeyEvent(event: KeyboardEvent): boolean {
 	return (
+		event.key === 'Globe' ||
 		event.key === 'Fn' ||
 		event.key === 'Function' ||
+		event.code === 'Globe' ||
 		event.code === 'Fn' ||
 		event.code === 'Function'
 	);
@@ -290,6 +292,7 @@ export const ChatInput = memo(
 		const { status: dictationStatus } = useDictationModels();
 
 		const voiceBaseTextRef = useRef('');
+		const shouldFocusAfterDictationRef = useRef(false);
 		const {
 			isListening,
 			isTranscribing,
@@ -311,9 +314,18 @@ export const ChatInput = memo(
 				}
 
 				setMessage(nextMessage);
+				if (isFinal) {
+					shouldFocusAfterDictationRef.current = true;
+				}
 			},
 		});
 		const isVoiceActive = isListening || isTranscribing;
+
+		useEffect(() => {
+			if (isVoiceActive || !shouldFocusAfterDictationRef.current) return;
+			shouldFocusAfterDictationRef.current = false;
+			textareaRef.current?.focus({ preventScroll: true });
+		}, [isVoiceActive]);
 
 		const defaultDictationModel = dictationStatus?.models.find(
 			(model) => model.id === dictationStatus.defaultModel,
@@ -474,21 +486,21 @@ export const ChatInput = memo(
 			};
 
 			const handleKeyDown = (event: KeyboardEvent) => {
-				const isFnShortcut = isFunctionKeyEvent(event);
+				const isGlobeShortcut = isGlobeKeyEvent(event);
 				const isWebShortcut = isWebVoiceShortcutDown(event);
-				if (!isFnShortcut && !isWebShortcut) return;
+				if (!isGlobeShortcut && !isWebShortcut) return;
 
 				event.preventDefault();
 				event.stopPropagation();
 
 				if (event.repeat) return;
-				startShortcutPress(isFnShortcut ? 'fn' : 'web');
+				startShortcutPress(isGlobeShortcut ? 'fn' : 'web');
 			};
 
 			const handleKeyUp = (event: KeyboardEvent) => {
 				const shortcutKind = voiceShortcutKindRef.current;
 				const isCurrentShortcut =
-					(shortcutKind === 'fn' && isFunctionKeyEvent(event)) ||
+					(shortcutKind === 'fn' && isGlobeKeyEvent(event)) ||
 					(shortcutKind === 'web' && isWebVoiceShortcutUp(event));
 				if (!isCurrentShortcut) return;
 
