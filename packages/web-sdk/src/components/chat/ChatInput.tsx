@@ -20,8 +20,11 @@ import {
 	FileIcon,
 	FlaskConical,
 	ChevronUp,
+	Mic,
+	Square,
 } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
+import { LiveWaveform } from './LiveWaveform';
 import { FileMentionPopup } from './FileMentionPopup';
 import { SkillMentionPopup } from './SkillMentionPopup';
 import { CommandSuggestionsPopup } from './CommandSuggestionsPopup';
@@ -32,6 +35,7 @@ import { useSkills } from '../../hooks/useSkills';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
 import { useVimMode } from '../../hooks/useVimMode';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
 import { useSkillMention } from '../../hooks/useSkillMention';
 import { useCommandSuggestions } from '../../hooks/useCommandSuggestions';
@@ -219,6 +223,38 @@ export const ChatInput = memo(
 			setMessage,
 		});
 
+		const voiceBaseTextRef = useRef('');
+		const {
+			isListening,
+			isSupported: voiceSupported,
+			analyser,
+			start: startVoice,
+			stop: stopVoice,
+		} = useVoiceInput({
+			onTranscript: (transcript) => {
+				const base = voiceBaseTextRef.current;
+				const sep = base && !/\s$/.test(base) ? ' ' : '';
+				setMessage(transcript ? `${base}${sep}${transcript}` : base);
+			},
+		});
+
+		const handleStartVoice = useCallback(() => {
+			voiceBaseTextRef.current = message;
+			void startVoice();
+		}, [message, startVoice]);
+
+		const handleStopVoice = useCallback(() => {
+			stopVoice();
+			textareaRef.current?.focus();
+		}, [stopVoice]);
+
+		// Stop recording if the input unmounts (e.g. session switch).
+		useEffect(() => {
+			return () => {
+				stopVoice();
+			};
+		}, [stopVoice]);
+
 		useEffect(() => {
 			textareaRef.current?.focus();
 		}, []);
@@ -246,10 +282,10 @@ export const ChatInput = memo(
 			textarea.style.height = `${textarea.scrollHeight}px`;
 		}, []);
 
-		// biome-ignore lint/correctness/useExhaustiveDependencies: message dependency required for adjusting textarea height on content change
+		// biome-ignore lint/correctness/useExhaustiveDependencies: message and isListening intentionally trigger resizing when content changes or the textarea remounts after voice input
 		useEffect(() => {
 			adjustTextareaHeight();
-		}, [adjustTextareaHeight, message]);
+		}, [adjustTextareaHeight, message, isListening]);
 
 		const handleMentionClose = useCallback(() => {
 			setShowFileMention(false);
@@ -521,274 +557,328 @@ export const ChatInput = memo(
 						)}
 						<div
 							className={`relative z-10 flex flex-col rounded-3xl p-1 transition-all touch-manipulation ${
-								isPlanMode
-									? 'bg-slate-100 dark:bg-slate-900/40 border border-slate-300 dark:border-slate-700 focus-within:border-slate-400 dark:focus-within:border-slate-600 focus-within:ring-1 focus-within:ring-slate-300 dark:focus-within:ring-slate-700'
-									: 'bg-card border border-border focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40'
+								isListening
+									? 'bg-transparent border border-transparent'
+									: isPlanMode
+										? 'bg-slate-100 dark:bg-slate-900/40 border border-slate-300 dark:border-slate-700 focus-within:border-slate-400 dark:focus-within:border-slate-600 focus-within:ring-1 focus-within:ring-slate-300 dark:focus-within:ring-slate-700'
+										: 'bg-card border border-border focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40'
 							}`}
 						>
-							{showCommandSuggestions && (
-								<CommandSuggestionsPopup
-									query={commandQuery}
-									selectedIndex={commandSelectedIndex}
-									onSelect={handleCommandSelect}
-									onEnterSelect={handleCommandEnterSelect}
-									onClose={handleCommandClose}
-									sessionId={sessionId}
-								/>
-							)}
-
-							{showSkillMention && (
-								<SkillMentionPopup
-									skills={skillSummaries}
-									query={skillMentionQuery}
-									selectedIndex={skillMentionSelectedIndex}
-									onSelect={handleSkillMentionSelect}
-									onEnterSelect={handleSkillEnterSelect}
-									onClose={handleSkillMentionClose}
-								/>
-							)}
-
-							{hasFiles && (
-								<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-									{images.map((img) => (
+							{isListening ? (
+								<>
+									<div className="flex items-end gap-1">
 										<div
-											key={img.id}
-											className="relative group w-12 h-12 rounded-lg overflow-hidden bg-muted"
+											className="flex-1 min-w-0 text-primary"
+											style={{ height: '2.5rem' }}
 										>
-											{img.preview ? (
-												<img
-													src={img.preview}
-													alt="Attachment"
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<div className="w-full h-full flex items-center justify-center">
-													<ImageIcon className="w-5 h-5 text-muted-foreground" />
-												</div>
-											)}
-											{img.uploadStatus !== 'ready' && (
-												<div className="absolute inset-0 flex items-end justify-center bg-black/45 pb-0.5">
-													<span className="text-[9px] font-medium text-white">
-														{img.uploadStatus === 'uploading'
-															? 'uploading'
-															: 'failed'}
-													</span>
-												</div>
-											)}
-											<button
-												type="button"
-												onClick={() => onFileRemove?.(img.id)}
-												className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-											>
-												<X className="w-3 h-3 text-white" />
-											</button>
+											<LiveWaveform
+												active
+												analyser={analyser}
+												height="2.5rem"
+											/>
 										</div>
-									))}
-									{documents.map((doc) => (
-										<div
-											key={doc.id}
-											className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted max-w-[200px]"
+										<button
+											type="button"
+											onClick={handleStopVoice}
+											className="flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation bg-red-500 hover:bg-red-500/90 active:bg-red-500/80 text-white"
+											aria-label="Stop recording"
 										>
-											{doc.type === 'pdf' || doc.type === 'binary' ? (
-												<FileIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
-											) : (
-												<FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
-											)}
-											<span className="text-xs truncate">
-												{doc.name}
-												{doc.uploadStatus === 'uploading' ? ' · uploading' : ''}
-												{doc.uploadStatus === 'failed' ? ' · failed' : ''}
-											</span>
-											<button
-												type="button"
-												onClick={() => onFileRemove?.(doc.id)}
-												className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-											>
-												<X className="w-3 h-3 text-white" />
-											</button>
+											<Square className="w-3.5 h-3.5 fill-current" />
+										</button>
+									</div>
+									{/* Invisible spacer matching the settings/meta row so the
+								    waveform stays aligned with the textarea position. */}
+									<div aria-hidden className="invisible mt-1 px-3">
+										<div className="px-2 py-0.5 text-[10px] leading-none">
+											&nbsp;
 										</div>
-									))}
-								</div>
-							)}
+									</div>
+								</>
+							) : (
+								<>
+									{showCommandSuggestions && (
+										<CommandSuggestionsPopup
+											query={commandQuery}
+											selectedIndex={commandSelectedIndex}
+											onSelect={handleCommandSelect}
+											onEnterSelect={handleCommandEnterSelect}
+											onClose={handleCommandClose}
+											sessionId={sessionId}
+										/>
+									)}
 
-							{researchContexts.length > 0 && (
-								<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-									{researchContexts.map((ctx) => (
-										<div
-											key={ctx.id}
-											className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 border border-teal-500/30 max-w-[200px]"
-										>
-											<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
-											<span className="text-xs truncate text-teal-600 dark:text-teal-400">
-												{ctx.label}
-											</span>
-											{onResearchContextRemove && (
-												<button
-													type="button"
-													onClick={() => onResearchContextRemove(ctx.id)}
-													className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+									{showSkillMention && (
+										<SkillMentionPopup
+											skills={skillSummaries}
+											query={skillMentionQuery}
+											selectedIndex={skillMentionSelectedIndex}
+											onSelect={handleSkillMentionSelect}
+											onEnterSelect={handleSkillEnterSelect}
+											onClose={handleSkillMentionClose}
+										/>
+									)}
+
+									{hasFiles && (
+										<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+											{images.map((img) => (
+												<div
+													key={img.id}
+													className="relative group w-12 h-12 rounded-lg overflow-hidden bg-muted"
 												>
-													<X className="w-3 h-3 text-white" />
-												</button>
-											)}
-										</div>
-									))}
-								</div>
-							)}
-
-							<div className="flex items-end gap-1">
-								{onConfigClick && (
-									<button
-										type="button"
-										onClick={onConfigClick}
-										className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-background/50 active:bg-background/70 transition-colors text-muted-foreground hover:text-foreground flex-shrink-0 touch-manipulation"
-									>
-										<MoreVertical className="w-4 h-4" />
-									</button>
-								)}
-								<Textarea
-									ref={textareaRef}
-									value={message}
-									onChange={handleChange}
-									onKeyDown={handleKeyDown}
-									onPaste={handleTextareaPaste}
-									placeholder={
-										isPlanMode
-											? 'Plan mode - Type a message...'
-											: 'Type a message...'
-									}
-									disabled={disabled}
-									rows={1}
-									className={`border-0 bg-transparent pl-1 pr-2 py-2 max-h-[200px] overflow-y-auto leading-normal resize-none scrollbar-hide text-base ${
-										preferences.vimMode && vimMode === 'normal'
-											? 'caret-[6px]'
-											: ''
-									}`}
-									style={{ height: '2.5rem' }}
-								/>
-								<button
-									type="button"
-									onClick={handleSend}
-									disabled={disabled || (!message.trim() && !hasFiles)}
-									className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation ${
-										message.trim() || hasFiles
-											? 'bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground'
-											: 'bg-transparent text-muted-foreground'
-									}`}
-								>
-									<ArrowUp className="w-4 h-4" />
-								</button>
-							</div>
-						</div>
-
-						<div
-							className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-								reasoningEnabled ||
-								visionEnabled ||
-								modelName ||
-								providerName ||
-								authType ||
-								agent
-									? 'grid-rows-[1fr]'
-									: 'grid-rows-[0fr]'
-							}`}
-						>
-							<div
-								className={
-									showAgentDropdown ? 'overflow-visible' : 'overflow-hidden'
-								}
-							>
-								<div className="grid grid-cols-[auto_1fr_auto] items-center mt-1 px-3">
-									<div
-										className="justify-self-start flex-shrink-0 relative"
-										ref={agentDropdownRef}
-									>
-										{agent && agents.length > 0 && (
-											<button
-												type="button"
-												onClick={() => setShowAgentDropdown(!showAgentDropdown)}
-												className="text-[10px] text-muted-foreground flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer"
-											>
-												<span className="uppercase font-medium">{agent}</span>
-												<ChevronUp
-													className={`h-2.5 w-2.5 transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`}
-												/>
-											</button>
-										)}
-										{showAgentDropdown && (
-											<div className="absolute bottom-full left-0 mb-1 min-w-[120px] bg-popover border border-border rounded-md shadow-lg overflow-hidden z-50">
-												{agents.map((a) => (
+													{img.preview ? (
+														<img
+															src={img.preview}
+															alt="Attachment"
+															className="w-full h-full object-cover"
+														/>
+													) : (
+														<div className="w-full h-full flex items-center justify-center">
+															<ImageIcon className="w-5 h-5 text-muted-foreground" />
+														</div>
+													)}
+													{img.uploadStatus !== 'ready' && (
+														<div className="absolute inset-0 flex items-end justify-center bg-black/45 pb-0.5">
+															<span className="text-[9px] font-medium text-white">
+																{img.uploadStatus === 'uploading'
+																	? 'uploading'
+																	: 'failed'}
+															</span>
+														</div>
+													)}
 													<button
-														key={a}
 														type="button"
-														onClick={() => {
-															onAgentChange?.(a);
-															setShowAgentDropdown(false);
-														}}
-														className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent ${a === agent ? 'text-foreground font-medium bg-accent/50' : 'text-muted-foreground'}`}
+														onClick={() => onFileRemove?.(img.id)}
+														className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
 													>
-														{a}
+														<X className="w-3 h-3 text-white" />
 													</button>
-												))}
-											</div>
+												</div>
+											))}
+											{documents.map((doc) => (
+												<div
+													key={doc.id}
+													className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted max-w-[200px]"
+												>
+													{doc.type === 'pdf' || doc.type === 'binary' ? (
+														<FileIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
+													) : (
+														<FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+													)}
+													<span className="text-xs truncate">
+														{doc.name}
+														{doc.uploadStatus === 'uploading'
+															? ' · uploading'
+															: ''}
+														{doc.uploadStatus === 'failed' ? ' · failed' : ''}
+													</span>
+													<button
+														type="button"
+														onClick={() => onFileRemove?.(doc.id)}
+														className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+													>
+														<X className="w-3 h-3 text-white" />
+													</button>
+												</div>
+											))}
+										</div>
+									)}
+
+									{researchContexts.length > 0 && (
+										<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+											{researchContexts.map((ctx) => (
+												<div
+													key={ctx.id}
+													className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 border border-teal-500/30 max-w-[200px]"
+												>
+													<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
+													<span className="text-xs truncate text-teal-600 dark:text-teal-400">
+														{ctx.label}
+													</span>
+													{onResearchContextRemove && (
+														<button
+															type="button"
+															onClick={() => onResearchContextRemove(ctx.id)}
+															className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+														>
+															<X className="w-3 h-3 text-white" />
+														</button>
+													)}
+												</div>
+											))}
+										</div>
+									)}
+
+									<div className="flex items-end gap-1">
+										{onConfigClick && (
+											<button
+												type="button"
+												onClick={onConfigClick}
+												className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-background/50 active:bg-background/70 transition-colors text-muted-foreground hover:text-foreground flex-shrink-0 touch-manipulation"
+											>
+												<MoreVertical className="w-4 h-4" />
+											</button>
+										)}
+										<Textarea
+											ref={textareaRef}
+											value={message}
+											onChange={handleChange}
+											onKeyDown={handleKeyDown}
+											onPaste={handleTextareaPaste}
+											placeholder={
+												isPlanMode
+													? 'Plan mode - Type a message...'
+													: 'Type a message...'
+											}
+											disabled={disabled}
+											rows={1}
+											className={`border-0 bg-transparent pl-1 pr-2 py-2 max-h-[200px] overflow-y-auto leading-normal resize-none scrollbar-hide text-base ${
+												preferences.vimMode && vimMode === 'normal'
+													? 'caret-[6px]'
+													: ''
+											}`}
+											style={{ height: '2.5rem' }}
+										/>
+										{message.trim() || hasFiles || !voiceSupported ? (
+											<button
+												type="button"
+												onClick={handleSend}
+												disabled={disabled || (!message.trim() && !hasFiles)}
+												className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation ${
+													message.trim() || hasFiles
+														? 'bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground'
+														: 'bg-transparent text-muted-foreground'
+												}`}
+											>
+												<ArrowUp className="w-4 h-4" />
+											</button>
+										) : (
+											<button
+												type="button"
+												onClick={handleStartVoice}
+												disabled={disabled}
+												className="flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation bg-transparent text-muted-foreground hover:text-foreground hover:bg-background/50 active:bg-background/70"
+												aria-label="Start voice input"
+											>
+												<Mic className="w-4 h-4" />
+											</button>
 										)}
 									</div>
-									<div className="justify-self-center">
-										{(providerName || modelName || authType) && (
-											<div className="text-[10px] text-muted-foreground flex items-center gap-1 px-2 py-0.5">
+								</>
+							)}
+						</div>
+
+						{!isListening && (
+							<div
+								className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+									reasoningEnabled ||
+									visionEnabled ||
+									modelName ||
+									providerName ||
+									authType ||
+									agent
+										? 'grid-rows-[1fr]'
+										: 'grid-rows-[0fr]'
+								}`}
+							>
+								<div
+									className={
+										showAgentDropdown ? 'overflow-visible' : 'overflow-hidden'
+									}
+								>
+									<div className="grid grid-cols-[auto_1fr_auto] items-center mt-1 px-3">
+										<div
+											className="justify-self-start flex-shrink-0 relative"
+											ref={agentDropdownRef}
+										>
+											{agent && agents.length > 0 && (
 												<button
 													type="button"
-													onClick={onModelInfoClick}
-													className="flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer"
+													onClick={() =>
+														setShowAgentDropdown(!showAgentDropdown)
+													}
+													className="text-[10px] text-muted-foreground flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer"
 												>
-													{providerName && (
-														<>
-															<ProviderLogo
-																provider={providerName}
-																size={12}
-																className="opacity-70"
-															/>
-															<span className="opacity-40">/</span>
-														</>
-													)}
-													{modelName && <span>{modelName}</span>}
-													{isCustomProvider && (
-														<span className="opacity-50">(custom)</span>
-													)}
-													{authType && authType === 'oauth' && (
-														<span className="opacity-50">(pro)</span>
-													)}
-													{isSetu && setuPlanLabel && (
-														<span className="opacity-50">
-															({setuPlanLabel.toLowerCase()})
-														</span>
-													)}
-													{isFreeModel && (
-														<span className="opacity-50">(free)</span>
-													)}
+													<span className="uppercase font-medium">{agent}</span>
+													<ChevronUp
+														className={`h-2.5 w-2.5 transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`}
+													/>
 												</button>
-											</div>
-										)}
-									</div>
-									<div className="justify-self-end flex-shrink-0 flex items-center gap-2">
-										{reasoningEnabled && (
-											<span className="text-[10px] text-indigo-600 dark:text-indigo-300 flex items-center gap-1 w-[52px] justify-center">
-												<Brain className="h-3 w-3 flex-shrink-0" />
-												{(
-													configData?.defaults?.reasoningLevel ?? 'high'
-												).replace('xhigh', 'x-high')}
-											</span>
-										)}
-										{visionEnabled && (
-											<span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-												<ImageIcon className="h-3 w-3" />
-												images
-											</span>
-										)}
+											)}
+											{showAgentDropdown && (
+												<div className="absolute bottom-full left-0 mb-1 min-w-[120px] bg-popover border border-border rounded-md shadow-lg overflow-hidden z-50">
+													{agents.map((a) => (
+														<button
+															key={a}
+															type="button"
+															onClick={() => {
+																onAgentChange?.(a);
+																setShowAgentDropdown(false);
+															}}
+															className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-accent ${a === agent ? 'text-foreground font-medium bg-accent/50' : 'text-muted-foreground'}`}
+														>
+															{a}
+														</button>
+													))}
+												</div>
+											)}
+										</div>
+										<div className="justify-self-center">
+											{(providerName || modelName || authType) && (
+												<div className="text-[10px] text-muted-foreground flex items-center gap-1 px-2 py-0.5">
+													<button
+														type="button"
+														onClick={onModelInfoClick}
+														className="flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer"
+													>
+														{providerName && (
+															<>
+																<ProviderLogo
+																	provider={providerName}
+																	size={12}
+																	className="opacity-70"
+																/>
+																<span className="opacity-40">/</span>
+															</>
+														)}
+														{modelName && <span>{modelName}</span>}
+														{isCustomProvider && (
+															<span className="opacity-50">(custom)</span>
+														)}
+														{authType && authType === 'oauth' && (
+															<span className="opacity-50">(pro)</span>
+														)}
+														{isSetu && setuPlanLabel && (
+															<span className="opacity-50">
+																({setuPlanLabel.toLowerCase()})
+															</span>
+														)}
+														{isFreeModel && (
+															<span className="opacity-50">(free)</span>
+														)}
+													</button>
+												</div>
+											)}
+										</div>
+										<div className="justify-self-end flex-shrink-0 flex items-center gap-2">
+											{reasoningEnabled && (
+												<span className="text-[10px] text-indigo-600 dark:text-indigo-300 flex items-center gap-1 w-[52px] justify-center">
+													<Brain className="h-3 w-3 flex-shrink-0" />
+													{(
+														configData?.defaults?.reasoningLevel ?? 'high'
+													).replace('xhigh', 'x-high')}
+												</span>
+											)}
+											{visionEnabled && (
+												<span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+													<ImageIcon className="h-3 w-3" />
+													images
+												</span>
+											)}
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
+						)}
 
 						{showFileMention && !filesLoading && (
 							<FileMentionPopup

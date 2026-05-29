@@ -13,6 +13,7 @@ export * from './ui/StableSpinner';
 // Chat Components
 export * from './chat/ChatInput';
 export * from './chat/ChatInputContainer';
+export * from './chat/LiveWaveform';
 export * from './chat/ConfigModal';
 export * from './chat/ConfigSelector';
 export * from './chat/InputQueueBar';
