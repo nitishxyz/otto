@@ -43,7 +43,7 @@ export const Sidebar = memo(function Sidebar({
 	return (
 		<>
 			<aside
-				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-screen md:h-auto w-full ${
+				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-[var(--app-height,100dvh)] md:h-auto w-full ${
 					isCollapsed
 						? 'hidden md:flex md:w-12 border-border bg-background'
 						: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
@@ -87,7 +87,7 @@ export const Sidebar = memo(function Sidebar({
 				) : (
 					<>
 						<div className="flex h-full w-full md:w-[var(--expanded-sidebar-width)] flex-col min-w-0 relative">
-							<div className="h-14 border-b border-sidebar-border px-4 flex items-center gap-2 md:hidden bg-sidebar">
+							<div className="h-[calc(var(--mobile-safe-area-top)+3.5rem)] border-b border-sidebar-border px-4 pt-[var(--mobile-safe-area-top)] flex items-center gap-2 md:hidden bg-sidebar">
 								<Button
 									variant="ghost"
 									size="icon"

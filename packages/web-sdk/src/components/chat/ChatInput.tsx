@@ -495,7 +495,7 @@ export const ChatInput = memo(
 							</div>
 						);
 					})()}
-				<div className="absolute bottom-0 left-0 right-0 pt-16 pb-5 md:pb-6 px-2 md:px-4 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20 safe-area-inset-bottom">
+				<div className="absolute bottom-0 left-0 right-0 px-2 pt-16 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20">
 					<div className={inputWidthClass}>
 						{preferences.vimMode && vimMode === 'normal' && (
 							<div className="absolute -top-6 right-0 px-2 py-0.5 text-xs font-mono font-semibold bg-amber-500/90 text-white rounded shadow-sm">

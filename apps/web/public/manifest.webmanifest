@@ -1,0 +1,20 @@
+{
+	"name": "otto",
+	"short_name": "otto",
+	"description": "Hosted otto web app for connecting to shared local sessions.",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"display_override": ["standalone", "browser"],
+	"background_color": "#141416",
+	"theme_color": "#141416",
+	"orientation": "portrait-primary",
+	"icons": [
+		{
+			"src": "/pwa-icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any maskable"
+		}
+	]
+}
