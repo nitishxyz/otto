@@ -46,7 +46,6 @@ export function registerOttoRouterCommand(program: Command) {
 				network?: string;
 				rpcUrl?: string;
 				ottorouterUrl?: string;
-				setuUrl?: string;
 			};
 
 			if (!wallet.configured || !wallet.publicKey) {
@@ -61,7 +60,7 @@ export function registerOttoRouterCommand(program: Command) {
 			const publicKey = wallet.publicKey;
 			const network = wallet.network ?? 'unknown';
 			const rpcUrl = wallet.rpcUrl ?? '';
-			const ottorouterUrl = wallet.ottorouterUrl ?? wallet.setuUrl ?? '';
+			const ottorouterUrl = wallet.ottorouterUrl ?? '';
 
 			const networkLabel =
 				network === 'mainnet'

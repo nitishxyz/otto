@@ -94,7 +94,7 @@ Sent once after opening the socket.
 ```json
 {
   "type": "start",
-  "model": "small.en-q5_0",
+  "model": "small.en-q5_1",
   "language": "en",
   "format": {
     "encoding": "pcm_s16le",
@@ -148,7 +148,7 @@ At 16 kHz mono PCM16, bandwidth is about 32 KB/s. This is acceptable for local a
 {
   "type": "ready",
   "sessionId": "dict_...",
-  "model": "small.en-q5_0",
+  "model": "small.en-q5_1",
   "format": {
     "encoding": "pcm_s16le",
     "sampleRate": 16000,
@@ -188,7 +188,7 @@ Optional. Not required for v1.
   "type": "final",
   "text": "Open the file and explain the error.",
   "language": "en",
-  "model": "small.en-q5_0",
+  "model": "small.en-q5_1",
   "durationMs": 4200
 }
 ```
@@ -397,14 +397,15 @@ type DictationModel = {
 Recommended default:
 
 ```text
-small.en-q5_0
+small.en-q5_1
 ```
 
 Also expose:
 
 ```text
-base.en-q5_0       fast English
-small.en-q5_0      balanced English, recommended
+tiny.en-q5_1       fastest English
+base.en-q5_1       fast English
+small.en-q5_1      balanced English, recommended
 large-v3-turbo-q5_0 accurate multilingual, optional
 ```
 
@@ -417,6 +418,56 @@ Install flow:
 5. report install state.
 
 Model files should not be bundled into the otto binary.
+
+## Phase 4.5 — Model download UI
+
+Outcome: users can understand, install, inspect, and remove local dictation models without needing to trigger recording first.
+
+There should be two entry points for model installation:
+
+1. first-use prompt from the chat input when a user starts recording and no usable model is installed,
+2. a persistent settings surface for managing dictation models manually.
+
+Recommended UI surfaces:
+
+```text
+Settings modal
+  -> Dictation / Voice section
+    -> Local dictation status
+    -> Installed model
+    -> Available models
+    -> Download / Pause / Retry / Remove actions
+```
+
+The first-use flow should be lightweight:
+
+```text
+user clicks mic
+  -> server reports DICTATION_MODEL_MISSING
+  -> client shows "Download local dictation model?"
+  -> user confirms
+  -> model download progress is shown
+  -> recording starts or user clicks mic again
+```
+
+The settings flow should support proactive model management:
+
+- show whether local dictation is available on this machine,
+- show installed model and disk usage,
+- show recommended default model,
+- allow downloading other models,
+- allow removing installed models,
+- show download progress and checksum/verification state,
+- show clear errors for failed downloads or unsupported platforms.
+
+Suggested web-sdk files:
+
+```text
+packages/web-sdk/src/components/settings/DictationSettings.tsx
+packages/web-sdk/src/hooks/useDictationModels.ts
+```
+
+The client should still remain dumb. The UI should call server APIs for status, model list, installation, and removal; it should not know about model file paths or whisper.cpp internals.
 
 ## Phase 5 — Embed whisper.cpp runtime
 
@@ -621,7 +672,7 @@ Optional commands:
 ```bash
 otto dictation status
 otto dictation models
-otto dictation install small.en-q5_0
+otto dictation install small.en-q5_1
 otto dictation transcribe ./sample.wav
 ```
 

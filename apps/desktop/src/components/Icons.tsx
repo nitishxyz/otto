@@ -1,4 +1,4 @@
-export const SetuLogo = ({ size = 22 }: { size?: number }) => {
+export const OttoLogo = ({ size = 22 }: { size?: number }) => {
 	const height = Math.round(size * 0.65);
 	const width = Math.round(height * (748 / 303));
 	return (

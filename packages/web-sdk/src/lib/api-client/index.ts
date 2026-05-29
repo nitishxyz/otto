@@ -8,8 +8,21 @@ import { ottorouterMixin } from './ottorouter';
 import { authMixin } from './auth';
 import { skillsMixin } from './skills';
 import { usageMixin } from './usage';
+import { dictationMixin } from './dictation';
 
 export { configureApiClient } from './utils';
+export type {
+	CreateDictationSessionInput,
+	CreateDictationSessionResponse,
+	DictationModelInstallEvent,
+	DictationModelInstallStatus,
+	DictationModelState,
+	DictationModelsResponse,
+	DictationStatusResponse,
+	InstallDictationModelInput,
+	InstallDictationModelResponse,
+	RemoveDictationModelResponse,
+} from './dictation';
 
 class ApiClient {
 	getSessions = sessionsMixin.getSessions;
@@ -116,6 +129,14 @@ class ApiClient {
 
 	getUsageStats = usageMixin.getUsageStats;
 	getGlobalUsageStats = usageMixin.getGlobalUsageStats;
+
+	getDictationStatus = dictationMixin.getDictationStatus;
+	listDictationModels = dictationMixin.listDictationModels;
+	installDictationModel = dictationMixin.installDictationModel;
+	removeDictationModel = dictationMixin.removeDictationModel;
+	createDictationSession = dictationMixin.createDictationSession;
+	getDictationModelInstallEventsUrl =
+		dictationMixin.getDictationModelInstallEventsUrl;
 }
 
 export const apiClient = new ApiClient();

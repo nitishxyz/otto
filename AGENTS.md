@@ -75,8 +75,8 @@ When you need schema/database changes:
 ## AI SDK and Agents
 
 - Use AI SDK v5 APIs (`generateText`, `streamText`, `generateObject`, `streamObject`, `tool`, `embed`, `rerank`)
-- Support provider switching via SDK (OpenAI, Anthropic, Google, OpenRouter, OpenCode, Setu)
-- Setu uses Solana wallet auth — store the base58 private key with `otto auth login setu` or via `OTTOROUTER_PRIVATE_KEY`
+- Support provider switching via SDK (OpenAI, Anthropic, Google, OpenRouter, OpenCode, OttoRouter)
+- OttoRouter uses Solana wallet auth — store the base58 private key with `otto auth login ottorouter` or via `OTTOROUTER_PRIVATE_KEY`
 - Agents and tools are modular
 - Load defaults from `packages/sdk/src/tools/`
 - Allow project overrides under `.otto/`

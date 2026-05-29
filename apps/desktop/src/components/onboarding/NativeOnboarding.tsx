@@ -4,7 +4,7 @@ import { useServer } from '../../hooks/useServer';
 import { usePlatform } from '../../hooks/usePlatform';
 import { handleTitleBarDrag } from '../../utils/title-bar';
 import { tauriOnboarding } from '../../lib/tauri-onboarding';
-import { SetuLoader } from '../SetuLoader';
+import { OttoRouterLoader } from '../OttoRouterLoader';
 import { WindowControls } from '../WindowControls';
 import {
 	OnboardingModal,
@@ -161,7 +161,7 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 	if (!serverReady) {
 		return (
 			<div className="min-h-screen flex flex-col items-center justify-center gap-4">
-				<SetuLoader
+				<OttoRouterLoader
 					label={
 						serverError
 							? serverError
@@ -221,7 +221,7 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 				)}
 				{!isOpen && onboardingLoading && (
 					<div className="flex items-center justify-center min-h-[60vh]">
-						<SetuLoader label="Loading..." />
+						<OttoRouterLoader label="Loading..." />
 					</div>
 				)}
 			</div>

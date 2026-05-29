@@ -100,6 +100,26 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Chat',
 	},
 	{
+		keys: ['Fn', 'hold'],
+		description: 'Record voice while held',
+		category: 'Chat',
+	},
+	{
+		keys: ['Fn', 'Fn'],
+		description: 'Toggle hands-free voice recording',
+		category: 'Chat',
+	},
+	{
+		keys: ['Ctrl/Option', 'Space'],
+		description: 'Record voice while held (web)',
+		category: 'Chat',
+	},
+	{
+		keys: ['Ctrl/Option', 'Space', 'twice'],
+		description: 'Toggle hands-free voice recording (web)',
+		category: 'Chat',
+	},
+	{
 		keys: ['@'],
 		description: 'Mention file (opens file picker)',
 		category: 'Chat',

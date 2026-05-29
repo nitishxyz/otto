@@ -36,7 +36,7 @@ describe('bearer auth request flow', () => {
 		let tokenExchangeCount = 0;
 		const ottorouterFetch = createOttoRouterFetch({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async (input, init) => {
 				const url = String(input);
 				const headers = new Headers(init?.headers);
@@ -53,9 +53,15 @@ describe('bearer auth request flow', () => {
 		});
 
 		await Promise.all([
-			ottorouterFetch('https://setu.test/v1/messages', { method: 'POST' }),
-			ottorouterFetch('https://setu.test/v1/messages', { method: 'POST' }),
-			ottorouterFetch('https://setu.test/v1/messages', { method: 'POST' }),
+			ottorouterFetch('https://ottorouter.test/v1/messages', {
+				method: 'POST',
+			}),
+			ottorouterFetch('https://ottorouter.test/v1/messages', {
+				method: 'POST',
+			}),
+			ottorouterFetch('https://ottorouter.test/v1/messages', {
+				method: 'POST',
+			}),
 		]);
 
 		expect(tokenExchangeCount).toBe(1);
@@ -77,7 +83,7 @@ describe('bearer auth request flow', () => {
 		let apiCount = 0;
 		const ottorouterFetch = createOttoRouterFetch({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async (input, init) => {
 				const url = String(input);
 				const headers = new Headers(init?.headers);
@@ -96,9 +102,12 @@ describe('bearer auth request flow', () => {
 			},
 		});
 
-		const response = await ottorouterFetch('https://setu.test/v1/messages', {
-			method: 'POST',
-		});
+		const response = await ottorouterFetch(
+			'https://ottorouter.test/v1/messages',
+			{
+				method: 'POST',
+			},
+		);
 
 		expect(response.status).toBe(200);
 		expect(tokenExchangeCount).toBe(2);
@@ -124,7 +133,7 @@ describe('bearer auth request flow', () => {
 			});
 		}) as typeof fetch;
 
-		const balance = await fetchBalance(wallet, 'https://setu.test');
+		const balance = await fetchBalance(wallet, 'https://ottorouter.test');
 		expect(balance?.walletAddress).toBe(walletAddress);
 		expect(balance?.balance).toBe(12.5);
 

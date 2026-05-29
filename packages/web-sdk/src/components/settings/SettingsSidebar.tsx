@@ -1,5 +1,6 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import {
 	Settings,
 	ChevronRight,
@@ -15,8 +16,9 @@ import {
 	Check,
 	Key,
 	Type,
-	Sparkles,
+	Brain,
 	BarChart3,
+	Mic,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
@@ -34,6 +36,7 @@ import {
 import { usePreferences } from '../../hooks/usePreferences';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { OttoRouterTopupModal } from './OttoRouterTopupModal';
+import { DictationSettings } from './DictationSettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -44,6 +47,7 @@ import {
 	listPlatformSystemFonts,
 	isPlatformDesktop,
 } from '../../lib/platform';
+import { ReasoningTabs, type ReasoningLevel } from '../chat/ReasoningTabs';
 
 const SETTINGS_PANEL_KEY = 'settings';
 const SETTINGS_DEFAULT_WIDTH = 320;
@@ -170,24 +174,31 @@ interface ToggleRowProps {
 	label: string;
 	checked: boolean;
 	onChange: (checked: boolean) => void;
+	description?: string;
 }
 
 const ToggleRow = memo(function ToggleRow({
 	label,
 	checked,
 	onChange,
+	description,
 }: ToggleRowProps) {
 	return (
-		<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
-			<span className="min-w-0 flex-1 truncate text-muted-foreground">
-				{label}
-			</span>
+		<div className="flex min-w-0 items-center justify-between gap-4 py-2 text-sm">
+			<div className="min-w-0 flex-1">
+				<div className="truncate font-medium text-foreground">{label}</div>
+				{description ? (
+					<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+						{description}
+					</p>
+				) : null}
+			</div>
 			<button
 				type="button"
 				role="switch"
 				aria-checked={checked}
 				onClick={() => onChange(!checked)}
-				className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+				className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-background ${
 					checked ? 'bg-primary' : 'bg-muted'
 				}`}
 			>
@@ -207,6 +218,7 @@ interface SelectRowProps {
 	options: Array<{ id: string; label: string }>;
 	onChange: (value: string) => void;
 	disabled?: boolean;
+	description?: string;
 }
 
 const SelectRow = memo(function SelectRow({
@@ -215,6 +227,7 @@ const SelectRow = memo(function SelectRow({
 	options,
 	onChange,
 	disabled,
+	description,
 }: SelectRowProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [menuStyle, setMenuStyle] = useState<{
@@ -247,15 +260,30 @@ const SelectRow = memo(function SelectRow({
 	}, [isOpen]);
 
 	return (
-		<div className="flex items-center justify-between text-sm">
-			<span className="text-muted-foreground">{label}</span>
-			<div className="relative">
+		<div className="flex items-center justify-between gap-4 text-sm">
+			<div className="min-w-0 flex-1">
+				<span
+					className={
+						description
+							? 'font-medium text-foreground'
+							: 'text-muted-foreground'
+					}
+				>
+					{label}
+				</span>
+				{description ? (
+					<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+						{description}
+					</p>
+				) : null}
+			</div>
+			<div className="relative shrink-0">
 				<button
 					ref={buttonRef}
 					type="button"
 					onClick={() => !disabled && setIsOpen(!isOpen)}
 					disabled={disabled}
-					className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted hover:bg-muted/80 rounded border border-border disabled:opacity-50"
+					className="flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted hover:bg-muted/80 rounded border border-border transition-colors disabled:opacity-50"
 				>
 					<span className="max-w-[120px] truncate">
 						{selectedOption?.label || value || 'Select...'}
@@ -549,136 +577,265 @@ interface PreferencesModalProps {
 	onClose: () => void;
 }
 
+type PreferencesTab = 'editor' | 'automation' | 'reasoning' | 'dictation';
+
+const PREFERENCE_TABS: Array<{
+	id: PreferencesTab;
+	label: string;
+	description: string;
+	icon: React.ReactNode;
+}> = [
+	{
+		id: 'editor',
+		label: 'Editor',
+		description: 'Input, layout, and appearance',
+		icon: <Type className="h-4 w-4" />,
+	},
+	{
+		id: 'automation',
+		label: 'Automation',
+		description: 'Tool approvals and auto-compaction',
+		icon: <Zap className="h-4 w-4" />,
+	},
+	{
+		id: 'reasoning',
+		label: 'Reasoning',
+		description: 'Model thinking and effort level',
+		icon: <Brain className="h-4 w-4" />,
+	},
+	{
+		id: 'dictation',
+		label: 'Dictation',
+		description: 'Voice input and local models',
+		icon: <Mic className="h-4 w-4" />,
+	},
+];
+
 function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	const { data: config } = useConfig();
 	const { preferences, updatePreferences } = usePreferences();
 	const updateDefaults = useUpdateDefaults();
 	const isDesktop = isPlatformDesktop();
+	const [activeTab, setActiveTab] = useState<PreferencesTab>('editor');
+	const activeTabConfig = PREFERENCE_TABS.find((tab) => tab.id === activeTab);
+
+	const renderActiveTab = () => {
+		switch (activeTab) {
+			case 'editor':
+				return (
+					<div className="divide-y divide-border/60">
+						<ToggleRow
+							label="Vim Mode"
+							description="Use modal keybindings in the chat input."
+							checked={preferences.vimMode}
+							onChange={(checked) => updatePreferences({ vimMode: checked })}
+						/>
+						<ToggleRow
+							label="Compact Thread"
+							description="Reduce spacing between messages for a denser view."
+							checked={preferences.compactThread}
+							onChange={(checked) =>
+								updatePreferences({ compactThread: checked })
+							}
+						/>
+						<ToggleRow
+							label="Full Width Content"
+							description="Let messages span the full width of the window."
+							checked={preferences.fullWidthContent}
+							onChange={(checked) =>
+								updatePreferences({ fullWidthContent: checked })
+							}
+						/>
+						{isDesktop ? (
+							<ToggleRow
+								label="Smart Sidebar Edges"
+								description="Snap sidebars to window edges automatically."
+								checked={preferences.smartEdges}
+								onChange={(checked) =>
+									updatePreferences({ smartEdges: checked })
+								}
+							/>
+						) : null}
+						<div className="py-2">
+							<FontPickerRow
+								value={preferences.fontFamily}
+								onChange={(fontFamily) => updatePreferences({ fontFamily })}
+							/>
+						</div>
+					</div>
+				);
+			case 'automation':
+				return (
+					<div className="divide-y divide-border/60">
+						<div className="py-2">
+							<NumberInputRow
+								label="Auto Compact"
+								value={config?.defaults?.autoCompactThresholdTokens}
+								onCommit={(value) =>
+									updateDefaults.mutate({
+										autoCompactThresholdTokens: value,
+										scope: 'global',
+									})
+								}
+								placeholder="Tokens"
+								hint="Summarize the thread once it grows past this many tokens."
+								disabled={updateDefaults.isPending}
+							/>
+						</div>
+						<div className="py-2">
+							<SelectRow
+								label="Tool Approval"
+								description="Choose which tool calls require manual confirmation."
+								value={config?.defaults?.toolApproval ?? 'dangerous'}
+								options={[
+									{ id: 'auto', label: 'Auto' },
+									{ id: 'dangerous', label: 'Dangerous only' },
+									{ id: 'yolo', label: 'YOLO' },
+									{ id: 'all', label: 'All tools' },
+								]}
+								onChange={(value) =>
+									updateDefaults.mutate({
+										toolApproval: value as
+											| 'auto'
+											| 'dangerous'
+											| 'all'
+											| 'yolo',
+										scope: 'global',
+									})
+								}
+								disabled={updateDefaults.isPending}
+							/>
+						</div>
+						<ToggleRow
+							label="Guided Mode"
+							description="Walk through steps with extra prompts and checkpoints."
+							checked={config?.defaults?.guidedMode ?? false}
+							onChange={(checked) =>
+								updateDefaults.mutate({
+									guidedMode: checked,
+									scope: 'global',
+								})
+							}
+						/>
+					</div>
+				);
+			case 'reasoning':
+				return (
+					<div className="divide-y divide-border/60">
+						<ToggleRow
+							label="Show Reasoning"
+							description="Display the model's thinking alongside responses."
+							checked={config?.defaults?.reasoningText ?? true}
+							onChange={(checked) =>
+								updateDefaults.mutate({
+									reasoningText: checked,
+									scope: 'global',
+								})
+							}
+						/>
+						<div className="space-y-2.5 py-3">
+							<div>
+								<div className="text-sm font-medium text-foreground">
+									Reasoning Level
+								</div>
+								<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+									Higher levels think longer but cost more tokens.
+								</p>
+							</div>
+							<ReasoningTabs
+								value={
+									(config?.defaults?.reasoningLevel ?? 'high') as ReasoningLevel
+								}
+								onChange={(level) =>
+									updateDefaults.mutate({
+										reasoningLevel: level,
+										scope: 'global',
+									})
+								}
+								disabled={updateDefaults.isPending}
+							/>
+						</div>
+					</div>
+				);
+			case 'dictation':
+				return (
+					<div className="divide-y divide-border/60">
+						<ToggleRow
+							label="Release to Send"
+							description="Send the message automatically when dictation ends."
+							checked={preferences.releaseToSend}
+							onChange={(checked) =>
+								updatePreferences({ releaseToSend: checked })
+							}
+						/>
+						<div className="pt-3">
+							<DictationSettings embedded />
+						</div>
+					</div>
+				);
+		}
+	};
 
 	return (
-		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="lg">
-			<div className="-m-6">
-				<SettingsSection
-					title="Editor"
-					icon={<Type className="w-4 h-4 text-muted-foreground" />}
-				>
-					<ToggleRow
-						label="Vim Mode"
-						checked={preferences.vimMode}
-						onChange={(checked) => updatePreferences({ vimMode: checked })}
-					/>
-					<ToggleRow
-						label="Compact Thread"
-						checked={preferences.compactThread}
-						onChange={(checked) =>
-							updatePreferences({ compactThread: checked })
-						}
-					/>
-					<ToggleRow
-						label="Full Width Content"
-						checked={preferences.fullWidthContent}
-						onChange={(checked) =>
-							updatePreferences({ fullWidthContent: checked })
-						}
-					/>
-					{isDesktop ? (
-						<ToggleRow
-							label="Smart Sidebar Edges"
-							checked={preferences.smartEdges}
-							onChange={(checked) => updatePreferences({ smartEdges: checked })}
-						/>
-					) : null}
-					<FontPickerRow
-						value={preferences.fontFamily}
-						onChange={(fontFamily) => updatePreferences({ fontFamily })}
-					/>
-				</SettingsSection>
+		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="4xl">
+			<div className="-m-6 flex h-[clamp(420px,70vh,560px)] overflow-hidden">
+				<nav className="flex w-48 shrink-0 flex-col border-r border-border bg-muted/20 py-1">
+					{PREFERENCE_TABS.map((tab) => {
+						const isActive = activeTab === tab.id;
+						return (
+							<button
+								key={tab.id}
+								type="button"
+								onClick={() => setActiveTab(tab.id)}
+								className={`relative flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+									isActive
+										? 'bg-background text-foreground'
+										: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+								}`}
+							>
+								{isActive ? (
+									<motion.span
+										layoutId="preferences-tab-indicator"
+										className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary"
+										transition={{ duration: 0.2, ease: 'easeOut' }}
+									/>
+								) : null}
+								<span
+									className={
+										isActive ? 'text-foreground' : 'text-muted-foreground'
+									}
+								>
+									{tab.icon}
+								</span>
+								<span className="text-sm font-medium">{tab.label}</span>
+							</button>
+						);
+					})}
+				</nav>
 
-				<SettingsSection
-					title="Automation"
-					icon={<Zap className="w-4 h-4 text-muted-foreground" />}
-				>
-					<NumberInputRow
-						label="Auto Compact"
-						value={config?.defaults?.autoCompactThresholdTokens}
-						onCommit={(value) =>
-							updateDefaults.mutate({
-								autoCompactThresholdTokens: value,
-								scope: 'global',
-							})
-						}
-						placeholder="Tokens"
-						disabled={updateDefaults.isPending}
-					/>
-					<SelectRow
-						label="Tool Approval"
-						value={config?.defaults?.toolApproval ?? 'dangerous'}
-						options={[
-							{ id: 'auto', label: 'Auto (no approval)' },
-							{ id: 'dangerous', label: 'Dangerous only' },
-							{ id: 'yolo', label: 'YOLO (hard blocks only)' },
-							{ id: 'all', label: 'All tools' },
-						]}
-						onChange={(value) =>
-							updateDefaults.mutate({
-								toolApproval: value as 'auto' | 'dangerous' | 'all' | 'yolo',
-								scope: 'global',
-							})
-						}
-						disabled={updateDefaults.isPending}
-					/>
-					<ToggleRow
-						label="Guided Mode"
-						checked={config?.defaults?.guidedMode ?? false}
-						onChange={(checked) =>
-							updateDefaults.mutate({
-								guidedMode: checked,
-								scope: 'global',
-							})
-						}
-					/>
-				</SettingsSection>
-
-				<SettingsSection
-					title="Reasoning"
-					icon={<Sparkles className="w-4 h-4 text-muted-foreground" />}
-				>
-					<ToggleRow
-						label="Show Reasoning"
-						checked={config?.defaults?.reasoningText ?? true}
-						onChange={(checked) =>
-							updateDefaults.mutate({
-								reasoningText: checked,
-								scope: 'global',
-							})
-						}
-					/>
-					<SelectRow
-						label="Reasoning Level"
-						value={config?.defaults?.reasoningLevel ?? 'high'}
-						options={[
-							{ id: 'minimal', label: 'Minimal' },
-							{ id: 'low', label: 'Low' },
-							{ id: 'medium', label: 'Medium' },
-							{ id: 'high', label: 'High' },
-							{ id: 'max', label: 'Max' },
-							{ id: 'xhigh', label: 'Extra High' },
-						]}
-						onChange={(value) =>
-							updateDefaults.mutate({
-								reasoningLevel: value as
-									| 'minimal'
-									| 'low'
-									| 'medium'
-									| 'high'
-									| 'max'
-									| 'xhigh',
-								scope: 'global',
-							})
-						}
-						disabled={updateDefaults.isPending}
-					/>
-				</SettingsSection>
+				<section className="flex min-w-0 flex-1 flex-col">
+					<div className="shrink-0 border-b border-border px-6 py-4">
+						<h2 className="text-base font-semibold text-foreground">
+							{activeTabConfig?.label}
+						</h2>
+						<p className="mt-0.5 text-xs text-muted-foreground">
+							{activeTabConfig?.description}
+						</p>
+					</div>
+					<div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
+						<AnimatePresence mode="wait">
+							<motion.div
+								key={activeTab}
+								initial={{ opacity: 0, y: 6 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: -6 }}
+								transition={{ duration: 0.15, ease: 'easeOut' }}
+							>
+								{renderActiveTab()}
+							</motion.div>
+						</AnimatePresence>
+					</div>
+				</section>
 			</div>
 		</Modal>
 	);
@@ -716,9 +873,9 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	// Handle topup success callback from Polar checkout redirect
 	useTopupCallback();
 
-	const hasSetu = config?.providers?.includes('ottorouter');
-	const { fetchBalance: refreshSetuBalance } = useOttoRouterBalance(
-		hasSetu ? 'ottorouter' : undefined,
+	const hasOttoRouter = config?.providers?.includes('ottorouter');
+	const { fetchBalance: refreshOttoRouterBalance } = useOttoRouterBalance(
+		hasOttoRouter ? 'ottorouter' : undefined,
 	);
 
 	const setOnboardingOpen = useOnboardingStore((s) => s.setOpen);
@@ -726,7 +883,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	const setManageMode = useOnboardingStore((s) => s.setManageMode);
 	const { fetchAuthStatus } = useAuthStatus();
 
-	const exportSetuPrivateKey = useCallback(async () => {
+	const exportOttoRouterPrivateKey = useCallback(async () => {
 		return await apiClient.exportOttoRouterWallet();
 	}, []);
 
@@ -852,14 +1009,14 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 					</SettingsSection>
 
 					{config?.providers?.includes('ottorouter') && (
-						<SetuWalletSection
+						<OttoRouterWalletSection
 							ottorouterWallet={ottorouterWallet}
 							ottorouterBalance={ottorouterBalance}
 							ottorouterUsdcBalance={ottorouterUsdcBalance}
 							ottorouterLoading={ottorouterLoading}
-							refreshSetuBalance={refreshSetuBalance}
+							refreshOttoRouterBalance={refreshOttoRouterBalance}
 							openTopupModal={openTopupModal}
-							onExportPrivateKey={exportSetuPrivateKey}
+							onExportPrivateKey={exportOttoRouterPrivateKey}
 						/>
 					)}
 
@@ -913,7 +1070,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	);
 });
 
-function SetuSubscriptionInfo() {
+function OttoRouterSubscriptionInfo() {
 	const subscription = useOttoRouterStore((s) => s.subscription);
 	const payg = useOttoRouterStore((s) => s.payg);
 
@@ -956,12 +1113,12 @@ function SetuSubscriptionInfo() {
 	);
 }
 
-interface SetuWalletSectionProps {
+interface OttoRouterWalletSectionProps {
 	ottorouterWallet: string | null;
 	ottorouterBalance: number | null;
 	ottorouterUsdcBalance: number | null;
 	ottorouterLoading: boolean;
-	refreshSetuBalance: () => void;
+	refreshOttoRouterBalance: () => void;
 	openTopupModal: () => void;
 	onExportPrivateKey: () => Promise<{
 		success: boolean;
@@ -970,15 +1127,15 @@ interface SetuWalletSectionProps {
 	}>;
 }
 
-const SetuWalletSection = memo(function SetuWalletSection({
+const OttoRouterWalletSection = memo(function OttoRouterWalletSection({
 	ottorouterWallet,
 	ottorouterBalance,
 	ottorouterUsdcBalance,
 	ottorouterLoading,
-	refreshSetuBalance,
+	refreshOttoRouterBalance,
 	openTopupModal,
 	onExportPrivateKey,
-}: SetuWalletSectionProps) {
+}: OttoRouterWalletSectionProps) {
 	const hasActiveSubscription = useOttoRouterStore(
 		(s) => !!s.subscription?.active,
 	);
@@ -1050,12 +1207,12 @@ const SetuWalletSection = memo(function SetuWalletSection({
 
 	return (
 		<SettingsSection
-			title="Setu Credits"
+			title="OttoRouter Credits"
 			icon={<Wallet className="w-4 h-4 text-muted-foreground" />}
 			action={
 				<button
 					type="button"
-					onClick={refreshSetuBalance}
+					onClick={refreshOttoRouterBalance}
 					disabled={ottorouterLoading}
 					className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
 					title="Refresh balances"
@@ -1100,7 +1257,7 @@ const SetuWalletSection = memo(function SetuWalletSection({
 							)}
 						</button>
 					</div>
-					<SetuSubscriptionInfo />
+					<OttoRouterSubscriptionInfo />
 					{!hasActiveSubscription && (
 						<>
 							<SettingRow
@@ -1157,12 +1314,14 @@ const SetuWalletSection = memo(function SetuWalletSection({
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<Key className="w-5 h-5 text-muted-foreground" />
-							<h3 className="text-lg font-semibold">Export Setu Private Key</h3>
+							<h3 className="text-lg font-semibold">
+								Export OttoRouter Private Key
+							</h3>
 						</div>
 						<div className="p-6">
 							<p className="text-sm text-muted-foreground mb-4">
 								Keep this private key secret. Anyone with this key can spend
-								funds from your Setu wallet.
+								funds from your OttoRouter wallet.
 							</p>
 
 							{isExportingPrivateKey && (

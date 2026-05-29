@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { colors, font } from '../theme';
 
-const SetuBolt: React.FC<{ size: number; color: string }> = ({
+const OttoRouterBolt: React.FC<{ size: number; color: string }> = ({
 	size,
 	color,
 }) => (
@@ -192,7 +192,7 @@ export const OttoRouter: React.FC = () => {
 							position: 'relative',
 						}}
 					>
-						<SetuBolt size={130} color={colors.accent} />
+						<OttoRouterBolt size={130} color={colors.accent} />
 					</div>
 				</div>
 

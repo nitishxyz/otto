@@ -29,6 +29,7 @@ import { registerSkillsRoutes } from './routes/skills.ts';
 import { registerUsageRoutes } from './routes/usage.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
+import { registerDictationRoutes } from './routes/dictation.ts';
 import type { AgentConfigEntry } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
 
@@ -112,6 +113,7 @@ function initApp() {
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);
+	registerDictationRoutes(app);
 
 	return app;
 }
@@ -190,6 +192,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	registerUsageRoutes(honoApp);
 	registerAttachmentRoutes(honoApp);
 	registerSimulatorRoutes(honoApp);
+	registerDictationRoutes(honoApp);
 
 	return honoApp;
 }
@@ -224,6 +227,12 @@ export type EmbeddedAppConfig = {
 		model?: string;
 		agent?: string;
 		toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
+		theme?: 'light' | 'dark';
+		vimMode?: boolean;
+		compactThread?: boolean;
+		fontFamily?: string;
+		smartEdges?: boolean;
+		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		autoCompactThresholdTokens?: number | null;
 	};
@@ -306,6 +315,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	registerUsageRoutes(honoApp);
 	registerAttachmentRoutes(honoApp);
 	registerSimulatorRoutes(honoApp);
+	registerDictationRoutes(honoApp);
 
 	return honoApp;
 }

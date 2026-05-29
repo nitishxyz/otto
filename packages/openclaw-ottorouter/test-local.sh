@@ -42,12 +42,12 @@ echo ""
 
 # Step 6: Test completion
 echo "6. Testing completion (expect 402 if unfunded):"
-HTTP_CODE=$(curl -s -o /tmp/setu-test-resp.json -w "%{http_code}" \
+HTTP_CODE=$(curl -s -o /tmp/ottorouter-test-resp.json -w "%{http_code}" \
   -X POST http://localhost:8403/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"Say hello in one word"}],"max_tokens":10}')
 echo "   HTTP $HTTP_CODE"
-cat /tmp/setu-test-resp.json | python3 -m json.tool 2>/dev/null | head -20 || true
+cat /tmp/ottorouter-test-resp.json | python3 -m json.tool 2>/dev/null | head -20 || true
 echo ""
 
 # Cleanup

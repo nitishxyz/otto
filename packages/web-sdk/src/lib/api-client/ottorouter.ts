@@ -1,7 +1,7 @@
 import {
-	getOttoRouterBalance as apiGetSetuBalance,
-	getOttoRouterWallet as apiGetSetuWallet,
-	getOttoRouterUsdcBalance as apiGetSetuUsdcBalance,
+	getOttoRouterBalance as apiGetOttoRouterBalance,
+	getOttoRouterWallet as apiGetOttoRouterWallet,
+	getOttoRouterUsdcBalance as apiGetOttoRouterUsdcBalance,
 	createPolarCheckout as apiCreatePolarCheckout,
 	getPolarTopupEstimate as apiGetPolarTopupEstimate,
 	getPolarTopupStatus as apiGetPolarTopupStatus,
@@ -66,7 +66,7 @@ export const ottorouterMixin = {
 		} | null;
 	} | null> {
 		try {
-			const response = await apiGetSetuBalance();
+			const response = await apiGetOttoRouterBalance();
 			if (response.error) return null;
 			// biome-ignore lint/suspicious/noExplicitAny: API response structure
 			return response.data as any;
@@ -81,7 +81,7 @@ export const ottorouterMixin = {
 		error?: string;
 	}> {
 		try {
-			const response = await apiGetSetuWallet();
+			const response = await apiGetOttoRouterWallet();
 			if (response.error) return { configured: false };
 			// biome-ignore lint/suspicious/noExplicitAny: API response structure
 			return response.data as any;
@@ -98,7 +98,7 @@ export const ottorouterMixin = {
 		network: 'mainnet' | 'devnet';
 	} | null> {
 		try {
-			const response = await apiGetSetuUsdcBalance({
+			const response = await apiGetOttoRouterUsdcBalance({
 				query: { network },
 			});
 			if (response.error) return null;

@@ -12,7 +12,7 @@ import {
 import { NativeOnboarding } from './components/onboarding/NativeOnboarding';
 import { ProjectPicker } from './components/ProjectPicker';
 import { Workspace } from './components/Workspace';
-import { SetuLoader } from './components/SetuLoader';
+import { OttoRouterLoader } from './components/OttoRouterLoader';
 import type { Project } from './lib/tauri-bridge';
 import { DesktopThemeContext, type DesktopThemeContextValue } from './theme';
 
@@ -111,7 +111,7 @@ function RootRouteComponent() {
 	if (!initialized) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
-				<SetuLoader />
+				<OttoRouterLoader />
 			</div>
 		);
 	}

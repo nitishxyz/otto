@@ -7,6 +7,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { embeddedRg } from './generated/embedded-rg.ts';
+import { embeddedWhisperCli } from './generated/embedded-whisper-cli.ts';
 
 function getAgiBinDir(): string {
 	const cfgHome = process.env.XDG_CONFIG_HOME;
@@ -18,27 +19,32 @@ function getAgiBinDir(): string {
 const MIN_BINARY_SIZE = 100_000;
 
 export function bootstrapBinaries(): void {
-	if (!embeddedRg) return;
-
 	const binDir = getAgiBinDir();
 	const rgName = process.platform === 'win32' ? 'rg.exe' : 'rg';
-	const rgDest = join(binDir, rgName);
+	const whisperCliName =
+		process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
 
-	if (existsSync(rgDest)) return;
+	bootstrapBinary(embeddedRg, join(binDir, rgName));
+	bootstrapBinary(embeddedWhisperCli, join(binDir, whisperCliName));
+}
+
+function bootstrapBinary(embeddedPath: string | null, dest: string): void {
+	if (!embeddedPath || existsSync(dest)) return;
 
 	let buf: Buffer;
 	try {
-		buf = readFileSync(embeddedRg);
+		buf = readFileSync(embeddedPath);
 		if (buf.length < MIN_BINARY_SIZE) return;
 	} catch {
 		return;
 	}
 
 	try {
+		const binDir = getAgiBinDir();
 		mkdirSync(binDir, { recursive: true });
-		writeFileSync(rgDest, buf);
+		writeFileSync(dest, buf);
 		if (process.platform !== 'win32') {
-			chmodSync(rgDest, 0o755);
+			chmodSync(dest, 0o755);
 		}
 	} catch {}
 }

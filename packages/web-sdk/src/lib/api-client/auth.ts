@@ -1,8 +1,8 @@
 import {
 	getAuthStatus as apiGetAuthStatus,
-	setupOttoRouterWallet as apiSetupSetuWallet,
-	importOttoRouterWallet as apiImportSetuWallet,
-	exportOttoRouterWallet as apiExportSetuWallet,
+	setupOttoRouterWallet as apiSetupOttoRouterWallet,
+	importOttoRouterWallet as apiImportOttoRouterWallet,
+	exportOttoRouterWallet as apiExportOttoRouterWallet,
 	addProviderApiKey as apiAddProviderApiKey,
 	removeProvider as apiRemoveProvider,
 	completeOnboarding as apiCompleteOnboarding,
@@ -57,7 +57,7 @@ export const authMixin = {
 		publicKey: string;
 		isNew: boolean;
 	}> {
-		const response = await apiSetupSetuWallet();
+		const response = await apiSetupOttoRouterWallet();
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -67,7 +67,7 @@ export const authMixin = {
 		success: boolean;
 		publicKey: string;
 	}> {
-		const response = await apiImportSetuWallet({
+		const response = await apiImportOttoRouterWallet({
 			body: { privateKey },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
@@ -80,7 +80,7 @@ export const authMixin = {
 		publicKey: string;
 		privateKey: string;
 	}> {
-		const response = await apiExportSetuWallet();
+		const response = await apiExportOttoRouterWallet();
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;

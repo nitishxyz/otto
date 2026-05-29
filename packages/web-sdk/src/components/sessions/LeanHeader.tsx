@@ -101,9 +101,9 @@ export function LeanHeader({
 		session.provider,
 		providerAuthType,
 	);
-	const isSetu = session.provider === 'ottorouter';
-	useOttoRouterBalance(isSetu ? 'ottorouter' : undefined);
-	const setuUsage = useUsageStore((s) => s.usage.ottorouter);
+	const isOttoRouter = session.provider === 'ottorouter';
+	useOttoRouterBalance(isOttoRouter ? 'ottorouter' : undefined);
+	const ottorouterUsage = useUsageStore((s) => s.usage.ottorouter);
 
 	const rootRef = useRef<HTMLDivElement>(null);
 	const width = useContainerWidth(rootRef);
@@ -177,8 +177,8 @@ export function LeanHeader({
 							<UsageRing usage={usage} provider={session.provider} />
 						)}
 
-						{isSetu && setuUsage && (
-							<UsageRing usage={setuUsage} provider="ottorouter" />
+						{isOttoRouter && ottorouterUsage && (
+							<UsageRing usage={ottorouterUsage} provider="ottorouter" />
 						)}
 
 						<div className="flex items-center gap-2">

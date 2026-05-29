@@ -269,7 +269,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const prevTopupModalOpen = useRef(false);
 	const { fetchBalance } = useOttoRouterBalance('ottorouter');
 	const effectivePayg = payg?.effectiveSpendableUsd ?? balance ?? 0;
-	const setuStatusLabel = subscription?.active
+	const ottorouterStatusLabel = subscription?.active
 		? `GO ${(subscription.creditsRemaining ?? 0).toFixed(1)} credits`
 		: `$${effectivePayg.toFixed(2)}`;
 
@@ -923,7 +923,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 						<p className="text-lg text-muted-foreground max-w-2xl">
 							{manageMode
 								? 'Add or remove AI providers. Your changes are saved automatically.'
-								: 'Setu is your default AI provider. GO plan credits are applied automatically.'}
+								: 'OttoRouter is your default AI provider. GO plan credits are applied automatically.'}
 						</p>
 					</div>
 
@@ -934,11 +934,11 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 								{authStatus.ottorouter.configured &&
 								authStatus.ottorouter.publicKey ? (
 									<div className="flex flex-col h-full">
-										{/* Setu Default Provider Badge */}
+										{/* OttoRouter Default Provider Badge */}
 										<div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
 											<ProviderLogo provider="ottorouter" size={16} />
 											<span className="text-sm font-medium text-green-600 dark:text-green-400">
-												Setu
+												OttoRouter
 											</span>
 											<span className="text-xs text-green-600/60 dark:text-green-500/60 ml-auto">
 												Default Provider
@@ -973,7 +973,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 												<div className="flex items-center justify-between gap-2">
 													<div className="flex items-center gap-1.5 min-w-0">
 														<span className="font-mono text-xs sm:text-sm text-foreground truncate">
-															{setuStatusLabel}
+															{ottorouterStatusLabel}
 														</span>
 													</div>
 													<button
@@ -1031,7 +1031,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										<StableSpinner
 											size="xl"
 											className="text-muted-foreground"
-											title="Loading Setu wallet"
+											title="Loading OttoRouter wallet"
 										/>
 									</div>
 								)}
@@ -1518,12 +1518,14 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<ProviderLogo provider="ottorouter" size={24} />
-							<h3 className="text-lg font-semibold">Import Setu Wallet</h3>
+							<h3 className="text-lg font-semibold">
+								Import OttoRouter Wallet
+							</h3>
 						</div>
 						<div className="p-6">
 							<p className="text-sm text-muted-foreground mb-4">
 								Paste your base58 private key to replace the current wallet used
-								for Setu.
+								for OttoRouter.
 							</p>
 							<textarea
 								ref={importPrivateKeyRef}

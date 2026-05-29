@@ -39,7 +39,7 @@
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
 		"db:reset": "bun run scripts/reset-db.ts",
 		"catalog:update": "bun run scripts/update-catalog.ts",
-		"catalog:ottorouter": "bun run scripts/update-catalog.ts --setu",
+		"catalog:ottorouter": "bun run scripts/update-catalog.ts --ottorouter",
 		"compile": "bun run scripts/compile.ts",
 		"compile:verbose": "bun run scripts/compile.ts --verbose",
 		"build:bin:darwin-arm64": "bun run scripts/build-web.ts && mkdir -p dist && bun build --compile --minify --target=bun-darwin-arm64 ./apps/cli/index.ts --outfile dist/otto-darwin-arm64",

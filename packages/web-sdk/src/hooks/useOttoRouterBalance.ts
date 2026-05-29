@@ -25,21 +25,21 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 
 		setLoading(true);
 		try {
-			const [setuData, usdcData, walletData] = await Promise.all([
+			const [ottorouterData, usdcData, walletData] = await Promise.all([
 				apiClient.getOttoRouterBalance(),
 				apiClient.getOttoRouterUsdcBalance(network),
 				apiClient.getOttoRouterWallet(),
 			]);
 
-			if (setuData) {
-				setBalance(setuData.balance);
-				setWalletAddress(setuData.walletAddress);
-				setScope(setuData.scope ?? null);
-				setPayg(setuData.payg ?? null);
-				setSubscription(setuData.subscription ?? null);
-				setLimits(setuData.limits ?? null);
+			if (ottorouterData) {
+				setBalance(ottorouterData.balance);
+				setWalletAddress(ottorouterData.walletAddress);
+				setScope(ottorouterData.scope ?? null);
+				setPayg(ottorouterData.payg ?? null);
+				setSubscription(ottorouterData.subscription ?? null);
+				setLimits(ottorouterData.limits ?? null);
 
-				const sub = setuData.subscription;
+				const sub = ottorouterData.subscription;
 				if (sub?.active && sub.usageWindows) {
 					setUsage('ottorouter', {
 						provider: 'ottorouter',
@@ -63,7 +63,7 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 
 			if (usdcData) {
 				setUsdcBalance(usdcData.usdcBalance);
-				if (!setuData && usdcData.walletAddress) {
+				if (!ottorouterData && usdcData.walletAddress) {
 					setWalletAddress(usdcData.walletAddress);
 				}
 			}

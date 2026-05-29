@@ -47,12 +47,22 @@ const targetArg = process.argv[2];
 const platformKey = getPlatformKey(targetArg);
 const isWindows = platformKey.startsWith('windows');
 const rgName = isWindows ? 'rg.exe' : 'rg';
+const whisperCliName = isWindows ? 'whisper-cli.exe' : 'whisper-cli';
 
 const rgSource = join(VENDOR_BIN, platformKey, rgName);
 const rgDest = join(CLI_VENDOR, rgName);
+const whisperCliSource = join(VENDOR_BIN, platformKey, whisperCliName);
+const whisperCliDest = join(CLI_VENDOR, whisperCliName);
 
 mkdirSync(CLI_VENDOR, { recursive: true });
 mkdirSync(GENERATED_DIR, { recursive: true });
+
+function writeVendorAssetDeclaration(fileName: string, exportName: string) {
+	writeFileSync(
+		join(CLI_VENDOR, `${fileName}.d.ts`),
+		`declare const ${exportName}: string;\nexport default ${exportName};\n`,
+	);
+}
 
 async function ensureVendorRipgrep() {
 	if (existsSync(rgSource)) {
@@ -66,17 +76,43 @@ async function ensureVendorRipgrep() {
 	return existsSync(rgSource);
 }
 
+async function ensureVendorWhisperCli() {
+	if (existsSync(whisperCliSource)) {
+		return true;
+	}
+
+	console.log(
+		`Vendor whisper-cli missing for ${platformKey}; preparing vendor binaries...`,
+	);
+	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')}`;
+	return existsSync(whisperCliSource);
+}
+
 let hasRg = false;
+let hasWhisperCli = false;
 
 if (await ensureVendorRipgrep()) {
 	copyFileSync(rgSource, rgDest);
+	writeVendorAssetDeclaration(rgName, 'embeddedRgPath');
 	hasRg = true;
 	console.log(`Copied ${platformKey}/${rgName} to apps/cli/vendor/`);
 } else {
 	console.log(`No vendor binary at ${rgSource} — embedded rg will be null`);
 }
 
+if (await ensureVendorWhisperCli()) {
+	copyFileSync(whisperCliSource, whisperCliDest);
+	writeVendorAssetDeclaration(whisperCliName, 'embeddedWhisperCliPath');
+	hasWhisperCli = true;
+	console.log(`Copied ${platformKey}/${whisperCliName} to apps/cli/vendor/`);
+} else {
+	console.log(
+		`No vendor binary at ${whisperCliSource} — embedded whisper-cli will be null`,
+	);
+}
+
 const generatedFile = join(GENERATED_DIR, 'embedded-rg.ts');
+const generatedWhisperFile = join(GENERATED_DIR, 'embedded-whisper-cli.ts');
 
 if (hasRg) {
 	writeFileSync(
@@ -90,4 +126,18 @@ if (hasRg) {
 		`export const embeddedRg: string | null = null;\n`,
 	);
 	console.log('Generated embedded-rg.ts (null — no binary available)');
+}
+
+if (hasWhisperCli) {
+	writeFileSync(
+		generatedWhisperFile,
+		`import embeddedWhisperCliPath from '../../vendor/${whisperCliName}' with { type: 'file' };\nexport const embeddedWhisperCli: string | null = embeddedWhisperCliPath;\n`,
+	);
+	console.log('Generated embedded-whisper-cli.ts (with binary)');
+} else {
+	writeFileSync(
+		generatedWhisperFile,
+		`export const embeddedWhisperCli: string | null = null;\n`,
+	);
+	console.log('Generated embedded-whisper-cli.ts (null — no binary available)');
 }

@@ -38,6 +38,12 @@ export function useUpdateDefaults() {
 			guidedMode?: boolean;
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
+			theme?: 'light' | 'dark';
+			vimMode?: boolean;
+			compactThread?: boolean;
+			fontFamily?: string;
+			smartEdges?: boolean;
+			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			scope?: 'global' | 'local';

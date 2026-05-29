@@ -84,6 +84,12 @@ export async function writeDefaults(
 		reasoningText: boolean;
 		reasoningLevel: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 		theme: string;
+		vimMode: boolean;
+		compactThread: boolean;
+		fontFamily: string;
+		smartEdges: boolean;
+		releaseToSend: boolean;
+		fullWidthContent: boolean;
 		autoCompactThresholdTokens: number | null;
 	}>,
 	projectRoot?: string,

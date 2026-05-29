@@ -104,8 +104,8 @@ describe('provider base prompts', () => {
 		});
 	});
 
-	describe('aggregate provider family detection (setu)', () => {
-		it('detects openai family for setu gpt models', async () => {
+	describe('aggregate provider family detection (ottorouter)', () => {
+		it('detects openai family for OttoRouter gpt models', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'gpt-5-nano',
@@ -115,7 +115,7 @@ describe('provider base prompts', () => {
 			expect(result.prompt).toContain('coding agent');
 		});
 
-		it('detects anthropic family for setu claude models', async () => {
+		it('detects anthropic family for OttoRouter claude models', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'claude-3-5-haiku-latest',
@@ -125,7 +125,7 @@ describe('provider base prompts', () => {
 			expect(result.prompt).toContain('Claude');
 		});
 
-		it('detects moonshot family for setu kimi models', async () => {
+		it('detects moonshot family for OttoRouter kimi models', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'kimi-k2.5',
@@ -135,7 +135,7 @@ describe('provider base prompts', () => {
 			expect(result.prompt).toContain('Kimi');
 		});
 
-		it('detects moonshot family for kimi-k2-thinking via setu', async () => {
+		it('detects moonshot family for kimi-k2-thinking via OttoRouter', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'kimi-k2-thinking',

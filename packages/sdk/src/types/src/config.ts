@@ -31,6 +31,11 @@ export type DefaultConfig = {
 	reasoningText?: boolean;
 	reasoningLevel?: ReasoningLevel;
 	theme?: string;
+	vimMode?: boolean;
+	compactThread?: boolean;
+	fontFamily?: string;
+	smartEdges?: boolean;
+	releaseToSend?: boolean;
 	fullWidthContent?: boolean;
 	autoCompactThresholdTokens?: number | null;
 };

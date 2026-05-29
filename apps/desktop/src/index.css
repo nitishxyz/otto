@@ -366,7 +366,7 @@ button:focus-visible {
 	}
 }
 
-.setu-loader-ring {
+.ottorouter-loader-ring {
 	position: relative;
 	display: flex;
 	align-items: center;
@@ -375,7 +375,7 @@ button:focus-visible {
 	height: 72px;
 }
 
-.setu-loader-ring::before {
+.ottorouter-loader-ring::before {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -383,17 +383,17 @@ button:focus-visible {
 	border: 2px solid hsl(var(--muted));
 }
 
-.setu-loader-ring::after {
+.ottorouter-loader-ring::after {
 	content: "";
 	position: absolute;
 	inset: 0;
 	border-radius: 50%;
 	border: 2px solid transparent;
 	border-top-color: hsl(var(--foreground));
-	animation: setu-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	animation: ottorouter-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-@keyframes setu-spin {
+@keyframes ottorouter-spin {
 	to {
 		transform: rotate(360deg);
 	}

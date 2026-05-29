@@ -1,25 +1,16 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useConfig, useUpdateDefaults } from './useConfig';
 
 type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'otto-theme';
-
-function resolveInitialTheme(): Theme {
-	if (typeof window === 'undefined') {
-		return 'dark';
-	}
-	const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-	if (stored === 'light' || stored === 'dark') {
-		return stored;
-	}
-	if (window.matchMedia?.('(prefers-color-scheme: light)').matches) {
-		return 'light';
-	}
-	return 'dark';
+function normalizeTheme(theme: string | undefined): Theme {
+	return theme === 'light' ? 'light' : 'dark';
 }
 
 export function useTheme() {
-	const [theme, setTheme] = useState<Theme>(() => resolveInitialTheme());
+	const { data: config } = useConfig();
+	const updateDefaults = useUpdateDefaults();
+	const theme = normalizeTheme(config?.defaults?.theme);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
@@ -31,40 +22,25 @@ export function useTheme() {
 			root.classList.remove('dark');
 		}
 
-		try {
-			window.localStorage.setItem(STORAGE_KEY, theme);
-		} catch (error) {
-			console.warn('Failed to persist theme preference', error);
-		}
-
 		if (window.parent && window.parent !== window) {
 			window.parent.postMessage({ type: 'otto-set-theme', theme }, '*');
 		}
 	}, [theme]);
 
-	useEffect(() => {
-		if (typeof window === 'undefined') return;
-		const handler = (e: MessageEvent) => {
-			if (
-				e.data?.type === 'otto-set-theme' &&
-				(e.data.theme === 'light' || e.data.theme === 'dark')
-			) {
-				setTheme(e.data.theme);
-			}
-		};
-		window.addEventListener('message', handler);
-		return () => window.removeEventListener('message', handler);
-	}, []);
+	const setTheme = useCallback(
+		(nextTheme: Theme) => {
+			updateDefaults.mutate({ theme: nextTheme, scope: 'global' });
+		},
+		[updateDefaults],
+	);
 
-	// Memoize toggleTheme to prevent creating new function reference on every render
 	const toggleTheme = useCallback(() => {
-		setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-	}, []);
+		setTheme(theme === 'dark' ? 'light' : 'dark');
+	}, [setTheme, theme]);
 
-	// Return a stable object reference
 	return useMemo(
 		() => ({ theme, setTheme, toggleTheme }),
-		[theme, toggleTheme],
+		[theme, setTheme, toggleTheme],
 	);
 }
 

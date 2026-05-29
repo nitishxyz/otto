@@ -5,7 +5,7 @@ import { toast, useToastStore } from '../stores/toastStore';
 import { useOttoRouterStore } from '../stores/ottorouterStore';
 import { useTopupApprovalStore } from '../stores/topupApprovalStore';
 
-export function useSetuPayments(sessionId: string | undefined) {
+export function useOttoRouterPayments(sessionId: string | undefined) {
 	const clientRef = useRef<SSEClient | null>(null);
 	const loadingToastIdRef = useRef<string | null>(null);
 	const setBalance = useOttoRouterStore((s) => s.setBalance);

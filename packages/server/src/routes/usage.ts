@@ -104,7 +104,7 @@ function resolveAuthKind(
 	provider: string,
 	currentAuth: Awaited<ReturnType<typeof getAllAuth>>,
 ): AuthKind {
-	// OttoRouter / Setu is its own subscription/credits-based service.
+	// OttoRouter is its own subscription/credits-based service.
 	if (provider === 'ottorouter') return 'subscription';
 	// Copilot is subscription-based (GitHub Copilot)
 	if (provider === 'copilot') return 'subscription';

@@ -48,6 +48,25 @@ export function registerDefaultsRoute(app: Hono) {
 								model: {
 									type: 'string',
 								},
+								theme: {
+									type: 'string',
+									enum: ['light', 'dark'],
+								},
+								vimMode: {
+									type: 'boolean',
+								},
+								compactThread: {
+									type: 'boolean',
+								},
+								fontFamily: {
+									type: 'string',
+								},
+								smartEdges: {
+									type: 'boolean',
+								},
+								releaseToSend: {
+									type: 'boolean',
+								},
 								fullWidthContent: {
 									type: 'boolean',
 								},
@@ -95,6 +114,25 @@ export function registerDefaultsRoute(app: Hono) {
 											model: {
 												type: 'string',
 											},
+											theme: {
+												type: 'string',
+												enum: ['light', 'dark'],
+											},
+											vimMode: {
+												type: 'boolean',
+											},
+											compactThread: {
+												type: 'boolean',
+											},
+											fontFamily: {
+												type: 'string',
+											},
+											smartEdges: {
+												type: 'boolean',
+											},
+											releaseToSend: {
+												type: 'boolean',
+											},
 											fullWidthContent: {
 												type: 'boolean',
 											},
@@ -139,7 +177,12 @@ export function registerDefaultsRoute(app: Hono) {
 					guidedMode?: boolean;
 					reasoningText?: boolean;
 					reasoningLevel?: ReasoningLevel;
-					theme?: string;
+					theme?: 'light' | 'dark';
+					vimMode?: boolean;
+					compactThread?: boolean;
+					fontFamily?: string;
+					smartEdges?: boolean;
+					releaseToSend?: boolean;
 					fullWidthContent?: boolean;
 					autoCompactThresholdTokens?: number | null;
 					scope?: 'global' | 'local';
@@ -154,7 +197,12 @@ export function registerDefaultsRoute(app: Hono) {
 					guidedMode: boolean;
 					reasoningText: boolean;
 					reasoningLevel: ReasoningLevel;
-					theme: string;
+					theme: 'light' | 'dark';
+					vimMode: boolean;
+					compactThread: boolean;
+					fontFamily: string;
+					smartEdges: boolean;
+					releaseToSend: boolean;
 					fullWidthContent: boolean;
 					autoCompactThresholdTokens: number | null;
 				}> = {};
@@ -172,7 +220,19 @@ export function registerDefaultsRoute(app: Hono) {
 				if (body.reasoningText !== undefined)
 					updates.reasoningText = body.reasoningText;
 				if (body.reasoningLevel) updates.reasoningLevel = body.reasoningLevel;
-				if (body.theme) updates.theme = body.theme;
+				if (body.theme === 'light' || body.theme === 'dark') {
+					updates.theme = body.theme;
+				}
+				if (body.vimMode !== undefined) updates.vimMode = body.vimMode;
+				if (body.compactThread !== undefined)
+					updates.compactThread = body.compactThread;
+				if (body.fontFamily !== undefined) {
+					const fontFamily = body.fontFamily.trim();
+					if (fontFamily) updates.fontFamily = fontFamily;
+				}
+				if (body.smartEdges !== undefined) updates.smartEdges = body.smartEdges;
+				if (body.releaseToSend !== undefined)
+					updates.releaseToSend = body.releaseToSend;
 				if (body.fullWidthContent !== undefined)
 					updates.fullWidthContent = body.fullWidthContent;
 				if (body.autoCompactThresholdTokens !== undefined) {

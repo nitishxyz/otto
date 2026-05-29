@@ -99,7 +99,42 @@ export function registerMainConfigRoute(app: Hono) {
 					guidedMode: cfg.defaults.guidedMode ?? false,
 					reasoningText: cfg.defaults.reasoningText ?? true,
 					reasoningLevel: cfg.defaults.reasoningLevel ?? 'high',
-					theme: cfg.defaults.theme,
+					theme:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.theme,
+							cfg.defaults.theme,
+						) ?? 'dark',
+					vimMode:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.vimMode,
+							cfg.defaults.vimMode,
+						) ?? false,
+					compactThread:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.compactThread,
+							cfg.defaults.compactThread,
+						) ?? true,
+					fontFamily:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.fontFamily,
+							cfg.defaults.fontFamily,
+						) ?? 'IBM Plex Mono',
+					smartEdges:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.smartEdges,
+							cfg.defaults.smartEdges,
+						) ?? true,
+					releaseToSend:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.releaseToSend,
+							cfg.defaults.releaseToSend,
+						) ?? false,
 					fullWidthContent:
 						getDefault(
 							undefined,

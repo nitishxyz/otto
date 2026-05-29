@@ -34,6 +34,7 @@ import { useFiles } from '../../hooks/useFiles';
 import { useSkills } from '../../hooks/useSkills';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
+import { useDictationModels } from '../../hooks/useDictationModels';
 import { useVimMode } from '../../hooks/useVimMode';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
@@ -46,9 +47,38 @@ import {
 } from '../../lib/commands';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import type { FileAttachment } from '../../hooks/useFileUpload';
+import { StableSpinner } from '../ui/StableSpinner';
 import { InputApprovalBar } from './InputApprovalBar';
 import { InputQueueBar } from './InputQueueBar';
 import { InputTodosBar } from './InputTodosBar';
+import { DictationInstallPrompt } from './DictationInstallPrompt';
+
+const VOICE_SHORTCUT_DOUBLE_PRESS_WINDOW_MS = 280;
+
+function isFunctionKeyEvent(event: KeyboardEvent): boolean {
+	return (
+		event.key === 'Fn' ||
+		event.key === 'Function' ||
+		event.code === 'Fn' ||
+		event.code === 'Function'
+	);
+}
+
+function isWebVoiceShortcutDown(event: KeyboardEvent): boolean {
+	return event.code === 'Space' && (event.ctrlKey || event.altKey);
+}
+
+function isWebVoiceShortcutUp(event: KeyboardEvent): boolean {
+	return (
+		event.code === 'Space' ||
+		event.key === 'Control' ||
+		event.key === 'Alt' ||
+		event.code === 'ControlLeft' ||
+		event.code === 'ControlRight' ||
+		event.code === 'AltLeft' ||
+		event.code === 'AltRight'
+	);
+}
 
 interface ChatInputProps {
 	onSend: (message: string) => void;
@@ -117,7 +147,12 @@ export const ChatInput = memo(
 		const [message, setMessage] = useState('');
 		const [isPlanMode, setIsPlanMode] = useState(externalIsPlanMode || false);
 		const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+		const [showDictationInstallPrompt, setShowDictationInstallPrompt] =
+			useState(false);
 		const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+		const [voiceShortcutMode, setVoiceShortcutMode] = useState<
+			'hold' | 'latched' | null
+		>(null);
 		const textareaRef = useRef<HTMLTextAreaElement>(null);
 		const agentDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -125,15 +160,15 @@ export const ChatInput = memo(
 		const { data: configData } = useConfig();
 		const updateDefaultsMutation = useUpdateDefaults();
 
-		const setuSubscription = useOttoRouterStore((s) => s.subscription);
-		const isSetu = providerName === 'ottorouter';
-		const setuPlanLabel = useMemo(() => {
-			if (!isSetu) return null;
-			if (setuSubscription?.active) {
-				return setuSubscription.tierName ?? 'GO';
+		const ottorouterSubscription = useOttoRouterStore((s) => s.subscription);
+		const isOttoRouter = providerName === 'ottorouter';
+		const ottorouterPlanLabel = useMemo(() => {
+			if (!isOttoRouter) return null;
+			if (ottorouterSubscription?.active) {
+				return ottorouterSubscription.tierName ?? 'GO';
 			}
 			return null;
-		}, [isSetu, setuSubscription]);
+		}, [isOttoRouter, ottorouterSubscription]);
 
 		useEffect(() => {
 			if (!showAgentDropdown) return;
@@ -223,30 +258,270 @@ export const ChatInput = memo(
 			setMessage,
 		});
 
+		const resetComposer = useCallback(() => {
+			setMessage('');
+			setShowFileMention(false);
+			setShowSkillMention(false);
+			setShowCommandSuggestions(false);
+			setCurrentFileToSelect(undefined);
+			setCurrentSkillToSelect(undefined);
+			setCurrentCommandToSelect(undefined);
+
+			if (textareaRef.current) {
+				textareaRef.current.style.height = 'auto';
+			}
+
+			if (preferences.vimMode) {
+				setVimMode('normal');
+			}
+
+			textareaRef.current?.focus();
+		}, [
+			preferences.vimMode,
+			setShowFileMention,
+			setShowSkillMention,
+			setShowCommandSuggestions,
+			setCurrentFileToSelect,
+			setCurrentSkillToSelect,
+			setCurrentCommandToSelect,
+			setVimMode,
+		]);
+
+		const { status: dictationStatus } = useDictationModels();
+
 		const voiceBaseTextRef = useRef('');
 		const {
 			isListening,
+			isTranscribing,
 			isSupported: voiceSupported,
 			analyser,
+			error: voiceError,
 			start: startVoice,
 			stop: stopVoice,
 		} = useVoiceInput({
-			onTranscript: (transcript) => {
+			onTranscript: (transcript, isFinal) => {
 				const base = voiceBaseTextRef.current;
 				const sep = base && !/\s$/.test(base) ? ' ' : '';
-				setMessage(transcript ? `${base}${sep}${transcript}` : base);
+				const nextMessage = transcript ? `${base}${sep}${transcript}` : base;
+
+				if (isFinal && preferences.releaseToSend && nextMessage.trim()) {
+					onSend(nextMessage);
+					resetComposer();
+					return;
+				}
+
+				setMessage(nextMessage);
 			},
 		});
+		const isVoiceActive = isListening || isTranscribing;
+
+		const defaultDictationModel = dictationStatus?.models.find(
+			(model) => model.id === dictationStatus.defaultModel,
+		);
 
 		const handleStartVoice = useCallback(() => {
+			setVoiceShortcutMode(null);
 			voiceBaseTextRef.current = message;
+			if (!defaultDictationModel?.installed) {
+				setShowDictationInstallPrompt(true);
+				return;
+			}
 			void startVoice();
-		}, [message, startVoice]);
+		}, [defaultDictationModel?.installed, message, startVoice]);
+
+		const handleDictationReady = useCallback(() => {
+			void startVoice();
+		}, [startVoice]);
 
 		const handleStopVoice = useCallback(() => {
+			setVoiceShortcutMode(null);
 			stopVoice();
 			textareaRef.current?.focus();
 		}, [stopVoice]);
+
+		const handleStartVoiceRef = useRef(handleStartVoice);
+		const handleStopVoiceRef = useRef(handleStopVoice);
+		const voiceShortcutStateRef = useRef({
+			disabled: Boolean(disabled),
+			isListening,
+			isTranscribing,
+			voiceSupported,
+		});
+		const fnKeyDownRef = useRef(false);
+		const fnKeyDownAtRef = useRef(0);
+		const fnLatchedRecordingRef = useRef(false);
+		const fnReleaseTimerRef = useRef<number | null>(null);
+		const fnStopRequestedRef = useRef(false);
+		const voiceShortcutKindRef = useRef<'fn' | 'web' | 'native' | null>(null);
+
+		useEffect(() => {
+			handleStartVoiceRef.current = handleStartVoice;
+			handleStopVoiceRef.current = handleStopVoice;
+			voiceShortcutStateRef.current = {
+				disabled: Boolean(disabled),
+				isListening,
+				isTranscribing,
+				voiceSupported,
+			};
+
+			if (!isListening) {
+				fnLatchedRecordingRef.current = false;
+				setVoiceShortcutMode(null);
+			}
+
+			if (
+				isListening &&
+				fnStopRequestedRef.current &&
+				!fnKeyDownRef.current &&
+				!fnLatchedRecordingRef.current
+			) {
+				fnStopRequestedRef.current = false;
+				handleStopVoice();
+			}
+		}, [
+			disabled,
+			handleStartVoice,
+			handleStopVoice,
+			isListening,
+			isTranscribing,
+			voiceSupported,
+		]);
+
+		useEffect(() => {
+			const clearReleaseTimer = () => {
+				if (fnReleaseTimerRef.current === null) return;
+				window.clearTimeout(fnReleaseTimerRef.current);
+				fnReleaseTimerRef.current = null;
+			};
+
+			const stopFromShortcut = () => {
+				clearReleaseTimer();
+				fnStopRequestedRef.current = false;
+				fnLatchedRecordingRef.current = false;
+				setVoiceShortcutMode(null);
+				handleStopVoiceRef.current();
+			};
+
+			const scheduleStop = (delayMs: number) => {
+				clearReleaseTimer();
+				fnReleaseTimerRef.current = window.setTimeout(() => {
+					fnReleaseTimerRef.current = null;
+					if (fnLatchedRecordingRef.current) return;
+					setVoiceShortcutMode(null);
+
+					if (voiceShortcutStateRef.current.isListening) {
+						stopFromShortcut();
+						return;
+					}
+
+					fnStopRequestedRef.current = true;
+				}, delayMs);
+			};
+
+			const startShortcutPress = (kind: 'fn' | 'web' | 'native') => {
+				if (fnKeyDownRef.current) return;
+				const state = voiceShortcutStateRef.current;
+				if (state.disabled || !state.voiceSupported || state.isTranscribing) {
+					return;
+				}
+
+				voiceShortcutKindRef.current = kind;
+				fnKeyDownRef.current = true;
+				fnKeyDownAtRef.current = performance.now();
+				setVoiceShortcutMode('hold');
+
+				if (fnLatchedRecordingRef.current) {
+					stopFromShortcut();
+					return;
+				}
+
+				if (fnReleaseTimerRef.current !== null) {
+					clearReleaseTimer();
+					fnStopRequestedRef.current = false;
+					fnLatchedRecordingRef.current = true;
+					setVoiceShortcutMode('latched');
+					return;
+				}
+
+				if (!state.isListening) {
+					handleStartVoiceRef.current();
+				}
+			};
+
+			const endShortcutPress = () => {
+				const wasPressed = fnKeyDownRef.current;
+				fnKeyDownRef.current = false;
+				voiceShortcutKindRef.current = null;
+				if (!wasPressed) return;
+				if (fnLatchedRecordingRef.current) return;
+
+				const elapsedMs = performance.now() - fnKeyDownAtRef.current;
+				const delayMs = Math.max(
+					0,
+					VOICE_SHORTCUT_DOUBLE_PRESS_WINDOW_MS - elapsedMs,
+				);
+				if (delayMs > 0) {
+					scheduleStop(delayMs);
+					return;
+				}
+
+				if (voiceShortcutStateRef.current.isListening) {
+					stopFromShortcut();
+					return;
+				}
+
+				fnStopRequestedRef.current = true;
+			};
+
+			const handleKeyDown = (event: KeyboardEvent) => {
+				const isFnShortcut = isFunctionKeyEvent(event);
+				const isWebShortcut = isWebVoiceShortcutDown(event);
+				if (!isFnShortcut && !isWebShortcut) return;
+
+				event.preventDefault();
+				event.stopPropagation();
+
+				if (event.repeat) return;
+				startShortcutPress(isFnShortcut ? 'fn' : 'web');
+			};
+
+			const handleKeyUp = (event: KeyboardEvent) => {
+				const shortcutKind = voiceShortcutKindRef.current;
+				const isCurrentShortcut =
+					(shortcutKind === 'fn' && isFunctionKeyEvent(event)) ||
+					(shortcutKind === 'web' && isWebVoiceShortcutUp(event));
+				if (!isCurrentShortcut) return;
+
+				event.preventDefault();
+				event.stopPropagation();
+				endShortcutPress();
+			};
+
+			const handleNativeShortcutDown = () => startShortcutPress('native');
+			const handleNativeShortcutUp = () => endShortcutPress();
+
+			window.addEventListener('keydown', handleKeyDown, true);
+			window.addEventListener('keyup', handleKeyUp, true);
+			window.addEventListener(
+				'otto:voice-shortcut-down',
+				handleNativeShortcutDown,
+			);
+			window.addEventListener('otto:voice-shortcut-up', handleNativeShortcutUp);
+
+			return () => {
+				clearReleaseTimer();
+				window.removeEventListener('keydown', handleKeyDown, true);
+				window.removeEventListener('keyup', handleKeyUp, true);
+				window.removeEventListener(
+					'otto:voice-shortcut-down',
+					handleNativeShortcutDown,
+				);
+				window.removeEventListener(
+					'otto:voice-shortcut-up',
+					handleNativeShortcutUp,
+				);
+			};
+		}, []);
 
 		// Stop recording if the input unmounts (e.g. session switch).
 		useEffect(() => {
@@ -282,10 +557,10 @@ export const ChatInput = memo(
 			textarea.style.height = `${textarea.scrollHeight}px`;
 		}, []);
 
-		// biome-ignore lint/correctness/useExhaustiveDependencies: message and isListening intentionally trigger resizing when content changes or the textarea remounts after voice input
+		// biome-ignore lint/correctness/useExhaustiveDependencies: message and isVoiceActive intentionally trigger resizing when content changes or the textarea remounts after voice input
 		useEffect(() => {
 			adjustTextareaHeight();
-		}, [adjustTextareaHeight, message, isListening]);
+		}, [adjustTextareaHeight, message, isVoiceActive]);
 
 		const handleMentionClose = useCallback(() => {
 			setShowFileMention(false);
@@ -320,26 +595,6 @@ export const ChatInput = memo(
 			const trimmedMessage = message.trim();
 			if (!trimmedMessage || disabled) return;
 
-			const resetComposer = () => {
-				setMessage('');
-				setShowFileMention(false);
-				setShowSkillMention(false);
-				setShowCommandSuggestions(false);
-				setCurrentFileToSelect(undefined);
-				setCurrentSkillToSelect(undefined);
-				setCurrentCommandToSelect(undefined);
-
-				if (textareaRef.current) {
-					textareaRef.current.style.height = 'auto';
-				}
-
-				if (preferences.vimMode) {
-					setVimMode('normal');
-				}
-
-				textareaRef.current?.focus();
-			};
-
 			const exactCommand = findExactCommand(trimmedMessage);
 			if (exactCommand) {
 				if (shouldSendSlashCommandAsMessage(exactCommand.id)) {
@@ -356,20 +611,7 @@ export const ChatInput = memo(
 
 			onSend(message);
 			resetComposer();
-		}, [
-			message,
-			disabled,
-			onCommand,
-			onSend,
-			preferences.vimMode,
-			setShowFileMention,
-			setShowSkillMention,
-			setShowCommandSuggestions,
-			setCurrentFileToSelect,
-			setCurrentSkillToSelect,
-			setCurrentCommandToSelect,
-			setVimMode,
-		]);
+		}, [message, disabled, onCommand, onSend, resetComposer]);
 
 		useEffect(() => {
 			handleSendRef.current = handleSend;
@@ -494,6 +736,11 @@ export const ChatInput = memo(
 		const inputOverlayWidthClass = preferences.fullWidthContent
 			? 'w-3/4'
 			: 'w-[90%]';
+		const voiceButtonMode = voiceShortcutMode ?? 'manual';
+		const voiceButtonClass =
+			voiceButtonMode === 'manual'
+				? 'bg-red-500 hover:bg-red-500/90 active:bg-red-500/80 text-white'
+				: 'bg-red-500 hover:bg-red-500/90 active:bg-red-500/80 text-white';
 
 		return (
 			<>
@@ -557,34 +804,44 @@ export const ChatInput = memo(
 						)}
 						<div
 							className={`relative z-10 flex flex-col rounded-3xl p-1 transition-all touch-manipulation ${
-								isListening
+								isVoiceActive
 									? 'bg-transparent border border-transparent'
 									: isPlanMode
 										? 'bg-slate-100 dark:bg-slate-900/40 border border-slate-300 dark:border-slate-700 focus-within:border-slate-400 dark:focus-within:border-slate-600 focus-within:ring-1 focus-within:ring-slate-300 dark:focus-within:ring-slate-700'
 										: 'bg-card border border-border focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40'
 							}`}
 						>
-							{isListening ? (
+							{isVoiceActive ? (
 								<>
-									<div className="flex items-end gap-1">
+									<div className="flex items-center gap-1">
 										<div
 											className="flex-1 min-w-0 text-primary"
-											style={{ height: '2.5rem' }}
+											style={{ height: '3rem' }}
 										>
 											<LiveWaveform
-												active
+												active={isListening}
 												analyser={analyser}
-												height="2.5rem"
+												height="3rem"
+												loading={isTranscribing}
 											/>
 										</div>
-										<button
-											type="button"
-											onClick={handleStopVoice}
-											className="flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation bg-red-500 hover:bg-red-500/90 active:bg-red-500/80 text-white"
-											aria-label="Stop recording"
-										>
-											<Square className="w-3.5 h-3.5 fill-current" />
-										</button>
+										{isListening ? (
+											<button
+												type="button"
+												onClick={handleStopVoice}
+												className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all flex-shrink-0 touch-manipulation ${voiceButtonClass}`}
+												aria-label="Stop recording"
+											>
+												{voiceButtonMode !== 'manual' ? (
+													<span className="absolute inset-1 rounded-full bg-white/15 animate-pulse" />
+												) : null}
+												<Square className="w-3.5 h-3.5 fill-current" />
+											</button>
+										) : (
+											<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-primary">
+												<StableSpinner className="h-4 w-4" />
+											</div>
+										)}
 									</div>
 									{/* Invisible spacer matching the settings/meta row so the
 								    waveform stays aligned with the textarea position. */}
@@ -738,11 +995,18 @@ export const ChatInput = memo(
 											}`}
 											style={{ height: '2.5rem' }}
 										/>
-										{message.trim() || hasFiles || !voiceSupported ? (
+										{message.trim() ||
+										hasFiles ||
+										!voiceSupported ||
+										isTranscribing ? (
 											<button
 												type="button"
 												onClick={handleSend}
-												disabled={disabled || (!message.trim() && !hasFiles)}
+												disabled={
+													disabled ||
+													isTranscribing ||
+													(!message.trim() && !hasFiles)
+												}
 												className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation ${
 													message.trim() || hasFiles
 														? 'bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground'
@@ -755,7 +1019,7 @@ export const ChatInput = memo(
 											<button
 												type="button"
 												onClick={handleStartVoice}
-												disabled={disabled}
+												disabled={disabled || isTranscribing}
 												className="flex items-center justify-center w-10 h-10 rounded-full transition-colors flex-shrink-0 touch-manipulation bg-transparent text-muted-foreground hover:text-foreground hover:bg-background/50 active:bg-background/70"
 												aria-label="Start voice input"
 											>
@@ -767,7 +1031,13 @@ export const ChatInput = memo(
 							)}
 						</div>
 
-						{!isListening && (
+						{voiceError && !isListening && (
+							<div className="mt-2 px-3 text-xs text-destructive">
+								{voiceError}
+							</div>
+						)}
+
+						{!isVoiceActive && (
 							<div
 								className={`grid transition-[grid-template-rows] duration-200 ease-out ${
 									reasoningEnabled ||
@@ -847,9 +1117,9 @@ export const ChatInput = memo(
 														{authType && authType === 'oauth' && (
 															<span className="opacity-50">(pro)</span>
 														)}
-														{isSetu && setuPlanLabel && (
+														{isOttoRouter && ottorouterPlanLabel && (
 															<span className="opacity-50">
-																({setuPlanLabel.toLowerCase()})
+																({ottorouterPlanLabel.toLowerCase()})
 															</span>
 														)}
 														{isFreeModel && (
@@ -895,6 +1165,12 @@ export const ChatInput = memo(
 						<ShortcutsModal
 							isOpen={showShortcutsModal}
 							onClose={() => setShowShortcutsModal(false)}
+						/>
+
+						<DictationInstallPrompt
+							isOpen={showDictationInstallPrompt}
+							onClose={() => setShowDictationInstallPrompt(false)}
+							onReady={handleDictationReady}
 						/>
 					</div>
 				</div>

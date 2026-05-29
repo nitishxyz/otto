@@ -4,6 +4,8 @@ import type { HTMLAttributes } from 'react';
 export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
 	/** When true, the waveform reads from the analyser and animates. */
 	active?: boolean;
+	/** When true, hold the waveform and show a processing shimmer. */
+	loading?: boolean;
 	/** Externally-owned analyser node (mic stream lives in useVoiceInput). */
 	analyser?: AnalyserNode | null;
 	barWidth?: number;
@@ -31,16 +33,17 @@ export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
  */
 export function LiveWaveform({
 	active = false,
+	loading = false,
 	analyser = null,
-	barWidth = 3,
-	barGap = 2,
-	barRadius = 1.5,
+	barWidth = 4,
+	barGap = 3,
+	barRadius = 0,
 	barHeight: baseBarHeight = 3,
 	barColor,
 	fadeEdges = true,
 	fadeWidth = 32,
 	height = 40,
-	sensitivity = 1.4,
+	sensitivity = 1.2,
 	updateRate = 45,
 	className = '',
 	...props
@@ -116,8 +119,19 @@ export function LiveWaveform({
 				for (let i = startFreq; i < endFreq; i++) sum += dataArray[i];
 				const avg = (sum / (endFreq - startFreq) / 255) * sensitivity;
 
-				historyRef.current.push(Math.min(1, Math.max(0.05, avg)));
+				historyRef.current.push(Math.min(0.9, Math.max(0.05, avg)));
 				if (historyRef.current.length > maxBars) historyRef.current.shift();
+			} else if (loading) {
+				// Keep the last captured bars visible while transcription finishes.
+				if (historyRef.current.length === 0) {
+					historyRef.current = Array.from({ length: maxBars }, (_, index) => {
+						const wave = Math.sin(index * 0.55) * 0.28;
+						return Math.min(0.8, Math.max(0.12, 0.35 + wave));
+					});
+				}
+				if (historyRef.current.length > maxBars) {
+					historyRef.current = historyRef.current.slice(-maxBars);
+				}
 			} else if (!active && historyRef.current.length > 0) {
 				// Drain remaining bars off the left edge when stopped.
 				if (currentTime - lastUpdateRef.current > updateRate) {
@@ -132,6 +146,13 @@ export function LiveWaveform({
 				barColor || getComputedStyle(canvas).color || '#000';
 			const centerY = rect.height / 2;
 			const history = historyRef.current;
+			const shimmerCycleMs = 1800;
+			const shimmerProgress = (currentTime % shimmerCycleMs) / shimmerCycleMs;
+			const shimmerCenterX =
+				shimmerProgress < 0.5
+					? rect.width * shimmerProgress * 2
+					: rect.width * (1 - (shimmerProgress - 0.5) * 2);
+			const shimmerWidth = Math.max(56, rect.width * 0.22);
 
 			// Draw newest bar at the right, scrolling left.
 			for (let i = 0; i < history.length; i++) {
@@ -139,10 +160,25 @@ export function LiveWaveform({
 				const value = history[dataIndex] || 0.05;
 				const x = rect.width - (i + 1) * step;
 				if (x + barWidth < 0) break;
-				const h = Math.max(baseBarHeight, value * rect.height * 0.85);
+				const barCenterX = x + barWidth / 2;
+				const shimmerDistance = Math.abs(barCenterX - shimmerCenterX);
+				const shimmerAmount =
+					loading && shimmerDistance < shimmerWidth
+						? Math.cos((shimmerDistance / shimmerWidth) * (Math.PI / 2)) ** 2
+						: 0;
+				const baseHeight = Math.max(baseBarHeight, value * rect.height * 0.78);
+				const individualVariation = 0.82 + ((dataIndex * 13) % 7) * 0.045;
+				const lift = shimmerAmount * individualVariation;
+				const danceHeight = loading
+					? Math.min(rect.height * 0.86, baseHeight * (1 + lift * 0.6))
+					: baseHeight;
+				const h = Math.max(baseBarHeight, danceHeight);
 				const y = centerY - h / 2;
 				ctx.fillStyle = computedBarColor;
-				ctx.globalAlpha = 0.35 + value * 0.65;
+				ctx.globalAlpha = Math.min(
+					1,
+					0.3 + value * 0.45 + shimmerAmount * 0.25,
+				);
 				if (barRadius > 0) {
 					ctx.beginPath();
 					ctx.roundRect(x, y, barWidth, h, barRadius);
@@ -180,6 +216,7 @@ export function LiveWaveform({
 		};
 	}, [
 		active,
+		loading,
 		analyser,
 		sensitivity,
 		updateRate,
@@ -197,7 +234,13 @@ export function LiveWaveform({
 			className={`relative h-full w-full ${className}`}
 			ref={containerRef}
 			style={{ height: heightStyle }}
-			aria-label={active ? 'Live audio waveform' : 'Audio waveform idle'}
+			aria-label={
+				active
+					? 'Live audio waveform'
+					: loading
+						? 'Transcribing audio waveform'
+						: 'Audio waveform idle'
+			}
 			role="img"
 			{...props}
 		>

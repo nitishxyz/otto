@@ -39,7 +39,7 @@ pub struct ConfigFile {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SetuStatus {
+pub struct OttoRouterStatus {
     pub configured: bool,
     pub public_key: Option<String>,
 }
@@ -59,7 +59,7 @@ pub struct ProviderStatus {
 #[serde(rename_all = "camelCase")]
 pub struct OnboardingStatus {
     pub onboarding_complete: bool,
-    pub setu: SetuStatus,
+    pub ottorouter: OttoRouterStatus,
     pub providers: HashMap<String, ProviderStatus>,
     pub defaults: Defaults,
 }
@@ -201,12 +201,12 @@ pub async fn get_onboarding_status() -> Result<OnboardingStatus, String> {
     let config = read_config()?;
     let auth = read_auth()?;
 
-    let setu = match auth.get("setu") {
-        Some(AuthInfo::Wallet { secret }) => SetuStatus {
+    let ottorouter = match auth.get("ottorouter") {
+        Some(AuthInfo::Wallet { secret }) => OttoRouterStatus {
             configured: true,
             public_key: Some(public_key_from_secret(secret)?),
         },
-        _ => SetuStatus {
+        _ => OttoRouterStatus {
             configured: false,
             public_key: None,
         },
@@ -233,7 +233,7 @@ pub async fn get_onboarding_status() -> Result<OnboardingStatus, String> {
 
     Ok(OnboardingStatus {
         onboarding_complete: config.onboarding_complete,
-        setu,
+        ottorouter,
         providers,
         defaults: config.defaults,
     })
@@ -243,7 +243,7 @@ pub async fn get_onboarding_status() -> Result<OnboardingStatus, String> {
 pub async fn generate_wallet() -> Result<WalletResult, String> {
     let mut auth = read_auth()?;
 
-    if let Some(AuthInfo::Wallet { secret }) = auth.get("setu") {
+    if let Some(AuthInfo::Wallet { secret }) = auth.get("ottorouter") {
         return Ok(WalletResult {
             public_key: public_key_from_secret(secret)?,
         });
@@ -259,7 +259,7 @@ pub async fn generate_wallet() -> Result<WalletResult, String> {
     let secret = bs58::encode(&full_secret).into_string();
     let public_key = bs58::encode(verifying_key.as_bytes()).into_string();
 
-    auth.insert("setu".to_string(), AuthInfo::Wallet { secret });
+    auth.insert("ottorouter".to_string(), AuthInfo::Wallet { secret });
     write_auth(&auth)?;
 
     Ok(WalletResult { public_key })

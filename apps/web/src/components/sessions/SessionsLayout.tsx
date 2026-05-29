@@ -23,7 +23,7 @@ import {
 	useGitStatus,
 	useStageFiles,
 	useOttoRouterBalance,
-	useSetuPayments,
+	useOttoRouterPayments,
 	useUnstageFiles,
 	useRestoreFiles,
 	useDeleteFiles,
@@ -53,7 +53,7 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
-	useSetuPayments(sessionId);
+	useOttoRouterPayments(sessionId);
 	useOttoRouterBalance(config?.defaults?.provider);
 
 	const focusInput = useCallback(() => {

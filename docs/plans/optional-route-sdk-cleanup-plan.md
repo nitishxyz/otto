@@ -274,7 +274,6 @@ Candidate extraction:
   - `auth/openai.ts`
   - `auth/anthropic.ts`
   - `auth/copilot.ts`
-  - `auth/setu.ts`
   - `auth/ottorouter.ts`
 - Shared helpers:
   - `auth/callback.ts`

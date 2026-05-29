@@ -18,6 +18,7 @@ export * from './chat/ConfigModal';
 export * from './chat/ConfigSelector';
 export * from './chat/InputQueueBar';
 export * from './chat/InputTodosBar';
+export * from './chat/DictationInstallPrompt';
 export * from './chat/StopButton';
 export * from './chat/NewSessionLanding';
 
@@ -78,6 +79,7 @@ export * from './research/ResearchSidebarToggle';
 export * from './settings/SettingsSidebar';
 export * from './settings/SettingsSidebarToggle';
 export * from './settings/OttoRouterTopupModal';
+export * from './settings/DictationSettings';
 
 // Tunnel Components
 export * from './tunnel/TunnelSidebar';

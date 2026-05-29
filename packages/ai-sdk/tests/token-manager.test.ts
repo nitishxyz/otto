@@ -28,7 +28,7 @@ describe('createAccessTokenManager', () => {
 		const requests: Array<{ url: string; headers: Headers }> = [];
 		const manager = createAccessTokenManager({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async (input, init) => {
 				requests.push({
 					url: String(input),
@@ -41,7 +41,9 @@ describe('createAccessTokenManager', () => {
 		const token = await manager.getToken();
 		expect(token).toBe('token-1');
 		expect(requests).toHaveLength(1);
-		expect(requests[0]?.url).toBe('https://setu.test/v1/auth/wallet-token');
+		expect(requests[0]?.url).toBe(
+			'https://ottorouter.test/v1/auth/wallet-token',
+		);
 		expect(requests[0]?.headers.get('x-wallet-address')).toBe(walletAddress);
 
 		const nonce = requests[0]?.headers.get('x-wallet-nonce');
@@ -62,7 +64,7 @@ describe('createAccessTokenManager', () => {
 		let exchangeCount = 0;
 		const manager = createAccessTokenManager({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async () => {
 				exchangeCount++;
 				return Response.json({
@@ -82,7 +84,7 @@ describe('createAccessTokenManager', () => {
 		let exchangeCount = 0;
 		const manager = createAccessTokenManager({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async () => {
 				exchangeCount++;
 				if (exchangeCount === 1) {
@@ -102,7 +104,7 @@ describe('createAccessTokenManager', () => {
 		let exchangeCount = 0;
 		const manager = createAccessTokenManager({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async () => {
 				exchangeCount++;
 				await new Promise((resolve) => setTimeout(resolve, 10));
@@ -125,7 +127,7 @@ describe('createAccessTokenManager', () => {
 		let exchangeCount = 0;
 		const manager = createAccessTokenManager({
 			wallet,
-			baseURL: 'https://setu.test',
+			baseURL: 'https://ottorouter.test',
 			fetch: async () => {
 				exchangeCount++;
 				return Response.json({

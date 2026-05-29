@@ -8,7 +8,7 @@ import { useFullscreen } from '../hooks/useFullscreen';
 import { handleTitleBarDrag } from '../utils/title-bar';
 import type { Project } from '../lib/tauri-bridge';
 import { tauriBridge } from '../lib/tauri-bridge';
-import { SetuLoader } from './SetuLoader';
+import { OttoRouterLoader } from './OttoRouterLoader';
 import { useDesktopTheme } from '../theme';
 import { WindowControls } from './WindowControls';
 import { useVersion } from '../hooks/useVersion';
@@ -234,7 +234,7 @@ export function Workspace({
 			<div className="flex-1 min-h-0 relative bg-background">
 				{loading && (
 					<div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-						<SetuLoader label="Starting server..." />
+						<OttoRouterLoader label="Starting server..." />
 					</div>
 				)}
 				{error && !loading && (

@@ -296,7 +296,7 @@ export const OttoRouterTopupModal = memo(function OttoRouterTopupModal() {
 				key: order.keyId,
 				amount: order.amount,
 				currency: order.currency,
-				name: 'Setu',
+				name: 'OttoRouter',
 				description: `Top up $${order.creditAmountUsd.toFixed(2)} credits`,
 				order_id: order.orderId,
 				handler: async (response: {
@@ -692,7 +692,7 @@ export const OttoRouterTopupModal = memo(function OttoRouterTopupModal() {
 										)}
 									</div>
 									<p className="text-xs text-muted-foreground mt-1">
-										Send USDC to your Setu wallet to increase balance.
+										Send USDC to your OttoRouter wallet to increase balance.
 									</p>
 								</div>
 							</div>

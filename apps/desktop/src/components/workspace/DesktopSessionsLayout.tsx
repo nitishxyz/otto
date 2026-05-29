@@ -18,9 +18,9 @@ import {
 	useGitStatus,
 	useKeyboardShortcuts,
 	useOttoRouterBalance,
+	useOttoRouterPayments,
 	useRestoreFiles,
 	useSessions,
-	useSetuPayments,
 	useStageFiles,
 	useUnstageFiles,
 	useWorkingDirectory,
@@ -62,7 +62,7 @@ export function DesktopSessionsLayout({
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
-	useSetuPayments(sessionId);
+	useOttoRouterPayments(sessionId);
 	useOttoRouterBalance(config?.defaults?.provider);
 
 	const focusInput = useCallback(() => {

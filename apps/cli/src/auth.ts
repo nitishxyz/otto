@@ -408,7 +408,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 	}
 
 	if (provider === 'ottorouter') {
-		return runAuthLoginSetu(cfg, wantLocal);
+		return runAuthLoginOttoRouter(cfg, wantLocal);
 	}
 
 	if (provider === 'copilot') {
@@ -958,11 +958,11 @@ async function runAuthLoginAnthropic(
 	}
 }
 
-async function runAuthLoginSetu(
+async function runAuthLoginOttoRouter(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
 ): Promise<boolean> {
-	log.info('Setu uses a Solana wallet for authentication.');
+	log.info('OttoRouter uses a Solana wallet for authentication.');
 
 	const authMethod = (await select({
 		message: 'Select wallet option',

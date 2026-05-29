@@ -66,7 +66,7 @@ const plugin: OpenClawPluginDefinition = {
 
 		api.registerProvider({
 			id: 'ottorouter',
-			label: 'Setu (Solana USDC)',
+			label: 'OttoRouter (Solana USDC)',
 			aliases: ['ottorouter-solana'],
 			envVars: ['OTTOROUTER_PRIVATE_KEY'],
 			models: buildProviderConfig(port),
