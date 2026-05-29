@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useConfig, useUpdateDefaults } from './useConfig';
 
 type Theme = 'light' | 'dark';
@@ -10,7 +10,15 @@ function normalizeTheme(theme: string | undefined): Theme {
 export function useTheme() {
 	const { data: config } = useConfig();
 	const updateDefaults = useUpdateDefaults();
-	const theme = normalizeTheme(config?.defaults?.theme);
+	const configTheme = normalizeTheme(config?.defaults?.theme);
+	const [optimisticTheme, setOptimisticTheme] = useState<Theme | null>(null);
+	const theme = optimisticTheme ?? configTheme;
+
+	useEffect(() => {
+		if (optimisticTheme === configTheme) {
+			setOptimisticTheme(null);
+		}
+	}, [configTheme, optimisticTheme]);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
@@ -29,7 +37,17 @@ export function useTheme() {
 
 	const setTheme = useCallback(
 		(nextTheme: Theme) => {
-			updateDefaults.mutate({ theme: nextTheme, scope: 'global' });
+			setOptimisticTheme(nextTheme);
+			updateDefaults.mutate(
+				{ theme: nextTheme, scope: 'global' },
+				{
+					onError: () => {
+						setOptimisticTheme((currentTheme) =>
+							currentTheme === nextTheme ? null : currentTheme,
+						);
+					},
+				},
+			);
 		},
 		[updateDefaults],
 	);

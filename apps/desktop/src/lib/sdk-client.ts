@@ -99,7 +99,6 @@ function registerDesktopPlatformAdapters() {
 			'--otto-font-family',
 			cssFontFamily(fontFamily),
 		);
-		window.localStorage.setItem('otto-desktop-font-family', fontFamily);
 	};
 	void appWindow
 		.isFocused()

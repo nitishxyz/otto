@@ -26,6 +26,7 @@ pub struct Defaults {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub tool_approval: Option<String>,
+    pub theme: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -285,6 +286,7 @@ pub async fn set_defaults(
     provider: Option<String>,
     model: Option<String>,
     tool_approval: Option<String>,
+    theme: Option<String>,
 ) -> Result<(), String> {
     let mut config = read_config()?;
     if agent.is_some() {
@@ -298,6 +300,9 @@ pub async fn set_defaults(
     }
     if tool_approval.is_some() {
         config.defaults.tool_approval = tool_approval;
+    }
+    if matches!(theme.as_deref(), Some("light" | "dark")) {
+        config.defaults.theme = theme;
     }
     write_config(&config)
 }

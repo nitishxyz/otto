@@ -1,36 +1,18 @@
 import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { RouterProvider } from '@tanstack/react-router';
-import { useTheme } from '@ottocode/web-sdk/hooks';
 import { tauriBridge, type Project } from './lib/tauri-bridge';
 import { tauriOnboarding } from './lib/tauri-onboarding';
 import { router } from './router';
+import { useNativeDesktopTheme } from './theme';
 import './index.css';
-
-const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
-const DESKTOP_FONT_STORAGE_KEY = 'otto-desktop-font-family';
-
-function applyDesktopFontFamily(fontFamily: string) {
-	const trimmed = fontFamily.trim() || DEFAULT_FONT_FAMILY;
-	document.documentElement.style.setProperty(
-		'--otto-font-family',
-		`"${trimmed.replace(/"/g, '\\"')}", "${DEFAULT_FONT_FAMILY}", monospace`,
-	);
-}
 
 function App() {
 	const [initialized, setInitialized] = useState(false);
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-	const { theme, setTheme, toggleTheme } = useTheme();
+	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme();
 
 	useEffect(() => {
-		const storedFontFamily = window.localStorage.getItem(
-			DESKTOP_FONT_STORAGE_KEY,
-		);
-		if (storedFontFamily) {
-			applyDesktopFontFamily(storedFontFamily);
-		}
-
 		const init = async () => {
 			const initialPath = await tauriBridge.getInitialProject();
 			const initialRemote = await tauriBridge.getInitialRemote();

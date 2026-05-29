@@ -1,3 +1,5 @@
+import { isPlatformDesktop } from './platform';
+
 // Extend Window interface to include custom properties
 interface OttoWindow extends Window {
 	__OTTO_API_URL__?: string;
@@ -30,6 +32,7 @@ export function normalizeApiBaseUrl(value: string): string {
 
 function getStoredApiBaseUrl(): string | undefined {
 	if (typeof window === 'undefined') return undefined;
+	if (isPlatformDesktop()) return undefined;
 	try {
 		return (
 			window.localStorage.getItem(RUNTIME_API_BASE_URL_STORAGE_KEY) ?? undefined
@@ -65,10 +68,12 @@ export function setRuntimeApiBaseUrl(value: string): string {
 	if (typeof window !== 'undefined') {
 		const win = window as OttoWindow;
 		win.OTTO_SERVER_URL = baseUrl;
-		try {
-			window.localStorage.setItem(RUNTIME_API_BASE_URL_STORAGE_KEY, baseUrl);
-		} catch {
-			// Ignore storage errors; the in-memory URL still works for this page load.
+		if (!isPlatformDesktop()) {
+			try {
+				window.localStorage.setItem(RUNTIME_API_BASE_URL_STORAGE_KEY, baseUrl);
+			} catch {
+				// Ignore storage errors; the in-memory URL still works for this page load.
+			}
 		}
 	}
 	return baseUrl;
