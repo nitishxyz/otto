@@ -21,6 +21,7 @@ import ANTHROPIC_SPOOF_PROMPT from '@ottocode/sdk/prompts/providers/anthropicSpo
 
 import { getTerminalManager } from '@ottocode/sdk';
 import { buildCapabilitySummary } from './capabilities.ts';
+import { buildExplicitSkillMentionContext } from './skill-mentions.ts';
 
 export type ComposedSystemPrompt = {
 	prompt: string;
@@ -39,6 +40,7 @@ export async function composeSystemPrompt(options: {
 	spoofPrompt?: string;
 	includeEnvironment?: boolean;
 	includeProjectTree?: boolean;
+	userContent?: string;
 	userContext?: string;
 	contextSummary?: string;
 	isOpenAIOAuth?: boolean;
@@ -140,6 +142,15 @@ export async function composeSystemPrompt(options: {
 	if (capabilitySummary.prompt) {
 		parts.push(capabilitySummary.prompt);
 		components.push(...capabilitySummary.components);
+	}
+	const explicitSkillContext = await buildExplicitSkillMentionContext({
+		content: options.userContent,
+		skills,
+		skillSettings: options.skillSettings,
+	});
+	if (explicitSkillContext) {
+		parts.push(explicitSkillContext);
+		components.push('skills:explicit');
 	}
 
 	// Add user-provided context if present

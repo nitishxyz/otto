@@ -51,6 +51,7 @@ export async function buildRunnerPrompt(args: {
 		guidedMode: cfg.defaults.guidedMode,
 		spoofPrompt: undefined,
 		includeProjectTree: false,
+		userContent: opts.userContent,
 		userContext: opts.userContext,
 		contextSummary,
 		isOpenAIOAuth: oauth.isOpenAIOAuth,

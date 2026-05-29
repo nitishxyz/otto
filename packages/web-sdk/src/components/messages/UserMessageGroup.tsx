@@ -17,6 +17,9 @@ import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { useQueueStore } from '../../stores/queueStore';
 import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
+import { linkifyExplicitSkillMentions } from '../../lib/skillMentions';
+import { useSkills } from '../../hooks/useSkills';
+import { useSkillsStore } from '../../stores/skillsStore';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -48,6 +51,9 @@ export const UserMessageGroup = memo(
 		const [expandedImage, setExpandedImage] = useState<string | null>(null);
 		const parts = message.parts || [];
 		const queryClient = useQueryClient();
+		const { data: skillsConfig } = useSkills();
+		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
+		const selectSkill = useSkillsStore((state) => state.selectSkill);
 
 		const { isQueued, position } = useMessageQueuePosition(
 			sessionId,
@@ -77,6 +83,10 @@ export const UserMessageGroup = memo(
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
 			parseResearchContext(rawContent);
+		const renderedContent = linkifyExplicitSkillMentions(
+			content,
+			skillsConfig?.items ?? [],
+		);
 
 		const images: Array<{ id: string; src: string }> = [];
 		for (const part of imageParts) {
@@ -141,6 +151,11 @@ export const UserMessageGroup = memo(
 			} catch (err) {
 				console.error('Failed to cancel queued message:', err);
 			}
+		};
+
+		const handleSkillClick = (skillName: string) => {
+			expandSkillsSidebar();
+			selectSkill(skillName);
 		};
 
 		const handleDelete = async () => {
@@ -251,32 +266,52 @@ export const UserMessageGroup = memo(
 													href,
 													children,
 													...props
-												}: ComponentPropsWithoutRef<'a'>) => (
-													<a
-														href={href}
-														target="_blank"
-														rel="noopener noreferrer"
-														className="text-primary underline decoration-primary/35 underline-offset-2 transition-colors hover:text-primary/90 hover:decoration-primary"
-														onClick={(e) => {
-															if (window.self !== window.top && href) {
-																e.preventDefault();
-																window.parent.postMessage(
-																	{
-																		type: 'otto-open-url',
-																		url: href,
-																	},
-																	'*',
-																);
-															}
-														}}
-														{...props}
-													>
-														{children}
-													</a>
-												),
+												}: ComponentPropsWithoutRef<'a'>) => {
+													const skillHref = href?.startsWith('#otto-skill:')
+														? href.slice('#otto-skill:'.length)
+														: href?.startsWith('otto-skill:')
+															? href.slice('otto-skill:'.length)
+															: null;
+													if (skillHref) {
+														const skillName = decodeURIComponent(skillHref);
+														return (
+															<button
+																type="button"
+																onClick={() => handleSkillClick(skillName)}
+																className="inline-flex align-baseline items-center rounded-md border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 font-mono text-violet-600 dark:text-violet-300 hover:bg-violet-500/15 transition-colors"
+																title={`Open ${skillName} SKILL.md`}
+															>
+																{children}
+															</button>
+														);
+													}
+													return (
+														<a
+															href={href}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-primary underline decoration-primary/35 underline-offset-2 transition-colors hover:text-primary/90 hover:decoration-primary"
+															onClick={(e) => {
+																if (window.self !== window.top && href) {
+																	e.preventDefault();
+																	window.parent.postMessage(
+																		{
+																			type: 'otto-open-url',
+																			url: href,
+																		},
+																		'*',
+																	);
+																}
+															}}
+															{...props}
+														>
+															{children}
+														</a>
+													);
+												},
 											}}
 										>
-											{content.replace(/\n/g, '  \n')}
+											{renderedContent.replace(/\n/g, '  \n')}
 										</ReactMarkdown>
 									</div>
 								)}

@@ -218,6 +218,7 @@ export async function dispatchAssistantMessage(
 			model,
 			projectRoot: cfg.projectRoot,
 			oneShot: Boolean(effectiveOneShot),
+			userContent: content,
 			userContext,
 			estimatedInputTokens,
 			reasoningText,

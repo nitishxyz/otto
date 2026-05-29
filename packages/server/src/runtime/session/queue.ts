@@ -12,6 +12,7 @@ export type RunOpts = {
 	projectRoot: string;
 	queuedAt?: number;
 	oneShot?: boolean;
+	userContent?: string;
 	userContext?: string;
 	estimatedInputTokens?: number;
 	reasoningText?: boolean;

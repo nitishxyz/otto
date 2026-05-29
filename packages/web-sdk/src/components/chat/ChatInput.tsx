@@ -23,14 +23,17 @@ import {
 } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
 import { FileMentionPopup } from './FileMentionPopup';
+import { SkillMentionPopup } from './SkillMentionPopup';
 import { CommandSuggestionsPopup } from './CommandSuggestionsPopup';
 import { ShortcutsModal } from './ShortcutsModal';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { useFiles } from '../../hooks/useFiles';
+import { useSkills } from '../../hooks/useSkills';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
 import { useVimMode } from '../../hooks/useVimMode';
 import { useFileMention } from '../../hooks/useFileMention';
+import { useSkillMention } from '../../hooks/useSkillMention';
 import { useCommandSuggestions } from '../../hooks/useCommandSuggestions';
 import { createChatInputKeyHandler } from './ChatInputKeyHandler';
 import {
@@ -158,6 +161,22 @@ export const ChatInput = memo(
 			checkForMention,
 		} = useFileMention();
 
+		const {
+			showSkillMention,
+			skillMentionQuery,
+			skillMentionSelectedIndex,
+			currentSkillToSelect,
+			setShowSkillMention,
+			setSkillMentionSelectedIndex,
+			setCurrentSkillToSelect,
+			handleSkillSelect: selectSkill,
+			handleEnterSelect: handleSkillEnterSelect,
+			checkForSkillMention,
+		} = useSkillMention();
+
+		const { data: skillsConfig } = useSkills();
+		const skillSummaries = skillsConfig?.items ?? [];
+
 		const { data: filesData, isLoading: filesLoading } = useFiles({
 			enabled: showFileMention,
 			query: mentionQuery,
@@ -237,6 +256,11 @@ export const ChatInput = memo(
 			setCurrentFileToSelect(undefined);
 		}, [setShowFileMention, setCurrentFileToSelect]);
 
+		const handleSkillMentionClose = useCallback(() => {
+			setShowSkillMention(false);
+			setCurrentSkillToSelect(undefined);
+		}, [setShowSkillMention, setCurrentSkillToSelect]);
+
 		const handleCommandClose = useCallback(() => {
 			setShowCommandSuggestions(false);
 			setCurrentCommandToSelect(undefined);
@@ -249,6 +273,13 @@ export const ChatInput = memo(
 			[selectFile],
 		);
 
+		const handleSkillMentionSelect = useCallback(
+			(skillName: string) => {
+				selectSkill(skillName, textareaRef, setMessage);
+			},
+			[selectSkill],
+		);
+
 		const handleSend = useCallback(() => {
 			const trimmedMessage = message.trim();
 			if (!trimmedMessage || disabled) return;
@@ -256,8 +287,10 @@ export const ChatInput = memo(
 			const resetComposer = () => {
 				setMessage('');
 				setShowFileMention(false);
+				setShowSkillMention(false);
 				setShowCommandSuggestions(false);
 				setCurrentFileToSelect(undefined);
+				setCurrentSkillToSelect(undefined);
 				setCurrentCommandToSelect(undefined);
 
 				if (textareaRef.current) {
@@ -294,8 +327,10 @@ export const ChatInput = memo(
 			onSend,
 			preferences.vimMode,
 			setShowFileMention,
+			setShowSkillMention,
 			setShowCommandSuggestions,
 			setCurrentFileToSelect,
+			setCurrentSkillToSelect,
 			setCurrentCommandToSelect,
 			setVimMode,
 		]);
@@ -317,11 +352,14 @@ export const ChatInput = memo(
 
 				if (value.startsWith('/') && !value.includes(' ')) {
 					setShowFileMention(false);
+					setShowSkillMention(false);
 					setCurrentFileToSelect(undefined);
+					setCurrentSkillToSelect(undefined);
 				} else {
 					setShowCommandSuggestions(false);
 					setCurrentCommandToSelect(undefined);
 					checkForMention(value, e.target.selectionStart);
+					checkForSkillMention(value, e.target.selectionStart);
 				}
 			},
 			[
@@ -329,10 +367,13 @@ export const ChatInput = memo(
 				vimMode,
 				checkForCommand,
 				setShowFileMention,
+				setShowSkillMention,
 				setCurrentFileToSelect,
+				setCurrentSkillToSelect,
 				setShowCommandSuggestions,
 				setCurrentCommandToSelect,
 				checkForMention,
+				checkForSkillMention,
 			],
 		);
 
@@ -340,21 +381,27 @@ export const ChatInput = memo(
 			() =>
 				createChatInputKeyHandler({
 					showFileMention,
+					showSkillMention,
 					showCommandSuggestions,
 					mentionSelectedIndex,
+					skillMentionSelectedIndex,
 					commandSelectedIndex,
 					currentFileToSelect,
+					currentSkillToSelect,
 					currentCommandToSelect,
 					isPlanMode,
 					vimModeEnabled: preferences.vimMode,
 					vimMode,
 					setMentionSelectedIndex,
+					setSkillMentionSelectedIndex,
 					setCommandSelectedIndex,
 					setShowFileMention,
+					setShowSkillMention,
 					setShowCommandSuggestions,
 					setIsPlanMode,
 					setVimMode,
 					handleFileSelect: handleMentionSelect,
+					handleSkillSelect: handleSkillMentionSelect,
 					handleCommandSelect,
 					handleSend,
 					handleVimNormalMode,
@@ -362,20 +409,26 @@ export const ChatInput = memo(
 				}),
 			[
 				showFileMention,
+				showSkillMention,
 				showCommandSuggestions,
 				mentionSelectedIndex,
+				skillMentionSelectedIndex,
 				commandSelectedIndex,
 				currentFileToSelect,
+				currentSkillToSelect,
 				currentCommandToSelect,
 				isPlanMode,
 				preferences.vimMode,
 				vimMode,
 				setMentionSelectedIndex,
+				setSkillMentionSelectedIndex,
 				setCommandSelectedIndex,
 				setShowFileMention,
+				setShowSkillMention,
 				setShowCommandSuggestions,
 				setVimMode,
 				handleMentionSelect,
+				handleSkillMentionSelect,
 				handleCommandSelect,
 				handleSend,
 				handleVimNormalMode,
@@ -481,6 +534,17 @@ export const ChatInput = memo(
 									onEnterSelect={handleCommandEnterSelect}
 									onClose={handleCommandClose}
 									sessionId={sessionId}
+								/>
+							)}
+
+							{showSkillMention && (
+								<SkillMentionPopup
+									skills={skillSummaries}
+									query={skillMentionQuery}
+									selectedIndex={skillMentionSelectedIndex}
+									onSelect={handleSkillMentionSelect}
+									onEnterSelect={handleSkillEnterSelect}
+									onClose={handleSkillMentionClose}
 								/>
 							)}
 
