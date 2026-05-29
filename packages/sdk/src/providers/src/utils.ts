@@ -40,7 +40,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	google: ['gemini-2.0-flash-lite'],
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],
-	ottorouter: ['kimi-k2.5'],
+	ottorouter: ['glm-5-turbo'],
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	copilot: ['gpt-4.1-mini'],
