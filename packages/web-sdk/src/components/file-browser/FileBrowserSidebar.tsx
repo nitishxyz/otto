@@ -19,7 +19,7 @@ import { StableSpinner } from '../ui/StableSpinner';
 
 const PANEL_KEY = 'file-browser';
 const DEFAULT_WIDTH = 320;
-const MIN_WIDTH = 280;
+const MIN_WIDTH = 320;
 const MAX_WIDTH = 600;
 
 function getViewerTabPath(

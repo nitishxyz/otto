@@ -282,10 +282,12 @@ export function GitFileTree({
 						focused ? 'ring-1 ring-inset ring-primary/40 bg-muted/50' : ''
 					}`}
 				>
-					<span
-						style={{ width: depth * INDENT_SIZE }}
-						className="flex-shrink-0"
-					/>
+					{depth > 0 && (
+						<span
+							style={{ width: depth * INDENT_SIZE }}
+							className="flex-shrink-0"
+						/>
+					)}
 					<button
 						type="button"
 						onClick={() => toggleExpanded(node.path)}

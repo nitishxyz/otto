@@ -36,9 +36,9 @@ import { UserMessageGroup } from '../messages/UserMessageGroup';
 import { ResizeHandle } from '../ui/ResizeHandle';
 
 const PANEL_KEY = 'research';
-const DEFAULT_WIDTH = 384;
-const MIN_WIDTH = 384;
-const MAX_WIDTH = 640;
+const DEFAULT_WIDTH = 320;
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 600;
 
 interface ResearchSidebarProps {
 	parentSessionId: string | null;
