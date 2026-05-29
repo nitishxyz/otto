@@ -62,7 +62,9 @@ function isGlobeKeyEvent(event: KeyboardEvent): boolean {
 		event.key === 'Function' ||
 		event.code === 'Globe' ||
 		event.code === 'Fn' ||
-		event.code === 'Function'
+		event.code === 'Function' ||
+		event.keyCode === 63 ||
+		event.which === 63
 	);
 }
 

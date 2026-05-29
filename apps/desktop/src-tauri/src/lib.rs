@@ -1,4 +1,5 @@
 mod commands;
+mod voice_shortcut;
 
 use commands::server::ServerState;
 use std::sync::Mutex;
@@ -127,6 +128,8 @@ pub fn run() {
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
+
+            voice_shortcut::install(app.handle().clone());
 
             let new_window = MenuItemBuilder::new("New Window")
                 .id("new_window")

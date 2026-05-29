@@ -1,3 +1,4 @@
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { onAction } from '@tauri-apps/plugin-notification';
@@ -21,6 +22,7 @@ interface OttoWindow extends Window {
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
 	OTTO_NOTIFICATION_ACTION_LISTENER?: boolean;
+	OTTO_VOICE_SHORTCUT_LISTENER?: boolean;
 	OTTO_WINDOW_FOCUS_LISTENER?: boolean;
 	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
 }
@@ -79,6 +81,10 @@ function cssFontFamily(fontFamily: string) {
 	return `"${trimmed.replace(/"/g, '\\"')}", "${DEFAULT_FONT_FAMILY}", monospace`;
 }
 
+function dispatchVoiceShortcutEvent(eventName: string) {
+	window.dispatchEvent(new CustomEvent(eventName));
+}
+
 function registerDesktopPlatformAdapters() {
 	const win = window as OttoWindow;
 	const appWindow = getCurrentWindow();
@@ -111,6 +117,20 @@ function registerDesktopPlatformAdapters() {
 			.catch((error: unknown) => {
 				console.error('[otto] Failed to register focus listener:', error);
 			});
+	}
+
+	if (!win.OTTO_VOICE_SHORTCUT_LISTENER) {
+		win.OTTO_VOICE_SHORTCUT_LISTENER = true;
+		void listen('otto:voice-shortcut-down', () => {
+			dispatchVoiceShortcutEvent('otto:voice-shortcut-down');
+		}).catch((error: unknown) => {
+			console.error('[otto] Failed to register voice shortcut down:', error);
+		});
+		void listen('otto:voice-shortcut-up', () => {
+			dispatchVoiceShortcutEvent('otto:voice-shortcut-up');
+		}).catch((error: unknown) => {
+			console.error('[otto] Failed to register voice shortcut up:', error);
+		});
 	}
 
 	if (!win.OTTO_NOTIFICATION_ACTION_LISTENER) {
