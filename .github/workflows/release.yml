@@ -371,6 +371,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: desktop-${{ matrix.target }}
+          cache-on-failure: true
+
       - name: Install Linux dependencies
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
@@ -584,6 +591,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/canvas/src-tauri -> target
+          key: canvas-${{ matrix.target }}
+          cache-on-failure: true
+
       - name: Setup Zig
         shell: bash
         run: brew install zig
@@ -726,6 +740,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/launcher/src-tauri -> target
+          key: launcher-${{ matrix.target }}
+          cache-on-failure: true
 
       - name: Install Linux dependencies
         if: startsWith(matrix.platform, 'ubuntu')
