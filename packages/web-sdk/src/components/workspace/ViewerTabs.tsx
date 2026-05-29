@@ -352,6 +352,17 @@ export const ViewerTabs = memo(function ViewerTabs() {
 						/>
 					</div>
 				</div>
+				<div className="h-12 w-12 shrink-0 border-r border-b border-sidebar-border bg-background flex items-stretch">
+					<button
+						type="button"
+						onClick={closeAllTabs}
+						title="Close all tabs and collapse viewer"
+						aria-label="Close all tabs and collapse viewer"
+						className="h-full w-full inline-flex items-center justify-center rounded-none text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive active:translate-y-0 active:scale-100"
+					>
+						<X className="h-3.5 w-3.5" />
+					</button>
+				</div>
 				<div className="h-12 min-w-0 flex-1 flex overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide">
 					{visibleTabs.map((tab) => {
 						const isActive = tab.id === activeTab.id;
@@ -392,17 +403,6 @@ export const ViewerTabs = memo(function ViewerTabs() {
 						);
 					})}
 					<div className="min-w-8 flex-1 border-b border-sidebar-border bg-background" />
-					<div className="h-12 shrink-0 border-b border-l border-sidebar-border bg-background flex items-center px-1.5">
-						<button
-							type="button"
-							onClick={closeAllTabs}
-							title="Close all tabs and collapse viewer"
-							aria-label="Close all tabs and collapse viewer"
-							className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
-						>
-							<X className="h-3.5 w-3.5" />
-						</button>
-					</div>
 				</div>
 			</div>
 

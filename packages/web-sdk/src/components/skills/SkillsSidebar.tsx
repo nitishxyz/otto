@@ -257,11 +257,17 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 											{SCOPE_LABELS[scope] ?? scope}
 										</div>
 										{scopeSkills.map((skill) => (
-											<button
-												type="button"
+											<div
+												role="button"
+												tabIndex={0}
 												key={`${skill.scope}-${skill.name}`}
 												onClick={() => selectSkill(skill.name)}
-												className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors ${
+												onKeyDown={(event) => {
+													if (event.key !== 'Enter' && event.key !== ' ') return;
+													event.preventDefault();
+													selectSkill(skill.name);
+												}}
+												className={`w-full cursor-pointer text-left px-3 py-2 hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
 													selectedSkill === skill.name ? 'bg-accent' : ''
 												}`}
 											>
@@ -275,21 +281,27 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 															{skill.description}
 														</div>
 													</div>
-													<ToggleSwitch
-														checked={skill.enabled !== false}
-														loading={updateSkillsConfig.isPending}
-														onChange={() =>
-															updateSkillsConfig.mutate({
-																items: {
-																	[skill.name]: {
-																		enabled: skill.enabled === false,
+													<div
+														onPointerDown={(event) => event.stopPropagation()}
+														onClick={(event) => event.stopPropagation()}
+														onKeyDown={(event) => event.stopPropagation()}
+													>
+														<ToggleSwitch
+															checked={skill.enabled !== false}
+															loading={updateSkillsConfig.isPending}
+															onChange={() =>
+																updateSkillsConfig.mutate({
+																	items: {
+																		[skill.name]: {
+																			enabled: skill.enabled === false,
+																		},
 																	},
-																},
-															})
-														}
-													/>
+																})
+															}
+														/>
+													</div>
 												</div>
-											</button>
+											</div>
 										))}
 									</div>
 								);
