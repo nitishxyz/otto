@@ -37,6 +37,7 @@ interface OttoPlatformNotification {
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
 let hasRequestedNotificationPermission = false;
 let isDesktopWindowFocused = document.hasFocus();
+let ownsVoiceShortcutPress = false;
 
 function notificationIdFromString(id: string) {
 	let hash = 0;
@@ -85,6 +86,10 @@ function dispatchVoiceShortcutEvent(eventName: string) {
 	window.dispatchEvent(new CustomEvent(eventName));
 }
 
+function isCurrentWindowFocused() {
+	return isDesktopWindowFocused || document.hasFocus();
+}
+
 function registerDesktopPlatformAdapters() {
 	const win = window as OttoWindow;
 	const appWindow = getCurrentWindow();
@@ -121,11 +126,15 @@ function registerDesktopPlatformAdapters() {
 	if (!win.OTTO_VOICE_SHORTCUT_LISTENER) {
 		win.OTTO_VOICE_SHORTCUT_LISTENER = true;
 		void listen('otto:voice-shortcut-down', () => {
+			if (!isCurrentWindowFocused()) return;
+			ownsVoiceShortcutPress = true;
 			dispatchVoiceShortcutEvent('otto:voice-shortcut-down');
 		}).catch((error: unknown) => {
 			console.error('[otto] Failed to register voice shortcut down:', error);
 		});
 		void listen('otto:voice-shortcut-up', () => {
+			if (!ownsVoiceShortcutPress) return;
+			ownsVoiceShortcutPress = false;
 			dispatchVoiceShortcutEvent('otto:voice-shortcut-up');
 		}).catch((error: unknown) => {
 			console.error('[otto] Failed to register voice shortcut up:', error);

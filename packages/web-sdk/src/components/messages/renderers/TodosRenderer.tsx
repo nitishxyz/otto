@@ -1,9 +1,11 @@
 import { CheckCircle2, Circle, ArrowRight, XCircle } from 'lucide-react';
 import type { RendererProps } from './types';
 
+type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
 interface TodoItem {
 	step: string;
-	status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+	status: TodoStatus;
 }
 
 interface TodosResult {
@@ -11,8 +13,67 @@ interface TodosResult {
 	note?: string;
 }
 
+function isTodoStatus(status: unknown): status is TodoStatus {
+	return (
+		status === 'pending' ||
+		status === 'in_progress' ||
+		status === 'completed' ||
+		status === 'cancelled'
+	);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function normalizeTodoItems(rawItems: unknown): TodoItem[] | null {
+	if (!Array.isArray(rawItems)) return null;
+	const items = rawItems.flatMap((item): TodoItem[] => {
+		if (typeof item === 'string') {
+			const step = item.trim();
+			return step ? [{ step, status: 'pending' }] : [];
+		}
+		const record = asRecord(item);
+		if (!record || typeof record.step !== 'string') return [];
+		const step = record.step.trim();
+		if (!step) return [];
+		return [
+			{
+				step,
+				status: isTodoStatus(record.status) ? record.status : 'pending',
+			},
+		];
+	});
+	return items.length > 0 ? items : null;
+}
+
+function getTodosResult(
+	contentJson: RendererProps['contentJson'],
+): TodosResult {
+	const result = asRecord(contentJson.result);
+	const args = asRecord(contentJson.args);
+	const sources = [
+		{ rawItems: result?.items, note: result?.note },
+		{ rawItems: args?.todos, note: args?.note },
+	];
+
+	for (const source of sources) {
+		const items = normalizeTodoItems(source.rawItems);
+		if (items) {
+			return {
+				items,
+				note: typeof source.note === 'string' ? source.note : undefined,
+			};
+		}
+	}
+
+	return { items: [] };
+}
+
 export function TodosRenderer({ contentJson }: RendererProps) {
-	const result = (contentJson.result || {}) as TodosResult;
+	const result = getTodosResult(contentJson);
 	const items = result.items || [];
 	const note = result.note;
 

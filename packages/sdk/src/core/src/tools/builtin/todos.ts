@@ -60,7 +60,8 @@ export const updateTodosTool: Tool = tool({
 			.optional()
 			.describe('Optional note or context for the update'),
 	}),
-	async execute({ todos, note }: { todos: TodoItemInput[]; note?: string }) {
-		return { items: normalizeItems(todos), note };
+	async execute({ todos }: { todos: TodoItemInput[]; note?: string }) {
+		normalizeItems(todos);
+		return { ok: true };
 	},
 });

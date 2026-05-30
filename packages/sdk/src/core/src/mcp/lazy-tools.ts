@@ -67,10 +67,6 @@ export function buildLoadMCPToolsTool(briefs: MCPToolBrief[]): {
 					ok: true,
 					loaded,
 					...(notFound.length > 0 ? { notFound } : {}),
-					message:
-						loaded.length > 0
-							? `Loaded ${loaded.length} tool(s). They are now available for use.`
-							: 'No valid tools to load.',
 				};
 			},
 		}),

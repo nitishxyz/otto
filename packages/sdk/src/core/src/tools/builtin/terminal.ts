@@ -182,7 +182,6 @@ export function buildTerminalTool(
 							args: params.args || [],
 							shell: runInShell,
 							title: term.title,
-							message: `Started: ${params.command ?? command}${params.args ? ` ${params.args.join(' ')}` : ''}`,
 						};
 					}
 
@@ -249,7 +248,7 @@ export function buildTerminalTool(
 						return {
 							ok: true,
 							terminalId: term.id,
-							message: `Wrote ${params.input.length} characters to terminal`,
+							charactersWritten: params.input.length,
 						};
 					}
 
@@ -270,7 +269,6 @@ export function buildTerminalTool(
 						return {
 							ok: true,
 							terminalId: term.id,
-							message: 'Sent SIGINT (Ctrl+C) to terminal',
 						};
 					}
 
@@ -296,7 +294,6 @@ export function buildTerminalTool(
 						return {
 							ok: true,
 							terminalId: params.terminalId,
-							message: `Killed terminal ${params.terminalId}`,
 						};
 					}
 

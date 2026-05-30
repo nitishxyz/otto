@@ -427,8 +427,7 @@ describe('Built-in Tools', () => {
 			const result = await progressTool?.tool.execute({
 				message: 'Working...',
 			});
-			expect(result).toHaveProperty('message');
-			expect((result as { message: string }).message).toBe('Working...');
+			expect(result).toEqual({ ok: true });
 		});
 	});
 
@@ -443,7 +442,7 @@ describe('Built-in Tools', () => {
 					{ step: 'Task 2', status: 'in_progress' },
 				],
 			});
-			expect(result).toHaveProperty('items');
+			expect(result).toEqual({ ok: true });
 		});
 	});
 

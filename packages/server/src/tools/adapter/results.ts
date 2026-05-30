@@ -44,8 +44,11 @@ export function stripToolResultArtifactsForModel(result: unknown): unknown {
 	if (!result || typeof result !== 'object' || Array.isArray(result)) {
 		return result;
 	}
-	if (!('artifact' in result)) return result;
 	const { artifact: _artifact, ...rest } = result as Record<string, unknown>;
+	if (rest.operation === 'apply_patch' && 'changes' in rest) {
+		const { changes: _changes, ...compact } = rest;
+		return compact;
+	}
 	return rest;
 }
 

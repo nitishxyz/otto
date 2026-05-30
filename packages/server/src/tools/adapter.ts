@@ -164,7 +164,7 @@ export function adaptTools(
 				const baseToModelOutput = (base as { toModelOutput?: ToModelOutputFn })
 					.toModelOutput;
 				if (typeof baseToModelOutput === 'function') {
-					return baseToModelOutput(options);
+					return baseToModelOutput({ ...options, output: sanitizedOutput });
 				}
 				return {
 					type: 'json',
@@ -461,7 +461,7 @@ export function adaptTools(
 						publishToolResult(ctx, contentObj, stepIndexForEvent);
 						logToolResult(ctx, { name, callId, stepIndex: stepIndexForEvent });
 						if (name === 'update_todos') {
-							publishPlanUpdated(ctx, contentObj.result);
+							publishPlanUpdated(ctx, contentObj.result, contentObj.args);
 						}
 						return result as ToolExecuteReturn;
 					} catch (error) {

@@ -61,6 +61,39 @@ function isTodoStatus(status: unknown): status is TodoItem['status'] {
 	);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: null;
+}
+
+function normalizeTodoItems(rawItems: unknown): TodoItem[] | null {
+	if (!Array.isArray(rawItems)) return null;
+	const items = rawItems.flatMap((item): TodoItem[] => {
+		if (typeof item === 'string') {
+			const step = item.trim();
+			return step ? [{ step, status: 'pending' }] : [];
+		}
+		const record = asRecord(item);
+		if (!record) return [];
+		const rawStep =
+			typeof record.step === 'string'
+				? record.step
+				: typeof record.description === 'string'
+					? record.description
+					: '';
+		const step = rawStep.trim();
+		if (!step) return [];
+		return [
+			{
+				step,
+				status: isTodoStatus(record.status) ? record.status : 'pending',
+			},
+		];
+	});
+	return items.length > 0 ? items : null;
+}
+
 function getTodoToolName(
 	part: MessagePart,
 	content: Record<string, unknown> | null,
@@ -72,27 +105,25 @@ function getTodoToolName(
 function parseTodoSnapshot(
 	content: Record<string, unknown>,
 ): Omit<TodoSnapshot, 'updatedAt'> | null {
-	const rawResult = content.result;
-	const result =
-		rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
-			? (rawResult as Record<string, unknown>)
-			: content;
-	const rawItems = result.items;
-	if (!Array.isArray(rawItems)) return null;
+	const result = asRecord(content.result) ?? content;
+	const args = asRecord(content.args);
+	const sources = [
+		{ rawItems: result.items, note: result.note },
+		{ rawItems: content.items, note: content.note },
+		{ rawItems: args?.todos, note: args?.note },
+	];
 
-	const items = rawItems.flatMap((item): TodoItem[] => {
-		if (!item || typeof item !== 'object' || Array.isArray(item)) {
-			return [];
+	for (const source of sources) {
+		const items = normalizeTodoItems(source.rawItems);
+		if (items) {
+			return {
+				items,
+				note: typeof source.note === 'string' ? source.note : undefined,
+			};
 		}
-		const record = item as Record<string, unknown>;
-		if (typeof record.step !== 'string' || !isTodoStatus(record.status)) {
-			return [];
-		}
-		return [{ step: record.step, status: record.status }];
-	});
-	const note = typeof result.note === 'string' ? result.note : undefined;
+	}
 
-	return { items, note };
+	return null;
 }
 
 function isTodoSnapshotDone(snapshot: Omit<TodoSnapshot, 'updatedAt'>) {

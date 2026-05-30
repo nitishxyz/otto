@@ -94,22 +94,77 @@ export function logToolResult(
 	});
 }
 
+type PlanStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+type PlanItem = { step: string; status: PlanStatus };
+
+const PLAN_STATUSES = new Set<PlanStatus>([
+	'pending',
+	'in_progress',
+	'completed',
+	'cancelled',
+]);
+
+function normalizePlanItems(raw: unknown): PlanItem[] | null {
+	if (!Array.isArray(raw)) return null;
+	const items = raw.flatMap((item): PlanItem[] => {
+		if (typeof item === 'string') {
+			const step = item.trim();
+			return step ? [{ step, status: 'pending' }] : [];
+		}
+		if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+		const record = item as Record<string, unknown>;
+		if (typeof record.step !== 'string') return [];
+		const step = record.step.trim();
+		if (!step) return [];
+		const status = PLAN_STATUSES.has(record.status as PlanStatus)
+			? (record.status as PlanStatus)
+			: 'pending';
+		return [{ step, status }];
+	});
+	return items.length > 0 ? items : null;
+}
+
+function getPlanPayload(result: unknown, input?: unknown) {
+	const resultValue =
+		result && typeof result === 'object' && !Array.isArray(result)
+			? (result as Record<string, unknown>)
+			: undefined;
+	const resultItems = normalizePlanItems(resultValue?.items);
+	if (resultItems) {
+		return {
+			items: resultItems,
+			note:
+				typeof resultValue?.note === 'string' ? resultValue.note : undefined,
+		};
+	}
+
+	const inputValue =
+		input && typeof input === 'object' && !Array.isArray(input)
+			? (input as Record<string, unknown>)
+			: undefined;
+	const inputItems = normalizePlanItems(inputValue?.todos);
+	if (inputItems) {
+		return {
+			items: inputItems,
+			note: typeof inputValue?.note === 'string' ? inputValue.note : undefined,
+		};
+	}
+
+	return null;
+}
+
 export function publishPlanUpdated(
 	ctx: ToolAdapterContext,
 	result: unknown,
+	input?: unknown,
 ): void {
 	try {
-		const resultValue = result as
-			| { items?: unknown; note?: unknown }
-			| undefined;
-		if (resultValue && Array.isArray(resultValue.items)) {
+		const payload = getPlanPayload(result, input);
+		if (payload) {
 			publish({
 				type: 'plan.updated',
 				sessionId: ctx.sessionId,
-				payload: {
-					items: resultValue.items,
-					note: resultValue.note,
-				},
+				payload,
 			});
 		}
 	} catch {}
