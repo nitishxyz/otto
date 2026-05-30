@@ -170,6 +170,7 @@ interface MessagePartItemProps {
 	isFirstPart: boolean;
 	isLastToolCall?: boolean;
 	isLastProgressUpdate?: boolean;
+	isStatusLineToolCall?: boolean;
 	onNavigateToSession?: (sessionId: string) => void;
 	compact?: boolean;
 	pendingApproval?: PendingToolApproval | null;
@@ -186,6 +187,7 @@ export const MessagePartItem = memo(
 		showLine,
 		isLastToolCall,
 		isLastProgressUpdate,
+		isStatusLineToolCall,
 		onNavigateToSession,
 		compact,
 		pendingApproval,
@@ -197,12 +199,13 @@ export const MessagePartItem = memo(
 	}: MessagePartItemProps) {
 		const isCompactDensity = useIsCompactThread();
 		const isCompactThread = Boolean(compact || isCompactDensity);
-		// Show tool_call if it's the last one OR if it has a pending approval
-		// Never show loading indicator for progress_update calls
+		// Show tool_call if it's the last one OR if it has a pending approval.
+		// progress_update calls only render when pinned into the status line slot.
 		if (part.type === 'tool_call') {
 			const toolName = part.toolName || '';
-			if (toolName === 'progress_update') return null;
-			if (!isLastToolCall && !pendingApproval) return null;
+			if (toolName === 'progress_update' && !isStatusLineToolCall) return null;
+			if (!isStatusLineToolCall && !isLastToolCall && !pendingApproval)
+				return null;
 		}
 
 		if (
@@ -674,6 +677,7 @@ export const MessagePartItem = memo(
 			prevProps.showLine === nextProps.showLine &&
 			prevProps.isLastToolCall === nextProps.isLastToolCall &&
 			prevProps.isLastProgressUpdate === nextProps.isLastProgressUpdate &&
+			prevProps.isStatusLineToolCall === nextProps.isStatusLineToolCall &&
 			prevProps.compact === nextProps.compact &&
 			prevProps.onNavigateToSession === nextProps.onNavigateToSession &&
 			prevProps.pendingApproval?.callId === nextProps.pendingApproval?.callId &&

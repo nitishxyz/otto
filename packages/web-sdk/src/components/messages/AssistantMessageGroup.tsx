@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react';
 import { memo, useState, useCallback, useMemo } from 'react';
 import {
 	Sparkles,
@@ -54,6 +55,16 @@ function getLoadingMessage(messageId: string) {
 		.split('')
 		.reduce((acc, char) => acc + char.charCodeAt(0), 0);
 	return loadingMessages[hash % loadingMessages.length];
+}
+
+const STATUS_LINE_TOOL_NAMES = new Set([
+	'progress_update',
+	'update_status',
+	'update_todos',
+]);
+
+function isStatusLineTool(toolName: string | null | undefined) {
+	return STATUS_LINE_TOOL_NAMES.has(toolName || '');
 }
 
 type AssistantRenderItem =
@@ -162,6 +173,25 @@ export const AssistantMessageGroup = memo(
 		);
 		const latestProgressUpdatePart =
 			latestProgressUpdateIndex >= 0 ? parts[latestProgressUpdateIndex] : null;
+		const completedToolCallIds = new Set(
+			parts
+				.filter((part) => part.type === 'tool_result' && part.toolCallId)
+				.map((part) => part.toolCallId)
+				.filter((callId): callId is string => Boolean(callId)),
+		);
+		const latestStatusLineToolCallIndex = parts.reduce(
+			(lastIndex, part, index) =>
+				part.type === 'tool_call' &&
+				isStatusLineTool(part.toolName) &&
+				(!part.toolCallId || !completedToolCallIds.has(part.toolCallId))
+					? index
+					: lastIndex,
+			-1,
+		);
+		const latestStatusLineToolCallPart =
+			latestStatusLineToolCallIndex >= 0
+				? parts[latestStatusLineToolCallIndex]
+				: null;
 		const liveActionToolCallIds = new Set(
 			parts
 				.filter(
@@ -246,6 +276,11 @@ export const AssistantMessageGroup = memo(
 					continue;
 				}
 
+				if (isStatusLineTool(part.toolName)) {
+					flushCompactBuffer();
+					continue;
+				}
+
 				if (compact && isCompactActivityPart(part)) {
 					if (compactBuffer.length === 0) {
 						bufferStartIndex = index;
@@ -263,16 +298,21 @@ export const AssistantMessageGroup = memo(
 		}, [parts, compact]);
 		const hasVisibleNonProgressParts = renderItems.length > 0;
 		const firstVisiblePartIndex = parts.findIndex(
-			(part) =>
-				!(part.type === 'tool_result' && part.toolName === 'progress_update'),
+			(part) => !isStatusLineTool(part.toolName),
 		);
+		const shouldShowStatusLineToolCall =
+			message.status === 'pending' &&
+			!hasFinish &&
+			Boolean(latestStatusLineToolCallPart);
 		const shouldShowProgressUpdate =
 			message.status === 'pending' &&
 			!hasFinish &&
+			!latestStatusLineToolCallPart &&
 			Boolean(latestProgressUpdatePart);
 		const shouldShowLoadingFallback =
 			message.status === 'pending' &&
 			!hasFinish &&
+			!latestStatusLineToolCallPart &&
 			!latestProgressUpdatePart &&
 			!isQueued;
 		const shouldShowErrorFallback =
@@ -311,6 +351,13 @@ export const AssistantMessageGroup = memo(
 		const handleBranchClick = useCallback(() => {
 			setShowBranchModal(true);
 		}, []);
+
+		const statusLineMotion = {
+			initial: { opacity: 0, y: 6, filter: 'blur(2px)' },
+			animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+			exit: { opacity: 0, y: -6, filter: 'blur(2px)' },
+			transition: { duration: 0.16, ease: 'easeOut' },
+		} as const;
 
 		if (isQueued) {
 			return null;
@@ -391,6 +438,7 @@ export const AssistantMessageGroup = memo(
 						const hasFollowingContent =
 							renderIndex < renderItems.length - 1 ||
 							hasNextAssistantMessage ||
+							shouldShowStatusLineToolCall ||
 							shouldShowProgressUpdate ||
 							shouldShowLoadingFallback;
 
@@ -493,49 +541,72 @@ export const AssistantMessageGroup = memo(
 						</div>
 					)}
 
-					{shouldShowProgressUpdate && latestProgressUpdatePart && (
-						<MessagePartItem
-							key={latestProgressUpdatePart.id}
-							part={latestProgressUpdatePart}
-							showLine={hasNextAssistantMessage}
-							isFirstPart={!hasVisibleNonProgressParts && !showHeader}
-							isLastProgressUpdate
-							compact={compact}
-						/>
-					)}
+					<AnimatePresence mode="wait" initial={false}>
+						{shouldShowStatusLineToolCall && latestStatusLineToolCallPart ? (
+							<motion.div
+								key={`status-tool-${latestStatusLineToolCallPart.id}`}
+								{...statusLineMotion}
+							>
+								<MessagePartItem
+									part={latestStatusLineToolCallPart}
+									showLine={hasNextAssistantMessage}
+									isFirstPart={!hasVisibleNonProgressParts && !showHeader}
+									isLastToolCall
+									isStatusLineToolCall
+									compact={compact}
+								/>
+							</motion.div>
+						) : shouldShowProgressUpdate && latestProgressUpdatePart ? (
+							<motion.div
+								key={`status-progress-${latestProgressUpdatePart.id}`}
+								{...statusLineMotion}
+							>
+								<MessagePartItem
+									part={latestProgressUpdatePart}
+									showLine={hasNextAssistantMessage}
+									isFirstPart={!hasVisibleNonProgressParts && !showHeader}
+									isLastProgressUpdate
+									compact={compact}
+								/>
+							</motion.div>
+						) : shouldShowLoadingFallback ? (
+							<motion.div
+								key={`status-loading-${message.id}`}
+								{...statusLineMotion}
+							>
+								<div
+									className={`flex ${
+										isCompactThread ? 'gap-1.5' : 'gap-3'
+									} pb-2 relative max-w-full overflow-hidden`}
+								>
+									<div
+										className={`flex-shrink-0 ${
+											isCompactThread ? 'w-4' : 'w-6'
+										} flex items-center justify-center relative`}
+									>
+										<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-card text-violet-700 dark:bg-background dark:text-violet-300">
+											<StableSpinner title="Assistant is working" />
+										</div>
+										{hasNextAssistantMessage && (
+											<div
+												className="absolute left-1/2 -translate-x-1/2 w-[2px] bg-border z-0"
+												style={{ top: '1.25rem', bottom: '-0.5rem' }}
+											/>
+										)}
+									</div>
+									<div className="flex-1 min-w-0">
+										<div className="text-base leading-5 text-foreground animate-pulse">
+											{getLoadingMessage(message.id)}
+										</div>
+									</div>
+								</div>
+							</motion.div>
+						) : null}
+					</AnimatePresence>
 
 					{shouldShowErrorFallback && (
 						<div className="ml-7 mb-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
 							{message.error}
-						</div>
-					)}
-
-					{shouldShowLoadingFallback && (
-						<div
-							className={`flex ${
-								isCompactThread ? 'gap-1.5' : 'gap-3'
-							} pb-2 relative max-w-full overflow-hidden`}
-						>
-							<div
-								className={`flex-shrink-0 ${
-									isCompactThread ? 'w-4' : 'w-6'
-								} flex items-center justify-center relative`}
-							>
-								<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full relative bg-card text-violet-700 dark:bg-background dark:text-violet-300">
-									<StableSpinner title="Assistant is working" />
-								</div>
-								{hasNextAssistantMessage && (
-									<div
-										className="absolute left-1/2 -translate-x-1/2 w-[2px] bg-border z-0"
-										style={{ top: '1.25rem', bottom: '-0.5rem' }}
-									/>
-								)}
-							</div>
-							<div className="flex-1 min-w-0">
-								<div className="text-base leading-5 text-foreground animate-pulse">
-									{getLoadingMessage(message.id)}
-								</div>
-							</div>
 						</div>
 					)}
 				</div>
