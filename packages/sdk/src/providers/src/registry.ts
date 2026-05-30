@@ -66,6 +66,22 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 	return trimmed;
 }
 
+function normalizeConfiguredModels(
+	models: ProviderSettingsEntry['models'] | undefined,
+): ModelInfo[] {
+	if (!models) return [];
+	return models
+		.map((model): ModelInfo | null => {
+			if (typeof model === 'string') {
+				const id = model.trim();
+				return id ? { id, label: id } : null;
+			}
+			const id = normalizeOptionalText(model.id);
+			return id ? { ...model, id, label: model.label ?? id } : null;
+		})
+		.filter((model): model is ModelInfo => model !== null);
+}
+
 function resolveCustomCompatibility(
 	settings: ProviderSettingsEntry,
 ): ProviderCompatibility {
@@ -121,7 +137,8 @@ export function getProviderDefinition(
 
 	if (!settings?.custom) return undefined;
 	const cachedEntry = getCachedProviderCatalogEntry(provider);
-	const models = cachedEntry?.models ?? [];
+	const configuredModels = normalizeConfiguredModels(settings.models);
+	const models = cachedEntry?.models ?? configuredModels;
 	return {
 		id: provider,
 		label: settings.label ?? cachedEntry?.label ?? provider,

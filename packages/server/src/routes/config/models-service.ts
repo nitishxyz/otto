@@ -319,7 +319,7 @@ export async function handleGetProviderModels(c: Context) {
 			});
 		}
 		const filteredModels = getProviderModelsForUi({
-			catalogModels: providerCatalog?.models,
+			catalogModels: providerCatalog?.models ?? providerDefinition?.models,
 			provider,
 			authType,
 		});
@@ -371,7 +371,7 @@ export async function handleGetAllModels(c: Context) {
 		for (const provider of authorizedProviders) {
 			const providerCatalog = modelCatalogProviders[provider];
 			const providerDefinition = getProviderDefinition(cfg, provider);
-			if (!providerCatalog) continue;
+			if (!providerCatalog && !providerDefinition) continue;
 			const dynamicModels =
 				providerDefinition && shouldLazyLoadProviderModels(providerDefinition);
 			const authType = await getAuthTypeForProvider(
@@ -387,14 +387,14 @@ export async function handleGetAllModels(c: Context) {
 				});
 			}
 			const filteredModels = getProviderModelsForUi({
-				catalogModels: providerCatalog?.models,
+				catalogModels: providerCatalog?.models ?? providerDefinition?.models,
 				provider,
 				authType,
 			});
 			modelsMap[provider] = {
 				label: providerDefinition
 					? getUiProviderLabel(providerDefinition)
-					: (providerCatalog.label ?? provider),
+					: (providerCatalog?.label ?? provider),
 				authType,
 				allowAnyModel: providerDefinition?.allowAnyModel,
 				dynamicModels,

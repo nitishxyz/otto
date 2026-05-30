@@ -70,9 +70,12 @@ describe('custom declarative providers', () => {
 			compatibility: 'ollama',
 			family: 'default',
 			baseURL: 'http://127.0.0.1:11434/api',
-			allowAnyModel: true,
+			allowAnyModel: false,
 		});
-		expect(definition?.models).toEqual([]);
+		expect(definition?.models).toEqual([
+			{ id: 'qwen2.5-coder:14b', label: 'qwen2.5-coder:14b' },
+			{ id: 'deepseek-r1:32b', label: 'deepseek-r1:32b' },
+		]);
 	});
 
 	test('validates cached custom provider models', async () => {
@@ -189,8 +192,22 @@ describe('custom declarative providers', () => {
 				models: Array<{ id: string }>;
 				allowAnyModel: boolean;
 			};
-			expect(modelsPayload.allowAnyModel).toBe(true);
-			expect(modelsPayload.models).toEqual([]);
+			expect(modelsPayload.allowAnyModel).toBe(false);
+			expect(modelsPayload.models.map((model) => model.id)).toEqual([
+				'qwen2.5-coder:14b',
+			]);
+
+			const allModelsResponse = await app.request(
+				`http://localhost/v1/config/models?project=${encodeURIComponent(projectRoot)}`,
+			);
+			expect(allModelsResponse.status).toBe(200);
+			const allModelsPayload = (await allModelsResponse.json()) as Record<
+				string,
+				{ models: Array<{ id: string }> }
+			>;
+			expect(
+				allModelsPayload['my-ollama'].models.map((model) => model.id),
+			).toEqual(['qwen2.5-coder:14b']);
 		} finally {
 			if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
 			else process.env.XDG_CONFIG_HOME = previousConfigHome;
