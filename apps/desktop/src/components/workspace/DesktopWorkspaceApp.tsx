@@ -30,6 +30,7 @@ export function DesktopWorkspaceApp({
 		<DesktopWorkspaceProvider apiUrl={apiUrl}>
 			<div className="h-full min-h-0" data-project-path={project.path}>
 				<DesktopSessionsLayout
+					project={project}
 					theme={theme}
 					onToggleTheme={onToggleTheme}
 					sessionId={sessionId}

@@ -30,6 +30,7 @@ export function useProjects() {
 				name,
 				lastOpened: new Date().toISOString(),
 				pinned: false,
+				kind: 'local',
 			};
 			await tauriBridge.saveRecentProject(project);
 			await loadProjects();

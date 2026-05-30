@@ -5,6 +5,7 @@ export interface Project {
 	name: string;
 	lastOpened: string;
 	pinned: boolean;
+	kind?: 'local' | 'remote' | 'general';
 	remoteUrl?: string;
 }
 
@@ -68,6 +69,7 @@ export const tauriBridge = {
 		invoke('remove_recent_project', { path }),
 	toggleProjectPinned: (path: string) =>
 		invoke('toggle_project_pinned', { path }),
+	getGeneralWorkspacePath: () => invoke<string>('get_general_workspace_path'),
 
 	startServer: (projectPath: string, port?: number) =>
 		invoke<ServerInfo>('start_server', { projectPath, port }),

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, X, Link } from 'lucide-react';
+import { Star, X, Link, MessageCircle } from 'lucide-react';
 import type { Project } from '../lib/tauri-bridge';
 import { formatTimeAgo } from '../utils/format-time';
 
@@ -27,7 +27,9 @@ export function ProjectCard({
 			onMouseLeave={() => setHovered(false)}
 		>
 			<div className="w-9 h-9 rounded-md bg-muted/80 flex items-center justify-center flex-shrink-0">
-				{project.remoteUrl ? (
+				{project.kind === 'general' ? (
+					<MessageCircle className="w-4 h-4 text-muted-foreground" />
+				) : project.remoteUrl ? (
 					<Link className="w-4 h-4 text-muted-foreground" />
 				) : (
 					<svg
@@ -50,7 +52,9 @@ export function ProjectCard({
 					{project.name}
 				</div>
 				<div className="text-[13px] text-muted-foreground/70 truncate">
-					{project.remoteUrl || project.path}
+					{project.kind === 'general'
+						? 'General workspace'
+						: project.remoteUrl || project.path}
 				</div>
 			</div>
 

@@ -37,6 +37,7 @@ function App() {
 					name: remoteName,
 					lastOpened: new Date().toISOString(),
 					pinned: false,
+					kind: 'remote',
 					remoteUrl,
 				};
 				nextRoute = '/sessions';
@@ -47,6 +48,7 @@ function App() {
 					name,
 					lastOpened: new Date().toISOString(),
 					pinned: false,
+					kind: 'local',
 				};
 				tauriBridge.saveRecentProject(nextProject).catch(() => {});
 				nextRoute = '/sessions';

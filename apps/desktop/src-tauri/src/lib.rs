@@ -198,6 +198,7 @@ pub fn run() {
             commands::project::save_recent_project,
             commands::project::remove_recent_project,
             commands::project::toggle_project_pinned,
+            commands::project::get_general_workspace_path,
             commands::server::start_server,
             commands::server::stop_server,
             commands::server::stop_all_servers,

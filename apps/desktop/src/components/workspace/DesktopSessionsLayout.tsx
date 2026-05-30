@@ -28,9 +28,11 @@ import {
 import { apiClient } from '@ottocode/web-sdk/lib';
 import { useConfirmationStore, useGitStore } from '@ottocode/web-sdk/stores';
 import type { Theme } from '@ottocode/web-sdk/hooks';
+import type { Project } from '../../lib/tauri-bridge';
 import { DesktopAppLayout } from './DesktopAppLayout';
 
 interface DesktopSessionsLayoutProps {
+	project: Project;
 	theme: Theme;
 	onToggleTheme: () => void;
 	sessionId?: string;
@@ -39,6 +41,7 @@ interface DesktopSessionsLayoutProps {
 }
 
 export function DesktopSessionsLayout({
+	project,
 	theme,
 	onToggleTheme,
 	sessionId,
@@ -59,6 +62,8 @@ export function DesktopSessionsLayout({
 	const openConfirmation = useConfirmationStore(
 		(state) => state.openConfirmation,
 	);
+	const defaultAgent =
+		project.kind === 'general' ? 'general' : config?.defaults.agent;
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
@@ -111,7 +116,7 @@ export function DesktopSessionsLayout({
 		async (errorMessage: string) => {
 			try {
 				const session = await createSession.mutateAsync({
-					agent: config?.defaults.agent || 'general',
+					agent: defaultAgent || 'general',
 					provider: config?.defaults.provider,
 					model: config?.defaults.model,
 					title: 'Fix Git Error',
@@ -127,7 +132,7 @@ export function DesktopSessionsLayout({
 				console.error('Failed to create fix session:', error);
 			}
 		},
-		[createSession, config, navigate],
+		[createSession, config, defaultAgent, navigate],
 	);
 
 	const handleCopyText = useCallback(async (text: string) => {
@@ -235,7 +240,12 @@ export function DesktopSessionsLayout({
 
 	const mainContent = useMemo(() => {
 		if (!sessionId) {
-			return <NewSessionLanding onSessionCreated={handleSessionCreated} />;
+			return (
+				<NewSessionLanding
+					defaultAgent={defaultAgent}
+					onSessionCreated={handleSessionCreated}
+				/>
+			);
 		}
 
 		return (
@@ -260,6 +270,7 @@ export function DesktopSessionsLayout({
 		handleDeleteSession,
 		handleCopyText,
 		handleSessionCreated,
+		defaultAgent,
 	]);
 
 	return (

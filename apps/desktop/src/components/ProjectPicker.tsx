@@ -16,6 +16,7 @@ import {
 	FolderOpen,
 	GitBranch,
 	Link,
+	MessageCircle,
 	Star,
 	X,
 } from 'lucide-react';
@@ -84,6 +85,22 @@ export function ProjectPicker({
 		}
 	};
 
+	const handleGeneral = async () => {
+		try {
+			const path = await tauriBridge.getGeneralWorkspacePath();
+			const project: Project = {
+				path,
+				name: 'General',
+				lastOpened: new Date().toISOString(),
+				pinned: false,
+				kind: 'general',
+			};
+			onSelectProject(project);
+		} catch (err) {
+			alert(`Failed to open General workspace: ${err}`);
+		}
+	};
+
 	const handleConnect = () => {
 		if (!connectUrl.trim()) return;
 		try {
@@ -94,6 +111,7 @@ export function ProjectPicker({
 				name,
 				lastOpened: new Date().toISOString(),
 				pinned: false,
+				kind: 'remote',
 				remoteUrl: connectUrl.trim(),
 			};
 			tauriBridge.saveRecentProject(project).catch(() => {});
@@ -143,6 +161,7 @@ export function ProjectPicker({
 				name,
 				lastOpened: new Date().toISOString(),
 				pinned: false,
+				kind: 'local',
 			};
 			onSelectProject(project);
 		} catch (err) {
@@ -278,8 +297,8 @@ export function ProjectPicker({
 							)}
 						</div>
 
-						<div className="w-full max-w-xl">
-							<div className="grid grid-cols-3 gap-3 mb-10">
+						<div className="w-full max-w-2xl">
+							<div className="grid grid-cols-4 gap-3 mb-10">
 								<button
 									type="button"
 									onClick={handleOpenFolder}
@@ -294,6 +313,24 @@ export function ProjectPicker({
 										</div>
 										<div className="text-xs text-muted-foreground/60 mt-0.5">
 											Local project
+										</div>
+									</div>
+								</button>
+
+								<button
+									type="button"
+									onClick={handleGeneral}
+									className="group flex flex-col items-center gap-3 p-5 rounded-xl border border-border/50 hover:border-border hover:bg-muted/30 transition-all duration-150 text-center"
+								>
+									<div className="w-10 h-10 rounded-lg bg-muted/60 group-hover:bg-muted flex items-center justify-center transition-colors">
+										<MessageCircle className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+									</div>
+									<div>
+										<div className="text-sm font-medium text-foreground">
+											General
+										</div>
+										<div className="text-xs text-muted-foreground/60 mt-0.5">
+											No project
 										</div>
 									</div>
 								</button>

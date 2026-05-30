@@ -11,6 +11,8 @@ pub struct Project {
     pub last_opened: DateTime<Utc>,
     pub pinned: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_url: Option<String>,
 }
 
@@ -18,6 +20,14 @@ fn get_projects_config_path() -> Result<PathBuf, String> {
     dirs::home_dir()
         .ok_or_else(|| "No home directory".to_string())
         .map(|p| p.join(".otto").join("desktop-projects.json"))
+}
+
+fn get_general_workspace_dir() -> Result<PathBuf, String> {
+    let base_dir = dirs::data_dir()
+        .or_else(dirs::home_dir)
+        .ok_or_else(|| "No data directory".to_string())?;
+
+    Ok(base_dir.join("otto").join("general"))
 }
 
 #[tauri::command]
@@ -33,6 +43,15 @@ pub async fn open_project_dialog(app: tauri::AppHandle) -> Result<Option<String>
         Ok(None) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
+}
+
+#[tauri::command]
+pub async fn get_general_workspace_path() -> Result<String, String> {
+    let workspace_dir = get_general_workspace_dir()?;
+
+    std::fs::create_dir_all(&workspace_dir).map_err(|e| e.to_string())?;
+
+    Ok(workspace_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]

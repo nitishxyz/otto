@@ -20,6 +20,7 @@ import type { Session } from '../../types/api';
 
 interface NewSessionLandingProps {
 	onSessionCreated: (sessionId: string) => void;
+	defaultAgent?: string;
 	wordmark?: React.ReactNode;
 	compact?: boolean;
 	modalPosition?: 'fixed' | 'absolute';
@@ -32,7 +33,7 @@ export interface NewSessionLandingRef {
 export const NewSessionLanding = memo(
 	forwardRef<NewSessionLandingRef, NewSessionLandingProps>(
 		function NewSessionLanding(
-			{ onSessionCreated, wordmark, compact, modalPosition },
+			{ onSessionCreated, defaultAgent, wordmark, compact, modalPosition },
 			ref,
 		) {
 			const { data: config } = useConfig();
@@ -57,10 +58,10 @@ export const NewSessionLanding = memo(
 			useEffect(() => {
 				if (initializedRef.current || !config?.defaults) return;
 				initializedRef.current = true;
-				setAgent(config.defaults.agent || 'general');
+				setAgent(defaultAgent || config.defaults.agent || 'general');
 				setProvider(config.defaults.provider || '');
 				setModel(config.defaults.model || '');
-			}, [config]);
+			}, [config, defaultAgent]);
 
 			const modelSupportsVision = allModels?.[provider]?.models?.find(
 				(m) => m.id === model,
