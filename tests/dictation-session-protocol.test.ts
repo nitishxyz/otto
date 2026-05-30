@@ -99,6 +99,22 @@ describe('dictation session manager', () => {
 		expect(transcribeCalls).toBe(0);
 	});
 
+	test('filters foreign-language placeholder transcripts', async () => {
+		const manager = createDictationSessionManager({
+			async transcribe() {
+				return { text: '(speaking in foreign language)' };
+			},
+		});
+		const created = manager.create();
+		await manager.start(created.id);
+
+		await manager.appendAudioFrame(created.id, createAudiblePcm(300));
+		const final = await manager.stop(created.id);
+
+		expect(final.type).toBe('final');
+		expect(final.text).toBe('');
+	});
+
 	test('rejects audio frames before start', async () => {
 		const manager = createDictationSessionManager();
 		const created = manager.create();

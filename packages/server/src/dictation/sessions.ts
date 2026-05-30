@@ -25,6 +25,7 @@ const SPEECH_FRAME_MS = 20;
 const MIN_SPEECH_FRAME_COUNT = 3;
 const SPEECH_RMS_THRESHOLD = 0.01;
 const SPEECH_PEAK_THRESHOLD = 0.03;
+const IGNORED_TRANSCRIPTS = new Set(['speaking in foreign language']);
 
 export class DictationSessionError extends Error {
 	constructor(
@@ -178,12 +179,13 @@ export class DictationSessionManager {
 						wavPath: session.wavPath,
 					})
 				: { text: '' };
+			const finalText = sanitizeTranscript(text);
 			session.status = 'completed';
-			session.text = text;
+			session.text = finalText;
 			touch(session);
 			return {
 				type: 'final',
-				text,
+				text: finalText,
 				language: session.language,
 				model: session.model,
 				durationMs: session.receivedMs,
@@ -263,6 +265,22 @@ function shouldTranscribePcm(pcm: Buffer, format: AudioFormat): boolean {
 	}
 
 	return false;
+}
+
+function sanitizeTranscript(text: string): string {
+	const trimmed = text.trim();
+	if (IGNORED_TRANSCRIPTS.has(normalizeTranscriptForFiltering(trimmed))) {
+		return '';
+	}
+	return trimmed;
+}
+
+function normalizeTranscriptForFiltering(text: string): string {
+	return text
+		.toLowerCase()
+		.replace(/^[\s([{"'“‘]+|[\s)\]}"'”’.,!?]+$/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function calculatePcmFrameEnergy(
