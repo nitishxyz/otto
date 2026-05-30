@@ -24,6 +24,20 @@ const fakeTranscriptionRunner: DictationTranscriptionRunner = {
 	},
 };
 
+function createAudiblePcm(durationMs: number): Uint8Array {
+	const sampleRate = 16_000;
+	const samples = Math.floor((sampleRate * durationMs) / 1000);
+	const frame = new Uint8Array(samples * 2);
+	const view = new DataView(frame.buffer);
+	for (let index = 0; index < samples; index++) {
+		const sample = Math.round(
+			Math.sin((index / sampleRate) * 2 * Math.PI * 440) * 8000,
+		);
+		view.setInt16(index * 2, sample, true);
+	}
+	return frame;
+}
+
 beforeEach(async () => {
 	originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
 	process.env.XDG_CONFIG_HOME = tempConfigHome;
@@ -48,22 +62,41 @@ describe('dictation session manager', () => {
 
 		expect(started.status).toBe('recording');
 
-		const frame = new Uint8Array(3200);
+		const frame = createAudiblePcm(300);
 		const updated = await manager.appendAudioFrame(created.id, frame);
 
-		expect(updated.receivedBytes).toBe(3200);
-		expect(updated.receivedMs).toBe(100);
+		expect(updated.receivedBytes).toBe(9600);
+		expect(updated.receivedMs).toBe(300);
 
 		const final = await manager.stop(created.id);
 
 		expect(final.type).toBe('final');
-		expect(final.durationMs).toBe(100);
-		expect(final.text).toBe('[dictation fake: received 100ms of audio]');
+		expect(final.durationMs).toBe(300);
+		expect(final.text).toBe('[dictation fake: received 300ms of audio]');
 
 		const wav = await readFile(created.wavPath);
 		expect(wav.subarray(0, 4).toString()).toBe('RIFF');
 		expect(wav.subarray(8, 12).toString()).toBe('WAVE');
 		expect(wav.byteLength).toBe(44 + frame.byteLength);
+	});
+
+	test('returns an empty transcript for silent audio without transcribing', async () => {
+		let transcribeCalls = 0;
+		const manager = createDictationSessionManager({
+			async transcribe() {
+				transcribeCalls++;
+				return { text: 'you' };
+			},
+		});
+		const created = manager.create();
+		await manager.start(created.id);
+
+		await manager.appendAudioFrame(created.id, new Uint8Array(16_000));
+		const final = await manager.stop(created.id);
+
+		expect(final.type).toBe('final');
+		expect(final.text).toBe('');
+		expect(transcribeCalls).toBe(0);
 	});
 
 	test('rejects audio frames before start', async () => {

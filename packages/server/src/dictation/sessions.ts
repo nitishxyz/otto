@@ -21,6 +21,10 @@ import {
 } from './transcribe.ts';
 
 const MAX_DICTATION_BYTES = 32 * 1024 * 1024;
+const SPEECH_FRAME_MS = 20;
+const MIN_SPEECH_FRAME_COUNT = 3;
+const SPEECH_RMS_THRESHOLD = 0.01;
+const SPEECH_PEAK_THRESHOLD = 0.03;
 
 export class DictationSessionError extends Error {
 	constructor(
@@ -168,10 +172,12 @@ export class DictationSessionManager {
 		try {
 			const pcm = await readFile(session.pcmPath);
 			await writeFile(session.wavPath, createWavFile(pcm, session.format));
-			const { text } = await this.transcriptionRunner.transcribe({
-				session: { ...session },
-				wavPath: session.wavPath,
-			});
+			const { text } = shouldTranscribePcm(pcm, session.format)
+				? await this.transcriptionRunner.transcribe({
+						session: { ...session },
+						wavPath: session.wavPath,
+					})
+				: { text: '' };
 			session.status = 'completed';
 			session.text = text;
 			touch(session);
@@ -231,6 +237,54 @@ function calculateDurationMs(bytes: number, format: AudioFormat): number {
 	const bytesPerSample = format.encoding === 'pcm_s16le' ? 2 : 1;
 	const bytesPerSecond = format.sampleRate * format.channels * bytesPerSample;
 	return Math.floor((bytes / bytesPerSecond) * 1000);
+}
+
+function shouldTranscribePcm(pcm: Buffer, format: AudioFormat): boolean {
+	const samplesPerFrame = Math.max(
+		1,
+		Math.floor((format.sampleRate * SPEECH_FRAME_MS) / 1000) * format.channels,
+	);
+	const bytesPerFrame = samplesPerFrame * 2;
+	let speechFrames = 0;
+
+	for (let offset = 0; offset + 1 < pcm.byteLength; offset += bytesPerFrame) {
+		const energy = calculatePcmFrameEnergy(
+			pcm,
+			offset,
+			Math.min(offset + bytesPerFrame, pcm.byteLength),
+		);
+		if (
+			energy.rms >= SPEECH_RMS_THRESHOLD ||
+			energy.peak >= SPEECH_PEAK_THRESHOLD
+		) {
+			speechFrames++;
+			if (speechFrames >= MIN_SPEECH_FRAME_COUNT) return true;
+		}
+	}
+
+	return false;
+}
+
+function calculatePcmFrameEnergy(
+	pcm: Buffer,
+	start: number,
+	end: number,
+): { rms: number; peak: number } {
+	let sumSquares = 0;
+	let peak = 0;
+	let samples = 0;
+	for (let index = start; index + 1 < end; index += 2) {
+		const sample = pcm.readInt16LE(index) / 32768;
+		const abs = Math.abs(sample);
+		peak = Math.max(peak, abs);
+		sumSquares += sample * sample;
+		samples++;
+	}
+
+	return {
+		rms: samples === 0 ? 0 : Math.sqrt(sumSquares / samples),
+		peak,
+	};
 }
 
 function createWavFile(pcm: Buffer, format: AudioFormat): Buffer {
