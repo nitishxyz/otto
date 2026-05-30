@@ -2,6 +2,11 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent } from 'react';
 import type { Theme } from '@ottocode/web-sdk/hooks';
 import {
+	clearRuntimeApiBaseUrl,
+	configureApiClient,
+	getConfiguredRuntimeApiBaseUrl,
+} from '@ottocode/web-sdk/lib';
+import {
 	GitSidebarToggle,
 	GitSidebar,
 	TerminalPanelToggle,
@@ -55,6 +60,7 @@ import {
 	X,
 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
+import { isHostedApp } from '../../lib/hosted-app';
 
 const VIEWER_MIN_CHAT_WIDTH = 360;
 const VIEWER_PANEL_KEY = 'viewer';
@@ -81,6 +87,15 @@ function useMediaQuery(query: string): boolean {
 	return matches;
 }
 
+function getHostedConnectionUrl(): string | undefined {
+	if (!isHostedApp()) return undefined;
+	try {
+		return getConfiguredRuntimeApiBaseUrl();
+	} catch {
+		return undefined;
+	}
+}
+
 interface AppLayoutProps {
 	sidebar: ReactNode;
 	children: ReactNode;
@@ -103,6 +118,9 @@ export const AppLayout = memo(function AppLayout({
 }: AppLayoutProps) {
 	const navigate = useNavigate();
 	const [isMobilePanelMenuOpen, setIsMobilePanelMenuOpen] = useState(false);
+	const [hostedConnectionUrl, setHostedConnectionUrl] = useState(
+		getHostedConnectionUrl,
+	);
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const toggleGitPanel = useGitStore((s) => s.toggleSidebar);
@@ -194,6 +212,16 @@ export const AppLayout = memo(function AppLayout({
 		setIsMobilePanelMenuOpen(false);
 		togglePanel();
 	}, []);
+	const handleSwitchConnection = useCallback(() => {
+		clearRuntimeApiBaseUrl();
+		configureApiClient();
+		setHostedConnectionUrl(undefined);
+		void navigate({ to: '/', replace: true });
+	}, [navigate]);
+
+	useEffect(() => {
+		setHostedConnectionUrl(getHostedConnectionUrl());
+	}, []);
 
 	useEffect(() => {
 		const wasRightPanelOpen = previousRightPanelOpenRef.current;
@@ -281,7 +309,13 @@ export const AppLayout = memo(function AppLayout({
 			onTouchEnd={handleTouchEnd}
 		>
 			{/* Left sidebar - Sessions */}
-			<Sidebar onNewSession={onNewSession}>{sidebar}</Sidebar>
+			<Sidebar
+				onNewSession={onNewSession}
+				connectionUrl={hostedConnectionUrl}
+				onSwitchConnection={handleSwitchConnection}
+			>
+				{sidebar}
+			</Sidebar>
 
 			{/* Main content area with bottom terminal panel */}
 			<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto pt-[calc(var(--mobile-safe-area-top)+3rem)] md:pt-0">

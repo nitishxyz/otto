@@ -10,14 +10,26 @@ const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
 
+function getConnectionLabel(url: string): string {
+	try {
+		return new URL(url).host;
+	} catch {
+		return url;
+	}
+}
+
 interface SidebarProps {
 	children: ReactNode;
 	onNewSession?: () => void;
+	connectionUrl?: string;
+	onSwitchConnection?: () => void;
 }
 
 export const Sidebar = memo(function Sidebar({
 	children,
 	onNewSession,
+	connectionUrl,
+	onSwitchConnection,
 }: SidebarProps) {
 	const isCollapsed = useSidebarStore((state) => state.isCollapsed);
 	const toggleCollapse = useSidebarStore((state) => state.toggleCollapse);
@@ -127,7 +139,28 @@ export const Sidebar = memo(function Sidebar({
 								</div>
 							</div>
 
-							<div className="h-12 border-t border-sidebar-border px-2 flex items-center justify-end">
+							<div className="h-12 border-t border-sidebar-border px-2 flex items-center justify-between gap-2">
+								{connectionUrl && onSwitchConnection ? (
+									<div className="min-w-0 flex flex-1 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent/40 px-2 py-1">
+										<span className="h-2 w-2 flex-shrink-0 rounded-full bg-green-500" />
+										<span
+											className="min-w-0 flex-1 truncate text-[11px] text-sidebar-muted-foreground"
+											title={connectionUrl}
+										>
+											{getConnectionLabel(connectionUrl)}
+										</span>
+										<button
+											type="button"
+											onClick={onSwitchConnection}
+											className="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+											title="Disconnect and choose another tunnel"
+										>
+											Switch
+										</button>
+									</div>
+								) : (
+									<div />
+								)}
 								<Button
 									variant="ghost"
 									size="icon"
