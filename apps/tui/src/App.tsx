@@ -17,6 +17,7 @@ import { ChatView } from './components/ChatView.tsx';
 import { ChatInput } from './components/ChatInput.tsx';
 import { Overlays } from './components/Overlays.tsx';
 import { ApproveAllBar } from './components/ApproveAllBar.tsx';
+import { SecureInputBar } from './components/SecureInputBar.tsx';
 import { useSession } from './hooks/useSession.ts';
 import { useStream } from './hooks/useStream.ts';
 import { useConfig } from './hooks/useConfig.ts';
@@ -144,6 +145,8 @@ export function App({
 		queuedMessageIds,
 		pendingApprovals,
 		setPendingApprovals,
+		pendingSecureInputs,
+		setPendingSecureInputs,
 		reload,
 		addOptimisticUser,
 	} = useStream(
@@ -490,7 +493,59 @@ export function App({
 		setPendingApprovals([]);
 	}, [approveToolCall, pendingApprovals, setPendingApprovals]);
 
+	const handleSecureInputSubmit = useCallback(
+		async (promptId: string, value: string) => {
+			const sid = sessionIdRef.current;
+			if (!sid) return;
+			const response = await fetch(
+				`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sid)}/secure-input`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ promptId, value }),
+				},
+			);
+			if (!response.ok) {
+				showStatus({ type: 'error', label: 'secure input failed' }, 3000);
+				return;
+			}
+			setPendingSecureInputs((prev) =>
+				prev.filter((input) => input.promptId !== promptId),
+			);
+		},
+		[setPendingSecureInputs, showStatus],
+	);
+
+	const handleSecureInputCancel = useCallback(
+		async (promptId: string) => {
+			const sid = sessionIdRef.current;
+			if (!sid) return;
+			const response = await fetch(
+				`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sid)}/secure-input`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ promptId, cancelled: true }),
+				},
+			);
+			if (!response.ok) {
+				showStatus(
+					{ type: 'error', label: 'secure input cancel failed' },
+					3000,
+				);
+				return;
+			}
+			setPendingSecureInputs((prev) =>
+				prev.filter((input) => input.promptId !== promptId),
+			);
+		},
+		[setPendingSecureInputs, showStatus],
+	);
+
 	useKeyboard((key) => {
+		if (pendingSecureInputs.length > 0 && !(key.ctrl && key.name === 'c')) {
+			return;
+		}
 		if (key.name === 'escape') {
 			if (overlay !== 'none') {
 				setOverlay('none');
@@ -633,9 +688,21 @@ export function App({
 				/>
 			)}
 
+			{pendingSecureInputs.length > 0 && (
+				<SecureInputBar
+					pendingInput={pendingSecureInputs[0]}
+					onSubmit={handleSecureInputSubmit}
+					onCancel={handleSecureInputCancel}
+				/>
+			)}
+
 			<ChatInput
 				onSubmit={handleSubmit}
-				disabled={pendingApprovals.length > 0 || overlay !== 'none'}
+				disabled={
+					pendingApprovals.length > 0 ||
+					pendingSecureInputs.length > 0 ||
+					overlay !== 'none'
+				}
 				status={status}
 				isStreaming={isStreaming}
 				provider={provider}

@@ -49,6 +49,7 @@ import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import type { FileAttachment } from '../../hooks/useFileUpload';
 import { StableSpinner } from '../ui/StableSpinner';
 import { InputApprovalBar } from './InputApprovalBar';
+import { InputSecureInputBar } from './InputSecureInputBar';
 import { InputQueueBar } from './InputQueueBar';
 import { InputTodosBar } from './InputTodosBar';
 import { DictationInstallPrompt } from './DictationInstallPrompt';
@@ -814,6 +815,7 @@ export const ChatInput = memo(
 								/>
 								<InputTodosBar key={sessionId} sessionId={sessionId} />
 								<InputApprovalBar sessionId={sessionId} />
+								<InputSecureInputBar sessionId={sessionId} />
 							</div>
 						)}
 						<div

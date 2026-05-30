@@ -19,6 +19,7 @@ import { registerSessionFilesRoutes } from './routes/session-files.ts';
 import { registerBranchRoutes } from './routes/branch.ts';
 import { registerResearchRoutes } from './routes/research.ts';
 import { registerSessionApprovalRoute } from './routes/session-approval.ts';
+import { registerSessionSecureInputRoute } from './routes/session-secure-input.ts';
 import { registerOttoRouterRoutes } from './routes/ottorouter.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerTunnelRoutes } from './routes/tunnel.ts';
@@ -92,6 +93,7 @@ function initApp() {
 	registerOpenApiRoute(app);
 	registerSessionsRoutes(app);
 	registerSessionApprovalRoute(app);
+	registerSessionSecureInputRoute(app);
 	registerSessionMessagesRoutes(app);
 	registerSessionStreamRoute(app);
 	registerClientEventsRoute(app);
@@ -173,6 +175,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	registerOpenApiRoute(honoApp);
 	registerSessionsRoutes(honoApp);
 	registerSessionApprovalRoute(honoApp);
+	registerSessionSecureInputRoute(honoApp);
 	registerSessionMessagesRoutes(honoApp);
 	registerSessionStreamRoute(honoApp);
 	registerClientEventsRoute(honoApp);
@@ -296,6 +299,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	registerOpenApiRoute(honoApp);
 	registerSessionsRoutes(honoApp);
 	registerSessionApprovalRoute(honoApp);
+	registerSessionSecureInputRoute(honoApp);
 	registerSessionMessagesRoutes(honoApp);
 	registerSessionStreamRoute(honoApp);
 	registerClientEventsRoute(honoApp);

@@ -209,6 +209,7 @@ export function ChatInput({
 	}, [checkForMention]);
 
 	const handleSubmit = useCallback(() => {
+		if (disabled) return;
 		if (!textareaRef.current) return;
 
 		if (showFileMentionRef.current) {
@@ -245,9 +246,11 @@ export function ChatInput({
 		clearAttachmentsRef.current();
 		setCommandMatches([]);
 		setShowFileMention(false);
-	}, [onSubmit, handleFileSelect]);
+	}, [onSubmit, handleFileSelect, disabled]);
 
 	useKeyboard((key) => {
+		if (disabled) return;
+
 		if (key.ctrl && key.name === 'l') {
 			if (textareaRef.current) {
 				textareaRef.current.clear();

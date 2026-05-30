@@ -4,6 +4,7 @@ import { SSEClient } from '../lib/sse-client';
 import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
+import { useSecureInputStore } from '../stores/secureInputStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import {
 	normalizeQueueState,
@@ -43,6 +44,8 @@ export function useSessionStream(
 		updatePendingApproval,
 		setPendingApprovals,
 	} = useToolApprovalStore();
+	const { addPendingInput, removePendingInput, setPendingInputs } =
+		useSecureInputStore();
 
 	useEffect(() => {
 		if (!sessionId || !enabled) {
@@ -67,6 +70,19 @@ export function useSessionStream(
 			})
 			.catch(() => {
 				setPendingApprovals([]);
+			});
+
+		apiClient
+			.getPendingSecureInputs(sessionId)
+			.then((result) => {
+				if (result.ok && result.pending.length > 0) {
+					setPendingInputs(result.pending);
+				} else {
+					setPendingInputs([]);
+				}
+			})
+			.catch(() => {
+				setPendingInputs([]);
 			});
 
 		const client = new SSEClient();
@@ -1732,6 +1748,37 @@ export function useSessionStream(
 					}
 					break;
 				}
+				case 'shell.secure_input.required': {
+					const promptId =
+						typeof payload?.promptId === 'string' ? payload.promptId : null;
+					const prompt =
+						typeof payload?.prompt === 'string' ? payload.prompt : null;
+					if (promptId && prompt) {
+						addPendingInput({
+							promptId,
+							prompt,
+							messageId:
+								typeof payload?.messageId === 'string'
+									? payload.messageId
+									: undefined,
+							callId:
+								typeof payload?.callId === 'string'
+									? payload.callId
+									: undefined,
+							inputKind: 'password',
+							createdAt: Date.now(),
+						});
+					}
+					break;
+				}
+				case 'shell.secure_input.resolved': {
+					const promptId =
+						typeof payload?.promptId === 'string' ? payload.promptId : null;
+					if (promptId) {
+						removePendingInput(promptId);
+					}
+					break;
+				}
 				case 'error': {
 					handleToolActivityViewerEvent('error', payload);
 					removeEphemeralToolCall(payload);
@@ -1818,9 +1865,12 @@ export function useSessionStream(
 		sessionId,
 		queryClient,
 		addPendingApproval,
+		addPendingInput,
 		removePendingApproval,
+		removePendingInput,
 		enabled,
 		setPendingApprovals,
+		setPendingInputs,
 		updatePendingApproval,
 	]);
 }

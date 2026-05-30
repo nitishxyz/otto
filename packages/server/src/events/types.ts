@@ -2,6 +2,8 @@ export type OttoEventType =
 	| 'tool.approval.required'
 	| 'tool.approval.updated'
 	| 'tool.approval.resolved'
+	| 'shell.secure_input.required'
+	| 'shell.secure_input.resolved'
 	| 'ottorouter.payment.required'
 	| 'ottorouter.payment.signing'
 	| 'ottorouter.payment.complete'

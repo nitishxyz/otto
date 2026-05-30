@@ -9,6 +9,7 @@ import type {
 	Message,
 	MessagePart,
 	PendingApproval,
+	PendingSecureInput,
 	SSEEvent,
 } from '../types.ts';
 
@@ -457,6 +458,17 @@ async function loadSessionMessages(sessionId: string) {
 	return (response.data ?? []) as Message[];
 }
 
+async function loadPendingSecureInputs(sessionId: string) {
+	const response = await fetch(
+		`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/secure-input/pending`,
+	);
+	if (!response.ok) return [];
+	const data = await response.json().catch(() => null);
+	return Array.isArray(data?.pending)
+		? (data.pending as PendingSecureInput[])
+		: [];
+}
+
 async function connectSSE(
 	url: string,
 	signal: AbortSignal,
@@ -498,6 +510,9 @@ export function useStream(
 	const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(
 		[],
 	);
+	const [pendingSecureInputs, setPendingSecureInputs] = useState<
+		PendingSecureInput[]
+	>([]);
 	const abortRef = useRef<AbortController | null>(null);
 	const onSessionUpdateRef = useRef(onSessionUpdate);
 	onSessionUpdateRef.current = onSessionUpdate;
@@ -517,6 +532,7 @@ export function useStream(
 	useEffect(() => {
 		if (!sessionId) {
 			dispatch({ type: 'CLEAR' });
+			setPendingSecureInputs([]);
 			return;
 		}
 
@@ -527,6 +543,9 @@ export function useStream(
 		loadSessionMessages(sessionId)
 			.then((messages) => dispatch({ type: 'LOAD', messages }))
 			.catch(() => {});
+		loadPendingSecureInputs(sessionId)
+			.then(setPendingSecureInputs)
+			.catch(() => setPendingSecureInputs([]));
 
 		const streamUrl = buildSessionStreamUrl({ baseUrl, sessionId });
 		connectSSE(streamUrl, controller.signal, (event) => {
@@ -582,6 +601,47 @@ export function useStream(
 						);
 					} else {
 						setPendingApprovals([]);
+					}
+					break;
+				}
+				case 'shell.secure_input.required': {
+					const promptId =
+						typeof payload.promptId === 'string' ? payload.promptId : '';
+					const prompt =
+						typeof payload.prompt === 'string' ? payload.prompt : '';
+					if (promptId && prompt) {
+						setPendingSecureInputs((prev) => {
+							if (prev.some((input) => input.promptId === promptId)) {
+								return prev;
+							}
+							return [
+								...prev,
+								{
+									promptId,
+									prompt,
+									messageId:
+										typeof payload.messageId === 'string'
+											? payload.messageId
+											: undefined,
+									callId:
+										typeof payload.callId === 'string'
+											? payload.callId
+											: undefined,
+									inputKind: 'password',
+									createdAt: Date.now(),
+								},
+							];
+						});
+					}
+					break;
+				}
+				case 'shell.secure_input.resolved': {
+					const promptId =
+						typeof payload.promptId === 'string' ? payload.promptId : '';
+					if (promptId) {
+						setPendingSecureInputs((prev) =>
+							prev.filter((input) => input.promptId !== promptId),
+						);
 					}
 					break;
 				}
@@ -661,6 +721,8 @@ export function useStream(
 		queuedMessageIds,
 		pendingApprovals,
 		setPendingApprovals,
+		pendingSecureInputs,
+		setPendingSecureInputs,
 		reload,
 		dispatch,
 		addOptimisticUser,

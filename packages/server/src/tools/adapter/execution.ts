@@ -1,5 +1,15 @@
 import type { Tool } from 'ai';
+import { shellExecutorContext, type ShellExecutor } from '@ottocode/sdk';
+import { getAugmentedPath } from '@ottocode/sdk/tools/bin-manager';
+import { createToolError, type ToolResponse } from '@ottocode/sdk/tools/error';
+import { spawn } from 'node:child_process';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
+import { requestSecureInput } from '../../runtime/tools/secure-input.ts';
+import {
+	detectSecurePrompt,
+	normalizeSudoCommand,
+} from '../../runtime/tools/secure-prompt.ts';
+import { attachTerminalSecureInput } from '../../runtime/tools/terminal-secure-input.ts';
 import { getCwd, joinRelative, setCwd } from '../../runtime/utils/cwd.ts';
 import { publishToolDelta } from './events.ts';
 
@@ -15,6 +25,218 @@ type ToolExecuteOptions = ToolExecuteSignature['options'] extends never
 	? undefined
 	: ToolExecuteSignature['options'];
 type ToolExecuteReturn = ToolExecuteSignature['result'];
+type ShellResult = ToolResponse<{
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+}>;
+type SecureShellStreamChunk =
+	| { channel: 'output'; delta: string }
+	| { result: ShellResult };
+
+const SHELL_OUTPUT_LIMIT_BYTES = 1024 * 1024;
+
+function killProcessTree(pid: number) {
+	try {
+		process.kill(-pid, 'SIGTERM');
+	} catch {
+		try {
+			process.kill(pid, 'SIGTERM');
+		} catch {}
+	}
+}
+
+function createSecureShellExecutor(args: {
+	ctx: ToolAdapterContext;
+	callId?: string;
+}): ShellExecutor {
+	const { ctx, callId } = args;
+	return async function* secureShellExecutor(input, options) {
+		const cmd = normalizeSudoCommand(input.cmd);
+		const timeout = input.timeout ?? 300000;
+		const command =
+			process.platform === 'win32'
+				? process.env.COMSPEC || 'cmd.exe'
+				: process.env.SHELL || '/bin/bash';
+		const commandArgs =
+			process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-lc', cmd];
+		const proc = spawn(command, commandArgs, {
+			cwd: input.cwd,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			env: { ...process.env, PATH: getAugmentedPath() },
+			detached: true,
+		});
+
+		let stdout = '';
+		let stderr = '';
+		let recentOutput = '';
+		let securePromptPending = false;
+		let didTimeout = false;
+		let didAbort = false;
+		let settled = false;
+		let done = false;
+		let timeoutId: ReturnType<typeof setTimeout> | null = null;
+		const queue: SecureShellStreamChunk[] = [];
+		let notify: (() => void) | null = null;
+
+		const wake = () => {
+			if (!notify) return;
+			notify();
+			notify = null;
+		};
+
+		const pushDelta = (text: string) => {
+			if (!text) return;
+			queue.push({ channel: 'output', delta: text });
+			wake();
+		};
+
+		const settle = (result: ShellResult) => {
+			if (settled) return;
+			settled = true;
+			if (timeoutId) clearTimeout(timeoutId);
+			options?.abortSignal?.removeEventListener('abort', onAbort);
+			queue.push({ result });
+			done = true;
+			wake();
+		};
+
+		const maybeRequestSecureInput = (text: string) => {
+			recentOutput = `${recentOutput}${text}`.slice(-1000);
+			if (securePromptPending) return;
+			const prompt = detectSecurePrompt(recentOutput);
+			if (!prompt) return;
+
+			securePromptPending = true;
+			void requestSecureInput({
+				sessionId: ctx.sessionId,
+				messageId: ctx.messageId,
+				callId,
+				prompt,
+			}).then((value) => {
+				securePromptPending = false;
+				recentOutput = '';
+				if (settled) return;
+				if (value === null) {
+					didAbort = true;
+					if (proc.pid) killProcessTree(proc.pid);
+					else proc.kill('SIGTERM');
+					return;
+				}
+				proc.stdin?.write(`${value}\n`);
+			});
+		};
+
+		function onAbort() {
+			if (settled) return;
+			didAbort = true;
+			if (proc.pid) killProcessTree(proc.pid);
+			else proc.kill('SIGTERM');
+		}
+
+		options?.abortSignal?.addEventListener('abort', onAbort, { once: true });
+
+		if (timeout > 0) {
+			timeoutId = setTimeout(() => {
+				didTimeout = true;
+				if (proc.pid) killProcessTree(proc.pid);
+				else proc.kill();
+			}, timeout);
+		}
+
+		proc.stdout?.on('data', (chunk) => {
+			const text = chunk.toString();
+			stdout += text;
+			if (stdout.length > SHELL_OUTPUT_LIMIT_BYTES) {
+				stdout = stdout.slice(-SHELL_OUTPUT_LIMIT_BYTES);
+			}
+			pushDelta(text);
+			maybeRequestSecureInput(text);
+		});
+
+		proc.stderr?.on('data', (chunk) => {
+			const text = chunk.toString();
+			stderr += text;
+			if (stderr.length > SHELL_OUTPUT_LIMIT_BYTES) {
+				stderr = stderr.slice(-SHELL_OUTPUT_LIMIT_BYTES);
+			}
+			pushDelta(text);
+			maybeRequestSecureInput(text);
+		});
+
+		proc.on('close', (exitCode) => {
+			if (didAbort) {
+				settle(
+					createToolError(`Command aborted by user: ${input.cmd}`, 'abort', {
+						cmd: input.cmd,
+						stdout,
+						stderr,
+					}),
+				);
+				return;
+			}
+
+			if (didTimeout) {
+				settle(
+					createToolError(
+						`Command timed out after ${timeout}ms: ${input.cmd}`,
+						'timeout',
+						{
+							parameter: 'timeout',
+							value: timeout,
+							stdout,
+							stderr,
+							suggestion: 'Increase timeout or optimize the command',
+						},
+					),
+				);
+				return;
+			}
+
+			if (exitCode !== 0 && !input.allowNonZeroExit) {
+				const errorDetail = stderr.trim() || stdout.trim() || '';
+				const errorMsg = `Command failed with exit code ${exitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
+				settle(
+					createToolError(errorMsg, 'execution', {
+						exitCode,
+						stdout,
+						stderr,
+						cmd: input.cmd,
+						suggestion: 'Check command syntax or use allowNonZeroExit: true',
+					}),
+				);
+				return;
+			}
+
+			settle({ ok: true, exitCode: exitCode ?? 0, stdout, stderr });
+		});
+
+		proc.on('error', (err) => {
+			settle(
+				createToolError(
+					`Command execution failed: ${err.message}`,
+					'execution',
+					{
+						cmd: input.cmd,
+						originalError: err.message,
+					},
+				),
+			);
+		});
+
+		while (!done || queue.length > 0) {
+			if (queue.length === 0) {
+				await new Promise<void>((resolve) => {
+					notify = resolve;
+				});
+			}
+			while (queue.length > 0) {
+				const chunk = queue.shift();
+				if (chunk) yield chunk;
+			}
+		}
+	};
+}
 
 export function executeBaseTool(
 	ctx: ToolAdapterContext,
@@ -23,10 +245,11 @@ export function executeBaseTool(
 		name: string;
 		input: ToolExecuteInput;
 		options: ToolExecuteOptions;
+		callId?: string;
 	},
 ): ToolExecuteReturn | { cwd: string } | null | undefined {
 	const cwd = getCwd(ctx.sessionId);
-	const { base, name, input, options } = args;
+	const { base, name, input, options, callId } = args;
 
 	if (name === 'pwd') {
 		return { cwd };
@@ -66,8 +289,23 @@ export function executeBaseTool(
 					cwd,
 				} as ToolExecuteInput)
 			: input;
+		const secureShellExecutor = createSecureShellExecutor({ ctx, callId });
+		return shellExecutorContext.run(secureShellExecutor, () => {
+			// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
+			return base.execute?.(nextInput, options as any);
+		}) as ToolExecuteReturn;
+	}
+
+	if (name === 'terminal') {
 		// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-		return base.execute?.(nextInput, options as any);
+		const res = base.execute?.(input, options as any);
+		return Promise.resolve(res as ToolExecuteReturn).then((result) => {
+			const terminalId = getTerminalId(result);
+			if (terminalId) {
+				attachTerminalSecureInput({ ctx, terminalId, callId });
+			}
+			return result;
+		}) as ToolExecuteReturn;
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex

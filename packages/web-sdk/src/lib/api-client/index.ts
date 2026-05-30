@@ -9,6 +9,7 @@ import { authMixin } from './auth';
 import { skillsMixin } from './skills';
 import { usageMixin } from './usage';
 import { dictationMixin } from './dictation';
+import { secureInputMixin } from './secure-input';
 
 export { configureApiClient } from './utils';
 export type {
@@ -86,6 +87,9 @@ class ApiClient {
 
 	approveToolCall = approvalMixin.approveToolCall;
 	getPendingApprovals = approvalMixin.getPendingApprovals;
+	submitSecureInput = secureInputMixin.submitSecureInput;
+	cancelSecureInput = secureInputMixin.cancelSecureInput;
+	getPendingSecureInputs = secureInputMixin.getPendingSecureInputs;
 
 	getOttoRouterBalance = ottorouterMixin.getOttoRouterBalance;
 	getOttoRouterWallet = ottorouterMixin.getOttoRouterWallet;

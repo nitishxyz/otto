@@ -70,6 +70,15 @@ export interface PendingApproval {
 	messageId: string;
 }
 
+export interface PendingSecureInput {
+	promptId: string;
+	messageId?: string;
+	callId?: string;
+	prompt: string;
+	inputKind: 'password' | 'passphrase' | 'token';
+	createdAt: number;
+}
+
 export type Overlay =
 	| 'none'
 	| 'sessions'

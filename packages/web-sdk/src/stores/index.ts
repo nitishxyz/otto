@@ -10,6 +10,7 @@ export * from './toastStore';
 export * from './ottorouterStore';
 export * from './settingsStore';
 export * from './toolApprovalStore';
+export * from './secureInputStore';
 export * from './topupApprovalStore';
 export * from './todoStore';
 export * from './onboardingStore';

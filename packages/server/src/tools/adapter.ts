@@ -373,6 +373,7 @@ export function adaptTools(
 							name,
 							input,
 							options,
+							callId: callIdFromQueue,
 						});
 						let result: unknown = res;
 						// If tool returns an async iterable, stream deltas while accumulating
