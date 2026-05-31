@@ -22,6 +22,29 @@ async function resolveStreamedResult(value: unknown): Promise<unknown> {
 	return result;
 }
 
+async function collectStreamedShell(value: unknown): Promise<{
+	result: unknown;
+	output: string;
+}> {
+	if (!value || typeof value !== 'object' || !(Symbol.asyncIterator in value)) {
+		return { result: value, output: '' };
+	}
+
+	let result: unknown;
+	let output = '';
+	for await (const chunk of value as AsyncIterable<{
+		channel?: string;
+		delta?: string;
+		result?: unknown;
+	}>) {
+		if (chunk.channel === 'output' && typeof chunk.delta === 'string') {
+			output += chunk.delta;
+		}
+		if (chunk.result !== undefined) result = chunk.result;
+	}
+	return { result, output };
+}
+
 let testDir: string;
 let projectRoot: string;
 
@@ -293,6 +316,22 @@ describe('Built-in Tools', () => {
 			);
 			expect(result).toHaveProperty('stdout');
 			expect((result as { stdout: string }).stdout).toContain('test');
+		});
+
+		it('should tail shell output when requested', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+
+			const { result, output } = await collectStreamedShell(
+				await shellTool?.tool.execute({
+					cmd: 'printf "one\\ntwo\\nthree\\n"',
+					outputMode: 'tail',
+					tailLines: 2,
+				}),
+			);
+			expect(result).toMatchObject({ ok: true, outputMode: 'tail' });
+			expect((result as { stdout: string }).stdout).toBe('two\nthree\n');
+			expect(output).toBe('one\ntwo\nthree\n');
 		});
 
 		it('should handle command errors', async () => {

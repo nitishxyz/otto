@@ -4,16 +4,19 @@ import {
 	abortSession,
 	getRunnerState,
 } from '../packages/server/src/runtime/session/queue.js';
+import { forgetProject } from '../packages/server/src/runtime/projects/registry.js';
 import type { Hono } from 'hono';
 import type {
 	Message,
 	MessagePart,
 } from '../packages/database/src/types/index.js';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let tempDir: string;
+let previousHome: string | undefined;
+let previousXdgConfigHome: string | undefined;
 
 function req(path: string) {
 	const sep = path.includes('?') ? '&' : '?';
@@ -25,19 +28,37 @@ describe('User Context Feature', () => {
 	let sessionId: string;
 
 	afterEach(async () => {
-		if (sessionId) {
-			abortSession(sessionId, true);
-			for (let i = 0; i < 50; i++) {
-				const state = getRunnerState(sessionId);
-				if (!state?.running) break;
-				await new Promise((resolve) => setTimeout(resolve, 10));
+		try {
+			if (sessionId) {
+				abortSession(sessionId, true);
+				for (let i = 0; i < 50; i++) {
+					const state = getRunnerState(sessionId);
+					if (!state?.running) break;
+					await new Promise((resolve) => setTimeout(resolve, 10));
+				}
 			}
+			if (tempDir) await forgetProject(tempDir);
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+
+			if (previousXdgConfigHome === undefined)
+				delete process.env.XDG_CONFIG_HOME;
+			else process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+
+			if (tempDir) await rm(tempDir, { recursive: true, force: true });
 		}
-		if (tempDir) await rm(tempDir, { recursive: true, force: true });
 	});
 
 	beforeEach(async () => {
+		sessionId = '';
 		tempDir = await mkdtemp(join(tmpdir(), 'otto-user-ctx-'));
+		previousHome = process.env.HOME;
+		previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		process.env.HOME = join(tempDir, 'home');
+		process.env.XDG_CONFIG_HOME = join(tempDir, 'xdg-config');
+		await mkdir(join(process.env.XDG_CONFIG_HOME, 'otto'), { recursive: true });
+
 		if (!process.env.ANTHROPIC_API_KEY) {
 			process.env.ANTHROPIC_API_KEY = 'test-key';
 		}

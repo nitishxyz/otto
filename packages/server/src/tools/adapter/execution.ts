@@ -1,6 +1,7 @@
 import type { Tool } from 'ai';
 import { shellExecutorContext, type ShellExecutor } from '@ottocode/sdk';
 import { getAugmentedPath } from '@ottocode/sdk/tools/bin-manager';
+import { appendTailLines } from '@ottocode/sdk/tools/builtin/shell';
 import { createToolError, type ToolResponse } from '@ottocode/sdk/tools/error';
 import { spawn } from 'node:child_process';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
@@ -29,6 +30,8 @@ type ShellResult = ToolResponse<{
 	exitCode: number;
 	stdout: string;
 	stderr: string;
+	outputMode?: 'full' | 'tail';
+	tailLines?: number;
 }>;
 type SecureShellStreamChunk =
 	| { channel: 'output'; delta: string }
@@ -54,6 +57,8 @@ function createSecureShellExecutor(args: {
 	return async function* secureShellExecutor(input, options) {
 		const cmd = normalizeSudoCommand(input.cmd);
 		const timeout = input.timeout ?? 300000;
+		const outputMode = input.outputMode ?? 'full';
+		const tailLines = input.tailLines ?? 100;
 		const command =
 			process.platform === 'win32'
 				? process.env.COMSPEC || 'cmd.exe'
@@ -146,8 +151,11 @@ function createSecureShellExecutor(args: {
 
 		proc.stdout?.on('data', (chunk) => {
 			const text = chunk.toString();
-			stdout += text;
-			if (stdout.length > SHELL_OUTPUT_LIMIT_BYTES) {
+			stdout =
+				outputMode === 'tail'
+					? appendTailLines(stdout, text, tailLines)
+					: `${stdout}${text}`;
+			if (outputMode === 'full' && stdout.length > SHELL_OUTPUT_LIMIT_BYTES) {
 				stdout = stdout.slice(-SHELL_OUTPUT_LIMIT_BYTES);
 			}
 			pushDelta(text);
@@ -156,8 +164,11 @@ function createSecureShellExecutor(args: {
 
 		proc.stderr?.on('data', (chunk) => {
 			const text = chunk.toString();
-			stderr += text;
-			if (stderr.length > SHELL_OUTPUT_LIMIT_BYTES) {
+			stderr =
+				outputMode === 'tail'
+					? appendTailLines(stderr, text, tailLines)
+					: `${stderr}${text}`;
+			if (outputMode === 'full' && stderr.length > SHELL_OUTPUT_LIMIT_BYTES) {
 				stderr = stderr.slice(-SHELL_OUTPUT_LIMIT_BYTES);
 			}
 			pushDelta(text);
@@ -171,6 +182,7 @@ function createSecureShellExecutor(args: {
 						cmd: input.cmd,
 						stdout,
 						stderr,
+						...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 					}),
 				);
 				return;
@@ -186,6 +198,7 @@ function createSecureShellExecutor(args: {
 							value: timeout,
 							stdout,
 							stderr,
+							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 							suggestion: 'Increase timeout or optimize the command',
 						},
 					),
@@ -202,13 +215,20 @@ function createSecureShellExecutor(args: {
 						stdout,
 						stderr,
 						cmd: input.cmd,
+						...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 						suggestion: 'Check command syntax or use allowNonZeroExit: true',
 					}),
 				);
 				return;
 			}
 
-			settle({ ok: true, exitCode: exitCode ?? 0, stdout, stderr });
+			settle({
+				ok: true,
+				exitCode: exitCode ?? 0,
+				stdout,
+				stderr,
+				...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+			});
 		});
 
 		proc.on('error', (err) => {

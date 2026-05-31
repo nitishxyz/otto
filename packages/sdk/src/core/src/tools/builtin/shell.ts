@@ -42,10 +42,30 @@ function killProcessTree(pid: number) {
 	}
 }
 
+export type ShellOutputMode = 'full' | 'tail';
+
+const DEFAULT_TAIL_LINES = 100;
+
+export function appendTailLines(
+	current: string,
+	text: string,
+	tailLines: number,
+): string {
+	if (!text) return current;
+	const linesToKeep = Math.max(1, Math.floor(tailLines));
+	const combined = `${current}${text}`;
+	const lines = combined.split('\n');
+	const entriesToKeep = combined.endsWith('\n') ? linesToKeep + 1 : linesToKeep;
+	if (lines.length <= entriesToKeep) return combined;
+	return lines.slice(-entriesToKeep).join('\n');
+}
+
 type ShellResult = ToolResponse<{
 	exitCode: number;
 	stdout: string;
 	stderr: string;
+	outputMode?: ShellOutputMode;
+	tailLines?: number;
 }>;
 
 type ShellStreamChunk =
@@ -89,6 +109,23 @@ const shellInputSchema = z
 			.optional()
 			.default(300000)
 			.describe('Timeout in milliseconds (default: 300000 = 5 minutes)'),
+		outputMode: z
+			.enum(['full', 'tail'])
+			.optional()
+			.default('full')
+			.describe(
+				'Output capture mode. Use "full" for complete stdout/stderr, or "tail" to keep only the last tailLines lines and avoid huge tool results.',
+			),
+		tailLines: z
+			.number()
+			.int()
+			.min(1)
+			.max(5000)
+			.optional()
+			.default(DEFAULT_TAIL_LINES)
+			.describe(
+				'Number of trailing stdout/stderr lines to keep when outputMode is "tail"',
+			),
 	})
 	.strict();
 
@@ -112,7 +149,14 @@ export function buildShellTool(projectRoot: string): {
 		description: DESCRIPTION,
 		inputSchema: shellInputSchema,
 		execute(
-			{ cmd, cwd, allowNonZeroExit, timeout = 300000 }: ShellInput,
+			{
+				cmd,
+				cwd,
+				allowNonZeroExit,
+				timeout = 300000,
+				outputMode = 'full',
+				tailLines = DEFAULT_TAIL_LINES,
+			}: ShellInput,
 			options?: { abortSignal?: AbortSignal },
 		): AsyncIterable<ShellStreamChunk> | ShellResult {
 			const abortSignal = options?.abortSignal;
@@ -128,7 +172,14 @@ export function buildShellTool(projectRoot: string): {
 			const shellExecutor = shellExecutorContext.getStore();
 			if (shellExecutor) {
 				return shellExecutor(
-					{ cmd: finalCmd, cwd: absCwd, allowNonZeroExit, timeout },
+					{
+						cmd: finalCmd,
+						cwd: absCwd,
+						allowNonZeroExit,
+						timeout,
+						outputMode,
+						tailLines,
+					},
 					options,
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
 			}
@@ -196,13 +247,19 @@ export function buildShellTool(projectRoot: string): {
 
 			proc.stdout?.on('data', (chunk) => {
 				const text = chunk.toString();
-				stdout += text;
+				stdout =
+					outputMode === 'tail'
+						? appendTailLines(stdout, text, tailLines)
+						: `${stdout}${text}`;
 				pushDelta(text);
 			});
 
 			proc.stderr?.on('data', (chunk) => {
 				const text = chunk.toString();
-				stderr += text;
+				stderr =
+					outputMode === 'tail'
+						? appendTailLines(stderr, text, tailLines)
+						: `${stderr}${text}`;
 				pushDelta(text);
 			});
 
@@ -213,6 +270,7 @@ export function buildShellTool(projectRoot: string): {
 							cmd,
 							stdout,
 							stderr,
+							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 						}),
 					);
 					return;
@@ -228,6 +286,7 @@ export function buildShellTool(projectRoot: string): {
 								value: timeout,
 								stdout,
 								stderr,
+								...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 								suggestion: 'Increase timeout or optimize the command',
 							},
 						),
@@ -244,6 +303,7 @@ export function buildShellTool(projectRoot: string): {
 							stdout,
 							stderr,
 							cmd,
+							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 							suggestion: 'Check command syntax or use allowNonZeroExit: true',
 						}),
 					);
@@ -255,6 +315,7 @@ export function buildShellTool(projectRoot: string): {
 					exitCode: exitCode ?? 0,
 					stdout,
 					stderr,
+					...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 				});
 			});
 

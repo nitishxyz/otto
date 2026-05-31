@@ -170,7 +170,6 @@ export function DesktopSessionsLayout({
 	useKeyboardShortcuts({
 		sessionIds,
 		activeSessionId: sessionId,
-		gitFiles,
 		onSelectSession: handleSelectSession,
 		onNewSession: handleNewSession,
 		onStageFile: (paths) =>

@@ -10,7 +10,11 @@ import { eq } from 'drizzle-orm';
 import { openApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { loadProjectDb } from './sessions/service.ts';
-import { listProjects, touchProject } from '../runtime/projects/registry.ts';
+import {
+	forgetProjects,
+	listProjects,
+	touchProject,
+} from '../runtime/projects/registry.ts';
 
 type AuthKind = 'oauth' | 'api' | 'wallet' | 'subscription' | 'unknown';
 type AuthBucket = 'oauth' | 'api' | 'subscription';
@@ -575,7 +579,21 @@ export function registerUsageRoutes(app: Hono) {
 					// best effort
 				}
 
-				const known = await listProjects();
+				const registered = await listProjects();
+				const known: typeof registered = [];
+				const staleProjectRoots: string[] = [];
+				for (const proj of registered) {
+					const dbFile = Bun.file(proj.dbPath);
+					if (await dbFile.exists()) {
+						known.push(proj);
+					} else {
+						staleProjectRoots.push(proj.path);
+					}
+				}
+				if (staleProjectRoots.length > 0) {
+					await forgetProjects(staleProjectRoots);
+				}
+
 				const merged = emptyAggregate();
 				const included: NonNullable<
 					UsageStatsResponse['projects']
@@ -586,10 +604,6 @@ export function registerUsageRoutes(app: Hono) {
 
 				const results = await Promise.allSettled(
 					known.map(async (proj) => {
-						const dbFile = Bun.file(proj.dbPath);
-						if (!(await dbFile.exists())) {
-							throw new Error('database file not found');
-						}
 						const out = await aggregateProject(proj.path);
 						return { proj, out };
 					}),

@@ -129,9 +129,20 @@ export async function listProjects(): Promise<RegisteredProject[]> {
  * Remove a project from the registry. Does not touch the project's DB.
  */
 export async function forgetProject(projectRoot: string): Promise<void> {
+	await forgetProjects([projectRoot]);
+}
+
+/**
+ * Remove projects from the registry. Does not touch project DB files.
+ */
+export async function forgetProjects(projectRoots: string[]): Promise<void> {
+	const roots = new Set(projectRoots);
+	if (roots.size === 0) return;
+
 	const reg = await loadRegistry();
-	const next = reg.projects.filter((p) => p.path !== projectRoot);
+	const next = reg.projects.filter((p) => !roots.has(p.path));
 	if (next.length === reg.projects.length) return;
 	reg.projects = next;
+	for (const root of roots) touchedThisSession.delete(root);
 	await saveRegistry(reg);
 }
