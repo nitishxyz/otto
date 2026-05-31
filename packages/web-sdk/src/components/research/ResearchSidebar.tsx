@@ -50,6 +50,18 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 	onNavigateToSession,
 }: ResearchSidebarProps) {
 	const isExpanded = useResearchStore((state) => state.isExpanded);
+	return isExpanded ? (
+		<ResearchSidebarContent
+			parentSessionId={parentSessionId}
+			onNavigateToSession={onNavigateToSession}
+		/>
+	) : null;
+});
+
+const ResearchSidebarContent = memo(function ResearchSidebarContent({
+	parentSessionId,
+	onNavigateToSession,
+}: ResearchSidebarProps) {
 	const collapseSidebar = useResearchStore((state) => state.collapseSidebar);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
@@ -74,7 +86,7 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 		data: researchData,
 		isLoading,
 		refetch,
-	} = useResearchSessions(parentSessionId, isExpanded);
+	} = useResearchSessions(parentSessionId, true);
 	const createMutation = useCreateResearchSession();
 	const injectMutation = useInjectContext();
 	const exportMutation = useExportToSession();
@@ -82,16 +94,16 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 
 	const { data: messagesData } = useMessages(
 		activeResearchSessionId ?? undefined,
-		{ enabled: isExpanded },
+		{ enabled: true },
 	);
 
 	const { data: parentMessagesData } = useMessages(
 		parentSessionId ?? undefined,
-		{ enabled: isExpanded },
+		{ enabled: true },
 	);
 
 	// Enable streaming for the active research session
-	useSessionStream(activeResearchSessionId ?? undefined, isExpanded);
+	useSessionStream(activeResearchSessionId ?? undefined, true);
 
 	const updateSession = useUpdateSession(activeResearchSessionId ?? '');
 
@@ -321,8 +333,6 @@ export const ResearchSidebar = memo(function ResearchSidebar({
 	);
 
 	const parentSession = useSession(parentSessionId ?? '');
-
-	if (!isExpanded) return null;
 
 	const sessions = researchData?.sessions ?? [];
 	const activeSession = sessions.find((s) => s.id === activeResearchSessionId);

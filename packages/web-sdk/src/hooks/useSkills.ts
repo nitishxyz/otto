@@ -3,7 +3,12 @@ import { useSkillsStore } from '../stores/skillsStore';
 import { useEffect } from 'react';
 import { apiClient } from '../lib/api-client';
 
-export function useSkills() {
+interface UseSkillsOptions {
+	enabled?: boolean;
+}
+
+export function useSkills(options: UseSkillsOptions = {}) {
+	const enabled = options.enabled ?? true;
 	const setSkillsConfig = useSkillsStore((s) => s.setSkillsConfig);
 
 	const query = useQuery({
@@ -11,6 +16,7 @@ export function useSkills() {
 		queryFn: async () => {
 			return apiClient.getSkillsConfig();
 		},
+		enabled,
 		refetchInterval: 30000,
 	});
 

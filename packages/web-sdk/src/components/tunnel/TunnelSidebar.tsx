@@ -34,6 +34,10 @@ function truncateUrl(url: string): string {
 
 export const TunnelSidebar = memo(function TunnelSidebar() {
 	const isExpanded = useTunnelStore((s) => s.isExpanded);
+	return isExpanded ? <TunnelSidebarContent /> : null;
+});
+
+const TunnelSidebarContent = memo(function TunnelSidebarContent() {
 	const collapseSidebar = useTunnelStore((s) => s.collapseSidebar);
 	const status = useTunnelStore((s) => s.status);
 	const url = useTunnelStore((s) => s.url);
@@ -62,8 +66,6 @@ export const TunnelSidebar = memo(function TunnelSidebar() {
 	const handleStop = () => {
 		stopTunnel.mutate();
 	};
-
-	if (!isExpanded) return null;
 
 	return (
 		<div className="w-full min-w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">

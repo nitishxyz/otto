@@ -33,6 +33,10 @@ function fuzzyMatch(
 
 export const QuickFilePicker = memo(function QuickFilePicker() {
 	const isOpen = useFilePickerStore((s) => s.isOpen);
+	return isOpen ? <QuickFilePickerContent /> : null;
+});
+
+const QuickFilePickerContent = memo(function QuickFilePickerContent() {
 	const close = useFilePickerStore((s) => s.close);
 	const openFile = useFileBrowserStore((s) => s.openFile);
 
@@ -41,7 +45,7 @@ export const QuickFilePicker = memo(function QuickFilePicker() {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
 
-	const { data: filesData } = useFiles({ enabled: isOpen, query });
+	const { data: filesData } = useFiles({ enabled: true, query });
 
 	const ignoredSet = useMemo(
 		() => new Set(filesData?.ignoredFiles ?? []),
@@ -62,12 +66,8 @@ export const QuickFilePicker = memo(function QuickFilePicker() {
 	}, [filesData?.files, query]);
 
 	useEffect(() => {
-		if (isOpen) {
-			setQuery('');
-			setSelectedIndex(0);
-			setTimeout(() => inputRef.current?.focus(), 0);
-		}
-	}, [isOpen]);
+		setTimeout(() => inputRef.current?.focus(), 0);
+	}, []);
 
 	useEffect(() => {
 		const item = listRef.current?.children[selectedIndex] as
@@ -109,8 +109,6 @@ export const QuickFilePicker = memo(function QuickFilePicker() {
 		},
 		[close],
 	);
-
-	if (!isOpen) return null;
 
 	return (
 		<div

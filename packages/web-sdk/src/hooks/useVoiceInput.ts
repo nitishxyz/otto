@@ -32,6 +32,7 @@ interface UseVoiceInputOptions {
 	/** Called when local dictation returns transcript text. */
 	onTranscript?: (transcript: string, isFinal: boolean) => void;
 	onError?: (message: string) => void;
+	onNeedsInstall?: () => void;
 	lang?: string;
 }
 
@@ -121,6 +122,7 @@ function appendBuffer(
 export function useVoiceInput({
 	onTranscript,
 	onError,
+	onNeedsInstall,
 	lang = 'en-US',
 }: UseVoiceInputOptions = {}): UseVoiceInputResult {
 	const [isListening, setIsListening] = useState(false);
@@ -139,10 +141,12 @@ export function useVoiceInput({
 
 	const onTranscriptRef = useRef(onTranscript);
 	const onErrorRef = useRef(onError);
+	const onNeedsInstallRef = useRef(onNeedsInstall);
 	useEffect(() => {
 		onTranscriptRef.current = onTranscript;
 		onErrorRef.current = onError;
-	}, [onTranscript, onError]);
+		onNeedsInstallRef.current = onNeedsInstall;
+	}, [onTranscript, onError, onNeedsInstall]);
 
 	const isSupported =
 		typeof window !== 'undefined' &&
@@ -154,6 +158,16 @@ export function useVoiceInput({
 		setError(message);
 		onErrorRef.current?.(message);
 	}, []);
+
+	const handleMissingModel = useCallback(() => {
+		if (onNeedsInstallRef.current) {
+			onNeedsInstallRef.current();
+			return;
+		}
+		emitError(
+			'Install a local dictation model from Settings before recording.',
+		);
+	}, [emitError]);
 
 	const cleanupAudio = useCallback(() => {
 		if (processorRef.current) {
@@ -271,9 +285,7 @@ export function useVoiceInput({
 				(item) => item.id === status.defaultModel,
 			);
 			if (!model?.installed) {
-				emitError(
-					'Install a local dictation model from Settings before recording.',
-				);
+				handleMissingModel();
 				return;
 			}
 
@@ -282,9 +294,7 @@ export function useVoiceInput({
 				language: toLanguageCode(lang),
 			});
 			if (!session.modelInstalled) {
-				emitError(
-					'Install a local dictation model from Settings before recording.',
-				);
+				handleMissingModel();
 				return;
 			}
 
@@ -385,7 +395,14 @@ export function useVoiceInput({
 			emitError(msg);
 			cleanup();
 		}
-	}, [cleanup, emitError, handleAudioProcess, isSupported, lang]);
+	}, [
+		cleanup,
+		emitError,
+		handleAudioProcess,
+		handleMissingModel,
+		isSupported,
+		lang,
+	]);
 
 	useEffect(() => cleanup, [cleanup]);
 

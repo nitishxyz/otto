@@ -52,6 +52,12 @@ export const GitSidebar = memo(function GitSidebar({
 	onFixWithAI,
 }: GitSidebarProps) {
 	const isExpanded = useGitStore((state) => state.isExpanded);
+	return isExpanded ? <GitSidebarContent onFixWithAI={onFixWithAI} /> : null;
+});
+
+const GitSidebarContent = memo(function GitSidebarContent({
+	onFixWithAI,
+}: GitSidebarProps) {
 	const collapseSidebar = useGitStore((state) => state.collapseSidebar);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
@@ -75,10 +81,8 @@ export const GitSidebar = memo(function GitSidebar({
 	);
 
 	useEffect(() => {
-		if (isExpanded) {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-		}
-	}, [isExpanded, queryClient]);
+		queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+	}, [queryClient]);
 
 	const handleRefresh = () => {
 		refetch();
@@ -181,8 +185,6 @@ export const GitSidebar = memo(function GitSidebar({
 		},
 		[onFixWithAI, dismissError],
 	);
-
-	if (!isExpanded) return null;
 
 	const allFiles = [
 		...(status?.conflicted || []),

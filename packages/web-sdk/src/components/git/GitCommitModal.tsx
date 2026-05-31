@@ -8,7 +8,12 @@ import { Modal } from '../ui/Modal';
 import { StableSpinner } from '../ui/StableSpinner';
 
 export function GitCommitModal() {
-	const { isCommitModalOpen, closeCommitModal } = useGitStore();
+	const isCommitModalOpen = useGitStore((state) => state.isCommitModalOpen);
+	return isCommitModalOpen ? <GitCommitModalContent /> : null;
+}
+
+function GitCommitModalContent() {
+	const closeCommitModal = useGitStore((state) => state.closeCommitModal);
 	const commitSessionId = useGitStore((state) => state.commitSessionId);
 	const commitChanges = useCommitChanges();
 	const generateMessage = useGenerateCommitMessage(commitSessionId);
@@ -42,8 +47,6 @@ export function GitCommitModal() {
 	}, [generateMessage]);
 
 	useEffect(() => {
-		if (!isCommitModalOpen) return;
-
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
 				e.preventDefault();
@@ -61,17 +64,11 @@ export function GitCommitModal() {
 
 		document.addEventListener('keydown', handleKeyDown);
 		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [
-		isCommitModalOpen,
-		message,
-		commitChanges.isPending,
-		handleCommit,
-		handleGenerateMessage,
-	]);
+	}, [message, commitChanges.isPending, handleCommit, handleGenerateMessage]);
 
 	return (
 		<Modal
-			isOpen={isCommitModalOpen}
+			isOpen
 			onClose={handleClose}
 			title={
 				<div className="flex items-center gap-2">

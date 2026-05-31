@@ -4,8 +4,12 @@ import { X, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function ConfirmationDialog() {
+	const isOpen = useConfirmationStore((state) => state.isOpen);
+	return isOpen ? <ConfirmationDialogContent /> : null;
+}
+
+function ConfirmationDialogContent() {
 	const {
-		isOpen,
 		title,
 		message,
 		confirmLabel,
@@ -17,12 +21,6 @@ export function ConfirmationDialog() {
 	} = useConfirmationStore();
 
 	const [isProcessing, setIsProcessing] = useState(false);
-
-	useEffect(() => {
-		if (!isOpen) {
-			setIsProcessing(false);
-		}
-	}, [isOpen]);
 
 	const handleConfirm = useCallback(async () => {
 		setIsProcessing(true);
@@ -48,7 +46,7 @@ export function ConfirmationDialog() {
 
 	useEffect(() => {
 		const handleEscape = (e: KeyboardEvent) => {
-			if (isOpen && !isProcessing) {
+			if (!isProcessing) {
 				const target = e.target as HTMLElement;
 				const isInInput =
 					target.tagName === 'INPUT' ||
@@ -65,13 +63,9 @@ export function ConfirmationDialog() {
 			}
 		};
 
-		if (isOpen) {
-			document.addEventListener('keydown', handleEscape);
-			return () => document.removeEventListener('keydown', handleEscape);
-		}
-	}, [isOpen, isProcessing, handleConfirm, handleCancel]);
-
-	if (!isOpen) return null;
+		document.addEventListener('keydown', handleEscape);
+		return () => document.removeEventListener('keydown', handleEscape);
+	}, [isProcessing, handleConfirm, handleCancel]);
 
 	return (
 		<div

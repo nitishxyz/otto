@@ -46,6 +46,10 @@ function formatSize(bytes: number): string {
 
 export const SkillsSidebar = memo(function SkillsSidebar() {
 	const isExpanded = useSkillsStore((s) => s.isExpanded);
+	return isExpanded ? <SkillsSidebarContent /> : null;
+});
+
+const SkillsSidebarContent = memo(function SkillsSidebarContent() {
 	const collapseSidebar = useSkillsStore((s) => s.collapseSidebar);
 	const skills = useSkillsStore((s) => s.skills);
 	const globalEnabled = useSkillsStore((s) => s.globalEnabled);
@@ -82,8 +86,6 @@ export const SkillsSidebar = memo(function SkillsSidebar() {
 		}
 		return groups;
 	}, [filteredSkills]);
-
-	if (!isExpanded) return null;
 
 	return (
 		<div className="w-full min-w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">

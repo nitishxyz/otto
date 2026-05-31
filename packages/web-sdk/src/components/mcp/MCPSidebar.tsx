@@ -271,6 +271,10 @@ function useAuthPoller(name: string | null, onAuthenticated: () => void) {
 
 export const MCPSidebar = memo(function MCPSidebar() {
 	const isExpanded = useMCPStore((s) => s.isExpanded);
+	return isExpanded ? <MCPSidebarContent /> : null;
+});
+
+const MCPSidebarContent = memo(function MCPSidebarContent() {
 	const collapseSidebar = useMCPStore((s) => s.collapseSidebar);
 	const servers = useMCPStore((s) => s.servers);
 	const loading = useMCPStore((s) => s.loading);
@@ -409,8 +413,6 @@ export const MCPSidebar = memo(function MCPSidebar() {
 			return a.name.localeCompare(b.name);
 		});
 	}, [servers, searchQuery]);
-
-	if (!isExpanded) return null;
 
 	const connectedCount = servers.filter((s) => s.connected).length;
 

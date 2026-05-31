@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import {
 	init,
 	Terminal,
@@ -146,7 +146,7 @@ interface TerminalViewerProps {
 	onExit?: (terminalId: string) => void;
 }
 
-export function TerminalViewer({
+export const TerminalViewer = memo(function TerminalViewer({
 	terminalId,
 	isActive,
 	onExit,
@@ -481,8 +481,10 @@ export function TerminalViewer({
 	}, [isActive, fitTerminal]);
 
 	useEffect(() => {
-		fitTerminal();
-	}, [fitTerminal]);
+		if (isActive) {
+			fitTerminal();
+		}
+	}, [fitTerminal, isActive]);
 
 	return (
 		<div
@@ -492,16 +494,18 @@ export function TerminalViewer({
 		>
 			<div className="relative flex-1 min-h-0 overflow-hidden">
 				<div ref={containerRef} className="absolute inset-0 bg-background" />
-				<div
-					className="absolute inset-0 bg-background flex items-center justify-center pointer-events-none transition-opacity duration-300"
-					style={{ opacity: ready ? 0 : 1 }}
-				>
-					<div className="flex items-center gap-2 text-muted-foreground">
-						<StableSpinner title="Loading terminal" />
-						<span className="text-xs">Loading terminal…</span>
+				{isActive ? (
+					<div
+						className="absolute inset-0 bg-background flex items-center justify-center pointer-events-none transition-opacity duration-300"
+						style={{ opacity: ready ? 0 : 1 }}
+					>
+						<div className="flex items-center gap-2 text-muted-foreground">
+							<StableSpinner title="Loading terminal" />
+							<span className="text-xs">Loading terminal…</span>
+						</div>
 					</div>
-				</div>
+				) : null}
 			</div>
 		</div>
 	);
-}
+});

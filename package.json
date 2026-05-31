@@ -35,7 +35,7 @@
 		"typecheck": "bun run --filter './apps/*' --filter './packages/*' typecheck",
 		"check": "bun run lint && bun run typecheck",
 		"cli": "bun run apps/cli/index.ts",
-		"test": "bun test tests packages/*/tests",
+		"test": "bun test tests packages/*/tests --path-ignore-patterns 'tmp/**'",
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
 		"db:reset": "bun run scripts/reset-db.ts",
 		"catalog:update": "bun run scripts/update-catalog.ts",

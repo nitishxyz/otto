@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle, XCircle, Info, ExternalLink, X } from 'lucide-react';
 import {
 	useToastStore,
@@ -34,56 +34,70 @@ const typeStyles: Record<
 	},
 };
 
-function ToastItem({ toast }: { toast: Toast }) {
+const TOAST_PROGRESS_STYLE = `
+@keyframes otto-toast-progress {
+	from { transform: scaleX(1); }
+	to { transform: scaleX(0); }
+}
+`;
+
+const ToastItem = memo(function ToastItem({ toast }: { toast: Toast }) {
 	const [phase, setPhase] = useState<'enter' | 'visible' | 'exit'>('enter');
-	const [progress, setProgress] = useState(100);
 	const removeToast = useToastStore((s) => s.removeToast);
-	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	useEffect(() => {
-		requestAnimationFrame(() => {
+		const frame = requestAnimationFrame(() => {
 			requestAnimationFrame(() => setPhase('visible'));
 		});
 
-		const duration = toast.duration;
-		if (duration && duration > 0) {
-			const start = Date.now();
-			timerRef.current = setInterval(() => {
-				const elapsed = Date.now() - start;
-				const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
-				setProgress(remaining);
-				if (remaining <= 0 && timerRef.current) {
-					clearInterval(timerRef.current);
-				}
-			}, 30);
-		}
+		return () => cancelAnimationFrame(frame);
+	}, []);
 
-		return () => {
-			if (timerRef.current) clearInterval(timerRef.current);
-		};
-	}, [toast.duration]);
-
-	const handleDismiss = () => {
+	const handleDismiss = useCallback(() => {
 		setPhase('exit');
 		setTimeout(() => removeToast(toast.id), 180);
-	};
+	}, [removeToast, toast.id]);
 
-	const runAction = async () => {
+	const runAction = useCallback(async () => {
 		if (toast.action?.onClick) {
 			await toast.action.onClick();
 		} else if (toast.action?.href) {
 			openUrl(toast.action.href);
 		}
-	};
+	}, [toast.action]);
 
-	const handleToastClick = async () => {
+	const handleToastClick = useCallback(async () => {
 		if (toast.activateActionOnClick && toast.action) {
 			await runAction();
 		}
 		handleDismiss();
-	};
+	}, [handleDismiss, runAction, toast.action, toast.activateActionOnClick]);
+
+	const handleDismissClick = useCallback(
+		(e: React.MouseEvent<HTMLButtonElement>) => {
+			e.stopPropagation();
+			handleDismiss();
+		},
+		[handleDismiss],
+	);
+
+	const handleActionClick = useCallback(
+		async (e: React.MouseEvent<HTMLButtonElement>) => {
+			e.stopPropagation();
+			await runAction();
+			handleDismiss();
+		},
+		[handleDismiss, runAction],
+	);
 
 	const style = typeStyles[toast.type];
+	const progressStyle = useMemo<React.CSSProperties>(
+		() => ({
+			animation: `otto-toast-progress ${toast.duration ?? 0}ms linear forwards`,
+			transformOrigin: 'left',
+		}),
+		[toast.duration],
+	);
 
 	const transitionClass =
 		phase === 'enter'
@@ -121,10 +135,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 
 				<button
 					type="button"
-					onClick={(e) => {
-						e.stopPropagation();
-						handleDismiss();
-					}}
+					onClick={handleDismissClick}
 					className="shrink-0 size-5 inline-flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 mt-px"
 					aria-label="Dismiss"
 				>
@@ -136,11 +147,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 				<div className="flex items-center px-3 pb-2.5 pt-0 pl-[34px]">
 					<button
 						type="button"
-						onClick={async (e) => {
-							e.stopPropagation();
-							await runAction();
-							handleDismiss();
-						}}
+						onClick={handleActionClick}
 						className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors px-2.5 py-1 rounded-md"
 					>
 						{toast.action.label}
@@ -151,18 +158,12 @@ function ToastItem({ toast }: { toast: Toast }) {
 
 			{Number(toast.duration) > 0 && toast.type !== 'loading' && (
 				<div className="h-px w-full bg-border/50">
-					<div
-						className={`h-full ${style.bar}`}
-						style={{
-							width: `${progress}%`,
-							transition: 'width 80ms linear',
-						}}
-					/>
+					<div className={`h-full w-full ${style.bar}`} style={progressStyle} />
 				</div>
 			)}
 		</div>
 	);
-}
+});
 
 export function Toaster() {
 	const toasts = useToastStore((s) => s.toasts);
@@ -170,10 +171,13 @@ export function Toaster() {
 	if (toasts.length === 0) return null;
 
 	return (
-		<div className="fixed bottom-3 right-3 z-[9999] flex flex-col-reverse gap-1.5 w-[340px]">
-			{toasts.map((toast) => (
-				<ToastItem key={toast.id} toast={toast} />
-			))}
-		</div>
+		<>
+			<style>{TOAST_PROGRESS_STYLE}</style>
+			<div className="fixed bottom-3 right-3 z-[9999] flex flex-col-reverse gap-1.5 w-[340px]">
+				{toasts.map((toast) => (
+					<ToastItem key={toast.id} toast={toast} />
+				))}
+			</div>
+		</>
 	);
 }

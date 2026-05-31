@@ -64,7 +64,7 @@ describe('Built-in Tools', () => {
 		const names = tools.map((t) => t.name);
 
 		expect(names).toContain('read');
-		expect(names).toContain('read_image');
+		expect(names).toContain('load_tools');
 		expect(names).toContain('edit');
 		expect(names).toContain('multiedit');
 		expect(names).toContain('write');
@@ -114,16 +114,16 @@ describe('Built-in Tools', () => {
 
 	describe('read_image tool', () => {
 		it('should read image content for vision models', async () => {
-			const { tools } = await discoverProjectTools(projectRoot);
-			const imageTool = tools.find((t) => t.name === 'read_image');
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const imageTool = lazyToolsRecord.read_image;
 			expect(imageTool).toBeDefined();
 
-			const result = await imageTool?.tool.execute({ path: 'pixel.png' });
+			const result = await imageTool?.execute?.({ path: 'pixel.png' });
 			expect(result).toHaveProperty('mediaType');
 			expect((result as { mediaType: string }).mediaType).toBe('image/png');
 			expect((result as { data: string }).data.length).toBeGreaterThan(0);
 
-			const modelOutput = await imageTool?.tool.toModelOutput?.({
+			const modelOutput = await imageTool?.toModelOutput?.({
 				toolCallId: 'call-1',
 				input: { path: 'pixel.png' },
 				output: result,

@@ -8,6 +8,7 @@ import {
 	useImperativeHandle,
 	useMemo,
 } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSendMessage } from '../../hooks/useMessages';
 import {
@@ -75,10 +76,6 @@ export const ChatInputContainer = memo(
 			const [agent, setAgent] = useState('');
 			const [provider, setProvider] = useState('');
 			const [model, setModel] = useState('');
-			const [isConfigOpen, setIsConfigOpen] = useState(false);
-			const [configFocusTarget, setConfigFocusTarget] = useState<
-				'agent' | 'model' | null
-			>(null);
 			const [inputKey, setInputKey] = useState(0);
 
 			const chatInputRef = useRef<{
@@ -100,21 +97,15 @@ export const ChatInputContainer = memo(
 			);
 			const queryClient = useQueryClient();
 
-			const modelSupportsReasoning = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.reasoningText;
+			const selectedModel = useMemo(
+				() => allModels?.[provider]?.models?.find((m) => m.id === model),
+				[allModels, provider, model],
+			);
 
-			const modelSupportsVision = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.vision;
-
-			const modelSupportsAttachment = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.attachment;
-
-			const modelIsFree = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.free;
+			const modelSupportsReasoning = selectedModel?.reasoningText;
+			const modelSupportsVision = selectedModel?.vision;
+			const modelSupportsAttachment = selectedModel?.attachment;
+			const modelIsFree = selectedModel?.free;
 
 			const {
 				images,
@@ -280,23 +271,12 @@ export const ChatInputContainer = memo(
 				],
 			);
 
-			const handleToggleConfig = useCallback(() => {
-				setIsConfigOpen((prev) => !prev);
-			}, []);
-
-			const handleCloseConfig = useCallback(() => {
-				setIsConfigOpen(false);
-				setConfigFocusTarget(null);
-			}, []);
-
 			const handleCommand = useCallback(
 				async (commandId: string) => {
 					if (commandId === 'models') {
-						setConfigFocusTarget('model');
-						setIsConfigOpen(true);
+						openConfigRef.current?.('model');
 					} else if (commandId === 'agents') {
-						setConfigFocusTarget('agent');
-						setIsConfigOpen(true);
+						openConfigRef.current?.('agent');
 					} else if (commandId === 'new') {
 						onNewSession?.();
 					} else if (commandId === 'stage') {
@@ -503,61 +483,162 @@ export const ChatInputContainer = memo(
 				[updateSession],
 			);
 
+			const openConfigRef = useRef<
+				((target: 'agent' | 'model' | null) => void) | null
+			>(null);
+			const handleOpenConfigReady = useCallback(
+				(openConfig: (target: 'agent' | 'model' | null) => void) => {
+					openConfigRef.current = openConfig;
+				},
+				[],
+			);
+
 			return (
-				<>
-					<ConfigModal
-						isOpen={isConfigOpen}
-						onClose={handleCloseConfig}
-						initialFocus={configFocusTarget}
-						chatInputRef={chatInputRef}
-						agent={agent}
-						provider={provider}
-						model={model}
-						modelSupportsReasoning={modelSupportsReasoning}
-						onAgentChange={handleAgentChange}
-						onProviderChange={handleProviderChange}
-						onModelChange={handleModelChange}
-						onModelSelectorChange={handleModelSelectorChange}
-						modalPosition={modalPosition}
-					/>
-					<ChatInput
-						ref={chatInputRef}
-						key={inputKey}
-						onSend={handleSendMessage}
-						onCommand={handleCommand}
-						disabled={sendMessage.isPending}
-						onConfigClick={handleToggleConfig}
-						onPlanModeToggle={handlePlanModeToggle}
-						isPlanMode={agent === 'plan'}
-						reasoningEnabled={
-							modelSupportsReasoning &&
-							(config?.defaults?.reasoningText ?? true)
-						}
-						sessionId={sessionId}
-						images={images}
-						documents={documents}
-						onFileRemove={removeFile}
-						isDragging={isDragging}
-						onPaste={handlePaste}
-						visionEnabled={modelSupportsVision}
-						attachmentEnabled={modelSupportsAttachment}
-						modelName={model}
-						providerName={provider}
-						isCustomProvider={isCustomProvider}
-						authType={providerAuthType}
-						isFreeModel={modelIsFree}
-						researchContexts={researchContexts}
-						onResearchContextRemove={handleResearchContextRemove}
-						onModelInfoClick={() => {
-							setConfigFocusTarget('model');
-							setIsConfigOpen(true);
-						}}
-						agent={agent}
-						agents={config?.agents}
-						onAgentChange={handleAgentChange}
-					/>
-				</>
+				<ChatConfigModalHost
+					chatInputRef={chatInputRef}
+					agent={agent}
+					provider={provider}
+					model={model}
+					modelSupportsReasoning={modelSupportsReasoning}
+					onAgentChange={handleAgentChange}
+					onProviderChange={handleProviderChange}
+					onModelChange={handleModelChange}
+					onModelSelectorChange={handleModelSelectorChange}
+					modalPosition={modalPosition}
+					onOpenConfigReady={handleOpenConfigReady}
+				>
+					{({ toggleConfig, openModelConfig }) => (
+						<ChatInput
+							ref={chatInputRef}
+							key={inputKey}
+							onSend={handleSendMessage}
+							onCommand={handleCommand}
+							disabled={sendMessage.isPending}
+							onConfigClick={toggleConfig}
+							onPlanModeToggle={handlePlanModeToggle}
+							isPlanMode={agent === 'plan'}
+							reasoningEnabled={
+								modelSupportsReasoning &&
+								(config?.defaults?.reasoningText ?? true)
+							}
+							sessionId={sessionId}
+							images={images}
+							documents={documents}
+							onFileRemove={removeFile}
+							isDragging={isDragging}
+							onPaste={handlePaste}
+							visionEnabled={modelSupportsVision}
+							attachmentEnabled={modelSupportsAttachment}
+							modelName={model}
+							providerName={provider}
+							isCustomProvider={isCustomProvider}
+							authType={providerAuthType}
+							isFreeModel={modelIsFree}
+							researchContexts={researchContexts}
+							onResearchContextRemove={handleResearchContextRemove}
+							onModelInfoClick={openModelConfig}
+							agent={agent}
+							agents={config?.agents}
+							onAgentChange={handleAgentChange}
+						/>
+					)}
+				</ChatConfigModalHost>
 			);
 		},
 	),
 );
+
+type ConfigFocusTarget = 'agent' | 'model' | null;
+
+type ConfigControls = {
+	openConfig: (target: ConfigFocusTarget) => void;
+	openModelConfig: () => void;
+	toggleConfig: () => void;
+};
+
+interface ChatConfigModalHostProps {
+	chatInputRef: RefObject<{
+		focus: () => void;
+		setValue: (value: string) => void;
+	}>;
+	agent: string;
+	provider: string;
+	model: string;
+	modelSupportsReasoning?: boolean;
+	onAgentChange: (agent: string) => void;
+	onProviderChange: (provider: string) => void;
+	onModelChange: (model: string) => void;
+	onModelSelectorChange?: (provider: string, model: string) => void;
+	modalPosition?: 'fixed' | 'absolute';
+	onOpenConfigReady: (openConfig: (target: ConfigFocusTarget) => void) => void;
+	children: (controls: ConfigControls) => ReactNode;
+}
+
+const ChatConfigModalHost = memo(function ChatConfigModalHost({
+	chatInputRef,
+	agent,
+	provider,
+	model,
+	modelSupportsReasoning,
+	onAgentChange,
+	onProviderChange,
+	onModelChange,
+	onModelSelectorChange,
+	modalPosition,
+	onOpenConfigReady,
+	children,
+}: ChatConfigModalHostProps) {
+	const [isConfigOpen, setIsConfigOpen] = useState(false);
+	const [configFocusTarget, setConfigFocusTarget] =
+		useState<ConfigFocusTarget>(null);
+
+	const openConfig = useCallback((target: ConfigFocusTarget) => {
+		setConfigFocusTarget(target);
+		setIsConfigOpen(true);
+	}, []);
+
+	useEffect(() => {
+		onOpenConfigReady(openConfig);
+	}, [onOpenConfigReady, openConfig]);
+
+	const toggleConfig = useCallback(() => {
+		setIsConfigOpen((prev) => !prev);
+	}, []);
+
+	const handleCloseConfig = useCallback(() => {
+		setIsConfigOpen(false);
+		setConfigFocusTarget(null);
+	}, []);
+
+	const openModelConfig = useCallback(() => {
+		openConfig('model');
+	}, [openConfig]);
+
+	const controls = useMemo(
+		() => ({ openConfig, openModelConfig, toggleConfig }),
+		[openConfig, openModelConfig, toggleConfig],
+	);
+
+	return (
+		<>
+			{isConfigOpen ? (
+				<ConfigModal
+					isOpen
+					onClose={handleCloseConfig}
+					initialFocus={configFocusTarget}
+					chatInputRef={chatInputRef}
+					agent={agent}
+					provider={provider}
+					model={model}
+					modelSupportsReasoning={modelSupportsReasoning}
+					onAgentChange={onAgentChange}
+					onProviderChange={onProviderChange}
+					onModelChange={onModelChange}
+					onModelSelectorChange={onModelSelectorChange}
+					modalPosition={modalPosition}
+				/>
+			) : null}
+			{children(controls)}
+		</>
+	);
+});

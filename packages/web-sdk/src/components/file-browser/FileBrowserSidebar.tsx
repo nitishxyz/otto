@@ -152,6 +152,10 @@ function TreeItem({
 
 export const FileBrowserSidebar = memo(function FileBrowserSidebar() {
 	const isExpanded = useFileBrowserStore((s) => s.isExpanded);
+	return isExpanded ? <FileBrowserSidebarContent /> : null;
+});
+
+const FileBrowserSidebarContent = memo(function FileBrowserSidebarContent() {
 	const collapseSidebar = useFileBrowserStore((s) => s.collapseSidebar);
 	const revealFile = useFileBrowserStore((s) => s.revealFile);
 	const activeFileTabPath = useViewerTabsStore((state) => {
@@ -165,12 +169,10 @@ export const FileBrowserSidebar = memo(function FileBrowserSidebar() {
 	const { data: rootData, isLoading, refetch } = useFileTree('.');
 
 	useEffect(() => {
-		if (isExpanded && activeFileTabPath) {
+		if (activeFileTabPath) {
 			revealFile(activeFileTabPath);
 		}
-	}, [isExpanded, activeFileTabPath, revealFile]);
-
-	if (!isExpanded) return null;
+	}, [activeFileTabPath, revealFile]);
 
 	return (
 		<div

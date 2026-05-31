@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { FilePen, FilePlus, FileEdit, RefreshCw } from 'lucide-react';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -84,16 +84,17 @@ function countLinesFromPatch(op: SessionFileOperation): {
 	return { additions: 0, deletions: 0 };
 }
 
-function SessionFileItem({ file }: { file: SessionFile }) {
-	const openDiff = useSessionFilesStore((state) => state.openDiff);
-	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
-	const activeViewerTab = useViewerTabsStore((state) =>
-		state.tabs.find((tab) => tab.id === state.activeTabId),
-	);
-	const activeViewerTabPath = getViewerTabPath(activeViewerTab);
-	const isSelected =
-		selectedFile === file.path || activeViewerTabPath === file.path;
+interface SessionFileItemProps {
+	file: SessionFile;
+	isSelected: boolean;
+	onOpen: (file: SessionFile) => void;
+}
 
+const SessionFileItem = memo(function SessionFileItem({
+	file,
+	isSelected,
+	onOpen,
+}: SessionFileItemProps) {
 	const lastOp = file.operations[file.operations.length - 1];
 
 	const { totalAdditions, totalDeletions } = useMemo(() => {
@@ -107,11 +108,11 @@ function SessionFileItem({ file }: { file: SessionFile }) {
 		return { totalAdditions: additions, totalDeletions: deletions };
 	}, [file.operations]);
 
-	const handleClick = () => {
+	const handleClick = useCallback(() => {
 		if (file.operations.length > 0) {
-			openDiff(file.path, file.operations);
+			onOpen(file);
 		}
-	};
+	}, [file, onOpen]);
 
 	return (
 		<button
@@ -140,24 +141,39 @@ function SessionFileItem({ file }: { file: SessionFile }) {
 			</div>
 		</button>
 	);
-}
+});
 
 export const SessionFilesSidebar = memo(function SessionFilesSidebar({
 	sessionId,
 }: SessionFilesSidebarProps) {
 	const isExpanded = useSessionFilesStore((state) => state.isExpanded);
+	return isExpanded ? (
+		<SessionFilesSidebarContent sessionId={sessionId} />
+	) : null;
+});
+
+const SessionFilesSidebarContent = memo(function SessionFilesSidebarContent({
+	sessionId,
+}: SessionFilesSidebarProps) {
 	const collapseSidebar = useSessionFilesStore(
 		(state) => state.collapseSidebar,
 	);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
-	const { data, isLoading, error, refetch } = useSessionFiles(
-		sessionId,
-		isExpanded,
+	const openDiff = useSessionFilesStore((state) => state.openDiff);
+	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
+	const activeViewerTabPath = useViewerTabsStore((state) => {
+		const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+		return getViewerTabPath(activeTab);
+	});
+	const { data, isLoading, error, refetch } = useSessionFiles(sessionId, true);
+	const handleOpenFile = useCallback(
+		(file: SessionFile) => {
+			openDiff(file.path, file.operations);
+		},
+		[openDiff],
 	);
-
-	if (!isExpanded) return null;
 
 	return (
 		<div
@@ -203,7 +219,15 @@ export const SessionFilesSidebar = memo(function SessionFilesSidebar({
 					) : (
 						<div className="divide-y divide-border">
 							{data.files.map((file) => (
-								<SessionFileItem key={file.path} file={file} />
+								<SessionFileItem
+									key={file.path}
+									file={file}
+									isSelected={
+										selectedFile === file.path ||
+										activeViewerTabPath === file.path
+									}
+									onOpen={handleOpenFile}
+								/>
 							))}
 						</div>
 					)}

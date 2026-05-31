@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '../layout/AppLayout';
 import {
 	SessionListContainer,
@@ -16,19 +17,26 @@ import {
 	useWorkingDirectory,
 	useKeyboardShortcuts,
 	useClientEvents,
+	sessionsQueryKey,
 } from '@ottocode/web-sdk/hooks';
 import { useGitStore, useConfirmationStore } from '@ottocode/web-sdk/stores';
 import { apiClient } from '@ottocode/web-sdk/lib';
 import {
-	useGitStatus,
 	useStageFiles,
 	useOttoRouterBalance,
 	useOttoRouterPayments,
 	useUnstageFiles,
 	useRestoreFiles,
 	useDeleteFiles,
-	useSessions,
 } from '@ottocode/web-sdk/hooks';
+
+interface SessionsCachePage {
+	items?: Array<{ id: string }>;
+}
+
+interface SessionsCacheData {
+	pages?: SessionsCachePage[];
+}
 
 interface SessionsLayoutProps {
 	sessionId?: string;
@@ -39,22 +47,7 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
 	const { theme, toggleTheme } = useTheme();
-	const { openCommitModal, openDiff } = useGitStore();
 	const navigate = useNavigate();
-	const { data: sessions = [] } = useSessions();
-	const { data: gitStatus } = useGitStatus();
-	const stageFiles = useStageFiles();
-	const unstageFiles = useUnstageFiles();
-	const restoreFiles = useRestoreFiles();
-	const deleteFiles = useDeleteFiles();
-	const openConfirmation = useConfirmationStore(
-		(state) => state.openConfirmation,
-	);
-
-	useWorkingDirectory();
-	useClientEvents(sessionId);
-	useOttoRouterPayments(sessionId);
-	useOttoRouterBalance(config?.defaults?.provider);
 
 	const focusInput = useCallback(() => {
 		setTimeout(() => {
@@ -116,68 +109,6 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 		},
 		[createSession, config, navigate],
 	);
-
-	const gitFiles = useMemo(() => {
-		if (!gitStatus) return [];
-		return [
-			...(gitStatus.conflicted ?? []).map((f) => ({
-				path: f.path,
-				staged: false,
-				status: f.status,
-			})),
-			...gitStatus.staged.map((f) => ({
-				path: f.path,
-				staged: true,
-				status: f.status,
-			})),
-			...gitStatus.unstaged.map((f) => ({
-				path: f.path,
-				staged: false,
-				status: f.status,
-			})),
-			...gitStatus.untracked.map((f) => ({
-				path: f.path,
-				staged: false,
-				status: f.status,
-			})),
-		];
-	}, [gitStatus]);
-
-	const sessionIds = useMemo(() => sessions.map((s) => s.id), [sessions]);
-
-	useKeyboardShortcuts({
-		sessionIds,
-		activeSessionId: sessionId,
-		gitFiles,
-		onSelectSession: handleSelectSession,
-		onNewSession: handleNewSession,
-		onStageFile: (paths) =>
-			stageFiles.mutate(Array.isArray(paths) ? paths : [paths]),
-		onUnstageFile: (paths) =>
-			unstageFiles.mutate(Array.isArray(paths) ? paths : [paths]),
-		onRestoreFile: (path) => restoreFiles.mutate([path]),
-		onDeleteFile: (path) => {
-			openConfirmation({
-				title: 'Delete File',
-				message: `Delete ${path}? This will permanently remove the untracked file.`,
-				confirmLabel: 'Delete',
-				variant: 'destructive',
-				onConfirm: async () => {
-					await deleteFiles.mutateAsync([path]);
-				},
-			});
-		},
-		onStageAll: () => {
-			if (gitFiles.some((f) => !f.staged)) stageFiles.mutate(['.']);
-		},
-		onUnstageAll: () => {
-			const staged = gitFiles.filter((f) => f.staged).map((f) => f.path);
-			if (staged.length > 0) unstageFiles.mutate(staged);
-		},
-		onOpenCommitModal: openCommitModal,
-		onViewDiff: openDiff,
-		onReturnToInput: focusInput,
-	});
 
 	useEffect(() => {
 		if (sessionId) {
@@ -254,8 +185,25 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 		handleSessionCreated,
 	]);
 
+	const sidebarContent = useMemo(
+		() => (
+			<SessionListContainer
+				activeSessionId={sessionId}
+				onSelectSession={handleSelectSession}
+			/>
+		),
+		[sessionId, handleSelectSession],
+	);
+
 	return (
 		<>
+			<SessionRuntimeEffects sessionId={sessionId} />
+			<SessionKeyboardShortcuts
+				activeSessionId={sessionId}
+				onNewSession={handleNewSession}
+				onReturnToInput={focusInput}
+				onSelectSession={handleSelectSession}
+			/>
 			<AppLayout
 				onNewSession={handleNewSession}
 				theme={theme}
@@ -263,16 +211,119 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}
-				sidebar={
-					<SessionListContainer
-						activeSessionId={sessionId}
-						onSelectSession={handleSelectSession}
-					/>
-				}
+				sidebar={sidebarContent}
 			>
 				{mainContent}
 			</AppLayout>
 			<Toaster />
 		</>
 	);
+}
+
+function SessionRuntimeEffects({ sessionId }: SessionsLayoutProps) {
+	const { data: config } = useConfig();
+
+	useWorkingDirectory();
+	useClientEvents(sessionId);
+	useOttoRouterPayments(sessionId);
+	useOttoRouterBalance(config?.defaults?.provider);
+
+	return null;
+}
+
+interface SessionKeyboardShortcutsProps {
+	activeSessionId?: string;
+	onNewSession: () => void;
+	onReturnToInput: () => void;
+	onSelectSession: (sessionId: string) => void;
+}
+
+function SessionKeyboardShortcuts({
+	activeSessionId,
+	onNewSession,
+	onReturnToInput,
+	onSelectSession,
+}: SessionKeyboardShortcutsProps) {
+	const queryClient = useQueryClient();
+	const openCommitModal = useGitStore((state) => state.openCommitModal);
+	const openDiff = useGitStore((state) => state.openDiff);
+	const stageFiles = useStageFiles();
+	const unstageFiles = useUnstageFiles();
+	const restoreFiles = useRestoreFiles();
+	const deleteFiles = useDeleteFiles();
+	const openConfirmation = useConfirmationStore(
+		(state) => state.openConfirmation,
+	);
+
+	const getSessionIds = useCallback(() => {
+		const cached =
+			queryClient.getQueryData<SessionsCacheData>(sessionsQueryKey);
+		return (
+			cached?.pages?.flatMap((page) => page.items?.map((s) => s.id) ?? []) ?? []
+		);
+	}, [queryClient]);
+
+	const handleStageFile = useCallback(
+		(paths: string[]) => stageFiles.mutate(paths),
+		[stageFiles],
+	);
+
+	const handleUnstageFile = useCallback(
+		(paths: string[]) => unstageFiles.mutate(paths),
+		[unstageFiles],
+	);
+
+	const handleRestoreFile = useCallback(
+		(path: string) => restoreFiles.mutate([path]),
+		[restoreFiles],
+	);
+
+	const handleDeleteFile = useCallback(
+		(path: string) => {
+			openConfirmation({
+				title: 'Delete File',
+				message: `Delete ${path}? This will permanently remove the untracked file.`,
+				confirmLabel: 'Delete',
+				variant: 'destructive',
+				onConfirm: async () => {
+					await deleteFiles.mutateAsync([path]);
+				},
+			});
+		},
+		[deleteFiles, openConfirmation],
+	);
+
+	const handleStageAll = useCallback(() => {
+		const paths = useGitStore
+			.getState()
+			.gitTreeRows.filter((row) => row.type === 'file' && !row.staged)
+			.flatMap((row) => row.actionPaths);
+		if (paths.length > 0) stageFiles.mutate(Array.from(new Set(paths)));
+	}, [stageFiles]);
+
+	const handleUnstageAll = useCallback(() => {
+		const paths = useGitStore
+			.getState()
+			.gitTreeRows.filter((row) => row.type === 'file' && row.staged)
+			.flatMap((row) => row.actionPaths);
+		if (paths.length > 0) unstageFiles.mutate(Array.from(new Set(paths)));
+	}, [unstageFiles]);
+
+	useKeyboardShortcuts({
+		getSessionIds,
+		activeSessionId,
+		onSelectSession,
+		onNewSession,
+		onStageFile: handleStageFile,
+		onUnstageFile: handleUnstageFile,
+		onRestoreFile: handleRestoreFile,
+		onDeleteFile: handleDeleteFile,
+		onStageAll: handleStageAll,
+		onUnstageAll: handleUnstageAll,
+		onOpenCommitModal: openCommitModal,
+		onViewDiff: openDiff,
+		onReturnToInput,
+	});
+
+	return null;
 }

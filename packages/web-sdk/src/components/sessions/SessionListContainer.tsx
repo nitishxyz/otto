@@ -1,13 +1,106 @@
 import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
+import type { RefObject } from 'react';
 import { useMarkSessionViewed, useSessions } from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
 import { StableSpinner } from '../ui/StableSpinner';
 import { getSessionGroupLabel } from './session-time';
+import type { Session } from '../../types/api';
+
+const FOCUS_RING_CLASSES = ['ring-1', 'ring-inset', 'ring-sidebar-ring/40'];
 
 interface SessionListContainerProps {
 	activeSessionId?: string;
 	onSelectSession: (sessionId: string) => void;
+}
+
+interface SessionSnapshot {
+	id: string;
+	index: number;
+	title: string | null;
+	agent: string;
+	isRunning: boolean;
+	createdAt: number;
+	lastActiveAt: number;
+	lastViewedAt: number | null;
+	activityAt: number;
+}
+
+interface SessionListRowProps {
+	session: Session;
+	snapshot: SessionSnapshot;
+	isActive: boolean;
+	onSelectSession: (sessionId: string) => void;
+	registerItem: (sessionId: string, element: HTMLDivElement | null) => void;
+}
+
+const SessionListRow = memo(function SessionListRow({
+	session,
+	snapshot,
+	isActive,
+	onSelectSession,
+	registerItem,
+}: SessionListRowProps) {
+	const setRef = useCallback(
+		(element: HTMLDivElement | null) => {
+			registerItem(snapshot.id, element);
+		},
+		[registerItem, snapshot.id],
+	);
+
+	const handleClick = useCallback(() => {
+		onSelectSession(snapshot.id);
+	}, [onSelectSession, snapshot.id]);
+
+	return (
+		<div ref={setRef}>
+			<SessionItem
+				session={session}
+				isActive={isActive}
+				onClick={handleClick}
+			/>
+		</div>
+	);
+});
+
+interface SessionFocusControllerProps {
+	sessionSnapshot: SessionSnapshot[];
+	itemRefs: RefObject<Map<string, HTMLDivElement>>;
+}
+
+function SessionFocusController({
+	sessionSnapshot,
+	itemRefs,
+}: SessionFocusControllerProps) {
+	const currentFocus = useFocusStore((state) => state.currentFocus);
+	const sessionIndex = useFocusStore((state) => state.sessionIndex);
+	const previousFocusedSessionId = useRef<string | null>(null);
+
+	useEffect(() => {
+		const previousId = previousFocusedSessionId.current;
+		if (previousId) {
+			const previousElement = itemRefs.current?.get(previousId);
+			previousElement?.classList.remove(...FOCUS_RING_CLASSES);
+		}
+
+		if (currentFocus !== 'sessions') {
+			previousFocusedSessionId.current = null;
+			return;
+		}
+
+		const session = sessionSnapshot[sessionIndex];
+		if (!session) {
+			previousFocusedSessionId.current = null;
+			return;
+		}
+
+		const element = itemRefs.current?.get(session.id);
+		element?.classList.add(...FOCUS_RING_CLASSES);
+		element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		previousFocusedSessionId.current = session.id;
+	}, [currentFocus, itemRefs, sessionIndex, sessionSnapshot]);
+
+	return null;
 }
 
 export const SessionListContainer = memo(function SessionListContainer({
@@ -21,7 +114,6 @@ export const SessionListContainer = memo(function SessionListContainer({
 		fetchNextPage,
 		isFetchingNextPage,
 	} = useSessions();
-	const { currentFocus, sessionIndex } = useFocusStore();
 	const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const paginationSentinelRef = useRef<HTMLDivElement>(null);
@@ -39,7 +131,15 @@ export const SessionListContainer = memo(function SessionListContainer({
 		[onSelectSession],
 	);
 
-	const sessionSnapshot = useMemo(() => {
+	const registerItem = useCallback(
+		(sessionId: string, element: HTMLDivElement | null) => {
+			if (element) itemRefs.current.set(sessionId, element);
+			else itemRefs.current.delete(sessionId);
+		},
+		[],
+	);
+
+	const sessionSnapshot = useMemo<SessionSnapshot[]>(() => {
 		return sessions.map((s, index) => ({
 			id: s.id,
 			index,
@@ -56,6 +156,10 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const sessionMap = useMemo(
 		() => new Map(sessions.map((session) => [session.id, session])),
 		[sessions],
+	);
+	const sessionSnapshotMap = useMemo(
+		() => new Map(sessionSnapshot.map((session) => [session.id, session])),
+		[sessionSnapshot],
 	);
 
 	const runningSessions = useMemo(() => {
@@ -116,19 +220,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 		}));
 	}, [sessionSnapshot, runningSessionIds]);
 
-	useEffect(() => {
-		if (currentFocus === 'sessions') {
-			const session = sessionSnapshot[sessionIndex];
-			if (session) {
-				const element = itemRefs.current.get(session.id);
-				element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-			}
-		}
-	}, [currentFocus, sessionIndex, sessionSnapshot]);
-
 	const markViewedIfReady = useCallback(
 		(sessionId: string) => {
-			const session = sessionSnapshot.find((item) => item.id === sessionId);
+			const session = sessionSnapshotMap.get(sessionId);
 			if (!session || session.isRunning) return;
 			if (session.activityAt <= (session.lastViewedAt ?? 0)) return;
 			if (markedViewedRef.current.get(session.id) === session.activityAt) {
@@ -140,7 +234,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 				onError: () => markedViewedRef.current.delete(session.id),
 			});
 		},
-		[markSessionViewed, sessionSnapshot],
+		[markSessionViewed, sessionSnapshotMap],
 	);
 
 	useEffect(() => {
@@ -155,24 +249,30 @@ export const SessionListContainer = memo(function SessionListContainer({
 		if (
 			!activeSessionId ||
 			lastScrolledSessionId.current === activeSessionId ||
-			sessions.length === 0
+			sessionSnapshot.length === 0
 		)
 			return;
 
-		const activeIndex = sessions.findIndex((s) => s.id === activeSessionId);
-		if (activeIndex === -1 && hasNextPage) {
+		const activeSession = sessionSnapshotMap.get(activeSessionId);
+		if (!activeSession && hasNextPage) {
 			fetchNextPage();
 			return;
 		}
 
-		if (activeIndex !== -1) {
+		if (activeSession) {
 			lastScrolledSessionId.current = activeSessionId;
 			requestAnimationFrame(() => {
 				const element = itemRefs.current.get(activeSessionId);
 				element?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 			});
 		}
-	}, [activeSessionId, sessions, hasNextPage, fetchNextPage]);
+	}, [
+		activeSessionId,
+		sessionSnapshot.length,
+		sessionSnapshotMap,
+		hasNextPage,
+		fetchNextPage,
+	]);
 
 	useEffect(() => {
 		const container = scrollContainerRef.current;
@@ -243,33 +343,25 @@ export const SessionListContainer = memo(function SessionListContainer({
 		);
 	}
 
-	const renderSession = (session: (typeof sessionSnapshot)[0]) => {
+	const renderSession = (session: SessionSnapshot) => {
 		const fullSession = sessionMap.get(session.id);
 		if (!fullSession) return null;
-		const isFocused =
-			currentFocus === 'sessions' && sessionIndex === session.index;
 
 		return (
-			<div
+			<SessionListRow
 				key={session.id}
-				ref={(el) => {
-					if (el) itemRefs.current.set(session.id, el);
-					else itemRefs.current.delete(session.id);
-				}}
-				className={isFocused ? 'ring-1 ring-inset ring-sidebar-ring/40' : ''}
-			>
-				<SessionItem
-					session={fullSession}
-					isActive={session.id === activeSessionId}
-					onClick={() => handleSessionClick(session.id)}
-				/>
-			</div>
+				session={fullSession}
+				snapshot={session}
+				isActive={session.id === activeSessionId}
+				onSelectSession={handleSessionClick}
+				registerItem={registerItem}
+			/>
 		);
 	};
 
 	const renderGroup = (group: {
 		label: string;
-		sessions: typeof sessionSnapshot;
+		sessions: SessionSnapshot[];
 	}) => (
 		<div key={group.label}>
 			<h4 className="sticky top-12 z-10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
@@ -289,6 +381,10 @@ export const SessionListContainer = memo(function SessionListContainer({
 			ref={scrollContainerRef}
 			className="flex flex-col h-full overflow-y-auto scrollbar-hide"
 		>
+			<SessionFocusController
+				sessionSnapshot={sessionSnapshot}
+				itemRefs={itemRefs}
+			/>
 			<div className="h-12 shrink-0" aria-hidden="true" />
 			<div className="pt-3 pb-1">
 				<div className="space-y-4">

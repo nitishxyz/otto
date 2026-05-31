@@ -855,6 +855,14 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	onOpenDashboard,
 }: SettingsSidebarProps = {}) {
 	const isExpanded = useSettingsStore((state) => state.isExpanded);
+	return isExpanded ? (
+		<SettingsSidebarContent onOpenDashboard={onOpenDashboard} />
+	) : null;
+});
+
+const SettingsSidebarContent = memo(function SettingsSidebarContent({
+	onOpenDashboard,
+}: SettingsSidebarProps = {}) {
 	const collapseSidebar = useSettingsStore((state) => state.collapseSidebar);
 	const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
 	const panelWidth = usePanelWidthStore(
@@ -911,8 +919,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 		return config.agents.map((a) => ({ id: a, label: a }));
 	}, [config?.agents]);
 
-	if (!isExpanded) return null;
-
 	const handleProviderChange = (provider: string) => {
 		const firstModel = allModels?.[provider]?.models?.[0]?.id;
 		updateDefaults.mutate({
@@ -929,6 +935,14 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	const handleAgentChange = (agent: string) => {
 		updateDefaults.mutate({ agent, scope: 'global' });
 	};
+
+	const handleOpenPreferences = useCallback(() => {
+		setIsPreferencesOpen(true);
+	}, []);
+
+	const handleClosePreferences = useCallback(() => {
+		setIsPreferencesOpen(false);
+	}, []);
 
 	return (
 		<div
@@ -1050,7 +1064,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
 				<button
 					type="button"
-					onClick={() => setIsPreferencesOpen(true)}
+					onClick={handleOpenPreferences}
 					title="Open preferences"
 					className="group shrink-0 w-full h-12 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
 				>
@@ -1061,10 +1075,9 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 					<ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
 				</button>
 
-				<PreferencesModal
-					isOpen={isPreferencesOpen}
-					onClose={() => setIsPreferencesOpen(false)}
-				/>
+				{isPreferencesOpen ? (
+					<PreferencesModal isOpen onClose={handleClosePreferences} />
+				) : null}
 			</div>
 		</div>
 	);

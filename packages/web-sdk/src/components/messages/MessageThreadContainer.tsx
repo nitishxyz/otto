@@ -17,10 +17,21 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 	sessionId,
 	onSelectSession,
 }: MessageThreadContainerProps) {
+	return (
+		<>
+			<SessionStreamController sessionId={sessionId} />
+			<ToolApprovalShortcutController sessionId={sessionId} />
+			<MessageThreadData
+				sessionId={sessionId}
+				onSelectSession={onSelectSession}
+			/>
+			<TopupModalHost />
+		</>
+	);
+});
+
+function SessionStreamController({ sessionId }: { sessionId: string }) {
 	const queryClient = useQueryClient();
-	const { data: messages = [], isLoading } = useMessages(sessionId);
-	const { data: sessions = [] } = useSessions();
-	const { preferences } = usePreferences();
 
 	useSessionStream(sessionId);
 
@@ -30,8 +41,25 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 		queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
 	}, [queryClient, sessionId]);
 
-	// Enable keyboard shortcuts (Y/N/A) for tool approval in this session
+	return null;
+}
+
+function ToolApprovalShortcutController({ sessionId }: { sessionId: string }) {
 	useToolApprovalShortcuts(sessionId);
+	return null;
+}
+
+function TopupModalHost() {
+	return <OttoRouterTopupModal />;
+}
+
+const MessageThreadData = memo(function MessageThreadData({
+	sessionId,
+	onSelectSession,
+}: MessageThreadContainerProps) {
+	const { data: messages = [], isLoading } = useMessages(sessionId);
+	const { data: sessions = [] } = useSessions();
+	const { preferences } = usePreferences();
 
 	const session = useMemo(
 		() => sessions.find((s) => s.id === sessionId),
@@ -53,16 +81,13 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 	}
 
 	return (
-		<>
-			<MessageThread
-				messages={messages}
-				sessionId={sessionId}
-				session={session}
-				isGenerating={isGenerating}
-				compact={preferences.compactThread}
-				onSelectSession={onSelectSession}
-			/>
-			<OttoRouterTopupModal />
-		</>
+		<MessageThread
+			messages={messages}
+			sessionId={sessionId}
+			session={session}
+			isGenerating={isGenerating}
+			compact={preferences.compactThread}
+			onSelectSession={onSelectSession}
+		/>
 	);
 });

@@ -107,599 +107,593 @@ function RazorpayIcon({ className = 'w-5 h-5' }: { className?: string }) {
 
 export const OttoRouterTopupModal = memo(function OttoRouterTopupModal() {
 	const isOpen = useOttoRouterStore((s) => s.isTopupModalOpen);
-	const closeModal = useOttoRouterStore((s) => s.closeTopupModal);
-	const balance = useOttoRouterStore((s) => s.balance);
-	const setBalance = useOttoRouterStore((s) => s.setBalance);
-	const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
-	const subscription = useOttoRouterStore((s) => s.subscription);
+	return isOpen ? <OttoRouterTopupModalContent /> : null;
+});
 
-	const [view, setView] = useState<ModalView>('amount');
-	const [gateway, setGateway] = useState<PaymentGateway>('polar');
-	const [amount, setAmount] = useState<number>(25);
-	const [customAmount, setCustomAmount] = useState<string>('');
-	const [isCustom, setIsCustom] = useState(false);
-	const [estimate, setEstimate] = useState<FeeEstimate | null>(null);
-	const [razorpayEstimate, setRazorpayEstimate] =
-		useState<RazorpayEstimate | null>(null);
-	const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
-	const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
-	const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo | null>(null);
-	const [isPolling, setIsPolling] = useState(false);
-	const [confirmedAmount, setConfirmedAmount] = useState<number | null>(null);
-	const [pollCount, setPollCount] = useState(0);
-	const [isManualChecking, setIsManualChecking] = useState(false);
-	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+const OttoRouterTopupModalContent = memo(
+	function OttoRouterTopupModalContent() {
+		const closeModal = useOttoRouterStore((s) => s.closeTopupModal);
+		const balance = useOttoRouterStore((s) => s.balance);
+		const setBalance = useOttoRouterStore((s) => s.setBalance);
+		const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
+		const subscription = useOttoRouterStore((s) => s.subscription);
 
-	const effectiveAmount = isCustom ? parseFloat(customAmount) || 0 : amount;
-	const hasGoPlan = !!subscription?.active;
-	const minAmount = gateway === 'razorpay' ? MIN_AMOUNT_RAZORPAY : MIN_AMOUNT;
+		const [view, setView] = useState<ModalView>('amount');
+		const [gateway, setGateway] = useState<PaymentGateway>('polar');
+		const [amount, setAmount] = useState<number>(25);
+		const [customAmount, setCustomAmount] = useState<string>('');
+		const [isCustom, setIsCustom] = useState(false);
+		const [estimate, setEstimate] = useState<FeeEstimate | null>(null);
+		const [razorpayEstimate, setRazorpayEstimate] =
+			useState<RazorpayEstimate | null>(null);
+		const [isLoadingEstimate, setIsLoadingEstimate] = useState(false);
+		const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
+		const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo | null>(null);
+		const [isPolling, setIsPolling] = useState(false);
+		const [confirmedAmount, setConfirmedAmount] = useState<number | null>(null);
+		const [pollCount, setPollCount] = useState(0);
+		const [isManualChecking, setIsManualChecking] = useState(false);
+		const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-	const fetchEstimate = useCallback(
-		async (amt: number) => {
-			if (amt < minAmount || amt > MAX_AMOUNT) {
-				setEstimate(null);
-				setRazorpayEstimate(null);
-				return;
-			}
-			setIsLoadingEstimate(true);
-			try {
-				if (gateway === 'polar') {
-					const result = await apiClient.getPolarTopupEstimate(amt);
-					setEstimate(result);
-					setRazorpayEstimate(null);
-				} else {
-					const result = await apiClient.getRazorpayTopupEstimate(amt);
-					setRazorpayEstimate(result);
+		const effectiveAmount = isCustom ? parseFloat(customAmount) || 0 : amount;
+		const hasGoPlan = !!subscription?.active;
+		const minAmount = gateway === 'razorpay' ? MIN_AMOUNT_RAZORPAY : MIN_AMOUNT;
+
+		const fetchEstimate = useCallback(
+			async (amt: number) => {
+				if (amt < minAmount || amt > MAX_AMOUNT) {
 					setEstimate(null);
+					setRazorpayEstimate(null);
+					return;
 				}
-			} catch {
-				setEstimate(null);
-				setRazorpayEstimate(null);
-			} finally {
-				setIsLoadingEstimate(false);
-			}
-		},
-		[gateway, minAmount],
-	);
-
-	useEffect(() => {
-		if (isOpen && effectiveAmount >= minAmount && view === 'amount') {
-			const timeout = setTimeout(() => fetchEstimate(effectiveAmount), 300);
-			return () => clearTimeout(timeout);
-		}
-	}, [isOpen, effectiveAmount, fetchEstimate, view, minAmount]);
-
-	const stopPolling = useCallback(() => {
-		if (pollRef.current) {
-			clearInterval(pollRef.current);
-			pollRef.current = null;
-		}
-		setIsPolling(false);
-	}, []);
-
-	useEffect(() => {
-		if (!isOpen) {
-			stopPolling();
-			setView('amount');
-			setCheckoutInfo(null);
-			setConfirmedAmount(null);
-			setPollCount(0);
-		}
-	}, [isOpen, stopPolling]);
-
-	useEffect(() => {
-		return () => stopPolling();
-	}, [stopPolling]);
-
-	const startPolling = useCallback(
-		(checkoutId: string) => {
-			if (pollRef.current) return;
-			setIsPolling(true);
-			setPollCount(0);
-
-			const check = async () => {
+				setIsLoadingEstimate(true);
 				try {
-					const status = await apiClient.getPolarTopupStatus(checkoutId);
-					setPollCount((c) => c + 1);
-					if (status?.confirmed) {
-						stopPolling();
-						setConfirmedAmount(status.amountUsd);
-						localStorage.removeItem('pendingPolarCheckout');
-
-						const balanceData = await apiClient.getOttoRouterBalance();
-						if (balanceData?.balance !== undefined) {
-							setBalance(balanceData.balance);
-						}
-						setView('confirmed');
+					if (gateway === 'polar') {
+						const result = await apiClient.getPolarTopupEstimate(amt);
+						setEstimate(result);
+						setRazorpayEstimate(null);
+					} else {
+						const result = await apiClient.getRazorpayTopupEstimate(amt);
+						setRazorpayEstimate(result);
+						setEstimate(null);
 					}
 				} catch {
-					setPollCount((c) => c + 1);
+					setEstimate(null);
+					setRazorpayEstimate(null);
+				} finally {
+					setIsLoadingEstimate(false);
 				}
-			};
+			},
+			[gateway, minAmount],
+		);
 
-			check();
-			pollRef.current = setInterval(check, POLL_INTERVAL);
-		},
-		[stopPolling, setBalance],
-	);
-
-	const handlePresetClick = (preset: number) => {
-		setAmount(preset);
-		setIsCustom(false);
-		setCustomAmount('');
-	};
-
-	const handleCustomAmountChange = (value: string) => {
-		setCustomAmount(value);
-		setIsCustom(true);
-	};
-
-	const openCheckoutUrl = useCallback((url: string) => {
-		if (window.self !== window.top) {
-			window.parent.postMessage({ type: 'otto-open-url', url }, '*');
-		} else {
-			window.open(url, '_blank');
-		}
-	}, []);
-
-	const handlePolarCheckout = async () => {
-		if (effectiveAmount < MIN_AMOUNT || effectiveAmount > MAX_AMOUNT) {
-			toast.error(`Amount must be between $${MIN_AMOUNT} and $${MAX_AMOUNT}`);
-			return;
-		}
-
-		setIsCreatingCheckout(true);
-		try {
-			const result = await apiClient.createPolarCheckout(
-				effectiveAmount,
-				SUCCESS_PAGE_URL,
-			);
-
-			if (result.checkoutUrl && result.checkoutId) {
-				const info: CheckoutInfo = {
-					url: result.checkoutUrl,
-					checkoutId: result.checkoutId,
-					creditAmount: result.creditAmount,
-					chargeAmount: result.chargeAmount,
-				};
-				setCheckoutInfo(info);
-				localStorage.setItem('pendingPolarCheckout', result.checkoutId);
-				setView('checkout');
-				openCheckoutUrl(result.checkoutUrl);
-				startPolling(result.checkoutId);
+		useEffect(() => {
+			if (effectiveAmount >= minAmount && view === 'amount') {
+				const timeout = setTimeout(() => fetchEstimate(effectiveAmount), 300);
+				return () => clearTimeout(timeout);
 			}
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : 'Failed to create checkout',
-			);
-		} finally {
-			setIsCreatingCheckout(false);
-		}
-	};
+		}, [effectiveAmount, fetchEstimate, view, minAmount]);
 
-	const handleRazorpayCheckout = async () => {
-		if (effectiveAmount < MIN_AMOUNT_RAZORPAY || effectiveAmount > MAX_AMOUNT) {
-			toast.error(
-				`Amount must be between $${MIN_AMOUNT_RAZORPAY} and $${MAX_AMOUNT}`,
-			);
-			return;
-		}
+		const stopPolling = useCallback(() => {
+			if (pollRef.current) {
+				clearInterval(pollRef.current);
+				pollRef.current = null;
+			}
+			setIsPolling(false);
+		}, []);
 
-		setIsCreatingCheckout(true);
-		try {
-			await loadRazorpayScript();
-			const order = await apiClient.createRazorpayOrder(effectiveAmount);
+		useEffect(() => {
+			return () => stopPolling();
+		}, [stopPolling]);
 
-			setView('razorpay-processing');
+		const startPolling = useCallback(
+			(checkoutId: string) => {
+				if (pollRef.current) return;
+				setIsPolling(true);
+				setPollCount(0);
 
-			const rzp = new window.Razorpay({
-				key: order.keyId,
-				amount: order.amount,
-				currency: order.currency,
-				name: 'OttoRouter',
-				description: `Top up $${order.creditAmountUsd.toFixed(2)} credits`,
-				order_id: order.orderId,
-				handler: async (response: {
-					razorpay_order_id: string;
-					razorpay_payment_id: string;
-					razorpay_signature: string;
-				}) => {
+				const check = async () => {
 					try {
-						const result = await apiClient.verifyRazorpayPayment({
-							razorpay_order_id: response.razorpay_order_id,
-							razorpay_payment_id: response.razorpay_payment_id,
-							razorpay_signature: response.razorpay_signature,
-						});
+						const status = await apiClient.getPolarTopupStatus(checkoutId);
+						setPollCount((c) => c + 1);
+						if (status?.confirmed) {
+							stopPolling();
+							setConfirmedAmount(status.amountUsd);
+							localStorage.removeItem('pendingPolarCheckout');
 
-						if (result.success) {
-							setConfirmedAmount(result.credited);
 							const balanceData = await apiClient.getOttoRouterBalance();
 							if (balanceData?.balance !== undefined) {
 								setBalance(balanceData.balance);
 							}
 							setView('confirmed');
 						}
-					} catch (err) {
-						toast.error(
-							err instanceof Error
-								? err.message
-								: 'Payment verification failed',
-						);
-						setView('amount');
+					} catch {
+						setPollCount((c) => c + 1);
 					}
-				},
-				modal: {
-					ondismiss: () => {
-						setView('amount');
-					},
-				},
-				theme: {
-					color: '#7c3aed',
-				},
-			});
+				};
 
-			rzp.on('payment.failed', () => {
-				toast.error('Payment failed. Please try again.');
-				setView('amount');
-			});
+				check();
+				pollRef.current = setInterval(check, POLL_INTERVAL);
+			},
+			[stopPolling, setBalance],
+		);
 
-			rzp.open();
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : 'Failed to create order',
-			);
-			setView('amount');
-		} finally {
-			setIsCreatingCheckout(false);
-		}
-	};
+		const handlePresetClick = (preset: number) => {
+			setAmount(preset);
+			setIsCustom(false);
+			setCustomAmount('');
+		};
 
-	const handleCheckout = () => {
-		if (gateway === 'polar') {
-			handlePolarCheckout();
-		} else {
-			handleRazorpayCheckout();
-		}
-	};
+		const handleCustomAmountChange = (value: string) => {
+			setCustomAmount(value);
+			setIsCustom(true);
+		};
 
-	const handleCheckNow = async () => {
-		if (!checkoutInfo) return;
-		setIsManualChecking(true);
-		try {
-			const status = await apiClient.getPolarTopupStatus(
-				checkoutInfo.checkoutId,
-			);
-			if (status?.confirmed) {
-				stopPolling();
-				setConfirmedAmount(status.amountUsd);
-				localStorage.removeItem('pendingPolarCheckout');
-
-				const balanceData = await apiClient.getOttoRouterBalance();
-				if (balanceData?.balance !== undefined) {
-					setBalance(balanceData.balance);
-				}
-				setView('confirmed');
+		const openCheckoutUrl = useCallback((url: string) => {
+			if (window.self !== window.top) {
+				window.parent.postMessage({ type: 'otto-open-url', url }, '*');
 			} else {
-				toast.error('Payment not confirmed yet. Keep waiting or try again.');
+				window.open(url, '_blank');
 			}
-		} catch (err) {
-			console.error('[OttoRouterTopupModal] Check failed:', err);
-			toast.error('Failed to check payment status');
-		} finally {
-			setIsManualChecking(false);
-		}
-	};
+		}, []);
 
-	const handleDone = () => {
-		closeModal();
-	};
+		const handlePolarCheckout = async () => {
+			if (effectiveAmount < MIN_AMOUNT || effectiveAmount > MAX_AMOUNT) {
+				toast.error(`Amount must be between $${MIN_AMOUNT} and $${MAX_AMOUNT}`);
+				return;
+			}
 
-	const isValidAmount =
-		effectiveAmount >= minAmount && effectiveAmount <= MAX_AMOUNT;
+			setIsCreatingCheckout(true);
+			try {
+				const result = await apiClient.createPolarCheckout(
+					effectiveAmount,
+					SUCCESS_PAGE_URL,
+				);
 
-	const modalTitle =
-		view === 'confirmed'
-			? 'Payment Confirmed'
-			: view === 'checkout'
-				? 'Waiting for Payment'
-				: view === 'razorpay-processing'
-					? 'Processing Payment'
-					: 'Add Credits';
+				if (result.checkoutUrl && result.checkoutId) {
+					const info: CheckoutInfo = {
+						url: result.checkoutUrl,
+						checkoutId: result.checkoutId,
+						creditAmount: result.creditAmount,
+						chargeAmount: result.chargeAmount,
+					};
+					setCheckoutInfo(info);
+					localStorage.setItem('pendingPolarCheckout', result.checkoutId);
+					setView('checkout');
+					openCheckoutUrl(result.checkoutUrl);
+					startPolling(result.checkoutId);
+				}
+			} catch (error) {
+				toast.error(
+					error instanceof Error ? error.message : 'Failed to create checkout',
+				);
+			} finally {
+				setIsCreatingCheckout(false);
+			}
+		};
 
-	return (
-		<Modal
-			isOpen={isOpen}
-			onClose={closeModal}
-			title={modalTitle}
-			maxWidth="md"
-		>
-			<div className="space-y-6">
-				{view === 'confirmed' && (
-					<>
-						<div className="py-4">
-							<StatusIndicator
-								status="success"
-								label={`+$${confirmedAmount?.toFixed(2) ?? checkoutInfo?.creditAmount.toFixed(2)}`}
-								sublabel="Credits added to your balance"
-							/>
-						</div>
+		const handleRazorpayCheckout = async () => {
+			if (
+				effectiveAmount < MIN_AMOUNT_RAZORPAY ||
+				effectiveAmount > MAX_AMOUNT
+			) {
+				toast.error(
+					`Amount must be between $${MIN_AMOUNT_RAZORPAY} and $${MAX_AMOUNT}`,
+				);
+				return;
+			}
 
-						<button
-							type="button"
-							onClick={handleDone}
-							className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2"
-						>
-							Done
-						</button>
-					</>
-				)}
+			setIsCreatingCheckout(true);
+			try {
+				await loadRazorpayScript();
+				const order = await apiClient.createRazorpayOrder(effectiveAmount);
 
-				{view === 'razorpay-processing' && (
-					<div className="py-8">
-						<StatusIndicator
-							status="loading"
-							label="Complete payment in the Razorpay window"
-							sublabel="Do not close this page"
-						/>
-					</div>
-				)}
+				setView('razorpay-processing');
 
-				{view === 'checkout' && checkoutInfo && (
-					<>
-						<div className="py-4">
-							<StatusIndicator
-								status="loading"
-								label="Complete your payment"
-								sublabel="A checkout window has been opened"
-							/>
-							<div className="flex items-center justify-center gap-2 mt-4 px-3 py-1.5 bg-muted/40 rounded-full w-fit mx-auto">
-								<div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-								<span className="text-xs text-muted-foreground font-mono">
-									{isPolling ? `Checking... (${pollCount})` : 'Paused'}
-								</span>
-							</div>
-						</div>
+				const rzp = new window.Razorpay({
+					key: order.keyId,
+					amount: order.amount,
+					currency: order.currency,
+					name: 'OttoRouter',
+					description: `Top up $${order.creditAmountUsd.toFixed(2)} credits`,
+					order_id: order.orderId,
+					handler: async (response: {
+						razorpay_order_id: string;
+						razorpay_payment_id: string;
+						razorpay_signature: string;
+					}) => {
+						try {
+							const result = await apiClient.verifyRazorpayPayment({
+								razorpay_order_id: response.razorpay_order_id,
+								razorpay_payment_id: response.razorpay_payment_id,
+								razorpay_signature: response.razorpay_signature,
+							});
 
-						<div className="space-y-2">
-							<button
-								type="button"
-								onClick={handleCheckNow}
-								disabled={isManualChecking}
-								className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-							>
-								{isManualChecking ? (
-									<StableSpinner title="Checking payment status" />
-								) : (
-									<RefreshCw className="w-4 h-4" />
-								)}
-								{isManualChecking ? 'Checking...' : 'Check Now'}
-							</button>
-							<button
-								type="button"
-								onClick={() => openCheckoutUrl(checkoutInfo.url)}
-								className="w-full h-11 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
-							>
-								<ExternalLink className="w-4 h-4" />
-								Open Checkout Again
-							</button>
-						</div>
+							if (result.success) {
+								setConfirmedAmount(result.credited);
+								const balanceData = await apiClient.getOttoRouterBalance();
+								if (balanceData?.balance !== undefined) {
+									setBalance(balanceData.balance);
+								}
+								setView('confirmed');
+							}
+						} catch (err) {
+							toast.error(
+								err instanceof Error
+									? err.message
+									: 'Payment verification failed',
+							);
+							setView('amount');
+						}
+					},
+					modal: {
+						ondismiss: () => {
+							setView('amount');
+						},
+					},
+					theme: {
+						color: '#7c3aed',
+					},
+				});
 
-						<p className="text-xs text-muted-foreground text-center">
-							Status checks automatically every 5 seconds. You can close this
-							and it will keep checking.
-						</p>
-					</>
-				)}
+				rzp.on('payment.failed', () => {
+					toast.error('Payment failed. Please try again.');
+					setView('amount');
+				});
 
-				{view === 'amount' && (
-					<>
-						{hasGoPlan && (
-							<div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg px-3 py-2">
-								You are on GO. Top-ups add extra balance for additional usage.
-							</div>
-						)}
-						<div className="flex items-center justify-between py-3 px-4 bg-muted/40 rounded-lg">
-							<span className="text-sm text-muted-foreground">
-								Current Balance
-							</span>
-							<span className="text-lg font-mono font-semibold">
-								${balance?.toFixed(2) ?? '0.00'}
-							</span>
-						</div>
+				rzp.open();
+			} catch (error) {
+				toast.error(
+					error instanceof Error ? error.message : 'Failed to create order',
+				);
+				setView('amount');
+			} finally {
+				setIsCreatingCheckout(false);
+			}
+		};
 
-						<div className="flex rounded-lg border border-border overflow-hidden">
-							<button
-								type="button"
-								onClick={() => setGateway('polar')}
-								className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
-									gateway === 'polar'
-										? 'bg-foreground text-background'
-										: 'bg-transparent text-muted-foreground hover:text-foreground'
-								}`}
-							>
-								<PolarIcon className="w-3.5 h-3.5" />
-								Polar
-							</button>
-							<button
-								type="button"
-								onClick={() => setGateway('razorpay')}
-								className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
-									gateway === 'razorpay'
-										? 'bg-foreground text-background'
-										: 'bg-transparent text-muted-foreground hover:text-foreground'
-								}`}
-							>
-								<RazorpayIcon className="w-3.5 h-3.5" />
-								Razorpay
-							</button>
-						</div>
+		const handleCheckout = () => {
+			if (gateway === 'polar') {
+				handlePolarCheckout();
+			} else {
+				handleRazorpayCheckout();
+			}
+		};
 
-						<div className="space-y-4">
-							<div className="grid grid-cols-4 gap-2">
-								{PRESET_AMOUNTS.map((preset) => (
-									<button
-										key={preset}
-										type="button"
-										onClick={() => handlePresetClick(preset)}
-										className={`h-12 text-base font-mono rounded-lg border-2 transition-all ${
-											!isCustom && amount === preset
-												? 'bg-foreground text-background border-foreground'
-												: 'bg-transparent border-border text-foreground hover:border-foreground/40'
-										}`}
-									>
-										${preset}
-									</button>
-								))}
-							</div>
+		const handleCheckNow = async () => {
+			if (!checkoutInfo) return;
+			setIsManualChecking(true);
+			try {
+				const status = await apiClient.getPolarTopupStatus(
+					checkoutInfo.checkoutId,
+				);
+				if (status?.confirmed) {
+					stopPolling();
+					setConfirmedAmount(status.amountUsd);
+					localStorage.removeItem('pendingPolarCheckout');
 
-							<div className="relative">
-								<span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
-									$
-								</span>
-								<input
-									type="number"
-									placeholder="Custom"
-									value={customAmount}
-									onChange={(e) => handleCustomAmountChange(e.target.value)}
-									onFocus={() => setIsCustom(true)}
-									min={minAmount}
-									max={MAX_AMOUNT}
-									step="1"
-									className={`w-full h-12 pl-8 pr-4 text-base font-mono bg-transparent border-2 rounded-lg outline-none transition-all ${
-										isCustom
-											? 'border-foreground'
-											: 'border-border focus:border-foreground/40'
-									}`}
+					const balanceData = await apiClient.getOttoRouterBalance();
+					if (balanceData?.balance !== undefined) {
+						setBalance(balanceData.balance);
+					}
+					setView('confirmed');
+				} else {
+					toast.error('Payment not confirmed yet. Keep waiting or try again.');
+				}
+			} catch (err) {
+				console.error('[OttoRouterTopupModal] Check failed:', err);
+				toast.error('Failed to check payment status');
+			} finally {
+				setIsManualChecking(false);
+			}
+		};
+
+		const handleDone = () => {
+			closeModal();
+		};
+
+		const isValidAmount =
+			effectiveAmount >= minAmount && effectiveAmount <= MAX_AMOUNT;
+
+		const modalTitle =
+			view === 'confirmed'
+				? 'Payment Confirmed'
+				: view === 'checkout'
+					? 'Waiting for Payment'
+					: view === 'razorpay-processing'
+						? 'Processing Payment'
+						: 'Add Credits';
+
+		return (
+			<Modal isOpen onClose={closeModal} title={modalTitle} maxWidth="md">
+				<div className="space-y-6">
+					{view === 'confirmed' && (
+						<>
+							<div className="py-4">
+								<StatusIndicator
+									status="success"
+									label={`+$${confirmedAmount?.toFixed(2) ?? checkoutInfo?.creditAmount.toFixed(2)}`}
+									sublabel="Credits added to your balance"
 								/>
 							</div>
-						</div>
 
-						<div
-							className={`grid transition-all duration-200 ease-out ${
-								isValidAmount
-									? 'grid-rows-[1fr] opacity-100'
-									: 'grid-rows-[0fr] opacity-0'
-							}`}
-						>
-							<div className="overflow-hidden">
-								<div className="space-y-3 py-4 border-t border-border">
-									{isLoadingEstimate ? (
-										<>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Credits
-												</span>
-												<div className="h-6 w-16 bg-muted/60 rounded animate-pulse" />
-											</div>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Fee
-												</span>
-												<div className="h-4 w-12 bg-muted/60 rounded animate-pulse" />
-											</div>
-											<div className="flex justify-between items-center pt-3 border-t border-border">
-												<span className="font-medium">Total</span>
-												<div className="h-7 w-20 bg-muted/60 rounded animate-pulse" />
-											</div>
-										</>
-									) : gateway === 'polar' && estimate ? (
-										<>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Credits
-												</span>
-												<span className="font-mono text-lg">
-													${estimate.creditAmount.toFixed(2)}
-												</span>
-											</div>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Fee
-												</span>
-												<span className="font-mono text-sm text-muted-foreground">
-													+${estimate.feeAmount.toFixed(2)}
-												</span>
-											</div>
-											<div className="flex justify-between items-center pt-3 border-t border-border">
-												<span className="font-medium">Total</span>
-												<span className="font-mono text-xl font-semibold">
-													${estimate.chargeAmount.toFixed(2)}
-												</span>
-											</div>
-										</>
-									) : gateway === 'razorpay' && razorpayEstimate ? (
-										<>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Credits
-												</span>
-												<span className="font-mono text-lg">
-													${razorpayEstimate.creditAmountUsd.toFixed(2)}
-												</span>
-											</div>
-											<div className="flex justify-between items-center">
-												<span className="text-sm text-muted-foreground">
-													Fee
-												</span>
-												<span className="font-mono text-sm text-muted-foreground">
-													+₹{razorpayEstimate.feeAmountInr.toFixed(2)}
-												</span>
-											</div>
-											<div className="flex justify-between items-center pt-3 border-t border-border">
-												<span className="font-medium">Total</span>
-												<span className="font-mono text-xl font-semibold">
-													₹{razorpayEstimate.chargeAmountInr.toFixed(2)}
-												</span>
-											</div>
-											<p className="text-[10px] text-muted-foreground text-right">
-												1 USD ≈ {razorpayEstimate.exchangeRate} INR
-											</p>
-										</>
-									) : null}
+							<button
+								type="button"
+								onClick={handleDone}
+								className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2"
+							>
+								Done
+							</button>
+						</>
+					)}
+
+					{view === 'razorpay-processing' && (
+						<div className="py-8">
+							<StatusIndicator
+								status="loading"
+								label="Complete payment in the Razorpay window"
+								sublabel="Do not close this page"
+							/>
+						</div>
+					)}
+
+					{view === 'checkout' && checkoutInfo && (
+						<>
+							<div className="py-4">
+								<StatusIndicator
+									status="loading"
+									label="Complete your payment"
+									sublabel="A checkout window has been opened"
+								/>
+								<div className="flex items-center justify-center gap-2 mt-4 px-3 py-1.5 bg-muted/40 rounded-full w-fit mx-auto">
+									<div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+									<span className="text-xs text-muted-foreground font-mono">
+										{isPolling ? `Checking... (${pollCount})` : 'Paused'}
+									</span>
 								</div>
 							</div>
-						</div>
 
-						<button
-							type="button"
-							onClick={handleCheckout}
-							disabled={!isValidAmount || isCreatingCheckout}
-							className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-						>
-							{isCreatingCheckout ? (
-								<StableSpinner title="Creating checkout" />
-							) : (
-								<CreditCard className="w-4 h-4" />
+							<div className="space-y-2">
+								<button
+									type="button"
+									onClick={handleCheckNow}
+									disabled={isManualChecking}
+									className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{isManualChecking ? (
+										<StableSpinner title="Checking payment status" />
+									) : (
+										<RefreshCw className="w-4 h-4" />
+									)}
+									{isManualChecking ? 'Checking...' : 'Check Now'}
+								</button>
+								<button
+									type="button"
+									onClick={() => openCheckoutUrl(checkoutInfo.url)}
+									className="w-full h-11 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
+								>
+									<ExternalLink className="w-4 h-4" />
+									Open Checkout Again
+								</button>
+							</div>
+
+							<p className="text-xs text-muted-foreground text-center">
+								Status checks automatically every 5 seconds. You can close this
+								and it will keep checking.
+							</p>
+						</>
+					)}
+
+					{view === 'amount' && (
+						<>
+							{hasGoPlan && (
+								<div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg px-3 py-2">
+									You are on GO. Top-ups add extra balance for additional usage.
+								</div>
 							)}
-							{gateway === 'polar' ? 'Pay with Card' : 'Pay with Razorpay'}
-						</button>
-
-						<div className="relative pt-6">
-							<div className="absolute inset-x-0 top-0 flex items-center">
-								<div className="flex-1 h-px bg-border" />
-								<span className="px-3 text-xs text-muted-foreground">OR</span>
-								<div className="flex-1 h-px bg-border" />
+							<div className="flex items-center justify-between py-3 px-4 bg-muted/40 rounded-lg">
+								<span className="text-sm text-muted-foreground">
+									Current Balance
+								</span>
+								<span className="text-lg font-mono font-semibold">
+									${balance?.toFixed(2) ?? '0.00'}
+								</span>
 							</div>
-							<div className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg">
-								<Wallet className="w-5 h-5 text-muted-foreground mt-0.5" />
-								<div className="flex-1 min-w-0">
-									<div className="flex items-center justify-between">
-										<span className="font-medium text-sm">Pay with USDC</span>
-										{usdcBalance !== null && (
-											<span className="text-xs font-mono text-muted-foreground">
-												{usdcBalance.toFixed(2)} USDC
-											</span>
-										)}
-									</div>
-									<p className="text-xs text-muted-foreground mt-1">
-										Send USDC to your OttoRouter wallet to increase balance.
-									</p>
+
+							<div className="flex rounded-lg border border-border overflow-hidden">
+								<button
+									type="button"
+									onClick={() => setGateway('polar')}
+									className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+										gateway === 'polar'
+											? 'bg-foreground text-background'
+											: 'bg-transparent text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									<PolarIcon className="w-3.5 h-3.5" />
+									Polar
+								</button>
+								<button
+									type="button"
+									onClick={() => setGateway('razorpay')}
+									className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
+										gateway === 'razorpay'
+											? 'bg-foreground text-background'
+											: 'bg-transparent text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									<RazorpayIcon className="w-3.5 h-3.5" />
+									Razorpay
+								</button>
+							</div>
+
+							<div className="space-y-4">
+								<div className="grid grid-cols-4 gap-2">
+									{PRESET_AMOUNTS.map((preset) => (
+										<button
+											key={preset}
+											type="button"
+											onClick={() => handlePresetClick(preset)}
+											className={`h-12 text-base font-mono rounded-lg border-2 transition-all ${
+												!isCustom && amount === preset
+													? 'bg-foreground text-background border-foreground'
+													: 'bg-transparent border-border text-foreground hover:border-foreground/40'
+											}`}
+										>
+											${preset}
+										</button>
+									))}
+								</div>
+
+								<div className="relative">
+									<span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
+										$
+									</span>
+									<input
+										type="number"
+										placeholder="Custom"
+										value={customAmount}
+										onChange={(e) => handleCustomAmountChange(e.target.value)}
+										onFocus={() => setIsCustom(true)}
+										min={minAmount}
+										max={MAX_AMOUNT}
+										step="1"
+										className={`w-full h-12 pl-8 pr-4 text-base font-mono bg-transparent border-2 rounded-lg outline-none transition-all ${
+											isCustom
+												? 'border-foreground'
+												: 'border-border focus:border-foreground/40'
+										}`}
+									/>
 								</div>
 							</div>
-						</div>
-					</>
-				)}
-			</div>
-		</Modal>
-	);
-});
+
+							<div
+								className={`grid transition-all duration-200 ease-out ${
+									isValidAmount
+										? 'grid-rows-[1fr] opacity-100'
+										: 'grid-rows-[0fr] opacity-0'
+								}`}
+							>
+								<div className="overflow-hidden">
+									<div className="space-y-3 py-4 border-t border-border">
+										{isLoadingEstimate ? (
+											<>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Credits
+													</span>
+													<div className="h-6 w-16 bg-muted/60 rounded animate-pulse" />
+												</div>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Fee
+													</span>
+													<div className="h-4 w-12 bg-muted/60 rounded animate-pulse" />
+												</div>
+												<div className="flex justify-between items-center pt-3 border-t border-border">
+													<span className="font-medium">Total</span>
+													<div className="h-7 w-20 bg-muted/60 rounded animate-pulse" />
+												</div>
+											</>
+										) : gateway === 'polar' && estimate ? (
+											<>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Credits
+													</span>
+													<span className="font-mono text-lg">
+														${estimate.creditAmount.toFixed(2)}
+													</span>
+												</div>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Fee
+													</span>
+													<span className="font-mono text-sm text-muted-foreground">
+														+${estimate.feeAmount.toFixed(2)}
+													</span>
+												</div>
+												<div className="flex justify-between items-center pt-3 border-t border-border">
+													<span className="font-medium">Total</span>
+													<span className="font-mono text-xl font-semibold">
+														${estimate.chargeAmount.toFixed(2)}
+													</span>
+												</div>
+											</>
+										) : gateway === 'razorpay' && razorpayEstimate ? (
+											<>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Credits
+													</span>
+													<span className="font-mono text-lg">
+														${razorpayEstimate.creditAmountUsd.toFixed(2)}
+													</span>
+												</div>
+												<div className="flex justify-between items-center">
+													<span className="text-sm text-muted-foreground">
+														Fee
+													</span>
+													<span className="font-mono text-sm text-muted-foreground">
+														+₹{razorpayEstimate.feeAmountInr.toFixed(2)}
+													</span>
+												</div>
+												<div className="flex justify-between items-center pt-3 border-t border-border">
+													<span className="font-medium">Total</span>
+													<span className="font-mono text-xl font-semibold">
+														₹{razorpayEstimate.chargeAmountInr.toFixed(2)}
+													</span>
+												</div>
+												<p className="text-[10px] text-muted-foreground text-right">
+													1 USD ≈ {razorpayEstimate.exchangeRate} INR
+												</p>
+											</>
+										) : null}
+									</div>
+								</div>
+							</div>
+
+							<button
+								type="button"
+								onClick={handleCheckout}
+								disabled={!isValidAmount || isCreatingCheckout}
+								className="w-full h-12 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+							>
+								{isCreatingCheckout ? (
+									<StableSpinner title="Creating checkout" />
+								) : (
+									<CreditCard className="w-4 h-4" />
+								)}
+								{gateway === 'polar' ? 'Pay with Card' : 'Pay with Razorpay'}
+							</button>
+
+							<div className="relative pt-6">
+								<div className="absolute inset-x-0 top-0 flex items-center">
+									<div className="flex-1 h-px bg-border" />
+									<span className="px-3 text-xs text-muted-foreground">OR</span>
+									<div className="flex-1 h-px bg-border" />
+								</div>
+								<div className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg">
+									<Wallet className="w-5 h-5 text-muted-foreground mt-0.5" />
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center justify-between">
+											<span className="font-medium text-sm">Pay with USDC</span>
+											{usdcBalance !== null && (
+												<span className="text-xs font-mono text-muted-foreground">
+													{usdcBalance.toFixed(2)} USDC
+												</span>
+											)}
+										</div>
+										<p className="text-xs text-muted-foreground mt-1">
+											Send USDC to your OttoRouter wallet to increase balance.
+										</p>
+									</div>
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+			</Modal>
+		);
+	},
+);

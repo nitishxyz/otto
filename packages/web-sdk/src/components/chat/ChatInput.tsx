@@ -34,7 +34,6 @@ import { useFiles } from '../../hooks/useFiles';
 import { useSkills } from '../../hooks/useSkills';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
-import { useDictationModels } from '../../hooks/useDictationModels';
 import { useVimMode } from '../../hooks/useVimMode';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
@@ -218,7 +217,7 @@ export const ChatInput = memo(
 			checkForSkillMention,
 		} = useSkillMention();
 
-		const { data: skillsConfig } = useSkills();
+		const { data: skillsConfig } = useSkills({ enabled: showSkillMention });
 		const skillSummaries = skillsConfig?.items ?? [];
 
 		const { data: filesData, isLoading: filesLoading } = useFiles({
@@ -292,10 +291,11 @@ export const ChatInput = memo(
 			setVimMode,
 		]);
 
-		const { status: dictationStatus } = useDictationModels();
-
 		const voiceBaseTextRef = useRef('');
 		const shouldFocusAfterDictationRef = useRef(false);
+		const handleNeedsDictationInstall = useCallback(() => {
+			setShowDictationInstallPrompt(true);
+		}, []);
 		const {
 			isListening,
 			isTranscribing,
@@ -305,6 +305,7 @@ export const ChatInput = memo(
 			start: startVoice,
 			stop: stopVoice,
 		} = useVoiceInput({
+			onNeedsInstall: handleNeedsDictationInstall,
 			onTranscript: (transcript, isFinal) => {
 				const base = voiceBaseTextRef.current;
 				const sep = base && !/\s$/.test(base) ? ' ' : '';
@@ -330,23 +331,23 @@ export const ChatInput = memo(
 			textareaRef.current?.focus({ preventScroll: true });
 		}, [isVoiceActive]);
 
-		const defaultDictationModel = dictationStatus?.models.find(
-			(model) => model.id === dictationStatus.defaultModel,
-		);
-
 		const handleStartVoice = useCallback(() => {
 			setVoiceShortcutMode(null);
 			voiceBaseTextRef.current = message;
-			if (!defaultDictationModel?.installed) {
-				setShowDictationInstallPrompt(true);
-				return;
-			}
 			void startVoice();
-		}, [defaultDictationModel?.installed, message, startVoice]);
+		}, [message, startVoice]);
 
 		const handleDictationReady = useCallback(() => {
 			void startVoice();
 		}, [startVoice]);
+
+		const handleCloseShortcutsModal = useCallback(() => {
+			setShowShortcutsModal(false);
+		}, []);
+
+		const handleCloseDictationInstallPrompt = useCallback(() => {
+			setShowDictationInstallPrompt(false);
+		}, []);
 
 		const handleStopVoice = useCallback(() => {
 			setVoiceShortcutMode(null);
@@ -759,40 +760,12 @@ export const ChatInput = memo(
 
 		return (
 			<>
-				{isDragging &&
-					(() => {
-						const supportsAny = visionEnabled || attachmentEnabled;
-						const fileTypes = [
-							...(visionEnabled ? ['Images'] : []),
-							...(attachmentEnabled ? ['PDF'] : []),
-							'Markdown',
-							'Text',
-							'Other files',
-						].join(', ');
-						return (
-							<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
-								<div
-									className={`flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed ${supportsAny ? 'bg-card border-primary/50' : 'bg-card border-muted-foreground/30'}`}
-								>
-									<div
-										className={`p-4 rounded-full ${supportsAny ? 'bg-primary/10' : 'bg-muted'}`}
-									>
-										<FileIcon
-											className={`w-12 h-12 ${supportsAny ? 'text-primary' : 'text-muted-foreground'}`}
-										/>
-									</div>
-									<div className="text-center">
-										<p className="text-lg font-medium text-foreground">
-											Drop files here
-										</p>
-										<p className="text-sm text-muted-foreground">
-											{fileTypes} up to 100MB
-										</p>
-									</div>
-								</div>
-							</div>
-						);
-					})()}
+				{isDragging ? (
+					<FileDropOverlay
+						visionEnabled={visionEnabled}
+						attachmentEnabled={attachmentEnabled}
+					/>
+				) : null}
 				<div className="absolute bottom-0 left-0 right-0 px-2 pt-16 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20">
 					<div className={inputWidthClass}>
 						{preferences.vimMode && vimMode === 'normal' && (
@@ -805,19 +778,10 @@ export const ChatInput = memo(
 								INSERT
 							</div>
 						)}
-						{sessionId && (
-							<div
-								className={`pointer-events-auto ${inputOverlayWidthClass} mx-auto relative z-0`}
-							>
-								<InputQueueBar
-									key={`${sessionId}-queue`}
-									sessionId={sessionId}
-								/>
-								<InputTodosBar key={sessionId} sessionId={sessionId} />
-								<InputApprovalBar sessionId={sessionId} />
-								<InputSecureInputBar sessionId={sessionId} />
-							</div>
-						)}
+						<ChatInputSessionBars
+							sessionId={sessionId}
+							widthClass={inputOverlayWidthClass}
+						/>
 						<div
 							className={`relative z-10 flex flex-col rounded-3xl p-1 transition-all touch-manipulation ${
 								isVoiceActive
@@ -828,45 +792,14 @@ export const ChatInput = memo(
 							}`}
 						>
 							{isVoiceActive ? (
-								<>
-									<div className="flex items-center gap-1">
-										<div
-											className="flex-1 min-w-0 text-primary"
-											style={{ height: '3rem' }}
-										>
-											<LiveWaveform
-												active={isListening}
-												analyser={analyser}
-												height="3rem"
-												loading={isTranscribing}
-											/>
-										</div>
-										{isListening ? (
-											<button
-												type="button"
-												onClick={handleStopVoice}
-												className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all flex-shrink-0 touch-manipulation ${voiceButtonClass}`}
-												aria-label="Stop recording"
-											>
-												{voiceButtonMode !== 'manual' ? (
-													<span className="absolute inset-1 rounded-full bg-white/15 animate-pulse" />
-												) : null}
-												<Square className="w-3.5 h-3.5 fill-current" />
-											</button>
-										) : (
-											<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-primary">
-												<StableSpinner className="h-4 w-4" />
-											</div>
-										)}
-									</div>
-									{/* Invisible spacer matching the settings/meta row so the
-								    waveform stays aligned with the textarea position. */}
-									<div aria-hidden className="invisible mt-1 px-3">
-										<div className="px-2 py-0.5 text-[10px] leading-none">
-											&nbsp;
-										</div>
-									</div>
-								</>
+								<VoiceInputPanel
+									isListening={isListening}
+									isTranscribing={isTranscribing}
+									analyser={analyser}
+									voiceButtonMode={voiceButtonMode}
+									voiceButtonClass={voiceButtonClass}
+									onStopVoice={handleStopVoice}
+								/>
 							) : (
 								<>
 									{showCommandSuggestions && (
@@ -891,95 +824,16 @@ export const ChatInput = memo(
 										/>
 									)}
 
-									{hasFiles && (
-										<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-											{images.map((img) => (
-												<div
-													key={img.id}
-													className="relative group w-12 h-12 rounded-lg overflow-hidden bg-muted"
-												>
-													{img.preview ? (
-														<img
-															src={img.preview}
-															alt="Attachment"
-															className="w-full h-full object-cover"
-														/>
-													) : (
-														<div className="w-full h-full flex items-center justify-center">
-															<ImageIcon className="w-5 h-5 text-muted-foreground" />
-														</div>
-													)}
-													{img.uploadStatus !== 'ready' && (
-														<div className="absolute inset-0 flex items-end justify-center bg-black/45 pb-0.5">
-															<span className="text-[9px] font-medium text-white">
-																{img.uploadStatus === 'uploading'
-																	? 'uploading'
-																	: 'failed'}
-															</span>
-														</div>
-													)}
-													<button
-														type="button"
-														onClick={() => onFileRemove?.(img.id)}
-														className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-													>
-														<X className="w-3 h-3 text-white" />
-													</button>
-												</div>
-											))}
-											{documents.map((doc) => (
-												<div
-													key={doc.id}
-													className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted max-w-[200px]"
-												>
-													{doc.type === 'pdf' || doc.type === 'binary' ? (
-														<FileIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
-													) : (
-														<FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
-													)}
-													<span className="text-xs truncate">
-														{doc.name}
-														{doc.uploadStatus === 'uploading'
-															? ' · uploading'
-															: ''}
-														{doc.uploadStatus === 'failed' ? ' · failed' : ''}
-													</span>
-													<button
-														type="button"
-														onClick={() => onFileRemove?.(doc.id)}
-														className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-													>
-														<X className="w-3 h-3 text-white" />
-													</button>
-												</div>
-											))}
-										</div>
-									)}
+									<AttachmentPreviewList
+										images={images}
+										documents={documents}
+										onFileRemove={onFileRemove}
+									/>
 
-									{researchContexts.length > 0 && (
-										<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
-											{researchContexts.map((ctx) => (
-												<div
-													key={ctx.id}
-													className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 border border-teal-500/30 max-w-[200px]"
-												>
-													<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
-													<span className="text-xs truncate text-teal-600 dark:text-teal-400">
-														{ctx.label}
-													</span>
-													{onResearchContextRemove && (
-														<button
-															type="button"
-															onClick={() => onResearchContextRemove(ctx.id)}
-															className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
-														>
-															<X className="w-3 h-3 text-white" />
-														</button>
-													)}
-												</div>
-											))}
-										</div>
-									)}
+									<ResearchContextChips
+										contexts={researchContexts}
+										onRemove={onResearchContextRemove}
+									/>
 
 									<div className="flex items-end gap-1">
 										{onConfigClick && (
@@ -1178,19 +1032,305 @@ export const ChatInput = memo(
 							/>
 						)}
 
-						<ShortcutsModal
-							isOpen={showShortcutsModal}
-							onClose={() => setShowShortcutsModal(false)}
-						/>
+						{showShortcutsModal ? (
+							<ShortcutsModal isOpen onClose={handleCloseShortcutsModal} />
+						) : null}
 
-						<DictationInstallPrompt
-							isOpen={showDictationInstallPrompt}
-							onClose={() => setShowDictationInstallPrompt(false)}
-							onReady={handleDictationReady}
-						/>
+						{showDictationInstallPrompt ? (
+							<DictationInstallPrompt
+								isOpen
+								onClose={handleCloseDictationInstallPrompt}
+								onReady={handleDictationReady}
+							/>
+						) : null}
 					</div>
 				</div>
 			</>
 		);
 	}),
 );
+
+interface FileDropOverlayProps {
+	visionEnabled: boolean;
+	attachmentEnabled: boolean;
+}
+
+const FileDropOverlay = memo(function FileDropOverlay({
+	visionEnabled,
+	attachmentEnabled,
+}: FileDropOverlayProps) {
+	const supportsAny = visionEnabled || attachmentEnabled;
+	const fileTypes = [
+		...(visionEnabled ? ['Images'] : []),
+		...(attachmentEnabled ? ['PDF'] : []),
+		'Markdown',
+		'Text',
+		'Other files',
+	].join(', ');
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
+			<div
+				className={`flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed ${supportsAny ? 'bg-card border-primary/50' : 'bg-card border-muted-foreground/30'}`}
+			>
+				<div
+					className={`p-4 rounded-full ${supportsAny ? 'bg-primary/10' : 'bg-muted'}`}
+				>
+					<FileIcon
+						className={`w-12 h-12 ${supportsAny ? 'text-primary' : 'text-muted-foreground'}`}
+					/>
+				</div>
+				<div className="text-center">
+					<p className="text-lg font-medium text-foreground">Drop files here</p>
+					<p className="text-sm text-muted-foreground">
+						{fileTypes} up to 100MB
+					</p>
+				</div>
+			</div>
+		</div>
+	);
+});
+
+interface VoiceInputPanelProps {
+	isListening: boolean;
+	isTranscribing: boolean;
+	analyser: AnalyserNode | null;
+	voiceButtonMode: 'manual' | 'hold' | 'latched';
+	voiceButtonClass: string;
+	onStopVoice: () => void;
+}
+
+const VoiceInputPanel = memo(function VoiceInputPanel({
+	isListening,
+	isTranscribing,
+	analyser,
+	voiceButtonMode,
+	voiceButtonClass,
+	onStopVoice,
+}: VoiceInputPanelProps) {
+	return (
+		<>
+			<div className="flex items-center gap-1">
+				<div className="flex-1 min-w-0 text-primary" style={{ height: '3rem' }}>
+					<LiveWaveform
+						active={isListening}
+						analyser={analyser}
+						height="3rem"
+						loading={isTranscribing}
+					/>
+				</div>
+				{isListening ? (
+					<button
+						type="button"
+						onClick={onStopVoice}
+						className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all flex-shrink-0 touch-manipulation ${voiceButtonClass}`}
+						aria-label="Stop recording"
+					>
+						{voiceButtonMode !== 'manual' ? (
+							<span className="absolute inset-1 rounded-full bg-white/15 animate-pulse" />
+						) : null}
+						<Square className="w-3.5 h-3.5 fill-current" />
+					</button>
+				) : (
+					<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-primary">
+						<StableSpinner className="h-4 w-4" />
+					</div>
+				)}
+			</div>
+			{/* Invisible spacer matching the settings/meta row so the waveform stays aligned with the textarea position. */}
+			<div aria-hidden className="invisible mt-1 px-3">
+				<div className="px-2 py-0.5 text-[10px] leading-none">&nbsp;</div>
+			</div>
+		</>
+	);
+});
+
+interface AttachmentPreviewListProps {
+	images: FileAttachment[];
+	documents: FileAttachment[];
+	onFileRemove?: (id: string) => void;
+}
+
+const AttachmentPreviewList = memo(function AttachmentPreviewList({
+	images,
+	documents,
+	onFileRemove,
+}: AttachmentPreviewListProps) {
+	if (images.length === 0 && documents.length === 0) return null;
+
+	return (
+		<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+			{images.map((image) => (
+				<ImageAttachmentPreview
+					key={image.id}
+					image={image}
+					onRemove={onFileRemove}
+				/>
+			))}
+			{documents.map((document) => (
+				<DocumentAttachmentPreview
+					key={document.id}
+					document={document}
+					onRemove={onFileRemove}
+				/>
+			))}
+		</div>
+	);
+});
+
+interface ImageAttachmentPreviewProps {
+	image: FileAttachment;
+	onRemove?: (id: string) => void;
+}
+
+const ImageAttachmentPreview = memo(function ImageAttachmentPreview({
+	image,
+	onRemove,
+}: ImageAttachmentPreviewProps) {
+	const handleRemove = useCallback(() => {
+		onRemove?.(image.id);
+	}, [image.id, onRemove]);
+
+	return (
+		<div className="relative group w-12 h-12 rounded-lg overflow-hidden bg-muted">
+			{image.preview ? (
+				<img
+					src={image.preview}
+					alt="Attachment"
+					className="w-full h-full object-cover"
+				/>
+			) : (
+				<div className="w-full h-full flex items-center justify-center">
+					<ImageIcon className="w-5 h-5 text-muted-foreground" />
+				</div>
+			)}
+			{image.uploadStatus !== 'ready' && (
+				<div className="absolute inset-0 flex items-end justify-center bg-black/45 pb-0.5">
+					<span className="text-[9px] font-medium text-white">
+						{image.uploadStatus === 'uploading' ? 'uploading' : 'failed'}
+					</span>
+				</div>
+			)}
+			<button
+				type="button"
+				onClick={handleRemove}
+				className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+			>
+				<X className="w-3 h-3 text-white" />
+			</button>
+		</div>
+	);
+});
+
+interface DocumentAttachmentPreviewProps {
+	document: FileAttachment;
+	onRemove?: (id: string) => void;
+}
+
+const DocumentAttachmentPreview = memo(function DocumentAttachmentPreview({
+	document,
+	onRemove,
+}: DocumentAttachmentPreviewProps) {
+	const handleRemove = useCallback(() => {
+		onRemove?.(document.id);
+	}, [document.id, onRemove]);
+
+	return (
+		<div className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-muted max-w-[200px]">
+			{document.type === 'pdf' || document.type === 'binary' ? (
+				<FileIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
+			) : (
+				<FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+			)}
+			<span className="text-xs truncate">
+				{document.name}
+				{document.uploadStatus === 'uploading' ? ' · uploading' : ''}
+				{document.uploadStatus === 'failed' ? ' · failed' : ''}
+			</span>
+			<button
+				type="button"
+				onClick={handleRemove}
+				className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+			>
+				<X className="w-3 h-3 text-white" />
+			</button>
+		</div>
+	);
+});
+
+interface ResearchContextChipsProps {
+	contexts: Array<{ id: string; label: string }>;
+	onRemove?: (id: string) => void;
+}
+
+const ResearchContextChips = memo(function ResearchContextChips({
+	contexts,
+	onRemove,
+}: ResearchContextChipsProps) {
+	if (contexts.length === 0) return null;
+
+	return (
+		<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+			{contexts.map((context) => (
+				<ResearchContextChip
+					key={context.id}
+					context={context}
+					onRemove={onRemove}
+				/>
+			))}
+		</div>
+	);
+});
+
+interface ResearchContextChipProps {
+	context: { id: string; label: string };
+	onRemove?: (id: string) => void;
+}
+
+const ResearchContextChip = memo(function ResearchContextChip({
+	context,
+	onRemove,
+}: ResearchContextChipProps) {
+	const handleRemove = useCallback(() => {
+		onRemove?.(context.id);
+	}, [context.id, onRemove]);
+
+	return (
+		<div className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 border border-teal-500/30 max-w-[200px]">
+			<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
+			<span className="text-xs truncate text-teal-600 dark:text-teal-400">
+				{context.label}
+			</span>
+			{onRemove && (
+				<button
+					type="button"
+					onClick={handleRemove}
+					className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+				>
+					<X className="w-3 h-3 text-white" />
+				</button>
+			)}
+		</div>
+	);
+});
+
+interface ChatInputSessionBarsProps {
+	sessionId?: string;
+	widthClass: string;
+}
+
+const ChatInputSessionBars = memo(function ChatInputSessionBars({
+	sessionId,
+	widthClass,
+}: ChatInputSessionBarsProps) {
+	if (!sessionId) return null;
+
+	return (
+		<div className={`pointer-events-auto ${widthClass} mx-auto relative z-0`}>
+			<InputQueueBar key={`${sessionId}-queue`} sessionId={sessionId} />
+			<InputTodosBar key={sessionId} sessionId={sessionId} />
+			<InputApprovalBar sessionId={sessionId} />
+			<InputSecureInputBar sessionId={sessionId} />
+		</div>
+	);
+});

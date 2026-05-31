@@ -265,21 +265,23 @@ export const NewSessionLanding = memo(
 					}`}
 					style={{ transitionProperty: 'opacity, transform' }}
 				>
-					<ConfigModal
-						isOpen={isConfigOpen}
-						onClose={handleCloseConfig}
-						initialFocus={configFocusTarget}
-						chatInputRef={chatInputRef}
-						agent={agent}
-						provider={provider}
-						model={model}
-						modelSupportsReasoning={modelSupportsReasoning}
-						onAgentChange={handleAgentChange}
-						onProviderChange={handleProviderChange}
-						onModelChange={handleModelChange}
-						onModelSelectorChange={handleModelSelectorChange}
-						modalPosition={modalPosition}
-					/>
+					{isConfigOpen ? (
+						<ConfigModal
+							isOpen
+							onClose={handleCloseConfig}
+							initialFocus={configFocusTarget}
+							chatInputRef={chatInputRef}
+							agent={agent}
+							provider={provider}
+							model={model}
+							modelSupportsReasoning={modelSupportsReasoning}
+							onAgentChange={handleAgentChange}
+							onProviderChange={handleProviderChange}
+							onModelChange={handleModelChange}
+							onModelSelectorChange={handleModelSelectorChange}
+							modalPosition={modalPosition}
+						/>
+					) : null}
 					<div className={`w-full ${compact ? 'max-w-xl' : 'max-w-2xl'}`}>
 						<div className="flex justify-center mb-6">
 							{wordmark || defaultWordmark}

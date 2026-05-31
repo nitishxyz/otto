@@ -13,9 +13,9 @@ import { useFilePickerStore } from '../stores/filePickerStore';
 import { useTerminalStore } from '../stores/terminalStore';
 
 interface UseKeyboardShortcutsOptions {
-	sessionIds: string[];
+	sessionIds?: string[];
+	getSessionIds?: () => string[];
 	activeSessionId?: string;
-	gitFiles: Array<{ path: string; staged: boolean; status?: string }>;
 	onSelectSession: (sessionId: string) => void;
 	onNewSession: () => void;
 	onStageFile?: (paths: string[]) => void;
@@ -30,7 +30,8 @@ interface UseKeyboardShortcutsOptions {
 }
 
 export function useKeyboardShortcuts({
-	sessionIds,
+	sessionIds = [],
+	getSessionIds,
 	activeSessionId,
 	onSelectSession,
 	onNewSession,
@@ -71,8 +72,6 @@ export function useKeyboardShortcuts({
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
 	const toggleTerminalPanel = useTerminalStore((state) => state.togglePanel);
 
-	const currentSessionIndex = sessionIds.indexOf(activeSessionId || '');
-
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
 			const target = e.target as HTMLElement;
@@ -82,6 +81,10 @@ export function useKeyboardShortcuts({
 				target.isContentEditable;
 			const isInTerminal = !!target.closest('[data-terminal-viewer]');
 			const isShortcutModifierPressed = e.ctrlKey || e.metaKey;
+			const latestSessionIds = getSessionIds?.() ?? sessionIds;
+			const currentSessionIndex = latestSessionIds.indexOf(
+				activeSessionId || '',
+			);
 
 			if (
 				isShortcutModifierPressed &&
@@ -248,23 +251,26 @@ export function useKeyboardShortcuts({
 			}
 
 			if (currentFocus === 'sessions' && !isInInput) {
-				if (e.key === 'j' && sessionIds.length > 0) {
+				if (e.key === 'j' && latestSessionIds.length > 0) {
 					e.preventDefault();
-					const nextIndex = Math.min(sessionIndex + 1, sessionIds.length - 1);
+					const nextIndex = Math.min(
+						sessionIndex + 1,
+						latestSessionIds.length - 1,
+					);
 					setSessionIndex(nextIndex);
 					return;
 				}
 
-				if (e.key === 'k' && sessionIds.length > 0) {
+				if (e.key === 'k' && latestSessionIds.length > 0) {
 					e.preventDefault();
 					const prevIndex = Math.max(sessionIndex - 1, 0);
 					setSessionIndex(prevIndex);
 					return;
 				}
 
-				if (e.key === 'Enter' && sessionIds[sessionIndex]) {
+				if (e.key === 'Enter' && latestSessionIds[sessionIndex]) {
 					e.preventDefault();
-					onSelectSession(sessionIds[sessionIndex]);
+					onSelectSession(latestSessionIds[sessionIndex]);
 					setFocus('input');
 					return;
 				}
@@ -358,8 +364,9 @@ export function useKeyboardShortcuts({
 			sessionIndex,
 			gitFileIndex,
 			sessionIds,
+			getSessionIds,
+			activeSessionId,
 			gitTreeRows,
-			currentSessionIndex,
 			isGitExpanded,
 			setFocus,
 			setSessionIndex,

@@ -18,6 +18,17 @@ This file defines conventions for AI agents and human contributors working in th
 - Avoid circular dependencies
 - If a module grows beyond ~200–300 lines, consider refactoring
 
+## Frontend Performance Boundaries
+
+- Keep React parent/layout components focused on structure, not feature-specific state.
+- A component should only subscribe to stores, queries, and hooks needed to render its own immediate output.
+- If a dependency is only needed by a child panel, modal, list row, or controller, move that dependency into that child.
+- Do not run expensive hooks before visibility gates. Use lightweight wrappers for hidden panels/modals and mount the heavy content only when visible.
+- Prefer narrow Zustand selectors for exact values/actions; avoid subscribing to broad objects such as full store slices or all panel widths when only one value is needed.
+- Avoid per-row global store subscriptions in large lists. Compute shared state once in the parent and pass stable props to memoized rows.
+- Gate closed modals instead of always rendering them with `isOpen={false}` when the modal wrapper does non-trivial work.
+- For frontend performance work, follow the plan in [docs/plans/react-performance-optimization-plan.md](docs/plans/react-performance-optimization-plan.md) and verify changes with React Scan where possible.
+
 ## Monorepo Package Imports
 
 Use workspace package imports for cross-package dependencies:
