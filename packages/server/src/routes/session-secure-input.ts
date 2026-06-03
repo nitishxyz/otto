@@ -34,7 +34,7 @@ const secureInputErrorResponseSchema = z.object({
 const pendingSecureInputSchema = z.object({
 	promptId: z.string(),
 	messageId: z.string(),
-	callId: z.string(),
+	callId: z.string().optional(),
 	prompt: z.string(),
 	inputKind: z.literal('password'),
 	createdAt: z.number(),
