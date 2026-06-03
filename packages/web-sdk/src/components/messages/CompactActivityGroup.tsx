@@ -43,6 +43,7 @@ export function CompactActivityGroup({
 	const hasReasoning = entries.some((e) => e.toolName === 'reasoning');
 
 	const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+	const shouldRenderLiveEntries = !showSummary;
 
 	useEffect(() => {
 		if (!collapsed) {
@@ -196,59 +197,63 @@ export function CompactActivityGroup({
 								hoveredRef.current = false;
 							}}
 						>
-							<div ref={contentMeasureRef} className="pt-2.5">
-								{entries.map((entry, i) => {
-									const isLast = i === entries.length - 1;
-									const isNewAppend = i >= prevCountRef.current;
-									const isReasoning = entry.toolName === 'reasoning';
-									const showFullText =
-										isReasoning && entry.fullText && entry.fullText.trim();
+							{shouldRenderLiveEntries && (
+								<div ref={contentMeasureRef} className="pt-2.5">
+									{entries.map((entry, i) => {
+										const isLast = i === entries.length - 1;
+										const isNewAppend = i >= prevCountRef.current;
+										const isReasoning = entry.toolName === 'reasoning';
+										const showFullText =
+											isReasoning && entry.fullText && entry.fullText.trim();
 
-									if (showFullText) {
+										if (showFullText) {
+											return (
+												<div
+													key={entry.id}
+													className="px-1 py-0.5"
+													style={{
+														animation: isNewAppend
+															? `ottoEntryIn ${ANIM_MS}ms ${EASING} both`
+															: undefined,
+													}}
+												>
+													<p
+														className={`text-[12px] leading-relaxed font-mono whitespace-pre-wrap ${
+															isLast
+																? 'text-foreground/80'
+																: 'text-muted-foreground/60'
+														}`}
+													>
+														{entry.fullText}
+													</p>
+												</div>
+											);
+										}
+
 										return (
 											<div
 												key={entry.id}
-												className="px-1 py-0.5"
+												className={`flex items-center px-1 ${
+													isCompact ? 'text-[13px] h-6' : 'text-[15px] h-7'
+												} leading-5 ${
+													isLast
+														? 'text-foreground'
+														: 'text-muted-foreground/70'
+												}`}
 												style={{
 													animation: isNewAppend
 														? `ottoEntryIn ${ANIM_MS}ms ${EASING} both`
 														: undefined,
 												}}
 											>
-												<p
-													className={`text-[12px] leading-relaxed font-mono whitespace-pre-wrap ${
-														isLast
-															? 'text-foreground/80'
-															: 'text-muted-foreground/60'
-													}`}
-												>
-													{entry.fullText}
-												</p>
+												<span className="block min-w-0 truncate">
+													{entry.label}
+												</span>
 											</div>
 										);
-									}
-
-									return (
-										<div
-											key={entry.id}
-											className={`flex items-center px-1 ${
-												isCompact ? 'text-[13px] h-6' : 'text-[15px] h-7'
-											} leading-5 ${
-												isLast ? 'text-foreground' : 'text-muted-foreground/70'
-											}`}
-											style={{
-												animation: isNewAppend
-													? `ottoEntryIn ${ANIM_MS}ms ${EASING} both`
-													: undefined,
-											}}
-										>
-											<span className="block min-w-0 truncate">
-												{entry.label}
-											</span>
-										</div>
-									);
-								})}
-							</div>
+									})}
+								</div>
+							)}
 						</div>
 					</div>
 

@@ -1,6 +1,16 @@
-import { useEffect, useRef, useState, useMemo, memo, useCallback } from 'react';
+import {
+	useEffect,
+	useRef,
+	useState,
+	useMemo,
+	memo,
+	useCallback,
+	useLayoutEffect,
+	type RefObject,
+} from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Virtuoso, type Components, type VirtuosoHandle } from 'react-virtuoso';
 import type { Message, MessagePart, Session } from '../../types/api';
 import { AssistantMessageGroup } from './AssistantMessageGroup';
 import { UserMessageGroup } from './UserMessageGroup';
@@ -36,6 +46,9 @@ const TODO_TOOL_NAMES = new Set([
 	'UpdateTodos',
 	'UpdatePlan',
 ]);
+
+const TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT = 12;
+const TODO_SNAPSHOT_SCAN_PART_LIMIT = 500;
 
 function parseToolResultContent(
 	part: MessagePart,
@@ -166,7 +179,15 @@ function findLatestTodoSnapshot(
 		}
 
 		const parts = message?.parts ?? [];
-		for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
+		const firstPartIndex = Math.max(
+			0,
+			parts.length - TODO_SNAPSHOT_SCAN_PART_LIMIT,
+		);
+		for (
+			let partIndex = parts.length - 1;
+			partIndex >= firstPartIndex;
+			partIndex--
+		) {
 			const part = parts[partIndex];
 			if (part.type !== 'tool_result') continue;
 			const content = parseToolResultContent(part);
@@ -182,6 +203,238 @@ function findLatestTodoSnapshot(
 	return null;
 }
 
+function getTodoSnapshotScanWindow(messages: Message[]) {
+	if (messages.length <= TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT) return messages;
+	return messages.slice(-TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT);
+}
+
+function isVisibleThreadMessage(message: Message) {
+	return (
+		message.role !== 'system' &&
+		!(
+			message.role === 'assistant' &&
+			message.status === 'complete' &&
+			(message.parts?.length ?? 0) === 0
+		)
+	);
+}
+
+function isPendingEmptyAssistant(
+	message: Message,
+	currentMessageId: string | null,
+) {
+	return (
+		message.role === 'assistant' &&
+		message.status === 'pending' &&
+		(message.parts?.length ?? 0) === 0 &&
+		message.id !== currentMessageId
+	);
+}
+
+function isActiveAssistantMessage(
+	message: Message,
+	currentMessageId: string | null,
+	queuedMessageIds: Set<string>,
+) {
+	return (
+		message.role === 'assistant' &&
+		(message.id === currentMessageId ||
+			(message.status === 'pending' && !queuedMessageIds.has(message.id)))
+	);
+}
+
+function filterThreadMessages(
+	messages: Message[],
+	currentMessageId: string | null,
+	queueLength: number,
+	queuedMessageIds: Set<string>,
+) {
+	const visibleMessages = messages.filter(isVisibleThreadMessage);
+	const queueBusy = Boolean(currentMessageId) || queueLength > 0;
+
+	if (!queueBusy) return visibleMessages;
+
+	const nextAssistantByIndex = new Array<Message | undefined>(
+		visibleMessages.length,
+	);
+	let nextAssistant: Message | undefined;
+	for (let index = visibleMessages.length - 1; index >= 0; index--) {
+		nextAssistantByIndex[index] = nextAssistant;
+		const message = visibleMessages[index];
+		if (message?.role === 'assistant') {
+			nextAssistant = message;
+		}
+	}
+
+	const hasEarlierActiveAssistantByIndex = new Array<boolean>(
+		visibleMessages.length,
+	);
+	let hasEarlierActiveAssistant = false;
+	for (let index = 0; index < visibleMessages.length; index++) {
+		hasEarlierActiveAssistantByIndex[index] = hasEarlierActiveAssistant;
+		const message = visibleMessages[index];
+		if (
+			message &&
+			isActiveAssistantMessage(message, currentMessageId, queuedMessageIds)
+		) {
+			hasEarlierActiveAssistant = true;
+		}
+	}
+
+	return visibleMessages.filter((message, index) => {
+		if (message.role === 'assistant') {
+			return !isPendingEmptyAssistant(message, currentMessageId);
+		}
+
+		if (message.role !== 'user') return true;
+
+		const nextAssistant = nextAssistantByIndex[index];
+		if (nextAssistant) {
+			const nextAssistantIsQueued =
+				queuedMessageIds.has(nextAssistant.id) ||
+				isPendingEmptyAssistant(nextAssistant, currentMessageId);
+			return !nextAssistantIsQueued;
+		}
+
+		return !hasEarlierActiveAssistantByIndex[index];
+	});
+}
+
+interface ThreadMessageRowProps {
+	sessionId?: string;
+	message: Message;
+	previousMessage?: Message;
+	nextMessage?: Message;
+	isFirst: boolean;
+	isLastMessage: boolean;
+	currentMessageId: string | null;
+	queueLength: number;
+	compact: boolean;
+	isThreadScrolling: boolean;
+	onSelectSession?: (sessionId: string) => void;
+	createRetryHandler: (messageId: string) => () => Promise<void>;
+	onCompact: () => Promise<void>;
+}
+
+const ThreadMessageRow = memo(function ThreadMessageRow({
+	sessionId,
+	message,
+	previousMessage,
+	nextMessage,
+	isFirst,
+	isLastMessage,
+	currentMessageId,
+	queueLength,
+	compact,
+	isThreadScrolling,
+	onSelectSession,
+	createRetryHandler,
+	onCompact,
+}: ThreadMessageRowProps) {
+	const nextAssistantMessage =
+		nextMessage && nextMessage.role === 'assistant' ? nextMessage : undefined;
+	const hasQueuedOrRunningLaterTurn = Boolean(
+		currentMessageId && currentMessageId !== message.id,
+	);
+	const canRetryTurn =
+		message.role === 'assistant' &&
+		isLastMessage &&
+		!hasQueuedOrRunningLaterTurn &&
+		queueLength === 0;
+	const retryHandler = useMemo(
+		() => (canRetryTurn ? createRetryHandler(message.id) : undefined),
+		[canRetryTurn, createRetryHandler, message.id],
+	);
+
+	if (message.role === 'user') {
+		return (
+			<UserMessageGroup
+				sessionId={sessionId}
+				message={message}
+				isFirst={isFirst}
+				nextAssistantMessageId={nextAssistantMessage?.id}
+			/>
+		);
+	}
+
+	if (message.role === 'assistant') {
+		const showHeader = !previousMessage || previousMessage.role !== 'assistant';
+		const nextIsAssistant = Boolean(nextAssistantMessage);
+
+		return (
+			<AssistantMessageGroup
+				sessionId={sessionId}
+				message={message}
+				showHeader={showHeader}
+				hasNextAssistantMessage={nextIsAssistant}
+				isLastMessage={isLastMessage}
+				onBranchCreated={onSelectSession}
+				onNavigateToSession={onSelectSession}
+				onRetry={retryHandler}
+				compact={compact}
+				onCompact={isLastMessage ? onCompact : undefined}
+				isThreadScrolling={isThreadScrolling}
+			/>
+		);
+	}
+
+	return null;
+});
+
+interface ThreadVirtuosoContext {
+	session?: Session;
+	isGenerating?: boolean;
+	onSelectSession?: (sessionId: string) => void;
+	sessionHeaderRef: RefObject<HTMLDivElement | null>;
+	footerBottomPaddingClass: string;
+	showTopupApproval: boolean;
+	pendingTopup: ReturnType<
+		typeof useTopupApprovalStore.getState
+	>['pendingTopup'];
+	clearPendingTopup: () => void;
+	rowOuterClass: string;
+	contentWidthClass: string;
+}
+
+function ThreadVirtuosoHeader({ context }: { context: ThreadVirtuosoContext }) {
+	return (
+		<div ref={context.sessionHeaderRef}>
+			{context.session && (
+				<SessionHeader
+					session={context.session}
+					isGenerating={context.isGenerating}
+					onNavigateToSession={context.onSelectSession}
+				/>
+			)}
+		</div>
+	);
+}
+
+function ThreadVirtuosoFooter({ context }: { context: ThreadVirtuosoContext }) {
+	return (
+		<div className={context.footerBottomPaddingClass}>
+			{context.showTopupApproval && context.pendingTopup && (
+				<div className={context.rowOuterClass}>
+					<div className={context.contentWidthClass}>
+						<div className="py-4">
+							<TopupApprovalCard
+								pendingTopup={context.pendingTopup}
+								onMethodSelected={() => context.clearPendingTopup()}
+								onCancel={() => context.clearPendingTopup()}
+							/>
+						</div>
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
+
+const THREAD_VIRTUOSO_COMPONENTS: Components<Message, ThreadVirtuosoContext> = {
+	Header: ThreadVirtuosoHeader,
+	Footer: ThreadVirtuosoFooter,
+};
+
 export const MessageThread = memo(function MessageThread({
 	messages,
 	session,
@@ -193,24 +446,24 @@ export const MessageThread = memo(function MessageThread({
 }: MessageThreadProps) {
 	const queryClient = useQueryClient();
 	const { preferences } = usePreferences();
-	const bottomRef = useRef<HTMLDivElement>(null);
-	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const virtuosoRef = useRef<VirtuosoHandle>(null);
+	const scrollContainerRef = useRef<HTMLElement>(null);
 	const sessionHeaderRef = useRef<HTMLDivElement>(null);
 	const threadRootRef = useRef<HTMLDivElement>(null);
 	const threadWidth = useContainerWidth(threadRootRef);
 	const density: 'normal' | 'compact' =
 		threadWidth > 0 && threadWidth < 640 ? 'compact' : 'normal';
 	const [autoScroll, setAutoScroll] = useState(true);
+	const [isThreadScrolling, setIsThreadScrolling] = useState(false);
 	const autoScrollRef = useRef(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
 	const userScrollingRef = useRef(false);
 	const userScrollTimeoutRef = useRef<
 		ReturnType<typeof setTimeout> | undefined
 	>(undefined);
-	const targetScrollRef = useRef(0);
 	const animationFrameRef = useRef<number | undefined>(undefined);
 	const initialScrollDoneRef = useRef(false);
-	const lastSessionIdRef = useRef<string | undefined>(session?.id);
+	const lastSessionIdRef = useRef<string | undefined>(sessionId);
 	const prevMessagesLengthRef = useRef(messages.length);
 	const prevIsGeneratingRef = useRef(isGenerating);
 	const lastScrollHeightRef = useRef(0);
@@ -227,14 +480,37 @@ export const MessageThread = memo(function MessageThread({
 
 	const showTopupApproval =
 		pendingTopup && pendingTopup.sessionId === sessionId;
+	const todoSnapshotScanMessages = useMemo(
+		() => getTodoSnapshotScanWindow(messages),
+		[messages],
+	);
+	const latestTodoSnapshot = useMemo(
+		() => findLatestTodoSnapshot(todoSnapshotScanMessages, queuedMessageIds),
+		[todoSnapshotScanMessages, queuedMessageIds],
+	);
+	const filteredMessages = useMemo(() => {
+		return filterThreadMessages(
+			messages,
+			queueState.currentMessageId,
+			queueState.queueLength,
+			queuedMessageIds,
+		);
+	}, [
+		messages,
+		queueState.currentMessageId,
+		queueState.queueLength,
+		queuedMessageIds,
+	]);
 
 	useEffect(() => {
 		if (!sessionId) return;
-		setSessionTodos(
-			sessionId,
-			findLatestTodoSnapshot(messages, queuedMessageIds),
-		);
-	}, [messages, queuedMessageIds, sessionId, setSessionTodos]);
+		if (
+			latestTodoSnapshot ||
+			messages.length <= TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT
+		) {
+			setSessionTodos(sessionId, latestTodoSnapshot);
+		}
+	}, [latestTodoSnapshot, messages.length, sessionId, setSessionTodos]);
 
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;
@@ -243,7 +519,6 @@ export const MessageThread = memo(function MessageThread({
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-		const scrollHeightIncreased = scrollHeight > lastScrollHeightRef.current;
 		const userScrolledUp = scrollTop < lastScrollTopRef.current - 5;
 
 		lastScrollHeightRef.current = scrollHeight;
@@ -256,9 +531,6 @@ export const MessageThread = memo(function MessageThread({
 			autoScrollRef.current = false;
 			setAutoScroll(false);
 			userScrollingRef.current = true;
-		} else if (!scrollHeightIncreased && autoScrollRef.current) {
-			autoScrollRef.current = false;
-			setAutoScroll(false);
 		}
 		if (
 			userScrolledUp ||
@@ -280,25 +552,66 @@ export const MessageThread = memo(function MessageThread({
 		}
 	}, []);
 
+	const scrollToThreadBottom = useCallback(
+		(behavior: ScrollBehavior = 'auto') => {
+			virtuosoRef.current?.scrollTo({
+				top: Number.MAX_SAFE_INTEGER,
+				behavior,
+			});
+		},
+		[],
+	);
+
+	const scheduleScrollToThreadBottom = useCallback(
+		(behavior: ScrollBehavior = 'auto', frames = 2) => {
+			if (animationFrameRef.current) {
+				cancelAnimationFrame(animationFrameRef.current);
+			}
+
+			let remainingFrames = Math.max(1, frames);
+			const tick = () => {
+				scrollToThreadBottom(behavior);
+				remainingFrames -= 1;
+				if (remainingFrames > 0) {
+					animationFrameRef.current = requestAnimationFrame(tick);
+					return;
+				}
+				animationFrameRef.current = undefined;
+			};
+
+			animationFrameRef.current = requestAnimationFrame(tick);
+		},
+		[scrollToThreadBottom],
+	);
+
 	// Immediate scroll to bottom on initial load or session change
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (disableAutoScroll) return;
 
-		const sessionChanged = session?.id !== lastSessionIdRef.current;
-		lastSessionIdRef.current = session?.id;
+		const sessionChanged = sessionId !== lastSessionIdRef.current;
+		lastSessionIdRef.current = sessionId;
 
 		if (sessionChanged) {
 			initialScrollDoneRef.current = false;
+			userScrollingRef.current = false;
+			setIsThreadScrolling(false);
+			lastScrollHeightRef.current = 0;
+			lastScrollTopRef.current = 0;
+			setShowLeanHeader(false);
 		}
 
-		if (!initialScrollDoneRef.current && messages.length > 0) {
+		if (!initialScrollDoneRef.current && filteredMessages.length > 0) {
 			initialScrollDoneRef.current = true;
-			const container = scrollContainerRef.current;
-			if (container) {
-				container.scrollTop = container.scrollHeight;
-			}
+			autoScrollRef.current = true;
+			setAutoScroll(true);
+			scheduleScrollToThreadBottom('auto', 6);
 		}
-	}, [messages.length, session?.id, disableAutoScroll]);
+	}, [
+		filteredMessages.length,
+		sessionId,
+		disableAutoScroll,
+		scheduleScrollToThreadBottom,
+	]);
 
 	useEffect(() => {
 		if (disableAutoScroll) return;
@@ -314,57 +627,25 @@ export const MessageThread = memo(function MessageThread({
 			userScrollingRef.current = false;
 			autoScrollRef.current = true;
 			setAutoScroll(true);
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					const container = scrollContainerRef.current;
-					if (container) {
-						container.scrollTop = container.scrollHeight;
-					}
-				});
-			});
+			scheduleScrollToThreadBottom('auto', 4);
 		} else if (messagesAdded && !userScrollingRef.current && !isGenerating) {
 			autoScrollRef.current = true;
 			setAutoScroll(true);
+			scheduleScrollToThreadBottom('auto', 2);
 		}
-	}, [messages.length, isGenerating, disableAutoScroll]);
+	}, [
+		messages.length,
+		isGenerating,
+		disableAutoScroll,
+		scheduleScrollToThreadBottom,
+	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: messages dep needed for streaming content updates
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (disableAutoScroll) return;
-
-		const container = scrollContainerRef.current;
-		if (!container || !autoScroll || userScrollingRef.current) return;
-
-		targetScrollRef.current = container.scrollHeight - container.clientHeight;
-
-		const animate = () => {
-			const el = scrollContainerRef.current;
-			if (!el || userScrollingRef.current) return;
-
-			const current = el.scrollTop;
-			const target = el.scrollHeight - el.clientHeight;
-			const diff = target - current;
-
-			if (Math.abs(diff) < 1) {
-				el.scrollTop = el.scrollHeight - el.clientHeight;
-				return;
-			}
-
-			// If very close, just snap to bottom
-			if (Math.abs(diff) < 10) {
-				el.scrollTop = el.scrollHeight - el.clientHeight;
-				return;
-			}
-
-			el.scrollTop = current + diff * 0.15;
-			animationFrameRef.current = requestAnimationFrame(animate);
-		};
-
-		if (animationFrameRef.current) {
-			cancelAnimationFrame(animationFrameRef.current);
-		}
-		animationFrameRef.current = requestAnimationFrame(animate);
-	}, [messages, autoScroll]);
+		if (!autoScrollRef.current || userScrollingRef.current) return;
+		scheduleScrollToThreadBottom('auto', 1);
+	}, [messages, disableAutoScroll, scheduleScrollToThreadBottom]);
 
 	useEffect(() => {
 		return () => {
@@ -381,67 +662,8 @@ export const MessageThread = memo(function MessageThread({
 		userScrollingRef.current = false;
 		autoScrollRef.current = true;
 		setAutoScroll(true);
-		const container = scrollContainerRef.current;
-		if (container) {
-			container.scrollTop = container.scrollHeight;
-		}
+		scheduleScrollToThreadBottom('auto', 3);
 	};
-
-	const filteredMessages = useMemo(() => {
-		const visibleMessages = messages.filter(
-			(message) =>
-				message.role !== 'system' &&
-				!(
-					message.role === 'assistant' &&
-					message.status === 'complete' &&
-					(message.parts?.length ?? 0) === 0
-				),
-		);
-		const queueBusy =
-			Boolean(queueState.currentMessageId) || queueState.queueLength > 0;
-
-		if (!queueBusy) return visibleMessages;
-
-		return visibleMessages.filter((message, index) => {
-			if (message.role === 'assistant') {
-				const isPendingEmptyAssistant =
-					message.status === 'pending' &&
-					(message.parts?.length ?? 0) === 0 &&
-					message.id !== queueState.currentMessageId;
-				return !isPendingEmptyAssistant;
-			}
-
-			if (message.role !== 'user') return true;
-
-			const nextAssistant = visibleMessages
-				.slice(index + 1)
-				.find((candidate) => candidate.role === 'assistant');
-			if (nextAssistant) {
-				const nextAssistantIsQueued =
-					queuedMessageIds.has(nextAssistant.id) ||
-					(nextAssistant.status === 'pending' &&
-						(nextAssistant.parts?.length ?? 0) === 0 &&
-						nextAssistant.id !== queueState.currentMessageId);
-				return !nextAssistantIsQueued;
-			}
-
-			const hasEarlierActiveAssistant = visibleMessages
-				.slice(0, index)
-				.some(
-					(candidate) =>
-						candidate.role === 'assistant' &&
-						(candidate.id === queueState.currentMessageId ||
-							(candidate.status === 'pending' &&
-								!queuedMessageIds.has(candidate.id))),
-				);
-			return !hasEarlierActiveAssistant;
-		});
-	}, [
-		messages,
-		queueState.currentMessageId,
-		queueState.queueLength,
-		queuedMessageIds,
-	]);
 
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
@@ -450,6 +672,37 @@ export const MessageThread = memo(function MessageThread({
 		: compact
 			? 'max-w-3xl mx-auto space-y-4'
 			: 'max-w-3xl mx-auto space-y-6';
+	const rowOuterClass =
+		density === 'compact' ? 'px-2 pb-3' : compact ? 'px-4 pb-4' : 'px-6 pb-6';
+	const firstRowTopClass =
+		density === 'compact' ? 'pt-3' : compact ? 'pt-4' : 'pt-6';
+	const footerBottomPaddingClass =
+		density === 'compact' || compact ? 'pb-80' : 'pb-96';
+	const virtuosoContext = useMemo<ThreadVirtuosoContext>(
+		() => ({
+			session,
+			isGenerating,
+			onSelectSession,
+			sessionHeaderRef,
+			footerBottomPaddingClass,
+			showTopupApproval: Boolean(showTopupApproval),
+			pendingTopup,
+			clearPendingTopup,
+			rowOuterClass,
+			contentWidthClass,
+		}),
+		[
+			session,
+			isGenerating,
+			onSelectSession,
+			footerBottomPaddingClass,
+			showTopupApproval,
+			pendingTopup,
+			clearPendingTopup,
+			rowOuterClass,
+			contentWidthClass,
+		],
+	);
 
 	// Create a retry handler for error messages
 	const createRetryHandler = useCallback(
@@ -525,107 +778,53 @@ export const MessageThread = memo(function MessageThread({
 					/>
 				)}
 
-				<div
-					ref={scrollContainerRef}
-					className="flex-1 overflow-y-auto scrollbar-hide"
+				<Virtuoso
+					ref={virtuosoRef}
+					className="flex-1 scrollbar-hide"
+					data={filteredMessages}
+					atBottomThreshold={100}
+					increaseViewportBy={{ top: 2400, bottom: 1600 }}
+					minOverscanItemCount={{ top: 4, bottom: 3 }}
+					initialTopMostItemIndex={{
+						index: Math.max(0, filteredMessages.length - 1),
+						align: 'end',
+					}}
+					followOutput={(isAtBottom) =>
+						autoScrollRef.current && isAtBottom ? 'auto' : false
+					}
+					scrollerRef={(ref) => {
+						scrollContainerRef.current =
+							ref instanceof HTMLElement ? ref : null;
+					}}
 					onScroll={handleScroll}
-				>
-					{/* Session Header - scrolls with content */}
-					<div ref={sessionHeaderRef}>
-						{session && (
-							<SessionHeader
-								session={session}
-								isGenerating={isGenerating}
-								onNavigateToSession={onSelectSession}
-							/>
-						)}
-					</div>
-
-					{/* Messages */}
-					<div
-						className={
-							density === 'compact'
-								? 'px-2 pt-3 pb-80'
-								: compact
-									? 'p-4 pb-80'
-									: 'p-6 pb-96'
-						}
-					>
-						<div className={contentWidthClass}>
-							{filteredMessages.map((message, idx) => {
-								const prevMessage = filteredMessages[idx - 1];
-								const nextMessage = filteredMessages[idx + 1];
-								const isLastMessage = idx === filteredMessages.length - 1;
-
-								if (message.role === 'user') {
-									const nextAssistantMessage =
-										nextMessage && nextMessage.role === 'assistant'
-											? nextMessage
-											: undefined;
-									return (
-										<UserMessageGroup
-											key={message.id}
-											sessionId={sessionId}
-											message={message}
-											isFirst={idx === 0}
-											nextAssistantMessageId={nextAssistantMessage?.id}
-										/>
-									);
-								}
-
-								if (message.role === 'assistant') {
-									const showHeader =
-										!prevMessage || prevMessage.role !== 'assistant';
-									const nextIsAssistant =
-										nextMessage && nextMessage.role === 'assistant';
-									const hasQueuedOrRunningLaterTurn = Boolean(
-										queueState.currentMessageId &&
-											queueState.currentMessageId !== message.id,
-									);
-									const canRetryTurn =
-										isLastMessage &&
-										!hasQueuedOrRunningLaterTurn &&
-										queueState.queueLength === 0;
-
-									return (
-										<AssistantMessageGroup
-											key={message.id}
-											sessionId={sessionId}
-											message={message}
-											showHeader={showHeader}
-											hasNextAssistantMessage={nextIsAssistant}
-											isLastMessage={isLastMessage}
-											onBranchCreated={onSelectSession}
-											onNavigateToSession={onSelectSession}
-											onRetry={
-												canRetryTurn
-													? createRetryHandler(message.id)
-													: undefined
-											}
-											compact={compact}
-											onCompact={isLastMessage ? handleCompact : undefined}
-										/>
-									);
-								}
-
-								return null;
-							})}
-
-							{/* Topup Approval Card - shown when payment required */}
-							{showTopupApproval && pendingTopup && (
-								<div className="py-4">
-									<TopupApprovalCard
-										pendingTopup={pendingTopup}
-										onMethodSelected={() => clearPendingTopup()}
-										onCancel={() => clearPendingTopup()}
-									/>
-								</div>
-							)}
-
-							<div ref={bottomRef} />
+					isScrolling={setIsThreadScrolling}
+					computeItemKey={(_, message) => message.id}
+					components={THREAD_VIRTUOSO_COMPONENTS}
+					context={virtuosoContext}
+					itemContent={(idx, message) => (
+						<div
+							className={`${rowOuterClass} ${idx === 0 ? firstRowTopClass : ''}`}
+						>
+							<div className={contentWidthClass}>
+								<ThreadMessageRow
+									sessionId={sessionId}
+									message={message}
+									previousMessage={filteredMessages[idx - 1]}
+									nextMessage={filteredMessages[idx + 1]}
+									isFirst={idx === 0}
+									isLastMessage={idx === filteredMessages.length - 1}
+									currentMessageId={queueState.currentMessageId}
+									queueLength={queueState.queueLength}
+									compact={compact}
+									isThreadScrolling={isThreadScrolling}
+									onSelectSession={onSelectSession}
+									createRetryHandler={createRetryHandler}
+									onCompact={handleCompact}
+								/>
+							</div>
 						</div>
-					</div>
-				</div>
+					)}
+				/>
 
 				{/* Scroll to bottom button - only shown when user has scrolled up */}
 				{!autoScroll && (

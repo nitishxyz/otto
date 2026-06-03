@@ -1,5 +1,12 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { memo, useState, useCallback, useMemo } from 'react';
+import {
+	memo,
+	useState,
+	useCallback,
+	useMemo,
+	useEffect,
+	Fragment,
+} from 'react';
 import {
 	Sparkles,
 	GitBranch,
@@ -37,6 +44,7 @@ interface AssistantMessageGroupProps {
 	onNavigateToSession?: (sessionId: string) => void;
 	onRetry?: () => void;
 	onCompact?: () => void;
+	isThreadScrolling?: boolean;
 }
 
 const loadingMessages = [
@@ -63,8 +71,30 @@ const STATUS_LINE_TOOL_NAMES = new Set([
 	'update_todos',
 ]);
 
+const AUTO_COMPACT_COMPLETED_PART_THRESHOLD = 60;
+const PART_WINDOW_RENDER_THRESHOLD = 90;
+const PART_WINDOW_HEAD_COUNT = 20;
+const PART_WINDOW_TAIL_COUNT = 48;
+
 function isStatusLineTool(toolName: string | null | undefined) {
 	return STATUS_LINE_TOOL_NAMES.has(toolName || '');
+}
+
+function compareMessageParts(a: MessagePart, b: MessagePart) {
+	const indexDiff = (a.index ?? 0) - (b.index ?? 0);
+	if (indexDiff !== 0) return indexDiff;
+	const stepDiff = (a.stepIndex ?? 0) - (b.stepIndex ?? 0);
+	if (stepDiff !== 0) return stepDiff;
+	return (a.startedAt ?? 0) - (b.startedAt ?? 0);
+}
+
+function areMessagePartsOrdered(parts: MessagePart[]) {
+	for (let index = 1; index < parts.length; index++) {
+		if (compareMessageParts(parts[index - 1], parts[index]) > 0) {
+			return false;
+		}
+	}
+	return true;
 }
 
 type AssistantRenderItem =
@@ -80,6 +110,107 @@ type AssistantRenderItem =
 			titleOverride?: string;
 	  };
 
+interface VisibleAssistantRenderItem {
+	item: AssistantRenderItem;
+	renderIndex: number;
+}
+
+function getVisibleRenderItems(
+	renderItems: AssistantRenderItem[],
+	showAllParts: boolean,
+	messageStatus: Message['status'],
+) {
+	if (
+		showAllParts ||
+		messageStatus === 'pending' ||
+		renderItems.length <= PART_WINDOW_RENDER_THRESHOLD
+	) {
+		return {
+			visibleRenderItems: renderItems.map((item, renderIndex) => ({
+				item,
+				renderIndex,
+			})),
+			omittedRenderItemCount: 0,
+		};
+	}
+
+	const tailStart = Math.max(
+		PART_WINDOW_HEAD_COUNT,
+		renderItems.length - PART_WINDOW_TAIL_COUNT,
+	);
+	const visibleRenderItems: VisibleAssistantRenderItem[] = [];
+	for (
+		let renderIndex = 0;
+		renderIndex < PART_WINDOW_HEAD_COUNT;
+		renderIndex++
+	) {
+		const item = renderItems[renderIndex];
+		if (item) visibleRenderItems.push({ item, renderIndex });
+	}
+	for (
+		let renderIndex = tailStart;
+		renderIndex < renderItems.length;
+		renderIndex++
+	) {
+		const item = renderItems[renderIndex];
+		if (item) visibleRenderItems.push({ item, renderIndex });
+	}
+
+	return {
+		visibleRenderItems,
+		omittedRenderItemCount: Math.max(0, tailStart - PART_WINDOW_HEAD_COUNT),
+	};
+}
+
+function getRenderItemKey(item: AssistantRenderItem) {
+	return item.kind === 'group' ? item.id : item.part.id;
+}
+
+function HiddenAssistantStepsRow({
+	count,
+	onShowAll,
+	compact,
+}: {
+	count: number;
+	onShowAll: () => void;
+	compact?: boolean;
+}) {
+	const isCompactThread = useIsCompactThread();
+	const isCompact = Boolean(compact || isCompactThread);
+
+	return (
+		<div
+			className={`flex ${isCompact ? 'gap-1.5' : 'gap-3'} pb-1.5 relative max-w-full overflow-hidden`}
+		>
+			<div
+				className={`flex-shrink-0 ${isCompact ? 'w-4' : 'w-6'} flex items-start justify-center relative`}
+			>
+				<div
+					className="absolute left-1/2 top-0 bottom-[-0.375rem] -translate-x-1/2 w-[2px] bg-border z-0"
+					aria-hidden="true"
+				/>
+			</div>
+
+			<div className="flex-1 min-w-0">
+				<button
+					type="button"
+					onClick={onShowAll}
+					className="inline-flex max-w-full items-center gap-1.5 py-0.5 text-xs text-muted-foreground/75 transition-colors hover:text-foreground"
+					title={`Show ${count} hidden assistant steps`}
+				>
+					<span className="text-muted-foreground/45">⋯</span>
+					<span className="truncate leading-5">
+						{count} earlier assistant steps collapsed
+					</span>
+					<span className="text-foreground/80 underline decoration-border underline-offset-2">
+						Show
+					</span>
+				</button>
+			</div>
+		</div>
+	);
+}
+
 export const AssistantMessageGroup = memo(
 	function AssistantMessageGroup({
 		sessionId,
@@ -92,13 +223,21 @@ export const AssistantMessageGroup = memo(
 		onNavigateToSession,
 		onRetry,
 		onCompact,
+		isThreadScrolling = false,
 	}: AssistantMessageGroupProps) {
 		const { isQueued } = useMessageQueuePosition(sessionId, message.id);
 		const isCompactDensity = useIsCompactThread();
 		const isCompactThread = Boolean(compact || isCompactDensity);
 		const [isHovered, setIsHovered] = useState(false);
+		const effectiveHovered = isHovered && !isThreadScrolling;
 		const [showBranchModal, setShowBranchModal] = useState(false);
 		const [copied, setCopied] = useState(false);
+		const [showAllParts, setShowAllParts] = useState(false);
+
+		useEffect(() => {
+			if (!message.id) return;
+			setShowAllParts(false);
+		}, [message.id]);
 
 		// Tool approval handling
 		const { pendingApprovals, removePendingApproval } = useToolApprovalStore();
@@ -153,15 +292,14 @@ export const AssistantMessageGroup = memo(
 		// Sort parts by index to maintain correct order when tool results come in
 		const parts = useMemo(() => {
 			const rawParts = message.parts || [];
-			return [...rawParts].sort((a, b) => {
-				const indexDiff = (a.index ?? 0) - (b.index ?? 0);
-				if (indexDiff !== 0) return indexDiff;
-				const stepDiff = (a.stepIndex ?? 0) - (b.stepIndex ?? 0);
-				if (stepDiff !== 0) return stepDiff;
-				// Secondary sort by startedAt for parts with same index
-				return (a.startedAt ?? 0) - (b.startedAt ?? 0);
-			});
+			return areMessagePartsOrdered(rawParts)
+				? rawParts
+				: [...rawParts].sort(compareMessageParts);
 		}, [message.parts]);
+		const autoCompactActivity =
+			message.status !== 'pending' &&
+			parts.length >= AUTO_COMPACT_COMPLETED_PART_THRESHOLD;
+		const shouldCompactActivity = Boolean(compact || autoCompactActivity);
 
 		const hasFinish = parts.some((part) => part.toolName === 'finish');
 		const latestProgressUpdateIndex = parts.reduce(
@@ -281,7 +419,7 @@ export const AssistantMessageGroup = memo(
 					continue;
 				}
 
-				if (compact && isCompactActivityPart(part)) {
+				if (shouldCompactActivity && isCompactActivityPart(part)) {
 					if (compactBuffer.length === 0) {
 						bufferStartIndex = index;
 					}
@@ -295,7 +433,11 @@ export const AssistantMessageGroup = memo(
 
 			flushCompactBuffer();
 			return items;
-		}, [parts, compact]);
+		}, [parts, shouldCompactActivity]);
+		const { visibleRenderItems, omittedRenderItemCount } = useMemo(
+			() => getVisibleRenderItems(renderItems, showAllParts, message.status),
+			[renderItems, showAllParts, message.status],
+		);
 		const hasVisibleNonProgressParts = renderItems.length > 0;
 		const firstVisiblePartIndex = parts.findIndex(
 			(part) => !isStatusLineTool(part.toolName),
@@ -359,6 +501,92 @@ export const AssistantMessageGroup = memo(
 			transition: { duration: 0.16, ease: 'easeOut' },
 		} as const;
 
+		const renderAssistantRenderItem = (
+			item: AssistantRenderItem,
+			renderIndex: number,
+		) => {
+			const hasFollowingContent =
+				renderIndex < renderItems.length - 1 ||
+				hasNextAssistantMessage ||
+				shouldShowStatusLineToolCall ||
+				shouldShowProgressUpdate ||
+				shouldShowLoadingFallback;
+
+			if (item.kind === 'group') {
+				return (
+					<CompactActivityGroup
+						entries={item.entries}
+						titleOverride={item.titleOverride}
+						showLine={hasFollowingContent}
+						collapsed={
+							message.status !== 'pending' ||
+							renderIndex < renderItems.length - 1
+						}
+						compact={compact || autoCompactActivity}
+					/>
+				);
+			}
+
+			const { part, index } = item;
+			const isLastPart = index === parts.length - 1;
+			const isActionTool =
+				part.ephemeral &&
+				(part.type === 'tool_call' || part.type === 'tool_result') &&
+				[
+					'shell',
+					'bash',
+					'edit',
+					'multiedit',
+					'write',
+					'copy_into',
+					'apply_patch',
+					'terminal',
+				].includes(part.toolName || '');
+
+			if (isActionTool) {
+				return (
+					<ActionToolBox
+						part={part}
+						showLine={hasFollowingContent}
+						compact={compact}
+					/>
+				);
+			}
+
+			const pendingApproval =
+				part.type === 'tool_call' && part.toolCallId
+					? (pendingApprovals.find((a) => a.callId === part.toolCallId) ?? null)
+					: null;
+			if (
+				part.type === 'tool_result' &&
+				part.toolCallId &&
+				liveActionToolCallIds.has(part.toolCallId)
+			) {
+				return null;
+			}
+			const isFinishTool =
+				part.type === 'tool_result' && part.toolName === 'finish';
+			const showLine = hasFollowingContent && !isFinishTool;
+			const isLastToolCall = part.type === 'tool_call' && isLastPart;
+
+			return (
+				<MessagePartItem
+					part={part}
+					showLine={showLine}
+					isFirstPart={index === firstVisiblePartIndex && !showHeader}
+					isLastToolCall={isLastToolCall}
+					onNavigateToSession={onNavigateToSession}
+					compact={compact}
+					pendingApproval={pendingApproval}
+					onApprove={handleApprove}
+					onReject={handleReject}
+					sessionId={sessionId}
+					onRetry={onRetry}
+					onCompact={onCompact}
+				/>
+			);
+		};
+
 		if (isQueued) {
 			return null;
 		}
@@ -367,7 +595,9 @@ export const AssistantMessageGroup = memo(
 			// biome-ignore lint/a11y/noStaticElementInteractions: hover state for showing actions
 			<div
 				className="relative group"
-				onMouseEnter={() => setIsHovered(true)}
+				onMouseEnter={() => {
+					if (!isThreadScrolling) setIsHovered(true);
+				}}
 				onMouseLeave={() => setIsHovered(false)}
 			>
 				{showHeader && (
@@ -420,104 +650,38 @@ export const AssistantMessageGroup = memo(
 								)}
 							</div>
 						</div>
-						{isHovered && isComplete && sessionId && showBranchButton && (
-							<button
-								type="button"
-								onClick={handleBranchClick}
-								className="ml-4 p-1.5 text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
-								title="Branch from this message"
-							>
-								<GitBranch className="h-4 w-4" />
-							</button>
-						)}
+						{effectiveHovered &&
+							isComplete &&
+							sessionId &&
+							showBranchButton && (
+								<button
+									type="button"
+									onClick={handleBranchClick}
+									className="ml-4 p-1.5 text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+									title="Branch from this message"
+								>
+									<GitBranch className="h-4 w-4" />
+								</button>
+							)}
 					</div>
 				)}
 
 				<div className="relative ml-1">
-					{renderItems.map((item, renderIndex) => {
-						const hasFollowingContent =
-							renderIndex < renderItems.length - 1 ||
-							hasNextAssistantMessage ||
-							shouldShowStatusLineToolCall ||
-							shouldShowProgressUpdate ||
-							shouldShowLoadingFallback;
-
-						if (item.kind === 'group') {
-							return (
-								<CompactActivityGroup
-									key={item.id}
-									entries={item.entries}
-									titleOverride={item.titleOverride}
-									showLine={hasFollowingContent}
-									collapsed={
-										message.status !== 'pending' ||
-										renderIndex < renderItems.length - 1
-									}
-									compact={compact}
-								/>
-							);
-						}
-
-						const { part, index } = item;
-						const isLastPart = index === parts.length - 1;
-						const isActionTool =
-							part.ephemeral &&
-							(part.type === 'tool_call' || part.type === 'tool_result') &&
-							[
-								'shell',
-								'bash',
-								'edit',
-								'multiedit',
-								'write',
-								'copy_into',
-								'apply_patch',
-								'terminal',
-							].includes(part.toolName || '');
-
-						if (isActionTool) {
-							return (
-								<ActionToolBox
-									key={part.id}
-									part={part}
-									showLine={hasFollowingContent}
-									compact={compact}
-								/>
-							);
-						}
-
-						const pendingApproval =
-							part.type === 'tool_call' && part.toolCallId
-								? (pendingApprovals.find((a) => a.callId === part.toolCallId) ??
-									null)
-								: null;
-						if (
-							part.type === 'tool_result' &&
-							part.toolCallId &&
-							liveActionToolCallIds.has(part.toolCallId)
-						) {
-							return null;
-						}
-						const isFinishTool =
-							part.type === 'tool_result' && part.toolName === 'finish';
-						const showLine = hasFollowingContent && !isFinishTool;
-						const isLastToolCall = part.type === 'tool_call' && isLastPart;
-
+					{visibleRenderItems.map(({ item, renderIndex }, visibleIndex) => {
+						const showPartWindowGap =
+							omittedRenderItemCount > 0 &&
+							visibleIndex === PART_WINDOW_HEAD_COUNT;
 						return (
-							<MessagePartItem
-								key={part.id}
-								part={part}
-								showLine={showLine}
-								isFirstPart={index === firstVisiblePartIndex && !showHeader}
-								isLastToolCall={isLastToolCall}
-								onNavigateToSession={onNavigateToSession}
-								compact={compact}
-								pendingApproval={pendingApproval}
-								onApprove={handleApprove}
-								onReject={handleReject}
-								sessionId={sessionId}
-								onRetry={onRetry}
-								onCompact={onCompact}
-							/>
+							<Fragment key={getRenderItemKey(item)}>
+								{showPartWindowGap && (
+									<HiddenAssistantStepsRow
+										count={omittedRenderItemCount}
+										onShowAll={() => setShowAllParts(true)}
+										compact={compact}
+									/>
+								)}
+								{renderAssistantRenderItem(item, renderIndex)}
+							</Fragment>
 						);
 					})}
 
@@ -614,7 +778,7 @@ export const AssistantMessageGroup = memo(
 				{isComplete && sessionId && (
 					<div
 						className="grid ml-7 transition-[grid-template-rows] duration-200 ease-out"
-						style={{ gridTemplateRows: isHovered ? '1fr' : '0fr' }}
+						style={{ gridTemplateRows: effectiveHovered ? '1fr' : '0fr' }}
 					>
 						<div className="overflow-hidden">
 							<div className="flex gap-2 mt-2">

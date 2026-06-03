@@ -77,7 +77,7 @@
     },
     "apps/cli": {
       "name": "@ottocode/cli",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "bin": {
         "otto": "./dist/otto",
       },
@@ -104,7 +104,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.132",
+      "version": "0.1.133",
       "dependencies": {
         "@ottocode/web-sdk": "workspace:*",
         "@tanstack/react-query": "^5.90.2",
@@ -469,7 +469,7 @@
     },
     "packages/api": {
       "name": "@ottocode/api",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "axios": "^1.7.9",
         "eventsource-parser": "^2.0.1",
@@ -482,7 +482,7 @@
     },
     "packages/database": {
       "name": "@ottocode/database",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "drizzle-orm": "^0.44.5",
@@ -495,7 +495,7 @@
     },
     "packages/install": {
       "name": "@ottocode/install",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "bin": {
         "otto": "./start.js",
       },
@@ -518,7 +518,7 @@
     },
     "packages/sdk": {
       "name": "@ottocode/sdk",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "@ai-sdk/anthropic": "^3.0.72",
         "@ai-sdk/google": "^3.0.0",
@@ -551,7 +551,7 @@
     },
     "packages/server": {
       "name": "@ottocode/server",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "@hono/zod-openapi": "^1.1.5",
         "@ottocode/database": "workspace:*",
@@ -568,7 +568,7 @@
     },
     "packages/web-sdk": {
       "name": "@ottocode/web-sdk",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "@codemirror/lang-css": "^6.3.1",
         "@codemirror/lang-html": "^6.4.11",
@@ -593,6 +593,7 @@
         "ghostty-web": "^0.4.0",
         "motion": "^12.40.0",
         "qrcode.react": "^4.2.0",
+        "react-virtuoso": "^4.18.7",
       },
       "devDependencies": {
         "@tanstack/react-query": "^5.90.2",
@@ -623,7 +624,7 @@
     },
     "packages/web-ui": {
       "name": "@ottocode/web-ui",
-      "version": "0.1.294",
+      "version": "0.1.295",
       "dependencies": {
         "express": "^5.1.0",
       },
@@ -4277,6 +4278,8 @@
     "react-style-singleton": ["react-style-singleton@2.2.3", "", { "dependencies": { "get-nonce": "^1.0.0", "tslib": "^2.0.0" }, "peerDependencies": { "@types/react": "*", "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-b6jSvxvVnyptAiLjbkWLE/lOnR4lfTtDAl+eUC7RZy+QQWc6wRzIV2CE6xBuMmDxc2qIihtDCZD5NPOFl7fRBQ=="],
 
     "react-syntax-highlighter": ["react-syntax-highlighter@15.6.6", "", { "dependencies": { "@babel/runtime": "^7.3.1", "highlight.js": "^10.4.1", "highlightjs-vue": "^1.0.0", "lowlight": "^1.17.0", "prismjs": "^1.30.0", "refractor": "^3.6.0" }, "peerDependencies": { "react": ">= 0.14.0" } }, "sha512-DgXrc+AZF47+HvAPEmn7Ua/1p10jNoVZVI/LoPiYdtY+OM+/nG5yefLHKJwdKqY1adMuHFbeyBaG9j64ML7vTw=="],
+
+    "react-virtuoso": ["react-virtuoso@4.18.7", "", { "peerDependencies": { "react": ">=16 || >=17 || >= 18 || >= 19", "react-dom": ">=16 || >=17 || >= 18 || >=19" } }, "sha512-xNF5zDGEEIMB7cKwcen/pLig0YDf6OnfFrVgKFa7sHPf9fRem0CaLshyObbBcP88jzn0enavL39EgplgdyT21g=="],
 
     "read-cache": ["read-cache@1.0.0", "", { "dependencies": { "pify": "^2.3.0" } }, "sha512-Owdv/Ft7IjOgm/i0xvNDZ1LrRANRfew4b2prF3OWMQLxLfu3bS8FVhCsrSCMK4lR56Y9ya+AThoTpDCTxCmpRA=="],
 
