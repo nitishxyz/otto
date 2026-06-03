@@ -51,7 +51,7 @@ const attachmentParamsSchema = z.object({
 });
 
 const attachmentUploadBodySchema = z.object({
-	file: z.any().openapi({
+	file: z.unknown().openapi({
 		type: 'string',
 		format: 'binary',
 		description: 'Attachment file to store',
@@ -78,7 +78,7 @@ const attachmentErrorResponseSchema = z.object({
 	error: z.string(),
 });
 
-const binaryAttachmentResponseSchema = z.any().openapi({
+const binaryAttachmentResponseSchema = z.unknown().openapi({
 	type: 'string',
 	format: 'binary',
 	description: 'Raw attachment file bytes',

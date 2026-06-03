@@ -25,7 +25,12 @@ const gitBranchQuerySchema = z.object({
 
 const gitBranchResponseSchema = z.object({
 	status: z.literal('ok'),
-	data: z.any(),
+	data: z.object({
+		branch: z.string().nullable(),
+		ahead: z.number(),
+		behind: z.number(),
+		remotes: z.array(z.string()),
+	}),
 });
 
 const gitErrorResponseSchema = z.object({

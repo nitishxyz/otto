@@ -9,7 +9,29 @@ import {
 	listResearchSessions,
 } from './research/service.ts';
 
-const sessionSchema = z.any();
+const sessionSchema = z
+	.object({
+		id: z.string(),
+		title: z.string().nullable(),
+		agent: z.string(),
+		provider: z.string(),
+		model: z.string(),
+		projectPath: z.string(),
+		createdAt: z.number(),
+		lastActiveAt: z.number().nullable(),
+		lastViewedAt: z.number().nullable().optional(),
+		totalInputTokens: z.number().nullable(),
+		totalOutputTokens: z.number().nullable(),
+		totalCachedTokens: z.number().nullable().optional(),
+		totalCacheCreationTokens: z.number().nullable().optional(),
+		totalToolTimeMs: z.number().nullable(),
+		currentContextTokens: z.number().nullable().optional(),
+		toolCounts: z.record(z.string(), z.number()).optional(),
+		parentSessionId: z.string().nullable().optional(),
+		branchPointMessageId: z.string().nullable().optional(),
+		sessionType: z.enum(['main', 'branch', 'handoff']).optional(),
+	})
+	.passthrough();
 
 const parentParamsSchema = z.object({
 	parentId: z.string().openapi({

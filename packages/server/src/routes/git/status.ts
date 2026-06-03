@@ -25,9 +25,65 @@ const gitStatusQuerySchema = z.object({
 		}),
 });
 
+const gitFileSchema = z
+	.object({
+		path: z.string(),
+		absPath: z.string(),
+		status: z.enum([
+			'modified',
+			'added',
+			'deleted',
+			'renamed',
+			'untracked',
+			'conflicted',
+		]),
+		staged: z.boolean(),
+		insertions: z.number().optional(),
+		deletions: z.number().optional(),
+		oldPath: z.string().optional(),
+		isNew: z.boolean(),
+		conflictType: z
+			.enum([
+				'both-modified',
+				'deleted-by-us',
+				'deleted-by-them',
+				'both-added',
+				'both-deleted',
+			])
+			.optional(),
+	})
+	.passthrough();
+
 const gitStatusResponseSchema = z.object({
 	status: z.literal('ok'),
-	data: z.any(),
+	data: z.object({
+		branch: z.string().nullable(),
+		headSha: z.string().nullable(),
+		shortHeadSha: z.string().nullable(),
+		isDetached: z.boolean(),
+		operation: z
+			.object({
+				type: z.string(),
+				label: z.string(),
+				current: z.number().optional(),
+				total: z.number().optional(),
+				headName: z.string().optional(),
+				onto: z.string().optional(),
+			})
+			.nullable(),
+		ahead: z.number(),
+		behind: z.number(),
+		hasUpstream: z.boolean(),
+		remotes: z.array(z.string()),
+		gitRoot: z.string(),
+		workingDir: z.string(),
+		staged: z.array(gitFileSchema),
+		unstaged: z.array(gitFileSchema),
+		untracked: z.array(gitFileSchema),
+		conflicted: z.array(gitFileSchema),
+		hasChanges: z.boolean(),
+		hasConflicts: z.boolean(),
+	}),
 });
 
 const gitErrorResponseSchema = z.object({

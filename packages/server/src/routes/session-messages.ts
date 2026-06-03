@@ -19,7 +19,52 @@ import { dispatchAssistantMessage } from '../runtime/message/service.ts';
 type MessagePartRow = typeof messageParts.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 
-const messageSchema = z.any();
+const messagePartSchema = z
+	.object({
+		id: z.string(),
+		messageId: z.string(),
+		index: z.number(),
+		stepIndex: z.number().nullable().optional(),
+		type: z.string(),
+		content: z.union([z.string(), z.record(z.string(), z.unknown())]),
+		contentJson: z.unknown().optional(),
+		agent: z.string(),
+		provider: z.string(),
+		model: z.string(),
+		startedAt: z.number().nullable().optional(),
+		completedAt: z.number().nullable().optional(),
+		compactedAt: z.number().nullable().optional(),
+		toolName: z.string().nullable().optional(),
+		toolCallId: z.string().nullable().optional(),
+		toolDurationMs: z.number().nullable().optional(),
+	})
+	.passthrough();
+
+const messageSchema = z
+	.object({
+		id: z.string(),
+		sessionId: z.string(),
+		role: z.string(),
+		status: z.string(),
+		agent: z.string(),
+		provider: z.string(),
+		model: z.string(),
+		createdAt: z.number(),
+		completedAt: z.number().nullable().optional(),
+		latencyMs: z.number().nullable().optional(),
+		inputTokens: z.number().nullable().optional(),
+		outputTokens: z.number().nullable().optional(),
+		totalTokens: z.number().nullable().optional(),
+		cachedInputTokens: z.number().nullable().optional(),
+		cacheCreationInputTokens: z.number().nullable().optional(),
+		reasoningTokens: z.number().nullable().optional(),
+		error: z.string().nullable().optional(),
+		errorType: z.string().nullable().optional(),
+		errorDetails: z.string().nullable().optional(),
+		isAborted: z.boolean().nullable().optional(),
+		parts: z.array(messagePartSchema).optional(),
+	})
+	.passthrough();
 
 const messageParamsSchema = z.object({
 	id: z.string().openapi({

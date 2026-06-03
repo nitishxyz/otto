@@ -3,7 +3,23 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { addMCPServer, listMCPServers, removeMCPServer } from './service.ts';
 
-const mcpServerSchema = z.any().openapi('MCPServer');
+const mcpServerSchema = z
+	.object({
+		name: z.string(),
+		transport: z.enum(['stdio', 'http', 'sse']),
+		command: z.string().optional(),
+		args: z.array(z.string()),
+		url: z.string().optional(),
+		disabled: z.boolean(),
+		connected: z.boolean(),
+		tools: z.array(z.string()),
+		authRequired: z.boolean(),
+		authenticated: z.boolean(),
+		scope: z.enum(['global', 'project']),
+		authType: z.string().optional(),
+	})
+	.passthrough()
+	.openapi('MCPServer');
 
 const listMCPServersResponseSchema = z.object({
 	servers: z.array(mcpServerSchema),

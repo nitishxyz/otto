@@ -76,8 +76,11 @@ When you need schema/database changes:
 - Hono-based app
 - Each endpoint belongs in its own module under `packages/server/src/routes/`
 - Endpoint contracts must be Zod-first: define request params/query/body and response schemas with `@hono/zod-openapi`/Zod in server route/schema modules, then derive OpenAPI from those schemas.
+- Register documented endpoints with `zodOpenApiRoute(...)`; do not reintroduce `openApiRoute(...)`, hand-written `OperationObject` route specs, or hardcoded OpenAPI component registries.
+- Avoid broad `z.any()` endpoint schemas. Prefer explicit Zod objects/enums/unions; use `z.unknown()` only for genuinely opaque payloads such as binary multipart/file content, and document the reason in the route module.
 - Do not hand-write OpenAPI schema objects as the source of truth for normal JSON endpoints. If an endpoint truly cannot be represented by Zod/OpenAPI (for example raw WebSocket upgrade handling, SSE helpers, binary file responses, or multipart edge cases), keep the exception narrow and document why in the route module.
 - Expose OpenAPI at `/openapi.json` from registered server routes; do not maintain a separate hardcoded spec file.
+- Generate clients from the OpenAPI output with hey (`bun run --filter @ottocode/api generate`/`build`) and have first-party clients call the generated SDK instead of duplicating endpoint URLs or response types.
 - Streaming uses SSE; prefer AI SDK helpers for stream responses
 - For API changes, follow this order:
   1. Implement/update route methods in `packages/server/src/routes/`

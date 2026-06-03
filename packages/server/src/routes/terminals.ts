@@ -14,7 +14,20 @@ import {
 	sendTerminalInput,
 } from './terminals/service.ts';
 
-const terminalSchema = z.any();
+const terminalSchema = z.object({
+	id: z.string(),
+	pid: z.number(),
+	command: z.string(),
+	args: z.array(z.string()),
+	cwd: z.string(),
+	purpose: z.string(),
+	createdBy: z.enum(['user', 'llm']),
+	title: z.string(),
+	status: z.enum(['running', 'exited']),
+	exitCode: z.number().optional(),
+	createdAt: z.union([z.string(), z.date()]),
+	uptime: z.number(),
+});
 
 const terminalIdParamsSchema = z.object({
 	id: z.string().openapi({

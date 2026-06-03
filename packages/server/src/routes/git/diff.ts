@@ -46,7 +46,19 @@ const gitDiffQuerySchema = z.object({
 
 const gitDiffResponseSchema = z.object({
 	status: z.literal('ok'),
-	data: z.any(),
+	data: z.object({
+		file: z.string(),
+		absPath: z.string(),
+		diff: z.string(),
+		content: z.string().optional(),
+		fullFile: z.boolean().optional(),
+		isNewFile: z.boolean(),
+		isBinary: z.boolean(),
+		insertions: z.number(),
+		deletions: z.number(),
+		language: z.string(),
+		staged: z.boolean(),
+	}),
 });
 
 const gitErrorResponseSchema = z.object({

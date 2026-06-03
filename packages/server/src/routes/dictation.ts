@@ -41,13 +41,62 @@ const errorResponseSchema = z.object({
 	code: z.string().optional(),
 });
 
-const dictationModelSchema = z.any();
-const dictationSessionSchema = z.any();
 const audioFormatSchema = z.object({
-	encoding: z.string().optional(),
-	sampleRate: z.number().optional(),
-	channels: z.number().optional(),
+	encoding: z.string(),
+	sampleRate: z.number(),
+	channels: z.number(),
 });
+
+const dictationModelSchema = z
+	.object({
+		id: z.string(),
+		label: z.string(),
+		language: z.enum(['en', 'multi']),
+		sizeBytes: z.number(),
+		url: z.string(),
+		sha256: z.string(),
+		recommended: z.boolean().optional(),
+		installed: z.boolean(),
+		installing: z.boolean(),
+		installedSizeBytes: z.number(),
+		installStatus: z.enum([
+			'idle',
+			'installing',
+			'verifying',
+			'installed',
+			'error',
+		]),
+		progressBytes: z.number(),
+		totalBytes: z.number(),
+		error: z.string().optional(),
+		errorCode: z.string().optional(),
+	})
+	.passthrough();
+
+const dictationSessionSchema = z
+	.object({
+		id: z.string(),
+		status: z.enum([
+			'created',
+			'recording',
+			'transcribing',
+			'completed',
+			'cancelled',
+			'error',
+		]),
+		model: z.string(),
+		language: z.string(),
+		format: audioFormatSchema,
+		createdAt: z.string(),
+		updatedAt: z.string(),
+		receivedBytes: z.number(),
+		receivedMs: z.number(),
+		pcmPath: z.string(),
+		wavPath: z.string(),
+		text: z.string().optional(),
+		error: z.string().optional(),
+	})
+	.passthrough();
 
 const modelParamsSchema = z.object({
 	model: z.string().openapi({ param: { name: 'model', in: 'path' } }),

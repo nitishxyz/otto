@@ -20,7 +20,9 @@ const gitGenerateCommitMessageBodySchema = z.object({
 
 const gitCommitResponseSchema = z.object({
 	status: z.literal('ok'),
-	data: z.any(),
+	data: z.object({
+		message: z.string(),
+	}),
 });
 
 const gitGeneratedMessageResponseSchema = z.object({
