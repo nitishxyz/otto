@@ -11,11 +11,15 @@ import {
 } from 'lucide-react';
 import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
-import { useSimulatorStatus } from '../../hooks/useSimulator';
+import {
+	useSimulatorStatus,
+	useStartSimulator,
+} from '../../hooks/useSimulator';
 import { Button } from '../ui/Button';
 
 const DEFAULT_BROWSER_URL = 'http://localhost:3000';
 const SIMULATOR_URL = 'http://localhost:3200';
+const SIMULATOR_TAB_ID = 'browser:simulator';
 const IFRAME_EMBED_TIMEOUT_MS = 6000;
 
 type BrowserViewerTab = Extract<ViewerTab, { type: 'browser' }>;
@@ -107,6 +111,11 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	);
 	const [embedError, setEmbedError] = useState<string | null>(null);
 	const simulatorStatus = useSimulatorStatus();
+	const {
+		mutate: startSimulatorPreview,
+		isPending: isStartingSimulatorPreview,
+		error: startSimulatorError,
+	} = useStartSimulator();
 	const nativeBrowser =
 		typeof window !== 'undefined' ? window.OTTO_NATIVE_BROWSER : undefined;
 	const normalizedUrl = normalizeBrowserUrl(tab.url);
@@ -115,6 +124,21 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	const canGoBack = historyIndex > 0;
 	const canGoForward =
 		historyIndex >= 0 && historyIndex < historyEntries.length - 1;
+	const simulatorStateStatus = simulatorStatus.data?.status;
+	const simulatorStateUrl = simulatorStatus.data?.url;
+	const isSimulatorPreview = tab.kind === 'simulator';
+	const isStartingSimulator =
+		isStartingSimulatorPreview || simulatorStateStatus === 'starting';
+	const simulatorError =
+		isSimulatorPreview && simulatorStatus.data?.status === 'error'
+			? simulatorStatus.data.error
+			: isSimulatorPreview
+				? startSimulatorError?.message
+				: null;
+	const shouldHoldSimulatorPreview =
+		isSimulatorPreview &&
+		!simulatorError &&
+		simulatorStateStatus !== 'connected';
 
 	const clearIframeEmbedTimeout = useCallback(() => {
 		if (iframeEmbedTimeoutRef.current) {
@@ -172,7 +196,16 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	);
 
 	useEffect(() => {
+		if (shouldHoldSimulatorPreview) {
+			clearIframeEmbedTimeout();
+			return;
+		}
+
 		if (!isLoading || !canRenderUrl || useNativeBrowser) {
+			clearIframeEmbedTimeout();
+			return;
+		}
+		if (isSimulatorPreview) {
 			clearIframeEmbedTimeout();
 			return;
 		}
@@ -187,7 +220,32 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		}, IFRAME_EMBED_TIMEOUT_MS);
 
 		return clearIframeEmbedTimeout;
-	}, [canRenderUrl, clearIframeEmbedTimeout, isLoading, useNativeBrowser]);
+	}, [
+		canRenderUrl,
+		clearIframeEmbedTimeout,
+		isSimulatorPreview,
+		isLoading,
+		shouldHoldSimulatorPreview,
+		useNativeBrowser,
+	]);
+
+	useEffect(() => {
+		if (!shouldHoldSimulatorPreview) return;
+
+		setEmbedError(null);
+		setIsLoading(true);
+		setLoadingProgress((progress) =>
+			progress <= 0 || progress >= 100 ? 12 : progress,
+		);
+	}, [shouldHoldSimulatorPreview]);
+
+	useEffect(() => {
+		if (!isSimulatorPreview || simulatorStateStatus !== 'connected') return;
+
+		setEmbedError(null);
+		setIsLoading(true);
+		setLoadingProgress(12);
+	}, [isSimulatorPreview, simulatorStateStatus]);
 
 	useEffect(
 		() => () => {
@@ -327,10 +385,38 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		}
 	};
 
-	const simulatorError =
-		tab.kind === 'simulator' && simulatorStatus.data?.status === 'error'
-			? simulatorStatus.data.error
-			: null;
+	const openSimulatorPreview = useCallback(() => {
+		const previewUrl = simulatorStateUrl ?? SIMULATOR_URL;
+		openBrowserTab(previewUrl, {
+			kind: 'simulator',
+			title: 'Simulator',
+		});
+
+		if (
+			simulatorStateStatus === 'connected' ||
+			simulatorStateStatus === 'starting' ||
+			isStartingSimulatorPreview
+		) {
+			return;
+		}
+
+		startSimulatorPreview(3200, {
+			onSuccess: (result) => {
+				openBrowserTab(result.url ?? SIMULATOR_URL, {
+					kind: 'simulator',
+					title: 'Simulator',
+				});
+				reloadBrowserTab(SIMULATOR_TAB_ID);
+			},
+		});
+	}, [
+		isStartingSimulatorPreview,
+		openBrowserTab,
+		reloadBrowserTab,
+		simulatorStateStatus,
+		simulatorStateUrl,
+		startSimulatorPreview,
+	]);
 
 	return (
 		<div className="h-full w-full min-w-0 bg-background flex flex-col">
@@ -429,16 +515,17 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 						</button>
 						<button
 							type="button"
-							onClick={() =>
-								openBrowserTab(SIMULATOR_URL, {
-									kind: 'simulator',
-									title: 'Simulator',
-								})
+							onClick={openSimulatorPreview}
+							title={
+								isStartingSimulator
+									? 'Starting simulator preview'
+									: 'Start simulator preview'
 							}
-							title="Simulator preview"
 							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
 						>
-							<Smartphone className="h-4 w-4" />
+							<Smartphone
+								className={`h-4 w-4 ${isStartingSimulator ? 'animate-pulse' : ''}`}
+							/>
 						</button>
 					</div>
 				</div>
@@ -450,7 +537,33 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 			)}
 
 			<div ref={contentRef} className="min-h-0 flex-1 bg-muted/20">
-				{useNativeBrowser && canRenderUrl ? (
+				{shouldHoldSimulatorPreview ? (
+					<div className="h-full w-full flex items-center justify-center p-6 text-center">
+						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
+							<Smartphone className="mx-auto mb-3 h-8 w-8 animate-pulse text-violet-500" />
+							<h2 className="mb-2 text-sm font-semibold text-foreground">
+								{isStartingSimulator || simulatorStatus.isLoading
+									? 'Starting simulator preview'
+									: 'Simulator preview is not running'}
+							</h2>
+							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+								{isStartingSimulator || simulatorStatus.isLoading
+									? 'Otto is waiting for serve-sim to publish a preview URL.'
+									: 'Start serve-sim before loading the simulator web preview.'}
+							</p>
+							{!isStartingSimulator && !simulatorStatus.isLoading && (
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={openSimulatorPreview}
+								>
+									Start simulator
+								</Button>
+							)}
+						</div>
+					</div>
+				) : useNativeBrowser && canRenderUrl ? (
 					<div className="h-full w-full bg-background" />
 				) : canRenderUrl && !embedError ? (
 					<iframe

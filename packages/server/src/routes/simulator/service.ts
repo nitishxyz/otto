@@ -61,6 +61,10 @@ function findUrl(text: string): string | null {
 	return match?.[0] ?? null;
 }
 
+function previewUrlForPort(port: number): string {
+	return `http://localhost:${port}`;
+}
+
 function extractServeSimState(stdout: string, fallbackPort: number) {
 	const jsonValues = parseMaybeJsonLines(stdout);
 	let url = findUrl(stdout);
@@ -91,10 +95,23 @@ function extractServeSimState(stdout: string, fallbackPort: number) {
 	}
 
 	return {
-		url: url ?? `http://localhost:${fallbackPort}`,
+		url: url ?? previewUrlForPort(fallbackPort),
 		deviceName,
 		udid,
 	};
+}
+
+async function isPreviewUrlReady(url: string): Promise<boolean> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 750);
+	try {
+		const response = await fetch(url, { signal: controller.signal });
+		return response.ok;
+	} catch {
+		return false;
+	} finally {
+		clearTimeout(timeout);
+	}
 }
 
 async function killProcessOnPort(port: number) {
@@ -180,7 +197,7 @@ function startPreviewProcess(args: string[]) {
 		(chunk) => {
 			previewStdout += chunk;
 			const parsed = extractServeSimState(previewStdout, state.port);
-			if (parsed.url) {
+			if (parsed.url && parsed.url !== previewUrlForPort(state.port)) {
 				updateState({
 					status: 'connected',
 					url: parsed.url,
@@ -208,14 +225,18 @@ function startPreviewProcess(args: string[]) {
 	});
 }
 
-async function waitForPreviewUrl(port: number, timeoutMs = 3500) {
+async function waitForPreviewUrl(port: number, timeoutMs = 15_000) {
 	const started = Date.now();
+	const fallbackUrl = previewUrlForPort(port);
 	while (Date.now() - started < timeoutMs) {
 		const parsed = extractServeSimState(previewStdout, port);
-		if (parsed.url && parsed.url !== `http://localhost:${port}`) return parsed;
+		if (parsed.url && parsed.url !== fallbackUrl) return parsed;
+		if (await isPreviewUrlReady(fallbackUrl)) {
+			return { ...parsed, url: fallbackUrl };
+		}
 		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
-	return extractServeSimState(previewStdout, port);
+	return null;
 }
 
 export function getSimulatorStatus(): SimulatorState {
@@ -246,8 +267,9 @@ export async function startSimulator(
 
 	startPreviewProcess(args);
 	const parsed = await waitForPreviewUrl(port);
-	if (!previewProcess) {
-		const error = previewStderr || previewStdout || 'Failed to start serve-sim';
+	if (!previewProcess || !parsed) {
+		const error =
+			previewStderr || previewStdout || 'Timed out waiting for serve-sim';
 		updateState({ status: 'error', error });
 		return { ok: false, error, stdout: previewStdout, stderr: previewStderr };
 	}
