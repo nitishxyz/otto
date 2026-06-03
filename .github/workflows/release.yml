@@ -874,20 +874,48 @@ jobs:
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
 
+      - name: Prepare CLI release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.bump-version.outputs.cli_version }}"
+          CHANGELOG="apps/cli/CHANGELOG.md"
+
+          {
+            echo "## otto v${VERSION}"
+            echo
+
+            if [ -f "$CHANGELOG" ]; then
+              awk -v version="$VERSION" '
+                /^## / {
+                  if (found) exit
+                  if ($0 ~ "^## \\[?v?" version "\\]?") {
+                    found = 1
+                    next
+                  }
+                }
+                found { print }
+              ' "$CHANGELOG"
+            else
+              echo "No generated changelog entry was found for this release."
+              echo
+            fi
+
+            echo
+            echo "### Downloads"
+            echo
+            echo "- macOS (Intel): otto-darwin-x64"
+            echo "- macOS (Apple Silicon): otto-darwin-arm64"
+            echo "- Linux (x64): otto-linux-x64"
+            echo "- Linux (ARM64): otto-linux-arm64"
+          } > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.bump-version.outputs.cli_version }}
           name: "otto v${{ needs.bump-version.outputs.cli_version }}"
-          body: |
-            ## otto v${{ needs.bump-version.outputs.cli_version }}
-
-            Platform binaries are attached below.
-
-            - macOS (Intel): otto-darwin-x64
-            - macOS (Apple Silicon): otto-darwin-arm64
-            - Linux (x64): otto-linux-x64
-            - Linux (ARM64): otto-linux-arm64
+          body_path: release-notes.md
           files: ./release/*
           draft: false
           prerelease: false

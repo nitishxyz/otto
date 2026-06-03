@@ -23,6 +23,7 @@
 - [Development](development.md)
 - [Development Guide](development-guide.md)
 - [Publishing](publishing.md)
+- [Release changelogs](release-changelog.md)
 - [Contributing](../AGENTS.md)
 
 ## Advanced

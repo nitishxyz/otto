@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/acp",
-	"version": "0.1.196",
+	"version": "0.1.197",
 	"description": "ACP (Agent Client Protocol) adapter for otto — enables otto in Zed, JetBrains, Neovim, VS Code, and any ACP client",
 	"author": "nitishxyz",
 	"license": "MIT",

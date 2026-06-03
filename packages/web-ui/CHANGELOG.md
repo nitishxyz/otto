@@ -1,10 +1,13 @@
 # Changelog
 
+## 0.1.296
+
 All notable changes to `@ottocode/web-ui` will be documented in this file.
 
 ## [0.2.0] - 2025-01-XX (Upcoming)
 
 ### Added
+
 - **`serveWebUI()` function** - Ultra-simple one-line integration
   - Automatic SPA routing and asset handling
   - Configurable prefix (`/ui`, `/admin`, etc.)
@@ -16,11 +19,13 @@ All notable changes to `@ottocode/web-ui` will be documented in this file.
   - Automatic MIME type detection
 
 ### Changed
+
 - README updated with new `serveWebUI()` examples
 - Examples updated to use `serveWebUI()` instead of manual routing
 - QUICK-START.md completely rewritten for the new API
 
 ### Improved
+
 - Simplified integration from ~50 lines to ~3 lines of code
 - Better error messages and documentation
 - Comprehensive TypeScript types with JSDoc comments
@@ -28,6 +33,7 @@ All notable changes to `@ottocode/web-ui` will be documented in this file.
 ## [0.1.0] - 2025-01-XX
 
 ### Added
+
 - Initial release
 - `getWebUIPath()` - Get path to web assets directory
 - `getIndexPath()` - Get path to index.html
@@ -38,6 +44,7 @@ All notable changes to `@ottocode/web-ui` will be documented in this file.
 - Comprehensive README and documentation
 
 ### Features
+
 - Zero-config asset serving
 - Framework-agnostic design
 - Works with Bun, Express, Fastify, Hono
@@ -51,8 +58,9 @@ All notable changes to `@ottocode/web-ui` will be documented in this file.
 ### From 0.1.0 to 0.2.0
 
 **Old way:**
+
 ```typescript
-import { getWebUIPath, getIndexPath } from '@ottocode/web-ui';
+import { getWebUIPath, getIndexPath } from "@ottocode/web-ui";
 
 const webUIPath = getWebUIPath();
 
@@ -60,38 +68,40 @@ Bun.serve({
   port: 3000,
   async fetch(req) {
     const url = new URL(req.url);
-    
-    if (url.pathname.startsWith('/ui')) {
-      const filePath = url.pathname.replace('/ui', '') || '/';
-      
-      if (filePath === '/') {
+
+    if (url.pathname.startsWith("/ui")) {
+      const filePath = url.pathname.replace("/ui", "") || "/";
+
+      if (filePath === "/") {
         return new Response(Bun.file(getIndexPath()));
       }
-      
+
       const file = Bun.file(webUIPath + filePath);
       if (await file.exists()) {
         return new Response(file);
       }
-      
+
       return new Response(Bun.file(getIndexPath()));
     }
-    
-    return new Response('Not found', { status: 404 });
-  }
+
+    return new Response("Not found", { status: 404 });
+  },
 });
 ```
 
 **New way:**
+
 ```typescript
-import { serveWebUI } from '@ottocode/web-ui';
+import { serveWebUI } from "@ottocode/web-ui";
 
 Bun.serve({
   port: 3000,
-  fetch: serveWebUI({ prefix: '/ui' })
+  fetch: serveWebUI({ prefix: "/ui" }),
 });
 ```
 
 **Benefits of upgrading:**
+
 - ✅ 95% less code
 - ✅ Automatic asset path handling
 - ✅ Better error handling

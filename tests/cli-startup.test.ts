@@ -13,6 +13,7 @@ const runDiscoveredCommandMock = mock(async () => false);
 const loggerErrorMock = mock(() => {});
 const setDebugEnabledMock = mock(() => {});
 const setTraceEnabledMock = mock(() => {});
+const ensureProjectOttoIgnoredMock = mock(async () => false);
 
 mock.module('@ottocode/cli/src/cli-deps.ts', () => ({
 	logger: { error: loggerErrorMock },
@@ -42,6 +43,10 @@ mock.module('@ottocode/cli/src/commands/index.ts', () => ({
 
 mock.module('@ottocode/cli/src/custom-commands.ts', () => ({
 	runDiscoveredCommand: runDiscoveredCommandMock,
+}));
+
+mock.module('@ottocode/cli/src/gitignore.ts', () => ({
+	ensureProjectOttoIgnored: ensureProjectOttoIgnoredMock,
 }));
 
 mock.module('@ottocode/cli/src/commands/serve.ts', () => ({
@@ -79,6 +84,8 @@ describe('cli startup auth gating', () => {
 		stopEphemeralServerMock.mockReset();
 		runDiscoveredCommandMock.mockReset();
 		runDiscoveredCommandMock.mockImplementation(async () => false);
+		ensureProjectOttoIgnoredMock.mockReset();
+		ensureProjectOttoIgnoredMock.mockImplementation(async () => false);
 		loggerErrorMock.mockReset();
 		setDebugEnabledMock.mockReset();
 		setTraceEnabledMock.mockReset();
@@ -130,5 +137,14 @@ describe('cli startup auth gating', () => {
 
 		expect(ciModeDuringAuth).toBe('1');
 		expect(process.env.OTTO_CI_MODE).toBeUndefined();
+	});
+
+	it('ensures the project .otto directory is gitignored on startup', async () => {
+		const { runCli } = await cliModulePromise;
+
+		await runCli(['--ci'], 'test');
+
+		expect(ensureProjectOttoIgnoredMock).toHaveBeenCalledTimes(1);
+		expect(ensureProjectOttoIgnoredMock).toHaveBeenCalledWith(process.cwd());
 	});
 });

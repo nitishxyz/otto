@@ -111,7 +111,10 @@ export const sessionsMixin = {
 	},
 
 	async abortSession(sessionId: string): Promise<{ success: boolean }> {
-		const response = await apiAbortSession({ path: { sessionId } });
+		const response = await apiAbortSession({
+			path: { sessionId },
+			body: {},
+		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as { success: boolean };
 	},
@@ -122,6 +125,7 @@ export const sessionsMixin = {
 	): Promise<{ success: boolean; wasRunning: boolean; messageId: string }> {
 		const response = await apiAbortSession({
 			path: { sessionId },
+			body: {},
 		});
 		if (response.error) throw new Error('Failed to abort message');
 		return response.data as {

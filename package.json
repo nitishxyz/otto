@@ -63,6 +63,9 @@
 		"build:canvas": "bun run scripts/build-canvas.ts",
 		"build:canvas:signed": "bun run scripts/build-canvas.ts --sign",
 		"build:canvas:release": "./scripts/build-canvas-release.sh",
+		"changeset": "changeset",
+		"changeset:status": "changeset status --verbose",
+		"changeset:version": "changeset version",
 		"prepublishOnly": "bun run compile",
 		"version:bump": "bun run scripts/bump-version.ts"
 	},
@@ -95,6 +98,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.4",
+		"@changesets/cli": "^2.31.0",
 		"@types/bun": "latest",
 		"@types/marked-terminal": "^6.1.1",
 		"drizzle-kit": "^0.31.4"

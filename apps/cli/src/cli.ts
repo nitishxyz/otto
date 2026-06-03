@@ -20,6 +20,7 @@ import {
 	registerWebCommand,
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
+import { ensureProjectOttoIgnored } from './gitignore.ts';
 
 const SKIP_SERVER_COMMANDS = new Set([
 	'serve',
@@ -98,6 +99,7 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 	try {
 		const projectIdx = argv.indexOf('--project');
 		const projectRoot = projectIdx >= 0 ? argv[projectIdx + 1] : process.cwd();
+		await ensureProjectOttoIgnored(projectRoot);
 
 		const cmd = argv.find((arg) => !arg.startsWith('-'));
 		shouldStopEphemeralServer = Boolean(

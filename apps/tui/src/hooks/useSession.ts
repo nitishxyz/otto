@@ -157,7 +157,7 @@ export function useSession() {
 
 	const abortSessionFn = useCallback(async (sessionId: string) => {
 		try {
-			await apiAbortSession({ path: { sessionId } });
+			await apiAbortSession({ path: { sessionId }, body: {} });
 		} catch {}
 	}, []);
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@ottocode/api",
+      "@ottocode/cli",
+      "@ottocode/database",
+      "@ottocode/install",
+      "@ottocode/sdk",
+      "@ottocode/server",
+      "@ottocode/web-sdk",
+      "@ottocode/web-ui"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "@ottocode/canvas",
+    "@ottocode/desktop",
+    "@ottocode/launcher",
+    "@ottocode/preview-api",
+    "@ottocode/preview-web",
+    "api-web-ui-integration-example",
+    "basic-cli-bot-example",
+    "git-commit-helper-example",
+    "landing",
+    "otto-intro-video",
+    "ottocode-mobile",
+    "web"
+  ],
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  }
+}
