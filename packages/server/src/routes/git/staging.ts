@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleDeleteFiles,
 	handleRestoreFiles,
@@ -7,8 +8,31 @@ import {
 	handleUnstageFiles,
 } from './staging-service.ts';
 
+const gitFilesBodySchema = z.object({
+	project: z.string().optional(),
+	files: z.array(z.string()),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
+function gitFilesActionResponseSchema(
+	field: 'staged' | 'unstaged' | 'restored' | 'deleted',
+) {
+	return z.object({
+		status: z.literal('ok'),
+		data: z.object({
+			[field]: z.array(z.string()),
+			failed: z.array(z.string()).optional(),
+		}),
+	});
+}
+
 export function registerStagingRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -16,25 +40,11 @@ export function registerStagingRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'stageFiles',
 			summary: 'Stage files',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								files: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-							},
-							required: ['files'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitFilesBodySchema },
 					},
 				},
 			},
@@ -43,58 +53,14 @@ export function registerStagingRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											staged: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											failed: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: ['staged', 'failed'],
-									},
-								},
-								required: ['status', 'data'],
-							},
+							schema: gitFilesActionResponseSchema('staged'),
 						},
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -102,7 +68,7 @@ export function registerStagingRoutes(app: Hono) {
 		handleStageFiles,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -110,25 +76,11 @@ export function registerStagingRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'unstageFiles',
 			summary: 'Unstage files',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								files: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-							},
-							required: ['files'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitFilesBodySchema },
 					},
 				},
 			},
@@ -137,58 +89,14 @@ export function registerStagingRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											unstaged: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											failed: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: ['unstaged', 'failed'],
-									},
-								},
-								required: ['status', 'data'],
-							},
+							schema: gitFilesActionResponseSchema('unstaged'),
 						},
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -196,7 +104,7 @@ export function registerStagingRoutes(app: Hono) {
 		handleUnstageFiles,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -204,25 +112,11 @@ export function registerStagingRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'restoreFiles',
 			summary: 'Restore files to HEAD',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								files: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-							},
-							required: ['files'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitFilesBodySchema },
 					},
 				},
 			},
@@ -231,52 +125,14 @@ export function registerStagingRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											restored: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: ['restored'],
-									},
-								},
-								required: ['status', 'data'],
-							},
+							schema: gitFilesActionResponseSchema('restored'),
 						},
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -284,7 +140,7 @@ export function registerStagingRoutes(app: Hono) {
 		handleRestoreFiles,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -292,25 +148,11 @@ export function registerStagingRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'deleteFiles',
 			summary: 'Delete untracked files',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								files: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-							},
-							required: ['files'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitFilesBodySchema },
 					},
 				},
 			},
@@ -319,52 +161,14 @@ export function registerStagingRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											deleted: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: ['deleted'],
-									},
-								},
-								required: ['status', 'data'],
-							},
+							schema: gitFilesActionResponseSchema('deleted'),
 						},
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

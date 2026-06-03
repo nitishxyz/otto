@@ -1,20 +1,43 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitStatusSchema } from './schemas.ts';
 import {
-	validateAndGetGitRoot,
-	parseGitStatus,
 	getAheadBehind,
-	getHeadInfo,
 	getGitOperationState,
+	getHeadInfo,
+	parseGitStatus,
+	validateAndGetGitRoot,
 } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
 
 const execFileAsync = promisify(execFile);
 
+const gitStatusQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const gitStatusResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.any(),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerStatusRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -24,83 +47,26 @@ export function registerStatusRoute(app: Hono) {
 			summary: 'Get git status',
 			description:
 				'Returns current git status including staged, unstaged, and untracked files',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: gitStatusQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										$ref: '#/components/schemas/GitStatus',
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitStatusResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

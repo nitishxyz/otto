@@ -1,6 +1,8 @@
 import { useKeyboard, useRenderer } from '@opentui/react';
 import { useCallback, useEffect, useRef, useMemo } from 'react';
 import {
+	createSessionHandoff,
+	resolveSecureInput,
 	stageFiles,
 	shareSession,
 	syncShare,
@@ -318,16 +320,19 @@ export function App({
 					if (activeSession) {
 						showStatus({ type: 'loading', label: 'creating handoff…' });
 						try {
-							const response = await fetch(
-								`${getBaseUrl()}/v1/sessions/${encodeURIComponent(activeSession.id)}/handoff`,
-								{ method: 'POST' },
-							);
-							const data = await response.json().catch(() => null);
-							if (!response.ok || typeof data?.sessionId !== 'string') {
+							const response = await createSessionHandoff({
+								path: { sessionId: activeSession.id },
+							});
+							if (
+								response.error ||
+								typeof response.data?.sessionId !== 'string'
+							) {
 								throw new Error('handoff failed');
 							}
 							const updatedSessions = await loadSessions();
-							const next = updatedSessions.find((s) => s.id === data.sessionId);
+							const next = updatedSessions.find(
+								(s) => s.id === response.data?.sessionId,
+							);
 							if (next) switchSession(next);
 							showStatus({ type: 'success', label: 'handoff created' }, 3000);
 						} catch {
@@ -497,15 +502,11 @@ export function App({
 		async (promptId: string, value: string) => {
 			const sid = sessionIdRef.current;
 			if (!sid) return;
-			const response = await fetch(
-				`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sid)}/secure-input`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ promptId, value }),
-				},
-			);
-			if (!response.ok) {
+			const response = await resolveSecureInput({
+				path: { id: sid },
+				body: { promptId, value },
+			});
+			if (response.error) {
 				showStatus({ type: 'error', label: 'secure input failed' }, 3000);
 				return;
 			}
@@ -520,15 +521,11 @@ export function App({
 		async (promptId: string) => {
 			const sid = sessionIdRef.current;
 			if (!sid) return;
-			const response = await fetch(
-				`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sid)}/secure-input`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ promptId, cancelled: true }),
-				},
-			);
-			if (!response.ok) {
+			const response = await resolveSecureInput({
+				path: { id: sid },
+				body: { promptId, cancelled: true },
+			});
+			if (response.error) {
 				showStatus(
 					{ type: 'error', label: 'secure input cancel failed' },
 					3000,

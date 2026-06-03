@@ -1,8 +1,6 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import { registerOpenApiComponents } from '../openapi/register.ts';
 
 export function registerOpenApiRoute(app: OpenAPIHono) {
-	registerOpenApiComponents(app);
 	app.doc('/openapi.json', {
 		openapi: '3.0.3',
 		info: {

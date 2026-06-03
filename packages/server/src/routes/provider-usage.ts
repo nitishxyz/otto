@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import {
 	getAuth,
@@ -10,9 +11,34 @@ import { logger } from '@ottocode/sdk';
 import { setAuth } from '@ottocode/sdk';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import type { OAuth } from '@ottocode/sdk';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const USAGE_CACHE_TTL_MS = 60_000;
+
+const providerUsageParamsSchema = z.object({
+	provider: z.enum(['anthropic', 'openai']).openapi({
+		param: { name: 'provider', in: 'path' },
+	}),
+});
+
+const providerUsageWindowSchema = z.object({
+	usedPercent: z.number().optional(),
+	windowSeconds: z.number().int().optional(),
+	resetsAt: z.string().nullable().optional(),
+	resetAfterSeconds: z.number().int().optional(),
+});
+
+const providerUsageResponseSchema = z.object({
+	provider: z.string(),
+	primaryWindow: providerUsageWindowSchema.nullable().optional(),
+	secondaryWindow: providerUsageWindowSchema.nullable().optional(),
+	limitReached: z.boolean(),
+	planType: z.string().nullable().optional(),
+});
+
+const providerUsageErrorSchema = z.object({
+	error: z.union([z.string(), z.object({ message: z.string() })]),
+});
 
 async function ensureValidOAuth(
 	provider: ProviderId,
@@ -229,7 +255,7 @@ async function fetchProviderUsage(
 }
 
 export function registerProviderUsageRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -237,109 +263,26 @@ export function registerProviderUsageRoutes(app: Hono) {
 			tags: ['config'],
 			operationId: 'getProviderUsage',
 			summary: 'Get usage information for an OAuth provider',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						type: 'string',
-						enum: ['anthropic', 'openai'],
-					},
-				},
-			],
+			request: {
+				params: providerUsageParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									provider: {
-										type: 'string',
-									},
-									primaryWindow: {
-										type: 'object',
-										nullable: true,
-										properties: {
-											usedPercent: {
-												type: 'number',
-											},
-											windowSeconds: {
-												type: 'integer',
-											},
-											resetsAt: {
-												type: 'string',
-												nullable: true,
-											},
-											resetAfterSeconds: {
-												type: 'integer',
-											},
-										},
-									},
-									secondaryWindow: {
-										type: 'object',
-										nullable: true,
-										properties: {
-											usedPercent: {
-												type: 'number',
-											},
-											windowSeconds: {
-												type: 'integer',
-											},
-											resetsAt: {
-												type: 'string',
-												nullable: true,
-											},
-											resetAfterSeconds: {
-												type: 'integer',
-											},
-										},
-									},
-									limitReached: {
-										type: 'boolean',
-									},
-									planType: {
-										type: 'string',
-										nullable: true,
-									},
-								},
-								required: ['provider', 'limitReached'],
-							},
-						},
+						'application/json': { schema: providerUsageResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerUsageErrorSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerUsageErrorSchema },
 					},
 				},
 			},

@@ -1,7 +1,8 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import type { TerminalManager } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import { upgradeWebSocket } from '../ws.ts';
-import { openApiRoute } from '../openapi/route.ts';
 import {
 	createTerminal,
 	createTerminalWebSocketHandler,
@@ -13,11 +14,44 @@ import {
 	sendTerminalInput,
 } from './terminals/service.ts';
 
+const terminalSchema = z.any();
+
+const terminalIdParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+});
+
+const terminalCreateBodySchema = z.object({
+	command: z.string().openapi({ description: 'Command to execute' }),
+	args: z.array(z.string()).optional().openapi({
+		description: 'Command arguments',
+	}),
+	purpose: z
+		.string()
+		.openapi({ description: 'Description of terminal purpose' }),
+	cwd: z.string().optional().openapi({ description: 'Working directory' }),
+	title: z.string().optional().openapi({ description: 'Terminal title' }),
+});
+
+const terminalInputBodySchema = z.object({
+	input: z.string().openapi({ description: 'Input to send to terminal' }),
+});
+
+const terminalResizeBodySchema = z.object({
+	cols: z.number().int().min(1),
+	rows: z.number().int().min(1),
+});
+
+const successResponseSchema = z.object({
+	success: z.boolean(),
+});
+
 export function registerTerminalsRoutes(
 	app: Hono,
 	terminalManager: TerminalManager,
 ) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -30,20 +64,10 @@ export function registerTerminalsRoutes(
 					description: 'List of terminals',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									terminals: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/Terminal',
-										},
-									},
-									count: {
-										type: 'integer',
-									},
-								},
-							},
+							schema: z.object({
+								terminals: z.array(terminalSchema),
+								count: z.number().int(),
+							}),
 						},
 					},
 				},
@@ -52,7 +76,7 @@ export function registerTerminalsRoutes(
 		(c) => c.json(listTerminals(terminalManager)),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -60,39 +84,11 @@ export function registerTerminalsRoutes(
 			operationId: 'postTerminals',
 			summary: 'Create a new terminal',
 			description: 'Spawn a new terminal process',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							required: ['command', 'purpose'],
-							properties: {
-								command: {
-									type: 'string',
-									description: 'Command to execute',
-								},
-								args: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-									description: 'Command arguments',
-								},
-								purpose: {
-									type: 'string',
-									description: 'Description of terminal purpose',
-								},
-								cwd: {
-									type: 'string',
-									description: 'Working directory',
-								},
-								title: {
-									type: 'string',
-									description: 'Terminal title',
-								},
-							},
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: terminalCreateBodySchema },
 					},
 				},
 			},
@@ -101,23 +97,12 @@ export function registerTerminalsRoutes(
 					description: 'Terminal created',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									terminalId: {
-										type: 'string',
-									},
-									pid: {
-										type: 'integer',
-									},
-									purpose: {
-										type: 'string',
-									},
-									command: {
-										type: 'string',
-									},
-								},
-							},
+							schema: z.object({
+								terminalId: z.string(),
+								pid: z.number().int(),
+								purpose: z.string(),
+								command: z.string(),
+							}),
 						},
 					},
 				},
@@ -126,7 +111,7 @@ export function registerTerminalsRoutes(
 		(c) => createTerminal(c, terminalManager),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -134,41 +119,23 @@ export function registerTerminalsRoutes(
 			operationId: 'getTerminalsById',
 			summary: 'Get terminal details',
 			description: 'Get information about a specific terminal',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: { params: terminalIdParamsSchema },
 			responses: {
 				'200': {
 					description: 'Terminal details',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									terminal: {
-										$ref: '#/components/schemas/Terminal',
-									},
-								},
-							},
+							schema: z.object({ terminal: terminalSchema }),
 						},
 					},
 				},
-				'404': {
-					description: 'Terminal not found',
-				},
+				'404': { description: 'Terminal not found' },
 			},
 		},
 		(c) => getTerminal(c, terminalManager),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -177,14 +144,7 @@ export function registerTerminalsRoutes(
 			summary: 'Connect to terminal WebSocket',
 			description:
 				'Upgrade to a WebSocket for bidirectional terminal I/O. Generated HTTP clients cannot consume the upgraded connection directly.',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: terminalIdParamsSchema },
 			responses: {
 				'101': { description: 'WebSocket upgrade accepted' },
 				'404': { description: 'Terminal not found' },
@@ -196,7 +156,7 @@ export function registerTerminalsRoutes(
 		}),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -204,32 +164,20 @@ export function registerTerminalsRoutes(
 			operationId: 'getTerminalsByIdOutput',
 			summary: 'Stream terminal output',
 			description: 'Get real-time terminal output via SSE',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: { params: terminalIdParamsSchema },
 			responses: {
 				'200': {
 					description: 'SSE stream of terminal output',
 					content: {
-						'text/event-stream': {
-							schema: {
-								type: 'string',
-							},
-						},
+						'text/event-stream': { schema: z.string() },
 					},
 				},
 			},
 		},
 		(c) => handleTerminalOutput(c, terminalManager),
 	);
-	openApiRoute(
+
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -237,21 +185,12 @@ export function registerTerminalsRoutes(
 			operationId: 'postTerminalsByIdOutput',
 			summary: 'Stream terminal output using POST',
 			description: 'Compatibility alias for terminal output SSE',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: terminalIdParamsSchema },
 			responses: {
 				'200': {
 					description: 'SSE stream of terminal output',
 					content: {
-						'text/event-stream': {
-							schema: { type: 'string' },
-						},
+						'text/event-stream': { schema: z.string() },
 					},
 				},
 			},
@@ -259,7 +198,7 @@ export function registerTerminalsRoutes(
 		(c) => handleTerminalOutput(c, terminalManager),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -267,30 +206,12 @@ export function registerTerminalsRoutes(
 			operationId: 'postTerminalsByIdInput',
 			summary: 'Send input to terminal',
 			description: 'Write data to terminal stdin',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
+			request: {
+				params: terminalIdParamsSchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							required: ['input'],
-							properties: {
-								input: {
-									type: 'string',
-									description: 'Input to send to terminal',
-								},
-							},
-						},
+					content: {
+						'application/json': { schema: terminalInputBodySchema },
 					},
 				},
 			},
@@ -298,16 +219,7 @@ export function registerTerminalsRoutes(
 				'200': {
 					description: 'Input sent',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-							},
-						},
+						'application/json': { schema: successResponseSchema },
 					},
 				},
 			},
@@ -315,7 +227,7 @@ export function registerTerminalsRoutes(
 		(c) => sendTerminalInput(c, terminalManager),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -323,30 +235,12 @@ export function registerTerminalsRoutes(
 			operationId: 'deleteTerminalsById',
 			summary: 'Kill terminal',
 			description: 'Terminate a running terminal process',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: { params: terminalIdParamsSchema },
 			responses: {
 				'200': {
 					description: 'Terminal killed',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-							},
-						},
+						'application/json': { schema: successResponseSchema },
 					},
 				},
 			},
@@ -354,7 +248,7 @@ export function registerTerminalsRoutes(
 		(c) => killTerminal(c, terminalManager),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -362,26 +256,12 @@ export function registerTerminalsRoutes(
 			operationId: 'resizeTerminal',
 			summary: 'Resize terminal',
 			description: 'Resize the pseudo-terminal dimensions.',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
+			request: {
+				params: terminalIdParamsSchema,
+				body: {
 					required: true,
-					schema: { type: 'string' },
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							required: ['cols', 'rows'],
-							properties: {
-								cols: { type: 'integer', minimum: 1 },
-								rows: { type: 'integer', minimum: 1 },
-							},
-						},
+					content: {
+						'application/json': { schema: terminalResizeBodySchema },
 					},
 				},
 			},
@@ -389,13 +269,7 @@ export function registerTerminalsRoutes(
 				'200': {
 					description: 'Terminal resized',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								required: ['success'],
-								properties: { success: { type: 'boolean' } },
-							},
-						},
+						'application/json': { schema: successResponseSchema },
 					},
 				},
 				'400': { description: 'Invalid terminal size' },

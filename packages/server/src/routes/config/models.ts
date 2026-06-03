@@ -1,12 +1,59 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleGetAllModels,
 	handleGetProviderModels,
 } from './models-service.ts';
 
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const providerModelsParamsSchema = z.object({
+	provider: z.string().openapi({
+		param: { name: 'provider', in: 'path' },
+	}),
+});
+
+const modelSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	toolCall: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	vision: z.boolean().optional(),
+	attachment: z.boolean().optional(),
+});
+
+const providerModelsResponseSchema = z.object({
+	models: z.array(modelSchema),
+	default: z.string().nullable().optional(),
+	allowAnyModel: z.boolean(),
+	label: z.string(),
+});
+
+const providerModelsErrorSchema = z.object({
+	error: z.string(),
+});
+
+const allModelsResponseSchema = z.record(
+	z.string(),
+	z.object({
+		label: z.string(),
+		authType: z.string().optional(),
+		models: z.array(modelSchema),
+	}),
+);
+
 export function registerModelsRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -14,86 +61,27 @@ export function registerModelsRoutes(app: Hono) {
 			tags: ['config'],
 			operationId: 'getProviderModels',
 			summary: 'Get available models for a provider',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						$ref: '#/components/schemas/Provider',
-					},
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+				params: providerModelsParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									models: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/Model',
-										},
-									},
-									default: {
-										type: 'string',
-										nullable: true,
-									},
-									allowAnyModel: {
-										type: 'boolean',
-									},
-									label: {
-										type: 'string',
-									},
-								},
-								required: ['models', 'allowAnyModel', 'label'],
-							},
-						},
+						'application/json': { schema: providerModelsResponseSchema },
 					},
 				},
 				'403': {
 					description: 'Provider not authorized',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerModelsErrorSchema },
 					},
 				},
 				'404': {
 					description: 'Provider not found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerModelsErrorSchema },
 					},
 				},
 			},
@@ -101,7 +89,7 @@ export function registerModelsRoutes(app: Hono) {
 		handleGetProviderModels,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -109,66 +97,14 @@ export function registerModelsRoutes(app: Hono) {
 			tags: ['config'],
 			operationId: 'getAllModels',
 			summary: 'Get all models across authorized providers',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								additionalProperties: {
-									type: 'object',
-									properties: {
-										label: {
-											type: 'string',
-										},
-										authType: {
-											type: 'string',
-										},
-										models: {
-											type: 'array',
-											items: {
-												type: 'object',
-												properties: {
-													id: {
-														type: 'string',
-													},
-													label: {
-														type: 'string',
-													},
-													toolCall: {
-														type: 'boolean',
-													},
-													reasoningText: {
-														type: 'boolean',
-													},
-													vision: {
-														type: 'boolean',
-													},
-													attachment: {
-														type: 'boolean',
-													},
-												},
-												required: ['id', 'label'],
-											},
-										},
-									},
-									required: ['label', 'models'],
-								},
-							},
-						},
+						'application/json': { schema: allModelsResponseSchema },
 					},
 				},
 			},

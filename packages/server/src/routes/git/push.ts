@@ -1,14 +1,33 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitPushSchema } from './schemas.ts';
-import { validateAndGetGitRoot, getCurrentBranch } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+import { getCurrentBranch, validateAndGetGitRoot } from './utils.ts';
 
 const execFileAsync = promisify(execFile);
 
+const gitProjectBodySchema = z.object({
+	project: z.string().optional(),
+});
+
+const gitOutputResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		output: z.string(),
+	}),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+	details: z.string().optional(),
+});
+
 export function registerPushRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -17,18 +36,11 @@ export function registerPushRoute(app: Hono) {
 			operationId: 'pushCommits',
 			summary: 'Push commits to remote',
 			description: 'Pushes local commits to the configured remote repository',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: gitProjectBodySchema },
 					},
 				},
 			},
@@ -36,73 +48,19 @@ export function registerPushRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											output: {
-												type: 'string',
-											},
-										},
-										required: ['output'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitOutputResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

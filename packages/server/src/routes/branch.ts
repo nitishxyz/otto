@@ -1,17 +1,56 @@
-import type { Hono } from 'hono';
-import { loadConfig } from '@ottocode/sdk';
+import { z } from '@hono/zod-openapi';
 import { getDb } from '@ottocode/database';
-import { hasConfiguredProvider, logger } from '@ottocode/sdk';
+import { hasConfiguredProvider, loadConfig, logger } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../openapi/route.ts';
+import { serializeError } from '../runtime/errors/api-error.ts';
 import {
 	createBranch,
-	listBranches,
 	getParentSession,
+	listBranches,
 } from '../runtime/session/branch.ts';
-import { serializeError } from '../runtime/errors/api-error.ts';
-import { openApiRoute } from '../openapi/route.ts';
+
+const sessionSchema = z.any();
+
+const sessionIdParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+});
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const createBranchBodySchema = z.object({
+	fromMessageId: z.string(),
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	agent: z.string().optional(),
+	title: z.string().optional(),
+});
+
+const branchErrorSchema = z.object({
+	error: z.string(),
+});
+
+const listBranchesResponseSchema = z.object({
+	branches: z.array(sessionSchema),
+});
+
+const getParentSessionResponseSchema = z.object({
+	parent: sessionSchema.nullable(),
+});
 
 export function registerBranchRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -19,51 +58,13 @@ export function registerBranchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'createBranch',
 			summary: 'Create a branch from a session message',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								fromMessageId: {
-									type: 'string',
-								},
-								provider: {
-									type: 'string',
-								},
-								model: {
-									type: 'string',
-								},
-								agent: {
-									type: 'string',
-								},
-								title: {
-									type: 'string',
-								},
-							},
-							required: ['fromMessageId'],
-						},
+					content: {
+						'application/json': { schema: createBranchBodySchema },
 					},
 				},
 			},
@@ -71,27 +72,13 @@ export function registerBranchRoutes(app: Hono) {
 				'201': {
 					description: 'Created',
 					content: {
-						'application/json': {
-							schema: {
-								$ref: '#/components/schemas/Session',
-							},
-						},
+						'application/json': { schema: sessionSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: branchErrorSchema },
 					},
 				},
 			},
@@ -154,7 +141,7 @@ export function registerBranchRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -162,44 +149,15 @@ export function registerBranchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'listBranches',
 			summary: 'List branches of a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									branches: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/Session',
-										},
-									},
-								},
-								required: ['branches'],
-							},
-						},
+						'application/json': { schema: listBranchesResponseSchema },
 					},
 				},
 			},
@@ -222,7 +180,7 @@ export function registerBranchRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -230,46 +188,15 @@ export function registerBranchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'getParentSession',
 			summary: 'Get parent session of a branch',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									parent: {
-										nullable: true,
-										allOf: [
-											{
-												$ref: '#/components/schemas/Session',
-											},
-										],
-									},
-								},
-								required: ['parent'],
-							},
-						},
+						'application/json': { schema: getParentSessionResponseSchema },
 					},
 				},
 			},

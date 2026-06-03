@@ -1,11 +1,27 @@
+import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribeClientEvents } from '../events/bus.ts';
 import type { ClientEvent } from '../events/types.ts';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const STREAM_DESCRIPTION =
 	'SSE event stream. Events include notification, session.status, and heartbeat.';
+
+const clientEventsQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const clientEventsStreamSchema = z.string().openapi({
+	description: STREAM_DESCRIPTION,
+});
 
 function safeStringify(obj: unknown): string {
 	return JSON.stringify(obj, (_key, value) =>
@@ -64,7 +80,7 @@ function handleClientEventsStream(c: Context) {
 }
 
 export function registerClientEventsRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -74,25 +90,15 @@ export function registerClientEventsRoute(app: Hono) {
 			summary: 'Subscribe to global client event stream (SSE)',
 			description:
 				'App-level SSE stream for notifications and lightweight cross-session status updates.',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: clientEventsQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'text/event-stream',
 					content: {
 						'text/event-stream': {
-							schema: {
-								type: 'string',
-								description: STREAM_DESCRIPTION,
-							},
+							schema: clientEventsStreamSchema,
 						},
 					},
 				},
@@ -100,7 +106,7 @@ export function registerClientEventsRoute(app: Hono) {
 		},
 		handleClientEventsStream,
 	);
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -110,25 +116,15 @@ export function registerClientEventsRoute(app: Hono) {
 			summary: 'Subscribe to global client event stream (SSE) using POST',
 			description:
 				'Compatibility alias for app-level SSE over tunnels/proxies that do not support GET streams.',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: clientEventsQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'text/event-stream',
 					content: {
 						'text/event-stream': {
-							schema: {
-								type: 'string',
-								description: STREAM_DESCRIPTION,
-							},
+							schema: clientEventsStreamSchema,
 						},
 					},
 				},

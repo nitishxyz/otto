@@ -1,13 +1,29 @@
+import { z } from '@hono/zod-openapi';
+import { loadConfig, logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
-import { loadConfig } from '@ottocode/sdk';
 import type { EmbeddedAppConfig } from '../../index.ts';
-import { logger } from '@ottocode/sdk';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { discoverAllAgents, getDefault } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+
+const getAgentsQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const getAgentsResponseSchema = z.object({
+	agents: z.array(z.string()),
+	default: z.string(),
+});
 
 export function registerAgentsRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -15,38 +31,15 @@ export function registerAgentsRoute(app: Hono) {
 			tags: ['config'],
 			operationId: 'getAgents',
 			summary: 'Get available agents',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: getAgentsQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									agents: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									default: {
-										type: 'string',
-									},
-								},
-								required: ['agents', 'default'],
-							},
+							schema: getAgentsResponseSchema,
 						},
 					},
 				},

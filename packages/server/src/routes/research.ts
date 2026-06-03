@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	createResearchSession,
 	deleteResearchSession,
@@ -8,8 +9,54 @@ import {
 	listResearchSessions,
 } from './research/service.ts';
 
+const sessionSchema = z.any();
+
+const parentParamsSchema = z.object({
+	parentId: z.string().openapi({
+		param: { name: 'parentId', in: 'path' },
+	}),
+});
+
+const researchParamsSchema = z.object({
+	researchId: z.string().openapi({
+		param: { name: 'researchId', in: 'path' },
+	}),
+});
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const researchSessionBodySchema = z.object({
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	title: z.string().optional(),
+});
+
+const exportResearchBodySchema = z.object({
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	agent: z.string().optional(),
+});
+
+const injectResearchBodySchema = z.object({
+	researchSessionId: z.string(),
+	label: z.string().optional(),
+});
+
+const researchErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerResearchRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -17,60 +64,23 @@ export function registerResearchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'listResearchSessions',
 			summary: 'List research sessions for a parent',
-			parameters: [
-				{
-					in: 'path',
-					name: 'parentId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: parentParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									sessions: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/Session',
-										},
-									},
-								},
-								required: ['sessions'],
-							},
+							schema: z.object({ sessions: z.array(sessionSchema) }),
 						},
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 			},
@@ -78,7 +88,7 @@ export function registerResearchRoutes(app: Hono) {
 		listResearchSessions,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -86,44 +96,13 @@ export function registerResearchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'createResearchSession',
 			summary: 'Create a research session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'parentId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
+			request: {
+				params: parentParamsSchema,
+				query: projectQuerySchema,
+				body: {
 					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								provider: {
-									type: 'string',
-								},
-								model: {
-									type: 'string',
-								},
-								title: {
-									type: 'string',
-								},
-							},
-						},
+					content: {
+						'application/json': { schema: researchSessionBodySchema },
 					},
 				},
 			},
@@ -132,35 +111,17 @@ export function registerResearchRoutes(app: Hono) {
 					description: 'Created',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									session: {
-										$ref: '#/components/schemas/Session',
-									},
-									parentSessionId: {
-										type: 'string',
-									},
-								},
-								required: ['session', 'parentSessionId'],
-							},
+							schema: z.object({
+								session: sessionSchema,
+								parentSessionId: z.string(),
+							}),
 						},
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 			},
@@ -168,7 +129,7 @@ export function registerResearchRoutes(app: Hono) {
 		createResearchSession,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -176,73 +137,27 @@ export function registerResearchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'deleteResearchSession',
 			summary: 'Delete a research session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'researchId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: researchParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-								required: ['success'],
-							},
-						},
+						'application/json': { schema: z.object({ success: z.boolean() }) },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 			},
@@ -250,7 +165,7 @@ export function registerResearchRoutes(app: Hono) {
 		deleteResearchSession,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -258,42 +173,13 @@ export function registerResearchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'injectResearchContext',
 			summary: 'Inject research context into parent session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'parentId',
+			request: {
+				params: parentParamsSchema,
+				query: projectQuerySchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								researchSessionId: {
-									type: 'string',
-								},
-								label: {
-									type: 'string',
-								},
-							},
-							required: ['researchSessionId'],
-						},
+					content: {
+						'application/json': { schema: injectResearchBodySchema },
 					},
 				},
 			},
@@ -302,66 +188,26 @@ export function registerResearchRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									content: {
-										type: 'string',
-									},
-									label: {
-										type: 'string',
-									},
-									sessionId: {
-										type: 'string',
-									},
-									parentSessionId: {
-										type: 'string',
-									},
-									tokenEstimate: {
-										type: 'integer',
-									},
-								},
-								required: [
-									'content',
-									'label',
-									'sessionId',
-									'parentSessionId',
-									'tokenEstimate',
-								],
-							},
+							schema: z.object({
+								content: z.string(),
+								label: z.string(),
+								sessionId: z.string(),
+								parentSessionId: z.string(),
+								tokenEstimate: z.number().int(),
+							}),
 						},
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 			},
@@ -369,7 +215,7 @@ export function registerResearchRoutes(app: Hono) {
 		injectResearchContext,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -377,44 +223,13 @@ export function registerResearchRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'exportResearchSession',
 			summary: 'Export research session to a new main session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'researchId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
+			request: {
+				params: researchParamsSchema,
+				query: projectQuerySchema,
+				body: {
 					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								provider: {
-									type: 'string',
-								},
-								model: {
-									type: 'string',
-								},
-								agent: {
-									type: 'string',
-								},
-							},
-						},
+					content: {
+						'application/json': { schema: exportResearchBodySchema },
 					},
 				},
 			},
@@ -423,35 +238,17 @@ export function registerResearchRoutes(app: Hono) {
 					description: 'Created',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									newSession: {
-										$ref: '#/components/schemas/Session',
-									},
-									injectedContext: {
-										type: 'string',
-									},
-								},
-								required: ['newSession', 'injectedContext'],
-							},
+							schema: z.object({
+								newSession: sessionSchema,
+								injectedContext: z.string(),
+							}),
 						},
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: researchErrorSchema },
 					},
 				},
 			},

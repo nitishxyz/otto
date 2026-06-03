@@ -5,7 +5,8 @@ import {
 	type DragEvent,
 	type ClipboardEvent,
 } from 'react';
-import { getBaseUrl, extractErrorMessage } from '../lib/api-client/utils';
+import { uploadAttachment } from '@ottocode/api';
+import { extractErrorMessage } from '../lib/api-client/utils';
 
 export type FileAttachmentType = 'image' | 'pdf' | 'text' | 'binary';
 export type FileUploadStatus = 'uploading' | 'ready' | 'failed';
@@ -147,19 +148,16 @@ async function uploadOriginalFile(
 	file: File,
 	sessionId?: string,
 ): Promise<UploadedAttachment> {
-	const form = new FormData();
-	form.set('file', file);
-	if (sessionId) form.set('sessionId', sessionId);
-
-	const response = await fetch(`${getBaseUrl()}/v1/attachments`, {
-		method: 'POST',
-		body: form,
+	const response = await uploadAttachment({
+		body: {
+			file,
+			...(sessionId ? { sessionId } : {}),
+		},
 	});
-	const data = await response.json().catch(() => null);
-	if (!response.ok) {
-		throw new Error(extractErrorMessage(data));
+	if (response.error) {
+		throw new Error(extractErrorMessage(response.error));
 	}
-	return data as UploadedAttachment;
+	return response.data as UploadedAttachment;
 }
 
 interface UseFileUploadOptions {

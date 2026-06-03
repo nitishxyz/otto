@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	getSimulatorLogs,
 	getSimulatorStatus,
@@ -11,33 +12,92 @@ import {
 	stopSimulator,
 } from './simulator/service.ts';
 
-const simulatorStateSchema = {
-	type: 'object',
-	properties: {
-		status: {
-			type: 'string',
-			enum: ['idle', 'starting', 'connected', 'error'],
-		},
-		url: { type: 'string', nullable: true },
-		deviceName: { type: 'string', nullable: true },
-		udid: { type: 'string', nullable: true },
-		port: { type: 'integer' },
-		error: { type: 'string', nullable: true },
-		updatedAt: { type: 'string' },
-	},
-	required: [
-		'status',
-		'url',
-		'deviceName',
-		'udid',
-		'port',
-		'error',
-		'updatedAt',
-	],
-} as const;
+const simulatorStateSchema = z.object({
+	status: z.enum(['idle', 'starting', 'connected', 'error']),
+	url: z.string().nullable(),
+	deviceName: z.string().nullable(),
+	udid: z.string().nullable(),
+	port: z.number().int(),
+	error: z.string().nullable(),
+	updatedAt: z.string(),
+});
+
+const simulatorCommandBaseSchema = z.object({
+	ok: z.boolean(),
+	stdout: z.string().optional(),
+	stderr: z.string().optional(),
+	error: z.string().optional(),
+});
+
+const startSimulatorBodySchema = z.object({
+	port: z.number().int().optional(),
+	device: z.string().optional(),
+});
+
+const startSimulatorResponseSchema = simulatorCommandBaseSchema.merge(
+	simulatorStateSchema.partial(),
+);
+
+const stopSimulatorBodySchema = z.object({
+	device: z.string().optional(),
+});
+
+const listSimulatorsResponseSchema = z
+	.object({
+		ok: z.literal(true),
+		state: simulatorStateSchema,
+		raw: z.string(),
+	})
+	.or(
+		z.object({
+			ok: z.literal(false),
+			error: z.string(),
+			stdout: z.string(),
+			stderr: z.string(),
+		}),
+	);
+
+const buttonBodySchema = z.object({
+	name: z.string().optional(),
+	device: z.string().optional(),
+});
+
+const buttonResponseSchema = simulatorCommandBaseSchema.extend({
+	button: z.string(),
+});
+
+const gestureBodySchema = z.object({
+	gesture: z.unknown(),
+	device: z.string().optional(),
+});
+
+const gestureResponseSchema = simulatorCommandBaseSchema.extend({
+	gesture: z.unknown(),
+});
+
+const rotateBodySchema = z.object({
+	orientation: z.enum([
+		'portrait',
+		'portrait_upside_down',
+		'landscape_left',
+		'landscape_right',
+	]),
+	device: z.string().optional(),
+});
+
+const rotateResponseSchema = simulatorCommandBaseSchema.extend({
+	orientation: z.string(),
+});
+
+const simulatorLogsResponseSchema = z.object({
+	ok: z.boolean(),
+	logs: z.string().optional(),
+	url: z.string().optional(),
+	error: z.string().optional(),
+});
 
 export function registerSimulatorRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -57,7 +117,7 @@ export function registerSimulatorRoutes(app: Hono) {
 		(c) => c.json(getSimulatorStatus()),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -66,13 +126,18 @@ export function registerSimulatorRoutes(app: Hono) {
 			operationId: 'listSimulators',
 			summary: 'List running serve-sim streams',
 			responses: {
-				'200': { description: 'Running serve-sim streams' },
+				'200': {
+					description: 'Running serve-sim streams',
+					content: {
+						'application/json': { schema: listSimulatorsResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => c.json(await listSimulators()),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -80,35 +145,39 @@ export function registerSimulatorRoutes(app: Hono) {
 			tags: ['simulator'],
 			operationId: 'startSimulator',
 			summary: 'Start serve-sim',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								port: { type: 'integer' },
-								device: { type: 'string' },
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: startSimulatorBodySchema },
 					},
 				},
 			},
 			responses: {
-				'200': { description: 'serve-sim started' },
-				'500': { description: 'serve-sim failed to start' },
+				'200': {
+					description: 'serve-sim started',
+					content: {
+						'application/json': { schema: startSimulatorResponseSchema },
+					},
+				},
+				'500': {
+					description: 'serve-sim failed to start',
+					content: {
+						'application/json': { schema: startSimulatorResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
 			const body = await c.req
-				.json<{ port?: number; device?: string }>()
+				.json<z.infer<typeof startSimulatorBodySchema>>()
 				.catch(() => ({}));
 			const result = await startSimulator(body);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -116,32 +185,39 @@ export function registerSimulatorRoutes(app: Hono) {
 			tags: ['simulator'],
 			operationId: 'stopSimulator',
 			summary: 'Stop serve-sim',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: { device: { type: 'string' } },
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: stopSimulatorBodySchema },
 					},
 				},
 			},
 			responses: {
-				'200': { description: 'serve-sim stopped' },
-				'500': { description: 'serve-sim failed to stop' },
+				'200': {
+					description: 'serve-sim stopped',
+					content: {
+						'application/json': { schema: startSimulatorResponseSchema },
+					},
+				},
+				'500': {
+					description: 'serve-sim failed to stop',
+					content: {
+						'application/json': { schema: startSimulatorResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
-			const body: { device?: string } = await c.req
-				.json<{ device?: string }>()
+			const body: z.infer<typeof stopSimulatorBodySchema> = await c.req
+				.json<z.infer<typeof stopSimulatorBodySchema>>()
 				.catch(() => ({}));
 			const result = await stopSimulator(body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -149,35 +225,39 @@ export function registerSimulatorRoutes(app: Hono) {
 			tags: ['simulator'],
 			operationId: 'pressSimulatorButton',
 			summary: 'Send a simulator button press',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								name: { type: 'string' },
-								device: { type: 'string' },
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: buttonBodySchema },
 					},
 				},
 			},
 			responses: {
-				'200': { description: 'Button sent' },
-				'500': { description: 'Button failed' },
+				'200': {
+					description: 'Button sent',
+					content: {
+						'application/json': { schema: buttonResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Button failed',
+					content: {
+						'application/json': { schema: buttonResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
-			const body: { name?: string; device?: string } = await c.req
-				.json<{ name?: string; device?: string }>()
+			const body: z.infer<typeof buttonBodySchema> = await c.req
+				.json<z.infer<typeof buttonBodySchema>>()
 				.catch(() => ({}));
 			const result = await sendSimulatorButton(body.name, body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -185,34 +265,37 @@ export function registerSimulatorRoutes(app: Hono) {
 			tags: ['simulator'],
 			operationId: 'sendSimulatorGesture',
 			summary: 'Send a simulator touch gesture',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								gesture: {},
-								device: { type: 'string' },
-							},
-							required: ['gesture'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gestureBodySchema },
 					},
 				},
 			},
 			responses: {
-				'200': { description: 'Gesture sent' },
-				'500': { description: 'Gesture failed' },
+				'200': {
+					description: 'Gesture sent',
+					content: {
+						'application/json': { schema: gestureResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Gesture failed',
+					content: {
+						'application/json': { schema: gestureResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
-			const body = await c.req.json<{ gesture?: unknown; device?: string }>();
+			const body = await c.req.json<z.infer<typeof gestureBodySchema>>();
 			const result = await sendSimulatorGesture(body.gesture, body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -220,42 +303,37 @@ export function registerSimulatorRoutes(app: Hono) {
 			tags: ['simulator'],
 			operationId: 'rotateSimulator',
 			summary: 'Rotate simulator orientation',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								orientation: {
-									type: 'string',
-									enum: [
-										'portrait',
-										'portrait_upside_down',
-										'landscape_left',
-										'landscape_right',
-									],
-								},
-								device: { type: 'string' },
-							},
-							required: ['orientation'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: rotateBodySchema },
 					},
 				},
 			},
 			responses: {
-				'200': { description: 'Rotation sent' },
-				'500': { description: 'Rotation failed' },
+				'200': {
+					description: 'Rotation sent',
+					content: {
+						'application/json': { schema: rotateResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Rotation failed',
+					content: {
+						'application/json': { schema: rotateResponseSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
-			const body = await c.req.json<{ orientation: string; device?: string }>();
+			const body = await c.req.json<z.infer<typeof rotateBodySchema>>();
 			const result = await rotateSimulator(body.orientation, body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -264,8 +342,18 @@ export function registerSimulatorRoutes(app: Hono) {
 			operationId: 'getSimulatorLogs',
 			summary: 'Get serve-sim logs',
 			responses: {
-				'200': { description: 'Simulator logs' },
-				'400': { description: 'No active simulator' },
+				'200': {
+					description: 'Simulator logs',
+					content: {
+						'application/json': { schema: simulatorLogsResponseSchema },
+					},
+				},
+				'400': {
+					description: 'No active simulator',
+					content: {
+						'application/json': { schema: simulatorLogsResponseSchema },
+					},
+				},
 			},
 		},
 		getSimulatorLogs,

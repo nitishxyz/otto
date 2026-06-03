@@ -1,9 +1,44 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { addMCPServer, listMCPServers, removeMCPServer } from './service.ts';
 
+const mcpServerSchema = z.any().openapi('MCPServer');
+
+const listMCPServersResponseSchema = z.object({
+	servers: z.array(mcpServerSchema),
+});
+
+const addMCPServerBodySchema = z.object({
+	name: z.string(),
+	transport: z.enum(['stdio', 'http', 'sse']).optional().default('stdio'),
+	command: z.string().optional(),
+	args: z.array(z.string()).optional(),
+	env: z.record(z.string(), z.string()).optional(),
+	url: z.string().optional(),
+	headers: z.record(z.string(), z.string()).optional(),
+	oauth: z.record(z.string(), z.unknown()).optional(),
+	scope: z.enum(['global', 'project']).optional().default('global'),
+});
+
+const mcpServerActionResponseSchema = z.object({
+	ok: z.boolean(),
+	error: z.string().optional(),
+});
+
+const mcpServerErrorSchema = z.object({
+	error: z.string(),
+});
+
+const mcpServerNameParamsSchema = z.object({
+	name: z.string().openapi({
+		param: { name: 'name', in: 'path' },
+		description: 'MCP server name',
+	}),
+});
+
 export function registerMCPServerConfigRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -15,20 +50,7 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									servers: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/MCPServer',
-										},
-									},
-								},
-								required: ['servers'],
-							},
-						},
+						'application/json': { schema: listMCPServersResponseSchema },
 					},
 				},
 			},
@@ -38,7 +60,7 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -46,56 +68,11 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 			tags: ['mcp'],
 			operationId: 'addMCPServer',
 			summary: 'Add a new MCP server',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								name: {
-									type: 'string',
-								},
-								transport: {
-									type: 'string',
-									enum: ['stdio', 'http', 'sse'],
-									default: 'stdio',
-								},
-								command: {
-									type: 'string',
-								},
-								args: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-								env: {
-									type: 'object',
-									additionalProperties: {
-										type: 'string',
-									},
-								},
-								url: {
-									type: 'string',
-								},
-								headers: {
-									type: 'object',
-									additionalProperties: {
-										type: 'string',
-									},
-								},
-								oauth: {
-									type: 'object',
-								},
-								scope: {
-									type: 'string',
-									enum: ['global', 'project'],
-									default: 'global',
-								},
-							},
-							required: ['name'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: addMCPServerBodySchema },
 					},
 				},
 			},
@@ -103,36 +80,13 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: mcpServerActionResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: mcpServerErrorSchema },
 					},
 				},
 			},
@@ -145,7 +99,7 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -153,51 +107,20 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 			tags: ['mcp'],
 			operationId: 'removeMCPServer',
 			summary: 'Remove an MCP server',
-			parameters: [
-				{
-					in: 'path',
-					name: 'name',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'MCP server name',
-				},
-			],
+			request: {
+				params: mcpServerNameParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: mcpServerActionResponseSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: mcpServerErrorSchema },
 					},
 				},
 			},

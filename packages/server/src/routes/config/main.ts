@@ -1,7 +1,8 @@
+import { z } from '@hono/zod-openapi';
+import { loadConfig, logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
-import { loadConfig } from '@ottocode/sdk';
 import type { EmbeddedAppConfig } from '../../index.ts';
-import { logger } from '@ottocode/sdk';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	discoverAllAgents,
@@ -9,10 +10,64 @@ import {
 	getDefault,
 	getProviderDetails,
 } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const providerDetailSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	source: z.enum(['built-in', 'custom']),
+	enabled: z.boolean(),
+	authorized: z.boolean(),
+	custom: z.boolean().optional(),
+	compatibility: z.string().nullable().optional(),
+	family: z.string().nullable().optional(),
+	baseURL: z.string().nullable().optional(),
+	apiKeyEnv: z.string().nullable().optional(),
+	hasApiKey: z.boolean().optional(),
+	allowAnyModel: z.boolean().optional(),
+	modelCount: z.number().int().optional(),
+	authType: z.string().nullable().optional(),
+});
+
+const configDefaultsSchema = z.object({
+	agent: z.string(),
+	provider: z.string(),
+	model: z.string(),
+	toolApproval: z.enum(['auto', 'dangerous', 'all', 'yolo']).optional(),
+	guidedMode: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	reasoningLevel: z
+		.enum(['minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
+		.optional(),
+	theme: z.enum(['light', 'dark']).optional(),
+	vimMode: z.boolean().optional(),
+	compactThread: z.boolean().optional(),
+	fontFamily: z.string().optional(),
+	smartEdges: z.boolean().optional(),
+	releaseToSend: z.boolean().optional(),
+	fullWidthContent: z.boolean().optional(),
+	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+});
+
+const configResponseSchema = z.object({
+	agents: z.array(z.string()),
+	providers: z.array(z.string()),
+	providerDetails: z.array(providerDetailSchema),
+	defaults: configDefaultsSchema,
+});
 
 export function registerMainConfigRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -21,27 +76,14 @@ export function registerMainConfigRoute(app: Hono) {
 			operationId: 'getConfig',
 			summary: 'Get full configuration',
 			description: 'Returns agents, authorized providers, models, and defaults',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								$ref: '#/components/schemas/Config',
-							},
-						},
+						'application/json': { schema: configResponseSchema },
 					},
 				},
 			},

@@ -1,14 +1,15 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
 	authorizeCopilot,
 	getAuth,
+	logger,
 	pollForCopilotTokenOnce,
 	readEnvKey,
 	setAuth,
 } from '@ottocode/sdk';
 import { execFileSync } from 'node:child_process';
-import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	detectOAuthOrgRestriction,
 	fetchCopilotModels,
@@ -16,8 +17,68 @@ import {
 } from './service.ts';
 import { copilotDeviceSessions } from './state.ts';
 
+const errorResponseSchema = z.object({ error: z.string() });
+
+const copilotStartResponseSchema = z.object({
+	sessionId: z.string(),
+	userCode: z.string(),
+	verificationUri: z.string(),
+	interval: z.number().int(),
+});
+
+const copilotPollBodySchema = z.object({
+	sessionId: z.string(),
+});
+
+const copilotPollResponseSchema = z.object({
+	status: z.enum(['complete', 'pending', 'error']),
+	error: z.string().optional(),
+});
+
+const ghImportCapabilitySchema = z.object({
+	available: z.boolean(),
+	authenticated: z.boolean(),
+	reason: z.string().optional(),
+});
+
+const copilotMethodsSchema = z.object({
+	oauth: z.boolean(),
+	token: z.boolean(),
+	ghImport: ghImportCapabilitySchema,
+});
+
+const copilotTokenBodySchema = z.object({
+	token: z.string(),
+});
+
+const copilotSaveResponseSchema = z.object({
+	success: z.boolean(),
+	provider: z.string(),
+	source: z.enum(['token', 'gh']),
+	modelCount: z.number().int(),
+	hasGpt52Codex: z.boolean(),
+	sampleModels: z.array(z.string()),
+});
+
+const copilotDiagnosticsSchema = z.object({
+	tokenSources: z.array(
+		z.object({
+			source: z.enum(['env', 'stored']),
+			configured: z.boolean(),
+			modelCount: z.number().int().optional(),
+			hasGpt52Codex: z.boolean().optional(),
+			sampleModels: z.array(z.string()).optional(),
+			restrictedByOrgPolicy: z.boolean().optional(),
+			restrictedOrg: z.string().optional(),
+			restrictionMessage: z.string().optional(),
+			error: z.string().optional(),
+		}),
+	),
+	methods: copilotMethodsSchema,
+});
+
 export function registerAuthCopilotRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -29,31 +90,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									sessionId: {
-										type: 'string',
-									},
-									userCode: {
-										type: 'string',
-									},
-									verificationUri: {
-										type: 'string',
-									},
-									interval: {
-										type: 'integer',
-									},
-								},
-								required: [
-									'sessionId',
-									'userCode',
-									'verificationUri',
-									'interval',
-								],
-							},
-						},
+						'application/json': { schema: copilotStartResponseSchema },
 					},
 				},
 			},
@@ -85,7 +122,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -93,19 +130,11 @@ export function registerAuthCopilotRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'pollCopilotDeviceFlow',
 			summary: 'Poll Copilot device flow for completion',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								sessionId: {
-									type: 'string',
-								},
-							},
-							required: ['sessionId'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: copilotPollBodySchema },
 					},
 				},
 			},
@@ -113,38 +142,12 @@ export function registerAuthCopilotRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['complete', 'pending', 'error'],
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['status'],
-							},
-						},
+						'application/json': { schema: copilotPollResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -190,7 +193,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -201,37 +204,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									oauth: {
-										type: 'boolean',
-									},
-									token: {
-										type: 'boolean',
-									},
-									ghImport: {
-										type: 'object',
-										properties: {
-											available: {
-												type: 'boolean',
-											},
-											authenticated: {
-												type: 'boolean',
-											},
-											reason: {
-												type: 'string',
-											},
-										},
-										required: ['available', 'authenticated'],
-									},
-								},
-								required: ['oauth', 'token', 'ghImport'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: copilotMethodsSchema } },
 				},
 			},
 		},
@@ -245,7 +218,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -253,19 +226,11 @@ export function registerAuthCopilotRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'saveCopilotToken',
 			summary: 'Save Copilot token after validating model access',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								token: {
-									type: 'string',
-								},
-							},
-							required: ['token'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: copilotTokenBodySchema },
 					},
 				},
 			},
@@ -273,60 +238,12 @@ export function registerAuthCopilotRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										type: 'string',
-									},
-									source: {
-										type: 'string',
-										enum: ['token'],
-									},
-									modelCount: {
-										type: 'integer',
-									},
-									hasGpt52Codex: {
-										type: 'boolean',
-									},
-									sampleModels: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-								},
-								required: [
-									'success',
-									'provider',
-									'source',
-									'modelCount',
-									'hasGpt52Codex',
-									'sampleModels',
-								],
-							},
-						},
+						'application/json': { schema: copilotSaveResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -380,7 +297,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -392,60 +309,12 @@ export function registerAuthCopilotRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										type: 'string',
-									},
-									source: {
-										type: 'string',
-										enum: ['gh'],
-									},
-									modelCount: {
-										type: 'integer',
-									},
-									hasGpt52Codex: {
-										type: 'boolean',
-									},
-									sampleModels: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-								},
-								required: [
-									'success',
-									'provider',
-									'source',
-									'modelCount',
-									'hasGpt52Codex',
-									'sampleModels',
-								],
-							},
-						},
+						'application/json': { schema: copilotSaveResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -519,7 +388,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -530,83 +399,7 @@ export function registerAuthCopilotRoutes(app: Hono) {
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									tokenSources: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												source: {
-													type: 'string',
-													enum: ['env', 'stored'],
-												},
-												configured: {
-													type: 'boolean',
-												},
-												modelCount: {
-													type: 'integer',
-												},
-												hasGpt52Codex: {
-													type: 'boolean',
-												},
-												sampleModels: {
-													type: 'array',
-													items: {
-														type: 'string',
-													},
-												},
-												restrictedByOrgPolicy: {
-													type: 'boolean',
-												},
-												restrictedOrg: {
-													type: 'string',
-												},
-												restrictionMessage: {
-													type: 'string',
-												},
-												error: {
-													type: 'string',
-												},
-											},
-											required: ['source', 'configured'],
-										},
-									},
-									methods: {
-										type: 'object',
-										properties: {
-											oauth: {
-												type: 'boolean',
-											},
-											token: {
-												type: 'boolean',
-											},
-											ghImport: {
-												type: 'object',
-												properties: {
-													available: {
-														type: 'boolean',
-													},
-													authenticated: {
-														type: 'boolean',
-													},
-													reason: {
-														type: 'string',
-													},
-												},
-												required: ['available', 'authenticated'],
-											},
-										},
-										required: ['oauth', 'token', 'ghImport'],
-									},
-								},
-								required: ['tokenSources', 'methods'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: copilotDiagnosticsSchema } },
 				},
 			},
 		},

@@ -1,9 +1,16 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { getServerInfo } from '../state.ts';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
+
+const rootResponseSchema = z.string();
+
+const serverInfoSchema = z.object({
+	port: z.number().nullable(),
+});
 
 export function registerRootRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -16,7 +23,7 @@ export function registerRootRoutes(app: Hono) {
 					description: 'Server is running',
 					content: {
 						'text/plain': {
-							schema: { type: 'string' },
+							schema: rootResponseSchema,
 						},
 					},
 				},
@@ -25,7 +32,7 @@ export function registerRootRoutes(app: Hono) {
 		(c) => c.text('otto server running'),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -38,10 +45,7 @@ export function registerRootRoutes(app: Hono) {
 					description: 'Server runtime metadata',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								additionalProperties: true,
-							},
+							schema: serverInfoSchema,
 						},
 					},
 				},

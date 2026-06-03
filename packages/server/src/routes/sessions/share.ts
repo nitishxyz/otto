@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	createShare,
 	deleteShare,
@@ -9,8 +10,75 @@ import {
 	syncShare,
 } from './service.ts';
 
+const sessionIdParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+});
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const shareStatusSchema = z.object({
+	shared: z.boolean(),
+	shareId: z.string().optional(),
+	url: z.string().optional(),
+	title: z.string().nullable().optional(),
+	createdAt: z.number().int().optional(),
+	lastSyncedAt: z.number().int().optional(),
+	lastSyncedMessageId: z.string().optional(),
+	syncedMessages: z.number().int().optional(),
+	totalMessages: z.number().int().optional(),
+	pendingMessages: z.number().int().optional(),
+	isSynced: z.boolean().optional(),
+});
+
+const shareCreateResponseSchema = z.object({
+	shared: z.boolean(),
+	shareId: z.string().optional(),
+	url: z.string().optional(),
+	message: z.string().optional(),
+});
+
+const shareSyncResponseSchema = z.object({
+	synced: z.boolean(),
+	url: z.string().optional(),
+	newMessages: z.number().int().optional(),
+	message: z.string().optional(),
+});
+
+const shareDeleteResponseSchema = z.object({
+	deleted: z.boolean(),
+	sessionId: z.string(),
+});
+
+const shareListItemSchema = z.object({
+	sessionId: z.string(),
+	shareId: z.string(),
+	url: z.string(),
+	title: z.string().nullable().optional(),
+	createdAt: z.number().int(),
+	lastSyncedAt: z.number().int(),
+});
+
+const listSharesResponseSchema = z.object({
+	shares: z.array(shareListItemSchema),
+});
+
+const shareErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionShareRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -18,72 +86,15 @@ export function registerSessionShareRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'getShareStatus',
 			summary: 'Get share status for a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									shared: {
-										type: 'boolean',
-									},
-									shareId: {
-										type: 'string',
-									},
-									url: {
-										type: 'string',
-									},
-									title: {
-										type: 'string',
-										nullable: true,
-									},
-									createdAt: {
-										type: 'integer',
-									},
-									lastSyncedAt: {
-										type: 'integer',
-									},
-									lastSyncedMessageId: {
-										type: 'string',
-									},
-									syncedMessages: {
-										type: 'integer',
-									},
-									totalMessages: {
-										type: 'integer',
-									},
-									pendingMessages: {
-										type: 'integer',
-									},
-									isSynced: {
-										type: 'boolean',
-									},
-								},
-								required: ['shared'],
-							},
-						},
+						'application/json': { schema: shareStatusSchema },
 					},
 				},
 			},
@@ -96,7 +107,7 @@ export function registerSessionShareRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -104,82 +115,27 @@ export function registerSessionShareRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'shareSession',
 			summary: 'Share a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									shared: {
-										type: 'boolean',
-									},
-									shareId: {
-										type: 'string',
-									},
-									url: {
-										type: 'string',
-									},
-									message: {
-										type: 'string',
-									},
-								},
-								required: ['shared'],
-							},
-						},
+						'application/json': { schema: shareCreateResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: shareErrorSchema },
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: shareErrorSchema },
 					},
 				},
 			},
@@ -195,7 +151,7 @@ export function registerSessionShareRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'put',
@@ -203,66 +159,21 @@ export function registerSessionShareRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'syncShare',
 			summary: 'Sync shared session with new messages',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									synced: {
-										type: 'boolean',
-									},
-									url: {
-										type: 'string',
-									},
-									newMessages: {
-										type: 'integer',
-									},
-									message: {
-										type: 'string',
-									},
-								},
-								required: ['synced'],
-							},
-						},
+						'application/json': { schema: shareSyncResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: shareErrorSchema },
 					},
 				},
 			},
@@ -278,7 +189,7 @@ export function registerSessionShareRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -286,60 +197,21 @@ export function registerSessionShareRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'deleteShare',
 			summary: 'Delete a shared session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									deleted: {
-										type: 'boolean',
-									},
-									sessionId: {
-										type: 'string',
-									},
-								},
-								required: ['deleted', 'sessionId'],
-							},
-						},
+						'application/json': { schema: shareDeleteResponseSchema },
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: shareErrorSchema },
 					},
 				},
 			},
@@ -355,7 +227,7 @@ export function registerSessionShareRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -363,64 +235,14 @@ export function registerSessionShareRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'listShares',
 			summary: 'List all shared sessions for a project',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									shares: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												sessionId: {
-													type: 'string',
-												},
-												shareId: {
-													type: 'string',
-												},
-												url: {
-													type: 'string',
-												},
-												title: {
-													type: 'string',
-													nullable: true,
-												},
-												createdAt: {
-													type: 'integer',
-												},
-												lastSyncedAt: {
-													type: 'integer',
-												},
-											},
-											required: [
-												'sessionId',
-												'shareId',
-												'url',
-												'createdAt',
-												'lastSyncedAt',
-											],
-										},
-									},
-								},
-								required: ['shares'],
-							},
-						},
+						'application/json': { schema: listSharesResponseSchema },
 					},
 				},
 			},

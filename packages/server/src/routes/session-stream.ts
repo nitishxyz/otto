@@ -1,8 +1,33 @@
+import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribe } from '../events/bus.ts';
 import type { OttoEvent } from '../events/types.ts';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
+
+const STREAM_DESCRIPTION =
+	'SSE event stream. Events include session.created, message.created, message.part.delta, tool.call, tool.delta, tool.result, message.completed, error.';
+
+const sessionStreamParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+});
+
+const sessionStreamQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const sessionStreamResponseSchema = z.string().openapi({
+	description: STREAM_DESCRIPTION,
+});
 
 function safeStringify(obj: unknown): string {
 	return JSON.stringify(obj, (_key, value) =>
@@ -58,7 +83,7 @@ function handleSessionStream(c: Context) {
 }
 
 export function registerSessionStreamRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -66,36 +91,16 @@ export function registerSessionStreamRoute(app: Hono) {
 			tags: ['stream'],
 			operationId: 'subscribeSessionStream',
 			summary: 'Subscribe to session event stream (SSE)',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'id',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: sessionStreamParamsSchema,
+				query: sessionStreamQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'text/event-stream',
 					content: {
 						'text/event-stream': {
-							schema: {
-								type: 'string',
-								description:
-									'SSE event stream. Events include session.created, message.created, message.part.delta, tool.call, tool.delta, tool.result, message.completed, error.',
-							},
+							schema: sessionStreamResponseSchema,
 						},
 					},
 				},
@@ -103,7 +108,7 @@ export function registerSessionStreamRoute(app: Hono) {
 		},
 		handleSessionStream,
 	);
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -111,28 +116,16 @@ export function registerSessionStreamRoute(app: Hono) {
 			tags: ['stream'],
 			operationId: 'subscribeSessionStreamPost',
 			summary: 'Subscribe to session event stream (SSE) using POST',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'id',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: {
+				params: sessionStreamParamsSchema,
+				query: sessionStreamQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'text/event-stream',
 					content: {
 						'text/event-stream': {
-							schema: { type: 'string' },
+							schema: sessionStreamResponseSchema,
 						},
 					},
 				},

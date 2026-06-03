@@ -1,16 +1,42 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
 	ensureOttoRouterWallet,
 	getOttoRouterWallet,
 	importWallet,
+	logger,
 	setAuth,
 } from '@ottocode/sdk';
-import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 
+const setupWalletResponseSchema = z.object({
+	success: z.boolean(),
+	publicKey: z.string(),
+	isNew: z.boolean(),
+});
+
+const importWalletBodySchema = z.object({
+	privateKey: z.string(),
+});
+
+const importWalletResponseSchema = z.object({
+	success: z.boolean(),
+	publicKey: z.string(),
+});
+
+const exportWalletResponseSchema = z.object({
+	success: z.boolean(),
+	publicKey: z.string(),
+	privateKey: z.string(),
+});
+
+const walletErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerAuthWalletRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -22,23 +48,7 @@ export function registerAuthWalletRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									publicKey: {
-										type: 'string',
-									},
-									isNew: {
-										type: 'boolean',
-									},
-								},
-								required: ['success', 'publicKey', 'isNew'],
-							},
-						},
+						'application/json': { schema: setupWalletResponseSchema },
 					},
 				},
 			},
@@ -62,7 +72,7 @@ export function registerAuthWalletRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -70,19 +80,11 @@ export function registerAuthWalletRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'importOttoRouterWallet',
 			summary: 'Import OttoRouter wallet from private key',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								privateKey: {
-									type: 'string',
-								},
-							},
-							required: ['privateKey'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: importWalletBodySchema },
 					},
 				},
 			},
@@ -90,43 +92,20 @@ export function registerAuthWalletRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									publicKey: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'publicKey'],
-							},
-						},
+						'application/json': { schema: importWalletResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: walletErrorSchema },
 					},
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const { privateKey } = await c.req.json<{ privateKey: string }>();
+				const { privateKey } = importWalletBodySchema.parse(await c.req.json());
 
 				if (!privateKey) {
 					return c.json({ error: 'Private key required' }, 400);
@@ -156,7 +135,7 @@ export function registerAuthWalletRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -168,39 +147,13 @@ export function registerAuthWalletRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									publicKey: {
-										type: 'string',
-									},
-									privateKey: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'publicKey', 'privateKey'],
-							},
-						},
+						'application/json': { schema: exportWalletResponseSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: walletErrorSchema },
 					},
 				},
 			},

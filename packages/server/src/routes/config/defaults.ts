@@ -1,17 +1,82 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
-	setConfig,
-	loadConfig,
 	hasConfiguredProvider,
+	loadConfig,
+	logger,
+	setConfig,
 	type ProviderId,
 	type ReasoningLevel,
 } from '@ottocode/sdk';
-import { logger } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const toolApprovalSchema = z.enum(['auto', 'dangerous', 'all', 'yolo']);
+const reasoningLevelSchema = z.enum([
+	'minimal',
+	'low',
+	'medium',
+	'high',
+	'max',
+	'xhigh',
+]);
+const themeSchema = z.enum(['light', 'dark']);
+
+const defaultsUpdateBodySchema = z.object({
+	agent: z.string().optional(),
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	toolApproval: toolApprovalSchema.optional(),
+	guidedMode: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	reasoningLevel: reasoningLevelSchema.optional(),
+	theme: themeSchema.optional(),
+	vimMode: z.boolean().optional(),
+	compactThread: z.boolean().optional(),
+	fontFamily: z.string().optional(),
+	smartEdges: z.boolean().optional(),
+	releaseToSend: z.boolean().optional(),
+	fullWidthContent: z.boolean().optional(),
+	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+	scope: z.enum(['global', 'local']).optional().default('local'),
+});
+
+const defaultsSchema = z.object({
+	agent: z.string(),
+	provider: z.string(),
+	model: z.string(),
+	toolApproval: toolApprovalSchema.optional(),
+	guidedMode: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	reasoningLevel: reasoningLevelSchema.optional(),
+	theme: themeSchema.optional(),
+	vimMode: z.boolean().optional(),
+	compactThread: z.boolean().optional(),
+	fontFamily: z.string().optional(),
+	smartEdges: z.boolean().optional(),
+	releaseToSend: z.boolean().optional(),
+	fullWidthContent: z.boolean().optional(),
+	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+});
+
+const updateDefaultsResponseSchema = z.object({
+	success: z.boolean(),
+	defaults: defaultsSchema,
+});
 
 export function registerDefaultsRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'patch',
@@ -20,74 +85,12 @@ export function registerDefaultsRoute(app: Hono) {
 			operationId: 'updateDefaults',
 			summary: 'Update default configuration',
 			description: 'Update the default agent, provider, and/or model',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								agent: {
-									type: 'string',
-								},
-								provider: {
-									type: 'string',
-								},
-								model: {
-									type: 'string',
-								},
-								theme: {
-									type: 'string',
-									enum: ['light', 'dark'],
-								},
-								vimMode: {
-									type: 'boolean',
-								},
-								compactThread: {
-									type: 'boolean',
-								},
-								fontFamily: {
-									type: 'string',
-								},
-								smartEdges: {
-									type: 'boolean',
-								},
-								releaseToSend: {
-									type: 'boolean',
-								},
-								fullWidthContent: {
-									type: 'boolean',
-								},
-								autoCompactThresholdTokens: {
-									type: 'integer',
-									nullable: true,
-								},
-								reasoningText: {
-									type: 'boolean',
-								},
-								reasoningLevel: {
-									type: 'string',
-									enum: ['minimal', 'low', 'medium', 'high', 'max', 'xhigh'],
-								},
-								scope: {
-									type: 'string',
-									enum: ['global', 'local'],
-									default: 'local',
-								},
-							},
-						},
+			request: {
+				query: projectQuerySchema,
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: defaultsUpdateBodySchema },
 					},
 				},
 			},
@@ -95,72 +98,7 @@ export function registerDefaultsRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									defaults: {
-										type: 'object',
-										properties: {
-											agent: {
-												type: 'string',
-											},
-											provider: {
-												type: 'string',
-											},
-											model: {
-												type: 'string',
-											},
-											theme: {
-												type: 'string',
-												enum: ['light', 'dark'],
-											},
-											vimMode: {
-												type: 'boolean',
-											},
-											compactThread: {
-												type: 'boolean',
-											},
-											fontFamily: {
-												type: 'string',
-											},
-											smartEdges: {
-												type: 'boolean',
-											},
-											releaseToSend: {
-												type: 'boolean',
-											},
-											fullWidthContent: {
-												type: 'boolean',
-											},
-											autoCompactThresholdTokens: {
-												type: 'integer',
-												nullable: true,
-											},
-											reasoningText: {
-												type: 'boolean',
-											},
-											reasoningLevel: {
-												type: 'string',
-												enum: [
-													'minimal',
-													'low',
-													'medium',
-													'high',
-													'max',
-													'xhigh',
-												],
-											},
-										},
-										required: ['agent', 'provider', 'model'],
-									},
-								},
-								required: ['success', 'defaults'],
-							},
-						},
+						'application/json': { schema: updateDefaultsResponseSchema },
 					},
 				},
 			},

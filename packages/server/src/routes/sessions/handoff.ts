@@ -1,6 +1,7 @@
+import { z } from '@hono/zod-openapi';
 import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { createHandoffSession } from '../../runtime/session/handoff.ts';
 import {
@@ -9,8 +10,39 @@ import {
 	normalizeSessionRow,
 } from './service.ts';
 
+const sessionSchema = z.any();
+
+const handoffParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+		description: 'Source session ID',
+	}),
+});
+
+const handoffQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const handoffResponseSchema = z.object({
+	session: sessionSchema,
+	sessionId: z.string(),
+	sourceSessionId: z.string(),
+	message: z.string(),
+});
+
+const handoffErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionHandoffRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -18,58 +50,21 @@ export function registerSessionHandoffRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'createSessionHandoff',
 			summary: 'Create a new session from current session context',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: { type: 'string' },
-					description: 'Source session ID',
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: handoffParamsSchema,
+				query: handoffQuerySchema,
+			},
 			responses: {
 				'201': {
 					description: 'Created',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									session: { $ref: '#/components/schemas/Session' },
-									sessionId: { type: 'string' },
-									sourceSessionId: { type: 'string' },
-									message: { type: 'string' },
-								},
-								required: [
-									'session',
-									'sessionId',
-									'sourceSessionId',
-									'message',
-								],
-							},
-						},
+						'application/json': { schema: handoffResponseSchema },
 					},
 				},
 				'404': {
 					description: 'Session not found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: { type: 'string' },
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: handoffErrorSchema },
 					},
 				},
 			},

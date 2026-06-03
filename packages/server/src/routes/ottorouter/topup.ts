@@ -1,7 +1,8 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import { logger } from '@ottocode/sdk';
+import type { Hono } from 'hono';
 import { publish } from '../../events/bus.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	getPendingTopup,
@@ -10,8 +11,48 @@ import {
 	type TopupMethod,
 } from '../../runtime/topup/manager.ts';
 
+const topupMethodSchema = z.enum(['crypto', 'fiat']);
+
+const selectTopupBodySchema = z.object({
+	sessionId: z.string(),
+	method: topupMethodSchema,
+});
+
+const cancelTopupBodySchema = z.object({
+	sessionId: z.string(),
+	reason: z.string().optional(),
+});
+
+const pendingTopupQuerySchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'query' },
+	}),
+});
+
+const selectTopupResponseSchema = z.object({
+	success: z.boolean(),
+	method: topupMethodSchema,
+});
+
+const successResponseSchema = z.object({
+	success: z.boolean(),
+});
+
+const pendingTopupResponseSchema = z.object({
+	hasPending: z.boolean(),
+	sessionId: z.string().optional(),
+	messageId: z.string().optional(),
+	amountUsd: z.number().optional(),
+	currentBalance: z.number().optional(),
+	createdAt: z.number().int().optional(),
+});
+
+const topupErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerOttoRouterTopupRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -19,23 +60,11 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'selectTopupMethod',
 			summary: 'Select topup method for pending request',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								sessionId: {
-									type: 'string',
-								},
-								method: {
-									type: 'string',
-									enum: ['crypto', 'fiat'],
-								},
-							},
-							required: ['sessionId', 'method'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: selectTopupBodySchema },
 					},
 				},
 			},
@@ -43,36 +72,13 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									method: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'method'],
-							},
-						},
+						'application/json': { schema: selectTopupResponseSchema },
 					},
 				},
 				'404': {
 					description: 'No pending topup',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: topupErrorSchema },
 					},
 				},
 			},
@@ -119,7 +125,7 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -127,22 +133,11 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'cancelTopup',
 			summary: 'Cancel pending topup',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								sessionId: {
-									type: 'string',
-								},
-								reason: {
-									type: 'string',
-								},
-							},
-							required: ['sessionId'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: cancelTopupBodySchema },
 					},
 				},
 			},
@@ -150,33 +145,13 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-								required: ['success'],
-							},
-						},
+						'application/json': { schema: successResponseSchema },
 					},
 				},
 				'404': {
 					description: 'No pending topup',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: topupErrorSchema },
 					},
 				},
 			},
@@ -219,7 +194,7 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -227,46 +202,14 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'getPendingTopup',
 			summary: 'Get pending topup for a session',
-			parameters: [
-				{
-					in: 'query',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				query: pendingTopupQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									hasPending: {
-										type: 'boolean',
-									},
-									sessionId: {
-										type: 'string',
-									},
-									messageId: {
-										type: 'string',
-									},
-									amountUsd: {
-										type: 'number',
-									},
-									currentBalance: {
-										type: 'number',
-									},
-									createdAt: {
-										type: 'integer',
-									},
-								},
-								required: ['hasPending'],
-							},
-						},
+						'application/json': { schema: pendingTopupResponseSchema },
 					},
 				},
 			},

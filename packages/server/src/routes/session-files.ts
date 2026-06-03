@@ -1,3 +1,4 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { loadConfig } from '@ottocode/sdk';
 import { getDb } from '@ottocode/database';
@@ -5,7 +6,7 @@ import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const FILE_EDIT_TOOLS = [
 	'Write',
@@ -253,8 +254,65 @@ function getOperationType(toolName: string): 'write' | 'patch' | 'create' {
 	return 'write';
 }
 
+const sessionFilesParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+});
+
+const sessionFilesQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const fileOperationSchema = z.object({
+	path: z.string(),
+	operation: z.enum(['write', 'patch', 'create']),
+	timestamp: z.number().int(),
+	toolCallId: z.string(),
+	toolName: z.string(),
+	patch: z.string().optional(),
+	content: z.string().optional(),
+	artifact: z
+		.object({
+			kind: z.string(),
+			patch: z.string().optional(),
+			summary: z
+				.object({
+					additions: z.number().int(),
+					deletions: z.number().int(),
+				})
+				.optional(),
+		})
+		.optional(),
+});
+
+const sessionFileSchema = z.object({
+	path: z.string(),
+	operations: z.array(fileOperationSchema),
+	operationCount: z.number().int(),
+	firstModified: z.number().int(),
+	lastModified: z.number().int(),
+});
+
+const sessionFilesResponseSchema = z.object({
+	files: z.array(sessionFileSchema),
+	totalFiles: z.number().int(),
+	totalOperations: z.number().int(),
+});
+
+const sessionFilesErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionFilesRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -262,118 +320,21 @@ export function registerSessionFilesRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'getSessionFiles',
 			summary: 'Get files modified in a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: sessionFilesParamsSchema,
+				query: sessionFilesQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									files: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												path: {
-													type: 'string',
-												},
-												operationCount: {
-													type: 'integer',
-												},
-												firstModified: {
-													type: 'integer',
-												},
-												lastModified: {
-													type: 'integer',
-												},
-												operations: {
-													type: 'array',
-													items: {
-														type: 'object',
-														properties: {
-															path: {
-																type: 'string',
-															},
-															operation: {
-																type: 'string',
-																enum: ['write', 'patch', 'create'],
-															},
-															timestamp: {
-																type: 'integer',
-															},
-															toolCallId: {
-																type: 'string',
-															},
-															toolName: {
-																type: 'string',
-															},
-														},
-														required: [
-															'path',
-															'operation',
-															'timestamp',
-															'toolCallId',
-															'toolName',
-														],
-													},
-												},
-											},
-											required: [
-												'path',
-												'operationCount',
-												'firstModified',
-												'lastModified',
-												'operations',
-											],
-										},
-									},
-									totalFiles: {
-										type: 'integer',
-									},
-									totalOperations: {
-										type: 'integer',
-									},
-								},
-								required: ['files', 'totalFiles', 'totalOperations'],
-							},
-						},
+						'application/json': { schema: sessionFilesResponseSchema },
 					},
 				},
 				'404': {
 					description: 'Session not found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: sessionFilesErrorSchema },
 					},
 				},
 			},

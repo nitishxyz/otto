@@ -1,10 +1,15 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import { logger, setOnboardingComplete } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 
+const completeOnboardingResponseSchema = z.object({
+	success: z.boolean(),
+});
+
 export function registerAuthOnboardingRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -17,15 +22,7 @@ export function registerAuthOnboardingRoutes(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-								required: ['success'],
-							},
+							schema: completeOnboardingResponseSchema,
 						},
 					},
 				},

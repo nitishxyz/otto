@@ -1,10 +1,29 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import { logger, readDebugConfig, writeDebugConfig } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+
+const debugConfigSchema = z.object({
+	enabled: z.boolean(),
+	scopes: z.array(z.string()),
+	logPath: z.string(),
+	sessionsDir: z.string(),
+	debugDir: z.string(),
+});
+
+const updateDebugConfigBodySchema = z.object({
+	enabled: z.boolean().optional(),
+	scopes: z.array(z.string()).optional(),
+});
+
+const updateDebugConfigResponseSchema = z.object({
+	success: z.boolean(),
+	debug: debugConfigSchema,
+});
 
 export function registerDebugConfigRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -17,36 +36,7 @@ export function registerDebugConfigRoute(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									enabled: {
-										type: 'boolean',
-									},
-									scopes: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									logPath: {
-										type: 'string',
-									},
-									sessionsDir: {
-										type: 'string',
-									},
-									debugDir: {
-										type: 'string',
-									},
-								},
-								required: [
-									'enabled',
-									'scopes',
-									'logPath',
-									'sessionsDir',
-									'debugDir',
-								],
-							},
+							schema: debugConfigSchema,
 						},
 					},
 				},
@@ -64,7 +54,7 @@ export function registerDebugConfigRoute(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'patch',
@@ -72,23 +62,12 @@ export function registerDebugConfigRoute(app: Hono) {
 			tags: ['config'],
 			operationId: 'updateDebugConfig',
 			summary: 'Update debug configuration',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								enabled: {
-									type: 'boolean',
-								},
-								scopes: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-							},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': {
+							schema: updateDebugConfigBodySchema,
 						},
 					},
 				},
@@ -98,45 +77,7 @@ export function registerDebugConfigRoute(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									debug: {
-										type: 'object',
-										properties: {
-											enabled: {
-												type: 'boolean',
-											},
-											scopes: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											logPath: {
-												type: 'string',
-											},
-											sessionsDir: {
-												type: 'string',
-											},
-											debugDir: {
-												type: 'string',
-											},
-										},
-										required: [
-											'enabled',
-											'scopes',
-											'logPath',
-											'sessionsDir',
-											'debugDir',
-										],
-									},
-								},
-								required: ['success', 'debug'],
-							},
+							schema: updateDebugConfigResponseSchema,
 						},
 					},
 				},
@@ -144,10 +85,7 @@ export function registerDebugConfigRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json<{
-					enabled?: boolean;
-					scopes?: string[];
-				}>();
+				const body = updateDebugConfigBodySchema.parse(await c.req.json());
 
 				await writeDebugConfig({
 					enabled: body.enabled,

@@ -1,13 +1,49 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
-	resolveApproval,
 	getPendingApproval,
 	getPendingApprovalsForSession,
+	resolveApproval,
 } from '../runtime/tools/approval.ts';
-import { openApiRoute } from '../openapi/route.ts';
+
+const sessionIdParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+});
+
+const resolveApprovalBodySchema = z.object({
+	callId: z.string(),
+	approved: z.boolean(),
+});
+
+const resolveApprovalResponseSchema = z.object({
+	ok: z.boolean(),
+	callId: z.string(),
+	approved: z.boolean(),
+});
+
+const approvalErrorSchema = z.object({
+	ok: z.literal(false).optional(),
+	error: z.string(),
+});
+
+const pendingApprovalSchema = z.object({
+	callId: z.string(),
+	toolName: z.string(),
+	args: z.record(z.string(), z.unknown()).optional(),
+	messageId: z.string().optional(),
+	createdAt: z.number().int(),
+});
+
+const pendingApprovalsResponseSchema = z.object({
+	ok: z.boolean(),
+	pending: z.array(pendingApprovalSchema),
+});
 
 export function registerSessionApprovalRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -15,32 +51,12 @@ export function registerSessionApprovalRoute(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'resolveApproval',
 			summary: 'Approve or deny a tool execution',
-			parameters: [
-				{
-					in: 'path',
-					name: 'id',
+			request: {
+				params: sessionIdParamsSchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								callId: {
-									type: 'string',
-								},
-								approved: {
-									type: 'boolean',
-								},
-							},
-							required: ['callId', 'approved'],
-						},
+					content: {
+						'application/json': { schema: resolveApprovalBodySchema },
 					},
 				},
 			},
@@ -48,81 +64,32 @@ export function registerSessionApprovalRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									callId: {
-										type: 'string',
-									},
-									approved: {
-										type: 'boolean',
-									},
-								},
-								required: ['ok', 'callId', 'approved'],
-							},
-						},
+						'application/json': { schema: resolveApprovalResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: approvalErrorSchema },
 					},
 				},
 				'403': {
-					description: 'Bad Request',
+					description: 'Forbidden',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: approvalErrorSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: approvalErrorSchema },
 					},
 				},
 			},
 		},
 		async (c) => {
 			const sessionId = c.req.param('id');
-			const body = await c.req.json<{
-				callId: string;
-				approved: boolean;
-			}>();
+			const body = resolveApprovalBodySchema.parse(await c.req.json());
 
 			if (!body.callId) {
 				return c.json({ ok: false, error: 'callId is required' }, 400);
@@ -157,7 +124,7 @@ export function registerSessionApprovalRoute(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -165,55 +132,14 @@ export function registerSessionApprovalRoute(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'getPendingApprovals',
 			summary: 'Get pending approvals for a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'id',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									pending: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												callId: {
-													type: 'string',
-												},
-												toolName: {
-													type: 'string',
-												},
-												args: {
-													type: 'object',
-												},
-												messageId: {
-													type: 'string',
-												},
-												createdAt: {
-													type: 'integer',
-												},
-											},
-											required: ['callId', 'toolName', 'createdAt'],
-										},
-									},
-								},
-								required: ['ok', 'pending'],
-							},
-						},
+						'application/json': { schema: pendingApprovalsResponseSchema },
 					},
 				},
 			},

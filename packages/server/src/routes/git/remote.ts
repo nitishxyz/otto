@@ -1,13 +1,70 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleAddGitRemote,
 	handleGetGitRemotes,
 	handleRemoveGitRemote,
 } from './remote-service.ts';
 
+const gitProjectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const gitRemoteBodySchema = z.object({
+	project: z.string().optional(),
+	name: z.string(),
+	url: z.string(),
+});
+
+const gitRemoteRemoveBodySchema = z.object({
+	project: z.string().optional(),
+	name: z.string(),
+});
+
+const gitRemoteSchema = z.object({
+	name: z.string(),
+	url: z.string(),
+	type: z.string(),
+});
+
+const gitRemotesResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		remotes: z.array(gitRemoteSchema),
+	}),
+});
+
+const gitRemoteAddedResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		name: z.string(),
+		url: z.string(),
+	}),
+});
+
+const gitRemoteRemovedResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		removed: z.string(),
+	}),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerRemoteRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -15,104 +72,26 @@ export function registerRemoteRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'getGitRemotes',
 			summary: 'List git remotes',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: gitProjectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											remotes: {
-												type: 'array',
-												items: {
-													type: 'object',
-													properties: {
-														name: {
-															type: 'string',
-														},
-														url: {
-															type: 'string',
-														},
-														type: {
-															type: 'string',
-														},
-													},
-													required: ['name', 'url', 'type'],
-												},
-											},
-										},
-										required: ['remotes'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitRemotesResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -120,7 +99,7 @@ export function registerRemoteRoutes(app: Hono) {
 		handleGetGitRemotes,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -128,25 +107,11 @@ export function registerRemoteRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'addGitRemote',
 			summary: 'Add a git remote',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								name: {
-									type: 'string',
-								},
-								url: {
-									type: 'string',
-								},
-							},
-							required: ['name', 'url'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitRemoteBodySchema },
 					},
 				},
 			},
@@ -154,76 +119,19 @@ export function registerRemoteRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											name: {
-												type: 'string',
-											},
-											url: {
-												type: 'string',
-											},
-										},
-										required: ['name', 'url'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitRemoteAddedResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -231,7 +139,7 @@ export function registerRemoteRoutes(app: Hono) {
 		handleAddGitRemote,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -239,22 +147,11 @@ export function registerRemoteRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'removeGitRemote',
 			summary: 'Remove a git remote',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								name: {
-									type: 'string',
-								},
-							},
-							required: ['name'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitRemoteRemoveBodySchema },
 					},
 				},
 			},
@@ -262,50 +159,13 @@ export function registerRemoteRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											removed: {
-												type: 'string',
-											},
-										},
-										required: ['removed'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitRemoteRemovedResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

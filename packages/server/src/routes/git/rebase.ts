@@ -1,9 +1,10 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitRebaseSchema } from './schemas.ts';
 import { getGitOperationState, validateAndGetGitRoot } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -13,8 +14,29 @@ const REBASE_ACTION_ARGS = {
 	skip: '--skip',
 } as const;
 
+const gitRebaseActionSchema = z.enum(['continue', 'abort', 'skip']);
+
+const gitRebaseBodySchema = z.object({
+	project: z.string().optional(),
+	action: gitRebaseActionSchema,
+});
+
+const gitRebaseResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		action: gitRebaseActionSchema,
+		output: z.string(),
+	}),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerRebaseRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -24,21 +46,11 @@ export function registerRebaseRoute(app: Hono) {
 			summary: 'Perform a git rebase action',
 			description:
 				'Runs git rebase --continue, --abort, or --skip for an in-progress rebase.',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: { type: 'string' },
-								action: {
-									type: 'string',
-									enum: ['continue', 'abort', 'skip'],
-								},
-							},
-							required: ['action'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitRebaseBodySchema },
 					},
 				},
 			},
@@ -46,74 +58,25 @@ export function registerRebaseRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['ok'] },
-									data: {
-										type: 'object',
-										properties: {
-											action: {
-												type: 'string',
-												enum: ['continue', 'abort', 'skip'],
-											},
-											output: { type: 'string' },
-										},
-										required: ['action', 'output'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitRebaseResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['error'] },
-									error: { type: 'string' },
-									code: { type: 'string' },
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'409': {
 					description: 'No rebase is currently in progress',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['error'] },
-									error: { type: 'string' },
-									code: { type: 'string' },
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['error'] },
-									error: { type: 'string' },
-									code: { type: 'string' },
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

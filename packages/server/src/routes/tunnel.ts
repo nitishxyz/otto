@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	getActiveTunnelUrl,
 	getTunnelQRCode,
@@ -14,8 +15,62 @@ import {
 
 export { getActiveTunnelUrl, setExternalTunnel, stopActiveTunnel };
 
+const tunnelStatusSchema = z.object({
+	status: z.enum(['idle', 'starting', 'connected', 'error']),
+	url: z.string().nullable(),
+	error: z.string().nullable(),
+	binaryInstalled: z.boolean(),
+	isRunning: z.boolean(),
+});
+
+const startTunnelBodySchema = z.object({
+	port: z.number().int().optional(),
+});
+
+const tunnelActionResponseSchema = z.object({
+	ok: z.boolean(),
+	url: z.string().nullable().optional(),
+	message: z.string().optional(),
+	error: z.string().optional(),
+});
+
+const registerTunnelBodySchema = z.object({
+	url: z.string(),
+});
+
+const tunnelErrorResponseSchema = z.object({
+	ok: z.literal(false).optional(),
+	error: z.string(),
+});
+
+const tunnelQrResponseSchema = z.object({
+	ok: z.boolean(),
+	url: z.string().optional(),
+	qrCode: z.string().optional(),
+	error: z.string().optional(),
+});
+
+const tunnelStreamSchema = z.string().openapi({
+	description: 'SSE stream of tunnel status updates',
+});
+
+const tunnelStreamRoute = {
+	tags: ['tunnel'],
+	summary: 'Subscribe to tunnel status stream',
+	responses: {
+		'200': {
+			description: 'SSE stream of tunnel status updates',
+			content: {
+				'text/event-stream': {
+					schema: tunnelStreamSchema,
+				},
+			},
+		},
+	},
+};
+
 export function registerTunnelRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -27,32 +82,7 @@ export function registerTunnelRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['idle', 'starting', 'connected', 'error'],
-									},
-									url: {
-										type: 'string',
-										nullable: true,
-									},
-									error: {
-										type: 'string',
-										nullable: true,
-									},
-									binaryInstalled: {
-										type: 'boolean',
-									},
-									isRunning: {
-										type: 'boolean',
-									},
-								},
-								required: ['status', 'binaryInstalled', 'isRunning'],
-							},
-						},
+						'application/json': { schema: tunnelStatusSchema },
 					},
 				},
 			},
@@ -60,7 +90,7 @@ export function registerTunnelRoutes(app: Hono) {
 		async (c) => c.json(await getTunnelStatus()),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -68,18 +98,11 @@ export function registerTunnelRoutes(app: Hono) {
 			tags: ['tunnel'],
 			operationId: 'startTunnel',
 			summary: 'Start a tunnel',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								port: {
-									type: 'integer',
-								},
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: startTunnelBodySchema },
 					},
 				},
 			},
@@ -87,40 +110,27 @@ export function registerTunnelRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									url: {
-										type: 'string',
-									},
-									message: {
-										type: 'string',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: tunnelActionResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Tunnel failed to start',
+					content: {
+						'application/json': { schema: tunnelActionResponseSchema },
 					},
 				},
 			},
 		},
 		async (c) => {
-			const body: { port?: number } = await c.req
-				.json<{ port?: number }>()
+			const body: z.infer<typeof startTunnelBodySchema> = await c.req
+				.json<z.infer<typeof startTunnelBodySchema>>()
 				.catch(() => ({}));
 			const result = await startTunnel(body.port);
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -128,19 +138,11 @@ export function registerTunnelRoutes(app: Hono) {
 			tags: ['tunnel'],
 			operationId: 'registerTunnel',
 			summary: 'Register an external tunnel URL',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								url: {
-									type: 'string',
-								},
-							},
-							required: ['url'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: registerTunnelBodySchema },
 					},
 				},
 			},
@@ -148,53 +150,27 @@ export function registerTunnelRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									url: {
-										type: 'string',
-									},
-									message: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: tunnelActionResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: tunnelErrorResponseSchema },
 					},
 				},
 			},
 		},
 		async (c) => {
 			const body: { url?: string } = await c.req
-				.json<{ url?: string }>()
-				.catch(() => ({}));
+				.json<z.infer<typeof registerTunnelBodySchema>>()
+				.catch(() => ({ url: undefined }));
 			const result = registerExternalTunnel(body.url);
 			return c.json(result, result.ok ? 200 : 400);
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -206,20 +182,13 @@ export function registerTunnelRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									message: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: tunnelActionResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Tunnel failed to stop',
+					content: {
+						'application/json': { schema: tunnelActionResponseSchema },
 					},
 				},
 			},
@@ -230,7 +199,7 @@ export function registerTunnelRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -242,39 +211,13 @@ export function registerTunnelRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									url: {
-										type: 'string',
-									},
-									qrCode: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: tunnelQrResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: tunnelErrorResponseSchema },
 					},
 				},
 			},
@@ -285,22 +228,7 @@ export function registerTunnelRoutes(app: Hono) {
 		},
 	);
 
-	const tunnelStreamRoute = {
-		tags: ['tunnel'],
-		summary: 'Subscribe to tunnel status stream',
-		responses: {
-			'200': {
-				description: 'SSE stream of tunnel status updates',
-				content: {
-					'text/event-stream': {
-						schema: { type: 'string' },
-					},
-				},
-			},
-		},
-	};
-
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -310,7 +238,7 @@ export function registerTunnelRoutes(app: Hono) {
 		},
 		handleTunnelStream,
 	);
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',

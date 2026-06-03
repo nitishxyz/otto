@@ -2,26 +2,18 @@ import {
 	getUsageStats as apiGetUsageStats,
 	getGlobalUsageStats as apiGetGlobalUsageStats,
 	type UsageStats,
-	type UsageProviderAgg,
-	type UsageModelAgg,
-	type UsageDailyAgg,
-	type UsageProjectInfo,
-	type UsageProjectUnavailable,
-	type UsageProjectsBreakdown,
-	type UsageTotals,
 } from '@ottocode/api';
 import { extractErrorMessage } from './utils';
 
-export type {
-	UsageStats,
-	UsageProviderAgg,
-	UsageModelAgg,
-	UsageDailyAgg,
-	UsageProjectInfo,
-	UsageProjectUnavailable,
-	UsageProjectsBreakdown,
-	UsageTotals,
-};
+export type { UsageStats };
+export type UsageTotals = UsageStats['totals'];
+export type UsageProviderAgg = UsageStats['providers'][number];
+export type UsageModelAgg = UsageStats['models'][number];
+export type UsageDailyAgg = UsageStats['daily'][number];
+export type UsageProjectsBreakdown = NonNullable<UsageStats['projects']>;
+export type UsageProjectInfo = UsageProjectsBreakdown['included'][number];
+export type UsageProjectUnavailable =
+	UsageProjectsBreakdown['unavailable'][number];
 
 export type UsageAuthBucket = 'oauth' | 'api' | 'subscription';
 

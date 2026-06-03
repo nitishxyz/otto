@@ -1,21 +1,22 @@
-import type { Hono } from 'hono';
-import { readdir } from 'node:fs/promises';
+import { z } from '@hono/zod-openapi';
 import {
-	readConfig,
-	isProviderAuthorized,
+	buildFsTools,
+	buildGitTools,
 	getConfiguredProviderApiKey,
 	getConfiguredProviderEnvVar,
 	getConfiguredProviderIds,
-	buildFsTools,
-	buildGitTools,
-	getSecureAuthPath,
 	getGlobalAgentsJsonPath,
-	getGlobalToolsDir,
 	getGlobalCommandsDir,
+	getGlobalToolsDir,
+	getSecureAuthPath,
+	isProviderAuthorized,
 	logger,
+	readConfig,
 } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { readdir } from 'node:fs/promises';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
-import { openApiRoute } from '../openapi/route.ts';
 
 async function fileExists(path: string | null): Promise<boolean> {
 	if (!path) return false;
@@ -46,8 +47,63 @@ async function listDir(dir: string | null): Promise<string[]> {
 	}
 }
 
+const doctorQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const doctorResponseSchema = z.object({
+	providers: z.array(
+		z.object({
+			id: z.string(),
+			ok: z.boolean(),
+			configured: z.boolean(),
+			sources: z.array(z.string()),
+		}),
+	),
+	defaults: z.object({
+		agent: z.string(),
+		provider: z.string(),
+		model: z.string(),
+		providerAuthorized: z.boolean(),
+	}),
+	agents: z.object({
+		globalPath: z.string().nullable(),
+		localPath: z.string().nullable(),
+		globalNames: z.array(z.string()),
+		localNames: z.array(z.string()),
+	}),
+	tools: z.object({
+		defaultNames: z.array(z.string()),
+		globalPath: z.string().nullable().optional(),
+		globalNames: z.array(z.string()),
+		localPath: z.string().nullable().optional(),
+		localNames: z.array(z.string()),
+		effectiveNames: z.array(z.string()),
+	}),
+	commands: z.object({
+		globalPath: z.string().nullable().optional(),
+		globalNames: z.array(z.string()),
+		localPath: z.string().nullable().optional(),
+		localNames: z.array(z.string()),
+	}),
+	issues: z.array(z.string()),
+	suggestions: z.array(z.string()),
+	globalAuthPath: z.string().nullable().optional(),
+});
+
+const doctorErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerDoctorRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -55,217 +111,20 @@ export function registerDoctorRoutes(app: Hono) {
 			tags: ['config'],
 			operationId: 'runDoctor',
 			summary: 'Run diagnostics on the current configuration',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: doctorQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									providers: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												id: {
-													type: 'string',
-												},
-												ok: {
-													type: 'boolean',
-												},
-												configured: {
-													type: 'boolean',
-												},
-												sources: {
-													type: 'array',
-													items: {
-														type: 'string',
-													},
-												},
-											},
-											required: ['id', 'ok', 'configured', 'sources'],
-										},
-									},
-									defaults: {
-										type: 'object',
-										properties: {
-											agent: {
-												type: 'string',
-											},
-											provider: {
-												type: 'string',
-											},
-											model: {
-												type: 'string',
-											},
-											providerAuthorized: {
-												type: 'boolean',
-											},
-										},
-										required: [
-											'agent',
-											'provider',
-											'model',
-											'providerAuthorized',
-										],
-									},
-									agents: {
-										type: 'object',
-										properties: {
-											globalPath: {
-												type: 'string',
-												nullable: true,
-											},
-											localPath: {
-												type: 'string',
-												nullable: true,
-											},
-											globalNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											localNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: [
-											'globalPath',
-											'localPath',
-											'globalNames',
-											'localNames',
-										],
-									},
-									tools: {
-										type: 'object',
-										properties: {
-											defaultNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											globalPath: {
-												type: 'string',
-												nullable: true,
-											},
-											globalNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											localPath: {
-												type: 'string',
-												nullable: true,
-											},
-											localNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											effectiveNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: [
-											'defaultNames',
-											'globalNames',
-											'localNames',
-											'effectiveNames',
-										],
-									},
-									commands: {
-										type: 'object',
-										properties: {
-											globalPath: {
-												type: 'string',
-												nullable: true,
-											},
-											globalNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-											localPath: {
-												type: 'string',
-												nullable: true,
-											},
-											localNames: {
-												type: 'array',
-												items: {
-													type: 'string',
-												},
-											},
-										},
-										required: ['globalNames', 'localNames'],
-									},
-									issues: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									suggestions: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									globalAuthPath: {
-										type: 'string',
-										nullable: true,
-									},
-								},
-								required: [
-									'providers',
-									'defaults',
-									'agents',
-									'tools',
-									'commands',
-									'issues',
-									'suggestions',
-								],
-							},
-						},
+						'application/json': { schema: doctorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: doctorErrorSchema },
 					},
 				},
 			},

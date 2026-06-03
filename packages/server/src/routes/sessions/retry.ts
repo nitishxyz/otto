@@ -1,12 +1,42 @@
+import { z } from '@hono/zod-openapi';
 import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { loadProjectDb, retryAssistantMessage } from './service.ts';
 
+const retryMessageParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+	messageId: z.string().openapi({
+		param: { name: 'messageId', in: 'path' },
+	}),
+});
+
+const retryMessageQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const retryMessageResponseSchema = z.object({
+	success: z.boolean(),
+	messageId: z.string(),
+});
+
+const retryMessageErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionRetryRoutes(app: Hono) {
 	// Retry a failed assistant message
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -14,84 +44,27 @@ export function registerSessionRetryRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'retryMessage',
 			summary: 'Retry a failed assistant message',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'path',
-					name: 'messageId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: retryMessageParamsSchema,
+				query: retryMessageQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									messageId: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'messageId'],
-							},
-						},
+						'application/json': { schema: retryMessageResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: retryMessageErrorSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: retryMessageErrorSchema },
 					},
 				},
 			},

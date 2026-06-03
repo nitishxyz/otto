@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleDeleteProviderSettings,
 	handleDiscoverProviderModels,
@@ -7,8 +8,102 @@ import {
 	handleUpdateProviderSettings,
 } from './providers-service.ts';
 
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const providerParamsSchema = z.object({
+	provider: z.string().openapi({
+		param: { name: 'provider', in: 'path' },
+	}),
+});
+
+const providerDetailSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	source: z.enum(['built-in', 'custom']),
+	enabled: z.boolean(),
+	authorized: z.boolean(),
+	custom: z.boolean().optional(),
+	compatibility: z.string().nullable().optional(),
+	family: z.string().nullable().optional(),
+	baseURL: z.string().nullable().optional(),
+	apiKeyEnv: z.string().nullable().optional(),
+	hasApiKey: z.boolean().optional(),
+	allowAnyModel: z.boolean().optional(),
+	modelCount: z.number().int().optional(),
+	authType: z.string().nullable().optional(),
+});
+
+const providersResponseSchema = z.object({
+	providers: z.array(z.string()),
+	details: z.array(providerDetailSchema),
+	default: z.string(),
+});
+
+const discoveredModelSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	toolCall: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	vision: z.boolean().optional(),
+	attachment: z.boolean().optional(),
+	contextWindow: z.number().optional(),
+	maxOutputTokens: z.number().optional(),
+});
+
+const discoverProviderModelsBodySchema = z.object({
+	compatibility: z.string().optional().openapi({
+		description:
+			'Provider compatibility mode. Model discovery currently supports ollama.',
+	}),
+	baseURL: z.string().openapi({
+		description: 'Provider base URL to inspect.',
+	}),
+	apiKey: z.string().optional().openapi({
+		description: 'Optional API key for the provider.',
+	}),
+});
+
+const discoverProviderModelsResponseSchema = z.object({
+	baseURL: z.string().optional(),
+	models: z.array(discoveredModelSchema),
+	unsupported: z.boolean().optional(),
+	message: z.string().optional(),
+});
+
+const providerSettingsBodySchema = z.object({
+	enabled: z.boolean().optional(),
+	custom: z.boolean().optional(),
+	label: z.string().optional(),
+	compatibility: z.string().optional(),
+	family: z.string().optional(),
+	baseURL: z.string().nullable().optional(),
+	apiKey: z.string().nullable().optional(),
+	apiKeyEnv: z.string().nullable().optional(),
+	models: z.array(z.string()).optional(),
+	allowAnyModel: z.boolean().optional(),
+});
+
+const providerSettingsResponseSchema = z.object({
+	success: z.boolean(),
+	provider: z.string(),
+	details: z.array(providerDetailSchema),
+});
+
+const providerErrorSchema = z.object({
+	error: z.string().optional(),
+});
+
 export function registerProvidersRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -17,45 +112,14 @@ export function registerProvidersRoute(app: Hono) {
 			operationId: 'getProviders',
 			summary: 'Get available providers',
 			description: 'Returns only providers that have been authorized',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									providers: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/Provider',
-										},
-									},
-									details: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/ProviderDetail',
-										},
-									},
-									default: {
-										$ref: '#/components/schemas/Provider',
-									},
-								},
-								required: ['providers', 'details', 'default'],
-							},
-						},
+						'application/json': { schema: providersResponseSchema },
 					},
 				},
 			},
@@ -63,7 +127,7 @@ export function registerProvidersRoute(app: Hono) {
 		handleGetProviders,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -73,29 +137,11 @@ export function registerProvidersRoute(app: Hono) {
 			summary: 'Discover models for a provider',
 			description:
 				'Discovers available models from a provider base URL. Currently supports Ollama-compatible providers.',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								compatibility: {
-									type: 'string',
-									description:
-										'Provider compatibility mode. Model discovery currently supports ollama.',
-								},
-								baseURL: {
-									type: 'string',
-									description: 'Provider base URL to inspect.',
-								},
-								apiKey: {
-									type: 'string',
-									description: 'Optional API key for the provider.',
-								},
-							},
-							required: ['baseURL'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: discoverProviderModelsBodySchema },
 					},
 				},
 			},
@@ -104,42 +150,22 @@ export function registerProvidersRoute(app: Hono) {
 					description: 'Discovered provider models',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									baseURL: { type: 'string' },
-									models: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												id: { type: 'string' },
-												label: { type: 'string' },
-												toolCall: { type: 'boolean' },
-												reasoningText: { type: 'boolean' },
-												vision: { type: 'boolean' },
-												attachment: { type: 'boolean' },
-												contextWindow: { type: 'number' },
-												maxOutputTokens: { type: 'number' },
-											},
-											required: ['id', 'label'],
-										},
-									},
-									unsupported: { type: 'boolean' },
-									message: { type: 'string' },
-								},
-								required: ['models'],
-							},
+							schema: discoverProviderModelsResponseSchema,
 						},
 					},
 				},
-				'400': { description: 'Invalid discovery request' },
+				'400': {
+					description: 'Invalid discovery request',
+					content: {
+						'application/json': { schema: providerErrorSchema },
+					},
+				},
 			},
 		},
 		handleDiscoverProviderModels,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'put',
@@ -147,71 +173,13 @@ export function registerProvidersRoute(app: Hono) {
 			tags: ['config'],
 			operationId: 'updateProviderSettings',
 			summary: 'Create or update provider settings',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'provider',
+			request: {
+				query: projectQuerySchema,
+				params: providerParamsSchema,
+				body: {
 					required: true,
-					schema: {
-						$ref: '#/components/schemas/Provider',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								enabled: {
-									type: 'boolean',
-								},
-								custom: {
-									type: 'boolean',
-								},
-								label: {
-									type: 'string',
-								},
-								compatibility: {
-									type: 'string',
-								},
-								family: {
-									type: 'string',
-								},
-								baseURL: {
-									type: 'string',
-									nullable: true,
-								},
-								apiKey: {
-									type: 'string',
-									nullable: true,
-								},
-								apiKeyEnv: {
-									type: 'string',
-									nullable: true,
-								},
-								models: {
-									type: 'array',
-									items: {
-										type: 'string',
-									},
-								},
-								allowAnyModel: {
-									type: 'boolean',
-								},
-							},
-						},
+					content: {
+						'application/json': { schema: providerSettingsBodySchema },
 					},
 				},
 			},
@@ -219,26 +187,7 @@ export function registerProvidersRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										$ref: '#/components/schemas/Provider',
-									},
-									details: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/ProviderDetail',
-										},
-									},
-								},
-								required: ['success', 'provider', 'details'],
-							},
-						},
+						'application/json': { schema: providerSettingsResponseSchema },
 					},
 				},
 			},
@@ -246,7 +195,7 @@ export function registerProvidersRoute(app: Hono) {
 		handleUpdateProviderSettings,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -254,50 +203,15 @@ export function registerProvidersRoute(app: Hono) {
 			tags: ['config'],
 			operationId: 'deleteProviderSettings',
 			summary: 'Delete provider override or custom provider entry',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						$ref: '#/components/schemas/Provider',
-					},
-				},
-			],
+			request: {
+				query: projectQuerySchema,
+				params: providerParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										$ref: '#/components/schemas/Provider',
-									},
-									details: {
-										type: 'array',
-										items: {
-											$ref: '#/components/schemas/ProviderDetail',
-										},
-									},
-								},
-								required: ['success', 'provider', 'details'],
-							},
-						},
+						'application/json': { schema: providerSettingsResponseSchema },
 					},
 				},
 			},

@@ -1,6 +1,7 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import { getPublicKeyFromPrivate, logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	getOttoRouterBalance,
@@ -9,8 +10,78 @@ import {
 	getOttoRouterWalletInfo,
 } from './service.ts';
 
+const errorResponseSchema = z.object({ error: z.string() });
+
+const nullableNumberSchema = z.number().nullable();
+
+const ottoRouterBalanceSchema = z.object({
+	walletAddress: z.string(),
+	balance: z.number(),
+	totalSpent: z.number(),
+	totalTopups: z.number(),
+	requestCount: z.number(),
+	scope: z.enum(['wallet', 'account']).optional(),
+	payg: z
+		.object({
+			walletBalanceUsd: z.number().optional(),
+			accountBalanceUsd: z.number().optional(),
+			rawPoolUsd: z.number().optional(),
+			effectiveSpendableUsd: z.number().optional(),
+		})
+		.optional(),
+	limits: z
+		.object({
+			enabled: z.boolean().optional(),
+			dailyLimitUsd: nullableNumberSchema.optional(),
+			dailySpentUsd: z.number().optional(),
+			dailyRemainingUsd: nullableNumberSchema.optional(),
+			monthlyLimitUsd: nullableNumberSchema.optional(),
+			monthlySpentUsd: z.number().optional(),
+			monthlyRemainingUsd: nullableNumberSchema.optional(),
+			capRemainingUsd: nullableNumberSchema.optional(),
+		})
+		.nullable()
+		.optional(),
+	subscription: z
+		.object({
+			active: z.boolean().optional(),
+			tierId: z.string().optional(),
+			tierName: z.string().optional(),
+			creditsIncluded: z.number().optional(),
+			creditsUsed: z.number().optional(),
+			creditsRemaining: z.number().optional(),
+			periodStart: z.string().optional(),
+			periodEnd: z.string().optional(),
+		})
+		.nullable()
+		.optional(),
+});
+
+const ottoRouterWalletSchema = z.object({
+	configured: z.boolean(),
+	publicKey: z.string().optional(),
+	error: z.string().optional(),
+});
+
+const usdcBalanceQuerySchema = z.object({
+	network: z
+		.enum(['mainnet', 'devnet'])
+		.optional()
+		.default('mainnet')
+		.openapi({
+			param: { name: 'network', in: 'query' },
+			description: 'Solana network to query',
+		}),
+});
+
+const usdcBalanceResponseSchema = z.object({
+	walletAddress: z.string(),
+	usdcBalance: z.number(),
+	network: z.enum(['mainnet', 'devnet']),
+});
+
 export function registerOttoRouterWalletRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -24,154 +95,16 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									walletAddress: {
-										type: 'string',
-									},
-									balance: {
-										type: 'number',
-									},
-									totalSpent: {
-										type: 'number',
-									},
-									totalTopups: {
-										type: 'number',
-									},
-									requestCount: {
-										type: 'number',
-									},
-									scope: {
-										type: 'string',
-										enum: ['wallet', 'account'],
-									},
-									payg: {
-										type: 'object',
-										properties: {
-											walletBalanceUsd: {
-												type: 'number',
-											},
-											accountBalanceUsd: {
-												type: 'number',
-											},
-											rawPoolUsd: {
-												type: 'number',
-											},
-											effectiveSpendableUsd: {
-												type: 'number',
-											},
-										},
-									},
-									limits: {
-										type: 'object',
-										nullable: true,
-										properties: {
-											enabled: {
-												type: 'boolean',
-											},
-											dailyLimitUsd: {
-												type: 'number',
-												nullable: true,
-											},
-											dailySpentUsd: {
-												type: 'number',
-											},
-											dailyRemainingUsd: {
-												type: 'number',
-												nullable: true,
-											},
-											monthlyLimitUsd: {
-												type: 'number',
-												nullable: true,
-											},
-											monthlySpentUsd: {
-												type: 'number',
-											},
-											monthlyRemainingUsd: {
-												type: 'number',
-												nullable: true,
-											},
-											capRemainingUsd: {
-												type: 'number',
-												nullable: true,
-											},
-										},
-									},
-									subscription: {
-										type: 'object',
-										nullable: true,
-										properties: {
-											active: {
-												type: 'boolean',
-											},
-											tierId: {
-												type: 'string',
-											},
-											tierName: {
-												type: 'string',
-											},
-											creditsIncluded: {
-												type: 'number',
-											},
-											creditsUsed: {
-												type: 'number',
-											},
-											creditsRemaining: {
-												type: 'number',
-											},
-											periodStart: {
-												type: 'string',
-											},
-											periodEnd: {
-												type: 'string',
-											},
-										},
-									},
-								},
-								required: [
-									'walletAddress',
-									'balance',
-									'totalSpent',
-									'totalTopups',
-									'requestCount',
-								],
-							},
-						},
+						'application/json': { schema: ottoRouterBalanceSchema },
 					},
 				},
 				'401': {
 					description: 'Wallet not configured',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 				'502': {
 					description: 'Failed to fetch balance from OttoRouter',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -189,7 +122,7 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -203,23 +136,7 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									configured: {
-										type: 'boolean',
-									},
-									publicKey: {
-										type: 'string',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['configured'],
-							},
-						},
+						'application/json': { schema: ottoRouterWalletSchema },
 					},
 				},
 			},
@@ -235,7 +152,7 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -245,73 +162,21 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 			summary: 'Get USDC token balance',
 			description:
 				'Fetches USDC balance from Solana blockchain for the configured wallet',
-			parameters: [
-				{
-					in: 'query',
-					name: 'network',
-					schema: {
-						type: 'string',
-						enum: ['mainnet', 'devnet'],
-						default: 'mainnet',
-					},
-					description: 'Solana network to query',
-				},
-			],
+			request: { query: usdcBalanceQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									walletAddress: {
-										type: 'string',
-									},
-									usdcBalance: {
-										type: 'number',
-									},
-									network: {
-										type: 'string',
-										enum: ['mainnet', 'devnet'],
-									},
-								},
-								required: ['walletAddress', 'usdcBalance', 'network'],
-							},
-						},
+						'application/json': { schema: usdcBalanceResponseSchema },
 					},
 				},
 				'401': {
 					description: 'Wallet not configured',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 				'502': {
 					description: 'Failed to fetch USDC balance from Solana',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},

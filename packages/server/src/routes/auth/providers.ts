@@ -1,17 +1,37 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
 	catalog,
 	isBuiltInProviderId,
+	logger,
 	removeAuth,
 	setAuth,
 	type ProviderId,
 } from '@ottocode/sdk';
-import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 
+const providerParamSchema = z.object({
+	provider: z.string().openapi({
+		param: { name: 'provider', in: 'path' },
+	}),
+});
+
+const addProviderApiKeyBodySchema = z.object({
+	apiKey: z.string(),
+});
+
+const providerAuthResponseSchema = z.object({
+	success: z.boolean(),
+	provider: z.string(),
+});
+
+const providerAuthErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerAuthProviderRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -19,29 +39,12 @@ export function registerAuthProviderRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'addProviderApiKey',
 			summary: 'Add API key for a provider',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
+			request: {
+				params: providerParamSchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								apiKey: {
-									type: 'string',
-								},
-							},
-							required: ['apiKey'],
-						},
+					content: {
+						'application/json': { schema: addProviderApiKeyBodySchema },
 					},
 				},
 			},
@@ -49,36 +52,13 @@ export function registerAuthProviderRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'provider'],
-							},
-						},
+						'application/json': { schema: providerAuthResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerAuthErrorSchema },
 					},
 				},
 			},
@@ -86,7 +66,9 @@ export function registerAuthProviderRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const provider = c.req.param('provider') as ProviderId;
-				const { apiKey } = await c.req.json<{ apiKey: string }>();
+				const { apiKey } = addProviderApiKeyBodySchema.parse(
+					await c.req.json(),
+				);
 
 				if (!isBuiltInProviderId(provider) || !catalog[provider]) {
 					return c.json({ error: 'Unknown provider' }, 400);
@@ -112,7 +94,7 @@ export function registerAuthProviderRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -120,50 +102,20 @@ export function registerAuthProviderRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'removeProvider',
 			summary: 'Remove auth for a provider',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: providerParamSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'provider'],
-							},
-						},
+						'application/json': { schema: providerAuthResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: providerAuthErrorSchema },
 					},
 				},
 			},

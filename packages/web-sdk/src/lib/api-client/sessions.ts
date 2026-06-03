@@ -10,8 +10,9 @@ import {
 	getSessionQueue as apiGetSessionQueue,
 	removeFromQueue as apiRemoveFromQueue,
 	retryMessage as apiRetryMessage,
+	createSessionHandoff as apiCreateSessionHandoff,
+	sendQueuedMessageNow as apiSendQueuedMessageNow,
 	buildSessionStreamUrl,
-	type Session as ApiSession,
 	type CreateSessionData,
 	type CreateMessageData,
 } from '@ottocode/api';
@@ -30,6 +31,8 @@ import {
 	convertMessage,
 	getBaseUrl,
 } from './utils';
+
+type ApiSession = Parameters<typeof convertSession>[0];
 
 export const sessionsMixin = {
 	async getSessions(): Promise<Session[]> {
@@ -59,7 +62,7 @@ export const sessionsMixin = {
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		if (!response.data) throw new Error('No data returned from create session');
-		return convertSession(response.data);
+		return convertSession(response.data as ApiSession);
 	},
 
 	async updateSession(
@@ -93,12 +96,9 @@ export const sessionsMixin = {
 		sourceSessionId: string;
 		message: string;
 	}> {
-		const response = await fetch(
-			`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/handoff`,
-			{ method: 'POST' },
-		);
-		const data = await response.json().catch(() => null);
-		if (!response.ok) throw new Error(extractErrorMessage(data));
+		const response = await apiCreateSessionHandoff({ path: { sessionId } });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		const data = response.data;
 		if (!data?.session || !data?.sessionId) {
 			throw new Error('No data returned from handoff');
 		}
@@ -169,13 +169,11 @@ export const sessionsMixin = {
 		wasRunning?: boolean;
 		preemptedMessageId?: string | null;
 	}> {
-		const response = await fetch(
-			`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/queue/${encodeURIComponent(messageId)}/send-now`,
-			{ method: 'POST' },
-		);
-		const data = await response.json().catch(() => null);
-		if (!response.ok) throw new Error(extractErrorMessage(data));
-		return data as {
+		const response = await apiSendQueuedMessageNow({
+			path: { sessionId, messageId },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as {
 			success: boolean;
 			promoted: boolean;
 			wasQueued?: boolean;

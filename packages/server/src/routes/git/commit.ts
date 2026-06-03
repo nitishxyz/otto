@@ -1,12 +1,43 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleCommitChanges,
 	handleGenerateCommitMessage,
 } from './commit-service.ts';
 
+const gitCommitBodySchema = z.object({
+	project: z.string().optional(),
+	message: z.string().min(1),
+});
+
+const gitGenerateCommitMessageBodySchema = z.object({
+	project: z.string().optional(),
+	sessionId: z.string().optional().openapi({
+		description: 'Session ID to use session provider',
+	}),
+});
+
+const gitCommitResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.any(),
+});
+
+const gitGeneratedMessageResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		message: z.string(),
+	}),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerCommitRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -14,23 +45,11 @@ export function registerCommitRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'commitChanges',
 			summary: 'Commit staged changes',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								message: {
-									type: 'string',
-									minLength: 1,
-								},
-							},
-							required: ['message'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: gitCommitBodySchema },
 					},
 				},
 			},
@@ -38,67 +57,19 @@ export function registerCommitRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										$ref: '#/components/schemas/GitCommit',
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitCommitResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},
@@ -106,7 +77,7 @@ export function registerCommitRoutes(app: Hono) {
 		handleCommitChanges,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -116,22 +87,11 @@ export function registerCommitRoutes(app: Hono) {
 			summary: 'Generate AI-powered commit message',
 			description:
 				'Uses AI to generate a commit message based on staged changes',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-								sessionId: {
-									type: 'string',
-									description: 'Session ID to use session provider',
-								},
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: gitGenerateCommitMessageBodySchema },
 					},
 				},
 			},
@@ -139,73 +99,19 @@ export function registerCommitRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											message: {
-												type: 'string',
-											},
-										},
-										required: ['message'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitGeneratedMessageResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

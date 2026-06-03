@@ -1,20 +1,48 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
 	catalog,
 	getAllAuth,
 	getOnboardingComplete,
 	getOttoRouterWallet,
 	loadConfig,
+	logger,
 	type ProviderId,
 } from '@ottocode/sdk';
-import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { getProviderDetails } from '../config/utils.ts';
 import { getGhImportCapability } from './service.ts';
 
+const authStatusProviderSchema = z.object({
+	configured: z.boolean(),
+	type: z.enum(['api', 'oauth', 'wallet']).optional(),
+	label: z.string(),
+	supportsOAuth: z.boolean(),
+	supportsToken: z.boolean().optional(),
+	supportsGhImport: z.boolean().optional(),
+	custom: z.boolean().optional(),
+	modelCount: z.number().int(),
+	costRange: z
+		.object({
+			min: z.number(),
+			max: z.number(),
+		})
+		.optional(),
+});
+
+const authStatusResponseSchema = z.object({
+	onboardingComplete: z.boolean(),
+	ottorouter: z.object({
+		configured: z.boolean(),
+		publicKey: z.string().optional(),
+	}),
+	providers: z.record(z.string(), authStatusProviderSchema),
+	defaults: z.record(z.string(), z.unknown()).optional(),
+});
+
 export function registerAuthStatusRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -26,92 +54,7 @@ export function registerAuthStatusRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									onboardingComplete: {
-										type: 'boolean',
-									},
-									ottorouter: {
-										type: 'object',
-										properties: {
-											configured: {
-												type: 'boolean',
-											},
-											publicKey: {
-												type: 'string',
-											},
-										},
-										required: ['configured'],
-									},
-									providers: {
-										type: 'object',
-										additionalProperties: {
-											type: 'object',
-											properties: {
-												configured: {
-													type: 'boolean',
-												},
-												type: {
-													type: 'string',
-													enum: ['api', 'oauth', 'wallet'],
-												},
-												label: {
-													type: 'string',
-												},
-												supportsOAuth: {
-													type: 'boolean',
-												},
-												supportsToken: {
-													type: 'boolean',
-												},
-												supportsGhImport: {
-													type: 'boolean',
-												},
-												modelCount: {
-													type: 'integer',
-												},
-												costRange: {
-													type: 'object',
-													nullable: true,
-													properties: {
-														min: {
-															type: 'number',
-														},
-														max: {
-															type: 'number',
-														},
-													},
-													required: ['min', 'max'],
-												},
-											},
-											required: [
-												'configured',
-												'label',
-												'supportsOAuth',
-												'modelCount',
-											],
-										},
-									},
-									defaults: {
-										type: 'object',
-										properties: {
-											agent: {
-												type: 'string',
-											},
-											provider: {
-												type: 'string',
-											},
-											model: {
-												type: 'string',
-											},
-										},
-									},
-								},
-								required: ['onboardingComplete', 'ottorouter', 'providers'],
-							},
-						},
+						'application/json': { schema: authStatusResponseSchema },
 					},
 				},
 			},

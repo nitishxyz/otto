@@ -1,9 +1,7 @@
+import { z } from '@hono/zod-openapi';
 import type { Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import type { ReferenceObject, SchemaObject } from 'openapi3-ts/oas30';
-import { openApiRoute } from '../openapi/route.ts';
-import { upgradeWebSocket } from '../ws.ts';
 import { DICTATION_MODELS } from '../dictation/manifest.ts';
 import {
 	DictationModelError,
@@ -28,6 +26,8 @@ import {
 	type DictationClientMessage,
 	type DictationServerEvent,
 } from '../dictation/types.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
+import { upgradeWebSocket } from '../ws.ts';
 
 const dictationSessions = createDictationSessionManager();
 
@@ -36,22 +36,35 @@ type WebSocketLike = {
 	close: (code?: number, reason?: string) => void;
 };
 
-function jsonSchema(
-	properties: Record<string, ReferenceObject | SchemaObject>,
-	required: string[] = [],
-): SchemaObject {
-	return {
-		type: 'object',
-		properties,
-		required,
-	};
-}
+const errorResponseSchema = z.object({
+	error: z.string(),
+	code: z.string().optional(),
+});
 
-function errorResponseSchema() {
-	return jsonSchema({ error: { type: 'string' }, code: { type: 'string' } }, [
-		'error',
-	]);
-}
+const dictationModelSchema = z.any();
+const dictationSessionSchema = z.any();
+const audioFormatSchema = z.object({
+	encoding: z.string().optional(),
+	sampleRate: z.number().optional(),
+	channels: z.number().optional(),
+});
+
+const modelParamsSchema = z.object({
+	model: z.string().openapi({ param: { name: 'model', in: 'path' } }),
+});
+
+const sessionParamsSchema = z.object({
+	id: z.string().openapi({ param: { name: 'id', in: 'path' } }),
+});
+
+const installModelBodySchema = z.object({
+	force: z.boolean().optional(),
+});
+
+const createSessionBodySchema = z.object({
+	model: z.string().optional(),
+	language: z.string().optional(),
+});
 
 function sessionResponse(sessionId: string, c: Context) {
 	const url = new URL(c.req.url);
@@ -146,7 +159,7 @@ async function streamModelInstallEvents(c: Context) {
 }
 
 export function registerDictationRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -159,30 +172,14 @@ export function registerDictationRoutes(app: Hono) {
 					description: 'Dictation status',
 					content: {
 						'application/json': {
-							schema: jsonSchema(
-								{
-									available: { type: 'boolean' },
-									engine: { type: 'string' },
-									engineInstalled: { type: 'boolean' },
-									defaultModel: { type: 'string' },
-									format: {
-										type: 'object',
-										properties: {
-											encoding: { type: 'string' },
-											sampleRate: { type: 'number' },
-											channels: { type: 'number' },
-										},
-									},
-									models: { type: 'array', items: { type: 'object' } },
-								},
-								[
-									'available',
-									'engine',
-									'engineInstalled',
-									'defaultModel',
-									'models',
-								],
-							),
+							schema: z.object({
+								available: z.boolean(),
+								engine: z.string(),
+								engineInstalled: z.boolean(),
+								defaultModel: z.string(),
+								format: audioFormatSchema.optional(),
+								models: z.array(dictationModelSchema),
+							}),
 						},
 					},
 				},
@@ -199,7 +196,7 @@ export function registerDictationRoutes(app: Hono) {
 			}),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -212,12 +209,7 @@ export function registerDictationRoutes(app: Hono) {
 					description: 'Dictation models',
 					content: {
 						'application/json': {
-							schema: jsonSchema(
-								{
-									models: { type: 'array', items: { type: 'object' } },
-								},
-								['models'],
-							),
+							schema: z.object({ models: z.array(dictationModelSchema) }),
 						},
 					},
 				},
@@ -229,7 +221,7 @@ export function registerDictationRoutes(app: Hono) {
 			}),
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -237,19 +229,12 @@ export function registerDictationRoutes(app: Hono) {
 			tags: ['dictation'],
 			operationId: 'installDictationModel',
 			summary: 'Install a local dictation model',
-			parameters: [
-				{
-					name: 'model',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: jsonSchema({ force: { type: 'boolean' } }),
+			request: {
+				params: modelParamsSchema,
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: installModelBodySchema },
 					},
 				},
 			},
@@ -258,7 +243,7 @@ export function registerDictationRoutes(app: Hono) {
 					description: 'Model installed or already present',
 					content: {
 						'application/json': {
-							schema: jsonSchema({ model: { type: 'object' } }, ['model']),
+							schema: z.object({ model: dictationModelSchema }),
 						},
 					},
 				},
@@ -266,21 +251,17 @@ export function registerDictationRoutes(app: Hono) {
 					description: 'Model installation started',
 					content: {
 						'application/json': {
-							schema: jsonSchema({ model: { type: 'object' } }, ['model']),
+							schema: z.object({ model: dictationModelSchema }),
 						},
 					},
 				},
 				'404': {
 					description: 'Model not found',
-					content: {
-						'application/json': { schema: errorResponseSchema() },
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 				'501': {
 					description: 'Model download metadata is not configured',
-					content: {
-						'application/json': { schema: errorResponseSchema() },
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -297,7 +278,7 @@ export function registerDictationRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -307,35 +288,22 @@ export function registerDictationRoutes(app: Hono) {
 			summary: 'Stream local dictation model install progress',
 			description:
 				'Stream model install progress events via SSE. Generated HTTP clients may need custom SSE handling.',
-			parameters: [
-				{
-					name: 'model',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: modelParamsSchema },
 			responses: {
 				'200': {
 					description: 'SSE stream of model install progress',
-					content: {
-						'text/event-stream': {
-							schema: { type: 'string' },
-						},
-					},
+					content: { 'text/event-stream': { schema: z.string() } },
 				},
 				'404': {
 					description: 'Model not found',
-					content: {
-						'application/json': { schema: errorResponseSchema() },
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
 		streamModelInstallEvents,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -343,31 +311,22 @@ export function registerDictationRoutes(app: Hono) {
 			tags: ['dictation'],
 			operationId: 'removeDictationModel',
 			summary: 'Remove an installed local dictation model',
-			parameters: [
-				{
-					name: 'model',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: modelParamsSchema },
 			responses: {
 				'200': {
 					description: 'Model removed',
 					content: {
 						'application/json': {
-							schema: jsonSchema(
-								{ removed: { type: 'boolean' }, model: { type: 'object' } },
-								['removed', 'model'],
-							),
+							schema: z.object({
+								removed: z.boolean(),
+								model: dictationModelSchema,
+							}),
 						},
 					},
 				},
 				'404': {
 					description: 'Model not found',
-					content: {
-						'application/json': { schema: errorResponseSchema() },
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -380,7 +339,7 @@ export function registerDictationRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -388,14 +347,11 @@ export function registerDictationRoutes(app: Hono) {
 			tags: ['dictation'],
 			operationId: 'createDictationSession',
 			summary: 'Create a streaming dictation session',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: jsonSchema({
-							model: { type: 'string' },
-							language: { type: 'string' },
-						}),
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: createSessionBodySchema },
 					},
 				},
 			},
@@ -404,16 +360,13 @@ export function registerDictationRoutes(app: Hono) {
 					description: 'Dictation session created',
 					content: {
 						'application/json': {
-							schema: jsonSchema(
-								{
-									id: { type: 'string' },
-									wsUrl: { type: 'string' },
-									model: { type: 'string' },
-									modelInstalled: { type: 'boolean' },
-									format: { type: 'object' },
-								},
-								['id', 'wsUrl', 'model', 'modelInstalled', 'format'],
-							),
+							schema: z.object({
+								id: z.string(),
+								wsUrl: z.string(),
+								model: z.string(),
+								modelInstalled: z.boolean(),
+								format: audioFormatSchema,
+							}),
 						},
 					},
 				},
@@ -447,7 +400,7 @@ export function registerDictationRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -455,28 +408,19 @@ export function registerDictationRoutes(app: Hono) {
 			tags: ['dictation'],
 			operationId: 'getDictationSession',
 			summary: 'Get a dictation session',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: sessionParamsSchema },
 			responses: {
 				'200': {
 					description: 'Dictation session',
 					content: {
 						'application/json': {
-							schema: jsonSchema({ session: { type: 'object' } }, ['session']),
+							schema: z.object({ session: dictationSessionSchema }),
 						},
 					},
 				},
 				'404': {
 					description: 'Session not found',
-					content: {
-						'application/json': { schema: errorResponseSchema() },
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -488,7 +432,7 @@ export function registerDictationRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -496,20 +440,13 @@ export function registerDictationRoutes(app: Hono) {
 			tags: ['dictation'],
 			operationId: 'deleteDictationSession',
 			summary: 'Delete a dictation session',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: sessionParamsSchema },
 			responses: {
 				'200': {
 					description: 'Deleted',
 					content: {
 						'application/json': {
-							schema: jsonSchema({ deleted: { type: 'boolean' } }, ['deleted']),
+							schema: z.object({ deleted: z.boolean() }),
 						},
 					},
 				},
@@ -521,7 +458,7 @@ export function registerDictationRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -531,14 +468,7 @@ export function registerDictationRoutes(app: Hono) {
 			summary: 'Connect to dictation WebSocket',
 			description:
 				'Upgrade to a WebSocket for streaming PCM audio frames and receiving transcript events.',
-			parameters: [
-				{
-					name: 'id',
-					in: 'path',
-					required: true,
-					schema: { type: 'string' },
-				},
-			],
+			request: { params: sessionParamsSchema },
 			responses: {
 				'101': { description: 'WebSocket upgrade accepted' },
 				'404': { description: 'Session not found' },

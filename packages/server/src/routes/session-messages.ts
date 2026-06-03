@@ -1,26 +1,105 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
+import { getDb } from '@ottocode/database';
+import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
 	ensureProviderEnv,
 	getProviderDefinition,
 	isProviderAuthorized,
 	loadConfig,
+	logger,
 	type ReasoningLevel,
 	validateProviderModel,
 } from '@ottocode/sdk';
-import { getDb } from '@ottocode/database';
-import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { dispatchAssistantMessage } from '../runtime/message/service.ts';
-import { logger } from '@ottocode/sdk';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
-import { openApiRoute } from '../openapi/route.ts';
+import { dispatchAssistantMessage } from '../runtime/message/service.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 
+const messageSchema = z.any();
+
+const messageParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+});
+
+const listMessagesQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+	without: z
+		.enum(['parts'])
+		.optional()
+		.openapi({
+			param: { name: 'without', in: 'query' },
+			description:
+				'Exclude parts from the response. By default, parts are included.',
+		}),
+	parsed: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'parsed', in: 'query' },
+		}),
+});
+
+const createMessageQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const createMessageBodySchema = z.object({
+	content: z.string(),
+	agent: z.string().optional().openapi({
+		description: 'Agent name. Defaults to config if omitted.',
+	}),
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	userContext: z.string().optional().openapi({
+		description:
+			'Optional user-provided context to include in the system prompt.',
+	}),
+	reasoningText: z.boolean().optional().openapi({
+		description:
+			'Enable extended thinking / reasoning for models that support it.',
+	}),
+	reasoningLevel: z
+		.enum(['minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
+		.optional()
+		.openapi({
+			description:
+				'Reasoning intensity level for providers/models that support it.',
+		}),
+	images: z.array(z.unknown()).optional(),
+	files: z.array(z.unknown()).optional(),
+	oneShot: z.boolean().optional(),
+});
+
+const createMessageResponseSchema = z.object({
+	messageId: z.string(),
+});
+
+const messageErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionMessagesRoutes(app: Hono) {
-	// List messages for a session
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -28,65 +107,15 @@ export function registerSessionMessagesRoutes(app: Hono) {
 			tags: ['messages'],
 			operationId: 'listMessages',
 			summary: 'List messages for a session',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'id',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'without',
-					required: false,
-					schema: {
-						type: 'string',
-						enum: ['parts'],
-					},
-					description:
-						'Exclude parts from the response. By default, parts are included.',
-				},
-			],
+			request: {
+				params: messageParamsSchema,
+				query: listMessagesQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'array',
-								items: {
-									allOf: [
-										{
-											$ref: '#/components/schemas/Message',
-										},
-										{
-											type: 'object',
-											properties: {
-												parts: {
-													type: 'array',
-													items: {
-														$ref: '#/components/schemas/MessagePart',
-													},
-												},
-											},
-											required: [],
-										},
-									],
-								},
-							},
-						},
+						'application/json': { schema: z.array(messageSchema) },
 					},
 				},
 			},
@@ -152,8 +181,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 		},
 	);
 
-	// Post a user message and get assistant reply (non-streaming for v0)
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -161,65 +189,13 @@ export function registerSessionMessagesRoutes(app: Hono) {
 			tags: ['messages'],
 			operationId: 'createMessage',
 			summary: 'Send a user message and enqueue assistant run',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'path',
-					name: 'id',
+			request: {
+				params: messageParamsSchema,
+				query: createMessageQuerySchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							required: ['content'],
-							properties: {
-								content: {
-									type: 'string',
-								},
-								agent: {
-									type: 'string',
-									description: 'Agent name. Defaults to config if omitted.',
-								},
-								provider: {
-									$ref: '#/components/schemas/Provider',
-								},
-								model: {
-									type: 'string',
-								},
-								userContext: {
-									type: 'string',
-									description:
-										'Optional user-provided context to include in the system prompt.',
-								},
-								reasoningText: {
-									type: 'boolean',
-									description:
-										'Enable extended thinking / reasoning for models that support it.',
-								},
-								reasoningLevel: {
-									type: 'string',
-									enum: ['minimal', 'low', 'medium', 'high', 'max', 'xhigh'],
-									description:
-										'Reasoning intensity level for providers/models that support it.',
-								},
-							},
-						},
+					content: {
+						'application/json': { schema: createMessageBodySchema },
 					},
 				},
 			},
@@ -227,33 +203,13 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				'202': {
 					description: 'Accepted',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									messageId: {
-										type: 'string',
-									},
-								},
-								required: ['messageId'],
-							},
-						},
+						'application/json': { schema: createMessageResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: messageErrorSchema },
 					},
 				},
 			},
@@ -266,7 +222,6 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				const sessionId = c.req.param('id');
 				const body = await c.req.json().catch(() => ({}));
 
-				// DEBUG: Log received body
 				logger.info('[API] Received message request', {
 					sessionId,
 					hasContent: !!body?.content,
@@ -276,7 +231,6 @@ export function registerSessionMessagesRoutes(app: Hono) {
 						: 'NONE',
 				});
 
-				// Load session to inherit its provider/model/agent by default
 				const sessionRows = await db
 					.select()
 					.from(sessions)
@@ -295,7 +249,6 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				const images = Array.isArray(body?.images) ? body.images : undefined;
 				const files = Array.isArray(body?.files) ? body.files : undefined;
 
-				// DEBUG: Log extracted userContext
 				logger.info('[API] Extracted userContext', {
 					userContext: userContext
 						? `${String(userContext).substring(0, 50)}...`
@@ -310,8 +263,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					cfg.defaults.reasoningLevel ??
 					'high';
 
-				// Validate model capabilities if tools are allowed for this agent
-				const wantsToolCalls = true; // agent toolset may be non-empty
+				const wantsToolCalls = true;
 				try {
 					validateProviderModel(provider, modelName, cfg, { wantsToolCalls });
 				} catch (err) {
@@ -319,7 +271,6 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					const message = err instanceof Error ? err.message : String(err);
 					return c.json({ error: message }, 400);
 				}
-				// Enforce provider auth: only allow providers/models the user authenticated for
 				const authorized = await isProviderAuthorized(cfg, provider);
 				if (!authorized) {
 					logger.warn('Provider not authorized', { provider });

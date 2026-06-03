@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { API_BASE_URL } from '../lib/config';
+import {
+	getSimulatorStatus,
+	startSimulator as apiStartSimulator,
+	stopSimulator as apiStopSimulator,
+} from '@ottocode/api';
 
 export interface SimulatorState {
 	status: 'idle' | 'starting' | 'connected' | 'error';
@@ -16,43 +20,24 @@ interface SimulatorStartResponse extends SimulatorState {
 	stdout?: string;
 }
 
-function simulatorUrl(path: string) {
-	return `${API_BASE_URL.replace(/\/$/, '')}${path}`;
-}
-
-async function readJson<T>(response: Response): Promise<T> {
-	const data = (await response.json()) as T;
-	if (!response.ok) {
-		const message =
-			data && typeof data === 'object' && 'error' in data
-				? String((data as { error?: unknown }).error)
-				: response.statusText;
-		throw new Error(message);
-	}
-	return data;
-}
-
 async function fetchSimulatorStatus(): Promise<SimulatorState> {
-	const response = await fetch(simulatorUrl('/v1/simulator/status'));
-	return readJson<SimulatorState>(response);
+	const response = await getSimulatorStatus();
+	if (response.error) throw new Error('Failed to get simulator status');
+	return response.data as SimulatorState;
 }
 
 async function startSimulator(port = 3200): Promise<SimulatorStartResponse> {
-	const response = await fetch(simulatorUrl('/v1/simulator/start'), {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ port }),
+	const response = await apiStartSimulator({
+		body: { port },
 	});
-	return readJson<SimulatorStartResponse>(response);
+	if (response.error) throw new Error('Failed to start simulator');
+	return response.data as SimulatorStartResponse;
 }
 
 async function stopSimulator(): Promise<{ ok: boolean }> {
-	const response = await fetch(simulatorUrl('/v1/simulator/stop'), {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({}),
-	});
-	return readJson<{ ok: boolean }>(response);
+	const response = await apiStopSimulator({ body: {} });
+	if (response.error) throw new Error('Failed to stop simulator');
+	return response.data as { ok: boolean };
 }
 
 export function useSimulatorStatus() {

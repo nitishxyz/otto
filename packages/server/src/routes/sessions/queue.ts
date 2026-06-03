@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	getSessionQueueState,
 	loadProjectDb,
@@ -7,9 +8,78 @@ import {
 	sendSessionQueuedMessageNow,
 } from './service.ts';
 
+const sessionIdParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+});
+
+const queueMessageParamsSchema = z.object({
+	sessionId: z.string().openapi({
+		param: { name: 'sessionId', in: 'path' },
+	}),
+	messageId: z.string().openapi({
+		param: { name: 'messageId', in: 'path' },
+	}),
+});
+
+const projectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const abortBodySchema = z.object({
+	messageId: z.string().optional(),
+	clearQueue: z.boolean().optional(),
+});
+
+const abortResponseSchema = z.object({
+	success: z.boolean(),
+	wasRunning: z.boolean().optional(),
+	messageId: z.string().optional(),
+});
+
+const queueStateSchema = z.object({
+	currentMessageId: z.string().nullable(),
+	queuedMessages: z.array(
+		z.object({
+			assistantMessageId: z.string(),
+			agent: z.string(),
+			provider: z.string(),
+			model: z.string(),
+		}),
+	),
+	isRunning: z.boolean(),
+});
+
+const sendNowResponseSchema = z.object({
+	success: z.boolean(),
+	promoted: z.boolean(),
+	wasQueued: z.boolean().optional(),
+	wasRunning: z.boolean().optional(),
+	preemptedMessageId: z.string().nullable().optional(),
+});
+
+const removeQueueResponseSchema = z.object({
+	success: z.boolean(),
+	removed: z.boolean().optional(),
+	wasQueued: z.boolean().optional(),
+	wasRunning: z.boolean().optional(),
+	wasStored: z.boolean().optional(),
+});
+
+const queueErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerSessionQueueRoutes(app: Hono) {
-	// Abort session stream
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -19,32 +89,20 @@ export function registerSessionQueueRoutes(app: Hono) {
 			summary: 'Abort a running session',
 			description:
 				'Aborts any currently running assistant generation for the session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
+			request: {
+				params: sessionIdParamsSchema,
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: abortBodySchema },
 					},
-					description: 'Session ID to abort',
 				},
-			],
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-								},
-								required: ['success'],
-							},
-						},
+						'application/json': { schema: abortResponseSchema },
 					},
 				},
 			},
@@ -77,8 +135,7 @@ export function registerSessionQueueRoutes(app: Hono) {
 		},
 	);
 
-	// Get queue state for a session
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -86,55 +143,14 @@ export function registerSessionQueueRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'getSessionQueue',
 			summary: 'Get queue state for a session',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: sessionIdParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									currentMessageId: {
-										type: 'string',
-										nullable: true,
-									},
-									queuedMessages: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												assistantMessageId: {
-													type: 'string',
-												},
-												agent: {
-													type: 'string',
-												},
-												provider: {
-													type: 'string',
-												},
-												model: {
-													type: 'string',
-												},
-											},
-										},
-									},
-									isRunning: {
-										type: 'boolean',
-									},
-								},
-								required: ['currentMessageId', 'queuedMessages', 'isRunning'],
-							},
-						},
+						'application/json': { schema: queueStateSchema },
 					},
 				},
 			},
@@ -145,8 +161,7 @@ export function registerSessionQueueRoutes(app: Hono) {
 		},
 	);
 
-	// Promote a queued message and preempt the active run without showing an abort error
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -156,71 +171,20 @@ export function registerSessionQueueRoutes(app: Hono) {
 			summary: 'Send a queued message now',
 			description:
 				'Promotes a queued message to run next and silently preempts the active assistant generation.',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'path',
-					name: 'messageId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: queueMessageParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									promoted: {
-										type: 'boolean',
-									},
-									wasQueued: {
-										type: 'boolean',
-									},
-									wasRunning: {
-										type: 'boolean',
-									},
-									preemptedMessageId: {
-										type: 'string',
-										nullable: true,
-									},
-								},
-								required: ['success', 'promoted'],
-							},
-						},
+						'application/json': { schema: sendNowResponseSchema },
 					},
 				},
 				'404': {
 					description: 'Queued message not found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									promoted: {
-										type: 'boolean',
-									},
-								},
-								required: ['success', 'promoted'],
-							},
-						},
+						'application/json': { schema: sendNowResponseSchema },
 					},
 				},
 			},
@@ -235,8 +199,7 @@ export function registerSessionQueueRoutes(app: Hono) {
 		},
 	);
 
-	// Remove a message from the queue
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'delete',
@@ -244,77 +207,21 @@ export function registerSessionQueueRoutes(app: Hono) {
 			tags: ['sessions'],
 			operationId: 'removeFromQueue',
 			summary: 'Remove a message from session queue',
-			parameters: [
-				{
-					in: 'path',
-					name: 'sessionId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'path',
-					name: 'messageId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				params: queueMessageParamsSchema,
+				query: projectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									removed: {
-										type: 'boolean',
-									},
-									wasQueued: {
-										type: 'boolean',
-									},
-									wasRunning: {
-										type: 'boolean',
-									},
-									wasStored: {
-										type: 'boolean',
-									},
-								},
-								required: ['success'],
-							},
-						},
+						'application/json': { schema: removeQueueResponseSchema },
 					},
 				},
 				'404': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: queueErrorSchema },
 					},
 				},
 			},

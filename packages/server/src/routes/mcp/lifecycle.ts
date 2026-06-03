@@ -1,10 +1,47 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { startMCPServer, stopMCPServer, testMCPServer } from './service.ts';
 import { copilotMCPOAuthStore, copilotMCPSessions } from './state.ts';
 
+const mcpServerNameParamsSchema = z.object({
+	name: z.string().openapi({
+		param: { name: 'name', in: 'path' },
+		description: 'MCP server name',
+	}),
+});
+
+const mcpToolSchema = z.object({
+	name: z.string().optional(),
+	description: z.string().optional(),
+});
+
+const mcpLifecycleResponseSchema = z.object({
+	ok: z.boolean(),
+	name: z.string().optional(),
+	connected: z.boolean().optional(),
+	tools: z.array(mcpToolSchema).optional(),
+	authRequired: z.boolean().optional(),
+	authType: z.string().optional(),
+	sessionId: z.string().optional(),
+	userCode: z.string().optional(),
+	verificationUri: z.string().optional(),
+	interval: z.number().int().optional(),
+	authUrl: z.string().optional(),
+	error: z.string().optional(),
+});
+
+const mcpActionResponseSchema = z.object({
+	ok: z.boolean(),
+	error: z.string().optional(),
+});
+
+const mcpErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerMCPLifecycleRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -12,92 +49,20 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 			tags: ['mcp'],
 			operationId: 'startMCPServer',
 			summary: 'Start an MCP server',
-			parameters: [
-				{
-					in: 'path',
-					name: 'name',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'MCP server name',
-				},
-			],
+			request: {
+				params: mcpServerNameParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									name: {
-										type: 'string',
-									},
-									connected: {
-										type: 'boolean',
-									},
-									tools: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												name: {
-													type: 'string',
-												},
-												description: {
-													type: 'string',
-												},
-											},
-										},
-									},
-									authRequired: {
-										type: 'boolean',
-									},
-									authType: {
-										type: 'string',
-									},
-									sessionId: {
-										type: 'string',
-									},
-									userCode: {
-										type: 'string',
-									},
-									verificationUri: {
-										type: 'string',
-									},
-									interval: {
-										type: 'integer',
-									},
-									authUrl: {
-										type: 'string',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: mcpLifecycleResponseSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: mcpErrorSchema },
 					},
 				},
 			},
@@ -114,7 +79,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -122,51 +87,20 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 			tags: ['mcp'],
 			operationId: 'stopMCPServer',
 			summary: 'Stop an MCP server',
-			parameters: [
-				{
-					in: 'path',
-					name: 'name',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'MCP server name',
-				},
-			],
+			request: {
+				params: mcpServerNameParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: mcpActionResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: mcpErrorSchema },
 					},
 				},
 			},
@@ -179,7 +113,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -187,68 +121,20 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 			tags: ['mcp'],
 			operationId: 'testMCPServer',
 			summary: 'Test connection to an MCP server',
-			parameters: [
-				{
-					in: 'path',
-					name: 'name',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'MCP server name',
-				},
-			],
+			request: {
+				params: mcpServerNameParamsSchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									ok: {
-										type: 'boolean',
-									},
-									name: {
-										type: 'string',
-									},
-									tools: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												name: {
-													type: 'string',
-												},
-												description: {
-													type: 'string',
-												},
-											},
-										},
-									},
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['ok'],
-							},
-						},
+						'application/json': { schema: mcpLifecycleResponseSchema },
 					},
 				},
 				'404': {
-					description: 'Bad Request',
+					description: 'Not Found',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: mcpErrorSchema },
 					},
 				},
 			},

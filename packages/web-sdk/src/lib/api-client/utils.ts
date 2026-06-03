@@ -1,13 +1,21 @@
 import { client } from '@ottocode/api';
-import type {
-	Session as ApiSession,
-	Message as ApiMessage,
-} from '@ottocode/api';
 import {
 	getRuntimeApiBaseUrl,
 	setRuntimeApiBaseUrl as persistRuntimeApiBaseUrl,
 } from '../config';
 import type { Session, Message } from '../../types/api';
+
+type ApiSession = Record<string, unknown> & {
+	title?: string | null;
+	createdAt?: string | number;
+	lastActiveAt?: string | number;
+	lastViewedAt?: string | number | null;
+};
+
+type ApiMessage = Record<string, unknown> & {
+	createdAt?: string | number;
+	completedAt?: string | number | null;
+};
 
 function getClientAdapter(): 'fetch' | undefined {
 	if (typeof window !== 'undefined' && typeof window.fetch === 'function') {

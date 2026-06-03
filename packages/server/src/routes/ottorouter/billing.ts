@@ -1,6 +1,7 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	buildWalletHeaders,
@@ -8,8 +9,80 @@ import {
 	getOttoRouterPrivateKey,
 } from './service.ts';
 
+const errorResponseSchema = z.object({ error: z.string() });
+const passthroughResponseSchema = z.record(z.string(), z.unknown());
+
+const amountQuerySchema = z.object({
+	amount: z.coerce.number().openapi({
+		param: { name: 'amount', in: 'query' },
+		description: 'Amount in USD',
+	}),
+});
+
+const polarEstimateSchema = z.object({
+	creditAmount: z.number().optional(),
+	chargeAmount: z.number().optional(),
+	feeAmount: z.number().optional(),
+	feeBreakdown: z
+		.object({
+			basePercent: z.number().optional(),
+			internationalPercent: z.number().optional(),
+			fixedCents: z.number().optional(),
+		})
+		.optional(),
+});
+
+const polarCheckoutBodySchema = z.object({
+	amount: z.number(),
+	successUrl: z.string(),
+});
+
+const polarStatusQuerySchema = z.object({
+	checkoutId: z.string().openapi({
+		param: { name: 'checkoutId', in: 'query' },
+	}),
+});
+
+const polarStatusSchema = z.object({
+	checkoutId: z.string().optional(),
+	confirmed: z.boolean().optional(),
+	amountUsd: z.number().nullable().optional(),
+	confirmedAt: z.string().nullable().optional(),
+});
+
+const razorpayEstimateSchema = z.object({
+	creditAmountUsd: z.number().optional(),
+	chargeAmountInr: z.number().optional(),
+	feeAmountInr: z.number().optional(),
+	currency: z.string().optional(),
+	exchangeRate: z.number().optional(),
+});
+
+const razorpayOrderBodySchema = z.object({ amount: z.number() });
+
+const razorpayOrderResponseSchema = z.object({
+	success: z.boolean().optional(),
+	orderId: z.string().optional(),
+	amount: z.number().optional(),
+	currency: z.string().optional(),
+	creditAmountUsd: z.number().optional(),
+	keyId: z.string().optional(),
+});
+
+const razorpayVerifyBodySchema = z.object({
+	razorpay_order_id: z.string(),
+	razorpay_payment_id: z.string(),
+	razorpay_signature: z.string(),
+});
+
+const razorpayVerifyResponseSchema = z.object({
+	success: z.boolean().optional(),
+	credited: z.number().optional(),
+	newBalance: z.number().optional(),
+});
+
 export function registerOttoRouterBillingRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -17,52 +90,11 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'getPolarTopupEstimate',
 			summary: 'Get estimated fees for a Polar topup',
-			parameters: [
-				{
-					in: 'query',
-					name: 'amount',
-					required: true,
-					schema: {
-						type: 'number',
-					},
-					description: 'Amount in USD',
-				},
-			],
+			request: { query: amountQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									creditAmount: {
-										type: 'number',
-									},
-									chargeAmount: {
-										type: 'number',
-									},
-									feeAmount: {
-										type: 'number',
-									},
-									feeBreakdown: {
-										type: 'object',
-										properties: {
-											basePercent: {
-												type: 'number',
-											},
-											internationalPercent: {
-												type: 'number',
-											},
-											fixedCents: {
-												type: 'number',
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					content: { 'application/json': { schema: polarEstimateSchema } },
 				},
 			},
 		},
@@ -96,7 +128,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -104,51 +136,22 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'createPolarCheckout',
 			summary: 'Create a Polar checkout for topping up',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								amount: {
-									type: 'number',
-								},
-								successUrl: {
-									type: 'string',
-								},
-							},
-							required: ['amount', 'successUrl'],
-						},
-					},
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: polarCheckoutBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-							},
-						},
+						'application/json': { schema: passthroughResponseSchema },
 					},
 				},
 				'401': {
 					description: 'Wallet not configured',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -199,7 +202,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -207,42 +210,11 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'getPolarTopupStatus',
 			summary: 'Get status of a Polar checkout',
-			parameters: [
-				{
-					in: 'query',
-					name: 'checkoutId',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: { query: polarStatusQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									checkoutId: {
-										type: 'string',
-									},
-									confirmed: {
-										type: 'boolean',
-									},
-									amountUsd: {
-										type: 'number',
-										nullable: true,
-									},
-									confirmedAt: {
-										type: 'string',
-										nullable: true,
-									},
-								},
-							},
-						},
-					},
+					content: { 'application/json': { schema: polarStatusSchema } },
 				},
 			},
 		},
@@ -276,7 +248,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -284,44 +256,11 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'getRazorpayTopupEstimate',
 			summary: 'Get estimated fees for a Razorpay topup',
-			parameters: [
-				{
-					in: 'query',
-					name: 'amount',
-					required: true,
-					schema: {
-						type: 'number',
-					},
-					description: 'Amount in USD',
-				},
-			],
+			request: { query: amountQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									creditAmountUsd: {
-										type: 'number',
-									},
-									chargeAmountInr: {
-										type: 'number',
-									},
-									feeAmountInr: {
-										type: 'number',
-									},
-									currency: {
-										type: 'string',
-									},
-									exchangeRate: {
-										type: 'number',
-									},
-								},
-							},
-						},
-					},
+					content: { 'application/json': { schema: razorpayEstimateSchema } },
 				},
 			},
 		},
@@ -355,7 +294,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -363,68 +302,22 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'createRazorpayOrder',
 			summary: 'Create a Razorpay order for topping up',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								amount: {
-									type: 'number',
-								},
-							},
-							required: ['amount'],
-						},
-					},
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: razorpayOrderBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									orderId: {
-										type: 'string',
-									},
-									amount: {
-										type: 'number',
-									},
-									currency: {
-										type: 'string',
-									},
-									creditAmountUsd: {
-										type: 'number',
-									},
-									keyId: {
-										type: 'string',
-									},
-								},
-							},
-						},
+						'application/json': { schema: razorpayOrderResponseSchema },
 					},
 				},
 				'401': {
 					description: 'Wallet not configured',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -468,7 +361,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -476,69 +369,22 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 			tags: ['ottorouter'],
 			operationId: 'verifyRazorpayPayment',
 			summary: 'Verify Razorpay payment and credit balance',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								razorpay_order_id: {
-									type: 'string',
-								},
-								razorpay_payment_id: {
-									type: 'string',
-								},
-								razorpay_signature: {
-									type: 'string',
-								},
-							},
-							required: [
-								'razorpay_order_id',
-								'razorpay_payment_id',
-								'razorpay_signature',
-							],
-						},
-					},
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: razorpayVerifyBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									credited: {
-										type: 'number',
-									},
-									newBalance: {
-										type: 'number',
-									},
-								},
-							},
-						},
+						'application/json': { schema: razorpayVerifyResponseSchema },
 					},
 				},
 				'401': {
 					description: 'Wallet not configured',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},

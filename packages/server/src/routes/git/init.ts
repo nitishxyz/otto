@@ -1,16 +1,35 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { realpath, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitStatusSchema } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
 
 const execFileAsync = promisify(execFile);
 
+const gitProjectBodySchema = z.object({
+	project: z.string().optional(),
+});
+
+const gitInitResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		initialized: z.boolean(),
+		path: z.string(),
+	}),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerInitRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -18,18 +37,11 @@ export function registerInitRoute(app: Hono) {
 			tags: ['git'],
 			operationId: 'initGitRepo',
 			summary: 'Initialize a git repository',
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: {
-									type: 'string',
-								},
-							},
-						},
+			request: {
+				body: {
+					required: false,
+					content: {
+						'application/json': { schema: gitProjectBodySchema },
 					},
 				},
 			},
@@ -37,53 +49,13 @@ export function registerInitRoute(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										type: 'object',
-										properties: {
-											initialized: {
-												type: 'boolean',
-											},
-											path: {
-												type: 'string',
-											},
-										},
-										required: ['initialized', 'path'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitInitResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

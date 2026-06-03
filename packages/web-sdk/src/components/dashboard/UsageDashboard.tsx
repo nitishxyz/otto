@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Globe2, RefreshCw } from 'lucide-react';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { apiClient } from '../../lib/api-client';
-import type {
-	UsageStats,
-	UsageProviderAgg,
-	UsageModelAgg,
-} from '../../lib/api-client/usage';
+import type { UsageStats } from '../../lib/api-client/usage';
 
 interface UsageDashboardProps {
 	onBack?: () => void;
@@ -390,7 +386,7 @@ function AuthSplit({ stats }: { stats: UsageStats }) {
 /* Top usage list (combined providers + models)                        */
 /* ------------------------------------------------------------------ */
 
-function ProviderList({ providers }: { providers: UsageProviderAgg[] }) {
+function ProviderList({ providers }: { providers: UsageStats['providers'] }) {
 	if (providers.length === 0) {
 		return (
 			<div className="py-10 text-center text-xs text-muted-foreground">
@@ -433,7 +429,7 @@ function ProviderList({ providers }: { providers: UsageProviderAgg[] }) {
 	);
 }
 
-function ModelList({ models }: { models: UsageModelAgg[] }) {
+function ModelList({ models }: { models: UsageStats['models'] }) {
 	if (models.length === 0) {
 		return (
 			<div className="py-10 text-center text-xs text-muted-foreground">

@@ -1,21 +1,62 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
-import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitDiffSchema } from './schemas.ts';
 import {
-	validateAndGetGitRoot,
 	checkIfNewFile,
 	inferLanguage,
 	summarizeDiff,
+	validateAndGetGitRoot,
 } from './utils.ts';
-import { openApiRoute } from '../../openapi/route.ts';
 
 const execFileAsync = promisify(execFile);
 
+const gitDiffQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+	file: z.string().openapi({
+		param: { name: 'file', in: 'query' },
+		description: 'File path to get diff for',
+	}),
+	staged: z
+		.enum(['true', 'false'])
+		.optional()
+		.openapi({
+			param: { name: 'staged', in: 'query' },
+			description: 'Show staged diff (default: unstaged)',
+		}),
+	fullFile: z
+		.enum(['true', 'false'])
+		.optional()
+		.openapi({
+			param: { name: 'fullFile', in: 'query' },
+			description: 'Include full file content in diff',
+		}),
+});
+
+const gitDiffResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.any(),
+});
+
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
 export function registerDiffRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -23,112 +64,26 @@ export function registerDiffRoute(app: Hono) {
 			tags: ['git'],
 			operationId: 'getGitDiff',
 			summary: 'Get git diff for a file',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'file',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'File path to get diff for',
-				},
-				{
-					in: 'query',
-					name: 'staged',
-					required: false,
-					schema: {
-						type: 'string',
-						enum: ['true', 'false'],
-					},
-					description: 'Show staged diff (default: unstaged)',
-				},
-				{
-					in: 'query',
-					name: 'fullFile',
-					required: false,
-					schema: {
-						type: 'string',
-						enum: ['true', 'false'],
-					},
-					description: 'Include full file content in diff',
-				},
-			],
+			request: {
+				query: gitDiffQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['ok'],
-									},
-									data: {
-										$ref: '#/components/schemas/GitDiff',
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: gitDiffResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Error',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['error'],
-									},
-									error: {
-										type: 'string',
-									},
-									code: {
-										type: 'string',
-									},
-								},
-								required: ['status', 'error'],
-							},
-						},
+						'application/json': { schema: gitErrorResponseSchema },
 					},
 				},
 			},

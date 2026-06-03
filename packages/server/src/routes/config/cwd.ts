@@ -1,11 +1,17 @@
+import { z } from '@hono/zod-openapi';
+import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { basename } from 'node:path';
-import { logger } from '@ottocode/sdk';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import { openApiRoute } from '../../openapi/route.ts';
+
+const cwdResponseSchema = z.object({
+	cwd: z.string(),
+	dirName: z.string(),
+});
 
 export function registerCwdRoute(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -18,18 +24,7 @@ export function registerCwdRoute(app: Hono) {
 					description: 'OK',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									cwd: {
-										type: 'string',
-									},
-									dirName: {
-										type: 'string',
-									},
-								},
-								required: ['cwd', 'dirName'],
-							},
+							schema: cwdResponseSchema,
 						},
 					},
 				},

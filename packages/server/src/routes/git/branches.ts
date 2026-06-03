@@ -1,45 +1,77 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../../openapi/route.ts';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import {
 	handleCheckoutBranch,
 	handleCreateBranch,
 	handleListBranches,
 } from './branches-service.ts';
 
-const errorResponse = {
-	description: 'Error',
-	content: {
-		'application/json': {
-			schema: {
-				type: 'object',
-				properties: {
-					status: { type: 'string', enum: ['error'] },
-					error: { type: 'string' },
-					code: { type: 'string' },
-				},
-				required: ['status', 'error'],
-			},
-		},
-	},
-} as const;
+const gitProjectQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
 
-const branchItemSchema = {
-	type: 'object',
-	properties: {
-		name: { type: 'string' },
-		fullName: { type: 'string' },
-		current: { type: 'boolean' },
-		remote: { type: 'boolean' },
-		remoteName: { type: 'string' },
-		upstream: { type: 'string' },
-		sha: { type: 'string' },
-		subject: { type: 'string' },
-	},
-	required: ['name', 'fullName', 'current', 'remote'],
-} as const;
+const gitErrorResponseSchema = z.object({
+	status: z.literal('error'),
+	error: z.string(),
+	code: z.string().optional(),
+});
+
+const branchItemSchema = z.object({
+	name: z.string(),
+	fullName: z.string(),
+	current: z.boolean(),
+	remote: z.boolean(),
+	remoteName: z.string().optional(),
+	upstream: z.string().optional(),
+	sha: z.string().optional(),
+	subject: z.string().optional(),
+});
+
+const listBranchesResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		current: z.string(),
+		branches: z.array(branchItemSchema),
+	}),
+});
+
+const checkoutBranchBodySchema = z.object({
+	project: z.string().optional(),
+	branch: z.string(),
+});
+
+const checkoutBranchResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		branch: z.string(),
+	}),
+});
+
+const createBranchBodySchema = z.object({
+	project: z.string().optional(),
+	name: z.string(),
+	startPoint: z.string().optional(),
+	checkout: z.boolean().optional(),
+});
+
+const createBranchResponseSchema = z.object({
+	status: z.literal('ok'),
+	data: z.object({
+		branch: z.string(),
+		checkedOut: z.boolean(),
+	}),
+});
 
 export function registerBranchesRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -47,50 +79,34 @@ export function registerBranchesRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'listGitBranches',
 			summary: 'List local and remote git branches',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
+			request: {
+				query: gitProjectQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['ok'] },
-									data: {
-										type: 'object',
-										properties: {
-											current: { type: 'string' },
-											branches: {
-												type: 'array',
-												items: branchItemSchema,
-											},
-										},
-										required: ['current', 'branches'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: listBranchesResponseSchema },
 					},
 				},
-				'400': errorResponse,
-				'500': errorResponse,
+				'400': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
 			},
 		},
 		handleListBranches,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -98,18 +114,11 @@ export function registerBranchesRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'checkoutGitBranch',
 			summary: 'Switch to an existing git branch',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: { type: 'string' },
-								branch: { type: 'string' },
-							},
-							required: ['branch'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: checkoutBranchBodySchema },
 					},
 				},
 			},
@@ -117,32 +126,27 @@ export function registerBranchesRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['ok'] },
-									data: {
-										type: 'object',
-										properties: {
-											branch: { type: 'string' },
-										},
-										required: ['branch'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: checkoutBranchResponseSchema },
 					},
 				},
-				'400': errorResponse,
-				'500': errorResponse,
+				'400': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
 			},
 		},
 		handleCheckoutBranch,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -150,20 +154,11 @@ export function registerBranchesRoutes(app: Hono) {
 			tags: ['git'],
 			operationId: 'createGitBranch',
 			summary: 'Create a new git branch (optionally checking it out)',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								project: { type: 'string' },
-								name: { type: 'string' },
-								startPoint: { type: 'string' },
-								checkout: { type: 'boolean' },
-							},
-							required: ['name'],
-						},
+			request: {
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: createBranchBodySchema },
 					},
 				},
 			},
@@ -171,27 +166,21 @@ export function registerBranchesRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: { type: 'string', enum: ['ok'] },
-									data: {
-										type: 'object',
-										properties: {
-											branch: { type: 'string' },
-											checkedOut: { type: 'boolean' },
-										},
-										required: ['branch', 'checkedOut'],
-									},
-								},
-								required: ['status', 'data'],
-							},
-						},
+						'application/json': { schema: createBranchResponseSchema },
 					},
 				},
-				'400': errorResponse,
-				'500': errorResponse,
+				'400': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Error',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
 			},
 		},
 		handleCreateBranch,

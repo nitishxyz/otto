@@ -1,4 +1,4 @@
-import type { Hono } from 'hono';
+import { z } from '@hono/zod-openapi';
 import {
 	authorize,
 	authorizeOpenAI,
@@ -8,16 +8,80 @@ import {
 	exchangeOpenAI,
 	exchangeOpenAIWeb,
 	exchangeWeb,
+	logger,
 	pollOpenAIDeviceCodeOnce,
 	requestOpenAIDeviceCode,
 	setAuth,
 } from '@ottocode/sdk';
-import { logger } from '@ottocode/sdk';
-import { openApiRoute } from '../../openapi/route.ts';
+import type { Hono } from 'hono';
+import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { oauthVerifiers, openAIDeviceSessions } from './state.ts';
 
+const errorResponseSchema = z.object({ error: z.string() });
+const htmlResponseSchema = z.string();
+
+const deviceStartResponseSchema = z.object({
+	sessionId: z.string(),
+	userCode: z.string(),
+	verificationUri: z.string(),
+	interval: z.number().int(),
+});
+
+const devicePollBodySchema = z.object({ sessionId: z.string() });
+const devicePollResponseSchema = z.object({
+	status: z.enum(['complete', 'pending', 'error']),
+	error: z.string().optional(),
+});
+
+const providerParamsSchema = z.object({
+	provider: z.string().openapi({ param: { name: 'provider', in: 'path' } }),
+});
+
+const oauthUrlBodySchema = z.object({
+	mode: z.enum(['max', 'console']).optional().default('max'),
+});
+
+const oauthUrlResponseSchema = z.object({
+	url: z.string(),
+	sessionId: z.string(),
+	provider: z.string(),
+});
+
+const oauthExchangeBodySchema = z.object({
+	code: z.string(),
+	sessionId: z.string(),
+});
+
+const oauthSuccessResponseSchema = z.object({
+	success: z.boolean(),
+	provider: z.string(),
+});
+
+const oauthStartQuerySchema = z.object({
+	mode: z
+		.enum(['max', 'console'])
+		.optional()
+		.default('max')
+		.openapi({
+			param: { name: 'mode', in: 'query' },
+		}),
+});
+
+const oauthCallbackQuerySchema = z.object({
+	code: z
+		.string()
+		.optional()
+		.openapi({ param: { name: 'code', in: 'query' } }),
+	fragment: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'fragment', in: 'query' },
+		}),
+});
+
 export function registerAuthOAuthRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -29,36 +93,12 @@ export function registerAuthOAuthRoutes(app: Hono) {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									sessionId: { type: 'string' },
-									userCode: { type: 'string' },
-									verificationUri: { type: 'string' },
-									interval: { type: 'integer' },
-								},
-								required: [
-									'sessionId',
-									'userCode',
-									'verificationUri',
-									'interval',
-								],
-							},
-						},
+						'application/json': { schema: deviceStartResponseSchema },
 					},
 				},
 				'500': {
 					description: 'Server Error',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: { error: { type: 'string' } },
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -89,7 +129,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -97,50 +137,20 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'pollOpenAIDeviceFlow',
 			summary: 'Poll OpenAI device flow for completion',
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								sessionId: { type: 'string' },
-							},
-							required: ['sessionId'],
-						},
-					},
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: devicePollBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									status: {
-										type: 'string',
-										enum: ['complete', 'pending', 'error'],
-									},
-									error: { type: 'string' },
-								},
-								required: ['status'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: devicePollResponseSchema } },
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: { error: { type: 'string' } },
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -192,7 +202,8 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			}
 		},
 	);
-	openApiRoute(
+
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -200,71 +211,21 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'getOAuthUrl',
 			summary: 'Get OAuth authorization URL',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: false,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								mode: {
-									type: 'string',
-									enum: ['max', 'console'],
-									default: 'max',
-								},
-							},
-						},
-					},
+			request: {
+				params: providerParamsSchema,
+				body: {
+					required: false,
+					content: { 'application/json': { schema: oauthUrlBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									url: {
-										type: 'string',
-									},
-									sessionId: {
-										type: 'string',
-									},
-									provider: {
-										type: 'string',
-									},
-								},
-								required: ['url', 'sessionId', 'provider'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: oauthUrlResponseSchema } },
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -321,7 +282,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -329,70 +290,23 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'exchangeOAuthCode',
 			summary: 'Exchange OAuth code for tokens',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
+			request: {
+				params: providerParamsSchema,
+				body: {
 					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							properties: {
-								code: {
-									type: 'string',
-								},
-								sessionId: {
-									type: 'string',
-								},
-							},
-							required: ['code', 'sessionId'],
-						},
-					},
+					content: { 'application/json': { schema: oauthExchangeBodySchema } },
 				},
 			},
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									success: {
-										type: 'boolean',
-									},
-									provider: {
-										type: 'string',
-									},
-								},
-								required: ['success', 'provider'],
-							},
-						},
+						'application/json': { schema: oauthSuccessResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -448,7 +362,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -456,45 +370,15 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'startOAuth',
 			summary: 'Start OAuth flow with redirect',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'mode',
-					required: false,
-					schema: {
-						type: 'string',
-						enum: ['max', 'console'],
-						default: 'max',
-					},
-				},
-			],
+			request: {
+				params: providerParamsSchema,
+				query: oauthStartQuerySchema,
+			},
 			responses: {
-				'302': {
-					description: 'Redirect to OAuth provider',
-				},
+				'302': { description: 'Redirect to OAuth provider' },
 				'400': {
 					description: 'Bad Request',
-					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
-					},
+					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
@@ -573,7 +457,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 		},
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -581,42 +465,14 @@ export function registerAuthOAuthRoutes(app: Hono) {
 			tags: ['auth'],
 			operationId: 'oauthCallback',
 			summary: 'OAuth callback handler',
-			parameters: [
-				{
-					in: 'path',
-					name: 'provider',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'code',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-				},
-				{
-					in: 'query',
-					name: 'fragment',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-				},
-			],
+			request: {
+				params: providerParamsSchema,
+				query: oauthCallbackQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'HTML response',
-					content: {
-						'text/html': {
-							schema: {
-								type: 'string',
-							},
-						},
-					},
+					content: { 'text/html': { schema: htmlResponseSchema } },
 				},
 			},
 		},
@@ -687,27 +543,9 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					<head>
 						<title>Connected!</title>
 						<style>
-							body {
-								font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-								display: flex;
-								justify-content: center;
-								align-items: center;
-								height: 100vh;
-								margin: 0;
-								background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-								color: white;
-							}
-							.container {
-								text-align: center;
-								padding: 2rem;
-								background: rgba(255,255,255,0.1);
-								border-radius: 16px;
-								backdrop-filter: blur(10px);
-							}
-							.checkmark {
-								font-size: 4rem;
-								margin-bottom: 1rem;
-							}
+							body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+							.container { text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px); }
+							.checkmark { font-size: 4rem; margin-bottom: 1rem; }
 							h1 { margin: 0 0 0.5rem 0; }
 							p { margin: 0; opacity: 0.9; }
 						</style>
@@ -719,9 +557,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 							<p>You can close this window.</p>
 						</div>
 						<script>
-							if (window.opener) {
-								window.opener.postMessage({ type: 'oauth-success', provider: '${provider}' }, '*');
-							}
+							if (window.opener) window.opener.postMessage({ type: 'oauth-success', provider: '${provider}' }, '*');
 							setTimeout(() => window.close(), 1500);
 						</script>
 					</body>
@@ -736,23 +572,8 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					<head>
 						<title>Error</title>
 						<style>
-							body {
-								font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-								display: flex;
-								justify-content: center;
-								align-items: center;
-								height: 100vh;
-								margin: 0;
-								background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-								color: white;
-							}
-							.container {
-								text-align: center;
-								padding: 2rem;
-								background: rgba(255,255,255,0.1);
-								border-radius: 16px;
-								backdrop-filter: blur(10px);
-							}
+							body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+							.container { text-align: center; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(10px); }
 							.icon { font-size: 4rem; margin-bottom: 1rem; }
 							h1 { margin: 0 0 0.5rem 0; }
 							p { margin: 0; opacity: 0.9; }
@@ -765,9 +586,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 							<p>${message}</p>
 						</div>
 						<script>
-							if (window.opener) {
-								window.opener.postMessage({ type: 'oauth-error', provider: '${c.req.param('provider')}', error: '${message}' }, '*');
-							}
+							if (window.opener) window.opener.postMessage({ type: 'oauth-error', provider: '${c.req.param('provider')}', error: '${message}' }, '*');
 							setTimeout(() => window.close(), 3000);
 						</script>
 					</body>

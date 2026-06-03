@@ -1,22 +1,18 @@
-import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
+import {
+	createRoute,
+	type OpenAPIHono,
+	type RouteConfig,
+} from '@hono/zod-openapi';
 import type { Handler, Hono } from 'hono';
-import type { OperationObject } from 'openapi3-ts/oas30';
-import { buildRouteConfig, type HttpMethod } from './register.ts';
 
-type InlineRouteConfig = OperationObject & {
-	method: HttpMethod;
-	path: string;
-};
-
-export function openApiRoute(
+/**
+ * Register an endpoint whose OpenAPI contract is derived from Zod schemas.
+ */
+export function zodOpenApiRoute(
 	app: Hono,
-	route: InlineRouteConfig,
+	route: RouteConfig,
 	handler: Handler,
 ) {
 	const openApiApp = app as OpenAPIHono;
-	const { method, path, ...operation } = route;
-	return openApiApp.openapi(
-		createRoute(buildRouteConfig(method, path, operation)),
-		handler as never,
-	);
+	return openApiApp.openapi(createRoute(route), handler as never);
 }

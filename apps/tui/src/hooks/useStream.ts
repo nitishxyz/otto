@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState, useCallback } from 'react';
 import {
 	buildSessionStreamUrl,
 	createSSEStream,
+	listPendingSecureInputs,
 	listMessages,
 } from '@ottocode/api';
 import { getBaseUrl } from '../api.ts';
@@ -459,13 +460,10 @@ async function loadSessionMessages(sessionId: string) {
 }
 
 async function loadPendingSecureInputs(sessionId: string) {
-	const response = await fetch(
-		`${getBaseUrl()}/v1/sessions/${encodeURIComponent(sessionId)}/secure-input/pending`,
-	);
-	if (!response.ok) return [];
-	const data = await response.json().catch(() => null);
-	return Array.isArray(data?.pending)
-		? (data.pending as PendingSecureInput[])
+	const response = await listPendingSecureInputs({ path: { id: sessionId } });
+	if (response.error) return [];
+	return Array.isArray(response.data?.pending)
+		? (response.data.pending as PendingSecureInput[])
 		: [];
 }
 

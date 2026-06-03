@@ -1,5 +1,6 @@
+import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { openApiRoute } from '../openapi/route.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	handleFileTree,
 	handleListFiles,
@@ -8,8 +9,126 @@ import {
 	handleSearchFiles,
 } from './files/handlers.ts';
 
+const projectQueryPart = {
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+};
+
+const listFilesQuerySchema = z.object({
+	...projectQueryPart,
+	maxDepth: z.coerce
+		.number()
+		.int()
+		.optional()
+		.default(10)
+		.openapi({
+			param: { name: 'maxDepth', in: 'query' },
+			description: 'Maximum directory depth to traverse',
+		}),
+	limit: z.coerce
+		.number()
+		.int()
+		.optional()
+		.default(1000)
+		.openapi({
+			param: { name: 'limit', in: 'query' },
+			description: 'Maximum number of files to return',
+		}),
+});
+
+const searchFilesQuerySchema = z.object({
+	...projectQueryPart,
+	q: z
+		.string()
+		.optional()
+		.default('')
+		.openapi({
+			param: { name: 'q', in: 'query' },
+			description: 'Search query',
+		}),
+	maxDepth: z.coerce
+		.number()
+		.int()
+		.optional()
+		.openapi({
+			param: { name: 'maxDepth', in: 'query' },
+			description: 'Maximum directory depth to traverse',
+		}),
+	limit: z.coerce
+		.number()
+		.int()
+		.optional()
+		.openapi({
+			param: { name: 'limit', in: 'query' },
+			description: 'Maximum number of files to return',
+		}),
+});
+
+const treeQuerySchema = z.object({
+	...projectQueryPart,
+	path: z
+		.string()
+		.optional()
+		.default('.')
+		.openapi({
+			param: { name: 'path', in: 'query' },
+			description: 'Directory path relative to project root',
+		}),
+});
+
+const filePathQuerySchema = z.object({
+	...projectQueryPart,
+	path: z.string().openapi({
+		param: { name: 'path', in: 'query' },
+		description: 'Absolute file path or path relative to project root',
+	}),
+});
+
+const changedFileSchema = z.object({
+	path: z.string(),
+	status: z.string(),
+});
+
+const fileListResponseSchema = z.object({
+	files: z.array(z.string()),
+	changedFiles: z.array(changedFileSchema),
+	truncated: z.boolean(),
+});
+
+const treeItemSchema = z.object({
+	name: z.string(),
+	path: z.string(),
+	type: z.enum(['file', 'directory']),
+	gitignored: z.boolean().optional(),
+	vendor: z.boolean().optional(),
+	searchable: z.boolean().optional(),
+});
+
+const fileTreeResponseSchema = z.object({
+	items: z.array(treeItemSchema),
+	path: z.string(),
+	truncated: z.boolean(),
+});
+
+const readFileResponseSchema = z.object({
+	content: z.string(),
+	path: z.string(),
+	extension: z.string(),
+	lineCount: z.number().int(),
+});
+
+const fileErrorSchema = z.object({
+	error: z.string(),
+});
+
 export function registerFilesRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -19,83 +138,12 @@ export function registerFilesRoutes(app: Hono) {
 			summary: 'List project files',
 			description:
 				'Returns list of files in the project directory, excluding common build artifacts and dependencies',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'maxDepth',
-					required: false,
-					schema: {
-						type: 'integer',
-						default: 10,
-					},
-					description: 'Maximum directory depth to traverse',
-				},
-				{
-					in: 'query',
-					name: 'limit',
-					required: false,
-					schema: {
-						type: 'integer',
-						default: 1000,
-					},
-					description: 'Maximum number of files to return',
-				},
-			],
+			request: { query: listFilesQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									files: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									changedFiles: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												path: {
-													type: 'string',
-												},
-												status: {
-													type: 'string',
-													enum: [
-														'added',
-														'modified',
-														'deleted',
-														'renamed',
-														'untracked',
-													],
-												},
-											},
-											required: ['path', 'status'],
-										},
-										description:
-											'List of files with uncommitted changes (from git status)',
-									},
-									truncated: {
-										type: 'boolean',
-									},
-								},
-								required: ['files', 'changedFiles', 'truncated'],
-							},
-						},
+						'application/json': { schema: fileListResponseSchema },
 					},
 				},
 			},
@@ -103,7 +151,7 @@ export function registerFilesRoutes(app: Hono) {
 		handleListFiles,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -113,82 +161,12 @@ export function registerFilesRoutes(app: Hono) {
 			summary: 'Search project files',
 			description:
 				'Searches files for mentions and quick-open. Excludes dependencies, build artifacts, and gitignored files by default.',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'q',
-					required: false,
-					schema: {
-						type: 'string',
-						default: '',
-					},
-					description: 'Search query',
-				},
-				{
-					in: 'query',
-					name: 'maxDepth',
-					required: false,
-					schema: {
-						type: 'integer',
-					},
-					description: 'Maximum directory depth to traverse',
-				},
-				{
-					in: 'query',
-					name: 'limit',
-					required: false,
-					schema: {
-						type: 'integer',
-					},
-					description: 'Maximum number of files to return',
-				},
-			],
+			request: { query: searchFilesQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									files: {
-										type: 'array',
-										items: {
-											type: 'string',
-										},
-									},
-									changedFiles: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												path: {
-													type: 'string',
-												},
-												status: {
-													type: 'string',
-												},
-											},
-											required: ['path', 'status'],
-										},
-									},
-									truncated: {
-										type: 'boolean',
-									},
-								},
-								required: ['files', 'changedFiles', 'truncated'],
-							},
-						},
+						'application/json': { schema: fileListResponseSchema },
 					},
 				},
 			},
@@ -196,7 +174,7 @@ export function registerFilesRoutes(app: Hono) {
 		handleSearchFiles,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -204,74 +182,12 @@ export function registerFilesRoutes(app: Hono) {
 			tags: ['files'],
 			operationId: 'getFileTree',
 			summary: 'Get directory tree listing',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'path',
-					required: false,
-					schema: {
-						type: 'string',
-						default: '.',
-					},
-					description: 'Directory path relative to project root',
-				},
-			],
+			request: { query: treeQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									items: {
-										type: 'array',
-										items: {
-											type: 'object',
-											properties: {
-												name: {
-													type: 'string',
-												},
-												path: {
-													type: 'string',
-												},
-												type: {
-													type: 'string',
-													enum: ['file', 'directory'],
-												},
-												gitignored: {
-													type: 'boolean',
-												},
-												vendor: {
-													type: 'boolean',
-												},
-												searchable: {
-													type: 'boolean',
-												},
-											},
-											required: ['name', 'path', 'type'],
-										},
-									},
-									path: {
-										type: 'string',
-									},
-									truncated: {
-										type: 'boolean',
-									},
-								},
-								required: ['items', 'path', 'truncated'],
-							},
-						},
+						'application/json': { schema: fileTreeResponseSchema },
 					},
 				},
 			},
@@ -279,7 +195,7 @@ export function registerFilesRoutes(app: Hono) {
 		handleFileTree,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -287,67 +203,18 @@ export function registerFilesRoutes(app: Hono) {
 			tags: ['files'],
 			operationId: 'readFile',
 			summary: 'Read file content',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'path',
-					required: true,
-					schema: {
-						type: 'string',
-					},
-					description: 'Absolute file path or path relative to project root',
-				},
-			],
+			request: { query: filePathQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									content: {
-										type: 'string',
-									},
-									path: {
-										type: 'string',
-									},
-									extension: {
-										type: 'string',
-									},
-									lineCount: {
-										type: 'integer',
-									},
-								},
-								required: ['content', 'path', 'extension', 'lineCount'],
-							},
-						},
+						'application/json': { schema: readFileResponseSchema },
 					},
 				},
 				'400': {
 					description: 'Bad Request',
 					content: {
-						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
-						},
+						'application/json': { schema: fileErrorSchema },
 					},
 				},
 			},
@@ -355,7 +222,7 @@ export function registerFilesRoutes(app: Hono) {
 		handleReadFile,
 	);
 
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'get',
@@ -363,29 +230,13 @@ export function registerFilesRoutes(app: Hono) {
 			tags: ['files'],
 			operationId: 'getFileRaw',
 			summary: 'Read raw file bytes',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: { type: 'string' },
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-				{
-					in: 'query',
-					name: 'path',
-					required: true,
-					schema: { type: 'string' },
-					description: 'Absolute file path or path relative to project root.',
-				},
-			],
+			request: { query: filePathQuerySchema },
 			responses: {
 				'200': {
 					description: 'Raw file content',
 					content: {
 						'application/octet-stream': {
-							schema: { type: 'string', format: 'binary' },
+							schema: z.string().openapi({ format: 'binary' }),
 						},
 					},
 				},

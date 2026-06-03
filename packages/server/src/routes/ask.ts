@@ -1,4 +1,8 @@
+import { z } from '@hono/zod-openapi';
+import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
+import type { EmbeddedAppConfig } from '../index.ts';
+import { zodOpenApiRoute } from '../openapi/route.ts';
 import type {
 	AskServerRequest,
 	InjectableConfig,
@@ -6,12 +10,81 @@ import type {
 } from '../runtime/ask/service.ts';
 import { handleAskRequest } from '../runtime/ask/service.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
-import { logger } from '@ottocode/sdk';
-import type { EmbeddedAppConfig } from '../index.ts';
-import { openApiRoute } from '../openapi/route.ts';
+
+const askQuerySchema = z.object({
+	project: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'project', in: 'query' },
+			description:
+				'Project root override (defaults to current working directory).',
+		}),
+});
+
+const askBodySchema = z.object({
+	prompt: z.string().openapi({
+		description: 'User prompt to send to the assistant.',
+	}),
+	agent: z.string().optional().openapi({
+		description: 'Optional agent name to use for this request.',
+	}),
+	provider: z.string().optional().openapi({
+		description:
+			'Optional provider override. When omitted the agent and config defaults apply.',
+	}),
+	model: z.string().optional().openapi({
+		description: 'Optional model override for the selected provider.',
+	}),
+	reasoningText: z.boolean().optional().openapi({
+		description:
+			'Enable extended thinking / reasoning for models that support it.',
+	}),
+	reasoningLevel: z
+		.enum(['minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
+		.optional()
+		.openapi({
+			description:
+				'Optional reasoning intensity override for supported providers/models.',
+		}),
+	sessionId: z.string().optional().openapi({
+		description: 'Send the prompt to a specific session.',
+	}),
+	last: z.boolean().optional().openapi({
+		description: 'If true, reuse the most recent session for the project.',
+	}),
+	jsonMode: z.boolean().optional().openapi({
+		description: 'Request structured JSON output when supported by the agent.',
+	}),
+});
+
+const askResponseSchema = z.object({
+	sessionId: z.string(),
+	header: z.object({
+		sessionId: z.string(),
+		agent: z.string().nullable().optional(),
+		provider: z.string().nullable().optional(),
+		model: z.string().nullable().optional(),
+	}),
+	provider: z.string(),
+	model: z.string(),
+	agent: z.string(),
+	assistantMessageId: z.string(),
+	message: z
+		.object({
+			kind: z.enum(['created', 'last']),
+			sessionId: z.string(),
+		})
+		.nullable()
+		.optional(),
+});
+
+const askErrorSchema = z.object({
+	error: z.string(),
+});
 
 export function registerAskRoutes(app: Hono) {
-	openApiRoute(
+	zodOpenApiRoute(
 		app,
 		{
 			method: 'post',
@@ -21,71 +94,12 @@ export function registerAskRoutes(app: Hono) {
 			summary: 'Send a prompt using the ask service',
 			description:
 				'Streamlined endpoint used by the CLI to send prompts and receive assistant responses. Creates sessions as needed and reuses the last session when requested.',
-			parameters: [
-				{
-					in: 'query',
-					name: 'project',
-					required: false,
-					schema: {
-						type: 'string',
-					},
-					description:
-						'Project root override (defaults to current working directory).',
-				},
-			],
-			requestBody: {
-				required: true,
-				content: {
-					'application/json': {
-						schema: {
-							type: 'object',
-							required: ['prompt'],
-							properties: {
-								prompt: {
-									type: 'string',
-									description: 'User prompt to send to the assistant.',
-								},
-								agent: {
-									type: 'string',
-									description: 'Optional agent name to use for this request.',
-								},
-								provider: {
-									$ref: '#/components/schemas/Provider',
-									description:
-										'Optional provider override. When omitted the agent and config defaults apply.',
-								},
-								model: {
-									type: 'string',
-									description:
-										'Optional model override for the selected provider.',
-								},
-								reasoningText: {
-									type: 'boolean',
-									description:
-										'Enable extended thinking / reasoning for models that support it.',
-								},
-								reasoningLevel: {
-									type: 'string',
-									enum: ['minimal', 'low', 'medium', 'high', 'max', 'xhigh'],
-									description:
-										'Optional reasoning intensity override for supported providers/models.',
-								},
-								sessionId: {
-									type: 'string',
-									description: 'Send the prompt to a specific session.',
-								},
-								last: {
-									type: 'boolean',
-									description:
-										'If true, reuse the most recent session for the project.',
-								},
-								jsonMode: {
-									type: 'boolean',
-									description:
-										'Request structured JSON output when supported by the agent.',
-								},
-							},
-						},
+			request: {
+				query: askQuerySchema,
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: askBodySchema },
 					},
 				},
 			},
@@ -94,9 +108,7 @@ export function registerAskRoutes(app: Hono) {
 					description: 'Accepted',
 					content: {
 						'application/json': {
-							schema: {
-								$ref: '#/components/schemas/AskResponse',
-							},
+							schema: askResponseSchema,
 						},
 					},
 				},
@@ -104,15 +116,7 @@ export function registerAskRoutes(app: Hono) {
 					description: 'Bad Request',
 					content: {
 						'application/json': {
-							schema: {
-								type: 'object',
-								properties: {
-									error: {
-										type: 'string',
-									},
-								},
-								required: ['error'],
-							},
+							schema: askErrorSchema,
 						},
 					},
 				},
