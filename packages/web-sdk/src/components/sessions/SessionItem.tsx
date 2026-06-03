@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck, Pin } from 'lucide-react';
 import type { Session } from '../../types/api';
 import { StableSpinner } from '../ui/StableSpinner';
 import { formatRelativeSessionTime } from './session-time';
@@ -9,15 +9,18 @@ interface SessionItemProps {
 	session: Session;
 	isActive: boolean;
 	onClick: () => void;
+	onTogglePinned: () => void;
 }
 
 export const SessionItem = memo(function SessionItem({
 	session,
 	isActive,
 	onClick,
+	onTogglePinned,
 }: SessionItemProps) {
 	const title = session.title || `Session ${session.id.slice(0, 8)}`;
 	const isRunning = session.isRunning ?? false;
+	const isPinned = session.pinnedAt != null;
 	const lastUpdatedAt = session.lastActiveAt ?? session.createdAt;
 	const isReadyForReview =
 		!isRunning && lastUpdatedAt > (session.lastViewedAt ?? 0);
@@ -33,9 +36,7 @@ export const SessionItem = memo(function SessionItem({
 	) : null;
 
 	return (
-		<button
-			type="button"
-			onClick={onClick}
+		<div
 			className={`group flex w-full items-start gap-2 px-4 py-3 text-left transition-colors duration-150 ${
 				isActive
 					? 'bg-black/[0.08] text-sidebar-foreground dark:bg-white/[0.08]'
@@ -49,12 +50,33 @@ export const SessionItem = memo(function SessionItem({
 				</span>
 			)}
 			<span className="block min-w-0 flex-1">
-				<span
-					className={`block min-w-0 truncate text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}
-				>
-					{title}
+				<span className="flex min-w-0 items-center">
+					<button
+						type="button"
+						onClick={onClick}
+						className={`block min-w-0 flex-1 truncate text-left text-[13px] leading-5 ${isActive ? 'font-medium' : 'font-normal'}`}
+					>
+						{title}
+					</button>
+					<button
+						type="button"
+						onClick={onTogglePinned}
+						className={`flex h-5 shrink-0 items-center justify-center overflow-hidden rounded text-sidebar-muted-foreground transition-all duration-150 ease-out hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring/50 ${
+							isPinned
+								? 'ml-1 w-5 translate-x-0 opacity-100 text-sidebar-foreground'
+								: 'ml-0 w-0 translate-x-1 opacity-0 group-hover:ml-1 group-hover:w-5 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:ml-1 group-focus-within:w-5 group-focus-within:translate-x-0 group-focus-within:opacity-100'
+						}`}
+						aria-label={isPinned ? 'Unpin session' : 'Pin session'}
+						title={isPinned ? 'Unpin session' : 'Pin session'}
+					>
+						<Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-current' : ''}`} />
+					</button>
 				</span>
-				<span className="mt-0.5 flex items-center justify-between gap-3 text-[11px] leading-4 text-sidebar-muted-foreground">
+				<button
+					type="button"
+					onClick={onClick}
+					className="mt-0.5 flex w-full items-center justify-between gap-3 text-left text-[11px] leading-4 text-sidebar-muted-foreground"
+				>
 					<span className="min-w-0 flex-1 truncate">
 						{showStats ? (
 							<InlineChangeCount
@@ -74,8 +96,8 @@ export const SessionItem = memo(function SessionItem({
 							{metadata}
 						</span>
 					)}
-				</span>
+				</button>
 			</span>
-		</button>
+		</div>
 	);
 });

@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { sessions } from '@ottocode/database/schema';
 import { hasConfiguredProvider, logger, type ProviderId } from '@ottocode/sdk';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveAgentConfig } from '../../runtime/agent/registry.ts';
@@ -27,6 +27,7 @@ const sessionSchema = z
 		createdAt: z.number(),
 		lastActiveAt: z.number().nullable(),
 		lastViewedAt: z.number().nullable().optional(),
+		pinnedAt: z.number().nullable().optional(),
 		totalInputTokens: z.number().nullable(),
 		totalOutputTokens: z.number().nullable(),
 		totalCachedTokens: z.number().nullable().optional(),
@@ -107,6 +108,7 @@ const updateSessionBodySchema = z.object({
 	agent: z.string().optional(),
 	provider: z.string().optional(),
 	model: z.string().optional(),
+	isPinned: z.boolean().optional(),
 });
 
 const errorResponseSchema = z.object({ error: z.string() });
@@ -157,7 +159,11 @@ export function registerSessionCrudRoutes(app: Hono) {
 						ne(sessions.sessionType, 'research'),
 					),
 				)
-				.orderBy(desc(sessions.lastActiveAt), desc(sessions.createdAt))
+				.orderBy(
+					desc(sql`${sessions.pinnedAt} IS NOT NULL`),
+					desc(sessions.lastActiveAt),
+					desc(sessions.createdAt),
+				)
 				.limit(limit + 1)
 				.offset(offset);
 			const hasMore = rows.length > limit;
@@ -408,10 +414,12 @@ export function registerSessionCrudRoutes(app: Hono) {
 					return c.json({ error: updateResult.error }, updateResult.status);
 				}
 
-				await db
-					.update(sessions)
-					.set(updateResult.updates)
-					.where(eq(sessions.id, sessionId));
+				if (Object.keys(updateResult.updates).length > 0) {
+					await db
+						.update(sessions)
+						.set(updateResult.updates)
+						.where(eq(sessions.id, sessionId));
+				}
 
 				const updatedRows = await db
 					.select()

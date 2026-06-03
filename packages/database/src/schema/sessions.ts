@@ -11,6 +11,7 @@ export const sessions = sqliteTable('sessions', {
 	// Metadata
 	lastActiveAt: integer('last_active_at', { mode: 'number' }),
 	lastViewedAt: integer('last_viewed_at', { mode: 'number' }),
+	pinnedAt: integer('pinned_at', { mode: 'number' }),
 	totalInputTokens: integer('total_input_tokens'),
 	totalOutputTokens: integer('total_output_tokens'),
 	totalCachedTokens: integer('total_cached_tokens'),

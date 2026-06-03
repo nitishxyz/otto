@@ -10,6 +10,7 @@ type ApiSession = Record<string, unknown> & {
 	createdAt?: string | number;
 	lastActiveAt?: string | number;
 	lastViewedAt?: string | number | null;
+	pinnedAt?: string | number | null;
 };
 
 type ApiMessage = Record<string, unknown> & {
@@ -80,6 +81,10 @@ export function convertSession(apiSession: ApiSession): Session {
 			typeof apiSession.lastViewedAt === 'string'
 				? new Date(apiSession.lastViewedAt).getTime()
 				: apiSession.lastViewedAt,
+		pinnedAt:
+			typeof apiSession.pinnedAt === 'string'
+				? new Date(apiSession.pinnedAt).getTime()
+				: apiSession.pinnedAt,
 	} as Session;
 }
 

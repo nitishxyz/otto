@@ -1,6 +1,10 @@
 import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useMarkSessionViewed, useSessions } from '../../hooks/useSessions';
+import {
+	useMarkSessionViewed,
+	useSessions,
+	useSetSessionPinned,
+} from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
 import { StableSpinner } from '../ui/StableSpinner';
@@ -23,6 +27,7 @@ interface SessionSnapshot {
 	createdAt: number;
 	lastActiveAt: number;
 	lastViewedAt: number | null;
+	pinnedAt: number | null;
 	activityAt: number;
 }
 
@@ -31,6 +36,7 @@ interface SessionListRowProps {
 	snapshot: SessionSnapshot;
 	isActive: boolean;
 	onSelectSession: (sessionId: string) => void;
+	onTogglePinned: (sessionId: string, isPinned: boolean) => void;
 	registerItem: (sessionId: string, element: HTMLDivElement | null) => void;
 }
 
@@ -39,6 +45,7 @@ const SessionListRow = memo(function SessionListRow({
 	snapshot,
 	isActive,
 	onSelectSession,
+	onTogglePinned,
 	registerItem,
 }: SessionListRowProps) {
 	const setRef = useCallback(
@@ -52,12 +59,17 @@ const SessionListRow = memo(function SessionListRow({
 		onSelectSession(snapshot.id);
 	}, [onSelectSession, snapshot.id]);
 
+	const handleTogglePinned = useCallback(() => {
+		onTogglePinned(snapshot.id, snapshot.pinnedAt == null);
+	}, [onTogglePinned, snapshot.id, snapshot.pinnedAt]);
+
 	return (
 		<div ref={setRef}>
 			<SessionItem
 				session={session}
 				isActive={isActive}
 				onClick={handleClick}
+				onTogglePinned={handleTogglePinned}
 			/>
 		</div>
 	);
@@ -122,6 +134,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const previousActiveSessionId = useRef<string | undefined>(activeSessionId);
 	const runningOrderRef = useRef<string[]>([]);
 	const markSessionViewed = useMarkSessionViewed();
+	const setSessionPinned = useSetSessionPinned();
 
 	const handleSessionClick = useCallback(
 		(sessionId: string) => {
@@ -139,6 +152,13 @@ export const SessionListContainer = memo(function SessionListContainer({
 		[],
 	);
 
+	const handleTogglePinned = useCallback(
+		(sessionId: string, isPinned: boolean) => {
+			setSessionPinned.mutate({ sessionId, isPinned });
+		},
+		[setSessionPinned],
+	);
+
 	const sessionSnapshot = useMemo<SessionSnapshot[]>(() => {
 		return sessions.map((s, index) => ({
 			id: s.id,
@@ -149,6 +169,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 			createdAt: s.createdAt,
 			lastActiveAt: s.lastActiveAt,
 			lastViewedAt: s.lastViewedAt ?? null,
+			pinnedAt: s.pinnedAt ?? null,
 			activityAt: s.lastActiveAt ?? s.createdAt,
 		}));
 	}, [sessions]);
@@ -165,7 +186,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	const runningSessions = useMemo(() => {
 		const runningSessionMap = new Map(
 			sessionSnapshot
-				.filter((session) => session.isRunning)
+				.filter((session) => session.isRunning && session.pinnedAt == null)
 				.map((session) => [session.id, session]),
 		);
 
@@ -174,7 +195,11 @@ export const SessionListContainer = memo(function SessionListContainer({
 		);
 
 		for (const session of sessionSnapshot) {
-			if (session.isRunning && !runningOrderRef.current.includes(session.id)) {
+			if (
+				session.isRunning &&
+				session.pinnedAt == null &&
+				!runningOrderRef.current.includes(session.id)
+			) {
 				runningOrderRef.current.push(session.id);
 			}
 		}
@@ -188,6 +213,15 @@ export const SessionListContainer = memo(function SessionListContainer({
 		() => new Set(runningSessions.map((session) => session.id)),
 		[runningSessions],
 	);
+
+	const pinnedGroups = useMemo(() => {
+		const pinnedSessions = sessionSnapshot.filter(
+			(session) => session.pinnedAt != null,
+		);
+		return pinnedSessions.length > 0
+			? [{ label: 'Pinned', sessions: pinnedSessions }]
+			: [];
+	}, [sessionSnapshot]);
 
 	const statusGroups = useMemo(
 		() => [
@@ -207,6 +241,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 		const groups = new Map<string, typeof sessionSnapshot>();
 
 		for (const session of sessionSnapshot) {
+			if (session.pinnedAt != null) continue;
 			if (runningSessionIds.has(session.id)) continue;
 			const label = getSessionGroupLabel(session.activityAt);
 			const existingSessions = groups.get(label) ?? [];
@@ -354,6 +389,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 				snapshot={session}
 				isActive={session.id === activeSessionId}
 				onSelectSession={handleSessionClick}
+				onTogglePinned={handleTogglePinned}
 				registerItem={registerItem}
 			/>
 		);
@@ -388,6 +424,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 			<div className="h-12 shrink-0" aria-hidden="true" />
 			<div className="pt-3 pb-1">
 				<div className="space-y-4">
+					{pinnedGroups.map((group) => renderGroup(group))}
 					{statusGroups.map((group) => renderGroup(group))}
 					{recentGroups.map((group) => renderGroup(group))}
 				</div>

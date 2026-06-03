@@ -170,6 +170,7 @@ export async function createBranch({
 		createdAt: newSession.createdAt,
 		lastActiveAt: newSession.lastActiveAt ?? null,
 		lastViewedAt: now,
+		pinnedAt: null,
 		totalInputTokens: null,
 		totalOutputTokens: null,
 		totalCachedTokens: null,

@@ -94,6 +94,43 @@ export function useUpdateSession(sessionId: string) {
 	});
 }
 
+export function useSetSessionPinned() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({
+			sessionId,
+			isPinned,
+		}: {
+			sessionId: string;
+			isPinned: boolean;
+		}) => apiClient.updateSession(sessionId, { isPinned }),
+		onSuccess: async (updatedSession) => {
+			queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
+				sessionsQueryKey,
+				(old) => {
+					if (!old) return old;
+					return {
+						...old,
+						pages: old.pages.map((page) => ({
+							...page,
+							items: page.items.map((session) =>
+								session.id === updatedSession.id
+									? { ...session, ...updatedSession }
+									: session,
+							),
+						})),
+					};
+				},
+			);
+			await queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			await queryClient.invalidateQueries({
+				queryKey: ['session', updatedSession.id],
+			});
+		},
+	});
+}
+
 export function useMarkSessionViewed() {
 	const queryClient = useQueryClient();
 

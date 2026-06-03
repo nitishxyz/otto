@@ -518,6 +518,7 @@ export type SessionPreferenceUpdates = {
 	model?: string;
 	title?: string | null;
 	lastActiveAt?: number;
+	pinnedAt?: number | null;
 };
 
 export async function buildSessionPreferenceUpdates(
@@ -528,12 +529,18 @@ export async function buildSessionPreferenceUpdates(
 	| { ok: true; updates: SessionPreferenceUpdates }
 	| { ok: false; error: string; status: 400 }
 > {
-	const updates: SessionPreferenceUpdates = {
-		lastActiveAt: Date.now(),
-	};
+	const updates: SessionPreferenceUpdates = {};
+	let shouldTouchLastActiveAt = false;
 
 	if (typeof body.title === 'string') {
 		updates.title = body.title.trim() || null;
+		shouldTouchLastActiveAt = true;
+	}
+
+	if (typeof body.isPinned === 'boolean') {
+		updates.pinnedAt = body.isPinned
+			? (existingSession.pinnedAt ?? Date.now())
+			: null;
 	}
 
 	if (typeof body.agent === 'string') {
@@ -542,6 +549,7 @@ export async function buildSessionPreferenceUpdates(
 			try {
 				await resolveAgentConfig(cfg.projectRoot, agentName);
 				updates.agent = agentName;
+				shouldTouchLastActiveAt = true;
 			} catch {
 				return { ok: false, error: `Invalid agent: ${agentName}`, status: 400 };
 			}
@@ -552,6 +560,7 @@ export async function buildSessionPreferenceUpdates(
 		const providerName = body.provider.trim();
 		if (providerName && hasConfiguredProvider(cfg, providerName)) {
 			updates.provider = providerName;
+			shouldTouchLastActiveAt = true;
 		} else if (providerName) {
 			return {
 				ok: false,
@@ -577,7 +586,12 @@ export async function buildSessionPreferenceUpdates(
 			}
 
 			updates.model = modelName;
+			shouldTouchLastActiveAt = true;
 		}
+	}
+
+	if (shouldTouchLastActiveAt) {
+		updates.lastActiveAt = Date.now();
 	}
 
 	return { ok: true, updates };

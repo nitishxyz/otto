@@ -8,6 +8,7 @@ export interface Session {
 	createdAt: number;
 	lastActiveAt: number | null;
 	lastViewedAt?: number | null;
+	pinnedAt?: number | null;
 	totalInputTokens: number | null;
 	totalOutputTokens: number | null;
 	totalCachedTokens?: number | null;
@@ -88,6 +89,7 @@ export interface UpdateSessionRequest {
 	agent?: string;
 	provider?: string;
 	model?: string;
+	isPinned?: boolean;
 }
 
 export interface SendMessageRequest {

@@ -15,6 +15,13 @@
 			"when": 1779359925155,
 			"tag": "0001_elite_ego",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1780499685486,
+			"tag": "0002_flawless_stature",
+			"breakpoints": true
 		}
 	]
 }

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { OttoConfig } from '@ottocode/sdk';
 import type { DB } from '@ottocode/database';
 import { messageParts, messages, sessions } from '@ottocode/database/schema';
@@ -51,6 +51,7 @@ export async function createSession({
 		createdAt: now,
 		lastActiveAt: now,
 		lastViewedAt: now,
+		pinnedAt: null,
 		totalInputTokens: null,
 		totalOutputTokens: null,
 		totalCachedTokens: null,
@@ -128,7 +129,11 @@ export async function listSessions({
 					)
 				: ne(sessions.sessionType, 'research'),
 		)
-		.orderBy(desc(sessions.lastActiveAt), desc(sessions.createdAt))
+		.orderBy(
+			desc(sql`${sessions.pinnedAt} IS NOT NULL`),
+			desc(sessions.lastActiveAt),
+			desc(sessions.createdAt),
+		)
 		.limit(limit);
 }
 

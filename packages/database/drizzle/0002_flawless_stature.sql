@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `pinned_at` integer;
