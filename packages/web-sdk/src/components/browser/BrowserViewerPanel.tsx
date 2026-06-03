@@ -398,44 +398,49 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 							/>
 						</div>
 					</form>
-					<button
-						type="button"
-						onClick={() =>
-							window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
-						}
-						disabled={!canRenderUrl}
-						title="Open externally"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
+					<div
+						className="flex shrink-0 items-center gap-1"
+						data-smart-edge-ignore="right"
 					>
-						<ExternalLink className="h-4 w-4" />
-					</button>
-					<button
-						type="button"
-						onClick={() =>
-							openBrowserTab('', {
-								kind: 'browser',
-								title: 'Browser',
-								newTab: true,
-							})
-						}
-						title="New browser preview"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
-					>
-						<Plus className="h-4 w-4" />
-					</button>
-					<button
-						type="button"
-						onClick={() =>
-							openBrowserTab(SIMULATOR_URL, {
-								kind: 'simulator',
-								title: 'Simulator',
-							})
-						}
-						title="Simulator preview"
-						className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
-					>
-						<Smartphone className="h-4 w-4" />
-					</button>
+						<button
+							type="button"
+							onClick={() =>
+								window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
+							}
+							disabled={!canRenderUrl}
+							title="Open externally"
+							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
+						>
+							<ExternalLink className="h-4 w-4" />
+						</button>
+						<button
+							type="button"
+							onClick={() =>
+								openBrowserTab('', {
+									kind: 'browser',
+									title: 'Browser',
+									newTab: true,
+								})
+							}
+							title="New browser preview"
+							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
+						>
+							<Plus className="h-4 w-4" />
+						</button>
+						<button
+							type="button"
+							onClick={() =>
+								openBrowserTab(SIMULATOR_URL, {
+									kind: 'simulator',
+									title: 'Simulator',
+								})
+							}
+							title="Simulator preview"
+							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
+						>
+							<Smartphone className="h-4 w-4" />
+						</button>
+					</div>
 				</div>
 			</div>
 			{simulatorError && (

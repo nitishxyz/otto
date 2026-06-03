@@ -53,6 +53,7 @@ const RIGHT_RAIL_HOVER_RATIO = 0.05;
 const HOVER_SHOW_DELAY_MS = 260;
 const HOVER_HIDE_DELAY_MS = 120;
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
+const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 
 function useMediaQuery(query: string): boolean {
 	const [matches, setMatches] = useState(() => {
@@ -277,6 +278,17 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		};
 
 		const handleMouseMove = (event: MouseEvent) => {
+			const target = event.target;
+			if (
+				target instanceof Element &&
+				target.closest(SMART_EDGE_IGNORE_SELECTOR)
+			) {
+				clearHoverTimeouts();
+				setIsRightRailHoverPending(false);
+				setRailVisible(false);
+				return;
+			}
+
 			const hoverWidth = window.innerWidth * RIGHT_RAIL_HOVER_RATIO;
 			scheduleRailVisible(window.innerWidth - event.clientX <= hoverWidth);
 		};
