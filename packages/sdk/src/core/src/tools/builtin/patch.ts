@@ -110,9 +110,22 @@ export function buildApplyPatchTool(projectRoot: string): {
 				const message = error instanceof Error ? error.message : String(error);
 				return createToolError(message, 'validation', {
 					parameter: 'patch',
-					suggestion:
-						'Provide patch content using the enveloped format (*** Begin Patch ... *** End Patch) or standard unified diff format (---/+++ headers).',
+					suggestion: message.includes('Missing "*** End Patch"')
+						? 'The patch tool automatically appends a missing end marker when real patch operations are present. This input appears incomplete; resend the full patch body, not just the begin marker.'
+						: 'Provide patch content using the enveloped format (*** Begin Patch ... *** End Patch) or standard unified diff format (---/+++ headers).',
 				});
+			}
+
+			if (operations.length === 0) {
+				return createToolError(
+					'Patch contains no operations. Do not retry the same empty patch; include at least one Add/Update/Delete/Replace directive between the begin and end markers.',
+					'validation',
+					{
+						parameter: 'patch',
+						suggestion:
+							'Provide a complete patch body such as *** Replace in: path, *** Find:, *** With:, then *** End Patch.',
+					},
+				);
 			}
 
 			try {

@@ -81,15 +81,25 @@ export function buildReadTool(projectRoot: string): {
 				.describe(
 					'Ending line number (1-indexed, inclusive). Required if startLine is provided.',
 				),
+			maxLines: z
+				.number()
+				.int()
+				.min(1)
+				.optional()
+				.describe(
+					'Number of lines to read starting at startLine. Ignored when endLine is provided.',
+				),
 		}),
 		async execute({
 			path,
 			startLine,
 			endLine,
+			maxLines,
 		}: {
 			path: string;
 			startLine?: number;
 			endLine?: number;
+			maxLines?: number;
 		}): Promise<ToolResponse<ReadResult>> {
 			if (!path || path.trim().length === 0) {
 				return createToolError(
@@ -111,10 +121,12 @@ export function buildReadTool(projectRoot: string): {
 				const indent = detectIndentation(content);
 				await rememberFileRead(projectRoot, abs);
 
-				if (startLine !== undefined && endLine !== undefined) {
+				if (startLine !== undefined) {
 					const lines = content.split('\n');
+					const requestedEndLine =
+						endLine ?? startLine + Math.max(1, maxLines ?? 1) - 1;
 					const start = Math.max(1, startLine) - 1;
-					const end = Math.min(lines.length, endLine);
+					const end = Math.min(lines.length, requestedEndLine);
 					const selectedLines = lines.slice(start, end);
 					content = selectedLines.join('\n');
 					const result: ReadResult = {
@@ -122,7 +134,7 @@ export function buildReadTool(projectRoot: string): {
 						path: req,
 						content,
 						size: content.length,
-						lineRange: `@${startLine}-${endLine}`,
+						lineRange: `@${startLine}-${requestedEndLine}`,
 						totalLines: lines.length,
 					};
 					if (indent) result.indentation = indent;

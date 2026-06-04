@@ -25,6 +25,26 @@ type BunImageConstructor = new (
 export type ImageAttachmentPayload = {
 	data: string;
 	mediaType: string;
+	name?: string;
+	attachmentId?: string;
+	original?: AttachmentOriginalMetadata;
+	compression?: ImageCompressionMetadata;
+};
+
+type AttachmentOriginalMetadata = {
+	filename?: string;
+	size?: number;
+	sha256?: string;
+	mimeType?: string;
+};
+
+export type ImageCompressionMetadata = {
+	compressed: boolean;
+	originalBytes: number;
+	compressedBytes: number;
+	originalMediaType: string;
+	maxEdge: number;
+	quality: number;
 };
 
 export type FileAttachmentPayload = {
@@ -32,14 +52,10 @@ export type FileAttachmentPayload = {
 	name: string;
 	data?: string;
 	mediaType: string;
+	compression?: ImageCompressionMetadata;
 	textContent?: string;
 	attachmentId?: string;
-	original?: {
-		filename?: string;
-		size?: number;
-		sha256?: string;
-		mimeType?: string;
-	};
+	original?: AttachmentOriginalMetadata;
 };
 
 type CompressImageOptions = {
@@ -108,8 +124,17 @@ async function compressImageAttachment(
 		}
 
 		return {
+			...attachment,
 			data: Buffer.from(output).toString('base64'),
 			mediaType: JPEG_MEDIA_TYPE,
+			compression: {
+				compressed: true,
+				originalBytes: input.byteLength,
+				compressedBytes: output.byteLength,
+				originalMediaType: attachment.mediaType,
+				maxEdge: options.maxEdge,
+				quality: options.quality,
+			},
 		};
 	} catch {
 		return attachment;
@@ -176,6 +201,7 @@ export async function compressFileImageAttachments(
 				...attachment,
 				data: compressed.data,
 				mediaType: compressed.mediaType,
+				compression: compressed.compression,
 			};
 		}),
 	);

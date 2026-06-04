@@ -23,6 +23,7 @@ const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 		attachment: false,
 		toolCall: true,
 		reasoningText: true,
+		editToolCapability: 'structured',
 		provider: { npm: '@ai-sdk/xai' },
 	},
 	{

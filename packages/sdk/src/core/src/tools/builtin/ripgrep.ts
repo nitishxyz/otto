@@ -42,6 +42,9 @@ export function buildRipgrepTool(projectRoot: string): {
 			ToolResponse<{
 				count: number;
 				matches: Array<{ file: string; line: number; text: string }>;
+				truncated?: boolean;
+				shownMatches?: number;
+				files?: Array<{ file: string; matches: number }>;
 			}>
 		> {
 			function expandTilde(p: string) {
@@ -54,7 +57,14 @@ export function buildRipgrepTool(projectRoot: string): {
 			const p = expandTilde(String(path ?? '.')).trim();
 			const isAbs = p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p);
 			const target = p ? (isAbs ? p : join(projectRoot, p)) : projectRoot;
-			const args = ['--no-heading', '--line-number', '--color=never'];
+			const args = [
+				'--no-heading',
+				'--line-number',
+				'--color=never',
+				'--max-columns',
+				'240',
+				'--max-columns-preview',
+			];
 			if (ignoreCase) args.push('-i');
 			if (Array.isArray(glob)) for (const g of glob) args.push('-g', g);
 			args.push('--max-count', String(maxResults));
@@ -65,11 +75,72 @@ export function buildRipgrepTool(projectRoot: string): {
 				const rgBin = await resolveBinary('rg');
 				return await new Promise((resolve) => {
 					const proc = spawn(rgBin, args, { cwd: projectRoot });
-					let stdout = '';
 					let stderr = '';
+					let pendingLine = '';
+					let truncated = false;
+					let settled = false;
+					const TEXT_MAX = 200;
+					const matches: Array<{ file: string; line: number; text: string }> =
+						[];
+					const fileCounts = new Map<string, number>();
+
+					const parseLine = (lineText: string) => {
+						if (!lineText || matches.length >= maxResults) return;
+						const m = lineText.match(/^(.+?):(\d+):(.*)$/s);
+						const match = (() => {
+							if (!m) {
+								return {
+									file: '',
+									line: 0,
+									text:
+										lineText.length > TEXT_MAX
+											? `${lineText.slice(0, TEXT_MAX)}…`
+											: lineText,
+								};
+							}
+							const file = m[1];
+							const line = Number.parseInt(m[2], 10);
+							const raw = m[3];
+							const text =
+								raw.length > TEXT_MAX ? `${raw.slice(0, TEXT_MAX)}…` : raw;
+							return { file, line, text };
+						})();
+						matches.push(match);
+						if (match.file) {
+							fileCounts.set(match.file, (fileCounts.get(match.file) ?? 0) + 1);
+						}
+						if (matches.length >= maxResults) {
+							truncated = true;
+							proc.kill('SIGTERM');
+						}
+					};
+
+					const resolveSuccess = () => {
+						if (settled) return;
+						settled = true;
+						const files = Array.from(fileCounts.entries()).map(
+							([file, count]) => ({ file, matches: count }),
+						);
+						resolve({
+							ok: true,
+							count: matches.length,
+							matches,
+							...(truncated
+								? { truncated: true, shownMatches: matches.length }
+								: {}),
+							...(files.length ? { files } : {}),
+						});
+					};
 
 					proc.stdout.on('data', (data) => {
-						stdout += data.toString();
+						if (matches.length >= maxResults) return;
+						pendingLine += data.toString();
+						const lines = pendingLine.split('\n');
+						pendingLine = lines.pop() ?? '';
+						for (const line of lines) {
+							parseLine(line);
+							if (matches.length >= maxResults) break;
+						}
 					});
 
 					proc.stderr.on('data', (data) => {
@@ -77,7 +148,9 @@ export function buildRipgrepTool(projectRoot: string): {
 					});
 
 					proc.on('close', (code) => {
-						if (code !== 0 && code !== 1) {
+						if (pendingLine && matches.length < maxResults)
+							parseLine(pendingLine);
+						if (!truncated && code !== 0 && code !== 1) {
 							resolve(
 								createToolError(
 									stderr.trim() || 'ripgrep failed',
@@ -91,30 +164,12 @@ export function buildRipgrepTool(projectRoot: string): {
 							return;
 						}
 
-						const lines = stdout
-							.split('\n')
-							.filter(Boolean)
-							.slice(0, maxResults);
-						const TEXT_MAX = 200;
-						const matches = lines.map((l) => {
-							const m = l.match(/^(.+?):(\d+):(.*)$/s);
-							if (!m)
-								return {
-									file: '',
-									line: 0,
-									text: l.length > TEXT_MAX ? `${l.slice(0, TEXT_MAX)}…` : l,
-								};
-							const file = m[1];
-							const line = Number.parseInt(m[2], 10);
-							const raw = m[3];
-							const text =
-								raw.length > TEXT_MAX ? `${raw.slice(0, TEXT_MAX)}…` : raw;
-							return { file, line, text };
-						});
-						resolve({ ok: true, count: matches.length, matches });
+						resolveSuccess();
 					});
 
 					proc.on('error', (err) => {
+						if (settled) return;
+						settled = true;
 						resolve(
 							createToolError(String(err), 'execution', {
 								suggestion: 'Ensure ripgrep (rg) is installed',

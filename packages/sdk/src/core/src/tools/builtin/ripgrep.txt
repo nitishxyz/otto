@@ -8,5 +8,7 @@ This is the only content-search tool available. Use it for any text search acros
 ## Usage tips
 
 - Narrow the search set with `glob` first if the pattern may match too broadly.
+- Prefer narrow `path` and `glob` values over repo-wide searches.
+- Keep `maxResults` low for broad searches; the tool stops after the global limit.
 - Batch independent searches (e.g. multiple function names) in a single turn for parallel execution.
 - Use `ignoreCase: true` for case-insensitive matching; pass `glob` patterns (e.g. `["*.ts"]`) to limit file types.

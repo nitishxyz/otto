@@ -17,10 +17,19 @@ import {
 import { estimateTokens } from './compaction.ts';
 import { detectOAuth, adaptSimpleCall } from '../provider/oauth-adapter.ts';
 import { prepareBuiltinCommand } from '../commands/builtins.ts';
+import { storeAttachmentBytes } from '../../routes/attachments.ts';
 import {
 	compressFileImageAttachments,
 	compressImageAttachments,
+	type ImageCompressionMetadata,
 } from './image-compression.ts';
+
+type AttachmentOriginalMetadata = {
+	filename?: string;
+	size?: number;
+	sha256?: string;
+	mimeType?: string;
+};
 
 type SessionRow = typeof sessions.$inferSelect;
 
@@ -36,22 +45,65 @@ type DispatchOptions = {
 	userContext?: string;
 	reasoningText?: boolean;
 	reasoningLevel?: ReasoningLevel;
-	images?: Array<{ data: string; mediaType: string }>;
+	images?: Array<{
+		data: string;
+		mediaType: string;
+		name?: string;
+		attachmentId?: string;
+		original?: AttachmentOriginalMetadata;
+		compression?: ImageCompressionMetadata;
+	}>;
 	files?: Array<{
 		type: 'image' | 'pdf' | 'text' | 'binary';
 		name: string;
 		data?: string;
 		mediaType: string;
+		compression?: ImageCompressionMetadata;
 		textContent?: string;
 		attachmentId?: string;
-		original?: {
-			filename?: string;
-			size?: number;
-			sha256?: string;
-			mimeType?: string;
-		};
+		original?: AttachmentOriginalMetadata;
 	}>;
 };
+
+async function attachDirectImages(args: {
+	projectRoot: string;
+	sessionId: string;
+	images?: DispatchOptions['images'];
+}): Promise<DispatchOptions['images']> {
+	if (!args.images?.length) return args.images;
+
+	return Promise.all(
+		args.images.map(async (image, index) => {
+			if (image.attachmentId || !image.data) return image;
+			try {
+				const bytes = Buffer.from(image.data, 'base64');
+				const metadata = await storeAttachmentBytes({
+					projectRoot: args.projectRoot,
+					bytes,
+					filename: image.name || `image-${index + 1}`,
+					mimeType: image.mediaType,
+					sessionId: args.sessionId,
+				});
+				return {
+					...image,
+					attachmentId: metadata.id,
+					name: metadata.filename,
+					original: {
+						filename: metadata.filename,
+						size: metadata.size,
+						sha256: metadata.sha256,
+						mimeType: metadata.mimeType,
+					},
+				};
+			} catch (error) {
+				logger.warn('Failed to store direct image attachment', error, {
+					sessionId: args.sessionId,
+				});
+				return image;
+			}
+		}),
+	);
+}
 
 export async function dispatchAssistantMessage(
 	options: DispatchOptions,
@@ -74,7 +126,14 @@ export async function dispatchAssistantMessage(
 
 	const sessionId = session.id;
 	const now = Date.now();
-	const compressedImages = await compressImageAttachments(images);
+	const imagesWithAttachments = await attachDirectImages({
+		projectRoot: cfg.projectRoot,
+		sessionId,
+		images,
+	});
+	const compressedImages = await compressImageAttachments(
+		imagesWithAttachments,
+	);
 	const compressedFiles = await compressFileImageAttachments(files);
 	const builtinCommand = await prepareBuiltinCommand({
 		cfg,
@@ -126,7 +185,14 @@ export async function dispatchAssistantMessage(
 				messageId: userMessageId,
 				index: i + 1,
 				type: 'image',
-				content: JSON.stringify({ data: img.data, mediaType: img.mediaType }),
+				content: JSON.stringify({
+					data: img.data,
+					mediaType: img.mediaType,
+					name: img.name,
+					attachmentId: img.attachmentId,
+					original: img.original,
+					compression: img.compression,
+				}),
 				agent: effectiveAgent,
 				provider,
 				model,
@@ -148,6 +214,7 @@ export async function dispatchAssistantMessage(
 					name: file.name,
 					data: file.data,
 					mediaType: file.mediaType,
+					compression: file.compression,
 					textContent: file.textContent,
 					attachmentId: file.attachmentId,
 					original: file.original,

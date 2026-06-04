@@ -253,6 +253,10 @@ function mapModel(
 	if (hasValue(m.tool_call)) info.toolCall = Boolean(m.tool_call);
 	if (hasValue(m.reasoning)) info.reasoningText = Boolean(m.reasoning);
 	if (hasValue(m.attachment)) info.attachment = Boolean(m.attachment);
+	const editToolCapability = normalizeEditToolCapability(
+		m.edit_tool_capability ?? m.editToolCapability,
+	);
+	if (editToolCapability) info.editToolCapability = editToolCapability;
 	const temperature = normalizeTemperature(m.temperature);
 	if (temperature !== undefined) info.temperature = temperature;
 	if (typeof m.knowledge === 'string' && m.knowledge.trim())
@@ -300,6 +304,11 @@ function normalizeModalities(value: unknown) {
 function normalizeTemperature(value: unknown): boolean | number | undefined {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
 	if (typeof value === 'boolean') return value;
+	return undefined;
+}
+
+function normalizeEditToolCapability(value: unknown) {
+	if (value === 'structured' || value === 'patch') return value;
 	return undefined;
 }
 

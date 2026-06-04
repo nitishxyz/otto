@@ -11,6 +11,128 @@ import { eq, asc, inArray } from 'drizzle-orm';
 import { stripToolResultArtifactsForModel } from '../../tools/adapter/results.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
 
+type MessagePartRow = typeof messageParts.$inferSelect;
+
+const MODEL_HISTORY_MAX_BYTES = 1_500_000;
+const COMPACTED_OLD_TEXT_BYTES = 1_000;
+
+function getReadResultKey(part: MessagePartRow): string | undefined {
+	if (part.type !== 'tool_result' || part.compactedAt) return undefined;
+	try {
+		const content = JSON.parse(part.content ?? '{}') as {
+			name?: string;
+			result?: unknown;
+		};
+		if (content.name !== 'read') return undefined;
+		if (
+			!content.result ||
+			typeof content.result !== 'object' ||
+			Array.isArray(content.result)
+		) {
+			return undefined;
+		}
+		const result = content.result as Record<string, unknown>;
+		if (result.ok === false || typeof result.path !== 'string')
+			return undefined;
+		const lineRange =
+			typeof result.lineRange === 'string' ? result.lineRange : 'full';
+		return `${result.path}\u0000${lineRange}`;
+	} catch {
+		return undefined;
+	}
+}
+
+function findLatestUserImageMessageId(
+	rows: Array<typeof messages.$inferSelect>,
+	partsByMessageId: Map<string, MessagePartRow[]>,
+): string | undefined {
+	for (let index = rows.length - 1; index >= 0; index--) {
+		const row = rows[index];
+		if (row.role !== 'user') continue;
+		const parts = partsByMessageId.get(row.id) ?? [];
+		if (parts.some((part) => part.type === 'image')) return row.id;
+	}
+	return undefined;
+}
+
+function jsonByteLength(value: unknown): number {
+	try {
+		return Buffer.byteLength(JSON.stringify(value), 'utf8');
+	} catch {
+		return Buffer.byteLength(String(value), 'utf8');
+	}
+}
+
+function hasToolishContent(message: ModelMessage): boolean {
+	const content = (message as { content?: unknown }).content;
+	if (!Array.isArray(content)) return false;
+	return content.some((part) => {
+		if (!part || typeof part !== 'object') return false;
+		const type = (part as { type?: unknown }).type;
+		return typeof type === 'string' && type.startsWith('tool-');
+	});
+}
+
+function compactOldMessageText(message: ModelMessage): boolean {
+	if (hasToolishContent(message)) return false;
+	const mutable = message as { content?: unknown };
+	if (typeof mutable.content === 'string') {
+		if (
+			Buffer.byteLength(mutable.content, 'utf8') <= COMPACTED_OLD_TEXT_BYTES
+		) {
+			return false;
+		}
+		mutable.content = `${mutable.content.slice(0, COMPACTED_OLD_TEXT_BYTES)}\n… older message text compacted to keep model history under budget …`;
+		return true;
+	}
+	if (!Array.isArray(mutable.content)) return false;
+
+	let changed = false;
+	mutable.content = mutable.content.map((part) => {
+		if (!part || typeof part !== 'object') return part;
+		const record = part as Record<string, unknown>;
+		if (record.type !== 'text' || typeof record.text !== 'string') return part;
+		if (Buffer.byteLength(record.text, 'utf8') <= COMPACTED_OLD_TEXT_BYTES) {
+			return part;
+		}
+		changed = true;
+		return {
+			...record,
+			text: `${record.text.slice(0, COMPACTED_OLD_TEXT_BYTES)}\n… older message text compacted to keep model history under budget …`,
+		};
+	});
+	return changed;
+}
+
+function enforceModelHistoryBudget(history: ModelMessage[]): ModelMessage[] {
+	let totalBytes = jsonByteLength(history);
+	if (totalBytes <= MODEL_HISTORY_MAX_BYTES) return history;
+
+	for (let index = 0; index < history.length - 4; index++) {
+		if (!compactOldMessageText(history[index])) continue;
+		totalBytes = jsonByteLength(history);
+		if (totalBytes <= MODEL_HISTORY_MAX_BYTES) break;
+	}
+	return history;
+}
+
+function findSupersededReadPartIds(parts: MessagePartRow[]): Set<string> {
+	const latestPartIdByReadKey = new Map<string, string>();
+	const readKeyByPartId = new Map<string, string>();
+	for (const part of parts) {
+		const key = getReadResultKey(part);
+		if (!key) continue;
+		readKeyByPartId.set(part.id, key);
+		latestPartIdByReadKey.set(key, part.id);
+	}
+
+	const superseded = new Set<string>();
+	for (const [partId, key] of readKeyByPartId) {
+		if (latestPartIdByReadKey.get(key) !== partId) superseded.add(partId);
+	}
+	return superseded;
+}
+
 /**
  * Builds the conversation history for a session from the database,
  * converting it to the format expected by the AI SDK.
@@ -45,6 +167,14 @@ export async function buildHistoryMessages(
 		}
 		partsByMessageId.set(part.messageId, [part]);
 	}
+	const orderedParts = rows.flatMap(
+		(row) => partsByMessageId.get(row.id) ?? [],
+	);
+	const supersededReadPartIds = findSupersededReadPartIds(orderedParts);
+	const latestUserImageMessageId = findLatestUserImageMessageId(
+		rows,
+		partsByMessageId,
+	);
 
 	const history: ModelMessage[] = [];
 	const toolHistory = new ToolHistoryTracker();
@@ -65,30 +195,6 @@ export async function buildHistoryMessages(
 
 		if (m.role === 'user') {
 			const userParts: Array<TextPart | FilePart> = [];
-			const pushAttachmentReference = (obj: {
-				attachmentId?: string;
-				name?: string;
-				mediaType?: string;
-				type?: string;
-				original?: { filename?: string; size?: number; sha256?: string };
-			}) => {
-				if (!obj.attachmentId) return;
-				const name = obj.original?.filename || obj.name || 'attachment';
-				const attrs = [
-					`id="${obj.attachmentId}"`,
-					`name="${name.replace(/"/g, '&quot;')}"`,
-					obj.type ? `type="${obj.type}"` : undefined,
-					obj.mediaType ? `mimeType="${obj.mediaType}"` : undefined,
-					obj.original?.size ? `size="${obj.original.size}"` : undefined,
-					obj.original?.sha256 ? `sha256="${obj.original.sha256}"` : undefined,
-				]
-					.filter(Boolean)
-					.join(' ');
-				userParts.push({
-					type: 'text',
-					text: `<uploaded_attachment ${attrs}>Use copy_attachment_to_project to copy the untouched original upload into the project when needed.</uploaded_attachment>`,
-				});
-			};
 			for (const p of parts) {
 				if (p.type === 'text') {
 					try {
@@ -105,8 +211,11 @@ export async function buildHistoryMessages(
 							name?: string;
 							original?: { filename?: string; size?: number; sha256?: string };
 						};
-						pushAttachmentReference({ ...obj, type: 'image' });
-						if (obj.data && obj.mediaType) {
+						if (
+							m.id === latestUserImageMessageId &&
+							obj.data &&
+							obj.mediaType
+						) {
 							userParts.push({
 								type: 'file',
 								data: obj.data,
@@ -125,7 +234,6 @@ export async function buildHistoryMessages(
 							attachmentId?: string;
 							original?: { filename?: string; size?: number; sha256?: string };
 						};
-						pushAttachmentReference(obj);
 						if (obj.type === 'text' && obj.textContent) {
 							userParts.push({
 								type: 'text',
@@ -138,7 +246,12 @@ export async function buildHistoryMessages(
 								filename: obj.name,
 								mediaType: obj.mediaType,
 							});
-						} else if (obj.type === 'image' && obj.data && obj.mediaType) {
+						} else if (
+							obj.type === 'image' &&
+							obj.data &&
+							obj.mediaType &&
+							m.id === latestUserImageMessageId
+						) {
 							userParts.push({
 								type: 'file',
 								data: obj.data,
@@ -171,6 +284,7 @@ export async function buildHistoryMessages(
 				{
 					name: string;
 					callId: string;
+					partId?: string;
 					result: unknown;
 				}
 			>();
@@ -188,6 +302,7 @@ export async function buildHistoryMessages(
 						toolResultsById.set(obj.callId, {
 							name: obj.name ?? 'tool',
 							callId: obj.callId,
+							partId: p.id,
 							result: obj.result,
 						});
 					}
@@ -233,7 +348,15 @@ export async function buildHistoryMessages(
 							toolCallId: obj.callId,
 							input: obj.args,
 							output: (() => {
-								const r = stripToolResultArtifactsForModel(result.result);
+								const r = stripToolResultArtifactsForModel(result.result, {
+									toolName: result.name,
+									compactedReason:
+										result.name === 'read' &&
+										result.partId &&
+										supersededReadPartIds.has(result.partId)
+											? 'Superseded by a later read of the same file and line range.'
+											: undefined,
+								});
 								if (typeof r === 'string') return r;
 								try {
 									return JSON.stringify(r);
@@ -247,7 +370,15 @@ export async function buildHistoryMessages(
 							toolName: obj.name,
 							callId: obj.callId,
 							args: obj.args,
-							result: stripToolResultArtifactsForModel(result.result),
+							result: stripToolResultArtifactsForModel(result.result, {
+								toolName: result.name,
+								compactedReason:
+									result.name === 'read' &&
+									result.partId &&
+									supersededReadPartIds.has(result.partId)
+										? 'Superseded by a later read of the same file and line range.'
+										: undefined,
+							}),
 						});
 
 						assistantParts.push(part as never);
@@ -262,7 +393,7 @@ export async function buildHistoryMessages(
 		}
 	}
 
-	return history;
+	return enforceModelHistoryBudget(history);
 }
 
 async function _logPendingToolParts(

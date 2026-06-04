@@ -24,6 +24,13 @@ describe('image compression', () => {
 		);
 
 		expect(compressed.mediaType).toBe('image/jpeg');
+		expect(compressed.compression).toMatchObject({
+			compressed: true,
+			originalBytes: input.byteLength,
+			originalMediaType: 'image/png',
+			maxEdge: 128,
+			quality: 80,
+		});
 		expect(Buffer.from(compressed.data, 'base64').byteLength).toBeLessThan(
 			input.byteLength,
 		);
@@ -60,6 +67,7 @@ describe('image compression', () => {
 		);
 
 		expect(imageFile.mediaType).toBe('image/jpeg');
+		expect(imageFile.compression?.compressed).toBe(true);
 		expect(textFile).toEqual({
 			type: 'text',
 			name: 'notes.txt',

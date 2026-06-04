@@ -42,9 +42,44 @@ function killProcessTree(pid: number) {
 	}
 }
 
-export type ShellOutputMode = 'full' | 'tail';
+export type ShellOutputMode = 'auto' | 'full' | 'tail';
 
 const DEFAULT_TAIL_LINES = 100;
+const DEFAULT_MAX_OUTPUT_BYTES = 128_000;
+
+type CompactTextResult = {
+	text: string;
+	truncated: boolean;
+	originalBytes: number;
+	shownBytes: number;
+};
+
+function compactTextByBytes(
+	text: string,
+	maxBytes: number,
+	label: string,
+): CompactTextResult {
+	const originalBytes = Buffer.byteLength(text, 'utf8');
+	if (maxBytes <= 0 || originalBytes <= maxBytes) {
+		return { text, truncated: false, originalBytes, shownBytes: originalBytes };
+	}
+
+	const marker = `\n… omitted ${originalBytes - maxBytes} bytes from ${label} …\n`;
+	const markerBytes = Buffer.byteLength(marker, 'utf8');
+	const budget = Math.max(0, maxBytes - markerBytes);
+	const headBytes = Math.floor(budget / 2);
+	const tailBytes = budget - headBytes;
+	const buffer = Buffer.from(text, 'utf8');
+	const compacted = `${buffer.subarray(0, headBytes).toString('utf8')}${marker}${buffer
+		.subarray(buffer.byteLength - tailBytes)
+		.toString('utf8')}`;
+	return {
+		text: compacted,
+		truncated: true,
+		originalBytes,
+		shownBytes: Buffer.byteLength(compacted, 'utf8'),
+	};
+}
 
 export function appendTailLines(
 	current: string,
@@ -66,6 +101,13 @@ type ShellResult = ToolResponse<{
 	stderr: string;
 	outputMode?: ShellOutputMode;
 	tailLines?: number;
+	maxOutputBytes?: number;
+	stdoutTruncated?: boolean;
+	stdoutOriginalBytes?: number;
+	stdoutShownBytes?: number;
+	stderrTruncated?: boolean;
+	stderrOriginalBytes?: number;
+	stderrShownBytes?: number;
 }>;
 
 type ShellStreamChunk =
@@ -110,11 +152,11 @@ const shellInputSchema = z
 			.default(300000)
 			.describe('Timeout in milliseconds (default: 300000 = 5 minutes)'),
 		outputMode: z
-			.enum(['full', 'tail'])
+			.enum(['auto', 'full', 'tail'])
 			.optional()
-			.default('full')
+			.default('auto')
 			.describe(
-				'Output capture mode. Use "full" for complete stdout/stderr, or "tail" to keep only the last tailLines lines and avoid huge tool results.',
+				'Output capture mode. Use "auto" for bounded output, "full" for full output up to maxOutputBytes, or "tail" to keep only the last tailLines lines.',
 			),
 		tailLines: z
 			.number()
@@ -125,6 +167,16 @@ const shellInputSchema = z
 			.default(DEFAULT_TAIL_LINES)
 			.describe(
 				'Number of trailing stdout/stderr lines to keep when outputMode is "tail"',
+			),
+		maxOutputBytes: z
+			.number()
+			.int()
+			.min(0)
+			.max(10_000_000)
+			.optional()
+			.default(DEFAULT_MAX_OUTPUT_BYTES)
+			.describe(
+				'Maximum bytes to keep per stdout/stderr in the final tool result. Use 0 to disable byte capping.',
 			),
 	})
 	.strict();
@@ -154,8 +206,9 @@ export function buildShellTool(projectRoot: string): {
 				cwd,
 				allowNonZeroExit,
 				timeout = 300000,
-				outputMode = 'full',
+				outputMode = 'auto',
 				tailLines = DEFAULT_TAIL_LINES,
+				maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
 			}: ShellInput,
 			options?: { abortSignal?: AbortSignal },
 		): AsyncIterable<ShellStreamChunk> | ShellResult {
@@ -179,6 +232,7 @@ export function buildShellTool(projectRoot: string): {
 						timeout,
 						outputMode,
 						tailLines,
+						maxOutputBytes,
 					},
 					options,
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
@@ -217,6 +271,49 @@ export function buildShellTool(projectRoot: string): {
 			const settle = (result: ShellResult) => {
 				if (settled) return;
 				settled = true;
+				if ('stdout' in result && 'stderr' in result) {
+					const stdoutCompact = compactTextByBytes(
+						result.stdout,
+						maxOutputBytes,
+						'shell stdout',
+					);
+					const stderrCompact = compactTextByBytes(
+						result.stderr,
+						maxOutputBytes,
+						'shell stderr',
+					);
+					result.stdout = stdoutCompact.text;
+					result.stderr = stderrCompact.text;
+					result.maxOutputBytes = maxOutputBytes;
+					if (stdoutCompact.truncated) {
+						result.stdoutTruncated = true;
+						result.stdoutOriginalBytes = stdoutCompact.originalBytes;
+						result.stdoutShownBytes = stdoutCompact.shownBytes;
+					}
+					if (stderrCompact.truncated) {
+						result.stderrTruncated = true;
+						result.stderrOriginalBytes = stderrCompact.originalBytes;
+						result.stderrShownBytes = stderrCompact.shownBytes;
+					}
+				} else if ('details' in result && result.details) {
+					const details = result.details;
+					for (const field of ['stdout', 'stderr'] as const) {
+						const value = details[field];
+						if (typeof value !== 'string') continue;
+						const compact = compactTextByBytes(
+							value,
+							maxOutputBytes,
+							`shell ${field}`,
+						);
+						details[field] = compact.text;
+						if (compact.truncated) {
+							details[`${field}Truncated`] = true;
+							details[`${field}OriginalBytes`] = compact.originalBytes;
+							details[`${field}ShownBytes`] = compact.shownBytes;
+						}
+					}
+					details.maxOutputBytes = maxOutputBytes;
+				}
 				if (timeoutId) clearTimeout(timeoutId);
 				if (abortSignal) {
 					abortSignal.removeEventListener('abort', onAbort);
@@ -248,7 +345,7 @@ export function buildShellTool(projectRoot: string): {
 			proc.stdout?.on('data', (chunk) => {
 				const text = chunk.toString();
 				stdout =
-					outputMode === 'tail'
+					outputMode === 'tail' || outputMode === 'auto'
 						? appendTailLines(stdout, text, tailLines)
 						: `${stdout}${text}`;
 				pushDelta(text);
@@ -257,7 +354,7 @@ export function buildShellTool(projectRoot: string): {
 			proc.stderr?.on('data', (chunk) => {
 				const text = chunk.toString();
 				stderr =
-					outputMode === 'tail'
+					outputMode === 'tail' || outputMode === 'auto'
 						? appendTailLines(stderr, text, tailLines)
 						: `${stderr}${text}`;
 				pushDelta(text);
@@ -270,7 +367,9 @@ export function buildShellTool(projectRoot: string): {
 							cmd,
 							stdout,
 							stderr,
-							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+							...(outputMode === 'tail' || outputMode === 'auto'
+								? { outputMode, tailLines, maxOutputBytes }
+								: { outputMode, maxOutputBytes }),
 						}),
 					);
 					return;
@@ -286,7 +385,9 @@ export function buildShellTool(projectRoot: string): {
 								value: timeout,
 								stdout,
 								stderr,
-								...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+								...(outputMode === 'tail' || outputMode === 'auto'
+									? { outputMode, tailLines, maxOutputBytes }
+									: { outputMode, maxOutputBytes }),
 								suggestion: 'Increase timeout or optimize the command',
 							},
 						),
@@ -303,7 +404,9 @@ export function buildShellTool(projectRoot: string): {
 							stdout,
 							stderr,
 							cmd,
-							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+							...(outputMode === 'tail' || outputMode === 'auto'
+								? { outputMode, tailLines, maxOutputBytes }
+								: { outputMode, maxOutputBytes }),
 							suggestion: 'Check command syntax or use allowNonZeroExit: true',
 						}),
 					);
@@ -315,7 +418,9 @@ export function buildShellTool(projectRoot: string): {
 					exitCode: exitCode ?? 0,
 					stdout,
 					stderr,
-					...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+					...(outputMode === 'tail' || outputMode === 'auto'
+						? { outputMode, tailLines, maxOutputBytes }
+						: { outputMode, maxOutputBytes }),
 				});
 			});
 

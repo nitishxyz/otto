@@ -1,9 +1,10 @@
 import {
 	getConfiguredProviderFamily,
+	getConfiguredProviderModels,
 	getModelFamily,
 	type OttoConfig,
 } from '@ottocode/sdk';
-import type { DiscoveredTool } from '@ottocode/sdk';
+import type { DiscoveredTool, ModelInfo } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
 
 const EDITING_TOOL_NAMES = [
@@ -18,6 +19,55 @@ const MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS = new Set([
 	'general',
 	'init',
 ]);
+
+const LOWER_TIER_MODEL_PATTERNS = [
+	/(^|[-_/])fast($|[-_/])/,
+	/(^|[-_/])flash($|[-_/])/,
+	/(^|[-_/])mini($|[-_/])/,
+	/(^|[-_/])nano($|[-_/])/,
+	/(^|[-_/])lite($|[-_/])/,
+	/(^|[-_/])small($|[-_/])/,
+	/(^|[-_/])haiku($|[-_/])/,
+	/(^|[-_/])composer($|[-_/])/,
+] as const;
+
+const STRUCTURED_EDIT_COST_LIMIT = { input: 1, output: 5 } as const;
+
+function findConfiguredModelInfo(
+	cfg: OttoConfig | undefined,
+	provider: RunOpts['provider'],
+	model: string,
+): ModelInfo | undefined {
+	if (!cfg) return undefined;
+	return getConfiguredProviderModels(cfg, provider).find(
+		(entry) => entry.id === model,
+	);
+}
+
+function isLowCostModel(modelInfo: ModelInfo | undefined): boolean {
+	const cost = modelInfo?.cost;
+	if (!cost) return false;
+	return (
+		cost.input !== undefined &&
+		cost.output !== undefined &&
+		cost.input <= STRUCTURED_EDIT_COST_LIMIT.input &&
+		cost.output <= STRUCTURED_EDIT_COST_LIMIT.output
+	);
+}
+
+function shouldUseStructuredEditTools(
+	model: string,
+	modelInfo: ModelInfo | undefined,
+): boolean {
+	if (modelInfo?.editToolCapability === 'structured') return true;
+	if (modelInfo?.editToolCapability === 'patch') return false;
+	if (isLowCostModel(modelInfo)) return true;
+
+	const normalizedModel = model.toLowerCase();
+	return LOWER_TIER_MODEL_PATTERNS.some((pattern) =>
+		pattern.test(normalizedModel),
+	);
+}
 
 function normalizeToolName(toolName: string): string {
 	return toolName === 'bash' ? 'shell' : toolName;
@@ -67,9 +117,16 @@ export function applyModelFamilyEditToolPolicy(
 	const family = cfg
 		? getConfiguredProviderFamily(cfg, provider, model)
 		: getModelFamily(provider, model);
+	const modelInfo = findConfiguredModelInfo(cfg, provider, model);
 	const next = tools.filter(
 		(toolName) => !EDITING_TOOL_NAMES.includes(toolName),
 	);
+	if (shouldUseStructuredEditTools(model, modelInfo)) {
+		return Array.from(
+			new Set([...next, 'write', 'edit', 'multiedit', 'copy_into']),
+		);
+	}
+
 	const preferredEditingTools =
 		family === 'anthropic' || family === 'openai'
 			? ['write', 'copy_into', 'apply_patch']

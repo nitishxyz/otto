@@ -133,6 +133,33 @@ describe('Built-in Tools', () => {
 			);
 			expect((result as { lineRange: string }).lineRange).toBe('@1-2');
 		});
+
+		it('should read one line when only startLine is provided', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+
+			const result = await readTool?.tool.execute({
+				path: 'test.txt',
+				startLine: 2,
+			});
+
+			expect((result as { content: string }).content).toBe('Line 2');
+			expect((result as { lineRange: string }).lineRange).toBe('@2-2');
+		});
+
+		it('should read maxLines from startLine', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+
+			const result = await readTool?.tool.execute({
+				path: 'test.txt',
+				startLine: 2,
+				maxLines: 2,
+			});
+
+			expect((result as { content: string }).content).toBe('Line 2\nLine 3');
+			expect((result as { lineRange: string }).lineRange).toBe('@2-3');
+		});
 	});
 
 	describe('read_image tool', () => {
@@ -334,6 +361,24 @@ describe('Built-in Tools', () => {
 			expect(output).toBe('one\ntwo\nthree\n');
 		});
 
+		it('should cap large final shell outputs by bytes', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+
+			const result = await resolveStreamedResult(
+				await shellTool?.tool.execute({
+					cmd: 'python3 - <<\'PY\'\nprint("x" * 5000)\nPY',
+					outputMode: 'full',
+					maxOutputBytes: 1000,
+				}),
+			);
+
+			expect((result as { stdout: string }).stdout.length).toBeLessThan(1500);
+			expect((result as { stdoutTruncated?: boolean }).stdoutTruncated).toBe(
+				true,
+			);
+		});
+
 		it('should handle command errors', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');
@@ -389,6 +434,23 @@ describe('Built-in Tools', () => {
 				path: '.',
 			});
 			expect((result as { count: number }).count).toBe(0);
+		});
+
+		it('should stop at a global maxResults limit', async () => {
+			await writeFile(join(projectRoot, 'many-a.txt'), 'needle\nneedle\n');
+			await writeFile(join(projectRoot, 'many-b.txt'), 'needle\nneedle\n');
+			const { tools } = await discoverProjectTools(projectRoot);
+			const ripgrepTool = tools.find((t) => t.name === 'ripgrep');
+
+			const result = await ripgrepTool?.tool.execute({
+				query: 'needle',
+				path: '.',
+				maxResults: 2,
+			});
+
+			expect((result as { count: number }).count).toBe(2);
+			expect((result as { matches: unknown[] }).matches).toHaveLength(2);
+			expect((result as { truncated?: boolean }).truncated).toBe(true);
 		});
 	});
 
@@ -505,6 +567,23 @@ describe('Built-in Tools', () => {
 			expect(
 				(result as { artifact?: { patch?: string } }).artifact?.patch,
 			).toContain('@@ -0,0 +1');
+		});
+
+		it('should reject empty begin-marker-only patches with a specific error', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const patchTool = tools.find((t) => t.name === 'apply_patch');
+
+			const result = await patchTool?.tool.execute({
+				patch: '*** Begin Patch',
+			});
+
+			expect(result).toMatchObject({ ok: false, errorType: 'validation' });
+			expect((result as { error?: string }).error).toContain(
+				'Patch contains no operations',
+			);
+			expect(
+				(result as { details?: { suggestion?: string } }).details?.suggestion,
+			).toContain('complete patch body');
 		});
 
 		it('should update existing file using enveloped patch', async () => {

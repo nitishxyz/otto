@@ -94,6 +94,12 @@ export type ModelInfo = {
 	toolCall?: boolean;
 	reasoningText?: boolean;
 	attachment?: boolean;
+	/**
+	 * Editing tool policy override for this model.
+	 * Use structured for lower-end models that handle simple edit schemas better
+	 * than free-form patch languages.
+	 */
+	editToolCapability?: 'structured' | 'patch';
 	temperature?: boolean | number;
 	knowledge?: string;
 	releaseDate?: string;

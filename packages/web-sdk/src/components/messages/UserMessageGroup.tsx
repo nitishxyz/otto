@@ -32,6 +32,7 @@ interface ImageData {
 	data?: string;
 	mediaType: string;
 	name?: string;
+	attachmentId?: string;
 }
 
 interface FileData {
@@ -40,6 +41,7 @@ interface FileData {
 	data?: string;
 	mediaType: string;
 	textContent?: string;
+	attachmentId?: string;
 }
 
 export const UserMessageGroup = memo(

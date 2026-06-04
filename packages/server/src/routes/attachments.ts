@@ -20,7 +20,7 @@ const MIME_EXTENSIONS: Record<string, string> = {
 	'application/pdf': '.pdf',
 };
 
-type StoredAttachmentMetadata = {
+export type StoredAttachmentMetadata = {
 	id: string;
 	filename: string;
 	mimeType: string;
@@ -130,13 +130,55 @@ async function readMetadata(projectRoot: string, attachmentId: string) {
 	return JSON.parse(raw) as StoredAttachmentMetadata;
 }
 
-function metadataResponse(metadata: StoredAttachmentMetadata) {
+export function metadataResponse(metadata: StoredAttachmentMetadata) {
 	return {
 		...metadata,
 		originalUrl: `/v1/attachments/${encodeURIComponent(metadata.id)}`,
 		metadataUrl: `/v1/attachments/${encodeURIComponent(metadata.id)}/metadata`,
 		status: 'ready' as const,
 	};
+}
+
+export async function storeAttachmentBytes(args: {
+	projectRoot: string;
+	bytes: Buffer;
+	filename: string;
+	mimeType: string;
+	sessionId?: string;
+}): Promise<StoredAttachmentMetadata> {
+	if (args.bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+		throw new Error(
+			`File too large: ${(args.bytes.byteLength / 1024 / 1024).toFixed(1)}MB. Max: ${MAX_ATTACHMENT_BYTES / 1024 / 1024}MB`,
+		);
+	}
+
+	const id = `att_${crypto.randomUUID()}`;
+	const filename = sanitizeFilename(args.filename);
+	const mimeType = args.mimeType || 'application/octet-stream';
+	const dir = attachmentDir(args.projectRoot, id);
+	await mkdir(dir, { recursive: true });
+
+	const sha256 = createHash('sha256').update(args.bytes).digest('hex');
+	const originalStorageName = getOriginalStorageName(mimeType, filename);
+	const originalPath = join(ATTACHMENTS_DIR, id, originalStorageName);
+	await writeFile(join(dir, originalStorageName), args.bytes);
+
+	const metadata: StoredAttachmentMetadata = {
+		id,
+		filename,
+		mimeType,
+		size: args.bytes.byteLength,
+		sha256,
+		kind: getAttachmentKind(mimeType),
+		...(args.sessionId ? { sessionId: args.sessionId } : {}),
+		originalPath,
+		createdAt: new Date().toISOString(),
+	};
+	await writeFile(
+		join(dir, 'metadata.json'),
+		`${JSON.stringify(metadata, null, 2)}\n`,
+	);
+	return metadata;
 }
 
 export function registerAttachmentRoutes(app: Hono) {
@@ -214,36 +256,18 @@ export function registerAttachmentRoutes(app: Hono) {
 					);
 				}
 
-				const id = `att_${crypto.randomUUID()}`;
-				const filename = sanitizeFilename(value.name);
-				const mimeType = value.type || 'application/octet-stream';
-				const dir = attachmentDir(cfg.projectRoot, id);
-				await mkdir(dir, { recursive: true });
-
 				const bytes = Buffer.from(await value.arrayBuffer());
-				const sha256 = createHash('sha256').update(bytes).digest('hex');
-				const originalStorageName = getOriginalStorageName(mimeType, filename);
-				const originalPath = join(ATTACHMENTS_DIR, id, originalStorageName);
-				await writeFile(join(dir, originalStorageName), bytes);
-
 				const sessionIdValue = form.get('sessionId');
-				const metadata: StoredAttachmentMetadata = {
-					id,
-					filename,
-					mimeType,
-					size: bytes.byteLength,
-					sha256,
-					kind: getAttachmentKind(mimeType),
-					...(typeof sessionIdValue === 'string' && sessionIdValue
-						? { sessionId: sessionIdValue }
-						: {}),
-					originalPath,
-					createdAt: new Date().toISOString(),
-				};
-				await writeFile(
-					join(dir, 'metadata.json'),
-					`${JSON.stringify(metadata, null, 2)}\n`,
-				);
+				const metadata = await storeAttachmentBytes({
+					projectRoot: cfg.projectRoot,
+					bytes,
+					filename: value.name,
+					mimeType: value.type || 'application/octet-stream',
+					sessionId:
+						typeof sessionIdValue === 'string' && sessionIdValue
+							? sessionIdValue
+							: undefined,
+				});
 
 				return c.json(metadataResponse(metadata), 201);
 			} catch (error) {

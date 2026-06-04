@@ -7,8 +7,10 @@
 ## Usage tips
 
 - Chain commands with `&&` to fail-fast.
-- For long outputs, redirect to a file and `read` it back.
-- For verbose commands like builds or tests, set `outputMode: "tail"` and optionally `tailLines` to return only the last N stdout/stderr lines in the final tool result while still streaming full output to the UI. Use `outputMode: "full"` when you need complete output in the result.
+- For long outputs, redirect to a file, inspect `wc -c`, then read a small range or tail.
+- `outputMode: "auto"` is the default and keeps bounded tail output. Use `outputMode: "tail"` with `tailLines` for verbose builds/tests, or `outputMode: "full"` only when complete output is truly needed.
+- Final `stdout`/`stderr` are capped by `maxOutputBytes` per stream to avoid huge tool results. Set `maxOutputBytes: 0` only when you intentionally need uncapped output.
+- For binary, minified, or `strings` searches, cap line width explicitly, e.g. `rg -o '.{0,80}needle.{0,120}' | head -50`.
 - For long-running non-interactive commands, set an appropriate `timeout` and ensure the command exits on its own.
 - Batch independent checks (e.g. `git status && git diff`) in parallel tool calls rather than sequential shell chains when you need results separately.
 - Never use `shell` with `sed`/`awk` for programmatic file editing — use the dedicated file-editing tools instead.

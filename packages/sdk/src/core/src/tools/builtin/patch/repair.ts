@@ -1,4 +1,15 @@
-import { PATCH_BEGIN_MARKER, PATCH_END_MARKER } from './constants.ts';
+import {
+	PATCH_ADD_PREFIX,
+	PATCH_BEGIN_MARKER,
+	PATCH_DELETE_LINES_PREFIX,
+	PATCH_DELETE_PREFIX,
+	PATCH_END_MARKER,
+	PATCH_INSERT_AFTER_PREFIX,
+	PATCH_INSERT_BEFORE_PREFIX,
+	PATCH_REPLACE_LINES_PREFIX,
+	PATCH_REPLACE_PREFIX,
+	PATCH_UPDATE_PREFIX,
+} from './constants.ts';
 
 export function repairPatchContent(patch: string): string {
 	patch = extractPatchFromWrappedJson(patch);
@@ -35,12 +46,16 @@ function appendMissingEndMarker(patch: string): string {
 	if (trimmed.includes(PATCH_END_MARKER)) return patch;
 
 	const hasContent =
-		trimmed.includes('*** Update File:') ||
-		trimmed.includes('*** Add File:') ||
-		trimmed.includes('*** Delete File:') ||
-		trimmed.includes('*** Replace in:');
+		trimmed.includes(PATCH_UPDATE_PREFIX) ||
+		trimmed.includes(PATCH_ADD_PREFIX) ||
+		trimmed.includes(PATCH_DELETE_PREFIX) ||
+		trimmed.includes(PATCH_REPLACE_PREFIX) ||
+		trimmed.includes(PATCH_DELETE_LINES_PREFIX) ||
+		trimmed.includes(PATCH_REPLACE_LINES_PREFIX) ||
+		trimmed.includes(PATCH_INSERT_BEFORE_PREFIX) ||
+		trimmed.includes(PATCH_INSERT_AFTER_PREFIX);
 
-	if (hasContent) {
+	if (hasContent || trimmed.trim() === PATCH_BEGIN_MARKER) {
 		return `${trimmed}\n${PATCH_END_MARKER}`;
 	}
 

@@ -4,6 +4,44 @@ import {
 	mergeProviderOptions,
 } from '../packages/server/src/runtime/agent/runner-setup.ts';
 import { buildCodexProviderOptions } from '../packages/server/src/runtime/provider/oauth-adapter.ts';
+import type { OttoConfig } from '../packages/sdk/src/types/src/config.ts';
+
+const editPolicyTools = [
+	'read',
+	'edit',
+	'multiedit',
+	'write',
+	'apply_patch',
+	'shell',
+];
+
+function testConfigWithModels(
+	models: OttoConfig['providers'][string]['models'],
+) {
+	return {
+		projectRoot: '/tmp/project',
+		defaults: {
+			agent: 'build',
+			provider: 'test-provider',
+			model: 'catalog-model',
+		},
+		providers: {
+			'test-provider': {
+				enabled: true,
+				custom: true,
+				compatibility: 'openai-compatible',
+				family: 'openai',
+				models,
+			},
+		},
+		paths: {
+			dataDir: '/tmp/otto',
+			dbPath: '/tmp/otto/db.sqlite',
+			projectConfigPath: null,
+			globalConfigPath: null,
+		},
+	} satisfies OttoConfig;
+}
 
 describe('mergeProviderOptions', () => {
 	test('preserves existing nested OpenAI OAuth instructions', () => {
@@ -85,7 +123,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 	test('keeps only write and apply_patch for Anthropic-family build models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'build',
-			['read', 'edit', 'multiedit', 'write', 'apply_patch', 'shell'],
+			editPolicyTools,
 			'anthropic',
 			'claude-sonnet-4-20250514',
 		);
@@ -102,7 +140,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 	test('keeps only write and apply_patch for OpenAI-family general models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'general',
-			['read', 'edit', 'multiedit', 'write', 'apply_patch', 'shell'],
+			editPolicyTools,
 			'openrouter',
 			'openai/gpt-4.1',
 		);
@@ -119,9 +157,98 @@ describe('applyModelFamilyEditToolPolicy', () => {
 	test('keeps write, edit, and multiedit for non-Anthropic/OpenAI init models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'init',
-			['read', 'edit', 'multiedit', 'write', 'apply_patch', 'shell'],
+			editPolicyTools,
 			'google',
 			'gemini-2.5-flash',
+		);
+
+		expect(result).toEqual([
+			'read',
+			'shell',
+			'write',
+			'edit',
+			'multiedit',
+			'copy_into',
+		]);
+	});
+
+	test('uses structured edit tools for lower-tier build models across providers', () => {
+		const result = applyModelFamilyEditToolPolicy(
+			'build',
+			editPolicyTools,
+			'xai',
+			'grok-composer-2.5-fast',
+		);
+
+		expect(result).toEqual([
+			'read',
+			'shell',
+			'write',
+			'edit',
+			'multiedit',
+			'copy_into',
+		]);
+	});
+
+	test('uses structured edit tools for OpenAI mini models', () => {
+		const result = applyModelFamilyEditToolPolicy(
+			'general',
+			editPolicyTools,
+			'openai',
+			'gpt-5-mini',
+		);
+
+		expect(result).toEqual([
+			'read',
+			'shell',
+			'write',
+			'edit',
+			'multiedit',
+			'copy_into',
+		]);
+	});
+
+	test('uses structured edit tools for catalog low-cost models', () => {
+		const cfg = testConfigWithModels([
+			{
+				id: 'catalog-low',
+				cost: { input: 0.5, output: 3 },
+				toolCall: true,
+			},
+		]);
+		const result = applyModelFamilyEditToolPolicy(
+			'build',
+			editPolicyTools,
+			'test-provider',
+			'catalog-low',
+			cfg,
+		);
+
+		expect(result).toEqual([
+			'read',
+			'shell',
+			'write',
+			'edit',
+			'multiedit',
+			'copy_into',
+		]);
+	});
+
+	test('uses explicit catalog edit tool capability overrides', () => {
+		const cfg = testConfigWithModels([
+			{
+				id: 'catalog-explicit',
+				cost: { input: 20, output: 100 },
+				toolCall: true,
+				editToolCapability: 'structured',
+			},
+		]);
+		const result = applyModelFamilyEditToolPolicy(
+			'build',
+			editPolicyTools,
+			'test-provider',
+			'catalog-explicit',
+			cfg,
 		);
 
 		expect(result).toEqual([
