@@ -122,6 +122,32 @@ describe('custom declarative providers', () => {
 		});
 	});
 
+	test('allows explicit uncataloged models when requested', async () => {
+		const cfg = createConfig();
+		const selection = await selectProviderAndModel({
+			cfg,
+			agentProviderDefault: 'my-ollama',
+			agentModelDefault: 'qwen2.5-coder:14b',
+			explicitProvider: 'xai',
+			explicitModel: 'composer-2.5',
+			allowUnknownModel: true,
+			skipAuth: true,
+		});
+
+		expect(selection).toMatchObject({
+			provider: 'xai',
+			model: 'composer-2.5',
+		});
+		expect(() => validateProviderModel('xai', 'composer-2.5', cfg)).toThrow(
+			/Model not found for provider xai/,
+		);
+		expect(() =>
+			validateProviderModel('xai', 'composer-2.5', cfg, {
+				allowUnknownModel: true,
+			}),
+		).not.toThrow();
+	});
+
 	test('uses ollama reasoning options for custom providers', () => {
 		const cfg = createConfig();
 		const result = buildReasoningConfig({

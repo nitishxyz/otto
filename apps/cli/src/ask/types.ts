@@ -5,6 +5,7 @@ export type AskOptions = {
 	agent?: string;
 	provider?: ProviderId;
 	model?: string;
+	wild?: boolean;
 	project?: string;
 	sessionId?: string;
 	last?: boolean;

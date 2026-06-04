@@ -11,6 +11,7 @@ import {
 export type CapabilityRequest = {
 	wantsToolCalls?: boolean;
 	wantsVision?: boolean; // input image
+	allowUnknownModel?: boolean;
 };
 
 export function validateProviderModel(
@@ -41,7 +42,10 @@ export function validateProviderModel(
 			});
 			return;
 		}
-		if (!providerAllowsAnyModel(cfg, providerId)) {
+		if (
+			!effectiveCap?.allowUnknownModel &&
+			!providerAllowsAnyModel(cfg, providerId)
+		) {
 			const knownModels = definition.models.length
 				? definition.models
 				: cachedModels;

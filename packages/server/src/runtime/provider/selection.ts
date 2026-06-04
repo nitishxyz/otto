@@ -23,6 +23,7 @@ type SelectionInput = {
 	agentModelDefault: string;
 	explicitProvider?: ProviderId;
 	explicitModel?: string;
+	allowUnknownModel?: boolean;
 	skipAuth?: boolean;
 };
 
@@ -42,6 +43,7 @@ export async function selectProviderAndModel(
 		agentModelDefault,
 		explicitProvider,
 		explicitModel,
+		allowUnknownModel,
 		skipAuth,
 	} = input;
 
@@ -62,6 +64,7 @@ export async function selectProviderAndModel(
 		cfg,
 		provider,
 		explicitModel,
+		allowUnknownModel,
 		agentModelDefault,
 	});
 
@@ -107,10 +110,15 @@ function resolveModelForProvider(args: {
 	cfg: OttoConfig;
 	provider: ProviderId;
 	explicitModel?: string;
+	allowUnknownModel?: boolean;
 	agentModelDefault: string;
 }): string {
-	const { cfg, provider, explicitModel, agentModelDefault } = args;
+	const { cfg, provider, explicitModel, allowUnknownModel, agentModelDefault } =
+		args;
 	if (explicitModel && hasConfiguredModel(cfg, provider, explicitModel)) {
+		return explicitModel;
+	}
+	if (explicitModel && allowUnknownModel && explicitModel.trim()) {
 		return explicitModel;
 	}
 	if (hasConfiguredModel(cfg, provider, agentModelDefault)) {

@@ -179,6 +179,7 @@ export async function runDiscoveredCommand(
 	const modelFlagIdx = argv.indexOf('--model');
 	const sessionFlagIdx = argv.indexOf('--session');
 	const lastFlag = argv.includes('--last');
+	const wildFlag = argv.includes('--wild');
 
 	const agent =
 		(agentFlagIdx >= 0 ? argv[agentFlagIdx + 1] : undefined) ||
@@ -205,6 +206,7 @@ export async function runDiscoveredCommand(
 		agent,
 		provider,
 		model,
+		wild: wildFlag,
 		last: lastFlag,
 		sessionId,
 	});

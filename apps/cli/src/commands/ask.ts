@@ -8,6 +8,7 @@ export interface AskOptions {
 	agent?: string;
 	provider?: ProviderId;
 	model?: string;
+	wild?: boolean;
 	project: string;
 	last: boolean;
 	session?: string;
@@ -23,6 +24,7 @@ export async function handleAsk(prompt: string | undefined, opts: AskOptions) {
 			agent: opts.agent,
 			provider: opts.provider,
 			model: opts.model,
+			wild: opts.wild,
 			project: opts.project,
 			last: opts.last,
 			sessionId: opts.session,
@@ -44,6 +46,7 @@ export async function handleAsk(prompt: string | undefined, opts: AskOptions) {
 		agent: opts.agent,
 		provider: opts.provider,
 		model: opts.model,
+		wild: opts.wild,
 		last: opts.last,
 		sessionId: opts.session,
 	});
@@ -62,6 +65,7 @@ export function registerAskCommand(program: Command) {
 			'Override provider (openai, anthropic, google, openrouter, opencode, ottorouter)',
 		)
 		.option('--model <model>', 'Override model')
+		.option('--wild', 'Use an uncataloged model id')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--last', 'Continue most recent session', false)
 		.option('--session <id>', 'Continue specific session')
@@ -71,6 +75,7 @@ export function registerAskCommand(program: Command) {
 				agent: opts.agent,
 				provider: opts.provider as ProviderId | undefined,
 				model: opts.model,
+				wild: opts.wild,
 				project: opts.project,
 				last: opts.last,
 				session: opts.session,

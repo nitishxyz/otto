@@ -63,6 +63,7 @@ export type AskServerRequest = {
 	agent?: string;
 	provider?: string;
 	model?: string;
+	allowUnknownModel?: boolean;
 	reasoningText?: boolean;
 	reasoningLevel?: ReasoningLevel;
 	sessionId?: string;
@@ -235,6 +236,7 @@ async function processAskRequest(
 			agentModelDefault,
 			explicitProvider,
 			explicitModel: request.model,
+			allowUnknownModel: request.allowUnknownModel,
 			skipAuth: Boolean(
 				request.skipFileConfig || request.config || request.credentials,
 			),
@@ -310,6 +312,7 @@ async function processAskRequest(
 
 	validateProviderModel(providerForMessage, modelForMessage, cfg, {
 		wantsVision: Boolean(request.images?.length),
+		allowUnknownModel: request.allowUnknownModel === true,
 	});
 
 	if (!request.skipFileConfig && !request.config && !request.credentials) {

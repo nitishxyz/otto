@@ -23,6 +23,13 @@ otto auth list            # List configured providers
 otto auth logout          # Remove provider credentials
 ```
 
+To test a model id before it lands in otto's catalog, pass `--wild` with an
+explicit provider and model:
+
+```bash
+otto ask "hello" --provider xai --model composer-2.5 --wild
+```
+
 `otto auth login xai` supports both `XAI_API_KEY` and browser OAuth for
 SuperGrok / X Premium+ accounts. If xAI accepts the login but model calls return
 `403`, your subscription tier may not be allowlisted for OAuth API access; use an

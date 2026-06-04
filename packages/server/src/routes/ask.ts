@@ -36,6 +36,10 @@ const askBodySchema = z.object({
 	model: z.string().optional().openapi({
 		description: 'Optional model override for the selected provider.',
 	}),
+	allowUnknownModel: z.boolean().optional().openapi({
+		description:
+			'Allow an explicit model id that is not present in the configured model catalog.',
+	}),
 	reasoningText: z.boolean().optional().openapi({
 		description:
 			'Enable extended thinking / reasoning for models that support it.',
@@ -193,6 +197,7 @@ export function registerAskRoutes(app: Hono) {
 				agent: typeof body.agent === 'string' ? body.agent : undefined,
 				provider: typeof body.provider === 'string' ? body.provider : undefined,
 				model: typeof body.model === 'string' ? body.model : undefined,
+				allowUnknownModel: Boolean(body.allowUnknownModel),
 				reasoningText:
 					typeof body.reasoningText === 'boolean'
 						? body.reasoningText
