@@ -11,10 +11,17 @@ const OWNER_API_FORMAT: Record<string, ProviderApiFormat> = {
 	google: 'google-native',
 	minimax: 'anthropic-messages',
 	moonshot: 'openai-chat',
+	qwen: 'openai-chat',
 	openrouter: 'openrouter-chat',
 	zai: 'openai-chat',
 	xai: 'xai-chat',
 };
+
+const PREFIX_API_FORMAT: Array<{
+	prefix: string;
+	providerId: ProviderId;
+	apiFormat: ProviderApiFormat;
+}> = [{ prefix: 'qwen', providerId: 'qwen', apiFormat: 'openai-chat' }];
 
 export class ProviderRegistry {
 	private configs: ProviderConfig[];
@@ -57,6 +64,16 @@ export class ProviderRegistry {
 			const providerId = entry.owned_by as ProviderId;
 			const apiFormat = OWNER_API_FORMAT[providerId] ?? 'openai-chat';
 			return { providerId, apiFormat };
+		}
+
+		const prefixMatch = PREFIX_API_FORMAT.find(({ prefix }) =>
+			modelId.toLowerCase().startsWith(prefix),
+		);
+		if (prefixMatch) {
+			return {
+				providerId: prefixMatch.providerId,
+				apiFormat: prefixMatch.apiFormat,
+			};
 		}
 
 		return null;
