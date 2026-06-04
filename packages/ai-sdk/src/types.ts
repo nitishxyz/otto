@@ -5,6 +5,7 @@ export type ProviderId =
 	| 'anthropic'
 	| 'google'
 	| 'moonshot'
+	| 'qwen'
 	| 'zai'
 	| 'minimax'
 	| (string & {});

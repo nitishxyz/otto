@@ -139,6 +139,7 @@ const OWNER_TO_FAMILY: Record<ModelOwner, UnderlyingProviderKey> = {
 	openrouter: 'openai-compatible',
 	xai: 'openai',
 	moonshot: 'moonshot',
+	qwen: 'openai-compatible',
 	zai: 'glm',
 	minimax: 'minimax',
 };
@@ -180,6 +181,8 @@ function inferFromModelId(model: string): UnderlyingProviderKey {
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
 	if (lower.includes('grok') || lower.startsWith('xai/')) return 'openai';
+	if (lower.includes('qwen') || lower.startsWith('qwen/'))
+		return 'openai-compatible';
 	if (lower.includes('kimi') || lower.startsWith('moonshotai/'))
 		return 'moonshot';
 	if (

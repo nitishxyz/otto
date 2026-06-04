@@ -21,6 +21,7 @@ const OWNER_NPM: Record<ModelOwner, string> = {
 	openrouter: '@openrouter/ai-sdk-provider',
 	xai: '@ai-sdk/xai',
 	moonshot: '@ai-sdk/openai-compatible',
+	qwen: '@ai-sdk/openai-compatible',
 	zai: '@ai-sdk/openai-compatible',
 	minimax: '@ai-sdk/anthropic',
 };

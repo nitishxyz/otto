@@ -67,6 +67,7 @@ export type ModelOwner =
 	| 'openrouter'
 	| 'xai'
 	| 'moonshot'
+	| 'qwen'
 	| 'zai'
 	| 'minimax';
 
