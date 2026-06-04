@@ -105,7 +105,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.135",
+      "version": "0.1.136",
       "dependencies": {
         "@ottocode/web-sdk": "workspace:*",
         "@tanstack/react-query": "^5.90.2",
@@ -470,7 +470,7 @@
     },
     "packages/api": {
       "name": "@ottocode/api",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "dependencies": {
         "axios": "^1.7.9",
         "eventsource-parser": "^2.0.1",
@@ -483,7 +483,7 @@
     },
     "packages/database": {
       "name": "@ottocode/database",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "drizzle-orm": "^0.44.5",
@@ -496,7 +496,7 @@
     },
     "packages/install": {
       "name": "@ottocode/install",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "bin": {
         "otto": "./start.js",
       },
@@ -552,7 +552,7 @@
     },
     "packages/server": {
       "name": "@ottocode/server",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "dependencies": {
         "@hono/zod-openapi": "^1.1.5",
         "@ottocode/database": "workspace:*",
@@ -569,7 +569,7 @@
     },
     "packages/web-sdk": {
       "name": "@ottocode/web-sdk",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "dependencies": {
         "@codemirror/lang-css": "^6.3.1",
         "@codemirror/lang-html": "^6.4.11",
@@ -625,7 +625,7 @@
     },
     "packages/web-ui": {
       "name": "@ottocode/web-ui",
-      "version": "0.1.297",
+      "version": "0.1.298",
       "dependencies": {
         "express": "^5.1.0",
       },
