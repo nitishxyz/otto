@@ -1,11 +1,7 @@
-# @ottocode/sdk
+# @ottorouter/ai-sdk
 
-## 0.1.298
+## 0.2.5
 
 ### Patch Changes
 
 - Update provider model catalogs with the latest metadata and add OttoRouter Qwen routing through the OpenAI-compatible chat endpoint.
-- Updated dependencies
-  - @ottorouter/ai-sdk@0.2.5
-
-## 0.1.296
