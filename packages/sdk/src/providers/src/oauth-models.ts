@@ -26,7 +26,17 @@ const OAUTH_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
 	],
 };
 
+const OAUTH_ONLY_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
+	xai: ['grok-build', 'grok-composer-2.5-fast'],
+};
+
+function isOAuthOnlyModel(provider: ProviderId, modelId: string): boolean {
+	return OAUTH_ONLY_MODEL_IDS[provider]?.includes(modelId) === true;
+}
+
 function matchesOAuthModel(provider: ProviderId, modelId: string): boolean {
+	if (isOAuthOnlyModel(provider, modelId)) return true;
+
 	const exactIds = OAUTH_MODEL_IDS[provider];
 	if (exactIds?.includes(modelId)) return true;
 
@@ -48,7 +58,9 @@ export function filterModelsForAuthType(
 	models: ModelInfo[],
 	authType: 'api' | 'oauth' | 'wallet' | undefined,
 ): ModelInfo[] {
-	if (authType !== 'oauth') return models;
+	if (authType !== 'oauth') {
+		return models.filter((model) => !isOAuthOnlyModel(provider, model.id));
+	}
 	const exactIds = OAUTH_MODEL_IDS[provider];
 	const prefixes = OAUTH_MODEL_PREFIXES[provider];
 	if (!exactIds && !prefixes) return models;

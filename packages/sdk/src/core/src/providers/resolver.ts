@@ -13,6 +13,7 @@ import {
 	createXaiModel,
 	createZaiCodingModel,
 	createZaiModel,
+	isXaiGrokCliModel,
 	normalizeOllamaBaseURL,
 	resolveOpenAIResponsesModel,
 	shouldUseOpenAIResponsesApi,
@@ -195,10 +196,14 @@ export async function resolveModel(
 	}
 
 	if (provider === 'xai') {
+		if (isXaiGrokCliModel(model) && !config.oauth) {
+			throw new Error('Grok Build and Grok Composer 2.5 require xAI OAuth.');
+		}
 		return createXaiModel(model, {
 			apiKey: config.oauth?.access ?? config.apiKey,
 			baseURL: config.baseURL,
 			useResponses: !!config.oauth,
+			useGrokCliProxy: !!config.oauth && isXaiGrokCliModel(model),
 		});
 	}
 

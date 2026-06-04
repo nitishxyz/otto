@@ -23,7 +23,13 @@ export const UsageRing = memo(function UsageRing({
 	provider,
 }: UsageRingProps) {
 	const openModal = useUsageStore((s) => s.openModal);
-	const percent = usage.primaryWindow?.usedPercent ?? 0;
+	const percent = Math.max(
+		0,
+		Math.min(usage.primaryWindow?.usedPercent ?? 0, 100),
+	);
+	const windowSeconds = usage.primaryWindow?.windowSeconds ?? 18000;
+	const windowLabel = windowSeconds > 1209600 ? 'mo' : '5h';
+	const titleLabel = windowSeconds > 1209600 ? 'monthly' : '5h window';
 	const dashOffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 	const color = getColor(percent);
 
@@ -32,7 +38,7 @@ export const UsageRing = memo(function UsageRing({
 			type="button"
 			onClick={() => openModal(provider)}
 			className="relative flex items-center hover:opacity-80 transition-opacity cursor-pointer"
-			title={`Usage: ${Math.round(percent)}% (5h window) — Click for details`}
+			title={`Usage: ${Math.round(percent)}% (${titleLabel}) — Click for details`}
 		>
 			<svg
 				width={SIZE}
@@ -66,7 +72,7 @@ export const UsageRing = memo(function UsageRing({
 				className="absolute inset-0 flex items-center justify-center rotate-0 font-medium text-muted-foreground"
 				style={{ fontSize: 7 }}
 			>
-				5h
+				{windowLabel}
 			</span>
 		</button>
 	);

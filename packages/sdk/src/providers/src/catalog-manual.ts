@@ -14,6 +14,29 @@ type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
 
+const XAI_GROK_CLI_MODELS: ModelInfo[] = [
+	{
+		id: 'grok-build',
+		ownedBy: 'xai',
+		label: 'Grok Build',
+		modalities: { input: ['text'], output: ['text'] },
+		attachment: false,
+		toolCall: true,
+		reasoningText: true,
+		provider: { npm: '@ai-sdk/xai' },
+	},
+	{
+		id: 'grok-composer-2.5-fast',
+		ownedBy: 'xai',
+		label: 'Grok Composer 2.5 Fast',
+		modalities: { input: ['text'], output: ['text'] },
+		attachment: false,
+		toolCall: true,
+		reasoningText: true,
+		provider: { npm: '@ai-sdk/xai' },
+	},
+];
+
 const OWNER_NPM: Record<ModelOwner, string> = {
 	openai: '@ai-sdk/openai',
 	anthropic: '@ai-sdk/anthropic',
@@ -102,6 +125,32 @@ function buildOllamaCloudEntry(): ProviderCatalogEntry {
 	};
 }
 
+export function appendXaiGrokCliModels<T extends { models: ModelInfo[] }>(
+	entry: T | undefined,
+): T | undefined {
+	if (!entry) return undefined;
+	const grokCliModelsById = new Map(
+		XAI_GROK_CLI_MODELS.map((model) => [model.id, model]),
+	);
+	const mergedModels = entry.models.map((model) => {
+		const override = grokCliModelsById.get(model.id);
+		if (!override) return model;
+		return {
+			...model,
+			...override,
+			label: model.label ?? override.label,
+			cost: model.cost ?? override.cost,
+			limit: model.limit ?? override.limit,
+		};
+	});
+	const existingIds = new Set(mergedModels.map((model) => model.id));
+	const missingModels = XAI_GROK_CLI_MODELS.filter(
+		(model) => !existingIds.has(model.id),
+	);
+	if (!missingModels.length && mergedModels === entry.models) return entry;
+	return { ...entry, models: [...mergedModels, ...missingModels] };
+}
+
 export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
@@ -111,6 +160,10 @@ export function mergeManualCatalog(
 		...(base as Record<BuiltInProviderId, ProviderCatalogEntry>),
 	};
 	merged[OLLAMA_CLOUD_ID] = ollamaCloudEntry;
+	const xaiEntry = appendXaiGrokCliModels(merged.xai);
+	if (xaiEntry) {
+		merged.xai = xaiEntry;
+	}
 	if (manualEntry) {
 		merged[OTTOROUTER_ID] = manualEntry;
 	}

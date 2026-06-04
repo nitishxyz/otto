@@ -3,6 +3,7 @@ import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import {
 	getAuth,
+	getGrokCliHeaders,
 	refreshToken,
 	refreshOpenAIToken,
 	type ProviderId,
@@ -16,7 +17,7 @@ import { zodOpenApiRoute } from '../openapi/route.ts';
 const USAGE_CACHE_TTL_MS = 60_000;
 
 const providerUsageParamsSchema = z.object({
-	provider: z.enum(['anthropic', 'openai']).openapi({
+	provider: z.enum(['anthropic', 'openai', 'xai']).openapi({
 		param: { name: 'provider', in: 'path' },
 	}),
 });
@@ -186,9 +187,68 @@ async function fetchOpenAIUsage(access: string, accountId?: string) {
 	};
 }
 
+async function fetchXaiGrokUsage(access: string) {
+	const response = await fetch('https://cli-chat-proxy.grok.com/v1/billing', {
+		headers: {
+			Authorization: `Bearer ${access}`,
+			Accept: 'application/json',
+			...getGrokCliHeaders('grok-build'),
+		},
+	});
+
+	if (!response.ok) {
+		throw new Error(`xAI Grok billing API returned ${response.status}`);
+	}
+
+	const data = (await response.json()) as {
+		config?: {
+			monthlyLimit?: { val?: number };
+			used?: { val?: number };
+			onDemandCap?: { val?: number };
+			billingPeriodStart?: string;
+			billingPeriodEnd?: string;
+			history?: Array<{
+				billingCycle?: string;
+				includedUsed?: number;
+				onDemandUsed?: number;
+				totalUsed?: number;
+			}>;
+		};
+	};
+
+	const config = data.config ?? {};
+	const monthlyLimit = config.monthlyLimit?.val ?? 0;
+	const used = config.used?.val ?? 0;
+	const onDemandCap = config.onDemandCap?.val ?? 0;
+	const rawPercent = monthlyLimit > 0 ? (used / monthlyLimit) * 100 : 0;
+	const usedPercent = Math.max(0, Math.min(rawPercent, 100));
+	const start = config.billingPeriodStart
+		? new Date(config.billingPeriodStart).getTime()
+		: null;
+	const end = config.billingPeriodEnd
+		? new Date(config.billingPeriodEnd).getTime()
+		: null;
+	const windowSeconds =
+		start && end && end > start ? Math.round((end - start) / 1000) : 2592000;
+
+	return {
+		provider: 'xai' as const,
+		planType: 'Grok credits',
+		primaryWindow: {
+			usedPercent,
+			windowSeconds,
+			resetsAt: config.billingPeriodEnd ?? null,
+		},
+		secondaryWindow: null,
+		limitReached: monthlyLimit > 0 && used >= monthlyLimit && onDemandCap <= 0,
+		raw: data,
+	};
+}
+
 type ProviderUsage =
 	| Awaited<ReturnType<typeof fetchAnthropicUsage>>
-	| Awaited<ReturnType<typeof fetchOpenAIUsage>>;
+	| Awaited<ReturnType<typeof fetchOpenAIUsage>>
+	| Awaited<ReturnType<typeof fetchXaiGrokUsage>>;
 
 type UsageCacheEntry = {
 	data?: ProviderUsage;
@@ -229,7 +289,9 @@ async function fetchProviderUsage(
 	const inflight =
 		provider === 'anthropic'
 			? fetchAnthropicUsage(tokenResult.access)
-			: fetchOpenAIUsage(tokenResult.access, tokenResult.oauth.accountId);
+			: provider === 'xai'
+				? fetchXaiGrokUsage(tokenResult.access)
+				: fetchOpenAIUsage(tokenResult.access, tokenResult.oauth.accountId);
 
 	usageCache.set(cacheKey, {
 		data: cached?.data,
@@ -291,7 +353,11 @@ export function registerProviderUsageRoutes(app: Hono) {
 			try {
 				const provider = c.req.param('provider') as ProviderId;
 
-				if (provider !== 'anthropic' && provider !== 'openai') {
+				if (
+					provider !== 'anthropic' &&
+					provider !== 'openai' &&
+					provider !== 'xai'
+				) {
 					return c.json(
 						{ error: { message: 'Usage not supported for this provider' } },
 						400,

@@ -214,7 +214,8 @@ function pickProviders(
 			} else {
 				ownedBy = staticOwner;
 			}
-			models.push(mapModel(mid, raw, ownedBy));
+			const model = mapModel(mid, raw, ownedBy);
+			if (isSupportedCatalogModel(model)) models.push(model);
 		}
 		models.sort((a, b) => a.id.localeCompare(b.id));
 		const base = createEmptyEntry(key);
@@ -268,6 +269,19 @@ function mapModel(
 	const provider = normalizeProviderBinding(m.provider);
 	if (provider) info.provider = provider;
 	return info;
+}
+
+function isSupportedCatalogModel(model: ModelInfo): boolean {
+	if (model.toolCall !== true) return false;
+	const inputModalities = model.modalities?.input ?? [];
+	if (inputModalities.length > 0 && !inputModalities.includes('text')) {
+		return false;
+	}
+	const outputModalities = model.modalities?.output ?? [];
+	if (outputModalities.length > 0 && !outputModalities.includes('text')) {
+		return false;
+	}
+	return true;
 }
 
 function normalizeModalities(value: unknown) {
@@ -421,6 +435,7 @@ function buildOttoRouterEntry(
 					: {}),
 			} satisfies ModelInfo;
 		})
+		.filter(isSupportedCatalogModel)
 		.sort((a, b) => {
 			const ownerA = a.ownedBy ?? '';
 			const ownerB = b.ownedBy ?? '';
@@ -551,6 +566,13 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 	const providers = [...new Set(data.data.map((m) => m.owned_by))].sort();
 
 	const models = data.data
+		.filter((m) =>
+			isSupportedCatalogModel({
+				id: m.id,
+				toolCall: m.tool_call ?? m.capabilities?.tool_call ?? false,
+				...(m.modalities ? { modalities: m.modalities } : {}),
+			}),
+		)
 		.map((m) => ({
 			id: m.id,
 			...(m.name ? { name: m.name } : {}),

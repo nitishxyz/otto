@@ -21,6 +21,7 @@ function formatTimeRemaining(resetsAt: string | null): string {
 function windowLabel(seconds: number): string {
 	if (seconds <= 18000) return '5 Hour';
 	if (seconds <= 86400) return '24 Hour';
+	if (seconds > 1209600) return 'Monthly';
 	return '7 Day';
 }
 
@@ -98,14 +99,14 @@ export const UsageModal = memo(function UsageModal() {
 
 				{usage.primaryWindow && (
 					<UsageBar
-						label={`${windowLabel(usage.primaryWindow.windowSeconds)} Window`}
+						label={`${windowLabel(usage.primaryWindow.windowSeconds)} Usage`}
 						window={usage.primaryWindow}
 					/>
 				)}
 
 				{usage.secondaryWindow && (
 					<UsageBar
-						label={`${windowLabel(usage.secondaryWindow.windowSeconds)} Window`}
+						label={`${windowLabel(usage.secondaryWindow.windowSeconds)} Usage`}
 						window={usage.secondaryWindow}
 					/>
 				)}

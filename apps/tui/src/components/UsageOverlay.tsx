@@ -42,6 +42,7 @@ function windowLabel(seconds: number | undefined): string {
 	if (!seconds) return 'Window';
 	if (seconds <= 18000) return '5 Hour';
 	if (seconds <= 86400) return '24 Hour';
+	if (seconds > 1209600) return 'Monthly';
 	return '7 Day';
 }
 
@@ -84,7 +85,9 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 				const authType = providerInfo?.authType;
 				const isOAuthProvider =
 					authType === 'oauth' &&
-					(currentProvider === 'anthropic' || currentProvider === 'openai');
+					(currentProvider === 'anthropic' ||
+						currentProvider === 'openai' ||
+						currentProvider === 'xai');
 
 				if (!cancelled) setIsOAuth(isOAuthProvider);
 
@@ -92,7 +95,7 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 					if (!cancelled) {
 						setLoading(false);
 						setError(
-							'Usage is only available for OAuth providers (OpenAI, Anthropic)',
+							'Usage is only available for OAuth providers (OpenAI, Anthropic, xAI)',
 						);
 					}
 					return;

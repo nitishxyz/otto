@@ -27,13 +27,15 @@ To test a model id before it lands in otto's catalog, pass `--wild` with an
 explicit provider and model:
 
 ```bash
-otto ask "hello" --provider xai --model composer-2.5 --wild
+otto ask "hello" --provider xai --model grok-composer-2.5-fast --wild
 ```
 
 `otto auth login xai` supports both `XAI_API_KEY` and browser OAuth for
-SuperGrok / X Premium+ accounts. If xAI accepts the login but model calls return
-`403`, your subscription tier may not be allowlisted for OAuth API access; use an
-`XAI_API_KEY` fallback.
+SuperGrok / X Premium+ accounts. OAuth also enables Grok CLI-only models such as
+`grok-build` and `grok-composer-2.5-fast`, routed through Grok's CLI proxy. If
+xAI accepts the login but model calls return `403`, your subscription tier may
+not be allowlisted for OAuth API access; use an `XAI_API_KEY` fallback for normal
+xAI API models.
 
 `otto auth login openai` offers both OpenAI browser-callback OAuth and
 device-code OAuth for ChatGPT Plus/Pro accounts. Device-code OAuth works from SSH

@@ -1,5 +1,6 @@
 import { getGlobalConfigDir, joinPath } from '../../config/src/paths.ts';
 import type { ModelInfo, ProviderId } from '../../types/src/index.ts';
+import { appendXaiGrokCliModels } from './catalog-manual.ts';
 
 export type CachedProviderCatalogEntry = {
 	id: ProviderId;
@@ -68,6 +69,10 @@ export function normalizeModelCatalogPayload(
 	for (const [id, value] of Object.entries(source)) {
 		const entry = normalizeProviderEntry(id, value);
 		if (entry) providers[id] = entry;
+	}
+	const xaiEntry = appendXaiGrokCliModels(providers.xai);
+	if (xaiEntry) {
+		providers.xai = xaiEntry;
 	}
 	return providers;
 }

@@ -3,6 +3,7 @@ import {
 	catalog,
 	filterModelsForAuthType,
 	isModelAllowedForOAuth,
+	normalizeModelCatalogPayload,
 } from '@ottocode/sdk';
 
 describe('oauth model filtering', () => {
@@ -33,6 +34,59 @@ describe('oauth model filtering', () => {
 		);
 
 		expect(filtered).toHaveLength(catalog.openai.models.length);
+	});
+
+	test('shows Grok CLI models only for xAI OAuth', () => {
+		const oauthModels = filterModelsForAuthType(
+			'xai',
+			catalog.xai.models,
+			'oauth',
+		).map((model) => model.id);
+		const apiModels = filterModelsForAuthType(
+			'xai',
+			catalog.xai.models,
+			'api',
+		).map((model) => model.id);
+
+		expect(oauthModels).toContain('grok-build');
+		expect(oauthModels).toContain('grok-composer-2.5-fast');
+		expect(oauthModels).toContain('grok-4.3');
+		expect(apiModels).not.toContain('grok-build');
+		expect(apiModels).not.toContain('grok-composer-2.5-fast');
+		expect(isModelAllowedForOAuth('xai', 'grok-composer-2.5-fast')).toBe(true);
+
+		const composer = catalog.xai.models.find(
+			(model) => model.id === 'grok-composer-2.5-fast',
+		);
+		expect(composer?.modalities?.input).toEqual(['text']);
+		expect(composer?.attachment).toBe(false);
+	});
+
+	test('adds Grok CLI models to cached xAI catalog payloads', () => {
+		const providers = normalizeModelCatalogPayload({
+			xai: {
+				id: 'xai',
+				models: [
+					{ id: 'grok-4.3', label: 'Grok 4.3' },
+					{
+						id: 'grok-composer-2.5-fast',
+						label: 'Grok Composer 2.5 Fast',
+						modalities: { input: ['text'], output: ['text'] },
+						attachment: false,
+					},
+				],
+			},
+		});
+		const modelIds = providers.xai.models.map((model) => model.id);
+		const composer = providers.xai.models.find(
+			(model) => model.id === 'grok-composer-2.5-fast',
+		);
+
+		expect(modelIds).toContain('grok-4.3');
+		expect(modelIds).toContain('grok-build');
+		expect(modelIds).toContain('grok-composer-2.5-fast');
+		expect(composer?.modalities?.input).toEqual(['text']);
+		expect(composer?.attachment).toBe(false);
 	});
 
 	test('keeps Anthropic OAuth prefix matching', () => {

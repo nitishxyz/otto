@@ -4,6 +4,7 @@ import {
 	setAuth,
 	refreshXaiToken,
 	createXaiModel,
+	isXaiGrokCliModel,
 } from '@ottocode/sdk';
 
 export async function getXaiInstance(cfg: OttoConfig, model: string) {
@@ -25,7 +26,14 @@ export async function getXaiInstance(cfg: OttoConfig, model: string) {
 		return createXaiModel(model, {
 			apiKey: currentAuth.access,
 			useResponses: true,
+			useGrokCliProxy: isXaiGrokCliModel(model),
 		});
+	}
+
+	if (isXaiGrokCliModel(model)) {
+		throw new Error(
+			'Grok Build and Grok Composer 2.5 require xAI OAuth. Run `otto auth login xai --method oauth` or reuse the official Grok CLI login.',
+		);
 	}
 
 	const apiKey = auth?.type === 'api' ? auth.key : undefined;
