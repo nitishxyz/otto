@@ -22,7 +22,9 @@ function tabKindLabel(tab: ViewerTab): string {
 		case 'file':
 			return 'file';
 		case 'tool-preview':
-			return tab.toolName === 'write' ? 'write preview' : 'patch preview';
+			return tab.toolName === 'write'
+				? 'write preview'
+				: `${tab.toolName.replace('_', '-')} preview`;
 		case 'skill-file':
 			return tab.skill;
 		case 'browser':

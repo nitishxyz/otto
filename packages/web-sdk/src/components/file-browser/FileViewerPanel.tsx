@@ -106,9 +106,15 @@ function formatReadHighlightLabel(highlight: ToolActivityHighlight): string {
 }
 
 function formatPatchPreviewLabel(preview: ToolPatchPreview): string {
-	if (preview.status === 'success') return 'Patch applied';
-	if (preview.status === 'error') return 'Patch failed';
-	return 'Patching file';
+	const label =
+		preview.toolName === 'edit'
+			? 'Edit'
+			: preview.toolName === 'multiedit'
+				? 'Multi-edit'
+				: 'Patch';
+	if (preview.status === 'success') return `${label} applied`;
+	if (preview.status === 'error') return `${label} failed`;
+	return `${label} preview`;
 }
 
 function formatWritePreviewLabel(preview: ToolWritePreview): string {
@@ -228,7 +234,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		if (hasSameSnapshot) return;
 		useViewerTabsStore.getState().openToolPreviewTab({
 			path: selectedFile,
-			toolName: 'apply_patch',
+			toolName: patchPreview.toolName,
 			callId: patchPreview.callId,
 			baseContent,
 			patch: patchPreview.patch,

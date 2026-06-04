@@ -128,6 +128,22 @@ function getOptimizedWritePreview(
 	};
 }
 
+function isPatchPreviewTool(
+	toolName: ToolPreviewPanelProps['tab']['toolName'],
+): boolean {
+	return (
+		toolName === 'apply_patch' ||
+		toolName === 'edit' ||
+		toolName === 'multiedit'
+	);
+}
+
+function getPatchToolLabel(toolName: ToolPreviewPanelProps['tab']['toolName']) {
+	if (toolName === 'edit') return 'Edit';
+	if (toolName === 'multiedit') return 'Multi-edit';
+	return 'Patch';
+}
+
 function normalizePatchPath(path: string): string {
 	return path.replace(/^a\//, '').replace(/^b\//, '').trim();
 }
@@ -707,9 +723,13 @@ export function buildLivePatchPreview(
 function getStatusLabel(tab: ToolPreviewPanelProps['tab']): string {
 	if (tab.status === 'error') return `${tab.toolName.replace('_', ' ')} failed`;
 	if (tab.status === 'success') {
-		return tab.toolName === 'write' ? 'Write applied' : 'Patch applied';
+		return tab.toolName === 'write'
+			? 'Write applied'
+			: `${getPatchToolLabel(tab.toolName)} applied`;
 	}
-	return tab.toolName === 'write' ? 'Proposed write' : 'Patch preview';
+	return tab.toolName === 'write'
+		? 'Proposed write'
+		: `${getPatchToolLabel(tab.toolName)} preview`;
 }
 
 function StatusIcon({
@@ -793,13 +813,14 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 		preview: LivePatchPreview;
 	} | null>(null);
 	const statusLabel = getStatusLabel(tab);
-	const shouldLoadPatchFile = tab.toolName === 'apply_patch';
+	const isPatchPreview = isPatchPreviewTool(tab.toolName);
+	const shouldLoadPatchFile = isPatchPreview;
 	const shouldLoadAppliedFile = shouldLoadPatchFile && tab.status === 'success';
 	const { data: appliedFile, refetch: refetchAppliedFile } = useFileContent(
 		shouldLoadPatchFile ? tab.path : null,
 	);
 	const shouldUseLargePatchFallback = Boolean(
-		tab.toolName === 'apply_patch' &&
+		isPatchPreview &&
 			((tab.patch?.length ?? 0) >= LARGE_PATCH_PREVIEW_CHARS ||
 				(appliedFile?.content?.length ?? 0) >= LARGE_PATCH_FILE_CHARS),
 	);
@@ -828,7 +849,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 	const scrollSignal = `${tab.content?.length ?? 0}:${tab.patch?.length ?? 0}:${appliedFile?.content?.length ?? 0}`;
 	const livePatchPreview = useMemo(
 		() =>
-			tab.toolName === 'apply_patch' &&
+			isPatchPreview &&
 			tab.status !== 'success' &&
 			!shouldUseLargePatchFallback &&
 			appliedFile?.content !== undefined
@@ -839,7 +860,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 					)
 				: null,
 		[
-			tab.toolName,
+			isPatchPreview,
 			tab.status,
 			tab.baseContent,
 			tab.patch,
@@ -865,7 +886,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 		tab.previewLatestLine,
 	]);
 	const patchPreviewKey = `${tab.callId ?? ''}:${tab.path}`;
-	if (tab.toolName === 'apply_patch' && livePatchPreview) {
+	if (isPatchPreview && livePatchPreview) {
 		lastPatchPreviewRef.current = {
 			key: patchPreviewKey,
 			preview: livePatchPreview,
@@ -877,7 +898,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 			: (livePatchPreview ?? persistedPatchPreview);
 
 	useEffect(() => {
-		if (tab.toolName !== 'apply_patch' || !livePatchPreview) return;
+		if (!isPatchPreviewTool(tab.toolName) || !livePatchPreview) return;
 		const baseContent = tab.baseContent ?? appliedFile?.content;
 		const previewLineTones = [...livePatchPreview.lineTones.entries()];
 		const existingLineTones = tab.previewLineTones ?? [];
@@ -896,7 +917,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 		if (hasSameSnapshot) return;
 		useViewerTabsStore.getState().openToolPreviewTab({
 			path: tab.path,
-			toolName: 'apply_patch',
+			toolName: tab.toolName,
 			callId: tab.callId,
 			baseContent,
 			patch: tab.patch,
@@ -964,20 +985,20 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 			)}
 
 			<div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-				{tab.toolName === 'apply_patch' && largePatchPreview ? (
+				{isPatchPreview && largePatchPreview ? (
 					<PlainSourceViewer
 						content={largePatchPreview}
 						path="preview.patch"
 						notice="Large patch/file preview: showing the patch text instead of rendering the full file to keep the app responsive."
 					/>
-				) : tab.toolName === 'apply_patch' && stablePatchPreview ? (
+				) : isPatchPreview && stablePatchPreview ? (
 					<SourceViewer
 						content={stablePatchPreview.content}
 						path={tab.path}
 						lineTones={stablePatchPreview.lineTones}
 						scrollToLine={stablePatchPreview.latestLine}
 					/>
-				) : tab.toolName === 'apply_patch' && tab.patch ? (
+				) : isPatchPreview && tab.patch ? (
 					<SourceViewer
 						content={tab.patch}
 						path="preview.patch"
@@ -997,7 +1018,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 							Loading patched file...
 						</div>
 					)
-				) : tab.toolName === 'apply_patch' ? (
+				) : isPatchPreview ? (
 					appliedFile?.content !== undefined ? (
 						<SourceViewer content={appliedFile.content} path={tab.path} />
 					) : (

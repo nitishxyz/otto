@@ -412,12 +412,22 @@ export function useSessionStream(
 
 		const getArtifactRecord = (
 			payload: Record<string, unknown> | undefined,
-		): Record<string, unknown> | null =>
-			payload?.artifact &&
-			typeof payload.artifact === 'object' &&
-			!Array.isArray(payload.artifact)
-				? (payload.artifact as Record<string, unknown>)
+		): Record<string, unknown> | null => {
+			if (
+				payload?.artifact &&
+				typeof payload.artifact === 'object' &&
+				!Array.isArray(payload.artifact)
+			) {
+				return payload.artifact as Record<string, unknown>;
+			}
+
+			const result = getResultRecord(payload);
+			return result?.artifact &&
+				typeof result.artifact === 'object' &&
+				!Array.isArray(result.artifact)
+				? (result.artifact as Record<string, unknown>)
 				: null;
+		};
 
 		const extractErrorMessage = (
 			payload: Record<string, unknown> | undefined,
@@ -616,6 +626,83 @@ export function useSessionStream(
 			}
 
 			return lines.size > 0 ? [...lines] : undefined;
+		};
+
+		type EditPreviewToolName = 'edit' | 'multiedit';
+
+		type StringEditPreview = {
+			oldString: string;
+			newString: string;
+		};
+
+		const getPatchTextLines = (value: string): string[] => {
+			if (value.length === 0) return [];
+			const lines = value.split('\n');
+			if (value.endsWith('\n')) lines.pop();
+			return lines;
+		};
+
+		const appendStringEditPatchHunk = (
+			lines: string[],
+			edit: StringEditPreview,
+		) => {
+			lines.push('@@');
+			for (const line of getPatchTextLines(edit.oldString)) {
+				lines.push(`-${line}`);
+			}
+			for (const line of getPatchTextLines(edit.newString)) {
+				lines.push(`+${line}`);
+			}
+		};
+
+		const buildStringEditPatchPreview = (
+			path: string,
+			edits: StringEditPreview[],
+		): string | undefined => {
+			const validEdits = edits.filter(
+				(edit) => edit.oldString.length > 0 || edit.newString.length > 0,
+			);
+			if (validEdits.length === 0) return undefined;
+
+			const lines = ['*** Begin Patch', `*** Update File: ${path}`];
+			for (const edit of validEdits) appendStringEditPatchHunk(lines, edit);
+			lines.push('*** End Patch', '');
+			return lines.join('\n');
+		};
+
+		const getMultiEditPreviewEdits = (
+			args: Record<string, unknown> | null,
+		): StringEditPreview[] => {
+			const edits = Array.isArray(args?.edits) ? args.edits : [];
+			return edits.flatMap((edit) => {
+				if (!edit || typeof edit !== 'object' || Array.isArray(edit)) return [];
+				const record = edit as Record<string, unknown>;
+				return typeof record.oldString === 'string' &&
+					typeof record.newString === 'string'
+					? [{ oldString: record.oldString, newString: record.newString }]
+					: [];
+			});
+		};
+
+		const getEditPreviewPatch = (
+			toolName: EditPreviewToolName,
+			path: string,
+			args: Record<string, unknown> | null,
+			buffer: string,
+			artifact: Record<string, unknown> | null,
+		): string | undefined => {
+			if (typeof artifact?.patch === 'string') return artifact.patch;
+
+			if (toolName === 'edit') {
+				const oldString = getStringArg(args, buffer, 'oldString');
+				const newString = getStringArg(args, buffer, 'newString');
+				return oldString !== undefined && newString !== undefined
+					? buildStringEditPatchPreview(path, [{ oldString, newString }])
+					: undefined;
+			}
+
+			const edits = getMultiEditPreviewEdits(args);
+			return buildStringEditPatchPreview(path, edits);
 		};
 
 		const handleReadToolActivity = (
@@ -837,6 +924,65 @@ export function useSessionStream(
 			}
 		};
 
+		const handleEditToolActivity = (
+			eventType: string,
+			payload: Record<string, unknown> | undefined,
+			delta?: string | null,
+		) => {
+			const name = getToolEventName(payload);
+			if (name !== 'edit' && name !== 'multiedit') return;
+
+			const args = getToolArgsForViewer(payload, delta);
+			const buffer = getBufferedToolInput(payload);
+			const artifact = getArtifactRecord(payload);
+			const result = getResultRecord(payload);
+			const path =
+				(typeof result?.path === 'string' ? result.path : undefined) ??
+				getStringArg(args, buffer, 'path', true);
+			if (!path) return;
+
+			const failed = result?.ok === false || eventType === 'error';
+			const status = failed
+				? 'error'
+				: eventType === 'tool.result'
+					? 'success'
+					: 'streaming';
+			const callId = getToolEventCallId(payload) ?? undefined;
+			const patch = getEditPreviewPatch(name, path, args, buffer, artifact);
+			if (status === 'success') invalidateFileContentCache(path);
+			if (!patch) return;
+
+			const previewKey = callId ?? `${name}:${path}`;
+			const lineSignature =
+				status === 'streaming'
+					? getCompletedPatchChangeLineSignature(patch)
+					: undefined;
+			if (status === 'streaming') {
+				const last = toolPreviewEmitRef.current.get(previewKey);
+				if (last?.lineSignature === lineSignature) return;
+			}
+
+			const viewerStore = useViewerTabsStore.getState();
+			if (!viewerStore.followToolActivity) return;
+
+			viewerStore.openToolPreviewTab({
+				path,
+				toolName: name,
+				callId,
+				patch,
+				status,
+				error: extractErrorMessage(payload),
+			});
+
+			if (status === 'streaming') {
+				toolPreviewEmitRef.current.set(previewKey, {
+					emittedAt: Date.now(),
+					contentLength: buffer.length,
+					lineSignature,
+				});
+			}
+		};
+
 		const handleSimulatorToolActivity = (
 			eventType: string,
 			payload: Record<string, unknown> | undefined,
@@ -875,6 +1021,9 @@ export function useSessionStream(
 			const name = getToolEventName(payload);
 			if (name === 'read') handleReadToolActivity(eventType, payload, delta);
 			if (name === 'write') handleWriteToolActivity(eventType, payload, delta);
+			if (name === 'edit' || name === 'multiedit') {
+				handleEditToolActivity(eventType, payload, delta);
+			}
 			if (name === 'apply_patch') {
 				handleApplyPatchToolActivity(eventType, payload, delta);
 			}

@@ -23,9 +23,11 @@ export interface ToolChangeCount {
 	removals: number;
 }
 
+export type ToolPatchPreviewName = 'apply_patch' | 'edit' | 'multiedit';
+
 export interface ToolPreviewTabInput {
 	path: string;
-	toolName: 'write' | 'apply_patch';
+	toolName: 'write' | ToolPatchPreviewName;
 	callId?: string;
 	content?: string;
 	baseContent?: string;
@@ -45,7 +47,7 @@ export type ToolPatchPreview = Omit<
 	ToolPreviewTabInput,
 	'toolName' | 'content'
 > & {
-	toolName: 'apply_patch';
+	toolName: ToolPatchPreviewName;
 };
 
 export type ToolWritePreview = Omit<
@@ -94,7 +96,7 @@ export type ViewerTab =
 			type: 'tool-preview';
 			title: string;
 			path: string;
-			toolName: 'write' | 'apply_patch';
+			toolName: 'write' | ToolPatchPreviewName;
 			callId?: string;
 			content?: string;
 			baseContent?: string;
@@ -234,6 +236,16 @@ function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
 	const next = [...tabs];
 	next[existingIndex] = tab;
 	return next;
+}
+
+function isPatchPreviewTool(
+	toolName: ToolPreviewTabInput['toolName'],
+): toolName is ToolPatchPreviewName {
+	return (
+		toolName === 'apply_patch' ||
+		toolName === 'edit' ||
+		toolName === 'multiedit'
+	);
 }
 
 function isSamePatchCall(
@@ -489,10 +501,12 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 							))
 					),
 			);
-			if (preview.toolName === 'apply_patch') {
+			if (isPatchPreviewTool(preview.toolName)) {
 				const existingPatchPreview =
 					existingFile?.patchPreview ??
-					(existing?.toolName === 'apply_patch' ? existing : undefined);
+					(existing && isPatchPreviewTool(existing.toolName)
+						? existing
+						: undefined);
 				const samePatchCall = isSamePatchCall(existingPatchPreview, preview);
 				const baseContent =
 					preview.baseContent ??
@@ -529,7 +543,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						writePreview: undefined,
 						patchPreview: {
 							path: targetPath,
-							toolName: 'apply_patch',
+							toolName: preview.toolName,
 							callId: preview.callId ?? existingPatchPreview?.callId,
 							baseContent,
 							patch: preview.patch ?? existingPatchPreview?.patch,
