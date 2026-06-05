@@ -22,6 +22,11 @@ const askQuerySchema = z.object({
 		}),
 });
 
+const agentToolGroupsSchema = z.object({
+	firstClass: z.array(z.string()).optional(),
+	loadable: z.array(z.string()).optional(),
+});
+
 const askBodySchema = z.object({
 	prompt: z.string().openapi({
 		description: 'User prompt to send to the assistant.',
@@ -59,6 +64,13 @@ const askBodySchema = z.object({
 	}),
 	jsonMode: z.boolean().optional().openapi({
 		description: 'Request structured JSON output when supported by the agent.',
+	}),
+	agentPrompt: z.string().optional().openapi({
+		description: 'Inline agent prompt for this request.',
+	}),
+	tools: agentToolGroupsSchema.optional().openapi({
+		description:
+			'Inline agent tool configuration split into first-class and loadable tools.',
 	}),
 });
 
@@ -227,7 +239,12 @@ export function registerAskRoutes(app: Hono) {
 						: undefined),
 				agentPrompt:
 					typeof body.agentPrompt === 'string' ? body.agentPrompt : undefined,
-				tools: Array.isArray(body.tools) ? body.tools : undefined,
+				tools:
+					body.tools &&
+					typeof body.tools === 'object' &&
+					!Array.isArray(body.tools)
+						? (body.tools as AskServerRequest['tools'])
+						: undefined,
 			};
 
 			try {

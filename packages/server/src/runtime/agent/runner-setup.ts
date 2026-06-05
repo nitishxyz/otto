@@ -1,4 +1,9 @@
-import { discoverProjectTools, loadConfig, logger } from '@ottocode/sdk';
+import {
+	buildLoadFirstPartyToolsTool,
+	discoverProjectTools,
+	loadConfig,
+	logger,
+} from '@ottocode/sdk';
 import { getDb } from '@ottocode/database';
 import { sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
@@ -10,7 +15,7 @@ import { time } from '../debug/index.ts';
 import { buildHistoryMessages } from '../message/history-builder.ts';
 import { setupToolContext } from '../tools/setup.ts';
 import type { RunOpts } from '../session/queue.ts';
-import { resolveAgentConfig } from './registry.ts';
+import { flattenAgentToolConfig, resolveAgentConfig } from './registry.ts';
 import {
 	appendRunnerPromptMessages,
 	buildRunnerPrompt,
@@ -28,6 +33,14 @@ import {
 import { nowMs, timePromise } from './runner-setup-utils.ts';
 
 export { applyModelFamilyEditToolPolicy, mergeProviderOptions };
+
+const DATABASE_TOOL_NAMES = new Set([
+	'query_sessions',
+	'query_messages',
+	'get_session_context',
+	'search_history',
+	'present_action',
+]);
 
 type RunnerSetupTimings = {
 	loadConfigAndDbMs: number;
@@ -104,16 +117,47 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const toolsTimer = time('runner:discoverTools');
 	const { value: discovered, durationMs: discoverToolsMs } =
 		await discoveredToolsPromise;
-	const allTools = discovered.tools;
-	const { lazyToolsRecord, mcpToolsRecord } = discovered;
+	let allTools = discovered.tools;
+	let { lazyToolsRecord } = discovered;
+	const { mcpToolsRecord } = discovered;
 
-	if (opts.agent === 'research') {
+	const configuredToolNames = new Set(
+		flattenAgentToolConfig(agentCfg.toolConfig),
+	);
+	const needsDatabaseTools =
+		opts.agent === 'research' ||
+		Array.from(configuredToolNames).some((name) =>
+			DATABASE_TOOL_NAMES.has(name),
+		);
+
+	if (needsDatabaseTools) {
 		const currentSession = sessionRows[0];
 		const parentSessionId = currentSession?.parentSessionId ?? null;
 		const dbTools = buildDatabaseTools(cfg.projectRoot, parentSessionId);
 		for (const dt of dbTools) {
 			discovered.tools.push(dt);
 		}
+	}
+
+	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);
+	for (const toolItem of allTools) {
+		if (!configuredLoadableNames.has(toolItem.name)) continue;
+		if (toolItem.name === 'load_tools' || toolItem.name === 'load_mcp_tools')
+			continue;
+		lazyToolsRecord[toolItem.name] = toolItem.tool;
+	}
+
+	const allowedLazyToolNames = Object.keys(lazyToolsRecord).filter((name) =>
+		configuredLoadableNames.has(name),
+	);
+	if (allowedLazyToolNames.length !== Object.keys(lazyToolsRecord).length) {
+		lazyToolsRecord = Object.fromEntries(
+			allowedLazyToolNames.map((name) => [name, lazyToolsRecord[name]]),
+		) as Record<string, Tool>;
+		const loadTools = buildLoadFirstPartyToolsTool(allowedLazyToolNames);
+		allTools = allTools.map((item) =>
+			item.name === loadTools.name ? loadTools : item,
+		);
 	}
 
 	toolsTimer.end({
@@ -145,7 +189,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 
 	const gated = buildAllowedTools({
 		agentName: agentCfg.name,
-		agentTools: agentCfg.tools || [],
+		agentTools: agentCfg.toolConfig.firstClass || [],
 		provider: opts.provider,
 		model: opts.model,
 		cfg,

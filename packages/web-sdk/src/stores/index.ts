@@ -20,6 +20,7 @@ export * from './usageStore';
 export * from './fileBrowserStore';
 export * from './mcpStore';
 export * from './skillsStore';
+export * from './agentsStore';
 export * from './filePickerStore';
 export * from './viewerTabsStore';
 export * from './rightRailStore';

@@ -31,7 +31,10 @@ import { registerUsageRoutes } from './routes/usage.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
 import { registerDictationRoutes } from './routes/dictation.ts';
-import type { AgentConfigEntry } from './runtime/agent/registry.ts';
+import type {
+	AgentConfigEntry,
+	AgentToolConfig,
+} from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
 
 const globalTerminalManager = new TerminalManager();
@@ -222,7 +225,7 @@ export type EmbeddedAppConfig = {
 	/** Custom agents (optional - falls back to .otto/agents/) */
 	agents?: Record<
 		string,
-		Omit<AgentConfigEntry, 'tools'> & { tools?: readonly string[] | string[] }
+		Omit<AgentConfigEntry, 'tools'> & { tools?: AgentToolConfig }
 	>;
 	/** Default settings (optional - falls back to config.json) */
 	defaults?: {
@@ -326,8 +329,21 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 
 export {
 	resolveAgentConfig,
-	defaultToolsForAgent,
+	defaultToolConfigForAgent,
+	flattenAgentToolConfig,
+	BUILTIN_AGENT_NAMES,
+	type AgentToolConfig,
+	type AgentToolGroups,
 } from './runtime/agent/registry.ts';
+export {
+	getAgentDetail,
+	getAllAgentDetails,
+	upsertAgentConfig,
+	deleteAgentConfig,
+	validateAgentName,
+	type AgentDetail,
+	type AgentConfigScope,
+} from './runtime/agent/config-management.ts';
 export {
 	composeSystemPrompt,
 	type ComposedSystemPrompt,

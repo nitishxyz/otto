@@ -266,13 +266,16 @@ export function registerDoctorRoutes(app: Hono) {
 					['local', localAgents],
 				] as const) {
 					for (const [name, entry] of Object.entries(entries)) {
-						if (
-							entry &&
-							typeof entry === 'object' &&
-							Object.hasOwn(entry, 'tools') &&
-							!Array.isArray((entry as { tools?: unknown }).tools)
-						) {
-							issues.push(`${scope}:${name} tools field must be an array`);
+						if (entry && typeof entry === 'object') {
+							const tools = (entry as { tools?: unknown }).tools;
+							if (
+								Object.hasOwn(entry, 'tools') &&
+								(!tools || typeof tools !== 'object' || Array.isArray(tools))
+							) {
+								issues.push(
+									`${scope}:${name} tools field must be an object with firstClass/loadable arrays`,
+								);
+							}
 						}
 					}
 				}

@@ -71,7 +71,7 @@ function ConfirmationDialogContent() {
 		<div
 			role="dialog"
 			aria-modal="true"
-			className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+			className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10050]"
 			onClick={handleBackdropClick}
 			onKeyDown={(e) => {
 				const target = e.target as HTMLElement;

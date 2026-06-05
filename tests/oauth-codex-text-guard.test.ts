@@ -469,4 +469,78 @@ describe('oauth codex text guard', () => {
 			],
 		});
 	});
+
+	test('includes attachment ids in image history so originals can be copied', async () => {
+		const projectRoot = mkdtempSync(join(tmpdir(), 'otto-history-image-id-'));
+		const db = await getDb(projectRoot);
+		const now = Date.now();
+
+		await db.insert(sessions).values({
+			id: 'session-image-id-test',
+			agent: 'build',
+			provider: 'openai',
+			model: 'gpt-5.3-codex',
+			projectPath: projectRoot,
+			createdAt: now,
+			lastActiveAt: now,
+		});
+
+		await db.insert(messages).values({
+			id: 'user-image-id-msg',
+			sessionId: 'session-image-id-test',
+			role: 'user',
+			status: 'complete',
+			agent: 'build',
+			provider: 'openai',
+			model: 'gpt-5.3-codex',
+			createdAt: now,
+		});
+
+		await db.insert(messageParts).values([
+			{
+				id: 'user-image-id-text-part',
+				messageId: 'user-image-id-msg',
+				index: 0,
+				type: 'text',
+				content: JSON.stringify({ text: 'use this image' }),
+				agent: 'build',
+				provider: 'openai',
+				model: 'gpt-5.3-codex',
+			},
+			{
+				id: 'user-image-id-part',
+				messageId: 'user-image-id-msg',
+				index: 1,
+				type: 'image',
+				content: JSON.stringify({
+					data: 'ZmFrZS1pbWFnZS1ieXRlcw==',
+					mediaType: 'image/png',
+					name: 'image.png',
+					attachmentId: 'att_image_123',
+					original: { filename: 'image.png', size: 1234 },
+				}),
+				agent: 'build',
+				provider: 'openai',
+				model: 'gpt-5.3-codex',
+			},
+		]);
+
+		const history = await buildHistoryMessages(db, 'session-image-id-test');
+		expect(history[0]).toEqual({
+			role: 'user',
+			content: [
+				{ type: 'text', text: 'use this image' },
+				{
+					type: 'text',
+					text: '[image attachment; name: image.png; mediaType: image/png; attachmentId: att_image_123; originalBytes: 1234] To copy the original upload into the project, use copy_attachment_to_project with attachmentId "att_image_123".',
+				},
+				{
+					type: 'file',
+					data: 'ZmFrZS1pbWFnZS1ieXRlcw==',
+					filename: 'image.png',
+					mediaType: 'image/png',
+				},
+			],
+		});
+	});
 });

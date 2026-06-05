@@ -205,14 +205,14 @@ describe('AskService with Config Injection', () => {
 					model: 'gpt-4o-mini',
 				},
 				agentPrompt: 'You are a helpful test assistant.',
-				tools: ['progress_update', 'finish'],
+				tools: { firstClass: ['progress_update', 'finish'] },
 			});
 		} catch (err) {
 			expect(err).toBeDefined();
 		}
 	});
 
-	test('accepts custom tools array', async () => {
+	test('accepts structured custom tools', async () => {
 		const { handleAskRequest } = await import('@ottocode/server');
 
 		process.env.OPENAI_API_KEY = 'sk-test-tools-key';
@@ -227,7 +227,9 @@ describe('AskService with Config Injection', () => {
 					model: 'gpt-4o-mini',
 				},
 				agentPrompt: 'Test agent',
-				tools: ['progress_update', 'finish', 'read', 'write'],
+				tools: {
+					firstClass: ['progress_update', 'finish', 'read', 'write'],
+				},
 			});
 		} catch (err) {
 			expect(err).toBeDefined();
@@ -241,15 +243,15 @@ describe('Agent Config Injection', () => {
 
 		const config = await resolveAgentConfig(process.cwd(), 'test-agent', {
 			prompt: 'Inline test prompt',
-			tools: ['progress_update', 'finish'],
+			tools: { firstClass: ['progress_update', 'finish'] },
 			provider: 'openai',
 			model: 'gpt-4o-mini',
 		});
 
 		expect(config.name).toBe('test-agent');
 		expect(config.prompt).toBe('Inline test prompt');
-		expect(config.tools).toContain('progress_update');
-		expect(config.tools).toContain('finish');
+		expect(config.toolConfig.firstClass).toContain('progress_update');
+		expect(config.toolConfig.firstClass).toContain('finish');
 		expect(config.provider).toBe('openai');
 		expect(config.model).toBe('gpt-4o-mini');
 	});
@@ -261,7 +263,7 @@ describe('Agent Config Injection', () => {
 
 		expect(config.name).toBe('general');
 		expect(config.prompt).toBeDefined();
-		expect(config.tools.length).toBeGreaterThan(0);
+		expect(config.toolConfig.firstClass.length).toBeGreaterThan(0);
 	});
 });
 
@@ -307,7 +309,7 @@ describe('API Route Integration', () => {
 					apiKey: 'sk-test',
 				},
 				agentPrompt: 'You are a test assistant.',
-				tools: ['progress_update', 'finish'],
+				tools: { firstClass: ['progress_update', 'finish'] },
 			}),
 		});
 

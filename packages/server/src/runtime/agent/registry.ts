@@ -8,22 +8,35 @@ import { resolveAgentPrompt } from './registry-prompts.ts';
 export type AgentConfig = {
 	name: string;
 	prompt: string;
-	tools: string[]; // allowed tool names
+	toolConfig: Required<AgentToolGroups>;
 	provider?: ProviderName;
 	model?: string;
 };
 
+export type AgentToolGroups = {
+	firstClass?: string[];
+	loadable?: string[];
+};
+
+export type AgentToolConfig = AgentToolGroups;
+
 export type AgentConfigEntry = {
-	tools?: string[];
-	appendTools?: string[];
+	tools?: AgentToolConfig;
+	appendTools?: AgentToolConfig;
 	prompt?: string;
 	provider?: string;
 	model?: string;
 };
 
-type AgentsJson = Record<string, AgentConfigEntry>;
+export type AgentsJson = Record<string, AgentConfigEntry>;
 
-const BUILTIN_AGENT_NAMES = ['build', 'plan', 'general', 'init', 'research'];
+export const BUILTIN_AGENT_NAMES = [
+	'build',
+	'plan',
+	'general',
+	'init',
+	'research',
+];
 
 function normalizeStringList(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
@@ -37,6 +50,53 @@ function normalizeStringList(value: unknown): string[] {
 		out.push(trimmed);
 	}
 	return out;
+}
+
+export function normalizeAgentToolConfig(
+	value: unknown,
+): Required<AgentToolGroups> | undefined {
+	if (!value || typeof value !== 'object') return undefined;
+	if (Array.isArray(value)) return undefined;
+	const record = value as Record<string, unknown>;
+	const firstClass = normalizeStringList(record.firstClass);
+	const loadable = normalizeStringList(record.loadable);
+	return firstClass.length || loadable.length
+		? { firstClass, loadable }
+		: undefined;
+}
+
+export function flattenAgentToolConfig(
+	groups: AgentToolGroups | undefined,
+): string[] {
+	if (!groups) return [];
+	return Array.from(
+		new Set([...(groups.firstClass ?? []), ...(groups.loadable ?? [])]),
+	);
+}
+
+function normalizeRequiredToolGroups(
+	groups: AgentToolGroups,
+): Required<AgentToolGroups> {
+	return {
+		firstClass: Array.from(
+			new Set([...(groups.firstClass ?? []), ...baseToolSet]),
+		),
+		loadable: Array.from(new Set(groups.loadable ?? [])),
+	};
+}
+
+function mergeToolGroups(
+	base: AgentToolGroups | undefined,
+	extra: AgentToolGroups | undefined,
+): AgentToolGroups | undefined {
+	if (!base && !extra) return undefined;
+	const firstClass = Array.from(
+		new Set([...(base?.firstClass ?? []), ...(extra?.firstClass ?? [])]),
+	);
+	const loadable = Array.from(
+		new Set([...(base?.loadable ?? []), ...(extra?.loadable ?? [])]),
+	);
+	return { firstClass, loadable };
 }
 
 const providerValues = new Set<ProviderName>(
@@ -63,27 +123,29 @@ function mergeAgentEntries(
 	override: AgentConfigEntry,
 ): AgentConfigEntry {
 	const merged: AgentConfigEntry = {};
-	const baseTools = normalizeStringList(base?.tools);
-	if (baseTools.length) merged.tools = [...baseTools];
-	const baseAppend = normalizeStringList(base?.appendTools);
-	if (baseAppend.length) merged.appendTools = [...baseAppend];
+	const baseTools = normalizeAgentToolConfig(base?.tools);
+	if (baseTools) merged.tools = baseTools;
+	const baseAppend = normalizeAgentToolConfig(base?.appendTools);
+	if (baseAppend) merged.appendTools = baseAppend;
 	if (base && Object.hasOwn(base, 'prompt')) merged.prompt = base.prompt;
 	if (base && Object.hasOwn(base, 'provider'))
 		merged.provider = normalizeProvider(base.provider);
 	if (base && Object.hasOwn(base, 'model'))
 		merged.model = normalizeModel(base.model);
 
-	if (Array.isArray(override.tools))
-		merged.tools = normalizeStringList(override.tools);
-	if (Array.isArray(override.appendTools)) {
-		const extras = normalizeStringList(override.appendTools);
-		const union = new Set([...(merged.appendTools ?? []), ...extras]);
-		merged.appendTools = Array.from(union);
-	} else if (
-		Object.hasOwn(override, 'appendTools') &&
-		!Array.isArray(override.appendTools)
-	) {
-		delete merged.appendTools;
+	if (Object.hasOwn(override, 'tools')) {
+		const normalized = normalizeAgentToolConfig(override.tools);
+		if (normalized) merged.tools = normalized;
+		else delete merged.tools;
+	}
+	if (Object.hasOwn(override, 'appendTools')) {
+		const extras = normalizeAgentToolConfig(override.appendTools);
+		const union = mergeToolGroups(
+			normalizeAgentToolConfig(merged.appendTools),
+			extras,
+		);
+		if (union) merged.appendTools = union;
+		else delete merged.appendTools;
 	}
 	if (Object.hasOwn(override, 'prompt')) merged.prompt = override.prompt;
 
@@ -100,97 +162,102 @@ function mergeAgentEntries(
 	return merged;
 }
 
-const baseToolSet = ['progress_update', 'finish'] as const;
+const baseToolSet = ['progress_update', 'finish', 'load_tools'] as const;
 
-const defaultToolExtras: Record<string, string[]> = {
-	build: [
-		'skill',
-		'read',
-		'read_image',
-		'edit',
-		'multiedit',
-		'write',
-		'copy_into',
-		'copy_attachment_to_project',
-		'ls',
-		'tree',
-		'shell',
-		'update_todos',
-		'glob',
-		'ripgrep',
-		'git_status',
-		'terminal',
-		'apply_patch',
-		'websearch',
-	],
-	plan: [
-		'skill',
-		'read',
-		'read_image',
-		'ls',
-		'tree',
-		'ripgrep',
-		'update_todos',
-		'websearch',
-	],
-	general: [
-		'skill',
-		'read',
-		'read_image',
-		'edit',
-		'multiedit',
-		'write',
-		'copy_into',
-		'copy_attachment_to_project',
-		'ls',
-		'tree',
-		'shell',
-		'ripgrep',
-		'glob',
-		'websearch',
-		'update_todos',
-	],
-	init: [
-		'skill',
-		'read',
-		'read_image',
-		'edit',
-		'multiedit',
-		'write',
-		'copy_into',
-		'copy_attachment_to_project',
-		'ls',
-		'tree',
-		'shell',
-		'update_todos',
-		'glob',
-		'ripgrep',
-		'git_status',
-		'terminal',
-		'apply_patch',
-		'websearch',
-	],
-	git: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'],
-	commit: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'],
-	research: [
-		'read',
-		'read_image',
-		'ls',
-		'tree',
-		'ripgrep',
-		'websearch',
-		'update_todos',
-		'query_sessions',
-		'query_messages',
-		'get_session_context',
-		'search_history',
-		'present_action',
-	],
+const defaultToolExtras: Record<string, AgentToolGroups> = {
+	build: {
+		firstClass: [
+			'skill',
+			'read',
+			'edit',
+			'multiedit',
+			'write',
+			'copy_into',
+			'ls',
+			'tree',
+			'shell',
+			'update_todos',
+			'glob',
+			'ripgrep',
+			'git_status',
+			'terminal',
+			'apply_patch',
+			'websearch',
+		],
+		loadable: ['read_image', 'copy_attachment_to_project', 'simulator'],
+	},
+	plan: {
+		firstClass: [
+			'skill',
+			'read',
+			'ls',
+			'tree',
+			'ripgrep',
+			'update_todos',
+			'websearch',
+		],
+		loadable: ['read_image'],
+	},
+	general: {
+		firstClass: [
+			'skill',
+			'read',
+			'ls',
+			'tree',
+			'shell',
+			'ripgrep',
+			'glob',
+			'websearch',
+			'update_todos',
+		],
+	},
+	init: {
+		firstClass: [
+			'skill',
+			'read',
+			'edit',
+			'multiedit',
+			'write',
+			'copy_into',
+			'ls',
+			'tree',
+			'shell',
+			'update_todos',
+			'glob',
+			'ripgrep',
+			'git_status',
+			'apply_patch',
+			'websearch',
+		],
+		loadable: ['read_image'],
+	},
+	git: { firstClass: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'] },
+	commit: {
+		firstClass: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'],
+	},
+	research: {
+		firstClass: [
+			'read',
+			'ls',
+			'tree',
+			'ripgrep',
+			'websearch',
+			'update_todos',
+			'query_sessions',
+			'query_messages',
+			'get_session_context',
+			'search_history',
+			'present_action',
+		],
+		loadable: ['read_image', 'copy_attachment_to_project'],
+	},
 };
 
-export function defaultToolsForAgent(name: string): string[] {
-	const extras = defaultToolExtras[name] ? [...defaultToolExtras[name]] : [];
-	return Array.from(new Set([...baseToolSet, ...extras]));
+export function defaultToolConfigForAgent(
+	name: string,
+): Required<AgentToolGroups> {
+	const extras = defaultToolExtras[name];
+	return normalizeRequiredToolGroups(extras ?? {});
 }
 
 export async function loadAgentsConfig(
@@ -269,7 +336,7 @@ export async function resolveAgentConfig(
 	name: string,
 	inlineConfig?: {
 		prompt?: string;
-		tools?: string[];
+		tools?: AgentToolConfig;
 		provider?: string;
 		model?: string;
 	},
@@ -277,10 +344,14 @@ export async function resolveAgentConfig(
 	if (inlineConfig?.prompt) {
 		const provider = normalizeProvider(inlineConfig.provider);
 		const model = normalizeModel(inlineConfig.model);
+		const toolConfig = normalizeRequiredToolGroups(
+			normalizeAgentToolConfig(inlineConfig.tools) ??
+				defaultToolConfigForAgent(name),
+		);
 		return {
 			name,
 			prompt: inlineConfig.prompt,
-			tools: inlineConfig.tools ?? defaultToolsForAgent(name),
+			toolConfig,
 			provider,
 			model,
 		};
@@ -294,25 +365,23 @@ export async function resolveAgentConfig(
 	});
 
 	// Default tool access per agent if not explicitly configured
-	let tools = Array.isArray(entry?.tools)
-		? [...(entry?.tools as string[])]
-		: defaultToolsForAgent(name);
+	let toolConfig: AgentToolGroups | undefined = entry?.tools
+		? normalizeAgentToolConfig(entry.tools)
+		: defaultToolConfigForAgent(name);
 	if (!entry || !entry.tools) {
-		tools = defaultToolsForAgent(name);
+		toolConfig = defaultToolConfigForAgent(name);
 	}
-	if (Array.isArray(entry?.appendTools) && entry.appendTools.length) {
-		for (const t of entry.appendTools) {
-			if (typeof t === 'string' && t.trim()) tools.push(t.trim());
-		}
+	const appendTools = normalizeAgentToolConfig(entry?.appendTools);
+	if (appendTools) {
+		toolConfig = mergeToolGroups(toolConfig, appendTools) ?? toolConfig;
 	}
-	// Deduplicate and ensure base tools are always available
-	const deduped = Array.from(new Set([...tools, ...baseToolSet]));
+	const normalizedToolConfig = normalizeRequiredToolGroups(toolConfig ?? {});
 	const provider = normalizeProvider(entry?.provider);
 	const model = normalizeModel(entry?.model);
 	return {
 		name,
 		prompt,
-		tools: deduped,
+		toolConfig: normalizedToolConfig,
 		provider,
 		model,
 	};

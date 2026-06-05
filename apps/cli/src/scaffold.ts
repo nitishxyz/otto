@@ -11,11 +11,38 @@ import {
 } from '@clack/prompts';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'node:readline';
-import { defaultToolsForAgent } from '@ottocode/server/runtime/agent-registry';
+import {
+	defaultToolConfigForAgent,
+	flattenAgentToolConfig,
+	type AgentToolConfig,
+} from '@ottocode/server/runtime/agent-registry';
 import { discoverProjectTools } from '@ottocode/sdk';
 import { getGlobalConfigDir, getHomeDir } from '@ottocode/sdk';
 
 type ScaffoldOptions = { project?: string; local?: boolean };
+
+const LOADABLE_TOOLS = new Set([
+	'read_image',
+	'copy_attachment_to_project',
+	'simulator',
+]);
+
+function toolConfigFromNames(names: string[]): Required<AgentToolConfig> {
+	const firstClass = new Set<string>();
+	const loadable = new Set<string>();
+	for (const name of names) {
+		if (LOADABLE_TOOLS.has(name)) loadable.add(name);
+		else firstClass.add(name);
+	}
+	return {
+		firstClass: Array.from(firstClass),
+		loadable: Array.from(loadable),
+	};
+}
+
+function toolNamesFromConfig(config: AgentToolConfig | undefined): string[] {
+	return flattenAgentToolConfig(config ?? {});
+}
 
 export async function runScaffold(opts: ScaffoldOptions = {}) {
 	const projectRoot = (opts.project ?? process.cwd()).replace(/\\/g, '/');
@@ -109,7 +136,7 @@ async function scaffoldAgent(
 	const toolList = Array.from(new Set([...(tools as string[])]));
 	current[String(name)] = {
 		...(current[String(name)] ?? {}),
-		tools: toolList,
+		tools: toolConfigFromNames(toolList),
 		...(promptRel ? { prompt: promptRel } : {}),
 	};
 	await ensureDir(agentsPath.substring(0, agentsPath.lastIndexOf('/')));
@@ -166,7 +193,7 @@ export async function editAgentsConfig(
 	log.message(`Editing ${scopeLabel} agents config`);
 	const current = (await readJson(agentsPath).catch(() => ({}))) as Record<
 		string,
-		{ tools?: string[]; appendTools?: string[]; prompt?: string }
+		{ tools?: AgentToolConfig; appendTools?: AgentToolConfig; prompt?: string }
 	>;
 	const builtInList = ['general', 'build', 'plan'];
 	const names = Object.keys(current);
@@ -204,11 +231,13 @@ export async function editAgentsConfig(
 	const entry = current[key] ?? {};
 	const scope = isGlobalBase(baseDir, projectRoot) ? 'global' : 'local';
 	const builtInAgents = new Set(['general', 'build', 'plan']);
-	const defaults = defaultToolsForAgent(key).filter((t) => t !== 'finish');
-	const hasOverride = Array.isArray(entry.tools);
-	const existingAppend = Array.isArray(entry.appendTools)
-		? entry.appendTools.filter((t) => t !== 'finish')
-		: [];
+	const defaults = flattenAgentToolConfig(
+		defaultToolConfigForAgent(key),
+	).filter((t) => t !== 'finish');
+	const hasOverride = Boolean(entry.tools);
+	const existingAppend = toolNamesFromConfig(entry.appendTools).filter(
+		(t) => t !== 'finish',
+	);
 	let mode: 'append' | 'override';
 	if (hasOverride) mode = 'override';
 	else if (existingAppend.length) mode = 'append';
@@ -234,7 +263,7 @@ export async function editAgentsConfig(
 	const preselect =
 		mode === 'append'
 			? existingAppend
-			: (entry.tools ?? []).filter((t) => t !== 'finish');
+			: toolNamesFromConfig(entry.tools).filter((t) => t !== 'finish');
 	const optionValues = await listAvailableTools(projectRoot, scope, false);
 	const baseDefaults = new Set(defaults);
 	const filteredOptions = optionValues.filter((tool) => {
@@ -309,8 +338,8 @@ export async function editAgentsConfig(
 	}
 	const selection = Array.from(new Set((toolsSel as string[]) || []));
 	const nextEntry: {
-		tools?: string[];
-		appendTools?: string[];
+		tools?: AgentToolConfig;
+		appendTools?: AgentToolConfig;
 		prompt?: string;
 	} = { ...(current[key] ?? {}) };
 	if (ensurePrompt)
@@ -320,12 +349,12 @@ export async function editAgentsConfig(
 	else delete nextEntry.prompt;
 	if (mode === 'append') {
 		const extras = selection.filter((t) => t !== 'finish');
-		if (extras.length) nextEntry.appendTools = extras;
+		if (extras.length) nextEntry.appendTools = toolConfigFromNames(extras);
 		else delete nextEntry.appendTools;
 		delete nextEntry.tools;
 	} else {
 		const finalTools = Array.from(new Set([...selection, 'finish']));
-		nextEntry.tools = finalTools;
+		nextEntry.tools = toolConfigFromNames(finalTools);
 		delete nextEntry.appendTools;
 	}
 	current[key] = nextEntry;

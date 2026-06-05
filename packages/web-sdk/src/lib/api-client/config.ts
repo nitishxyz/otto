@@ -2,10 +2,23 @@ import {
 	getConfig as apiGetConfig,
 	getProviderModels as apiGetProviderModels,
 	getAllModels as apiGetAllModels,
+	getAgentDetails as apiGetAgentDetails,
+	getAgent as apiGetAgent,
+	getConfigTools as apiGetConfigTools,
+	upsertAgent as apiUpsertAgent,
+	deleteAgent as apiDeleteAgent,
 	discoverProviderModels as apiDiscoverProviderModels,
 	updateDefaults as apiUpdateDefaults,
 	updateProviderSettings as apiUpdateProviderSettings,
 	deleteProviderSettings as apiDeleteProviderSettings,
+} from '@ottocode/api';
+import type {
+	GetAgentDetailsResponse,
+	GetAgentResponse,
+	GetConfigToolsResponse,
+	UpsertAgentData,
+	UpsertAgentResponse,
+	DeleteAgentResponse,
 } from '@ottocode/api';
 import type { AllModelsResponse } from '../../types/api';
 import { extractErrorMessage } from './utils';
@@ -28,6 +41,19 @@ export type DiscoveredProviderModel = {
 	contextWindow?: number;
 	maxOutputTokens?: number;
 };
+
+export type AgentDetail = GetAgentResponse['agent'];
+
+export type AgentToolGroups = {
+	firstClass?: string[];
+	loadable?: string[];
+};
+
+export type AgentToolConfig = AgentToolGroups;
+
+export type UpdateAgentInput = UpsertAgentData['body'];
+
+export type ToolDetail = GetConfigToolsResponse['tools'][number];
 
 export const configMixin = {
 	async getConfig(): Promise<{
@@ -55,6 +81,48 @@ export const configMixin = {
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
+	},
+
+	async getAgentDetails(): Promise<GetAgentDetailsResponse> {
+		const response = await apiGetAgentDetails();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as GetAgentDetailsResponse;
+	},
+
+	async getAgent(name: string): Promise<GetAgentResponse> {
+		const response = await apiGetAgent({ path: { agent: name } });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as GetAgentResponse;
+	},
+
+	async getConfigTools(): Promise<GetConfigToolsResponse> {
+		const response = await apiGetConfigTools();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as GetConfigToolsResponse;
+	},
+
+	async updateAgent(
+		name: string,
+		input: UpdateAgentInput,
+	): Promise<UpsertAgentResponse> {
+		const response = await apiUpsertAgent({
+			path: { agent: name },
+			body: input,
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as UpsertAgentResponse;
+	},
+
+	async deleteAgent(
+		name: string,
+		scope: 'local' | 'global' = 'local',
+	): Promise<DeleteAgentResponse> {
+		const response = await apiDeleteAgent({
+			path: { agent: name },
+			query: { scope },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as DeleteAgentResponse;
 	},
 
 	async getModels(providerId: string): Promise<{

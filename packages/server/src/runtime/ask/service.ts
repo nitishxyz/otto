@@ -10,7 +10,7 @@ import {
 	selectProviderAndModel,
 	type ProviderSelection,
 } from '../provider/selection.ts';
-import { resolveAgentConfig } from '../agent/registry.ts';
+import { resolveAgentConfig, type AgentToolConfig } from '../agent/registry.ts';
 import { dispatchAssistantMessage } from '../message/service.ts';
 import {
 	validateProviderModel,
@@ -73,7 +73,7 @@ export type AskServerRequest = {
 	config?: InjectableConfig;
 	credentials?: InjectableCredentials;
 	agentPrompt?: string;
-	tools?: string[];
+	tools?: AgentToolConfig;
 	images?: Array<{ data: string; mediaType: string }>;
 };
 
@@ -205,17 +205,16 @@ async function processAskRequest(
 
 	const agentTimer = time('ask:resolveAgentConfig');
 	const agentCfg = request.agentPrompt
-		? {
-				name: agentName,
+		? await resolveAgentConfig(cfg.projectRoot, agentName, {
 				prompt: request.agentPrompt,
-				tools: request.tools ?? ['progress_update', 'finish'],
+				tools: request.tools ?? { firstClass: ['progress_update', 'finish'] },
 				provider:
 					typeof request.provider === 'string' &&
 					hasConfiguredProvider(cfg, request.provider)
 						? request.provider
 						: undefined,
 				model: request.model,
-			}
+			})
 		: await resolveAgentConfig(cfg.projectRoot, agentName);
 	agentTimer.end({ agent: agentName });
 	const agentProviderDefault = hasConfiguredProvider(cfg, agentCfg.provider)

@@ -4,6 +4,7 @@ import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
 	ensureProviderEnv,
 	getProviderDefinition,
+	hasConfiguredProvider,
 	isProviderAuthorized,
 	loadConfig,
 	logger,
@@ -14,6 +15,7 @@ import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
+import { resolveAgentConfig } from '../runtime/agent/registry.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
@@ -111,11 +113,18 @@ const createMessageQuerySchema = z.object({
 const createMessageBodySchema = z.object({
 	content: z.string(),
 	agent: z.string().optional().openapi({
-		description: 'Agent name. Defaults to config if omitted.',
+		description:
+			'Agent name. Defaults to the session agent, then config default. When explicitly changed and provider/model are omitted, the selected agent provider/model overrides are used before the session/default provider/model.',
 	}),
-	provider: z.string().optional(),
-	model: z.string().optional(),
-	userContext: z.string().optional().openapi({
+	provider: z.string().optional().openapi({
+		description:
+			'Provider override for this message. If omitted, explicit agent provider override, session provider, then config default are used.',
+	}),
+	model: z.string().optional().openapi({
+		description:
+			'Model override for this message. If omitted, explicit agent model override, session model, then config default are used.',
+	}),
+	userContext: z.string().nullable().optional().openapi({
 		description:
 			'Optional user-provided context to include in the system prompt.',
 	}),
@@ -285,12 +294,24 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					return c.json({ error: 'Session not found' }, 404);
 				}
 				const sess: SessionRow = sessionRows[0];
+				const requestedAgent =
+					typeof body?.agent === 'string' ? body.agent : undefined;
+				const agent = requestedAgent ?? sess.agent ?? cfg.defaults.agent;
+				const agentCfg = requestedAgent
+					? await resolveAgentConfig(cfg.projectRoot, requestedAgent)
+					: undefined;
+				const agentProvider = hasConfiguredProvider(cfg, agentCfg?.provider)
+					? agentCfg?.provider
+					: undefined;
 				const provider =
-					body?.provider ?? sess.provider ?? cfg.defaults.provider;
-				const modelName = body?.model ?? sess.model ?? cfg.defaults.model;
-				const agent = body?.agent ?? sess.agent ?? cfg.defaults.agent;
+					body?.provider ??
+					agentProvider ??
+					sess.provider ??
+					cfg.defaults.provider;
+				const modelName =
+					body?.model ?? agentCfg?.model ?? sess.model ?? cfg.defaults.model;
 				const content = body?.content ?? '';
-				const userContext = body?.userContext;
+				const userContext = body?.userContext ?? undefined;
 				const images = Array.isArray(body?.images) ? body.images : undefined;
 				const files = Array.isArray(body?.files) ? body.files : undefined;
 

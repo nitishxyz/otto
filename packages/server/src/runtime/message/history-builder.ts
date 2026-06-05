@@ -16,6 +16,26 @@ type MessagePartRow = typeof messageParts.$inferSelect;
 const MODEL_HISTORY_MAX_BYTES = 1_500_000;
 const COMPACTED_OLD_TEXT_BYTES = 1_000;
 
+function formatAttachmentContext(args: {
+	kind: string;
+	name?: string;
+	mediaType?: string;
+	attachmentId?: string;
+	original?: { filename?: string; size?: number; sha256?: string };
+}): string | undefined {
+	const name = args.name || args.original?.filename || 'attachment';
+	if (!args.attachmentId) return undefined;
+	const details = [
+		`${args.kind} attachment`,
+		`name: ${name}`,
+		args.mediaType ? `mediaType: ${args.mediaType}` : undefined,
+		`attachmentId: ${args.attachmentId}`,
+		args.original?.size ? `originalBytes: ${args.original.size}` : undefined,
+	].filter(Boolean);
+	const copyHint = ` To copy the original upload into the project, use copy_attachment_to_project with attachmentId "${args.attachmentId}".`;
+	return `[${details.join('; ')}]${copyHint}`;
+}
+
 function getReadResultKey(part: MessagePartRow): string | undefined {
 	if (part.type !== 'tool_result' || part.compactedAt) return undefined;
 	try {
@@ -211,6 +231,16 @@ export async function buildHistoryMessages(
 							name?: string;
 							original?: { filename?: string; size?: number; sha256?: string };
 						};
+						const attachmentContext = formatAttachmentContext({
+							kind: 'image',
+							name: obj.name,
+							mediaType: obj.mediaType,
+							attachmentId: obj.attachmentId,
+							original: obj.original,
+						});
+						if (attachmentContext) {
+							userParts.push({ type: 'text', text: attachmentContext });
+						}
 						if (
 							m.id === latestUserImageMessageId &&
 							obj.data &&
@@ -219,6 +249,7 @@ export async function buildHistoryMessages(
 							userParts.push({
 								type: 'file',
 								data: obj.data,
+								...(obj.name ? { filename: obj.name } : {}),
 								mediaType: obj.mediaType,
 							});
 						}
@@ -240,18 +271,42 @@ export async function buildHistoryMessages(
 								text: `<file name="${obj.name || 'file'}">\n${obj.textContent}\n</file>`,
 							});
 						} else if (obj.type === 'pdf' && obj.data && obj.mediaType) {
+							const attachmentContext = formatAttachmentContext({
+								kind: 'pdf',
+								name: obj.name,
+								mediaType: obj.mediaType,
+								attachmentId: obj.attachmentId,
+								original: obj.original,
+							});
+							if (attachmentContext) {
+								userParts.push({ type: 'text', text: attachmentContext });
+							}
 							userParts.push({
 								type: 'file',
 								data: obj.data,
 								filename: obj.name,
 								mediaType: obj.mediaType,
 							});
-						} else if (
-							obj.type === 'image' &&
-							obj.data &&
-							obj.mediaType &&
-							m.id === latestUserImageMessageId
-						) {
+						} else if (obj.type === 'image') {
+							const attachmentContext = formatAttachmentContext({
+								kind: 'image',
+								name: obj.name,
+								mediaType: obj.mediaType,
+								attachmentId: obj.attachmentId,
+								original: obj.original,
+							});
+							if (attachmentContext) {
+								userParts.push({ type: 'text', text: attachmentContext });
+							}
+							if (
+								!(
+									obj.data &&
+									obj.mediaType &&
+									m.id === latestUserImageMessageId
+								)
+							) {
+								continue;
+							}
 							userParts.push({
 								type: 'file',
 								data: obj.data,

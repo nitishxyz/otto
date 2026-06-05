@@ -1,5 +1,8 @@
 import { loadConfig } from '@ottocode/sdk';
-import { resolveAgentConfig } from '@ottocode/server/runtime/agent-registry';
+import {
+	flattenAgentToolConfig,
+	resolveAgentConfig,
+} from '@ottocode/server/runtime/agent-registry';
 import { discoverProjectTools } from '@ottocode/sdk';
 import { box, table } from './ui.ts';
 
@@ -16,7 +19,7 @@ export async function runToolsList(opts: { project?: string } = {}) {
 		const row: string[] = [t];
 		for (const a of agents) {
 			const acfg = await resolveAgentConfig(cfg.projectRoot, a);
-			row.push(acfg.tools.includes(t) ? '✔' : '');
+			row.push(flattenAgentToolConfig(acfg.toolConfig).includes(t) ? '✔' : '');
 		}
 		rows.push(row);
 	}

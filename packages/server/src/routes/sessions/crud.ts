@@ -98,9 +98,18 @@ const sessionProjectQuerySchema = projectQuerySchema;
 
 const createSessionBodySchema = z.object({
 	title: z.string().nullable().optional(),
-	agent: z.string().optional(),
-	provider: z.string().optional(),
-	model: z.string().optional(),
+	agent: z.string().optional().openapi({
+		description:
+			'Agent name. Defaults to config. Agent provider/model overrides are used when provider/model are omitted.',
+	}),
+	provider: z.string().optional().openapi({
+		description:
+			'Provider override. If omitted, selected agent provider override, then config default are used.',
+	}),
+	model: z.string().optional().openapi({
+		description:
+			'Model override. If omitted, selected agent model override, then config default are used.',
+	}),
 });
 
 const updateSessionBodySchema = z.object({

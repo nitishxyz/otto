@@ -65,6 +65,11 @@ class ApiClient {
 	createGitBranch = gitMixin.createGitBranch;
 
 	getConfig = configMixin.getConfig;
+	getAgentDetails = configMixin.getAgentDetails;
+	getAgent = configMixin.getAgent;
+	getConfigTools = configMixin.getConfigTools;
+	updateAgent = configMixin.updateAgent;
+	deleteAgent = configMixin.deleteAgent;
 	getModels = configMixin.getModels;
 	getAllModels = configMixin.getAllModels;
 	discoverProviderModels = configMixin.discoverProviderModels;

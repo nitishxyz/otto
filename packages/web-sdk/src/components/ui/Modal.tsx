@@ -9,7 +9,7 @@ interface ModalProps {
 	showCloseButton?: boolean;
 	closeOnBackdropClick?: boolean;
 	closeOnEscape?: boolean;
-	maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
+	maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '5xl';
 	position?: 'fixed' | 'absolute';
 }
 
@@ -20,6 +20,7 @@ const maxWidthClasses = {
 	xl: 'max-w-xl',
 	'2xl': 'max-w-2xl',
 	'4xl': 'max-w-4xl',
+	'5xl': 'max-w-5xl',
 };
 
 export function Modal({

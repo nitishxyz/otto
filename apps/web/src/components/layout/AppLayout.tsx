@@ -27,6 +27,8 @@ import {
 	MCPSidebarToggle,
 	SkillsSidebar,
 	SkillsSidebarToggle,
+	AgentsManagerModal,
+	AgentsSidebarToggle,
 	QuickFilePicker,
 	ResizeHandle,
 	ViewerTabs,
@@ -39,6 +41,7 @@ import {
 	useFileBrowserStore,
 	useMCPStore,
 	useSkillsStore,
+	useAgentsStore,
 	usePanelWidthStore,
 	useViewerTabsStore,
 	useSidebarStore,
@@ -46,6 +49,7 @@ import {
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
 import {
+	Bot,
 	FileCode2,
 	FolderOpen,
 	GitBranch,
@@ -104,6 +108,7 @@ function collapseRightPanels() {
 	useFileBrowserStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAgentsStore.getState().closeManager();
 }
 
 function getAnyRightPanelOpen(): boolean {
@@ -319,6 +324,7 @@ export const AppLayout = memo(function AppLayout({
 			{/* Modals */}
 			<GitCommitModal />
 			<ConfirmationDialog />
+			<AgentsManagerModal />
 			<QuickFilePicker />
 		</div>
 	);
@@ -546,6 +552,7 @@ const RightPanelArea = memo(function RightPanelArea({
 				<TunnelSidebarToggle />
 				<MCPSidebarToggle />
 				<SkillsSidebarToggle />
+				<AgentsSidebarToggle />
 				<SettingsSidebarToggle />
 				<div className="flex-1" />
 				<TerminalPanelToggle />
@@ -597,6 +604,7 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 	const toggleFileBrowserPanel = useFileBrowserStore((s) => s.toggleSidebar);
 	const toggleMcpPanel = useMCPStore((s) => s.toggleSidebar);
 	const toggleSkillsPanel = useSkillsStore((s) => s.toggleSidebar);
+	const toggleAgentsPanel = useAgentsStore((s) => s.toggleManager);
 
 	if (!isOpen) return null;
 
@@ -662,6 +670,13 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
 					>
 						<Wrench className="h-4 w-4" /> Skills
+					</button>
+					<button
+						type="button"
+						onClick={() => openMobilePanel(toggleAgentsPanel)}
+						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
+					>
+						<Bot className="h-4 w-4" /> Agents
 					</button>
 					<button
 						type="button"

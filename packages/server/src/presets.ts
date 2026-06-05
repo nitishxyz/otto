@@ -13,11 +13,14 @@ import AGENT_INIT from '@ottocode/sdk/prompts/agents/init.txt' with {
 import AGENT_RESEARCH from '@ottocode/sdk/prompts/agents/research.txt' with {
 	type: 'text',
 };
-import { defaultToolsForAgent } from './runtime/agent/registry.ts';
+import {
+	defaultToolConfigForAgent,
+	type AgentToolGroups,
+} from './runtime/agent/registry.ts';
 
 type BuiltinAgentPreset = {
 	prompt: string;
-	tools: string[];
+	tools: Required<AgentToolGroups>;
 };
 
 /**
@@ -29,23 +32,23 @@ type BuiltinAgentPreset = {
 export const BUILTIN_AGENTS = {
 	build: {
 		prompt: AGENT_BUILD,
-		tools: defaultToolsForAgent('build'),
+		tools: defaultToolConfigForAgent('build'),
 	},
 	plan: {
 		prompt: AGENT_PLAN,
-		tools: defaultToolsForAgent('plan'),
+		tools: defaultToolConfigForAgent('plan'),
 	},
 	general: {
 		prompt: AGENT_GENERAL,
-		tools: defaultToolsForAgent('general'),
+		tools: defaultToolConfigForAgent('general'),
 	},
 	init: {
 		prompt: AGENT_INIT,
-		tools: defaultToolsForAgent('init'),
+		tools: defaultToolConfigForAgent('init'),
 	},
 	research: {
 		prompt: AGENT_RESEARCH,
-		tools: defaultToolsForAgent('research'),
+		tools: defaultToolConfigForAgent('research'),
 	},
 } satisfies Record<string, BuiltinAgentPreset>;
 

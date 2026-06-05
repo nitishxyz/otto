@@ -6,6 +6,9 @@ import {
 	BrowserPanelToggle,
 	Button,
 	ConfirmationDialog,
+	AgentsManagerModal,
+	AgentsSidebar,
+	AgentsSidebarToggle,
 	FileBrowserSidebar,
 	FileBrowserSidebarToggle,
 	GitCommitModal,
@@ -405,6 +408,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								<FileBrowserSidebar />
 								<MCPSidebar />
 								<SkillsSidebar />
+								<AgentsSidebar />
 							</div>
 						</div>
 					</div>
@@ -434,6 +438,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<TunnelSidebarToggle />
 							<MCPSidebarToggle />
 							<SkillsSidebarToggle />
+							<AgentsSidebarToggle />
 							<SettingsSidebarToggle />
 							<div className="flex-1" />
 							<TerminalPanelToggle />
@@ -462,6 +467,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 
 			<GitCommitModal />
 			<ConfirmationDialog />
+			<AgentsManagerModal />
 			<QuickFilePicker />
 			{dashboardOpen && <UsageDashboard onBack={onCloseDashboard} />}
 		</div>

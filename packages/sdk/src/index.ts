@@ -311,6 +311,7 @@ export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildSimulatorTool,
+	getLazyToolDefinitions,
 } from './core/src/index.ts';
 export {
 	appendCoAuthorTrailer,

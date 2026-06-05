@@ -5,7 +5,11 @@ import {
 	useMemo,
 	useImperativeHandle,
 	forwardRef,
+	useLayoutEffect,
+	type CSSProperties,
+	type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { useAllModels, useModels } from '../../hooks/useConfig';
@@ -17,7 +21,8 @@ interface UnifiedModelSelectorProps {
 	model: string;
 	onChange: (provider: string, model: string) => void;
 	disabled?: boolean;
-	dropdownMode?: 'absolute' | 'inline';
+	dropdownMode?: 'absolute' | 'inline' | 'portal';
+	placeholder?: string;
 }
 
 interface FlattenedModel {
@@ -41,7 +46,14 @@ export const UnifiedModelSelector = forwardRef<
 	UnifiedModelSelectorRef,
 	UnifiedModelSelectorProps
 >(function UnifiedModelSelector(
-	{ provider, model, onChange, disabled = false, dropdownMode = 'absolute' },
+	{
+		provider,
+		model,
+		onChange,
+		disabled = false,
+		dropdownMode = 'absolute',
+		placeholder,
+	},
 	ref,
 ) {
 	const { data: allModels } = useAllModels();
@@ -59,6 +71,9 @@ export const UnifiedModelSelector = forwardRef<
 	>({});
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
+	const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
 	const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
 	useEffect(() => {
@@ -286,7 +301,8 @@ export const UnifiedModelSelector = forwardRef<
 		const handleClickOutside = (event: MouseEvent) => {
 			if (
 				dropdownRef.current &&
-				!dropdownRef.current.contains(event.target as Node)
+				!dropdownRef.current.contains(event.target as Node) &&
+				(!menuRef.current || !menuRef.current.contains(event.target as Node))
 			) {
 				setIsOpen(false);
 			}
@@ -314,6 +330,40 @@ export const UnifiedModelSelector = forwardRef<
 			document.removeEventListener('keydown', handleEscape);
 		};
 	}, [isOpen]);
+
+	useLayoutEffect(() => {
+		if (!isOpen || dropdownMode !== 'portal') return;
+		const update = () => {
+			const el = triggerRef.current;
+			if (!el) return;
+			const rect = el.getBoundingClientRect();
+			const margin = 8;
+			const maxPanel = 320;
+			const spaceBelow = window.innerHeight - rect.bottom - margin;
+			const spaceAbove = rect.top - margin;
+			const openUp =
+				spaceBelow < Math.min(maxPanel, 240) && spaceAbove > spaceBelow;
+			setMenuStyle({
+				position: 'fixed',
+				left: rect.left,
+				width: rect.width,
+				maxHeight: Math.max(
+					160,
+					Math.min(maxPanel, openUp ? spaceAbove : spaceBelow),
+				),
+				...(openUp
+					? { bottom: window.innerHeight - rect.top + 4 }
+					: { top: rect.bottom + 4 }),
+			});
+		};
+		update();
+		window.addEventListener('resize', update);
+		window.addEventListener('scroll', update, true);
+		return () => {
+			window.removeEventListener('resize', update);
+			window.removeEventListener('scroll', update, true);
+		};
+	}, [isOpen, dropdownMode]);
 
 	const handleSelect = (
 		selectedProvider: string,
@@ -367,162 +417,192 @@ export const UnifiedModelSelector = forwardRef<
 	const dropdownPositionClass =
 		dropdownMode === 'inline' ? 'relative' : 'absolute z-50';
 
+	const wrapDropdown = (children: ReactNode) =>
+		dropdownMode === 'portal' ? (
+			createPortal(
+				<div
+					ref={menuRef}
+					style={menuStyle}
+					className="z-[10000] bg-[hsl(var(--popover))] border border-[hsl(var(--border))] rounded-md shadow-lg overflow-hidden flex flex-col"
+				>
+					{children}
+				</div>,
+				document.body,
+			)
+		) : (
+			<div
+				className={`${dropdownPositionClass} mt-1 w-full bg-[hsl(var(--popover))] border border-[hsl(var(--border))] rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col`}
+			>
+				{children}
+			</div>
+		);
+
 	return (
 		<div ref={dropdownRef} className="relative w-full">
 			<button
 				type="button"
+				ref={triggerRef}
 				onClick={() => !disabled && setIsOpen(!isOpen)}
 				disabled={disabled}
 				className="w-full flex items-center justify-between px-3 py-2 bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--accent))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 			>
 				<span className="flex items-center gap-2 text-sm truncate">
-					<span className="text-[hsl(var(--muted-foreground))]">
-						{currentProviderLabel}
-					</span>
-					<span className="text-[hsl(var(--muted-foreground))]/50">/</span>
-					<span className="text-[hsl(var(--foreground))]">
-						{currentModelLabel}
-					</span>
+					{!provider && !model && placeholder ? (
+						<span className="text-[hsl(var(--muted-foreground))]">
+							{placeholder}
+						</span>
+					) : (
+						<>
+							<span className="text-[hsl(var(--muted-foreground))]">
+								{currentProviderLabel}
+							</span>
+							<span className="text-[hsl(var(--muted-foreground))]/50">/</span>
+							<span className="text-[hsl(var(--foreground))]">
+								{currentModelLabel}
+							</span>
+						</>
+					)}
 				</span>
 				<ChevronDown
 					className={`w-4 h-4 text-[hsl(var(--muted-foreground))] transition-transform ${isOpen ? 'rotate-180' : ''}`}
 				/>
 			</button>
-			{isOpen && (
-				<div
-					className={`${dropdownPositionClass} mt-1 w-full bg-[hsl(var(--popover))] border border-[hsl(var(--border))] rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col`}
-				>
-					<div className="p-2 border-b border-[hsl(var(--border))]">
-						<div className="relative">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-							<input
-								ref={searchInputRef}
-								type="text"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								onKeyDown={handleSearchKeyDown}
-								placeholder="Search providers and models..."
-								className="w-full pl-9 pr-3 py-2 bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] rounded text-sm text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-							/>
-						</div>
-					</div>
-
-					<div className="overflow-y-auto">
-						{displayedProviderKeys.length === 0 ? (
-							<div className="p-4 text-center text-[hsl(var(--muted-foreground))] text-sm">
-								{isCurrentProviderLoading
-									? 'Loading models...'
-									: 'No models found'}
+			{isOpen &&
+				wrapDropdown(
+					<>
+						<div className="p-2 border-b border-[hsl(var(--border))]">
+							<div className="relative">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+								<input
+									ref={searchInputRef}
+									type="text"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									onKeyDown={handleSearchKeyDown}
+									placeholder="Search providers and models..."
+									className="w-full pl-9 pr-3 py-2 bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] rounded text-sm text-[hsl(var(--foreground))] placeholder-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+								/>
 							</div>
-						) : (
-							displayedProviderKeys.map((providerKey) => {
-								const providerData = filteredModels[providerKey];
-								const isProviderLoading =
-									loadingProviders[providerKey] ||
-									(providerKey === provider &&
-										isCurrentProviderLoading &&
-										!providerData);
+						</div>
 
-								return (
-									<div
-										key={providerKey}
-										className="border-b border-[hsl(var(--border))] last:border-0"
-									>
-										<div className="sticky top-0 px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider bg-[hsl(var(--muted))] z-10">
-											{providerData?.label || providerKey}
-										</div>
-										<div>
-											{isProviderLoading ? (
-												<div className="px-4 py-2 text-sm text-[hsl(var(--muted-foreground))]">
-													Loading models...
-												</div>
-											) : providerData?.models.length ? (
-												providerData.models.map((modelItem) => {
-													const isSelected =
-														providerKey === provider && modelItem.id === model;
-													const flatIndex = filteredFlatList.findIndex(
-														(item) =>
-															item.providerKey === providerKey &&
-															item.modelId === modelItem.id,
-													);
-													const isHighlighted = flatIndex === highlightedIndex;
-													const isAvailable = modelItem.available !== false;
+						<div className="overflow-y-auto">
+							{displayedProviderKeys.length === 0 ? (
+								<div className="p-4 text-center text-[hsl(var(--muted-foreground))] text-sm">
+									{isCurrentProviderLoading
+										? 'Loading models...'
+										: 'No models found'}
+								</div>
+							) : (
+								displayedProviderKeys.map((providerKey) => {
+									const providerData = filteredModels[providerKey];
+									const isProviderLoading =
+										loadingProviders[providerKey] ||
+										(providerKey === provider &&
+											isCurrentProviderLoading &&
+											!providerData);
 
-													return (
-														<button
-															key={modelItem.id}
-															ref={(el) => {
-																if (flatIndex >= 0) {
-																	itemRefs.current[flatIndex] = el;
+									return (
+										<div
+											key={providerKey}
+											className="border-b border-[hsl(var(--border))] last:border-0"
+										>
+											<div className="sticky top-0 px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider bg-[hsl(var(--muted))] z-10">
+												{providerData?.label || providerKey}
+											</div>
+											<div>
+												{isProviderLoading ? (
+													<div className="px-4 py-2 text-sm text-[hsl(var(--muted-foreground))]">
+														Loading models...
+													</div>
+												) : providerData?.models.length ? (
+													providerData.models.map((modelItem) => {
+														const isSelected =
+															providerKey === provider &&
+															modelItem.id === model;
+														const flatIndex = filteredFlatList.findIndex(
+															(item) =>
+																item.providerKey === providerKey &&
+																item.modelId === modelItem.id,
+														);
+														const isHighlighted =
+															flatIndex === highlightedIndex;
+														const isAvailable = modelItem.available !== false;
+
+														return (
+															<button
+																key={modelItem.id}
+																ref={(el) => {
+																	if (flatIndex >= 0) {
+																		itemRefs.current[flatIndex] = el;
+																	}
+																}}
+																type="button"
+																disabled={!isAvailable}
+																title={modelItem.unavailableReason}
+																onClick={() =>
+																	handleSelect(
+																		providerKey,
+																		modelItem.id,
+																		modelItem.available,
+																	)
 																}
-															}}
-															type="button"
-															disabled={!isAvailable}
-															title={modelItem.unavailableReason}
-															onClick={() =>
-																handleSelect(
-																	providerKey,
-																	modelItem.id,
-																	modelItem.available,
-																)
-															}
-															onMouseEnter={() =>
-																setHighlightedIndex(flatIndex)
-															}
-															className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
-																isHighlighted
-																	? 'bg-[hsl(var(--accent))]'
-																	: 'hover:bg-[hsl(var(--accent))]'
-															} ${
-																isSelected
-																	? 'text-[hsl(var(--accent-foreground))] font-medium'
-																	: 'text-[hsl(var(--foreground))]'
-															} ${
-																!isAvailable
-																	? 'opacity-60 cursor-not-allowed'
-																	: ''
-															}`}
-														>
-															<span className="truncate">
-																{modelItem.label}
-															</span>
-															{(!isAvailable ||
-																modelItem.toolCall ||
-																modelItem.reasoningText) && (
-																<div className="flex gap-1 ml-2 flex-shrink-0">
-																	{!isAvailable && (
-																		<span className="text-[10px] px-1.5 py-0.5 bg-red-600/20 text-red-400 rounded">
-																			Unavailable
-																		</span>
-																	)}
-																	{modelItem.toolCall && (
-																		<span className="text-[10px] px-1.5 py-0.5 bg-green-600/20 text-green-400 rounded">
-																			Tools
-																		</span>
-																	)}
-																	{modelItem.reasoningText && (
-																		<span className="text-[10px] px-1.5 py-0.5 bg-purple-600/20 text-purple-400 rounded">
-																			Reasoning
-																		</span>
-																	)}
-																</div>
-															)}
-														</button>
-													);
-												})
-											) : (
-												<div className="px-4 py-2 text-sm text-[hsl(var(--muted-foreground))]">
-													No models available
-												</div>
-											)}
+																onMouseEnter={() =>
+																	setHighlightedIndex(flatIndex)
+																}
+																className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
+																	isHighlighted
+																		? 'bg-[hsl(var(--accent))]'
+																		: 'hover:bg-[hsl(var(--accent))]'
+																} ${
+																	isSelected
+																		? 'text-[hsl(var(--accent-foreground))] font-medium'
+																		: 'text-[hsl(var(--foreground))]'
+																} ${
+																	!isAvailable
+																		? 'opacity-60 cursor-not-allowed'
+																		: ''
+																}`}
+															>
+																<span className="truncate">
+																	{modelItem.label}
+																</span>
+																{(!isAvailable ||
+																	modelItem.toolCall ||
+																	modelItem.reasoningText) && (
+																	<div className="flex gap-1 ml-2 flex-shrink-0">
+																		{!isAvailable && (
+																			<span className="text-[10px] px-1.5 py-0.5 bg-red-600/20 text-red-400 rounded">
+																				Unavailable
+																			</span>
+																		)}
+																		{modelItem.toolCall && (
+																			<span className="text-[10px] px-1.5 py-0.5 bg-green-600/20 text-green-400 rounded">
+																				Tools
+																			</span>
+																		)}
+																		{modelItem.reasoningText && (
+																			<span className="text-[10px] px-1.5 py-0.5 bg-purple-600/20 text-purple-400 rounded">
+																				Reasoning
+																			</span>
+																		)}
+																	</div>
+																)}
+															</button>
+														);
+													})
+												) : (
+													<div className="px-4 py-2 text-sm text-[hsl(var(--muted-foreground))]">
+														No models available
+													</div>
+												)}
+											</div>
 										</div>
-									</div>
-								);
-							})
-						)}
-					</div>
-				</div>
-			)}
+									);
+								})
+							)}
+						</div>
+					</>,
+				)}
 		</div>
 	);
 });

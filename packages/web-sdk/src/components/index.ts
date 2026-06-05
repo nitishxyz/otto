@@ -94,6 +94,12 @@ export * from './skills/SkillsSidebar';
 export * from './skills/SkillsSidebarToggle';
 export * from './skills/SkillViewerPanel';
 
+// Agents Components
+export * from './agents/AgentsSidebar';
+export * from './agents/AgentsSidebarToggle';
+export * from './agents/AgentsManagerModal';
+export * from './agents/AgentProviderModelFields';
+
 // File Browser Components
 export * from './file-browser/FileBrowserSidebar';
 export * from './file-browser/FileBrowserSidebarToggle';

@@ -56,6 +56,7 @@ export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildSimulatorTool,
+	getLazyToolDefinitions,
 } from './tools/lazy/index';
 
 // =======================

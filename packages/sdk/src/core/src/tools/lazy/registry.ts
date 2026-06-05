@@ -42,10 +42,16 @@ export function buildLazyToolsRecord(
 	return record;
 }
 
-export function buildLoadFirstPartyToolsTool(): { name: string; tool: Tool } {
-	const briefs = getLazyToolDefinitions().map(({ name, description }) => ({
-		name,
-		description,
-	}));
+export function buildLoadFirstPartyToolsTool(allowedNames?: Iterable<string>): {
+	name: string;
+	tool: Tool;
+} {
+	const allowed = allowedNames ? new Set(allowedNames) : null;
+	const briefs = getLazyToolDefinitions()
+		.filter(({ name }) => !allowed || allowed.has(name))
+		.map(({ name, description }) => ({
+			name,
+			description,
+		}));
 	return buildLoadToolsTool(briefs);
 }
