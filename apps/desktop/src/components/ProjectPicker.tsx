@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useProjects } from '../hooks/useProjects';
 import { useGitHub } from '../hooks/useGitHub';
 import { usePlatform } from '../hooks/usePlatform';
@@ -9,21 +9,24 @@ import { ProjectCard } from './ProjectCard';
 import { DeviceCodeModal } from './DeviceCodeModal';
 import { CloneModal } from './CloneModal';
 import {
-	Sun,
-	Moon,
 	ArrowDownToLine,
-	RotateCw,
 	FolderOpen,
 	GitBranch,
 	Link,
 	MessageCircle,
+	Moon,
+	RotateCw,
+	Search,
 	Star,
+	Sun,
 	X,
 } from 'lucide-react';
 import { useDesktopTheme } from '../theme';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';
+
+const PROJECTS_PER_PAGE = 10;
 
 export function ProjectPicker({
 	onSelectProject,
@@ -52,9 +55,13 @@ export function ProjectPicker({
 	const [connectName, setConnectName] = useState('');
 	const [cloning, setCloning] = useState(false);
 	const [cloningRepo, setCloningRepo] = useState<string | null>(null);
+	const [projectSearch, setProjectSearch] = useState('');
+	const [projectVisibleCount, setProjectVisibleCount] =
+		useState(PROJECTS_PER_PAGE);
 	const platform = usePlatform();
 	const { theme, toggleTheme } = useDesktopTheme();
 	const pageRef = useRef(1);
+	const projectLoadMoreRef = useRef<HTMLDivElement | null>(null);
 	const {
 		available: updateAvailable,
 		version: updateVersion,
@@ -181,8 +188,50 @@ export function ProjectPicker({
 		}
 	}, [showOAuthModal, oauthState.step, isAuthenticated, loadRepos]);
 
-	const pinnedProjects = projects.filter((p) => p.pinned);
-	const recentProjects = projects.filter((p) => !p.pinned);
+	const filteredProjects = useMemo(() => {
+		const query = projectSearch.trim().toLowerCase();
+
+		if (!query) {
+			return projects;
+		}
+
+		return projects.filter((project) =>
+			[project.name, project.path, project.kind ?? '', project.remoteUrl ?? '']
+				.join(' ')
+				.toLowerCase()
+				.includes(query),
+		);
+	}, [projects, projectSearch]);
+	const visibleProjects = filteredProjects.slice(0, projectVisibleCount);
+	const pinnedProjects = visibleProjects.filter((p) => p.pinned);
+	const recentProjects = visibleProjects.filter((p) => !p.pinned);
+	const showProjectSearch = projects.length > PROJECTS_PER_PAGE;
+	const hasMoreProjects = visibleProjects.length < filteredProjects.length;
+	const hasProjectResults =
+		pinnedProjects.length > 0 || recentProjects.length > 0;
+
+	useEffect(() => {
+		if (!hasMoreProjects) {
+			return;
+		}
+
+		const loadMoreElement = projectLoadMoreRef.current;
+		if (!loadMoreElement) {
+			return;
+		}
+
+		const observer = new IntersectionObserver((entries) => {
+			if (entries.some((entry) => entry.isIntersecting)) {
+				setProjectVisibleCount((count) =>
+					Math.min(filteredProjects.length, count + PROJECTS_PER_PAGE),
+				);
+			}
+		});
+
+		observer.observe(loadMoreElement);
+
+		return () => observer.disconnect();
+	}, [filteredProjects.length, hasMoreProjects]);
 
 	return (
 		<div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -380,8 +429,26 @@ export function ProjectPicker({
 								</button>
 							</div>
 
-							{(pinnedProjects.length > 0 || recentProjects.length > 0) && (
+							{projects.length > 0 && (
 								<div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
+									{showProjectSearch && (
+										<div className="p-3 border-b border-border/30">
+											<label className="relative block">
+												<span className="sr-only">Search projects</span>
+												<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+												<input
+													type="search"
+													value={projectSearch}
+													onChange={(e) => {
+														setProjectSearch(e.target.value);
+														setProjectVisibleCount(PROJECTS_PER_PAGE);
+													}}
+													placeholder="Search projects..."
+													className="w-full h-9 pl-9 pr-3 bg-muted/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring/50 transition-colors"
+												/>
+											</label>
+										</div>
+									)}
 									{pinnedProjects.length > 0 && (
 										<div>
 											<div className="px-4 pt-3 pb-1">
@@ -429,6 +496,20 @@ export function ProjectPicker({
 												))}
 											</div>
 										</div>
+									)}
+
+									{!hasProjectResults && (
+										<div className="text-center py-10 text-sm text-muted-foreground/60">
+											No matching projects
+										</div>
+									)}
+
+									{hasMoreProjects && (
+										<div
+											ref={projectLoadMoreRef}
+											className="h-8 border-t border-border/30"
+											aria-hidden="true"
+										/>
 									)}
 								</div>
 							)}

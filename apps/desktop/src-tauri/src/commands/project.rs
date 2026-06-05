@@ -84,7 +84,6 @@ pub async fn save_recent_project(project: Project) -> Result<(), String> {
 
     projects.retain(|p| p.path != project.path);
     projects.insert(0, project);
-    projects.truncate(10);
 
     let content = serde_json::to_string_pretty(&projects).map_err(|e| e.to_string())?;
 
