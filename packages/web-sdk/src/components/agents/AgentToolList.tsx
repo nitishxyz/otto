@@ -158,7 +158,9 @@ const ToolColumn = memo(function ToolColumn({
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [picking, setPicking] = useState(false);
 
-	const selected = tools.filter((t) => t.enabled);
+	const selected = tools
+		.filter((t) => t.enabled)
+		.sort((a, b) => Number(a.required ?? false) - Number(b.required ?? false));
 	const available = tools.filter((t) => !t.enabled);
 
 	const handleDrop = (e: React.DragEvent) => {
