@@ -256,7 +256,7 @@ export const configMixin = {
 	}> {
 		const response = await apiUpdateDefaults({
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
-			body: data as any,
+			body: { scope: 'global', ...data } as any,
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure

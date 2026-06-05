@@ -49,7 +49,7 @@ const defaultsUpdateBodySchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
-	scope: z.enum(['global', 'local']).optional().default('local'),
+	scope: z.enum(['global', 'local']).optional().default('global'),
 });
 
 const defaultsSchema = z.object({

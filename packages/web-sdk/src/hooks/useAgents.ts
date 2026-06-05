@@ -113,7 +113,7 @@ export function useSetDefaultAgent() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: (name: string) =>
-			apiClient.updateDefaults({ agent: name, scope: 'local' }),
+			apiClient.updateDefaults({ agent: name, scope: 'global' }),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ['config', 'agents'] });
 			void queryClient.invalidateQueries({ queryKey: ['config'] });
