@@ -1588,6 +1588,8 @@ export function useSessionStream(
 			const callId = getToolEventCallId(payload);
 			if (!callId) return;
 			const payloadName = getToolEventName(payload);
+			const payloadMessageId =
+				typeof payload?.messageId === 'string' ? payload.messageId : null;
 			const payloadStepIndex =
 				typeof payload?.stepIndex === 'number' ? payload.stepIndex : null;
 			const payloadResult = payload?.result;
@@ -1600,6 +1602,9 @@ export function useSessionStream(
 					let changed = false;
 					const now = Date.now();
 					const nextMessages = oldMessages.map((message) => {
+						if (payloadMessageId && message.id !== payloadMessageId) {
+							return message;
+						}
 						if (!message.parts?.length) return message;
 						let messageChanged = false;
 						const updatedParts = message.parts.map((part) => {

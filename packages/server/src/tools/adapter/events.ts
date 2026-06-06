@@ -77,7 +77,7 @@ export function publishToolResult(
 	publish({
 		type: 'tool.result',
 		sessionId: ctx.sessionId,
-		payload: { ...content, stepIndex },
+		payload: { ...content, stepIndex, messageId: ctx.messageId },
 	});
 }
 

@@ -15,6 +15,7 @@ const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
 const MAX_SCROLL_H = 140;
 const LIVE_TOOL_CONTENT_PREVIEW_CHARS = 8_000;
+const COMPLETE_SUMMARY_DELAY_MS = 120;
 
 function getPayload(part: MessagePart): Record<string, unknown> {
 	if (part.contentJson && typeof part.contentJson === 'object') {
@@ -249,7 +250,10 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 		}
 		if (showSummary) return;
 		if (!isComplete) return;
-		const t = window.setTimeout(() => setShowSummary(true), 500);
+		const t = window.setTimeout(
+			() => setShowSummary(true),
+			COMPLETE_SUMMARY_DELAY_MS,
+		);
 		return () => window.clearTimeout(t);
 	}, [isComplete, showSummary, latched]);
 

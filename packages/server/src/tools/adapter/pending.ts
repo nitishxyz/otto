@@ -3,6 +3,7 @@ export type PendingCallMeta = {
 	startTs: number;
 	stepIndex?: number;
 	args?: unknown;
+	hasPublishedDelta?: boolean;
 	approvalPromise?: Promise<boolean>;
 	blocked?: boolean;
 	blockReason?: string;

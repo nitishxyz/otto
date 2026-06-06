@@ -186,8 +186,20 @@ export function adaptTools(
 			async onInputDelta(options: unknown) {
 				const delta = (options as { inputTextDelta?: string } | undefined)
 					?.inputTextDelta;
-				const queue = pendingCalls.get(name);
-				const meta = queue?.length ? queue[queue.length - 1] : undefined;
+				const sdkCallId = extractToolCallId(options);
+				const queue = getPendingQueue(pendingCalls, name);
+				let meta = queue.length ? queue[queue.length - 1] : undefined;
+				if (!meta) {
+					meta = {
+						callId: sdkCallId || crypto.randomUUID(),
+						startTs: Date.now(),
+						stepIndex: ctx.stepIndex,
+					};
+					queue.push(meta);
+				}
+				if (sdkCallId && meta.callId !== sdkCallId && !meta.hasPublishedDelta) {
+					meta.callId = sdkCallId;
+				}
 				// Stream tool argument deltas as events if needed
 				publishToolDelta(ctx, {
 					name,
@@ -196,6 +208,7 @@ export function adaptTools(
 					stepIndex: meta?.stepIndex ?? ctx.stepIndex,
 					callId: meta?.callId,
 				});
+				meta.hasPublishedDelta = true;
 				if (typeof base.onInputDelta === 'function')
 					// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
 					await base.onInputDelta(options as any);
@@ -213,7 +226,7 @@ export function adaptTools(
 					};
 					queue.push(meta);
 				}
-				if (sdkCallId && meta.callId !== sdkCallId) {
+				if (sdkCallId && meta.callId !== sdkCallId && !meta.hasPublishedDelta) {
 					meta.callId = sdkCallId;
 				}
 				meta.stepIndex = ctx.stepIndex;
