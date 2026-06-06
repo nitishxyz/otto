@@ -4,6 +4,7 @@ import { Moon, Sun } from 'lucide-react';
 import { usePreferences, type Theme } from '@ottocode/web-sdk/hooks';
 import {
 	BrowserPanelToggle,
+	BtwFloatingChat,
 	Button,
 	ConfirmationDialog,
 	AgentsManagerModal,
@@ -469,6 +470,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 			<ConfirmationDialog />
 			<AgentsManagerModal />
 			<QuickFilePicker />
+			<BtwFloatingChat />
 			{dashboardOpen && <UsageDashboard onBack={onCloseDashboard} />}
 		</div>
 	);

@@ -10,6 +10,7 @@ import {
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useBtwStore } from '../../stores/btwStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import {
 	NEW_SESSION_FILE_SELECTIONS_KEY,
@@ -165,6 +166,12 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	onClose,
 }: FileViewerPanelProps = {}) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const latestAnchorRectRef = useRef<{
+		top: number;
+		left: number;
+		bottom: number;
+		right: number;
+	} | null>(null);
 	const [selectionToolbar, setSelectionToolbar] =
 		useState<SelectionToolbarState | null>(null);
 	const storeIsViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
@@ -199,6 +206,23 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		return () => document.removeEventListener('keydown', handleEscape);
 	}, [isViewerOpen, closeViewer]);
 
+	const openBtwForActiveSelection = useCallback(() => {
+		if (!isViewerOpen || !selectedFile) return;
+
+		const selection = useFileSelectionStore.getState().activeSelection;
+		if (!selection || selection.filePath !== selectedFile) {
+			toast.error('Select text in the file viewer first');
+			return;
+		}
+
+		useBtwStore.getState().open({
+			selection,
+			parentSessionId: useGitStore.getState().activeSessionId,
+			anchorRect: latestAnchorRectRef.current,
+		});
+		setSelectionToolbar(null);
+	}, [isViewerOpen, selectedFile]);
+
 	const attachActiveSelection = useCallback(() => {
 		if (!isViewerOpen || !selectedFile) return;
 
@@ -225,6 +249,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			if (!selectedFile || !selection) {
 				setActiveSelection(null);
 				setSelectionToolbar(null);
+				latestAnchorRectRef.current = null;
 				return;
 			}
 
@@ -233,10 +258,12 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 
 			if (!selection.anchorRect) {
 				setSelectionToolbar(null);
+				latestAnchorRectRef.current = null;
 				return;
 			}
+			latestAnchorRectRef.current = selection.anchorRect;
 
-			const toolbarWidth = 72;
+			const toolbarWidth = 230;
 			setSelectionToolbar({
 				top: Math.max(8, selection.anchorRect.top - 44),
 				left: Math.max(
@@ -272,6 +299,26 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		document.addEventListener('keydown', handleAttachSelection);
 		return () => document.removeEventListener('keydown', handleAttachSelection);
 	}, [attachActiveSelection, isViewerOpen, selectedFile]);
+
+	useEffect(() => {
+		const handleOpenBtw = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			const isInInput =
+				target?.tagName === 'INPUT' ||
+				target?.tagName === 'TEXTAREA' ||
+				target?.isContentEditable;
+
+			if (isInInput || event.key.toLowerCase() !== 'k') return;
+			if (!event.metaKey && !event.ctrlKey) return;
+			if (!isViewerOpen || !selectedFile) return;
+
+			event.preventDefault();
+			openBtwForActiveSelection();
+		};
+
+		document.addEventListener('keydown', handleOpenBtw);
+		return () => document.removeEventListener('keydown', handleOpenBtw);
+	}, [isViewerOpen, openBtwForActiveSelection, selectedFile]);
 
 	const effectiveHighlight =
 		patchPreview || writePreview ? undefined : highlight;
@@ -479,7 +526,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 				<div
 					role="toolbar"
 					aria-label="Selection actions"
-					className="fixed z-[80] rounded-xl border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur"
+					className="fixed z-[80] flex items-center gap-1 rounded-xl border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur"
 					style={{
 						top: selectionToolbar.top,
 						left: selectionToolbar.left,
@@ -495,6 +542,17 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 						<span>Add to Chat</span>
 						<kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
 							⌘I
+						</kbd>
+					</button>
+					<button
+						type="button"
+						onClick={openBtwForActiveSelection}
+						className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+						title="Ask BTW about selected text"
+					>
+						<span>BTW</span>
+						<kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+							⌘K
 						</kbd>
 					</button>
 				</div>

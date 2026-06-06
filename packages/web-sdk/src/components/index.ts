@@ -22,6 +22,9 @@ export * from './chat/DictationInstallPrompt';
 export * from './chat/StopButton';
 export * from './chat/NewSessionLanding';
 
+// BTW Components
+export * from './btw/BtwFloatingChat';
+
 // Message Components
 export * from './messages/MessageThread';
 export * from './messages/MessageThreadContainer';

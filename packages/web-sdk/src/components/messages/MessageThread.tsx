@@ -38,6 +38,7 @@ interface MessageThreadProps {
 	compact?: boolean;
 	disableAutoScroll?: boolean;
 	onSelectSession?: (sessionId: string) => void;
+	footerBottomPaddingClass?: string;
 }
 
 const TODO_TOOL_NAMES = new Set([
@@ -443,6 +444,7 @@ export const MessageThread = memo(function MessageThread({
 	compact = false,
 	disableAutoScroll = false,
 	onSelectSession,
+	footerBottomPaddingClass: footerBottomPaddingClassOverride,
 }: MessageThreadProps) {
 	const queryClient = useQueryClient();
 	const { preferences } = usePreferences();
@@ -677,7 +679,8 @@ export const MessageThread = memo(function MessageThread({
 	const firstRowTopClass =
 		density === 'compact' ? 'pt-3' : compact ? 'pt-4' : 'pt-6';
 	const footerBottomPaddingClass =
-		density === 'compact' || compact ? 'pb-80' : 'pb-96';
+		footerBottomPaddingClassOverride ??
+		(density === 'compact' || compact ? 'pb-80' : 'pb-96');
 	const virtuosoContext = useMemo<ThreadVirtuosoContext>(
 		() => ({
 			session,

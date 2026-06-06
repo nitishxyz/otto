@@ -21,6 +21,8 @@ type CreateSessionInput = {
 	provider: ProviderId;
 	model: string;
 	title?: string | null;
+	parentSessionId?: string | null;
+	sessionType?: 'main' | 'branch' | 'handoff' | 'research' | 'btw';
 };
 
 export async function createSession({
@@ -30,6 +32,8 @@ export async function createSession({
 	provider,
 	model,
 	title,
+	parentSessionId,
+	sessionType = 'main',
 }: CreateSessionInput): Promise<SessionRow> {
 	validateProviderModel(provider, model, cfg);
 	const authorized = await isProviderAuthorized(cfg, provider);
@@ -62,9 +66,9 @@ export async function createSession({
 		currentContextTokens: null,
 		contextSummary: null,
 		lastCompactedAt: null,
-		parentSessionId: null,
+		parentSessionId: parentSessionId ?? null,
 		branchPointMessageId: null,
-		sessionType: 'main',
+		sessionType,
 	};
 	await db.insert(sessions).values(row);
 	publish({ type: 'session.created', sessionId: id, payload: row });
@@ -126,8 +130,12 @@ export async function listSessions({
 				? and(
 						eq(sessions.projectPath, projectPath),
 						ne(sessions.sessionType, 'research'),
+						ne(sessions.sessionType, 'btw'),
 					)
-				: ne(sessions.sessionType, 'research'),
+				: and(
+						ne(sessions.sessionType, 'research'),
+						ne(sessions.sessionType, 'btw'),
+					),
 		)
 		.orderBy(
 			desc(sql`${sessions.pinnedAt} IS NOT NULL`),

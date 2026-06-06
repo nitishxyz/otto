@@ -9,6 +9,7 @@ import {
 	Trash2,
 	RotateCcw,
 	FlaskConical,
+	Code2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +18,7 @@ import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { useQueueStore } from '../../stores/queueStore';
 import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
+import { parseFileSelections } from '../../lib/fileSelectionContext';
 import { linkifyExplicitSkillMentions } from '../../lib/skillMentions';
 import { useSkills } from '../../hooks/useSkills';
 import { useSkillsStore } from '../../stores/skillsStore';
@@ -85,8 +87,12 @@ export const UserMessageGroup = memo(
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
 			parseResearchContext(rawContent);
+		const {
+			fileSelections: parsedFileSelections,
+			cleanContent: contentAfterFileSelections,
+		} = parseFileSelections(content);
 		const renderedContent = linkifyExplicitSkillMentions(
-			content,
+			contentAfterFileSelections,
 			skillsConfig?.items ?? [],
 		);
 
@@ -133,12 +139,19 @@ export const UserMessageGroup = memo(
 			});
 		};
 
-		const hasContent = content.trim().length > 0;
+		const hasContent = contentAfterFileSelections.trim().length > 0;
 		const hasImages = images.length > 0;
 		const hasFiles = files.length > 0;
 		const hasResearchContexts = parsedResearchContexts.length > 0;
+		const hasFileSelections = parsedFileSelections.length > 0;
 
-		if (!hasContent && !hasImages && !hasFiles && !hasResearchContexts)
+		if (
+			!hasContent &&
+			!hasImages &&
+			!hasFiles &&
+			!hasResearchContexts &&
+			!hasFileSelections
+		)
 			return null;
 
 		if (isQueued) return null;
@@ -254,6 +267,22 @@ export const UserMessageGroup = memo(
 												<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
 												<span className="text-xs text-teal-600 dark:text-teal-400">
 													{ctx.label}
+												</span>
+											</div>
+										))}
+									</div>
+								)}
+								{hasFileSelections && (
+									<div className="flex flex-wrap gap-2 mb-2">
+										{parsedFileSelections.map((sel) => (
+											<div
+												key={sel.id}
+												className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 max-w-[260px]"
+												title={sel.text}
+											>
+												<Code2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
+												<span className="text-xs truncate font-mono text-blue-600 dark:text-blue-400">
+													{sel.label}
 												</span>
 											</div>
 										))}

@@ -32,6 +32,7 @@ import {
 	QuickFilePicker,
 	ResizeHandle,
 	ViewerTabs,
+	BtwFloatingChat,
 } from '@ottocode/web-sdk/components';
 import {
 	useGitStore,
@@ -326,6 +327,7 @@ export const AppLayout = memo(function AppLayout({
 			<ConfirmationDialog />
 			<AgentsManagerModal />
 			<QuickFilePicker />
+			<BtwFloatingChat />
 		</div>
 	);
 });

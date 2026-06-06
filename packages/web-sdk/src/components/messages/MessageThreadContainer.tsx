@@ -11,11 +11,13 @@ import { OttoRouterTopupModal } from '../settings/OttoRouterTopupModal';
 interface MessageThreadContainerProps {
 	sessionId: string;
 	onSelectSession?: (sessionId: string) => void;
+	footerBottomPaddingClass?: string;
 }
 
 export const MessageThreadContainer = memo(function MessageThreadContainer({
 	sessionId,
 	onSelectSession,
+	footerBottomPaddingClass,
 }: MessageThreadContainerProps) {
 	return (
 		<>
@@ -24,6 +26,7 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 			<MessageThreadData
 				sessionId={sessionId}
 				onSelectSession={onSelectSession}
+				footerBottomPaddingClass={footerBottomPaddingClass}
 			/>
 			<TopupModalHost />
 		</>
@@ -56,6 +59,7 @@ function TopupModalHost() {
 const MessageThreadData = memo(function MessageThreadData({
 	sessionId,
 	onSelectSession,
+	footerBottomPaddingClass,
 }: MessageThreadContainerProps) {
 	const { data: messages = [], isLoading } = useMessages(sessionId);
 	const { data: sessions = [] } = useSessions();
@@ -88,6 +92,7 @@ const MessageThreadData = memo(function MessageThreadData({
 			isGenerating={isGenerating}
 			compact={preferences.compactThread}
 			onSelectSession={onSelectSession}
+			footerBottomPaddingClass={footerBottomPaddingClass}
 		/>
 	);
 });

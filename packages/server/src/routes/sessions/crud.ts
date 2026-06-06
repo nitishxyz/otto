@@ -39,7 +39,7 @@ const sessionSchema = z
 		lastCompactedAt: z.number().nullable().optional(),
 		parentSessionId: z.string().nullable().optional(),
 		branchPointMessageId: z.string().nullable().optional(),
-		sessionType: z.enum(['main', 'branch', 'handoff']).optional(),
+		sessionType: z.enum(['main', 'branch', 'handoff', 'btw']).optional(),
 		toolCounts: z.record(z.string(), z.number()).optional(),
 		isRunning: z.boolean().optional(),
 		fileStats: z
@@ -110,6 +110,8 @@ const createSessionBodySchema = z.object({
 		description:
 			'Model override. If omitted, selected agent model override, then config default are used.',
 	}),
+	parentSessionId: z.string().nullable().optional(),
+	sessionType: z.enum(['main', 'btw']).optional(),
 });
 
 const updateSessionBodySchema = z.object({
@@ -166,6 +168,7 @@ export function registerSessionCrudRoutes(app: Hono) {
 					and(
 						eq(sessions.projectPath, cfg.projectRoot),
 						ne(sessions.sessionType, 'research'),
+						ne(sessions.sessionType, 'btw'),
 					),
 				)
 				.orderBy(
@@ -254,6 +257,9 @@ export function registerSessionCrudRoutes(app: Hono) {
 					provider,
 					model,
 					title: (body.title as string | null | undefined) ?? null,
+					parentSessionId:
+						(body.parentSessionId as string | null | undefined) ?? null,
+					sessionType: body.sessionType === 'btw' ? 'btw' : 'main',
 				});
 				return c.json(row, 201);
 			} catch (err) {
