@@ -18,6 +18,7 @@ export * from './panelWidthStore';
 export * from './tunnelStore';
 export * from './usageStore';
 export * from './fileBrowserStore';
+export * from './fileSelectionStore';
 export * from './mcpStore';
 export * from './skillsStore';
 export * from './agentsStore';

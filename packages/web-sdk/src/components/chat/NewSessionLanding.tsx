@@ -11,10 +11,15 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useConfig, useAllModels } from '../../hooks/useConfig';
 import { useFileUpload } from '../../hooks/useFileUpload';
+import {
+	NEW_SESSION_FILE_SELECTIONS_KEY,
+	useFileSelectionStore,
+} from '../../stores/fileSelectionStore';
 import { toast } from '../../stores/toastStore';
 import { ChatInput } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
 import { apiClient } from '../../lib/api-client';
+import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { sessionsQueryKey } from '../../hooks/useSessions';
 import type { Session } from '../../types/api';
 
@@ -95,6 +100,31 @@ export const NewSessionLanding = memo(
 				supportsFileAttachments: !!modelSupportsAttachment,
 				onError: toast.error,
 			});
+			const pendingFileSelectionsMap = useFileSelectionStore(
+				(state) => state.pendingSelections,
+			);
+			const removeFileSelection = useFileSelectionStore(
+				(state) => state.removeSelectionFromSession,
+			);
+			const clearFileSelections = useFileSelectionStore(
+				(state) => state.clearSelections,
+			);
+			const pendingFileSelections =
+				pendingFileSelectionsMap.get(NEW_SESSION_FILE_SELECTIONS_KEY) ?? [];
+			const fileSelectionContexts = useMemo(
+				() =>
+					pendingFileSelections.map((selection) => ({
+						id: selection.id,
+						label: selection.label,
+					})),
+				[pendingFileSelections],
+			);
+			const handleFileSelectionContextRemove = useCallback(
+				(selectionId: string) => {
+					removeFileSelection(NEW_SESSION_FILE_SELECTIONS_KEY, selectionId);
+				},
+				[removeFileSelection],
+			);
 
 			useImperativeHandle(ref, () => ({
 				focus: () => {
@@ -197,8 +227,17 @@ export const NewSessionLanding = memo(
 									}))
 								: undefined;
 
+						const fileSelectionCtxs = useFileSelectionStore
+							.getState()
+							.getSelections(NEW_SESSION_FILE_SELECTIONS_KEY);
+						const fileSelectionPrefix =
+							formatFileSelectionsForMessage(fileSelectionCtxs);
+						const finalContent = [fileSelectionPrefix, content]
+							.filter(Boolean)
+							.join('\n\n');
+
 						await apiClient.sendMessage(session.id, {
-							content,
+							content: finalContent,
 							files: fileData,
 							agent: agent || undefined,
 							provider: provider || undefined,
@@ -210,6 +249,7 @@ export const NewSessionLanding = memo(
 						});
 
 						clearFiles();
+						clearFileSelections(NEW_SESSION_FILE_SELECTIONS_KEY);
 						pendingSessionIdRef.current = session.id;
 						setTransitioning(true);
 						setTimeout(() => {
@@ -235,6 +275,7 @@ export const NewSessionLanding = memo(
 					images,
 					documents,
 					clearFiles,
+					clearFileSelections,
 					onSessionCreated,
 					queryClient,
 					modelSupportsReasoning,
@@ -305,6 +346,8 @@ export const NewSessionLanding = memo(
 								isCustomProvider={isCustomProvider}
 								authType={providerAuthType}
 								isFreeModel={modelIsFree}
+								fileSelectionContexts={fileSelectionContexts}
+								onFileSelectionContextRemove={handleFileSelectionContextRemove}
 								onConfigClick={handleToggleConfig}
 								onModelInfoClick={() => {
 									setConfigFocusTarget('model');

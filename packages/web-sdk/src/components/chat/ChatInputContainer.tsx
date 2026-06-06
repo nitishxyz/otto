@@ -22,7 +22,9 @@ import { useGitStore } from '../../stores/gitStore';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { useQueueStore } from '../../stores/queueStore';
 import { usePendingResearchStore } from '../../stores/pendingResearchStore';
+import { useFileSelectionStore } from '../../stores/fileSelectionStore';
 import { formatResearchContextForMessage } from '../../lib/parseResearchContext';
+import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { toast } from '../../stores/toastStore';
 import { useToastStore } from '../../stores/toastStore';
 import { apiClient } from '../../lib/api-client';
@@ -124,14 +126,25 @@ export const ChatInputContainer = memo(
 			const pendingContextsMap = usePendingResearchStore(
 				(state) => state.pendingContexts,
 			);
+			const pendingFileSelectionsMap = useFileSelectionStore(
+				(state) => state.pendingSelections,
+			);
 			const removeResearchContext = usePendingResearchStore(
 				(state) => state.removeContext,
 			);
 			const consumeResearchContexts = usePendingResearchStore(
 				(state) => state.consumeContexts,
 			);
+			const removeFileSelection = useFileSelectionStore(
+				(state) => state.removeSelectionFromSession,
+			);
+			const clearFileSelections = useFileSelectionStore(
+				(state) => state.clearSelections,
+			);
 
 			const pendingResearchContexts = pendingContextsMap.get(sessionId) || [];
+			const pendingFileSelections =
+				pendingFileSelectionsMap.get(sessionId) || [];
 
 			const researchContexts = useMemo(
 				() =>
@@ -142,11 +155,27 @@ export const ChatInputContainer = memo(
 				[pendingResearchContexts],
 			);
 
+			const fileSelectionContexts = useMemo(
+				() =>
+					pendingFileSelections.map((selection) => ({
+						id: selection.id,
+						label: selection.label,
+					})),
+				[pendingFileSelections],
+			);
+
 			const handleResearchContextRemove = useCallback(
 				(contextId: string) => {
 					removeResearchContext(sessionId, contextId);
 				},
 				[sessionId, removeResearchContext],
+			);
+
+			const handleFileSelectionContextRemove = useCallback(
+				(selectionId: string) => {
+					removeFileSelection(sessionId, selectionId);
+				},
+				[sessionId, removeFileSelection],
 			);
 
 			const providerAuthType = allModels?.[provider]?.authType;
@@ -212,9 +241,14 @@ export const ChatInputContainer = memo(
 						const researchCtxs = consumeResearchContexts(sessionId);
 						const researchPrefix =
 							formatResearchContextForMessage(researchCtxs);
-						const finalContent = researchPrefix
-							? `${researchPrefix}\n\n${content}`
-							: content;
+						const fileSelectionCtxs = useFileSelectionStore
+							.getState()
+							.getSelections(sessionId);
+						const fileSelectionPrefix =
+							formatFileSelectionsForMessage(fileSelectionCtxs);
+						const finalContent = [fileSelectionPrefix, researchPrefix, content]
+							.filter(Boolean)
+							.join('\n\n');
 
 						const fileData =
 							allAttachments.length > 0
@@ -250,6 +284,7 @@ export const ChatInputContainer = memo(
 						});
 
 						clearFiles();
+						clearFileSelections(sessionId);
 					} catch (error) {
 						console.error('Failed to send message:', error);
 					}
@@ -265,6 +300,7 @@ export const ChatInputContainer = memo(
 					userContext,
 					sessionId,
 					consumeResearchContexts,
+					clearFileSelections,
 					config?.defaults?.reasoningLevel,
 					config?.defaults?.reasoningText,
 					modelSupportsReasoning,
@@ -536,6 +572,8 @@ export const ChatInputContainer = memo(
 							isFreeModel={modelIsFree}
 							researchContexts={researchContexts}
 							onResearchContextRemove={handleResearchContextRemove}
+							fileSelectionContexts={fileSelectionContexts}
+							onFileSelectionContextRemove={handleFileSelectionContextRemove}
 							onModelInfoClick={openModelConfig}
 							agent={agent}
 							agents={config?.agents}

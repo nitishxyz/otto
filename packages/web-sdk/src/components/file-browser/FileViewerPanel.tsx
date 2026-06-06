@@ -1,14 +1,21 @@
 import {
 	memo,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
+	useState,
 	type ComponentPropsWithoutRef,
 } from 'react';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
+import {
+	NEW_SESSION_FILE_SELECTIONS_KEY,
+	useFileSelectionStore,
+} from '../../stores/fileSelectionStore';
+import { useGitStore } from '../../stores/gitStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import type {
 	ToolActivityAnnotation,
@@ -16,6 +23,8 @@ import type {
 	ToolPatchPreview,
 	ToolWritePreview,
 } from '../../stores/viewerTabsStore';
+import type { CodeMirrorTextSelection } from '../../lib/fileSelectionContext';
+import { createFileSelectionContext } from '../../lib/fileSelectionContext';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import { Button } from '../ui/Button';
 import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
@@ -27,6 +36,7 @@ import {
 	normalizeChangeCount,
 } from '../workspace/ViewerStatusBar';
 import { getBaseUrl } from '../../lib/api-client/utils';
+import { toast } from '../../stores/toastStore';
 
 const IMAGE_EXTENSIONS = new Set([
 	'avif',
@@ -139,6 +149,11 @@ interface FileViewerPanelProps {
 	onClose?: () => void;
 }
 
+interface SelectionToolbarState {
+	top: number;
+	left: number;
+}
+
 export const FileViewerPanel = memo(function FileViewerPanel({
 	mode = 'overlay',
 	open,
@@ -150,9 +165,12 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 	onClose,
 }: FileViewerPanelProps = {}) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const [selectionToolbar, setSelectionToolbar] =
+		useState<SelectionToolbarState | null>(null);
 	const storeIsViewerOpen = useFileBrowserStore((s) => s.isViewerOpen);
 	const storeSelectedFile = useFileBrowserStore((s) => s.selectedFile);
 	const storeCloseViewer = useFileBrowserStore((s) => s.closeViewer);
+	const setActiveSelection = useFileSelectionStore((s) => s.setActiveSelection);
 	const isViewerOpen = open ?? storeIsViewerOpen;
 	const selectedFile = file ?? storeSelectedFile;
 	const closeViewer = onClose ?? storeCloseViewer;
@@ -180,6 +198,80 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 		document.addEventListener('keydown', handleEscape);
 		return () => document.removeEventListener('keydown', handleEscape);
 	}, [isViewerOpen, closeViewer]);
+
+	const attachActiveSelection = useCallback(() => {
+		if (!isViewerOpen || !selectedFile) return;
+
+		const selectionState = useFileSelectionStore.getState();
+		const selection = selectionState.activeSelection;
+		if (!selection || selection.filePath !== selectedFile) {
+			toast.error('Select text in the file viewer first');
+			return;
+		}
+
+		const sessionId =
+			useGitStore.getState().activeSessionId ?? NEW_SESSION_FILE_SELECTIONS_KEY;
+
+		selectionState.attachSelectionToSession(sessionId, selection);
+		setSelectionToolbar(null);
+		toast.success(`Attached ${selection.label}`);
+		window.setTimeout(() => {
+			document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+		}, 0);
+	}, [isViewerOpen, selectedFile]);
+
+	const handleSelectionChange = useCallback(
+		(selection: CodeMirrorTextSelection | null) => {
+			if (!selectedFile || !selection) {
+				setActiveSelection(null);
+				setSelectionToolbar(null);
+				return;
+			}
+
+			const fileSelection = createFileSelectionContext(selectedFile, selection);
+			setActiveSelection(fileSelection);
+
+			if (!selection.anchorRect) {
+				setSelectionToolbar(null);
+				return;
+			}
+
+			const toolbarWidth = 72;
+			setSelectionToolbar({
+				top: Math.max(8, selection.anchorRect.top - 44),
+				left: Math.max(
+					8,
+					Math.min(
+						window.innerWidth - toolbarWidth - 8,
+						(selection.anchorRect.left + selection.anchorRect.right) / 2 -
+							toolbarWidth / 2,
+					),
+				),
+			});
+		},
+		[selectedFile, setActiveSelection],
+	);
+
+	useEffect(() => {
+		const handleAttachSelection = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			const isInInput =
+				target?.tagName === 'INPUT' ||
+				target?.tagName === 'TEXTAREA' ||
+				target?.isContentEditable;
+
+			if (isInInput || event.key.toLowerCase() !== 'i') return;
+			if (!event.metaKey && !event.ctrlKey) return;
+			if (!isViewerOpen || !selectedFile) return;
+
+			event.preventDefault();
+
+			attachActiveSelection();
+		};
+
+		document.addEventListener('keydown', handleAttachSelection);
+		return () => document.removeEventListener('keydown', handleAttachSelection);
+	}, [attachActiveSelection, isViewerOpen, selectedFile]);
 
 	const effectiveHighlight =
 		patchPreview || writePreview ? undefined : highlight;
@@ -248,6 +340,16 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			error: patchPreview.error,
 		});
 	}, [selectedFile, data?.content, patchPreview, livePatchPreview]);
+
+	useEffect(() => {
+		if (!selectedFile) return;
+		setActiveSelection(null);
+		setSelectionToolbar(null);
+		return () => {
+			setActiveSelection(null);
+			setSelectionToolbar(null);
+		};
+	}, [selectedFile, setActiveSelection]);
 
 	useEffect(() => {
 		if (!data || !effectiveHighlight?.startLine) return;
@@ -373,6 +475,30 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 					: 'absolute inset-0 bg-background z-50 flex flex-col animate-in slide-in-from-left duration-300'
 			}
 		>
+			{selectionToolbar ? (
+				<div
+					role="toolbar"
+					aria-label="Selection actions"
+					className="fixed z-[80] rounded-xl border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur"
+					style={{
+						top: selectionToolbar.top,
+						left: selectionToolbar.left,
+					}}
+					onMouseDown={(event) => event.preventDefault()}
+				>
+					<button
+						type="button"
+						onClick={attachActiveSelection}
+						className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+						title="Attach selected text to current chat"
+					>
+						<span>Add to Chat</span>
+						<kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+							⌘I
+						</kbd>
+					</button>
+				</div>
+			) : null}
 			{mode !== 'pane' && (
 				<div className="h-12 border-b border-sidebar-border px-2.5 flex items-center gap-2 shrink-0 bg-sidebar-accent/40">
 					<Button
@@ -483,6 +609,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 							lineTones={persistentLineTones}
 							scrollToLine={scrollToHighlightLine}
 							disableMarkdownSyntax={isMarkdownFile(selectedFile)}
+							onSelectionChange={handleSelectionChange}
 						/>
 					)
 				) : (

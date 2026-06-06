@@ -32,6 +32,7 @@ import {
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { CodeMirrorTextSelection } from '../../lib/fileSelectionContext';
 
 export type CodeMirrorLineTone = 'add' | 'remove' | 'primary';
 type CodeMirrorLineNumberFormatter = (lineNumber: number) => string;
@@ -47,6 +48,7 @@ interface CodeMirrorViewerProps {
 	scrollToEndSignal?: string | number;
 	disableMarkdownSyntax?: boolean;
 	lineNumberFormatter?: CodeMirrorLineNumberFormatter;
+	onSelectionChange?: (selection: CodeMirrorTextSelection | null) => void;
 }
 
 const viewerTheme = EditorView.theme({
@@ -298,6 +300,53 @@ function lineNumbersExtension(
 	return lineNumbers({ formatNumber: lineNumberFormatter });
 }
 
+function getTextSelection(view: EditorView): CodeMirrorTextSelection | null {
+	const { state } = view;
+	const range = state.selection.main;
+	if (range.empty) return null;
+
+	const from = Math.min(range.from, range.to);
+	const to = Math.max(range.from, range.to);
+	const startLine = state.doc.lineAt(from);
+	const endLine = state.doc.lineAt(to);
+	const text = state.doc.sliceString(from, to);
+	if (!text) return null;
+	const fromCoords = view.coordsAtPos(from);
+	const toCoords = view.coordsAtPos(to);
+	const anchorRect =
+		fromCoords || toCoords
+			? {
+					top: Math.min(
+						fromCoords?.top ?? toCoords?.top ?? 0,
+						toCoords?.top ?? fromCoords?.top ?? 0,
+					),
+					left: Math.min(
+						fromCoords?.left ?? toCoords?.left ?? 0,
+						toCoords?.left ?? fromCoords?.left ?? 0,
+					),
+					bottom: Math.max(
+						fromCoords?.bottom ?? toCoords?.bottom ?? 0,
+						toCoords?.bottom ?? fromCoords?.bottom ?? 0,
+					),
+					right: Math.max(
+						fromCoords?.right ?? toCoords?.right ?? 0,
+						toCoords?.right ?? fromCoords?.right ?? 0,
+					),
+				}
+			: undefined;
+
+	return {
+		from,
+		to,
+		startLine: startLine.number,
+		startColumn: from - startLine.from + 1,
+		endLine: endLine.number,
+		endColumn: to - endLine.from + 1,
+		text,
+		anchorRect,
+	};
+}
+
 export function CodeMirrorViewer({
 	content,
 	path,
@@ -309,16 +358,24 @@ export function CodeMirrorViewer({
 	scrollToEndSignal,
 	disableMarkdownSyntax = false,
 	lineNumberFormatter,
+	onSelectionChange,
 }: CodeMirrorViewerProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const contentRef = useRef(content);
+	const onSelectionChangeRef = useRef(onSelectionChange);
 	const lineNumbersCompartmentRef = useRef(new Compartment());
 	const languageCompartmentRef = useRef(new Compartment());
 	const decorationsCompartmentRef = useRef(new Compartment());
+	const selectionCompartmentRef = useRef(new Compartment());
 	const lineNumbersExtensionRef = useRef<Extension>([]);
 	const languageExtensionRef = useRef<Extension>([]);
 	const decorationsExtensionRef = useRef<Extension>([]);
+	const selectionExtensionRef = useRef<Extension>([]);
+
+	useEffect(() => {
+		onSelectionChangeRef.current = onSelectionChange;
+	}, [onSelectionChange]);
 
 	const lineNumberExtension = useMemo(
 		() => lineNumbersExtension(lineNumberFormatter),
@@ -332,9 +389,18 @@ export function CodeMirrorViewer({
 		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
 		[highlightedLines, highlightTone, lineTones],
 	);
+	const selectionExtension = useMemo(
+		() =>
+			EditorView.updateListener.of((update) => {
+				if (!update.selectionSet && !update.docChanged) return;
+				onSelectionChangeRef.current?.(getTextSelection(update.view));
+			}),
+		[],
+	);
 	lineNumbersExtensionRef.current = lineNumberExtension;
 	languageExtensionRef.current = languageExtension;
 	decorationsExtensionRef.current = decorationsExtension;
+	selectionExtensionRef.current = selectionExtension;
 	const createEditorState = useCallback(
 		(doc: string) =>
 			EditorState.create({
@@ -347,9 +413,15 @@ export function CodeMirrorViewer({
 					syntaxHighlighting(syntaxTheme, { fallback: true }),
 					languageCompartmentRef.current.of(languageExtension),
 					decorationsCompartmentRef.current.of(decorationsExtension),
+					selectionCompartmentRef.current.of(selectionExtension),
 				],
 			}),
-		[lineNumberExtension, languageExtension, decorationsExtension],
+		[
+			lineNumberExtension,
+			languageExtension,
+			decorationsExtension,
+			selectionExtension,
+		],
 	);
 
 	useEffect(() => {
@@ -369,6 +441,7 @@ export function CodeMirrorViewer({
 					syntaxHighlighting(syntaxTheme, { fallback: true }),
 					languageCompartmentRef.current.of(languageExtensionRef.current),
 					decorationsCompartmentRef.current.of(decorationsExtensionRef.current),
+					selectionCompartmentRef.current.of(selectionExtensionRef.current),
 				],
 			}),
 		});

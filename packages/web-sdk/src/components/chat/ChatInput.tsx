@@ -18,6 +18,7 @@ import {
 	Brain,
 	FileText,
 	FileIcon,
+	Code2,
 	FlaskConical,
 	ChevronUp,
 	Mic,
@@ -107,6 +108,8 @@ interface ChatInputProps {
 	isFreeModel?: boolean;
 	researchContexts?: Array<{ id: string; label: string }>;
 	onResearchContextRemove?: (id: string) => void;
+	fileSelectionContexts?: Array<{ id: string; label: string }>;
+	onFileSelectionContextRemove?: (id: string) => void;
 	onModelInfoClick?: () => void;
 	agent?: string;
 	agents?: string[];
@@ -141,6 +144,8 @@ export const ChatInput = memo(
 			isFreeModel,
 			researchContexts = [],
 			onResearchContextRemove,
+			fileSelectionContexts = [],
+			onFileSelectionContextRemove,
 			onModelInfoClick,
 			agent,
 			agents = [],
@@ -835,6 +840,11 @@ export const ChatInput = memo(
 										onRemove={onResearchContextRemove}
 									/>
 
+									<FileSelectionContextChips
+										contexts={fileSelectionContexts}
+										onRemove={onFileSelectionContextRemove}
+									/>
+
 									<div className="flex items-end gap-1">
 										{onConfigClick && (
 											<button
@@ -1299,6 +1309,62 @@ const ResearchContextChip = memo(function ResearchContextChip({
 		<div className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 border border-teal-500/30 max-w-[200px]">
 			<FlaskConical className="w-4 h-4 text-teal-500 flex-shrink-0" />
 			<span className="text-xs truncate text-teal-600 dark:text-teal-400">
+				{context.label}
+			</span>
+			{onRemove && (
+				<button
+					type="button"
+					onClick={handleRemove}
+					className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-md opacity-0 group-hover:opacity-100 transition-opacity"
+				>
+					<X className="w-3 h-3 text-white" />
+				</button>
+			)}
+		</div>
+	);
+});
+
+interface FileSelectionContextChipsProps {
+	contexts: Array<{ id: string; label: string }>;
+	onRemove?: (id: string) => void;
+}
+
+const FileSelectionContextChips = memo(function FileSelectionContextChips({
+	contexts,
+	onRemove,
+}: FileSelectionContextChipsProps) {
+	if (contexts.length === 0) return null;
+
+	return (
+		<div className="flex flex-wrap gap-2 px-3 pt-2 pb-1">
+			{contexts.map((context) => (
+				<FileSelectionContextChip
+					key={context.id}
+					context={context}
+					onRemove={onRemove}
+				/>
+			))}
+		</div>
+	);
+});
+
+interface FileSelectionContextChipProps {
+	context: { id: string; label: string };
+	onRemove?: (id: string) => void;
+}
+
+const FileSelectionContextChip = memo(function FileSelectionContextChip({
+	context,
+	onRemove,
+}: FileSelectionContextChipProps) {
+	const handleRemove = useCallback(() => {
+		onRemove?.(context.id);
+	}, [context.id, onRemove]);
+
+	return (
+		<div className="relative group flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 max-w-[240px]">
+			<Code2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
+			<span className="text-xs truncate font-mono text-blue-600 dark:text-blue-400">
 				{context.label}
 			</span>
 			{onRemove && (

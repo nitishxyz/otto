@@ -54,6 +54,13 @@ otto web interface supports vim-style keyboard shortcuts for efficient navigatio
 - **Diff preview** - Automatically shown when file is focused (no need to press Enter)
 - **Space** - Also shows diff when toggling stage/unstage
 
+### File Viewer
+
+- **Cmd+I / Ctrl+I** - Attach selected file text to the current chat input
+  - Select text in a file viewer first
+  - Adds a removable file-range context chip to the current session composer
+  - Sends the selected text and path/range metadata with the next message
+
 ## Visual Indicators
 
 - Focused items show a blue ring highlight
