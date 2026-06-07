@@ -18,7 +18,9 @@ import {
 import type { Message, MessagePart } from '../../types/api';
 import { MessagePartItem } from './MessagePartItem';
 import { CompactActivityGroup } from './CompactActivityGroup';
+import { CompactionSummaryBox } from './CompactionSummaryBox';
 import { ActionToolBox } from './ActionToolBox';
+import { shouldRenderCompactionSummaryBox } from './compactionSummary';
 import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { BranchModal } from '../branch/BranchModal';
 import { ProviderLogo } from '../common/ProviderLogo';
@@ -45,6 +47,7 @@ interface AssistantMessageGroupProps {
 	onRetry?: () => void;
 	onCompact?: () => void;
 	isThreadScrolling?: boolean;
+	previousUserMessage?: Message;
 }
 
 const loadingMessages = [
@@ -224,6 +227,7 @@ export const AssistantMessageGroup = memo(
 		onRetry,
 		onCompact,
 		isThreadScrolling = false,
+		previousUserMessage,
 	}: AssistantMessageGroupProps) {
 		const { isQueued } = useMessageQueuePosition(sessionId, message.id);
 		const isCompactDensity = useIsCompactThread();
@@ -529,6 +533,23 @@ export const AssistantMessageGroup = memo(
 
 			const { part, index } = item;
 			const isLastPart = index === parts.length - 1;
+
+			if (
+				shouldRenderCompactionSummaryBox({
+					compact,
+					part,
+					previousUserMessage,
+				})
+			) {
+				return (
+					<CompactionSummaryBox
+						part={part}
+						showLine={hasFollowingContent}
+						compact={compact}
+					/>
+				);
+			}
+
 			const isActionTool =
 				part.ephemeral &&
 				(part.type === 'tool_call' || part.type === 'tool_result') &&

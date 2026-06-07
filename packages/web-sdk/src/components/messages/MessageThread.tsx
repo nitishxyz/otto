@@ -375,6 +375,9 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
 				compact={compact}
 				onCompact={isLastMessage ? onCompact : undefined}
 				isThreadScrolling={isThreadScrolling}
+				previousUserMessage={
+					previousMessage?.role === 'user' ? previousMessage : undefined
+				}
 			/>
 		);
 	}
