@@ -16,90 +16,125 @@ import {
 function transformToUnifiedDiff(patch: string): string {
 	const lines = patch.split('\n');
 	const result: string[] = [];
-	let addCount = 0;
-	let removeCount = 0;
 	const diffLines: string[] = [];
 
+	const flushDiffLines = () => {
+		if (diffLines.length === 0) return;
+		result.push(...diffLines);
+		diffLines.length = 0;
+	};
+
 	for (const line of lines) {
-		if (
-			line.startsWith('*** Begin Patch') ||
-			line.startsWith('*** End Patch') ||
-			line.startsWith('*** Update File:') ||
-			line.startsWith('*** Add File:') ||
-			line.startsWith('*** Delete File:')
-		) {
-			if (diffLines.length > 0) {
-				result.push(`@@ -1,${removeCount} +1,${addCount} @@`);
-				result.push(...diffLines);
-				diffLines.length = 0;
-				addCount = 0;
-				removeCount = 0;
-			}
-			result.push(line);
-			continue;
-		}
-
-		if (line.match(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/)) {
-			if (diffLines.length > 0) {
-				result.push(`@@ -1,${removeCount} +1,${addCount} @@`);
-				result.push(...diffLines);
-				diffLines.length = 0;
-				addCount = 0;
-				removeCount = 0;
-			}
-			result.push(line);
-			continue;
-		}
-
-		if (line.startsWith('@@')) {
-			result.push(line);
+		if (isSessionPatchMetadataLine(line)) {
+			flushDiffLines();
 			continue;
 		}
 
 		if (line.startsWith('+')) {
-			addCount++;
 			diffLines.push(line);
 		} else if (line.startsWith('-')) {
-			removeCount++;
 			diffLines.push(line);
 		} else if (line.startsWith(' ') || line.startsWith('\t')) {
-			addCount++;
-			removeCount++;
 			diffLines.push(line.startsWith('\t') ? ` ${line}` : line);
 		} else if (line.trim() === '') {
 			diffLines.push(' ');
-			addCount++;
-			removeCount++;
 		} else {
-			addCount++;
-			removeCount++;
 			diffLines.push(` ${line}`);
 		}
 	}
 
-	if (diffLines.length > 0) {
-		result.push(`@@ -1,${removeCount} +1,${addCount} @@`);
-		result.push(...diffLines);
-	}
+	flushDiffLines();
 
 	return result.join('\n');
 }
 
-function getPatchLineTones(patch: string): Map<number, CodeMirrorLineTone> {
-	const tones = new Map<number, CodeMirrorLineTone>();
+function isSessionPatchSeparatorLine(line: string): boolean {
+	const trimmed = line.trim();
+	return trimmed.length > 0 && /^=+$/.test(trimmed);
+}
+
+function isSessionPatchMetadataLine(line: string): boolean {
+	if (line.startsWith('@@')) return true;
+	if (isSessionPatchSeparatorLine(line)) return true;
+	if (line.startsWith('*** ')) return true;
+	return (
+		line.startsWith('diff --git ') ||
+		line.startsWith('index ') ||
+		line.startsWith('--- ') ||
+		line.startsWith('+++ ') ||
+		line.startsWith('new file mode ') ||
+		line.startsWith('deleted file mode ') ||
+		line.startsWith('old mode ') ||
+		line.startsWith('new mode ') ||
+		line.startsWith('similarity index ') ||
+		line.startsWith('dissimilarity index ') ||
+		line.startsWith('rename from ') ||
+		line.startsWith('rename to ') ||
+		line.startsWith('copy from ') ||
+		line.startsWith('copy to ')
+	);
+}
+
+function parseHunkHeader(
+	line: string,
+): { oldStart: number; newStart: number } | null {
+	const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+	if (!match) return null;
+	return {
+		oldStart: Number.parseInt(match[1], 10),
+		newStart: Number.parseInt(match[2], 10),
+	};
+}
+
+function buildSessionPatchDisplay(patch: string): {
+	content: string;
+	lineNumbers: Map<number, string>;
+	lineTones: Map<number, CodeMirrorLineTone>;
+} {
+	const contentLines: string[] = [];
+	const lineNumbers = new Map<number, string>();
+	const lineTones = new Map<number, CodeMirrorLineTone>();
 	const lines = patch.split('\n');
-	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index];
-		const lineNumber = index + 1;
-		if (line.startsWith('@@')) {
-			tones.set(lineNumber, 'primary');
-		} else if (line.startsWith('+') && !line.startsWith('+++')) {
-			tones.set(lineNumber, 'add');
+	let oldLine: number | null = null;
+	let newLine: number | null = null;
+
+	for (const line of lines) {
+		const hunk = parseHunkHeader(line);
+		if (hunk) {
+			oldLine = hunk.oldStart;
+			newLine = hunk.newStart;
+			continue;
+		}
+
+		if (isSessionPatchMetadataLine(line)) continue;
+
+		const lineNumber = contentLines.length + 1;
+
+		contentLines.push(line);
+		if (line.startsWith('+') && !line.startsWith('+++')) {
+			if (newLine !== null) {
+				lineNumbers.set(lineNumber, String(newLine));
+				newLine += 1;
+			}
+			lineTones.set(lineNumber, 'add');
 		} else if (line.startsWith('-') && !line.startsWith('---')) {
-			tones.set(lineNumber, 'remove');
+			if (oldLine !== null) {
+				lineNumbers.set(lineNumber, String(oldLine));
+				oldLine += 1;
+			}
+			lineTones.set(lineNumber, 'remove');
+		} else if (oldLine !== null && newLine !== null) {
+			lineNumbers.set(lineNumber, String(newLine));
+			oldLine += 1;
+			newLine += 1;
 		}
 	}
-	return tones;
+
+	return {
+		content: contentLines.join('\n'),
+		lineNumbers,
+		lineTones,
+	};
 }
 
 function FullHeightDiffView({
@@ -109,15 +144,18 @@ function FullHeightDiffView({
 	patch: string;
 	filePath: string;
 }) {
+	const display = useMemo(() => buildSessionPatchDisplay(patch), [patch]);
+
 	return (
-		<div className="bg-card/60 border border-border rounded-lg overflow-hidden h-full">
-			<CodeMirrorViewer
-				content={patch}
-				path={filePath}
-				lineTones={getPatchLineTones(patch)}
-				disableMarkdownSyntax
-			/>
-		</div>
+		<CodeMirrorViewer
+			content={display.content}
+			path={filePath}
+			lineTones={display.lineTones}
+			lineNumberFormatter={(lineNumber) =>
+				display.lineNumbers.get(lineNumber) ?? ''
+			}
+			disableMarkdownSyntax
+		/>
 	);
 }
 
@@ -339,7 +377,7 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 				</div>
 			)}
 
-			<div className="flex-1 overflow-hidden p-4">
+			<div className="flex-1 overflow-auto min-h-0">
 				{patchContent ? (
 					<FullHeightDiffView patch={patchContent} filePath={selectedFile} />
 				) : (
