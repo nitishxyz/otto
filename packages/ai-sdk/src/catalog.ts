@@ -1994,5 +1994,5 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 		'xai',
 		'zai',
 	],
-	lastUpdated: '2026-06-04',
+	lastUpdated: '2026-06-07',
 } as const satisfies OttoRouterCatalog;

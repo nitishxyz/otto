@@ -3,7 +3,11 @@ import type { Message, MessagePart } from '../../types/api';
 const COMPACTION_HEADER_PATTERN = /context\s+compacted/i;
 
 export function getMessagePartText(part: MessagePart): string {
-	if (part.contentJson && typeof part.contentJson === 'object' && 'text' in part.contentJson) {
+	if (
+		part.contentJson &&
+		typeof part.contentJson === 'object' &&
+		'text' in part.contentJson
+	) {
 		return String(part.contentJson.text);
 	}
 	const raw = part.content;

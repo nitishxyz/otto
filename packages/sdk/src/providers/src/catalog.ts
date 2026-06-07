@@ -2968,30 +2968,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
-					id: 'baidu/ernie-4.5-vl-28b-a3b',
-					label: 'ERNIE 4.5 VL 28B A3B',
-					modalities: {
-						input: ['text', 'image'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-08-12',
-					lastUpdated: '2025-08-12',
-					openWeights: true,
-					cost: {
-						input: 0.14,
-						output: 0.56,
-					},
-					limit: {
-						context: 30000,
-						output: 8000,
-					},
-				},
-				{
 					id: 'bytedance-seed/seed-1.6',
 					label: 'Seed 1.6',
 					modalities: {
@@ -3207,7 +3183,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-r1',
-					label: 'R1',
+					label: 'DeepSeek-R1',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -3216,9 +3192,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2024-07-31',
+					knowledge: '2024-07',
 					releaseDate: '2025-01-20',
-					lastUpdated: '2025-01-20',
+					lastUpdated: '2025-05-29',
 					openWeights: true,
 					cost: {
 						input: 0.7,
@@ -3839,11 +3815,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.12,
-						output: 0.37,
+						output: 0.36,
+						cacheRead: 0.09,
 					},
 					limit: {
-						context: 262144,
-						output: 16384,
+						context: 256000,
+						output: 8192,
 					},
 				},
 				{
@@ -4055,10 +4032,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.02,
-						output: 0.05,
+						output: 0.03,
 					},
 					limit: {
-						context: 16384,
+						context: 131072,
 						output: 16384,
 					},
 				},
@@ -4278,7 +4255,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 196608,
-						output: 131072,
+						output: 196608,
 					},
 				},
 				{
@@ -4900,7 +4877,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
-					label: 'Llama 3.3 Nemotron Super 49B V1.5',
+					label: 'Llama 3.3 Nemotron Super 49B v1.5',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -4909,9 +4886,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2024-03-31',
-					releaseDate: '2025-10-10',
-					lastUpdated: '2025-10-10',
+					releaseDate: '2025-07-25',
+					lastUpdated: '2025-07-25',
 					openWeights: true,
 					cost: {
 						input: 0.1,
@@ -4933,8 +4909,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					releaseDate: '2025-12-14',
-					lastUpdated: '2025-12-14',
+					releaseDate: '2025-12-15',
+					lastUpdated: '2025-12-15',
 					openWeights: true,
 					cost: {
 						input: 0.05,
@@ -4956,9 +4932,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-11',
-					releaseDate: '2025-12-14',
-					lastUpdated: '2025-12-14',
+					releaseDate: '2025-12-15',
+					lastUpdated: '2025-12-15',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -4973,7 +4948,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
 					label: 'Nemotron 3 Nano Omni (free)',
 					modalities: {
-						input: ['text', 'audio', 'image', 'video'],
+						input: ['text', 'image', 'video', 'audio'],
 						output: ['text'],
 					},
 					toolCall: true,
@@ -4982,7 +4957,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-04-28',
 					lastUpdated: '2026-04-28',
-					openWeights: false,
+					openWeights: true,
 					cost: {
 						input: 0,
 						output: 0,
@@ -4994,7 +4969,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'nvidia/nemotron-3-super-120b-a12b',
-					label: 'Nemotron 3 Super',
+					label: 'Nemotron 3 Super 120B A12B',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -5003,7 +4978,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2024-04',
 					releaseDate: '2026-03-11',
 					lastUpdated: '2026-03-11',
 					openWeights: true,
@@ -5027,7 +5001,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2024-04',
 					releaseDate: '2026-03-11',
 					lastUpdated: '2026-03-11',
 					openWeights: true,
@@ -5042,7 +5015,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'nvidia/nemotron-3-ultra-550b-a55b',
-					label: 'Nemotron 3 Ultra',
+					label: 'Nemotron 3 Ultra 550B A55B',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -5091,14 +5064,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					id: 'nvidia/nemotron-nano-12b-v2-vl:free',
 					label: 'Nemotron Nano 12B 2 VL (free)',
 					modalities: {
-						input: ['image', 'text', 'video'],
+						input: ['text', 'image', 'video'],
 						output: ['text'],
 					},
 					toolCall: true,
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					knowledge: '2025-11',
 					releaseDate: '2025-10-28',
 					lastUpdated: '2025-10-28',
 					openWeights: true,
@@ -5113,7 +5085,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'nvidia/nemotron-nano-9b-v2',
-					label: 'Nemotron Nano 9B V2',
+					label: 'Nemotron Nano 9B v2',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -5122,9 +5094,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-09-05',
-					lastUpdated: '2025-09-05',
+					releaseDate: '2025-08-18',
+					lastUpdated: '2025-08-18',
 					openWeights: true,
 					cost: {
 						input: 0.04,
@@ -5146,9 +5117,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-09-05',
-					lastUpdated: '2025-09-05',
+					releaseDate: '2025-08-18',
+					lastUpdated: '2025-08-18',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -5256,31 +5226,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 8191,
-						output: 4096,
-					},
-				},
-				{
-					id: 'openai/gpt-4-1106-preview',
-					ownedBy: 'openai',
-					label: 'GPT-4 Turbo (older v1106)',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: false,
-					temperature: true,
-					knowledge: '2023-04-30',
-					releaseDate: '2023-11-06',
-					lastUpdated: '2023-11-06',
-					openWeights: false,
-					cost: {
-						input: 10,
-						output: 30,
-					},
-					limit: {
-						context: 128000,
 						output: 4096,
 					},
 				},
@@ -6726,7 +6671,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen-plus',
-					label: 'Qwen-Plus',
+					label: 'Qwen Plus',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -6735,9 +6680,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-02-01',
-					lastUpdated: '2025-02-01',
+					knowledge: '2024-04',
+					releaseDate: '2024-01-25',
+					lastUpdated: '2025-09-11',
 					openWeights: false,
 					cost: {
 						input: 0.26,
@@ -6825,7 +6770,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3-235b-a22b',
-					label: 'Qwen3 235B A22B',
+					label: 'Qwen3 235B-A22B',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -6834,9 +6779,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-04-28',
-					lastUpdated: '2025-04-28',
+					knowledge: '2025-04',
+					releaseDate: '2025-04',
+					lastUpdated: '2025-04',
 					openWeights: true,
 					cost: {
 						input: 0.455,
@@ -6917,7 +6862,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 40960,
-						output: 20000,
+						output: 16384,
 					},
 				},
 				{
@@ -6980,9 +6925,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-04-28',
-					lastUpdated: '2025-04-28',
+					knowledge: '2025-04',
+					releaseDate: '2025-04',
+					lastUpdated: '2025-04',
 					openWeights: true,
 					cost: {
 						input: 0.08,
@@ -7044,7 +6989,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3-coder-30b-a3b-instruct',
-					label: 'Qwen3 Coder 30B A3B Instruct',
+					label: 'Qwen3-Coder 30B-A3B Instruct',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -7053,9 +6998,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-06-30',
-					releaseDate: '2025-07-31',
-					lastUpdated: '2025-07-31',
+					knowledge: '2025-04',
+					releaseDate: '2025-04',
+					lastUpdated: '2025-04',
 					openWeights: true,
 					cost: {
 						input: 0.07,
@@ -7077,9 +7022,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-06-30',
-					releaseDate: '2025-09-17',
-					lastUpdated: '2025-09-17',
+					knowledge: '2025-04',
+					releaseDate: '2025-07-28',
+					lastUpdated: '2025-07-28',
 					openWeights: false,
 					cost: {
 						input: 0.195,
@@ -7127,9 +7072,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-06-30',
-					releaseDate: '2025-09-23',
-					lastUpdated: '2025-09-23',
+					knowledge: '2025-04',
+					releaseDate: '2025-07-23',
+					lastUpdated: '2025-07-23',
 					openWeights: false,
 					cost: {
 						input: 0.65,
@@ -7177,7 +7122,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-06-30',
+					knowledge: '2025-04',
 					releaseDate: '2025-09-23',
 					lastUpdated: '2025-09-23',
 					openWeights: false,
@@ -7217,7 +7162,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3-next-80b-a3b-instruct',
-					label: 'Qwen3 Next 80B A3B Instruct',
+					label: 'Qwen3-Next 80B-A3B Instruct',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -7226,9 +7171,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-09-30',
-					releaseDate: '2025-09-11',
-					lastUpdated: '2025-09-11',
+					knowledge: '2025-04',
+					releaseDate: '2025-09',
+					lastUpdated: '2025-09',
 					openWeights: true,
 					cost: {
 						input: 0.09,
@@ -7250,9 +7195,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-09-30',
-					releaseDate: '2025-09-11',
-					lastUpdated: '2025-09-11',
+					knowledge: '2025-04',
+					releaseDate: '2025-09',
+					lastUpdated: '2025-09',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -7265,7 +7210,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3-next-80b-a3b-thinking',
-					label: 'Qwen3 Next 80B A3B Thinking',
+					label: 'Qwen3-Next 80B-A3B (Thinking)',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -7274,9 +7219,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-09-30',
-					releaseDate: '2025-09-11',
-					lastUpdated: '2025-09-11',
+					knowledge: '2025-04',
+					releaseDate: '2025-09',
+					lastUpdated: '2025-09',
 					openWeights: true,
 					cost: {
 						input: 0.0975,
@@ -7455,7 +7400,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3.5-122b-a10b',
-					label: 'Qwen3.5-122B-A10B',
+					label: 'Qwen3.5 122B-A10B',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -7464,8 +7409,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-02-25',
-					lastUpdated: '2026-02-25',
+					releaseDate: '2026-02-23',
+					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
 						input: 0.26,
@@ -7478,7 +7423,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3.5-27b',
-					label: 'Qwen3.5-27B',
+					label: 'Qwen3.5 27B',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -7487,8 +7432,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-02-25',
-					lastUpdated: '2026-02-25',
+					releaseDate: '2026-02-23',
+					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
 						input: 0.195,
@@ -7501,7 +7446,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3.5-35b-a3b',
-					label: 'Qwen3.5-35B-A3B',
+					label: 'Qwen3.5 35B-A3B',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -7510,8 +7455,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-02-25',
-					lastUpdated: '2026-02-25',
+					releaseDate: '2026-02-23',
+					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
 						input: 0.14,
@@ -7525,7 +7470,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'qwen/qwen3.5-397b-a17b',
-					label: 'Qwen3.5 397B A17B',
+					label: 'Qwen3.5 397B-A17B',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -7534,9 +7479,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					knowledge: '2025-04',
-					releaseDate: '2026-02-16',
-					lastUpdated: '2026-02-16',
+					releaseDate: '2026-02-15',
+					lastUpdated: '2026-02-15',
 					openWeights: true,
 					cost: {
 						input: 0.39,
@@ -7652,21 +7596,21 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-04-27',
-					lastUpdated: '2026-04-27',
+					releaseDate: '2026-04-22',
+					lastUpdated: '2026-04-22',
 					openWeights: true,
 					cost: {
-						input: 0.29,
-						output: 3.2,
+						input: 0.289,
+						output: 2.4,
 					},
 					limit: {
-						context: 262140,
-						output: 262140,
+						context: 131072,
+						output: 131072,
 					},
 				},
 				{
 					id: 'qwen/qwen3.6-35b-a3b',
-					label: 'Qwen3.6 35B A3B',
+					label: 'Qwen3.6 35B-A3B',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -7675,8 +7619,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-04-27',
-					lastUpdated: '2026-04-27',
+					releaseDate: '2026-04-17',
+					lastUpdated: '2026-04-17',
 					openWeights: true,
 					cost: {
 						input: 0.14,
@@ -7722,8 +7666,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					releaseDate: '2026-04-27',
-					lastUpdated: '2026-04-27',
+					knowledge: '2025-04',
+					releaseDate: '2026-04-20',
+					lastUpdated: '2026-04-20',
 					openWeights: false,
 					cost: {
 						input: 1.04,
@@ -7796,8 +7741,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-06-03',
-					lastUpdated: '2026-06-03',
+					knowledge: '2025-04',
+					releaseDate: '2026-06-02',
+					lastUpdated: '2026-06-02',
 					openWeights: false,
 					cost: {
 						input: 0.4,
@@ -7857,30 +7803,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
-					id: 'sao10k/l3-euryale-70b',
-					label: 'Llama 3 Euryale 70B v2.1',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: false,
-					temperature: true,
-					knowledge: '2023-12-31',
-					releaseDate: '2024-06-18',
-					lastUpdated: '2024-06-18',
-					openWeights: true,
-					cost: {
-						input: 1.48,
-						output: 1.48,
-					},
-					limit: {
-						context: 8192,
-						output: 8192,
-					},
-				},
-				{
 					id: 'sao10k/l3.1-euryale-70b',
 					label: 'Llama 3.1 Euryale 70B v2.2',
 					modalities: {
@@ -7917,7 +7839,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					knowledge: '2025-01',
 					releaseDate: '2026-01-29',
-					lastUpdated: '2026-01-29',
+					lastUpdated: '2026-02-13',
 					openWeights: true,
 					cost: {
 						input: 0.09,
@@ -7964,8 +7886,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					releaseDate: '2026-04-22',
-					lastUpdated: '2026-04-22',
+					releaseDate: '2026-04-20',
+					lastUpdated: '2026-04-20',
 					openWeights: true,
 					cost: {
 						input: 0.063,
@@ -12504,6 +12426,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					toolCall: true,
 					reasoningText: true,
 					attachment: false,
+					temperature: true,
 					releaseDate: '2025-12-15',
 					lastUpdated: '2026-01-19',
 					openWeights: true,
@@ -12522,6 +12445,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					toolCall: true,
 					reasoningText: true,
 					attachment: false,
+					temperature: true,
 					releaseDate: '2026-03-11',
 					lastUpdated: '2026-03-12',
 					openWeights: true,
