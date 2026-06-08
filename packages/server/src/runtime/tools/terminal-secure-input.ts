@@ -3,23 +3,68 @@ import type { ToolAdapterContext } from './context.ts';
 import { requestSecureInput } from './secure-input.ts';
 import { detectSecurePrompt } from './secure-prompt.ts';
 
-const watchedTerminals = new Set<string>();
+interface TerminalSecureInputWatcher {
+	waitForPromptResolution: (timeoutMs?: number) => Promise<boolean>;
+}
+
+const watchedTerminals = new Map<string, TerminalSecureInputWatcher>();
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export function attachTerminalSecureInput(args: {
 	ctx: ToolAdapterContext;
 	terminalId: string;
 	callId?: string;
-}): void {
+}): TerminalSecureInputWatcher | null {
 	const terminalManager = getTerminalManager();
 	const terminal = terminalManager?.get(args.terminalId);
-	if (!terminal) return;
+	if (!terminal) return null;
 
 	const watchKey = `${args.ctx.sessionId}:${args.terminalId}`;
-	if (watchedTerminals.has(watchKey)) return;
-	watchedTerminals.add(watchKey);
+	const existing = watchedTerminals.get(watchKey);
+	if (existing) return existing;
 
 	let recentOutput = '';
 	let securePromptPending = false;
+	let currentPromptPromise: Promise<void> | null = null;
+	const promptWaiters = new Set<() => void>();
+
+	const notifyPromptWaiters = () => {
+		for (const waiter of promptWaiters) {
+			waiter();
+		}
+		promptWaiters.clear();
+	};
+
+	const waitForPromptResolution = async (timeoutMs = 2000) => {
+		if (currentPromptPromise) {
+			await currentPromptPromise;
+			return true;
+		}
+
+		return new Promise<boolean>((resolve) => {
+			let settled = false;
+			const finish = (value: boolean) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timeout);
+				promptWaiters.delete(onPrompt);
+				resolve(value);
+			};
+			const onPrompt = () => {
+				void (currentPromptPromise ?? Promise.resolve()).then(() => {
+					finish(true);
+				});
+			};
+			const timeout = setTimeout(() => finish(false), timeoutMs);
+			promptWaiters.add(onPrompt);
+		});
+	};
+
+	const watcher: TerminalSecureInputWatcher = { waitForPromptResolution };
+	watchedTerminals.set(watchKey, watcher);
 
 	const onData = (data: string) => {
 		recentOutput = `${recentOutput}${data}`.slice(-1000);
@@ -29,31 +74,42 @@ export function attachTerminalSecureInput(args: {
 		if (!prompt) return;
 
 		securePromptPending = true;
-		void requestSecureInput({
+		currentPromptPromise = requestSecureInput({
 			sessionId: args.ctx.sessionId,
 			messageId: args.ctx.messageId,
 			callId: args.callId,
 			prompt,
-		}).then((value) => {
-			securePromptPending = false;
-			recentOutput = '';
+		})
+			.then(async (value) => {
+				securePromptPending = false;
+				recentOutput = '';
 
-			const current = terminalManager?.get(args.terminalId);
-			if (!current || current.status !== 'running') return;
+				const current = terminalManager?.get(args.terminalId);
+				if (!current || current.status !== 'running') {
+					await delay(250);
+					return;
+				}
 
-			if (value === null) {
-				current.write('\x03');
-				return;
-			}
+				if (value === null) {
+					current.write('\x03');
+					await delay(250);
+					return;
+				}
 
-			current.write(`${value}\r`);
-		});
+				current.write(`${value}\r`);
+				await delay(250);
+			})
+			.finally(() => {
+				currentPromptPromise = null;
+			});
+		notifyPromptWaiters();
 	};
 
 	const cleanup = () => {
 		terminal.removeDataListener(onData);
 		terminal.removeExitListener(onExit);
 		watchedTerminals.delete(watchKey);
+		notifyPromptWaiters();
 	};
 
 	function onExit() {
@@ -69,4 +125,6 @@ export function attachTerminalSecureInput(args: {
 	if (terminal.status === 'exited') {
 		cleanup();
 	}
+
+	return watcher;
 }

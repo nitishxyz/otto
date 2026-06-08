@@ -237,6 +237,7 @@ export function createErrorHandler(
 						publishWrapper,
 						opts.provider,
 						opts.model,
+						opts.assistantMessageId,
 					);
 					if (compactResult.success) {
 						compactionSucceeded = true;
@@ -292,6 +293,7 @@ export function createErrorHandler(
 							compactionRetries: retries + 1,
 						},
 						retryCallback,
+						{ front: true },
 					);
 					return;
 				}

@@ -22,6 +22,7 @@ export async function performAutoCompaction(
 	}) => void,
 	provider: string,
 	modelId: string,
+	throughMessageId?: string,
 ): Promise<{
 	success: boolean;
 	summary?: string;
@@ -38,6 +39,7 @@ export async function performAutoCompaction(
 			db,
 			sessionId,
 			contextTokenLimit,
+			throughMessageId,
 		);
 		if (!context || context.length < 100) {
 			return { success: false, error: 'Not enough context to compact' };
@@ -123,6 +125,7 @@ export async function performAutoCompaction(
 			db,
 			sessionId,
 			assistantMessageId,
+			throughMessageId,
 		);
 		void compactResult;
 

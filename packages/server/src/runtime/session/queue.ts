@@ -96,6 +96,7 @@ function publishQueueState(sessionId: string) {
 export function enqueueAssistantRun(
 	opts: Omit<RunOpts, 'abortSignal' | 'queuedAt'>,
 	processQueueFn: (sessionId: string) => Promise<void>,
+	options?: { front?: boolean },
 ) {
 	const abortController = new AbortController();
 	messageAbortControllers.set(opts.assistantMessageId, abortController);
@@ -105,11 +106,16 @@ export function enqueueAssistantRun(
 		running: false,
 		currentMessageId: null,
 	};
-	state.queue.push({
+	const job = {
 		...opts,
 		queuedAt: globalThis.performance?.now?.() ?? Date.now(),
 		abortSignal: abortController.signal,
-	});
+	};
+	if (options?.front) {
+		state.queue.unshift(job);
+	} else {
+		state.queue.push(job);
+	}
 	runners.set(opts.sessionId, state);
 
 	publishQueueState(opts.sessionId);

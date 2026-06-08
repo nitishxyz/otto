@@ -6,12 +6,18 @@ export async function buildCompactionContext(
 	db: Awaited<ReturnType<typeof getDb>>,
 	sessionId: string,
 	contextTokenLimit?: number,
+	throughMessageId?: string,
 ): Promise<string> {
-	const allMessages = await db
+	const sessionMessages = await db
 		.select()
 		.from(messages)
 		.where(eq(messages.sessionId, sessionId))
 		.orderBy(desc(messages.createdAt));
+	const cutoffIndex = throughMessageId
+		? sessionMessages.findIndex((msg) => msg.id === throughMessageId)
+		: -1;
+	const allMessages =
+		cutoffIndex >= 0 ? sessionMessages.slice(cutoffIndex) : sessionMessages;
 
 	const maxChars = contextTokenLimit ? contextTokenLimit * 4 : 60000;
 	const recentBudget = Math.floor(maxChars * 0.65);

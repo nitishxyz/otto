@@ -319,10 +319,18 @@ export function executeBaseTool(
 	if (name === 'terminal') {
 		// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
 		const res = base.execute?.(input, options as any);
-		return Promise.resolve(res as ToolExecuteReturn).then((result) => {
+		return Promise.resolve(res as ToolExecuteReturn).then(async (result) => {
 			const terminalId = getTerminalId(result);
 			if (terminalId) {
-				attachTerminalSecureInput({ ctx, terminalId, callId });
+				const operation = (input as Record<string, unknown>)?.operation;
+				const watcher = attachTerminalSecureInput({ ctx, terminalId, callId });
+				const resolvedPrompt = await watcher?.waitForPromptResolution(
+					operation === 'read' ? 0 : undefined,
+				);
+				if (resolvedPrompt && operation === 'read') {
+					// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
+					return Promise.resolve(base.execute?.(input, options as any));
+				}
 			}
 			return result;
 		}) as ToolExecuteReturn;

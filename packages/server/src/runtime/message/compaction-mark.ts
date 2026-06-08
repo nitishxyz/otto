@@ -22,18 +22,19 @@ export async function markSessionCompacted(
 	db: Awaited<ReturnType<typeof getDb>>,
 	sessionId: string,
 	compactMessageId: string,
+	throughMessageId?: string,
 ): Promise<{ compacted: number; saved: number }> {
-	const compactMsg = await db
+	const cutoffMsg = await db
 		.select()
 		.from(messages)
-		.where(eq(messages.id, compactMessageId))
+		.where(eq(messages.id, throughMessageId ?? compactMessageId))
 		.limit(1);
 
-	if (!compactMsg.length) {
+	if (!cutoffMsg.length) {
 		return { compacted: 0, saved: 0 };
 	}
 
-	const cutoffTime = compactMsg[0].createdAt;
+	const cutoffTime = cutoffMsg[0].createdAt;
 
 	const oldMessages = await db
 		.select()

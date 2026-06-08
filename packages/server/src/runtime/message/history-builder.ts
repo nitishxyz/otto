@@ -10,6 +10,7 @@ import { messages, messageParts } from '@ottocode/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { stripToolResultArtifactsForModel } from '../../tools/adapter/results.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
+import { getQueueState } from '../session/queue.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
 
@@ -153,6 +154,29 @@ function findSupersededReadPartIds(parts: MessagePartRow[]): Set<string> {
 	return superseded;
 }
 
+function findQueuedUserMessageIds(
+	rows: Array<typeof messages.$inferSelect>,
+	queuedAssistantMessageIds: Set<string>,
+): Set<string> {
+	const queuedUserMessageIds = new Set<string>();
+	if (queuedAssistantMessageIds.size === 0) return queuedUserMessageIds;
+
+	for (const queuedAssistantMessageId of queuedAssistantMessageIds) {
+		const assistantIndex = rows.findIndex(
+			(row) => row.id === queuedAssistantMessageId,
+		);
+		if (assistantIndex <= 0) continue;
+
+		const userMessage = rows
+			.slice(0, assistantIndex)
+			.reverse()
+			.find((row) => row.role === 'user');
+		if (userMessage) queuedUserMessageIds.add(userMessage.id);
+	}
+
+	return queuedUserMessageIds;
+}
+
 /**
  * Builds the conversation history for a session from the database,
  * converting it to the format expected by the AI SDK.
@@ -167,6 +191,14 @@ export async function buildHistoryMessages(
 		.from(messages)
 		.where(eq(messages.sessionId, sessionId))
 		.orderBy(asc(messages.createdAt));
+	const queuedAssistantMessageIds = new Set(
+		getQueueState(sessionId)?.queuedMessages.map((item) => item.messageId) ??
+			[],
+	);
+	const queuedUserMessageIds = findQueuedUserMessageIds(
+		rows,
+		queuedAssistantMessageIds,
+	);
 	const messageIds = rows.map((row) => row.id);
 	const allParts = messageIds.length
 		? await db
@@ -200,6 +232,10 @@ export async function buildHistoryMessages(
 	const toolHistory = new ToolHistoryTracker();
 
 	for (const m of rows) {
+		if (queuedAssistantMessageIds.has(m.id) || queuedUserMessageIds.has(m.id)) {
+			continue;
+		}
+
 		const parts = partsByMessageId.get(m.id) ?? [];
 
 		if (

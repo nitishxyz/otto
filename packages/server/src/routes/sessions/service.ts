@@ -13,7 +13,7 @@ import {
 	type ProviderId,
 	validateProviderModel,
 } from '@ottocode/sdk';
-import { and, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { userInfo } from 'node:os';
 import { resolveAgentConfig } from '../../runtime/agent/registry.ts';
 import { publish } from '../../events/bus.ts';
@@ -298,21 +298,30 @@ async function deleteQueuedAssistantPair(
 	const assistantMsg = await db
 		.select()
 		.from(messages)
-		.where(eq(messages.id, messageId))
+		.where(and(eq(messages.id, messageId), eq(messages.sessionId, sessionId)))
 		.limit(1);
 
 	if (assistantMsg.length === 0) return;
 
-	const userMsg = await db
+	const sessionMessages = await db
 		.select()
 		.from(messages)
-		.where(and(eq(messages.sessionId, sessionId), eq(messages.role, 'user')))
-		.orderBy(desc(messages.createdAt))
-		.limit(1);
+		.where(eq(messages.sessionId, sessionId))
+		.orderBy(asc(messages.createdAt));
+	const assistantIndex = sessionMessages.findIndex(
+		(message) => message.id === messageId,
+	);
+	const userMsg =
+		assistantIndex > 0
+			? sessionMessages
+					.slice(0, assistantIndex)
+					.reverse()
+					.find((message) => message.role === 'user')
+			: undefined;
 
 	const messageIdsToDelete = [messageId];
-	if (userMsg.length > 0) {
-		messageIdsToDelete.push(userMsg[0].id);
+	if (userMsg) {
+		messageIdsToDelete.push(userMsg.id);
 	}
 
 	await db
