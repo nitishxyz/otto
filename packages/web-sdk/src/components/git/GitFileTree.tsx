@@ -1,10 +1,4 @@
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-	type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import type { GitFileStatus } from '../../types/api';
 import { useFocusStore } from '../../stores/focusStore';
@@ -204,30 +198,35 @@ export function GitFileTree({
 	showModifiedIndicator,
 }: GitFileTreeProps) {
 	const tree = useMemo(() => buildTree(files), [files]);
-	const [expanded, setExpanded] = useState(() => getInitialExpanded(tree));
+	const folderPaths = useMemo(() => getInitialExpanded(tree), [tree]);
 	const currentFocus = useFocusStore((state) => state.currentFocus);
 	const gitFileIndex = useFocusStore((state) => state.gitFileIndex);
+	const expandedFolders = useGitStore(
+		(state) => state.gitTreeExpandedFolders[sectionId],
+	);
 	const gitTreeRows = useGitStore((state) => state.gitTreeRows);
+	const syncGitTreeFolders = useGitStore((state) => state.syncGitTreeFolders);
+	const toggleGitTreeFolder = useGitStore((state) => state.toggleGitTreeFolder);
 	const setGitTreeSectionRows = useGitStore(
 		(state) => state.setGitTreeSectionRows,
 	);
+	const expanded = expandedFolders ?? folderPaths;
+	const lastScrolledFocusedRowIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		const folderPaths = getInitialExpanded(tree);
-		setExpanded((prev) => {
-			const hasNewFolder = [...folderPaths].some((path) => !prev.has(path));
-			return hasNewFolder ? new Set([...folderPaths, ...prev]) : prev;
-		});
-	}, [tree]);
+		syncGitTreeFolders(sectionId, [...folderPaths]);
+	}, [sectionId, folderPaths, syncGitTreeFolders]);
 
-	const toggleExpanded = useCallback((path: string) => {
-		setExpanded((prev) => {
-			const next = new Set(prev);
-			if (next.has(path)) next.delete(path);
-			else next.add(path);
-			return next;
-		});
-	}, []);
+	useEffect(() => {
+		if (currentFocus !== 'git') {
+			lastScrolledFocusedRowIdRef.current = null;
+		}
+	}, [currentFocus]);
+
+	const toggleExpanded = useCallback(
+		(path: string) => toggleGitTreeFolder(sectionId, path),
+		[sectionId, toggleGitTreeFolder],
+	);
 
 	const visibleRows = useMemo(
 		() => collectVisibleRows(tree, sectionId, staged, expanded, toggleExpanded),
@@ -245,8 +244,10 @@ export function GitFileTree({
 	const scrollFocusedRow = (
 		element: HTMLDivElement | null,
 		focused: boolean,
+		id: string,
 	) => {
-		if (element && focused) {
+		if (element && focused && lastScrolledFocusedRowIdRef.current !== id) {
+			lastScrolledFocusedRowIdRef.current = id;
 			element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 		}
 	};
@@ -259,7 +260,7 @@ export function GitFileTree({
 			return (
 				<div
 					key={node.path}
-					ref={(el) => scrollFocusedRow(el, focused)}
+					ref={(el) => scrollFocusedRow(el, focused, rowId)}
 					className={focused ? 'ring-1 ring-inset ring-primary/40' : ''}
 				>
 					<GitFileItem
@@ -277,7 +278,7 @@ export function GitFileTree({
 		return (
 			<div key={node.path}>
 				<div
-					ref={(el) => scrollFocusedRow(el, focused)}
+					ref={(el) => scrollFocusedRow(el, focused, rowId)}
 					className={`flex items-center gap-2 px-3 py-1.5 h-8 text-left hover:bg-muted/50 transition-colors group ${
 						focused ? 'ring-1 ring-inset ring-primary/40 bg-muted/50' : ''
 					}`}

@@ -63,6 +63,8 @@ interface GitState {
 	wasSessionListCollapsed: boolean;
 
 	// Visible Git tree rows for keyboard navigation
+	gitTreeKnownFolders: Record<string, Set<string>>;
+	gitTreeExpandedFolders: Record<string, Set<string>>;
 	gitTreeSections: Record<string, GitTreeRow[]>;
 	gitTreeRows: GitTreeRow[];
 
@@ -81,6 +83,8 @@ interface GitState {
 
 	setActiveSessionId: (sessionId: string | null) => void;
 	setSessionListCollapsed: (collapsed: boolean) => void;
+	syncGitTreeFolders: (sectionId: string, paths: string[]) => void;
+	toggleGitTreeFolder: (sectionId: string, path: string) => void;
 	setGitTreeSectionRows: (sectionId: string, rows: GitTreeRow[]) => void;
 }
 
@@ -94,6 +98,8 @@ export const useGitStore = create<GitState>((set) => ({
 	isCommitModalOpen: false,
 	commitSessionId: null,
 	wasSessionListCollapsed: false,
+	gitTreeKnownFolders: {},
+	gitTreeExpandedFolders: {},
 	gitTreeSections: {},
 	gitTreeRows: [],
 
@@ -153,6 +159,52 @@ export const useGitStore = create<GitState>((set) => ({
 	setActiveSessionId: (sessionId) => set({ activeSessionId: sessionId }),
 	setSessionListCollapsed: (collapsed) =>
 		set({ wasSessionListCollapsed: collapsed }),
+	syncGitTreeFolders: (sectionId, paths) =>
+		set((state) => {
+			const knownFolders = state.gitTreeKnownFolders[sectionId] ?? new Set();
+			const expandedFolders =
+				state.gitTreeExpandedFolders[sectionId] ?? new Set();
+			let changed = false;
+			const nextKnownFolders = new Set(knownFolders);
+			const nextExpandedFolders = new Set(expandedFolders);
+
+			for (const path of paths) {
+				if (!nextKnownFolders.has(path)) {
+					nextKnownFolders.add(path);
+					nextExpandedFolders.add(path);
+					changed = true;
+				}
+			}
+
+			if (!changed) return state;
+
+			return {
+				gitTreeKnownFolders: {
+					...state.gitTreeKnownFolders,
+					[sectionId]: nextKnownFolders,
+				},
+				gitTreeExpandedFolders: {
+					...state.gitTreeExpandedFolders,
+					[sectionId]: nextExpandedFolders,
+				},
+			};
+		}),
+	toggleGitTreeFolder: (sectionId, path) =>
+		set((state) => {
+			const expandedFolders =
+				state.gitTreeExpandedFolders[sectionId] ?? new Set();
+			const nextExpandedFolders = new Set(expandedFolders);
+
+			if (nextExpandedFolders.has(path)) nextExpandedFolders.delete(path);
+			else nextExpandedFolders.add(path);
+
+			return {
+				gitTreeExpandedFolders: {
+					...state.gitTreeExpandedFolders,
+					[sectionId]: nextExpandedFolders,
+				},
+			};
+		}),
 	setGitTreeSectionRows: (sectionId, rows) =>
 		set((state) => {
 			if (areGitTreeRowsEqual(state.gitTreeSections[sectionId], rows)) {
