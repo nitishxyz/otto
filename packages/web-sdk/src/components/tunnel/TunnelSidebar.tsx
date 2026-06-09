@@ -34,6 +34,7 @@ function truncateUrl(url: string): string {
 
 export const TunnelSidebar = memo(function TunnelSidebar() {
 	const isExpanded = useTunnelStore((s) => s.isExpanded);
+	useTunnelStatus();
 	return isExpanded ? <TunnelSidebarContent /> : null;
 });
 
@@ -48,7 +49,6 @@ const TunnelSidebarContent = memo(function TunnelSidebarContent() {
 	const stopTunnel = useStopTunnel();
 	const [copied, setCopied] = useState(false);
 
-	useTunnelStatus();
 	useTunnelStream();
 
 	const handleCopyUrl = async () => {

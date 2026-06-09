@@ -32,6 +32,17 @@ interface TunnelQrResponse {
 	error?: string;
 }
 
+function normalizeTunnelStatus(data: {
+	status: TunnelStatusResponse['status'];
+	url: string | null;
+	isRunning?: boolean;
+}): TunnelStatusResponse['status'] {
+	if (data.isRunning && data.url) return 'connected';
+	if (data.isRunning && data.status === 'idle') return 'starting';
+	if (data.status === 'connected' && !data.url) return 'starting';
+	return data.status;
+}
+
 async function fetchTunnelStatus(): Promise<TunnelStatusResponse> {
 	const response = await getTunnelStatus();
 	if (response.error) throw new Error(JSON.stringify(response.error));
@@ -72,11 +83,12 @@ export function useTunnelStatus() {
 		queryKey: ['tunnel', 'status'],
 		queryFn: fetchTunnelStatus,
 		refetchInterval: 3000,
+		refetchOnMount: 'always',
 	});
 
 	useEffect(() => {
 		if (query.data) {
-			setStatus(query.data.status);
+			setStatus(normalizeTunnelStatus(query.data));
 			setUrl(query.data.url);
 			setError(query.data.error);
 		}
@@ -100,11 +112,13 @@ export function useStartTunnel() {
 			setError(null);
 		},
 		onSuccess: (data) => {
-			if (data.ok && data.url) {
-				setStatus('connected');
-				setUrl(data.url);
+			if (data.ok) {
+				if (data.url) {
+					setStatus('connected');
+					setUrl(data.url);
+				}
 				setProgress(null);
-			} else if (!data.ok) {
+			} else {
 				setStatus('error');
 				setError(data.error || 'Failed to start tunnel');
 				setProgress(null);
@@ -173,7 +187,7 @@ export function useTunnelStream() {
 			try {
 				const data = JSON.parse(event.data);
 				if (data.type === 'status') {
-					setStatus(data.status);
+					setStatus(normalizeTunnelStatus(data));
 					setUrl(data.url);
 					setError(data.error);
 					setProgress(data.progress);

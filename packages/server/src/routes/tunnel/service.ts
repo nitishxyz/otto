@@ -17,15 +17,33 @@ let tunnelStatus: TunnelStatus = 'idle';
 let tunnelError: string | null = null;
 let progressMessage: string | null = null;
 
-export async function getTunnelStatus() {
-	const binaryInstalled = await isTunnelBinaryInstalled();
+function getCurrentTunnelState() {
+	const isRunning = activeTunnel?.isRunning ?? false;
+	const status = isRunning
+		? tunnelUrl
+			? 'connected'
+			: 'starting'
+		: tunnelStatus;
 
 	return {
-		status: tunnelStatus,
+		status,
 		url: tunnelUrl,
 		error: tunnelError,
+		isRunning,
+		progress: progressMessage,
+	};
+}
+
+export async function getTunnelStatus() {
+	const binaryInstalled = await isTunnelBinaryInstalled();
+	const state = getCurrentTunnelState();
+
+	return {
+		status: state.status,
+		url: state.url,
+		error: state.error,
 		binaryInstalled,
-		isRunning: activeTunnel?.isRunning ?? false,
+		isRunning: state.isRunning,
 	};
 }
 
@@ -149,22 +167,10 @@ export async function handleTunnelStream(c: Context) {
 			}
 		};
 
-		await sendEvent({
-			type: 'status',
-			status: tunnelStatus,
-			url: tunnelUrl,
-			error: tunnelError,
-			progress: progressMessage,
-		});
+		await sendEvent({ type: 'status', ...getCurrentTunnelState() });
 
 		const interval = setInterval(async () => {
-			await sendEvent({
-				type: 'status',
-				status: tunnelStatus,
-				url: tunnelUrl,
-				error: tunnelError,
-				progress: progressMessage,
-			});
+			await sendEvent({ type: 'status', ...getCurrentTunnelState() });
 		}, 1000);
 
 		const onAbort = () => {
