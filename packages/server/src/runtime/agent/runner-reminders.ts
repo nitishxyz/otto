@@ -3,6 +3,24 @@ export type RunnerMessage = {
 	content: string | Array<unknown>;
 };
 
+function insertReminderBeforeTrailingUserMessage(
+	messages: RunnerMessage[],
+	reminder: RunnerMessage,
+): void {
+	const lastMessage = messages.at(-1);
+	const lastText =
+		typeof lastMessage?.content === 'string' ? lastMessage.content : '';
+	const lastIsReminder =
+		lastText.startsWith('[system-reminder]') ||
+		lastText.startsWith('<system-reminder>');
+	if (lastMessage?.role === 'user' && !lastIsReminder) {
+		messages.splice(messages.length - 1, 0, reminder);
+		return;
+	}
+
+	messages.push(reminder);
+}
+
 export function appendRunnerReminderMessages(args: {
 	messages: RunnerMessage[];
 	isFirstMessage: boolean;
@@ -12,7 +30,8 @@ export function appendRunnerReminderMessages(args: {
 	const { messages, isFirstMessage, isOpenAIOAuth, continuationCount } = args;
 
 	if (!isFirstMessage) {
-		messages.push(
+		insertReminderBeforeTrailingUserMessage(
+			messages,
 			isOpenAIOAuth
 				? {
 						role: 'user',
@@ -29,7 +48,8 @@ export function appendRunnerReminderMessages(args: {
 
 	if ((continuationCount ?? 0) <= 0) return;
 
-	messages.push(
+	insertReminderBeforeTrailingUserMessage(
+		messages,
 		isOpenAIOAuth
 			? {
 					role: 'user',
