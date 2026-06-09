@@ -28,7 +28,6 @@ import {
 const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
 const REMOTE_CATALOG_REFRESH_TTL_MS = 5 * 60 * 1000;
 const PROVIDER_MODEL_REFRESH_TTL_MS = 60 * 1000;
-const USE_BUILTIN_MODEL_CATALOG = process.env.CI === 'true';
 
 type UiModel = {
 	id: string;
@@ -84,10 +83,41 @@ function getRemoteCatalogUrl(): string {
 	);
 }
 
+function mergeModelLists(
+	bundledModels: ModelInfo[] | undefined,
+	cachedModels: ModelInfo[] | undefined,
+): ModelInfo[] {
+	const bundledById = new Map(
+		(bundledModels ?? []).map((model) => [model.id, model]),
+	);
+	const merged: ModelInfo[] = [];
+	for (const cachedModel of cachedModels ?? []) {
+		const bundledModel = bundledById.get(cachedModel.id);
+		if (bundledModel) bundledById.delete(cachedModel.id);
+		merged.push({ ...bundledModel, ...cachedModel });
+	}
+	merged.push(...bundledById.values());
+	return merged;
+}
+
 function getModelCatalogProviders(
 	cachedCatalog: Awaited<ReturnType<typeof readCachedModelCatalog>>,
 ): Record<string, { models?: ModelInfo[]; label?: string }> {
-	return cachedCatalog?.providers ?? (USE_BUILTIN_MODEL_CATALOG ? catalog : {});
+	const providers: Record<string, { models?: ModelInfo[]; label?: string }> = {
+		...catalog,
+	};
+	for (const [provider, cachedEntry] of Object.entries(
+		cachedCatalog?.providers ?? {},
+	)) {
+		const bundledEntry = providers[provider];
+		providers[provider] = {
+			...bundledEntry,
+			...cachedEntry,
+			label: cachedEntry.label ?? bundledEntry?.label,
+			models: mergeModelLists(bundledEntry?.models, cachedEntry.models),
+		};
+	}
+	return providers;
 }
 
 async function refreshRemoteCatalogInBackground(): Promise<void> {

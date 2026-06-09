@@ -90,6 +90,10 @@ describe('oauth model filtering', () => {
 	});
 
 	test('keeps Anthropic OAuth prefix matching', () => {
+		expect(isModelAllowedForOAuth('anthropic', 'claude-fable-5')).toBe(true);
+		expect(isModelAllowedForOAuth('anthropic', 'claude-fable-5-20260609')).toBe(
+			true,
+		);
 		expect(isModelAllowedForOAuth('anthropic', 'claude-sonnet-4-5')).toBe(true);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-sonnet-4-5-20251001'),

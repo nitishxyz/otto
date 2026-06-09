@@ -306,6 +306,54 @@ describe('custom declarative providers', () => {
 		}
 	});
 
+	test('merges cached built-in provider models with bundled catalog models', async () => {
+		const projectRoot = await mkdtemp(
+			join(tmpdir(), 'otto-provider-builtin-cache-'),
+		);
+		const configHome = await mkdtemp(
+			join(tmpdir(), 'otto-config-builtin-cache-'),
+		);
+		const previousConfigHome = process.env.XDG_CONFIG_HOME;
+
+		try {
+			process.env.XDG_CONFIG_HOME = configHome;
+			const app = createEmbeddedApp({
+				auth: { anthropic: { apiKey: 'test-anthropic-key' } },
+			});
+			await writeCachedModelCatalog({
+				anthropic: {
+					id: 'anthropic',
+					label: 'Anthropic Cached',
+					models: [
+						{
+							id: 'cached-anthropic-only',
+							label: 'Cached Anthropic Only',
+						},
+					],
+				},
+			});
+
+			const allModelsResponse = await app.request(
+				`http://localhost/v1/config/models?project=${encodeURIComponent(projectRoot)}`,
+			);
+			expect(allModelsResponse.status).toBe(200);
+			const allModelsPayload = (await allModelsResponse.json()) as Record<
+				string,
+				{ models: Array<{ id: string }> }
+			>;
+			const anthropicModelIds = allModelsPayload.anthropic.models.map(
+				(model) => model.id,
+			);
+			expect(anthropicModelIds).toContain('cached-anthropic-only');
+			expect(anthropicModelIds).toContain('claude-fable-5');
+		} finally {
+			if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+			else process.env.XDG_CONFIG_HOME = previousConfigHome;
+			await rm(projectRoot, { recursive: true, force: true });
+			await rm(configHome, { recursive: true, force: true });
+		}
+	});
+
 	test('does not expose cached provider models without provider auth', async () => {
 		const projectRoot = await mkdtemp(
 			join(tmpdir(), 'otto-provider-cache-only-'),

@@ -2,6 +2,7 @@ import type { ProviderId, ModelInfo } from '../../types/src/index.ts';
 
 const OAUTH_MODEL_PREFIXES: Partial<Record<ProviderId, string[]>> = {
 	anthropic: [
+		'claude-fable-5',
 		'claude-haiku-4-5',
 		'claude-opus-4-5',
 		'claude-opus-4-6',
