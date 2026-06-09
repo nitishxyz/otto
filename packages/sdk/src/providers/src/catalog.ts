@@ -1293,6 +1293,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
+					id: 'claude-fable-5',
+					ownedBy: 'anthropic',
+					label: 'Claude Fable 5',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: false,
+					cost: {
+						input: 10,
+						output: 50,
+						cacheRead: 1,
+						cacheWrite: 12.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 128000,
+					},
+				},
+				{
 					id: 'claude-haiku-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5 (latest)',
@@ -2291,13 +2317,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 0.684,
-						output: 3.42,
-						cacheRead: 0.144,
+						input: 0.68,
+						output: 3.41,
+						cacheRead: 0.34,
 					},
 					limit: {
-						context: 262144,
-						output: 262144,
+						context: 262142,
+						output: 262142,
 					},
 				},
 				{
@@ -3717,8 +3743,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-03-13',
 					openWeights: true,
 					cost: {
-						input: 0.04,
-						output: 0.13,
+						input: 0.05,
+						output: 0.15,
 					},
 					limit: {
 						context: 131072,
@@ -4127,7 +4153,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-04-05',
 					openWeights: true,
 					cost: {
-						input: 0.08,
+						input: 0.1,
 						output: 0.3,
 					},
 					limit: {
@@ -4818,13 +4844,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.684,
-						output: 3.42,
-						cacheRead: 0.144,
+						input: 0.68,
+						output: 3.41,
+						cacheRead: 0.34,
 					},
 					limit: {
-						context: 262144,
-						output: 262144,
+						context: 262142,
+						output: 262142,
 					},
 				},
 				{
@@ -4853,26 +4879,26 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
-					id: 'nex-agi/deepseek-v3.1-nex-n1',
-					label: 'DeepSeek V3.1 Nex N1',
+					id: 'nex-agi/nex-n2-pro:free',
+					label: 'Nex-N2-Pro (free)',
 					modalities: {
-						input: ['text'],
+						input: ['text', 'image'],
 						output: ['text'],
 					},
 					toolCall: true,
-					reasoningText: false,
-					attachment: false,
+					reasoningText: true,
+					attachment: true,
 					temperature: true,
-					releaseDate: '2025-12-08',
-					lastUpdated: '2025-12-08',
+					releaseDate: '2026-06-08',
+					lastUpdated: '2026-06-08',
 					openWeights: true,
 					cost: {
-						input: 0.135,
-						output: 0.5,
+						input: 0,
+						output: 0,
 					},
 					limit: {
-						context: 131072,
-						output: 163840,
+						context: 262144,
+						output: 262144,
 					},
 				},
 				{
@@ -4890,7 +4916,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-07-25',
 					openWeights: true,
 					cost: {
-						input: 0.1,
+						input: 0.4,
 						output: 0.4,
 					},
 					limit: {
@@ -6808,7 +6834,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-07-21',
 					openWeights: true,
 					cost: {
-						input: 0.071,
+						input: 0.09,
 						output: 0.1,
 					},
 					limit: {
@@ -6857,8 +6883,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-04-28',
 					openWeights: true,
 					cost: {
-						input: 0.09,
-						output: 0.45,
+						input: 0.12,
+						output: 0.5,
 					},
 					limit: {
 						context: 40960,
@@ -7506,12 +7532,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-03-10',
 					openWeights: true,
 					cost: {
-						input: 0.04,
+						input: 0.1,
 						output: 0.15,
 					},
 					limit: {
 						context: 262144,
-						output: 81920,
+						output: 262144,
 					},
 				},
 				{
@@ -7862,9 +7888,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-05-28',
-					lastUpdated: '2026-05-28',
-					openWeights: false,
+					knowledge: '2026-01-01',
+					releaseDate: '2026-05-29',
+					lastUpdated: '2026-05-29',
+					openWeights: true,
 					cost: {
 						input: 0.2,
 						output: 1.15,
@@ -10150,6 +10177,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
+					id: 'north-mini-code-free',
+					label: 'North Mini Code Free',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-09-23',
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: true,
+					cost: {
+						input: 0,
+						output: 0,
+					},
+					limit: {
+						context: 256000,
+						output: 64000,
+					},
+				},
+				{
 					id: 'qwen3-coder',
 					label: 'Qwen3 Coder',
 					modalities: {
@@ -10338,7 +10389,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.2,
 					},
 					limit: {
-						context: 2000000,
+						context: 1000000,
 						output: 30000,
 					},
 				},
@@ -10363,7 +10414,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.2,
 					},
 					limit: {
-						context: 2000000,
+						context: 1000000,
 						output: 30000,
 					},
 				},
@@ -12255,7 +12306,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: ['text'],
 					},
 					toolCall: true,
-					reasoningText: false,
+					reasoningText: true,
 					attachment: false,
 					releaseDate: '2025-10-23',
 					lastUpdated: '2026-01-19',
@@ -12333,7 +12384,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					toolCall: true,
 					reasoningText: true,
-					attachment: false,
+					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
 					releaseDate: '2026-05-31',
@@ -12452,6 +12503,25 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 262144,
 						output: 65536,
+					},
+				},
+				{
+					id: 'nemotron-3-ultra',
+					label: 'nemotron-3-ultra',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-06-04',
+					lastUpdated: '2026-06-04',
+					openWeights: true,
+					limit: {
+						context: 262144,
+						output: 128000,
 					},
 				},
 				{

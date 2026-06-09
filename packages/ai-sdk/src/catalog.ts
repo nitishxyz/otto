@@ -135,6 +135,30 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			},
 		},
 		{
+			id: 'claude-fable-5',
+			name: 'Claude Fable 5',
+			owned_by: 'anthropic',
+			context_length: 1000000,
+			max_output: 128000,
+			reasoning: true,
+			tool_call: true,
+			attachment: true,
+			temperature: false,
+			release_date: '2026-06-09',
+			last_updated: '2026-06-09',
+			open_weights: false,
+			modalities: {
+				input: ['text', 'image', 'pdf'],
+				output: ['text'],
+			},
+			pricing: {
+				input: 10.049999999999999,
+				output: 50.24999999999999,
+				cache_read: 1.005,
+				cache_write: 12.562499999999998,
+			},
+		},
+		{
 			id: 'claude-haiku-4-5',
 			name: 'Claude Haiku 4.5 (latest)',
 			owned_by: 'anthropic',
@@ -554,7 +578,7 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			pricing: {
 				input: 0.1407,
 				output: 0.2814,
-				cache_read: 0.02814,
+				cache_read: 0.0028139999999999997,
 			},
 		},
 		{
@@ -578,7 +602,7 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			pricing: {
 				input: 0.1407,
 				output: 0.2814,
-				cache_read: 0.02814,
+				cache_read: 0.0028139999999999997,
 			},
 		},
 		{
@@ -1729,7 +1753,7 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			id: 'qwen3.7-plus',
 			name: 'Qwen3.7 Plus',
 			owned_by: 'qwen',
-			context_length: 131072,
+			context_length: 1000000,
 			max_output: 16384,
 			reasoning: true,
 			tool_call: true,
@@ -1737,10 +1761,10 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			temperature: true,
 			knowledge: '2025-04',
 			release_date: '2026-06-02',
-			last_updated: '2026-06-02',
+			last_updated: '2026-06-04',
 			open_weights: false,
 			modalities: {
-				input: ['text'],
+				input: ['text', 'image', 'video'],
 				output: ['text'],
 			},
 			pricing: {
@@ -1754,7 +1778,7 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			id: 'grok-4.20-0309-non-reasoning',
 			name: 'Grok 4.20 (Non-Reasoning)',
 			owned_by: 'xai',
-			context_length: 2000000,
+			context_length: 1000000,
 			max_output: 30000,
 			reasoning: false,
 			tool_call: true,
@@ -1777,7 +1801,7 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			id: 'grok-4.20-0309-reasoning',
 			name: 'Grok 4.20 (Reasoning)',
 			owned_by: 'xai',
-			context_length: 2000000,
+			context_length: 1000000,
 			max_output: 30000,
 			reasoning: true,
 			tool_call: true,
@@ -1994,5 +2018,5 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 		'xai',
 		'zai',
 	],
-	lastUpdated: '2026-06-07',
+	lastUpdated: '2026-06-09',
 } as const satisfies OttoRouterCatalog;
