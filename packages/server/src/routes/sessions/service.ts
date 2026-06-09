@@ -556,8 +556,20 @@ export async function buildSessionPreferenceUpdates(
 		const agentName = body.agent.trim();
 		if (agentName) {
 			try {
-				await resolveAgentConfig(cfg.projectRoot, agentName);
+				const agentCfg = await resolveAgentConfig(cfg.projectRoot, agentName);
 				updates.agent = agentName;
+				if (
+					typeof body.provider !== 'string' &&
+					typeof body.model !== 'string'
+				) {
+					const agentProvider = hasConfiguredProvider(cfg, agentCfg.provider)
+						? agentCfg.provider
+						: cfg.defaults.provider;
+					const agentModel = agentCfg.model ?? cfg.defaults.model;
+					validateProviderModel(agentProvider, agentModel, cfg);
+					updates.provider = agentProvider;
+					updates.model = agentModel;
+				}
 				shouldTouchLastActiveAt = true;
 			} catch {
 				return { ok: false, error: `Invalid agent: ${agentName}`, status: 400 };

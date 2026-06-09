@@ -113,5 +113,10 @@ export const useAgentsStore = create<AgentsState>((set) => ({
 	openCreateModal: () =>
 		set({ isManagerOpen: true, isExpanded: true, isCreateModalOpen: true }),
 
-	closeCreateModal: () => set({ isCreateModalOpen: false }),
+	closeCreateModal: () =>
+		set({
+			isCreateModalOpen: false,
+			managerMode: 'library',
+			editorPage: 'overview',
+		}),
 }));

@@ -17,6 +17,7 @@ import {
 	useDeleteSession,
 } from '../../hooks/useSessions';
 import { useAllModels, useConfig } from '../../hooks/useConfig';
+import { useAgentDetails } from '../../hooks/useAgents';
 import { useStageFiles } from '../../hooks/useGit';
 import { useGitStore } from '../../stores/gitStore';
 import { useFileUpload } from '../../hooks/useFileUpload';
@@ -90,6 +91,7 @@ export const ChatInputContainer = memo(
 			const deleteSession = useDeleteSession();
 			const { data: allModels } = useAllModels();
 			const { data: config } = useConfig();
+			const { data: agentDetails } = useAgentDetails({ enabled: true });
 			const stageFiles = useStageFiles();
 			const openCommitModalForSession = useGitStore(
 				(state) => state.openCommitModalForSession,
@@ -108,6 +110,13 @@ export const ChatInputContainer = memo(
 			const modelSupportsVision = selectedModel?.vision;
 			const modelSupportsAttachment = selectedModel?.attachment;
 			const modelIsFree = selectedModel?.free;
+			const agentNames = useMemo(
+				() =>
+					agentDetails?.agents.length
+						? agentDetails.agents.map((agentDetail) => agentDetail.name)
+						: (config?.agents ?? []),
+				[agentDetails?.agents, config?.agents],
+			);
 
 			const {
 				images,
@@ -452,13 +461,35 @@ export const ChatInputContainer = memo(
 			const handleAgentChange = useCallback(
 				async (value: string) => {
 					setAgent(value);
+					const selectedAgent = agentDetails?.agents.find(
+						(agentDetail) => agentDetail.name === value,
+					);
+					const update = selectedAgent
+						? {
+								agent: value,
+								provider:
+									selectedAgent.provider ??
+									config?.defaults?.provider ??
+									provider,
+								model: selectedAgent.model ?? config?.defaults?.model ?? model,
+							}
+						: { agent: value };
+					if ('provider' in update) setProvider(update.provider);
+					if ('model' in update) setModel(update.model);
 					try {
-						await updateSession.mutateAsync({ agent: value });
+						await updateSession.mutateAsync(update);
 					} catch (error) {
 						console.error('Failed to update agent:', error);
 					}
 				},
-				[updateSession],
+				[
+					agentDetails?.agents,
+					config?.defaults?.model,
+					config?.defaults?.provider,
+					model,
+					provider,
+					updateSession,
+				],
 			);
 
 			const handleModelSelectorChange = useCallback(
@@ -509,14 +540,9 @@ export const ChatInputContainer = memo(
 			const handlePlanModeToggle = useCallback(
 				async (isPlanMode: boolean) => {
 					const newAgent = isPlanMode ? 'plan' : 'build';
-					setAgent(newAgent);
-					try {
-						await updateSession.mutateAsync({ agent: newAgent });
-					} catch (error) {
-						console.error('Failed to switch agent:', error);
-					}
+					await handleAgentChange(newAgent);
 				},
-				[updateSession],
+				[handleAgentChange],
 			);
 
 			const openConfigRef = useRef<
@@ -576,7 +602,7 @@ export const ChatInputContainer = memo(
 							onFileSelectionContextRemove={handleFileSelectionContextRemove}
 							onModelInfoClick={openModelConfig}
 							agent={agent}
-							agents={config?.agents}
+							agents={agentNames}
 							onAgentChange={handleAgentChange}
 						/>
 					)}

@@ -39,7 +39,6 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 	availableTools,
 }: AgentCreatePaneProps) {
 	const closeCreateModal = useAgentsStore((s) => s.closeCreateModal);
-	const openAgentInManager = useAgentsStore((s) => s.openAgentInManager);
 	const updateAgent = useUpdateAgent();
 	const nameId = useId();
 	const duplicateId = useId();
@@ -160,7 +159,7 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 			{
 				onSuccess: () => {
 					resetForm();
-					openAgentInManager(trimmed);
+					closeCreateModal();
 				},
 				onError: (err) => {
 					setError(String(err));

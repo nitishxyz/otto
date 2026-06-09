@@ -75,6 +75,7 @@ export function useUpdateAgent() {
 		onSuccess: (data, variables) => {
 			queryClient.setQueryData(['config', 'agents', variables.name], data);
 			void queryClient.invalidateQueries({ queryKey: ['config', 'agents'] });
+			void queryClient.invalidateQueries({ queryKey: ['config'] });
 		},
 	});
 }
@@ -105,6 +106,7 @@ export function useDeleteAgent() {
 					null;
 				selectAgent(next);
 			}
+			void queryClient.invalidateQueries({ queryKey: ['config'] });
 		},
 	});
 }

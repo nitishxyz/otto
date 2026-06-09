@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
+import { useAgentDetails } from '../../hooks/useAgents';
 import { Modal } from '../ui/Modal';
 import {
 	UnifiedModelSelector,
@@ -43,9 +44,17 @@ export function ConfigModal({
 	modalPosition = 'fixed',
 }: ConfigModalProps) {
 	const { data: config, isLoading: configLoading } = useConfig();
+	const { data: agentDetails } = useAgentDetails({ enabled: true });
 	const updateDefaults = useUpdateDefaults();
 	const reasoningEnabled = config?.defaults?.reasoningText ?? true;
 	const reasoningLevel = config?.defaults?.reasoningLevel ?? 'high';
+	const agentNames = useMemo(
+		() =>
+			agentDetails?.agents.length
+				? agentDetails.agents.map((agentDetail) => agentDetail.name)
+				: (config?.agents ?? []),
+		[agentDetails?.agents, config?.agents],
+	);
 	const agentSelectorRef = useRef<UnifiedAgentSelectorRef>(null);
 	const modelSelectorRef = useRef<UnifiedModelSelectorRef>(null);
 
@@ -143,7 +152,7 @@ export function ConfigModal({
 						<UnifiedAgentSelector
 							ref={agentSelectorRef}
 							agent={agent}
-							agents={config.agents}
+							agents={agentNames}
 							onChange={onAgentChange}
 						/>
 					</div>
