@@ -9,13 +9,13 @@
 		"db:migrate": "bun run scripts/migrate.ts"
 	},
 	"dependencies": {
-		"drizzle-orm": "^0.44.5",
-		"hono": "^4.9.9",
-		"nanoid": "^5.0.9",
-		"sst": "^4.12.2"
+		"drizzle-orm": "0.44.7",
+		"hono": "4.12.0",
+		"nanoid": "5.1.6",
+		"sst": "4.12.2"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20250109.0",
-		"drizzle-kit": "^0.31.4"
+		"@cloudflare/workers-types": "4.20260219.0",
+		"drizzle-kit": "0.31.9"
 	}
 }

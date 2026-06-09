@@ -51,17 +51,17 @@
 		"@ottocode/acp": "workspace:*",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/tui": "workspace:*",
-		"@clack/prompts": "^0.11.0",
-		"chalk": "^5.6.2",
-		"commander": "^14.0.2",
-		"diff": "^8.0.2",
-		"marked": "^16.3.0",
-		"marked-terminal": "^7.3.0",
-		"qrcode-terminal": "^0.12.0"
+		"@clack/prompts": "0.11.0",
+		"chalk": "5.6.2",
+		"commander": "14.0.3",
+		"diff": "8.0.3",
+		"marked": "16.4.2",
+		"marked-terminal": "7.3.0",
+		"qrcode-terminal": "0.12.0"
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
-		"@types/marked-terminal": "^6.1.1",
-		"typescript": "~5.9.3"
+		"@types/bun": "1.3.14",
+		"@types/marked-terminal": "6.1.1",
+		"typescript": "5.9.3"
 	}
 }

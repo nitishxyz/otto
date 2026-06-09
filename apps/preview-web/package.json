@@ -10,23 +10,23 @@
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "13.1.10",
-		"@astrojs/tailwind": "^6.0.2",
-		"@tanstack/react-query": "^5.90.2",
-		"astro": "^6",
-		"lucide-react": "^0.563.0",
-		"react": "^19.1.1",
-		"react-dom": "^19.1.1",
-		"react-markdown": "^10.1.0",
-		"react-syntax-highlighter": "^15.6.6",
-		"rehype-raw": "^7.0.0",
-		"remark-gfm": "^4.0.1",
-		"zustand": "^5.0.11"
+		"@astrojs/tailwind": "6.0.2",
+		"@tanstack/react-query": "5.90.21",
+		"astro": "6.1.9",
+		"lucide-react": "0.563.0",
+		"react": "19.2.0",
+		"react-dom": "19.2.0",
+		"react-markdown": "10.1.0",
+		"react-syntax-highlighter": "15.6.6",
+		"rehype-raw": "7.0.0",
+		"remark-gfm": "4.0.1",
+		"zustand": "5.0.11"
 	},
 	"devDependencies": {
-		"@types/react": "^19.1.16",
-		"@types/react-dom": "^19.1.9",
-		"@types/react-syntax-highlighter": "^15.5.13",
-		"@vitejs/plugin-react": "^5.2.0",
-		"tailwindcss": "3"
+		"@types/react": "19.2.14",
+		"@types/react-dom": "19.2.3",
+		"@types/react-syntax-highlighter": "15.5.13",
+		"@vitejs/plugin-react": "5.2.0",
+		"tailwindcss": "3.4.19"
 	}
 }

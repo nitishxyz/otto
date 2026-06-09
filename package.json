@@ -70,40 +70,16 @@
 		"version:bump": "bun run scripts/bump-version.ts"
 	},
 	"dependencies": {
-		"@ai-sdk/anthropic": "^3.0.82",
-		"@ai-sdk/devtools": "^0.0.18",
-		"@ai-sdk/google": "^3.0.80",
-		"@ai-sdk/openai": "^3.0.69",
-		"@ai-sdk/openai-compatible": "^2.0.48",
-		"@ai-sdk/provider": "^3.0.10",
-		"@ai-sdk/provider-utils": "^4.0.27",
-		"@ai-sdk/xai": "^3.0.93",
-		"@clack/prompts": "^0.11.0",
-		"@noble/ciphers": "^1.3.0",
-		"@noble/hashes": "^1.3.0",
-		"@openauthjs/openauth": "^0.4.3",
-		"@openrouter/ai-sdk-provider": "^2.9.0",
-		"@resvg/resvg-js": "^2.6.2",
-		"@solana/web3.js": "^1.98.0",
-		"ai": "^6.0.199",
-		"bs58": "^6.0.0",
-		"diff": "^8.0.2",
-		"hono": "^4.9.9",
-		"marked": "^16.3.0",
-		"marked-terminal": "^7.3.0",
-		"opencode-anthropic-auth": "^0.0.2",
-		"satori": "^0.19.2",
-		"sst": "^4.12.2",
-		"tweetnacl": "^1.0.3",
-		"x402": "^1.1.0",
-		"zod": "^4.3.6"
+		"@resvg/resvg-js": "2.6.2",
+		"satori": "0.19.2",
+		"sst": "4.12.2"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.4",
-		"@changesets/cli": "^2.31.0",
-		"@types/bun": "latest",
-		"@types/marked-terminal": "^6.1.1",
-		"drizzle-kit": "^0.31.4"
+		"@changesets/cli": "2.31.0",
+		"@types/bun": "1.3.9",
+		"drizzle-kit": "0.31.9",
+		"hono": "4.12.0"
 	},
 	"overrides": {
 		"react": "19.2.0",

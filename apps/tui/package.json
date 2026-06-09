@@ -15,14 +15,14 @@
 		"@opentui/react": "0.1.84",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
-		"eventsource-parser": "^3.0.0",
-		"fuse.js": "^7.1.0",
-		"opentui-spinner": "^0.0.6",
-		"react": "^19.1.1",
-		"zustand": "^5.0.11"
+		"eventsource-parser": "3.0.8",
+		"fuse.js": "7.1.0",
+		"opentui-spinner": "0.0.6",
+		"react": "19.2.0",
+		"zustand": "5.0.11"
 	},
 	"devDependencies": {
-		"@types/react": "^19.1.16",
-		"typescript": "^5.7.0"
+		"@types/react": "19.2.14",
+		"typescript": "5.9.3"
 	}
 }
