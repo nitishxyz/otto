@@ -1,0 +1,14 @@
+- Search file contents using the FFF indexed search engine
+- Returns a flat list of matches with `file`, `line`, and `text`
+- Supports regex patterns, include globs, path constraints, and case-insensitive search
+- Respects `.gitignore` by default
+
+Use this for text/code search across the codebase. It is the primary tool for repository content discovery.
+
+## Usage tips
+
+- Narrow broad searches with `path` and `glob` values.
+- Keep `maxResults` low for broad searches; the tool returns at most that many matches.
+- Batch independent searches (e.g. multiple function names) in a single turn for parallel execution.
+- Use `ignoreCase: true` for case-insensitive matching; pass `glob` patterns (e.g. `["*.ts", "*.tsx"]`) to limit file types.
+- For filename/path discovery, use `glob` first when you already know the file pattern.

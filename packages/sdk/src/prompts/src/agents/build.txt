@@ -31,5 +31,6 @@ After making changes:
 
 ## Searching & discovery
 
-- `ripgrep` for content search, `glob` for filename patterns, `tree` for hierarchical structure.
+- Use the `search` tool for content/code search and `glob` for filename patterns.
+- Reserve `shell` for execution, builds, tests, and other command-line tasks.
 - Batch independent reads/searches in a single turn for performance.

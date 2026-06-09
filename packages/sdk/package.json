@@ -61,9 +61,9 @@
 			"import": "./src/core/src/tools/builtin/progress.ts",
 			"types": "./src/core/src/tools/builtin/progress.ts"
 		},
-		"./tools/builtin/ripgrep": {
-			"import": "./src/core/src/tools/builtin/ripgrep.ts",
-			"types": "./src/core/src/tools/builtin/ripgrep.ts"
+		"./tools/builtin/search": {
+			"import": "./src/core/src/tools/builtin/search.ts",
+			"types": "./src/core/src/tools/builtin/search.ts"
 		},
 		"./tools/builtin/websearch": {
 			"import": "./src/core/src/tools/builtin/websearch.ts",
@@ -80,6 +80,10 @@
 		"./tools/bin-manager": {
 			"import": "./src/core/src/tools/bin-manager.ts",
 			"types": "./src/core/src/tools/bin-manager.ts"
+		},
+		"./search/fff": {
+			"import": "./src/core/src/search/fff.ts",
+			"types": "./src/core/src/search/fff.ts"
 		},
 		"./prompts/*": "./src/prompts/src/*"
 	},
@@ -99,6 +103,7 @@
 		"@ai-sdk/openai": "^3.0.0",
 		"@ai-sdk/openai-compatible": "^2.0.0",
 		"@ai-sdk/xai": "^3.0.0",
+		"@ff-labs/fff-bun": "^0.9.3",
 		"@modelcontextprotocol/sdk": "^1.12",
 		"@openauthjs/openauth": "^0.4.3",
 		"@openrouter/ai-sdk-provider": "^1.2.0",

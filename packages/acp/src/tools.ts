@@ -416,7 +416,7 @@ export function formatToolTitle(
 		case 'shell':
 		case 'bash':
 			return `Run: ${truncate(String(args?.cmd || 'command'), 180)}`;
-		case 'ripgrep':
+		case 'search':
 			return `Search: ${args?.query || ''}`;
 		case 'glob':
 			return `Find files: ${args?.pattern || ''}`;
@@ -462,7 +462,7 @@ export function getToolKind(name: string): ToolKind {
 		case 'bash':
 		case 'terminal':
 			return 'execute';
-		case 'ripgrep':
+		case 'search':
 		case 'glob':
 		case 'web_search':
 		case 'websearch':

@@ -13,7 +13,7 @@ const TOOLS = [
 	{ name: 'shell', category: 'Shell', color: colors.muted },
 	{ name: 'terminal', category: 'Shell', color: colors.muted },
 	{ name: 'apply_patch', category: 'Editing', color: colors.purple },
-	{ name: 'ripgrep', category: 'Search', color: colors.amber },
+	{ name: 'search', category: 'Search', color: colors.amber },
 	{ name: 'glob', category: 'Search', color: colors.amber },
 	{ name: 'git_status', category: 'Git', color: '#F97316' },
 	{ name: 'git_diff', category: 'Git', color: '#F97316' },

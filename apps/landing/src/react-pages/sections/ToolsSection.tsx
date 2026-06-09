@@ -2,7 +2,7 @@ import { Reveal } from '../../components/Reveal';
 
 const TOOL_GROUPS = [
 	{ cat: 'File', items: ['read', 'write', 'ls', 'tree', 'glob'] },
-	{ cat: 'Search', items: ['grep', 'ripgrep', 'websearch'] },
+	{ cat: 'Search', items: ['search', 'glob', 'websearch'] },
 	{ cat: 'Edit', items: ['edit', 'apply_patch'] },
 	{ cat: 'Shell', items: ['shell', 'terminal'] },
 	{ cat: 'Git', items: ['git_status', 'git_diff', 'git_commit'] },

@@ -62,7 +62,7 @@ export function toolCategoryFromName(tool: string): string {
 		return 'Filesystem';
 	if (['edit', 'multiedit', 'write', 'apply_patch'].includes(tool))
 		return 'Editing';
-	if (['ripgrep'].includes(tool)) return 'Search';
+	if (['search'].includes(tool)) return 'Search';
 	if (['shell', 'terminal'].includes(tool)) return 'Shell';
 	if (tool.startsWith('git_')) return 'Git';
 	if (tool === 'websearch') return 'Web';
@@ -202,7 +202,7 @@ export const TOOL_PRESETS: Record<
 				'ls',
 				'tree',
 				'glob',
-				'ripgrep',
+				'search',
 				'websearch',
 			],
 			loadable: ['read_image'],
@@ -219,7 +219,7 @@ export const TOOL_PRESETS: Record<
 				'ls',
 				'tree',
 				'glob',
-				'ripgrep',
+				'search',
 				'websearch',
 			],
 			loadable: ['read_image'],
@@ -235,7 +235,7 @@ export const TOOL_PRESETS: Record<
 				'read',
 				'ls',
 				'tree',
-				'ripgrep',
+				'search',
 				'websearch',
 				'query_sessions',
 				'query_messages',

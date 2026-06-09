@@ -50,11 +50,8 @@ const requireWhisperCli =
 const targetArg = scriptArgs.find((arg) => !arg.startsWith('--'));
 const platformKey = getPlatformKey(targetArg);
 const isWindows = platformKey.startsWith('windows');
-const rgName = isWindows ? 'rg.exe' : 'rg';
 const whisperCliName = isWindows ? 'whisper-cli.exe' : 'whisper-cli';
 
-const rgSource = join(VENDOR_BIN, platformKey, rgName);
-const rgDest = join(CLI_VENDOR, rgName);
 const whisperCliSource = join(VENDOR_BIN, platformKey, whisperCliName);
 const whisperCliDest = join(CLI_VENDOR, whisperCliName);
 
@@ -66,18 +63,6 @@ function writeVendorAssetDeclaration(fileName: string, exportName: string) {
 		join(CLI_VENDOR, `${fileName}.d.ts`),
 		`declare const ${exportName}: string;\nexport default ${exportName};\n`,
 	);
-}
-
-async function ensureVendorRipgrep() {
-	if (existsSync(rgSource)) {
-		return true;
-	}
-
-	console.log(
-		`Vendor ripgrep missing for ${platformKey}; downloading vendor binaries...`,
-	);
-	await $`bash ${join(ROOT, 'scripts', 'download-vendor-bins.sh')} ${platformKey}`;
-	return existsSync(rgSource);
 }
 
 async function ensureVendorWhisperCli() {
@@ -92,17 +77,7 @@ async function ensureVendorWhisperCli() {
 	return existsSync(whisperCliSource);
 }
 
-let hasRg = false;
 let hasWhisperCli = false;
-
-if (await ensureVendorRipgrep()) {
-	copyFileSync(rgSource, rgDest);
-	writeVendorAssetDeclaration(rgName, 'embeddedRgPath');
-	hasRg = true;
-	console.log(`Copied ${platformKey}/${rgName} to apps/cli/vendor/`);
-} else {
-	console.log(`No vendor binary at ${rgSource} — embedded rg will be null`);
-}
 
 if (await ensureVendorWhisperCli()) {
 	copyFileSync(whisperCliSource, whisperCliDest);
@@ -119,22 +94,7 @@ if (await ensureVendorWhisperCli()) {
 	}
 }
 
-const generatedFile = join(GENERATED_DIR, 'embedded-rg.ts');
 const generatedWhisperFile = join(GENERATED_DIR, 'embedded-whisper-cli.ts');
-
-if (hasRg) {
-	writeFileSync(
-		generatedFile,
-		`import embeddedRgPath from '../../vendor/${rgName}' with { type: 'file' };\nexport const embeddedRg: string | null = embeddedRgPath;\n`,
-	);
-	console.log('Generated embedded-rg.ts (with binary)');
-} else {
-	writeFileSync(
-		generatedFile,
-		`export const embeddedRg: string | null = null;\n`,
-	);
-	console.log('Generated embedded-rg.ts (null — no binary available)');
-}
 
 if (hasWhisperCli) {
 	writeFileSync(

@@ -97,7 +97,7 @@ assistant: Clients are marked as failed in the `connectToServer` function in src
 For software engineering requests (bugs, features, refactors, explanations):
 
 1. Use `update_todos` to plan multi-step work.
-2. Explore the codebase with the search tools (`glob`, `ripgrep`, `tree`, `read`). Batch independent searches in parallel.
+2. Explore the codebase with the search tools (`search`, `glob`, `tree`, `read`). Batch independent searches in parallel.
 3. Implement the solution.
 4. Verify — run the project's build/lint/test commands with `shell`. Check `README.md` / `AGENTS.md` to find the right command.
 5. Review diffs with `git_status` / `git_diff`.
@@ -109,7 +109,7 @@ When the user mentions a specific file (e.g. `@publish.config`, `src/app.ts`, `p
 
 - Check the `<project>` listing in the system prompt first — if the file is there, read it directly.
 - Do NOT waste tool calls searching for a file whose path is already known.
-- Fall back to `glob` / `ripgrep` only when the path is genuinely ambiguous.
+- Fall back to `glob` / `search` only when the path is genuinely ambiguous.
 
 # Batching tool calls
 

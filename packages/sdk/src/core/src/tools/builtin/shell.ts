@@ -47,6 +47,17 @@ export type ShellOutputMode = 'auto' | 'full' | 'tail';
 const DEFAULT_TAIL_LINES = 100;
 const DEFAULT_MAX_OUTPUT_BYTES = 128_000;
 
+function looksLikeRepositorySearchCommand(cmd: string): boolean {
+	const normalized = cmd.replace(/\s+/g, ' ').trim();
+	return (
+		/(^|[;&|()]\s*)(rg|ripgrep)(\s|$)/.test(normalized) ||
+		/(^|[;&|()]\s*)grep\s+.*\s(-R|-r|--recursive)(\s|$)/.test(normalized) ||
+		/(^|[;&|()]\s*)find\s+(\.|\.\/|\$PWD|\S*\/).*(-name|-iname|-path|-type)/.test(
+			normalized,
+		)
+	);
+}
+
 type CompactTextResult = {
 	text: string;
 	truncated: boolean;
@@ -218,6 +229,18 @@ export function buildShellTool(projectRoot: string): {
 				return createToolError('Command aborted before execution', 'abort', {
 					cmd,
 				});
+			}
+
+			if (looksLikeRepositorySearchCommand(cmd)) {
+				return createToolError(
+					'This looks like repository discovery. Use the search tool for content/code search or glob for filename/path discovery.',
+					'validation',
+					{
+						cmd,
+						suggestion:
+							'Use search for file contents, or glob for file and path discovery.',
+					},
+				);
 			}
 
 			const absCwd = resolveSafePath(projectRoot, cwd || '.');

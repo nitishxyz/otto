@@ -323,11 +323,7 @@ export const MessagePartItem = memo(
 					);
 				if (isShellTool(toolName))
 					return <Terminal className="h-4 w-4 text-muted-foreground" />;
-				if (
-					toolName === 'ripgrep' ||
-					toolName === 'grep' ||
-					toolName === 'glob'
-				)
+				if (toolName === 'search' || toolName === 'grep' || toolName === 'glob')
 					return (
 						<Search className="h-4 w-4 text-amber-600 dark:text-amber-300" />
 					);

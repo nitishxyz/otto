@@ -48,7 +48,7 @@ export type ToolResultModelOptions = {
 const SHELL_STDOUT_MODEL_BYTES = 24_000;
 const SHELL_STDERR_MODEL_BYTES = 24_000;
 const READ_CONTENT_MODEL_BYTES = 48_000;
-const RIPGREP_MODEL_MATCHES = 80;
+const SEARCH_MODEL_MATCHES = 80;
 const TERMINAL_OUTPUT_MODEL_BYTES = 24_000;
 
 function byteLength(text: string): number {
@@ -183,13 +183,13 @@ function compactReadResultForModel(
 	return compacted;
 }
 
-function compactRipgrepResultForModel(
+function compactSearchResultForModel(
 	result: Record<string, unknown>,
 ): Record<string, unknown> {
 	const matches = Array.isArray(result.matches) ? result.matches : undefined;
 	if (!matches) return result;
 
-	const shownMatches = matches.slice(0, RIPGREP_MODEL_MATCHES);
+	const shownMatches = matches.slice(0, SEARCH_MODEL_MATCHES);
 	return {
 		...result,
 		matches: shownMatches,
@@ -249,8 +249,8 @@ export function stripToolResultArtifactsForModel(
 			return compactShellResultForModel(rest);
 		case 'read':
 			return compactReadResultForModel(rest, options);
-		case 'ripgrep':
-			return compactRipgrepResultForModel(rest);
+		case 'search':
+			return compactSearchResultForModel(rest);
 		case 'terminal':
 			return compactTerminalResultForModel(rest);
 		default:

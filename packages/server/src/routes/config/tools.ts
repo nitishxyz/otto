@@ -34,7 +34,7 @@ const BUILTIN_TOOLS = new Set([
 	'ls',
 	'tree',
 	'glob',
-	'ripgrep',
+	'search',
 	'shell',
 	'terminal',
 	'apply_patch',
@@ -130,7 +130,7 @@ function getToolCategory(name: string): ToolCategory {
 	if (['edit', 'multiedit', 'write', 'apply_patch'].includes(name)) {
 		return 'editing';
 	}
-	if (name === 'ripgrep') return 'search';
+	if (name === 'search') return 'search';
 	if (['shell', 'terminal'].includes(name)) return 'shell';
 	if (name.startsWith('git_')) return 'git';
 	if (name === 'websearch') return 'web';

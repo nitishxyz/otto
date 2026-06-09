@@ -6,7 +6,6 @@ import {
 	chmodSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { embeddedRg } from './generated/embedded-rg.ts';
 import { embeddedWhisperCli } from './generated/embedded-whisper-cli.ts';
 
 function getAgiBinDir(): string {
@@ -20,11 +19,9 @@ const MIN_BINARY_SIZE = 100_000;
 
 export function bootstrapBinaries(): void {
 	const binDir = getAgiBinDir();
-	const rgName = process.platform === 'win32' ? 'rg.exe' : 'rg';
 	const whisperCliName =
 		process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
 
-	bootstrapBinary(embeddedRg, join(binDir, rgName));
 	bootstrapBinary(embeddedWhisperCli, join(binDir, whisperCliName));
 }
 

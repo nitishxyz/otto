@@ -184,7 +184,7 @@ Per-project agent overrides.
     "appendTools": ["git_diff", "glob"]
   },
   "reviewer": {
-    "tools": ["read", "ls", "tree", "ripgrep", "update_todos"],
+    "tools": ["read", "ls", "tree", "search", "update_todos"],
     "prompt": ".otto/agents/reviewer.md",
     "provider": "anthropic",
     "model": "claude-sonnet-4"

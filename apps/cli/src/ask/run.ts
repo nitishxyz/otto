@@ -392,7 +392,7 @@ async function consumeAskStream(flags: StreamFlags): Promise<StreamState> {
 			'read',
 			'ls',
 			'tree',
-			'ripgrep',
+			'search',
 			'git_diff',
 			'git_status',
 		].includes(name);

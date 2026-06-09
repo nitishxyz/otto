@@ -32,7 +32,7 @@ describe('agent config merging', () => {
 			await writeFile(
 				join(homeDir, '.config', 'otto', 'agents.json'),
 				JSON.stringify({
-					build: { appendTools: { firstClass: ['ripgrep'] } },
+					build: { appendTools: { firstClass: ['search'] } },
 				}),
 			);
 			await mkdir(join(projectRoot, '.otto'), { recursive: true });
@@ -44,7 +44,7 @@ describe('agent config merging', () => {
 			);
 
 			const cfg = await resolveAgentConfig(projectRoot, 'build');
-			expect(cfg.toolConfig.firstClass).toContain('ripgrep');
+			expect(cfg.toolConfig.firstClass).toContain('search');
 			expect(cfg.toolConfig.firstClass).toContain('read');
 		} finally {
 			if (prevHome === undefined) delete process.env.HOME;
@@ -181,7 +181,7 @@ describe('agent config merging', () => {
 					build: {
 						prompt: '.otto/agents/build/agent.md',
 						tools: { firstClass: ['read'] },
-						appendTools: { firstClass: ['ripgrep'] },
+						appendTools: { firstClass: ['search'] },
 					},
 				}),
 			);
@@ -195,7 +195,7 @@ describe('agent config merging', () => {
 			expect(detail.toolConfig.firstClass).toContain('read');
 			expect(detail.toolConfig.firstClass).toContain('finish');
 			expect(detail.toolConfig.firstClass).toContain('progress_update');
-			expect(detail.appendToolConfig.firstClass).toContain('ripgrep');
+			expect(detail.appendToolConfig.firstClass).toContain('search');
 			expect(detail.hasLocalOverride).toBe(true);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
@@ -218,7 +218,7 @@ describe('agent config merging', () => {
 					body: JSON.stringify({
 						prompt: 'Review code carefully.',
 						tools: {
-							firstClass: ['read', 'ripgrep'],
+							firstClass: ['read', 'search'],
 							loadable: ['read_image'],
 						},
 						promptStorage: 'file',
@@ -252,7 +252,7 @@ describe('agent config merging', () => {
 			expect(agentsJson.reviewer.prompt).toBe('.otto/agents/reviewer/agent.md');
 			expect(agentsJson.reviewer.tools.firstClass).toEqual([
 				'read',
-				'ripgrep',
+				'search',
 				'finish',
 				'progress_update',
 				'load_tools',

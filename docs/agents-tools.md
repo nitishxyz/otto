@@ -22,7 +22,7 @@ Default implementation agent for code changes.
 Common tools:
 
 - `read`, `write`, `ls`, `tree`, `shell`
-- `glob`, `ripgrep`
+- `glob`, `search`
 - `git_status`, `terminal`
 - `apply_patch`, `update_todos`, `websearch`
 
@@ -33,7 +33,7 @@ Planning/analysis agent.
 Common tools:
 
 - `read`, `ls`, `tree`
-- `ripgrep`
+- `search`
 - `update_todos`, `websearch`
 
 ### `general`
@@ -43,7 +43,7 @@ Broad mixed-purpose agent.
 Common tools:
 
 - `read`, `write`, `ls`, `tree`, `shell`
-- `glob`, `ripgrep`
+- `glob`, `search`
 - `update_todos`, `websearch`
 
 ### `research`
@@ -52,7 +52,7 @@ Research-oriented agent that can inspect prior sessions and related context.
 
 Common tools:
 
-- `read`, `ls`, `tree`, `ripgrep`, `websearch`
+- `read`, `ls`, `tree`, `search`, `websearch`
 - `update_todos`
 - `query_sessions`, `query_messages`, `get_session_context`
 - `search_history`, `get_parent_session`, `present_action`
@@ -80,7 +80,7 @@ only receive the subset defined by their preset or config overrides.
 
 | Tool | Description |
 |---|---|
-| `ripgrep` | Fast regex/code search |
+| `search` | Fast indexed regex/code search |
 | `websearch` | Web search or URL fetch |
 
 ### Editing
@@ -141,7 +141,7 @@ Example:
     "appendTools": ["git_diff", "glob"]
   },
   "reviewer": {
-    "tools": ["read", "ls", "tree", "ripgrep", "update_todos"],
+    "tools": ["read", "ls", "tree", "search", "update_todos"],
     "prompt": ".otto/agents/reviewer.md"
   }
 }

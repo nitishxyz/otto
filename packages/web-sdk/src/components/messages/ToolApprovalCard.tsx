@@ -74,7 +74,7 @@ function normalizeToolTarget(
 		apply_patch: ['path'],
 		glob: ['pattern'],
 		grep: ['query', 'pattern'],
-		ripgrep: ['query', 'pattern'],
+		search: ['query', 'pattern'],
 		shell: ['cmd', 'command'],
 		bash: ['cmd', 'command'],
 		terminal: ['command'],

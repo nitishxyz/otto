@@ -95,7 +95,7 @@ to see the actual default tool list for that preset.
 Current exported tool names include file, search, patch, git, terminal, control, and research helpers such as:
 
 - `read`, `write`, `ls`, `tree`, `pwd`, `cd`, `glob`
-- `ripgrep`, `websearch`
+- `search`, `websearch`
 - `apply_patch`
 - `shell`, `terminal`
 - `git_status`, `git_diff`, `git_commit`
@@ -162,7 +162,7 @@ const app = createEmbeddedApp({
   agents: {
     general: {
       ...BUILTIN_AGENTS.general,
-      tools: ['read', 'ls', 'tree', 'ripgrep', 'update_todos', 'websearch'],
+      tools: ['read', 'ls', 'tree', 'search', 'update_todos', 'websearch'],
     },
   },
 });

@@ -4,7 +4,7 @@ import { join, relative, resolve } from 'node:path';
 import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { logger } from '@ottocode/sdk';
-import { resolveBinary } from '@ottocode/sdk/tools/bin-manager';
+import { searchFffFiles } from '@ottocode/sdk/search/fff';
 
 const execAsync = promisify(exec);
 
@@ -83,64 +83,37 @@ function shouldExcludeSearchDir(name: string): boolean {
 	return shouldExcludeDir(name) || name.startsWith('.');
 }
 
-export async function listFilesWithRg(
+export async function listFilesWithSearch(
 	projectRoot: string,
 	maxDepth: number,
 	limit: number,
-	includeIgnored = false,
+	_includeIgnored = false,
 	query = '',
 ): Promise<{ files: string[]; truncated: boolean }> {
-	const rgBin = await resolveBinary('rg');
-
-	return new Promise((resolve) => {
-		const args = ['--files', '--sort', 'path', '--max-depth', String(maxDepth)];
-		if (includeIgnored) {
-			args.push('--no-ignore');
-		}
-		for (const dir of EXCLUDED_DIRS) {
-			args.push('--glob', `!**/${dir}/**`);
-		}
-
-		const proc = spawn(rgBin, args, { cwd: projectRoot });
-		let stdout = '';
-		let stderr = '';
-
-		proc.stdout.on('data', (data) => {
-			stdout += data.toString();
+	try {
+		const result = await searchFffFiles({
+			projectRoot,
+			maxDepth,
+			limit,
+			query,
+			exclude: Array.from(EXCLUDED_DIRS, (dir) => `${dir}/`),
 		});
-
-		proc.stderr.on('data', (data) => {
-			stderr += data.toString();
-		});
-
-		proc.on('close', (code) => {
-			if (code !== 0 && code !== 1) {
-				logger.warn('rg --files failed, falling back', { stderr } as Record<
-					string,
-					unknown
-				>);
-				resolve({ files: [], truncated: false });
-				return;
-			}
-
-			const allFiles = stdout.split('\n').filter(Boolean);
-
-			const normalizedQuery = query.trim().toLowerCase();
-			const filtered = allFiles.filter((f) => {
+		return {
+			files: result.files.filter((f) => {
+				if (f.split(/[\\/]/).some((part) => shouldExcludeSearchDir(part))) {
+					return false;
+				}
 				const filename = f.split(/[\\/]/).pop() || f;
-				if (shouldExcludeFile(filename)) return false;
-				if (!normalizedQuery) return true;
-				return f.toLowerCase().includes(normalizedQuery);
-			});
-
-			const truncated = filtered.length > limit;
-			resolve({ files: filtered.slice(0, limit), truncated });
-		});
-
-		proc.on('error', () => {
-			resolve({ files: [], truncated: false });
-		});
-	});
+				return !shouldExcludeFile(filename);
+			}),
+			truncated: result.truncated,
+		};
+	} catch (error) {
+		logger.warn('FFF file search failed, falling back', {
+			error: String(error),
+		} as Record<string, unknown>);
+		return { files: [], truncated: false };
+	}
 }
 
 export async function parseGitignore(

@@ -11,19 +11,19 @@ const AGENTS = [
 		name: 'plan',
 		color: 'text-blue-700 dark:text-blue-400',
 		desc: 'Architecture planning and analysis. Read-only — cannot modify files.',
-		tools: ['read', 'ls', 'tree', 'ripgrep', 'websearch'],
+		tools: ['read', 'ls', 'tree', 'search', 'websearch'],
 	},
 	{
 		name: 'general',
 		color: 'text-yellow-400',
 		desc: 'General-purpose assistant. Balanced toolset for everyday work.',
-		tools: ['read', 'write', 'shell', 'ripgrep', 'glob'],
+		tools: ['read', 'write', 'shell', 'search', 'glob'],
 	},
 	{
 		name: 'research',
 		color: 'text-purple-700 dark:text-purple-400',
 		desc: 'Deep research across sessions and the web. Queries past context.',
-		tools: ['read', 'ripgrep', 'websearch', 'query_sessions'],
+		tools: ['read', 'search', 'websearch', 'query_sessions'],
 	},
 ];
 

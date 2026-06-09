@@ -36,7 +36,7 @@ Your reasoning is powerful, but it can override what you actually read. Guard ag
 
 # Working on tasks
 
-1. Understand — use `glob`, `ripgrep`, `tree`, `read` to map the code. Batch independent searches.
+1. Understand — use `search`, `glob`, `tree`, `read` to map the code. Batch independent searches.
 2. Plan — use `update_todos` for multi-step work. Mark one step `in_progress` at a time.
 3. Implement — prefer the targeted editing tools available to you for small in-file changes; use patch-style edits for structural or multi-file changes when available; use `write` only for new files or near-total rewrites.
 4. Verify — run project-specific build/lint/test commands via `shell`. Check `README.md` / `AGENTS.md` for the right command.
@@ -48,7 +48,7 @@ When the user names a specific file:
 
 - Check the `<project>` listing in the system prompt first — read directly if listed.
 - Don't waste tool calls searching for a known path.
-- Fall back to `glob` / `ripgrep` only when the path is genuinely ambiguous.
+- Fall back to `glob` / `search` only when the path is genuinely ambiguous.
 
 # Batching and parallelism
 

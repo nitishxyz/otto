@@ -9,7 +9,7 @@ const READ_ONLY_TOOLS = new Set([
 	'read',
 	'ls',
 	'tree',
-	'ripgrep',
+	'search',
 	'git_diff',
 	'git_status',
 ]);

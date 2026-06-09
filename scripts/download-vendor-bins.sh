@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RIPGREP_VERSION="14.1.1"
 WHISPER_CPP_VERSION="v1.8.5"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,7 +31,6 @@ platform_requested() {
 }
 
 echo "=== Downloading vendor binaries ==="
-echo "ripgrep v${RIPGREP_VERSION}"
 echo "whisper.cpp ${WHISPER_CPP_VERSION}"
 if [[ ${#REQUESTED_PLATFORMS[@]} -gt 0 ]]; then
   echo "platforms ${REQUESTED_PLATFORMS[*]}"
@@ -94,50 +92,6 @@ build_host_whisper_cli() {
   echo "    ✓ done ($(du -h "$dest" | cut -f1))"
 }
 
-for entry in "${PLATFORMS[@]}"; do
-  PLATFORM="${entry%%:*}"
-  RG_TARGET="${entry##*:}"
-
-  if ! platform_requested "$PLATFORM"; then
-    continue
-  fi
-
-  DIR="$VENDOR_BIN/$PLATFORM"
-  mkdir -p "$DIR"
-
-  RG_BIN="$DIR/rg"
-  EXT="tar.gz"
-  if [[ "$PLATFORM" == windows-* ]]; then
-    RG_BIN="$DIR/rg.exe"
-    EXT="zip"
-  fi
-
-  if [[ -f "$RG_BIN" ]]; then
-    echo "  ✓ $PLATFORM/rg (exists)"
-    continue
-  fi
-
-  echo "  ↓ $PLATFORM/rg ..."
-  RG_ARCHIVE="ripgrep-${RIPGREP_VERSION}-${RG_TARGET}"
-  URL="https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/${RG_ARCHIVE}.${EXT}"
-
-  TMP_DIR=$(mktemp -d)
-  trap "rm -rf $TMP_DIR" EXIT
-
-  if [[ "$EXT" == "zip" ]]; then
-    curl -fsSL "$URL" -o "$TMP_DIR/rg.zip"
-    unzip -q "$TMP_DIR/rg.zip" -d "$TMP_DIR"
-    cp "$TMP_DIR/${RG_ARCHIVE}/rg.exe" "$RG_BIN"
-  else
-    curl -fsSL "$URL" | tar -xz -C "$TMP_DIR"
-    cp "$TMP_DIR/${RG_ARCHIVE}/rg" "$RG_BIN"
-  fi
-
-  chmod +x "$RG_BIN"
-  echo "    ✓ done ($(du -h "$RG_BIN" | cut -f1))"
-done
-
-echo ""
 echo "=== Preparing whisper.cpp CLI ==="
 HOST_PLATFORM="$(detect_host_platform)"
 

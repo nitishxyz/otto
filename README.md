@@ -147,7 +147,7 @@ The built-in tool surface available to agents:
 | Category | Tools |
 |---|---|
 | **File system** | `read` · `write` · `ls` · `tree` · `pwd` · `cd` · `glob` |
-| **Search** | `ripgrep` · `websearch` |
+| **Search** | `search` · `websearch` |
 | **Editing** | `apply_patch` |
 | **Shell** | `shell` · `terminal` |
 | **Git** | `git_status` · `git_diff` · `git_commit` |

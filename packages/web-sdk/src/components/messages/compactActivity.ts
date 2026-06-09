@@ -4,7 +4,7 @@ const EXPLORATION_TOOL_NAMES = new Set([
 	'read',
 	'ls',
 	'tree',
-	'ripgrep',
+	'search',
 	'grep',
 	'glob',
 	'websearch',
@@ -182,7 +182,7 @@ export function getCompactActivityEntry(
 	}
 
 	if (
-		part.toolName === 'ripgrep' ||
+		part.toolName === 'search' ||
 		part.toolName === 'grep' ||
 		part.toolName === 'glob'
 	) {
@@ -409,7 +409,7 @@ export function summarizeCompactActivities(
 			case 'tree':
 				scans += 1;
 				break;
-			case 'ripgrep':
+			case 'search':
 			case 'grep':
 			case 'glob':
 				searches += 1;

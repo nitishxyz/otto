@@ -28,7 +28,7 @@ export const CANONICAL_TO_PASCAL: Record<string, string> = {
 
 	// Search operations
 	glob: 'Glob',
-	ripgrep: 'Grep',
+	search: 'Search',
 
 	// Execution
 	shell: 'Shell',
@@ -54,7 +54,7 @@ export const CANONICAL_TO_PASCAL: Record<string, string> = {
 
 /**
  * Reverse mapping from PascalCase names to canonical.
- * Built to handle the many-to-one ripgrep/grep → Grep mapping.
+ * Built to handle Claude Code style tool names.
  */
 export const PASCAL_TO_CANONICAL: Record<string, string> = {
 	// File system operations
@@ -70,7 +70,8 @@ export const PASCAL_TO_CANONICAL: Record<string, string> = {
 
 	// Search operations
 	Glob: 'glob',
-	Grep: 'ripgrep', // Maps back to ripgrep (primary search tool)
+	Grep: 'search',
+	Search: 'search',
 
 	// Execution
 	Shell: 'shell',

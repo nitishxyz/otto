@@ -20,7 +20,7 @@ Help users find information from past sessions, session history, and the codebas
 
 ## Codebase Tools
 
-- `read`, `ripgrep`, `tree`, `ls`
+- `read`, `search`, `glob`, `tree`, `ls`
 
 ## Research Strategy
 

@@ -98,7 +98,7 @@ describe('Built-in Tools', () => {
 		expect(names).toContain('git_status');
 		expect(names).toContain('git_diff');
 		expect(names).toContain('git_commit');
-		expect(names).toContain('ripgrep');
+		expect(names).toContain('search');
 		expect(names).toContain('glob');
 		expect(names).toContain('apply_patch');
 		expect(names).toContain('finish');
@@ -388,6 +388,21 @@ describe('Built-in Tools', () => {
 			);
 			expect(result).toMatchObject({ ok: false });
 		});
+
+		it('should block repository search commands', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+
+			const result = await resolveStreamedResult(
+				await shellTool?.tool.execute({
+					cmd: 'rg "Hello"',
+					allowNonZeroExit: true,
+				}),
+			);
+
+			expect(result).toMatchObject({ ok: false });
+			expect((result as { error: string }).error).toContain('search tool');
+		});
 	});
 
 	describe('git tools', () => {
@@ -410,12 +425,12 @@ describe('Built-in Tools', () => {
 		});
 	});
 
-	describe('ripgrep tool', () => {
+	describe('search tool', () => {
 		it('should search for patterns', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
-			const ripgrepTool = tools.find((t) => t.name === 'ripgrep');
+			const searchTool = tools.find((t) => t.name === 'search');
 
-			const result = await ripgrepTool?.tool.execute({
+			const result = await searchTool?.tool.execute({
 				query: 'Hello',
 				path: '.',
 			});
@@ -427,9 +442,9 @@ describe('Built-in Tools', () => {
 
 		it('should handle no matches gracefully', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
-			const ripgrepTool = tools.find((t) => t.name === 'ripgrep');
+			const searchTool = tools.find((t) => t.name === 'search');
 
-			const result = await ripgrepTool?.tool.execute({
+			const result = await searchTool?.tool.execute({
 				query: 'NONEXISTENT_STRING_XYZ',
 				path: '.',
 			});
@@ -440,9 +455,9 @@ describe('Built-in Tools', () => {
 			await writeFile(join(projectRoot, 'many-a.txt'), 'needle\nneedle\n');
 			await writeFile(join(projectRoot, 'many-b.txt'), 'needle\nneedle\n');
 			const { tools } = await discoverProjectTools(projectRoot);
-			const ripgrepTool = tools.find((t) => t.name === 'ripgrep');
+			const searchTool = tools.find((t) => t.name === 'search');
 
-			const result = await ripgrepTool?.tool.execute({
+			const result = await searchTool?.tool.execute({
 				query: 'needle',
 				path: '.',
 				maxResults: 2,
@@ -457,7 +472,7 @@ describe('Built-in Tools', () => {
 	describe('grep tool', () => {
 		it('should search in files', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
-			const grepTool = tools.find((t) => t.name === 'ripgrep');
+			const grepTool = tools.find((t) => t.name === 'search');
 
 			const result = await grepTool?.tool.execute({
 				query: 'Hello',
@@ -469,7 +484,7 @@ describe('Built-in Tools', () => {
 
 		it('should support file includes', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
-			const grepTool = tools.find((t) => t.name === 'ripgrep');
+			const grepTool = tools.find((t) => t.name === 'search');
 
 			const result = await grepTool?.tool.execute({
 				query: 'export',
@@ -478,6 +493,22 @@ describe('Built-in Tools', () => {
 			});
 			expect(result).toHaveProperty('matches');
 			expect(result).toHaveProperty('count');
+		});
+
+		it('should treat multiple include globs as alternatives', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const grepTool = tools.find((t) => t.name === 'search');
+
+			const result = await grepTool?.tool.execute({
+				query: 'Hello',
+				path: '.',
+				glob: ['*.ts', '*.txt'],
+			});
+
+			expect((result as { count: number }).count).toBeGreaterThan(0);
+			expect((result as { matches: Array<{ file: string }> }).matches).toEqual(
+				expect.arrayContaining([expect.objectContaining({ file: 'test.txt' })]),
+			);
 		});
 	});
 

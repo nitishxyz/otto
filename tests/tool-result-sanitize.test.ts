@@ -68,7 +68,7 @@ describe('tool result model sanitization', () => {
 		expect(sanitized.stdoutTruncated).toBe(true);
 	});
 
-	it('caps ripgrep matches for model-visible history', () => {
+	it('caps search matches for model-visible history', () => {
 		const result = {
 			ok: true,
 			count: 200,
@@ -80,7 +80,7 @@ describe('tool result model sanitization', () => {
 		};
 
 		const sanitized = stripToolResultArtifactsForModel(result, {
-			toolName: 'ripgrep',
+			toolName: 'search',
 		}) as { matches: unknown[]; truncated?: boolean; originalMatches?: number };
 
 		expect(sanitized.matches).toHaveLength(80);

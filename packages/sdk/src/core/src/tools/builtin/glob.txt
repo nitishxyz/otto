@@ -8,6 +8,6 @@
 
 ## Usage tips
 
-- Use `glob` for filename patterns; use `ripgrep` for file contents.
+- Use `glob` for filename patterns; use `search` for file contents.
 - Combine with `path` to restrict the search to a subdirectory.
 - Prefer reading a known file directly over globbing to "find" it (check the `<project>` listing in the system prompt first).

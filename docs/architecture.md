@@ -255,7 +255,7 @@ Core built-ins include:
 - note: this is the overall built-in tool universe, not the tool list granted to every agent
 
 - file tools: `read`, `write`, `ls`, `tree`, `pwd`, `cd`, `glob`
-- search/web: `ripgrep`, `websearch`
+- search/web: `search`, `websearch`
 - editing: `apply_patch`
 - runtime: `shell`, `terminal`
 - git: `git_status`, `git_diff`, `git_commit`

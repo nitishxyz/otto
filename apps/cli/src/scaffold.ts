@@ -150,7 +150,7 @@ async function scaffoldAgent(
 async function scaffoldTool(projectRoot: string, baseDir: string) {
 	const id = await text({
 		message: 'Tool id (slug)',
-		placeholder: 'e.g. git_tag, ripgrep',
+		placeholder: 'e.g. git_tag, search',
 		validate: (v) =>
 			/^[a-zA-Z0-9][a-zA-Z0-9_-]{1,63}$/.test(String(v))
 				? undefined
@@ -486,7 +486,7 @@ export async function listAvailableTools(
 		'write',
 		'ls',
 		'tree',
-		'ripgrep',
+		'search',
 		'apply_patch',
 		'update_todos',
 		'git_status',

@@ -10,7 +10,7 @@ import {
 	getGitIgnoredFiles,
 	getSearchPolicy,
 	isHomeDirectory,
-	listFilesWithRg,
+	listFilesWithSearch,
 	matchesGitignorePattern,
 	parseGitignore,
 	shouldExcludeDir,
@@ -25,7 +25,7 @@ async function getSortedFileResult(args: {
 	query?: string;
 }) {
 	const policy = getSearchPolicy(args.projectRoot);
-	let result = await listFilesWithRg(
+	let result = await listFilesWithSearch(
 		args.projectRoot,
 		args.maxDepth,
 		args.limit,

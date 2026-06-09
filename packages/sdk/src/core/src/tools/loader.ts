@@ -5,7 +5,7 @@ import { buildFsTools } from './builtin/fs/index.ts';
 import { buildGitTools } from './builtin/git.ts';
 import { progressUpdateTool } from './builtin/progress.ts';
 import { buildShellTool } from './builtin/shell.ts';
-import { buildRipgrepTool } from './builtin/ripgrep.ts';
+import { buildSearchTool } from './builtin/search.ts';
 import { buildGlobTool } from './builtin/glob.ts';
 import { buildApplyPatchTool } from './builtin/patch.ts';
 import { updateTodosTool } from './builtin/todos.ts';
@@ -153,8 +153,8 @@ async function discoverStaticProjectTools(
 		const shell = buildShellTool(projectRoot);
 		tools.set(shell.name, shell.tool);
 		// Search
-		const rg = buildRipgrepTool(projectRoot);
-		tools.set(rg.name, rg.tool);
+		const search = buildSearchTool(projectRoot);
+		tools.set(search.name, search.tool);
 		const glob = buildGlobTool(projectRoot);
 		tools.set(glob.name, glob.tool);
 		// Patch/apply

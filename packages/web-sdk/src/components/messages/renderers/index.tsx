@@ -57,7 +57,8 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
 	Pwd: 'pwd',
 
 	Glob: 'glob',
-	Grep: 'ripgrep',
+	Grep: 'search',
+	Search: 'search',
 
 	Shell: 'shell',
 	Bash: 'shell',
@@ -159,7 +160,7 @@ export function ToolResultRenderer({
 			return <ListRenderer {...props} />;
 		case 'tree':
 			return <TreeRenderer {...props} />;
-		case 'ripgrep':
+		case 'search':
 		case 'grep':
 		case 'glob':
 			return <SearchRenderer {...props} />;

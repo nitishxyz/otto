@@ -74,7 +74,7 @@ export const BUILTIN_TOOLS = [
 	'cd',
 	'shell',
 	'terminal',
-	'ripgrep',
+	'search',
 	'glob',
 	'git_status',
 	'git_diff',

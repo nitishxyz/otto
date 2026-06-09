@@ -5,6 +5,6 @@
 
 Usage tips:
 - Prefer relative project paths when possible (more portable)
-- For large files or searches, use the Grep or Ripgrep tool
+- For large files or searches, use the `search` tool
 - Use startLine/endLine or startLine/maxLines for targeted reads of large files
 - If startLine is provided without endLine or maxLines, only that one line is read
