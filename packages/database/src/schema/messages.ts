@@ -21,6 +21,10 @@ export const messages = sqliteTable('messages', {
 	cachedInputTokens: integer('cached_input_tokens'),
 	cacheCreationInputTokens: integer('cache_creation_input_tokens'),
 	reasoningTokens: integer('reasoning_tokens'),
+	// Stream completion diagnostics
+	finishReason: text('finish_reason'),
+	rawFinishReason: text('raw_finish_reason'),
+	finishDetails: text('finish_details'), // JSON string with provider/stream details
 	// Error fields
 	error: text('error'),
 	errorType: text('error_type'), // 'api_error', 'abort', 'validation_error', etc.

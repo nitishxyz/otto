@@ -381,5 +381,3 @@ export function registerAttachmentRoutes(app: Hono) {
 		},
 	);
 }
-
-export type { StoredAttachmentMetadata };

@@ -96,7 +96,8 @@ async function attachDirectImages(args: {
 					},
 				};
 			} catch (error) {
-				logger.warn('Failed to store direct image attachment', error, {
+				logger.warn('Failed to store direct image attachment', {
+					error,
 					sessionId: args.sessionId,
 				});
 				return image;

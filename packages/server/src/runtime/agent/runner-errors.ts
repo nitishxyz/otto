@@ -143,6 +143,7 @@ export async function handleRunnerError(args: {
 				error: payload.message,
 				errorType: payload.type,
 				errorDetails: JSON.stringify(payload.details ?? {}),
+				finishReason: 'error',
 				isAborted: false,
 			})
 			.where(eq(messages.id, opts.assistantMessageId));

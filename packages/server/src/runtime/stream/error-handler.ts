@@ -343,6 +343,7 @@ export function createErrorHandler(
 					isApiError,
 					autoCompacted: isPromptTooLong && !opts.isCompactCommand,
 				}),
+				finishReason: 'error',
 				isAborted: false,
 			})
 			.where(eq(messages.id, opts.assistantMessageId));

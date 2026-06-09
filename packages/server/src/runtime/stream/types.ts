@@ -18,6 +18,9 @@ export type FinishEvent = {
 		| 'reasoningTokens'
 	>;
 	finishReason?: string;
+	rawFinishReason?: string;
+	providerMetadata?: ProviderMetadata;
+	response?: unknown;
 };
 
 export type AbortEvent = {

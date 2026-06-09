@@ -27,6 +27,9 @@ export interface Message {
 	promptTokens: number | null;
 	completionTokens: number | null;
 	totalTokens: number | null;
+	finishReason?: string | null;
+	rawFinishReason?: string | null;
+	finishDetails?: string | null;
 	error: string | null;
 	parts?: MessagePart[];
 	attachmentNames?: string[];

@@ -112,7 +112,11 @@ async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 	await cleanupEmptyTextParts(opts, db);
 	await db
 		.update(messages)
-		.set({ status: 'complete', completedAt: Date.now() })
+		.set({
+			status: 'complete',
+			completedAt: Date.now(),
+			finishReason: 'stream-idle-retry',
+		})
 		.where(eq(messages.id, opts.assistantMessageId));
 	publish({
 		type: 'message.completed',
@@ -647,6 +651,42 @@ async function runAssistant(opts: RunOpts) {
 			streamRawFinishReason = undefined;
 		}
 
+		try {
+			const existingRows = await db
+				.select({ finishDetails: messages.finishDetails })
+				.from(messages)
+				.where(eq(messages.id, opts.assistantMessageId))
+				.limit(1);
+			let finishDetails: Record<string, unknown> = {};
+			try {
+				finishDetails = existingRows[0]?.finishDetails
+					? JSON.parse(existingRows[0].finishDetails)
+					: {};
+			} catch {
+				finishDetails = {};
+			}
+			await db
+				.update(messages)
+				.set({
+					finishReason: streamFinishReason,
+					rawFinishReason: streamRawFinishReason,
+					finishDetails: JSON.stringify({
+						...finishDetails,
+						stream: {
+							finishObserved: toolObserver.state.finishObserved,
+							firstToolSeen: firstToolSeen(),
+							lastToolName: toolObserver.state.lastToolName,
+							endedWithToolActivity: toolObserver.state.endedWithToolActivity,
+							hasTrailingAssistantText:
+								(textState.latestAssistantText || textState.accumulated).trim()
+									.length > 0,
+							continuationCount: opts.continuationCount ?? 0,
+						},
+					}),
+				})
+				.where(eq(messages.id, opts.assistantMessageId));
+		} catch {}
+
 		if (dump) {
 			const finalTextSnapshot =
 				textState.latestAssistantText || textState.accumulated;
@@ -672,7 +712,7 @@ async function runAssistant(opts: RunOpts) {
 		);
 		if (isSendNowPreempt) {
 			if (!sendNowPreemptHandled) {
-				await completeAssistantMessage({}, opts, db);
+				await completeAssistantMessage({ finishReason: 'preempted' }, opts, db);
 				publish({
 					type: 'message.completed',
 					sessionId: opts.sessionId,

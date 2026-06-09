@@ -31,6 +31,7 @@ export function createAbortHandler(
 						stepsCompleted: steps.length,
 						preemptedAt: Date.now(),
 					}),
+					finishReason: 'preempted',
 					isAborted: false,
 				})
 				.where(eq(messages.id, opts.assistantMessageId));
@@ -77,6 +78,7 @@ export function createAbortHandler(
 					stepsCompleted: steps.length,
 					abortedAt: Date.now(),
 				}),
+				finishReason: 'abort',
 				isAborted: true,
 			})
 			.where(eq(messages.id, opts.assistantMessageId));

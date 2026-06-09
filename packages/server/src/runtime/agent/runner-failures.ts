@@ -56,6 +56,7 @@ export async function markUnhandledAssistantRunFailure(
 				error: message,
 				errorType: payload.type,
 				errorDetails: JSON.stringify(payload.details ?? {}),
+				finishReason: 'error',
 				isAborted: false,
 			})
 			.where(eq(messages.id, opts.assistantMessageId));

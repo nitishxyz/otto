@@ -82,6 +82,7 @@ export function createFinishHandler(
 				usage,
 				costUsd,
 				finishReason: fin.finishReason,
+				rawFinishReason: fin.rawFinishReason,
 			},
 		});
 

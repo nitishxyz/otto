@@ -331,6 +331,8 @@ export interface MessageCompletedEvent {
 		completionTokens: number;
 		totalTokens: number;
 	};
+	finishReason?: string;
+	rawFinishReason?: string;
 }
 
 export interface ErrorEvent {
