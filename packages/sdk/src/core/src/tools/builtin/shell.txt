@@ -1,4 +1,4 @@
-- Execute a non-interactive shell command using `bash -lc`
+- Execute a non-interactive shell command using the user's shell with startup PATH loaded
 - Returns `stdout`, `stderr`, and `exitCode`
 - `cwd` is relative to the project root and sandboxed within it
 

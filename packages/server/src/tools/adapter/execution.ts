@@ -1,6 +1,6 @@
 import type { Tool } from 'ai';
 import { shellExecutorContext, type ShellExecutor } from '@ottocode/sdk';
-import { getAugmentedPath } from '@ottocode/sdk/tools/bin-manager';
+import { getShellExecutionConfig } from '@ottocode/sdk/tools/bin-manager';
 import { appendTailLines } from '@ottocode/sdk/tools/builtin/shell';
 import { createToolError, type ToolResponse } from '@ottocode/sdk/tools/error';
 import { spawn } from 'node:child_process';
@@ -59,16 +59,11 @@ function createSecureShellExecutor(args: {
 		const timeout = input.timeout ?? 300000;
 		const outputMode = input.outputMode ?? 'full';
 		const tailLines = input.tailLines ?? 100;
-		const command =
-			process.platform === 'win32'
-				? process.env.COMSPEC || 'cmd.exe'
-				: process.env.SHELL || '/bin/bash';
-		const commandArgs =
-			process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-lc', cmd];
-		const proc = spawn(command, commandArgs, {
+		const shellConfig = getShellExecutionConfig(cmd);
+		const proc = spawn(shellConfig.command, shellConfig.args, {
 			cwd: input.cwd,
 			stdio: ['pipe', 'pipe', 'pipe'],
-			env: { ...process.env, PATH: getAugmentedPath() },
+			env: shellConfig.env,
 			detached: true,
 		});
 

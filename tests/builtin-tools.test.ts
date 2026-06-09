@@ -1,5 +1,12 @@
 import { describe, expect, it, beforeAll, afterAll } from 'bun:test';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import {
+	mkdtemp,
+	mkdir,
+	readFile,
+	writeFile,
+	rm,
+	chmod,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { discoverProjectTools } from '@ottocode/sdk';
@@ -334,6 +341,46 @@ describe('Built-in Tools', () => {
 	});
 
 	describe('shell tool', () => {
+		it('should load PATH from user shell startup files', async () => {
+			if (process.platform === 'win32') return;
+
+			const originalHome = process.env.HOME;
+			const originalShell = process.env.SHELL;
+			const originalPath = process.env.PATH;
+			const home = join(testDir, 'shell-home');
+			const binDir = join(testDir, 'shell-bin');
+			const commandPath = join(binDir, 'otto-shell-path-test');
+			await mkdir(home, { recursive: true });
+			await mkdir(binDir, { recursive: true });
+			await writeFile(commandPath, '#!/bin/sh\necho startup-path-ok\n');
+			await chmod(commandPath, 0o755);
+			await writeFile(join(home, '.bashrc'), `export PATH="${binDir}:$PATH"\n`);
+
+			try {
+				process.env.HOME = home;
+				process.env.SHELL = '/bin/bash';
+				process.env.PATH = '/usr/bin:/bin';
+
+				const { tools } = await discoverProjectTools(projectRoot);
+				const shellTool = tools.find((t) => t.name === 'shell');
+				const result = await resolveStreamedResult(
+					await shellTool?.tool.execute({ cmd: 'otto-shell-path-test' }),
+				);
+
+				expect(result).toMatchObject({ ok: true });
+				expect((result as { stdout: string }).stdout).toContain(
+					'startup-path-ok',
+				);
+			} finally {
+				if (originalHome === undefined) delete process.env.HOME;
+				else process.env.HOME = originalHome;
+				if (originalShell === undefined) delete process.env.SHELL;
+				else process.env.SHELL = originalShell;
+				if (originalPath === undefined) delete process.env.PATH;
+				else process.env.PATH = originalPath;
+			}
+		});
+
 		it('should execute shell commands', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');

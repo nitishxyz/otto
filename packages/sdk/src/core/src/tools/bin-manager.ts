@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import {
 	clearCachedBinaries,
@@ -64,6 +64,44 @@ export function clearBinaryCache(): void {
 	clearCachedBinaries();
 }
 
+export function getUserShell(): string {
+	if (process.platform === 'win32') return process.env.COMSPEC || 'cmd.exe';
+	return process.env.SHELL || '/bin/bash';
+}
+
+function getShellRcBootstrap(shell: string): string {
+	const shellName = shell.split('/').pop() || '';
+	if (shellName.includes('zsh')) {
+		return 'if [ -f "$HOME/.zshrc" ]; then . "$HOME/.zshrc"; fi';
+	}
+	if (shellName.includes('bash')) {
+		return 'if [ -f "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi';
+	}
+	return '';
+}
+
+export function getShellExecutionConfig(cmd: string): {
+	command: string;
+	args: string[];
+	env: NodeJS.ProcessEnv;
+} {
+	const env = { ...process.env, PATH: getAugmentedPath() };
+	if (process.platform === 'win32') {
+		return {
+			command: getUserShell(),
+			args: ['/d', '/s', '/c', cmd],
+			env,
+		};
+	}
+
+	const command = getUserShell();
+	return {
+		command,
+		args: ['-lc', 'eval "$OTTO_SHELL_COMMAND"'],
+		env: { ...env, OTTO_SHELL_COMMAND: cmd },
+	};
+}
+
 function getLoginShellPath(): string | null {
 	if (cachedLoginPath !== null) return cachedLoginPath;
 
@@ -82,10 +120,17 @@ function getLoginShellPath(): string | null {
 
 	for (const shell of shellCandidates) {
 		try {
-			const result = execSync(`${shell} -ilc 'echo "___PATH___:$PATH"'`, {
+			const rcBootstrap = getShellRcBootstrap(shell);
+			const pathCommand = `${rcBootstrap ? `${rcBootstrap}\n` : ''}echo "___PATH___:$PATH"`;
+			const result = execFileSync(shell, ['-ilc', pathCommand], {
 				timeout: 5000,
 				stdio: ['ignore', 'pipe', 'ignore'],
-				env: { HOME: home, USER: process.env.USER || '', SHELL: shell },
+				env: {
+					...process.env,
+					HOME: home,
+					USER: process.env.USER || '',
+					SHELL: shell,
+				},
 			});
 			const output = result.toString();
 			const match = output.match(/___PATH___:(.*)/);

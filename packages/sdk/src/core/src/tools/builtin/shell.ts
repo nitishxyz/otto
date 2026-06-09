@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import { z } from 'zod/v3';
 import DESCRIPTION from './shell.txt' with { type: 'text' };
-import { getAugmentedPath } from '../bin-manager.ts';
+import { getShellExecutionConfig } from '../bin-manager.ts';
 import { createToolError, type ToolResponse } from '../error.ts';
 import { injectCoAuthorIntoGitCommit } from './git-identity.ts';
 
@@ -147,7 +147,9 @@ const shellInputSchema = z
 	.object({
 		cmd: z
 			.string()
-			.describe('Non-interactive shell command to run (bash -c <cmd>)'),
+			.describe(
+				'Non-interactive shell command to run using the user shell with startup PATH loaded',
+			),
 		cwd: z
 			.string()
 			.default('.')
@@ -261,11 +263,11 @@ export function buildShellTool(projectRoot: string): {
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
 			}
 
-			const proc = spawn(finalCmd, {
+			const shellConfig = getShellExecutionConfig(finalCmd);
+			const proc = spawn(shellConfig.command, shellConfig.args, {
 				cwd: absCwd,
-				shell: true,
 				stdio: ['ignore', 'pipe', 'pipe'],
-				env: { ...process.env, PATH: getAugmentedPath() },
+				env: shellConfig.env,
 				detached: true,
 			});
 
