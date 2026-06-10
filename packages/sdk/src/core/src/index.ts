@@ -55,6 +55,7 @@ export { buildTerminalTool } from './tools/builtin/terminal';
 export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
+	buildMCPManagerTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
 } from './tools/lazy/index';

@@ -24,6 +24,7 @@ import { TerminalRenderer } from './TerminalRenderer';
 import { McpToolRenderer, isMcpTool } from './McpToolRenderer';
 import { LoadMcpToolsRenderer } from './LoadMcpToolsRenderer';
 import { LoadToolsRenderer } from './LoadToolsRenderer';
+import { McpManagerRenderer } from './McpManagerRenderer';
 import { SimulatorRenderer } from './SimulatorRenderer';
 import { SkillRenderer } from './SkillRenderer';
 
@@ -80,6 +81,7 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
 
 	LoadTools: 'load_tools',
 	LoadMcpTools: 'load_mcp_tools',
+	McpManager: 'mcp_manager',
 	Simulator: 'simulator',
 
 	Skill: 'skill',
@@ -177,6 +179,8 @@ export function ToolResultRenderer({
 			return <LoadToolsRenderer {...props} />;
 		case 'load_mcp_tools':
 			return <LoadMcpToolsRenderer {...props} toolName={toolName} />;
+		case 'mcp_manager':
+			return <McpManagerRenderer {...props} />;
 		case 'simulator':
 			return <SimulatorRenderer {...props} />;
 		case 'skill':

@@ -310,6 +310,7 @@ export { buildGitTools } from './core/src/index.ts';
 export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
+	buildMCPManagerTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
 } from './core/src/index.ts';

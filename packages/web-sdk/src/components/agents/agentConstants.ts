@@ -40,7 +40,14 @@ export function getAgentConfigScope(agent: AgentDetail): 'local' | 'global' {
 
 export function toolCategoryFromName(tool: string): string {
 	if (tool === 'load_tools') return 'First-class tools';
-	if (['simulator', 'read_image', 'copy_attachment_to_project'].includes(tool))
+	if (
+		[
+			'simulator',
+			'read_image',
+			'copy_attachment_to_project',
+			'mcp_manager',
+		].includes(tool)
+	)
 		return 'Loadable tools';
 	if (['progress_update', 'update_todos'].includes(tool))
 		return 'First-class tools';
@@ -113,6 +120,7 @@ const FALLBACK_LOADABLE_TOOLS = new Set([
 	'read_image',
 	'copy_attachment_to_project',
 	'simulator',
+	'mcp_manager',
 ]);
 
 export function buildAgentToolConfig(

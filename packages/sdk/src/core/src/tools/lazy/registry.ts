@@ -1,6 +1,7 @@
 import type { Tool } from 'ai';
 import { buildCopyAttachmentTool } from '../builtin/fs/copy-attachment.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
+import { buildMCPManagerTool } from './mcp-manager.ts';
 import { buildSimulatorTool } from './simulator.ts';
 import { buildLoadToolsTool, type LazyToolBrief } from './load-tools.ts';
 
@@ -27,6 +28,12 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 			description:
 				'Copy an original uploaded chat attachment into the project without recompression.',
 			build: buildCopyAttachmentTool,
+		},
+		{
+			name: 'mcp_manager',
+			description:
+				'Manage otto MCP servers: list, add, update, remove, enable, or disable servers in project (.otto/config.json) or global config.',
+			build: buildMCPManagerTool,
 		},
 	];
 }

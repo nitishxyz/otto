@@ -184,7 +184,12 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'apply_patch',
 			'websearch',
 		],
-		loadable: ['read_image', 'copy_attachment_to_project', 'simulator'],
+		loadable: [
+			'read_image',
+			'copy_attachment_to_project',
+			'simulator',
+			'mcp_manager',
+		],
 	},
 	plan: {
 		firstClass: [
@@ -210,6 +215,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 			'update_todos',
 		],
+		loadable: ['mcp_manager'],
 	},
 	init: {
 		firstClass: [
