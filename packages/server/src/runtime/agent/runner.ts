@@ -46,10 +46,6 @@ import {
 } from '../stream/text-guard.ts';
 import { createTurnDumpCollector } from '../debug/turn-dump.ts';
 import {
-	appendRunnerReminderMessages,
-	type RunnerMessage,
-} from './runner-reminders.ts';
-import {
 	createFirstOutputLatencyLogger,
 	logStreamRequestReady,
 	nowMs,
@@ -319,16 +315,10 @@ async function runAssistant(opts: RunOpts) {
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');
 
-	const messagesWithSystemInstructions: RunnerMessage[] = [
+	const messagesWithSystemInstructions = [
 		...additionalSystemMessages,
 		...history,
 	];
-	appendRunnerReminderMessages({
-		messages: messagesWithSystemInstructions,
-		isFirstMessage,
-		isOpenAIOAuth,
-		continuationCount: opts.continuationCount,
-	});
 
 	const dump = createTurnDumpCollector({
 		sessionId: opts.sessionId,
