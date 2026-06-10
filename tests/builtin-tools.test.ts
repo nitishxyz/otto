@@ -354,7 +354,10 @@ describe('Built-in Tools', () => {
 			await mkdir(binDir, { recursive: true });
 			await writeFile(commandPath, '#!/bin/sh\necho startup-path-ok\n');
 			await chmod(commandPath, 0o755);
-			await writeFile(join(home, '.bashrc'), `export PATH="${binDir}:$PATH"\n`);
+			await writeFile(
+				join(home, '.bashrc'),
+				`export PATH="${binDir}:$PATH"\nexport OTTO_SHELL_RC_TEST=rc-loaded\n`,
+			);
 
 			try {
 				process.env.HOME = home;
@@ -364,13 +367,16 @@ describe('Built-in Tools', () => {
 				const { tools } = await discoverProjectTools(projectRoot);
 				const shellTool = tools.find((t) => t.name === 'shell');
 				const result = await resolveStreamedResult(
-					await shellTool?.tool.execute({ cmd: 'otto-shell-path-test' }),
+					await shellTool?.tool.execute({
+						cmd: 'otto-shell-path-test && echo "$OTTO_SHELL_RC_TEST"',
+					}),
 				);
 
 				expect(result).toMatchObject({ ok: true });
 				expect((result as { stdout: string }).stdout).toContain(
 					'startup-path-ok',
 				);
+				expect((result as { stdout: string }).stdout).toContain('rc-loaded');
 			} finally {
 				if (originalHome === undefined) delete process.env.HOME;
 				else process.env.HOME = originalHome;
@@ -436,19 +442,18 @@ describe('Built-in Tools', () => {
 			expect(result).toMatchObject({ ok: false });
 		});
 
-		it('should block repository search commands', async () => {
+		it('should allow repository search commands', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');
 
 			const result = await resolveStreamedResult(
 				await shellTool?.tool.execute({
-					cmd: 'rg "Hello"',
-					allowNonZeroExit: true,
+					cmd: 'grep -R "Hello" .',
 				}),
 			);
 
-			expect(result).toMatchObject({ ok: false });
-			expect((result as { error: string }).error).toContain('search tool');
+			expect(result).toMatchObject({ ok: true, exitCode: 0 });
+			expect((result as { stdout: string }).stdout).toContain('Hello World');
 		});
 	});
 

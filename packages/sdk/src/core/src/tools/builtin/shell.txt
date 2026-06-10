@@ -1,4 +1,4 @@
-- Execute a non-interactive shell command using the user's shell with startup PATH loaded
+- Execute a non-interactive shell command using the user's shell with login/interactive startup loaded
 - Returns `stdout`, `stderr`, and `exitCode`
 - `cwd` is relative to the project root and sandboxed within it
 

@@ -105,7 +105,7 @@
 		"@ai-sdk/provider": "3.0.10",
 		"@ai-sdk/provider-utils": "4.0.27",
 		"@ai-sdk/xai": "3.0.93",
-		"@ff-labs/fff-bun": "0.9.3",
+		"@ff-labs/fff-bun": "0.9.4",
 		"@modelcontextprotocol/sdk": "1.27.1",
 		"@openauthjs/openauth": "0.4.3",
 		"@openrouter/ai-sdk-provider": "1.5.4",

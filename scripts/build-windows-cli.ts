@@ -132,6 +132,8 @@ if (useDocker) {
 		'build',
 		'--compile',
 		'--minify',
+		'--define',
+		'FFF_LIBC="gnu"',
 		'--target=bun-windows-x64',
 		'./apps/cli/index.ts',
 		'--outfile',

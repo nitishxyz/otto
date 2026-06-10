@@ -448,7 +448,7 @@ jobs:
           bun run ../../scripts/build-web.ts
           bun run ../../scripts/prepare-embedded-bins.ts "${PLATFORM}"
           mkdir -p dist
-          bun build --compile --minify --target="bun-${PLATFORM}" ./index.ts --outfile "dist/otto-${PLATFORM}"
+          bun build --compile --minify --define FFF_LIBC='"gnu"' --target="bun-${PLATFORM}" ./index.ts --outfile "dist/otto-${PLATFORM}"
           mkdir -p ../desktop/src-tauri/resources/binaries
           cp "dist/otto-${PLATFORM}" "../desktop/src-tauri/resources/binaries/otto-${PLATFORM}"
           chmod +x "../desktop/src-tauri/resources/binaries/otto-${PLATFORM}"

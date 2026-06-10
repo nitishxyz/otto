@@ -1,6 +1,16 @@
 #!/usr/bin/env bun
 import { $ } from 'bun';
-import { existsSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dir, '..');
@@ -58,12 +68,107 @@ const whisperCliDest = join(CLI_VENDOR, whisperCliName);
 mkdirSync(CLI_VENDOR, { recursive: true });
 mkdirSync(GENERATED_DIR, { recursive: true });
 
+function getFffBinPackage(platform: string): {
+	packageName: string;
+	libName: string;
+} {
+	const map: Record<string, { packageName: string; libName: string }> = {
+		'darwin-arm64': {
+			packageName: '@ff-labs/fff-bin-darwin-arm64',
+			libName: 'libfff_c.dylib',
+		},
+		'darwin-x64': {
+			packageName: '@ff-labs/fff-bin-darwin-x64',
+			libName: 'libfff_c.dylib',
+		},
+		'linux-x64': {
+			packageName: '@ff-labs/fff-bin-linux-x64-gnu',
+			libName: 'libfff_c.so',
+		},
+		'linux-arm64': {
+			packageName: '@ff-labs/fff-bin-linux-arm64-gnu',
+			libName: 'libfff_c.so',
+		},
+		'windows-x64': {
+			packageName: '@ff-labs/fff-bin-win32-x64',
+			libName: 'fff_c.dll',
+		},
+	};
+	const entry = map[platform];
+	if (!entry) throw new Error(`Unsupported FFF platform: ${platform}`);
+	return entry;
+}
+
+function getFffVersion(): string {
+	const pkgPath = join(
+		ROOT,
+		'node_modules',
+		'@ff-labs',
+		'fff-bun',
+		'package.json',
+	);
+	const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+		version: string;
+	};
+	return pkg.version;
+}
+
+/**
+ * Ensure the platform-specific @ff-labs/fff-bin-* package exists in
+ * node_modules so `bun build --compile` can embed the native library.
+ * `bun install` only installs the optional dependency matching the host,
+ * so cross-compiles (e.g. windows-x64 from macOS) need a manual fetch.
+ */
+async function ensureFffBinPackage(): Promise<void> {
+	const { packageName, libName } = getFffBinPackage(platformKey);
+	const packageDir = join(ROOT, 'node_modules', ...packageName.split('/'));
+	const libPath = join(packageDir, libName);
+	if (existsSync(libPath)) {
+		console.log(`FFF native library present: ${packageName}/${libName}`);
+		return;
+	}
+
+	const version = getFffVersion();
+	console.log(`Downloading ${packageName}@${version} for ${platformKey}...`);
+	const tmp = mkdtempSync(join(tmpdir(), 'otto-fff-bin-'));
+	try {
+		const metaResponse = await fetch(
+			`https://registry.npmjs.org/${packageName}/${version}`,
+		);
+		if (!metaResponse.ok)
+			throw new Error(`npm metadata fetch failed: ${metaResponse.status}`);
+		const meta = (await metaResponse.json()) as {
+			dist?: { tarball?: string };
+		};
+		if (!meta.dist?.tarball)
+			throw new Error(`No tarball for ${packageName}@${version}`);
+		const tarballResponse = await fetch(meta.dist.tarball);
+		if (!tarballResponse.ok)
+			throw new Error(`tarball fetch failed: ${tarballResponse.status}`);
+		const archivePath = join(tmp, 'fff-bin.tgz');
+		await Bun.write(archivePath, await tarballResponse.arrayBuffer());
+		await $`tar -xzf ${archivePath} -C ${tmp}`;
+		const extracted = join(tmp, 'package');
+		mkdirSync(packageDir, { recursive: true });
+		for (const entry of readdirSync(extracted)) {
+			copyFileSync(join(extracted, entry), join(packageDir, entry));
+		}
+		if (!existsSync(libPath))
+			throw new Error(`Extracted package missing ${libName}`);
+		console.log(`Installed ${packageName}@${version} into node_modules`);
+	} finally {
+		rmSync(tmp, { recursive: true, force: true });
+	}
+}
+
 function writeVendorAssetDeclaration(fileName: string, exportName: string) {
 	writeFileSync(
 		join(CLI_VENDOR, `${fileName}.d.ts`),
 		`declare const ${exportName}: string;\nexport default ${exportName};\n`,
 	);
 }
+
+await ensureFffBinPackage();
 
 async function ensureVendorWhisperCli() {
 	if (existsSync(whisperCliSource)) {

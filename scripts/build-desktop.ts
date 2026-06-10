@@ -93,7 +93,7 @@ async function buildCliBinary(platform: keyof typeof PLATFORMS) {
 
 	await $`cd ${CLI_DIR} && bun run ../../scripts/build-web.ts`;
 	await $`cd ${CLI_DIR} && bun run ../../scripts/prepare-embedded-bins.ts ${platform}`;
-	await $`cd ${CLI_DIR} && bun build --compile --minify --target=${target} ./index.ts --outfile ${outfile}`;
+	await $`cd ${CLI_DIR} && bun build --compile --minify --define FFF_LIBC='"gnu"' --target=${target} ./index.ts --outfile ${outfile}`;
 
 	return outfile;
 }

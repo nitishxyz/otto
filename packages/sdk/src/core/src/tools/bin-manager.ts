@@ -10,7 +10,10 @@ import { fileExists, isExecutable } from './bin-manager/filesystem.ts';
 import { getAgiBinDir, getBinaryFileName } from './bin-manager/paths.ts';
 import { extractFromVendor } from './bin-manager/vendor.ts';
 
-let cachedLoginPath: string | null = null;
+let cachedLoginPath: {
+	key: string;
+	path: string | null;
+} | null = null;
 
 export { getAgiBinDir } from './bin-manager/paths.ts';
 
@@ -80,6 +83,12 @@ function getShellRcBootstrap(shell: string): string {
 	return '';
 }
 
+function getInteractiveShellFlag(shell: string): string {
+	const shellName = shell.split('/').pop() || '';
+	if (shellName.includes('bash')) return '-ic';
+	return '-ilc';
+}
+
 export function getShellExecutionConfig(cmd: string): {
 	command: string;
 	args: string[];
@@ -97,20 +106,22 @@ export function getShellExecutionConfig(cmd: string): {
 	const command = getUserShell();
 	return {
 		command,
-		args: ['-lc', 'eval "$OTTO_SHELL_COMMAND"'],
+		args: [getInteractiveShellFlag(command), 'eval "$OTTO_SHELL_COMMAND"'],
 		env: { ...env, OTTO_SHELL_COMMAND: cmd },
 	};
 }
 
 function getLoginShellPath(): string | null {
-	if (cachedLoginPath !== null) return cachedLoginPath;
+	const home = process.env.HOME || homedir();
+	const userShell = getUserShell();
+	const cacheKey = [home, userShell, process.env.PATH || ''].join('\0');
+	if (cachedLoginPath?.key === cacheKey) return cachedLoginPath.path;
 
 	if (process.platform === 'win32') {
-		cachedLoginPath = process.env.PATH || '';
-		return cachedLoginPath;
+		cachedLoginPath = { key: cacheKey, path: process.env.PATH || '' };
+		return cachedLoginPath.path;
 	}
 
-	const home = process.env.HOME || homedir();
 	const shellCandidates = [
 		process.env.SHELL,
 		'/bin/zsh',
@@ -135,13 +146,13 @@ function getLoginShellPath(): string | null {
 			const output = result.toString();
 			const match = output.match(/___PATH___:(.*)/);
 			if (match?.[1]?.trim()) {
-				cachedLoginPath = match[1].trim();
-				return cachedLoginPath;
+				cachedLoginPath = { key: cacheKey, path: match[1].trim() };
+				return cachedLoginPath.path;
 			}
 		} catch {}
 	}
 
-	cachedLoginPath = null;
+	cachedLoginPath = { key: cacheKey, path: null };
 	return null;
 }
 

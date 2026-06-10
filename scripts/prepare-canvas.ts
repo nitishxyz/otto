@@ -210,7 +210,7 @@ async function buildCanvasCli(platform: PlatformKey) {
 
 	await $`cd ${CLI_DIR} && bun run ../../scripts/build-web.ts`;
 	await $`cd ${CLI_DIR} && bun run ../../scripts/prepare-embedded-bins.ts ${platform}`;
-	await $`cd ${CLI_DIR} && mkdir -p dist && bun build --compile --minify --target=${config.bunTarget} ./index.ts --outfile ${outputPath}`;
+	await $`cd ${CLI_DIR} && mkdir -p dist && bun build --compile --minify --define FFF_LIBC='"gnu"' --target=${config.bunTarget} ./index.ts --outfile ${outputPath}`;
 
 	copyFileSync(outputPath, stagedBinaryPath);
 	copyFileSync(outputPath, commandAliasPath);

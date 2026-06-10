@@ -37,7 +37,7 @@ async function buildWindowsCliBinary(): Promise<string> {
 	const outfile = join(CLI_DIR, 'dist', 'otto-windows-x64.exe');
 	mkdirSync(join(CLI_DIR, 'dist'), { recursive: true });
 
-	await $`cd ${CLI_DIR} && bun build --compile --minify --target=bun-windows-x64 ./index.ts --outfile ${outfile}`;
+	await $`cd ${CLI_DIR} && bun build --compile --minify --define FFF_LIBC='"gnu"' --target=bun-windows-x64 ./index.ts --outfile ${outfile}`;
 
 	console.log(`   ✅ Built ${outfile}`);
 	return outfile;
