@@ -26,7 +26,10 @@ export const IGNORE_PATTERNS: string[] = [
 ];
 
 export function defaultIgnoreGlobs(extra?: string[]): string[] {
-	const base = IGNORE_PATTERNS.map((p) => `!${p}*`);
+	const base = IGNORE_PATTERNS.flatMap((p) => {
+		const pattern = p.replace(/\/$/, '');
+		return [`${pattern}/**`, `**/${pattern}/**`];
+	});
 	if (Array.isArray(extra) && extra.length) return base.concat(extra);
 	return base;
 }

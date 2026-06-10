@@ -590,6 +590,38 @@ describe('Built-in Tools', () => {
 			expect(result).toHaveProperty('files');
 			expect(result).toHaveProperty('count');
 		});
+
+		it('should ignore dependency directories by default but allow direct paths', async () => {
+			await mkdir(join(projectRoot, 'node_modules', 'pkg'), {
+				recursive: true,
+			});
+			await writeFile(
+				join(projectRoot, 'node_modules', 'pkg', 'metadata.ts'),
+				'export const ignored = true;\n',
+			);
+			const { tools } = await discoverProjectTools(projectRoot);
+			const globTool = tools.find((t) => t.name === 'glob');
+
+			const defaultResult = await globTool?.tool.execute({
+				pattern: '**/{layout,page,metadata}.{ts,tsx,js,jsx}',
+				path: '.',
+				limit: 100,
+			});
+
+			expect((defaultResult as { files: string[] }).files).not.toContain(
+				'node_modules/pkg/metadata.ts',
+			);
+
+			const directResult = await globTool?.tool.execute({
+				pattern: '**/*.ts',
+				path: 'node_modules',
+				limit: 10,
+			});
+
+			expect((directResult as { files: string[] }).files).toContain(
+				'pkg/metadata.ts',
+			);
+		});
 	});
 
 	describe('finish tool', () => {
