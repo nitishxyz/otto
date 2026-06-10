@@ -47,11 +47,10 @@ import {
 } from '@ottocode/web-sdk/stores';
 import { DesktopSidebar } from './DesktopSidebar';
 
-const VIEWER_MIN_CHAT_WIDTH = 360;
+const CHAT_MIN_WIDTH = 400;
 const VIEWER_PANEL_KEY = 'viewer';
-const VIEWER_DEFAULT_WIDTH = 720;
 const VIEWER_MIN_WIDTH = 320;
-const VIEWER_MAX_WIDTH = 1200;
+const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const RIGHT_RAIL_HOVER_RATIO = 0.05;
 const HOVER_SHOW_DELAY_MS = 260;
@@ -109,6 +108,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
 	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
+	const sessionsCollapsed = useSidebarStore((s) => s.isCollapsed);
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
@@ -135,9 +135,13 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 				: fileBrowserExpanded
 					? (panelWidths['file-browser'] ?? RIGHT_PANEL_DEFAULT_WIDTH)
 					: RIGHT_PANEL_DEFAULT_WIDTH;
-	const viewerPanelWidth =
-		panelWidths[VIEWER_PANEL_KEY] ?? VIEWER_DEFAULT_WIDTH;
-	const viewerSideBySideWidth = `clamp(${VIEWER_MIN_WIDTH}px, ${viewerPanelWidth}px, calc(100% - ${VIEWER_MIN_CHAT_WIDTH}px))`;
+	const viewerPanelWidth = panelWidths[VIEWER_PANEL_KEY];
+	const anySidePanelOpen = !sessionsCollapsed || anyRightPanelOpen;
+	const viewerSideBySideWidth = anySidePanelOpen
+		? `calc(100% - ${CHAT_MIN_WIDTH}px)`
+		: `clamp(${VIEWER_MIN_WIDTH}px, ${
+				viewerPanelWidth ? `${viewerPanelWidth}px` : '50%'
+			}, calc(100% - ${CHAT_MIN_WIDTH}px))`;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousRightPanelOpenRef = useRef(anyRightPanelOpen);
 	const isRightRailVisibleRef = useRef(false);
@@ -152,15 +156,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		useState(false);
 	const [isRightRailVisible, setIsRightRailVisible] = useState(false);
 	const [isRightRailHoverPending, setIsRightRailHoverPending] = useState(false);
-	const shouldAnimateViewer = previousViewerOpenRef.current !== anyViewerOpen;
-	const mainPaneStyle = {
-		width:
-			anyViewerOpen && viewerSideBySide
-				? `calc(100% - ${viewerSideBySideWidth})`
-				: anyViewerOpen
-					? '0px'
-					: '100%',
-	} as CSSProperties;
+	const previousSidePanelOpenRef = useRef(anySidePanelOpen);
+	const shouldAnimateViewer =
+		previousViewerOpenRef.current !== anyViewerOpen ||
+		previousSidePanelOpenRef.current !== anySidePanelOpen;
 	const viewerPaneStyle = {
 		width: anyViewerOpen
 			? viewerSideBySide
@@ -234,6 +233,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	useEffect(() => {
 		previousViewerOpenRef.current = anyViewerOpen;
 	}, [anyViewerOpen]);
+
+	useEffect(() => {
+		previousSidePanelOpenRef.current = anySidePanelOpen;
+	}, [anySidePanelOpen]);
 
 	useEffect(() => {
 		const setRailVisible = (visible: boolean) => {
@@ -348,18 +351,13 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 					</div>
 					<div className="flex min-w-0 flex-1 overflow-hidden">
 						<main
-							className={`relative shrink-0 flex-col overflow-hidden min-w-0 ${
-								shouldAnimateViewer
-									? 'transition-[width] duration-300 ease-out'
-									: 'transition-none'
-							} ${
+							className={`relative flex-col overflow-hidden ${
 								!anyViewerOpen
-									? 'flex'
+									? 'flex flex-1 min-w-0'
 									: showChatBesideViewer
-										? 'hidden md:flex md:min-w-[360px]'
+										? 'hidden md:flex md:flex-1 md:min-w-[400px]'
 										: 'hidden'
 							}`}
-							style={mainPaneStyle}
 						>
 							{children}
 						</main>
@@ -378,13 +376,13 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							style={viewerPaneStyle}
 							aria-hidden={!anyViewerOpen}
 						>
-							{anyViewerOpen && viewerSideBySide && (
+							{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
 								<ResizeHandle
 									panelKey={VIEWER_PANEL_KEY}
 									side="right"
 									minWidth={VIEWER_MIN_WIDTH}
 									maxWidth={VIEWER_MAX_WIDTH}
-									defaultWidth={VIEWER_DEFAULT_WIDTH}
+									defaultWidth={VIEWER_MIN_WIDTH}
 								/>
 							)}
 							{anyViewerOpen && <ViewerTabs />}

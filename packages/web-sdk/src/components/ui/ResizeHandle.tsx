@@ -23,9 +23,14 @@ export const ResizeHandle = memo(function ResizeHandle({
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
 			e.preventDefault();
-			const currentWidth = usePanelWidthStore
+			const storedWidth = usePanelWidthStore
 				.getState()
 				.getWidth(panelKey, defaultWidth);
+			const measuredWidth = (
+				e.currentTarget as HTMLElement
+			).parentElement?.getBoundingClientRect().width;
+			const currentWidth =
+				measuredWidth && measuredWidth > 0 ? measuredWidth : storedWidth;
 			dragRef.current = { startX: e.clientX, startWidth: currentWidth };
 
 			const handleMouseMove = (ev: MouseEvent) => {

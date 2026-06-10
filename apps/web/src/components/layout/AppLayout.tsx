@@ -67,11 +67,10 @@ import {
 import { useNavigate } from '@tanstack/react-router';
 import { isHostedApp } from '../../lib/hosted-app';
 
-const VIEWER_MIN_CHAT_WIDTH = 360;
+const CHAT_MIN_WIDTH = 400;
 const VIEWER_PANEL_KEY = 'viewer';
-const VIEWER_DEFAULT_WIDTH = 720;
 const VIEWER_MIN_WIDTH = 320;
-const VIEWER_MAX_WIDTH = 1200;
+const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -156,19 +155,35 @@ export const AppLayout = memo(function AppLayout({
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
 	const viewerPanelWidth = usePanelWidthStore(
-		(s) => s.widths[VIEWER_PANEL_KEY] ?? VIEWER_DEFAULT_WIDTH,
+		(s) => s.widths[VIEWER_PANEL_KEY],
 	);
-	const viewerSideBySideWidth = `clamp(${VIEWER_MIN_WIDTH}px, ${viewerPanelWidth}px, calc(100% - ${VIEWER_MIN_CHAT_WIDTH}px))`;
+	const sidebarCollapsed = useSidebarStore((s) => s.isCollapsed);
+	const gitExpanded = useGitStore((s) => s.isExpanded);
+	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
+	const settingsExpanded = useSettingsStore((s) => s.isExpanded);
+	const tunnelExpanded = useTunnelStore((s) => s.isExpanded);
+	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
+	const mcpExpanded = useMCPStore((s) => s.isExpanded);
+	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const anySidePanelOpen =
+		!sidebarCollapsed ||
+		gitExpanded ||
+		sessionFilesExpanded ||
+		settingsExpanded ||
+		tunnelExpanded ||
+		fileBrowserExpanded ||
+		mcpExpanded ||
+		skillsExpanded;
+	const viewerSideBySideWidth = anySidePanelOpen
+		? `calc(100% - ${CHAT_MIN_WIDTH}px)`
+		: `clamp(${VIEWER_MIN_WIDTH}px, ${
+				viewerPanelWidth ? `${viewerPanelWidth}px` : '50%'
+			}, calc(100% - ${CHAT_MIN_WIDTH}px))`;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
-	const shouldAnimateViewer = previousViewerOpenRef.current !== anyViewerOpen;
-	const mainPaneStyle = {
-		width:
-			anyViewerOpen && viewerSideBySide
-				? `calc(100% - ${viewerSideBySideWidth})`
-				: anyViewerOpen
-					? '0px'
-					: '100%',
-	} as CSSProperties;
+	const previousSidePanelOpenRef = useRef(anySidePanelOpen);
+	const shouldAnimateViewer =
+		previousViewerOpenRef.current !== anyViewerOpen ||
+		previousSidePanelOpenRef.current !== anySidePanelOpen;
 	const viewerPaneStyle = {
 		width: anyViewerOpen
 			? viewerSideBySide
@@ -196,6 +211,10 @@ export const AppLayout = memo(function AppLayout({
 	useEffect(() => {
 		previousViewerOpenRef.current = anyViewerOpen;
 	}, [anyViewerOpen]);
+
+	useEffect(() => {
+		previousSidePanelOpenRef.current = anySidePanelOpen;
+	}, [anySidePanelOpen]);
 
 	const handleTouchStart = useCallback((event: TouchEvent<HTMLDivElement>) => {
 		const target = event.target as HTMLElement;
@@ -259,18 +278,13 @@ export const AppLayout = memo(function AppLayout({
 				<div className="flex-1 flex overflow-hidden">
 					<div className="flex min-w-0 flex-1 overflow-hidden">
 						<main
-							className={`relative shrink-0 flex-col overflow-hidden min-w-0 ${
-								shouldAnimateViewer
-									? 'transition-[width] duration-300 ease-out'
-									: 'transition-none'
-							} ${
+							className={`relative flex-col overflow-hidden ${
 								!anyViewerOpen
-									? 'flex'
+									? 'flex flex-1 min-w-0'
 									: showChatBesideViewer
-										? 'hidden md:flex md:min-w-[360px]'
+										? 'hidden md:flex md:flex-1 md:min-w-[400px]'
 										: 'hidden'
 							}`}
-							style={mainPaneStyle}
 						>
 							{children}
 						</main>
@@ -289,13 +303,13 @@ export const AppLayout = memo(function AppLayout({
 							style={viewerPaneStyle}
 							aria-hidden={!anyViewerOpen}
 						>
-							{anyViewerOpen && viewerSideBySide && (
+							{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
 								<ResizeHandle
 									panelKey={VIEWER_PANEL_KEY}
 									side="right"
 									minWidth={VIEWER_MIN_WIDTH}
 									maxWidth={VIEWER_MAX_WIDTH}
-									defaultWidth={VIEWER_DEFAULT_WIDTH}
+									defaultWidth={VIEWER_MIN_WIDTH}
 								/>
 							)}
 							{anyViewerOpen && <ViewerTabs />}
