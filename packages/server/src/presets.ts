@@ -83,7 +83,6 @@ export const BUILTIN_TOOLS = [
 	'update_todos',
 	'websearch',
 	'progress_update',
-	'finish',
 	'skill',
 	'query_sessions',
 	'query_messages',

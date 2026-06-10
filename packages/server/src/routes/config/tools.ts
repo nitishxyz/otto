@@ -11,7 +11,7 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
 
-const REQUIRED_TOOLS = new Set(['finish', 'progress_update', 'load_tools']);
+const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 const RISKY_TOOLS = new Set([
 	'shell',
 	'terminal',
@@ -21,7 +21,6 @@ const RISKY_TOOLS = new Set([
 ]);
 
 const BUILTIN_TOOLS = new Set([
-	'finish',
 	'progress_update',
 	'update_todos',
 	'read',
@@ -111,7 +110,7 @@ function getToolDescription(tool: Tool | undefined): string | undefined {
 
 function getToolCategory(name: string): ToolCategory {
 	if (name === 'load_tools') return 'first_class';
-	if (['finish', 'progress_update', 'update_todos'].includes(name)) {
+	if (['progress_update', 'update_todos'].includes(name)) {
 		return 'core';
 	}
 	if (

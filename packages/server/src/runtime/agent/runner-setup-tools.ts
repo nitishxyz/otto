@@ -150,10 +150,7 @@ export function buildAllowedTools(args: {
 		args.model,
 		args.cfg,
 	);
-	const allowedNames = new Set([
-		...normalizeToolNames(allowedToolNames),
-		'finish',
-	]);
+	const allowedNames = new Set(normalizeToolNames(allowedToolNames));
 	return args.allTools.filter(
 		(tool) =>
 			allowedNames.has(tool.name) ||

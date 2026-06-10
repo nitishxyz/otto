@@ -58,11 +58,7 @@ export type UpsertAgentInput = {
 	model?: string | null;
 };
 
-const REQUIRED_AGENT_TOOLS = [
-	'finish',
-	'progress_update',
-	'load_tools',
-] as const;
+const REQUIRED_AGENT_TOOLS = ['progress_update', 'load_tools'] as const;
 const MAX_PROMPT_BYTES = 256 * 1024;
 const AGENT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 

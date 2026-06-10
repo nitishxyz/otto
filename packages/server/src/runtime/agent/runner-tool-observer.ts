@@ -3,7 +3,6 @@ import type { OttoEvent } from '../../events/types.ts';
 import type { createTurnDumpCollector } from '../debug/turn-dump.ts';
 
 export type RunnerToolObserverState = {
-	finishObserved: boolean;
 	toolActivityObserved: boolean;
 	trailingAssistantTextAfterTool: boolean;
 	endedWithToolActivity: boolean;
@@ -21,7 +20,6 @@ export function observeRunnerToolEvents(args: {
 	onToolCall?: () => void;
 }): { state: RunnerToolObserverState; unsubscribe: () => void } {
 	const state: RunnerToolObserverState = {
-		finishObserved: false,
 		toolActivityObserved: false,
 		trailingAssistantTextAfterTool: false,
 		endedWithToolActivity: false,
@@ -75,10 +73,6 @@ export function observeRunnerToolEvents(args: {
 					);
 				} catch {}
 			}
-			try {
-				const name = (evt.payload as { name?: string } | undefined)?.name;
-				if (name === 'finish') state.finishObserved = true;
-			} catch {}
 		}
 	});
 

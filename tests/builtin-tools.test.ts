@@ -108,7 +108,6 @@ describe('Built-in Tools', () => {
 		expect(names).toContain('search');
 		expect(names).toContain('glob');
 		expect(names).toContain('apply_patch');
-		expect(names).toContain('finish');
 		expect(names).toContain('progress_update');
 		expect(names).toContain('websearch');
 		expect(names).toContain('update_todos');
@@ -621,17 +620,6 @@ describe('Built-in Tools', () => {
 			expect((directResult as { files: string[] }).files).toContain(
 				'pkg/metadata.ts',
 			);
-		});
-	});
-
-	describe('finish tool', () => {
-		it('should signal completion', async () => {
-			const { tools } = await discoverProjectTools(projectRoot);
-			const finishTool = tools.find((t) => t.name === 'finish');
-
-			const result = await finishTool?.tool.execute({});
-			expect(result).toHaveProperty('done');
-			expect((result as { done: boolean }).done).toBe(true);
 		});
 	});
 

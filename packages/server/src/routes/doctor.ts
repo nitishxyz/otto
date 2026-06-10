@@ -213,7 +213,6 @@ export function registerDoctorRoutes(app: Hono) {
 					new Set([
 						...buildFsTools(projectRoot).map((t) => t.name),
 						...buildGitTools(projectRoot).map((t) => t.name),
-						'finish',
 					]),
 				).sort();
 

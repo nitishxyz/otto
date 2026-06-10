@@ -75,7 +75,6 @@ export interface TurnDumpData {
 		}>;
 		finishReason?: string;
 		rawFinishReason?: string;
-		finishObserved: boolean;
 		aborted: boolean;
 	};
 	error?: {
@@ -127,7 +126,6 @@ export class TurnDumpCollector {
 				toolResults: [],
 				textDeltas: [],
 				steps: [],
-				finishObserved: false,
 				aborted: false,
 			},
 		};
@@ -272,12 +270,10 @@ export class TurnDumpCollector {
 	recordStreamEnd(opts: {
 		finishReason?: string;
 		rawFinishReason?: string;
-		finishObserved: boolean;
 		aborted: boolean;
 	}) {
 		this.data.stream.finishReason = opts.finishReason;
 		this.data.stream.rawFinishReason = opts.rawFinishReason;
-		this.data.stream.finishObserved = opts.finishObserved;
 		this.data.stream.aborted = opts.aborted;
 	}
 

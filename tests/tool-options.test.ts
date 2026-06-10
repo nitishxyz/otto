@@ -33,15 +33,14 @@ describe('listAvailableTools', () => {
 			await mkdir(toolDir, { recursive: true });
 			await writeFile(join(toolDir, 'tool.js'), pluginSource);
 
-			const tools = await listAvailableTools(projectRoot, 'local', false);
+			const tools = await listAvailableTools(projectRoot, 'local');
 			expect(tools).toContain('custom_thing');
 			expect(tools).toContain('read');
 			expect(tools).not.toContain('cd');
 			expect(tools).not.toContain('pwd');
-			const withFinish = await listAvailableTools(projectRoot, 'local', true);
-			expect(withFinish).toContain('finish');
-			const noDupes = new Set(withFinish);
-			expect(noDupes.size).toBe(withFinish.length);
+			expect(tools).not.toContain('finish');
+			const noDupes = new Set(tools);
+			expect(noDupes.size).toBe(tools.length);
 		} finally {
 			if (prevHome === undefined) delete process.env.HOME;
 			else process.env.HOME = prevHome;

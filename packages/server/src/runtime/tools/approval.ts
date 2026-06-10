@@ -15,11 +15,7 @@ export const DANGEROUS_TOOLS = new Set([
 	'git_push',
 ]);
 
-export const SAFE_TOOLS = new Set([
-	'finish',
-	'progress_update',
-	'update_todos',
-]);
+export const SAFE_TOOLS = new Set(['progress_update', 'update_todos']);
 
 export interface PendingApproval {
 	callId: string;

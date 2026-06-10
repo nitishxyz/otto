@@ -62,4 +62,4 @@ Independent operations (multiple reads, multiple searches, `git_status` + `git_d
 
 # Finishing
 
-Stream a short summary of what you did, then call the `finish` tool. Never call `finish` without first streaming a summary.
+Stream a short summary of what you did, then stop. Your turn ends when you stop calling tools.

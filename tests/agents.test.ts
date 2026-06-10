@@ -193,7 +193,6 @@ describe('agent config merging', () => {
 			expect(detail.prompt).toBe('Local build prompt');
 			expect(detail.promptSource).toContain('.otto/agents/build/agent.md');
 			expect(detail.toolConfig.firstClass).toContain('read');
-			expect(detail.toolConfig.firstClass).toContain('finish');
 			expect(detail.toolConfig.firstClass).toContain('progress_update');
 			expect(detail.appendToolConfig.firstClass).toContain('search');
 			expect(detail.hasLocalOverride).toBe(true);
@@ -230,7 +229,6 @@ describe('agent config merging', () => {
 			const putPayload = await putResponse.json();
 			expect(putPayload.agent.name).toBe('reviewer');
 			expect(putPayload.agent.custom).toBe(true);
-			expect(putPayload.agent.toolConfig.firstClass).toContain('finish');
 			expect(putPayload.agent.toolConfig.firstClass).toContain(
 				'progress_update',
 			);
@@ -253,7 +251,6 @@ describe('agent config merging', () => {
 			expect(agentsJson.reviewer.tools.firstClass).toEqual([
 				'read',
 				'search',
-				'finish',
 				'progress_update',
 				'load_tools',
 			]);
@@ -329,8 +326,8 @@ describe('agent config merging', () => {
 			);
 			expect(response.status).toBe(200);
 			const payload = await response.json();
-			const finish = payload.tools.find(
-				(tool: { name: string }) => tool.name === 'finish',
+			const progressUpdate = payload.tools.find(
+				(tool: { name: string }) => tool.name === 'progress_update',
 			);
 			const shell = payload.tools.find(
 				(tool: { name: string }) => tool.name === 'shell',
@@ -344,7 +341,7 @@ describe('agent config merging', () => {
 			const querySessions = payload.tools.find(
 				(tool: { name: string }) => tool.name === 'query_sessions',
 			);
-			expect(finish).toMatchObject({
+			expect(progressUpdate).toMatchObject({
 				category: 'core',
 				source: 'builtin',
 				activation: 'first_class',

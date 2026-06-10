@@ -1,6 +1,5 @@
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
-import { finishTool } from './builtin/finish.ts';
 import { buildFsTools } from './builtin/fs/index.ts';
 import { buildGitTools } from './builtin/git.ts';
 import { progressUpdateTool } from './builtin/progress.ts';
@@ -148,7 +147,6 @@ async function discoverStaticProjectTools(
 		for (const { name, tool } of buildGitTools(projectRoot))
 			tools.set(name, tool);
 		// Built-ins
-		tools.set('finish', finishTool);
 		tools.set('progress_update', progressUpdateTool);
 		const shell = buildShellTool(projectRoot);
 		tools.set(shell.name, shell.tool);

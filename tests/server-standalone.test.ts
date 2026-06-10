@@ -205,7 +205,7 @@ describe('AskService with Config Injection', () => {
 					model: 'gpt-4o-mini',
 				},
 				agentPrompt: 'You are a helpful test assistant.',
-				tools: { firstClass: ['progress_update', 'finish'] },
+				tools: { firstClass: ['progress_update'] },
 			});
 		} catch (err) {
 			expect(err).toBeDefined();
@@ -228,7 +228,7 @@ describe('AskService with Config Injection', () => {
 				},
 				agentPrompt: 'Test agent',
 				tools: {
-					firstClass: ['progress_update', 'finish', 'read', 'write'],
+					firstClass: ['progress_update', 'read', 'write'],
 				},
 			});
 		} catch (err) {
@@ -243,7 +243,7 @@ describe('Agent Config Injection', () => {
 
 		const config = await resolveAgentConfig(process.cwd(), 'test-agent', {
 			prompt: 'Inline test prompt',
-			tools: { firstClass: ['progress_update', 'finish'] },
+			tools: { firstClass: ['progress_update'] },
 			provider: 'openai',
 			model: 'gpt-4o-mini',
 		});
@@ -251,7 +251,6 @@ describe('Agent Config Injection', () => {
 		expect(config.name).toBe('test-agent');
 		expect(config.prompt).toBe('Inline test prompt');
 		expect(config.toolConfig.firstClass).toContain('progress_update');
-		expect(config.toolConfig.firstClass).toContain('finish');
 		expect(config.provider).toBe('openai');
 		expect(config.model).toBe('gpt-4o-mini');
 	});
@@ -309,7 +308,7 @@ describe('API Route Integration', () => {
 					apiKey: 'sk-test',
 				},
 				agentPrompt: 'You are a test assistant.',
-				tools: { firstClass: ['progress_update', 'finish'] },
+				tools: { firstClass: ['progress_update'] },
 			}),
 		});
 

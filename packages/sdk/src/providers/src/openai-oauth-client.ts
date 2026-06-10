@@ -25,9 +25,6 @@ type OpenAIOAuthSessionState = {
 	model?: string;
 	status?: string;
 	incompleteReason?: string;
-	turnState?: string;
-	installationId?: string;
-	windowId?: string;
 };
 
 const openAIOAuthSessionState = new Map<string, OpenAIOAuthSessionState>();
@@ -214,17 +211,6 @@ function writeSessionState(sessionId: string, next: OpenAIOAuthSessionState) {
 	openAIOAuthSessionState.set(sessionId, next);
 }
 
-function mergeSessionState(sessionId: string, next: OpenAIOAuthSessionState) {
-	writeSessionState(sessionId, {
-		...readSessionState(sessionId),
-		...next,
-	});
-}
-
-function getCodexWindowId(sessionId: string) {
-	return `${sessionId}:0`;
-}
-
 function rewriteRequestBody(
 	body: string,
 	sessionId?: string,
@@ -237,17 +223,6 @@ function rewriteRequestBody(
 			return { body: changed ? JSON.stringify(parsed) : body, model };
 		}
 
-		const clientMetadata =
-			parsed.client_metadata && typeof parsed.client_metadata === 'object'
-				? (parsed.client_metadata as Record<string, unknown>)
-				: {};
-		if (clientMetadata['x-codex-installation-id'] !== CODEX_INSTALLATION_ID) {
-			parsed.client_metadata = {
-				...clientMetadata,
-				'x-codex-installation-id': CODEX_INSTALLATION_ID,
-			};
-			changed = true;
-		}
 		if (typeof parsed.prompt_cache_key !== 'string') {
 			parsed.prompt_cache_key = sessionId;
 			changed = true;
@@ -384,9 +359,6 @@ function trackResponseEvent(data: string, sessionId?: string) {
 				model: responseModel ?? prior?.model,
 				status: responseStatus ?? type,
 				incompleteReason,
-				turnState: prior?.turnState,
-				installationId: prior?.installationId,
-				windowId: prior?.windowId,
 			});
 			logOpenAIOAuth(
 				`tracked response event type=${type ?? 'unknown'} responseId=${responseId} session=${sessionId} status=${responseStatus ?? 'unknown'} incompleteReason=${incompleteReason ?? 'none'}`,
@@ -692,10 +664,6 @@ function buildHeaders(
 	sessionId?: string,
 ): Headers {
 	const headers = new Headers(init?.headers);
-	const prior = readSessionState(sessionId);
-	const windowId = sessionId
-		? (prior?.windowId ?? getCodexWindowId(sessionId))
-		: undefined;
 	headers.delete('Authorization');
 	headers.delete('authorization');
 	headers.set('authorization', `Bearer ${accessToken}`);
@@ -710,28 +678,8 @@ function buildHeaders(
 	}
 	if (sessionId) {
 		headers.set('session_id', sessionId);
-		headers.set('thread_id', sessionId);
-		headers.set('x-codex-window-id', windowId ?? getCodexWindowId(sessionId));
-		if (prior?.turnState) {
-			headers.set('x-codex-turn-state', prior.turnState);
-		}
 	}
 	return headers;
-}
-
-function trackCodexResponseHeaders(response: Response, sessionId?: string) {
-	if (!sessionId) return;
-	const turnState = response.headers.get('x-codex-turn-state') ?? undefined;
-	if (!turnState) return;
-	const windowId = getCodexWindowId(sessionId);
-	mergeSessionState(sessionId, {
-		turnState,
-		installationId: CODEX_INSTALLATION_ID,
-		windowId,
-	});
-	logOpenAIOAuth(
-		`tracked x-codex-turn-state for session=${sessionId} window=${windowId}`,
-	);
 }
 
 export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
@@ -770,9 +718,6 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 					model: requestModel,
 					status: prior?.status,
 					incompleteReason: prior?.incompleteReason,
-					turnState: prior?.turnState,
-					installationId: prior?.installationId,
-					windowId: prior?.windowId,
 				});
 			}
 		}
@@ -830,9 +775,6 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 			bodyCharsApprox: requestBodySize,
 			model: requestModel,
 		});
-		if (isResponsesRequest) {
-			trackCodexResponseHeaders(response, config.sessionId);
-		}
 		if (!response.ok && response.status !== 401) {
 			loggerWarn('[openai-oauth] non-OK response', {
 				sessionId: config.sessionId,
@@ -892,9 +834,6 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 						requestStartedAt: retryStartedAt,
 					},
 				);
-				if (isResponsesRequest) {
-					trackCodexResponseHeaders(retryResponse, config.sessionId);
-				}
 				loggerDebug('[openai-oauth] retry response received', {
 					sessionId: config.sessionId,
 					target: isResponsesRequest ? 'codex.responses' : 'other',

@@ -125,7 +125,7 @@ describe('openai oauth client', () => {
 		});
 	});
 
-	test('replays Codex turn state and identity headers', async () => {
+	test('does not replay Codex turn state or stateful thread headers', async () => {
 		const requestHeaders: Headers[] = [];
 		const requestBodies: string[] = [];
 		let callCount = 0;
@@ -166,26 +166,21 @@ describe('openai oauth client', () => {
 
 		expect(requestHeaders[0]?.get('x-codex-turn-state')).toBeNull();
 		expect(requestHeaders[0]?.get('x-codex-installation-id')).toBeTruthy();
-		expect(requestHeaders[0]?.get('x-codex-window-id')).toBe(
-			'session-headers:0',
-		);
-		expect(requestHeaders[0]?.get('thread_id')).toBe('session-headers');
-		expect(requestHeaders[1]?.get('x-codex-turn-state')).toBe('turn-state-1');
-		expect(requestHeaders[1]?.get('x-codex-installation-id')).toBe(
-			requestHeaders[0]?.get('x-codex-installation-id'),
-		);
-		expect(JSON.parse(requestBodies[0] ?? '{}')).toMatchObject({
-			client_metadata: {
-				'x-codex-installation-id': requestHeaders[0]?.get(
-					'x-codex-installation-id',
-				),
-			},
+		expect(requestHeaders[0]?.get('x-codex-window-id')).toBeNull();
+		expect(requestHeaders[0]?.get('thread_id')).toBeNull();
+		expect(requestHeaders[0]?.get('session_id')).toBe('session-headers');
+		expect(requestHeaders[1]?.get('x-codex-turn-state')).toBeNull();
+		expect(requestHeaders[1]?.get('x-codex-window-id')).toBeNull();
+		expect(requestHeaders[1]?.get('thread_id')).toBeNull();
+		const firstBody = JSON.parse(requestBodies[0] ?? '{}');
+		expect(firstBody).not.toHaveProperty('client_metadata');
+		expect(firstBody).toMatchObject({
 			prompt_cache_key: 'session-headers',
 		});
 		expect(getOpenAIOAuthSessionState('session-headers')).toMatchObject({
-			turnState: 'turn-state-1',
-			installationId: requestHeaders[0]?.get('x-codex-installation-id'),
-			windowId: 'session-headers:0',
+			responseId: 'resp_2',
+			model: 'gpt-5.3-codex',
+			status: 'completed',
 		});
 	});
 

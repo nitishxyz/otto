@@ -206,7 +206,7 @@ export async function composeSystemPrompt(options: {
 	const fallback = [
 		'You are a concise, friendly coding agent.',
 		'Be precise and actionable. Use tools when needed, prefer small diffs.',
-		'Stream your answer; call finish when done.',
+		'Stream your answer; stop when done.',
 	].join(' ');
 	return {
 		prompt: fallback,

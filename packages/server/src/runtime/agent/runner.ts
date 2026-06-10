@@ -1,4 +1,4 @@
-import { hasToolCall, streamText } from 'ai';
+import { stepCountIs, streamText } from 'ai';
 import { logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
 import { messages } from '@ottocode/database/schema';
@@ -69,6 +69,7 @@ export {
 } from '../session/queue.ts';
 
 const OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX = 2;
+const MAX_TURN_STEPS = 1000;
 
 function parsePositiveIntegerEnv(name: string, fallback: number) {
 	const raw = process.env[name];
@@ -459,7 +460,7 @@ async function runAssistant(opts: RunOpts) {
 		opts.provider === 'copilot' && !opts.model.startsWith('gpt-5-mini');
 	const stopWhenCondition = isCopilotResponsesApi
 		? undefined
-		: hasToolCall('finish');
+		: stepCountIs(MAX_TURN_STEPS);
 	logStreamRequestReady({
 		opts,
 		setup,
@@ -615,7 +616,7 @@ async function runAssistant(opts: RunOpts) {
 		}
 
 		const fs = firstToolSeen();
-		if (!fs && !toolObserver.state.finishObserved) {
+		if (!fs) {
 			publish({
 				type: 'finish-step',
 				sessionId: opts.sessionId,
@@ -663,7 +664,6 @@ async function runAssistant(opts: RunOpts) {
 					finishDetails: JSON.stringify({
 						...finishDetails,
 						stream: {
-							finishObserved: toolObserver.state.finishObserved,
 							firstToolSeen: firstToolSeen(),
 							lastToolName: toolObserver.state.lastToolName,
 							endedWithToolActivity: toolObserver.state.endedWithToolActivity,
@@ -690,7 +690,6 @@ async function runAssistant(opts: RunOpts) {
 			dump.recordStreamEnd({
 				finishReason: streamFinishReason,
 				rawFinishReason: streamRawFinishReason,
-				finishObserved: toolObserver.state.finishObserved,
 				aborted: _abortedByUser,
 			});
 		}

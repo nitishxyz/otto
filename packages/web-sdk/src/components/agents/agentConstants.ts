@@ -1,10 +1,6 @@
 import type { AgentDetail, ToolDetail } from '../../hooks/useAgents';
 
-export const REQUIRED_TOOLS = new Set([
-	'finish',
-	'progress_update',
-	'load_tools',
-]);
+export const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 export const RISKY_TOOLS = new Set([
 	'shell',
 	'terminal',
@@ -46,7 +42,7 @@ export function toolCategoryFromName(tool: string): string {
 	if (tool === 'load_tools') return 'First-class tools';
 	if (['simulator', 'read_image', 'copy_attachment_to_project'].includes(tool))
 		return 'Loadable tools';
-	if (['finish', 'progress_update', 'update_todos'].includes(tool))
+	if (['progress_update', 'update_todos'].includes(tool))
 		return 'First-class tools';
 	if (
 		[
@@ -196,7 +192,6 @@ export const TOOL_PRESETS: Record<
 		label: 'Read-only',
 		tools: {
 			firstClass: [
-				'finish',
 				'progress_update',
 				'read',
 				'ls',
@@ -212,7 +207,6 @@ export const TOOL_PRESETS: Record<
 		label: 'Planning',
 		tools: {
 			firstClass: [
-				'finish',
 				'progress_update',
 				'update_todos',
 				'read',
@@ -229,7 +223,6 @@ export const TOOL_PRESETS: Record<
 		label: 'Research',
 		tools: {
 			firstClass: [
-				'finish',
 				'progress_update',
 				'update_todos',
 				'read',

@@ -92,9 +92,9 @@ async function scaffoldAgent(
 		return false;
 	}
 	const tools = await multiselect({
-		message: 'Select tools to allow for this agent (finish is always included)',
-		// built-ins (excluding finish) + discovered custom ids under .otto/tools/
-		options: (await listAvailableTools(projectRoot, scope, false)).map((t) => ({
+		message: 'Select tools to allow for this agent',
+		// built-ins + discovered custom ids under .otto/tools/
+		options: (await listAvailableTools(projectRoot, scope)).map((t) => ({
 			value: t,
 			label: t,
 		})),
@@ -132,7 +132,6 @@ async function scaffoldAgent(
 		const template = defaultAgentPromptTemplate(String(name));
 		await Bun.write(promptAbs, template);
 	}
-	// Do not persist 'finish' in agents.json; it is implicitly allowed at runtime
 	const toolList = Array.from(new Set([...(tools as string[])]));
 	current[String(name)] = {
 		...(current[String(name)] ?? {}),
@@ -249,7 +248,7 @@ export async function editAgentsConfig(
 			message:
 				mode === 'append'
 					? `Append extra tools to ${key}'s defaults? (defaults: ${
-							defaults.length ? defaults.join(', ') : 'finish'
+							defaults.length ? defaults.join(', ') : 'none'
 						})`
 					: `Override ${key}'s default tools?`,
 		});
@@ -264,7 +263,7 @@ export async function editAgentsConfig(
 		mode === 'append'
 			? existingAppend
 			: toolNamesFromConfig(entry.tools).filter((t) => t !== 'finish');
-	const optionValues = await listAvailableTools(projectRoot, scope, false);
+	const optionValues = await listAvailableTools(projectRoot, scope);
 	const baseDefaults = new Set(defaults);
 	const filteredOptions = optionValues.filter((tool) => {
 		if (mode === 'append') {
@@ -287,9 +286,9 @@ export async function editAgentsConfig(
 		message:
 			mode === 'append'
 				? `Extra tools to append for ${key} (defaults: ${
-						defaults.length ? defaults.join(', ') : 'finish'
+						defaults.length ? defaults.join(', ') : 'none'
 					})`
-				: `Tools for ${key} (finish is always included)`,
+				: `Tools for ${key}`,
 		options,
 		initialValues,
 	});
@@ -353,7 +352,7 @@ export async function editAgentsConfig(
 		else delete nextEntry.appendTools;
 		delete nextEntry.tools;
 	} else {
-		const finalTools = Array.from(new Set([...selection, 'finish']));
+		const finalTools = Array.from(new Set(selection));
 		nextEntry.tools = toolConfigFromNames(finalTools);
 		delete nextEntry.appendTools;
 	}
@@ -469,7 +468,6 @@ async function scaffoldCommand(
 export async function listAvailableTools(
 	_projectRoot: string,
 	_scope: 'local' | 'global',
-	includeFinish: boolean,
 ): Promise<string[]> {
 	const globalConfigDir = getGlobalConfigDir();
 	const { tools: discovered } = await discoverProjectTools(
@@ -495,12 +493,10 @@ export async function listAvailableTools(
 	];
 	for (const builtin of curatedBuiltIns) names.add(builtin);
 	for (const { name } of discovered) {
-		if (!includeFinish && name === 'finish') continue;
 		// Hide internal helpers
 		if (name === 'pwd' || name === 'cd' || name === 'progress_update') continue;
 		names.add(name);
 	}
-	if (includeFinish) names.add('finish');
 	return Array.from(names).sort();
 }
 

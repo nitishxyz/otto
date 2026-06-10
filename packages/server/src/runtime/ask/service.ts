@@ -207,7 +207,7 @@ async function processAskRequest(
 	const agentCfg = request.agentPrompt
 		? await resolveAgentConfig(cfg.projectRoot, agentName, {
 				prompt: request.agentPrompt,
-				tools: request.tools ?? { firstClass: ['progress_update', 'finish'] },
+				tools: request.tools ?? { firstClass: ['progress_update'] },
 				provider:
 					typeof request.provider === 'string' &&
 					hasConfiguredProvider(cfg, request.provider)
