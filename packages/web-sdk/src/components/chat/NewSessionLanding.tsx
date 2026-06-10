@@ -9,7 +9,8 @@ import {
 	useMemo,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useConfig, useAllModels } from '../../hooks/useConfig';
+import { useChatComposer } from '../../hooks/useChatComposer';
+import { useConfigModalControls } from '../../hooks/useConfigModalControls';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import {
 	NEW_SESSION_FILE_SELECTIONS_KEY,
@@ -41,52 +42,41 @@ export const NewSessionLanding = memo(
 			{ onSessionCreated, defaultAgent, wordmark, compact, modalPosition },
 			ref,
 		) {
-			const { data: config } = useConfig();
-			const { data: allModels } = useAllModels();
 			const queryClient = useQueryClient();
 			const [sending, setSending] = useState(false);
 			const [transitioning, setTransitioning] = useState(false);
 			const pendingSessionIdRef = useRef<string | null>(null);
-			const [agent, setAgent] = useState('');
-			const [provider, setProvider] = useState('');
-			const [model, setModel] = useState('');
-			const [isConfigOpen, setIsConfigOpen] = useState(false);
-			const [configFocusTarget, setConfigFocusTarget] = useState<
-				'agent' | 'model' | null
-			>(null);
+			const {
+				config,
+				agent,
+				provider,
+				model,
+				agentNames,
+				isPlanMode,
+				modelSupportsReasoning,
+				modelSupportsVision,
+				modelSupportsAttachment,
+				modelIsFree,
+				providerAuthType,
+				isCustomProvider,
+				handleAgentChange,
+				handlePlanModeToggle,
+				handleProviderChange,
+				handleModelChange,
+				handleModelSelectorChange,
+			} = useChatComposer({ defaultAgent });
+			const {
+				isConfigOpen,
+				configFocusTarget,
+				openConfig,
+				toggleConfig,
+				closeConfig,
+				openModelConfig,
+			} = useConfigModalControls();
 			const chatInputRef = useRef<{
 				focus: () => void;
 				setValue: (value: string) => void;
 			}>(null);
-			const initializedRef = useRef(false);
-
-			useEffect(() => {
-				if (initializedRef.current || !config?.defaults) return;
-				initializedRef.current = true;
-				setAgent(defaultAgent || config.defaults.agent || 'general');
-				setProvider(config.defaults.provider || '');
-				setModel(config.defaults.model || '');
-			}, [config, defaultAgent]);
-
-			const modelSupportsVision = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.vision;
-
-			const modelSupportsAttachment = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.attachment;
-
-			const modelSupportsReasoning = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.reasoningText;
-
-			const modelIsFree = allModels?.[provider]?.models?.find(
-				(m) => m.id === model,
-			)?.free;
-
-			const providerAuthType = allModels?.[provider]?.authType;
-			const isCustomProvider =
-				allModels?.[provider]?.label?.includes('(custom)') ?? false;
 
 			const {
 				images,
@@ -139,48 +129,16 @@ export const NewSessionLanding = memo(
 				return () => clearTimeout(timer);
 			}, []);
 
-			const handleAgentChange = useCallback((value: string) => {
-				setAgent(value);
-			}, []);
-
-			const handlePlanModeToggle = useCallback((isPlanMode: boolean) => {
-				setAgent(isPlanMode ? 'plan' : 'build');
-			}, []);
-
-			const handleProviderChange = useCallback((value: string) => {
-				setProvider(value);
-			}, []);
-
-			const handleModelChange = useCallback((value: string) => {
-				setModel(value);
-			}, []);
-
-			const handleModelSelectorChange = useCallback(
-				(newProvider: string, newModel: string) => {
-					setProvider(newProvider);
-					setModel(newModel);
+			const handleCommand = useCallback(
+				(commandId: string) => {
+					if (commandId === 'models') {
+						openConfig('model');
+					} else if (commandId === 'agents') {
+						openConfig('agent');
+					}
 				},
-				[],
+				[openConfig],
 			);
-
-			const handleToggleConfig = useCallback(() => {
-				setIsConfigOpen((prev) => !prev);
-			}, []);
-
-			const handleCloseConfig = useCallback(() => {
-				setIsConfigOpen(false);
-				setConfigFocusTarget(null);
-			}, []);
-
-			const handleCommand = useCallback((commandId: string) => {
-				if (commandId === 'models') {
-					setConfigFocusTarget('model');
-					setIsConfigOpen(true);
-				} else if (commandId === 'agents') {
-					setConfigFocusTarget('agent');
-					setIsConfigOpen(true);
-				}
-			}, []);
 
 			const handleSend = useCallback(
 				async (content: string) => {
@@ -309,7 +267,7 @@ export const NewSessionLanding = memo(
 					{isConfigOpen ? (
 						<ConfigModal
 							isOpen
-							onClose={handleCloseConfig}
+							onClose={closeConfig}
 							initialFocus={configFocusTarget}
 							chatInputRef={chatInputRef}
 							agent={agent}
@@ -348,20 +306,17 @@ export const NewSessionLanding = memo(
 								isFreeModel={modelIsFree}
 								fileSelectionContexts={fileSelectionContexts}
 								onFileSelectionContextRemove={handleFileSelectionContextRemove}
-								onConfigClick={handleToggleConfig}
-								onModelInfoClick={() => {
-									setConfigFocusTarget('model');
-									setIsConfigOpen(true);
-								}}
+								onConfigClick={toggleConfig}
+								onModelInfoClick={openModelConfig}
 								reasoningEnabled={
 									modelSupportsReasoning &&
 									(config?.defaults?.reasoningText ?? true)
 								}
 								agent={agent}
-								agents={config?.agents}
+								agents={agentNames}
 								onAgentChange={handleAgentChange}
 								onPlanModeToggle={handlePlanModeToggle}
-								isPlanMode={agent === 'plan'}
+								isPlanMode={isPlanMode}
 							/>
 						</div>
 					</div>

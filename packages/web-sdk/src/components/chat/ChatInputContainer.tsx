@@ -8,16 +8,11 @@ import {
 	useImperativeHandle,
 	useMemo,
 } from 'react';
-import type { ReactNode, RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSendMessage } from '../../hooks/useMessages';
-import {
-	useSession,
-	useUpdateSession,
-	useDeleteSession,
-} from '../../hooks/useSessions';
-import { useAllModels, useConfig } from '../../hooks/useConfig';
-import { useAgentDetails } from '../../hooks/useAgents';
+import { useDeleteSession } from '../../hooks/useSessions';
+import { useChatComposer } from '../../hooks/useChatComposer';
+import { useConfigModalControls } from '../../hooks/useConfigModalControls';
 import { useStageFiles } from '../../hooks/useGit';
 import { useGitStore } from '../../stores/gitStore';
 import { useFileUpload } from '../../hooks/useFileUpload';
@@ -75,10 +70,6 @@ export const ChatInputContainer = memo(
 			},
 			ref,
 		) {
-			const session = useSession(sessionId);
-			const [agent, setAgent] = useState('');
-			const [provider, setProvider] = useState('');
-			const [model, setModel] = useState('');
 			const [inputKey, setInputKey] = useState(0);
 
 			const chatInputRef = useRef<{
@@ -87,11 +78,34 @@ export const ChatInputContainer = memo(
 			}>(null);
 
 			const sendMessage = useSendMessage(sessionId);
-			const updateSession = useUpdateSession(sessionId);
 			const deleteSession = useDeleteSession();
-			const { data: allModels } = useAllModels();
-			const { data: config } = useConfig();
-			const { data: agentDetails } = useAgentDetails({ enabled: true });
+			const {
+				config,
+				agent,
+				provider,
+				model,
+				agentNames,
+				isPlanMode,
+				modelSupportsReasoning,
+				modelSupportsVision,
+				modelSupportsAttachment,
+				modelIsFree,
+				providerAuthType,
+				isCustomProvider,
+				handleAgentChange,
+				handlePlanModeToggle,
+				handleProviderChange,
+				handleModelChange,
+				handleModelSelectorChange,
+			} = useChatComposer({ sessionId });
+			const {
+				isConfigOpen,
+				configFocusTarget,
+				openConfig,
+				toggleConfig,
+				closeConfig,
+				openModelConfig,
+			} = useConfigModalControls();
 			const stageFiles = useStageFiles();
 			const openCommitModalForSession = useGitStore(
 				(state) => state.openCommitModalForSession,
@@ -100,23 +114,6 @@ export const ChatInputContainer = memo(
 				(state) => state.setActiveSessionId,
 			);
 			const queryClient = useQueryClient();
-
-			const selectedModel = useMemo(
-				() => allModels?.[provider]?.models?.find((m) => m.id === model),
-				[allModels, provider, model],
-			);
-
-			const modelSupportsReasoning = selectedModel?.reasoningText;
-			const modelSupportsVision = selectedModel?.vision;
-			const modelSupportsAttachment = selectedModel?.attachment;
-			const modelIsFree = selectedModel?.free;
-			const agentNames = useMemo(
-				() =>
-					agentDetails?.agents.length
-						? agentDetails.agents.map((agentDetail) => agentDetail.name)
-						: (config?.agents ?? []),
-				[agentDetails?.agents, config?.agents],
-			);
 
 			const {
 				images,
@@ -186,18 +183,6 @@ export const ChatInputContainer = memo(
 				},
 				[sessionId, removeFileSelection],
 			);
-
-			const providerAuthType = allModels?.[provider]?.authType;
-			const isCustomProvider =
-				allModels?.[provider]?.label?.includes('(custom)') ?? false;
-
-			useEffect(() => {
-				if (session) {
-					setAgent(session.agent);
-					setProvider(session.provider);
-					setModel(session.model);
-				}
-			}, [session]);
 
 			useEffect(() => {
 				setActiveSessionId(sessionId);
@@ -319,9 +304,9 @@ export const ChatInputContainer = memo(
 			const handleCommand = useCallback(
 				async (commandId: string) => {
 					if (commandId === 'models') {
-						openConfigRef.current?.('model');
+						openConfig('model');
 					} else if (commandId === 'agents') {
-						openConfigRef.current?.('agent');
+						openConfig('agent');
 					} else if (commandId === 'new') {
 						onNewSession?.();
 					} else if (commandId === 'stage') {
@@ -455,254 +440,66 @@ export const ChatInputContainer = memo(
 					onDeleteSession,
 					onCopyText,
 					queryClient,
+					openConfig,
 				],
-			);
-
-			const handleAgentChange = useCallback(
-				async (value: string) => {
-					setAgent(value);
-					const selectedAgent = agentDetails?.agents.find(
-						(agentDetail) => agentDetail.name === value,
-					);
-					const update = selectedAgent
-						? {
-								agent: value,
-								provider:
-									selectedAgent.provider ??
-									config?.defaults?.provider ??
-									provider,
-								model: selectedAgent.model ?? config?.defaults?.model ?? model,
-							}
-						: { agent: value };
-					if ('provider' in update) setProvider(update.provider);
-					if ('model' in update) setModel(update.model);
-					try {
-						await updateSession.mutateAsync(update);
-					} catch (error) {
-						console.error('Failed to update agent:', error);
-					}
-				},
-				[
-					agentDetails?.agents,
-					config?.defaults?.model,
-					config?.defaults?.provider,
-					model,
-					provider,
-					updateSession,
-				],
-			);
-
-			const handleModelSelectorChange = useCallback(
-				async (newProvider: string, newModel: string) => {
-					setProvider(newProvider);
-					setModel(newModel);
-					try {
-						await updateSession.mutateAsync({
-							provider: newProvider,
-							model: newModel,
-						});
-					} catch (error) {
-						console.error('Failed to update model:', error);
-					}
-				},
-				[updateSession],
-			);
-
-			const handleProviderChange = useCallback(
-				async (newProvider: string) => {
-					setProvider(newProvider);
-					if (model) {
-						try {
-							await updateSession.mutateAsync({
-								provider: newProvider,
-								model,
-							});
-						} catch (error) {
-							console.error('Failed to update provider:', error);
-						}
-					}
-				},
-				[model, updateSession],
-			);
-
-			const handleModelChange = useCallback(
-				async (newModel: string) => {
-					setModel(newModel);
-					try {
-						await updateSession.mutateAsync({ provider, model: newModel });
-					} catch (error) {
-						console.error('Failed to update model:', error);
-					}
-				},
-				[provider, updateSession],
-			);
-
-			const handlePlanModeToggle = useCallback(
-				async (isPlanMode: boolean) => {
-					const newAgent = isPlanMode ? 'plan' : 'build';
-					await handleAgentChange(newAgent);
-				},
-				[handleAgentChange],
-			);
-
-			const openConfigRef = useRef<
-				((target: 'agent' | 'model' | null) => void) | null
-			>(null);
-			const handleOpenConfigReady = useCallback(
-				(openConfig: (target: 'agent' | 'model' | null) => void) => {
-					openConfigRef.current = openConfig;
-				},
-				[],
 			);
 
 			return (
-				<ChatConfigModalHost
-					chatInputRef={chatInputRef}
-					agent={agent}
-					provider={provider}
-					model={model}
-					modelSupportsReasoning={modelSupportsReasoning}
-					onAgentChange={handleAgentChange}
-					onProviderChange={handleProviderChange}
-					onModelChange={handleModelChange}
-					onModelSelectorChange={handleModelSelectorChange}
-					modalPosition={modalPosition}
-					onOpenConfigReady={handleOpenConfigReady}
-				>
-					{({ toggleConfig, openModelConfig }) => (
-						<ChatInput
-							ref={chatInputRef}
-							key={inputKey}
-							onSend={handleSendMessage}
-							onCommand={handleCommand}
-							disabled={sendMessage.isPending}
-							onConfigClick={toggleConfig}
-							onPlanModeToggle={handlePlanModeToggle}
-							isPlanMode={agent === 'plan'}
-							reasoningEnabled={
-								modelSupportsReasoning &&
-								(config?.defaults?.reasoningText ?? true)
-							}
-							sessionId={sessionId}
-							images={images}
-							documents={documents}
-							onFileRemove={removeFile}
-							isDragging={isDragging}
-							onPaste={handlePaste}
-							visionEnabled={modelSupportsVision}
-							attachmentEnabled={modelSupportsAttachment}
-							modelName={model}
-							providerName={provider}
-							isCustomProvider={isCustomProvider}
-							authType={providerAuthType}
-							isFreeModel={modelIsFree}
-							researchContexts={researchContexts}
-							onResearchContextRemove={handleResearchContextRemove}
-							fileSelectionContexts={fileSelectionContexts}
-							onFileSelectionContextRemove={handleFileSelectionContextRemove}
-							onModelInfoClick={openModelConfig}
+				<>
+					{isConfigOpen ? (
+						<ConfigModal
+							isOpen
+							onClose={closeConfig}
+							initialFocus={configFocusTarget}
+							chatInputRef={chatInputRef}
 							agent={agent}
-							agents={agentNames}
+							provider={provider}
+							model={model}
+							modelSupportsReasoning={modelSupportsReasoning}
 							onAgentChange={handleAgentChange}
+							onProviderChange={handleProviderChange}
+							onModelChange={handleModelChange}
+							onModelSelectorChange={handleModelSelectorChange}
+							modalPosition={modalPosition}
 						/>
-					)}
-				</ChatConfigModalHost>
+					) : null}
+					<ChatInput
+						ref={chatInputRef}
+						key={inputKey}
+						onSend={handleSendMessage}
+						onCommand={handleCommand}
+						disabled={sendMessage.isPending}
+						onConfigClick={toggleConfig}
+						onPlanModeToggle={handlePlanModeToggle}
+						isPlanMode={isPlanMode}
+						reasoningEnabled={
+							modelSupportsReasoning &&
+							(config?.defaults?.reasoningText ?? true)
+						}
+						sessionId={sessionId}
+						images={images}
+						documents={documents}
+						onFileRemove={removeFile}
+						isDragging={isDragging}
+						onPaste={handlePaste}
+						visionEnabled={modelSupportsVision}
+						attachmentEnabled={modelSupportsAttachment}
+						modelName={model}
+						providerName={provider}
+						isCustomProvider={isCustomProvider}
+						authType={providerAuthType}
+						isFreeModel={modelIsFree}
+						researchContexts={researchContexts}
+						onResearchContextRemove={handleResearchContextRemove}
+						fileSelectionContexts={fileSelectionContexts}
+						onFileSelectionContextRemove={handleFileSelectionContextRemove}
+						onModelInfoClick={openModelConfig}
+						agent={agent}
+						agents={agentNames}
+						onAgentChange={handleAgentChange}
+					/>
+				</>
 			);
 		},
 	),
 );
-
-type ConfigFocusTarget = 'agent' | 'model' | null;
-
-type ConfigControls = {
-	openConfig: (target: ConfigFocusTarget) => void;
-	openModelConfig: () => void;
-	toggleConfig: () => void;
-};
-
-interface ChatConfigModalHostProps {
-	chatInputRef: RefObject<{
-		focus: () => void;
-		setValue: (value: string) => void;
-	}>;
-	agent: string;
-	provider: string;
-	model: string;
-	modelSupportsReasoning?: boolean;
-	onAgentChange: (agent: string) => void;
-	onProviderChange: (provider: string) => void;
-	onModelChange: (model: string) => void;
-	onModelSelectorChange?: (provider: string, model: string) => void;
-	modalPosition?: 'fixed' | 'absolute';
-	onOpenConfigReady: (openConfig: (target: ConfigFocusTarget) => void) => void;
-	children: (controls: ConfigControls) => ReactNode;
-}
-
-const ChatConfigModalHost = memo(function ChatConfigModalHost({
-	chatInputRef,
-	agent,
-	provider,
-	model,
-	modelSupportsReasoning,
-	onAgentChange,
-	onProviderChange,
-	onModelChange,
-	onModelSelectorChange,
-	modalPosition,
-	onOpenConfigReady,
-	children,
-}: ChatConfigModalHostProps) {
-	const [isConfigOpen, setIsConfigOpen] = useState(false);
-	const [configFocusTarget, setConfigFocusTarget] =
-		useState<ConfigFocusTarget>(null);
-
-	const openConfig = useCallback((target: ConfigFocusTarget) => {
-		setConfigFocusTarget(target);
-		setIsConfigOpen(true);
-	}, []);
-
-	useEffect(() => {
-		onOpenConfigReady(openConfig);
-	}, [onOpenConfigReady, openConfig]);
-
-	const toggleConfig = useCallback(() => {
-		setIsConfigOpen((prev) => !prev);
-	}, []);
-
-	const handleCloseConfig = useCallback(() => {
-		setIsConfigOpen(false);
-		setConfigFocusTarget(null);
-	}, []);
-
-	const openModelConfig = useCallback(() => {
-		openConfig('model');
-	}, [openConfig]);
-
-	const controls = useMemo(
-		() => ({ openConfig, openModelConfig, toggleConfig }),
-		[openConfig, openModelConfig, toggleConfig],
-	);
-
-	return (
-		<>
-			{isConfigOpen ? (
-				<ConfigModal
-					isOpen
-					onClose={handleCloseConfig}
-					initialFocus={configFocusTarget}
-					chatInputRef={chatInputRef}
-					agent={agent}
-					provider={provider}
-					model={model}
-					modelSupportsReasoning={modelSupportsReasoning}
-					onAgentChange={onAgentChange}
-					onProviderChange={onProviderChange}
-					onModelChange={onModelChange}
-					onModelSelectorChange={onModelSelectorChange}
-					modalPosition={modalPosition}
-				/>
-			) : null}
-			{children(controls)}
-		</>
-	);
-});

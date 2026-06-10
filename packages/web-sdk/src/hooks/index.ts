@@ -28,6 +28,8 @@ export * from './useFileBrowser';
 export * from './useMCP';
 export * from './useSkills';
 export * from './useAgents';
+export * from './useChatComposer';
+export * from './useConfigModalControls';
 export * from './useContainerWidth';
 export * from './useVoiceInput';
 export * from './useDictationModels';
