@@ -10,6 +10,8 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
+import { buildSubagentTools } from '../../tools/subagents/index.ts';
+import { buildGoalTools } from '../../tools/goals/index.ts';
 
 const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 const RISKY_TOOLS = new Set([
@@ -54,6 +56,15 @@ const RESEARCH_TOOLS = new Set([
 	'present_action',
 ]);
 
+const ORCHESTRATION_TOOLS = new Set([
+	'delegate_task',
+	'list_subagents',
+	'message_subagent',
+	'goal_list',
+	'goal_update',
+	'enqueue_session_message',
+]);
+
 const getToolsQuerySchema = z.object({
 	project: z
 		.string()
@@ -81,6 +92,7 @@ const toolDetailSchema = z.object({
 		'mcp',
 		'skill',
 		'research',
+		'orchestration',
 		'custom',
 		'other',
 	]),
@@ -135,6 +147,7 @@ function getToolCategory(name: string): ToolCategory {
 	if (name === 'websearch') return 'web';
 	if (name === 'skill') return 'skill';
 	if (RESEARCH_TOOLS.has(name)) return 'research';
+	if (ORCHESTRATION_TOOLS.has(name)) return 'orchestration';
 	if (name.includes('__') || name === 'load_mcp_tools') return 'mcp';
 	if (BUILTIN_TOOLS.has(name)) return 'other';
 	return 'custom';
@@ -144,7 +157,12 @@ function getToolSource(name: string, options: { mcp: boolean }): ToolSource {
 	if (options.mcp || name.includes('__') || name === 'load_mcp_tools')
 		return 'mcp';
 	if (name === 'skill') return 'skill';
-	if (BUILTIN_TOOLS.has(name) || RESEARCH_TOOLS.has(name)) return 'builtin';
+	if (
+		BUILTIN_TOOLS.has(name) ||
+		RESEARCH_TOOLS.has(name) ||
+		ORCHESTRATION_TOOLS.has(name)
+	)
+		return 'builtin';
 	return 'custom';
 }
 
@@ -206,6 +224,20 @@ export function registerToolsRoute(app: Hono) {
 				}
 
 				for (const item of buildDatabaseTools(cfg.projectRoot, null)) {
+					details.set(
+						item.name,
+						toToolDetail({ name: item.name, tool: item.tool }),
+					);
+				}
+
+				for (const item of [
+					...buildSubagentTools(cfg.projectRoot, ''),
+					...buildGoalTools({
+						projectRoot: cfg.projectRoot,
+						goalSessionId: '',
+						allowComplete: false,
+					}),
+				]) {
 					details.set(
 						item.name,
 						toToolDetail({ name: item.name, tool: item.tool }),

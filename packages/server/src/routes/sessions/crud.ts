@@ -169,6 +169,8 @@ export function registerSessionCrudRoutes(app: Hono) {
 						eq(sessions.projectPath, cfg.projectRoot),
 						ne(sessions.sessionType, 'research'),
 						ne(sessions.sessionType, 'btw'),
+						ne(sessions.sessionType, 'subagent'),
+						ne(sessions.sessionType, 'otto'),
 					),
 				)
 				.orderBy(

@@ -57,6 +57,7 @@ const configDefaultsSchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+	ottoEnabled: z.boolean().optional(),
 });
 
 const configResponseSchema = z.object({
@@ -189,6 +190,12 @@ export function registerMainConfigRoute(app: Hono) {
 							embeddedConfig?.defaults?.autoCompactThresholdTokens,
 							cfg.defaults.autoCompactThresholdTokens,
 						) ?? null,
+					ottoEnabled:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.ottoEnabled,
+							cfg.defaults.ottoEnabled,
+						) ?? true,
 				};
 
 				return c.json({

@@ -194,9 +194,11 @@ function buildCanonicalRegistrationMap(
 export async function runSessionLoop(sessionId: string) {
 	setRunning(sessionId, true);
 
+	let lastProjectRoot: string | undefined;
 	while (true) {
 		const job = await dequeueJob(sessionId);
 		if (!job) break;
+		lastProjectRoot = job.projectRoot;
 
 		try {
 			await runAssistant(job);
@@ -207,6 +209,13 @@ export async function runSessionLoop(sessionId: string) {
 
 	setRunning(sessionId, false);
 	cleanupSession(sessionId);
+
+	if (lastProjectRoot) {
+		try {
+			const { handleSessionIdle } = await import('../subagents/idle.ts');
+			void handleSessionIdle(sessionId, lastProjectRoot);
+		} catch {}
+	}
 }
 
 async function runAssistant(opts: RunOpts) {

@@ -22,7 +22,14 @@ type CreateSessionInput = {
 	model: string;
 	title?: string | null;
 	parentSessionId?: string | null;
-	sessionType?: 'main' | 'branch' | 'handoff' | 'research' | 'btw';
+	sessionType?:
+		| 'main'
+		| 'branch'
+		| 'handoff'
+		| 'research'
+		| 'btw'
+		| 'subagent'
+		| 'otto';
 };
 
 export async function createSession({
@@ -131,10 +138,14 @@ export async function listSessions({
 						eq(sessions.projectPath, projectPath),
 						ne(sessions.sessionType, 'research'),
 						ne(sessions.sessionType, 'btw'),
+						ne(sessions.sessionType, 'subagent'),
+						ne(sessions.sessionType, 'otto'),
 					)
 				: and(
 						ne(sessions.sessionType, 'research'),
 						ne(sessions.sessionType, 'btw'),
+						ne(sessions.sessionType, 'subagent'),
+						ne(sessions.sessionType, 'otto'),
 					),
 		)
 		.orderBy(

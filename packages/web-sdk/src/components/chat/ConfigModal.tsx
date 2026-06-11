@@ -48,6 +48,7 @@ export function ConfigModal({
 	const updateDefaults = useUpdateDefaults();
 	const reasoningEnabled = config?.defaults?.reasoningText ?? true;
 	const reasoningLevel = config?.defaults?.reasoningLevel ?? 'high';
+	const ottoEnabled = config?.defaults?.ottoEnabled ?? true;
 	const agentNames = useMemo(
 		() =>
 			agentDetails?.agents.length
@@ -168,6 +169,37 @@ export function ConfigModal({
 							onChange={handleModelChange}
 							dropdownMode="inline"
 						/>
+					</div>
+
+					<div className="flex items-center justify-between">
+						<div>
+							<div className="text-sm font-medium text-foreground">
+								Otto & Goals
+							</div>
+							<p className="mt-0.5 text-xs text-muted-foreground">
+								Supervisor agent that tracks goals and keeps sessions on task.
+							</p>
+						</div>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={ottoEnabled}
+							onClick={() =>
+								updateDefaults.mutate({
+									ottoEnabled: !ottoEnabled,
+									scope: 'global',
+								})
+							}
+							className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+								ottoEnabled ? 'bg-primary' : 'bg-muted'
+							}`}
+						>
+							<span
+								className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+									ottoEnabled ? 'translate-x-6' : 'translate-x-1'
+								} ${ottoEnabled ? 'bg-primary-foreground' : 'bg-foreground'}`}
+							/>
+						</button>
 					</div>
 				</div>
 			) : null}

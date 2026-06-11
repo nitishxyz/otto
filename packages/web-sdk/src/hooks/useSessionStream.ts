@@ -1832,6 +1832,8 @@ export function useSessionStream(
 					}
 					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
+					queryClient.invalidateQueries({ queryKey: ['subagents', sessionId] });
 					break;
 				}
 				case 'tool.delta': {
@@ -1981,6 +1983,13 @@ export function useSessionStream(
 							},
 						);
 					}
+					break;
+				}
+				case 'goal.updated': {
+					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
+					queryClient.invalidateQueries({
+						queryKey: ['subagents', sessionId],
+					});
 					break;
 				}
 				case 'queue.updated': {

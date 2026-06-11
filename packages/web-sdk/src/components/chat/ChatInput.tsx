@@ -52,6 +52,7 @@ import { InputApprovalBar } from './InputApprovalBar';
 import { InputSecureInputBar } from './InputSecureInputBar';
 import { InputQueueBar } from './InputQueueBar';
 import { InputTodosBar } from './InputTodosBar';
+import { InputSubagentsBar } from './InputSubagentsBar';
 import { DictationInstallPrompt } from './DictationInstallPrompt';
 
 const VOICE_SHORTCUT_DOUBLE_PRESS_WINDOW_MS = 280;
@@ -1394,6 +1395,7 @@ const ChatInputSessionBars = memo(function ChatInputSessionBars({
 	return (
 		<div className={`pointer-events-auto ${widthClass} mx-auto relative z-0`}>
 			<InputQueueBar key={`${sessionId}-queue`} sessionId={sessionId} />
+			<InputSubagentsBar key={`${sessionId}-subagents`} sessionId={sessionId} />
 			<InputTodosBar key={sessionId} sessionId={sessionId} />
 			<InputApprovalBar sessionId={sessionId} />
 			<InputSecureInputBar sessionId={sessionId} />

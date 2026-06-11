@@ -3,6 +3,7 @@ import { gitMixin } from './git';
 import { configMixin } from './config';
 import { filesMixin } from './files';
 import { branchesMixin } from './branches';
+import { goalsMixin } from './goals';
 import { approvalMixin } from './approval';
 import { ottorouterMixin } from './ottorouter';
 import { authMixin } from './auth';
@@ -12,6 +13,14 @@ import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
 
 export { configureApiClient } from './utils';
+export type {
+	Goal,
+	GoalStatus,
+	GoalTask,
+	GoalTaskStatus,
+	Subagent,
+	SubagentStatus,
+} from './goals';
 export type {
 	CreateDictationSessionInput,
 	CreateDictationSessionResponse,
@@ -89,6 +98,14 @@ class ApiClient {
 	getShareStatus = branchesMixin.getShareStatus;
 	shareSession = branchesMixin.shareSession;
 	syncSession = branchesMixin.syncSession;
+
+	getSessionGoal = goalsMixin.getSessionGoal;
+	createSessionGoal = goalsMixin.createSessionGoal;
+	updateGoal = goalsMixin.updateGoal;
+	addGoalTasks = goalsMixin.addGoalTasks;
+	updateGoalTask = goalsMixin.updateGoalTask;
+	startGoal = goalsMixin.startGoal;
+	listSessionSubagents = goalsMixin.listSessionSubagents;
 
 	approveToolCall = approvalMixin.approveToolCall;
 	getPendingApprovals = approvalMixin.getPendingApprovals;

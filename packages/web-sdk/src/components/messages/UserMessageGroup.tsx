@@ -20,6 +20,11 @@ import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
 import { parseFileSelections } from '../../lib/fileSelectionContext';
 import { linkifyExplicitSkillMentions } from '../../lib/skillMentions';
+import {
+	SubagentResultsNotice,
+	isSubagentResultsMessage,
+} from './SubagentResultsNotice';
+import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
 import { useSkills } from '../../hooks/useSkills';
 import { useSkillsStore } from '../../stores/skillsStore';
 
@@ -87,6 +92,13 @@ export const UserMessageGroup = memo(
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
 			parseResearchContext(rawContent);
+
+		if (isSubagentResultsMessage(rawContent)) {
+			return <SubagentResultsNotice content={rawContent} />;
+		}
+		if (isGoalStartMessage(rawContent)) {
+			return <GoalStartNotice content={rawContent} />;
+		}
 		const {
 			fileSelections: parsedFileSelections,
 			cleanContent: contentAfterFileSelections,

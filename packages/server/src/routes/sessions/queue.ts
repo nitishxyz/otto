@@ -131,6 +131,14 @@ export function registerSessionQueueRoutes(app: Hono) {
 			}
 
 			abortSession(sessionId, clearQueue);
+			try {
+				const project = c.req.query('project');
+				const { db } = await loadProjectDb(project);
+				const { abortChildSubagents } = await import(
+					'../../runtime/subagents/service.ts'
+				);
+				await abortChildSubagents(db, sessionId);
+			} catch {}
 			return c.json({ success: true });
 		},
 	);

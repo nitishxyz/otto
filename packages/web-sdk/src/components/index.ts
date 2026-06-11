@@ -18,12 +18,20 @@ export * from './chat/ConfigModal';
 export * from './chat/ConfigSelector';
 export * from './chat/InputQueueBar';
 export * from './chat/InputTodosBar';
+export * from './chat/InputSubagentsBar';
 export * from './chat/DictationInstallPrompt';
 export * from './chat/StopButton';
 export * from './chat/NewSessionLanding';
 
 // BTW Components
 export * from './btw/BtwFloatingChat';
+
+// Sub-agent Components
+export * from './subagents/SubagentFloatingViewer';
+
+// Goals Components
+export * from './goals/GoalsSidebar';
+export * from './goals/GoalsSidebarToggle';
 
 // Message Components
 export * from './messages/MessageThread';

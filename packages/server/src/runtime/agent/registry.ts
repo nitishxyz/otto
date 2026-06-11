@@ -36,6 +36,7 @@ export const BUILTIN_AGENT_NAMES = [
 	'general',
 	'init',
 	'research',
+	'otto',
 ];
 
 function normalizeStringList(value: unknown): string[] {
@@ -183,6 +184,11 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'terminal',
 			'apply_patch',
 			'websearch',
+			'delegate_task',
+			'list_subagents',
+			'message_subagent',
+			'goal_list',
+			'goal_update',
 		],
 		loadable: [
 			'read_image',
@@ -256,6 +262,18 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'present_action',
 		],
 		loadable: ['read_image', 'copy_attachment_to_project'],
+	},
+	otto: {
+		firstClass: [
+			'read',
+			'ls',
+			'tree',
+			'search',
+			'glob',
+			'goal_list',
+			'goal_update',
+			'enqueue_session_message',
+		],
 	},
 };
 

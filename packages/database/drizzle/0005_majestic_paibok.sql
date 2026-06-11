@@ -1,0 +1,1 @@
+ALTER TABLE `goals` ADD `started_at` integer;

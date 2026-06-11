@@ -25,6 +25,7 @@ export type OttoEventType =
 	| 'tool.delta'
 	| 'tool.result'
 	| 'plan.updated'
+	| 'goal.updated'
 	| 'finish-step'
 	| 'usage'
 	| 'queue.updated'

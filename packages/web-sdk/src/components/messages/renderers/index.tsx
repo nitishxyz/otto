@@ -27,6 +27,8 @@ import { LoadToolsRenderer } from './LoadToolsRenderer';
 import { McpManagerRenderer } from './McpManagerRenderer';
 import { SimulatorRenderer } from './SimulatorRenderer';
 import { SkillRenderer } from './SkillRenderer';
+import { GoalToolRenderer } from './GoalToolRenderer';
+import { SubagentToolRenderer } from './SubagentToolRenderer';
 
 interface ToolResultRendererProps {
 	toolName: string;
@@ -185,6 +187,13 @@ export function ToolResultRenderer({
 			return <SimulatorRenderer {...props} />;
 		case 'skill':
 			return <SkillRenderer {...props} />;
+		case 'goal_list':
+		case 'goal_update':
+			return <GoalToolRenderer {...props} toolName={normalizedName} />;
+		case 'delegate_task':
+		case 'list_subagents':
+		case 'message_subagent':
+			return <SubagentToolRenderer {...props} toolName={normalizedName} />;
 		case 'error':
 			return (
 				<ErrorRenderer

@@ -717,6 +717,17 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 								})
 							}
 						/>
+						<ToggleRow
+							label="Otto & Goals"
+							description="Supervisor agent that verifies goal progress and re-enqueues sessions until the goal is done. Disabling also disables goals."
+							checked={config?.defaults?.ottoEnabled ?? true}
+							onChange={(checked) =>
+								updateDefaults.mutate({
+									ottoEnabled: checked,
+									scope: 'global',
+								})
+							}
+						/>
 					</div>
 				);
 			case 'reasoning':

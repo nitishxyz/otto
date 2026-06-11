@@ -15,6 +15,7 @@ export * from './useFileUpload';
 export * from './useSessionFiles';
 export * from './useQueueState';
 export * from './useBranch';
+export * from './useGoals';
 export * from './useResearch';
 export * from './useOttoRouterPayments';
 export * from './useOttoRouterBalance';

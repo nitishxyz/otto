@@ -14,6 +14,11 @@ const EXPLORATION_TOOL_NAMES = new Set([
 	'search_history',
 	'get_session_context',
 	'get_parent_session',
+	'goal_list',
+	'goal_update',
+	'delegate_task',
+	'list_subagents',
+	'message_subagent',
 ]);
 
 interface CompactActivityEntry {
@@ -301,6 +306,83 @@ export function getCompactActivityEntry(
 		};
 	}
 
+	if (part.toolName === 'goal_list') {
+		const goal = getToolResult(part).goal as
+			| Record<string, unknown>
+			| null
+			| undefined;
+		const title =
+			goal && typeof goal === 'object'
+				? getStringField(goal, 'title')
+				: undefined;
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: title ? `Checking goal ${truncate(title, 36)}` : 'Checking goal',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'goal_update') {
+		const result = getToolResult(part);
+		const changes = Array.isArray(result.changes)
+			? result.changes.filter(
+					(item): item is string => typeof item === 'string',
+				)
+			: [];
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: changes.length
+				? `Updated goal: ${truncate(changes.join(', '), 46)}`
+				: 'Updating goal',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'delegate_task') {
+		const agent =
+			getStringField(args, 'agent') || getStringField(result, 'agent');
+		const task = getStringField(args, 'task');
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: agent
+				? `Delegating to ${agent}${task ? `: ${truncate(task, 34)}` : ''}`
+				: 'Delegating sub-agent task',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'message_subagent') {
+		const message = getStringField(args, 'message');
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: message
+				? `Following up with sub-agent: ${truncate(message, 42)}`
+				: 'Following up with sub-agent',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'list_subagents') {
+		const subagents = Array.isArray(result.subagents) ? result.subagents : [];
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: subagents.length
+				? `Checking ${subagents.length} sub-agent${subagents.length === 1 ? '' : 's'}`
+				: 'Checking sub-agents',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
 	return {
 		id: part.id,
 		toolName: part.toolName,
@@ -397,6 +479,8 @@ export function summarizeCompactActivities(
 	let webLookups = 0;
 	let reasoning = 0;
 	let historyLookups = 0;
+	let goalUpdates = 0;
+	let subagentOps = 0;
 
 	for (const entry of entries) {
 		switch (entry.toolName) {
@@ -425,6 +509,15 @@ export function summarizeCompactActivities(
 			case 'get_parent_session':
 				historyLookups += 1;
 				break;
+			case 'goal_list':
+			case 'goal_update':
+				goalUpdates += 1;
+				break;
+			case 'delegate_task':
+			case 'list_subagents':
+			case 'message_subagent':
+				subagentOps += 1;
+				break;
 		}
 	}
 	const hasProjectReview = files.size > 0 || scans > 0;
@@ -437,27 +530,35 @@ export function summarizeCompactActivities(
 		searches === 0 &&
 		scans === 0 &&
 		webLookups === 0 &&
-		historyLookups === 0;
+		historyLookups === 0 &&
+		goalUpdates === 0 &&
+		subagentOps === 0;
 
 	const title = isReasoningOnly
 		? durationStr
 			? `Thought for ${durationStr}`
 			: 'Thought through the approach'
-		: webLookups > 0
-			? hasProjectReview || searches > 0
-				? 'Researched and reviewed the project'
-				: 'Researched references'
-			: historyLookups > 0 && searches > 0
-				? 'Searched history and code'
-				: hasProjectReview && searches > 0
-					? 'Reviewed files and searched code'
-					: scans > 0
-						? 'Explored project structure'
-						: files.size > 0
-							? 'Reviewed project files'
-							: historyLookups > 0
-								? 'Searched session history'
-								: 'Thought through the approach';
+		: goalUpdates > 0 && subagentOps > 0
+			? 'Tracked goals and sub-agents'
+			: goalUpdates > 0
+				? 'Updated goal progress'
+				: subagentOps > 0
+					? 'Managed sub-agents'
+					: webLookups > 0
+						? hasProjectReview || searches > 0
+							? 'Researched and reviewed the project'
+							: 'Researched references'
+						: historyLookups > 0 && searches > 0
+							? 'Searched history and code'
+							: hasProjectReview && searches > 0
+								? 'Reviewed files and searched code'
+								: scans > 0
+									? 'Explored project structure'
+									: files.size > 0
+										? 'Reviewed project files'
+										: historyLookups > 0
+											? 'Searched session history'
+											: 'Thought through the approach';
 
 	const details: string[] = [];
 	if (!isReasoningOnly && durationStr) {
@@ -479,6 +580,16 @@ export function summarizeCompactActivities(
 	}
 	if (historyLookups > 0 && title !== 'Searched session history') {
 		details.push('session history');
+	}
+	if (goalUpdates > 0 && !title.includes('goal')) {
+		details.push(
+			`${goalUpdates} goal ${goalUpdates === 1 ? 'update' : 'updates'}`,
+		);
+	}
+	if (subagentOps > 0 && !title.includes('sub-agent')) {
+		details.push(
+			`${subagentOps} sub-agent ${subagentOps === 1 ? 'step' : 'steps'}`,
+		);
 	}
 	if (reasoning > 0 && !isReasoningOnly) {
 		details.push('reasoning');

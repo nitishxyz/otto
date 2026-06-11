@@ -46,6 +46,7 @@ const DEFAULTS: {
 		releaseToSend: false,
 		fullWidthContent: false,
 		autoCompactThresholdTokens: null,
+		ottoEnabled: true,
 	},
 	providers: DEFAULT_PROVIDER_SETTINGS,
 };

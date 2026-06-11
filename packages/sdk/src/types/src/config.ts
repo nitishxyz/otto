@@ -38,6 +38,8 @@ export type DefaultConfig = {
 	releaseToSend?: boolean;
 	fullWidthContent?: boolean;
 	autoCompactThresholdTokens?: number | null;
+	/** Enables the otto supervisor agent and persistent goals (disabled together). */
+	ottoEnabled?: boolean;
 };
 
 export type ProviderSettingsEntry = {

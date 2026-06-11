@@ -75,6 +75,7 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			ottoEnabled?: boolean;
 		};
 	}> {
 		const response = await apiGetConfig();
@@ -233,6 +234,7 @@ export const configMixin = {
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		autoCompactThresholdTokens?: number | null;
+		ottoEnabled?: boolean;
 		scope?: 'global' | 'local';
 	}): Promise<{
 		success: boolean;
@@ -252,6 +254,7 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			ottoEnabled?: boolean;
 		};
 	}> {
 		const response = await apiUpdateDefaults({

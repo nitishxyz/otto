@@ -91,6 +91,7 @@ export async function writeDefaults(
 		releaseToSend: boolean;
 		fullWidthContent: boolean;
 		autoCompactThresholdTokens: number | null;
+		ottoEnabled: boolean;
 	}>,
 	projectRoot?: string,
 ) {

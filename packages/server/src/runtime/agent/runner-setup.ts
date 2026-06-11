@@ -5,12 +5,15 @@ import {
 	logger,
 } from '@ottocode/sdk';
 import { getDb } from '@ottocode/database';
-import { sessions } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
+import { goals, sessions } from '@ottocode/database/schema';
+import { and, eq } from 'drizzle-orm';
 import type { Tool } from 'ai';
 import { adaptTools } from '../../tools/adapter.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
+import { buildSubagentTools } from '../../tools/subagents/index.ts';
+import { buildGoalTools } from '../../tools/goals/index.ts';
+import { buildEnqueueSessionMessageTool } from '../../tools/otto/index.ts';
 import { time } from '../debug/index.ts';
 import { buildHistoryMessages } from '../message/history-builder.ts';
 import { setupToolContext } from '../tools/setup.ts';
@@ -41,6 +44,15 @@ const DATABASE_TOOL_NAMES = new Set([
 	'search_history',
 	'present_action',
 ]);
+
+const SUBAGENT_TOOL_NAMES = new Set([
+	'delegate_task',
+	'list_subagents',
+	'message_subagent',
+]);
+const GOAL_TOOL_NAMES = new Set(['goal_list', 'goal_update']);
+const NO_DELEGATION_SESSION_TYPES = new Set(['subagent', 'otto']);
+const NO_GOAL_SESSION_TYPES = new Set(['subagent', 'research', 'btw']);
 
 type RunnerSetupTimings = {
 	loadConfigAndDbMs: number;
@@ -137,6 +149,69 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		for (const dt of dbTools) {
 			discovered.tools.push(dt);
 		}
+	}
+
+	const currentSessionType = sessionRows[0]?.sessionType ?? 'main';
+	const currentParentSessionId = sessionRows[0]?.parentSessionId ?? null;
+	const ottoEnabled = cfg.defaults.ottoEnabled !== false;
+
+	const needsSubagentTools =
+		!NO_DELEGATION_SESSION_TYPES.has(currentSessionType) &&
+		Array.from(configuredToolNames).some((name) =>
+			SUBAGENT_TOOL_NAMES.has(name),
+		);
+	if (needsSubagentTools) {
+		for (const item of buildSubagentTools(cfg.projectRoot, opts.sessionId)) {
+			discovered.tools.push(item);
+		}
+	}
+
+	let needsGoalTools =
+		ottoEnabled &&
+		(opts.agent === 'otto' ||
+			Array.from(configuredToolNames).some((name) =>
+				GOAL_TOOL_NAMES.has(name),
+			));
+	// Any main session with an active goal gets the goal tools, even when the
+	// agent's toolset doesn't list them — otherwise the agent cannot claim
+	// tasks and otto nudges it in circles.
+	if (
+		!needsGoalTools &&
+		ottoEnabled &&
+		!NO_GOAL_SESSION_TYPES.has(currentSessionType)
+	) {
+		const activeGoal = await db
+			.select({ id: goals.id })
+			.from(goals)
+			.where(
+				and(eq(goals.sessionId, opts.sessionId), eq(goals.status, 'active')),
+			)
+			.limit(1);
+		needsGoalTools = activeGoal.length > 0;
+	}
+	if (needsGoalTools) {
+		const goalSessionId =
+			currentSessionType === 'otto' && currentParentSessionId
+				? currentParentSessionId
+				: opts.sessionId;
+		const goalTools = buildGoalTools({
+			projectRoot: cfg.projectRoot,
+			goalSessionId,
+			allowComplete: opts.agent === 'otto',
+		});
+		for (const item of goalTools) {
+			discovered.tools.push(item);
+		}
+	}
+
+	if (
+		opts.agent === 'otto' &&
+		currentSessionType === 'otto' &&
+		currentParentSessionId
+	) {
+		discovered.tools.push(
+			buildEnqueueSessionMessageTool(cfg.projectRoot, currentParentSessionId),
+		);
 	}
 
 	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);

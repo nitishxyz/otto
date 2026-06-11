@@ -33,6 +33,9 @@ import {
 	ResizeHandle,
 	ViewerTabs,
 	BtwFloatingChat,
+	SubagentFloatingViewer,
+	GoalsSidebar,
+	GoalsSidebarToggle,
 } from '@ottocode/web-sdk/components';
 import {
 	useGitStore,
@@ -47,6 +50,7 @@ import {
 	useViewerTabsStore,
 	useSidebarStore,
 	useTerminalStore,
+	useGoalsPanelStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
 import {
@@ -342,6 +346,7 @@ export const AppLayout = memo(function AppLayout({
 			<AgentsManagerModal />
 			<QuickFilePicker />
 			<BtwFloatingChat />
+			<SubagentFloatingViewer />
 		</div>
 	);
 });
@@ -431,6 +436,7 @@ const RightPanelArea = memo(function RightPanelArea({
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const goalsExpanded = useGoalsPanelStore((s) => s.isExpanded);
 	const gitWidth = usePanelWidthStore(
 		(s) => s.widths.git ?? RIGHT_PANEL_DEFAULT_WIDTH,
 	);
@@ -450,7 +456,8 @@ const RightPanelArea = memo(function RightPanelArea({
 		tunnelExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
-		skillsExpanded;
+		skillsExpanded ||
+		goalsExpanded;
 	const activeRightPanelWidth = gitExpanded
 		? gitWidth
 		: sessionFilesExpanded
@@ -548,6 +555,7 @@ const RightPanelArea = memo(function RightPanelArea({
 				<div className="h-full w-full">
 					<GitSidebar onFixWithAI={onFixWithAI} />
 					<SessionFilesSidebar sessionId={sessionId} />
+					<GoalsSidebar sessionId={sessionId} />
 					<SettingsSidebar
 						onOpenDashboard={() => navigate({ to: '/dashboard' })}
 					/>
@@ -569,6 +577,7 @@ const RightPanelArea = memo(function RightPanelArea({
 				<MCPSidebarToggle />
 				<SkillsSidebarToggle />
 				<AgentsSidebarToggle />
+				<GoalsSidebarToggle sessionId={sessionId} />
 				<SettingsSidebarToggle />
 				<div className="flex-1" />
 				<TerminalPanelToggle />

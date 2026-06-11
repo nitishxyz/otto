@@ -46,6 +46,7 @@ export function useUpdateDefaults() {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			ottoEnabled?: boolean;
 			scope?: 'global' | 'local';
 		}) => apiClient.updateDefaults(data),
 		onMutate: async (data) => {
