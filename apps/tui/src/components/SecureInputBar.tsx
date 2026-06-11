@@ -72,23 +72,25 @@ export function SecureInputBar({
 
 	return (
 		<box
+			title=" secure input "
 			style={{
 				width: '100%',
 				flexShrink: 0,
 				flexDirection: 'column',
+				border: true,
+				borderStyle: 'rounded',
+				borderColor: colors.yellow,
+				titleColor: colors.yellow,
 				paddingLeft: 1,
 				paddingRight: 1,
-				paddingTop: 1,
-				paddingBottom: 1,
-				backgroundColor: '#3d2e00',
+				backgroundColor: colors.bg,
 			}}
 		>
 			<box style={{ flexDirection: 'row', gap: 1, width: '100%' }}>
-				<text fg={colors.yellow}>🔐 secure input required</text>
 				<text fg={colors.fgMuted}>{pendingInput.prompt}</text>
 			</box>
 			<box style={{ flexDirection: 'row', gap: 1, width: '100%' }}>
-				<text fg={colors.fgDark}>password:</text>
+				<text fg={colors.yellow}>❯</text>
 				<text fg={colors.fgBright}>{masked}</text>
 				{value.length === 0 && <text fg={colors.fgDark}>type secret…</text>}
 				<text fg={colors.green}>↵ send</text>

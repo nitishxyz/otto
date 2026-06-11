@@ -1,5 +1,5 @@
-import { useKeyboard, useRenderer } from '@opentui/react';
-import { TextareaRenderable } from '@opentui/core';
+import { useKeyboard } from '@opentui/react';
+import type { TextareaRenderable } from '@opentui/core';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	getGitStatus,
@@ -30,7 +30,6 @@ type Phase =
 
 export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 	const { colors } = useTheme();
-	const renderer = useRenderer();
 	const [phase, setPhase] = useState<Phase>('loading');
 	const [staged, setStaged] = useState<GitFileInfo[]>([]);
 	const [unstaged, setUnstaged] = useState<GitFileInfo[]>([]);
@@ -39,7 +38,6 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 	const [errorText, setErrorText] = useState('');
 	const [statusText, setStatusText] = useState('');
 	const textareaRef = useRef<TextareaRenderable | null>(null);
-	const containerRef = useRef<string>(`commit-msg-${Date.now()}`);
 	const phaseRef = useRef(phase);
 	phaseRef.current = phase;
 
@@ -158,44 +156,6 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 		setMessage(textareaRef.current.plainText);
 	}, []);
 
-	const tryCreateTextarea = useCallback(() => {
-		if (textareaRef.current) return;
-		const container = renderer.root.findDescendantById(containerRef.current);
-		if (!container) return;
-
-		const textarea = new TextareaRenderable(renderer, {
-			id: 'commit-msg-textarea',
-			width: '100%',
-			height: 3,
-			placeholder: 'Type commit message or press ⌃G to generate',
-			placeholderColor: colors.fgDark,
-			textColor: colors.fgBright,
-			focusedTextColor: colors.fgBright,
-			cursorColor: colors.blue,
-			wrapMode: 'word',
-			keyBindings: [],
-		});
-
-		textarea.onContentChange = handleContentChange;
-		container.add(textarea);
-		textareaRef.current = textarea;
-		textarea.focus();
-	}, [renderer, handleContentChange, colors]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run when phase changes so container becomes available
-	useEffect(() => {
-		tryCreateTextarea();
-	}, [tryCreateTextarea, phase, staged, unstaged, untracked]);
-
-	useEffect(() => {
-		return () => {
-			if (textareaRef.current) {
-				textareaRef.current.destroy();
-				textareaRef.current = null;
-			}
-		};
-	}, []);
-
 	const handleGenerateRef = useRef(handleGenerate);
 	handleGenerateRef.current = handleGenerate;
 	const handleCommitRef = useRef(handleCommit);
@@ -227,7 +187,11 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 	};
 
 	return (
-		<ModalFrame title="Commit" footer="⌃G generate · ⌃↵ commit · esc close">
+		<ModalFrame
+			title="Commit"
+			size="md"
+			footer="⌃G generate · ⌃↵ commit · esc close"
+		>
 			{phase === 'loading' && (
 				<box style={{ flexDirection: 'row', gap: 1 }}>
 					<spinner name="dots" color={colors.blue} />
@@ -329,8 +293,18 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 									phase === 'generating' ? colors.yellow : colors.border,
 							}}
 						>
-							<box
-								id={containerRef.current}
+							<textarea
+								ref={textareaRef}
+								focused
+								placeholder="Type commit message or press ⌃G to generate"
+								placeholderColor={colors.fgDark}
+								textColor={colors.fgBright}
+								focusedTextColor={colors.fgBright}
+								backgroundColor={colors.bg}
+								focusedBackgroundColor={colors.bg}
+								cursorColor={colors.blue}
+								wrapMode="word"
+								onContentChange={handleContentChange}
 								style={{ width: '100%', height: 3 }}
 							/>
 						</box>

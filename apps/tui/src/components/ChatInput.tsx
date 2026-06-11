@@ -1,11 +1,13 @@
-import { useRenderer, useKeyboard } from '@opentui/react';
-import { TextareaRenderable } from '@opentui/core';
+import { useKeyboard } from '@opentui/react';
+import { decodePasteBytes } from '@opentui/core';
+import type { TextareaOptions, TextareaRenderable } from '@opentui/core';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Fuse from 'fuse.js';
 import { searchFiles } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { TinySpinner } from './TinySpinner.tsx';
 import { COMMANDS } from '../commands.ts';
+import { getVisibleWindow } from './ModalFrame.tsx';
 import type { StatusIndicator } from '../stores/overlay.ts';
 import { useFileAttachments, isFilePath } from '../hooks/useFileAttachments.ts';
 import type {
@@ -30,21 +32,12 @@ interface ChatInputProps {
 }
 
 const MAX_FILE_RESULTS = 15;
-const INPUT_MIN_HEIGHT = 2;
-const INPUT_MAX_HEIGHT = 8;
-const ATTACHMENT_RE = /\[📎 [^\]]+\]/g;
+const MENU_VISIBLE_ROWS = 8;
 
-function stripAttachmentMarkers(text: string): string {
-	return text
-		.replace(ATTACHMENT_RE, '')
-		.replace(/\n{3,}/g, '\n\n')
-		.trim();
-}
-
-function makeAttachmentMarker(name: string): string {
-	const short = name.length > 20 ? `${name.slice(0, 17)}…` : name;
-	return `[📎 ${short}]`;
-}
+const INPUT_KEY_BINDINGS: NonNullable<TextareaOptions['keyBindings']> = [
+	{ name: 'return', action: 'submit' },
+	{ name: 'return', shift: true, action: 'newline' },
+];
 
 export function ChatInput({
 	onSubmit,
@@ -58,9 +51,7 @@ export function ChatInput({
 	onPlanModeToggle,
 }: ChatInputProps) {
 	const { colors } = useTheme();
-	const renderer = useRenderer();
 	const textareaRef = useRef<TextareaRenderable | null>(null);
-	const containerRef = useRef<string>(`chat-input-${Date.now()}`);
 	const [isPlanMode, setIsPlanMode] = useState(externalIsPlanMode || false);
 	const isPlanModeRef = useRef(isPlanMode);
 	isPlanModeRef.current = isPlanMode;
@@ -75,7 +66,7 @@ export function ChatInput({
 		images: attachedImages,
 		files: attachedFiles,
 		count: attachmentCount,
-		names: _attachmentNames,
+		names: attachmentNames,
 		addFromPath,
 		clear: clearAttachments,
 	} = useFileAttachments();
@@ -230,8 +221,7 @@ export function ChatInput({
 			onSubmit(`/${cmd.name}`);
 			return;
 		}
-		const rawText = textareaRef.current.plainText.trim();
-		const text = stripAttachmentMarkers(rawText);
+		const text = textareaRef.current.plainText.trim();
 		if (!text && attachmentCountRef.current === 0) return;
 		const imgData =
 			attachedImagesRef.current.length > 0
@@ -324,80 +314,44 @@ export function ChatInput({
 		}
 	});
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally sparse deps — this effect creates the textarea once; handleSubmit is synced via a separate useEffect below. Do NOT add colors.* or handleSubmit here — it causes the textarea to be destroyed/recreated on every render, breaking input.
+	// Intercept pasted file paths and turn them into attachments instead of text.
 	useEffect(() => {
-		const container = renderer.root.findDescendantById(containerRef.current);
-		if (!container || textareaRef.current) return;
-
-		const textarea = new TextareaRenderable(renderer, {
-			id: 'chat-textarea',
-			width: '100%',
-			height: 'auto',
-			minHeight: INPUT_MIN_HEIGHT,
-			maxHeight: INPUT_MAX_HEIGHT,
-			placeholder: 'Message otto…  ↵ send  ⇧↵ newline  ⇥ mode',
-			placeholderColor: colors.fgDark,
-			textColor: colors.fgBright,
-			focusedTextColor: colors.fgBright,
-			cursorColor: colors.blue,
-			wrapMode: 'word',
-			keyBindings: [
-				{ name: 'return', action: 'submit' },
-				{ name: 'return', shift: true, action: 'newline' },
-			],
-			onSubmit: handleSubmit,
-		});
-
-		textarea.onContentChange = handleContentChange;
-
+		const textarea = textareaRef.current;
+		if (!textarea) return;
 		const origHandlePaste = textarea.handlePaste.bind(textarea);
 		textarea.handlePaste = (event) => {
-			const text = event.text.trim();
+			const text = decodePasteBytes(event.bytes).trim();
 			const filePath = text.replace(/\\ /g, ' ');
 			if (isFilePath(filePath)) {
-				const added = addFromPathRef.current(filePath);
-				if (added) {
-					const name = filePath.split('/').pop() || filePath;
-					const marker = makeAttachmentMarker(name);
-					const current = textarea.plainText;
-					const prefix =
-						current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-					textarea.editBuffer.setText(`${current}${prefix}${marker} `);
-					textarea.editBuffer.setCursorByOffset(textarea.plainText.length);
-				}
+				addFromPathRef.current(filePath);
 				return;
 			}
 			origHandlePaste(event);
 		};
-
-		container.add(textarea);
-		textareaRef.current = textarea;
-		textarea.focus();
-
 		return () => {
-			if (textareaRef.current) {
-				textareaRef.current.destroy();
-				textareaRef.current = null;
-			}
+			textarea.handlePaste = origHandlePaste;
 		};
-	}, [renderer, handleContentChange]);
-
-	useEffect(() => {
-		if (textareaRef.current) {
-			textareaRef.current.onSubmit = handleSubmit;
-		}
-	}, [handleSubmit]);
-
-	useEffect(() => {
-		if (!textareaRef.current) return;
-		if (disabled) {
-			textareaRef.current.blur();
-		} else {
-			textareaRef.current.focus();
-		}
-	}, [disabled]);
+	}, []);
 
 	const hasStatus = isStreaming || status.type !== 'idle';
+	const accent = isPlanMode ? colors.cyan : colors.blue;
+	const borderColor = disabled
+		? colors.border
+		: isStreaming
+			? colors.streamDot
+			: accent;
+	const modeLabel = isPlanMode ? ' plan ' : ' build ';
+
+	const fileWindow = getVisibleWindow(
+		filteredFiles.length,
+		mentionSelectedIdx,
+		MENU_VISIBLE_ROWS,
+	);
+	const commandWindow = getVisibleWindow(
+		commandMatches.length,
+		selectedIdx,
+		MENU_VISIBLE_ROWS,
+	);
 
 	return (
 		<box
@@ -413,37 +367,45 @@ export function ChatInput({
 				<box
 					style={{
 						flexDirection: 'column',
-						backgroundColor: colors.bgHighlight,
-						borderStyle: 'rounded',
+						backgroundColor: colors.bg,
 						border: true,
+						borderStyle: 'rounded',
 						borderColor: colors.border,
 						paddingLeft: 1,
 						paddingRight: 1,
 						width: '100%',
 					}}
 				>
-					{filteredFiles.map((filePath, i) => (
-						<box
-							key={filePath}
-							style={{
-								flexDirection: 'row',
-								gap: 1,
-								height: 1,
-								width: '100%',
-								backgroundColor:
-									i === mentionSelectedIdx ? colors.bgSubtle : undefined,
-							}}
-						>
-							<text fg={i === mentionSelectedIdx ? colors.blue : colors.fgDark}>
-								@
-							</text>
-							<text
-								fg={i === mentionSelectedIdx ? colors.green : colors.fgMuted}
-							>
-								{filePath}
+					{filteredFiles
+						.slice(fileWindow.start, fileWindow.end)
+						.map((filePath, wi) => {
+							const i = fileWindow.start + wi;
+							const active = i === mentionSelectedIdx;
+							return (
+								<box
+									key={filePath}
+									style={{
+										flexDirection: 'row',
+										height: 1,
+										width: '100%',
+										backgroundColor: active ? colors.bgHighlight : undefined,
+									}}
+								>
+									<text fg={active ? colors.blue : colors.bg}>▌</text>
+									<text fg={active ? colors.blue : colors.fgDark}> @</text>
+									<text fg={active ? colors.fgBright : colors.fgMuted}>
+										{filePath}
+									</text>
+								</box>
+							);
+						})}
+					{filteredFiles.length > MENU_VISIBLE_ROWS && (
+						<box style={{ height: 1, paddingLeft: 2 }}>
+							<text fg={colors.fgDark}>
+								{mentionSelectedIdx + 1}/{filteredFiles.length}
 							</text>
 						</box>
-					))}
+					)}
 				</box>
 			)}
 			{showFileMention &&
@@ -451,14 +413,14 @@ export function ChatInput({
 				mentionQuery.length > 0 && (
 					<box
 						style={{
-							backgroundColor: colors.bgHighlight,
-							borderStyle: 'rounded',
+							backgroundColor: colors.bg,
 							border: true,
+							borderStyle: 'rounded',
 							borderColor: colors.border,
-							paddingLeft: 1,
+							paddingLeft: 2,
 							paddingRight: 1,
 							width: '100%',
-							height: 1,
+							height: 3,
 						}}
 					>
 						<text fg={colors.fgDark}>No files found</text>
@@ -468,50 +430,108 @@ export function ChatInput({
 				<box
 					style={{
 						flexDirection: 'column',
-						backgroundColor: colors.bgHighlight,
-						borderStyle: 'rounded',
+						backgroundColor: colors.bg,
 						border: true,
+						borderStyle: 'rounded',
 						borderColor: colors.border,
 						paddingLeft: 1,
 						paddingRight: 1,
 						width: '100%',
 					}}
 				>
-					{commandMatches.map((cmd, i) => (
-						<box
-							key={cmd.name}
-							style={{
-								flexDirection: 'row',
-								gap: 1,
-								height: 1,
-								width: '100%',
-								backgroundColor:
-									i === selectedIdx ? colors.bgSubtle : undefined,
-							}}
-						>
-							<text fg={i === selectedIdx ? colors.green : colors.fgMuted}>
-								/{cmd.name}
-							</text>
-							<text fg={i === selectedIdx ? colors.fgMuted : colors.fgDark}>
-								{cmd.description}
+					{commandMatches
+						.slice(commandWindow.start, commandWindow.end)
+						.map((cmd, wi) => {
+							const i = commandWindow.start + wi;
+							const active = i === selectedIdx;
+							return (
+								<box
+									key={cmd.name}
+									style={{
+										flexDirection: 'row',
+										gap: 1,
+										height: 1,
+										width: '100%',
+										backgroundColor: active ? colors.bgHighlight : undefined,
+									}}
+								>
+									<text fg={active ? colors.blue : colors.bg}>▌</text>
+									<text fg={active ? colors.green : colors.fgMuted}>
+										/{cmd.name}
+									</text>
+									<text fg={active ? colors.fgMuted : colors.fgDark}>
+										{cmd.description}
+									</text>
+								</box>
+							);
+						})}
+					{commandMatches.length > MENU_VISIBLE_ROWS && (
+						<box style={{ height: 1, paddingLeft: 2 }}>
+							<text fg={colors.fgDark}>
+								{selectedIdx + 1}/{commandMatches.length}
 							</text>
 						</box>
-					))}
+					)}
 				</box>
 			)}
 			<box
+				title={modeLabel}
 				style={{
 					width: '100%',
-					backgroundColor: colors.bgHighlight,
+					border: true,
+					borderStyle: 'rounded',
+					borderColor,
+					titleColor: borderColor,
+					backgroundColor: colors.bg,
 					flexDirection: 'column',
-					paddingTop: 1,
-					paddingBottom: 1,
 					paddingLeft: 1,
 					paddingRight: 1,
-					marginBottom: 1,
 				}}
 			>
-				<box id={containerRef.current} style={{ width: '100%' }} />
+				{attachmentCount > 0 && (
+					<box
+						style={{
+							flexDirection: 'row',
+							gap: 1,
+							height: 1,
+							width: '100%',
+							flexShrink: 0,
+						}}
+					>
+						{attachmentNames.map((name) => (
+							<text key={name} fg={colors.fgMuted} bg={colors.bgSubtle}>
+								{' ◳ '}
+								{name.length > 24 ? `${name.slice(0, 21)}…` : name}{' '}
+							</text>
+						))}
+					</box>
+				)}
+				<box style={{ flexDirection: 'row', width: '100%' }}>
+					<box style={{ width: 2, flexShrink: 0 }}>
+						<text fg={disabled ? colors.fgDark : accent}>❯</text>
+					</box>
+					<textarea
+						ref={textareaRef}
+						focused={!disabled}
+						placeholder="Message otto…"
+						placeholderColor={colors.fgDark}
+						textColor={colors.fgBright}
+						focusedTextColor={colors.fgBright}
+						backgroundColor={colors.bg}
+						focusedBackgroundColor={colors.bg}
+						cursorColor={accent}
+						wrapMode="word"
+						keyBindings={INPUT_KEY_BINDINGS}
+						onSubmit={handleSubmit}
+						onContentChange={handleContentChange}
+						style={{
+							flexGrow: 1,
+							height: 'auto',
+							minHeight: 1,
+							maxHeight: 8,
+						}}
+					/>
+				</box>
 			</box>
 			<box
 				style={{
@@ -519,15 +539,11 @@ export function ChatInput({
 					flexShrink: 0,
 					flexDirection: 'row',
 					justifyContent: 'space-between',
+					paddingLeft: 1,
+					paddingRight: 1,
 				}}
 			>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
-					<text
-						fg={isPlanMode ? colors.bg : colors.bg}
-						bg={isPlanMode ? colors.cyan : colors.blue}
-					>
-						{isPlanMode ? ' PLAN ' : ' BUILD '}
-					</text>
 					{hasStatus ? (
 						<box style={{ flexDirection: 'row' }}>
 							{isStreaming && status.type === 'idle' && (
@@ -553,7 +569,9 @@ export function ChatInput({
 							)}
 						</box>
 					) : (
-						<text fg={colors.fgDark}>⇥ switch mode · ⌃L clear</text>
+						<text fg={colors.fgDark}>
+							↵ send · ⇧↵ newline · ⇥ mode · ⌃L clear
+						</text>
 					)}
 				</box>
 				<box style={{ flexDirection: 'row' }}>

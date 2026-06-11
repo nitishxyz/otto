@@ -1,5 +1,5 @@
-import { useKeyboard, useRenderer } from '@opentui/react';
-import { TextareaRenderable } from '@opentui/core';
+import { useKeyboard, useTerminalDimensions } from '@opentui/react';
+import type { TextareaOptions, TextareaRenderable } from '@opentui/core';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Fuse from 'fuse.js';
 import { getAllModels } from '@ottocode/api';
@@ -21,6 +21,10 @@ interface ProviderModels {
 }
 
 type AllModels = Record<string, ProviderModels>;
+
+const SEARCH_KEY_BINDINGS: NonNullable<TextareaOptions['keyBindings']> = [
+	{ name: 'return', action: 'submit' },
+];
 
 interface FlatItem {
 	providerKey: string;
@@ -47,14 +51,12 @@ export function ModelsOverlay({
 	onSelect,
 }: ModelsOverlayProps) {
 	const { colors } = useTheme();
-	const renderer = useRenderer();
 	const [allModels, setAllModels] = useState<AllModels | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [selectedIdx, setSelectedIdx] = useState(0);
 	const selectedIdxRef = useRef(selectedIdx);
 	selectedIdxRef.current = selectedIdx;
 	const textareaRef = useRef<TextareaRenderable | null>(null);
-	const containerRef = useRef<string>(`models-search-${Date.now()}`);
 	const scrollOffsetRef = useRef(0);
 	const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -164,54 +166,30 @@ export function ModelsOverlay({
 		setScrollOffset(0);
 	}, [searchQuery]);
 
-	const VISIBLE_ROWS = 20;
+	const { height: terminalHeight } = useTerminalDimensions();
+	const VISIBLE_ROWS = Math.max(
+		5,
+		Math.floor((terminalHeight || 40) * 0.78) - 10,
+	);
 
-	const ensureVisible = useCallback((idx: number) => {
-		let offset = scrollOffsetRef.current;
-		if (idx < offset) {
-			offset = idx;
-		} else if (idx >= offset + VISIBLE_ROWS) {
-			offset = idx - VISIBLE_ROWS + 1;
-		}
-		scrollOffsetRef.current = offset;
-		setScrollOffset(offset);
-	}, []);
+	const ensureVisible = useCallback(
+		(idx: number) => {
+			let offset = scrollOffsetRef.current;
+			if (idx < offset) {
+				offset = idx;
+			} else if (idx >= offset + VISIBLE_ROWS) {
+				offset = idx - VISIBLE_ROWS + 1;
+			}
+			scrollOffsetRef.current = offset;
+			setScrollOffset(offset);
+		},
+		[VISIBLE_ROWS],
+	);
 
 	const handleContentChange = useCallback(() => {
 		if (!textareaRef.current) return;
 		setSearchQuery(textareaRef.current.plainText);
 	}, []);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: textarea is created once
-	useEffect(() => {
-		const container = renderer.root.findDescendantById(containerRef.current);
-		if (!container || textareaRef.current) return;
-
-		const textarea = new TextareaRenderable(renderer, {
-			id: 'models-search-textarea',
-			width: '100%',
-			height: 1,
-			placeholder: 'Search models…',
-			placeholderColor: colors.fgDark,
-			textColor: colors.fgBright,
-			focusedTextColor: colors.fgBright,
-			cursorColor: colors.blue,
-			wrapMode: 'word',
-			keyBindings: [],
-		});
-
-		textarea.onContentChange = handleContentChange;
-		container.add(textarea);
-		textareaRef.current = textarea;
-		textarea.focus();
-
-		return () => {
-			if (textareaRef.current) {
-				textareaRef.current.destroy();
-				textareaRef.current = null;
-			}
-		};
-	}, [renderer, handleContentChange]);
 
 	useKeyboard((key) => {
 		const list = flatListRef.current;
@@ -290,12 +268,13 @@ export function ModelsOverlay({
 			if (displayRows[i].type === 'model') visibleModels++;
 		}
 		return result;
-	}, [displayRows, scrollOffset]);
+	}, [displayRows, scrollOffset, VISIBLE_ROWS]);
 
 	return (
 		<ModalFrame
 			title="Models"
-			padding={1}
+			size="lg"
+			fill
 			footer="↑↓ nav · ↵ select · esc close"
 		>
 			<box
@@ -304,6 +283,7 @@ export function ModelsOverlay({
 					height: 3,
 					flexShrink: 0,
 					border: true,
+					borderStyle: 'rounded',
 					borderColor: colors.border,
 					marginBottom: 1,
 					paddingLeft: 1,
@@ -311,8 +291,22 @@ export function ModelsOverlay({
 				}}
 			>
 				<box style={{ flexDirection: 'row', width: '100%', height: 1 }}>
-					<text fg={colors.fgDark}>🔍 </text>
-					<box id={containerRef.current} style={{ width: '100%', height: 1 }} />
+					<text fg={colors.fgDark}>/ </text>
+					<textarea
+						ref={textareaRef}
+						focused
+						placeholder="Search models…"
+						placeholderColor={colors.fgDark}
+						textColor={colors.fgBright}
+						focusedTextColor={colors.fgBright}
+						backgroundColor={colors.bg}
+						focusedBackgroundColor={colors.bg}
+						cursorColor={colors.blue}
+						wrapMode="word"
+						keyBindings={SEARCH_KEY_BINDINGS}
+						onContentChange={handleContentChange}
+						style={{ flexGrow: 1, height: 1 }}
+					/>
 				</box>
 			</box>
 

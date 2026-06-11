@@ -1,3 +1,4 @@
+import { useTerminalDimensions } from '@opentui/react';
 import { useTheme } from '../theme.ts';
 
 interface StatusBarProps {
@@ -22,6 +23,7 @@ export function StatusBar({
 	contextUsagePercent = 0,
 }: StatusBarProps) {
 	const { colors } = useTheme();
+	const { width: terminalWidth } = useTerminalDimensions();
 	const title = sessionTitle || 'new session';
 
 	const contextColor =
@@ -38,7 +40,7 @@ export function StatusBar({
 
 	const leftLabel = ' otto │ ';
 	const rightStr = rightParts.length > 0 ? `  ${rightParts.join(' │ ')}` : '';
-	const cols = process.stdout.columns || 80;
+	const cols = terminalWidth || process.stdout.columns || 80;
 	const padding = 2;
 	const maxTitle = cols - padding - leftLabel.length - rightStr.length;
 	const displayTitle =

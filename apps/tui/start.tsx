@@ -22,7 +22,7 @@ export async function startTui(
 
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: false,
-		useAlternateScreen: true,
+		screenMode: 'alternate-screen',
 		targetFps: 30,
 	});
 	const root = createRoot(renderer);

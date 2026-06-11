@@ -2,18 +2,25 @@ import { useTerminalDimensions } from '@opentui/react';
 import type { ReactNode } from 'react';
 import { useTheme } from '../theme.ts';
 
+export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
+
+const SIZE_WIDTHS: Record<Exclude<ModalSize, 'full'>, number> = {
+	sm: 44,
+	md: 64,
+	lg: 96,
+};
+
 interface ModalFrameProps {
 	title: string;
 	children: ReactNode;
 	footer?: ReactNode;
-	preferredWidth?: number;
-	maxWidth?: number;
-	minWidth?: number;
-	contentHeight?: number;
+	/** Width preset. Defaults to 'lg'. */
+	size?: ModalSize;
+	/** Grow to max height (for scrollable lists). Default fits content. */
+	fill?: boolean;
 	maxHeightRatio?: number;
 	padding?: number;
 	gap?: number;
-	showHeader?: boolean;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -21,46 +28,33 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * OpenCode-inspired modal shell: a fullscreen dim backdrop with a centered
- * panel, plain header row, content body, and compact footer help.
+ * Centered modal panel with a rounded border, embedded title, and a compact
+ * footer hint row. Fits its content by default; pass `fill` for scroll lists.
  */
 export function ModalFrame({
 	title,
 	children,
 	footer,
-	preferredWidth = 96,
-	maxWidth = 112,
-	minWidth = 34,
-	contentHeight,
-	maxHeightRatio = 0.74,
+	size = 'lg',
+	fill = false,
+	maxHeightRatio = 0.78,
 	padding = 1,
 	gap = 1,
-	showHeader = true,
 }: ModalFrameProps) {
 	const { colors } = useTheme();
 	const { width: terminalWidth, height: terminalHeight } =
 		useTerminalDimensions();
 	const safeWidth = terminalWidth || (process.stdout.columns ?? 120);
 	const safeHeight = terminalHeight || (process.stdout.rows ?? 40);
-	const horizontalMargin = safeWidth < 70 ? 1 : 4;
-	const verticalMargin = safeHeight < 24 ? 1 : 2;
-	const availableWidth = Math.max(20, safeWidth - horizontalMargin * 2);
-	const width = clamp(
-		Math.min(preferredWidth, maxWidth),
-		Math.min(minWidth, availableWidth),
-		availableWidth,
-	);
+	const compact = safeWidth < 70;
+	const horizontalMargin = compact ? 1 : 4;
+	const availableWidth = Math.max(24, safeWidth - horizontalMargin * 2);
+	const presetWidth = size === 'full' ? availableWidth : SIZE_WIDTHS[size];
+	const width = clamp(presetWidth, 24, availableWidth);
 	const maxHeight = Math.max(
-		12,
-		Math.floor(safeHeight * maxHeightRatio) - verticalMargin,
+		8,
+		Math.floor(safeHeight * (safeHeight < 24 ? 0.9 : maxHeightRatio)),
 	);
-	const defaultHeight = Math.floor(safeHeight * maxHeightRatio);
-	const height = clamp(
-		contentHeight ?? defaultHeight,
-		Math.min(18, maxHeight),
-		Math.min(maxHeight, safeHeight - verticalMargin * 2),
-	);
-	const topPadding = Math.max(1, Math.floor((safeHeight - height) / 2));
 
 	return (
 		<box
@@ -73,45 +67,34 @@ export function ModalFrame({
 				zIndex: 3000,
 				backgroundColor: colors.bgDark,
 				alignItems: 'center',
-				paddingTop: topPadding,
+				justifyContent: 'center',
 			}}
 		>
 			<box
+				title={` ${title} `}
 				style={{
 					width,
-					height,
 					maxHeight,
+					height: fill ? maxHeight : undefined,
 					backgroundColor: colors.bg,
+					border: true,
+					borderStyle: 'rounded',
+					borderColor: colors.border,
+					titleColor: colors.fgBright,
 					flexDirection: 'column',
-					paddingTop: 1,
-					paddingBottom: padding,
+					paddingTop: padding,
+					paddingBottom: footer ? 0 : padding,
+					paddingLeft: padding + 1,
+					paddingRight: padding + 1,
 					gap,
 				}}
 			>
-				{showHeader && (
-					<box
-						style={{
-							paddingLeft: 4,
-							paddingRight: 4,
-							flexDirection: 'row',
-							justifyContent: 'space-between',
-							height: 1,
-							flexShrink: 0,
-						}}
-					>
-						<text fg={colors.fgBright}>
-							<b>{title}</b>
-						</text>
-						<text fg={colors.fgDark}>esc</text>
-					</box>
-				)}
 				<box
 					style={{
 						flexDirection: 'column',
-						flexGrow: 1,
+						flexGrow: fill ? 1 : 0,
 						flexShrink: 1,
-						paddingLeft: padding,
-						paddingRight: padding,
+						overflow: 'hidden',
 					}}
 				>
 					{children}
@@ -121,8 +104,8 @@ export function ModalFrame({
 						style={{
 							height: 1,
 							flexShrink: 0,
-							paddingLeft: 4,
-							paddingRight: 2,
+							flexDirection: 'row',
+							justifyContent: 'flex-end',
 						}}
 					>
 						<text fg={colors.fgDimmed}>{footer}</text>
@@ -149,44 +132,47 @@ export function SelectRow({
 	gutter?: ReactNode;
 }) {
 	const { colors } = useTheme();
-	const selectedFg = colors.bg;
 
 	return (
 		<box
 			style={{
-				flexDirection: 'column',
+				flexDirection: 'row',
 				height: 1,
 				width: '100%',
-				backgroundColor: active ? colors.blue : undefined,
+				backgroundColor: active ? colors.bgHighlight : undefined,
 			}}
 		>
+			<text fg={active ? colors.blue : colors.bg}>▌</text>
 			<box
 				style={{
 					flexDirection: 'row',
 					gap: 1,
-					paddingLeft: current || gutter ? 1 : 3,
-					paddingRight: 3,
-					width: '100%',
+					flexGrow: 1,
+					flexShrink: 1,
+					overflow: 'hidden',
+					paddingLeft: 1,
 				}}
 			>
-				{current && <text fg={active ? selectedFg : colors.blue}>●</text>}
+				{current && <text fg={colors.blue}>●</text>}
 				{!current && gutter}
-				<text fg={active ? selectedFg : current ? colors.blue : colors.fg}>
+				<text fg={active ? colors.fgBright : current ? colors.blue : colors.fg}>
 					{active ? <b>{title}</b> : title}
 				</text>
 				{description && (
-					<text fg={active ? selectedFg : colors.fgDark}>{description}</text>
-				)}
-				{footer && (
-					<box style={{ flexShrink: 0 }}>
-						{typeof footer === 'string' ? (
-							<text fg={active ? selectedFg : colors.fgDark}>{footer}</text>
-						) : (
-							footer
-						)}
-					</box>
+					<text fg={active ? colors.fgMuted : colors.fgDark}>
+						{description}
+					</text>
 				)}
 			</box>
+			{footer && (
+				<box style={{ flexShrink: 0, paddingRight: 1 }}>
+					{typeof footer === 'string' ? (
+						<text fg={active ? colors.fgMuted : colors.fgDark}>{footer}</text>
+					) : (
+						footer
+					)}
+				</box>
+			)}
 		</box>
 	);
 }

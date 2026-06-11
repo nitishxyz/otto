@@ -15,7 +15,7 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 	});
 
 	return (
-		<ModalFrame title="Help" footer="esc close">
+		<ModalFrame title="Help" size="md" footer="esc close">
 			<text fg={colors.blue}>
 				<b>Commands</b>
 			</text>

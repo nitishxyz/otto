@@ -8,16 +8,16 @@
 	},
 	"scripts": {
 		"dev": "bun run index.tsx",
-		"build": "bun build index.tsx --outdir dist --target bun"
+		"build": "bun build index.tsx --outdir dist --target bun --external '@opentui/core-*'"
 	},
 	"dependencies": {
-		"@opentui/core": "0.1.84",
-		"@opentui/react": "0.1.84",
+		"@opentui/core": "0.4.0",
+		"@opentui/react": "0.4.0",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
 		"eventsource-parser": "3.0.8",
 		"fuse.js": "7.1.0",
-		"opentui-spinner": "0.0.6",
+		"opentui-spinner": "0.0.7",
 		"react": "19.2.0",
 		"zustand": "5.0.11"
 	},

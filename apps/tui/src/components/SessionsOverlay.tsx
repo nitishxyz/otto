@@ -81,8 +81,8 @@ export function SessionsOverlay({
 	return (
 		<ModalFrame
 			title="Sessions"
-			padding={0}
-			gap={0}
+			size="lg"
+			fill
 			footer="↑↓ nav · ↵ select · esc close"
 		>
 			{sessions.length === 0 ? (

@@ -43,7 +43,11 @@ export function ThemeOverlay({ onClose, onSave }: ThemeOverlayProps) {
 	});
 
 	return (
-		<ModalFrame title="Theme" footer="↑↓ preview · ↵ confirm · esc cancel">
+		<ModalFrame
+			title="Theme"
+			size="sm"
+			footer="↑↓ preview · ↵ confirm · esc cancel"
+		>
 			<box style={{ flexDirection: 'column', gap: 0 }}>
 				{themeList.map((t, i) => {
 					const isSelected = i === selectedIdx;

@@ -136,7 +136,7 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 	});
 
 	return (
-		<ModalFrame title="Usage & Limits" footer="esc close">
+		<ModalFrame title="Usage & Limits" size="md" footer="esc close">
 			<box style={{ flexDirection: 'row', gap: 1 }}>
 				<text fg={colors.blue}>
 					<b>Provider:</b>

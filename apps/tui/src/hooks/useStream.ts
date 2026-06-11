@@ -111,8 +111,23 @@ function messageReducer(state: Message[], action: Action): Message[] {
 	switch (action.type) {
 		case 'LOAD': {
 			const optimistic = state.filter((m) => m.id.startsWith('optimistic-'));
-			if (optimistic.length === 0) return action.messages;
-			const loaded = action.messages;
+			const byId = new Map(state.map((m) => [m.id, m]));
+			// Prefer the local copy for messages still streaming: SSE deltas keep
+			// it ahead of the server snapshot, and swapping objects mid-stream
+			// causes visible re-render flicker.
+			const loaded = action.messages.map((m) => {
+				const existing = byId.get(m.id);
+				if (
+					existing &&
+					existing.role === 'assistant' &&
+					existing.status === 'pending' &&
+					m.status === 'pending'
+				) {
+					return existing;
+				}
+				return m;
+			});
+			if (optimistic.length === 0) return loaded;
 			const hasUserMsg = loaded.some((m) => m.role === 'user');
 			if (hasUserMsg) return loaded;
 			return [...optimistic, ...loaded];

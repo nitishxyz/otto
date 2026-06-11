@@ -496,6 +496,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		return (
 			<ModalFrame
 				title="Add MCP Server"
+				size="md"
 				footer="tab/↑↓ fields · ↵ submit · esc cancel"
 			>
 				<box style={{ flexDirection: 'column', gap: 1 }}>
@@ -579,7 +580,11 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 	if (view === 'confirm-delete') {
 		const target = sortedServers[selectedIdx];
 		return (
-			<ModalFrame title="Remove Server" footer="y/↵ confirm · any key cancel">
+			<ModalFrame
+				title="Remove Server"
+				size="sm"
+				footer="y/↵ confirm · any key cancel"
+			>
 				<text fg={colors.fgMuted}>
 					Remove <b>{target?.name}</b>?
 				</text>
@@ -594,6 +599,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		return (
 			<ModalFrame
 				title={`${toolsServer.name} — Tools (${toolsServer.tools.length})`}
+				size="md"
+				fill
 				footer="esc/↵ back"
 			>
 				<box
@@ -614,6 +621,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 	return (
 		<ModalFrame
 			title="MCP Servers"
+			size="lg"
+			fill
 			footer="↑↓ nav · ↵ toggle · a add · d del · t tools · esc close"
 		>
 			<box style={{ flexDirection: 'row', gap: 2, marginBottom: 1 }}>

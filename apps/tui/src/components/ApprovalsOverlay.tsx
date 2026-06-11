@@ -70,7 +70,11 @@ export function ApprovalsOverlay({
 	});
 
 	return (
-		<ModalFrame title="Tool approvals" footer="↑↓ move · ↵ save · esc close">
+		<ModalFrame
+			title="Tool approvals"
+			size="md"
+			footer="↑↓ move · ↵ save · esc close"
+		>
 			<text fg={colors.fgMuted}>
 				YOLO skips prompts but still blocks catastrophic commands like rm -rf /
 			</text>

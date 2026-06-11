@@ -74,7 +74,11 @@ export function AgentsOverlay({
 	const needsWindow = agents.length > visibleAgents.length;
 
 	return (
-		<ModalFrame title="Agents" footer="↑↓ move · ↵ select · esc close">
+		<ModalFrame
+			title="Agents"
+			size="md"
+			footer="↑↓ move · ↵ select · esc close"
+		>
 			{loading && <text fg={colors.fgDimmed}>loading…</text>}
 			{error && <text fg={colors.red}>{error}</text>}
 			{!loading && !error && agents.length === 0 && (

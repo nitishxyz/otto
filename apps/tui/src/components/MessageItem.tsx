@@ -3,6 +3,13 @@ import { TinySpinner } from './TinySpinner.tsx';
 import { useTheme } from '../theme.ts';
 import { ToolCallItem } from './ToolCallItem.tsx';
 import { InlineApproval } from './InlineApproval.tsx';
+import { TodoListCard } from './TodoListCard.tsx';
+import { MarkdownView } from './Markdown.tsx';
+import {
+	SubagentResultsCard,
+	isSubagentResultsMessage,
+	parseSubagentResults,
+} from './SubagentResultsCard.tsx';
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
 
 interface MessageItemProps {
@@ -48,7 +55,7 @@ function formatTime(ts: number): string {
 	return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const SKIP_TOOLS = new Set(['finish', 'progress_update', 'update_todos']);
+const SKIP_TOOLS = new Set(['finish', 'progress_update']);
 
 function formatError(raw: string | null | undefined): string {
 	if (!raw) return '';
@@ -67,38 +74,81 @@ function isToolPart(part: MessagePart): boolean {
 	return part.type === 'tool_call' || part.type === 'tool_result';
 }
 
-function getPartCategory(part: MessagePart): string {
-	if (part.type === 'tool_call' || part.type === 'tool_result') return 'tool';
-	return part.type;
+type Block =
+	| { key: string; kind: 'part'; part: MessagePart }
+	| { key: string; kind: 'tools'; parts: MessagePart[] }
+	| { key: string; kind: 'todos'; part: MessagePart };
+
+function partKeyOf(part: MessagePart): string {
+	return isToolPart(part) && part.toolCallId
+		? `tool-${part.toolCallId}`
+		: part.id;
+}
+
+/**
+ * Groups message parts into render blocks: consecutive tool parts merge into
+ * one compact group, only the latest update_todos survives (as a todo card),
+ * and empty text/reasoning parts are dropped so spacing stays uniform.
+ */
+function buildBlocks(parts: MessagePart[]): Block[] {
+	let lastTodoId: string | null = null;
+	for (const p of parts) {
+		if (isToolPart(p) && p.toolName === 'update_todos') lastTodoId = p.id;
+	}
+
+	const blocks: Block[] = [];
+	for (const part of parts) {
+		if (isToolPart(part)) {
+			const toolName = part.toolName || '';
+			if (SKIP_TOOLS.has(toolName)) continue;
+			if (toolName === 'update_todos') {
+				if (part.id !== lastTodoId) continue;
+				blocks.push({ key: `todos-${part.id}`, kind: 'todos', part });
+				continue;
+			}
+			const prev = blocks[blocks.length - 1];
+			if (prev?.kind === 'tools') {
+				prev.parts.push(part);
+			} else {
+				blocks.push({ key: partKeyOf(part), kind: 'tools', parts: [part] });
+			}
+			continue;
+		}
+		if (part.type === 'text' || part.type === 'reasoning') {
+			if (!extractText(part).trim()) continue;
+		}
+		blocks.push({ key: part.id, kind: 'part', part });
+	}
+	return blocks;
 }
 
 const PartRenderer = memo(function PartRenderer({
 	part,
 	isActive,
-	isLastTool,
-	prevType,
+	isLastPart,
 }: {
 	part: MessagePart;
 	isActive: boolean;
-	isLastTool: boolean;
-	prevType: string | null;
+	isLastPart: boolean;
 }) {
-	const { colors, syntaxStyle } = useTheme();
-	const category = getPartCategory(part);
-	const needsTopGap = prevType === null || prevType !== category;
+	const { colors } = useTheme();
 
 	if (part.type === 'text') {
 		const text = extractText(part);
 		if (!text.trim()) return null;
+		const isPartStreaming = isActive && isLastPart && !part.completedAt;
+		if (isPartStreaming) {
+			return (
+				<box style={{ width: '100%' }}>
+					<text wrapMode="word" fg={colors.fg}>
+						{text}
+					</text>
+				</box>
+			);
+		}
 		return (
-			<box style={{ width: '100%', marginTop: needsTopGap ? 1 : 0 }}>
-				<markdown
-					style={{ width: '100%' }}
-					content={text}
-					syntaxStyle={syntaxStyle}
-					streaming={isActive && !part.completedAt}
-					conceal
-				/>
+			<box style={{ width: '100%' }}>
+				<MarkdownView content={text} />
 			</box>
 		);
 	}
@@ -106,7 +156,7 @@ const PartRenderer = memo(function PartRenderer({
 	if (part.type === 'reasoning') {
 		const text = extractText(part);
 		if (!text.trim()) return null;
-		const isThinking = isActive && !part.completedAt;
+		const isThinking = isActive && isLastPart && !part.completedAt;
 		const lines = text.split('\n').filter((l) => l.trim());
 		let display: string;
 		if (isThinking) {
@@ -126,7 +176,6 @@ const PartRenderer = memo(function PartRenderer({
 				style={{
 					flexDirection: 'column',
 					paddingLeft: 1,
-					marginTop: needsTopGap ? 1 : 0,
 				}}
 			>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
@@ -144,18 +193,10 @@ const PartRenderer = memo(function PartRenderer({
 		);
 	}
 
-	if (isToolPart(part)) {
-		const toolName = part.toolName || '';
-		if (SKIP_TOOLS.has(toolName)) return null;
-		return (
-			<ToolCallItem part={part} isLast={isLastTool} isFirst={needsTopGap} />
-		);
-	}
-
 	if (part.type === 'error') {
 		const text = formatError(extractText(part));
 		return (
-			<box style={{ marginTop: 1, paddingLeft: 1 }}>
+			<box style={{ paddingLeft: 1 }}>
 				<text fg={colors.red}>{text || 'Error occurred'}</text>
 			</box>
 		);
@@ -286,6 +327,23 @@ const UserMessage = memo(function UserMessage({
 		return names;
 	}, [parts, message.attachmentNames]);
 
+	const subagentResults = useMemo(() => {
+		if (!content || !isSubagentResultsMessage(content)) return null;
+		const parsed = parseSubagentResults(content);
+		return parsed.length ? parsed : null;
+	}, [content]);
+
+	if (subagentResults) {
+		return (
+			<SubagentResultsCard
+				results={subagentResults}
+				timestamp={
+					message.createdAt > 0 ? formatTime(message.createdAt) : undefined
+				}
+			/>
+		);
+	}
+
 	return (
 		<box
 			style={{
@@ -388,13 +446,9 @@ const AssistantMessage = memo(function AssistantMessage({
 		return null;
 	}, [sortedParts]);
 
-	const toolParts = dedupedParts.filter(
-		(p) => isToolPart(p) && !SKIP_TOOLS.has(p.toolName || ''),
-	);
-	const lastToolIdx =
-		toolParts.length > 0
-			? dedupedParts.lastIndexOf(toolParts[toolParts.length - 1])
-			: -1;
+	const blocks = useMemo(() => buildBlocks(dedupedParts), [dedupedParts]);
+	const lastBlock = blocks[blocks.length - 1];
+	const lastPartId = lastBlock?.kind === 'part' ? lastBlock.part.id : null;
 
 	const showStreamingIndicator = isActive && !hasFinish;
 
@@ -437,32 +491,45 @@ const AssistantMessage = memo(function AssistantMessage({
 				)}
 			</box>
 
-			{dedupedParts.map((part, i) => {
-				const prev = i > 0 ? dedupedParts[i - 1] : null;
-				const prevCat = prev ? getPartCategory(prev) : null;
-				const approval =
-					isToolPart(part) && part.toolCallId
-						? (pendingApprovals?.find((a) => a.callId === part.toolCallId) ??
-							null)
-						: null;
-				return (
-					<box key={part.id} style={{ flexDirection: 'column', width: '100%' }}>
+			{blocks.map((block) => (
+				<box
+					key={block.key}
+					style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
+				>
+					{block.kind === 'tools' ? (
+						block.parts.map((part) => {
+							const approval = part.toolCallId
+								? (pendingApprovals?.find(
+										(a) => a.callId === part.toolCallId,
+									) ?? null)
+								: null;
+							return (
+								<box
+									key={partKeyOf(part)}
+									style={{ flexDirection: 'column', width: '100%' }}
+								>
+									<ToolCallItem part={part} />
+									{approval && onApprove && onDeny && (
+										<InlineApproval
+											approval={approval}
+											onApprove={onApprove}
+											onDeny={onDeny}
+										/>
+									)}
+								</box>
+							);
+						})
+					) : block.kind === 'todos' ? (
+						<TodoListCard part={block.part} />
+					) : (
 						<PartRenderer
-							part={part}
+							part={block.part}
 							isActive={isActive}
-							isLastTool={i === lastToolIdx}
-							prevType={prevCat}
+							isLastPart={block.part.id === lastPartId}
 						/>
-						{approval && onApprove && onDeny && (
-							<InlineApproval
-								approval={approval}
-								onApprove={onApprove}
-								onDeny={onDeny}
-							/>
-						)}
-					</box>
-				);
-			})}
+					)}
+				</box>
+			))}
 
 			{showStreamingIndicator && (
 				<StreamingIndicator progressPart={latestProgressPart} />

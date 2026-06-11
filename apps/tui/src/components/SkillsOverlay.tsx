@@ -254,6 +254,8 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 	return (
 		<ModalFrame
 			title={`Skills ${enabledCount}/${totalCount}`}
+			size="lg"
+			fill
 			footer={footerText}
 		>
 			<box flexDirection="column" flexGrow={1} overflow="hidden">

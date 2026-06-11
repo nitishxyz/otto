@@ -11,28 +11,165 @@ const DIFF_TOOLS = new Set([
 	'apply_patch',
 ]);
 
-function isShellTool(toolName?: string | null): boolean {
-	return toolName === 'shell' || toolName === 'bash';
-}
-
 interface ToolCallItemProps {
 	part: MessagePart;
-	isLast: boolean;
-	isFirst?: boolean;
 }
 
-function getTarget(part: MessagePart): string | null {
+function clip(value: string, max = 120): string {
+	const line = value.replace(/\s+/g, ' ').trim();
+	return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}
+
+function str(v: unknown): string | null {
+	return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+function num(v: unknown): number | null {
+	return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function asRecord(v: unknown): Record<string, unknown> | undefined {
+	return v && typeof v === 'object' && !Array.isArray(v)
+		? (v as Record<string, unknown>)
+		: undefined;
+}
+
+const PATCH_FILE_RE =
+	/\*\*\*\s+(?:Update File|Add File|Delete File|Replace in|Delete Lines in|Replace Lines in|Insert Before in|Insert After in):\s*(.+)/;
+
+function getToolSummary(part: MessagePart): string | null {
 	const cj = part.contentJson as Record<string, unknown> | undefined;
 	if (!cj) return null;
+	const args = asRecord(cj.args);
+	const result = asRecord(cj.result);
+	const src = args ?? cj;
+	const name = (part.toolName || '').toLowerCase();
 
-	const args = cj.args as Record<string, unknown> | undefined;
-	const source = args || cj;
-
-	if (isShellTool(part.toolName)) {
-		const cmd = source.cmd || source.command;
-		if (typeof cmd === 'string') {
-			const trimmed = cmd.trim();
-			return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
+	switch (name) {
+		case 'shell':
+		case 'bash': {
+			const cmd = str(src.cmd) ?? str(src.command);
+			return cmd ? clip(cmd) : null;
+		}
+		case 'ls':
+		case 'pwd':
+		case 'cd': {
+			return clip(str(src.path) ?? '.');
+		}
+		case 'tree': {
+			const path = str(src.path) ?? '.';
+			const depth = num(src.depth);
+			return clip(depth !== null ? `${path} (depth ${depth})` : path);
+		}
+		case 'glob': {
+			const pattern = str(src.pattern);
+			const path = str(src.path);
+			if (!pattern) return path ? clip(path) : null;
+			return clip(path ? `${pattern} in ${path}` : pattern);
+		}
+		case 'search':
+		case 'grep': {
+			const query = str(src.query) ?? str(src.pattern);
+			if (!query) return null;
+			const path = str(src.path);
+			const glob = Array.isArray(src.glob)
+				? src.glob.filter((g) => typeof g === 'string').join(',')
+				: str(src.glob);
+			let scope = path && path !== '.' ? ` in ${path}` : '';
+			if (glob) scope += ` [${glob}]`;
+			return clip(`"${query}"${scope}`);
+		}
+		case 'read':
+		case 'read_image': {
+			const path = str(src.path) ?? str(src.filePath) ?? str(src.file);
+			if (!path) return null;
+			const start = num(src.startLine);
+			const end = num(src.endLine);
+			if (start !== null && end !== null)
+				return clip(`${path}:${start}-${end}`);
+			if (start !== null) return clip(`${path}:${start}`);
+			return clip(path);
+		}
+		case 'write':
+		case 'edit':
+		case 'multiedit': {
+			const path = str(src.path) ?? str(src.filePath) ?? str(src.file);
+			return path ? clip(path) : null;
+		}
+		case 'copy_into': {
+			const sourcePath = str(src.sourcePath);
+			const targetPath = str(src.targetPath);
+			if (sourcePath && targetPath)
+				return clip(`${sourcePath} → ${targetPath}`);
+			const single = targetPath ?? sourcePath;
+			return single ? clip(single) : null;
+		}
+		case 'apply_patch': {
+			const path = str(src.path) ?? str(src.filePath);
+			if (path) return clip(path);
+			const patch = str(src.patch);
+			const fromPatch = patch ? PATCH_FILE_RE.exec(patch)?.[1] : null;
+			return fromPatch ? clip(fromPatch) : null;
+		}
+		case 'terminal': {
+			const op = str(src.operation);
+			const detail = str(src.command) ?? str(src.terminalId);
+			const segments = [op, detail].filter(Boolean) as string[];
+			return segments.length ? clip(segments.join(' ')) : null;
+		}
+		case 'websearch':
+		case 'web_search': {
+			const query = str(src.query);
+			if (query) return clip(`"${query}"`);
+			const url = str(src.url);
+			return url ? clip(url) : null;
+		}
+		case 'delegate_task': {
+			const agent = str(src.agent) ?? (result ? str(result.agent) : null);
+			const task = str(src.task);
+			if (agent && task) return clip(`${agent}: ${task}`);
+			const single = agent ?? task;
+			return single ? clip(single) : null;
+		}
+		case 'message_subagent': {
+			const id = str(src.subagentId);
+			const message = str(src.message);
+			const agent = result ? str(result.agent) : null;
+			const head = agent ?? (id ? `${id.slice(0, 8)}…` : null);
+			if (head && message) return clip(`${head}: ${message}`);
+			const single = message ?? head;
+			return single ? clip(single) : null;
+		}
+		case 'list_subagents': {
+			const subagents = result?.subagents;
+			if (Array.isArray(subagents)) {
+				const running = subagents.filter(
+					(s) => asRecord(s)?.status === 'running',
+				).length;
+				const count = subagents.length;
+				return clip(
+					`${count} sub-agent${count === 1 ? '' : 's'}${running ? `, ${running} running` : ''}`,
+				);
+			}
+			const status = str(src.status);
+			return status ? clip(status) : null;
+		}
+		case 'skill': {
+			const skillName = str(src.name);
+			const file = str(src.file);
+			if (skillName && file) return clip(`${skillName} (${file})`);
+			return skillName ? clip(skillName) : null;
+		}
+		case 'load_tools':
+		case 'load_mcp_tools': {
+			const tools = Array.isArray(src.tools)
+				? src.tools.filter((t) => typeof t === 'string').join(', ')
+				: null;
+			return tools ? clip(tools) : null;
+		}
+		case 'git_commit': {
+			const message = str(src.message);
+			return message ? clip(message.split('\n')[0] ?? message) : null;
 		}
 	}
 
@@ -44,12 +181,13 @@ function getTarget(part: MessagePart): string | null {
 		'pattern',
 		'query',
 		'url',
+		'cmd',
+		'command',
+		'message',
+		'name',
 	]) {
-		const val = source[key];
-		if (typeof val === 'string' && val.trim()) {
-			const trimmed = val.trim();
-			return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
-		}
+		const val = str(src[key]);
+		if (val) return clip(val);
 	}
 
 	return null;
@@ -121,12 +259,10 @@ function extractToolError(part: MessagePart): string | null {
 
 export const ToolCallItem = memo(function ToolCallItem({
 	part,
-	isLast: _isLast,
-	isFirst,
 }: ToolCallItemProps) {
 	const { colors } = useTheme();
 	const toolName = part.toolName || 'unknown';
-	const target = getTarget(part);
+	const target = getToolSummary(part);
 	const isResult = part.type === 'tool_result';
 	const isCompleted = isResult || !!part.completedAt;
 	const toolError = extractToolError(part);
@@ -170,7 +306,6 @@ export const ToolCallItem = memo(function ToolCallItem({
 			style={{
 				flexDirection: 'column',
 				width: '100%',
-				marginTop: isFirst ? 1 : 0,
 			}}
 		>
 			<box
