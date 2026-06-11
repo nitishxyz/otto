@@ -10,9 +10,6 @@ import { selectProviderAndModel } from '../provider/selection.ts';
 import { abortSession, getRunnerState } from '../session/queue.ts';
 
 const MAX_CONCURRENT_PER_PARENT = 3;
-const SUBAGENT_TIMEOUT_MS = 10 * 60 * 1000;
-
-const subagentTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 export type SubagentRecord = typeof subagents.$inferSelect;
 
@@ -162,8 +159,6 @@ export async function spawnSubagent(
 		content: prompt,
 	});
 
-	armSubagentTimeout({ subagentId, childSessionId: childSession.id, db });
-
 	publish({
 		type: 'session.updated',
 		sessionId: parentSessionId,
@@ -282,45 +277,6 @@ function buildSubagentPrompt(args: {
 	);
 	return lines.join('\n');
 }
-
-function armSubagentTimeout(args: {
-	subagentId: string;
-	childSessionId: string;
-	db: DB;
-}) {
-	const timer = setTimeout(async () => {
-		subagentTimeouts.delete(args.subagentId);
-		try {
-			const rows = await args.db
-				.select()
-				.from(subagents)
-				.where(eq(subagents.id, args.subagentId))
-				.limit(1);
-			if (!rows.length || rows[0].status !== 'running') return;
-			abortSession(args.childSessionId, true);
-			await args.db
-				.update(subagents)
-				.set({
-					status: 'failed',
-					summary: 'Sub-agent timed out and was aborted.',
-					updatedAt: Date.now(),
-				})
-				.where(eq(subagents.id, args.subagentId));
-			logger.warn('[subagent] timed out', { subagentId: args.subagentId });
-		} catch {}
-	}, SUBAGENT_TIMEOUT_MS);
-	if (typeof timer.unref === 'function') timer.unref();
-	subagentTimeouts.set(args.subagentId, timer);
-}
-
-function clearSubagentTimeout(subagentId: string) {
-	const timer = subagentTimeouts.get(subagentId);
-	if (timer) {
-		clearTimeout(timer);
-		subagentTimeouts.delete(subagentId);
-	}
-}
-
 /** Lists sub-agent records spawned from a parent session. */
 export async function listSubagentsForSession(
 	db: DB,
@@ -439,12 +395,6 @@ export async function messageSubagent(
 		].join('\n'),
 	});
 
-	armSubagentTimeout({
-		subagentId: record.id,
-		childSessionId: record.childSessionId,
-		db,
-	});
-
 	logger.info('[subagent] follow-up sent', {
 		subagentId: record.id,
 		parentSessionId,
@@ -479,7 +429,6 @@ export async function finalizeSubagentForChildSession(
 		.limit(1);
 	if (!rows.length) return undefined;
 	const record = rows[0];
-	clearSubagentTimeout(record.id);
 
 	const lastAssistant = await db
 		.select()
@@ -493,7 +442,7 @@ export async function finalizeSubagentForChildSession(
 	let failed = false;
 	if (assistantMessage) {
 		failed =
-			assistantMessage.status === 'failed' ||
+			assistantMessage.status === 'error' ||
 			assistantMessage.finishReason === 'error';
 		summary = await extractAssistantText(db, assistantMessage.id);
 	}
@@ -636,8 +585,9 @@ export async function abortChildSubagents(
 	if (!running.length) return;
 	const now = Date.now();
 	for (const record of running) {
-		clearSubagentTimeout(record.id);
-		abortSession(record.childSessionId, true);
+		abortSession(record.childSessionId, true, {
+			type: 'parent-session-aborted',
+		});
 		await db
 			.update(subagents)
 			.set({

@@ -44,6 +44,12 @@ export type SendNowPreemptReason = {
 	nextMessageId: string;
 };
 
+export type SystemAbortReason = {
+	type: 'parent-session-aborted';
+};
+
+export type RunAbortReason = SendNowPreemptReason | SystemAbortReason;
+
 /** Returns whether an abort reason came from the send-now preemption flow. */
 export function isSendNowPreemptReason(
 	value: unknown,
@@ -53,6 +59,16 @@ export function isSendNowPreemptReason(
 		typeof value === 'object' &&
 		(value as { type?: unknown }).type === 'send-now-preempt' &&
 		typeof (value as { nextMessageId?: unknown }).nextMessageId === 'string'
+	);
+}
+
+export function isSystemAbortReason(
+	value: unknown,
+): value is SystemAbortReason {
+	return (
+		Boolean(value) &&
+		typeof value === 'object' &&
+		(value as { type?: unknown }).type === 'parent-session-aborted'
 	);
 }
 
@@ -127,7 +143,11 @@ export function enqueueAssistantRun(
  * Aborts the currently running message for a session.
  * Optionally clears the queue.
  */
-export function abortSession(sessionId: string, clearQueue = false) {
+export function abortSession(
+	sessionId: string,
+	clearQueue = false,
+	reason?: RunAbortReason,
+) {
 	const state = runners.get(sessionId);
 	if (!state) return;
 
@@ -135,7 +155,7 @@ export function abortSession(sessionId: string, clearQueue = false) {
 	if (state.currentMessageId) {
 		const controller = messageAbortControllers.get(state.currentMessageId);
 		if (controller) {
-			controller.abort();
+			controller.abort(reason);
 			messageAbortControllers.delete(state.currentMessageId);
 		}
 	}
@@ -145,7 +165,7 @@ export function abortSession(sessionId: string, clearQueue = false) {
 		for (const opts of state.queue) {
 			const controller = messageAbortControllers.get(opts.assistantMessageId);
 			if (controller) {
-				controller.abort();
+				controller.abort(reason);
 				messageAbortControllers.delete(opts.assistantMessageId);
 			}
 		}

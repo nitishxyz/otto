@@ -1,4 +1,4 @@
-import { Target } from 'lucide-react';
+import { ScanEye } from 'lucide-react';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { Button } from '../ui/Button';
 
@@ -28,7 +28,7 @@ export function ToolActivityToggle({
 			}
 			className={compact ? 'h-7 w-7 flex-shrink-0' : 'h-7 w-7 flex-shrink-0'}
 		>
-			<Target
+			<ScanEye
 				className={`h-3.5 w-3.5 ${
 					followToolActivity ? 'text-blue-600 dark:text-blue-300' : ''
 				}`}

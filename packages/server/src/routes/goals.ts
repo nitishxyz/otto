@@ -139,7 +139,7 @@ async function listTasksForGoal(
 		.select()
 		.from(goalTasks)
 		.where(eq(goalTasks.goalId, goalId))
-		.orderBy(asc(goalTasks.position));
+		.orderBy(asc(goalTasks.position), asc(goalTasks.createdAt));
 }
 
 const DISABLED_ERROR =
@@ -197,6 +197,9 @@ export function registerGoalsRoutes(app: Hono) {
 		},
 	);
 
+	// Compatibility endpoints for the pre-orchestrator session-goal model. They
+	// intentionally read/write goals.sessionId; canonical project-wide goal
+	// surfaces are /v1/goals and per-goal otto ownership is goals.ottoSessionId.
 	zodOpenApiRoute(
 		app,
 		{

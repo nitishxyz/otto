@@ -9,6 +9,11 @@ import {
 	XCircle,
 } from 'lucide-react';
 import { useTodoStore, type TodoItem } from '../../stores/todoStore';
+import {
+	INPUT_BAR_ATTACHED_CARD_CLASS,
+	INPUT_BAR_GROUP_CLASS,
+	inputBarWrapperProps,
+} from './input-bar-chrome';
 
 interface InputTodosBarProps {
 	sessionId: string;
@@ -188,19 +193,24 @@ export const InputTodosBar = memo(function InputTodosBar({
 
 	return (
 		<div
-			className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+			className={`${INPUT_BAR_GROUP_CLASS} grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out`}
+			{...inputBarWrapperProps(hasTodos)}
 			style={{
 				gridTemplateRows: hasTodos ? '1fr' : '0fr',
 				opacity: hasTodos ? 1 : 0,
+				visibility: hasTodos ? 'visible' : 'hidden',
 			}}
 		>
 			<div className="overflow-hidden">
-				<div className="border border-border border-b-0 bg-card rounded-t-xl overflow-hidden -mb-1 pb-2">
+				<div
+					className={`border border-border bg-card overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}
+				>
 					<div
-						className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+						className="grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out"
 						style={{
 							gridTemplateRows: isExpanded ? '0fr' : '1fr',
 							opacity: isExpanded ? 0 : 1,
+							visibility: isExpanded ? 'hidden' : 'inherit',
 						}}
 					>
 						<div className="overflow-hidden">
@@ -238,10 +248,11 @@ export const InputTodosBar = memo(function InputTodosBar({
 					</div>
 
 					<div
-						className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+						className="grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out"
 						style={{
 							gridTemplateRows: isExpanded ? '1fr' : '0fr',
 							opacity: isExpanded ? 1 : 0,
+							visibility: isExpanded ? 'inherit' : 'hidden',
 						}}
 					>
 						<div className="overflow-hidden">

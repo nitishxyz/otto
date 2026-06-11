@@ -44,7 +44,7 @@ async function loadGoalWithTasks(projectRoot: string, ottoSessionId: string) {
 		.select()
 		.from(goalTasks)
 		.where(eq(goalTasks.goalId, goal.id))
-		.orderBy(asc(goalTasks.position));
+		.orderBy(asc(goalTasks.position), asc(goalTasks.createdAt));
 	return { db, goal, tasks };
 }
 
@@ -100,28 +100,24 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 			.describe('Append new tasks to the active goal, in order'),
 		updateTasks: z
 			.array(
-				z.object({
-					id: z.string().min(1),
-					status: z.enum(TASK_STATUSES).optional(),
-					note: z.string().optional(),
-					content: z.string().min(1).optional(),
-					sessionId: z
-						.string()
-						.optional()
-						.describe(
-							'Worker session or subagent session executing this task; record it when dispatching',
-						),
-					position: z
-						.number()
-						.int()
-						.min(0)
-						.optional()
-						.describe('New queue position (reorder)'),
-				}),
+				z
+					.object({
+						id: z.string().min(1),
+						status: z.enum(TASK_STATUSES).optional(),
+						note: z.string().optional(),
+						content: z.string().min(1).optional(),
+						sessionId: z
+							.string()
+							.optional()
+							.describe(
+								'Worker session or subagent session executing this task; record it when dispatching',
+							),
+					})
+					.strict(),
 			)
 			.optional()
 			.describe(
-				'Update task state. You are the only writer: mark a task in_progress when you dispatch it, completed after you verified the delegation result, blocked/cancelled with a note otherwise.',
+				'Update existing task state only. Do not omit, replace, delete, or reorder older tasks; mark obsolete work cancelled with a note so history stays visible.',
 			),
 	});
 
@@ -204,9 +200,6 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 								...(update.content ? { content: update.content } : {}),
 								...(update.sessionId !== undefined
 									? { sessionId: update.sessionId }
-									: {}),
-								...(update.position !== undefined
-									? { position: update.position }
 									: {}),
 								updatedAt: now,
 							})

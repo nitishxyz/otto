@@ -2,9 +2,36 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish } from '../../events/bus.ts';
-import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
+import {
+	isSendNowPreemptReason,
+	isSystemAbortReason,
+	type RunOpts,
+} from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import type { AbortEvent } from './types.ts';
+
+function getAbortClassification(reason: unknown): {
+	message: string;
+	type: string;
+	finishReason: string;
+	isAborted: boolean;
+} {
+	if (isSystemAbortReason(reason)) {
+		return {
+			message: 'Cancelled because the parent session was aborted',
+			type: 'cancelled',
+			finishReason: 'cancelled',
+			isAborted: false,
+		};
+	}
+
+	return {
+		message: 'Generation stopped by user',
+		type: 'abort',
+		finishReason: 'abort',
+		isAborted: true,
+	};
+}
 
 export function createAbortHandler(
 	opts: RunOpts,
@@ -48,6 +75,8 @@ export function createAbortHandler(
 			return;
 		}
 
+		const classification = getAbortClassification(abortReason);
+
 		const abortPartId = crypto.randomUUID();
 		await db.insert(messageParts).values({
 			id: abortPartId,
@@ -56,9 +85,9 @@ export function createAbortHandler(
 			stepIndex,
 			type: 'error',
 			content: JSON.stringify({
-				message: 'Generation stopped by user',
-				type: 'abort',
-				isAborted: true,
+				message: classification.message,
+				type: classification.type,
+				isAborted: classification.isAborted,
 				stepsCompleted: steps.length,
 			}),
 			agent: opts.agent,
@@ -72,14 +101,14 @@ export function createAbortHandler(
 			.update(messages)
 			.set({
 				status: 'error',
-				error: 'Generation stopped by user',
-				errorType: 'abort',
+				error: classification.message,
+				errorType: classification.type,
 				errorDetails: JSON.stringify({
 					stepsCompleted: steps.length,
 					abortedAt: Date.now(),
 				}),
-				finishReason: 'abort',
-				isAborted: true,
+				finishReason: classification.finishReason,
+				isAborted: classification.isAborted,
 			})
 			.where(eq(messages.id, opts.assistantMessageId));
 
@@ -89,9 +118,9 @@ export function createAbortHandler(
 			payload: {
 				messageId: opts.assistantMessageId,
 				partId: abortPartId,
-				error: 'Generation stopped by user',
-				errorType: 'abort',
-				isAborted: true,
+				error: classification.message,
+				errorType: classification.type,
+				isAborted: classification.isAborted,
 				stepsCompleted: steps.length,
 			},
 		});

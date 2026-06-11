@@ -4,6 +4,11 @@ import { useSessionSubagents } from '../../hooks/useGoals';
 import type { Subagent } from '../../lib/api-client';
 import { useSubagentViewerStore } from '../../stores/subagentViewerStore';
 import { StableSpinner } from '../ui/StableSpinner';
+import {
+	INPUT_BAR_ATTACHED_CARD_CLASS,
+	INPUT_BAR_GROUP_CLASS,
+	inputBarWrapperProps,
+} from './input-bar-chrome';
 
 interface InputSubagentsBarProps {
 	sessionId: string;
@@ -68,14 +73,17 @@ export const InputSubagentsBar = memo(function InputSubagentsBar({
 
 	return (
 		<div
-			className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+			className={`${INPUT_BAR_GROUP_CLASS} grid transition-[grid-template-rows,opacity] duration-200 ease-out`}
+			{...inputBarWrapperProps(hasContent)}
 			style={{
 				gridTemplateRows: hasContent ? '1fr' : '0fr',
 				opacity: hasContent ? 1 : 0,
 			}}
 		>
 			<div className="overflow-hidden">
-				<div className="border border-border border-b-0 bg-card rounded-t-xl overflow-hidden -mb-1 pb-2">
+				<div
+					className={`border border-border bg-card overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}
+				>
 					<button
 						type="button"
 						aria-expanded={isExpanded}

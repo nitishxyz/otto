@@ -11,6 +11,7 @@ import {
 	dequeueJob,
 	cleanupSession,
 	isSendNowPreemptReason,
+	isSystemAbortReason,
 } from '../session/queue.ts';
 import {
 	updateSessionTokensIncremental,
@@ -455,11 +456,11 @@ async function runAssistant(opts: RunOpts) {
 
 	const baseOnAbort = createAbortHandler(opts, db, getStepIndex, sharedCtx);
 	const onAbort = async (event: Parameters<typeof baseOnAbort>[0]) => {
-		const isSendNowPreempt = isSendNowPreemptReason(
-			(opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined)
-				?.reason,
-		);
-		_abortedByUser = !isSendNowPreempt;
+		const abortReason = (
+			opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined
+		)?.reason;
+		const isSendNowPreempt = isSendNowPreemptReason(abortReason);
+		_abortedByUser = !isSendNowPreempt && !isSystemAbortReason(abortReason);
 		await baseOnAbort(event);
 		sendNowPreemptHandled = isSendNowPreempt;
 	};

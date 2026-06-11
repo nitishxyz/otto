@@ -47,7 +47,11 @@ export const InputSecureInputBar = memo(function InputSecureInputBar({
 	if (!pending) return null;
 
 	return (
-		<div className="mb-2 rounded-xl border border-amber-500/40 bg-card/95 p-3 shadow-lg backdrop-blur">
+		<div
+			data-input-bar
+			data-active="true"
+			className="mb-2 rounded-xl border border-amber-500/40 bg-card/95 p-3 shadow-lg backdrop-blur"
+		>
 			<div className="mb-2 flex items-start gap-2">
 				<KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
 				<div className="min-w-0 flex-1">

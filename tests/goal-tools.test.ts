@@ -139,6 +139,47 @@ describe('single-writer goal tools', () => {
 		expect(valid.success).toBe(true);
 	});
 
+	test('goal_update preserves older task history and ordering', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: 'otto-preserve-history',
+		});
+		const execute = getExecute(updateTool);
+		const created = await execute({
+			createGoal: { title: 'Preserve history' },
+			addTasks: ['old task', 'new task'],
+		});
+		const [oldTask, newTask] = created.tasks;
+
+		await execute({
+			updateTasks: [{ id: oldTask.id, status: 'completed' }],
+		});
+
+		const inputSchema = (
+			updateTool.tool as unknown as {
+				inputSchema: { safeParse: (v: unknown) => { success: boolean } };
+			}
+		).inputSchema;
+		const reorderAttempt = inputSchema.safeParse({
+			updateTasks: [{ id: newTask.id, position: 0 }],
+		});
+		expect(reorderAttempt.success).toBe(false);
+
+		const updated = await execute({
+			updateTasks: [{ id: newTask.id, status: 'in_progress', position: 0 }],
+		});
+		expect(updated.tasks.map((task) => task.id)).toEqual([
+			oldTask.id,
+			newTask.id,
+		]);
+		expect(updated.tasks.find((task) => task.id === oldTask.id)?.status).toBe(
+			'completed',
+		);
+		expect(updated.tasks.find((task) => task.id === newTask.id)?.status).toBe(
+			'in_progress',
+		);
+	});
+
 	test('completeGoal closes the goal', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,

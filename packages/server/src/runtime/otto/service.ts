@@ -33,6 +33,8 @@ const AUTOMATED_PREFIXES = [
 	'[automated]',
 	'[otto]',
 	'<subagent_results>',
+	// Legacy worker-goal kickoff marker; retained so old automated messages do
+	// not count as manual user input when calculating otto stall state.
 	'<goal_start',
 	'<otto_kickoff',
 	'<otto_wakeup',
@@ -174,7 +176,7 @@ async function listGoalTasks(db: DB, goalId: string): Promise<GoalTaskRow[]> {
 		.select()
 		.from(goalTasks)
 		.where(eq(goalTasks.goalId, goalId))
-		.orderBy(asc(goalTasks.position));
+		.orderBy(asc(goalTasks.position), asc(goalTasks.createdAt));
 }
 
 async function completeGoal(db: DB, goal: GoalRow): Promise<void> {

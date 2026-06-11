@@ -21,8 +21,13 @@ import {
 } from '../../hooks/useGoals';
 import { useSubagentViewerStore } from '../../stores/subagentViewerStore';
 import { toast } from '../../stores/toastStore';
-import type { Goal, GoalTask } from '../../lib/api-client';
+import type { Goal, GoalStatus, GoalTask } from '../../lib/api-client';
 import { StableSpinner } from '../ui/StableSpinner';
+import {
+	INPUT_BAR_ATTACHED_CARD_CLASS,
+	INPUT_BAR_GROUP_CLASS,
+	inputBarWrapperProps,
+} from '../chat/input-bar-chrome';
 
 function TaskIcon({ status }: { status: GoalTask['status'] }) {
 	switch (status) {
@@ -63,6 +68,45 @@ function pickVisibleTask(tasks: GoalTask[]): GoalTask | undefined {
 		tasks.find((task) => task.status === 'pending') ??
 		tasks[0]
 	);
+}
+
+/**
+ * Resolves the goal shown for a session. Multiple goals can point at the
+ * same otto session; prefer active goals, then the most recently created,
+ * so the choice is deterministic instead of array-order dependent.
+ */
+function pickSessionGoal(
+	goals: Goal[] | undefined,
+	sessionId: string,
+): Goal | null {
+	if (!goals) return null;
+	const matches = goals.filter((g) => g.ottoSessionId === sessionId);
+	if (matches.length === 0) return null;
+	const active = matches.filter((g) => g.status === 'active');
+	const pool = active.length > 0 ? active : matches;
+	return pool.reduce((latest, g) =>
+		g.createdAt > latest.createdAt ? g : latest,
+	);
+}
+
+function GoalStatusBadge({ status }: { status: GoalStatus }) {
+	if (status === 'completed') {
+		return (
+			<span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+				<CheckCircle2 className="h-3 w-3" />
+				Completed
+			</span>
+		);
+	}
+	if (status === 'abandoned') {
+		return (
+			<span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+				<XCircle className="h-3 w-3" />
+				Abandoned
+			</span>
+		);
+	}
+	return null;
 }
 
 interface TaskRowProps {
@@ -120,7 +164,7 @@ const TaskRow = memo(function TaskRow({
 					type="button"
 					onClick={() => onDelete(task)}
 					disabled={deleteDisabled}
-					className="mt-[1px] flex-shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 disabled:opacity-50"
+					className="mt-[1px] flex-shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
 					aria-label="Delete task"
 					title="Delete task"
 				>
@@ -252,7 +296,9 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 	const openTasks = tasks.filter(
 		(task) => task.status !== 'completed' && task.status !== 'cancelled',
 	);
-	const visibleTask = pickVisibleTask(tasks);
+	const isActive = goal.status === 'active';
+	const summaryTask =
+		isActive && openTasks.length > 0 ? pickVisibleTask(tasks) : undefined;
 	const showStart =
 		goal.status === 'active' &&
 		!goal.startedAt &&
@@ -262,12 +308,15 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 		);
 
 	return (
-		<div className="border border-border border-b-0 bg-card rounded-t-xl overflow-hidden -mb-1 pb-2">
+		<div
+			className={`border border-border bg-card overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}
+		>
 			<div
-				className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+				className="grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out"
 				style={{
 					gridTemplateRows: isExpanded ? '0fr' : '1fr',
 					opacity: isExpanded ? 0 : 1,
+					visibility: isExpanded ? 'hidden' : 'inherit',
 				}}
 			>
 				<div className="overflow-hidden">
@@ -284,8 +333,9 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 						</span>
 						<span className="h-3 w-px bg-border flex-shrink-0" />
 						<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-							{visibleTask ? visibleTask.content : goal.title}
+							{summaryTask ? summaryTask.content : goal.title}
 						</span>
+						<GoalStatusBadge status={goal.status} />
 						<span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0">
 							{completed}/{total} done
 						</span>
@@ -295,10 +345,11 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 			</div>
 
 			<div
-				className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+				className="grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out"
 				style={{
 					gridTemplateRows: isExpanded ? '1fr' : '0fr',
 					opacity: isExpanded ? 1 : 0,
+					visibility: isExpanded ? 'inherit' : 'hidden',
 				}}
 			>
 				<div className="overflow-hidden">
@@ -314,6 +365,7 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 							<span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
 								{goal.title}
 							</span>
+							<GoalStatusBadge status={goal.status} />
 							<span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0">
 								{completed}/{total} done
 							</span>
@@ -322,7 +374,19 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 						{showStart ? (
 							<button
 								type="button"
-								onClick={() => startGoal.mutate({ goalId: goal.id })}
+								onClick={() =>
+									startGoal.mutate(
+										{ goalId: goal.id },
+										{
+											onError: (error) =>
+												toast.error(
+													error instanceof Error
+														? error.message
+														: 'Failed to start goal',
+												),
+										},
+									)
+								}
 								disabled={startGoal.isPending}
 								className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
 								title="Dispatch otto to work this goal"
@@ -339,7 +403,9 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 					<div className="max-h-64 overflow-y-auto divide-y divide-border">
 						{tasks.length === 0 ? (
 							<p className="px-3 py-2 text-xs text-muted-foreground">
-								No tasks yet. Ask otto to plan this goal, or add tasks below.
+								{isActive
+									? 'No tasks yet. Ask otto to plan this goal, or add tasks below.'
+									: 'No tasks were added to this goal.'}
 							</p>
 						) : (
 							tasks.map((task) => (
@@ -371,26 +437,43 @@ interface OttoGoalBarProps {
  * the exact InputTodosBar interaction pattern. Collapsed: compact summary
  * ("Goal | <current task> — n/m done"). Expanded: full task queue with
  * add/remove affordances and worker transcript links. Resolves the goal
- * attached to this session (goal.ottoSessionId === sessionId) and hides
- * itself with the grid-rows animation when no goal exists yet. Only mount
- * this for otto sessions — it owns the project goals query.
+ * attached to this session (goal.ottoSessionId === sessionId; when several
+ * match, the most recently created active goal wins) and hides itself with
+ * the grid-rows animation when no goal exists yet or while goals are still
+ * loading. A failed goals fetch shows a subtle inline notice instead of
+ * silently hiding. Only mount this for otto sessions — it owns the project
+ * goals query.
  */
 export const OttoGoalBar = memo(function OttoGoalBar({
 	sessionId,
 }: OttoGoalBarProps) {
-	const { data } = useProjectGoals();
-	const goal = data?.goals.find((g) => g.ottoSessionId === sessionId) ?? null;
+	const { data, isError } = useProjectGoals();
+	const goal = pickSessionGoal(data?.goals, sessionId);
+	const showError = isError && !goal;
 
 	return (
 		<div
-			className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+			className={`${INPUT_BAR_GROUP_CLASS} grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out`}
+			{...inputBarWrapperProps(Boolean(goal || showError))}
 			style={{
-				gridTemplateRows: goal ? '1fr' : '0fr',
-				opacity: goal ? 1 : 0,
+				gridTemplateRows: goal || showError ? '1fr' : '0fr',
+				opacity: goal || showError ? 1 : 0,
+				visibility: goal || showError ? 'visible' : 'hidden',
 			}}
 		>
 			<div className="overflow-hidden">
-				{goal ? <OttoGoalBarContent goal={goal} /> : null}
+				{goal ? (
+					<OttoGoalBarContent goal={goal} />
+				) : showError ? (
+					<div
+						className={`border border-border bg-card overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}
+					>
+						<p className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+							<AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+							Could not load goals — retrying automatically.
+						</p>
+					</div>
+				) : null}
 			</div>
 		</div>
 	);

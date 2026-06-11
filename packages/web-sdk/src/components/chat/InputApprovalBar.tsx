@@ -3,6 +3,11 @@ import { Shield, Check, X, CheckCheck } from 'lucide-react';
 import type { PendingToolApproval } from '../../stores/toolApprovalStore';
 import { useToolApprovalStore } from '../../stores/toolApprovalStore';
 import { apiClient } from '../../lib/api-client';
+import {
+	INPUT_BAR_ATTACHED_CARD_CLASS,
+	INPUT_BAR_GROUP_CLASS,
+	inputBarWrapperProps,
+} from './input-bar-chrome';
 
 interface InputApprovalBarProps {
 	sessionId: string;
@@ -127,14 +132,17 @@ export const InputApprovalBar = memo(function InputApprovalBar({
 
 	return (
 		<div
-			className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+			className={`${INPUT_BAR_GROUP_CLASS} grid transition-[grid-template-rows,opacity] duration-200 ease-out`}
+			{...inputBarWrapperProps(hasApprovals)}
 			style={{
 				gridTemplateRows: hasApprovals ? '1fr' : '0fr',
 				opacity: hasApprovals ? 1 : 0,
 			}}
 		>
 			<div className="overflow-hidden">
-				<div className="border border-amber-200 dark:border-amber-800 border-b-0 bg-amber-50/80 dark:bg-amber-950/30 rounded-t-xl overflow-hidden -mb-1 pb-2">
+				<div
+					className={`border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}
+				>
 					<div className="divide-y divide-amber-200/50 dark:divide-amber-800/50">
 						{pendingApprovals.map((approval) => (
 							<ApprovalItem

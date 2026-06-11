@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Bot, Target } from 'lucide-react';
+import { useOttoEnabled } from '../../hooks/useGoals';
 
 export type WorkspaceTab = 'agents' | 'otto';
 
@@ -16,12 +17,16 @@ interface OttoTabBarProps {
 /**
  * Top-level workspace tab switcher: Agents (direct sessions) vs Otto (goal
  * orchestrator). Controlled by the host app — typically backed by routes
- * (/sessions vs /otto) so refreshes land on the same tab.
+ * (/sessions vs /otto) so refreshes land on the same tab. Renders nothing
+ * when otto is disabled on the server (`useOttoEnabled()`); hosts should
+ * treat the active tab as 'agents' in that case.
  */
 export const OttoTabBar = memo(function OttoTabBar({
 	activeTab,
 	onTabChange,
 }: OttoTabBarProps) {
+	const ottoEnabled = useOttoEnabled();
+	if (!ottoEnabled) return null;
 	return (
 		<div className="flex h-10 shrink-0 items-stretch gap-1 border-b border-sidebar-border px-2 pt-1.5 pb-1">
 			{TABS.map((tab) => {

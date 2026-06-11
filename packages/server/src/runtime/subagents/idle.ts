@@ -27,7 +27,10 @@ async function wasLastRunAbortedByUser(
 		.limit(1);
 	const last = rows[0];
 	if (!last) return false;
-	return last.isAborted === true || last.finishReason === 'abort';
+	return (
+		last.isAborted === true ||
+		(last.isAborted !== false && last.finishReason === 'abort')
+	);
 }
 
 /**

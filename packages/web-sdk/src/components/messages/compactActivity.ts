@@ -126,13 +126,12 @@ interface GoalUpdateTaskInput {
 	note?: unknown;
 	content?: unknown;
 	sessionId?: unknown;
-	position?: unknown;
 }
 
 /**
  * Builds a compact label for otto's goal_update tool. The input shape is
  * otto-only: createGoal/completeGoal/addTasks plus updateTasks entries that
- * may carry a worker sessionId (dispatch) and a position (reorder).
+ * may carry a worker sessionId (dispatch).
  */
 function buildGoalUpdateLabel(
 	args: Record<string, unknown>,
@@ -171,7 +170,6 @@ function buildGoalUpdateLabel(
 	if (updateTasks.length) {
 		const statusCounts = new Map<string, number>();
 		let dispatched = 0;
-		let reordered = 0;
 		for (const update of updateTasks) {
 			if (typeof update !== 'object' || update === null) continue;
 			if (typeof update.status === 'string') {
@@ -183,9 +181,6 @@ function buildGoalUpdateLabel(
 			if (typeof update.sessionId === 'string' && update.sessionId) {
 				dispatched += 1;
 			}
-			if (typeof update.position === 'number') {
-				reordered += 1;
-			}
 		}
 		for (const [status, count] of statusCounts) {
 			segments.push(
@@ -196,9 +191,6 @@ function buildGoalUpdateLabel(
 			segments.push(
 				`dispatched ${dispatched} task${dispatched === 1 ? '' : 's'}`,
 			);
-		}
-		if (reordered > 0 && statusCounts.size === 0 && dispatched === 0) {
-			segments.push('reordered queue');
 		}
 	}
 
