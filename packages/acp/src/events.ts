@@ -1,9 +1,16 @@
 import type {
 	AgentSideConnection,
 	ClientCapabilities,
+	Usage,
 } from '@agentclientprotocol/sdk';
 import { resolveApproval } from '@ottocode/server/runtime/tools/approval';
 import type { OttoEvent } from '@ottocode/server/events/types';
+import { getSession as apiGetSession } from '@ottocode/api';
+import {
+	estimateModelCostUsd,
+	getModelInfo,
+	type ProviderId,
+} from '@ottocode/sdk';
 import { getToolLocations, mapPlanStatus } from './tools';
 import {
 	handleToolCall,
@@ -166,6 +173,7 @@ export async function handleOttoEvent(
 			}
 
 			case 'message.completed': {
+				await sendUsageUpdate(client, payload, acpSessionId, session);
 				if (
 					payload?.id === session.assistantMessageId &&
 					session.resolvePrompt
@@ -174,7 +182,11 @@ export async function handleOttoEvent(
 					session.resolvePrompt = null;
 					session.unsubscribe?.();
 					session.unsubscribe = null;
-					resolve({ stopReason: 'end_turn' });
+					const usage = extractTurnUsage(payload);
+					resolve({
+						stopReason: 'end_turn',
+						...(usage ? { usage } : {}),
+					});
 				}
 				return;
 			}
@@ -224,6 +236,100 @@ async function handleProgressUpdate(
 				? { messageId: session.assistantMessageId }
 				: {}),
 			content: { type: 'text', text: `${message}\n` },
+		},
+	});
+}
+
+type CompletedUsagePayload = {
+	inputTokens?: number;
+	outputTokens?: number;
+	totalTokens?: number;
+	cachedInputTokens?: number;
+	cacheCreationInputTokens?: number;
+};
+
+function readUsagePayload(
+	payload: Record<string, unknown> | undefined,
+): CompletedUsagePayload | undefined {
+	const usage = payload?.usage;
+	if (!usage || typeof usage !== 'object') return undefined;
+	return usage as CompletedUsagePayload;
+}
+
+function extractTurnUsage(
+	payload: Record<string, unknown> | undefined,
+): Usage | undefined {
+	const usage = readUsagePayload(payload);
+	if (!usage) return undefined;
+	const inputTokens = Number(usage.inputTokens ?? 0);
+	const outputTokens = Number(usage.outputTokens ?? 0);
+	const totalTokens = Number(usage.totalTokens ?? inputTokens + outputTokens);
+	if (!inputTokens && !outputTokens && !totalTokens) return undefined;
+	return {
+		inputTokens,
+		outputTokens,
+		totalTokens,
+		cachedReadTokens: Number(usage.cachedInputTokens ?? 0),
+		cachedWriteTokens: Number(usage.cacheCreationInputTokens ?? 0),
+	};
+}
+
+/**
+ * Sends a `usage_update` session notification (context window utilization and
+ * cumulative cost) after a turn completes, per the ACP Session Context Size
+ * and Cost RFD. Skipped when the model's context window size is unknown.
+ */
+async function sendUsageUpdate(
+	client: AgentSideConnection,
+	payload: Record<string, unknown> | undefined,
+	acpSessionId: string,
+	session: AcpSession,
+): Promise<void> {
+	if (!session.provider || !session.model) return;
+	const size = getModelInfo(session.provider as ProviderId, session.model)
+		?.limit?.context;
+	if (!size || size <= 0) return;
+
+	let used = 0;
+	let costUsd: number | undefined;
+	if (session.ottoSessionId) {
+		const { data: row } = await apiGetSession({
+			path: { sessionId: session.ottoSessionId },
+			query: { project: session.cwd },
+		}).catch(() => ({ data: undefined }));
+		if (row) {
+			used = Number(row.currentContextTokens ?? 0);
+			costUsd = estimateModelCostUsd(
+				session.provider as ProviderId,
+				session.model,
+				{
+					inputTokens: Number(row.totalInputTokens ?? 0),
+					outputTokens: Number(row.totalOutputTokens ?? 0),
+					cachedInputTokens: Number(row.totalCachedTokens ?? 0),
+					cacheCreationInputTokens: Number(row.totalCacheCreationTokens ?? 0),
+				},
+			);
+		}
+	}
+	if (!used) {
+		const usage = readUsagePayload(payload);
+		if (!usage) return;
+		used = Number(usage.inputTokens ?? 0) + Number(usage.outputTokens ?? 0);
+		if (costUsd === undefined && typeof payload?.costUsd === 'number') {
+			costUsd = payload.costUsd;
+		}
+	}
+	if (!used) return;
+
+	await client.sessionUpdate({
+		sessionId: acpSessionId,
+		update: {
+			sessionUpdate: 'usage_update',
+			used: Math.min(used, size),
+			size,
+			...(costUsd !== undefined
+				? { cost: { amount: costUsd, currency: 'USD' } }
+				: {}),
 		},
 	});
 }

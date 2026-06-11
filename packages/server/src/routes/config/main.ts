@@ -3,6 +3,7 @@ import { loadConfig, logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { isHiddenAgent } from '../../runtime/agent/registry.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	discoverAllAgents,
@@ -103,7 +104,9 @@ export function registerMainConfigRoute(app: Hono) {
 				let allAgents: string[];
 
 				if (embeddedConfig?.agents) {
-					const embeddedAgents = Object.keys(embeddedConfig.agents);
+					const embeddedAgents = Object.keys(embeddedConfig.agents).filter(
+						(name) => !isHiddenAgent(name),
+					);
 					const fileAgents = await discoverAllAgents(cfg.projectRoot);
 					allAgents = Array.from(
 						new Set([...embeddedAgents, ...fileAgents]),

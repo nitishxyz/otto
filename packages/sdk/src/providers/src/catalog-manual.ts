@@ -24,6 +24,7 @@ const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 		toolCall: true,
 		reasoningText: true,
 		editToolCapability: 'structured',
+		limit: { context: 512_000 },
 		provider: { npm: '@ai-sdk/xai' },
 	},
 	{
@@ -34,6 +35,7 @@ const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 		attachment: false,
 		toolCall: true,
 		reasoningText: true,
+		limit: { context: 200_000 },
 		provider: { npm: '@ai-sdk/xai' },
 	},
 ];

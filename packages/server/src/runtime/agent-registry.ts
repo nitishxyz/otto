@@ -5,6 +5,8 @@ export {
 	defaultToolConfigForAgent,
 	flattenAgentToolConfig,
 	BUILTIN_AGENT_NAMES,
+	HIDDEN_BUILTIN_AGENT_NAMES,
+	isHiddenAgent,
 	type AgentToolConfig,
 	type AgentToolGroups,
 	type AgentConfigEntry,

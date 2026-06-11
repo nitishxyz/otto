@@ -19,10 +19,10 @@ import type {
 	ResumeSessionResponse,
 	CloseSessionRequest,
 	CloseSessionResponse,
+	DeleteSessionRequest,
+	DeleteSessionResponse,
 	SetSessionModeRequest,
 	SetSessionModeResponse,
-	SetSessionModelRequest,
-	SetSessionModelResponse,
 	SetSessionConfigOptionRequest,
 	SetSessionConfigOptionResponse,
 } from '@agentclientprotocol/sdk';
@@ -34,10 +34,10 @@ import {
 } from '@ottocode/server/runtime/agent/runner';
 import {
 	createSession as apiCreateSession,
+	deleteSession as apiDeleteSession,
 	getSession as apiGetSession,
 	listSessions as apiListSessions,
 	updateSession as apiUpdateSession,
-	type Provider,
 } from '@ottocode/api';
 import {
 	createToolError,
@@ -80,6 +80,7 @@ export class OttoAcpAgent implements Agent {
 					list: {},
 					resume: {},
 					close: {},
+					delete: {},
 					additionalDirectories: {},
 				},
 				mcpCapabilities: {
@@ -227,6 +228,20 @@ export class OttoAcpAgent implements Agent {
 		return undefined;
 	}
 
+	async deleteSession(
+		params: DeleteSessionRequest,
+	): Promise<DeleteSessionResponse | undefined> {
+		const session = this.sessions.get(params.sessionId);
+		if (session) await this.closeSession({ sessionId: params.sessionId });
+		await ensureAcpServer();
+		const { error } = await apiDeleteSession({
+			path: { sessionId: params.sessionId },
+			query: session?.cwd ? { project: session.cwd } : undefined,
+		});
+		if (error) throw new Error('Failed to delete session');
+		return undefined;
+	}
+
 	async setSessionMode(
 		params: SetSessionModeRequest,
 	): Promise<SetSessionModeResponse | undefined> {
@@ -241,21 +256,6 @@ export class OttoAcpAgent implements Agent {
 				currentModeId: params.modeId,
 			},
 		});
-		return undefined;
-	}
-
-	async unstable_setSessionModel(
-		params: SetSessionModelRequest,
-	): Promise<SetSessionModelResponse | undefined> {
-		const session = this.sessions.get(params.sessionId);
-		if (!session) throw new Error('Session not found');
-		const parsed = parseModelId(params.modelId);
-		await this.persistSessionPreferences(session, {
-			provider: parsed.provider,
-			model: parsed.model,
-		});
-		session.provider = parsed.provider;
-		session.model = parsed.model;
 		return undefined;
 	}
 
@@ -529,9 +529,7 @@ export class OttoAcpAgent implements Agent {
 			query: { project: cfg.projectRoot },
 			body: {
 				...(preferences.agent ? { agent: preferences.agent } : {}),
-				...(preferences.provider
-					? { provider: preferences.provider as Provider }
-					: {}),
+				...(preferences.provider ? { provider: preferences.provider } : {}),
 				...(preferences.model ? { model: preferences.model } : {}),
 			},
 		});

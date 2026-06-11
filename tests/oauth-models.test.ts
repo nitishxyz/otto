@@ -58,6 +58,9 @@ describe('oauth model filtering', () => {
 		const composer = catalog.xai.models.find(
 			(model) => model.id === 'grok-composer-2.5-fast',
 		);
+		const build = catalog.xai.models.find((model) => model.id === 'grok-build');
+		expect(build?.limit?.context).toBe(512_000);
+		expect(composer?.limit?.context).toBe(200_000);
 		expect(composer?.modalities?.input).toEqual(['text']);
 		expect(composer?.attachment).toBe(false);
 	});
@@ -85,6 +88,7 @@ describe('oauth model filtering', () => {
 		expect(modelIds).toContain('grok-4.3');
 		expect(modelIds).toContain('grok-build');
 		expect(modelIds).toContain('grok-composer-2.5-fast');
+		expect(composer?.limit?.context).toBe(200_000);
 		expect(composer?.modalities?.input).toEqual(['text']);
 		expect(composer?.attachment).toBe(false);
 	});

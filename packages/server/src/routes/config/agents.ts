@@ -12,6 +12,7 @@ import {
 import {
 	BUILTIN_AGENT_DESCRIPTIONS,
 	defaultToolConfigForAgent,
+	isHiddenAgent,
 	MAX_AGENT_DESCRIPTION_LENGTH,
 	normalizeAgentDescription,
 } from '../../runtime/agent/registry.ts';
@@ -139,9 +140,11 @@ function embeddedOptionalToolConfig(value: unknown) {
 
 function getEmbeddedAgentDetails(embeddedConfig: EmbeddedAppConfig) {
 	const agentEntries = embeddedConfig.agents ?? {};
-	const names = Object.keys(agentEntries).length
-		? Object.keys(agentEntries)
-		: ['build', 'general', 'init', 'plan', 'research'];
+	const names = (
+		Object.keys(agentEntries).length
+			? Object.keys(agentEntries)
+			: ['build', 'general', 'plan', 'research']
+	).filter((name) => !isHiddenAgent(name));
 	const defaultAgent = getDefault(
 		embeddedConfig.agent,
 		embeddedConfig.defaults?.agent,
@@ -153,12 +156,8 @@ function getEmbeddedAgentDetails(embeddedConfig: EmbeddedAppConfig) {
 			const toolConfig = embeddedToolConfig(entry?.tools, name);
 			return {
 				name,
-				builtin: ['build', 'general', 'init', 'plan', 'research'].includes(
-					name,
-				),
-				custom: !['build', 'general', 'init', 'plan', 'research'].includes(
-					name,
-				),
+				builtin: ['build', 'general', 'plan', 'research'].includes(name),
+				custom: !['build', 'general', 'plan', 'research'].includes(name),
 				source: entry ? ('local' as const) : ('embedded' as const),
 				prompt: typeof entry?.prompt === 'string' ? entry.prompt : '',
 				promptSource: entry?.prompt ? 'embedded:agents' : 'embedded:default',
@@ -204,9 +203,11 @@ export function registerAgentsRoute(app: Hono) {
 				const embeddedConfig = getEmbeddedConfig(c);
 
 				if (embeddedConfig) {
-					const agents = embeddedConfig.agents
-						? Object.keys(embeddedConfig.agents)
-						: ['general', 'build', 'plan', 'init', 'research'];
+					const agents = (
+						embeddedConfig.agents
+							? Object.keys(embeddedConfig.agents)
+							: ['general', 'build', 'plan', 'research']
+					).filter((name) => !isHiddenAgent(name));
 					return c.json({
 						agents,
 						default: getDefault(

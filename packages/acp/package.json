@@ -24,7 +24,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@agentclientprotocol/sdk": "0.21.0",
+		"@agentclientprotocol/sdk": "0.25.0",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
 		"@ottocode/server": "workspace:*"

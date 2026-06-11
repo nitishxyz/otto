@@ -31,7 +31,13 @@ export async function replaySessionHistory(
 	if (error || !history) throw new Error('Failed to load session history');
 	for (const message of history) {
 		if (message.role !== 'user' && message.role !== 'assistant') continue;
-		const parts = message.parts ?? [];
+		const parts = (message.parts ?? []).map((part) => ({
+			...part,
+			content:
+				typeof part.content === 'string'
+					? part.content
+					: JSON.stringify(part.content),
+		}));
 
 		if (message.role === 'user') {
 			await replayUserMessageParts(client, sessionId, parts);

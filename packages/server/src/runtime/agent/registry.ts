@@ -41,6 +41,20 @@ export const BUILTIN_AGENT_NAMES = [
 	'otto',
 ];
 
+/**
+ * Built-in agents that are internal-only and must not be exposed in agent
+ * listings (UI pickers, ACP modes, delegation lists). They remain resolvable
+ * when explicitly requested (e.g. the /init command or the otto supervisor).
+ */
+export const HIDDEN_BUILTIN_AGENT_NAMES = ['init', 'otto'];
+
+const hiddenAgentSet = new Set(HIDDEN_BUILTIN_AGENT_NAMES);
+
+/** Returns true when an agent is internal-only and hidden from listings. */
+export function isHiddenAgent(name: string): boolean {
+	return hiddenAgentSet.has(name);
+}
+
 /** One-line descriptions for built-in agents, used in delegation prompts. */
 export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
 	build:
@@ -384,7 +398,9 @@ export async function discoverAllAgents(
 		}
 	} catch {}
 
-	return Array.from(agentSet).sort();
+	return Array.from(agentSet)
+		.filter((name) => !isHiddenAgent(name))
+		.sort();
 }
 
 export async function resolveAgentConfig(

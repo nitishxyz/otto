@@ -1,7 +1,6 @@
 import type {
 	SessionConfigOption,
 	SessionModeState,
-	SessionModelState,
 } from '@agentclientprotocol/sdk';
 import { discoverAllAgents } from '@ottocode/server/runtime/agent-registry';
 import {
@@ -17,7 +16,6 @@ import { DEFAULT_MODE, type AcpSession } from './types';
 export async function buildSessionState(session: AcpSession): Promise<{
 	configOptions: SessionConfigOption[];
 	modes: SessionModeState;
-	models: SessionModelState | null;
 }> {
 	const defaults = await loadSessionDefaults(session.cwd);
 	session.mode ||= defaults.agent;
@@ -75,17 +73,6 @@ export async function buildSessionState(session: AcpSession): Promise<{
 			currentModeId: session.mode,
 			availableModes: modeOptions,
 		},
-		models:
-			currentModel && modelOptions.length > 0
-				? {
-						currentModelId: currentModel,
-						availableModels: modelOptions.map((model) => ({
-							modelId: model.value,
-							name: model.name,
-							description: model.description,
-						})),
-					}
-				: null,
 	};
 }
 
