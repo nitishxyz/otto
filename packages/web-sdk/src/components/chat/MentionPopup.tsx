@@ -10,6 +10,7 @@ import {
 	FileType,
 	Plus,
 	Pencil,
+	Sparkles,
 	type LucideIcon,
 } from 'lucide-react';
 
@@ -18,14 +19,20 @@ export interface MentionAgent {
 	description?: string;
 }
 
+export interface MentionSkill {
+	name: string;
+	description?: string;
+}
+
 export interface MentionItem {
-	type: 'agent' | 'file';
+	type: 'agent' | 'skill' | 'file';
 	value: string;
 	description?: string;
 }
 
 interface MentionPopupProps {
 	agents: MentionAgent[];
+	skills?: MentionSkill[];
 	files: string[];
 	changedFiles?: Array<{
 		path: string;
@@ -39,6 +46,7 @@ interface MentionPopupProps {
 }
 
 const MAX_AGENT_RESULTS = 5;
+const MAX_SKILL_RESULTS = 5;
 const MAX_FILE_RESULTS = 20;
 
 function getFileIcon(filePath: string): LucideIcon {
@@ -125,8 +133,37 @@ function SectionLabel({ children }: { children: string }) {
 	);
 }
 
+/**
+ * Name-first matcher for agents/skills: prefix matches rank first, then
+ * word-boundary matches (after a dash), then substring matches. Descriptions
+ * are ignored so unrelated items don't pollute results.
+ */
+function matchByName<T extends { name: string }>(
+	items: T[],
+	query: string,
+	limit: number,
+): T[] {
+	if (!query) return items.slice(0, limit);
+	const q = query.toLowerCase();
+	const ranked: Array<{ item: T; rank: number }> = [];
+	for (const item of items) {
+		const name = item.name.toLowerCase();
+		let rank: number;
+		if (name.startsWith(q)) rank = 0;
+		else if (name.includes(`-${q}`)) rank = 1;
+		else if (name.includes(q)) rank = 2;
+		else continue;
+		ranked.push({ item, rank });
+	}
+	ranked.sort(
+		(a, b) => a.rank - b.rank || a.item.name.localeCompare(b.item.name),
+	);
+	return ranked.slice(0, limit).map((r) => r.item);
+}
+
 export function MentionPopup({
 	agents,
+	skills = [],
 	files,
 	changedFiles = [],
 	query,
@@ -140,27 +177,15 @@ export function MentionPopup({
 		[changedFiles],
 	);
 
-	const agentFuse = useMemo(
-		() =>
-			new Fuse(agents, {
-				keys: [
-					{ name: 'name', weight: 2 },
-					{ name: 'description', weight: 0.5 },
-				],
-				threshold: 0.25,
-				distance: 60,
-				ignoreLocation: true,
-			}),
-		[agents],
+	const agentResults = useMemo(
+		() => matchByName(agents, query, MAX_AGENT_RESULTS),
+		[agents, query],
 	);
 
-	const agentResults = useMemo(() => {
-		if (!query) return agents.slice(0, MAX_AGENT_RESULTS);
-		return agentFuse
-			.search(query)
-			.slice(0, MAX_AGENT_RESULTS)
-			.map((r) => r.item);
-	}, [agentFuse, agents, query]);
+	const skillResults = useMemo(
+		() => matchByName(skills, query, MAX_SKILL_RESULTS),
+		[skills, query],
+	);
 
 	const fileFuse = useMemo(
 		() =>
@@ -215,12 +240,17 @@ export function MentionPopup({
 				value: agent.name,
 				description: agent.description,
 			})),
+			...skillResults.map<MentionItem>((skill) => ({
+				type: 'skill',
+				value: skill.name,
+				description: skill.description,
+			})),
 			...fileResults.map<MentionItem>((path) => ({
 				type: 'file',
 				value: path,
 			})),
 		],
-		[agentResults, fileResults],
+		[agentResults, skillResults, fileResults],
 	);
 
 	const effectiveIndex = items.length > 0 ? selectedIndex % items.length : 0;
@@ -249,7 +279,8 @@ export function MentionPopup({
 		return null;
 	}
 
-	const fileSectionOffset = agentResults.length;
+	const skillSectionOffset = agentResults.length;
+	const fileSectionOffset = agentResults.length + skillResults.length;
 
 	return (
 		<div
@@ -285,9 +316,46 @@ export function MentionPopup({
 				</>
 			)}
 
+			{skillResults.length > 0 && (
+				<>
+					<SectionLabel>Skills</SectionLabel>
+					{skillResults.map((skill, index) => {
+						const itemIndex = skillSectionOffset + index;
+						return (
+							<button
+								type="button"
+								key={`skill-${skill.name}`}
+								id={`mention-item-${itemIndex}`}
+								onMouseDown={(e) => {
+									e.preventDefault();
+									onSelect(skill.name);
+								}}
+								className={`w-full text-left px-3 py-2 hover:bg-accent ${
+									itemIndex === effectiveIndex ? 'bg-accent' : ''
+								}`}
+							>
+								<div className="flex items-start gap-2 w-full">
+									<Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-1" />
+									<div className="min-w-0 flex-1">
+										<span className="font-mono text-sm">@{skill.name}</span>
+										{skill.description && (
+											<div className="text-xs text-muted-foreground truncate">
+												{skill.description}
+											</div>
+										)}
+									</div>
+								</div>
+							</button>
+						);
+					})}
+				</>
+			)}
+
 			{fileResults.length > 0 && (
 				<>
-					{agentResults.length > 0 && <SectionLabel>Files</SectionLabel>}
+					{(agentResults.length > 0 || skillResults.length > 0) && (
+						<SectionLabel>Files</SectionLabel>
+					)}
 					{fileResults.map((filePath, index) => {
 						const itemIndex = fileSectionOffset + index;
 						const Icon = getFileIcon(filePath);

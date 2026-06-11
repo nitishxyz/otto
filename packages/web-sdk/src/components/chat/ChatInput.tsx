@@ -226,9 +226,19 @@ export const ChatInput = memo(
 		} = useSkillMention();
 
 		const { data: skillsConfig } = useSkills({
-			enabled: showSkillMention || message.includes('$'),
+			enabled: showSkillMention || showFileMention || message.includes('$'),
 		});
 		const skillSummaries = skillsConfig?.items ?? [];
+		const mentionSkills = useMemo(
+			() =>
+				(skillsConfig?.items ?? [])
+					.filter((skill) => skill.enabled !== false)
+					.map((skill) => ({
+						name: skill.name,
+						description: skill.description,
+					})),
+			[skillsConfig],
+		);
 
 		const { data: filesData } = useFiles({
 			enabled: showFileMention,
@@ -1077,6 +1087,7 @@ export const ChatInput = memo(
 						{showFileMention && (
 							<MentionPopup
 								agents={mentionAgents}
+								skills={mentionSkills}
 								files={files}
 								changedFiles={changedFiles}
 								query={mentionQuery}

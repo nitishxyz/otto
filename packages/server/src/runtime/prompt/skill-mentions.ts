@@ -6,7 +6,7 @@ import {
 	type OttoConfig,
 } from '@ottocode/sdk';
 
-const SKILL_MENTION_REGEX = /(^|[\s([{])\$([a-z0-9]+(?:-[a-z0-9]+)*)/g;
+const SKILL_MENTION_REGEX = /(^|[\s([{])[$@]([a-z0-9]+(?:-[a-z0-9]+)*)/g;
 
 export type ExplicitSkillContextOptions = {
 	content?: string;
@@ -60,7 +60,7 @@ export async function buildExplicitSkillMentionContext({
 
 	return [
 		'<explicitly-requested-skills>',
-		'The user explicitly mentioned these skills with $skill syntax. Treat them as active for this turn. Follow each SKILL.md below. Do not call the skill tool just to load these SKILL.md files again; they are already loaded here. Supporting files are listed for progressive disclosure; use the skill tool with a specific file only when the skill instructions or task make a supporting file relevant.',
+		'The user explicitly mentioned these skills with @skill or $skill syntax. Treat them as active for this turn. Follow each SKILL.md below. Do not call the skill tool just to load these SKILL.md files again; they are already loaded here. Supporting files are listed for progressive disclosure; use the skill tool with a specific file only when the skill instructions or task make a supporting file relevant.',
 		'',
 		blocks.join('\n\n'),
 		'</explicitly-requested-skills>',
@@ -72,7 +72,7 @@ export function extractExplicitSkillMentions(
 	skills: DiscoveredSkill[],
 	skillSettings?: OttoConfig['skills'],
 ): string[] {
-	if (!content.includes('$')) return [];
+	if (!content.includes('$') && !content.includes('@')) return [];
 
 	const available = new Map(
 		filterDiscoveredSkills(skills, skillSettings).map((skill) => [

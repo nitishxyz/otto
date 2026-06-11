@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { mentionHighlightClasses } from '../../lib/mentionHighlightStyles';
 
 interface InputHighlightOverlayProps {
 	value: string;
@@ -31,6 +32,7 @@ function classifyToken(
 	const name = token.slice(1).replace(TRAILING_PUNCTUATION_REGEX, '');
 	if (!name) return 'text';
 	if (agentNames.has(name)) return 'agent';
+	if (skillNames.has(name)) return 'skill';
 	if (name.includes('/') || name.includes('.')) return 'file';
 	return 'text';
 }
@@ -75,12 +77,6 @@ function tokenize(
 	return segments;
 }
 
-const HIGHLIGHT_CLASSES: Record<Exclude<SegmentKind, 'text'>, string> = {
-	agent: 'rounded bg-blue-500/15 box-decoration-clone px-1 -mx-1 py-0.5',
-	file: 'rounded bg-foreground/10 box-decoration-clone px-1 -mx-1 py-0.5',
-	skill: 'rounded bg-amber-500/15 box-decoration-clone px-1 -mx-1 py-0.5',
-};
-
 /**
  * Renders a transparent-text backdrop behind the chat textarea that paints
  * rounded background highlights underneath @agent, @file, and $skill mentions.
@@ -121,7 +117,7 @@ export const InputHighlightOverlay = memo(function InputHighlightOverlay({
 						return <span key={key}>{segment.text}</span>;
 					}
 					return (
-						<span key={key} className={HIGHLIGHT_CLASSES[segment.kind]}>
+						<span key={key} className={mentionHighlightClasses[segment.kind]}>
 							{segment.text}
 						</span>
 					);

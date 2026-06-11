@@ -4,13 +4,13 @@ export interface SkillMentionSkill {
 	enabled?: boolean;
 }
 
-const SKILL_MENTION_REGEX = /(^|[\s([{])\$([a-z0-9]+(?:-[a-z0-9]+)*)/g;
+const SKILL_MENTION_REGEX = /(^|[\s([{])([$@])([a-z0-9]+(?:-[a-z0-9]+)*)/g;
 
 export function extractExplicitSkillMentions(
 	content: string,
 	skills: SkillMentionSkill[],
 ): string[] {
-	if (!content.includes('$')) return [];
+	if (!content.includes('$') && !content.includes('@')) return [];
 
 	const available = new Map(
 		skills
@@ -21,7 +21,7 @@ export function extractExplicitSkillMentions(
 	const result: string[] = [];
 
 	for (const match of content.matchAll(SKILL_MENTION_REGEX)) {
-		const name = match[2];
+		const name = match[3];
 		if (!name || seen.has(name) || !available.has(name)) continue;
 		seen.add(name);
 		result.push(name);
@@ -34,7 +34,7 @@ export function linkifyExplicitSkillMentions(
 	content: string,
 	skills: SkillMentionSkill[],
 ): string {
-	if (!content.includes('$')) return content;
+	if (!content.includes('$') && !content.includes('@')) return content;
 
 	const available = new Set(
 		skills
@@ -42,8 +42,8 @@ export function linkifyExplicitSkillMentions(
 			.map((skill) => skill.name),
 	);
 
-	return content.replace(SKILL_MENTION_REGEX, (match, prefix, name) => {
+	return content.replace(SKILL_MENTION_REGEX, (match, prefix, symbol, name) => {
 		if (!available.has(name)) return match;
-		return `${prefix}[$${name}](#otto-skill:${encodeURIComponent(name)})`;
+		return `${prefix}[${symbol}${name}](#otto-skill:${encodeURIComponent(name)})`;
 	});
 }

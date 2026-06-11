@@ -19,6 +19,7 @@ import { useQueueStore } from '../../stores/queueStore';
 import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
 import { parseFileSelections } from '../../lib/fileSelectionContext';
+import { mentionHighlightClasses } from '../../lib/mentionHighlightStyles';
 import { linkifyExplicitSkillMentions } from '../../lib/skillMentions';
 import {
 	SubagentResultsNotice,
@@ -321,7 +322,7 @@ export const UserMessageGroup = memo(
 															<button
 																type="button"
 																onClick={() => handleSkillClick(skillName)}
-																className="inline-flex align-baseline items-center rounded-md border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 font-mono text-violet-600 dark:text-violet-300 hover:bg-violet-500/15 transition-colors"
+																className={`${mentionHighlightClasses.skill} text-[0.92em] leading-normal transition-colors hover:bg-amber-500/20`}
 																title={`Open ${skillName} SKILL.md`}
 															>
 																{children}

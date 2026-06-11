@@ -42,6 +42,31 @@ function killProcessTree(pid: number) {
 	}
 }
 
+const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
+
+/**
+ * Detect commands that start with a standalone grep-style search binary.
+ * Pipelines like `ps aux | grep x` are allowed; only segments that begin
+ * with grep/rg are redirected to the dedicated `search` tool.
+ */
+export function findRedirectedSearchCommand(cmd: string): string | null {
+	const segments = cmd.split(/&&|\|\||;|\n/);
+	for (const segment of segments) {
+		const tokens = segment.trim().split(/\s+/);
+		let index = 0;
+		while (
+			index < tokens.length &&
+			/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? '')
+		) {
+			index++;
+		}
+		if (tokens[index] === 'command') index++;
+		const bin = tokens[index]?.split('/').pop() ?? '';
+		if (REDIRECTED_SEARCH_COMMANDS.has(bin)) return bin;
+	}
+	return null;
+}
+
 export type ShellOutputMode = 'auto' | 'full' | 'tail';
 
 const DEFAULT_TAIL_LINES = 100;

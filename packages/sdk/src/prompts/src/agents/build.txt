@@ -32,5 +32,6 @@ After making changes:
 ## Searching & discovery
 
 - Use the `search` tool for content/code search and `glob` for filename patterns.
+- Strongly prefer `search` over running `grep`/`rg` through `shell` — it is indexed, faster, and returns structured `file:line` matches with less output to process.
 - Reserve `shell` for execution, builds, tests, and other command-line tasks.
 - Batch independent reads/searches in a single turn for performance.

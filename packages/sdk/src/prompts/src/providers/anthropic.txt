@@ -97,7 +97,7 @@ assistant: Clients are marked as failed in the `connectToServer` function in src
 For software engineering requests (bugs, features, refactors, explanations):
 
 1. Use `update_todos` to plan multi-step work.
-2. Explore the codebase with the search tools (`search`, `glob`, `tree`, `read`). Batch independent searches in parallel.
+2. Explore the codebase with the search tools (`search`, `glob`, `tree`, `read`). Prefer `search` over `grep`/`rg` via shell — it is indexed, faster, and returns structured `file:line` matches. Batch independent searches in parallel.
 3. Implement the solution.
 4. Verify — run the project's build/lint/test commands with `shell`. Check `README.md` / `AGENTS.md` to find the right command.
 5. Review diffs with `git_status` / `git_diff`.

@@ -172,8 +172,8 @@ For casual greetings, acknowledgements, or one-off conversational messages, resp
 
 # Tool usage policy
 
-- For content/code search: use the `search` tool.
-- For file pattern matching: prefer `glob` tool.
+- For content/code search: use the `search` tool. Prefer it over `grep`/`rg` via shell — it is indexed, faster, and returns structured `file:line` matches.
+- For file pattern matching: prefer `glob` tool over `find` via shell.
 - Reserve shell for execution, builds, tests, and other command-line tasks.
 - Read files in chunks ≤ 250 lines; command output truncates after ~10 KB or ~256 lines.
 - Batch independent operations (multiple reads, multiple searches) in a single turn. Only serialize when the next call depends on the previous result.
