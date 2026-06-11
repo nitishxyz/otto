@@ -1,5 +1,15 @@
 # Otto, Goals, and Async Delegation Plan
 
+> **Superseded (June 2026):** the goal model described here (session-scoped
+> goals, worker self-claims via `done_pending`, two-phase completion) has been
+> replaced by the single-writer orchestrator design in
+> [otto-orchestrator-plan.md](otto-orchestrator-plan.md). Goals are now
+> project-scoped, bound to a per-goal otto session (`goals.ottoSessionId`),
+> and only otto writes goal state. Task statuses:
+> `pending | in_progress | completed | blocked | cancelled`.
+> The async-delegation primitive and wake-on-idle mechanism below remain
+> accurate.
+
 ## Vision
 
 Three pieces that share one primitive:

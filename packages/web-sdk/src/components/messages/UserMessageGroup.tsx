@@ -26,6 +26,8 @@ import {
 	isSubagentResultsMessage,
 } from './SubagentResultsNotice';
 import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
+import { OttoKickoffNotice, isOttoKickoffMessage } from './OttoKickoffNotice';
+import { OttoWakeupNotice, isOttoWakeupMessage } from './OttoWakeupNotice';
 import { useSkills } from '../../hooks/useSkills';
 import { useSkillsStore } from '../../stores/skillsStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
@@ -98,6 +100,12 @@ export const UserMessageGroup = memo(
 
 		if (isSubagentResultsMessage(rawContent)) {
 			return <SubagentResultsNotice content={rawContent} />;
+		}
+		if (isOttoKickoffMessage(rawContent)) {
+			return <OttoKickoffNotice content={rawContent} />;
+		}
+		if (isOttoWakeupMessage(rawContent)) {
+			return <OttoWakeupNotice content={rawContent} />;
 		}
 		if (isGoalStartMessage(rawContent)) {
 			return <GoalStartNotice content={rawContent} />;

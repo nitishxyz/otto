@@ -3,7 +3,6 @@ import {
 	ArrowRight,
 	CheckCircle2,
 	Circle,
-	Clock,
 	XCircle,
 } from 'lucide-react';
 import type { GenericRendererProps } from './types';
@@ -28,8 +27,6 @@ function taskIcon(status: string) {
 	switch (status) {
 		case 'completed':
 			return <CheckCircle2 className="h-3 w-3 text-green-500" />;
-		case 'done_pending':
-			return <Clock className="h-3 w-3 text-yellow-500" />;
 		case 'in_progress':
 			return <ArrowRight className="h-3 w-3 text-foreground/70" />;
 		case 'blocked':

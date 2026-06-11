@@ -39,7 +39,9 @@ const sessionSchema = z
 		lastCompactedAt: z.number().nullable().optional(),
 		parentSessionId: z.string().nullable().optional(),
 		branchPointMessageId: z.string().nullable().optional(),
-		sessionType: z.enum(['main', 'branch', 'handoff', 'btw']).optional(),
+		sessionType: z
+			.enum(['main', 'branch', 'handoff', 'btw', 'otto'])
+			.optional(),
 		toolCounts: z.record(z.string(), z.number()).optional(),
 		isRunning: z.boolean().optional(),
 		fileStats: z
@@ -86,6 +88,14 @@ const listSessionsQuerySchema = projectQuerySchema.extend({
 			param: { name: 'offset', in: 'query' },
 			description: 'Offset for pagination',
 		}),
+	sessionType: z
+		.enum(['otto'])
+		.optional()
+		.openapi({
+			param: { name: 'sessionType', in: 'query' },
+			description:
+				'Filter to a specific session type. Currently only "otto" is supported; omit for the default listing (which excludes otto sessions).',
+		}),
 });
 
 const sessionParamsSchema = z.object({
@@ -111,7 +121,7 @@ const createSessionBodySchema = z.object({
 			'Model override. If omitted, selected agent model override, then config default are used.',
 	}),
 	parentSessionId: z.string().nullable().optional(),
-	sessionType: z.enum(['main', 'btw']).optional(),
+	sessionType: z.enum(['main', 'btw', 'otto']).optional(),
 });
 
 const updateSessionBodySchema = z.object({
@@ -160,18 +170,24 @@ export function registerSessionCrudRoutes(app: Hono) {
 				parseInt(c.req.query('offset') || '0', 10) || 0,
 				0,
 			);
+			const sessionTypeFilter = c.req.query('sessionType');
 			const { cfg, db } = await loadProjectDb(projectRoot);
 			const rows = await db
 				.select()
 				.from(sessions)
 				.where(
-					and(
-						eq(sessions.projectPath, cfg.projectRoot),
-						ne(sessions.sessionType, 'research'),
-						ne(sessions.sessionType, 'btw'),
-						ne(sessions.sessionType, 'subagent'),
-						ne(sessions.sessionType, 'otto'),
-					),
+					sessionTypeFilter === 'otto'
+						? and(
+								eq(sessions.projectPath, cfg.projectRoot),
+								eq(sessions.sessionType, 'otto'),
+							)
+						: and(
+								eq(sessions.projectPath, cfg.projectRoot),
+								ne(sessions.sessionType, 'research'),
+								ne(sessions.sessionType, 'btw'),
+								ne(sessions.sessionType, 'subagent'),
+								ne(sessions.sessionType, 'otto'),
+							),
 				)
 				.orderBy(
 					desc(sql`${sessions.pinnedAt} IS NOT NULL`),
@@ -261,7 +277,12 @@ export function registerSessionCrudRoutes(app: Hono) {
 					title: (body.title as string | null | undefined) ?? null,
 					parentSessionId:
 						(body.parentSessionId as string | null | undefined) ?? null,
-					sessionType: body.sessionType === 'btw' ? 'btw' : 'main',
+					sessionType:
+						body.sessionType === 'btw'
+							? 'btw'
+							: body.sessionType === 'otto'
+								? 'otto'
+								: 'main',
 				});
 				return c.json(row, 201);
 			} catch (err) {

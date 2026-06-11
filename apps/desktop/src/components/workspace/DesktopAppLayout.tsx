@@ -15,8 +15,6 @@ import {
 	GitCommitModal,
 	GitSidebar,
 	GitSidebarToggle,
-	GoalsSidebar,
-	GoalsSidebarToggle,
 	MCPSidebar,
 	MCPSidebarToggle,
 	QuickFilePicker,
@@ -38,7 +36,6 @@ import {
 import {
 	useFileBrowserStore,
 	useGitStore,
-	useGoalsPanelStore,
 	useMCPStore,
 	usePanelWidthStore,
 	useRightRailStore,
@@ -111,7 +108,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
-	const goalsExpanded = useGoalsPanelStore((s) => s.isExpanded);
 	const setSessionsCollapsed = useSidebarStore((s) => s.setCollapsed);
 	const sessionsCollapsed = useSidebarStore((s) => s.isCollapsed);
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
@@ -126,8 +122,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		tunnelExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
-		skillsExpanded ||
-		goalsExpanded;
+		skillsExpanded;
 	const anyViewerOpen = viewerTabCount > 0;
 	const anyRightSurfaceOpen = anyRightPanelOpen || anyViewerOpen;
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
@@ -408,7 +403,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<div className="h-full w-full">
 								<GitSidebar onFixWithAI={onFixWithAI} />
 								<SessionFilesSidebar sessionId={sessionId} />
-								<GoalsSidebar sessionId={sessionId} />
 								<SettingsSidebar onOpenDashboard={onOpenDashboard} />
 								<TunnelSidebar />
 								<FileBrowserSidebar />
@@ -445,7 +439,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<MCPSidebarToggle />
 							<SkillsSidebarToggle />
 							<AgentsSidebarToggle />
-							<GoalsSidebarToggle sessionId={sessionId} />
 							<SettingsSidebarToggle />
 							<div className="flex-1" />
 							<TerminalPanelToggle />

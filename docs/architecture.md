@@ -139,6 +139,9 @@ Key responsibilities:
 - agent resolution and prompt composition
 - tool execution and approvals
 - OpenAPI generation
+- otto orchestration: project-scoped goals with per-goal otto sessions
+  (`goals.ottoSessionId`); otto is the sole writer of goal state and
+  dispatches tasks to worker agents via async delegation
 
 Exports include:
 
@@ -152,7 +155,7 @@ Exports include:
 
 SQLite + Drizzle ORM local persistence.
 
-- sessions/messages/artifacts schema
+- sessions/messages/artifacts/goals/subagents schema
 - bundled migrations
 - DB bootstrap helpers
 

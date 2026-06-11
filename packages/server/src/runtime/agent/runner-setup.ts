@@ -46,8 +46,9 @@ const DATABASE_TOOL_NAMES = new Set([
 	'present_action',
 ]);
 
-const NO_DELEGATION_SESSION_TYPES = new Set(['subagent', 'otto']);
-const NO_GOAL_SESSION_TYPES = new Set(['subagent', 'research', 'btw']);
+// Otto sessions get delegation: otto dispatches goal tasks to worker agents.
+// Subagents stay excluded (depth-1 delegation cap).
+const NO_DELEGATION_SESSION_TYPES = new Set(['subagent']);
 
 type RunnerSetupTimings = {
 	loadConfigAndDbMs: number;
@@ -189,20 +190,20 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		} catch {}
 	}
 
-	// Goal tools are built-in for every agent in eligible sessions, but only
-	// when otto/goals are enabled.
-	const needsGoalTools =
-		ottoEnabled &&
-		(opts.agent === 'otto' || !NO_GOAL_SESSION_TYPES.has(currentSessionType));
+	// Goals are single-writer: only otto carries goal tools. Workers stay
+	// goal-unaware and receive work via delegate_task / enqueued messages.
+	const needsGoalTools = ottoEnabled && opts.agent === 'otto';
 	if (needsGoalTools) {
-		const goalSessionId =
+		// Legacy otto sessions are children of the session they supervise and
+		// bind goals via goals.sessionId = parent. Phase 3 re-keys otto sessions
+		// per goal (goals.ottoSessionId), at which point this fallback goes away.
+		const ottoSessionId =
 			currentSessionType === 'otto' && currentParentSessionId
 				? currentParentSessionId
 				: opts.sessionId;
 		const goalTools = buildGoalTools({
 			projectRoot: cfg.projectRoot,
-			goalSessionId,
-			allowComplete: opts.agent === 'otto',
+			ottoSessionId,
 		});
 		for (const item of goalTools) {
 			discovered.tools.push(item);
@@ -210,14 +211,12 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		}
 	}
 
-	if (
-		opts.agent === 'otto' &&
-		currentSessionType === 'otto' &&
-		currentParentSessionId
-	) {
+	if (opts.agent === 'otto') {
 		const enqueueTool = buildEnqueueSessionMessageTool(
 			cfg.projectRoot,
-			currentParentSessionId,
+			currentSessionType === 'otto' && currentParentSessionId
+				? currentParentSessionId
+				: undefined,
 		);
 		discovered.tools.push(enqueueTool);
 		injectedToolNames.push(enqueueTool.name);

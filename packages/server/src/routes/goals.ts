@@ -6,6 +6,7 @@ import { loadConfig, logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
+import { publish } from '../events/bus.ts';
 
 const projectQuerySchema = z.object({
 	project: z
@@ -43,7 +44,6 @@ const goalStatusSchema = z.enum(['active', 'completed', 'abandoned']);
 const taskStatusSchema = z.enum([
 	'pending',
 	'in_progress',
-	'done_pending',
 	'completed',
 	'blocked',
 	'cancelled',
@@ -52,6 +52,7 @@ const taskStatusSchema = z.enum([
 const goalTaskSchema = z.object({
 	id: z.string(),
 	goalId: z.string(),
+	sessionId: z.string().nullable(),
 	position: z.number(),
 	content: z.string(),
 	status: taskStatusSchema,
@@ -64,6 +65,7 @@ const goalSchema = z.object({
 	id: z.string(),
 	projectPath: z.string(),
 	sessionId: z.string().nullable(),
+	ottoSessionId: z.string().nullable(),
 	title: z.string(),
 	status: goalStatusSchema,
 	startedAt: z.number().nullable(),
@@ -102,6 +104,7 @@ function serializeGoal(goal: GoalRow, tasks: GoalTaskRow[]) {
 		id: goal.id,
 		projectPath: goal.projectPath,
 		sessionId: goal.sessionId,
+		ottoSessionId: goal.ottoSessionId,
 		title: goal.title,
 		status: goal.status,
 		startedAt: goal.startedAt,
@@ -110,6 +113,7 @@ function serializeGoal(goal: GoalRow, tasks: GoalTaskRow[]) {
 		tasks: tasks.map((task) => ({
 			id: task.id,
 			goalId: task.goalId,
+			sessionId: task.sessionId,
 			position: task.position,
 			content: task.content,
 			status: task.status,
@@ -142,6 +146,57 @@ const DISABLED_ERROR =
 	'Goals are disabled because otto is disabled (defaults.ottoEnabled).';
 
 export function registerGoalsRoutes(app: Hono) {
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/goals',
+			tags: ['goals'],
+			operationId: 'listGoals',
+			summary: 'List goals for the project',
+			description:
+				'Returns every goal recorded for the project (active, completed, and abandoned), each with its task queue, ordered by most recent activity.',
+			request: { query: projectQuerySchema },
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': {
+							schema: z.object({ goals: z.array(goalSchema) }),
+						},
+					},
+				},
+				'403': {
+					description: 'Goals disabled',
+					content: { 'application/json': { schema: goalErrorSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const { cfg, db, enabled } = await loadGoalsContext(
+					c.req.query('project'),
+				);
+				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
+				const rows = await db
+					.select()
+					.from(goals)
+					.where(eq(goals.projectPath, cfg.projectRoot))
+					.orderBy(desc(goals.updatedAt));
+				const serialized = [];
+				for (const goal of rows) {
+					const tasks = await listTasksForGoal(db, goal.id);
+					serialized.push(serializeGoal(goal, tasks));
+				}
+				return c.json({ goals: serialized });
+			} catch (error) {
+				logger.error('Failed to list goals', error);
+				const errorResponse = serializeError(error);
+				return c.json(errorResponse, errorResponse.error.status || 500);
+			}
+		},
+	);
+
 	zodOpenApiRoute(
 		app,
 		{
@@ -526,6 +581,7 @@ export function registerGoalsRoutes(app: Hono) {
 					task: {
 						id: task.id,
 						goalId: task.goalId,
+						sessionId: task.sessionId,
 						position: task.position,
 						content: task.content,
 						status: task.status,
@@ -545,13 +601,103 @@ export function registerGoalsRoutes(app: Hono) {
 	zodOpenApiRoute(
 		app,
 		{
+			method: 'delete',
+			path: '/v1/goals/{goalId}/tasks/{taskId}',
+			tags: ['goals'],
+			operationId: 'deleteGoalTask',
+			summary: 'Delete a goal task',
+			description:
+				'Removes a task from the goal queue. Tasks currently in_progress cannot be deleted; cancel them instead so otto and the worker stay consistent.',
+			request: {
+				params: goalTaskParamsSchema,
+				query: projectQuerySchema,
+			},
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': { schema: z.object({ goal: goalSchema }) },
+					},
+				},
+				'403': {
+					description: 'Goals disabled',
+					content: { 'application/json': { schema: goalErrorSchema } },
+				},
+				'404': {
+					description: 'Not Found',
+					content: { 'application/json': { schema: goalErrorSchema } },
+				},
+				'409': {
+					description: 'Task cannot be deleted',
+					content: { 'application/json': { schema: goalErrorSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const { db, enabled } = await loadGoalsContext(c.req.query('project'));
+				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
+				const goalId = c.req.param('goalId');
+				const taskId = c.req.param('taskId');
+				const goalRows = await db
+					.select()
+					.from(goals)
+					.where(eq(goals.id, goalId))
+					.limit(1);
+				if (!goalRows.length) {
+					return c.json({ error: 'Goal not found.' }, 404);
+				}
+				const rows = await db
+					.select()
+					.from(goalTasks)
+					.where(and(eq(goalTasks.id, taskId), eq(goalTasks.goalId, goalId)))
+					.limit(1);
+				if (!rows.length) return c.json({ error: 'Task not found.' }, 404);
+				if (rows[0].status === 'in_progress') {
+					return c.json(
+						{
+							error:
+								'Task is in progress. Cancel it instead of deleting so otto and the worker stay consistent.',
+						},
+						409,
+					);
+				}
+				await db.delete(goalTasks).where(eq(goalTasks.id, taskId));
+				const now = Date.now();
+				await db
+					.update(goals)
+					.set({ updatedAt: now })
+					.where(eq(goals.id, goalId));
+				publish({
+					type: 'goal.updated',
+					sessionId: goalRows[0].ottoSessionId ?? goalRows[0].sessionId ?? '',
+					payload: { goalId, changes: [`task ${taskId} deleted`] },
+				});
+				const tasks = await listTasksForGoal(db, goalId);
+				const updated = await db
+					.select()
+					.from(goals)
+					.where(eq(goals.id, goalId))
+					.limit(1);
+				return c.json({ goal: serializeGoal(updated[0], tasks) });
+			} catch (error) {
+				logger.error('Failed to delete goal task', error);
+				const errorResponse = serializeError(error);
+				return c.json(errorResponse, errorResponse.error.status || 500);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
 			method: 'post',
 			path: '/v1/goals/{goalId}/start',
 			tags: ['goals'],
 			operationId: 'startGoal',
-			summary: 'Start working on a goal in its session',
+			summary: 'Start working on a goal via its otto orchestrator',
 			description:
-				'Injects an automated tagged kickoff message into the goal session so the agent works through the task queue. Otto continues the loop between runs.',
+				"Dispatches a kickoff message into the goal's otto session (creating one if missing). Otto orchestrates: it marks tasks in_progress, delegates work to agents, verifies results, and completes tasks.",
 			request: {
 				params: goalIdParamsSchema,
 				query: projectQuerySchema,
@@ -591,9 +737,6 @@ export function registerGoalsRoutes(app: Hono) {
 					.limit(1);
 				const goal = rows[0];
 				if (!goal) return c.json({ error: 'Goal not found.' }, 404);
-				if (!goal.sessionId) {
-					return c.json({ error: 'Goal has no session.' }, 409);
-				}
 				if (goal.status !== 'active') {
 					return c.json({ error: 'Goal is not active.' }, 409);
 				}
@@ -605,51 +748,36 @@ export function registerGoalsRoutes(app: Hono) {
 					return c.json({ error: 'Goal has no open tasks.' }, 409);
 				}
 
-				const { getSessionById } = await import(
-					'../runtime/session/manager.ts'
-				);
-				const session = await getSessionById({
-					db,
-					sessionId: goal.sessionId,
-				});
-				if (!session) {
-					return c.json({ error: 'Goal session no longer exists.' }, 404);
+				const {
+					ensureOttoSessionForGoal,
+					buildGoalKickoffMessage,
+					resetOttoStallState,
+				} = await import('../runtime/otto/service.ts');
+				const ottoSession = await ensureOttoSessionForGoal(db, cfg, goal);
+				if (!ottoSession) {
+					return c.json(
+						{ error: 'Failed to create otto session for goal.' },
+						409,
+					);
 				}
 
-				const taskLines = tasks.map(
-					(task) => `- [${task.status}] ${task.content}`,
-				);
-				const content = [
-					`<goal_start goal-id="${goal.id}">`,
-					`<title>${goal.title}</title>`,
-					'<tasks>',
-					...taskLines,
-					'</tasks>',
-					'</goal_start>',
-					'',
-					'Work through the open tasks in order. Use goal_list for the latest state. Before starting a task, mark it in_progress with goal_update; when finished, claim it with done_pending. Delegate to specialist agents with delegate_task where it helps. If a task says to use a specific agent, delegate it and do not perform that same task yourself unless the sub-agent fails or independent verification is explicitly requested. Otto verifies your claims and keeps the goal moving between runs.',
-				].join('\n');
-
+				const content = buildGoalKickoffMessage(goal, tasks);
 				const { dispatchAssistantMessage } = await import(
 					'../runtime/message/service.ts'
 				);
 				await dispatchAssistantMessage({
 					cfg,
 					db,
-					session,
-					agent: session.agent,
-					provider: session.provider as Parameters<
+					session: ottoSession,
+					agent: 'otto',
+					provider: ottoSession.provider as Parameters<
 						typeof dispatchAssistantMessage
 					>[0]['provider'],
-					model: session.model,
+					model: ottoSession.model,
 					content,
 				});
 
-				const { resetOttoStallState } = await import(
-					'../runtime/otto/service.ts'
-				);
-				resetOttoStallState(goal.sessionId);
-
+				resetOttoStallState(goal.id);
 				const now = Date.now();
 				await db
 					.update(goals)

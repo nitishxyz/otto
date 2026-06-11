@@ -1,6 +1,7 @@
 import {
 	useInfiniteQuery,
 	useMutation,
+	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -16,13 +17,18 @@ const SESSIONS_PAGE_SIZE = 50;
 
 export const sessionsQueryKey = ['sessions', 'list'] as const;
 
-export function useSessionsInfinite() {
+export type SessionListFilter = 'otto' | undefined;
+
+export function useSessionsInfinite(sessionType?: SessionListFilter) {
 	return useInfiniteQuery({
-		queryKey: sessionsQueryKey,
+		queryKey: sessionType
+			? ([...sessionsQueryKey, sessionType] as const)
+			: sessionsQueryKey,
 		queryFn: ({ pageParam = 0 }) =>
 			apiClient.getSessionsPage({
 				limit: SESSIONS_PAGE_SIZE,
 				offset: pageParam,
+				sessionType,
 			}),
 		getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
 		initialPageParam: 0,
@@ -32,8 +38,8 @@ export function useSessionsInfinite() {
 	});
 }
 
-export function useSessions() {
-	const query = useSessionsInfinite();
+export function useSessions(sessionType?: SessionListFilter) {
+	const query = useSessionsInfinite(sessionType);
 	const data = useMemo<Session[]>(() => {
 		if (!query.data?.pages) return [];
 		return query.data.pages.flatMap((p) => p.items ?? []);
@@ -50,9 +56,22 @@ export function useSessions() {
 	};
 }
 
+/**
+ * Resolves a session row by id. Looks in the main sessions list first; when
+ * the session is not listed there (e.g. otto orchestrator sessions, which are
+ * excluded from the default listing) it falls back to fetching the single
+ * session. The fallback query stays disabled for normally-listed sessions.
+ */
 export function useSession(sessionId: string) {
 	const { data: sessions } = useSessions();
-	return sessions?.find((s) => s.id === sessionId);
+	const listed = sessions?.find((s) => s.id === sessionId);
+	const { data: detail } = useQuery({
+		queryKey: ['session', sessionId],
+		queryFn: () => apiClient.getSession(sessionId),
+		enabled: Boolean(sessionId) && !listed,
+		staleTime: 15_000,
+	});
+	return listed ?? detail;
 }
 
 export function useCreateSession() {

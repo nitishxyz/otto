@@ -1,9 +1,11 @@
 import {
 	getSessionGoal as apiGetSessionGoal,
 	createSessionGoal as apiCreateSessionGoal,
+	listGoals as apiListGoals,
 	updateGoal as apiUpdateGoal,
 	addGoalTasks as apiAddGoalTasks,
 	updateGoalTask as apiUpdateGoalTask,
+	deleteGoalTask as apiDeleteGoalTask,
 	startGoal as apiStartGoal,
 	listSessionSubagents as apiListSessionSubagents,
 } from '@ottocode/api';
@@ -12,7 +14,6 @@ import { extractErrorMessage } from './utils';
 export type GoalTaskStatus =
 	| 'pending'
 	| 'in_progress'
-	| 'done_pending'
 	| 'completed'
 	| 'blocked'
 	| 'cancelled';
@@ -22,6 +23,7 @@ export type GoalStatus = 'active' | 'completed' | 'abandoned';
 export type GoalTask = {
 	id: string;
 	goalId: string;
+	sessionId: string | null;
 	position: number;
 	content: string;
 	status: GoalTaskStatus;
@@ -34,6 +36,7 @@ export type Goal = {
 	id: string;
 	projectPath: string;
 	sessionId: string | null;
+	ottoSessionId: string | null;
 	title: string;
 	status: GoalStatus;
 	startedAt: number | null;
@@ -58,6 +61,12 @@ export type Subagent = {
 };
 
 export const goalsMixin = {
+	async listGoals(): Promise<{ goals: Goal[] }> {
+		const response = await apiListGoals();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as unknown as { goals: Goal[] };
+	},
+
 	async getSessionGoal(sessionId: string): Promise<{ goal: Goal | null }> {
 		const response = await apiGetSessionGoal({ path: { sessionId } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
@@ -112,6 +121,15 @@ export const goalsMixin = {
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { task: GoalTask };
+	},
+
+	async deleteGoalTask(
+		goalId: string,
+		taskId: string,
+	): Promise<{ goal: Goal }> {
+		const response = await apiDeleteGoalTask({ path: { goalId, taskId } });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as unknown as { goal: Goal };
 	},
 
 	async startGoal(goalId: string): Promise<{ goal: Goal }> {

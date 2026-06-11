@@ -29,9 +29,8 @@ export * from './btw/BtwFloatingChat';
 // Sub-agent Components
 export * from './subagents/SubagentFloatingViewer';
 
-// Goals Components
-export * from './goals/GoalsSidebar';
-export * from './goals/GoalsSidebarToggle';
+// Otto Components
+export * from './otto';
 
 // Message Components
 export * from './messages/MessageThread';

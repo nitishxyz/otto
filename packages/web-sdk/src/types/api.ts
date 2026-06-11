@@ -18,7 +18,7 @@ export interface Session {
 	toolCounts?: Record<string, number>;
 	parentSessionId?: string | null;
 	branchPointMessageId?: string | null;
-	sessionType?: 'main' | 'branch' | 'handoff' | 'btw';
+	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'otto';
 	isRunning?: boolean;
 	fileStats?: {
 		changedFiles: number;
@@ -86,7 +86,7 @@ export interface CreateSessionRequest {
 	model?: string;
 	title?: string;
 	parentSessionId?: string | null;
-	sessionType?: 'main' | 'btw';
+	sessionType?: 'main' | 'btw' | 'otto';
 }
 
 export interface UpdateSessionRequest {

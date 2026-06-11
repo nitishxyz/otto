@@ -1832,7 +1832,9 @@ export function useSessionStream(
 					}
 					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+					queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
 					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
+					queryClient.invalidateQueries({ queryKey: ['goals', 'project'] });
 					queryClient.invalidateQueries({ queryKey: ['subagents', sessionId] });
 					break;
 				}
@@ -1987,6 +1989,7 @@ export function useSessionStream(
 				}
 				case 'goal.updated': {
 					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
+					queryClient.invalidateQueries({ queryKey: ['goals', 'project'] });
 					queryClient.invalidateQueries({
 						queryKey: ['subagents', sessionId],
 					});
@@ -2016,6 +2019,7 @@ export function useSessionStream(
 				if (now - lastSessionInvalidation >= 2000) {
 					lastSessionInvalidation = now;
 					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+					queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
 				}
 			}
 		});

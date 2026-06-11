@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
+import { Route as OttoIndexRouteImport } from './routes/otto.index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
+import { Route as OttoSessionIdRouteImport } from './routes/otto.$sessionId'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -29,43 +31,80 @@ const SessionsIndexRoute = SessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OttoIndexRoute = OttoIndexRouteImport.update({
+  id: '/otto/',
+  path: '/otto/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OttoSessionIdRoute = OttoSessionIdRouteImport.update({
+  id: '/otto/$sessionId',
+  path: '/otto/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/otto/$sessionId': typeof OttoSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/otto/': typeof OttoIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/otto/$sessionId': typeof OttoSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/otto': typeof OttoIndexRoute
   '/sessions': typeof SessionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/otto/$sessionId': typeof OttoSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/otto/': typeof OttoIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/otto/$sessionId'
+    | '/sessions/$sessionId'
+    | '/otto/'
+    | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions'
-  id: '__root__' | '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions/'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/otto/$sessionId'
+    | '/sessions/$sessionId'
+    | '/otto'
+    | '/sessions'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/otto/$sessionId'
+    | '/sessions/$sessionId'
+    | '/otto/'
+    | '/sessions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  OttoSessionIdRoute: typeof OttoSessionIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
+  OttoIndexRoute: typeof OttoIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
 }
 
@@ -92,11 +131,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/otto/': {
+      id: '/otto/'
+      path: '/otto'
+      fullPath: '/otto/'
+      preLoaderRoute: typeof OttoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
       path: '/sessions/$sessionId'
       fullPath: '/sessions/$sessionId'
       preLoaderRoute: typeof SessionsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/otto/$sessionId': {
+      id: '/otto/$sessionId'
+      path: '/otto/$sessionId'
+      fullPath: '/otto/$sessionId'
+      preLoaderRoute: typeof OttoSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -105,7 +158,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  OttoSessionIdRoute: OttoSessionIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
+  OttoIndexRoute: OttoIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
 }
 export const routeTree = rootRouteImport

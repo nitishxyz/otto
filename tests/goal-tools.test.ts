@@ -1,0 +1,281 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { getDb } from '@ottocode/database';
+import { goals, sessions } from '@ottocode/database/schema';
+import { eq } from 'drizzle-orm';
+import { loadConfig } from '@ottocode/sdk';
+import {
+	buildGoalListTool,
+	buildGoalUpdateTool,
+} from '../packages/server/src/tools/goals/index.ts';
+import {
+	buildGoalKickoffMessage,
+	ensureOttoSessionForGoal,
+} from '../packages/server/src/runtime/otto/service.ts';
+
+let projectRoot = '';
+const OTTO_SESSION_ID = 'otto-session-1';
+
+type ToolExecute = (input: Record<string, unknown>) => Promise<{
+	ok: boolean;
+	error?: string;
+	changes?: string[];
+	goal?: { id: string; title: string; status: string } | null;
+	tasks: Array<{
+		id: string;
+		position: number;
+		content: string;
+		status: string;
+		note?: string;
+		sessionId?: string;
+	}>;
+}>;
+
+function getExecute(item: { tool: unknown }): ToolExecute {
+	return (item.tool as { execute: ToolExecute }).execute;
+}
+
+beforeAll(async () => {
+	projectRoot = await mkdtemp(join(tmpdir(), 'otto-goal-tools-'));
+});
+
+afterAll(async () => {
+	await rm(projectRoot, { recursive: true, force: true });
+});
+
+describe('single-writer goal tools', () => {
+	test('goal_list returns null when no goal exists', async () => {
+		const listTool = buildGoalListTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const result = await getExecute(listTool)({});
+		expect(result.ok).toBe(true);
+		expect(result.goal).toBeNull();
+		expect(result.tasks).toEqual([]);
+	});
+
+	test('goal_update requires createGoal when no goal exists', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const result = await getExecute(updateTool)({ addTasks: ['orphan task'] });
+		expect(result.ok).toBe(false);
+		expect(result.error).toContain('createGoal');
+	});
+
+	test('createGoal binds goal to the otto session', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const result = await getExecute(updateTool)({
+			createGoal: { title: 'Test goal' },
+			addTasks: ['task one', 'task two'],
+		});
+		expect(result.ok).toBe(true);
+		expect(result.goal?.title).toBe('Test goal');
+		expect(result.tasks).toHaveLength(2);
+		expect(result.tasks[0].status).toBe('pending');
+
+		const db = await getDb(projectRoot);
+		const rows = await db
+			.select()
+			.from(goals)
+			.where(eq(goals.ottoSessionId, OTTO_SESSION_ID));
+		expect(rows).toHaveLength(1);
+		expect(rows[0].projectPath).toBe(
+			(await loadConfig(projectRoot)).projectRoot,
+		);
+	});
+
+	test('updateTasks records worker sessionId and status transitions', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const execute = getExecute(updateTool);
+		const list = await execute({});
+		const taskId = list.tasks[0].id;
+
+		const dispatched = await execute({
+			updateTasks: [
+				{ id: taskId, status: 'in_progress', sessionId: 'worker-1' },
+			],
+		});
+		expect(dispatched.ok).toBe(true);
+		const task = dispatched.tasks.find((t) => t.id === taskId);
+		expect(task?.status).toBe('in_progress');
+		expect(task?.sessionId).toBe('worker-1');
+
+		const completed = await execute({
+			updateTasks: [{ id: taskId, status: 'completed', note: 'verified' }],
+		});
+		const done = completed.tasks.find((t) => t.id === taskId);
+		expect(done?.status).toBe('completed');
+		expect(done?.note).toBe('verified');
+	});
+
+	test('done_pending is not an accepted task status', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const inputSchema = (
+			updateTool.tool as unknown as {
+				inputSchema: { safeParse: (v: unknown) => { success: boolean } };
+			}
+		).inputSchema;
+		const parsed = inputSchema.safeParse({
+			updateTasks: [{ id: 'x', status: 'done_pending' }],
+		});
+		expect(parsed.success).toBe(false);
+		const valid = inputSchema.safeParse({
+			updateTasks: [{ id: 'x', status: 'blocked' }],
+		});
+		expect(valid.success).toBe(true);
+	});
+
+	test('completeGoal closes the goal', async () => {
+		const updateTool = buildGoalUpdateTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const execute = getExecute(updateTool);
+		const list = await execute({});
+		const openIds = list.tasks
+			.filter((t) => t.status !== 'completed')
+			.map((t) => t.id);
+		await execute({
+			updateTasks: openIds.map((id) => ({ id, status: 'cancelled' })),
+		});
+		const result = await execute({ completeGoal: true });
+		expect(result.ok).toBe(true);
+		expect(result.changes).toContain('goal completed');
+
+		const listTool = buildGoalListTool({
+			projectRoot,
+			ottoSessionId: OTTO_SESSION_ID,
+		});
+		const after = await getExecute(listTool)({});
+		expect(after.goal).toBeNull();
+	});
+});
+
+describe('per-goal otto session binding', () => {
+	test('ensureOttoSessionForGoal returns the bound otto session', async () => {
+		const db = await getDb(projectRoot);
+		const cfg = await loadConfig(projectRoot);
+		const now = Date.now();
+		await db.insert(sessions).values({
+			id: 'otto-bound-1',
+			agent: 'otto',
+			provider: 'anthropic',
+			model: 'test',
+			projectPath: cfg.projectRoot,
+			createdAt: now,
+			sessionType: 'otto',
+		});
+		await db.insert(goals).values({
+			id: 'goal-bound-1',
+			projectPath: cfg.projectRoot,
+			ottoSessionId: 'otto-bound-1',
+			title: 'Bound goal',
+			status: 'active',
+			createdAt: now,
+			updatedAt: now,
+		});
+		const goalRow = (
+			await db.select().from(goals).where(eq(goals.id, 'goal-bound-1'))
+		)[0];
+		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
+		expect(session?.id).toBe('otto-bound-1');
+	});
+
+	test('legacy parent-child otto session is adopted and backfilled', async () => {
+		const db = await getDb(projectRoot);
+		const cfg = await loadConfig(projectRoot);
+		const now = Date.now();
+		await db.insert(sessions).values({
+			id: 'legacy-main-1',
+			agent: 'build',
+			provider: 'anthropic',
+			model: 'test',
+			projectPath: cfg.projectRoot,
+			createdAt: now,
+			sessionType: 'main',
+		});
+		await db.insert(sessions).values({
+			id: 'legacy-otto-1',
+			agent: 'otto',
+			provider: 'anthropic',
+			model: 'test',
+			projectPath: cfg.projectRoot,
+			createdAt: now,
+			parentSessionId: 'legacy-main-1',
+			sessionType: 'otto',
+		});
+		await db.insert(goals).values({
+			id: 'goal-legacy-1',
+			projectPath: cfg.projectRoot,
+			sessionId: 'legacy-main-1',
+			title: 'Legacy goal',
+			status: 'active',
+			createdAt: now,
+			updatedAt: now,
+		});
+		const goalRow = (
+			await db.select().from(goals).where(eq(goals.id, 'goal-legacy-1'))
+		)[0];
+		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
+		expect(session?.id).toBe('legacy-otto-1');
+
+		const backfilled = (
+			await db.select().from(goals).where(eq(goals.id, 'goal-legacy-1'))
+		)[0];
+		expect(backfilled.ottoSessionId).toBe('legacy-otto-1');
+	});
+});
+
+describe('goal kickoff message', () => {
+	test('includes tasks and orchestration instructions', () => {
+		const now = Date.now();
+		const goal = {
+			id: 'g1',
+			projectPath: '/p',
+			sessionId: null,
+			ottoSessionId: 'o1',
+			title: 'Ship feature',
+			status: 'active',
+			startedAt: null,
+			createdAt: now,
+			updatedAt: now,
+		};
+		const tasks = [
+			{
+				id: 't1',
+				goalId: 'g1',
+				sessionId: null,
+				position: 0,
+				content: 'do the thing',
+				status: 'pending',
+				note: null,
+				createdAt: now,
+				updatedAt: now,
+			},
+		];
+		const message = buildGoalKickoffMessage(goal, tasks);
+		expect(message.startsWith('<otto_kickoff goal-id="g1">')).toBe(true);
+		expect(message).toContain('</otto_kickoff>');
+		expect(message).toContain('<task id="t1" status="pending" position="0">');
+		expect(message).toContain('<instructions>');
+		expect(message).toContain('Ship feature');
+		expect(message).toContain('do the thing');
+		expect(message).toContain('goal_update');
+		expect(message).toContain('delegate_task');
+		expect(message).not.toContain('done_pending');
+	});
+});

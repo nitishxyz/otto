@@ -1,8 +1,14 @@
-import { memo, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Plus, ChevronRight, X } from 'lucide-react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useSidebarStore, usePanelWidthStore } from '@ottocode/web-sdk/stores';
-import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
+import {
+	Button,
+	OttoTabBar,
+	ResizeHandle,
+	type WorkspaceTab,
+} from '@ottocode/web-sdk/components';
 import { OttoWordmark } from './OttoWordmark';
 
 const PANEL_KEY = 'left-sidebar';
@@ -162,6 +168,7 @@ const ExpandedSidebarContent = memo(function ExpandedSidebarContent({
 		<>
 			<div className="flex h-full w-full md:w-[var(--expanded-sidebar-width)] flex-col min-w-0 relative">
 				<MobileSidebarHeader onClose={onCollapse} />
+				<RoutedOttoTabBar />
 				<SidebarSessionListFrame onNewSession={onNewSession}>
 					{children}
 				</SidebarSessionListFrame>
@@ -182,6 +189,28 @@ const ExpandedSidebarContent = memo(function ExpandedSidebarContent({
 			</div>
 		</>
 	);
+});
+
+/**
+ * Agents | Otto tab bar backed by routes: the active tab reflects the
+ * current pathname and switching tabs navigates, so refreshes land on the
+ * same workspace.
+ */
+const RoutedOttoTabBar = memo(function RoutedOttoTabBar() {
+	const navigate = useNavigate();
+	const activeTab = useRouterState({
+		select: (state): WorkspaceTab =>
+			state.location.pathname.startsWith('/otto') ? 'otto' : 'agents',
+	});
+
+	const handleTabChange = useCallback(
+		(tab: WorkspaceTab) => {
+			navigate({ to: tab === 'otto' ? '/otto' : '/sessions' });
+		},
+		[navigate],
+	);
+
+	return <OttoTabBar activeTab={activeTab} onTabChange={handleTabChange} />;
 });
 
 const MobileSidebarHeader = memo(function MobileSidebarHeader({

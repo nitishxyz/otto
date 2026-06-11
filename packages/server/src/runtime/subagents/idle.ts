@@ -8,7 +8,7 @@ import {
 	reportFinishedSubagents,
 } from './service.ts';
 
-const SKIPPED_SESSION_TYPES = new Set(['research', 'btw', 'otto']);
+const SKIPPED_SESSION_TYPES = new Set(['research', 'btw']);
 
 async function wasLastRunAbortedByUser(
 	db: Awaited<ReturnType<typeof getDb>>,
@@ -67,6 +67,10 @@ export async function handleSessionIdle(
 
 		const reported = await reportFinishedSubagents(db, cfg, sessionId);
 		if (reported) return;
+
+		// Otto sessions receive sub-agent results like any parent, but never
+		// wake another otto for themselves (no self-supervision loop).
+		if (sessionType === 'otto') return;
 
 		if (cfg.defaults.ottoEnabled === false) return;
 		const { maybeWakeOtto } = await import('../otto/service.ts');

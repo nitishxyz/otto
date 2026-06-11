@@ -38,6 +38,7 @@ class ApiClient {
 	getSessions = sessionsMixin.getSessions;
 	getSessionsPage = sessionsMixin.getSessionsPage;
 	createSession = sessionsMixin.createSession;
+	getSession = sessionsMixin.getSession;
 	updateSession = sessionsMixin.updateSession;
 	markSessionViewed = sessionsMixin.markSessionViewed;
 	deleteSession = sessionsMixin.deleteSession;
@@ -100,10 +101,12 @@ class ApiClient {
 	syncSession = branchesMixin.syncSession;
 
 	getSessionGoal = goalsMixin.getSessionGoal;
+	listGoals = goalsMixin.listGoals;
 	createSessionGoal = goalsMixin.createSessionGoal;
 	updateGoal = goalsMixin.updateGoal;
 	addGoalTasks = goalsMixin.addGoalTasks;
 	updateGoalTask = goalsMixin.updateGoalTask;
+	deleteGoalTask = goalsMixin.deleteGoalTask;
 	startGoal = goalsMixin.startGoal;
 	listSessionSubagents = goalsMixin.listSessionSubagents;
 

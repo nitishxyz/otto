@@ -44,9 +44,10 @@ export const BUILTIN_AGENT_NAMES = [
 /**
  * Built-in agents that are internal-only and must not be exposed in agent
  * listings (UI pickers, ACP modes, delegation lists). They remain resolvable
- * when explicitly requested (e.g. the /init command or the otto supervisor).
+ * when explicitly requested (e.g. the /init command). Otto is intentionally
+ * NOT hidden: it is listed and editable so users can set its provider/model.
  */
-export const HIDDEN_BUILTIN_AGENT_NAMES = ['init', 'otto'];
+export const HIDDEN_BUILTIN_AGENT_NAMES = ['init'];
 
 const hiddenAgentSet = new Set(HIDDEN_BUILTIN_AGENT_NAMES);
 
@@ -65,7 +66,7 @@ export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
 	init: 'Sets up AGENTS.md and project conventions for a repository.',
 	research:
 		'Searches session history and past conversations to answer questions.',
-	otto: 'Internal supervisor that verifies goal progress between runs.',
+	otto: 'Project orchestrator: plans goals, dispatches workers, verifies results.',
 };
 
 /** Maximum length of an agent description after normalization. */

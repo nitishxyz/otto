@@ -30,6 +30,10 @@ interface NewSessionLandingProps {
 	wordmark?: React.ReactNode;
 	compact?: boolean;
 	modalPosition?: 'fixed' | 'absolute';
+	/** Session type for the created session (e.g. 'otto' for the Otto tab). */
+	sessionType?: 'main' | 'otto';
+	/** Fixes the agent (no picker); provider/model stay user-editable. */
+	lockAgent?: boolean;
 }
 
 export interface NewSessionLandingRef {
@@ -39,7 +43,15 @@ export interface NewSessionLandingRef {
 export const NewSessionLanding = memo(
 	forwardRef<NewSessionLandingRef, NewSessionLandingProps>(
 		function NewSessionLanding(
-			{ onSessionCreated, defaultAgent, wordmark, compact, modalPosition },
+			{
+				onSessionCreated,
+				defaultAgent,
+				wordmark,
+				compact,
+				modalPosition,
+				sessionType,
+				lockAgent = false,
+			},
 			ref,
 		) {
 			const queryClient = useQueryClient();
@@ -133,11 +145,11 @@ export const NewSessionLanding = memo(
 				(commandId: string) => {
 					if (commandId === 'models') {
 						openConfig('model');
-					} else if (commandId === 'agents') {
+					} else if (commandId === 'agents' && !lockAgent) {
 						openConfig('agent');
 					}
 				},
-				[openConfig],
+				[openConfig, lockAgent],
 			);
 
 			const handleSend = useCallback(
@@ -161,6 +173,7 @@ export const NewSessionLanding = memo(
 							agent: agent || 'general',
 							provider: provider || undefined,
 							model: model || undefined,
+							sessionType: sessionType === 'otto' ? 'otto' : undefined,
 						});
 
 						queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
@@ -230,6 +243,7 @@ export const NewSessionLanding = memo(
 					agent,
 					provider,
 					model,
+					sessionType,
 					images,
 					documents,
 					clearFiles,
@@ -279,6 +293,7 @@ export const NewSessionLanding = memo(
 							onModelChange={handleModelChange}
 							onModelSelectorChange={handleModelSelectorChange}
 							modalPosition={modalPosition}
+							hideAgentSelector={lockAgent}
 						/>
 					) : null}
 					<div className={`w-full ${compact ? 'max-w-xl' : 'max-w-2xl'}`}>
@@ -313,8 +328,9 @@ export const NewSessionLanding = memo(
 									(config?.defaults?.reasoningText ?? true)
 								}
 								agent={agent}
-								agents={agentNames}
+								agents={lockAgent ? [] : agentNames}
 								onAgentChange={handleAgentChange}
+								agentLocked={lockAgent}
 								onPlanModeToggle={handlePlanModeToggle}
 								isPlanMode={isPlanMode}
 							/>

@@ -26,6 +26,8 @@ interface ConfigModalProps {
 	onModelChange: (model: string) => void;
 	onModelSelectorChange?: (provider: string, model: string) => void;
 	modalPosition?: 'fixed' | 'absolute';
+	/** Hides the agent picker (e.g. otto sessions, where the agent is fixed). */
+	hideAgentSelector?: boolean;
 }
 
 export function ConfigModal({
@@ -42,6 +44,7 @@ export function ConfigModal({
 	onModelChange,
 	onModelSelectorChange,
 	modalPosition = 'fixed',
+	hideAgentSelector = false,
 }: ConfigModalProps) {
 	const { data: config, isLoading: configLoading } = useConfig();
 	const { data: agentDetails } = useAgentDetails({ enabled: true });
@@ -146,17 +149,19 @@ export function ConfigModal({
 						</div>
 					)}
 
-					<div>
-						<div className="block text-sm font-medium text-foreground mb-2">
-							Agent
+					{!hideAgentSelector && (
+						<div>
+							<div className="block text-sm font-medium text-foreground mb-2">
+								Agent
+							</div>
+							<UnifiedAgentSelector
+								ref={agentSelectorRef}
+								agent={agent}
+								agents={agentNames}
+								onChange={onAgentChange}
+							/>
 						</div>
-						<UnifiedAgentSelector
-							ref={agentSelectorRef}
-							agent={agent}
-							agents={agentNames}
-							onChange={onAgentChange}
-						/>
-					</div>
+					)}
 
 					<div>
 						<div className="block text-sm font-medium text-foreground mb-2">

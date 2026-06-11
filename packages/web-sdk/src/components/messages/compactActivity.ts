@@ -120,6 +120,93 @@ function getStringField(
 	return undefined;
 }
 
+interface GoalUpdateTaskInput {
+	id?: unknown;
+	status?: unknown;
+	note?: unknown;
+	content?: unknown;
+	sessionId?: unknown;
+	position?: unknown;
+}
+
+/**
+ * Builds a compact label for otto's goal_update tool. The input shape is
+ * otto-only: createGoal/completeGoal/addTasks plus updateTasks entries that
+ * may carry a worker sessionId (dispatch) and a position (reorder).
+ */
+function buildGoalUpdateLabel(
+	args: Record<string, unknown>,
+	result: Record<string, unknown>,
+): string {
+	const changes = Array.isArray(result.changes)
+		? result.changes.filter((item): item is string => typeof item === 'string')
+		: [];
+	if (changes.length) {
+		return `Updated goal: ${truncate(changes.join(', '), 46)}`;
+	}
+
+	const createGoal = args.createGoal;
+	if (createGoal && typeof createGoal === 'object') {
+		const title = getStringField(
+			createGoal as Record<string, unknown>,
+			'title',
+		);
+		return title ? `Creating goal ${truncate(title, 36)}` : 'Creating a goal';
+	}
+	if (args.completeGoal === true) {
+		return 'Completing goal';
+	}
+
+	const segments: string[] = [];
+	const addTasks = Array.isArray(args.addTasks) ? args.addTasks : [];
+	if (addTasks.length) {
+		segments.push(
+			`adding ${addTasks.length} task${addTasks.length === 1 ? '' : 's'}`,
+		);
+	}
+
+	const updateTasks = Array.isArray(args.updateTasks)
+		? (args.updateTasks as GoalUpdateTaskInput[])
+		: [];
+	if (updateTasks.length) {
+		const statusCounts = new Map<string, number>();
+		let dispatched = 0;
+		let reordered = 0;
+		for (const update of updateTasks) {
+			if (typeof update !== 'object' || update === null) continue;
+			if (typeof update.status === 'string') {
+				statusCounts.set(
+					update.status,
+					(statusCounts.get(update.status) ?? 0) + 1,
+				);
+			}
+			if (typeof update.sessionId === 'string' && update.sessionId) {
+				dispatched += 1;
+			}
+			if (typeof update.position === 'number') {
+				reordered += 1;
+			}
+		}
+		for (const [status, count] of statusCounts) {
+			segments.push(
+				`${count} task${count === 1 ? '' : 's'} ${status.replace('_', ' ')}`,
+			);
+		}
+		if (dispatched > 0) {
+			segments.push(
+				`dispatched ${dispatched} task${dispatched === 1 ? '' : 's'}`,
+			);
+		}
+		if (reordered > 0 && statusCounts.size === 0 && dispatched === 0) {
+			segments.push('reordered queue');
+		}
+	}
+
+	return segments.length
+		? `Updating goal: ${truncate(segments.join(', '), 46)}`
+		: 'Updating goal';
+}
+
 /**
  * Returns true when a message part represents exploratory activity that should
  * be grouped in the compact thread renderer.
@@ -325,18 +412,10 @@ export function getCompactActivityEntry(
 	}
 
 	if (part.toolName === 'goal_update') {
-		const result = getToolResult(part);
-		const changes = Array.isArray(result.changes)
-			? result.changes.filter(
-					(item): item is string => typeof item === 'string',
-				)
-			: [];
 		return {
 			id: part.id,
 			toolName: part.toolName,
-			label: changes.length
-				? `Updated goal: ${truncate(changes.join(', '), 46)}`
-				: 'Updating goal',
+			label: buildGoalUpdateLabel(args, result),
 			startedAt: part.startedAt,
 			completedAt: part.completedAt,
 		};

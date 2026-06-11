@@ -23,6 +23,12 @@ const delegateInputSchema = z.object({
 		.describe(
 			'Relevant findings, file paths, and constraints the sub-agent needs',
 		),
+	reuseSessionId: z
+		.string()
+		.optional()
+		.describe(
+			'Child session id of a previous delegation to the SAME agent. The new task is dispatched into that session so prior context (explored files, changes) carries over. Use for related/continuation tasks; omit for unrelated work.',
+		),
 });
 
 export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
@@ -49,6 +55,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 					agent: input.agent,
 					task: input.task,
 					context: input.context,
+					reuseSessionId: input.reuseSessionId,
 				});
 				if (!result.ok) {
 					return { ok: false, error: result.error };

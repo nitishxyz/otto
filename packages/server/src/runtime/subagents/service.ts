@@ -24,17 +24,36 @@ export type SpawnSubagentInput = {
 	agent: string;
 	task: string;
 	context?: string;
+	/**
+	 * Existing subagent child session to dispatch the new task into instead of
+	 * creating a fresh session. Keeps prior context for related tasks (e.g.
+	 * frontend task 1 → frontend task 3). Must belong to the same parent and
+	 * the same agent, and must not be running.
+	 */
+	reuseSessionId?: string;
 };
 
 export type SpawnSubagentResult =
 	| { ok: true; subagentId: string; childSessionId: string; agent: string }
 	| { ok: false; error: string };
 
-/** Spawns an async sub-agent run in a new child session. */
+/**
+ * Spawns an async sub-agent run in a new child session, or resumes an
+ * existing child session when reuseSessionId is provided.
+ */
 export async function spawnSubagent(
 	input: SpawnSubagentInput,
 ): Promise<SpawnSubagentResult> {
-	const { db, cfg, parentSessionId, parentAgent, agent, task, context } = input;
+	const {
+		db,
+		cfg,
+		parentSessionId,
+		parentAgent,
+		agent,
+		task,
+		context,
+		reuseSessionId,
+	} = input;
 
 	const targetAgent = agent.trim();
 	if (!targetAgent) return { ok: false, error: 'Target agent is required.' };
@@ -72,27 +91,40 @@ export async function spawnSubagent(
 		};
 	}
 
-	const agentCfg = await resolveAgentConfig(cfg.projectRoot, targetAgent);
-	const agentProviderDefault = hasConfiguredProvider(cfg, agentCfg.provider)
-		? agentCfg.provider
-		: cfg.defaults.provider;
-	const agentModelDefault = agentCfg.model ?? cfg.defaults.model;
-	const selection = await selectProviderAndModel({
-		cfg,
-		agentProviderDefault,
-		agentModelDefault,
-	});
-
-	const childSession = await createSession({
-		db,
-		cfg,
-		agent: targetAgent,
-		provider: selection.provider,
-		model: selection.model,
-		title: `Sub-agent: ${task.slice(0, 60)}`,
-		parentSessionId,
-		sessionType: 'subagent',
-	});
+	let childSession: SessionRowForSpawn;
+	let isReuse = false;
+	if (reuseSessionId) {
+		const reuse = await resolveReusableChildSession({
+			db,
+			parentSessionId,
+			targetAgent,
+			reuseSessionId,
+		});
+		if (!reuse.ok) return { ok: false, error: reuse.error };
+		childSession = reuse.session;
+		isReuse = true;
+	} else {
+		const agentCfg = await resolveAgentConfig(cfg.projectRoot, targetAgent);
+		const agentProviderDefault = hasConfiguredProvider(cfg, agentCfg.provider)
+			? agentCfg.provider
+			: cfg.defaults.provider;
+		const agentModelDefault = agentCfg.model ?? cfg.defaults.model;
+		const selection = await selectProviderAndModel({
+			cfg,
+			agentProviderDefault,
+			agentModelDefault,
+		});
+		childSession = await createSession({
+			db,
+			cfg,
+			agent: targetAgent,
+			provider: selection.provider,
+			model: selection.model,
+			title: `Sub-agent: ${task.slice(0, 60)}`,
+			parentSessionId,
+			sessionType: 'subagent',
+		});
+	}
 
 	const subagentId = crypto.randomUUID();
 	const now = Date.now();
@@ -114,6 +146,7 @@ export async function spawnSubagent(
 		parentAgent,
 		task,
 		context,
+		isReuse,
 	});
 
 	const { dispatchAssistantMessage } = await import('../message/service.ts');
@@ -122,8 +155,10 @@ export async function spawnSubagent(
 		db,
 		session: childSession,
 		agent: targetAgent,
-		provider: selection.provider,
-		model: selection.model,
+		provider: childSession.provider as Parameters<
+			typeof dispatchAssistantMessage
+		>[0]['provider'],
+		model: childSession.model,
 		content: prompt,
 	});
 
@@ -147,8 +182,9 @@ export async function spawnSubagent(
 		parentSessionId,
 		childSessionId: childSession.id,
 		agent: targetAgent,
-		provider: selection.provider,
-		model: selection.model,
+		provider: childSession.provider,
+		model: childSession.model,
+		reused: isReuse,
 	});
 
 	return {
@@ -159,19 +195,70 @@ export async function spawnSubagent(
 	};
 }
 
+type SessionRowForSpawn = Awaited<ReturnType<typeof createSession>>;
+
+async function resolveReusableChildSession(args: {
+	db: DB;
+	parentSessionId: string;
+	targetAgent: string;
+	reuseSessionId: string;
+}): Promise<
+	{ ok: true; session: SessionRowForSpawn } | { ok: false; error: string }
+> {
+	const { db, parentSessionId, targetAgent, reuseSessionId } = args;
+	const session = await getSessionById({ db, sessionId: reuseSessionId });
+	if (!session) {
+		return {
+			ok: false,
+			error: `Reuse session "${reuseSessionId}" not found. Delegate without reuseSessionId to start fresh.`,
+		};
+	}
+	if (
+		session.sessionType !== 'subagent' ||
+		session.parentSessionId !== parentSessionId
+	) {
+		return {
+			ok: false,
+			error:
+				'Reuse session must be a sub-agent session previously spawned from this session.',
+		};
+	}
+	if (session.agent !== targetAgent) {
+		return {
+			ok: false,
+			error: `Reuse session belongs to agent "${session.agent}", not "${targetAgent}". Reuse is only valid for the same agent.`,
+		};
+	}
+	const records = await db
+		.select({ status: subagents.status })
+		.from(subagents)
+		.where(eq(subagents.childSessionId, reuseSessionId));
+	if (records.some((r) => r.status === 'running')) {
+		return {
+			ok: false,
+			error:
+				'Reuse session is still running a task. Wait for it to finish or delegate to a fresh session.',
+		};
+	}
+	return { ok: true, session };
+}
+
 function buildSubagentPrompt(args: {
 	parentSessionId: string;
 	parentAgent: string;
 	task: string;
 	context?: string;
+	isReuse?: boolean;
 }): string {
 	const lines = [
-		'You are running as a delegated sub-agent.',
+		args.isReuse
+			? 'You are running as a delegated sub-agent, continuing in a session you used for earlier related work. Your prior context (files explored, changes made) still applies — build on it instead of re-discovering.'
+			: 'You are running as a delegated sub-agent.',
 		'',
 		`Parent session: ${args.parentSessionId}`,
 		`Delegated by agent: ${args.parentAgent}`,
 		'',
-		'Task:',
+		args.isReuse ? 'New task:' : 'Task:',
 		args.task,
 	];
 	if (args.context?.trim()) {
@@ -183,7 +270,15 @@ function buildSubagentPrompt(args: {
 	}
 	lines.push(
 		'',
-		'Complete the task, then end with a concise result summary the delegating agent can use: relevant file paths, findings, and recommended next actions. Do not ask the user follow-up questions.',
+		'Complete the task, then END your final message with a structured result report. This report is the only thing the delegating agent sees — it is used to verify and accept your work, so make it factual and complete:',
+		'',
+		'## Result',
+		'- Outcome: what was accomplished (or why it failed / was partially done)',
+		'- Files changed: exact paths created/modified/deleted (or "none")',
+		'- Verification: what you ran to check the work (commands, tests, lint) and their results (or "none")',
+		'- Open issues: anything unresolved, follow-ups needed, or assumptions made (or "none")',
+		'',
+		'Never claim verification you did not perform. Do not ask the user follow-up questions.',
 	);
 	return lines.join('\n');
 }
@@ -340,7 +435,7 @@ export async function messageSubagent(
 			'',
 			message,
 			'',
-			'You still have your prior context. Complete this follow-up and end with a concise result summary.',
+			'You still have your prior context. Complete this follow-up and END with the same structured "## Result" report (Outcome, Files changed, Verification, Open issues). Never claim verification you did not perform.',
 		].join('\n'),
 	});
 

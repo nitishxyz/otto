@@ -4,6 +4,7 @@ import {
 	useMarkSessionViewed,
 	useSessions,
 	useSetSessionPinned,
+	type SessionListFilter,
 } from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
@@ -16,6 +17,8 @@ const FOCUS_RING_CLASSES = ['ring-1', 'ring-inset', 'ring-sidebar-ring/40'];
 interface SessionListContainerProps {
 	activeSessionId?: string;
 	onSelectSession: (sessionId: string) => void;
+	sessionType?: SessionListFilter;
+	emptyMessage?: string;
 }
 
 interface SessionSnapshot {
@@ -118,6 +121,8 @@ function SessionFocusController({
 export const SessionListContainer = memo(function SessionListContainer({
 	activeSessionId,
 	onSelectSession,
+	sessionType,
+	emptyMessage,
 }: SessionListContainerProps) {
 	const {
 		data: sessions = [],
@@ -125,7 +130,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 		hasNextPage,
 		fetchNextPage,
 		isFetchingNextPage,
-	} = useSessions();
+	} = useSessions(sessionType);
 	const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const paginationSentinelRef = useRef<HTMLDivElement>(null);
@@ -373,7 +378,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	if (sessionSnapshot.length === 0) {
 		return (
 			<div className="px-4 py-8 text-center text-sm text-sidebar-muted-foreground">
-				No sessions yet. Create one to get started.
+				{emptyMessage ?? 'No sessions yet. Create one to get started.'}
 			</div>
 		);
 	}

@@ -20,7 +20,6 @@ export * from './usageStore';
 export * from './fileBrowserStore';
 export * from './fileSelectionStore';
 export * from './btwStore';
-export * from './goalsPanelStore';
 export * from './subagentViewerStore';
 export * from './mcpStore';
 export * from './skillsStore';

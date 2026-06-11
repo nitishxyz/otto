@@ -117,6 +117,10 @@ interface ChatInputProps {
 	agent?: string;
 	agents?: string[];
 	onAgentChange?: (agent: string) => void;
+	/** Renders the agent as a fixed label without the switch dropdown. */
+	agentLocked?: boolean;
+	/** Extra bars rendered above the input alongside InputTodosBar (e.g. otto goals bar). */
+	topBars?: React.ReactNode;
 }
 
 export const ChatInput = memo(
@@ -153,6 +157,8 @@ export const ChatInput = memo(
 			agent,
 			agents = [],
 			onAgentChange,
+			agentLocked = false,
+			topBars,
 		},
 		ref,
 	) {
@@ -741,14 +747,14 @@ export const ChatInput = memo(
 					setShowFileMention,
 					setShowSkillMention,
 					setShowCommandSuggestions,
-					setIsPlanMode,
+					setIsPlanMode: agentLocked ? () => {} : setIsPlanMode,
 					setVimMode,
 					handleFileSelect: handleMentionSelect,
 					handleSkillSelect: handleSkillMentionSelect,
 					handleCommandSelect,
 					handleSend,
 					handleVimNormalMode,
-					onPlanModeToggle,
+					onPlanModeToggle: agentLocked ? undefined : onPlanModeToggle,
 				}),
 			[
 				showFileMention,
@@ -776,6 +782,7 @@ export const ChatInput = memo(
 				handleSend,
 				handleVimNormalMode,
 				onPlanModeToggle,
+				agentLocked,
 			],
 		);
 
@@ -830,6 +837,7 @@ export const ChatInput = memo(
 						<ChatInputSessionBars
 							sessionId={sessionId}
 							widthClass={inputOverlayWidthClass}
+							topBars={topBars}
 						/>
 						<div
 							className={`relative z-10 flex flex-col rounded-3xl p-1 transition-all touch-manipulation ${
@@ -1008,7 +1016,12 @@ export const ChatInput = memo(
 											className="justify-self-start flex-shrink-0 relative"
 											ref={agentDropdownRef}
 										>
-											{agent && agents.length > 0 && (
+											{agent && agentLocked && (
+												<span className="text-[10px] text-muted-foreground flex items-center gap-1">
+													<span className="uppercase font-medium">{agent}</span>
+												</span>
+											)}
+											{agent && !agentLocked && agents.length > 0 && (
 												<button
 													type="button"
 													onClick={() =>
@@ -1022,7 +1035,7 @@ export const ChatInput = memo(
 													/>
 												</button>
 											)}
-											{showAgentDropdown && (
+											{showAgentDropdown && !agentLocked && (
 												<div className="absolute bottom-full left-0 mb-1 min-w-[120px] bg-popover border border-border rounded-md shadow-lg overflow-hidden z-50">
 													{agents.map((a) => (
 														<button
@@ -1439,11 +1452,13 @@ const FileSelectionContextChip = memo(function FileSelectionContextChip({
 interface ChatInputSessionBarsProps {
 	sessionId?: string;
 	widthClass: string;
+	topBars?: React.ReactNode;
 }
 
 const ChatInputSessionBars = memo(function ChatInputSessionBars({
 	sessionId,
 	widthClass,
+	topBars,
 }: ChatInputSessionBarsProps) {
 	if (!sessionId) return null;
 
@@ -1451,6 +1466,7 @@ const ChatInputSessionBars = memo(function ChatInputSessionBars({
 		<div className={`pointer-events-auto ${widthClass} mx-auto relative z-0`}>
 			<InputQueueBar key={`${sessionId}-queue`} sessionId={sessionId} />
 			<InputSubagentsBar key={`${sessionId}-subagents`} sessionId={sessionId} />
+			{topBars}
 			<InputTodosBar key={sessionId} sessionId={sessionId} />
 			<InputApprovalBar sessionId={sessionId} />
 			<InputSecureInputBar sessionId={sessionId} />

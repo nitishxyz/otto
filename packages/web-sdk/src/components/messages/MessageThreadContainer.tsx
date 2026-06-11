@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMessages } from '../../hooks/useMessages';
 import { useSessionStream } from '../../hooks/useSessionStream';
-import { sessionsQueryKey, useSessions } from '../../hooks/useSessions';
+import { sessionsQueryKey, useSession } from '../../hooks/useSessions';
 import { usePreferences } from '../../hooks/usePreferences';
 import { MessageThread } from './MessageThread';
 import { useToolApprovalShortcuts } from '../../hooks/useToolApprovalShortcuts';
@@ -12,12 +12,19 @@ interface MessageThreadContainerProps {
 	sessionId: string;
 	onSelectSession?: (sessionId: string) => void;
 	footerBottomPaddingClass?: string;
+	/**
+	 * Force the compact thread renderer regardless of user preference. Used by
+	 * otto orchestrator threads so otto's verify/complete/dispatch tool calls
+	 * collapse into compact activity events instead of message bubbles.
+	 */
+	forceCompact?: boolean;
 }
 
 export const MessageThreadContainer = memo(function MessageThreadContainer({
 	sessionId,
 	onSelectSession,
 	footerBottomPaddingClass,
+	forceCompact,
 }: MessageThreadContainerProps) {
 	return (
 		<>
@@ -27,6 +34,7 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 				sessionId={sessionId}
 				onSelectSession={onSelectSession}
 				footerBottomPaddingClass={footerBottomPaddingClass}
+				forceCompact={forceCompact}
 			/>
 			<TopupModalHost />
 		</>
@@ -60,15 +68,15 @@ const MessageThreadData = memo(function MessageThreadData({
 	sessionId,
 	onSelectSession,
 	footerBottomPaddingClass,
+	forceCompact,
 }: MessageThreadContainerProps) {
 	const { data: messages = [], isLoading } = useMessages(sessionId);
-	const { data: sessions = [] } = useSessions();
+	const session = useSession(sessionId);
 	const { preferences } = usePreferences();
 
-	const session = useMemo(
-		() => sessions.find((s) => s.id === sessionId),
-		[sessions, sessionId],
-	);
+	// Otto orchestrator threads always use the compact renderer so otto's
+	// verify/complete/dispatch tool activity collapses into activity events.
+	const isOttoThread = forceCompact || session?.sessionType === 'otto';
 
 	const isGenerating = useMemo(
 		() =>
@@ -90,7 +98,7 @@ const MessageThreadData = memo(function MessageThreadData({
 			sessionId={sessionId}
 			session={session}
 			isGenerating={isGenerating}
-			compact={preferences.compactThread}
+			compact={isOttoThread || preferences.compactThread}
 			onSelectSession={onSelectSession}
 			footerBottomPaddingClass={footerBottomPaddingClass}
 		/>

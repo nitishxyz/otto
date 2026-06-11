@@ -35,6 +35,10 @@ interface ChatInputContainerProps {
 	onDeleteSession?: () => void;
 	onCopyText?: (text: string) => void | Promise<void>;
 	modalPosition?: 'fixed' | 'absolute';
+	/** Fixes the session agent (no agent picker); provider/model stay editable. */
+	lockedAgent?: boolean;
+	/** Extra bars rendered above the input alongside InputTodosBar. */
+	topBars?: React.ReactNode;
 }
 
 export interface ChatInputContainerRef {
@@ -67,6 +71,8 @@ export const ChatInputContainer = memo(
 				onDeleteSession,
 				onCopyText,
 				modalPosition,
+				lockedAgent = false,
+				topBars,
 			},
 			ref,
 		) {
@@ -461,6 +467,7 @@ export const ChatInputContainer = memo(
 							onModelChange={handleModelChange}
 							onModelSelectorChange={handleModelSelectorChange}
 							modalPosition={modalPosition}
+							hideAgentSelector={lockedAgent}
 						/>
 					) : null}
 					<ChatInput
@@ -495,8 +502,10 @@ export const ChatInputContainer = memo(
 						onFileSelectionContextRemove={handleFileSelectionContextRemove}
 						onModelInfoClick={openModelConfig}
 						agent={agent}
-						agents={agentNames}
+						agents={lockedAgent ? [] : agentNames}
 						onAgentChange={handleAgentChange}
+						agentLocked={lockedAgent}
+						topBars={topBars}
 					/>
 				</>
 			);

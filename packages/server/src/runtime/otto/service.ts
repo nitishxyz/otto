@@ -26,6 +26,7 @@ type StallState = {
 	lastHash: string;
 };
 
+/** Stall counters keyed by goal id (fallback: session id when no goal). */
 const stallStates = new Map<string, StallState>();
 
 const AUTOMATED_PREFIXES = [
@@ -33,11 +34,16 @@ const AUTOMATED_PREFIXES = [
 	'[otto]',
 	'<subagent_results>',
 	'<goal_start',
+	'<otto_kickoff',
+	'<otto_wakeup',
 ];
 
-/** Clears the stall counter, e.g. when the user explicitly (re)starts a goal. */
-export function resetOttoStallState(sessionId: string): void {
-	stallStates.delete(sessionId);
+/**
+ * Clears the stall counter for a goal (or legacy session key), e.g. when the
+ * user explicitly (re)starts a goal.
+ */
+export function resetOttoStallState(key: string): void {
+	stallStates.delete(key);
 }
 
 export type MaybeWakeOttoInput = {
@@ -47,14 +53,16 @@ export type MaybeWakeOttoInput = {
 };
 
 /**
- * Wakes the otto agent for a main session when there is an active goal with
- * open tasks or the last run errored. Guarded by a stall cap: wakeups without
- * task progress stop after MAX_STALLED_WAKEUPS until the user intervenes.
+ * Wakes the otto agent when a worker session's run finishes and there is an
+ * active goal with open tasks, or the last run errored. The goal is resolved
+ * via goal_tasks.sessionId (task dispatch) or legacy goals.sessionId. Guarded
+ * by a per-goal stall cap: wakeups without task progress stop after
+ * MAX_STALLED_WAKEUPS until the user intervenes.
  */
 export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 	const { db, cfg, session } = input;
 
-	const goal = await findActiveGoal(db, session.id);
+	const goal = await findGoalForIdleSession(db, session.id);
 	const tasks = goal ? await listGoalTasks(db, goal.id) : [];
 	const openTasks = tasks.filter(
 		(t) => t.status !== 'completed' && t.status !== 'cancelled',
@@ -67,14 +75,16 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 		(lastRun?.status === 'failed' ||
 			lastRun?.status === 'error' ||
 			lastRun?.finishReason === 'error');
+	const stallKey = goal?.id ?? session.id;
 	if (aborted) {
+		stallStates.delete(stallKey);
 		stallStates.delete(session.id);
 		return;
 	}
 
 	const shouldWake = (goal && openTasks.length > 0) || errored;
 	if (!shouldWake) {
-		stallStates.delete(session.id);
+		stallStates.delete(stallKey);
 		if (goal && tasks.length > 0 && openTasks.length === 0) {
 			await completeGoal(db, goal);
 		}
@@ -83,26 +93,29 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 
 	const lastUserMessageId = await getLastManualUserMessageId(db, session.id);
 	const hash = buildStateHash(tasks, lastUserMessageId, errored);
-	const state = stallStates.get(session.id);
+	const state = stallStates.get(stallKey);
 	if (state && state.lastHash === hash) {
 		state.stalls += 1;
 		if (state.stalls >= MAX_STALLED_WAKEUPS) {
 			logger.warn('[otto] stall cap reached; waiting for user input', {
+				goalId: goal?.id ?? null,
 				sessionId: session.id,
 				stalls: state.stalls,
 			});
 			return;
 		}
 	} else {
-		stallStates.set(session.id, { stalls: 0, lastHash: hash });
+		stallStates.set(stallKey, { stalls: 0, lastHash: hash });
 	}
 
-	const ottoSession = await findOrCreateOttoSession(db, cfg, session);
+	const ottoSession = goal
+		? await ensureOttoSessionForGoal(db, cfg, goal)
+		: await findOrCreateLegacyOttoSession(db, cfg, session);
 	if (!ottoSession) return;
 
 	const content = await buildOttoWakeMessage({
 		db,
-		mainSession: session,
+		workerSession: session,
 		goal,
 		tasks,
 		errored,
@@ -122,7 +135,7 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 		content,
 	});
 
-	logger.info('[otto] woke up for session', {
+	logger.info('[otto] woke up', {
 		sessionId: session.id,
 		ottoSessionId: ottoSession.id,
 		goalId: goal?.id ?? null,
@@ -130,10 +143,23 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 	});
 }
 
-async function findActiveGoal(
+/**
+ * Resolves the active goal an idle session belongs to: first via task
+ * dispatch (goal_tasks.sessionId), then via the legacy session binding
+ * (goals.sessionId).
+ */
+async function findGoalForIdleSession(
 	db: DB,
 	sessionId: string,
 ): Promise<GoalRow | undefined> {
+	const viaTask = await db
+		.select({ goal: goals })
+		.from(goalTasks)
+		.innerJoin(goals, eq(goalTasks.goalId, goals.id))
+		.where(and(eq(goalTasks.sessionId, sessionId), eq(goals.status, 'active')))
+		.orderBy(asc(goals.createdAt))
+		.limit(1);
+	if (viaTask[0]) return viaTask[0].goal;
 	const rows = await db
 		.select()
 		.from(goals)
@@ -156,10 +182,11 @@ async function completeGoal(db: DB, goal: GoalRow): Promise<void> {
 		.update(goals)
 		.set({ status: 'completed', updatedAt: Date.now() })
 		.where(eq(goals.id, goal.id));
-	if (goal.sessionId) {
+	const eventSessionId = goal.ottoSessionId ?? goal.sessionId;
+	if (eventSessionId) {
 		publish({
 			type: 'goal.updated',
-			sessionId: goal.sessionId,
+			sessionId: eventSessionId,
 			payload: { goalId: goal.id, changes: ['goal completed'] },
 		});
 	}
@@ -229,9 +256,9 @@ const TRANSCRIPT_MESSAGES = 8;
 const TRANSCRIPT_PART_LIMIT = 700;
 
 /**
- * Builds a compact tail of the main session conversation (text parts only) so
- * otto can see how the agent answered previous [otto] messages and what the
- * user actually asked for, instead of judging from task state alone.
+ * Builds a compact tail of the worker session conversation (text parts only)
+ * so otto can see how the agent answered previous [otto] messages and what
+ * the user actually asked for, instead of judging from task state alone.
  */
 async function buildRecentTranscript(
 	db: DB,
@@ -275,23 +302,88 @@ async function buildRecentTranscript(
 	return lines;
 }
 
-async function findOrCreateOttoSession(
+/**
+ * Returns the otto session that owns a goal, creating and binding one
+ * (goals.ottoSessionId) when missing. Migrates legacy goals whose otto
+ * session was a child of the supervised session.
+ */
+export async function ensureOttoSessionForGoal(
 	db: DB,
 	cfg: OttoConfig,
-	mainSession: SessionRow,
+	goal: GoalRow,
+): Promise<SessionRow | undefined> {
+	if (goal.ottoSessionId) {
+		const rows = await db
+			.select()
+			.from(sessions)
+			.where(eq(sessions.id, goal.ottoSessionId))
+			.limit(1);
+		if (rows[0]) return rows[0];
+	}
+
+	// Legacy binding: otto session created as a child of the supervised session.
+	if (goal.sessionId) {
+		const legacy = await db
+			.select()
+			.from(sessions)
+			.where(
+				and(
+					eq(sessions.parentSessionId, goal.sessionId),
+					eq(sessions.sessionType, 'otto'),
+				),
+			)
+			.limit(1);
+		if (legacy[0]) {
+			await db
+				.update(goals)
+				.set({ ottoSessionId: legacy[0].id, updatedAt: Date.now() })
+				.where(eq(goals.id, goal.id));
+			return legacy[0];
+		}
+	}
+
+	const created = await createOttoSession(db, cfg, {
+		title: goal.title,
+	});
+	if (!created) return undefined;
+	await db
+		.update(goals)
+		.set({ ottoSessionId: created.id, updatedAt: Date.now() })
+		.where(eq(goals.id, goal.id));
+	return created;
+}
+
+/**
+ * Legacy path for goal-less errored wakeups: one otto session per supervised
+ * session, bound via parentSessionId.
+ */
+async function findOrCreateLegacyOttoSession(
+	db: DB,
+	cfg: OttoConfig,
+	workerSession: SessionRow,
 ): Promise<SessionRow | undefined> {
 	const existing = await db
 		.select()
 		.from(sessions)
 		.where(
 			and(
-				eq(sessions.parentSessionId, mainSession.id),
+				eq(sessions.parentSessionId, workerSession.id),
 				eq(sessions.sessionType, 'otto'),
 			),
 		)
 		.limit(1);
 	if (existing.length) return existing[0];
+	return await createOttoSession(db, cfg, {
+		title: null,
+		parentSessionId: workerSession.id,
+	});
+}
 
+async function createOttoSession(
+	db: DB,
+	cfg: OttoConfig,
+	opts: { title: string | null; parentSessionId?: string },
+): Promise<SessionRow | undefined> {
 	try {
 		const agentCfg = await resolveAgentConfig(cfg.projectRoot, 'otto');
 		const agentProviderDefault = hasConfiguredProvider(cfg, agentCfg.provider)
@@ -309,65 +401,115 @@ async function findOrCreateOttoSession(
 			agent: 'otto',
 			provider: selection.provider,
 			model: selection.model,
-			title: 'otto',
-			parentSessionId: mainSession.id,
+			title: opts.title,
+			parentSessionId: opts.parentSessionId,
 			sessionType: 'otto',
 		});
 	} catch (error) {
 		logger.warn('[otto] failed to create otto session', {
-			sessionId: mainSession.id,
 			error: error instanceof Error ? error.message : String(error),
 		});
 		return undefined;
 	}
 }
 
+/**
+ * Builds the kickoff message dispatched into a goal's otto session when the
+ * user starts the goal. Otto plans dispatch from here. Wrapped in
+ * <otto_kickoff> so clients render it as structured UI instead of raw text.
+ */
+export function buildGoalKickoffMessage(
+	goal: GoalRow,
+	tasks: GoalTaskRow[],
+): string {
+	const lines: string[] = [
+		`<otto_kickoff goal-id="${goal.id}">`,
+		`<title>${goal.title}</title>`,
+	];
+	if (tasks.length) {
+		lines.push('<tasks>');
+		for (const task of tasks) {
+			lines.push(
+				`<task id="${task.id}" status="${task.status}" position="${task.position}">${task.content}${task.note ? ` <note>${task.note}</note>` : ''}</task>`,
+			);
+		}
+		lines.push('</tasks>');
+	} else {
+		lines.push('<tasks />');
+	}
+	if (goal.sessionId) {
+		lines.push(
+			`<legacy-worker-session>${goal.sessionId}</legacy-worker-session>`,
+		);
+	}
+	lines.push(
+		'<instructions>',
+		'The user started this goal. You orchestrate it.',
+		tasks.length
+			? 'Dispatch the first open task(s): mark them in_progress via goal_update (recording the worker sessionId), then delegate with delegate_task or enqueue into a worker session. Independent tasks may run in parallel.'
+			: 'The goal has no tasks yet. Create them with goal_update.',
+		'</instructions>',
+		'</otto_kickoff>',
+	);
+	return lines.join('\n');
+}
+
+/**
+ * Builds the wakeup message dispatched into otto when a worker session run
+ * finishes. Wrapped in <otto_wakeup> for structured client rendering.
+ */
 async function buildOttoWakeMessage(args: {
 	db: DB;
-	mainSession: SessionRow;
+	workerSession: SessionRow;
 	goal: GoalRow | undefined;
 	tasks: GoalTaskRow[];
 	errored: boolean;
 	lastRunFinishReason: string | null;
 }): Promise<string> {
+	const lastRun = args.errored
+		? `errored:${args.lastRunFinishReason ?? 'unknown'}`
+		: 'completed';
 	const lines: string[] = [
-		'[otto] Session run finished. Check up on the main session.',
-		'',
-		`Main session: ${args.mainSession.id}`,
-		`Main agent: ${args.mainSession.agent}`,
-		`Last run: ${args.errored ? `errored (${args.lastRunFinishReason ?? 'unknown'})` : 'completed'}`,
+		`<otto_wakeup worker-session-id="${args.workerSession.id}" worker-agent="${args.workerSession.agent}" last-run="${lastRun}">`,
 	];
 
 	if (args.goal) {
-		lines.push('', `Active goal: ${args.goal.title} (id: ${args.goal.id})`);
+		lines.push(`<goal id="${args.goal.id}"><title>${args.goal.title}</title>`);
 		if (args.tasks.length) {
-			lines.push('', 'Tasks:');
+			lines.push('<tasks>');
 			for (const task of args.tasks) {
-				const note = task.note ? ` — note: ${task.note}` : '';
+				const worker = task.sessionId
+					? ` worker-session-id="${task.sessionId}"`
+					: '';
 				lines.push(
-					`- [${task.status}] (id: ${task.id}, position: ${task.position}) ${task.content}${note}`,
+					`<task id="${task.id}" status="${task.status}" position="${task.position}"${worker}>${task.content}${task.note ? ` <note>${task.note}</note>` : ''}</task>`,
 				);
 			}
+			lines.push('</tasks>');
 		} else {
-			lines.push('', 'The goal has no tasks yet.');
+			lines.push('<tasks />');
 		}
+		lines.push('</goal>');
 	} else {
-		lines.push('', 'No active goal for this session.');
+		lines.push('<goal />');
 	}
 
-	const transcript = await buildRecentTranscript(args.db, args.mainSession.id);
+	const transcript = await buildRecentTranscript(
+		args.db,
+		args.workerSession.id,
+	);
 	if (transcript.length) {
 		lines.push(
-			'',
-			'Recent main-session conversation (oldest first; [auto] = automated message, including your own previous [otto] continuations):',
-			...transcript.map((line) => `> ${line}`),
+			'<transcript note="oldest first; [auto] = automated message, including your own previous [otto] continuations">',
+			...transcript,
+			'</transcript>',
 		);
 	}
 
 	const allSubagents = await args.db
 		.select()
 		.from(subagents)
-		.where(eq(subagents.parentSessionId, args.mainSession.id));
+		.where(eq(subagents.parentSessionId, args.workerSession.id));
 	const running = allSubagents.filter((r) => r.status === 'running');
 	const delivered = allSubagents.filter(
 		(r) => r.status !== 'running' && r.reported,
@@ -375,36 +517,34 @@ async function buildOttoWakeMessage(args: {
 	const undelivered = allSubagents.filter(
 		(r) => r.status !== 'running' && !r.reported,
 	);
-	if (running.length) {
-		lines.push(
-			'',
-			`Sub-agents still running for this session: ${running
-				.map((r) => r.agent)
-				.join(', ')}. Do not enqueue duplicate work for tasks they cover.`,
-		);
-	}
-	if (delivered.length) {
-		lines.push(
-			'',
-			`Sub-agent results ALREADY DELIVERED to the main agent (do not mention or re-send them): ${delivered
-				.map((r) => `${r.agent} (${r.status})`)
-				.join(', ')}.`,
-		);
-	}
-	if (undelivered.length) {
-		lines.push(
-			'',
-			`Sub-agent results not yet delivered (the server delivers them automatically on the next idle — do NOT copy them into your continuation): ${undelivered
-				.map((r) => `${r.agent} (${r.status})`)
-				.join(', ')}.`,
-		);
+	if (running.length || delivered.length || undelivered.length) {
+		lines.push('<subagents>');
+		for (const r of running) {
+			lines.push(
+				`<subagent agent="${r.agent}" status="running" note="Do not dispatch duplicate work for tasks it covers." />`,
+			);
+		}
+		for (const r of delivered) {
+			lines.push(
+				`<subagent agent="${r.agent}" status="${r.status}" delivered="true" note="Result already delivered to the worker agent; do not mention or re-send it." />`,
+			);
+		}
+		for (const r of undelivered) {
+			lines.push(
+				`<subagent agent="${r.agent}" status="${r.status}" delivered="false" note="Delivered automatically on next idle; do NOT copy it into your continuation." />`,
+			);
+		}
+		lines.push('</subagents>');
 	}
 
 	lines.push(
-		'',
-		'Follow your instructions: verify done_pending claims, update task statuses, and enqueue a continuation into the main session only if work remains or the error needs a retry.',
-		'If a previous [otto] message of yours was already answered in the conversation above, act on that answer (complete or reset tasks) — never re-ask the same thing.',
-		'Sub-agent results are delivered to the main session automatically — never repeat, summarize, or re-send them. Keep any enqueued continuation to one short line: which task to do next.',
+		'<instructions>',
+		'A worker session run finished. Check up on it.',
+		'Follow your instructions: verify finished work, update task statuses, and dispatch or enqueue a continuation only if work remains or the error needs a retry.',
+		'If a previous [otto] message of yours was already answered in the conversation above, act on that answer (complete or keep tasks with a note) — never re-ask the same thing.',
+		'Sub-agent results are delivered to the dispatching session automatically — never repeat, summarize, or re-send them. Keep any enqueued continuation to one short line: which task to do next.',
+		'</instructions>',
+		'</otto_wakeup>',
 	);
 	return lines.join('\n');
 }

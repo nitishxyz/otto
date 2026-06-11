@@ -1,6 +1,7 @@
 import {
 	createSession as apiCreateSession,
 	listSessions as apiListSessions,
+	getSession as apiGetSession,
 	listMessages as apiListMessages,
 	createMessage as apiCreateMessage,
 	abortSession as apiAbortSession,
@@ -41,11 +42,11 @@ export const sessionsMixin = {
 	},
 
 	async getSessionsPage(
-		params: { limit?: number; offset?: number } = {},
+		params: { limit?: number; offset?: number; sessionType?: 'otto' } = {},
 	): Promise<SessionsPage> {
-		const { limit = 50, offset = 0 } = params;
+		const { limit = 50, offset = 0, sessionType } = params;
 		const response = await apiListSessions({
-			query: { limit, offset },
+			query: sessionType ? { limit, offset, sessionType } : { limit, offset },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		const data = response.data;
@@ -62,6 +63,12 @@ export const sessionsMixin = {
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		if (!response.data) throw new Error('No data returned from create session');
+		return convertSession(response.data as ApiSession);
+	},
+
+	async getSession(sessionId: string): Promise<Session> {
+		const response = await apiGetSession({ path: { sessionId } });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return convertSession(response.data as ApiSession);
 	},
 

@@ -14,6 +14,10 @@ import mig0004 from '../../drizzle/0004_damp_ted_forrester.sql' with {
 import mig0005 from '../../drizzle/0005_majestic_paibok.sql' with {
 	type: 'text',
 };
+import mig0006 from '../../drizzle/0006_wild_magus.sql' with { type: 'text' };
+import mig0007 from '../../drizzle/0007_drop_done_pending_status.sql' with {
+	type: 'text',
+};
 
 export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0000_material_swarm.sql', content: mig0000 },
@@ -22,4 +26,6 @@ export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0003_public_ted_forrester.sql', content: mig0003 },
 	{ name: '0004_damp_ted_forrester.sql', content: mig0004 },
 	{ name: '0005_majestic_paibok.sql', content: mig0005 },
+	{ name: '0006_wild_magus.sql', content: mig0006 },
+	{ name: '0007_drop_done_pending_status.sql', content: mig0007 },
 ];

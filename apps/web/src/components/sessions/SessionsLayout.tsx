@@ -9,6 +9,8 @@ import {
 	NewSessionLanding,
 	type ChatInputContainerRef,
 	Toaster,
+	OttoSessionRail,
+	OttoWorkspace,
 } from '@ottocode/web-sdk/components';
 import {
 	useCreateSession,
@@ -20,6 +22,7 @@ import {
 	sessionsQueryKey,
 } from '@ottocode/web-sdk/hooks';
 import { useGitStore, useConfirmationStore } from '@ottocode/web-sdk/stores';
+
 import { apiClient } from '@ottocode/web-sdk/lib';
 import {
 	useStageFiles,
@@ -40,14 +43,20 @@ interface SessionsCacheData {
 
 interface SessionsLayoutProps {
 	sessionId?: string;
+	/** Workspace view: 'agents' (default, /sessions) or 'otto' (/otto). */
+	view?: 'agents' | 'otto';
 }
 
-export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
+export function SessionsLayout({
+	sessionId,
+	view = 'agents',
+}: SessionsLayoutProps) {
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
 	const { theme, toggleTheme } = useTheme();
 	const navigate = useNavigate();
+	const isOttoTab = view === 'otto';
 
 	const focusInput = useCallback(() => {
 		setTimeout(() => {
@@ -56,8 +65,8 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 	}, []);
 
 	const handleNewSession = useCallback(() => {
-		navigate({ to: '/sessions' });
-	}, [navigate]);
+		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
+	}, [navigate, isOttoTab]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
@@ -71,14 +80,37 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 		[navigate, focusInput],
 	);
 
+	const handleOttoSessionCreated = useCallback(
+		(newSessionId: string) => {
+			navigate({
+				to: '/otto/$sessionId',
+				params: { sessionId: newSessionId },
+				replace: false,
+			});
+			focusInput();
+		},
+		[navigate, focusInput],
+	);
+
 	const handleDeleteSession = useCallback(() => {
-		navigate({ to: '/sessions' });
-	}, [navigate]);
+		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
+	}, [navigate, isOttoTab]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
 			navigate({
 				to: '/sessions/$sessionId',
+				params: { sessionId: id },
+			});
+			focusInput();
+		},
+		[navigate, focusInput],
+	);
+
+	const handleSelectOttoSession = useCallback(
+		(id: string) => {
+			navigate({
+				to: '/otto/$sessionId',
 				params: { sessionId: id },
 			});
 			focusInput();
@@ -211,9 +243,27 @@ export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}
-				sidebar={sidebarContent}
+				sidebar={
+					isOttoTab ? (
+						<OttoSessionRail
+							activeSessionId={sessionId}
+							onSelectSession={handleSelectOttoSession}
+						/>
+					) : (
+						sidebarContent
+					)
+				}
 			>
-				{mainContent}
+				{isOttoTab ? (
+					<OttoWorkspace
+						sessionId={sessionId}
+						onSessionCreated={handleOttoSessionCreated}
+						onNewSession={handleNewSession}
+						onDeleteSession={handleDeleteSession}
+					/>
+				) : (
+					mainContent
+				)}
 			</AppLayout>
 			<Toaster />
 		</>
