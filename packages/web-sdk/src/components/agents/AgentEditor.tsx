@@ -49,6 +49,7 @@ export const AgentEditor = memo(function AgentEditor({
 	const [prompt, setPrompt] = useState(agent.prompt);
 	const [provider, setProvider] = useState(agent.provider ?? '');
 	const [model, setModel] = useState(agent.model ?? '');
+	const [description, setDescription] = useState(agent.description ?? '');
 	const [selectedToolNames, setSelectedToolNames] = useState(
 		() => new Set(savedToolNames),
 	);
@@ -60,12 +61,14 @@ export const AgentEditor = memo(function AgentEditor({
 		setPrompt(agent.prompt);
 		setProvider(agent.provider ?? '');
 		setModel(agent.model ?? '');
+		setDescription(agent.description ?? '');
 		setSelectedToolNames(new Set(savedToolNames));
 		setToolBuckets(toolBucketsFromConfig(agent.toolConfig));
 	}, [
 		agent.prompt,
 		agent.provider,
 		agent.model,
+		agent.description,
 		savedToolNames,
 		agent.toolConfig,
 	]);
@@ -88,7 +91,8 @@ export const AgentEditor = memo(function AgentEditor({
 	const detailsDirty =
 		prompt !== agent.prompt ||
 		provider !== (agent.provider ?? '') ||
-		model !== (agent.model ?? '');
+		model !== (agent.model ?? '') ||
+		description !== (agent.description ?? '');
 
 	const isDirty = toolsDirty || detailsDirty;
 
@@ -152,6 +156,7 @@ export const AgentEditor = memo(function AgentEditor({
 		setPrompt(agent.prompt);
 		setProvider(agent.provider ?? '');
 		setModel(agent.model ?? '');
+		setDescription(agent.description ?? '');
 		setSelectedToolNames(new Set(savedToolNames));
 		setToolBuckets(toolBucketsFromConfig(agent.toolConfig));
 	};
@@ -179,6 +184,7 @@ export const AgentEditor = memo(function AgentEditor({
 				scope: getAgentConfigScope(agent),
 				prompt,
 				promptStorage: 'file',
+				description: description.trim() || null,
 				provider: provider.trim() || null,
 				model: model.trim() || null,
 				tools: currentToolConfig,
@@ -271,6 +277,8 @@ export const AgentEditor = memo(function AgentEditor({
 						model={model}
 						onProviderChange={setProvider}
 						onModelChange={setModel}
+						description={description}
+						onDescriptionChange={setDescription}
 						toolCount={selectedToolNames.size}
 						promptLength={prompt.length}
 					/>
@@ -309,6 +317,8 @@ const OverviewPage = memo(function OverviewPage({
 	model,
 	onProviderChange,
 	onModelChange,
+	description,
+	onDescriptionChange,
 	toolCount,
 	promptLength,
 }: {
@@ -321,6 +331,8 @@ const OverviewPage = memo(function OverviewPage({
 	model: string;
 	onProviderChange: (v: string) => void;
 	onModelChange: (v: string) => void;
+	description: string;
+	onDescriptionChange: (v: string) => void;
 	toolCount: number;
 	promptLength: number;
 }) {
@@ -367,6 +379,16 @@ const OverviewPage = memo(function OverviewPage({
 			</div>
 
 			<div className="space-y-2">
+				<Field
+					label="Description"
+					value={description}
+					onChange={onDescriptionChange}
+					placeholder={
+						agent.defaultDescription ??
+						'One line: what this agent is good at (shown to other agents)'
+					}
+					maxLength={120}
+				/>
 				<Field
 					label="Provider override"
 					value={provider}
@@ -422,11 +444,13 @@ function Field({
 	value,
 	onChange,
 	placeholder,
+	maxLength,
 }: {
 	label: string;
 	value: string;
 	onChange: (v: string) => void;
 	placeholder: string;
+	maxLength?: number;
 }) {
 	return (
 		<div className="rounded-md border border-sidebar-border/60 p-2">
@@ -438,6 +462,7 @@ function Field({
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder={placeholder}
+				maxLength={maxLength}
 				className="w-full bg-transparent font-mono text-xs outline-none placeholder:text-muted-foreground"
 			/>
 		</div>

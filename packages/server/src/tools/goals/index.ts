@@ -108,7 +108,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 			.describe(
 				args.allowComplete
 					? 'Update task statuses/notes. You may set completed after verifying a done_pending claim.'
-					: 'Update task statuses/notes. Mark finished work as done_pending — only otto can set completed.',
+					: 'Update task statuses/notes. ALWAYS set a task to in_progress before you start working on it. Mark finished work as done_pending — only otto can set completed.',
 			),
 	});
 
@@ -117,7 +117,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 		tool: tool({
 			description: args.allowComplete
 				? 'Create or update the persistent goal/task queue. As otto you verify done_pending claims and finalize them to completed, or reset false claims to in_progress with a note.'
-				: 'Create or update the persistent goal/task queue for this session. Claim finished tasks with done_pending; otto verifies and finalizes them.',
+				: 'Create or update the persistent goal/task queue for this session. Before starting any task, mark it in_progress so the user can see what you are working on. Claim finished tasks with done_pending; otto verifies and finalizes them.',
 			inputSchema,
 			async execute(input) {
 				const db = await getDb(args.projectRoot);

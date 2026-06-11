@@ -143,6 +143,11 @@ const AgentGroup = memo(function AgentGroup({
 							<CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
 						)}
 					</div>
+					{agent.description ? (
+						<p className="mt-0.5 text-[11px] text-muted-foreground truncate">
+							{agent.description}
+						</p>
+					) : null}
 					<div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
 						<span className="px-1.5 py-0.5 rounded bg-muted">
 							{agent.builtin ? 'built-in' : 'custom'}

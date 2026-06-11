@@ -93,6 +93,9 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 				e.preventDefault();
 				if (currentSkillToSelect) {
 					handleSkillSelect(currentSkillToSelect);
+				} else {
+					setShowSkillMention(false);
+					handleSend();
 				}
 			} else if (e.key === 'Escape') {
 				e.preventDefault();
@@ -107,14 +110,17 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 		if (showFileMention) {
 			if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'j')) {
 				e.preventDefault();
-				setMentionSelectedIndex((mentionSelectedIndex + 1) % 20);
+				setMentionSelectedIndex((mentionSelectedIndex + 1) % 25);
 			} else if (e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'k')) {
 				e.preventDefault();
-				setMentionSelectedIndex((mentionSelectedIndex - 1 + 20) % 20);
+				setMentionSelectedIndex((mentionSelectedIndex - 1 + 25) % 25);
 			} else if (e.key === 'Enter') {
 				e.preventDefault();
 				if (currentFileToSelect) {
 					handleFileSelect(currentFileToSelect);
+				} else {
+					setShowFileMention(false);
+					handleSend();
 				}
 			} else if (e.key === 'Escape') {
 				e.preventDefault();

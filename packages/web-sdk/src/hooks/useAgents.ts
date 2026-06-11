@@ -55,6 +55,19 @@ export function useAgent(agentName: string | null) {
 	});
 }
 
+/**
+ * Lightweight agent list for @mention suggestions and input highlighting.
+ * Shares the cache with useAgentDetails but has no store side effects.
+ */
+export function useMentionAgents(options: UseAgentsOptions = {}) {
+	return useQuery({
+		queryKey: ['config', 'agents'],
+		queryFn: () => apiClient.getAgentDetails(),
+		enabled: options.enabled ?? true,
+		staleTime: 60_000,
+	});
+}
+
 export function useConfigTools(options: UseAgentsOptions = {}) {
 	const managerOpen = useAgentsStore((s) => s.isManagerOpen);
 	const createOpen = useAgentsStore((s) => s.isCreateModalOpen);

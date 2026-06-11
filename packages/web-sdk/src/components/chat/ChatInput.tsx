@@ -8,7 +8,7 @@ import {
 	useImperativeHandle,
 	useMemo,
 } from 'react';
-import type { ChangeEvent, ClipboardEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent, UIEvent } from 'react';
 
 import {
 	ArrowUp,
@@ -26,13 +26,15 @@ import {
 } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
 import { LiveWaveform } from './LiveWaveform';
-import { FileMentionPopup } from './FileMentionPopup';
+import { MentionPopup } from './MentionPopup';
 import { SkillMentionPopup } from './SkillMentionPopup';
+import { InputHighlightOverlay } from './InputHighlightOverlay';
 import { CommandSuggestionsPopup } from './CommandSuggestionsPopup';
 import { ShortcutsModal } from './ShortcutsModal';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { useFiles } from '../../hooks/useFiles';
 import { useSkills } from '../../hooks/useSkills';
+import { useMentionAgents } from '../../hooks/useAgents';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
 import { useVimMode } from '../../hooks/useVimMode';
@@ -223,15 +225,46 @@ export const ChatInput = memo(
 			checkForSkillMention,
 		} = useSkillMention();
 
-		const { data: skillsConfig } = useSkills({ enabled: showSkillMention });
+		const { data: skillsConfig } = useSkills({
+			enabled: showSkillMention || message.includes('$'),
+		});
 		const skillSummaries = skillsConfig?.items ?? [];
 
-		const { data: filesData, isLoading: filesLoading } = useFiles({
+		const { data: filesData } = useFiles({
 			enabled: showFileMention,
 			query: mentionQuery,
 		});
 		const files = filesData?.files || [];
 		const changedFiles = filesData?.changedFiles || [];
+
+		const { data: mentionAgentsData } = useMentionAgents({
+			enabled: showFileMention || message.includes('@'),
+		});
+		const mentionAgents = useMemo(
+			() =>
+				(mentionAgentsData?.agents ?? [])
+					.filter((a) => a.name !== 'otto' && a.name !== agent)
+					.map((a) => ({ name: a.name, description: a.description })),
+			[mentionAgentsData, agent],
+		);
+		const mentionAgentNames = useMemo(
+			() => mentionAgents.map((a) => a.name),
+			[mentionAgents],
+		);
+		const mentionSkillNames = useMemo(
+			() =>
+				(skillsConfig?.items ?? [])
+					.filter((skill) => skill.enabled !== false)
+					.map((skill) => skill.name),
+			[skillsConfig],
+		);
+		const [highlightScrollTop, setHighlightScrollTop] = useState(0);
+		const handleTextareaScroll = useCallback(
+			(e: UIEvent<HTMLTextAreaElement>) => {
+				setHighlightScrollTop(e.currentTarget.scrollTop);
+			},
+			[],
+		);
 
 		const {
 			showCommandSuggestions,
@@ -856,26 +889,36 @@ export const ChatInput = memo(
 												<MoreVertical className="w-4 h-4" />
 											</button>
 										)}
-										<Textarea
-											ref={textareaRef}
-											value={message}
-											onChange={handleChange}
-											onKeyDown={handleKeyDown}
-											onPaste={handleTextareaPaste}
-											placeholder={
-												isPlanMode
-													? 'Plan mode - Type a message...'
-													: 'Type a message...'
-											}
-											disabled={disabled}
-											rows={1}
-											className={`border-0 bg-transparent pl-1 pr-2 py-2 max-h-[200px] overflow-y-auto leading-normal resize-none scrollbar-hide text-base ${
-												preferences.vimMode && vimMode === 'normal'
-													? 'caret-[6px]'
-													: ''
-											}`}
-											style={{ height: '2.5rem' }}
-										/>
+										<div className="relative flex-1 min-w-0 flex items-end">
+											<InputHighlightOverlay
+												value={message}
+												agentNames={mentionAgentNames}
+												skillNames={mentionSkillNames}
+												scrollTop={highlightScrollTop}
+												className="pl-1 pr-2 py-2 text-base leading-normal"
+											/>
+											<Textarea
+												ref={textareaRef}
+												value={message}
+												onChange={handleChange}
+												onKeyDown={handleKeyDown}
+												onPaste={handleTextareaPaste}
+												onScroll={handleTextareaScroll}
+												placeholder={
+													isPlanMode
+														? 'Plan mode - Type a message...'
+														: 'Type a message...'
+												}
+												disabled={disabled}
+												rows={1}
+												className={`relative border-0 bg-transparent pl-1 pr-2 py-2 max-h-[200px] overflow-y-auto leading-normal resize-none scrollbar-hide text-base ${
+													preferences.vimMode && vimMode === 'normal'
+														? 'caret-[6px]'
+														: ''
+												}`}
+												style={{ height: '2.5rem' }}
+											/>
+										</div>
 										{message.trim() ||
 										hasFiles ||
 										!voiceSupported ||
@@ -1031,8 +1074,9 @@ export const ChatInput = memo(
 							</div>
 						)}
 
-						{showFileMention && !filesLoading && (
-							<FileMentionPopup
+						{showFileMention && (
+							<MentionPopup
+								agents={mentionAgents}
 								files={files}
 								changedFiles={changedFiles}
 								query={mentionQuery}

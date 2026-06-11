@@ -9,7 +9,12 @@ import {
 	getAllAgentDetails,
 	upsertAgentConfig,
 } from '../../runtime/agent/config-management.ts';
-import { defaultToolConfigForAgent } from '../../runtime/agent/registry.ts';
+import {
+	BUILTIN_AGENT_DESCRIPTIONS,
+	defaultToolConfigForAgent,
+	MAX_AGENT_DESCRIPTION_LENGTH,
+	normalizeAgentDescription,
+} from '../../runtime/agent/registry.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { discoverAllAgents, getDefault } from './utils.ts';
 
@@ -58,6 +63,8 @@ const agentDetailSchema = z.object({
 	source: z.enum(['builtin', 'local', 'global', 'merged', 'embedded']),
 	prompt: z.string(),
 	promptSource: z.string(),
+	description: z.string().optional(),
+	defaultDescription: z.string().optional(),
 	toolConfig: agentToolGroupsSchema,
 	defaultToolConfig: agentToolGroupsSchema,
 	appendToolConfig: agentToolGroupsSchema,
@@ -81,6 +88,11 @@ const upsertAgentBodySchema = z.object({
 	scope: z.enum(['local', 'global']).optional(),
 	prompt: z.string().optional(),
 	promptStorage: z.enum(['file', 'inline']).optional(),
+	description: z
+		.string()
+		.max(MAX_AGENT_DESCRIPTION_LENGTH)
+		.nullable()
+		.optional(),
 	tools: agentToolGroupsSchema.optional(),
 	appendTools: agentToolGroupsSchema.optional(),
 	provider: z.string().nullable().optional(),
@@ -150,6 +162,10 @@ function getEmbeddedAgentDetails(embeddedConfig: EmbeddedAppConfig) {
 				source: entry ? ('local' as const) : ('embedded' as const),
 				prompt: typeof entry?.prompt === 'string' ? entry.prompt : '',
 				promptSource: entry?.prompt ? 'embedded:agents' : 'embedded:default',
+				description:
+					normalizeAgentDescription(entry?.description) ??
+					BUILTIN_AGENT_DESCRIPTIONS[name],
+				defaultDescription: BUILTIN_AGENT_DESCRIPTIONS[name],
 				toolConfig,
 				defaultToolConfig: defaultToolConfigForAgent(name),
 				appendToolConfig: embeddedOptionalToolConfig(entry?.appendTools),

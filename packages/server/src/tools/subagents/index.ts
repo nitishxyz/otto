@@ -30,7 +30,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 		name: 'delegate_task',
 		tool: tool({
 			description:
-				'Delegate a bounded task to another configured agent. The sub-agent runs asynchronously in its own session while you continue working. Returns immediately with the child session id. You will receive the result automatically when it finishes, or you can poll with list_subagents.',
+				'Delegate a bounded task to another configured agent. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. You will receive the result automatically when it finishes, or you can poll with list_subagents.',
 			inputSchema: delegateInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -59,7 +59,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 					childSessionId: result.childSessionId,
 					agent: result.agent,
 					status: 'started',
-					note: 'The sub-agent is running in parallel. Continue with your other work; results arrive automatically when you go idle, or check list_subagents.',
+					note: 'Task ownership transferred to the sub-agent. Do not perform the delegated task yourself unless it fails or the user explicitly requested independent verification. Continue unrelated work, or wait/check list_subagents.',
 				};
 			},
 		}),

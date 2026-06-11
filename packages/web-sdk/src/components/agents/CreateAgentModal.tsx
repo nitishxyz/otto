@@ -41,10 +41,12 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 	const closeCreateModal = useAgentsStore((s) => s.closeCreateModal);
 	const updateAgent = useUpdateAgent();
 	const nameId = useId();
+	const descriptionId = useId();
 	const duplicateId = useId();
 	const promptId = useId();
 
 	const [name, setName] = useState('');
+	const [description, setDescription] = useState('');
 	const [prompt, setPrompt] = useState(BLANK_AGENT_PROMPT);
 	const [preset, setPreset] = useState<keyof typeof TOOL_PRESETS>('planning');
 	const [duplicateFrom, setDuplicateFrom] = useState('');
@@ -67,6 +69,7 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 
 	const resetForm = () => {
 		setName('');
+		setDescription('');
 		setPrompt(BLANK_AGENT_PROMPT);
 		setPreset('planning');
 		setDuplicateFrom('');
@@ -93,6 +96,8 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 		const source = agents.find((a) => a.name === sourceName);
 		if (!source) return;
 		if (!name.trim()) setName(suggestAgentName(source.name, agents));
+		if (!description.trim() && source.description)
+			setDescription(source.description);
 		if (copyPrompt) setPrompt(source.prompt || BLANK_AGENT_PROMPT);
 	};
 
@@ -151,6 +156,7 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 					scope,
 					prompt,
 					promptStorage: 'file',
+					description: description.trim() || null,
 					tools,
 					provider: provider.trim() || null,
 					model: model.trim() || null,
@@ -198,6 +204,26 @@ export const AgentCreatePane = memo(function AgentCreatePane({
 								placeholder="reviewer"
 								className={`${FIELD_CLASS} mt-1.5 font-mono`}
 							/>
+						</div>
+
+						<div>
+							<label
+								htmlFor={descriptionId}
+								className="text-xs font-medium text-muted-foreground"
+							>
+								Description
+							</label>
+							<input
+								id={descriptionId}
+								value={description}
+								onChange={(e) => setDescription(e.target.value)}
+								maxLength={120}
+								placeholder="One line: what this agent is good at"
+								className={`${FIELD_CLASS} mt-1.5`}
+							/>
+							<p className="mt-1 text-[11px] text-muted-foreground">
+								Shown to other agents so they know when to delegate here.
+							</p>
 						</div>
 
 						<div>

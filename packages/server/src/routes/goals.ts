@@ -627,7 +627,7 @@ export function registerGoalsRoutes(app: Hono) {
 					'</tasks>',
 					'</goal_start>',
 					'',
-					'Work through the open tasks in order. Use goal_list for the latest state and claim finished tasks with goal_update (done_pending). Delegate to specialist agents with delegate_task where it helps. Otto verifies your claims and keeps the goal moving between runs.',
+					'Work through the open tasks in order. Use goal_list for the latest state. Before starting a task, mark it in_progress with goal_update; when finished, claim it with done_pending. Delegate to specialist agents with delegate_task where it helps. If a task says to use a specific agent, delegate it and do not perform that same task yourself unless the sub-agent fails or independent verification is explicitly requested. Otto verifies your claims and keeps the goal moving between runs.',
 				].join('\n');
 
 				const { dispatchAssistantMessage } = await import(

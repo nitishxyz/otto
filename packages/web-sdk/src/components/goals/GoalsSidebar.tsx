@@ -27,6 +27,7 @@ import {
 	useUpdateGoal,
 	useUpdateGoalTask,
 } from '../../hooks/useGoals';
+import { useQueueState } from '../../hooks/useQueueState';
 import type { GoalTask } from '../../lib/api-client';
 import { SidebarHeader } from '../ui/SidebarHeader';
 import { Textarea } from '../ui/Textarea';
@@ -86,8 +87,13 @@ function taskTextClass(status: GoalTask['status']) {
 	return 'text-foreground/80';
 }
 
-function taskStatusLabel(status: GoalTask['status']): string | null {
-	if (status === 'done_pending') return 'awaiting otto';
+function taskStatusLabel(
+	status: GoalTask['status'],
+	isSessionRunning: boolean,
+): string | null {
+	if (status === 'done_pending') {
+		return isSessionRunning ? 'claimed' : 'awaiting otto';
+	}
 	if (status === 'blocked') return 'blocked';
 	return null;
 }
@@ -206,6 +212,7 @@ const GoalsSidebarContent = memo(function GoalsSidebarContent({
 	const updateTask = useUpdateGoalTask(sessionId);
 	const addTasks = useAddGoalTasks(sessionId);
 	const startGoal = useStartGoal(sessionId);
+	const queueState = useQueueState(sessionId);
 
 	const goal = data?.goal ?? null;
 	const tasks = goal?.tasks ?? [];
@@ -214,6 +221,10 @@ const GoalsSidebarContent = memo(function GoalsSidebarContent({
 	);
 	const canStart = Boolean(goal) && openTasks.length > 0;
 	const isStarted = Boolean(goal?.startedAt);
+	const isSessionRunning = queueState.isRunning;
+	const hasPendingVerification = tasks.some(
+		(task) => task.status === 'done_pending',
+	);
 
 	return (
 		<div
@@ -291,7 +302,10 @@ const GoalsSidebarContent = memo(function GoalsSidebarContent({
 						<div className="flex-1 overflow-y-auto min-h-0">
 							<div>
 								{tasks.map((task) => {
-									const statusLabel = taskStatusLabel(task.status);
+									const statusLabel = taskStatusLabel(
+										task.status,
+										isSessionRunning,
+									);
 									const isActive = task.status === 'in_progress';
 									return (
 										<div
@@ -358,7 +372,11 @@ const GoalsSidebarContent = memo(function GoalsSidebarContent({
 									{isStarted ? (
 										<div className="flex items-center justify-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-xs text-muted-foreground">
 											<StableSpinner size="sm" title="Goal in progress" />
-											In progress — otto keeps it moving
+											{hasPendingVerification
+												? isSessionRunning
+													? 'Waiting for run to finish'
+													: 'Otto is verifying claims'
+												: 'In progress'}
 										</div>
 									) : (
 										<>

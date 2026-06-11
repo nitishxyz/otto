@@ -11,9 +11,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
 	BUILTIN_AGENT_NAMES,
+	BUILTIN_AGENT_DESCRIPTIONS,
 	defaultToolConfigForAgent,
 	discoverAllAgents,
 	loadAgentsConfig,
+	normalizeAgentDescription,
 	resolveAgentConfig,
 	type AgentConfigEntry,
 	type AgentToolConfig,
@@ -38,6 +40,8 @@ export type AgentDetail = {
 	source: AgentDetailSource;
 	prompt: string;
 	promptSource: string;
+	description?: string;
+	defaultDescription?: string;
 	toolConfig: Required<AgentToolGroups>;
 	defaultToolConfig: Required<AgentToolGroups>;
 	appendToolConfig: AgentToolGroups;
@@ -52,6 +56,7 @@ export type UpsertAgentInput = {
 	scope?: AgentConfigScope;
 	prompt?: string;
 	promptStorage?: 'file' | 'inline';
+	description?: string | null;
 	tools?: AgentToolConfig;
 	appendTools?: AgentToolConfig;
 	provider?: string | null;
@@ -234,6 +239,8 @@ export async function getAgentDetail(
 		}),
 		prompt: promptResolution.prompt,
 		promptSource: promptResolution.source,
+		description: agentCfg.description,
+		defaultDescription: BUILTIN_AGENT_DESCRIPTIONS[name],
 		toolConfig: agentCfg.toolConfig,
 		defaultToolConfig: defaultToolConfigForAgent(name),
 		appendToolConfig: normalizeToolGroups(entry?.appendTools) ?? {},
@@ -311,6 +318,7 @@ function resolveValidationProvider(args: {
 }
 
 function applyAgentInputToEntry(args: {
+	name: string;
 	entry: AgentConfigEntry;
 	input: UpsertAgentInput;
 	promptReference?: string;
@@ -344,6 +352,14 @@ function applyAgentInputToEntry(args: {
 			next.model = model.trim();
 		} else {
 			delete next.model;
+		}
+	}
+	if (Object.hasOwn(args.input, 'description')) {
+		const normalized = normalizeAgentDescription(args.input.description);
+		if (normalized && normalized !== BUILTIN_AGENT_DESCRIPTIONS[args.name]) {
+			next.description = normalized;
+		} else {
+			delete next.description;
 		}
 	}
 	return next;
@@ -400,6 +416,7 @@ export async function upsertAgentConfig(args: {
 	}
 
 	agents[name] = applyAgentInputToEntry({
+		name,
 		entry: currentEntry,
 		input: args.input,
 		promptReference,

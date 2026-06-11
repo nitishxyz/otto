@@ -393,6 +393,7 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 	const [prompt, setPrompt] = useState(agent.prompt);
 	const [provider, setProvider] = useState(agent.provider ?? '');
 	const [model, setModel] = useState(agent.model ?? '');
+	const [description, setDescription] = useState(agent.description ?? '');
 	const [selectedToolNames, setSelectedToolNames] = useState(
 		() => new Set(savedToolNames),
 	);
@@ -404,12 +405,14 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 		setPrompt(agent.prompt);
 		setProvider(agent.provider ?? '');
 		setModel(agent.model ?? '');
+		setDescription(agent.description ?? '');
 		setSelectedToolNames(new Set(savedToolNames));
 		setToolBuckets(toolBucketsFromConfig(agent.toolConfig));
 	}, [
 		agent.prompt,
 		agent.provider,
 		agent.model,
+		agent.description,
 		savedToolNames,
 		agent.toolConfig,
 	]);
@@ -423,6 +426,7 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 		if (prompt !== agent.prompt) return true;
 		if (provider !== (agent.provider ?? '')) return true;
 		if (model !== (agent.model ?? '')) return true;
+		if (description !== (agent.description ?? '')) return true;
 		if (selectedToolNames.size !== savedToolNames.length) return true;
 		if (savedToolNames.some((t) => !selectedToolNames.has(t))) return true;
 		return (
@@ -434,6 +438,7 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 		prompt,
 		provider,
 		model,
+		description,
 		selectedToolNames,
 		currentToolConfig,
 		savedToolNames,
@@ -468,6 +473,7 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 				scope: getAgentConfigScope(agent),
 				prompt,
 				promptStorage: 'file',
+				description: description.trim() || null,
 				provider: provider.trim() || null,
 				model: model.trim() || null,
 				tools: currentToolConfig,
@@ -479,6 +485,7 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 		setPrompt(agent.prompt);
 		setProvider(agent.provider ?? '');
 		setModel(agent.model ?? '');
+		setDescription(agent.description ?? '');
 		setSelectedToolNames(new Set(savedToolNames));
 		setToolBuckets(toolBucketsFromConfig(agent.toolConfig));
 	};
@@ -588,6 +595,8 @@ const AgentWorkspaceMain = memo(function AgentWorkspaceMain({
 								model={model}
 								onProviderChange={setProvider}
 								onModelChange={setModel}
+								description={description}
+								onDescriptionChange={setDescription}
 								disabled={isBusy}
 							/>
 						)}
@@ -632,6 +641,8 @@ const OverviewContent = memo(function OverviewContent({
 	model,
 	onProviderChange,
 	onModelChange,
+	description,
+	onDescriptionChange,
 	disabled,
 }: {
 	agent: AgentDetail;
@@ -645,6 +656,8 @@ const OverviewContent = memo(function OverviewContent({
 	model: string;
 	onProviderChange: (v: string) => void;
 	onModelChange: (v: string) => void;
+	description: string;
+	onDescriptionChange: (v: string) => void;
 	disabled?: boolean;
 }) {
 	return (
@@ -684,6 +697,25 @@ const OverviewContent = memo(function OverviewContent({
 				>
 					{agent.builtin ? 'Reset overrides' : 'Delete agent'}
 				</Button>
+			</div>
+			<div className="space-y-1.5">
+				<div>
+					<div className="text-sm font-medium text-foreground">Description</div>
+					<p className="mt-0.5 text-xs text-muted-foreground">
+						Shown to other agents so they know when to delegate here.
+					</p>
+				</div>
+				<input
+					type="text"
+					value={description}
+					onChange={(e) => onDescriptionChange(e.target.value)}
+					disabled={disabled}
+					maxLength={120}
+					placeholder={
+						agent.defaultDescription ?? 'One line: what this agent is good at'
+					}
+					className="w-full h-9 px-3 text-sm bg-muted/30 rounded-md outline-none ring-1 ring-border focus:ring-primary/50 transition-shadow disabled:cursor-not-allowed disabled:opacity-50"
+				/>
 			</div>
 			<div className="flex items-center gap-2 text-sm font-medium text-foreground">
 				<Cpu className="h-4 w-4 text-muted-foreground" />

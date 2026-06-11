@@ -11,6 +11,7 @@ export type AgentConfig = {
 	toolConfig: Required<AgentToolGroups>;
 	provider?: ProviderName;
 	model?: string;
+	description?: string;
 };
 
 export type AgentToolGroups = {
@@ -26,6 +27,7 @@ export type AgentConfigEntry = {
 	prompt?: string;
 	provider?: string;
 	model?: string;
+	description?: string;
 };
 
 export type AgentsJson = Record<string, AgentConfigEntry>;
@@ -38,6 +40,32 @@ export const BUILTIN_AGENT_NAMES = [
 	'research',
 	'otto',
 ];
+
+/** One-line descriptions for built-in agents, used in delegation prompts. */
+export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
+	build:
+		'Full coding agent: edits files, runs commands, builds, tests, and delegates.',
+	plan: 'Read-only planner: explores the codebase and produces plans, no edits.',
+	general:
+		'General-purpose assistant for questions and light repo exploration.',
+	init: 'Sets up AGENTS.md and project conventions for a repository.',
+	research:
+		'Searches session history and past conversations to answer questions.',
+	otto: 'Internal supervisor that verifies goal progress between runs.',
+};
+
+/** Maximum length of an agent description after normalization. */
+export const MAX_AGENT_DESCRIPTION_LENGTH = 120;
+
+/** Normalizes an agent description to a single trimmed line, capped in length. */
+export function normalizeAgentDescription(value: unknown): string | undefined {
+	if (typeof value !== 'string') return undefined;
+	const oneLine = value.replace(/\s+/g, ' ').trim();
+	if (!oneLine) return undefined;
+	return oneLine.length > MAX_AGENT_DESCRIPTION_LENGTH
+		? `${oneLine.slice(0, MAX_AGENT_DESCRIPTION_LENGTH - 1)}…`
+		: oneLine;
+}
 
 function normalizeStringList(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
@@ -133,6 +161,10 @@ function mergeAgentEntries(
 		merged.provider = normalizeProvider(base.provider);
 	if (base && Object.hasOwn(base, 'model'))
 		merged.model = normalizeModel(base.model);
+	if (base && Object.hasOwn(base, 'description')) {
+		const normalized = normalizeAgentDescription(base.description);
+		if (normalized) merged.description = normalized;
+	}
 
 	if (Object.hasOwn(override, 'tools')) {
 		const normalized = normalizeAgentToolConfig(override.tools);
@@ -160,6 +192,11 @@ function mergeAgentEntries(
 		if (normalized) merged.model = normalized;
 		else delete merged.model;
 	}
+	if (Object.hasOwn(override, 'description')) {
+		const normalized = normalizeAgentDescription(override.description);
+		if (normalized) merged.description = normalized;
+		else delete merged.description;
+	}
 	return merged;
 }
 
@@ -184,11 +221,6 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'terminal',
 			'apply_patch',
 			'websearch',
-			'delegate_task',
-			'list_subagents',
-			'message_subagent',
-			'goal_list',
-			'goal_update',
 		],
 		loadable: [
 			'read_image',
@@ -402,11 +434,34 @@ export async function resolveAgentConfig(
 	const normalizedToolConfig = normalizeRequiredToolGroups(toolConfig ?? {});
 	const provider = normalizeProvider(entry?.provider);
 	const model = normalizeModel(entry?.model);
+	const description =
+		normalizeAgentDescription(entry?.description) ??
+		BUILTIN_AGENT_DESCRIPTIONS[name];
 	return {
 		name,
 		prompt,
 		toolConfig: normalizedToolConfig,
 		provider,
 		model,
+		description,
 	};
+}
+
+/**
+ * Lists all known agents with their one-line descriptions. Used to tell agents
+ * which specialists they can delegate to.
+ */
+export async function listAgentDescriptions(
+	projectRoot: string,
+): Promise<Array<{ name: string; description?: string }>> {
+	const [names, agentsJson] = await Promise.all([
+		discoverAllAgents(projectRoot),
+		loadAgentsConfig(projectRoot).catch(() => ({}) as AgentsJson),
+	]);
+	return names.map((name) => ({
+		name,
+		description:
+			normalizeAgentDescription(agentsJson[name]?.description) ??
+			BUILTIN_AGENT_DESCRIPTIONS[name],
+	}));
 }
