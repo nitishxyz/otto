@@ -9,6 +9,7 @@ import {
 import {
 	extractExplicitSkillMentions as extractWebSkillMentions,
 	linkifyExplicitSkillMentions,
+	linkifyUserMessageMentions,
 } from '../packages/web-sdk/src/lib/skillMentions.ts';
 import {
 	buildExplicitSkillMentionContext,
@@ -63,6 +64,17 @@ describe('skill mentions', () => {
 			),
 		).toBe(
 			'[$code-review](#otto-skill:code-review) inspect this and ignore $unknown',
+		);
+	});
+
+	test('linkifies user message skill and file mentions for inline rendering', () => {
+		expect(
+			linkifyUserMessageMentions(
+				'Update @publish.env with $debug and ignore @unknown',
+				skills,
+			),
+		).toBe(
+			'Update [@publish.env](#otto-file:publish.env) with [$debug](#otto-skill:debug) and ignore @unknown',
 		);
 	});
 

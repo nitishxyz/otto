@@ -20,7 +20,7 @@ import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
 import { parseFileSelections } from '../../lib/fileSelectionContext';
 import { mentionHighlightClasses } from '../../lib/mentionHighlightStyles';
-import { linkifyExplicitSkillMentions } from '../../lib/skillMentions';
+import { linkifyUserMessageMentions } from '../../lib/skillMentions';
 import {
 	SubagentResultsNotice,
 	isSubagentResultsMessage,
@@ -28,6 +28,7 @@ import {
 import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
 import { useSkills } from '../../hooks/useSkills';
 import { useSkillsStore } from '../../stores/skillsStore';
+import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -64,6 +65,7 @@ export const UserMessageGroup = memo(
 		const { data: skillsConfig } = useSkills();
 		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
 		const selectSkill = useSkillsStore((state) => state.selectSkill);
+		const openFile = useFileBrowserStore((state) => state.openFile);
 
 		const { isQueued, position } = useMessageQueuePosition(
 			sessionId,
@@ -104,7 +106,7 @@ export const UserMessageGroup = memo(
 			fileSelections: parsedFileSelections,
 			cleanContent: contentAfterFileSelections,
 		} = parseFileSelections(content);
-		const renderedContent = linkifyExplicitSkillMentions(
+		const renderedContent = linkifyUserMessageMentions(
 			contentAfterFileSelections,
 			skillsConfig?.items ?? [],
 		);
@@ -184,6 +186,10 @@ export const UserMessageGroup = memo(
 		const handleSkillClick = (skillName: string) => {
 			expandSkillsSidebar();
 			selectSkill(skillName);
+		};
+
+		const handleFileClick = (filePath: string) => {
+			openFile(filePath);
 		};
 
 		const handleDelete = async () => {
@@ -316,6 +322,11 @@ export const UserMessageGroup = memo(
 														: href?.startsWith('otto-skill:')
 															? href.slice('otto-skill:'.length)
 															: null;
+													const fileHref = href?.startsWith('#otto-file:')
+														? href.slice('#otto-file:'.length)
+														: href?.startsWith('otto-file:')
+															? href.slice('otto-file:'.length)
+															: null;
 													if (skillHref) {
 														const skillName = decodeURIComponent(skillHref);
 														return (
@@ -324,6 +335,19 @@ export const UserMessageGroup = memo(
 																onClick={() => handleSkillClick(skillName)}
 																className={`${mentionHighlightClasses.skill} text-[0.92em] leading-normal transition-colors hover:bg-amber-500/20`}
 																title={`Open ${skillName} SKILL.md`}
+															>
+																{children}
+															</button>
+														);
+													}
+													if (fileHref) {
+														const filePath = decodeURIComponent(fileHref);
+														return (
+															<button
+																type="button"
+																onClick={() => handleFileClick(filePath)}
+																className={`${mentionHighlightClasses.file} text-[0.92em] leading-normal transition-colors hover:bg-foreground/15`}
+																title={filePath}
 															>
 																{children}
 															</button>

@@ -873,6 +873,20 @@ export const ChatInput = memo(
 										/>
 									)}
 
+									{showFileMention && (
+										<MentionPopup
+											agents={mentionAgents}
+											skills={mentionSkills}
+											files={files}
+											changedFiles={changedFiles}
+											query={mentionQuery}
+											selectedIndex={mentionSelectedIndex}
+											onSelect={handleMentionSelect}
+											onEnterSelect={handleMentionEnterSelect}
+											onClose={handleMentionClose}
+										/>
+									)}
+
 									<AttachmentPreviewList
 										images={images}
 										documents={documents}
@@ -1082,20 +1096,6 @@ export const ChatInput = memo(
 									</div>
 								</div>
 							</div>
-						)}
-
-						{showFileMention && (
-							<MentionPopup
-								agents={mentionAgents}
-								skills={mentionSkills}
-								files={files}
-								changedFiles={changedFiles}
-								query={mentionQuery}
-								selectedIndex={mentionSelectedIndex}
-								onSelect={handleMentionSelect}
-								onEnterSelect={handleMentionEnterSelect}
-								onClose={handleMentionClose}
-							/>
 						)}
 
 						{showShortcutsModal ? (
