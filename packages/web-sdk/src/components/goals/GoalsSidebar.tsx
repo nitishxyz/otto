@@ -108,6 +108,7 @@ function GoalComposer({
 }: GoalComposerProps) {
 	const [value, setValue] = useState('');
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const shouldRefocusRef = useRef(false);
 
 	useEffect(() => {
 		const textarea = textareaRef.current;
@@ -115,6 +116,14 @@ function GoalComposer({
 		textarea.style.height = 'auto';
 		textarea.style.height = `${textarea.scrollHeight}px`;
 	}, []);
+
+	useEffect(() => {
+		if (disabled || !shouldRefocusRef.current) return;
+		shouldRefocusRef.current = false;
+		requestAnimationFrame(() => {
+			textareaRef.current?.focus();
+		});
+	}, [disabled]);
 
 	const handleChange = useCallback(
 		(event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -129,6 +138,7 @@ function GoalComposer({
 	const submit = useCallback(() => {
 		const trimmed = value.trim();
 		if (!trimmed || disabled) return;
+		shouldRefocusRef.current = true;
 		onSubmit(trimmed);
 		setValue('');
 		requestAnimationFrame(() => {
