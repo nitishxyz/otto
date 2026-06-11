@@ -225,6 +225,56 @@ function buildStateHash(
 	return `${taskPart}::${lastUserMessageId ?? ''}::${errored ? 'err' : 'ok'}`;
 }
 
+const TRANSCRIPT_MESSAGES = 8;
+const TRANSCRIPT_PART_LIMIT = 700;
+
+/**
+ * Builds a compact tail of the main session conversation (text parts only) so
+ * otto can see how the agent answered previous [otto] messages and what the
+ * user actually asked for, instead of judging from task state alone.
+ */
+async function buildRecentTranscript(
+	db: DB,
+	sessionId: string,
+): Promise<string[]> {
+	const rows = await db
+		.select({ id: messages.id, role: messages.role })
+		.from(messages)
+		.where(eq(messages.sessionId, sessionId))
+		.orderBy(desc(messages.createdAt))
+		.limit(TRANSCRIPT_MESSAGES);
+	rows.reverse();
+
+	const lines: string[] = [];
+	for (const row of rows) {
+		const parts = await db
+			.select({ type: messageParts.type, content: messageParts.content })
+			.from(messageParts)
+			.where(eq(messageParts.messageId, row.id))
+			.orderBy(asc(messageParts.index));
+		const texts: string[] = [];
+		for (const part of parts) {
+			if (part.type !== 'text' || !part.content) continue;
+			try {
+				const text = String(JSON.parse(part.content)?.text ?? '').trim();
+				if (text) texts.push(text);
+			} catch {}
+		}
+		if (!texts.length) continue;
+		let combined = texts.join('\n').replace(/\s+\n/g, '\n').trim();
+		if (combined.length > TRANSCRIPT_PART_LIMIT) {
+			combined = `${combined.slice(0, TRANSCRIPT_PART_LIMIT)}…`;
+		}
+		const automated = AUTOMATED_PREFIXES.some((prefix) =>
+			combined.trimStart().startsWith(prefix),
+		);
+		const label =
+			row.role === 'assistant' ? 'assistant' : automated ? 'auto' : 'user';
+		lines.push(`[${label}] ${combined}`);
+	}
+	return lines;
+}
+
 async function findOrCreateOttoSession(
 	db: DB,
 	cfg: OttoConfig,
@@ -305,6 +355,15 @@ async function buildOttoWakeMessage(args: {
 		lines.push('', 'No active goal for this session.');
 	}
 
+	const transcript = await buildRecentTranscript(args.db, args.mainSession.id);
+	if (transcript.length) {
+		lines.push(
+			'',
+			'Recent main-session conversation (oldest first; [auto] = automated message, including your own previous [otto] continuations):',
+			...transcript.map((line) => `> ${line}`),
+		);
+	}
+
 	const allSubagents = await args.db
 		.select()
 		.from(subagents)
@@ -344,6 +403,7 @@ async function buildOttoWakeMessage(args: {
 	lines.push(
 		'',
 		'Follow your instructions: verify done_pending claims, update task statuses, and enqueue a continuation into the main session only if work remains or the error needs a retry.',
+		'If a previous [otto] message of yours was already answered in the conversation above, act on that answer (complete or reset tasks) — never re-ask the same thing.',
 		'Sub-agent results are delivered to the main session automatically — never repeat, summarize, or re-send them. Keep any enqueued continuation to one short line: which task to do next.',
 	);
 	return lines.join('\n');

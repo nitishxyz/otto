@@ -442,6 +442,7 @@ Output ONLY the title, nothing else.`;
 					model,
 					system: adapted.system,
 					messages: adapted.messages,
+					providerOptions: adapted.providerOptions,
 				});
 				modelTitle = (out?.text || '').trim();
 			}

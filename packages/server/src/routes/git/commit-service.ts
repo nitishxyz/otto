@@ -184,6 +184,7 @@ export async function handleGenerateCommitMessage(c: Context) {
 			system: adapted.system,
 			messages: adapted.messages,
 			maxOutputTokens: adapted.maxOutputTokens,
+			providerOptions: adapted.providerOptions,
 		});
 
 		return c.json({

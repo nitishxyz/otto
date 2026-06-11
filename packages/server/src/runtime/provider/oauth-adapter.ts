@@ -50,6 +50,7 @@ export type OAuthContext = {
 	isOAuth: boolean;
 	needsSpoof: boolean;
 	isOpenAIOAuth: boolean;
+	isXaiOAuth: boolean;
 	spoofPrompt: string | undefined;
 };
 
@@ -73,6 +74,7 @@ export function detectOAuth(
 		isOAuth: !!isOAuth,
 		needsSpoof,
 		isOpenAIOAuth: !!isOAuth && provider === 'openai',
+		isXaiOAuth: !!isOAuth && provider === 'xai',
 		spoofPrompt: needsSpoof ? getProviderSpoofPrompt(provider) : undefined,
 	};
 }
@@ -94,6 +96,22 @@ export function buildCodexProviderOptions(instructions?: string) {
 			store: false as const,
 			instructions: instructions?.trim() || CODEX_INSTRUCTIONS,
 			parallelToolCalls: false,
+		},
+	};
+}
+
+/**
+ * Build xAI OAuth (Grok CLI proxy) providerOptions.
+ * The grok cli-chat proxy persists conversations server-side when
+ * `store` is left at its default (`true`), which leaks context from
+ * previous sessions into the first turn of new sessions. Forcing
+ * `store: false` keeps every request stateless (the AI SDK then also
+ * requests `reasoning.encrypted_content` so reasoning replay still works).
+ */
+export function buildXaiOAuthProviderOptions() {
+	return {
+		xai: {
+			store: false as const,
 		},
 	};
 }
@@ -160,6 +178,16 @@ export function adaptSimpleCall(
 				},
 			],
 			maxOutputTokens: input.maxOutputTokens,
+			forceStream: false,
+		};
+	}
+
+	if (ctx.isXaiOAuth) {
+		return {
+			system: input.instructions,
+			messages: [{ role: 'user', content: input.userContent }],
+			maxOutputTokens: input.maxOutputTokens,
+			providerOptions: buildXaiOAuthProviderOptions(),
 			forceStream: false,
 		};
 	}
@@ -232,6 +260,16 @@ export function adaptRunnerCall(
 			additionalSystemMessages: [],
 			maxOutputTokens: undefined,
 			providerOptions: buildCodexProviderOptions(composed.prompt),
+		};
+	}
+
+	if (ctx.isXaiOAuth) {
+		return {
+			system: composed.prompt,
+			systemComponents: composed.components,
+			additionalSystemMessages: [],
+			maxOutputTokens: opts.rawMaxOutputTokens,
+			providerOptions: buildXaiOAuthProviderOptions(),
 		};
 	}
 
