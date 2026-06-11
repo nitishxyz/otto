@@ -1,20 +1,16 @@
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Plus, ChevronRight, X } from 'lucide-react';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { Plus, X } from 'lucide-react';
 import { useSidebarStore, usePanelWidthStore } from '@ottocode/web-sdk/stores';
-import {
-	Button,
-	OttoTabBar,
-	ResizeHandle,
-	type WorkspaceTab,
-} from '@ottocode/web-sdk/components';
+import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
+import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
 import { OttoWordmark } from './OttoWordmark';
 
 const PANEL_KEY = 'left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
+const LEFT_SIDEBAR_HOVER_RATIO = 0.02;
 
 function getConnectionLabel(url: string): string {
 	try {
@@ -42,6 +38,15 @@ export const Sidebar = memo(function Sidebar({
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
+	const { preferences } = usePreferences();
+	const { isVisible: isAutoVisible, isHoverPending } = useEdgeHover({
+		side: 'left',
+		enabled: isCollapsed && preferences.smartEdges,
+		hoverRatio: LEFT_SIDEBAR_HOVER_RATIO,
+		activeWidth: panelWidth,
+	});
+	const shouldShowSidebar = !isCollapsed || isAutoVisible;
+	const shouldShowEdgeHint = isCollapsed && isHoverPending && !isAutoVisible;
 	const sidebarStyle = {
 		'--expanded-sidebar-width': `${panelWidth}px`,
 		maxWidth: '100%',
@@ -50,29 +55,36 @@ export const Sidebar = memo(function Sidebar({
 	return (
 		<>
 			<SidebarBodyOverflowController isCollapsed={isCollapsed} />
+			<div
+				className={`pointer-events-none fixed inset-y-0 left-0 z-40 hidden w-24 origin-left transition-[opacity,transform] duration-300 ease-out md:block ${
+					shouldShowEdgeHint
+						? 'opacity-50 scale-x-100'
+						: 'opacity-0 scale-x-[0.35]'
+				}`}
+				aria-hidden="true"
+			>
+				<div className="h-full w-full bg-[radial-gradient(ellipse_at_left,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
+			</div>
 			<aside
 				className={`relative z-50 shrink-0 overflow-hidden border-r transition-[width,background-color,border-color] duration-300 ease-out fixed md:relative top-0 left-0 h-[var(--app-height,100dvh)] md:h-auto w-full ${
-					isCollapsed
-						? 'hidden md:flex md:w-12 border-border bg-background'
-						: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+					shouldShowSidebar
+						? isCollapsed
+							? 'hidden md:flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+							: 'flex md:w-[var(--expanded-sidebar-width)] border-sidebar-border sidebar-fade-in'
+						: 'hidden md:flex md:w-0 md:border-transparent md:bg-background md:pointer-events-none'
 				}`}
 				style={sidebarStyle}
+				aria-hidden={!shouldShowSidebar}
+				inert={!shouldShowSidebar ? true : undefined}
 			>
-				{isCollapsed ? (
-					<CollapsedSidebarContent
-						onNewSession={onNewSession}
-						onExpand={toggleCollapse}
-					/>
-				) : (
-					<ExpandedSidebarContent
-						onNewSession={onNewSession}
-						onCollapse={toggleCollapse}
-						connectionUrl={connectionUrl}
-						onSwitchConnection={onSwitchConnection}
-					>
-						{children}
-					</ExpandedSidebarContent>
-				)}
+				<ExpandedSidebarContent
+					onNewSession={onNewSession}
+					onCollapse={toggleCollapse}
+					connectionUrl={connectionUrl}
+					onSwitchConnection={onSwitchConnection}
+				>
+					{children}
+				</ExpandedSidebarContent>
 			</aside>
 			<MobileSidebarBackdrop
 				isVisible={!isCollapsed}
@@ -103,52 +115,6 @@ function SidebarBodyOverflowController({
 	return null;
 }
 
-interface CollapsedSidebarContentProps {
-	onNewSession?: () => void;
-	onExpand: () => void;
-}
-
-const CollapsedSidebarContent = memo(function CollapsedSidebarContent({
-	onNewSession,
-	onExpand,
-}: CollapsedSidebarContentProps) {
-	return (
-		<div className="flex h-full w-full flex-col">
-			<div className="h-12 border-b border-border flex items-center justify-center">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={onNewSession}
-					title="New session"
-					className="h-8 w-8 rounded-md touch-manipulation text-muted-foreground hover:bg-muted/50"
-				>
-					<Plus className="size-[18px]" />
-				</Button>
-			</div>
-
-			<button
-				type="button"
-				className="flex-1 cursor-pointer hover:bg-muted/50 transition-colors touch-manipulation"
-				onClick={onExpand}
-				title="Expand sidebar"
-				aria-label="Expand sidebar"
-			/>
-
-			<div className="h-12 border-t border-border flex items-center justify-center">
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={onExpand}
-					title="Expand sidebar"
-					className="h-8 w-8 transition-transform duration-200 hover:scale-110 touch-manipulation text-muted-foreground hover:bg-muted/50"
-				>
-					<ChevronRight className="size-[18px]" />
-				</Button>
-			</div>
-		</div>
-	);
-});
-
 interface ExpandedSidebarContentProps {
 	children: ReactNode;
 	onNewSession?: () => void;
@@ -166,12 +132,24 @@ const ExpandedSidebarContent = memo(function ExpandedSidebarContent({
 }: ExpandedSidebarContentProps) {
 	return (
 		<>
-			<div className="flex h-full w-full md:w-[var(--expanded-sidebar-width)] flex-col min-w-0 relative">
-				<MobileSidebarHeader onClose={onCollapse} />
-				<RoutedOttoTabBar />
-				<SidebarSessionListFrame onNewSession={onNewSession}>
-					{children}
-				</SidebarSessionListFrame>
+			<div className="flex h-full w-full shrink-0 flex-col min-w-0 relative md:w-[var(--expanded-sidebar-width)] md:min-w-[var(--expanded-sidebar-width)]">
+				<MobileSidebarHeader onClose={onCollapse} onNewSession={onNewSession} />
+				<div className="hidden md:flex h-12 shrink-0 px-3 items-center justify-between border-b border-sidebar-border/40 bg-sidebar">
+					<div className="flex items-center text-sidebar-foreground/90">
+						<OttoWordmark height={14} className="select-none" />
+					</div>
+					<button
+						type="button"
+						onClick={onNewSession}
+						className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
+						title="New session"
+					>
+						<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
+					</button>
+				</div>
+				<div className="flex-1 relative overflow-hidden">
+					<div className="absolute inset-0 overflow-hidden">{children}</div>
+				</div>
 				<SidebarFooter
 					connectionUrl={connectionUrl}
 					onSwitchConnection={onSwitchConnection}
@@ -191,32 +169,12 @@ const ExpandedSidebarContent = memo(function ExpandedSidebarContent({
 	);
 });
 
-/**
- * Agents | Otto tab bar backed by routes: the active tab reflects the
- * current pathname and switching tabs navigates, so refreshes land on the
- * same workspace.
- */
-const RoutedOttoTabBar = memo(function RoutedOttoTabBar() {
-	const navigate = useNavigate();
-	const activeTab = useRouterState({
-		select: (state): WorkspaceTab =>
-			state.location.pathname.startsWith('/otto') ? 'otto' : 'agents',
-	});
-
-	const handleTabChange = useCallback(
-		(tab: WorkspaceTab) => {
-			navigate({ to: tab === 'otto' ? '/otto' : '/sessions' });
-		},
-		[navigate],
-	);
-
-	return <OttoTabBar activeTab={activeTab} onTabChange={handleTabChange} />;
-});
-
 const MobileSidebarHeader = memo(function MobileSidebarHeader({
 	onClose,
+	onNewSession,
 }: {
 	onClose: () => void;
+	onNewSession?: () => void;
 }) {
 	return (
 		<div className="h-[calc(var(--mobile-safe-area-top)+3.5rem)] border-b border-sidebar-border px-4 pt-[var(--mobile-safe-area-top)] flex items-center gap-2 md:hidden bg-sidebar">
@@ -233,37 +191,14 @@ const MobileSidebarHeader = memo(function MobileSidebarHeader({
 			<div className="flex-1 flex items-center">
 				<OttoWordmark height={14} className="text-sidebar-foreground" />
 			</div>
-		</div>
-	);
-});
-
-interface SidebarSessionListFrameProps {
-	children: ReactNode;
-	onNewSession?: () => void;
-}
-
-const SidebarSessionListFrame = memo(function SidebarSessionListFrame({
-	children,
-	onNewSession,
-}: SidebarSessionListFrameProps) {
-	return (
-		<div className="flex-1 relative overflow-hidden">
-			<div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-				<div className="h-12 px-3 flex items-center justify-between border-b border-sidebar-border/40 bg-sidebar/95 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/90">
-					<div className="flex items-center text-sidebar-foreground/90">
-						<OttoWordmark height={14} className="select-none" />
-					</div>
-					<button
-						type="button"
-						onClick={onNewSession}
-						className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
-						title="New session"
-					>
-						<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
-					</button>
-				</div>
-			</div>
-			<div className="absolute inset-0 overflow-hidden">{children}</div>
+			<button
+				type="button"
+				onClick={onNewSession}
+				className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
+				title="New session"
+			>
+				<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
+			</button>
 		</div>
 	);
 });

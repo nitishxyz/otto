@@ -54,9 +54,10 @@ export function ConfigModal({
 	const ottoEnabled = config?.defaults?.ottoEnabled ?? true;
 	const agentNames = useMemo(
 		() =>
-			agentDetails?.agents.length
+			(agentDetails?.agents.length
 				? agentDetails.agents.map((agentDetail) => agentDetail.name)
-				: (config?.agents ?? []),
+				: (config?.agents ?? [])
+			).filter((name) => name !== 'otto'),
 		[agentDetails?.agents, config?.agents],
 	);
 	const agentSelectorRef = useRef<UnifiedAgentSelectorRef>(null);

@@ -123,8 +123,12 @@ export * from './browser/BrowserViewerPanel';
 // Workspace Components
 export * from './workspace/ViewerTabs';
 
+// Title Bar Components
+export * from './titlebar/TitleBar';
+
 // Common Components
 export * from './common/FileTypeIcon';
+export * from './common/OttoOIcon';
 export * from './common/ProviderLogo';
 export * from './common/StatusIndicator';
 export * from './common/UsageRing';

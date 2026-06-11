@@ -21,7 +21,11 @@ import {
 	useClientEvents,
 	sessionsQueryKey,
 } from '@ottocode/web-sdk/hooks';
-import { useGitStore, useConfirmationStore } from '@ottocode/web-sdk/stores';
+import {
+	useGitStore,
+	useConfirmationStore,
+	useWorkspaceTabStore,
+} from '@ottocode/web-sdk/stores';
 
 import { apiClient } from '@ottocode/web-sdk/lib';
 import {
@@ -93,6 +97,9 @@ export function SessionsLayout({
 	);
 
 	const handleDeleteSession = useCallback(() => {
+		useWorkspaceTabStore
+			.getState()
+			.clearLastSession(isOttoTab ? 'otto' : 'agents');
 		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
 	}, [navigate, isOttoTab]);
 

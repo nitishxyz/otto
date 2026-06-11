@@ -1,0 +1,191 @@
+import { memo, useCallback, useEffect } from 'react';
+import { ArrowDownToLine, RotateCw } from 'lucide-react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useWorkspaceTabStore } from '@ottocode/web-sdk/stores';
+import {
+	OttoTabBar,
+	TitleBar,
+	TitleBarButton,
+	TitleBarRightRailToggle,
+	TitleBarThemeToggle,
+	type WorkspaceTab,
+} from '@ottocode/web-sdk/components';
+import { useUpdate } from '../../hooks/useUpdate';
+import { usePlatform } from '../../hooks/usePlatform';
+import { useFullscreen } from '../../hooks/useFullscreen';
+import { useVersion } from '../../hooks/useVersion';
+import { handleTitleBarDrag } from '../../utils/title-bar';
+import { tauriBridge } from '../../lib/tauri-bridge';
+import { useDesktopTheme } from '../../theme';
+import { WindowControls } from '../WindowControls';
+
+/**
+ * Agents | Otto tabs backed by the desktop router (/sessions vs /otto).
+ * Must render inside the workspace QueryClientProvider (OttoTabBar queries
+ * the server for otto availability). Remembers the last visited session per
+ * tab so switching tabs returns to that session instead of the landing.
+ */
+const DesktopRoutedOttoTabs = memo(function DesktopRoutedOttoTabs() {
+	const navigate = useNavigate();
+	const pathname = useRouterState({
+		select: (state) => state.location.pathname,
+	});
+	const activeTab: WorkspaceTab = pathname.startsWith('/otto')
+		? 'otto'
+		: 'agents';
+	const setLastSession = useWorkspaceTabStore((s) => s.setLastSession);
+
+	useEffect(() => {
+		const match = pathname.match(/^\/(otto|sessions)\/([^/]+)/);
+		if (match?.[2]) {
+			setLastSession(match[1] === 'otto' ? 'otto' : 'agents', match[2]);
+		}
+	}, [pathname, setLastSession]);
+
+	const handleTabChange = useCallback(
+		(tab: WorkspaceTab) => {
+			const lastSessionId =
+				useWorkspaceTabStore.getState().lastSessionByTab[tab];
+			if (lastSessionId) {
+				navigate({
+					to: tab === 'otto' ? '/otto/$sessionId' : '/sessions/$sessionId',
+					params: { sessionId: lastSessionId },
+				});
+				return;
+			}
+			navigate({ to: tab === 'otto' ? '/otto' : '/sessions' });
+		},
+		[navigate],
+	);
+
+	return (
+		<OttoTabBar
+			variant="titlebar"
+			activeTab={activeTab}
+			onTabChange={handleTabChange}
+		/>
+	);
+});
+
+interface DesktopTitleBarProps {
+	projectName: string;
+	onBack: () => void | Promise<void>;
+	serverPort?: number;
+	isRemote: boolean;
+	/** Hide the workspace tabs (e.g. while the server is still starting). */
+	showTabs?: boolean;
+}
+
+/**
+ * Desktop app title bar: shared TitleBar composition (sidebar toggle,
+ * Agents | Otto tabs, right-rail + theme toggles) plus desktop-specific
+ * content — back button, update controls, API port + app version, and a
+ * new-window button. Acts as the native drag region.
+ */
+export const DesktopTitleBar = memo(function DesktopTitleBar({
+	projectName,
+	onBack,
+	serverPort,
+	isRemote,
+	showTabs = true,
+}: DesktopTitleBarProps) {
+	const platform = usePlatform();
+	const isFullscreen = useFullscreen();
+	const { theme, toggleTheme } = useDesktopTheme();
+	const appVersion = useVersion();
+	const {
+		available,
+		version,
+		downloading,
+		downloaded,
+		progress,
+		downloadUpdate,
+		applyUpdate,
+		error: updateError,
+	} = useUpdate();
+
+	return (
+		<TitleBar
+			onMouseDown={handleTitleBarDrag}
+			dragRegion
+			leadingInset={platform === 'macos' && !isFullscreen}
+			onBack={onBack}
+			title={projectName}
+			leading={showTabs ? <DesktopRoutedOttoTabs /> : undefined}
+			trailing={
+				<>
+					{available &&
+						(downloaded ? (
+							<button
+								type="button"
+								onClick={applyUpdate}
+								className="h-7 px-3 flex items-center gap-1.5 text-sm font-medium bg-green-600 text-white rounded-full hover:bg-green-500 transition-colors"
+								title={`Restart to update to v${version}`}
+							>
+								<RotateCw className="w-4 h-4" />
+								Restart
+							</button>
+						) : (
+							<button
+								type="button"
+								onClick={downloadUpdate}
+								disabled={downloading}
+								className="h-7 px-3 flex items-center gap-1.5 text-sm font-medium bg-blue-600 text-white rounded-full hover:bg-blue-500 transition-colors disabled:opacity-60"
+								title={`Update to v${version}`}
+							>
+								<ArrowDownToLine className="w-4 h-4" />
+								{downloading ? `${progress}%` : 'Update'}
+							</button>
+						))}
+					{updateError && (
+						<span
+							className="text-sm text-red-400 max-w-[200px] truncate"
+							title={updateError}
+						>
+							⚠ {updateError}
+						</span>
+					)}
+					{serverPort != null && !isRemote && (
+						<div className="flex items-center gap-1.5 text-sm">
+							<span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+							<span className="text-muted-foreground">API {serverPort}</span>
+							{appVersion && (
+								<span className="text-muted-foreground/50">
+									· v{appVersion}
+								</span>
+							)}
+						</div>
+					)}
+					{isRemote && (
+						<div className="flex items-center gap-1.5 text-sm">
+							<span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+							<span className="text-muted-foreground">Remote</span>
+						</div>
+					)}
+					<TitleBarRightRailToggle />
+					<TitleBarThemeToggle theme={theme} onToggleTheme={toggleTheme} />
+					<TitleBarButton
+						onClick={() => tauriBridge.createNewWindow()}
+						title="New Window"
+					>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.5"
+							strokeLinecap="round"
+							aria-hidden="true"
+						>
+							<rect x="1" y="1" width="14" height="14" rx="2" />
+							<line x1="8" y1="4.5" x2="8" y2="11.5" />
+							<line x1="4.5" y1="8" x2="11.5" y2="8" />
+						</svg>
+					</TitleBarButton>
+					{platform === 'linux' && <WindowControls />}
+				</>
+			}
+		/>
+	);
+});

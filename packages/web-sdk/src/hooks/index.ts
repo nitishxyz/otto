@@ -32,5 +32,6 @@ export * from './useAgents';
 export * from './useChatComposer';
 export * from './useConfigModalControls';
 export * from './useContainerWidth';
+export * from './useEdgeHover';
 export * from './useVoiceInput';
 export * from './useDictationModels';

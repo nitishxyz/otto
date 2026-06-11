@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -6,6 +7,8 @@ import {
 	ChatInputContainer,
 	MessageThreadContainer,
 	NewSessionLanding,
+	OttoSessionRail,
+	OttoWorkspace,
 	SessionListContainer,
 	Toaster,
 	type ChatInputContainerRef,
@@ -26,7 +29,11 @@ import {
 	useWorkingDirectory,
 } from '@ottocode/web-sdk/hooks';
 import { apiClient } from '@ottocode/web-sdk/lib';
-import { useConfirmationStore, useGitStore } from '@ottocode/web-sdk/stores';
+import {
+	useConfirmationStore,
+	useGitStore,
+	useWorkspaceTabStore,
+} from '@ottocode/web-sdk/stores';
 import type { Theme } from '@ottocode/web-sdk/hooks';
 import type { Project } from '../../lib/tauri-bridge';
 import { DesktopAppLayout } from './DesktopAppLayout';
@@ -36,8 +43,11 @@ interface DesktopSessionsLayoutProps {
 	theme: Theme;
 	onToggleTheme: () => void;
 	sessionId?: string;
+	/** Workspace view: 'agents' (default, /sessions) or 'otto' (/otto). */
+	view?: 'agents' | 'otto';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
+	titleBar?: ReactNode;
 }
 
 export function DesktopSessionsLayout({
@@ -45,8 +55,10 @@ export function DesktopSessionsLayout({
 	theme,
 	onToggleTheme,
 	sessionId,
+	view = 'agents',
 	dashboardOpen,
 	onCloseDashboard,
+	titleBar,
 }: DesktopSessionsLayoutProps) {
 	const navigate = useNavigate();
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
@@ -64,6 +76,7 @@ export function DesktopSessionsLayout({
 	);
 	const defaultAgent =
 		project.kind === 'general' ? 'general' : config?.defaults.agent;
+	const isOttoTab = view === 'otto';
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
@@ -77,9 +90,9 @@ export function DesktopSessionsLayout({
 	}, []);
 
 	const handleNewSession = useCallback(() => {
-		navigate({ to: '/sessions' });
+		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
 		focusInput();
-	}, [navigate, focusInput]);
+	}, [navigate, focusInput, isOttoTab]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
@@ -94,14 +107,40 @@ export function DesktopSessionsLayout({
 	);
 
 	const handleDeleteSession = useCallback(() => {
-		navigate({ to: '/sessions' });
-	}, [navigate]);
+		useWorkspaceTabStore
+			.getState()
+			.clearLastSession(isOttoTab ? 'otto' : 'agents');
+		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
+	}, [navigate, isOttoTab]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
 			navigate({
 				to: '/sessions/$sessionId',
 				params: { sessionId: id },
+			});
+			focusInput();
+		},
+		[navigate, focusInput],
+	);
+
+	const handleSelectOttoSession = useCallback(
+		(id: string) => {
+			navigate({
+				to: '/otto/$sessionId',
+				params: { sessionId: id },
+			});
+			focusInput();
+		},
+		[navigate, focusInput],
+	);
+
+	const handleOttoSessionCreated = useCallback(
+		(newSessionId: string) => {
+			navigate({
+				to: '/otto/$sessionId',
+				params: { sessionId: newSessionId },
+				replace: false,
 			});
 			focusInput();
 		},
@@ -284,14 +323,33 @@ export function DesktopSessionsLayout({
 				dashboardOpen={dashboardOpen}
 				onOpenDashboard={handleOpenDashboard}
 				onCloseDashboard={onCloseDashboard}
+				titleBar={titleBar}
 				sidebar={
-					<SessionListContainer
-						activeSessionId={sessionId}
-						onSelectSession={handleSelectSession}
-					/>
+					isOttoTab ? (
+						<OttoSessionRail
+							activeSessionId={sessionId}
+							onSelectSession={handleSelectOttoSession}
+							hasOverlayHeader
+						/>
+					) : (
+						<SessionListContainer
+							activeSessionId={sessionId}
+							onSelectSession={handleSelectSession}
+							hasOverlayHeader
+						/>
+					)
 				}
 			>
-				{mainContent}
+				{isOttoTab ? (
+					<OttoWorkspace
+						sessionId={sessionId}
+						onSessionCreated={handleOttoSessionCreated}
+						onNewSession={handleNewSession}
+						onDeleteSession={handleDeleteSession}
+					/>
+				) : (
+					mainContent
+				)}
 			</DesktopAppLayout>
 			<Toaster />
 		</>

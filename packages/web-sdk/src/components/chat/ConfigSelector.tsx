@@ -89,11 +89,13 @@ export function ConfigSelector({
 						onChange={(e) => onAgentChange(e.target.value)}
 						className="text-xs bg-background border border-border rounded px-2 py-1 outline-none"
 					>
-						{config.agents.map((a) => (
-							<option key={a} value={a}>
-								{a}
-							</option>
-						))}
+						{config.agents
+							.filter((a) => a !== 'otto')
+							.map((a) => (
+								<option key={a} value={a}>
+									{a}
+								</option>
+							))}
 					</select>
 
 					<select

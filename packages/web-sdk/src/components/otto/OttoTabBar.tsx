@@ -1,21 +1,27 @@
 import { memo } from 'react';
-import { Bot, Target } from 'lucide-react';
+import { SquareTerminal } from 'lucide-react';
 import { useOttoEnabled } from '../../hooks/useGoals';
+import { OttoOIcon } from '../common/OttoOIcon';
 
 export type WorkspaceTab = 'agents' | 'otto';
 
 const TABS: Array<{ id: WorkspaceTab; label: string }> = [
-	{ id: 'agents', label: 'Agents' },
-	{ id: 'otto', label: 'Otto' },
+	{ id: 'agents', label: 'agents' },
+	{ id: 'otto', label: 'otto' },
 ];
 
 interface OttoTabBarProps {
 	activeTab: WorkspaceTab;
 	onTabChange: (tab: WorkspaceTab) => void;
+	/**
+	 * 'sidebar' (default): full-width tab row for the left sidebar.
+	 * 'titlebar': compact segmented control for the top title bar.
+	 */
+	variant?: 'sidebar' | 'titlebar';
 }
 
 /**
- * Top-level workspace tab switcher: Agents (direct sessions) vs Otto (goal
+ * Top-level workspace tab switcher: Chats (direct sessions) vs Otto (goal
  * orchestrator). Controlled by the host app — typically backed by routes
  * (/sessions vs /otto) so refreshes land on the same tab. Renders nothing
  * when otto is disabled on the server (`useOttoEnabled()`); hosts should
@@ -24,9 +30,39 @@ interface OttoTabBarProps {
 export const OttoTabBar = memo(function OttoTabBar({
 	activeTab,
 	onTabChange,
+	variant = 'sidebar',
 }: OttoTabBarProps) {
 	const ottoEnabled = useOttoEnabled();
 	if (!ottoEnabled) return null;
+	if (variant === 'titlebar') {
+		return (
+			<div className="flex h-8 items-center gap-0.5 rounded-lg bg-muted/60 p-0.5">
+				{TABS.map((tab) => {
+					const isActive = activeTab === tab.id;
+					return (
+						<button
+							key={tab.id}
+							type="button"
+							onClick={() => onTabChange(tab.id)}
+							className={`flex h-7 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors touch-manipulation ${
+								isActive
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'
+							}`}
+							aria-pressed={isActive}
+						>
+							{tab.id === 'agents' ? (
+								<SquareTerminal className="h-3.5 w-3.5" />
+							) : (
+								<OttoOIcon className="h-3 w-3" />
+							)}
+							{tab.label}
+						</button>
+					);
+				})}
+			</div>
+		);
+	}
 	return (
 		<div className="flex h-10 shrink-0 items-stretch gap-1 border-b border-sidebar-border px-2 pt-1.5 pb-1">
 			{TABS.map((tab) => {
@@ -44,9 +80,9 @@ export const OttoTabBar = memo(function OttoTabBar({
 						aria-pressed={isActive}
 					>
 						{tab.id === 'agents' ? (
-							<Bot className="h-3.5 w-3.5" />
+							<SquareTerminal className="h-3.5 w-3.5" />
 						) : (
-							<Target className="h-3.5 w-3.5" />
+							<OttoOIcon className="h-3 w-3" />
 						)}
 						{tab.label}
 					</button>

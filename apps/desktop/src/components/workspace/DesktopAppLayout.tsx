@@ -87,6 +87,7 @@ interface DesktopAppLayoutProps {
 	dashboardOpen: boolean;
 	onOpenDashboard: () => void;
 	onCloseDashboard: () => void;
+	titleBar?: ReactNode;
 }
 
 export const DesktopAppLayout = memo(function DesktopAppLayout({
@@ -100,6 +101,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	dashboardOpen,
 	onOpenDashboard,
 	onCloseDashboard,
+	titleBar,
 }: DesktopAppLayoutProps) {
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
@@ -335,134 +337,138 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	}, [smartEdges]);
 
 	return (
-		<div className="h-full flex bg-background touch-manipulation border-t border-border/50">
-			<DesktopSidebar onNewSession={onNewSession}>{sidebar}</DesktopSidebar>
+		<div className="h-full flex flex-col bg-background touch-manipulation">
+			{titleBar}
 
-			<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
-				<div className="flex-1 flex overflow-hidden relative">
-					<div
-						className={`pointer-events-none absolute inset-y-0 right-0 z-30 hidden w-12 origin-right transition-[opacity,transform] duration-300 ease-out md:block ${
-							shouldShowRightEdgeHint
-								? 'opacity-50 scale-x-100'
-								: 'opacity-0 scale-x-[0.35]'
-						}`}
-						aria-hidden="true"
-					>
-						<div className="h-full w-full bg-[radial-gradient(ellipse_at_right,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
-					</div>
-					<div className="flex min-w-0 flex-1 overflow-hidden">
-						<main
-							className={`relative flex-col overflow-hidden ${
-								!anyViewerOpen
-									? 'flex flex-1 min-w-0'
-									: showChatBesideViewer
-										? 'hidden md:flex md:flex-1 md:min-w-[400px]'
-										: 'hidden'
-							}`}
-						>
-							{children}
-						</main>
-						<section
-							className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
-								anyViewerOpen ? 'flex' : 'hidden md:flex'
-							} ${
-								anyViewerOpen
-									? 'border-sidebar-border opacity-100'
-									: 'border-transparent opacity-0'
-							} ${
-								shouldAnimateViewer
-									? 'transition-[width,opacity,border-color] duration-300 ease-out'
-									: 'transition-none'
-							}`}
-							style={viewerPaneStyle}
-							aria-hidden={!anyViewerOpen}
-						>
-							{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
-								<ResizeHandle
-									panelKey={VIEWER_PANEL_KEY}
-									side="right"
-									minWidth={VIEWER_MIN_WIDTH}
-									maxWidth={VIEWER_MAX_WIDTH}
-									defaultWidth={VIEWER_MIN_WIDTH}
-								/>
-							)}
-							{anyViewerOpen && <ViewerTabs />}
-						</section>
-					</div>
+			<div className="flex-1 flex min-h-0 overflow-hidden">
+				<DesktopSidebar onNewSession={onNewSession}>{sidebar}</DesktopSidebar>
 
-					<div className="flex">
+				<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
+					<div className="flex-1 flex overflow-hidden relative">
 						<div
-							className={`h-full shrink-0 overflow-hidden bg-sidebar ${
-								isRightPanelTransitioning
-									? 'transition-[width] duration-300 ease-out'
-									: 'transition-none'
+							className={`pointer-events-none absolute inset-y-0 right-0 z-30 hidden w-12 origin-right transition-[opacity,transform] duration-300 ease-out md:block ${
+								shouldShowRightEdgeHint
+									? 'opacity-50 scale-x-100'
+									: 'opacity-0 scale-x-[0.35]'
 							}`}
-							style={rightPanelStyle}
-							aria-hidden={!shouldRenderRightPanel}
+							aria-hidden="true"
 						>
-							<div className="h-full w-full">
-								<GitSidebar onFixWithAI={onFixWithAI} />
-								<SessionFilesSidebar sessionId={sessionId} />
-								<SettingsSidebar onOpenDashboard={onOpenDashboard} />
-								<TunnelSidebar />
-								<FileBrowserSidebar />
-								<MCPSidebar />
-								<SkillsSidebar />
-								<AgentsSidebar />
+							<div className="h-full w-full bg-[radial-gradient(ellipse_at_right,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
+						</div>
+						<div className="flex min-w-0 flex-1 overflow-hidden">
+							<main
+								className={`relative flex-col overflow-hidden ${
+									!anyViewerOpen
+										? 'flex flex-1 min-w-0'
+										: showChatBesideViewer
+											? 'hidden md:flex md:flex-1 md:min-w-[400px]'
+											: 'hidden'
+								}`}
+							>
+								{children}
+							</main>
+							<section
+								className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+									anyViewerOpen ? 'flex' : 'hidden md:flex'
+								} ${
+									anyViewerOpen
+										? 'border-sidebar-border opacity-100'
+										: 'border-transparent opacity-0'
+								} ${
+									shouldAnimateViewer
+										? 'transition-[width,opacity,border-color] duration-300 ease-out'
+										: 'transition-none'
+								}`}
+								style={viewerPaneStyle}
+								aria-hidden={!anyViewerOpen}
+							>
+								{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
+									<ResizeHandle
+										panelKey={VIEWER_PANEL_KEY}
+										side="right"
+										minWidth={VIEWER_MIN_WIDTH}
+										maxWidth={VIEWER_MAX_WIDTH}
+										defaultWidth={VIEWER_MIN_WIDTH}
+									/>
+								)}
+								{anyViewerOpen && <ViewerTabs />}
+							</section>
+						</div>
+
+						<div className="flex">
+							<div
+								className={`h-full shrink-0 overflow-hidden bg-sidebar ${
+									isRightPanelTransitioning
+										? 'transition-[width] duration-300 ease-out'
+										: 'transition-none'
+								}`}
+								style={rightPanelStyle}
+								aria-hidden={!shouldRenderRightPanel}
+							>
+								<div className="h-full w-full">
+									<GitSidebar onFixWithAI={onFixWithAI} />
+									<SessionFilesSidebar sessionId={sessionId} />
+									<SettingsSidebar onOpenDashboard={onOpenDashboard} />
+									<TunnelSidebar />
+									<FileBrowserSidebar />
+									<MCPSidebar />
+									<SkillsSidebar />
+									<AgentsSidebar />
+								</div>
 							</div>
 						</div>
-					</div>
 
-					<div
-						className={`relative z-40 hidden h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out md:block ${
-							shouldShowRightRail
-								? 'w-12 pointer-events-auto'
-								: 'w-0 pointer-events-none'
-						}`}
-					>
 						<div
-							className={`flex h-full w-12 flex-col border-l shadow-xl transition-[opacity,transform] duration-150 ease-out ${
+							className={`relative z-40 hidden h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out md:block ${
 								shouldShowRightRail
-									? 'translate-x-0 opacity-100 pointer-events-auto'
-									: 'translate-x-2 opacity-0 pointer-events-none'
-							} ${
-								anyRightPanelOpen
-									? 'sidebar-fade-in border-sidebar-border'
-									: 'bg-background border-border'
+									? 'w-12 pointer-events-auto'
+									: 'w-0 pointer-events-none'
 							}`}
 						>
-							<GitSidebarToggle />
-							<SessionFilesSidebarToggle sessionId={sessionId} />
-							<FileBrowserSidebarToggle />
-							<BrowserPanelToggle />
-							<TunnelSidebarToggle />
-							<MCPSidebarToggle />
-							<SkillsSidebarToggle />
-							<AgentsSidebarToggle />
-							<SettingsSidebarToggle />
-							<div className="flex-1" />
-							<TerminalPanelToggle />
-							<div className="h-12 border-t border-border flex items-center justify-center">
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={onToggleTheme}
-									title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-									aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-									className="touch-manipulation"
-								>
-									{theme === 'dark' ? (
-										<Sun className="w-4 h-4" />
-									) : (
-										<Moon className="w-4 h-4" />
-									)}
-								</Button>
+							<div
+								className={`flex h-full w-12 flex-col border-l shadow-xl transition-[opacity,transform] duration-150 ease-out ${
+									shouldShowRightRail
+										? 'translate-x-0 opacity-100 pointer-events-auto'
+										: 'translate-x-2 opacity-0 pointer-events-none'
+								} ${
+									anyRightPanelOpen
+										? 'sidebar-fade-in border-sidebar-border'
+										: 'bg-background border-border'
+								}`}
+							>
+								<GitSidebarToggle />
+								<SessionFilesSidebarToggle sessionId={sessionId} />
+								<FileBrowserSidebarToggle />
+								<BrowserPanelToggle />
+								<TunnelSidebarToggle />
+								<MCPSidebarToggle />
+								<SkillsSidebarToggle />
+								<AgentsSidebarToggle />
+								<SettingsSidebarToggle />
+								<div className="flex-1" />
+								<TerminalPanelToggle />
+								<div className="h-12 border-t border-border flex items-center justify-center">
+									<Button
+										variant="ghost"
+										size="icon"
+										onClick={onToggleTheme}
+										title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+										aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+										className="touch-manipulation"
+									>
+										{theme === 'dark' ? (
+											<Sun className="w-4 h-4" />
+										) : (
+											<Moon className="w-4 h-4" />
+										)}
+									</Button>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
 
-				<TerminalsPanel />
+					<TerminalsPanel />
+				</div>
 			</div>
 
 			<GitCommitModal />

@@ -5,6 +5,8 @@ import { SessionListContainer } from '../sessions/SessionListContainer';
 interface OttoSessionRailProps {
 	activeSessionId?: string;
 	onSelectSession: (sessionId: string) => void;
+	/** See SessionListContainer: host floats an h-12 header over the list. */
+	hasOverlayHeader?: boolean;
 }
 
 /**
@@ -16,6 +18,7 @@ interface OttoSessionRailProps {
 export const OttoSessionRail = memo(function OttoSessionRail({
 	activeSessionId,
 	onSelectSession,
+	hasOverlayHeader,
 }: OttoSessionRailProps) {
 	const ottoEnabled = useOttoEnabled();
 	if (!ottoEnabled) return null;
@@ -25,6 +28,7 @@ export const OttoSessionRail = memo(function OttoSessionRail({
 			activeSessionId={activeSessionId}
 			onSelectSession={onSelectSession}
 			emptyMessage="No otto sessions yet. Start chatting to create one."
+			hasOverlayHeader={hasOverlayHeader}
 		/>
 	);
 });

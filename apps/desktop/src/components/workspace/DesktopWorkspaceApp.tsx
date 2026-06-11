@@ -3,6 +3,7 @@ import {
 	OttoRouterTopupModal,
 } from '@ottocode/web-sdk/components';
 import type { Theme } from '@ottocode/web-sdk/hooks';
+import type { ReactNode } from 'react';
 import type { Project } from '../../lib/tauri-bridge';
 import { DesktopSessionsLayout } from './DesktopSessionsLayout';
 import { DesktopWorkspaceProvider } from './DesktopWorkspaceProvider';
@@ -13,8 +14,10 @@ interface DesktopWorkspaceAppProps {
 	theme: Theme;
 	onToggleTheme: () => void;
 	sessionId?: string;
+	view?: 'agents' | 'otto';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
+	titleBar?: ReactNode;
 }
 
 export function DesktopWorkspaceApp({
@@ -23,8 +26,10 @@ export function DesktopWorkspaceApp({
 	theme,
 	onToggleTheme,
 	sessionId,
+	view,
 	dashboardOpen,
 	onCloseDashboard,
+	titleBar,
 }: DesktopWorkspaceAppProps) {
 	return (
 		<DesktopWorkspaceProvider apiUrl={apiUrl}>
@@ -34,8 +39,10 @@ export function DesktopWorkspaceApp({
 					theme={theme}
 					onToggleTheme={onToggleTheme}
 					sessionId={sessionId}
+					view={view}
 					dashboardOpen={dashboardOpen}
 					onCloseDashboard={onCloseDashboard}
+					titleBar={titleBar}
 				/>
 				<OnboardingModal hideHeader />
 				<OttoRouterTopupModal />

@@ -1,7 +1,7 @@
 import {
 	ottorouterCatalog,
 	type OttoRouterModelCatalogEntry,
-} from '@ottorouter/ai-sdk';
+} from '@ottorouter/ai-sdk/catalog';
 import type {
 	BuiltInProviderId,
 	ModelInfo,

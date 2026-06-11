@@ -19,6 +19,11 @@ interface SessionListContainerProps {
 	onSelectSession: (sessionId: string) => void;
 	sessionType?: SessionListFilter;
 	emptyMessage?: string;
+	/**
+	 * Set when the host floats an absolutely-positioned h-12 header over the
+	 * list: adds a matching top spacer and offsets sticky group headers.
+	 */
+	hasOverlayHeader?: boolean;
 }
 
 interface SessionSnapshot {
@@ -123,6 +128,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	onSelectSession,
 	sessionType,
 	emptyMessage,
+	hasOverlayHeader = false,
 }: SessionListContainerProps) {
 	const {
 		data: sessions = [],
@@ -366,7 +372,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 
 	if (isLoading) {
 		return (
-			<div className="flex flex-col gap-2 px-3 py-2">
+			<div
+				className={`flex flex-col gap-2 px-3 py-2 ${hasOverlayHeader ? 'pt-14' : ''}`}
+			>
 				<div className="h-8 rounded-md bg-sidebar-accent/50 animate-pulse" />
 				<div className="h-8 rounded-md bg-sidebar-accent/50 animate-pulse" />
 				<div className="h-8 rounded-md bg-sidebar-accent/50 animate-pulse" />
@@ -377,7 +385,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 
 	if (sessionSnapshot.length === 0) {
 		return (
-			<div className="px-4 py-8 text-center text-sm text-sidebar-muted-foreground">
+			<div
+				className={`px-4 py-8 text-center text-sm text-sidebar-muted-foreground ${hasOverlayHeader ? 'pt-20' : ''}`}
+			>
 				{emptyMessage ?? 'No sessions yet. Create one to get started.'}
 			</div>
 		);
@@ -405,7 +415,9 @@ export const SessionListContainer = memo(function SessionListContainer({
 		sessions: SessionSnapshot[];
 	}) => (
 		<div key={group.label}>
-			<h4 className="sticky top-12 z-10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60">
+			<h4
+				className={`sticky ${hasOverlayHeader ? 'top-12' : 'top-0'} z-10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60`}
+			>
 				<span>{group.label}</span>
 				<span className="ml-2 text-sidebar-muted-foreground/60">
 					{group.sessions.length}
@@ -426,8 +438,8 @@ export const SessionListContainer = memo(function SessionListContainer({
 				sessionSnapshot={sessionSnapshot}
 				itemRefs={itemRefs}
 			/>
-			<div className="h-12 shrink-0" aria-hidden="true" />
-			<div className="pt-3 pb-1">
+			{hasOverlayHeader && <div className="h-12 shrink-0" aria-hidden="true" />}
+			<div className={hasOverlayHeader ? 'pt-3 pb-1' : 'pb-1'}>
 				<div className="space-y-4">
 					{pinnedGroups.map((group) => renderGroup(group))}
 					{statusGroups.map((group) => renderGroup(group))}

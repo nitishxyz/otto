@@ -64,6 +64,18 @@ const sessionDetailRoute = createRoute({
 	component: EmptyRouteComponent,
 });
 
+const ottoRoute = createRoute({
+	getParentRoute: () => workspaceRoute,
+	path: 'otto',
+	component: EmptyRouteComponent,
+});
+
+const ottoSessionDetailRoute = createRoute({
+	getParentRoute: () => workspaceRoute,
+	path: 'otto/$sessionId',
+	component: EmptyRouteComponent,
+});
+
 const dashboardRoute = createRoute({
 	getParentRoute: () => workspaceRoute,
 	path: 'dashboard',
@@ -77,6 +89,8 @@ const routeTree = rootRoute.addChildren([
 	workspaceRoute.addChildren([
 		sessionsRoute,
 		sessionDetailRoute,
+		ottoRoute,
+		ottoSessionDetailRoute,
 		dashboardRoute,
 	]),
 ]);
@@ -152,6 +166,11 @@ function WorkspaceRouteComponent() {
 	const dashboardOpen = matches.some(
 		(match) => match.routeId === dashboardRoute.id,
 	);
+	const isOttoView = matches.some(
+		(match) =>
+			match.routeId === ottoRoute.id ||
+			match.routeId === ottoSessionDetailRoute.id,
+	);
 	const sessionId = dashboardOpen
 		? (matchedSessionId ?? lastSessionIdRef.current)
 		: matchedSessionId;
@@ -188,6 +207,7 @@ function WorkspaceRouteComponent() {
 			project={selectedProject}
 			onBack={onBackToProjects}
 			sessionId={sessionId}
+			view={isOttoView ? 'otto' : 'agents'}
 			dashboardOpen={dashboardOpen}
 			onCloseDashboard={handleCloseDashboard}
 		/>

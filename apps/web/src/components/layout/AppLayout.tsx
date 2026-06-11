@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent } from 'react';
-import type { Theme } from '@ottocode/web-sdk/hooks';
+import {
+	useEdgeHover,
+	usePreferences,
+	type Theme,
+} from '@ottocode/web-sdk/hooks';
 import {
 	clearRuntimeApiBaseUrl,
 	configureApiClient,
@@ -48,8 +52,10 @@ import {
 	useViewerTabsStore,
 	useSidebarStore,
 	useTerminalStore,
+	useRightRailStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
+import { RoutedOttoTabs, WorkspaceTitleBar } from './WorkspaceTitleBar';
 import {
 	Bot,
 	FileCode2,
@@ -73,6 +79,8 @@ const VIEWER_PANEL_KEY = 'viewer';
 const VIEWER_MIN_WIDTH = 320;
 const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
+const RIGHT_RAIL_HOVER_RATIO = 0.05;
+const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
 const MOBILE_QUERY = '(max-width: 767px)';
 
@@ -257,77 +265,82 @@ export const AppLayout = memo(function AppLayout({
 
 	return (
 		<div
-			className="h-[var(--app-height,100dvh)] flex bg-background touch-manipulation border-t border-border/50 overflow-hidden"
+			className="h-[var(--app-height,100dvh)] flex flex-col bg-background touch-manipulation overflow-hidden"
 			onTouchStart={handleTouchStart}
 			onTouchEnd={handleTouchEnd}
 		>
-			{/* Left sidebar - Sessions */}
-			<Sidebar
-				onNewSession={onNewSession}
-				connectionUrl={hostedConnectionUrl}
-				onSwitchConnection={handleSwitchConnection}
-			>
-				{sidebar}
-			</Sidebar>
+			{/* App title bar - spans the full window width (desktop only) */}
+			<WorkspaceTitleBar theme={theme} onToggleTheme={onToggleTheme} />
 
-			{/* Main content area with bottom terminal panel */}
-			<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto pt-[calc(var(--mobile-safe-area-top)+3rem)] md:pt-0">
-				<MobileTopBar
-					anyViewerOpen={anyViewerOpen}
-					onOpenPanelMenu={handleOpenMobilePanelMenu}
-				/>
-				<div className="flex-1 flex overflow-hidden">
-					<div className="flex min-w-0 flex-1 overflow-hidden">
-						<main
-							className={`relative flex-col overflow-hidden ${
-								!anyViewerOpen
-									? 'flex flex-1 min-w-0'
-									: showChatBesideViewer
-										? 'hidden md:flex md:flex-1 md:min-w-[400px]'
-										: 'hidden'
-							}`}
-						>
-							{children}
-						</main>
-						<section
-							className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
-								anyViewerOpen ? 'flex' : 'hidden md:flex'
-							} ${
-								anyViewerOpen
-									? 'border-sidebar-border opacity-100'
-									: 'border-transparent opacity-0'
-							} ${
-								shouldAnimateViewer
-									? 'transition-[width,opacity,border-color] duration-300 ease-out'
-									: 'transition-none'
-							}`}
-							style={viewerPaneStyle}
-							aria-hidden={!anyViewerOpen}
-						>
-							{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
-								<ResizeHandle
-									panelKey={VIEWER_PANEL_KEY}
-									side="right"
-									minWidth={VIEWER_MIN_WIDTH}
-									maxWidth={VIEWER_MAX_WIDTH}
-									defaultWidth={VIEWER_MIN_WIDTH}
-								/>
-							)}
-							{anyViewerOpen && <ViewerTabs />}
-						</section>
+			<div className="flex-1 flex min-h-0 overflow-hidden">
+				{/* Left sidebar - Sessions */}
+				<Sidebar
+					onNewSession={onNewSession}
+					connectionUrl={hostedConnectionUrl}
+					onSwitchConnection={handleSwitchConnection}
+				>
+					{sidebar}
+				</Sidebar>
+
+				{/* Main content area with bottom terminal panel */}
+				<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto pt-[calc(var(--mobile-safe-area-top)+3rem)] md:pt-0">
+					<MobileTopBar
+						anyViewerOpen={anyViewerOpen}
+						onOpenPanelMenu={handleOpenMobilePanelMenu}
+					/>
+					<div className="flex-1 flex overflow-hidden">
+						<div className="flex min-w-0 flex-1 overflow-hidden">
+							<main
+								className={`relative flex-col overflow-hidden ${
+									!anyViewerOpen
+										? 'flex flex-1 min-w-0'
+										: showChatBesideViewer
+											? 'hidden md:flex md:flex-1 md:min-w-[400px]'
+											: 'hidden'
+								}`}
+							>
+								{children}
+							</main>
+							<section
+								className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+									anyViewerOpen ? 'flex' : 'hidden md:flex'
+								} ${
+									anyViewerOpen
+										? 'border-sidebar-border opacity-100'
+										: 'border-transparent opacity-0'
+								} ${
+									shouldAnimateViewer
+										? 'transition-[width,opacity,border-color] duration-300 ease-out'
+										: 'transition-none'
+								}`}
+								style={viewerPaneStyle}
+								aria-hidden={!anyViewerOpen}
+							>
+								{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
+									<ResizeHandle
+										panelKey={VIEWER_PANEL_KEY}
+										side="right"
+										minWidth={VIEWER_MIN_WIDTH}
+										maxWidth={VIEWER_MAX_WIDTH}
+										defaultWidth={VIEWER_MIN_WIDTH}
+									/>
+								)}
+								{anyViewerOpen && <ViewerTabs />}
+							</section>
+						</div>
+
+						<RightPanelArea
+							isMobile={isMobile}
+							sessionId={sessionId}
+							onFixWithAI={onFixWithAI}
+							theme={theme}
+							onToggleTheme={onToggleTheme}
+						/>
 					</div>
 
-					<RightPanelArea
-						isMobile={isMobile}
-						sessionId={sessionId}
-						onFixWithAI={onFixWithAI}
-						theme={theme}
-						onToggleTheme={onToggleTheme}
-					/>
+					{/* Bottom terminal panel */}
+					<TerminalsPanel />
 				</div>
-
-				{/* Bottom terminal panel */}
-				<TerminalsPanel />
 			</div>
 
 			<MobilePanelMenu
@@ -374,8 +387,14 @@ const MobileTopBar = memo(function MobileTopBar({
 				>
 					<Menu className="h-5 w-5" />
 				</Button>
-				<div className="min-w-0 flex-1 truncate px-1 text-sm font-medium text-foreground/80">
-					{anyViewerOpen ? 'Viewer' : 'Chat'}
+				<div className="min-w-0 flex-1 px-1">
+					{anyViewerOpen ? (
+						<span className="truncate text-sm font-medium text-foreground/80">
+							Viewer
+						</span>
+					) : (
+						<RoutedOttoTabs />
+					)}
 				</div>
 				{anyViewerOpen && (
 					<Button
@@ -445,6 +464,8 @@ const RightPanelArea = memo(function RightPanelArea({
 	const fileBrowserWidth = usePanelWidthStore(
 		(s) => s.widths['file-browser'] ?? RIGHT_PANEL_DEFAULT_WIDTH,
 	);
+	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
+	const { preferences } = usePreferences();
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
@@ -453,6 +474,16 @@ const RightPanelArea = memo(function RightPanelArea({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
+	const { isVisible: isRightRailVisible, isHoverPending } = useEdgeHover({
+		side: 'right',
+		enabled: !isMobile && preferences.smartEdges,
+		hoverRatio: RIGHT_RAIL_HOVER_RATIO,
+		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,
+	});
+	const shouldShowRightRail =
+		anyRightPanelOpen || isRightRailVisible || isRightRailPinned;
+	const shouldShowRightEdgeHint =
+		(isHoverPending || isRightRailVisible) && !isRightRailPinned;
 	const activeRightPanelWidth = gitExpanded
 		? gitWidth
 		: sessionFilesExpanded
@@ -518,6 +549,16 @@ const RightPanelArea = memo(function RightPanelArea({
 
 	return (
 		<div className="flex">
+			<div
+				className={`pointer-events-none fixed inset-y-0 right-0 z-30 hidden w-12 origin-right transition-[opacity,transform] duration-300 ease-out md:block ${
+					shouldShowRightEdgeHint
+						? 'opacity-50 scale-x-100'
+						: 'opacity-0 scale-x-[0.35]'
+				}`}
+				aria-hidden="true"
+			>
+				<div className="h-full w-full bg-[radial-gradient(ellipse_at_right,hsl(var(--sidebar-ring)/0.14)_0%,hsl(var(--sidebar-ring)/0.07)_40%,transparent_78%)]" />
+			</div>
 			{isMobile && anyRightPanelOpen && (
 				<div
 					className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm md:hidden"
@@ -561,34 +602,50 @@ const RightPanelArea = memo(function RightPanelArea({
 			</div>
 
 			<div
-				className={`hidden md:flex flex-col w-12 border-l ${anyRightPanelOpen ? 'sidebar-fade-in border-sidebar-border' : 'bg-background border-border'}`}
+				className={`relative z-40 hidden h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out md:block ${
+					shouldShowRightRail
+						? 'w-12 pointer-events-auto'
+						: 'w-0 pointer-events-none'
+				}`}
 			>
-				<GitSidebarToggle />
-				<SessionFilesSidebarToggle sessionId={sessionId} />
-				<FileBrowserSidebarToggle />
-				<BrowserPanelToggle />
-				<TunnelSidebarToggle />
-				<MCPSidebarToggle />
-				<SkillsSidebarToggle />
-				<AgentsSidebarToggle />
-				<SettingsSidebarToggle />
-				<div className="flex-1" />
-				<TerminalPanelToggle />
-				<div className="h-12 border-t border-border flex items-center justify-center">
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={onToggleTheme}
-						title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-						aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-						className="touch-manipulation"
-					>
-						{theme === 'dark' ? (
-							<Sun className="w-4 h-4" />
-						) : (
-							<Moon className="w-4 h-4" />
-						)}
-					</Button>
+				<div
+					className={`flex h-full w-12 flex-col border-l shadow-xl transition-[opacity,transform] duration-150 ease-out ${
+						shouldShowRightRail
+							? 'translate-x-0 opacity-100 pointer-events-auto'
+							: 'translate-x-2 opacity-0 pointer-events-none'
+					} ${
+						anyRightPanelOpen
+							? 'sidebar-fade-in border-sidebar-border'
+							: 'bg-background border-border'
+					}`}
+				>
+					<GitSidebarToggle />
+					<SessionFilesSidebarToggle sessionId={sessionId} />
+					<FileBrowserSidebarToggle />
+					<BrowserPanelToggle />
+					<TunnelSidebarToggle />
+					<MCPSidebarToggle />
+					<SkillsSidebarToggle />
+					<AgentsSidebarToggle />
+					<SettingsSidebarToggle />
+					<div className="flex-1" />
+					<TerminalPanelToggle />
+					<div className="h-12 border-t border-border flex items-center justify-center">
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={onToggleTheme}
+							title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+							aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+							className="touch-manipulation"
+						>
+							{theme === 'dark' ? (
+								<Sun className="w-4 h-4" />
+							) : (
+								<Moon className="w-4 h-4" />
+							)}
+						</Button>
+					</div>
 				</div>
 			</div>
 		</div>
