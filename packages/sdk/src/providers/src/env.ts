@@ -1,4 +1,5 @@
 import type { BuiltInProviderId, ProviderId } from '../../types/src/index.ts';
+import { readKimiApiKeyFromEnv } from './moonshot-client.ts';
 
 const ENV_VARS: Record<BuiltInProviderId, string> = {
 	openai: 'OPENAI_API_KEY',
@@ -12,15 +13,22 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	xai: 'XAI_API_KEY',
 	zai: 'ZAI_API_KEY',
 	'zai-coding': 'ZAI_CODING_API_KEY',
-	moonshot: 'MOONSHOT_API_KEY',
+	moonshot: 'KIMI_API_KEY',
 	minimax: 'MINIMAX_API_KEY',
 };
 
+const KIMI_PROVIDER_IDS = new Set<ProviderId>(['kimi', 'moonshot']);
+
 export function providerEnvVar(provider: ProviderId): string | undefined {
+	if (provider === 'kimi') return 'KIMI_API_KEY';
 	return ENV_VARS[provider as BuiltInProviderId];
 }
 
 export function readEnvKey(provider: ProviderId): string | undefined {
+	if (KIMI_PROVIDER_IDS.has(provider)) {
+		const value = readKimiApiKeyFromEnv();
+		return value.length ? value : undefined;
+	}
 	if (!(provider in ENV_VARS) && provider !== 'copilot') {
 		return undefined;
 	}
@@ -39,8 +47,13 @@ export function readEnvKey(provider: ProviderId): string | undefined {
 }
 
 export function setEnvKey(provider: ProviderId, value: string | undefined) {
+	if (!value) return;
+	if (KIMI_PROVIDER_IDS.has(provider)) {
+		process.env.KIMI_API_KEY = value;
+		return;
+	}
 	const key = providerEnvVar(provider);
-	if (key && value) {
+	if (key) {
 		process.env[key] = value;
 	}
 }

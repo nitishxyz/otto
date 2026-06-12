@@ -143,6 +143,8 @@ class ApiClient {
 	pollOpenAIDeviceFlow = authMixin.pollOpenAIDeviceFlow;
 	startCopilotDeviceFlow = authMixin.startCopilotDeviceFlow;
 	pollCopilotDeviceFlow = authMixin.pollCopilotDeviceFlow;
+	startKimiDeviceFlow = authMixin.startKimiDeviceFlow;
+	pollKimiDeviceFlow = authMixin.pollKimiDeviceFlow;
 	getCopilotAuthMethods = authMixin.getCopilotAuthMethods;
 	saveCopilotToken = authMixin.saveCopilotToken;
 	importCopilotTokenFromGh = authMixin.importCopilotTokenFromGh;

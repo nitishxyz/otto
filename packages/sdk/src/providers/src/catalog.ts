@@ -2171,6 +2171,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 			id: 'openrouter',
 			models: [
 				{
+					id: '~anthropic/claude-fable-latest',
+					ownedBy: 'anthropic',
+					label: 'Claude Fable Latest',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: false,
+					cost: {
+						input: 10,
+						output: 50,
+						cacheRead: 1,
+						cacheWrite: 12.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 128000,
+					},
+				},
+				{
 					id: '~anthropic/claude-haiku-latest',
 					ownedBy: 'anthropic',
 					label: 'Anthropic Claude Haiku Latest',
@@ -2317,13 +2343,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 0.68,
-						output: 3.41,
-						cacheRead: 0.34,
+						input: 0.67,
+						output: 3.39,
+						cacheRead: 0.14,
 					},
 					limit: {
-						context: 262142,
-						output: 262142,
+						context: 262144,
+						output: 262144,
 					},
 				},
 				{
@@ -2573,6 +2599,33 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 200000,
 						output: 8192,
+					},
+				},
+				{
+					id: 'anthropic/claude-fable-5',
+					ownedBy: 'anthropic',
+					label: 'Claude Fable 5',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					knowledge: '2026-01-31',
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: false,
+					cost: {
+						input: 10,
+						output: 50,
+						cacheRead: 1,
+						cacheWrite: 12.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 128000,
 					},
 				},
 				{
@@ -3178,7 +3231,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.135,
 					},
 					limit: {
-						context: 163840,
+						context: 32768,
 						output: 16384,
 					},
 				},
@@ -3415,8 +3468,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
-					releaseDate: '2025-03-20',
-					lastUpdated: '2025-06-05',
+					releaseDate: '2025-06-17',
+					lastUpdated: '2025-06-17',
 					openWeights: false,
 					cost: {
 						input: 0.3,
@@ -3496,8 +3549,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
-					releaseDate: '2025-03-20',
-					lastUpdated: '2025-06-05',
+					releaseDate: '2025-06-17',
+					lastUpdated: '2025-06-17',
 					openWeights: false,
 					cost: {
 						input: 1.25,
@@ -3841,12 +3894,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.12,
-						output: 0.36,
+						output: 0.35,
 						cacheRead: 0.09,
 					},
 					limit: {
-						context: 256000,
-						output: 8192,
+						context: 262144,
+						output: 262144,
 					},
 				},
 				{
@@ -4253,7 +4306,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.15,
-						output: 1.15,
+						output: 0.9,
+						cacheRead: 0.05,
 					},
 					limit: {
 						context: 196608,
@@ -4276,12 +4330,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-03-18',
 					openWeights: true,
 					cost: {
-						input: 0.279,
-						output: 1.2,
+						input: 0.25,
+						output: 1,
+						cacheRead: 0.05,
 					},
 					limit: {
 						context: 196608,
-						output: 196608,
+						output: 131072,
 					},
 				},
 				{
@@ -4844,34 +4899,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.68,
-						output: 3.41,
-						cacheRead: 0.34,
-					},
-					limit: {
-						context: 262142,
-						output: 262142,
-					},
-				},
-				{
-					id: 'moonshotai/kimi-k2.6:free',
-					ownedBy: 'moonshot',
-					label: 'Kimi K2.6 (free)',
-					modalities: {
-						input: ['text', 'image'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: false,
-					knowledge: '2025-01',
-					releaseDate: '2026-04-21',
-					lastUpdated: '2026-04-21',
-					openWeights: true,
-					cost: {
-						input: 0,
-						output: 0,
+						input: 0.67,
+						output: 3.39,
+						cacheRead: 0.14,
 					},
 					limit: {
 						context: 262144,
@@ -5107,29 +5137,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 128000,
 						output: 128000,
-					},
-				},
-				{
-					id: 'nvidia/nemotron-nano-9b-v2',
-					label: 'Nemotron Nano 9B v2',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: false,
-					temperature: true,
-					releaseDate: '2025-08-18',
-					lastUpdated: '2025-08-18',
-					openWeights: true,
-					cost: {
-						input: 0.04,
-						output: 0.16,
-					},
-					limit: {
-						context: 131072,
-						output: 16384,
 					},
 				},
 				{
@@ -7649,12 +7656,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-17',
 					openWeights: true,
 					cost: {
-						input: 0.14,
+						input: 0.15,
 						output: 1,
+						cacheRead: 0.05,
 					},
 					limit: {
-						context: 262140,
-						output: 262140,
+						context: 262144,
+						output: 262144,
 					},
 				},
 				{
@@ -7772,10 +7780,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-02',
 					openWeights: false,
 					cost: {
-						input: 0.4,
-						output: 1.6,
-						cacheRead: 0.08,
-						cacheWrite: 0.5,
+						input: 0.32,
+						output: 1.28,
+						cacheRead: 0.064,
+						cacheWrite: 0.4,
 					},
 					limit: {
 						context: 1000000,
@@ -8150,31 +8158,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 				},
 				{
-					id: 'z-ai/glm-4-32b',
-					ownedBy: 'zai',
-					label: 'GLM 4 32B ',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: false,
-					temperature: true,
-					knowledge: '2024-06-30',
-					releaseDate: '2025-07-24',
-					lastUpdated: '2025-07-24',
-					openWeights: false,
-					cost: {
-						input: 0.1,
-						output: 0.1,
-					},
-					limit: {
-						context: 128000,
-						output: 128000,
-					},
-				},
-				{
 					id: 'z-ai/glm-4.5',
 					ownedBy: 'zai',
 					label: 'GLM-4.5',
@@ -8224,31 +8207,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 131070,
 						output: 131070,
-					},
-				},
-				{
-					id: 'z-ai/glm-4.5-air:free',
-					ownedBy: 'zai',
-					label: 'GLM 4.5 Air (free)',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: false,
-					temperature: true,
-					knowledge: '2025-04',
-					releaseDate: '2025-07-28',
-					lastUpdated: '2025-07-28',
-					openWeights: true,
-					cost: {
-						input: 0,
-						output: 0,
-					},
-					limit: {
-						context: 131072,
-						output: 96000,
 					},
 				},
 				{
@@ -8322,11 +8280,11 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.3,
 						output: 0.9,
-						cacheRead: 0.05,
+						cacheRead: 0.055,
 					},
 					limit: {
 						context: 131072,
-						output: 24000,
+						output: 32768,
 					},
 				},
 				{
@@ -8427,7 +8385,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.24,
 					},
 					limit: {
-						context: 202752,
+						context: 262144,
 						output: 131072,
 					},
 				},
@@ -8450,31 +8408,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						input: 0.98,
 						output: 3.08,
 						cacheRead: 0.182,
-					},
-					limit: {
-						context: 202752,
-						output: 131072,
-					},
-				},
-				{
-					id: 'z-ai/glm-5v-turbo',
-					ownedBy: 'zai',
-					label: 'GLM-5V-Turbo',
-					modalities: {
-						input: ['image', 'text', 'video'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					releaseDate: '2026-04-01',
-					lastUpdated: '2026-04-01',
-					openWeights: false,
-					cost: {
-						input: 1.2,
-						output: 4,
-						cacheRead: 0.24,
 					},
 					limit: {
 						context: 202752,
@@ -8542,6 +8475,36 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 200000,
 						output: 8192,
+					},
+					provider: {
+						npm: '@ai-sdk/anthropic',
+					},
+				},
+				{
+					id: 'claude-fable-5',
+					ownedBy: 'anthropic',
+					label: 'Claude Fable 5',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					knowledge: '2026-01-31',
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: false,
+					cost: {
+						input: 10,
+						output: 50,
+						cacheRead: 1,
+						cacheWrite: 12.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 128000,
 					},
 					provider: {
 						npm: '@ai-sdk/anthropic',
@@ -8834,7 +8797,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.14,
 						output: 0.28,
-						cacheRead: 0.03,
+						cacheRead: 0.028,
 					},
 					limit: {
 						context: 1000000,
@@ -8864,6 +8827,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 200000,
 						output: 128000,
+					},
+				},
+				{
+					id: 'deepseek-v4-pro',
+					label: 'DeepSeek V4 Pro',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-04-24',
+					lastUpdated: '2026-04-24',
+					openWeights: true,
+					cost: {
+						input: 1.74,
+						output: 3.84,
+						cacheRead: 0.145,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
 					},
 				},
 				{
@@ -11154,12 +11142,38 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
+				{
+					id: 'kimi-k2.7-code',
+					ownedBy: 'moonshot',
+					label: 'Kimi K2.7 Code',
+					modalities: {
+						input: ['text', 'image', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					knowledge: '2025-01',
+					releaseDate: '2026-06-12',
+					lastUpdated: '2026-06-12',
+					openWeights: true,
+					cost: {
+						input: 0.95,
+						output: 4,
+						cacheRead: 0.19,
+					},
+					limit: {
+						context: 262144,
+						output: 262144,
+					},
+				},
 			],
-			label: 'Moonshot AI',
-			env: ['MOONSHOT_API_KEY'],
+			label: 'Kimi',
+			env: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
 			api: 'https://api.moonshot.ai/v1',
-			doc: 'https://platform.moonshot.ai/docs/api/chat',
+			doc: 'https://platform.kimi.ai/docs/api/overview.md',
 		},
 		minimax: {
 			id: 'minimax',
@@ -11351,6 +11365,33 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		copilot: {
 			id: 'copilot',
 			models: [
+				{
+					id: 'claude-fable-5',
+					ownedBy: 'anthropic',
+					label: 'Claude Fable 5',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					knowledge: '2026-01-31',
+					releaseDate: '2026-06-09',
+					lastUpdated: '2026-06-09',
+					openWeights: false,
+					cost: {
+						input: 10,
+						output: 50,
+						cacheRead: 1,
+						cacheWrite: 12.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 128000,
+					},
+				},
 				{
 					id: 'claude-haiku-4.5',
 					ownedBy: 'anthropic',
@@ -11579,8 +11620,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
-					releaseDate: '2025-03-20',
-					lastUpdated: '2025-06-05',
+					releaseDate: '2025-06-17',
+					lastUpdated: '2025-06-17',
 					openWeights: false,
 					cost: {
 						input: 1.25,

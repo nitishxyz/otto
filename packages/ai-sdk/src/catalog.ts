@@ -1061,6 +1061,27 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 			},
 		},
 		{
+			id: 'kimi-k2.7-code',
+			name: 'Kimi K2.7 Code',
+			owned_by: 'moonshot',
+			context_length: 262144,
+			max_output: 32768,
+			reasoning: true,
+			tool_call: true,
+			attachment: true,
+			temperature: false,
+			open_weights: true,
+			modalities: {
+				input: ['text', 'image', 'video'],
+				output: ['text'],
+			},
+			pricing: {
+				input: 0.9547499999999999,
+				output: 4.02,
+				cache_read: 0.19094999999999998,
+			},
+		},
+		{
 			id: 'gpt-5',
 			name: 'GPT-5',
 			owned_by: 'openai',
@@ -2018,5 +2039,5 @@ export const ottorouterCatalog: OttoRouterCatalog = {
 		'xai',
 		'zai',
 	],
-	lastUpdated: '2026-06-09',
+	lastUpdated: '2026-06-12',
 } as const satisfies OttoRouterCatalog;

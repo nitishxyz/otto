@@ -12,6 +12,8 @@ import {
 	pollOpenAiDeviceFlow as apiPollOpenAiDeviceFlow,
 	startCopilotDeviceFlow as apiStartCopilotDeviceFlow,
 	pollCopilotDeviceFlow as apiPollCopilotDeviceFlow,
+	startKimiDeviceFlow as apiStartKimiDeviceFlow,
+	pollKimiDeviceFlow as apiPollKimiDeviceFlow,
 	getCopilotAuthMethods as apiGetCopilotAuthMethods,
 	saveCopilotToken as apiSaveCopilotToken,
 	importCopilotTokenFromGh as apiImportCopilotTokenFromGh,
@@ -188,6 +190,29 @@ export const authMixin = {
 		sessionId: string,
 	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
 		const response = await apiPollCopilotDeviceFlow({
+			body: { sessionId },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async startKimiDeviceFlow(): Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}> {
+		const response = await apiStartKimiDeviceFlow();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async pollKimiDeviceFlow(
+		sessionId: string,
+	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
+		const response = await apiPollKimiDeviceFlow({
 			body: { sessionId },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));

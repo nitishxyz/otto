@@ -12,6 +12,7 @@ import {
 	zaiLogo,
 	ottorouterLogo,
 	minimaxLogo,
+	kimiLogo,
 	opencodeLogo,
 	copilotLogo,
 } from '../../assets/provider-logos';
@@ -30,6 +31,8 @@ const providerLogos: Record<string, string> = {
 	'zai-coding': zaiLogo,
 	ottorouter: ottorouterLogo,
 	minimax: minimaxLogo,
+	moonshot: kimiLogo,
+	kimi: kimiLogo,
 	opencode: opencodeLogo,
 	copilot: copilotLogo,
 };

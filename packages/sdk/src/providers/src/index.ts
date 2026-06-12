@@ -123,8 +123,15 @@ export {
 export type { OpenRouterProviderConfig } from './openrouter-client.ts';
 export { createOpencodeModel } from './opencode-client.ts';
 export type { OpencodeProviderConfig } from './opencode-client.ts';
-export { createMoonshotModel } from './moonshot-client.ts';
-export type { MoonshotProviderConfig } from './moonshot-client.ts';
+export {
+	createKimiModel,
+	createMoonshotModel,
+	readKimiApiKeyFromEnv,
+} from './moonshot-client.ts';
+export type {
+	KimiProviderConfig,
+	MoonshotProviderConfig,
+} from './moonshot-client.ts';
 export { createMinimaxModel } from './minimax-client.ts';
 export type { MinimaxProviderConfig } from './minimax-client.ts';
 export { createCopilotFetch, createCopilotModel } from './copilot-client.ts';

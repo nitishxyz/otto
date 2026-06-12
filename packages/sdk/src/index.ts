@@ -160,8 +160,15 @@ export {
 export type { OpenRouterProviderConfig } from './providers/src/index.ts';
 export { createOpencodeModel } from './providers/src/index.ts';
 export type { OpencodeProviderConfig } from './providers/src/index.ts';
-export { createMoonshotModel } from './providers/src/index.ts';
-export type { MoonshotProviderConfig } from './providers/src/index.ts';
+export {
+	createKimiModel,
+	createMoonshotModel,
+	readKimiApiKeyFromEnv,
+} from './providers/src/index.ts';
+export type {
+	KimiProviderConfig,
+	MoonshotProviderConfig,
+} from './providers/src/index.ts';
 export { createMinimaxModel } from './providers/src/index.ts';
 export type { MinimaxProviderConfig } from './providers/src/index.ts';
 export {
@@ -211,6 +218,16 @@ export {
 	readGrokCliAuth,
 } from './auth/src/index.ts';
 export type { XaiOAuthResult, XaiOAuthTokens } from './auth/src/index.ts';
+export {
+	refreshKimiToken,
+	requestKimiDeviceCode,
+	pollKimiDeviceCodeOnce,
+} from './auth/src/index.ts';
+export type {
+	KimiOAuthTokens,
+	KimiDeviceCodeResponse,
+	KimiDevicePollResult,
+} from './auth/src/index.ts';
 export {
 	generateWallet,
 	importWallet,

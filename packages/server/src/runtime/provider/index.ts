@@ -73,7 +73,7 @@ export async function resolveModel(
 	if (provider === 'zai-coding') {
 		return getZaiCodingInstance(cfg, model);
 	}
-	if (provider === 'moonshot') {
+	if (provider === 'moonshot' || provider === 'kimi') {
 		return getMoonshotInstance(cfg, model);
 	}
 	if (provider === 'minimax') {

@@ -18,6 +18,11 @@ export const openAIDeviceSessions = new Map<
 	}
 >();
 
+export const kimiDeviceSessions = new Map<
+	string,
+	{ deviceCode: string; interval: number; createdAt: number }
+>();
+
 setInterval(() => {
 	const now = Date.now();
 	for (const [key, value] of oauthVerifiers.entries()) {
@@ -33,6 +38,11 @@ setInterval(() => {
 	for (const [key, value] of openAIDeviceSessions.entries()) {
 		if (now - value.createdAt > 15 * 60 * 1000) {
 			openAIDeviceSessions.delete(key);
+		}
+	}
+	for (const [key, value] of kimiDeviceSessions.entries()) {
+		if (now - value.createdAt > 15 * 60 * 1000) {
+			kimiDeviceSessions.delete(key);
 		}
 	}
 }, 60 * 1000);

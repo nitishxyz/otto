@@ -32,7 +32,7 @@ export async function runSetup(projectRoot?: string) {
 			{ value: 'xai', label: 'xAI' },
 			{ value: 'zai', label: 'Z.AI (GLM)' },
 			{ value: 'zai-coding', label: 'Z.AI Coding Plan' },
-			{ value: 'moonshot', label: 'Moonshot AI (Kimi)' },
+			{ value: 'moonshot', label: 'Kimi' },
 			{ value: 'minimax', label: 'MiniMax' },
 		],
 		initialValues: Object.entries(cfg.providers)
@@ -83,7 +83,7 @@ export async function runSetup(projectRoot?: string) {
 												: p === 'zai-coding'
 													? 'ZAI_CODING_API_KEY'
 													: p === 'moonshot'
-														? 'MOONSHOT_API_KEY'
+														? 'KIMI_API_KEY'
 														: 'MINIMAX_API_KEY';
 		const key = await text({
 			message: `Enter ${keyLabel} (leave empty to skip)`,

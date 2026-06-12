@@ -1,5 +1,6 @@
 import { catalog } from './catalog-merged.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
+import { mergeModelLists } from './model-merge.ts';
 import type {
 	BuiltInProviderId,
 	ProviderId,
@@ -7,7 +8,7 @@ import type {
 	ModelOwner,
 } from '../../types/src/index.ts';
 import { filterModelsForAuthType } from './oauth-models.ts';
-import { isBuiltInProviderId } from './registry.ts';
+import { resolveBuiltInProviderCatalogId } from './registry.ts';
 
 export const providerIds = Object.keys(catalog) as BuiltInProviderId[];
 
@@ -108,7 +109,8 @@ export function getModelNpmBinding(
 	provider: ProviderId,
 	model: string,
 ): string | undefined {
-	const entry = isBuiltInProviderId(provider) ? catalog[provider] : undefined;
+	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+	const entry = catalogProvider ? catalog[catalogProvider] : undefined;
 	const modelInfo = getProviderModels(provider).find((m) => m.id === model);
 	if (modelInfo?.provider?.npm) return modelInfo.provider.npm;
 	if (entry?.npm) return entry.npm;
@@ -240,17 +242,21 @@ export function getModelInfo(
 	provider: ProviderId,
 	model: string,
 ): ModelInfo | undefined {
-	const entry = isBuiltInProviderId(provider) ? catalog[provider] : undefined;
+	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+	const entry = catalogProvider ? catalog[catalogProvider] : undefined;
 	if (!entry) return undefined;
 	return getProviderModels(provider).find((m) => m.id === model);
 }
 
 function getProviderModels(provider: ProviderId): ModelInfo[] {
-	return (
-		getCachedProviderCatalogEntry(provider)?.models ??
-		(isBuiltInProviderId(provider) ? catalog[provider]?.models : undefined) ??
-		[]
-	);
+	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+	const catalogModels = catalogProvider
+		? catalog[catalogProvider]?.models
+		: undefined;
+	const cachedModels = getCachedProviderCatalogEntry(
+		catalogProvider ?? provider,
+	)?.models;
+	return mergeModelLists(catalogModels, cachedModels);
 }
 
 export function modelSupportsReasoning(

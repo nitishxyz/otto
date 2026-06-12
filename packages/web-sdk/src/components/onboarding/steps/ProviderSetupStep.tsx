@@ -97,6 +97,15 @@ interface ProviderSetupStepProps {
 	onPollCopilotDeviceFlow?: (
 		sessionId: string,
 	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
+	onStartKimiDeviceFlow?: () => Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}>;
+	onPollKimiDeviceFlow?: (
+		sessionId: string,
+	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
 	onGetCopilotAuthMethods?: () => Promise<{
 		oauth: boolean;
 		token: boolean;
@@ -155,6 +164,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	hideHeader = false,
 	onStartCopilotDeviceFlow,
 	onPollCopilotDeviceFlow,
+	onStartKimiDeviceFlow,
+	onPollKimiDeviceFlow,
 	onGetCopilotAuthMethods,
 	onSaveCopilotToken,
 	onImportCopilotTokenFromGh,
@@ -249,6 +260,17 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const [copilotCodeCopied, setCopilotCodeCopied] = useState(false);
 	const [copilotModalOpen, setCopilotModalOpen] = useState(false);
 	const [copilotLoading, setCopilotLoading] = useState(false);
+	const [kimiDevice, setKimiDevice] = useState<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	} | null>(null);
+	const [kimiPolling, setKimiPolling] = useState(false);
+	const [kimiError, setKimiError] = useState<string | null>(null);
+	const [kimiCodeCopied, setKimiCodeCopied] = useState(false);
+	const [kimiModalOpen, setKimiModalOpen] = useState(false);
+	const [kimiLoading, setKimiLoading] = useState(false);
 	const copilotPollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const copilotCancelledRef = useRef(false);
 	const copilotPollFnRef = useRef(onPollCopilotDeviceFlow);
@@ -257,6 +279,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const openAICancelledRef = useRef(false);
 	const openAIPollFnRef = useRef(onPollOpenAIDeviceFlow);
 	openAIPollFnRef.current = onPollOpenAIDeviceFlow;
+	const kimiPollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+	const kimiCancelledRef = useRef(false);
+	const kimiPollFnRef = useRef(onPollKimiDeviceFlow);
+	kimiPollFnRef.current = onPollKimiDeviceFlow;
 	const balance = useOttoRouterStore((s) => s.balance);
 	const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 	const payg = useOttoRouterStore((s) => s.payg);
@@ -395,6 +421,52 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			clearTimeout(timeout);
 		};
 	}, [openAIPolling, openAIDevice]);
+
+	useEffect(() => {
+		if (!kimiPolling || !kimiDevice || !kimiPollFnRef.current) return;
+		kimiCancelledRef.current = false;
+		const pollIntervalMs = Math.max(
+			(kimiDevice.interval || 5) * 1000 + 2000,
+			7000,
+		);
+		const schedulePoll = () => {
+			kimiPollRef.current = setTimeout(async () => {
+				if (kimiCancelledRef.current) return;
+				try {
+					const pollFn = kimiPollFnRef.current;
+					if (!pollFn) return;
+					const result = await pollFn(kimiDevice.sessionId);
+					if (kimiCancelledRef.current) return;
+					if (result.status === 'complete') {
+						setKimiDevice(null);
+						setKimiPolling(false);
+						setKimiError(null);
+						setKimiModalOpen(false);
+					} else if (result.status === 'error') {
+						setKimiError(result.error || 'Authorization failed');
+						setKimiPolling(false);
+					} else {
+						schedulePoll();
+					}
+				} catch {
+					if (!kimiCancelledRef.current) schedulePoll();
+				}
+			}, pollIntervalMs);
+		};
+		schedulePoll();
+		const timeout = setTimeout(
+			() => {
+				setKimiPolling(false);
+				setKimiError('Authorization timed out. Please try again.');
+			},
+			15 * 60 * 1000,
+		);
+		return () => {
+			kimiCancelledRef.current = true;
+			if (kimiPollRef.current) clearTimeout(kimiPollRef.current);
+			clearTimeout(timeout);
+		};
+	}, [kimiPolling, kimiDevice]);
 
 	const handleCopy = async () => {
 		if (authStatus.ottorouter.publicKey) {
@@ -566,6 +638,23 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			});
 	};
 
+	const startKimiDeviceAuthorization = () => {
+		if (!onStartKimiDeviceFlow) return;
+		setKimiLoading(true);
+		setKimiError(null);
+		onStartKimiDeviceFlow()
+			.then((data) => {
+				setKimiDevice(data);
+				setKimiLoading(false);
+			})
+			.catch((err) => {
+				setKimiError(
+					err instanceof Error ? err.message : 'Failed to start device flow',
+				);
+				setKimiLoading(false);
+			});
+	};
+
 	const handleStartOAuth = async (providerId: string, mode?: string) => {
 		if (providerId === 'anthropic') {
 			setOauthSession({ provider: providerId, sessionId: null, mode });
@@ -576,6 +665,13 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			setOpenAICodeCopied(false);
 			setOpenAIAuthMode('choice');
 			setOpenAIModalOpen(true);
+		} else if (providerId === 'moonshot' && onStartKimiDeviceFlow) {
+			setKimiPolling(false);
+			setKimiDevice(null);
+			setKimiError(null);
+			setKimiCodeCopied(false);
+			setKimiModalOpen(true);
+			startKimiDeviceAuthorization();
 		} else if (providerId === 'copilot') {
 			setCopilotAuthMode('oauth');
 			setCopilotTokenInput('');
@@ -675,6 +771,33 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		if (openAIPollRef.current) {
 			clearTimeout(openAIPollRef.current);
 			openAIPollRef.current = undefined;
+		}
+	};
+
+	const handleKimiOpenAuth = () => {
+		if (!kimiDevice) return;
+		openUrl(kimiDevice.verificationUri);
+		setKimiPolling(true);
+	};
+
+	const handleKimiCopyCode = async () => {
+		if (!kimiDevice) return;
+		await navigator.clipboard.writeText(kimiDevice.userCode);
+		setKimiCodeCopied(true);
+		setTimeout(() => setKimiCodeCopied(false), 2000);
+	};
+
+	const handleCancelKimi = () => {
+		setKimiDevice(null);
+		setKimiPolling(false);
+		setKimiError(null);
+		setKimiCodeCopied(false);
+		setKimiModalOpen(false);
+		setKimiLoading(false);
+		kimiCancelledRef.current = true;
+		if (kimiPollRef.current) {
+			clearTimeout(kimiPollRef.current);
+			kimiPollRef.current = undefined;
 		}
 	};
 
@@ -836,6 +959,24 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 				return;
 			}
 
+			if (kimiModalOpen) {
+				markHandled();
+				if (!kimiLoading) {
+					setKimiDevice(null);
+					setKimiPolling(false);
+					setKimiError(null);
+					setKimiCodeCopied(false);
+					setKimiModalOpen(false);
+					setKimiLoading(false);
+					kimiCancelledRef.current = true;
+					if (kimiPollRef.current) {
+						clearTimeout(kimiPollRef.current);
+						kimiPollRef.current = undefined;
+					}
+				}
+				return;
+			}
+
 			if (addingProvider) {
 				markHandled();
 				setAddingProvider(null);
@@ -865,6 +1006,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		isImportingWallet,
 		isImportModalOpen,
 		isOpeningPopup,
+		kimiLoading,
+		kimiModalOpen,
 		oauthSession,
 	]);
 
@@ -1788,6 +1931,87 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 								</div>
 							</div>
 						)}
+					</div>
+				</div>
+			)}
+
+			{/* Kimi Device Flow Modal */}
+			{kimiModalOpen && (
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
+					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
+						<div className="flex items-center gap-3 p-6 border-b border-border">
+							<ProviderLogo provider="moonshot" size={24} />
+							<h3 className="text-lg font-semibold">Connect Kimi</h3>
+						</div>
+						<div className="p-6 space-y-4">
+							<p className="text-sm text-muted-foreground">
+								Open the Kimi sign-in page, then enter this one-time code. This
+								works from remote browsers, tunnels, and SSH sessions.
+							</p>
+							<div className="flex items-center justify-center gap-3">
+								{kimiLoading ? (
+									<div className="bg-muted px-6 py-3 rounded-lg animate-pulse">
+										<div className="h-9 w-48 bg-muted-foreground/20 rounded" />
+									</div>
+								) : kimiDevice ? (
+									<>
+										<code className="text-3xl font-mono font-bold tracking-widest text-foreground bg-muted px-6 py-3 rounded-lg select-all">
+											{kimiDevice.userCode}
+										</code>
+										<button
+											type="button"
+											onClick={handleKimiCopyCode}
+											className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+										>
+											{kimiCodeCopied ? (
+												<Check className="w-5 h-5 text-green-500" />
+											) : (
+												<Copy className="w-5 h-5" />
+											)}
+										</button>
+									</>
+								) : null}
+							</div>
+
+							{kimiError && (
+								<p className="text-sm text-red-500 text-center">{kimiError}</p>
+							)}
+
+							{kimiPolling && (
+								<div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+									<StableSpinner title="Waiting for Kimi authorization" />
+									Waiting for authorization...
+								</div>
+							)}
+
+							<div className="flex gap-3">
+								<button
+									type="button"
+									onClick={handleCancelKimi}
+									className="flex-1 h-11 px-4 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={handleKimiOpenAuth}
+									disabled={kimiPolling || kimiLoading}
+									className="flex-1 h-11 px-4 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{kimiPolling || kimiLoading ? (
+										<StableSpinner title="Opening Kimi" />
+									) : (
+										<>
+											Open Kimi
+											<ExternalLink className="w-4 h-4" />
+										</>
+									)}
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 			)}

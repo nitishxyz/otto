@@ -1,6 +1,7 @@
 import { catalog } from './catalog-merged.ts';
-import { providerEnvVar } from './env.ts';
+import { providerEnvVar, readEnvKey } from './env.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
+import { mergeModelLists } from './model-merge.ts';
 import { getUnderlyingProviderKey, providerIds } from './utils.ts';
 import type {
 	BuiltInProviderId,
@@ -94,13 +95,29 @@ function resolveCustomFamily(
 	return settings.family ?? 'default';
 }
 
-export function isBuiltInProviderId(
+export const KIMI_PROVIDER_ALIAS = 'kimi' as const;
+
+function isCatalogBuiltInProviderId(
 	value: unknown,
 ): value is BuiltInProviderId {
 	return (
 		typeof value === 'string' &&
 		providerIds.includes(value as BuiltInProviderId)
 	);
+}
+
+export function resolveBuiltInProviderCatalogId(
+	provider: ProviderId,
+): BuiltInProviderId | undefined {
+	if (provider === KIMI_PROVIDER_ALIAS) return 'moonshot';
+	if (isCatalogBuiltInProviderId(provider)) return provider;
+	return undefined;
+}
+
+export function isBuiltInProviderId(
+	value: unknown,
+): value is BuiltInProviderId {
+	return isCatalogBuiltInProviderId(value) || value === KIMI_PROVIDER_ALIAS;
 }
 
 export function getProviderSettings(
@@ -115,23 +132,37 @@ export function getProviderDefinition(
 	provider: ProviderId,
 ): ResolvedProviderDefinition | undefined {
 	const settings = getProviderSettings(cfg, provider);
-	if (isBuiltInProviderId(provider)) {
-		const entry = catalog[provider];
+	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+	if (catalogProvider) {
+		const entry = catalog[catalogProvider];
 		if (!entry) return undefined;
-		const cachedEntry = getCachedProviderCatalogEntry(provider);
-		const models = cachedEntry?.models ?? entry.models;
+		const cachedEntry = getCachedProviderCatalogEntry(catalogProvider);
+		const models = mergeModelLists(entry.models, cachedEntry?.models);
+		const moonshotSettings =
+			provider === KIMI_PROVIDER_ALIAS
+				? (getProviderSettings(cfg, 'moonshot') ?? settings)
+				: settings;
+		const resolvedSettings =
+			provider === KIMI_PROVIDER_ALIAS
+				? (settings ?? moonshotSettings)
+				: settings;
 		return {
 			id: provider,
-			label: settings?.label ?? cachedEntry?.label ?? entry.label ?? provider,
+			label:
+				resolvedSettings?.label ??
+				(provider === KIMI_PROVIDER_ALIAS
+					? 'Kimi'
+					: (cachedEntry?.label ?? entry.label ?? provider)),
 			source: 'built-in',
-			compatibility: BUILTIN_COMPATIBILITY[provider],
-			family: BUILTIN_FAMILY[provider],
-			baseURL: normalizeOptionalText(settings?.baseURL) ?? entry.api,
-			apiKey: normalizeOptionalText(settings?.apiKey),
+			compatibility: BUILTIN_COMPATIBILITY[catalogProvider],
+			family: BUILTIN_FAMILY[catalogProvider],
+			baseURL: normalizeOptionalText(resolvedSettings?.baseURL) ?? entry.api,
+			apiKey: normalizeOptionalText(resolvedSettings?.apiKey),
 			apiKeyEnv:
-				normalizeOptionalText(settings?.apiKeyEnv) ?? providerEnvVar(provider),
+				normalizeOptionalText(resolvedSettings?.apiKeyEnv) ??
+				providerEnvVar(provider),
 			models,
-			allowAnyModel: provider === 'ollama-cloud',
+			allowAnyModel: catalogProvider === 'ollama-cloud',
 		};
 	}
 
@@ -171,6 +202,7 @@ export function getConfiguredProviderIds(
 	const includeDisabled = options?.includeDisabled === true;
 	const ids = new Set<ProviderId>([
 		...providerIds,
+		KIMI_PROVIDER_ALIAS,
 		...Object.keys(cfg.providers),
 		cfg.defaults.provider,
 	]);
@@ -224,8 +256,11 @@ export function getConfiguredProviderFamily(
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return null;
 	if (definition.source === 'custom') return definition.family;
-	if (isBuiltInProviderId(provider)) {
-		return getUnderlyingProviderKey(provider, model) ?? definition.family;
+	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+	if (catalogProvider) {
+		return (
+			getUnderlyingProviderKey(catalogProvider, model) ?? definition.family
+		);
 	}
 	return definition.family;
 }
@@ -245,6 +280,10 @@ export function getConfiguredProviderApiKey(
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return undefined;
 	if (definition.apiKey?.length) return definition.apiKey;
+	if (provider === KIMI_PROVIDER_ALIAS || provider === 'moonshot') {
+		const envValue = readEnvKey(provider);
+		if (envValue?.length) return envValue;
+	}
 	if (definition.apiKeyEnv?.length) {
 		const value = process.env[definition.apiKeyEnv];
 		if (value?.length) return value;

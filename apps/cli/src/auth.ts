@@ -100,9 +100,9 @@ const PROVIDER_LINKS: Record<
 		env: 'ZAI_CODING_API_KEY',
 	},
 	moonshot: {
-		name: 'Moonshot AI (Kimi)',
-		url: 'https://platform.moonshot.ai/console/api-keys',
-		env: 'MOONSHOT_API_KEY',
+		name: 'Kimi',
+		url: 'https://platform.kimi.ai/console/api-keys',
+		env: 'KIMI_API_KEY',
 	},
 	minimax: {
 		name: 'MiniMax',
@@ -117,9 +117,15 @@ const PROVIDER_LINKS: Record<
 };
 
 const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
+const KIMI_CODE_OAUTH_CLIENT_ID = '17e5f671-d194-4dfb-9706-5516cb48c098';
+const KIMI_CODE_OAUTH_HOST =
+	process.env.KIMI_CODE_OAUTH_HOST ??
+	process.env.KIMI_OAUTH_HOST ??
+	'https://auth.kimi.com';
 
 type CopilotLoginMethod = 'oauth' | 'token' | 'gh';
 type XaiLoginMethod = 'oauth' | 'key' | 'grok-cli';
+type KimiLoginMethod = 'oauth' | 'key';
 
 function parseOptionValue(
 	args: string[],
@@ -140,6 +146,12 @@ function getCopilotLoginMethodArg(
 	const method = parseOptionValue(args, '--method');
 	if (method === 'oauth' || method === 'token' || method === 'gh')
 		return method;
+	return undefined;
+}
+
+function getKimiLoginMethodArg(args: string[]): KimiLoginMethod | undefined {
+	const method = parseOptionValue(args, '--method');
+	if (method === 'oauth' || method === 'key') return method;
 	return undefined;
 }
 
@@ -353,7 +365,11 @@ export async function runAuthStatus(_args: string[]) {
 export async function runAuthLogin(_args: string[]): Promise<boolean> {
 	const cfg = await loadConfig(process.cwd());
 	const wantLocal = _args.includes('--local');
-	const providerAlias = _args.includes('ollama') ? 'ollama-cloud' : undefined;
+	const providerAlias = _args.includes('ollama')
+		? 'ollama-cloud'
+		: _args.includes('kimi')
+			? 'moonshot'
+			: undefined;
 	const providerArg = (providerAlias ??
 		_args.find((arg) =>
 			(providerIds as readonly string[]).includes(arg as ProviderId),
@@ -419,6 +435,10 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 		return runAuthLoginXai(cfg, wantLocal);
 	}
 
+	if (provider === 'moonshot') {
+		return runAuthLoginKimi(cfg, wantLocal, _args);
+	}
+
 	const meta = PROVIDER_LINKS[provider];
 	log.info(`Open in browser: ${meta.url}`);
 	const key = await password({
@@ -445,6 +465,192 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 	log.info(`Tip: you can also set ${meta.env} in your environment.`);
 	outro('Done');
 	return true;
+}
+
+async function requestKimiDeviceAuthorization(): Promise<{
+	userCode: string;
+	deviceCode: string;
+	verificationUriComplete: string;
+	interval: number;
+	expiresIn: number | null;
+}> {
+	const response = await fetch(
+		`${KIMI_CODE_OAUTH_HOST.replace(/\/$/, '')}/api/oauth/device_authorization`,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Accept: 'application/json',
+			},
+			body: new URLSearchParams({
+				client_id: KIMI_CODE_OAUTH_CLIENT_ID,
+			}).toString(),
+		},
+	);
+	const data = (await response.json()) as Record<string, unknown>;
+	if (!response.ok) {
+		throw new Error(
+			`Kimi OAuth device authorization failed (${response.status})`,
+		);
+	}
+	const userCode = data.user_code;
+	const deviceCode = data.device_code;
+	const verificationUriComplete = data.verification_uri_complete;
+	if (
+		typeof userCode !== 'string' ||
+		typeof deviceCode !== 'string' ||
+		typeof verificationUriComplete !== 'string'
+	) {
+		throw new Error('Kimi OAuth device authorization response was incomplete.');
+	}
+	return {
+		userCode,
+		deviceCode,
+		verificationUriComplete,
+		interval: Number(data.interval ?? 5),
+		expiresIn:
+			data.expires_in === undefined || data.expires_in === null
+				? null
+				: Number(data.expires_in),
+	};
+}
+
+async function pollKimiDeviceToken(deviceCode: string): Promise<{
+	accessToken: string;
+	refreshToken: string;
+	expiresAt: number;
+	scope?: string;
+}> {
+	const response = await fetch(
+		`${KIMI_CODE_OAUTH_HOST.replace(/\/$/, '')}/api/oauth/token`,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Accept: 'application/json',
+			},
+			body: new URLSearchParams({
+				client_id: KIMI_CODE_OAUTH_CLIENT_ID,
+				device_code: deviceCode,
+				grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+			}).toString(),
+		},
+	);
+	const data = (await response.json()) as Record<string, unknown>;
+	if (response.ok && typeof data.access_token === 'string') {
+		const expiresIn = Number(data.expires_in ?? 0);
+		return {
+			accessToken: data.access_token,
+			refreshToken:
+				typeof data.refresh_token === 'string' ? data.refresh_token : '',
+			expiresAt: Date.now() + expiresIn * 1000,
+			scope: typeof data.scope === 'string' ? data.scope : undefined,
+		};
+	}
+	const errorCode =
+		typeof data.error === 'string' ? data.error : 'unknown_error';
+	if (errorCode === 'authorization_pending' || errorCode === 'slow_down') {
+		throw new Error(errorCode);
+	}
+	if (errorCode === 'expired_token')
+		throw new Error('Kimi OAuth code expired.');
+	if (errorCode === 'access_denied')
+		throw new Error('Kimi OAuth access denied.');
+	throw new Error(`Kimi OAuth token polling failed: ${errorCode}`);
+}
+
+async function runAuthLoginKimi(
+	cfg: Awaited<ReturnType<typeof loadConfig>>,
+	wantLocal: boolean,
+	args: string[],
+): Promise<boolean> {
+	const methodArg = getKimiLoginMethodArg(args);
+	const authMethod =
+		methodArg ??
+		((await select({
+			message: 'Select Kimi login method',
+			options: [
+				{ value: 'oauth', label: 'Kimi Code OAuth device flow' },
+				{ value: 'key', label: 'Kimi Platform API key' },
+			],
+		})) as KimiLoginMethod | symbol);
+	if (isCancel(authMethod)) {
+		cancel('Cancelled');
+		return false;
+	}
+	if (authMethod === 'key') {
+		const meta = PROVIDER_LINKS.moonshot;
+		log.info(`Open in browser: ${meta.url}`);
+		const key = await password({
+			message: `Paste ${meta.env} here`,
+			validate: (v) =>
+				v && String(v).trim().length > 0 ? undefined : 'Required',
+		});
+		if (isCancel(key)) {
+			cancel('Cancelled');
+			return false;
+		}
+		await setAuth(
+			'moonshot',
+			{ type: 'api', key: String(key) },
+			cfg.projectRoot,
+			'global',
+		);
+		await finalizeSuccessfulLogin('moonshot');
+		log.success('Saved');
+		outro('Done');
+		return true;
+	}
+
+	try {
+		const device = await requestKimiDeviceAuthorization();
+		log.info(`Open: ${device.verificationUriComplete}`);
+		log.info(`Code: ${device.userCode}`);
+		await openAuthUrl(device.verificationUriComplete);
+		const startedAt = Date.now();
+		const expiresMs = (device.expiresIn ?? 900) * 1000;
+		while (Date.now() - startedAt < expiresMs) {
+			await new Promise((resolve) =>
+				setTimeout(resolve, Math.max(device.interval, 1) * 1000),
+			);
+			try {
+				const token = await pollKimiDeviceToken(device.deviceCode);
+				await setAuth(
+					'moonshot',
+					{
+						type: 'oauth',
+						access: token.accessToken,
+						refresh: token.refreshToken,
+						expires: token.expiresAt,
+						scopes: token.scope,
+					},
+					cfg.projectRoot,
+					'global',
+				);
+				if (wantLocal)
+					log.warn(
+						'Local credential storage is disabled; saved to secure global location.',
+					);
+				await finalizeSuccessfulLogin('moonshot');
+				log.success('Kimi Code OAuth tokens saved!');
+				outro('Done');
+				return true;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (message === 'authorization_pending' || message === 'slow_down') {
+					continue;
+				}
+				throw error;
+			}
+		}
+		log.error('Kimi OAuth timed out before authorization completed.');
+		outro('Failed');
+		return false;
+	} catch (error) {
+		log.error(error instanceof Error ? error.message : String(error));
+		outro('Failed');
+		return false;
+	}
 }
 
 async function runAuthLoginOpenAI(

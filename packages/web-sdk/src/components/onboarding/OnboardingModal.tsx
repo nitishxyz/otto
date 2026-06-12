@@ -40,6 +40,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 		pollOpenAIDeviceFlow,
 		startCopilotDeviceFlow,
 		pollCopilotDeviceFlow,
+		startKimiDeviceFlow,
+		pollKimiDeviceFlow,
 		getCopilotAuthMethods,
 		saveCopilotToken,
 		importCopilotTokenFromGh,
@@ -106,6 +108,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 					hideHeader={hideHeader}
 					onStartCopilotDeviceFlow={startCopilotDeviceFlow}
 					onPollCopilotDeviceFlow={pollCopilotDeviceFlow}
+					onStartKimiDeviceFlow={startKimiDeviceFlow}
+					onPollKimiDeviceFlow={pollKimiDeviceFlow}
 					onGetCopilotAuthMethods={getCopilotAuthMethods}
 					onSaveCopilotToken={saveCopilotToken}
 					onImportCopilotTokenFromGh={importCopilotTokenFromGh}

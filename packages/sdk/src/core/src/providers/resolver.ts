@@ -7,7 +7,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
 	catalog,
 	createMinimaxModel,
-	createMoonshotModel,
+	createKimiModel,
 	createOttoRouterModel,
 	createOpenAIOAuthModel,
 	createXaiModel,
@@ -34,6 +34,7 @@ export type ProviderName =
 	| 'zai'
 	| 'zai-coding'
 	| 'moonshot'
+	| 'kimi'
 	| 'minimax';
 
 export type ModelConfig = {
@@ -221,10 +222,11 @@ export async function resolveModel(
 		});
 	}
 
-	if (provider === 'moonshot') {
-		return createMoonshotModel(model, {
+	if (provider === 'moonshot' || provider === 'kimi') {
+		return createKimiModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,
+			oauth: config.oauth,
 		});
 	}
 

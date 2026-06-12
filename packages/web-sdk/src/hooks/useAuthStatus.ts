@@ -344,6 +344,17 @@ export function useAuthStatus() {
 		[fetchAuthStatus],
 	);
 
+	const pollKimiDeviceFlow = useCallback(
+		async (sessionId: string) => {
+			const result = await apiClient.pollKimiDeviceFlow(sessionId);
+			if (result.status === 'complete') {
+				await fetchAuthStatus();
+			}
+			return result;
+		},
+		[fetchAuthStatus],
+	);
+
 	const saveCopilotToken = useCallback(
 		async (token: string) => {
 			setLoading(true);
@@ -402,6 +413,8 @@ export function useAuthStatus() {
 		pollOpenAIDeviceFlow,
 		startCopilotDeviceFlow: apiClient.startCopilotDeviceFlow.bind(apiClient),
 		pollCopilotDeviceFlow,
+		startKimiDeviceFlow: apiClient.startKimiDeviceFlow.bind(apiClient),
+		pollKimiDeviceFlow,
 		getCopilotAuthMethods: apiClient.getCopilotAuthMethods.bind(apiClient),
 		saveCopilotToken,
 		importCopilotTokenFromGh,

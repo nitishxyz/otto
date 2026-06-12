@@ -98,6 +98,15 @@ export {
 } from './xai-oauth.ts';
 
 export {
+	refreshKimiToken,
+	requestKimiDeviceCode,
+	pollKimiDeviceCodeOnce,
+	type KimiOAuthTokens,
+	type KimiDeviceCodeResponse,
+	type KimiDevicePollResult,
+} from './kimi-oauth.ts';
+
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

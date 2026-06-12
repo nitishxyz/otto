@@ -41,7 +41,7 @@ const FAMILY_OPTIONS: Array<{ value: ProviderPromptFamily; label: string }> = [
 	{ value: 'openai', label: 'OpenAI' },
 	{ value: 'anthropic', label: 'Anthropic' },
 	{ value: 'google', label: 'Google' },
-	{ value: 'moonshot', label: 'Moonshot' },
+	{ value: 'moonshot', label: 'Kimi' },
 	{ value: 'glm', label: 'GLM' },
 	{ value: 'minimax', label: 'MiniMax' },
 ];

@@ -1,11 +1,12 @@
 import { catalog } from './catalog-merged.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
+import { mergeModelLists } from './model-merge.ts';
 import type { OttoConfig, ProviderId } from '../../types/src/index.ts';
 import {
 	getProviderDefinition,
 	hasConfiguredModel,
-	isBuiltInProviderId,
 	providerAllowsAnyModel,
+	resolveBuiltInProviderCatalogId,
 } from './registry.ts';
 
 export type CapabilityRequest = {
@@ -28,7 +29,9 @@ export function validateProviderModel(
 	if (cfg) {
 		const definition = getProviderDefinition(cfg, providerId);
 		const cachedModels =
-			getCachedProviderCatalogEntry(providerId)?.models ?? [];
+			getCachedProviderCatalogEntry(
+				resolveBuiltInProviderCatalogId(providerId) ?? providerId,
+			)?.models ?? [];
 		if (!definition) {
 			if (!cachedModels.length) {
 				throw new Error(`Provider not supported: ${providerId}`);
@@ -69,12 +72,13 @@ export function validateProviderModel(
 	}
 
 	const p = providerId;
-	const builtInEntry = isBuiltInProviderId(p) ? catalog[p] : undefined;
-	if (!builtInEntry && !getCachedProviderCatalogEntry(p)) {
+	const catalogProvider = resolveBuiltInProviderCatalogId(p);
+	const builtInEntry = catalogProvider ? catalog[catalogProvider] : undefined;
+	const cachedEntry = getCachedProviderCatalogEntry(catalogProvider ?? p);
+	if (!builtInEntry && !cachedEntry) {
 		throw new Error(`Provider not supported: ${providerId}`);
 	}
-	const models =
-		getCachedProviderCatalogEntry(p)?.models ?? builtInEntry?.models ?? [];
+	const models = mergeModelLists(builtInEntry?.models, cachedEntry?.models);
 	const entry = models.find((m: { id: string }) => m.id === modelId);
 	if (!entry) {
 		throwModelNotFound(providerId, modelId, models);
