@@ -45,18 +45,25 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	copilot: ['gpt-4.1-mini'],
+	moonshot: ['kimi-k2-turbo-preview'],
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-5.4-mini'],
 	anthropic: ['claude-haiku-4-5'],
+	moonshot: ['kimi-k2.7-code'],
 };
+
+function preferredFastModelKey(provider: ProviderId): ProviderId {
+	return resolveBuiltInProviderCatalogId(provider) ?? provider;
+}
 
 export function getFastModel(provider: ProviderId): string | undefined {
 	const providerModels = getProviderModels(provider);
 	if (!providerModels.length) return undefined;
 
-	const preferred = PREFERRED_FAST_MODELS[provider] ?? [];
+	const preferred =
+		PREFERRED_FAST_MODELS[preferredFastModelKey(provider)] ?? [];
 	for (const modelId of preferred) {
 		if (providerModels.some((m) => m.id === modelId)) {
 			return modelId;
@@ -86,7 +93,7 @@ export function getFastModelForAuth(
 
 	const preferredMap =
 		authType === 'oauth' ? PREFERRED_FAST_MODELS_OAUTH : PREFERRED_FAST_MODELS;
-	const preferred = preferredMap[provider] ?? [];
+	const preferred = preferredMap[preferredFastModelKey(provider)] ?? [];
 	for (const modelId of preferred) {
 		if (filteredModels.some((m) => m.id === modelId)) {
 			return modelId;
