@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/web-sdk",
-	"version": "0.1.311",
+	"version": "0.1.312",
 	"description": "Reusable React components, hooks, and utilities for building ottocode web interfaces",
 	"type": "module",
 	"main": "./dist/index.js",
