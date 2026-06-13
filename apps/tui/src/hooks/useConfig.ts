@@ -28,6 +28,7 @@ export function useConfig() {
 			reasoningLevel: 'high',
 		},
 	});
+	const [isLoaded, setIsLoaded] = useState(false);
 
 	const loadConfig = useCallback(async () => {
 		try {
@@ -37,6 +38,8 @@ export function useConfig() {
 			return data;
 		} catch {
 			return null;
+		} finally {
+			setIsLoaded(true);
 		}
 	}, []);
 
@@ -52,7 +55,7 @@ export function useConfig() {
 		}) => {
 			try {
 				const response = await apiUpdateDefaults({
-					body: { ...changes, scope: 'global' },
+					body: { ...changes, scope: 'global' } as never,
 				});
 				const result = response.data as unknown as {
 					defaults: Config['defaults'];
@@ -70,5 +73,5 @@ export function useConfig() {
 		loadConfig();
 	}, []);
 
-	return { config, loadConfig, updateDefaults };
+	return { config, isLoaded, loadConfig, updateDefaults };
 }

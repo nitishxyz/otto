@@ -334,6 +334,7 @@ export function ChatInput({
 	}, []);
 
 	const hasStatus = isStreaming || status.type !== 'idle';
+	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
 	const borderColor = disabled ? colors.border : accent;
 	const modeLabel = isPlanMode ? ' plan ' : ' build ';
@@ -549,49 +550,105 @@ export function ChatInput({
 			<box
 				style={{
 					width: '100%',
+					height: 1,
 					flexShrink: 0,
 					flexDirection: 'row',
 					justifyContent: 'space-between',
+					overflow: 'hidden',
 					paddingLeft: 1,
 					paddingRight: 1,
 				}}
 			>
-				<box style={{ flexDirection: 'row', gap: 1 }}>
+				<box
+					style={{
+						flexDirection: 'row',
+						gap: 1,
+						flexShrink: 1,
+						overflow: 'hidden',
+					}}
+				>
 					{hasStatus ? (
-						<box style={{ flexDirection: 'row' }}>
+						<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
 							{isStreaming && status.type === 'idle' && (
-								<box style={{ flexDirection: 'row', gap: 1 }}>
+								<box
+									style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
+								>
 									<TinySpinner fg={colors.streamDot} />
-									<text fg={colors.streamDot}>generating</text>
+									<text fg={colors.streamDot} wrapMode="none" truncate>
+										generating
+									</text>
 									{escHint && (
-										<text fg={colors.yellow}>press Esc again to stop</text>
+										<text fg={colors.yellow} wrapMode="none" truncate>
+											press Esc again to stop
+										</text>
 									)}
 								</box>
 							)}
 							{status.type === 'loading' && (
-								<box style={{ flexDirection: 'row', gap: 1 }}>
+								<box
+									style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
+								>
 									<TinySpinner fg={colors.blue} />
-									<text fg={colors.blue}>{status.label}</text>
+									<text fg={colors.blue} wrapMode="none" truncate>
+										{status.label}
+									</text>
 								</box>
 							)}
 							{status.type === 'success' && (
-								<text fg={colors.green}>✓ {status.label}</text>
+								<text fg={colors.green} wrapMode="none" truncate>
+									✓ {status.label}
+								</text>
 							)}
 							{status.type === 'error' && (
-								<text fg={colors.red}>✗ {status.label}</text>
+								<text fg={colors.red} wrapMode="none" truncate>
+									✗ {status.label}
+								</text>
 							)}
 						</box>
 					) : (
-						<text fg={colors.fgDark}>
+						<text fg={colors.fgDark} wrapMode="none" truncate>
 							↵ send · ⇧↵ newline · ⇥ mode · ⌃L clear
 						</text>
 					)}
 				</box>
-				<box style={{ flexDirection: 'row' }}>
-					<text fg={colors.fgDark}>{provider}</text>
-					<text fg={colors.fgDimmed}>/</text>
-					<text fg={colors.fgMuted}>{model}</text>
-				</box>
+				{hasModelLabel && (
+					<box
+						style={{
+							flexDirection: 'row',
+							flexShrink: 1,
+							overflow: 'hidden',
+						}}
+					>
+						{provider.length > 0 && (
+							<text
+								style={{ flexShrink: 0 }}
+								fg={colors.fgDark}
+								wrapMode="none"
+							>
+								{provider}
+							</text>
+						)}
+						{provider.length > 0 && model.length > 0 && (
+							<text
+								style={{ flexShrink: 0 }}
+								fg={colors.fgDimmed}
+								wrapMode="none"
+							>
+								/
+							</text>
+						)}
+						{model.length > 0 && (
+							<text
+								style={{ flexShrink: 1, overflow: 'hidden' }}
+								fg={colors.fgMuted}
+								wrapMode="none"
+								truncate
+							>
+								{model}
+							</text>
+						)}
+					</box>
+				)}
 			</box>
 		</box>
 	);

@@ -126,7 +126,7 @@ export function App({
 		approveToolCall,
 	} = useSession(initialSessionDefaults);
 
-	const { config, updateDefaults } = useConfig();
+	const { config, isLoaded: isConfigLoaded, updateDefaults } = useConfig();
 
 	const themeSyncedRef = useRef(false);
 	useEffect(() => {
@@ -605,9 +605,18 @@ export function App({
 		}
 	}, [isStreaming, clearEscHint]);
 
-	const provider = activeSession?.provider || config.defaults.provider;
-	const model = activeSession?.model || config.defaults.model;
-	const currentAgent = activeSession?.agent || config.defaults.agent;
+	const provider =
+		activeSession?.provider ||
+		initialSessionDefaults?.provider ||
+		(isConfigLoaded ? config.defaults.provider : '');
+	const model =
+		activeSession?.model ||
+		initialSessionDefaults?.model ||
+		(isConfigLoaded ? config.defaults.model : '');
+	const currentAgent =
+		activeSession?.agent ||
+		initialSessionDefaults?.agent ||
+		(isConfigLoaded ? config.defaults.agent : 'build');
 
 	const handlePlanModeToggle = useCallback(
 		async (isPlanMode: boolean) => {
