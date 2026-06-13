@@ -320,7 +320,14 @@ export async function ensureOttoSessionForGoal(
 			.from(sessions)
 			.where(eq(sessions.id, goal.ottoSessionId))
 			.limit(1);
-		if (rows[0]) return rows[0];
+		if (rows[0]?.sessionType === 'otto') return rows[0];
+		if (rows[0]) {
+			logger.warn('[otto] goal bound to non-otto session; rebinding', {
+				goalId: goal.id,
+				boundSessionId: rows[0].id,
+				sessionType: rows[0].sessionType,
+			});
+		}
 	}
 
 	// Legacy binding: otto session created as a child of the supervised session.

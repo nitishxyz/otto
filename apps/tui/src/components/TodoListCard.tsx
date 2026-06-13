@@ -68,7 +68,7 @@ const TodoRow = memo(function TodoRow({ todo }: { todo: TodoItem }) {
 		todo.status === 'completed'
 			? '✓'
 			: todo.status === 'in_progress'
-				? '▸'
+				? '→'
 				: todo.status === 'cancelled'
 					? '✕'
 					: '○';

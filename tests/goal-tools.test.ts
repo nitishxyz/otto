@@ -236,6 +236,41 @@ describe('per-goal otto session binding', () => {
 		expect(session?.id).toBe('otto-bound-1');
 	});
 
+	test('non-otto goal binding is ignored and rebound to an otto session', async () => {
+		const db = await getDb(projectRoot);
+		const cfg = await loadConfig(projectRoot);
+		const now = Date.now();
+		await db.insert(sessions).values({
+			id: 'bad-main-bound-1',
+			agent: 'build',
+			provider: 'anthropic',
+			model: 'test',
+			projectPath: cfg.projectRoot,
+			createdAt: now,
+			sessionType: 'main',
+		});
+		await db.insert(goals).values({
+			id: 'goal-bad-bound-1',
+			projectPath: cfg.projectRoot,
+			ottoSessionId: 'bad-main-bound-1',
+			title: 'Bad bound goal',
+			status: 'active',
+			createdAt: now,
+			updatedAt: now,
+		});
+		const goalRow = (
+			await db.select().from(goals).where(eq(goals.id, 'goal-bad-bound-1'))
+		)[0];
+		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
+		expect(session?.id).not.toBe('bad-main-bound-1');
+		expect(session?.sessionType).toBe('otto');
+
+		const rebound = (
+			await db.select().from(goals).where(eq(goals.id, 'goal-bad-bound-1'))
+		)[0];
+		expect(rebound.ottoSessionId).toBe(session?.id);
+	});
+
 	test('legacy parent-child otto session is adopted and backfilled', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
