@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-06-13T16:53:25.003Z",
+	"updatedAt": "2026-06-13T18:08:26.327Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -14675,6 +14675,9 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-06-12",
+					"lastUpdated": "2026-06-12",
 					"openWeights": true,
 					"cost": {
 						"input": 0.9547499999999999,
@@ -14683,7 +14686,7 @@
 					},
 					"limit": {
 						"context": 262144,
-						"output": 32768
+						"output": 262144
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -14884,7 +14887,7 @@
 					},
 					"limit": {
 						"context": 1000000,
-						"output": 16384
+						"output": 65536
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"

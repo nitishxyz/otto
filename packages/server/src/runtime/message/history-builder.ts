@@ -11,6 +11,7 @@ import { eq, asc, inArray } from 'drizzle-orm';
 import { stripToolResultArtifactsForModel } from '../../tools/adapter/results.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
 import { getQueueState } from '../session/queue.ts';
+import { preprocessFileMentionsForModel } from './file-mentions.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
 
@@ -185,6 +186,7 @@ export async function buildHistoryMessages(
 	db: Awaited<ReturnType<typeof getDb>>,
 	sessionId: string,
 	_currentMessageId?: string,
+	options?: { projectRoot?: string },
 ): Promise<ModelMessage[]> {
 	const rows = await db
 		.select()
@@ -256,7 +258,13 @@ export async function buildHistoryMessages(
 					try {
 						const obj = JSON.parse(p.content ?? '{}');
 						const t = String(obj.text ?? '');
-						if (t) userParts.push({ type: 'text', text: t });
+						if (t) {
+							const preprocessed = await preprocessFileMentionsForModel({
+								text: t,
+								projectRoot: options?.projectRoot,
+							});
+							userParts.push({ type: 'text', text: preprocessed.text });
+						}
 					} catch {}
 				} else if (p.type === 'image') {
 					try {

@@ -103,7 +103,9 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		opts.omitHistory || (opts.isCompactCommand && opts.compactionContext)
 			? Promise.resolve({ value: [], durationMs: 0 })
 			: timePromise(
-					buildHistoryMessages(db, opts.sessionId, opts.assistantMessageId),
+					buildHistoryMessages(db, opts.sessionId, opts.assistantMessageId, {
+						projectRoot: cfg.projectRoot,
+					}),
 				);
 	const sessionRowsPromise = timePromise(
 		db.select().from(sessions).where(eq(sessions.id, opts.sessionId)).limit(1),

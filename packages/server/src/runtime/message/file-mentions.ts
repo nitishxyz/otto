@@ -1,0 +1,174 @@
+import { stat } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
+
+const FILE_MENTION_REGEX = /(^|[\s([{])@(\S+)/g;
+const TRAILING_PUNCTUATION_REGEX = /[.,!?;:)}\]]+$/;
+const DEFAULT_MAX_FILE_BYTES = 64 * 1024;
+const DEFAULT_MAX_TOTAL_BYTES = 256 * 1024;
+const TEXT_DECODER = new TextDecoder('utf-8', { fatal: true });
+
+export type FileMentionPreprocessResult = {
+	text: string;
+	mentionedFiles: Array<{
+		path: string;
+		content: string;
+		truncated: boolean;
+		size: number;
+	}>;
+};
+
+function isPathInsideRoot(path: string, root: string): boolean {
+	const relativePath = relative(root, path);
+	return (
+		relativePath === '' ||
+		(!relativePath.startsWith('..') && !isAbsolute(relativePath))
+	);
+}
+
+function resolveMentionPath(projectRoot: string, mentionPath: string) {
+	const root = resolve(projectRoot);
+	const absolutePath = isAbsolute(mentionPath)
+		? resolve(mentionPath)
+		: resolve(root, mentionPath);
+	if (!isPathInsideRoot(absolutePath, root)) return undefined;
+	return {
+		absolutePath,
+		relativePath: relative(root, absolutePath) || '.',
+	};
+}
+
+function stripTrailingPunctuation(token: string) {
+	const trailing = token.match(TRAILING_PUNCTUATION_REGEX)?.[0] ?? '';
+	return {
+		mentionPath: trailing ? token.slice(0, -trailing.length) : token,
+		trailing,
+	};
+}
+
+async function readMentionedTextFile(args: {
+	projectRoot: string;
+	mentionPath: string;
+	remainingBytes: number;
+	maxFileBytes: number;
+}) {
+	const resolved = resolveMentionPath(args.projectRoot, args.mentionPath);
+	if (!resolved) return undefined;
+	const fileStat = await stat(resolved.absolutePath).catch(() => undefined);
+	if (!fileStat?.isFile()) return undefined;
+
+	const readLimit = Math.max(
+		0,
+		Math.min(args.remainingBytes, args.maxFileBytes),
+	);
+	if (readLimit <= 0) {
+		return {
+			path: resolved.relativePath,
+			content: '',
+			truncated: true,
+			size: fileStat.size,
+		};
+	}
+
+	const file = Bun.file(resolved.absolutePath);
+	const bytes = new Uint8Array(await file.slice(0, readLimit).arrayBuffer());
+	try {
+		const content = TEXT_DECODER.decode(bytes);
+		return {
+			path: resolved.relativePath,
+			content,
+			truncated: fileStat.size > readLimit,
+			size: fileStat.size,
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+export async function preprocessFileMentionsForModel(args: {
+	text: string;
+	projectRoot?: string;
+	maxFileBytes?: number;
+	maxTotalBytes?: number;
+}): Promise<FileMentionPreprocessResult> {
+	const projectRoot = args.projectRoot?.trim();
+	if (!projectRoot || !args.text.includes('@')) {
+		return { text: args.text, mentionedFiles: [] };
+	}
+
+	const mentions: Array<{
+		fullMatch: string;
+		prefix: string;
+		token: string;
+		mentionPath: string;
+		trailing: string;
+	}> = [];
+	for (const match of args.text.matchAll(FILE_MENTION_REGEX)) {
+		const token = match[2];
+		if (!token) continue;
+		const { mentionPath, trailing } = stripTrailingPunctuation(token);
+		if (!mentionPath) continue;
+		mentions.push({
+			fullMatch: match[0],
+			prefix: match[1] ?? '',
+			token,
+			mentionPath,
+			trailing,
+		});
+	}
+	if (mentions.length === 0) return { text: args.text, mentionedFiles: [] };
+
+	const maxFileBytes = args.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+	const maxTotalBytes = args.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
+	const mentionedFiles: FileMentionPreprocessResult['mentionedFiles'] = [];
+	const seen = new Set<string>();
+	let remainingBytes = maxTotalBytes;
+	const replaceByToken = new Map<string, string>();
+
+	for (const mention of mentions) {
+		const file = await readMentionedTextFile({
+			projectRoot,
+			mentionPath: mention.mentionPath,
+			remainingBytes,
+			maxFileBytes,
+		});
+		if (!file) continue;
+
+		replaceByToken.set(
+			mention.token,
+			`${mention.mentionPath}${mention.trailing}`,
+		);
+		if (seen.has(file.path)) continue;
+		seen.add(file.path);
+		mentionedFiles.push(file);
+		remainingBytes -= Buffer.byteLength(file.content, 'utf8');
+	}
+
+	if (mentionedFiles.length === 0)
+		return { text: args.text, mentionedFiles: [] };
+
+	const cleanedText = args.text.replace(
+		FILE_MENTION_REGEX,
+		(match, prefix: string, token: string) => {
+			const replacement = replaceByToken.get(token);
+			return replacement ? `${prefix}${replacement}` : match;
+		},
+	);
+	const fileBlocks = mentionedFiles.map((file) => {
+		const metadata = [
+			`path="${file.path}"`,
+			`bytes="${file.size}"`,
+			file.truncated ? 'truncated="true"' : undefined,
+		]
+			.filter(Boolean)
+			.join(' ');
+		const truncationNote = file.truncated
+			? '\n\n[File content truncated to stay within prompt budget.]'
+			: '';
+		return `<mentioned-file ${metadata}>\n${file.content}${truncationNote}\n</mentioned-file>`;
+	});
+
+	return {
+		text: `${cleanedText}\n\n${fileBlocks.join('\n\n')}`,
+		mentionedFiles,
+	};
+}
