@@ -56,10 +56,10 @@ export type MaybeWakeOttoInput = {
 
 /**
  * Wakes the otto agent when a worker session's run finishes and there is an
- * active goal with open tasks, or the last run errored. The goal is resolved
- * via goal_tasks.sessionId (task dispatch) or legacy goals.sessionId. Guarded
- * by a per-goal stall cap: wakeups without task progress stop after
- * MAX_STALLED_WAKEUPS until the user intervenes.
+ * active goal with open tasks. The goal is resolved via goal_tasks.sessionId
+ * (task dispatch) or legacy goals.sessionId. Guarded by a per-goal stall cap:
+ * wakeups without task progress stop after MAX_STALLED_WAKEUPS until the user
+ * intervenes.
  */
 export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 	const { db, cfg, session } = input;
@@ -84,7 +84,7 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 		return;
 	}
 
-	const shouldWake = (goal && openTasks.length > 0) || errored;
+	const shouldWake = Boolean(goal && openTasks.length > 0);
 	if (!shouldWake) {
 		stallStates.delete(stallKey);
 		if (goal && tasks.length > 0 && openTasks.length === 0) {
@@ -112,7 +112,7 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 
 	const ottoSession = goal
 		? await ensureOttoSessionForGoal(db, cfg, goal)
-		: await findOrCreateLegacyOttoSession(db, cfg, session);
+		: undefined;
 	if (!ottoSession) return;
 
 	const content = await buildOttoWakeMessage({
@@ -360,32 +360,6 @@ export async function ensureOttoSessionForGoal(
 		.set({ ottoSessionId: created.id, updatedAt: Date.now() })
 		.where(eq(goals.id, goal.id));
 	return created;
-}
-
-/**
- * Legacy path for goal-less errored wakeups: one otto session per supervised
- * session, bound via parentSessionId.
- */
-async function findOrCreateLegacyOttoSession(
-	db: DB,
-	cfg: OttoConfig,
-	workerSession: SessionRow,
-): Promise<SessionRow | undefined> {
-	const existing = await db
-		.select()
-		.from(sessions)
-		.where(
-			and(
-				eq(sessions.parentSessionId, workerSession.id),
-				eq(sessions.sessionType, 'otto'),
-			),
-		)
-		.limit(1);
-	if (existing.length) return existing[0];
-	return await createOttoSession(db, cfg, {
-		title: null,
-		parentSessionId: workerSession.id,
-	});
 }
 
 async function createOttoSession(

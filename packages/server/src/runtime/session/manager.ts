@@ -20,6 +20,7 @@ type CreateSessionInput = {
 	agent: string;
 	provider: ProviderId;
 	model: string;
+	allowUnknownModel?: boolean;
 	title?: string | null;
 	parentSessionId?: string | null;
 	sessionType?:
@@ -38,11 +39,12 @@ export async function createSession({
 	agent,
 	provider,
 	model,
+	allowUnknownModel,
 	title,
 	parentSessionId,
 	sessionType = 'main',
 }: CreateSessionInput): Promise<SessionRow> {
-	validateProviderModel(provider, model, cfg);
+	validateProviderModel(provider, model, cfg, { allowUnknownModel });
 	const authorized = await isProviderAuthorized(cfg, provider);
 	if (!authorized) {
 		throw new Error(

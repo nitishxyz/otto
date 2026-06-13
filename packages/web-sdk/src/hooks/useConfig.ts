@@ -47,7 +47,7 @@ export function useUpdateDefaults() {
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			ottoEnabled?: boolean;
-			scope?: 'global' | 'local';
+			scope?: 'global';
 		}) => apiClient.updateDefaults(data),
 		onMutate: async (data) => {
 			await queryClient.cancelQueries({ queryKey: ['config'] });

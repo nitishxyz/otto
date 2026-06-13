@@ -56,7 +56,7 @@ export async function runAsk(prompt: string, opts: AskOptions = {}) {
 			agent: opts.agent,
 			provider: opts.provider,
 			model: opts.model,
-			allowUnknownModel: opts.wild,
+			allowUnknownModel: opts.wild || Boolean(opts.model?.trim()),
 			sessionId: opts.sessionId,
 			last: opts.last,
 			jsonMode,

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getDb } from '@ottocode/database';
-import { goals, sessions } from '@ottocode/database/schema';
+import { goals, messages, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { loadConfig } from '@ottocode/sdk';
 import {
@@ -13,6 +13,7 @@ import {
 import {
 	buildGoalKickoffMessage,
 	ensureOttoSessionForGoal,
+	maybeWakeOtto,
 } from '../packages/server/src/runtime/otto/service.ts';
 
 let projectRoot = '';
@@ -313,6 +314,48 @@ describe('per-goal otto session binding', () => {
 			await db.select().from(goals).where(eq(goals.id, 'goal-legacy-1'))
 		)[0];
 		expect(backfilled.ottoSessionId).toBe('legacy-otto-1');
+	});
+});
+
+describe('otto wakeup routing', () => {
+	test('errored normal sessions without an active goal do not create legacy otto wakeups', async () => {
+		const db = await getDb(projectRoot);
+		const cfg = await loadConfig(projectRoot);
+		const now = Date.now();
+		await db.insert(sessions).values({
+			id: 'error-main-no-goal-1',
+			agent: 'build',
+			provider: 'anthropic',
+			model: 'test',
+			projectPath: cfg.projectRoot,
+			createdAt: now,
+			sessionType: 'main',
+		});
+		await db.insert(messages).values({
+			id: 'error-main-no-goal-message-1',
+			sessionId: 'error-main-no-goal-1',
+			role: 'assistant',
+			status: 'failed',
+			agent: 'build',
+			provider: 'anthropic',
+			model: 'test',
+			createdAt: now,
+			finishReason: 'error',
+		});
+
+		const session = (
+			await db
+				.select()
+				.from(sessions)
+				.where(eq(sessions.id, 'error-main-no-goal-1'))
+		)[0];
+		await maybeWakeOtto({ db, cfg, session });
+
+		const legacyOttoSessions = await db
+			.select()
+			.from(sessions)
+			.where(eq(sessions.parentSessionId, 'error-main-no-goal-1'));
+		expect(legacyOttoSessions).toEqual([]);
 	});
 });
 

@@ -28,6 +28,8 @@ import {
 
 export type Scope = 'global' | 'local';
 
+const LOCAL_DEFAULT_UPDATE_KEYS = new Set(['agent', 'provider', 'model']);
+
 export type DebugConfig = {
 	enabled: boolean;
 	scopes: string[];
@@ -95,6 +97,16 @@ export async function writeDefaults(
 	}>,
 	projectRoot?: string,
 ) {
+	const scopedUpdates =
+		scope === 'local'
+			? (Object.fromEntries(
+					Object.entries(updates).filter(([key]) =>
+						LOCAL_DEFAULT_UPDATE_KEYS.has(key),
+					),
+				) as typeof updates)
+			: updates;
+	if (Object.keys(scopedUpdates).length === 0) return;
+
 	const filePath = getConfigFilePath(scope, projectRoot);
 	const existing = await readJsonFile(filePath);
 	const prevDefaults =
@@ -103,7 +115,7 @@ export async function writeDefaults(
 			: {};
 	const next = {
 		...existing,
-		defaults: { ...prevDefaults, ...updates },
+		defaults: { ...prevDefaults, ...scopedUpdates },
 	};
 	await writeConfigFile(filePath, next);
 }

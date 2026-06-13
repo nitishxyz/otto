@@ -14,20 +14,6 @@ type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
 
-const KIMI_K2_7_CODE_MODEL: ModelInfo = {
-	id: 'kimi-k2.7-code',
-	ownedBy: 'moonshot',
-	label: 'Kimi K2.7 Code',
-	modalities: { input: ['text', 'image', 'video'], output: ['text'] },
-	toolCall: true,
-	reasoningText: true,
-	attachment: true,
-	temperature: 1,
-	cost: { input: 0.95, output: 4, cacheRead: 0.19 },
-	limit: { context: 262_144, output: 32_768 },
-	provider: { npm: '@ai-sdk/openai-compatible' },
-};
-
 const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 	{
 		id: 'grok-build',
@@ -168,13 +154,10 @@ export function appendXaiGrokCliModels<T extends { models: ModelInfo[] }>(
 	return { ...entry, models: [...mergedModels, ...missingModels] };
 }
 
-export function appendOfficialKimiModels<T extends ProviderCatalogEntry>(
-	entry: T | undefined,
-): T | undefined {
+export function applyOfficialKimiCatalogMetadata<
+	T extends ProviderCatalogEntry,
+>(entry: T | undefined): T | undefined {
 	if (!entry) return undefined;
-	const hasKimiK27Code = entry.models.some(
-		(model) => model.id === KIMI_K2_7_CODE_MODEL.id,
-	);
 	const env = Array.from(
 		new Set(['KIMI_API_KEY', 'MOONSHOT_API_KEY', ...(entry.env ?? [])]),
 	);
@@ -183,9 +166,6 @@ export function appendOfficialKimiModels<T extends ProviderCatalogEntry>(
 		label: entry.label === 'Moonshot AI' ? 'Kimi' : entry.label,
 		env,
 		doc: 'https://platform.kimi.ai/docs/api/overview.md',
-		models: hasKimiK27Code
-			? entry.models
-			: [...entry.models, KIMI_K2_7_CODE_MODEL],
 	};
 }
 
@@ -202,7 +182,7 @@ export function mergeManualCatalog(
 	if (xaiEntry) {
 		merged.xai = xaiEntry;
 	}
-	const moonshotEntry = appendOfficialKimiModels(merged.moonshot);
+	const moonshotEntry = applyOfficialKimiCatalogMetadata(merged.moonshot);
 	if (moonshotEntry) {
 		merged.moonshot = moonshotEntry;
 	}

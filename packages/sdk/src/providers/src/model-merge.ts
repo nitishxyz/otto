@@ -5,8 +5,8 @@ import type { ModelInfo } from '../../types/src/index.ts';
  *
  * Cached entries override fields for overlapping ids (so remote updates like
  * pricing/limits still apply), while embedded/manual-only models (for example
- * `kimi-k2.7-code` or the manual xai grok-cli models) are always retained even
- * when a stale cache does not include them.
+ * the manual xai grok-cli models) are always retained even when a stale cache
+ * does not include them.
  */
 export function mergeModelLists(
 	baseModels: ModelInfo[] | undefined,

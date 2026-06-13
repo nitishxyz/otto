@@ -99,6 +99,7 @@ const MessageThreadData = memo(function MessageThreadData({
 			session={session}
 			isGenerating={isGenerating}
 			compact={isOttoThread || preferences.compactThread}
+			responsiveCompact={preferences.compactThread}
 			onSelectSession={onSelectSession}
 			footerBottomPaddingClass={footerBottomPaddingClass}
 		/>

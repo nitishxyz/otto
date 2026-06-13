@@ -127,6 +127,10 @@ const createMessageBodySchema = z.object({
 		description:
 			'Model override for this message. If omitted, explicit agent model override, session model, then config default are used.',
 	}),
+	allowUnknownModel: z.boolean().optional().openapi({
+		description:
+			'Allow a model id that is not present in the configured model catalog.',
+	}),
 	userContext: z.string().nullable().optional().openapi({
 		description:
 			'Optional user-provided context to include in the system prompt.',
@@ -333,8 +337,13 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					'high';
 
 				const wantsToolCalls = true;
+				const allowUnknownModel =
+					body?.allowUnknownModel === true || modelName === sess.model;
 				try {
-					validateProviderModel(provider, modelName, cfg, { wantsToolCalls });
+					validateProviderModel(provider, modelName, cfg, {
+						wantsToolCalls,
+						allowUnknownModel,
+					});
 				} catch (err) {
 					logger.error('Model validation failed', err, { provider, modelName });
 					const message = err instanceof Error ? err.message : String(err);

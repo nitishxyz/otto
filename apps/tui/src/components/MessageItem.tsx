@@ -85,6 +85,10 @@ function partKeyOf(part: MessagePart): string {
 		: part.id;
 }
 
+function isTodoTool(toolName: string | null): boolean {
+	return toolName === 'update_todos' || toolName === 'update_plan';
+}
+
 /**
  * Groups message parts into render blocks: consecutive tool parts merge into
  * one compact group, only the latest update_todos survives (as a todo card),
@@ -93,7 +97,7 @@ function partKeyOf(part: MessagePart): string {
 function buildBlocks(parts: MessagePart[]): Block[] {
 	let lastTodoId: string | null = null;
 	for (const p of parts) {
-		if (isToolPart(p) && p.toolName === 'update_todos') lastTodoId = p.id;
+		if (isToolPart(p) && isTodoTool(p.toolName)) lastTodoId = p.id;
 	}
 
 	const blocks: Block[] = [];
@@ -101,7 +105,7 @@ function buildBlocks(parts: MessagePart[]): Block[] {
 		if (isToolPart(part)) {
 			const toolName = part.toolName || '';
 			if (SKIP_TOOLS.has(toolName)) continue;
-			if (toolName === 'update_todos') {
+			if (isTodoTool(toolName)) {
 				if (part.id !== lastTodoId) continue;
 				blocks.push({ key: `todos-${part.id}`, kind: 'todos', part });
 				continue;

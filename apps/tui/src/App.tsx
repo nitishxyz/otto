@@ -64,12 +64,23 @@ function buildWebSessionUrl(
 export function App({
 	onQuit,
 	webUrl,
+	initialSession,
 }: {
 	onQuit: () => void;
 	webUrl?: string;
+	initialSession?: {
+		agent?: string;
+		provider?: string;
+		model?: string;
+		allowUnknownModel?: boolean;
+	};
 }) {
 	const renderer = useRenderer();
 	const { colors, setTheme } = useTheme();
+	const initialSessionDefaults = useMemo(
+		() => initialSession,
+		[initialSession],
+	);
 
 	const overlay = useOverlayStore((s) => s.overlay);
 	const setOverlay = useOverlayStore((s) => s.setOverlay);
@@ -113,7 +124,7 @@ export function App({
 		sendMessage,
 		abortSession,
 		approveToolCall,
-	} = useSession();
+	} = useSession(initialSessionDefaults);
 
 	const { config, updateDefaults } = useConfig();
 

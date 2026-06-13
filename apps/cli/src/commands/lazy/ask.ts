@@ -14,7 +14,7 @@ export function registerAskCommand(program: Command) {
 			'Override provider (openai, anthropic, google, openrouter, opencode, ottorouter)',
 		)
 		.option('--model <model>', 'Override model')
-		.option('--wild', 'Use an uncataloged model id')
+		.option('--wild', 'Allow uncataloged model id (default with --model)')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--last', 'Continue most recent session', false)
 		.option('--session <id>', 'Continue specific session')

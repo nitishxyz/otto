@@ -120,6 +120,10 @@ const createSessionBodySchema = z.object({
 		description:
 			'Model override. If omitted, selected agent model override, then config default are used.',
 	}),
+	allowUnknownModel: z.boolean().optional().openapi({
+		description:
+			'Allow a model override that is not present in the configured model catalog.',
+	}),
 	parentSessionId: z.string().nullable().optional(),
 	sessionType: z.enum(['main', 'btw', 'otto']).optional(),
 });
@@ -129,6 +133,7 @@ const updateSessionBodySchema = z.object({
 	agent: z.string().optional(),
 	provider: z.string().optional(),
 	model: z.string().optional(),
+	allowUnknownModel: z.boolean().optional(),
 	isPinned: z.boolean().optional(),
 });
 
@@ -274,6 +279,7 @@ export function registerSessionCrudRoutes(app: Hono) {
 					agent,
 					provider,
 					model,
+					allowUnknownModel: body.allowUnknownModel === true,
 					title: (body.title as string | null | undefined) ?? null,
 					parentSessionId:
 						(body.parentSessionId as string | null | undefined) ?? null,

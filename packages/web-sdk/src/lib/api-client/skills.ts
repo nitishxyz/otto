@@ -79,7 +79,6 @@ export const skillsMixin = {
 	async updateSkillsConfig(input: {
 		enabled?: boolean;
 		items?: Record<string, { enabled?: boolean }>;
-		scope?: 'global' | 'local';
 	}): Promise<SkillsConfigResponse> {
 		const response = await apiUpdateSkillsConfig({ body: input });
 		if (response.error) throw new Error(extractErrorMessage(response.error));

@@ -37,13 +37,107 @@ function asRecord(v: unknown): Record<string, unknown> | undefined {
 const PATCH_FILE_RE =
 	/\*\*\*\s+(?:Update File|Add File|Delete File|Replace in|Delete Lines in|Replace Lines in|Insert Before in|Insert After in):\s*(.+)/;
 
+const TOOL_NAME_ALIASES: Record<string, string> = {
+	readimage: 'read_image',
+	copyinto: 'copy_into',
+	copyattachmenttoproject: 'copy_attachment_to_project',
+	gitstatus: 'git_status',
+	gitdiff: 'git_diff',
+	gitcommit: 'git_commit',
+	applypatch: 'apply_patch',
+	updatetodos: 'update_todos',
+	updateplan: 'update_plan',
+	progressupdate: 'progress_update',
+	loadtools: 'load_tools',
+	loadmcptools: 'load_mcp_tools',
+	mcpmanager: 'mcp_manager',
+};
+
+function normalizeToolName(name: string | null): string {
+	const lower = (name || '').toLowerCase();
+	return TOOL_NAME_ALIASES[lower] ?? lower;
+}
+
+function countItems(value: unknown): number | null {
+	return Array.isArray(value) ? value.length : null;
+}
+
+function plural(count: number, word: string): string {
+	return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function formatBytes(bytes: number | null): string | null {
+	if (bytes === null) return null;
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function summarizePatch(patch: string): string {
+	let files = 0;
+	let additions = 0;
+	let deletions = 0;
+	for (const line of patch.split('\n')) {
+		if (line.startsWith('diff --git')) files += 1;
+		else if (line.startsWith('+') && !line.startsWith('+++')) additions += 1;
+		else if (line.startsWith('-') && !line.startsWith('---')) deletions += 1;
+	}
+	if (!files && !additions && !deletions) return 'no changes';
+	return [
+		files ? plural(files, 'file') : null,
+		additions ? `+${additions}` : null,
+		deletions ? `-${deletions}` : null,
+	]
+		.filter(Boolean)
+		.join(' ');
+}
+
+function mcpActionLabel(action: string | null): string {
+	switch (action) {
+		case 'list':
+			return 'list servers';
+		case 'add':
+			return 'add server';
+		case 'update':
+			return 'update server';
+		case 'remove':
+			return 'remove server';
+		case 'enable':
+			return 'enable server';
+		case 'disable':
+			return 'disable server';
+		default:
+			return action?.replace(/_/g, ' ') || 'mcp manager';
+	}
+}
+
+function simulatorActionLabel(action: string | null): string {
+	switch (action) {
+		case 'start':
+			return 'start preview';
+		case 'take_screenshot':
+			return 'screenshot';
+		case 'type':
+		case 'paste':
+			return 'type text';
+		case 'accessibility_tree':
+			return 'accessibility tree';
+		case 'open_url':
+			return 'open URL';
+		case 'list_apps':
+			return 'list apps';
+		default:
+			return action?.replace(/_/g, ' ') || 'simulator';
+	}
+}
+
 function getToolSummary(part: MessagePart): string | null {
 	const cj = part.contentJson as Record<string, unknown> | undefined;
 	if (!cj) return null;
 	const args = asRecord(cj.args);
 	const result = asRecord(cj.result);
 	const src = args ?? cj;
-	const name = (part.toolName || '').toLowerCase();
+	const name = normalizeToolName(part.toolName);
 
 	switch (name) {
 		case 'shell':
@@ -104,6 +198,16 @@ function getToolSummary(part: MessagePart): string | null {
 			const single = targetPath ?? sourcePath;
 			return single ? clip(single) : null;
 		}
+		case 'copy_attachment_to_project': {
+			const path =
+				(result ? str(result.path) : null) ??
+				str(src.targetPath) ??
+				str(src.path);
+			const filename = result ? str(result.filename) : null;
+			const bytes = result ? formatBytes(num(result.bytes)) : null;
+			const detail = [path ?? filename, bytes].filter(Boolean).join(' ');
+			return detail ? clip(detail) : null;
+		}
 		case 'apply_patch': {
 			const path = str(src.path) ?? str(src.filePath);
 			if (path) return clip(path);
@@ -111,11 +215,61 @@ function getToolSummary(part: MessagePart): string | null {
 			const fromPatch = patch ? PATCH_FILE_RE.exec(patch)?.[1] : null;
 			return fromPatch ? clip(fromPatch) : null;
 		}
+		case 'git_status': {
+			if (!result) return null;
+			const staged = num(result.staged) ?? 0;
+			const unstaged = num(result.unstaged) ?? 0;
+			if (!staged && !unstaged) return 'clean';
+			return [
+				staged ? `${staged} staged` : null,
+				unstaged ? `${unstaged} unstaged` : null,
+			]
+				.filter(Boolean)
+				.join(', ');
+		}
+		case 'git_diff': {
+			const patch = result ? (str(result.patch) ?? str(result.diff)) : null;
+			const scope = src.all || result?.all ? 'all ' : '';
+			return patch
+				? clip(`${scope}${summarizePatch(patch)}`)
+				: `${scope}no changes`;
+		}
 		case 'terminal': {
 			const op = str(src.operation);
 			const detail = str(src.command) ?? str(src.terminalId);
 			const segments = [op, detail].filter(Boolean) as string[];
 			return segments.length ? clip(segments.join(' ')) : null;
+		}
+		case 'mcp_manager': {
+			const action = (result ? str(result.action) : null) ?? str(src.action);
+			const servers = result ? countItems(result.servers) : null;
+			const server = result ? asRecord(result.server) : undefined;
+			const detail =
+				action === 'list' && servers !== null
+					? plural(servers, 'server')
+					: ((server ? str(server.name) : null) ??
+						(result ? str(result.name) : null) ??
+						str(src.name));
+			return clip([mcpActionLabel(action), detail].filter(Boolean).join(' '));
+		}
+		case 'simulator': {
+			const action = str(src.action);
+			const foreground = result ? asRecord(result.foreground) : undefined;
+			const stream = result ? asRecord(result.stream) : undefined;
+			const detail =
+				(result ? str(result.path) : null) ??
+				(result ? str(result.previewUrl) : null) ??
+				str(stream?.url) ??
+				(result ? str(result.bundleId) : null) ??
+				str(foreground?.bundleId) ??
+				str(src.bundleId) ??
+				str(src.url) ??
+				(countItems(result?.apps) !== null
+					? plural(countItems(result?.apps) ?? 0, 'app')
+					: null);
+			return clip(
+				[simulatorActionLabel(action), detail].filter(Boolean).join(' '),
+			);
 		}
 		case 'websearch':
 		case 'web_search': {
@@ -123,6 +277,52 @@ function getToolSummary(part: MessagePart): string | null {
 			if (query) return clip(`"${query}"`);
 			const url = str(src.url);
 			return url ? clip(url) : null;
+		}
+		case 'query_sessions': {
+			const sessions = result ? countItems(result.sessions) : null;
+			const total = result ? num(result.total) : null;
+			if (sessions !== null)
+				return clip(
+					`${plural(sessions, 'session')}${total ? ` of ${total}` : ''}`,
+				);
+			return str(src.agent) ?? str(src.sessionType) ?? null;
+		}
+		case 'query_messages': {
+			const messages = result ? countItems(result.messages) : null;
+			if (messages !== null) return plural(messages, 'message');
+			return str(src.search) ?? str(src.sessionId) ?? null;
+		}
+		case 'search_history': {
+			const results = result ? countItems(result.results) : null;
+			const query = str(src.query);
+			if (results !== null)
+				return clip(
+					`${plural(results, 'result')}${query ? ` for "${query}"` : ''}`,
+				);
+			return query ? clip(`"${query}"`) : null;
+		}
+		case 'get_session_context':
+		case 'get_parent_session': {
+			const session = result
+				? (asRecord(result.session) ?? asRecord(result.parentSession))
+				: undefined;
+			return (
+				(session ? (str(session.title) ?? str(session.id)) : null) ??
+				str(src.sessionId)
+			);
+		}
+		case 'present_action': {
+			const links = result ? countItems(result.links) : null;
+			return (
+				str(result?.title) ?? (links !== null ? plural(links, 'session') : null)
+			);
+		}
+		case 'goal_list':
+		case 'goal_update': {
+			const goal = result ? asRecord(result.goal) : undefined;
+			const tasks = result ? countItems(result.tasks) : null;
+			const title = goal ? str(goal.title) : null;
+			return title ?? (tasks !== null ? plural(tasks, 'task') : null);
 		}
 		case 'delegate_task': {
 			const agent = str(src.agent) ?? (result ? str(result.agent) : null);

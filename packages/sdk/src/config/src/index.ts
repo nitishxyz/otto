@@ -51,6 +51,12 @@ const DEFAULTS: {
 	providers: DEFAULT_PROVIDER_SETTINGS,
 };
 
+const LOCAL_DEFAULT_OVERRIDE_KEYS = [
+	'agent',
+	'provider',
+	'model',
+] satisfies Array<keyof OttoConfig['defaults']>;
+
 export async function loadConfig(
 	projectRootInput?: string,
 ): Promise<OttoConfig> {
@@ -72,7 +78,7 @@ export async function loadConfig(
 		DEFAULTS,
 		globalCfg,
 		globalSkillsCfg ? { skills: globalSkillsCfg } : undefined,
-		omitGlobalOnlySettings(projectCfg),
+		filterProjectConfig(projectCfg),
 	);
 
 	await ensureDir(dataDir);
@@ -97,12 +103,30 @@ export async function loadConfig(
 
 type JsonObject = Record<string, unknown>;
 
-function omitGlobalOnlySettings(
+function filterProjectConfig(
 	config: JsonObject | undefined,
 ): JsonObject | undefined {
 	if (!config) return undefined;
-	const { providers: _providers, skills: _skills, ...rest } = config;
+	const { providers: _providers, skills: _skills, defaults, ...rest } = config;
+	const localDefaults = pickLocalDefaults(defaults);
+	if (localDefaults) {
+		return { ...rest, defaults: localDefaults };
+	}
 	return rest;
+}
+
+function pickLocalDefaults(defaults: unknown): JsonObject | undefined {
+	if (!defaults || typeof defaults !== 'object' || Array.isArray(defaults)) {
+		return undefined;
+	}
+	const source = defaults as JsonObject;
+	const picked: JsonObject = {};
+	for (const key of LOCAL_DEFAULT_OVERRIDE_KEYS) {
+		if (Object.hasOwn(source, key)) {
+			picked[key] = source[key];
+		}
+	}
+	return Object.keys(picked).length > 0 ? picked : undefined;
 }
 
 async function readJsonOptional(file: string): Promise<JsonObject | undefined> {

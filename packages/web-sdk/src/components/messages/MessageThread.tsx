@@ -36,6 +36,7 @@ interface MessageThreadProps {
 	sessionId?: string;
 	isGenerating?: boolean;
 	compact?: boolean;
+	responsiveCompact?: boolean;
 	disableAutoScroll?: boolean;
 	onSelectSession?: (sessionId: string) => void;
 	footerBottomPaddingClass?: string;
@@ -445,6 +446,7 @@ export const MessageThread = memo(function MessageThread({
 	sessionId,
 	isGenerating,
 	compact = false,
+	responsiveCompact = true,
 	disableAutoScroll = false,
 	onSelectSession,
 	footerBottomPaddingClass: footerBottomPaddingClassOverride,
@@ -457,7 +459,9 @@ export const MessageThread = memo(function MessageThread({
 	const threadRootRef = useRef<HTMLDivElement>(null);
 	const threadWidth = useContainerWidth(threadRootRef);
 	const density: 'normal' | 'compact' =
-		threadWidth > 0 && threadWidth < 640 ? 'compact' : 'normal';
+		compact || (responsiveCompact && threadWidth > 0 && threadWidth < 640)
+			? 'compact'
+			: 'normal';
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isThreadScrolling, setIsThreadScrolling] = useState(false);
 	const autoScrollRef = useRef(true);

@@ -596,8 +596,11 @@ export async function buildSessionPreferenceUpdates(
 		if (modelName) {
 			const targetProvider = (updates.provider ||
 				existingSession.provider) as ProviderId;
+			const allowUnknownModel = body.allowUnknownModel === true;
 			try {
-				validateProviderModel(targetProvider, modelName, cfg);
+				validateProviderModel(targetProvider, modelName, cfg, {
+					allowUnknownModel,
+				});
 			} catch {
 				return {
 					ok: false,

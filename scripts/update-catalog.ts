@@ -15,20 +15,6 @@ const OTTOROUTER_SOURCE = 'https://api.ottorouter.org/v1/models';
 const OTTOROUTER_TARGET = 'packages/ai-sdk/src/catalog.ts';
 const REMOTE_CATALOG_TARGET = 'apps/landing/public/catalog/models.json';
 
-const OFFICIAL_KIMI_K2_7_CODE_MODEL: ModelInfo = {
-	id: 'kimi-k2.7-code',
-	ownedBy: 'moonshot',
-	label: 'Kimi K2.7 Code',
-	modalities: { input: ['text', 'image', 'video'], output: ['text'] },
-	toolCall: true,
-	reasoningText: true,
-	attachment: true,
-	temperature: 1,
-	cost: { input: 0.95, output: 4, cacheRead: 0.19 },
-	limit: { context: 262_144, output: 32_768 },
-	provider: { npm: '@ai-sdk/openai-compatible' },
-};
-
 interface ProviderFeedEntry {
 	id: string;
 	name?: string;
@@ -250,11 +236,11 @@ function pickProviders(
 		base.models = models;
 		out[key] = base;
 	}
-	applyOfficialKimiCatalogUpdates(out);
+	applyOfficialKimiCatalogMetadata(out);
 	return out;
 }
 
-function applyOfficialKimiCatalogUpdates(
+function applyOfficialKimiCatalogMetadata(
 	catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>,
 ) {
 	const entry = catalog.moonshot;
@@ -264,11 +250,6 @@ function applyOfficialKimiCatalogUpdates(
 		new Set(['KIMI_API_KEY', 'MOONSHOT_API_KEY', ...(entry.env ?? [])]),
 	);
 	entry.doc = 'https://platform.kimi.ai/docs/api/overview.md';
-	if (
-		!entry.models.some((model) => model.id === OFFICIAL_KIMI_K2_7_CODE_MODEL.id)
-	) {
-		entry.models.push(OFFICIAL_KIMI_K2_7_CODE_MODEL);
-	}
 }
 
 function mapModel(

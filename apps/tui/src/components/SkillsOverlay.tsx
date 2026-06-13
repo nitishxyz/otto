@@ -55,7 +55,6 @@ async function fetchSkillsConfig(): Promise<SkillsConfigResponse> {
 async function updateSkillsConfig(input: {
 	enabled?: boolean;
 	items?: Record<string, { enabled?: boolean }>;
-	scope?: 'global' | 'local';
 }): Promise<SkillsConfigResponse> {
 	client.setConfig({ baseURL: getBaseUrl() });
 	const response = await updateSkillsConfigApi({ body: input });
@@ -151,7 +150,6 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 		async (input: {
 			enabled?: boolean;
 			items?: Record<string, { enabled?: boolean }>;
-			scope?: 'global' | 'local';
 		}) => {
 			setSaving(true);
 			setError(null);

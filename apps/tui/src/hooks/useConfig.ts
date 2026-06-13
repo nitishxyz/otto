@@ -52,7 +52,7 @@ export function useConfig() {
 		}) => {
 			try {
 				const response = await apiUpdateDefaults({
-					body: changes,
+					body: { ...changes, scope: 'global' },
 				});
 				const result = response.data as unknown as {
 					defaults: Config['defaults'];

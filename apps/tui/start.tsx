@@ -13,6 +13,12 @@ export async function startTui(
 	port: number,
 	stopServer?: () => Promise<void>,
 	webUrl?: string,
+	initialSession?: {
+		agent?: string;
+		provider?: string;
+		model?: string;
+		allowUnknownModel?: boolean;
+	},
 ): Promise<void> {
 	setPort(port);
 	configureApi();
@@ -74,7 +80,11 @@ export async function startTui(
 
 	root.render(
 		<ThemeProvider>
-			<App onQuit={handleQuit} webUrl={webUrl} />
+			<App
+				onQuit={handleQuit}
+				webUrl={webUrl}
+				initialSession={initialSession}
+			/>
 		</ThemeProvider>,
 	);
 

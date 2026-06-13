@@ -335,11 +335,7 @@ export function ChatInput({
 
 	const hasStatus = isStreaming || status.type !== 'idle';
 	const accent = isPlanMode ? colors.cyan : colors.blue;
-	const borderColor = disabled
-		? colors.border
-		: isStreaming
-			? colors.streamDot
-			: accent;
+	const borderColor = disabled ? colors.border : accent;
 	const modeLabel = isPlanMode ? ' plan ' : ' build ';
 
 	const fileWindow = getVisibleWindow(
@@ -358,6 +354,8 @@ export function ChatInput({
 			style={{
 				width: '100%',
 				flexShrink: 0,
+				position: 'relative',
+				zIndex: 1000,
 				paddingLeft: 1,
 				paddingRight: 1,
 				flexDirection: 'column',
@@ -366,6 +364,11 @@ export function ChatInput({
 			{showFileMention && filteredFiles.length > 0 && (
 				<box
 					style={{
+						position: 'absolute',
+						bottom: 4,
+						left: 1,
+						right: 1,
+						zIndex: 1001,
 						flexDirection: 'column',
 						backgroundColor: colors.bg,
 						border: true,
@@ -413,6 +416,11 @@ export function ChatInput({
 				mentionQuery.length > 0 && (
 					<box
 						style={{
+							position: 'absolute',
+							bottom: 4,
+							left: 1,
+							right: 1,
+							zIndex: 1001,
 							backgroundColor: colors.bg,
 							border: true,
 							borderStyle: 'rounded',
@@ -429,6 +437,11 @@ export function ChatInput({
 			{commandMatches.length > 0 && (
 				<box
 					style={{
+						position: 'absolute',
+						bottom: 4,
+						left: 1,
+						right: 1,
+						zIndex: 1001,
 						flexDirection: 'column',
 						backgroundColor: colors.bg,
 						border: true,

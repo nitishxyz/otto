@@ -13,6 +13,13 @@ import type { Session } from '../types.ts';
 
 const PAGE_SIZE = 50;
 
+type SessionCreateDefaults = {
+	agent?: string;
+	provider?: string;
+	model?: string;
+	allowUnknownModel?: boolean;
+};
+
 function sortSessions(list: Session[]): Session[] {
 	return [...list].sort((a, b) => {
 		const aTime = a.lastActiveAt ?? a.createdAt ?? 0;
@@ -21,7 +28,7 @@ function sortSessions(list: Session[]): Session[] {
 	});
 }
 
-export function useSession() {
+export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeSession, setActiveSession] = useState<Session | null>(null);
 	const [hasMore, setHasMore] = useState(false);
@@ -69,7 +76,9 @@ export function useSession() {
 	const createSession = useCallback(
 		async (title?: string): Promise<Session | null> => {
 			try {
-				const response = await apiCreateSession({ body: { title } });
+				const response = await apiCreateSession({
+					body: { ...defaultCreateSession, title },
+				} as never);
 				const session = response.data as Session;
 				if (!session) return null;
 				setSessions((prev) => sortSessions([session, ...prev]));
@@ -79,7 +88,7 @@ export function useSession() {
 				return null;
 			}
 		},
-		[],
+		[defaultCreateSession],
 	);
 
 	const deleteSessionFn = useCallback(
@@ -114,7 +123,12 @@ export function useSession() {
 	const updateSessionPrefs = useCallback(
 		async (
 			sessionId: string,
-			changes: { agent?: string; provider?: string; model?: string },
+			changes: {
+				agent?: string;
+				provider?: string;
+				model?: string;
+				allowUnknownModel?: boolean;
+			},
 		) => {
 			try {
 				await apiUpdateSession({
@@ -145,6 +159,9 @@ export function useSession() {
 					path: { id: sessionId },
 					body: {
 						content,
+						...(defaultCreateSession?.allowUnknownModel
+							? { allowUnknownModel: true }
+							: {}),
 						...(images ? { images } : {}),
 						...(files ? { files } : {}),
 						// biome-ignore lint/suspicious/noExplicitAny: Server accepts images/files but SDK types don't include them
@@ -152,7 +169,7 @@ export function useSession() {
 				});
 			} catch {}
 		},
-		[],
+		[defaultCreateSession?.allowUnknownModel],
 	);
 
 	const abortSessionFn = useCallback(async (sessionId: string) => {

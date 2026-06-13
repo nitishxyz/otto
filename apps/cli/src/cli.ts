@@ -60,6 +60,9 @@ export function createCli(version: string): Command {
 			'Disable interactive auth onboarding and rely on env/stored auth',
 		)
 		.option('--web', 'Open Web UI instead of TUI')
+		.option('--agent <name>', 'Initial TUI agent')
+		.option('--provider <provider>', 'Initial TUI provider')
+		.option('--model <model>', 'Initial TUI model')
 		.hook('preAction', async (_thisCommand, actionCommand) => {
 			const cmdName = actionCommand.name();
 			if (!SKIP_SERVER_COMMANDS.has(cmdName)) {
@@ -89,6 +92,33 @@ export function createCli(version: string): Command {
 	return program;
 }
 
+const ROOT_VALUE_FLAGS = new Set([
+	'--agent',
+	'--model',
+	'--port',
+	'--project',
+	'--provider',
+]);
+
+function getFlagValue(argv: string[], flag: string): string | undefined {
+	const index = argv.indexOf(flag);
+	if (index < 0) return undefined;
+	const value = argv[index + 1];
+	return value && !value.startsWith('-') ? value : undefined;
+}
+
+function findCommandArg(argv: string[]): string | undefined {
+	for (let i = 0; i < argv.length; i++) {
+		const arg = argv[i];
+		if (ROOT_VALUE_FLAGS.has(arg)) {
+			i++;
+			continue;
+		}
+		if (!arg.startsWith('-')) return arg;
+	}
+	return undefined;
+}
+
 export async function runCli(argv: string[], version: string): Promise<void> {
 	const program = createCli(version);
 	const previousCiMode = process.env.OTTO_CI_MODE;
@@ -97,11 +127,10 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 		process.env.OTTO_CI_MODE = '1';
 	}
 	try {
-		const projectIdx = argv.indexOf('--project');
-		const projectRoot = projectIdx >= 0 ? argv[projectIdx + 1] : process.cwd();
+		const projectRoot = getFlagValue(argv, '--project') ?? process.cwd();
 		await ensureProjectOttoIgnored(projectRoot);
 
-		const cmd = argv.find((arg) => !arg.startsWith('-'));
+		const cmd = findCommandArg(argv);
 		shouldStopEphemeralServer = Boolean(
 			cmd && !NO_EPHEMERAL_SERVER_COMMANDS.has(cmd),
 		);
@@ -116,7 +145,7 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 
 		if (
 			argv.length === 0 ||
-			(argv.every((arg) => arg.startsWith('-')) &&
+			(!cmd &&
 				!argv.includes('-h') &&
 				!argv.includes('--help') &&
 				!argv.includes('-v') &&
@@ -132,9 +161,17 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 			}
 
 			const useWeb = argv.includes('--web');
-			const portFlagIndex = argv.indexOf('--port');
-			const port =
-				portFlagIndex >= 0 ? Number(argv[portFlagIndex + 1]) : undefined;
+			const portValue = getFlagValue(argv, '--port');
+			const port = portValue ? Number(portValue) : undefined;
+			const initialProvider = getFlagValue(argv, '--provider')?.trim();
+			const initialModel = getFlagValue(argv, '--model')?.trim();
+			const initialAgent = getFlagValue(argv, '--agent')?.trim();
+			const initialSession = {
+				...(initialAgent ? { agent: initialAgent } : {}),
+				...(initialProvider ? { provider: initialProvider } : {}),
+				...(initialModel ? { model: initialModel } : {}),
+				...(initialModel ? { allowUnknownModel: true } : {}),
+			};
 
 			if (useWeb) {
 				const noOpen = argv.includes('--no-open');
@@ -159,7 +196,7 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 			const { startApiServer } = await import('./commands/serve.ts');
 			const server = await startApiServer({ project: projectRoot, port });
 			const { startTui } = await import('@ottocode/tui');
-			await startTui(server.port, server.stop, server.webUrl);
+			await startTui(server.port, server.stop, server.webUrl, initialSession);
 			return;
 		}
 

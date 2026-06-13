@@ -42,7 +42,6 @@ export function useUpdateSkillsConfig() {
 		mutationFn: (input: {
 			enabled?: boolean;
 			items?: Record<string, { enabled?: boolean }>;
-			scope?: 'global' | 'local';
 		}) => apiClient.updateSkillsConfig(input),
 		onSuccess: (data) => {
 			setSkillsConfig({
