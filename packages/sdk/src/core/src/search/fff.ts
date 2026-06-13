@@ -1,11 +1,62 @@
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { FileFinder, type FileFinderApi } from '@ff-labs/fff-bun';
 
 export type FffFileSearchResult = {
 	files: string[];
 	truncated: boolean;
+};
+
+type FffResult<T = void> =
+	| { ok: true; value: T }
+	| { ok: false; error: string };
+
+type FileFinderItem = {
+	relativePath: string;
+	lineNumber: number;
+	lineContent: string;
+};
+
+type FileFinderApi = {
+	destroy(): void;
+	waitForIndexReady(timeoutMs: number): Promise<FffResult>;
+	scanFiles(): FffResult;
+	waitForScan(timeoutMs: number): Promise<FffResult>;
+	grep(
+		query: string,
+		options: {
+			mode: 'regex';
+			smartCase: boolean;
+			pageSize: number;
+			maxMatchesPerFile: number;
+		},
+	): FffResult<{ items: FileFinderItem[]; nextCursor?: unknown }>;
+	fileSearch(
+		query: string,
+		options: { pageIndex: number; pageSize: number },
+	): FffResult<{
+		items: Array<{ relativePath: string }>;
+		totalMatched: number;
+	}>;
+	glob(
+		query: string,
+		options: { pageIndex: number; pageSize: number },
+	): FffResult<{
+		items: Array<{ relativePath: string }>;
+		totalMatched: number;
+	}>;
+};
+
+type FileFinderModule = {
+	FileFinder: {
+		create(options: {
+			basePath: string;
+			aiMode: boolean;
+			disableWatch: boolean;
+			enableHomeDirScanning: boolean;
+			enableFsRootScanning: boolean;
+		}): FffResult<FileFinderApi>;
+	};
 };
 
 type FinderEntry = {
@@ -25,6 +76,8 @@ function isHomeRoot(path: string): boolean {
 }
 
 async function createFinderEntry(basePath: string): Promise<FinderEntry> {
+	const fffPackage = '@ff-labs/fff-bun';
+	const { FileFinder } = (await import(fffPackage)) as FileFinderModule;
 	const result = FileFinder.create({
 		basePath,
 		aiMode: true,

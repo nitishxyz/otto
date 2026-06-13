@@ -2,11 +2,6 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './search.txt' with { type: 'text' };
 import { createToolError, type ToolResponse } from '../error.ts';
-import {
-	getFffFinder,
-	refreshFffIndex,
-	resolveFffSearchScope,
-} from '../../search/fff.ts';
 
 const TEXT_MAX = 200;
 
@@ -82,6 +77,8 @@ export function buildSearchTool(projectRoot: string): {
 			maxResults?: number;
 		}): Promise<ToolResponse<SearchToolResult>> {
 			try {
+				const { getFffFinder, refreshFffIndex, resolveFffSearchScope } =
+					await import('../../search/fff.ts');
 				const { basePath, constraint } = await resolveFffSearchScope(
 					projectRoot,
 					path,
