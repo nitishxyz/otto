@@ -5,7 +5,10 @@ import { z } from 'zod/v3';
 import DESCRIPTION from './shell.txt' with { type: 'text' };
 import { getShellExecutionConfig } from '../bin-manager.ts';
 import { createToolError, type ToolResponse } from '../error.ts';
-import { injectCoAuthorIntoGitCommit } from './git-identity.ts';
+import {
+	injectCoAuthorIntoGitCommit,
+	shouldCoAuthorCommits,
+} from './git-identity.ts';
 
 function normalizePath(p: string) {
 	const normalized = p.replace(/\\/g, '/');
@@ -248,7 +251,10 @@ export function buildShellTool(projectRoot: string): {
 			}
 
 			const absCwd = resolveSafePath(projectRoot, cwd || '.');
-			const finalCmd = injectCoAuthorIntoGitCommit(cmd);
+			const finalCmd = injectCoAuthorIntoGitCommit(
+				cmd,
+				shouldCoAuthorCommits(projectRoot),
+			);
 			const shellExecutor = shellExecutorContext.getStore();
 			if (shellExecutor) {
 				return shellExecutor(

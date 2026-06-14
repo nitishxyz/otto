@@ -47,6 +47,7 @@ export function LeanHeader({
 	const { data: shareStatus } = useShareStatus(session.id);
 
 	const estimatedCost = useMemo(() => {
+		if (typeof session.totalCostUsd === 'number') return session.totalCostUsd;
 		const inputTokens = session.totalInputTokens || 0;
 		const outputTokens = session.totalOutputTokens || 0;
 		const cachedInputTokens = session.totalCachedTokens || 0;
@@ -66,7 +67,9 @@ export function LeanHeader({
 		session.totalOutputTokens,
 		session.totalCachedTokens,
 		session.totalCacheCreationTokens,
+		session.totalCostUsd,
 	]);
+	const subagentCost = session.subagentCostUsd ?? 0;
 
 	const formatCompactNumber = (num: number) => {
 		if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -194,7 +197,14 @@ export function LeanHeader({
 						</div>
 
 						{estimatedCost > 0 && !isCompact && (
-							<div className="flex items-center gap-1">
+							<div
+								className="flex items-center gap-1"
+								title={
+									subagentCost > 0
+										? `Total cost includes $${subagentCost.toFixed(4)} from sub-agents`
+										: 'Estimated session cost'
+								}
+							>
 								<DollarSign className="size-3.5" />
 								<span className="text-foreground font-medium">
 									{estimatedCost.toFixed(4)}

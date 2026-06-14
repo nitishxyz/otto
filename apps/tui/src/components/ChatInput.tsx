@@ -24,6 +24,7 @@ interface ChatInputProps {
 	disabled: boolean;
 	status: StatusIndicator;
 	isStreaming: boolean;
+	agent: string;
 	provider: string;
 	model: string;
 	escHint: boolean;
@@ -44,6 +45,7 @@ export function ChatInput({
 	disabled,
 	status,
 	isStreaming,
+	agent,
 	provider,
 	model,
 	escHint,
@@ -337,7 +339,7 @@ export function ChatInput({
 	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
 	const borderColor = disabled ? colors.border : accent;
-	const modeLabel = isPlanMode ? ' plan ' : ' build ';
+	const modeLabel = ` ${agent || (isPlanMode ? 'plan' : 'build')} `;
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,
@@ -574,9 +576,6 @@ export function ChatInput({
 									style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
 								>
 									<TinySpinner fg={colors.streamDot} />
-									<text fg={colors.streamDot} wrapMode="none" truncate>
-										generating
-									</text>
 									{escHint && (
 										<text fg={colors.yellow} wrapMode="none" truncate>
 											press Esc again to stop

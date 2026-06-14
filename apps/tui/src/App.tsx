@@ -176,8 +176,10 @@ export function App({
 	const totalOut = activeSession?.totalOutputTokens ?? 0;
 	const totalCached = activeSession?.totalCachedTokens ?? 0;
 	const totalCacheCreation = activeSession?.totalCacheCreationTokens ?? 0;
+	const totalCostUsd = activeSession?.totalCostUsd;
 
 	const estimatedCost = useMemo(() => {
+		if (typeof totalCostUsd === 'number') return totalCostUsd;
 		if (!sessionProvider) return 0;
 		return (
 			estimateModelCostUsd(sessionProvider as ProviderId, sessionModel, {
@@ -194,6 +196,7 @@ export function App({
 		totalOut,
 		totalCached,
 		totalCacheCreation,
+		totalCostUsd,
 	]);
 
 	const contextUsagePercent = useMemo(() => {
@@ -722,6 +725,7 @@ export function App({
 				}
 				status={status}
 				isStreaming={isStreaming}
+				agent={currentAgent}
 				provider={provider}
 				model={model}
 				escHint={escHint}

@@ -15,10 +15,13 @@ export interface Session {
 	totalCacheCreationTokens?: number | null;
 	totalToolTimeMs: number | null;
 	currentContextTokens?: number | null;
+	ownCostUsd?: number;
+	subagentCostUsd?: number;
+	totalCostUsd?: number;
 	toolCounts?: Record<string, number>;
 	parentSessionId?: string | null;
 	branchPointMessageId?: string | null;
-	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'otto';
+	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'otto' | 'subagent';
 	isRunning?: boolean;
 	fileStats?: {
 		changedFiles: number;

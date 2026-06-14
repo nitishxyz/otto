@@ -46,6 +46,7 @@ export function useUpdateDefaults() {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
 			scope?: 'global';
 		}) => apiClient.updateDefaults(data),

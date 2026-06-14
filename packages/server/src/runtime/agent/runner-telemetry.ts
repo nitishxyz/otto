@@ -1,8 +1,11 @@
 import { logger } from '@ottocode/sdk';
 import { time } from '../debug/index.ts';
 import type { RunOpts } from '../session/queue.ts';
-import type { RunnerMessage } from './runner-reminders.ts';
 import type { SetupResult } from './runner-setup.ts';
+
+type RunnerMessage =
+	| SetupResult['history'][number]
+	| SetupResult['additionalSystemMessages'][number];
 
 export function nowMs(): number {
 	const perf = globalThis.performance;

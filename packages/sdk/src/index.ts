@@ -334,6 +334,7 @@ export {
 export {
 	appendCoAuthorTrailer,
 	injectCoAuthorIntoGitCommit,
+	shouldCoAuthorCommits,
 	OTTOCODE_BOT_NAME,
 	OTTOCODE_BOT_EMAIL,
 	OTTOCODE_CO_AUTHOR,

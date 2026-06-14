@@ -6,7 +6,10 @@ import GIT_STATUS_DESCRIPTION from './git.status.txt' with { type: 'text' };
 import GIT_DIFF_DESCRIPTION from './git.diff.txt' with { type: 'text' };
 import GIT_COMMIT_DESCRIPTION from './git.commit.txt' with { type: 'text' };
 import { createToolError, type ToolResponse } from '../error.ts';
-import { appendCoAuthorTrailer } from './git-identity.ts';
+import {
+	appendCoAuthorTrailer,
+	shouldCoAuthorCommits,
+} from './git-identity.ts';
 
 const execAsync = promisify(exec);
 
@@ -120,7 +123,10 @@ export function buildGitTools(
 				});
 			}
 			const gitRoot = await findGitRoot();
-			const fullMessage = appendCoAuthorTrailer(message);
+			const fullMessage = appendCoAuthorTrailer(
+				message,
+				shouldCoAuthorCommits(projectRoot),
+			);
 			const args = [
 				'git',
 				'-C',

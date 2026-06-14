@@ -12,6 +12,7 @@ interface Config {
 		reasoningText?: boolean;
 		reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 		theme?: string;
+		coAuthorCommits?: boolean;
 	};
 }
 
@@ -52,6 +53,7 @@ export function useConfig() {
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 			theme?: string;
+			coAuthorCommits?: boolean;
 		}) => {
 			try {
 				const response = await apiUpdateDefaults({

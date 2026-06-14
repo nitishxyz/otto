@@ -45,6 +45,7 @@ export function SessionHeader({
 	const isCompact = width > 0 && width < 640;
 
 	const estimatedCost = useMemo(() => {
+		if (typeof session.totalCostUsd === 'number') return session.totalCostUsd;
 		const inputTokens = session.totalInputTokens || 0;
 		const outputTokens = session.totalOutputTokens || 0;
 		const cachedInputTokens = session.totalCachedTokens || 0;
@@ -64,7 +65,9 @@ export function SessionHeader({
 		session.totalOutputTokens,
 		session.totalCachedTokens,
 		session.totalCacheCreationTokens,
+		session.totalCostUsd,
 	]);
+	const subagentCost = session.subagentCostUsd ?? 0;
 
 	const formatDuration = (ms: number | null) => {
 		if (!ms) return '0s';
@@ -206,7 +209,14 @@ export function SessionHeader({
 					)}
 
 					{estimatedCost > 0 && !isCompact && (
-						<div className="flex items-center gap-1.5">
+						<div
+							className="flex items-center gap-1.5"
+							title={
+								subagentCost > 0
+									? `Total cost includes $${subagentCost.toFixed(4)} from sub-agents`
+									: 'Estimated session cost'
+							}
+						>
 							<DollarSign className="w-4 h-4" />
 							<span className="font-medium text-foreground">
 								{estimatedCost.toFixed(4)}

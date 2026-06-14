@@ -58,6 +58,7 @@ const configDefaultsSchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
 });
 
@@ -193,6 +194,12 @@ export function registerMainConfigRoute(app: Hono) {
 							embeddedConfig?.defaults?.autoCompactThresholdTokens,
 							cfg.defaults.autoCompactThresholdTokens,
 						) ?? null,
+					coAuthorCommits:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.coAuthorCommits,
+							cfg.defaults.coAuthorCommits,
+						) ?? false,
 					ottoEnabled:
 						getDefault(
 							undefined,

@@ -8,9 +8,11 @@ import { resolveAgentConfig } from '../../runtime/agent/registry.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { createSession as createSessionRow } from '../../runtime/session/manager.ts';
 import {
+	attachSessionCostSummary,
 	buildSessionPreferenceUpdates,
 	deleteSessionMessagesAndParts,
 	findSessionById,
+	getSessionCostSummaries,
 	getSessionFileStats,
 	loadProjectDb,
 	normalizeSessionRow,
@@ -35,12 +37,15 @@ const sessionSchema = z
 		totalReasoningTokens: z.number().nullable().optional(),
 		totalToolTimeMs: z.number().nullable(),
 		currentContextTokens: z.number().nullable().optional(),
+		ownCostUsd: z.number().optional(),
+		subagentCostUsd: z.number().optional(),
+		totalCostUsd: z.number().optional(),
 		contextSummary: z.string().nullable().optional(),
 		lastCompactedAt: z.number().nullable().optional(),
 		parentSessionId: z.string().nullable().optional(),
 		branchPointMessageId: z.string().nullable().optional(),
 		sessionType: z
-			.enum(['main', 'branch', 'handoff', 'btw', 'otto'])
+			.enum(['main', 'branch', 'handoff', 'btw', 'otto', 'subagent'])
 			.optional(),
 		toolCounts: z.record(z.string(), z.number()).optional(),
 		isRunning: z.boolean().optional(),
@@ -203,15 +208,23 @@ export function registerSessionCrudRoutes(app: Hono) {
 				.offset(offset);
 			const hasMore = rows.length > limit;
 			const page = hasMore ? rows.slice(0, limit) : rows;
-			const fileStats = await getSessionFileStats(db, page);
+			const [fileStats, costSummaries] = await Promise.all([
+				getSessionFileStats(db, page),
+				getSessionCostSummaries(db, page),
+			]);
 			const normalized = page.map((r) => {
 				const normalizedSession = normalizeSessionRow(r, {
 					includeRunning: true,
 				});
 				const stats = fileStats.get(r.id);
-				return stats && stats.changedFiles > 0
-					? { ...normalizedSession, fileStats: stats }
-					: normalizedSession;
+				const sessionWithStats =
+					stats && stats.changedFiles > 0
+						? { ...normalizedSession, fileStats: stats }
+						: normalizedSession;
+				return attachSessionCostSummary(
+					sessionWithStats,
+					costSummaries.get(r.id),
+				);
 			});
 			return c.json({
 				items: normalized,
@@ -290,7 +303,10 @@ export function registerSessionCrudRoutes(app: Hono) {
 								? 'otto'
 								: 'main',
 				});
-				return c.json(row, 201);
+				return c.json(
+					attachSessionCostSummary(normalizeSessionRow(row), undefined),
+					201,
+				);
 			} catch (err) {
 				logger.error('Failed to create session', err);
 				const errorResponse = serializeError(err);
@@ -334,7 +350,13 @@ export function registerSessionCrudRoutes(app: Hono) {
 						404,
 					);
 				}
-				return c.json(normalizeSessionRow(session));
+				const costSummaries = await getSessionCostSummaries(db, [session]);
+				return c.json(
+					attachSessionCostSummary(
+						normalizeSessionRow(session),
+						costSummaries.get(session.id),
+					),
+				);
 			} catch (err) {
 				logger.error('Failed to get session', err);
 				const errorResponse = serializeError(err);
@@ -382,10 +404,17 @@ export function registerSessionCrudRoutes(app: Hono) {
 					.where(eq(sessions.id, sessionId));
 
 				const updatedSession = await findSessionById(db, sessionId);
+				const sessionForResponse = updatedSession ?? existingSession;
+				const costSummaries = await getSessionCostSummaries(db, [
+					sessionForResponse,
+				]);
 				return c.json(
-					normalizeSessionRow(updatedSession ?? existingSession, {
-						includeRunning: true,
-					}),
+					attachSessionCostSummary(
+						normalizeSessionRow(sessionForResponse, {
+							includeRunning: true,
+						}),
+						costSummaries.get(sessionForResponse.id),
+					),
 				);
 			} catch (err) {
 				logger.error('Failed to mark session viewed', err);
@@ -471,7 +500,16 @@ export function registerSessionCrudRoutes(app: Hono) {
 					.where(eq(sessions.id, sessionId))
 					.limit(1);
 
-				return c.json(updatedRows[0]);
+				const responseSession = updatedRows[0] ?? existingSession;
+				const costSummaries = await getSessionCostSummaries(db, [
+					responseSession,
+				]);
+				return c.json(
+					attachSessionCostSummary(
+						normalizeSessionRow(responseSession),
+						costSummaries.get(responseSession.id),
+					),
+				);
 			} catch (err) {
 				logger.error('Failed to update session', err);
 				const errorResponse = serializeError(err);

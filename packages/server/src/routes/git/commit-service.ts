@@ -37,7 +37,11 @@ export async function handleCommitChanges(c: Context) {
 			);
 		}
 
-		const fullMessage = appendCoAuthorTrailer(message);
+		const config = await loadConfig(validation.gitRoot);
+		const fullMessage = appendCoAuthorTrailer(
+			message,
+			config.defaults.coAuthorCommits === true,
+		);
 		const { stdout } = await execFileAsync(
 			'git',
 			['commit', '-m', fullMessage],

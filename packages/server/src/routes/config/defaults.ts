@@ -49,6 +49,7 @@ const defaultsUpdateBodySchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
 	scope: z.enum(['global', 'local']).optional().default('global'),
 });
@@ -69,6 +70,7 @@ const defaultsSchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
+	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
 });
 
@@ -125,6 +127,7 @@ export function registerDefaultsRoute(app: Hono) {
 					releaseToSend?: boolean;
 					fullWidthContent?: boolean;
 					autoCompactThresholdTokens?: number | null;
+					coAuthorCommits?: boolean;
 					ottoEnabled?: boolean;
 					scope?: 'global' | 'local';
 				}>();
@@ -146,6 +149,7 @@ export function registerDefaultsRoute(app: Hono) {
 					releaseToSend: boolean;
 					fullWidthContent: boolean;
 					autoCompactThresholdTokens: number | null;
+					coAuthorCommits: boolean;
 					ottoEnabled: boolean;
 				}> = {};
 
@@ -185,6 +189,8 @@ export function registerDefaultsRoute(app: Hono) {
 						updates.autoCompactThresholdTokens = Math.floor(threshold);
 					}
 				}
+				if (body.coAuthorCommits !== undefined)
+					updates.coAuthorCommits = body.coAuthorCommits;
 				if (body.ottoEnabled !== undefined)
 					updates.ottoEnabled = body.ottoEnabled;
 

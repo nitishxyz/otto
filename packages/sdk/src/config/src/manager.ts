@@ -93,6 +93,7 @@ export async function writeDefaults(
 		releaseToSend: boolean;
 		fullWidthContent: boolean;
 		autoCompactThresholdTokens: number | null;
+		coAuthorCommits: boolean;
 		ottoEnabled: boolean;
 	}>,
 	projectRoot?: string,

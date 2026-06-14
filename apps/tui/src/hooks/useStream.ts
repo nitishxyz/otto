@@ -482,6 +482,31 @@ async function loadPendingSecureInputs(sessionId: string) {
 		: [];
 }
 
+async function loadSessionQueueState(sessionId: string, baseUrl: string) {
+	const url = new URL(
+		`/v1/sessions/${encodeURIComponent(sessionId)}/queue`,
+		baseUrl,
+	);
+	const response = await fetch(url);
+	if (!response.ok) return null;
+	return (await response.json()) as Record<string, unknown>;
+}
+
+function getQueuedMessageIds(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return value
+		.map((item) => {
+			if (!item || typeof item !== 'object') return null;
+			const record = item as Record<string, unknown>;
+			if (typeof record.messageId === 'string') return record.messageId;
+			if (typeof record.assistantMessageId === 'string') {
+				return record.assistantMessageId;
+			}
+			return null;
+		})
+		.filter((id): id is string => id !== null);
+}
+
 async function connectSSE(
 	url: string,
 	signal: AbortSignal,
@@ -545,6 +570,10 @@ export function useStream(
 	useEffect(() => {
 		if (!sessionId) {
 			dispatch({ type: 'CLEAR' });
+			setStreamingMessageId(null);
+			setQueueSize(0);
+			setQueuedMessageIds(new Set());
+			setPendingApprovals([]);
 			setPendingSecureInputs([]);
 			return;
 		}
@@ -553,15 +582,41 @@ export function useStream(
 		abortRef.current = controller;
 		const baseUrl = getBaseUrl();
 
+		setStreamingMessageId(null);
+		setQueueSize(0);
+		setQueuedMessageIds(new Set());
+		setPendingApprovals([]);
+		setPendingSecureInputs([]);
+
 		loadSessionMessages(sessionId)
-			.then((messages) => dispatch({ type: 'LOAD', messages }))
+			.then((messages) => {
+				if (!controller.signal.aborted) dispatch({ type: 'LOAD', messages });
+			})
 			.catch(() => {});
 		loadPendingSecureInputs(sessionId)
-			.then(setPendingSecureInputs)
-			.catch(() => setPendingSecureInputs([]));
+			.then((inputs) => {
+				if (!controller.signal.aborted) setPendingSecureInputs(inputs);
+			})
+			.catch(() => {
+				if (!controller.signal.aborted) setPendingSecureInputs([]);
+			});
+		loadSessionQueueState(sessionId, baseUrl)
+			.then((queueState) => {
+				if (controller.signal.aborted || !queueState) return;
+				const currentMsgId =
+					typeof queueState.currentMessageId === 'string'
+						? queueState.currentMessageId
+						: null;
+				setStreamingMessageId(currentMsgId);
+				const nextIds = getQueuedMessageIds(queueState.queuedMessages);
+				setQueueSize(nextIds.length);
+				setQueuedMessageIds(new Set(nextIds));
+			})
+			.catch(() => {});
 
 		const streamUrl = buildSessionStreamUrl({ baseUrl, sessionId });
 		connectSSE(streamUrl, controller.signal, (event) => {
+			if (controller.signal.aborted) return;
 			const payload = event.payload as Record<string, unknown>;
 
 			switch (event.type) {
@@ -663,8 +718,13 @@ export function useStream(
 					setStreamingMessageId(null);
 					onMessageCompletedRef.current?.();
 					setTimeout(() => {
+						if (controller.signal.aborted) return;
 						loadSessionMessages(sessionId)
-							.then((messages) => dispatch({ type: 'LOAD', messages }))
+							.then((messages) => {
+								if (!controller.signal.aborted) {
+									dispatch({ type: 'LOAD', messages });
+								}
+							})
 							.catch(() => {});
 					}, 300);
 					break;
@@ -680,20 +740,17 @@ export function useStream(
 					break;
 				}
 				case 'queue.updated': {
-					const queueLength =
-						typeof payload.queueLength === 'number' ? payload.queueLength : 0;
-					setQueueSize(queueLength);
 					const currentMsgId =
 						typeof payload.currentMessageId === 'string'
 							? payload.currentMessageId
 							: null;
-					if (currentMsgId) setStreamingMessageId(currentMsgId);
-					const queuedMsgs = Array.isArray(payload.queuedMessages)
-						? payload.queuedMessages
-						: [];
-					const nextIds = queuedMsgs.map(
-						(q: { messageId: string }) => q.messageId,
-					);
+					setStreamingMessageId(currentMsgId);
+					const nextIds = getQueuedMessageIds(payload.queuedMessages);
+					const queueLength =
+						typeof payload.queueLength === 'number'
+							? payload.queueLength
+							: nextIds.length;
+					setQueueSize(queueLength);
 					setQueuedMessageIds((prev) => {
 						if (
 							prev.size === nextIds.length &&

@@ -718,6 +718,17 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 							}
 						/>
 						<ToggleRow
+							label="Otto Commit Co-author"
+							description="Add the ottocode bot as a co-author on commits made through Otto."
+							checked={config?.defaults?.coAuthorCommits ?? false}
+							onChange={(checked) =>
+								updateDefaults.mutate({
+									coAuthorCommits: checked,
+									scope: 'global',
+								})
+							}
+						/>
+						<ToggleRow
 							label="Otto & Goals"
 							description="Supervisor agent that verifies goal progress and re-enqueues sessions until the goal is done. Disabling also disables goals."
 							checked={config?.defaults?.ottoEnabled ?? true}

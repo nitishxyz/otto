@@ -12,6 +12,9 @@ export interface Session {
 	totalCachedTokens: number | null;
 	totalCacheCreationTokens: number | null;
 	currentContextTokens: number | null;
+	ownCostUsd?: number;
+	subagentCostUsd?: number;
+	totalCostUsd?: number;
 }
 
 export interface Message {

@@ -51,6 +51,7 @@ export function ConfigModal({
 	const updateDefaults = useUpdateDefaults();
 	const reasoningEnabled = config?.defaults?.reasoningText ?? true;
 	const reasoningLevel = config?.defaults?.reasoningLevel ?? 'high';
+	const coAuthorCommits = config?.defaults?.coAuthorCommits ?? false;
 	const ottoEnabled = config?.defaults?.ottoEnabled ?? true;
 	const agentNames = useMemo(
 		() =>
@@ -175,6 +176,37 @@ export function ConfigModal({
 							onChange={handleModelChange}
 							dropdownMode="inline"
 						/>
+					</div>
+
+					<div className="flex items-center justify-between">
+						<div>
+							<div className="text-sm font-medium text-foreground">
+								Otto Commit Co-author
+							</div>
+							<p className="mt-0.5 text-xs text-muted-foreground">
+								Add the ottocode bot as a co-author on Otto commits.
+							</p>
+						</div>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={coAuthorCommits}
+							onClick={() =>
+								updateDefaults.mutate({
+									coAuthorCommits: !coAuthorCommits,
+									scope: 'global',
+								})
+							}
+							className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+								coAuthorCommits ? 'bg-primary' : 'bg-muted'
+							}`}
+						>
+							<span
+								className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+									coAuthorCommits ? 'translate-x-6' : 'translate-x-1'
+								} ${coAuthorCommits ? 'bg-primary-foreground' : 'bg-foreground'}`}
+							/>
+						</button>
 					</div>
 
 					<div className="flex items-center justify-between">

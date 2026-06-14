@@ -245,6 +245,7 @@ export type EmbeddedAppConfig = {
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		autoCompactThresholdTokens?: number | null;
+		coAuthorCommits?: boolean;
 		ottoEnabled?: boolean;
 	};
 	/** Additional CORS origins for proxies/Tailscale (e.g., ['https://myapp.ts.net', 'https://example.com']) */

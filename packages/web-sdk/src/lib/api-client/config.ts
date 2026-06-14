@@ -75,6 +75,7 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
 		};
 	}> {
@@ -234,6 +235,7 @@ export const configMixin = {
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		autoCompactThresholdTokens?: number | null;
+		coAuthorCommits?: boolean;
 		ottoEnabled?: boolean;
 		scope?: 'global' | 'local';
 	}): Promise<{
@@ -254,6 +256,7 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			autoCompactThresholdTokens?: number | null;
+			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
 		};
 	}> {

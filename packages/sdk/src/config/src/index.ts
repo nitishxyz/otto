@@ -46,6 +46,7 @@ const DEFAULTS: {
 		releaseToSend: false,
 		fullWidthContent: false,
 		autoCompactThresholdTokens: null,
+		coAuthorCommits: false,
 		ottoEnabled: true,
 	},
 	providers: DEFAULT_PROVIDER_SETTINGS,
