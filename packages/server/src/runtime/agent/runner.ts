@@ -70,6 +70,7 @@ export {
 } from '../session/queue.ts';
 
 const OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX = 2;
+const MAX_OUTPUT_CONTINUATION_RETRY_MAX = 2;
 const MAX_TURN_STEPS = 1000;
 
 function parsePositiveIntegerEnv(name: string, fallback: number) {
@@ -83,6 +84,28 @@ function getOpenAIOAuthCodexStreamIdleRetryMax() {
 	return parsePositiveIntegerEnv(
 		'OTTO_OPENAI_OAUTH_STREAM_IDLE_RETRY_MAX',
 		OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX,
+	);
+}
+
+function getMaxOutputContinuationRetryMax() {
+	return parsePositiveIntegerEnv(
+		'OTTO_MAX_OUTPUT_CONTINUATION_RETRY_MAX',
+		MAX_OUTPUT_CONTINUATION_RETRY_MAX,
+	);
+}
+
+function isMaxOutputTokensFinish(
+	finishReason: string | undefined,
+	rawFinishReason: string | undefined,
+): boolean {
+	const normalizedFinish = finishReason?.toLowerCase() ?? '';
+	const normalizedRaw = rawFinishReason?.toLowerCase() ?? '';
+	return (
+		normalizedRaw === 'max_output_tokens' ||
+		normalizedRaw === 'max_tokens' ||
+		normalizedRaw === 'length' ||
+		(normalizedFinish === 'length' &&
+			(normalizedRaw === '' || normalizedRaw.includes('token')))
 	);
 }
 
@@ -171,6 +194,70 @@ async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 			error: err instanceof Error ? err.message : String(err),
 		},
 	);
+	return true;
+}
+
+async function retryAfterMaxOutputTokensFinish(args: {
+	opts: RunOpts;
+	db: Awaited<ReturnType<typeof getDb>>;
+	finishReason: string | undefined;
+	rawFinishReason: string | undefined;
+}): Promise<boolean> {
+	const { opts, db, finishReason, rawFinishReason } = args;
+	if (!isMaxOutputTokensFinish(finishReason, rawFinishReason)) return false;
+	if (opts.abortSignal?.aborted) return false;
+	if (opts.isCompactCommand) return false;
+
+	const continuationCount = opts.continuationCount ?? 0;
+	const maxRetries = getMaxOutputContinuationRetryMax();
+	if (continuationCount >= maxRetries) return false;
+
+	const retryMessageId = crypto.randomUUID();
+	await db.insert(messages).values({
+		id: retryMessageId,
+		sessionId: opts.sessionId,
+		role: 'assistant',
+		status: 'pending',
+		agent: opts.agent,
+		provider: opts.provider,
+		model: opts.model,
+		createdAt: Date.now(),
+	});
+	publish({
+		type: 'message.created',
+		sessionId: opts.sessionId,
+		payload: {
+			id: retryMessageId,
+			role: 'assistant',
+			agent: opts.agent,
+			provider: opts.provider,
+			model: opts.model,
+			maxOutputContinuation: true,
+		},
+	});
+
+	const { abortSignal: _abortSignal, queuedAt: _queuedAt, ...retryOpts } = opts;
+	enqueueAssistantRun(
+		{
+			...retryOpts,
+			assistantMessageId: retryMessageId,
+			continuationCount: continuationCount + 1,
+		},
+		runSessionLoop,
+		{ front: true },
+	);
+	logger.warn('[agent] continuing run after max output token finish', {
+		sessionId: opts.sessionId,
+		messageId: opts.assistantMessageId,
+		retryMessageId,
+		agent: opts.agent,
+		provider: opts.provider,
+		model: opts.model,
+		finishReason,
+		rawFinishReason,
+		attempt: continuationCount + 1,
+		maxRetries,
+	});
 	return true;
 }
 
@@ -703,6 +790,13 @@ async function runAssistant(opts: RunOpts) {
 				aborted: _abortedByUser,
 			});
 		}
+
+		await retryAfterMaxOutputTokensFinish({
+			opts,
+			db,
+			finishReason: streamFinishReason,
+			rawFinishReason: streamRawFinishReason,
+		});
 	} catch (err) {
 		unsubscribeFinish();
 		const isSendNowPreempt = isSendNowPreemptReason(
