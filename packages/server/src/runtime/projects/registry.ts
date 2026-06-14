@@ -86,9 +86,11 @@ async function discoverStateProjects(
 		try {
 			const dbPathOnDisk = joinPath(stateDir, 'otto.sqlite');
 			if (!(await Bun.file(dbPathOnDisk).exists())) continue;
+			const metadataPath = joinPath(stateDir, 'project.json');
+			if (!(await Bun.file(metadataPath).exists())) continue;
 
 			const metadata = (await Bun.file(
-				joinPath(stateDir, 'project.json'),
+				metadataPath,
 			).json()) as ProjectMetadataFile;
 			if (!metadata || typeof metadata.root !== 'string') continue;
 			if (existingRoots.has(metadata.root)) continue;

@@ -147,4 +147,21 @@ describe('project registry', () => {
 			expect(project?.lastSeenAt).toBe(Date.parse(lastSeenAt));
 		});
 	});
+
+	it('skips state directories missing project metadata', async () => {
+		await withProject(
+			'otto-registry-orphan-',
+			async (projectRoot, ottoHome) => {
+				const orphanStateDir = join(ottoHome, 'projects', 'orphan-project');
+				await mkdir(orphanStateDir, { recursive: true });
+				await writeFile(join(orphanStateDir, 'otto.sqlite'), '');
+
+				const projects = await listProjects();
+
+				expect(
+					projects.find((item) => item.path === projectRoot),
+				).toBeUndefined();
+			},
+		);
+	});
 });

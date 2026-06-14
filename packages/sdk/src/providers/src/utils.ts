@@ -1,4 +1,5 @@
 import { catalog } from './catalog-merged.ts';
+import { filterAvailableKimiModels } from './catalog-manual.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
 import { mergeModelLists } from './model-merge.ts';
 import type {
@@ -45,7 +46,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	copilot: ['gpt-4.1-mini'],
-	moonshot: ['kimi-k2-turbo-preview'],
+	moonshot: ['kimi-k2.7-code'],
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
@@ -263,7 +264,10 @@ function getProviderModels(provider: ProviderId): ModelInfo[] {
 	const cachedModels = getCachedProviderCatalogEntry(
 		catalogProvider ?? provider,
 	)?.models;
-	return mergeModelLists(catalogModels, cachedModels);
+	const models = mergeModelLists(catalogModels, cachedModels);
+	return catalogProvider === 'moonshot'
+		? filterAvailableKimiModels(models)
+		: models;
 }
 
 export function modelSupportsReasoning(

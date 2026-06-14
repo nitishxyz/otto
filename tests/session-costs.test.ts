@@ -8,8 +8,18 @@ import { join } from 'node:path';
 import { getSessionCostSummaries } from '../packages/server/src/routes/sessions/service.ts';
 
 let projectRoot: string | undefined;
+let ottoHome: string | undefined;
+let previousOttoHome: string | undefined;
 
 afterEach(async () => {
+	if (previousOttoHome === undefined) {
+		delete process.env.OTTO_HOME;
+	} else {
+		process.env.OTTO_HOME = previousOttoHome;
+	}
+	previousOttoHome = undefined;
+	if (ottoHome) await rm(ottoHome, { recursive: true, force: true });
+	ottoHome = undefined;
 	if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
 	projectRoot = undefined;
 });
@@ -17,6 +27,9 @@ afterEach(async () => {
 describe('session cost summaries', () => {
 	test('attributes direct sub-agent costs to the parent session', async () => {
 		projectRoot = await mkdtemp(join(tmpdir(), 'otto-session-costs-'));
+		ottoHome = await mkdtemp(join(tmpdir(), 'otto-session-costs-home-'));
+		previousOttoHome = process.env.OTTO_HOME;
+		process.env.OTTO_HOME = ottoHome;
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
 		const now = Date.now();

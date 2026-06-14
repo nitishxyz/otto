@@ -274,6 +274,187 @@ function TokenChart({ data, max, hover, onHover }: SubChartProps) {
 		</div>
 	);
 }
+/* ------------------------------------------------------------------ */
+/* Skeleton loading state                                              */
+/* ------------------------------------------------------------------ */
+
+const SKELETON_BARS = [
+	{ id: 'a', height: 32 },
+	{ id: 'b', height: 48 },
+	{ id: 'c', height: 24 },
+	{ id: 'd', height: 64 },
+	{ id: 'e', height: 40 },
+	{ id: 'f', height: 72 },
+	{ id: 'g', height: 16 },
+	{ id: 'h', height: 56 },
+	{ id: 'i', height: 36 },
+	{ id: 'j', height: 80 },
+	{ id: 'k', height: 28 },
+	{ id: 'l', height: 44 },
+	{ id: 'm', height: 20 },
+	{ id: 'n', height: 60 },
+	{ id: 'o', height: 52 },
+	{ id: 'p', height: 12 },
+	{ id: 'q', height: 68 },
+	{ id: 'r', height: 76 },
+	{ id: 's', height: 44 },
+	{ id: 't', height: 32 },
+	{ id: 'u', height: 50 },
+	{ id: 'v', height: 18 },
+	{ id: 'w', height: 66 },
+	{ id: 'x', height: 38 },
+	{ id: 'y', height: 58 },
+	{ id: 'z', height: 26 },
+	{ id: 'aa', height: 70 },
+	{ id: 'ab', height: 22 },
+	{ id: 'ac', height: 46 },
+	{ id: 'ad', height: 54 },
+];
+
+const SKELETON_LIST_ROWS = [
+	{ id: 'a' },
+	{ id: 'b' },
+	{ id: 'c' },
+	{ id: 'd' },
+	{ id: 'e' },
+	{ id: 'f' },
+	{ id: 'g' },
+	{ id: 'h' },
+	{ id: 'i' },
+	{ id: 'j' },
+	{ id: 'k' },
+	{ id: 'l' },
+];
+
+function SkeletonHero() {
+	return (
+		<div className="rounded-2xl border border-border bg-card/60 px-6 py-7">
+			<div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr] gap-6 md:gap-10 items-center">
+				<div>
+					<div className="h-3 w-32 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-12 w-40 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-3 w-56 bg-muted rounded animate-pulse" />
+				</div>
+				<div className="md:border-l md:border-border/60 md:pl-6">
+					<div className="h-3 w-24 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-9 w-32 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-3 w-40 bg-muted rounded animate-pulse" />
+				</div>
+				<div className="md:border-l md:border-border/60 md:pl-6">
+					<div className="h-3 w-28 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-9 w-32 bg-muted rounded animate-pulse" />
+					<div className="mt-3 h-3 w-44 bg-muted rounded animate-pulse" />
+				</div>
+			</div>
+			<div className="mt-6 pt-5 border-t border-border/40 grid grid-cols-3 gap-6">
+				<div>
+					<div className="h-3 w-20 bg-muted rounded animate-pulse" />
+					<div className="mt-2 h-5 w-32 bg-muted rounded animate-pulse" />
+				</div>
+				<div>
+					<div className="h-3 w-16 bg-muted rounded animate-pulse" />
+					<div className="mt-2 h-5 w-36 bg-muted rounded animate-pulse" />
+				</div>
+				<div>
+					<div className="h-3 w-12 bg-muted rounded animate-pulse" />
+					<div className="mt-2 h-5 w-40 bg-muted rounded animate-pulse" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function SkeletonSplit() {
+	return (
+		<div className="space-y-2">
+			{[1, 2, 3].map((i) => (
+				<div key={i} className="flex items-center gap-3 py-2">
+					<div className="h-3 w-20 bg-muted rounded animate-pulse shrink-0" />
+					<div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+						<div className="h-full w-2/3 bg-muted rounded animate-pulse" />
+					</div>
+					<div className="h-3 w-20 bg-muted rounded animate-pulse shrink-0" />
+					<div className="h-4 w-16 bg-muted rounded animate-pulse shrink-0" />
+				</div>
+			))}
+		</div>
+	);
+}
+
+function SkeletonChart() {
+	return (
+		<div>
+			<div className="flex items-baseline justify-between gap-4 mb-4">
+				<div className="min-w-0 space-y-2">
+					<div className="h-3 w-24 bg-muted rounded animate-pulse" />
+					<div className="h-7 w-28 bg-muted rounded animate-pulse" />
+					<div className="h-3 w-48 bg-muted rounded animate-pulse" />
+				</div>
+				<div className="h-7 w-28 bg-muted rounded animate-pulse shrink-0" />
+			</div>
+			<div className="flex items-end gap-[3px] h-44">
+				{SKELETON_BARS.map((bar) => (
+					<div
+						key={`chart-skeleton-${bar.id}`}
+						className="flex-1 bg-muted rounded-sm animate-pulse"
+						style={{ height: `${bar.height}%` }}
+					/>
+				))}
+			</div>
+			<div className="mt-3 flex items-center justify-between">
+				<div className="h-3 w-16 bg-muted rounded animate-pulse" />
+				<div className="h-3 w-24 bg-muted rounded animate-pulse" />
+				<div className="h-3 w-16 bg-muted rounded animate-pulse" />
+			</div>
+		</div>
+	);
+}
+
+function SkeletonList({ rows = 6 }: { rows?: number }) {
+	return (
+		<div className="divide-y divide-border/60">
+			{SKELETON_LIST_ROWS.slice(0, rows).map((row, index) => (
+				<div
+					key={`list-skeleton-${row.id}-${index}`}
+					className="flex items-center gap-3 py-2.5 px-1"
+				>
+					<div className="size-7 shrink-0 rounded-md bg-muted animate-pulse" />
+					<div className="flex-1 min-w-0 space-y-1.5">
+						<div className="h-3.5 w-24 bg-muted rounded animate-pulse" />
+						<div className="h-2.5 w-36 bg-muted rounded animate-pulse" />
+					</div>
+					<div className="space-y-1.5 text-right shrink-0">
+						<div className="h-3.5 w-16 bg-muted rounded animate-pulse" />
+						<div className="h-2.5 w-14 bg-muted rounded animate-pulse ml-auto" />
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function UsageDashboardSkeleton() {
+	return (
+		<div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+			<SkeletonHero />
+			<Section title="How you're paying">
+				<SkeletonSplit />
+			</Section>
+			<Section title="Daily activity">
+				<SkeletonChart />
+			</Section>
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+				<Section title="By provider">
+					<SkeletonList />
+				</Section>
+				<Section title="Top models">
+					<SkeletonList />
+				</Section>
+			</div>
+		</div>
+	);
+}
+
 function Dot({ color, label }: { color: string; label: string }) {
 	return (
 		<span className="flex items-center gap-1">
@@ -609,6 +790,12 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 		else window.location.assign('/');
 	}, [onBack]);
 
+	const handleScopeChange = useCallback((next: 'project' | 'global') => {
+		setScope(next);
+		setStats(null);
+		setError(null);
+	}, []);
+
 	const projectName = useMemo(() => {
 		if (scope === 'global') {
 			const included = stats?.projects?.included.length ?? 0;
@@ -658,7 +845,7 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 						<div className="inline-flex p-0.5 rounded-md border border-border bg-muted/30 text-[11px]">
 							<button
 								type="button"
-								onClick={() => setScope('project')}
+								onClick={() => handleScopeChange('project')}
 								className={`px-2 py-0.5 rounded transition-colors ${
 									scope === 'project'
 										? 'bg-background text-foreground shadow-sm'
@@ -669,7 +856,7 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 							</button>
 							<button
 								type="button"
-								onClick={() => setScope('global')}
+								onClick={() => handleScopeChange('global')}
 								className={`px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 ${
 									scope === 'global'
 										? 'bg-background text-foreground shadow-sm'
@@ -705,11 +892,7 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 						</div>
 					)}
 
-					{loading && !stats && (
-						<div className="py-24 text-center text-xs text-muted-foreground">
-							loading…
-						</div>
-					)}
+					{loading && !stats && <UsageDashboardSkeleton />}
 
 					{stats && (
 						<>

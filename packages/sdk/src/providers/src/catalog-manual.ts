@@ -154,6 +154,18 @@ export function appendXaiGrokCliModels<T extends { models: ModelInfo[] }>(
 	return { ...entry, models: [...mergedModels, ...missingModels] };
 }
 
+const DEPRECATED_KIMI_MODEL_IDS = new Set([
+	'kimi-k2-0711-preview',
+	'kimi-k2-0905-preview',
+	'kimi-k2-thinking',
+	'kimi-k2-thinking-turbo',
+	'kimi-k2-turbo-preview',
+]);
+
+export function filterAvailableKimiModels(models: ModelInfo[]): ModelInfo[] {
+	return models.filter((model) => !DEPRECATED_KIMI_MODEL_IDS.has(model.id));
+}
+
 export function applyOfficialKimiCatalogMetadata<
 	T extends ProviderCatalogEntry,
 >(entry: T | undefined): T | undefined {
@@ -163,6 +175,7 @@ export function applyOfficialKimiCatalogMetadata<
 	);
 	return {
 		...entry,
+		models: filterAvailableKimiModels(entry.models),
 		label: entry.label === 'Moonshot AI' ? 'Kimi' : entry.label,
 		env,
 		doc: 'https://platform.kimi.ai/docs/api/overview.md',
