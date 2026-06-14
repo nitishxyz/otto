@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { loadConfig, logger } from '@ottocode/sdk';
+import { loadConfig, logger, type OttoConfig } from '@ottocode/sdk';
 import * as schema from './schema/index.ts';
 import { bundledMigrations } from './runtime/migrations-bundled.ts';
 
@@ -9,9 +9,15 @@ const migratedPaths = new Set<string>();
 
 export async function getDb(projectRootInput?: string) {
 	const cfg = await loadConfig(projectRootInput);
-	const dbPath = cfg.paths.dbPath;
-	// Data dir is ensured by loadConfig() already.
+	return getDbForConfig(cfg);
+}
 
+export async function getDbForConfig(cfg: OttoConfig) {
+	// Data dir is ensured by loadConfig() already.
+	return getDbByPath(cfg.paths.dbPath);
+}
+
+export async function getDbByPath(dbPath: string) {
 	const key = dbPath;
 	const cached = dbCache.get(key);
 	if (cached) return cached;

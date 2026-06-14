@@ -120,10 +120,12 @@ async function processAskRequest(
 		const injectedModel =
 			request.config?.model || request.model || 'gpt-4o-mini';
 		const injectedAgent = request.config?.agent || request.agent || 'general';
+		const baseCfg = await loadConfig(projectRoot);
 
 		cfg = {
-			projectRoot,
+			...baseCfg,
 			defaults: {
+				...baseCfg.defaults,
 				provider: injectedProvider,
 				model: injectedModel,
 				agent: injectedAgent,
@@ -146,12 +148,6 @@ async function processAskRequest(
 				'zai-coding': { enabled: true },
 				moonshot: { enabled: true },
 				minimax: { enabled: true },
-			},
-			paths: {
-				dataDir: `${projectRoot}/.otto`,
-				dbPath: `${projectRoot}/.otto/otto.sqlite`,
-				projectConfigPath: null,
-				globalConfigPath: null,
 			},
 		};
 

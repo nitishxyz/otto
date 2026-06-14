@@ -1,4 +1,4 @@
-import { getLocalDataDir } from '@ottocode/sdk';
+import { loadConfig } from '@ottocode/sdk';
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { isDebugEnabled } from './state.ts';
@@ -288,7 +288,8 @@ export class TurnDumpCollector {
 	async flush(projectRoot: string) {
 		this.data.duration = Date.now() - this.startTime;
 
-		const dumpDir = join(getLocalDataDir(projectRoot), 'debug-dumps');
+		const cfg = await loadConfig(projectRoot);
+		const dumpDir = cfg.paths.debugDumpsDir;
 		await mkdir(dumpDir, { recursive: true });
 
 		const ts = new Date()

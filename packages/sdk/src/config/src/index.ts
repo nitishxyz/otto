@@ -1,7 +1,10 @@
 import {
+	getProjectConfigDir,
+	getProjectConfigPath,
+	getProjectStateDir,
+	getLegacyProjectDataDir,
 	getGlobalConfigPath,
 	getGlobalSkillsConfigPath,
-	getLocalDataDir,
 	ensureDir,
 	fileExists,
 	joinPath,
@@ -65,9 +68,21 @@ export async function loadConfig(
 		? String(projectRootInput)
 		: process.cwd();
 
-	const dataDir = getLocalDataDir(projectRoot);
-	const dbPath = joinPath(dataDir, 'otto.sqlite');
-	const projectConfigPath = joinPath(dataDir, 'config.json');
+	const projectConfigDir = getProjectConfigDir(projectRoot);
+	const projectConfigPath = getProjectConfigPath(projectRoot);
+	const projectStateDir = await getProjectStateDir(projectRoot);
+	const dataDir = projectStateDir;
+	const dbPath = joinPath(projectStateDir, 'otto.sqlite');
+	const attachmentsDir = joinPath(projectStateDir, 'attachments');
+	const debugDir = joinPath(projectStateDir, 'debug');
+	const debugDumpsDir = joinPath(projectStateDir, 'debug-dumps');
+	const logsDir = joinPath(projectStateDir, 'logs');
+	const tmpDir = joinPath(projectStateDir, 'tmp');
+	const cacheDir = joinPath(projectStateDir, 'cache');
+	const legacyDbPath = joinPath(
+		getLegacyProjectDataDir(projectRoot),
+		'otto.sqlite',
+	);
 	const globalConfigPath = getGlobalConfigPath();
 	const globalSkillsConfigPath = getGlobalSkillsConfigPath();
 
@@ -82,7 +97,12 @@ export async function loadConfig(
 		filterProjectConfig(projectCfg),
 	);
 
-	await ensureDir(dataDir);
+	await ensureDir(projectStateDir);
+	if ((await fileExists(legacyDbPath)) && !(await fileExists(dbPath))) {
+		console.warn(
+			`Legacy Otto database found at ${legacyDbPath}. Run: otto storage migrate`,
+		);
+	}
 
 	return {
 		projectRoot,
@@ -90,11 +110,19 @@ export async function loadConfig(
 		providers: merged.providers as OttoConfig['providers'],
 		skills: merged.skills as OttoConfig['skills'],
 		paths: {
-			dataDir,
-			dbPath,
+			projectConfigDir,
 			projectConfigPath: (await fileExists(projectConfigPath))
 				? projectConfigPath
 				: null,
+			projectStateDir,
+			dataDir,
+			dbPath,
+			attachmentsDir,
+			debugDir,
+			debugDumpsDir,
+			logsDir,
+			tmpDir,
+			cacheDir,
 			globalConfigPath: (await fileExists(globalConfigPath))
 				? globalConfigPath
 				: null,

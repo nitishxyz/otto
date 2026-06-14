@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,6 +14,12 @@ import { selectProviderAndModel } from '../packages/server/src/runtime/provider/
 import { buildReasoningConfig } from '../packages/server/src/runtime/provider/reasoning.ts';
 
 function createConfig(): OttoConfig {
+	const stateDir = join(
+		process.env.OTTO_HOME ?? join(tmpdir(), 'otto-home'),
+		'projects',
+		'custom-providers-test',
+	);
+
 	return {
 		projectRoot: process.cwd(),
 		defaults: {
@@ -50,15 +56,38 @@ function createConfig(): OttoConfig {
 			},
 		},
 		paths: {
-			dataDir: '.otto',
-			dbPath: '.otto/otto.sqlite',
+			projectConfigDir: '.otto',
 			projectConfigPath: '.otto/config.json',
+			projectStateDir: stateDir,
+			dataDir: stateDir,
+			dbPath: join(stateDir, 'otto.sqlite'),
+			attachmentsDir: join(stateDir, 'attachments'),
+			debugDir: join(stateDir, 'debug'),
+			debugDumpsDir: join(stateDir, 'debug-dumps'),
+			logsDir: join(stateDir, 'logs'),
+			tmpDir: join(stateDir, 'tmp'),
+			cacheDir: join(stateDir, 'cache'),
 			globalConfigPath: null,
 		},
 	};
 }
 
 describe('custom declarative providers', () => {
+	let previousOttoHome: string | undefined;
+	let testOttoHome: string;
+
+	beforeEach(async () => {
+		previousOttoHome = process.env.OTTO_HOME;
+		testOttoHome = await mkdtemp(join(tmpdir(), 'otto-provider-home-'));
+		process.env.OTTO_HOME = testOttoHome;
+	});
+
+	afterEach(async () => {
+		if (previousOttoHome === undefined) delete process.env.OTTO_HOME;
+		else process.env.OTTO_HOME = previousOttoHome;
+		await rm(testOttoHome, { recursive: true, force: true });
+	});
+
 	test('builds a runtime definition for configured custom providers', () => {
 		const cfg = createConfig();
 		const definition = getProviderDefinition(cfg, 'my-ollama');

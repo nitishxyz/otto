@@ -27,53 +27,83 @@ describe('gitignore helper', () => {
 		expect(existsSync(join(projectDir, '.gitignore'))).toBe(false);
 	});
 
-	test('adds .otto to a git repository without a gitignore', async () => {
+	test('does not create gitignore entries in a clean git repository', async () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 
 		const changed = await ensureProjectOttoIgnored(projectDir);
 
-		expect(changed).toBe(true);
-		expect(await readFile(join(projectDir, '.gitignore'), 'utf8')).toBe(
-			'.otto\n',
-		);
+		expect(changed).toBe(false);
+		expect(existsSync(join(projectDir, '.gitignore'))).toBe(false);
+		expect(existsSync(join(projectDir, '.otto', '.gitignore'))).toBe(false);
 	});
 
-	test('appends .otto to an existing gitignore once', async () => {
+	test('keeps unrelated root gitignore unchanged', async () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 		await writeFile(join(projectDir, '.gitignore'), 'dist\nnode_modules\n');
 
 		const firstChanged = await ensureProjectOttoIgnored(projectDir);
 		const secondChanged = await ensureProjectOttoIgnored(projectDir);
 
-		expect(firstChanged).toBe(true);
+		expect(firstChanged).toBe(false);
 		expect(secondChanged).toBe(false);
 		expect(await readFile(join(projectDir, '.gitignore'), 'utf8')).toBe(
-			'dist\nnode_modules\n.otto\n',
+			'dist\nnode_modules\n',
 		);
+		expect(existsSync(join(projectDir, '.otto', '.gitignore'))).toBe(false);
 	});
 
-	test('recognizes existing .otto ignore variants', async () => {
+	test('removes existing blanket .otto ignore variants without replacements', async () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 		await writeFile(join(projectDir, '.gitignore'), 'dist\n/.otto/\n');
 
 		const changed = await ensureProjectOttoIgnored(projectDir);
 
-		expect(changed).toBe(false);
+		expect(changed).toBe(true);
 		expect(await readFile(join(projectDir, '.gitignore'), 'utf8')).toBe(
-			'dist\n/.otto/\n',
+			'dist\n',
+		);
+		expect(existsSync(join(projectDir, '.otto', '.gitignore'))).toBe(false);
+	});
+
+	test('removes root and nested runtime patterns without replacements', async () => {
+		await execFileAsync('git', ['init'], { cwd: projectDir });
+		await writeFile(
+			join(projectDir, '.gitignore'),
+			'dist\n.otto/otto.sqlite*\n.otto/attachments/\n**/.otto/cache/\n',
+		);
+
+		const changed = await ensureProjectOttoIgnored(projectDir);
+
+		expect(changed).toBe(true);
+		expect(await readFile(join(projectDir, '.gitignore'), 'utf8')).toBe(
+			'dist\n',
 		);
 	});
 
-	test('updates the repository root gitignore from a subdirectory', async () => {
+	test('does not modify existing project .otto gitignore entries', async () => {
+		await execFileAsync('git', ['init'], { cwd: projectDir });
+		await mkdir(join(projectDir, '.otto'), { recursive: true });
+		await writeFile(join(projectDir, '.otto', '.gitignore'), 'custom.tmp\n');
+
+		const changed = await ensureProjectOttoIgnored(projectDir);
+
+		expect(changed).toBe(false);
+		expect(
+			await readFile(join(projectDir, '.otto', '.gitignore'), 'utf8'),
+		).toBe('custom.tmp\n');
+		expect(existsSync(join(projectDir, '.gitignore'))).toBe(false);
+	});
+
+	test('subdirectory invocation does not create otto gitignore files', async () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 		const subdir = join(projectDir, 'packages', 'app');
 		await mkdir(subdir, { recursive: true });
 
 		const changed = await ensureProjectOttoIgnored(subdir);
 
-		expect(changed).toBe(true);
-		expect(await readFile(join(projectDir, '.gitignore'), 'utf8')).toBe(
-			'.otto\n',
-		);
+		expect(changed).toBe(false);
+		expect(existsSync(join(projectDir, '.gitignore'))).toBe(false);
+		expect(existsSync(join(subdir, '.otto'))).toBe(false);
+		expect(existsSync(join(projectDir, '.otto'))).toBe(false);
 	});
 });

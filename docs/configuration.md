@@ -42,9 +42,10 @@ Auth secrets are a special case: they are stored in a secure OS-specific path, n
 
 ### Project directory
 
+Project-local `.otto/` contains commit-safe configuration and extension files only:
+
 ```text
 .otto/
-├── otto.sqlite
 ├── config.json
 ├── agents.json
 ├── agents/
@@ -60,6 +61,23 @@ Auth secrets are a special case: they are stored in a secure OS-specific path, n
 │       └── tool.mjs
 └── skills/
 ```
+
+Runtime state is stored outside the project directory under a per-project state
+directory:
+
+```text
+$OTTO_HOME/projects/<project-id>/
+├── otto.sqlite
+├── attachments/
+├── cache/
+├── debug/
+├── debug-dumps/
+├── logs/
+└── tmp/
+```
+
+If `OTTO_HOME` is unset, otto uses the platform state directory. On Linux this
+is typically `~/.local/state/otto/projects/<project-id>/`.
 
 Notes:
 

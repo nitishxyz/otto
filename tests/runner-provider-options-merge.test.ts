@@ -35,9 +35,17 @@ function testConfigWithModels(
 			},
 		},
 		paths: {
+			projectConfigDir: '/tmp/project/.otto',
+			projectConfigPath: null,
+			projectStateDir: '/tmp/otto',
 			dataDir: '/tmp/otto',
 			dbPath: '/tmp/otto/db.sqlite',
-			projectConfigPath: null,
+			attachmentsDir: '/tmp/otto/attachments',
+			debugDir: '/tmp/otto/debug',
+			debugDumpsDir: '/tmp/otto/debug-dumps',
+			logsDir: '/tmp/otto/logs',
+			tmpDir: '/tmp/otto/tmp',
+			cacheDir: '/tmp/otto/cache',
 			globalConfigPath: null,
 		},
 	} satisfies OttoConfig;

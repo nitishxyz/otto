@@ -1,8 +1,27 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const OTTO_IGNORE_ENTRY = '.otto';
 const OTTO_IGNORE_PATTERNS = new Set(['.otto', '.otto/', '/.otto', '/.otto/']);
+const OLD_ROOT_RUNTIME_PATTERNS = new Set([
+	'.otto/otto.sqlite*',
+	'.otto/attachments/',
+	'.otto/debug/',
+	'.otto/debug-dumps/',
+	'.otto/logs/',
+	'.otto/tmp/',
+	'.otto/cache/',
+	'.otto/*.local.json',
+]);
+const NESTED_ROOT_RUNTIME_PATTERNS = new Set([
+	'**/.otto/otto.sqlite*',
+	'**/.otto/attachments/',
+	'**/.otto/debug/',
+	'**/.otto/debug-dumps/',
+	'**/.otto/logs/',
+	'**/.otto/tmp/',
+	'**/.otto/cache/',
+	'**/.otto/*.local.json',
+]);
 
 async function getGitRoot(projectRoot: string): Promise<string | null> {
 	try {
@@ -22,10 +41,27 @@ async function getGitRoot(projectRoot: string): Promise<string | null> {
 	}
 }
 
-function hasOttoIgnoreEntry(content: string): boolean {
-	return content
-		.split(/\r?\n/)
-		.some((line) => OTTO_IGNORE_PATTERNS.has(line.trim()));
+function updateRootGitignore(content: string): string | null {
+	let removedOttoRuntimeEntry = false;
+	const lines = content.split(/\r?\n/);
+	const nextLines = lines.filter((line) => {
+		const trimmed = line.trim();
+		if (
+			OTTO_IGNORE_PATTERNS.has(trimmed) ||
+			OLD_ROOT_RUNTIME_PATTERNS.has(trimmed) ||
+			NESTED_ROOT_RUNTIME_PATTERNS.has(trimmed)
+		) {
+			removedOttoRuntimeEntry = true;
+			return false;
+		}
+		return true;
+	});
+
+	while (nextLines.length > 0 && nextLines[nextLines.length - 1] === '') {
+		nextLines.pop();
+	}
+	if (!removedOttoRuntimeEntry) return null;
+	return [...nextLines, ''].join('\n');
 }
 
 async function readGitignore(path: string): Promise<string> {
@@ -40,11 +76,11 @@ async function readGitignore(path: string): Promise<string> {
 }
 
 /**
- * Ensures the local otto workspace directory is ignored by git for a project.
+ * Removes stale blanket/runtime `.otto` ignores from the root gitignore.
  *
- * Returns true only when the repository .gitignore was changed. Non-git
- * directories and write failures are treated as no-ops so CLI startup is not
- * blocked by housekeeping.
+ * Returns true when the repository .gitignore was changed. Non-git directories
+ * and write failures are treated as no-ops so CLI startup is not blocked by
+ * housekeeping.
  */
 export async function ensureProjectOttoIgnored(
 	projectRoot: string,
@@ -55,16 +91,13 @@ export async function ensureProjectOttoIgnored(
 
 		const gitignorePath = join(gitRoot, '.gitignore');
 		const content = await readGitignore(gitignorePath);
-		if (hasOttoIgnoreEntry(content)) return false;
+		const updatedRootGitignore = updateRootGitignore(content);
+		if (updatedRootGitignore !== null && updatedRootGitignore !== content) {
+			await writeFile(gitignorePath, updatedRootGitignore, 'utf8');
+			return true;
+		}
 
-		const separator =
-			content.length === 0 || content.endsWith('\n') ? '' : '\n';
-		await writeFile(
-			gitignorePath,
-			`${content}${separator}${OTTO_IGNORE_ENTRY}\n`,
-			'utf8',
-		);
-		return true;
+		return false;
 	} catch {
 		return false;
 	}

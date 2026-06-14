@@ -76,9 +76,17 @@ export type SkillSettings = {
  * Path configuration
  */
 export type PathConfig = {
+	projectConfigDir: string;
+	projectConfigPath: string | null;
+	projectStateDir: string;
 	dataDir: string;
 	dbPath: string;
-	projectConfigPath: string | null;
+	attachmentsDir: string;
+	debugDir: string;
+	debugDumpsDir: string;
+	logsDir: string;
+	tmpDir: string;
+	cacheDir: string;
 	globalConfigPath: string | null;
 };
 

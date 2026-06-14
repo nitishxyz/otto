@@ -1,13 +1,20 @@
 import { z } from '@hono/zod-openapi';
-import { loadConfig } from '@ottocode/sdk';
+import { loadConfig, type OttoConfig } from '@ottocode/sdk';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import {
+	basename,
+	extname,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+} from 'node:path';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
-const ATTACHMENTS_DIR = '.otto/attachments';
+const ATTACHMENTS_DIR = 'attachments';
 const MIME_EXTENSIONS: Record<string, string> = {
 	'image/png': '.png',
 	'image/jpeg': '.jpg',
@@ -29,6 +36,8 @@ export type StoredAttachmentMetadata = {
 	kind: 'image' | 'pdf' | 'text' | 'binary';
 	sessionId?: string;
 	originalPath: string;
+	storageRoot?: 'project-state';
+	relativePath?: string;
 	createdAt: string;
 };
 
@@ -68,6 +77,8 @@ const attachmentMetadataResponseSchema = z.object({
 	kind: z.enum(['image', 'pdf', 'text', 'binary']),
 	sessionId: z.string().optional(),
 	originalPath: z.string(),
+	storageRoot: z.literal('project-state').optional(),
+	relativePath: z.string().optional(),
 	createdAt: z.string(),
 	originalUrl: z.string(),
 	metadataUrl: z.string(),
@@ -117,17 +128,34 @@ function getOriginalStorageName(mimeType: string, filename: string): string {
 	return filenameExtension ? `original${filenameExtension}` : 'original';
 }
 
-function attachmentDir(projectRoot: string, attachmentId: string): string {
-	return join(projectRoot, ATTACHMENTS_DIR, attachmentId);
+function attachmentDir(attachmentsDir: string, attachmentId: string): string {
+	return join(attachmentsDir, attachmentId);
 }
 
-async function readMetadata(projectRoot: string, attachmentId: string) {
+async function readMetadata(cfg: OttoConfig, attachmentId: string) {
 	const metadataPath = join(
-		attachmentDir(projectRoot, attachmentId),
+		attachmentDir(cfg.paths.attachmentsDir, attachmentId),
 		'metadata.json',
 	);
 	const raw = await readFile(metadataPath, 'utf-8');
 	return JSON.parse(raw) as StoredAttachmentMetadata;
+}
+
+function resolveOriginalFile(
+	cfg: OttoConfig,
+	metadata: StoredAttachmentMetadata,
+): string {
+	if (metadata.storageRoot !== 'project-state' || !metadata.relativePath) {
+		throw new Error('Attachment metadata does not reference project state');
+	}
+
+	const stateRoot = resolve(cfg.paths.projectStateDir);
+	const originalFile = resolve(stateRoot, metadata.relativePath);
+	const relativeToState = relative(stateRoot, originalFile);
+	if (relativeToState.startsWith('..') || isAbsolute(relativeToState)) {
+		throw new Error('Attachment metadata path is outside project state');
+	}
+	return originalFile;
 }
 
 export function metadataResponse(metadata: StoredAttachmentMetadata) {
@@ -155,12 +183,13 @@ export async function storeAttachmentBytes(args: {
 	const id = `att_${crypto.randomUUID()}`;
 	const filename = sanitizeFilename(args.filename);
 	const mimeType = args.mimeType || 'application/octet-stream';
-	const dir = attachmentDir(args.projectRoot, id);
+	const cfg = await loadConfig(args.projectRoot);
+	const dir = attachmentDir(cfg.paths.attachmentsDir, id);
 	await mkdir(dir, { recursive: true });
 
 	const sha256 = createHash('sha256').update(args.bytes).digest('hex');
 	const originalStorageName = getOriginalStorageName(mimeType, filename);
-	const originalPath = join(ATTACHMENTS_DIR, id, originalStorageName);
+	const relativePath = join(ATTACHMENTS_DIR, id, originalStorageName);
 	await writeFile(join(dir, originalStorageName), args.bytes);
 
 	const metadata: StoredAttachmentMetadata = {
@@ -171,7 +200,9 @@ export async function storeAttachmentBytes(args: {
 		sha256,
 		kind: getAttachmentKind(mimeType),
 		...(args.sessionId ? { sessionId: args.sessionId } : {}),
-		originalPath,
+		originalPath: relativePath,
+		storageRoot: 'project-state',
+		relativePath,
 		createdAt: new Date().toISOString(),
 	};
 	await writeFile(
@@ -191,7 +222,7 @@ export function registerAttachmentRoutes(app: Hono) {
 			operationId: 'uploadAttachment',
 			summary: 'Upload an attachment',
 			description:
-				'Store an attachment file under the project .otto directory. Multipart uploads are represented in OpenAPI with a binary Zod schema so generated clients can expose the endpoint.',
+				'Store an attachment file under the configured project state directory. Multipart uploads are represented in OpenAPI with a binary Zod schema so generated clients can expose the endpoint.',
 			request: {
 				query: projectQuerySchema,
 				body: {
@@ -319,7 +350,7 @@ export function registerAttachmentRoutes(app: Hono) {
 			try {
 				const projectRoot = c.req.query('project') || process.cwd();
 				const cfg = await loadConfig(projectRoot);
-				const metadata = await readMetadata(cfg.projectRoot, c.req.param('id'));
+				const metadata = await readMetadata(cfg, c.req.param('id'));
 				return c.json(metadataResponse(metadata));
 			} catch {
 				return c.json({ error: 'Attachment not found' }, 404);
@@ -364,8 +395,8 @@ export function registerAttachmentRoutes(app: Hono) {
 			try {
 				const projectRoot = c.req.query('project') || process.cwd();
 				const cfg = await loadConfig(projectRoot);
-				const metadata = await readMetadata(cfg.projectRoot, c.req.param('id'));
-				const originalFile = join(cfg.projectRoot, metadata.originalPath);
+				const metadata = await readMetadata(cfg, c.req.param('id'));
+				const originalFile = resolveOriginalFile(cfg, metadata);
 				await stat(originalFile);
 				const file = Bun.file(originalFile, { type: metadata.mimeType });
 				return new Response(file, {

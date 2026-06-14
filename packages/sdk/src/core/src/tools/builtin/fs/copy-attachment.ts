@@ -3,6 +3,10 @@ import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
+import {
+	loadConfig,
+	type OttoConfig,
+} from '../../../../../config/src/index.ts';
 import { createToolError, type ToolResponse } from '../../error.ts';
 import { expandTilde, isAbsoluteLike, resolveSafePath } from './util.ts';
 import { rememberFileWrite } from './read-tracker.ts';
@@ -16,10 +20,11 @@ type AttachmentMetadata = {
 	sha256: string;
 	kind: 'image' | 'pdf' | 'text' | 'binary';
 	originalPath: string;
+	storageRoot?: 'project-state';
+	relativePath?: string;
 	createdAt: string;
 };
 
-const ATTACHMENTS_DIR = '.otto/attachments';
 const MIME_EXTENSIONS: Record<string, string[]> = {
 	'image/png': ['.png'],
 	'image/jpeg': ['.jpg', '.jpeg'],
@@ -43,17 +48,29 @@ function replaceExtension(path: string, extension: string): string {
 }
 
 async function readAttachmentMetadata(
-	projectRoot: string,
+	cfg: OttoConfig,
 	attachmentId: string,
 ): Promise<AttachmentMetadata> {
 	const metadataPath = join(
-		projectRoot,
-		ATTACHMENTS_DIR,
+		cfg.paths.attachmentsDir,
 		attachmentId,
 		'metadata.json',
 	);
 	const raw = await readFile(metadataPath, 'utf-8');
 	return JSON.parse(raw) as AttachmentMetadata;
+}
+
+function resolveAttachmentSource(
+	cfg: OttoConfig,
+	metadata: AttachmentMetadata,
+): string {
+	if (metadata.storageRoot === 'project-state' && metadata.relativePath) {
+		return join(cfg.paths.projectStateDir, metadata.relativePath);
+	}
+	return join(
+		cfg.paths.projectStateDir,
+		metadata.relativePath ?? metadata.originalPath,
+	);
 }
 
 export function buildCopyAttachmentTool(projectRoot: string): {
@@ -83,8 +100,8 @@ export function buildCopyAttachmentTool(projectRoot: string): {
 		async execute({
 			attachmentId,
 			targetPath,
-			overwrite,
-			createDirs,
+			overwrite = false,
+			createDirs = true,
 		}: {
 			attachmentId: string;
 			targetPath: string;
@@ -132,11 +149,9 @@ export function buildCopyAttachmentTool(projectRoot: string): {
 			}
 
 			try {
-				const metadata = await readAttachmentMetadata(
-					projectRoot,
-					attachmentId,
-				);
-				const source = join(projectRoot, metadata.originalPath);
+				const cfg = await loadConfig(projectRoot);
+				const metadata = await readAttachmentMetadata(cfg, attachmentId);
+				const source = resolveAttachmentSource(cfg, metadata);
 				const expectedExtensions = getExpectedExtensions(metadata.mimeType);
 				const targetExtension = extname(requestedPath).toLowerCase();
 				const preferredExtension = expectedExtensions[0];
@@ -145,7 +160,7 @@ export function buildCopyAttachmentTool(projectRoot: string): {
 						? replaceExtension(requestedPath, preferredExtension)
 						: requestedPath;
 				const extensionAdjusted = req !== requestedPath;
-				const target = resolveSafePath(projectRoot, req);
+				const target = resolveSafePath(cfg.projectRoot, req);
 				try {
 					await stat(target);
 					if (!overwrite) {
@@ -168,7 +183,7 @@ export function buildCopyAttachmentTool(projectRoot: string): {
 					await mkdir(dirname(target), { recursive: true });
 				}
 				await copyFile(source, target);
-				await rememberFileWrite(projectRoot, target);
+				await rememberFileWrite(cfg.projectRoot, target);
 				const bytes = await readFile(target);
 				const sha256 = createHash('sha256').update(bytes).digest('hex');
 				return {

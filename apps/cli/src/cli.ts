@@ -18,6 +18,7 @@ import {
 	registerShareCommand,
 	registerMCPCommand,
 	registerWebCommand,
+	registerStorageCommand,
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
 import { ensureProjectOttoIgnored } from './gitignore.ts';
@@ -36,6 +37,7 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'a',
 	'sessions',
 	'share',
+	'storage',
 ]);
 
 const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
@@ -46,6 +48,7 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'providers',
 	'debug',
 	'web',
+	'storage',
 ]);
 
 export function createCli(version: string): Command {
@@ -65,7 +68,11 @@ export function createCli(version: string): Command {
 		.option('--model <model>', 'Initial TUI model')
 		.hook('preAction', async (_thisCommand, actionCommand) => {
 			const cmdName = actionCommand.name();
-			if (!SKIP_SERVER_COMMANDS.has(cmdName)) {
+			const parentName = actionCommand.parent?.name();
+			if (
+				!SKIP_SERVER_COMMANDS.has(cmdName) &&
+				!(parentName && SKIP_SERVER_COMMANDS.has(parentName))
+			) {
 				const { ensureServer } = await import('./ask/server.ts');
 				await ensureServer();
 			}
@@ -88,6 +95,7 @@ export function createCli(version: string): Command {
 	registerShareCommand(program);
 	registerMCPCommand(program);
 	registerWebCommand(program, version);
+	registerStorageCommand(program);
 
 	return program;
 }
@@ -128,9 +136,10 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 	}
 	try {
 		const projectRoot = getFlagValue(argv, '--project') ?? process.cwd();
-		await ensureProjectOttoIgnored(projectRoot);
-
 		const cmd = findCommandArg(argv);
+		if (cmd !== 'storage') {
+			await ensureProjectOttoIgnored(projectRoot);
+		}
 		shouldStopEphemeralServer = Boolean(
 			cmd && !NO_EPHEMERAL_SERVER_COMMANDS.has(cmd),
 		);

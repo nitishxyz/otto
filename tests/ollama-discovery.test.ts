@@ -126,6 +126,8 @@ describe('ollama discovery', () => {
 				},
 			});
 
+			const stateDir = join(tmpdir(), 'otto-home', 'projects', 'ollama-test');
+
 			const cfg: OttoConfig = {
 				projectRoot: process.cwd(),
 				defaults: {
@@ -149,9 +151,17 @@ describe('ollama discovery', () => {
 					},
 				},
 				paths: {
-					dataDir: '.otto',
-					dbPath: '.otto/otto.sqlite',
+					projectConfigDir: '.otto',
 					projectConfigPath: '.otto/config.json',
+					projectStateDir: stateDir,
+					dataDir: stateDir,
+					dbPath: join(stateDir, 'otto.sqlite'),
+					attachmentsDir: join(stateDir, 'attachments'),
+					debugDir: join(stateDir, 'debug'),
+					debugDumpsDir: join(stateDir, 'debug-dumps'),
+					logsDir: join(stateDir, 'logs'),
+					tmpDir: join(stateDir, 'tmp'),
+					cacheDir: join(stateDir, 'cache'),
 					globalConfigPath: null,
 				},
 			};

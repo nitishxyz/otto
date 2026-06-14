@@ -38,6 +38,7 @@
 		"test": "bun test tests packages/*/tests --path-ignore-patterns 'tmp/**'",
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
 		"db:reset": "bun run scripts/reset-db.ts",
+		"storage:migrate-all": "bun run scripts/find-and-migrate-otto-storage.ts",
 		"catalog:update": "bun run scripts/update-catalog.ts",
 		"catalog:ottorouter": "bun run scripts/update-catalog.ts --ottorouter",
 		"compile": "bun run scripts/compile.ts",

@@ -110,18 +110,236 @@ export function getSessionSystemPromptPath(sessionId: string): string {
 	);
 }
 
-export function getLocalDataDir(projectRoot: string): string {
+/** Resolve the user-level Otto home directory for project state storage. */
+export function getOttoHomeDir(): string {
+	const ottoHome = process.env.OTTO_HOME;
+	if (ottoHome?.trim()) return ottoHome.replace(/\\/g, '/');
+	if (process.platform === 'win32') {
+		const appData = (process.env.APPDATA || '').replace(/\\/g, '/');
+		const base = appData || joinPath(getHomeDir(), 'AppData', 'Roaming');
+		return joinPath(base, 'otto');
+	}
+	return joinPath(getHomeDir(), '.local', 'state', 'otto');
+}
+
+/** Resolve the root directory containing per-project state directories. */
+export function getProjectsStateRoot(): string {
+	return joinPath(getOttoHomeDir(), 'projects');
+}
+
+const projectIdCache = new Map<string, Promise<string>>();
+
+/** Build a stable readable project ID from basename and git remote/path hash. */
+export async function getProjectId(projectRoot: string): Promise<string> {
+	const normalizedProjectRoot = projectRoot.replace(/\\/g, '/');
+	const cached = projectIdCache.get(normalizedProjectRoot);
+	if (cached) return cached;
+
+	const projectId = resolveProjectId(normalizedProjectRoot);
+	projectIdCache.set(normalizedProjectRoot, projectId);
+	return projectId;
+}
+
+async function resolveProjectId(
+	normalizedProjectRoot: string,
+): Promise<string> {
+	const slug = sanitizeProjectSlug(getPathBasename(normalizedProjectRoot));
+	const hashInput =
+		(await readGitRemoteUrl(normalizedProjectRoot)) ??
+		(await getCanonicalProjectRoot(normalizedProjectRoot));
+	const hash = (await sha256Hex(hashInput)).slice(0, 8);
+	return `${slug}-${hash}`;
+}
+
+/** Resolve the repository-local Otto project config directory. */
+export function getProjectConfigDir(projectRoot: string): string {
 	return joinPath(projectRoot, '.otto');
+}
+
+/** Resolve the repository-local Otto project config file path. */
+export function getProjectConfigPath(projectRoot: string): string {
+	return joinPath(getProjectConfigDir(projectRoot), 'config.json');
+}
+
+/** Resolve the user-level state directory for a project. */
+export async function getProjectStateDir(projectRoot: string): Promise<string> {
+	return joinPath(getProjectsStateRoot(), await getProjectId(projectRoot));
+}
+
+/** Resolve the project SQLite database path under user-level state. */
+export async function getProjectDbPath(projectRoot: string): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'otto.sqlite');
+}
+
+/** Resolve the project attachments directory under user-level state. */
+export async function getProjectAttachmentsDir(
+	projectRoot: string,
+): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'attachments');
+}
+
+/** Resolve the project debug directory under user-level state. */
+export async function getProjectDebugDir(projectRoot: string): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'debug');
+}
+
+/** Resolve the project debug dumps directory under user-level state. */
+export async function getProjectDebugDumpsDir(
+	projectRoot: string,
+): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'debug-dumps');
+}
+
+/** Resolve the project logs directory under user-level state. */
+export async function getProjectLogsDir(projectRoot: string): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'logs');
+}
+
+/** Resolve the project temporary files directory under user-level state. */
+export async function getProjectTmpDir(projectRoot: string): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'tmp');
+}
+
+/** Resolve the project cache directory under user-level state. */
+export async function getProjectCacheDir(projectRoot: string): Promise<string> {
+	return joinPath(await getProjectStateDir(projectRoot), 'cache');
+}
+
+/** Resolve the legacy repository-local data directory used before migration. */
+export function getLegacyProjectDataDir(projectRoot: string): string {
+	return joinPath(projectRoot, '.otto');
+}
+
+/** @deprecated Use getLegacyProjectDataDir() for legacy project-local data. */
+export function getLocalDataDir(projectRoot: string): string {
+	return getLegacyProjectDataDir(projectRoot);
+}
+
+function sanitizeProjectSlug(name: string): string {
+	return name.replace(/[^a-zA-Z0-9._-]+/g, '-') || 'project';
+}
+
+function getPathBasename(path: string): string {
+	const trimmed = path.replace(/\/+$/g, '');
+	const index = trimmed.lastIndexOf('/');
+	return index >= 0 ? trimmed.slice(index + 1) : trimmed;
+}
+
+async function sha256Hex(input: string): Promise<string> {
+	const subtle = globalThis.crypto?.subtle;
+	if (subtle) {
+		const encoded = new TextEncoder().encode(input);
+		const digest = await subtle.digest('SHA-256', encoded);
+		return Array.from(new Uint8Array(digest), (byte) =>
+			byte.toString(16).padStart(2, '0'),
+		).join('');
+	}
+
+	const { createHash } = await loadCrypto();
+	return createHash('sha256').update(input).digest('hex');
+}
+
+async function getCanonicalProjectRoot(projectRoot: string): Promise<string> {
+	try {
+		const { realpath } = await loadFsPromises();
+		return (await realpath(projectRoot)).replace(/\\/g, '/');
+	} catch {
+		return projectRoot.replace(/\\/g, '/');
+	}
+}
+
+async function readGitRemoteUrl(
+	projectRoot: string,
+): Promise<string | undefined> {
+	const currentBranchRemote = await readCurrentBranchRemote(projectRoot);
+	const remoteNames = currentBranchRemote
+		? [currentBranchRemote, 'origin']
+		: ['origin'];
+
+	for (const remoteName of remoteNames) {
+		const remoteUrl = await readGitConfigValue(
+			projectRoot,
+			`remote.${remoteName}.url`,
+		);
+		if (remoteUrl) return remoteUrl;
+	}
+
+	const remoteList = await readGitConfigValues(
+		projectRoot,
+		'config',
+		'--get-regexp',
+		'remote\\..*\\.url',
+	);
+	return remoteList
+		.map((line) => line.trim().split(/\s+/, 2)[1])
+		.find((url) => url?.trim());
+}
+
+async function readCurrentBranchRemote(
+	projectRoot: string,
+): Promise<string | undefined> {
+	const branch = await readGitConfigValues(
+		projectRoot,
+		'rev-parse',
+		'--abbrev-ref',
+		'HEAD',
+	);
+	const branchName = branch[0];
+	if (!branchName || branchName === 'HEAD') return undefined;
+	return readGitConfigValue(projectRoot, `branch.${branchName}.remote`);
+}
+
+async function readGitConfigValue(
+	projectRoot: string,
+	key: string,
+): Promise<string | undefined> {
+	const values = await readGitConfigValues(projectRoot, 'config', '--get', key);
+	return values[0];
+}
+
+async function readGitConfigValues(
+	projectRoot: string,
+	...args: string[]
+): Promise<string[]> {
+	try {
+		const { execFile } = await loadChildProcess();
+		const { promisify } = await loadUtil();
+		const execFileAsync = promisify(execFile);
+		const { stdout } = await execFileAsync('git', ['-C', projectRoot, ...args]);
+		const output = String(stdout);
+		return output
+			.split('\n')
+			.map((line) => line.trim())
+			.filter(Boolean);
+	} catch {
+		return [];
+	}
 }
 
 async function loadFsPromises(): Promise<typeof import('node:fs/promises')> {
 	return Function('specifier', 'return import(specifier)')('node:fs/promises');
 }
 
+async function loadChildProcess(): Promise<
+	typeof import('node:child_process')
+> {
+	return Function(
+		'specifier',
+		'return import(specifier)',
+	)('node:child_process');
+}
+
+async function loadUtil(): Promise<typeof import('node:util')> {
+	return Function('specifier', 'return import(specifier)')('node:util');
+}
+
+async function loadCrypto(): Promise<typeof import('node:crypto')> {
+	return Function('specifier', 'return import(specifier)')('node:crypto');
+}
+
 export async function ensureDir(dir: string) {
-	const { mkdir, writeFile } = await loadFsPromises();
+	const { mkdir } = await loadFsPromises();
 	await mkdir(dir, { recursive: true }).catch(() => {});
-	await writeFile(joinPath(dir, '.keep'), '').catch(() => {});
 }
 
 export async function fileExists(p: string) {

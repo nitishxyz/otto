@@ -114,6 +114,13 @@ describe('/init command', () => {
 	});
 
 	test('prepares an isolated /init built-in command spec', async () => {
+		const stateDir = join(
+			tmpdir(),
+			'otto-home',
+			'projects',
+			'init-command-test',
+		);
+
 		const command = await prepareBuiltinCommand({
 			cfg: {
 				projectRoot,
@@ -139,9 +146,17 @@ describe('/init command', () => {
 					minimax: { enabled: true },
 				},
 				paths: {
-					dataDir: join(projectRoot, '.otto'),
-					dbPath: join(projectRoot, '.otto', 'otto.sqlite'),
-					projectConfigPath: null,
+					projectConfigDir: join(projectRoot, '.otto'),
+					projectConfigPath: join(projectRoot, '.otto', 'config.json'),
+					projectStateDir: stateDir,
+					dataDir: stateDir,
+					dbPath: join(stateDir, 'otto.sqlite'),
+					attachmentsDir: join(stateDir, 'attachments'),
+					debugDir: join(stateDir, 'debug'),
+					debugDumpsDir: join(stateDir, 'debug-dumps'),
+					logsDir: join(stateDir, 'logs'),
+					tmpDir: join(stateDir, 'tmp'),
+					cacheDir: join(stateDir, 'cache'),
 					globalConfigPath: null,
 				},
 			},
