@@ -3,17 +3,7 @@ import { apiClient } from '../lib/api-client';
 
 const TARGET_SAMPLE_RATE = 16000;
 const PCM_FRAME_BYTES = 3200; // 100ms of 16 kHz mono pcm_s16le
-const PROCESSOR_BUFFER_SIZE = 1024;
-type LowLatencyAudioConstraints = MediaTrackConstraints & {
-	latency?: { ideal: number };
-};
-const LOW_LATENCY_AUDIO_CONSTRAINTS: LowLatencyAudioConstraints = {
-	channelCount: { ideal: 1 },
-	echoCancellation: false,
-	noiseSuppression: false,
-	autoGainControl: false,
-	latency: { ideal: 0 },
-};
+const PROCESSOR_BUFFER_SIZE = 4096;
 
 type DictationServerEvent =
 	| {
@@ -286,7 +276,11 @@ export function useVoiceInput({
 
 		try {
 			const streamPromise = navigator.mediaDevices.getUserMedia({
-				audio: LOW_LATENCY_AUDIO_CONSTRAINTS,
+				audio: {
+					echoCancellation: true,
+					noiseSuppression: true,
+					autoGainControl: true,
+				},
 			});
 			const statusPromise = apiClient.getDictationStatus().then(
 				(status) => ({ status }),
