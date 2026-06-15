@@ -1,9 +1,4 @@
-import {
-	getConfiguredProviderFamily,
-	getConfiguredProviderModels,
-	getModelFamily,
-	type OttoConfig,
-} from '@ottocode/sdk';
+import { getConfiguredProviderModels, type OttoConfig } from '@ottocode/sdk';
 import type { DiscoveredTool, ModelInfo } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
 
@@ -114,23 +109,30 @@ export function applyModelFamilyEditToolPolicy(
 	tools = normalizeToolNames(tools);
 	if (!MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS.has(agent)) return tools;
 
-	const family = cfg
-		? getConfiguredProviderFamily(cfg, provider, model)
-		: getModelFamily(provider, model);
 	const modelInfo = findConfiguredModelInfo(cfg, provider, model);
 	const next = tools.filter(
 		(toolName) => !EDITING_TOOL_NAMES.includes(toolName),
 	);
 	if (shouldUseStructuredEditTools(model, modelInfo)) {
 		return Array.from(
-			new Set([...next, 'write', 'edit', 'multiedit', 'copy_into']),
+			new Set([
+				...next,
+				'write',
+				'edit',
+				'multiedit',
+				'copy_into',
+				'apply_patch',
+			]),
 		);
 	}
 
-	const preferredEditingTools =
-		family === 'anthropic' || family === 'openai'
-			? ['write', 'copy_into', 'apply_patch']
-			: ['write', 'edit', 'multiedit', 'copy_into'];
+	const preferredEditingTools = [
+		'write',
+		'edit',
+		'multiedit',
+		'copy_into',
+		'apply_patch',
+	];
 
 	return Array.from(new Set([...next, ...preferredEditingTools]));
 }

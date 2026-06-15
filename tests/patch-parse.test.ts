@@ -43,4 +43,67 @@ describe('parsePatchInput', () => {
 			filePath: 'test.txt',
 		});
 	});
+
+	it('extracts enveloped patches from harmless prose wrappers', () => {
+		const patch = [
+			'Here is the patch:',
+			'```text',
+			'*** Begin Patch',
+			'*** Replace Lines in: test.txt',
+			'*** Lines: 1-1',
+			'*** With:',
+			'hello',
+			'*** End Patch',
+			'```',
+		].join('\n');
+
+		const repaired = repairPatchContent(patch);
+		const result = parsePatchInput(repaired);
+
+		expect(repaired.startsWith('*** Begin Patch')).toBe(true);
+		expect(repaired.endsWith('*** End Patch')).toBe(true);
+		expect(result.format).toBe('enveloped');
+		expect(result.operations).toHaveLength(1);
+	});
+
+	it('trims accidental content after the end marker', () => {
+		const patch = [
+			'*** Begin Patch',
+			'*** Replace Lines in: test.txt',
+			'*** Lines: 1-1',
+			'*** With:',
+			'hello',
+			'*** End Patch',
+			'This sentence should not make parsing fail.',
+		].join('\n');
+
+		const repaired = repairPatchContent(patch);
+		const result = parsePatchInput(repaired);
+
+		expect(repaired).not.toContain(
+			'This sentence should not make parsing fail.',
+		);
+		expect(result.format).toBe('enveloped');
+		expect(result.operations).toHaveLength(1);
+	});
+
+	it('repairs missing end markers before a closing markdown fence', () => {
+		const patch = [
+			'```text',
+			'*** Begin Patch',
+			'*** Replace Lines in: test.txt',
+			'*** Lines: 1-1',
+			'*** With:',
+			'hello',
+			'```',
+		].join('\n');
+
+		const repaired = repairPatchContent(patch);
+		const result = parsePatchInput(repaired);
+
+		expect(repaired).not.toContain('```');
+		expect(repaired.endsWith('*** End Patch')).toBe(true);
+		expect(result.format).toBe('enveloped');
+		expect(result.operations).toHaveLength(1);
+	});
 });

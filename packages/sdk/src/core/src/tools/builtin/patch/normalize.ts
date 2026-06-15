@@ -3,6 +3,7 @@ enum NormalizationLevel {
 	TABS_ONLY = 'tabs',
 	WHITESPACE = 'whitespace',
 	AGGRESSIVE = 'aggressive',
+	COLLAPSED = 'collapsed',
 }
 
 const DEFAULT_TAB_SIZE = 2;
@@ -22,6 +23,8 @@ export function normalizeWhitespace(
 			return line.replace(/\t/g, tabReplacement).replace(/\s+$/, '');
 		case NormalizationLevel.AGGRESSIVE:
 			return line.replace(/\t/g, tabReplacement).trim();
+		case NormalizationLevel.COLLAPSED:
+			return line.replace(/\t/g, tabReplacement).trim().replace(/\s+/g, ' ');
 		default:
 			return line;
 	}
@@ -32,6 +35,7 @@ export const NORMALIZATION_LEVELS: NormalizationLevel[] = [
 	NormalizationLevel.TABS_ONLY,
 	NormalizationLevel.WHITESPACE,
 	NormalizationLevel.AGGRESSIVE,
+	NormalizationLevel.COLLAPSED,
 ];
 
 export function getLeadingWhitespace(line: string): string {

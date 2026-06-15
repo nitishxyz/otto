@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
 	createKimiUsageFetch,
 	hoistKimiSseUsage,
+	sanitizeKimiToolSchema,
 } from '../packages/sdk/src/providers/src/moonshot-client.ts';
 
 const FINAL_CHUNK = JSON.stringify({
@@ -55,6 +56,64 @@ describe('hoistKimiSseUsage', () => {
 });
 
 describe('createKimiUsageFetch', () => {
+	test('sanitizes tool schemas before Moonshot requests are sent', async () => {
+		let capturedBody: Record<string, unknown> | undefined;
+		const baseFetch = (async (_input, init) => {
+			capturedBody = JSON.parse(String(init?.body ?? '{}'));
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: { 'content-type': 'application/json' },
+			});
+		}) as typeof fetch;
+
+		const wrapped = createKimiUsageFetch(baseFetch);
+		await wrapped('https://api.moonshot.ai/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({
+				tools: [
+					{
+						type: 'function',
+						function: {
+							name: 'read',
+							parameters: {
+								$schema: 'http://json-schema.org/draft-07/schema#',
+								type: 'object',
+								properties: {
+									path: {
+										type: 'string',
+										default: '.',
+										minLength: 1,
+									},
+									endLine: {
+										anyOf: [
+											{ type: 'integer' },
+											{ const: 'end', type: 'string' },
+										],
+									},
+								},
+								required: ['path'],
+							},
+						},
+					},
+				],
+			}),
+		});
+
+		const parameters = ((
+			(capturedBody?.tools as Array<Record<string, unknown>>)[0]
+				.function as Record<string, unknown>
+		).parameters ?? {}) as Record<string, unknown>;
+		expect(parameters).not.toHaveProperty('$schema');
+		const properties = parameters.properties as Record<
+			string,
+			Record<string, unknown>
+		>;
+		expect(properties.path).toEqual({ type: 'string', default: '.' });
+		expect(properties.endLine).toEqual({
+			anyOf: [{ type: 'integer' }, { enum: ['end'], type: 'string' }],
+		});
+	});
+
 	test('rewrites SSE streams so usage is exposed at the top level', async () => {
 		const sse = [
 			'data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}',
@@ -98,5 +157,60 @@ describe('createKimiUsageFetch', () => {
 		const wrapped = createKimiUsageFetch(baseFetch);
 		const res = await wrapped('https://api.moonshot.ai/v1/models');
 		expect(await res.text()).toBe(body);
+	});
+});
+
+describe('sanitizeKimiToolSchema', () => {
+	test('strips unsupported JSON Schema keywords recursively', () => {
+		expect(
+			sanitizeKimiToolSchema({
+				$schema: 'http://json-schema.org/draft-07/schema#',
+				type: 'object',
+				properties: {
+					path: { type: 'string', default: '.', minLength: 1 },
+				},
+				required: ['path'],
+			}),
+		).toEqual({
+			type: 'object',
+			properties: { path: { type: 'string', default: '.' } },
+			required: ['path'],
+		});
+	});
+
+	test('preserves property names that match unsupported schema keywords', () => {
+		expect(
+			sanitizeKimiToolSchema({
+				type: 'object',
+				properties: {
+					pattern: {
+						type: 'string',
+						pattern: '^.+$',
+						minLength: 1,
+					},
+				},
+				required: ['pattern'],
+			}),
+		).toEqual({
+			type: 'object',
+			properties: { pattern: { type: 'string' } },
+			required: ['pattern'],
+		});
+	});
+
+	test('preserves MFJS anyOf while converting const to enum', () => {
+		expect(
+			sanitizeKimiToolSchema({
+				anyOf: [
+					{ const: 'append', type: 'string' },
+					{ const: 'end', type: 'string' },
+				],
+			}),
+		).toEqual({
+			anyOf: [
+				{ enum: ['append'], type: 'string' },
+				{ enum: ['end'], type: 'string' },
+			],
+		});
 	});
 });

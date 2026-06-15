@@ -23,6 +23,7 @@ export function adjustReplacementIndentation(
 	let fileIndentChar: 'tab' | 'space' = 'space';
 	const deltas: number[] = [];
 	let hasAddStyleMismatch = false;
+	let hasContextContentMismatch = false;
 	let fileIndentDetected = false;
 
 	for (const fl of matchedFileLines) {
@@ -81,6 +82,7 @@ export function adjustReplacementIndentation(
 		if (line.kind === 'context') {
 			const fileLine = matchedFileLines[expectedIdx];
 			if (fileLine !== undefined) {
+				if (line.content !== fileLine) hasContextContentMismatch = true;
 				lastDelta = computeIndentDelta(line.content, fileLine, tabSize);
 				lastFileIndentExpanded = expandWhitespace(
 					getLeadingWhitespace(fileLine),
@@ -152,7 +154,12 @@ export function adjustReplacementIndentation(
 		}
 	}
 
-	if (!hasDelta && !hasStyleMismatch && !hasAddStyleMismatch) {
+	if (
+		!hasDelta &&
+		!hasStyleMismatch &&
+		!hasAddStyleMismatch &&
+		!hasContextContentMismatch
+	) {
 		return hunk.lines.filter((l) => l.kind !== 'remove').map((l) => l.content);
 	}
 

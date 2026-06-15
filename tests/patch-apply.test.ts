@@ -1726,6 +1726,39 @@ describe('patch apply — fuzzy match false positive prevention', () => {
 		expect(() => applyPatch(patch)).toThrow('Failed to apply patch hunk');
 	});
 
+	it('applies when model has extra internal whitespace but same tokens', async () => {
+		await writeTestFile(
+			'spacing.ts',
+			[
+				'function renderUser() {',
+				'  const label = formatName(user.firstName, user.lastName);',
+				'  return label;',
+				'}',
+			].join('\n'),
+		);
+
+		const patch = [
+			'*** Begin Patch',
+			'*** Update File: spacing.ts',
+			' function   renderUser() {',
+			'-  const   label   =   formatName(user.firstName,   user.lastName);',
+			'+  const label = formatDisplayName(user);',
+			'   return   label;',
+			'*** End Patch',
+		].join('\n');
+
+		await applyPatch(patch);
+		const content = await readTestFile('spacing.ts');
+		expect(content.trim()).toBe(
+			[
+				'function renderUser() {',
+				'  const label = formatDisplayName(user);',
+				'  return label;',
+				'}',
+			].join('\n'),
+		);
+	});
+
 	it('still applies when removal lines are missing but context matches', async () => {
 		await writeTestFile(
 			'partial.ts',

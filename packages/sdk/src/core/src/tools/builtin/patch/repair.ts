@@ -13,8 +13,28 @@ import {
 
 export function repairPatchContent(patch: string): string {
 	patch = extractPatchFromWrappedJson(patch);
+	patch = extractEnvelopedPatchFromText(patch);
+	patch = stripTrailingMarkdownFenceBeforeMissingEndMarker(patch);
 	patch = appendMissingEndMarker(patch);
+	patch = trimAfterEndMarker(patch);
 	return patch;
+}
+
+function looksLikeUnifiedPatch(patch: string): boolean {
+	const trimmed = patch.trimStart();
+	return (
+		trimmed.startsWith('diff --git ') ||
+		trimmed.startsWith('--- ') ||
+		trimmed.startsWith('Index: ')
+	);
+}
+
+function extractEnvelopedPatchFromText(patch: string): string {
+	const beginIndex = patch.indexOf(PATCH_BEGIN_MARKER);
+	if (beginIndex === -1) return patch;
+	if (beginIndex === patch.search(/\S/)) return patch;
+	if (looksLikeUnifiedPatch(patch)) return patch;
+	return patch.slice(beginIndex);
 }
 
 function extractPatchFromWrappedJson(patch: string): string {
@@ -60,4 +80,26 @@ function appendMissingEndMarker(patch: string): string {
 	}
 
 	return patch;
+}
+
+function stripTrailingMarkdownFenceBeforeMissingEndMarker(
+	patch: string,
+): string {
+	const trimmed = patch.trimEnd();
+	if (!trimmed.trimStart().startsWith(PATCH_BEGIN_MARKER)) return patch;
+	if (trimmed.includes(PATCH_END_MARKER)) return patch;
+	const lines = trimmed.split('\n');
+	const last = lines.at(-1)?.trim();
+	if (last !== '```') return patch;
+	return lines.slice(0, -1).join('\n');
+}
+
+function trimAfterEndMarker(patch: string): string {
+	if (!patch.trimStart().startsWith(PATCH_BEGIN_MARKER)) return patch;
+	const endIndex = patch.indexOf(PATCH_END_MARKER);
+	if (endIndex === -1) return patch;
+	const endOfMarker = endIndex + PATCH_END_MARKER.length;
+	const suffix = patch.slice(endOfMarker);
+	if (suffix.trim().length === 0) return patch;
+	return patch.slice(0, endOfMarker);
 }

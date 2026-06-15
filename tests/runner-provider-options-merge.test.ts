@@ -128,7 +128,7 @@ describe('mergeProviderOptions', () => {
 });
 
 describe('applyModelFamilyEditToolPolicy', () => {
-	test('keeps only write and apply_patch for Anthropic-family build models', () => {
+	test('keeps all editing tools for Anthropic-family build models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'build',
 			editPolicyTools,
@@ -140,12 +140,14 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'read',
 			'shell',
 			'write',
+			'edit',
+			'multiedit',
 			'copy_into',
 			'apply_patch',
 		]);
 	});
 
-	test('keeps only write and apply_patch for OpenAI-family general models', () => {
+	test('keeps all editing tools for OpenAI-family general models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'general',
 			editPolicyTools,
@@ -157,12 +159,14 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'read',
 			'shell',
 			'write',
+			'edit',
+			'multiedit',
 			'copy_into',
 			'apply_patch',
 		]);
 	});
 
-	test('keeps write, edit, and multiedit for non-Anthropic/OpenAI init models', () => {
+	test('keeps apply_patch for non-Anthropic/OpenAI init models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'init',
 			editPolicyTools,
@@ -177,6 +181,27 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'edit',
 			'multiedit',
 			'copy_into',
+			'apply_patch',
+		]);
+	});
+
+	test('keeps apply_patch for Moonshot/Kimi models', () => {
+		const result = applyModelFamilyEditToolPolicy(
+			'build',
+			editPolicyTools,
+			'moonshot',
+			'kimi-k2.7-code',
+		);
+
+		expect(result).toContain('apply_patch');
+		expect(result).toEqual([
+			'read',
+			'shell',
+			'write',
+			'edit',
+			'multiedit',
+			'copy_into',
+			'apply_patch',
 		]);
 	});
 
@@ -195,6 +220,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'edit',
 			'multiedit',
 			'copy_into',
+			'apply_patch',
 		]);
 	});
 
@@ -213,6 +239,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'edit',
 			'multiedit',
 			'copy_into',
+			'apply_patch',
 		]);
 	});
 
@@ -239,6 +266,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'edit',
 			'multiedit',
 			'copy_into',
+			'apply_patch',
 		]);
 	});
 
@@ -266,6 +294,7 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'edit',
 			'multiedit',
 			'copy_into',
+			'apply_patch',
 		]);
 	});
 
@@ -281,6 +310,8 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'read',
 			'shell',
 			'write',
+			'edit',
+			'multiedit',
 			'copy_into',
 			'apply_patch',
 		]);

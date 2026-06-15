@@ -15,6 +15,133 @@ export function readKimiApiKeyFromEnv(): string {
 	return process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || '';
 }
 
+const KIMI_UNSUPPORTED_SCHEMA_KEYS = new Set([
+	'$schema',
+	'$id',
+	'$ref',
+	'$defs',
+	'definitions',
+	'examples',
+	'title',
+	'nullable',
+	'format',
+	'pattern',
+	'minLength',
+	'maxLength',
+	'minimum',
+	'maximum',
+	'exclusiveMinimum',
+	'exclusiveMaximum',
+	'multipleOf',
+	'minItems',
+	'maxItems',
+	'uniqueItems',
+	'contains',
+	'minContains',
+	'maxContains',
+	'prefixItems',
+	'propertyNames',
+	'patternProperties',
+	'allOf',
+	'not',
+	'if',
+	'then',
+	'else',
+	'dependentSchemas',
+	'dependentRequired',
+	'unevaluatedProperties',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+/**
+ * Converts AI SDK JSON Schema output into the smaller schema dialect accepted
+ * by Kimi/Moonshot tool calls.
+ */
+export function sanitizeKimiToolSchema(schema: unknown): unknown {
+	if (Array.isArray(schema))
+		return schema.map((item) => sanitizeKimiToolSchema(item));
+	if (!isRecord(schema)) return schema;
+
+	const out: Record<string, unknown> = {};
+
+	for (const [key, value] of Object.entries(schema)) {
+		if (key === 'const') {
+			if (['number', 'string'].includes(typeof value)) out.enum = [value];
+			continue;
+		}
+		if (key === 'oneOf') {
+			const branches = toArray(value);
+			if (branches.length > 0) out.anyOf = sanitizeKimiToolSchema(branches);
+			continue;
+		}
+		if (key === 'properties' && isRecord(value)) {
+			out.properties = Object.fromEntries(
+				Object.entries(value).map(([propertyName, propertySchema]) => [
+					propertyName,
+					sanitizeKimiToolSchema(propertySchema),
+				]),
+			);
+			continue;
+		}
+		if (KIMI_UNSUPPORTED_SCHEMA_KEYS.has(key)) continue;
+		if (key === 'type' && Array.isArray(value)) {
+			const types = value.filter(
+				(type): type is string => typeof type === 'string',
+			);
+			if (types.length === 1) out.type = types[0];
+			else if (types.length > 1) {
+				out.anyOf = types.map((type) => ({ type }));
+			}
+			continue;
+		}
+		if (key === 'enum' && Array.isArray(value)) {
+			out.enum = value.filter((item) => item !== null);
+			continue;
+		}
+		out[key] = sanitizeKimiToolSchema(value);
+	}
+
+	return out;
+}
+
+function toArray(value: unknown): unknown[] {
+	return Array.isArray(value) ? value : [];
+}
+
+function sanitizeKimiToolRequest(body: unknown): unknown {
+	if (!isRecord(body) || !Array.isArray(body.tools)) return body;
+	let changed = false;
+	const tools = body.tools.map((tool) => {
+		if (!isRecord(tool)) return tool;
+		const fn = tool.function;
+		if (!isRecord(fn) || !('parameters' in fn)) return tool;
+		changed = true;
+		return {
+			...tool,
+			function: {
+				...fn,
+				parameters: sanitizeKimiToolSchema(fn.parameters),
+			},
+		};
+	});
+	return changed ? { ...body, tools } : body;
+}
+
+function sanitizeKimiFetchInit(init?: RequestInit): RequestInit | undefined {
+	if (!init || typeof init.body !== 'string') return init;
+	try {
+		const parsed = JSON.parse(init.body) as unknown;
+		const sanitized = sanitizeKimiToolRequest(parsed);
+		if (sanitized === parsed) return init;
+		return { ...init, body: JSON.stringify(sanitized) };
+	} catch {
+		return init;
+	}
+}
+
 /**
  * Kimi/Moonshot streaming responses report token usage on the final chunk's
  * `choices[0].usage` instead of the OpenAI-standard top-level `usage` field.
@@ -57,7 +184,7 @@ export function createKimiUsageFetch(
 		input: Parameters<typeof fetch>[0],
 		init?: Parameters<typeof fetch>[1],
 	): Promise<Response> => {
-		const response = await baseFetch(input, init);
+		const response = await baseFetch(input, sanitizeKimiFetchInit(init));
 		const contentType = response.headers.get('content-type') ?? '';
 		if (
 			!response.ok ||
