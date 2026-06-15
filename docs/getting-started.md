@@ -52,7 +52,19 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
 export GOOGLE_GENERATIVE_AI_API_KEY="..."
 export OPENROUTER_API_KEY="..."
+export ZAI_CODING_API_KEY="..." # GLM Coding Plan
 ```
+
+For Z.AI's GLM Coding Plan, use the separate `zai-coding` provider. It uses
+the Z.AI API key from your subscribed Coding Plan account, not OAuth:
+
+```bash
+otto auth login zai-coding
+otto --provider zai-coding --model glm-5.2
+```
+
+Use `zai` for the general Z.AI API endpoint and `zai-coding` for the dedicated
+Coding Plan endpoint.
 
 You can inspect what otto sees with:
 

@@ -13,6 +13,35 @@ type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
+const ZAI_CODING_ID: BuiltInProviderId = 'zai-coding';
+
+const ZAI_CODING_MODEL_ORDER = [
+	'glm-5.2',
+	'glm-5.1',
+	'glm-5-turbo',
+	'glm-5',
+	'glm-4.7',
+	'glm-4.5-air',
+	'glm-5v-turbo',
+];
+
+const ZAI_CODING_MANUAL_MODELS: ModelInfo[] = [
+	{
+		id: 'glm-5',
+		ownedBy: 'zai',
+		label: 'GLM-5',
+		modalities: { input: ['text'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: false,
+		temperature: true,
+		releaseDate: '2026-02-11',
+		lastUpdated: '2026-02-11',
+		openWeights: true,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		limit: { context: 204_800, output: 131_072 },
+	},
+];
 
 const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 	{
@@ -214,6 +243,33 @@ export function applyOfficialKimiCatalogMetadata<
 	};
 }
 
+export function applyZaiCodingCatalogMetadata<T extends ProviderCatalogEntry>(
+	entry: T | undefined,
+): T | undefined {
+	if (!entry) return undefined;
+	const order = new Map(
+		ZAI_CODING_MODEL_ORDER.map((modelId, index) => [modelId, index]),
+	);
+	const modelById = new Map(entry.models.map((model) => [model.id, model]));
+	for (const model of ZAI_CODING_MANUAL_MODELS) {
+		if (!modelById.has(model.id)) modelById.set(model.id, model);
+	}
+	const models = Array.from(modelById.values()).sort((a, b) => {
+		const orderA = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+		const orderB = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+		if (orderA !== orderB) return orderA - orderB;
+		return a.id.localeCompare(b.id);
+	});
+	return {
+		...entry,
+		models,
+		label: 'Z.AI Coding Plan',
+		env: ['ZAI_CODING_API_KEY'],
+		api: 'https://api.z.ai/api/coding/paas/v4',
+		doc: 'https://docs.z.ai/devpack/overview',
+	};
+}
+
 export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
@@ -230,6 +286,10 @@ export function mergeManualCatalog(
 	const kimiEntry = applyOfficialKimiCatalogMetadata(merged.kimi);
 	if (kimiEntry) {
 		merged.kimi = kimiEntry;
+	}
+	const zaiCodingEntry = applyZaiCodingCatalogMetadata(merged[ZAI_CODING_ID]);
+	if (zaiCodingEntry) {
+		merged[ZAI_CODING_ID] = zaiCodingEntry;
 	}
 	if (manualEntry) {
 		merged[OTTOROUTER_ID] = manualEntry;

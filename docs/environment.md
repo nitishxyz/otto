@@ -19,6 +19,10 @@ ZAI_API_KEY=...
 ZAI_CODING_API_KEY=...
 ```
 
+`ZAI_API_KEY` targets the general Z.AI API provider (`zai`).
+`ZAI_CODING_API_KEY` targets the GLM Coding Plan provider (`zai-coding`) and
+uses API-key bearer auth, not OAuth.
+
 Copilot auth can also be sourced from:
 
 ```bash

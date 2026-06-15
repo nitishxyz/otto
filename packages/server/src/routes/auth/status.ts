@@ -4,6 +4,7 @@ import {
 	getAllAuth,
 	getOnboardingComplete,
 	getOttoRouterWallet,
+	isProviderAuthorized,
 	loadConfig,
 	logger,
 	type ProviderId,
@@ -85,14 +86,20 @@ export function registerAuthStatusRoutes(app: Hono) {
 
 				for (const [id, entry] of Object.entries(catalog)) {
 					const providerAuth = auth[id as ProviderId];
+					const configured =
+						!!providerAuth ||
+						(await isProviderAuthorized(cfg, id as ProviderId));
+					const authType =
+						providerAuth?.type ??
+						(configured ? (id === 'copilot' ? 'oauth' : 'api') : undefined);
 					const models = entry.models || [];
 					const costs = models
 						.map((m) => m.cost?.input)
 						.filter((c): c is number => c !== undefined);
 
 					providers[id] = {
-						configured: !!providerAuth,
-						type: providerAuth?.type,
+						configured,
+						type: authType,
 						label: entry.label || id,
 						supportsOAuth:
 							id === 'anthropic' ||

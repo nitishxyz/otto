@@ -440,6 +440,10 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 	}
 
 	const meta = PROVIDER_LINKS[provider];
+	if (provider === 'zai-coding') {
+		log.info('GLM Coding Plan uses a Z.AI API key, not OAuth.');
+		log.info('Use an API key from Z.AI after subscribing to GLM Coding Plan.');
+	}
 	log.info(`Open in browser: ${meta.url}`);
 	const key = await password({
 		message: `Paste ${meta.env} here`,

@@ -4,6 +4,7 @@ import { catalog } from './catalog-merged.ts';
 export type ZaiProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
+	fetch?: typeof fetch;
 };
 
 export function createZaiModel(model: string, config?: ZaiProviderConfig) {
@@ -21,6 +22,7 @@ export function createZaiModel(model: string, config?: ZaiProviderConfig) {
 		name: entry?.label ?? 'Z.AI',
 		baseURL,
 		headers,
+		fetch: config?.fetch,
 	});
 
 	return instance(model);
@@ -44,6 +46,7 @@ export function createZaiCodingModel(
 		name: entry?.label ?? 'Z.AI Coding',
 		baseURL,
 		headers,
+		fetch: config?.fetch,
 	});
 
 	return instance(model);

@@ -211,6 +211,7 @@ export async function resolveModel(
 		return createZaiModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,
+			fetch: config.customFetch,
 		});
 	}
 
@@ -218,6 +219,7 @@ export async function resolveModel(
 		return createZaiCodingModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,
+			fetch: config.customFetch,
 		});
 	}
 

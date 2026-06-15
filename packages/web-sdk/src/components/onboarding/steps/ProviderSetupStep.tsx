@@ -1281,7 +1281,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										<div key={id}>
 											{addingProvider === id ? (
 												<div className="flex items-center gap-2 p-3 bg-card border border-ring rounded-xl overflow-hidden">
-													<div className="shrink-0">
+													<div className="shrink-0 flex items-center">
 														<ProviderLogo provider={id} size={18} />
 													</div>
 													<input
