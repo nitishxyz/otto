@@ -13,7 +13,7 @@ export type BuiltInProviderId =
 	| 'xai'
 	| 'zai'
 	| 'zai-coding'
-	| 'moonshot'
+	| 'kimi'
 	| 'minimax';
 
 /**
@@ -40,7 +40,7 @@ export type ProviderPromptFamily =
 	| 'anthropic'
 	| 'openai'
 	| 'google'
-	| 'moonshot'
+	| 'kimi'
 	| 'minimax'
 	| 'glm'
 	| 'openai-compatible';
@@ -52,7 +52,7 @@ export type ProviderFamily =
 	| 'openai'
 	| 'anthropic'
 	| 'google'
-	| 'moonshot'
+	| 'kimi'
 	| 'minimax'
 	| 'openai-compatible';
 
@@ -66,7 +66,7 @@ export type ModelOwner =
 	| 'google'
 	| 'openrouter'
 	| 'xai'
-	| 'moonshot'
+	| 'kimi'
 	| 'qwen'
 	| 'zai'
 	| 'minimax';

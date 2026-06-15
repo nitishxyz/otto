@@ -8,11 +8,8 @@ export type KimiProviderConfig = {
 	oauth?: OAuth;
 };
 
-/** @deprecated Use `KimiProviderConfig` */
-export type MoonshotProviderConfig = KimiProviderConfig;
-
 export function readKimiApiKeyFromEnv(): string {
-	return process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || '';
+	return process.env.KIMI_API_KEY || '';
 }
 
 const KIMI_UNSUPPORTED_SCHEMA_KEYS = new Set([
@@ -58,7 +55,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Converts AI SDK JSON Schema output into the smaller schema dialect accepted
- * by Kimi/Moonshot tool calls.
+ * by Kimi tool calls.
  */
 export function sanitizeKimiToolSchema(schema: unknown): unknown {
 	if (Array.isArray(schema))
@@ -143,7 +140,7 @@ function sanitizeKimiFetchInit(init?: RequestInit): RequestInit | undefined {
 }
 
 /**
- * Kimi/Moonshot streaming responses report token usage on the final chunk's
+ * Kimi streaming responses report token usage on the final chunk's
  * `choices[0].usage` instead of the OpenAI-standard top-level `usage` field.
  * The AI SDK openai-compatible parser only reads top-level `usage`, so we
  * hoist choice-level usage to the top level when it is missing.
@@ -227,7 +224,7 @@ export function createKimiUsageFetch(
 }
 
 export function createKimiModel(model: string, config?: KimiProviderConfig) {
-	const entry = catalog.moonshot;
+	const entry = catalog.kimi;
 	const oauthAccess = config?.oauth?.access;
 	const defaultApiBaseURL = entry?.api ?? 'https://api.moonshot.ai/v1';
 	const configuredBaseURL = config?.baseURL;
@@ -249,12 +246,4 @@ export function createKimiModel(model: string, config?: KimiProviderConfig) {
 	});
 
 	return instance(model);
-}
-
-/** @deprecated Use `createKimiModel` */
-export function createMoonshotModel(
-	model: string,
-	config?: MoonshotProviderConfig,
-) {
-	return createKimiModel(model, config);
 }

@@ -49,11 +49,7 @@ function getReasoningProviderTarget(
 	if (provider === 'ottorouter') return 'openrouter';
 	if (provider === 'openrouter') return 'openrouter';
 	if (definition?.compatibility === 'ollama') return 'ollama';
-	if (
-		provider === 'moonshot' ||
-		provider === 'zai' ||
-		provider === 'zai-coding'
-	) {
+	if (provider === 'kimi' || provider === 'zai' || provider === 'zai-coding') {
 		return 'openai-compatible';
 	}
 	if (provider === 'minimax') return 'anthropic';

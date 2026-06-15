@@ -32,7 +32,7 @@ export async function runSetup(projectRoot?: string) {
 			{ value: 'xai', label: 'xAI' },
 			{ value: 'zai', label: 'Z.AI (GLM)' },
 			{ value: 'zai-coding', label: 'Z.AI Coding Plan' },
-			{ value: 'moonshot', label: 'Kimi' },
+			{ value: 'kimi', label: 'Kimi' },
 			{ value: 'minimax', label: 'MiniMax' },
 		],
 		initialValues: Object.entries(cfg.providers)
@@ -53,7 +53,7 @@ export async function runSetup(projectRoot?: string) {
 		xai: { enabled: false },
 		zai: { enabled: false },
 		'zai-coding': { enabled: false },
-		moonshot: { enabled: false },
+		kimi: { enabled: false },
 		minimax: { enabled: false },
 	};
 	for (const p of providersPicked as ProviderId[]) providers[p].enabled = true;
@@ -82,7 +82,7 @@ export async function runSetup(projectRoot?: string) {
 												? 'ZAI_API_KEY'
 												: p === 'zai-coding'
 													? 'ZAI_CODING_API_KEY'
-													: p === 'moonshot'
+													: p === 'kimi'
 														? 'KIMI_API_KEY'
 														: 'MINIMAX_API_KEY';
 		const key = await text({
@@ -157,7 +157,7 @@ export async function runSetup(projectRoot?: string) {
 			xai: providers.xai,
 			zai: providers.zai,
 			'zai-coding': providers['zai-coding'],
-			moonshot: providers.moonshot,
+			kimi: providers.kimi,
 			minimax: providers.minimax,
 		},
 		paths: cfg.paths,

@@ -5,6 +5,7 @@ import {
 	filterModelsForAuthType,
 	getAuth,
 	getProviderDefinition,
+	resolveBuiltInProviderCatalogId,
 	loadConfig,
 	logger,
 	mergeCachedModelCatalog,
@@ -314,7 +315,10 @@ export async function handleGetProviderModels(c: Context) {
 		const cfg = await loadConfig(projectRoot);
 		const cachedCatalog = await readCachedModelCatalog();
 		const modelCatalogProviders = getModelCatalogProviders(cachedCatalog);
-		const providerCatalog = modelCatalogProviders[provider];
+		const catalogProvider = resolveBuiltInProviderCatalogId(provider);
+		const providerCatalog =
+			modelCatalogProviders[provider] ??
+			(catalogProvider ? modelCatalogProviders[catalogProvider] : undefined);
 
 		const authorized = await isProviderAuthorizedHybrid(
 			embeddedConfig,

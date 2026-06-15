@@ -95,7 +95,7 @@ Custom providers may optionally declare a family used for prompts and behavior:
 - `openai`
 - `anthropic`
 - `google`
-- `moonshot`
+- `kimi`
 - `minimax`
 - `glm`
 - `openai-compatible`

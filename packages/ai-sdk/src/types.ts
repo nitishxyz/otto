@@ -4,7 +4,7 @@ export type ProviderId =
 	| 'openai'
 	| 'anthropic'
 	| 'google'
-	| 'moonshot'
+	| 'kimi'
 	| 'qwen'
 	| 'zai'
 	| 'minimax'

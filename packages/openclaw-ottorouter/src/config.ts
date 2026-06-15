@@ -223,7 +223,7 @@ export function getDefaultModels(): OttoRouterModelConfig[] {
 		},
 		{
 			id: 'kimi-k2.5',
-			name: 'Kimi K2.5 (moonshot, via OttoRouter)',
+			name: 'Kimi K2.5 (via OttoRouter)',
 			api: 'openai-completions',
 			reasoning: false,
 			input: ['text'],

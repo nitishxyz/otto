@@ -14,7 +14,7 @@ import PROVIDER_ANTHROPIC from './providers/anthropic.txt' with {
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import PROVIDER_GOOGLE from './providers/google.txt' with { type: 'text' };
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import PROVIDER_MOONSHOT from './providers/moonshot.txt' with { type: 'text' };
+import PROVIDER_KIMI from './providers/kimi.txt' with { type: 'text' };
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import PROVIDER_DEFAULT from './providers/default.txt' with { type: 'text' };
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -24,7 +24,7 @@ const FAMILY_PROMPTS: Record<string, string> = {
 	openai: PROVIDER_OPENAI,
 	anthropic: PROVIDER_ANTHROPIC,
 	google: PROVIDER_GOOGLE,
-	moonshot: PROVIDER_MOONSHOT,
+	kimi: PROVIDER_KIMI,
 	glm: PROVIDER_GLM,
 	minimax: PROVIDER_DEFAULT,
 };
@@ -142,9 +142,9 @@ export async function providerBasePrompt(
 		const result = PROVIDER_GOOGLE.trim();
 		return { prompt: result, resolvedType: 'google' };
 	}
-	if (id === 'moonshot') {
-		const result = PROVIDER_MOONSHOT.trim();
-		return { prompt: result, resolvedType: 'moonshot' };
+	if (id === 'kimi') {
+		const result = PROVIDER_KIMI.trim();
+		return { prompt: result, resolvedType: 'kimi' };
 	}
 	if (id === 'zai' || id === 'zai-coding') {
 		const result = PROVIDER_GLM.trim();

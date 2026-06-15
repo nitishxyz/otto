@@ -665,7 +665,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			setOpenAICodeCopied(false);
 			setOpenAIAuthMode('choice');
 			setOpenAIModalOpen(true);
-		} else if (providerId === 'moonshot' && onStartKimiDeviceFlow) {
+		} else if (providerId === 'kimi' && onStartKimiDeviceFlow) {
 			setKimiPolling(false);
 			setKimiDevice(null);
 			setKimiError(null);
@@ -1943,7 +1943,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 				>
 					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
-							<ProviderLogo provider="moonshot" size={24} />
+							<ProviderLogo provider="kimi" size={24} />
 							<h3 className="text-lg font-semibold">Connect Kimi</h3>
 						</div>
 						<div className="p-6 space-y-4">

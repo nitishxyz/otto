@@ -20,6 +20,19 @@ type SessionCreateDefaults = {
 	allowUnknownModel?: boolean;
 };
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+	if (typeof error === 'string') return error;
+	if (!error || typeof error !== 'object') return fallback;
+	const payload = error as { error?: unknown; message?: unknown };
+	if (typeof payload.message === 'string') return payload.message;
+	if (typeof payload.error === 'string') return payload.error;
+	if (payload.error && typeof payload.error === 'object') {
+		const nested = payload.error as { message?: unknown };
+		if (typeof nested.message === 'string') return nested.message;
+	}
+	return fallback;
+}
+
 function sortSessions(list: Session[]): Session[] {
 	return [...list].sort((a, b) => {
 		const aTime = a.lastActiveAt ?? a.createdAt ?? 0;
@@ -33,6 +46,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 	const [activeSession, setActiveSession] = useState<Session | null>(null);
 	const [hasMore, setHasMore] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
+	const [sessionError, setSessionError] = useState<string | null>(null);
 	const nextOffsetRef = useRef<number | null>(null);
 
 	const loadSessions = useCallback(async () => {
@@ -76,15 +90,22 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 	const createSession = useCallback(
 		async (title?: string): Promise<Session | null> => {
 			try {
+				setSessionError(null);
 				const response = await apiCreateSession({
 					body: { ...defaultCreateSession, title },
 				} as never);
+				if (response.error) {
+					throw new Error(
+						getApiErrorMessage(response.error, 'failed to create session'),
+					);
+				}
 				const session = response.data as Session;
 				if (!session) return null;
 				setSessions((prev) => sortSessions([session, ...prev]));
 				setActiveSession(session);
 				return session;
-			} catch {
+			} catch (error) {
+				setSessionError(getApiErrorMessage(error, 'failed to create session'));
 				return null;
 			}
 		},
@@ -155,7 +176,8 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 			files?: unknown[],
 		) => {
 			try {
-				await createMessage({
+				setSessionError(null);
+				const response = await createMessage({
 					path: { id: sessionId },
 					body: {
 						content,
@@ -167,7 +189,14 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 						// biome-ignore lint/suspicious/noExplicitAny: Server accepts images/files but SDK types don't include them
 					} as any,
 				});
-			} catch {}
+				if (response.error) {
+					throw new Error(
+						getApiErrorMessage(response.error, 'failed to send message'),
+					);
+				}
+			} catch (error) {
+				setSessionError(getApiErrorMessage(error, 'failed to send message'));
+			}
 		},
 		[defaultCreateSession?.allowUnknownModel],
 	);
@@ -213,6 +242,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 		activeSession,
 		hasMore,
 		loadingMore,
+		sessionError,
 		loadSessions,
 		loadMoreSessions,
 		createSession,

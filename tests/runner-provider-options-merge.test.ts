@@ -185,11 +185,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		]);
 	});
 
-	test('keeps apply_patch for Moonshot/Kimi models', () => {
+	test('keeps apply_patch for Kimi models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'build',
 			editPolicyTools,
-			'moonshot',
+			'kimi',
 			'kimi-k2.7-code',
 		);
 

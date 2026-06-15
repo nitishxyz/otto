@@ -118,7 +118,7 @@ export function registerAuthKimiRoutes(app: Hono) {
 				}
 
 				await setAuth(
-					'moonshot',
+					'kimi',
 					{
 						type: 'oauth',
 						access: result.tokens.access,

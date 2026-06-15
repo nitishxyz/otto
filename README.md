@@ -24,7 +24,7 @@ otto is a local-first coding platform built around a single runtime — `otto se
 You pick the surface. The runtime, agents, tools, sessions, and providers stay the same across all of them.
 
 - **Local-first.** Your code, your machine, your keys. Secrets live in OS-secure stores, not config files.
-- **Multi-provider.** Anthropic, OpenAI, Google, OpenRouter, OpenCode, OttoRouter, Moonshot, Minimax, Z.AI — swap at runtime.
+- **Multi-provider.** Anthropic, OpenAI, Google, OpenRouter, OpenCode, OttoRouter, Kimi, Minimax, Z.AI — swap at runtime.
 - **Extensible.** Custom tools, MCP servers, skills, and agent presets, per-project or global.
 - **Open.** MIT-licensed, Bun monorepo, OpenAPI spec, embeddable server.
 
@@ -210,7 +210,7 @@ export GOOGLE_GENERATIVE_AI_API_KEY="..."
 export OPENROUTER_API_KEY="..."
 export OPENCODE_API_KEY="..."
 export OTTOROUTER_PRIVATE_KEY="..."          # Solana wallet (base58)
-export MOONSHOT_API_KEY="..."
+export KIMI_API_KEY="..."
 export MINIMAX_API_KEY="..."
 export ZAI_API_KEY="..."
 export ZAI_CODING_API_KEY="..."

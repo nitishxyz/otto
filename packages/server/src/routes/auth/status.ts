@@ -84,9 +84,7 @@ export function registerAuthStatusRoutes(app: Hono) {
 				> = {};
 
 				for (const [id, entry] of Object.entries(catalog)) {
-					const providerAuth =
-						auth[id as ProviderId] ??
-						(id === 'moonshot' ? auth.kimi : undefined);
+					const providerAuth = auth[id as ProviderId];
 					const models = entry.models || [];
 					const costs = models
 						.map((m) => m.cost?.input)
@@ -100,7 +98,7 @@ export function registerAuthStatusRoutes(app: Hono) {
 							id === 'anthropic' ||
 							id === 'openai' ||
 							id === 'copilot' ||
-							id === 'moonshot',
+							id === 'kimi',
 						supportsToken: id === 'copilot',
 						supportsGhImport:
 							id === 'copilot' ? ghImportCapability.available : false,

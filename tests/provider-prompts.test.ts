@@ -92,13 +92,13 @@ describe('provider base prompts', () => {
 			expect(result.prompt).toContain('software engineering');
 		});
 
-		it('uses moonshot prompt for moonshot provider', async () => {
+		it('uses kimi prompt for kimi provider', async () => {
 			const result = await providerBasePrompt(
-				'moonshot',
+				'kimi',
 				'kimi-k2.5',
 				process.cwd(),
 			);
-			expect(result.resolvedType).toBe('moonshot');
+			expect(result.resolvedType).toBe('kimi');
 			expect(result.prompt).toContain('Kimi');
 			expect(result.prompt).toContain('Thinking mode');
 		});
@@ -125,23 +125,23 @@ describe('provider base prompts', () => {
 			expect(result.prompt).toContain('Claude');
 		});
 
-		it('detects moonshot family for OttoRouter kimi models', async () => {
+		it('detects kimi family for OttoRouter kimi models', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'kimi-k2.5',
 				process.cwd(),
 			);
-			expect(result.resolvedType).toBe('moonshot');
+			expect(result.resolvedType).toBe('kimi');
 			expect(result.prompt).toContain('Kimi');
 		});
 
-		it('detects moonshot family for kimi-k2-thinking via OttoRouter', async () => {
+		it('detects kimi family for kimi-k2-thinking via OttoRouter', async () => {
 			const result = await providerBasePrompt(
 				'ottorouter',
 				'kimi-k2-thinking',
 				process.cwd(),
 			);
-			expect(result.resolvedType).toBe('moonshot');
+			expect(result.resolvedType).toBe('kimi');
 			expect(result.prompt).toContain('Thinking mode');
 		});
 	});
@@ -165,13 +165,13 @@ describe('provider base prompts', () => {
 			expect(result.resolvedType).toBe('anthropic');
 		});
 
-		it('detects moonshot family for openrouter kimi models', async () => {
+		it('detects kimi family for openrouter kimi models', async () => {
 			const result = await providerBasePrompt(
 				'openrouter',
 				'moonshotai/kimi-k2.5',
 				process.cwd(),
 			);
-			expect(result.resolvedType).toBe('moonshot');
+			expect(result.resolvedType).toBe('kimi');
 		});
 
 		it('detects google family for openrouter gemini models', async () => {
@@ -189,7 +189,7 @@ describe('provider base prompts', () => {
 			expect(getModelFamily('openai', 'gpt-4o')).toBe('openai');
 			expect(getModelFamily('anthropic', 'claude-3-opus')).toBe('anthropic');
 			expect(getModelFamily('google', 'gemini-pro')).toBe('google');
-			expect(getModelFamily('moonshot', 'kimi-k2.5')).toBe('moonshot');
+			expect(getModelFamily('kimi', 'kimi-k2.5')).toBe('kimi');
 		});
 
 		it('reads ownedBy from catalog for ottorouter models', () => {
@@ -200,8 +200,8 @@ describe('provider base prompts', () => {
 				m.id.includes('kimi'),
 			);
 			if (kimiModel) {
-				expect(kimiModel.ownedBy).toBe('moonshot');
-				expect(getModelFamily('ottorouter', kimiModel.id)).toBe('moonshot');
+				expect(kimiModel.ownedBy).toBe('kimi');
+				expect(getModelFamily('ottorouter', kimiModel.id)).toBe('kimi');
 			}
 
 			const claudeModel = ottorouterEntry?.models.find((m) =>
@@ -245,16 +245,14 @@ describe('provider base prompts', () => {
 			);
 			expect(getModelFamily('openrouter', 'openai/gpt-4o')).toBe('openai');
 			expect(getModelFamily('openrouter', 'google/gemini-pro')).toBe('google');
-			expect(getModelFamily('openrouter', 'moonshotai/kimi-k2.5')).toBe(
-				'moonshot',
-			);
+			expect(getModelFamily('openrouter', 'moonshotai/kimi-k2.5')).toBe('kimi');
 		});
 
 		it('detects families from model name for opencode', () => {
 			expect(getModelFamily('opencode', 'claude-3-opus')).toBe('anthropic');
 			expect(getModelFamily('opencode', 'gpt-5')).toBe('openai');
 			expect(getModelFamily('opencode', 'gemini-2-flash')).toBe('google');
-			expect(getModelFamily('opencode', 'kimi-k2.5')).toBe('moonshot');
+			expect(getModelFamily('opencode', 'kimi-k2.5')).toBe('kimi');
 		});
 	});
 
@@ -265,7 +263,7 @@ describe('provider base prompts', () => {
 			);
 			expect(getUnderlyingProviderKey('openai', 'gpt-4o')).toBe('openai');
 			expect(getUnderlyingProviderKey('google', 'gemini-pro')).toBe('google');
-			expect(getUnderlyingProviderKey('moonshot', 'kimi-k2')).toBe('moonshot');
+			expect(getUnderlyingProviderKey('kimi', 'kimi-k2')).toBe('kimi');
 		});
 
 		it('maps ottorouter models via ownedBy', () => {
@@ -275,9 +273,7 @@ describe('provider base prompts', () => {
 			expect(getUnderlyingProviderKey('ottorouter', 'codex-mini-latest')).toBe(
 				'openai',
 			);
-			expect(getUnderlyingProviderKey('ottorouter', 'kimi-k2.5')).toBe(
-				'moonshot',
-			);
+			expect(getUnderlyingProviderKey('ottorouter', 'kimi-k2.5')).toBe('kimi');
 			expect(getUnderlyingProviderKey('ottorouter', 'healer-alpha')).toBe(
 				'openai-compatible',
 			);
@@ -296,9 +292,10 @@ describe('provider base prompts', () => {
 					'openai',
 					'anthropic',
 					'deepseek',
-					'moonshot',
+					'kimi',
 					'google',
 					'minimax',
+					'qwen',
 					'xai',
 					'zai',
 				]).toContain(model.ownedBy);
@@ -320,12 +317,12 @@ describe('provider base prompts', () => {
 			}
 		});
 
-		it('moonshot provider models have correct npm binding', () => {
-			const moonshotEntry = catalog.moonshot;
-			expect(moonshotEntry).toBeDefined();
-			expect(moonshotEntry?.npm).toBe('@ai-sdk/openai-compatible');
+		it('kimi provider models have correct npm binding', () => {
+			const kimiEntry = catalog.kimi;
+			expect(kimiEntry).toBeDefined();
+			expect(kimiEntry?.npm).toBe('@ai-sdk/openai-compatible');
 
-			for (const model of moonshotEntry?.models || []) {
+			for (const model of kimiEntry?.models || []) {
 				expect(model.id).toContain('kimi');
 			}
 		});
@@ -343,16 +340,12 @@ describe('provider base prompts', () => {
 				'gemini-pro',
 				process.cwd(),
 			);
-			const moonshot = await providerBasePrompt(
-				'moonshot',
-				'kimi-k2.5',
-				process.cwd(),
-			);
+			const kimi = await providerBasePrompt('kimi', 'kimi-k2.5', process.cwd());
 
 			expect(openai.prompt.length).toBeGreaterThan(100);
 			expect(google.prompt.length).toBeGreaterThan(100);
-			expect(moonshot.prompt.length).toBeGreaterThan(100);
-			expect(moonshot.prompt).toContain('Kimi');
+			expect(kimi.prompt.length).toBeGreaterThan(100);
+			expect(kimi.prompt).toContain('Kimi');
 		});
 
 		it('anthropic prompt has conciseness examples in XML', async () => {
@@ -380,7 +373,7 @@ describe('provider base prompts', () => {
 				{ provider: 'openai', model: 'gpt-4o' },
 				{ provider: 'anthropic', model: 'claude-3-opus' },
 				{ provider: 'google', model: 'gemini-pro' },
-				{ provider: 'moonshot', model: 'kimi-k2.5' },
+				{ provider: 'kimi', model: 'kimi-k2.5' },
 			];
 			for (const { provider, model } of providers) {
 				const result = await providerBasePrompt(provider, model, process.cwd());

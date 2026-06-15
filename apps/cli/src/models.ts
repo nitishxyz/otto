@@ -61,10 +61,14 @@ export async function runModels(
 		}
 	}
 
+	const initialProvider = defaults.provider;
 	const provider = (await select({
 		message: 'Provider',
-		options: allowed.map((p) => ({ value: p, label: p })),
-		initialValue: defaults.provider,
+		options: allowed.map((p) => ({
+			value: p,
+			label: p === 'kimi' ? 'Kimi' : p,
+		})),
+		initialValue: initialProvider,
 	})) as string | symbol;
 	if (isCancel(provider)) return cancel('Cancelled');
 

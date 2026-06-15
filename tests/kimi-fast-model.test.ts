@@ -1,25 +1,34 @@
 import { describe, expect, test } from 'bun:test';
+import { catalog } from '../packages/sdk/src/providers/src/catalog-merged.ts';
 import {
 	getFastModel,
 	getFastModelForAuth,
 } from '../packages/sdk/src/providers/src/utils.ts';
 
-describe('kimi/moonshot fast model selection', () => {
-	test('prefers Kimi K2.7 Code for moonshot', () => {
-		expect(getFastModel('moonshot')).toBe('kimi-k2.7-code');
-	});
-
-	test('prefers Kimi K2.7 Code for the kimi alias', () => {
+describe('kimi fast model selection', () => {
+	test('prefers Kimi K2.7 Code for kimi', () => {
 		expect(getFastModel('kimi')).toBe('kimi-k2.7-code');
 	});
 
 	test('uses Kimi K2.7 Code for API-key auth', () => {
-		expect(getFastModelForAuth('moonshot', 'api')).toBe('kimi-k2.7-code');
 		expect(getFastModelForAuth('kimi', 'api')).toBe('kimi-k2.7-code');
 	});
 
 	test('uses Kimi K2.7 Code for Kimi Code OAuth', () => {
-		expect(getFastModelForAuth('moonshot', 'oauth')).toBe('kimi-k2.7-code');
 		expect(getFastModelForAuth('kimi', 'oauth')).toBe('kimi-k2.7-code');
+	});
+
+	test('includes Kimi K2.7 Code Highspeed manual catalog metadata', () => {
+		const model = catalog.kimi.models.find(
+			(entry) => entry.id === 'kimi-k2.7-code-highspeed',
+		);
+
+		expect(model).toMatchObject({
+			id: 'kimi-k2.7-code-highspeed',
+			ownedBy: 'kimi',
+			label: 'Kimi K2.7 Code Highspeed',
+			cost: { input: 1.9, output: 8, cacheRead: 0.38 },
+			limit: { context: 262_144, output: 262_144 },
+		});
 	});
 });

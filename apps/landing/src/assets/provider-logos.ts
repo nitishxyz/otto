@@ -36,7 +36,7 @@ export const zaiLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmlns="h
 <path d="M20.1312 7.50002L17.4088 11.1913H5.81625L8.5375 7.50002H20.1325H20.1312ZM34.0675 28.81L31.3475 32.5H19.795L22.5125 28.81H34.0675ZM35 7.50002L16.58 32.5H5L23.42 7.50002H35Z" fill="currentColor"/>
 </svg>`;
 
-export const moonshotLogo = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const kimiLogo = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/>
 <path d="M12 4C8.5 4 7 8 7 12C7 16 8.5 20 12 20" stroke="currentColor" stroke-width="2"/>
 </svg>`;
@@ -55,6 +55,6 @@ export const providerLogos: Record<string, string> = {
 	copilot: copilotLogo,
 	zai: zaiLogo,
 	'zai-coding': zaiLogo,
-	moonshot: moonshotLogo,
+	kimi: kimiLogo,
 	minimax: minimaxLogo,
 };

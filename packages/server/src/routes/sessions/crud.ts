@@ -272,10 +272,15 @@ export function registerSessionCrudRoutes(app: Hono) {
 			const agent = (body.agent as string | undefined) ?? cfg.defaults.agent;
 			const agentCfg = await resolveAgentConfig(cfg.projectRoot, agent);
 			const providerCandidate =
-				typeof body.provider === 'string' ? body.provider : undefined;
+				typeof body.provider === 'string' ? body.provider.trim() : undefined;
+			if (providerCandidate && !hasConfiguredProvider(cfg, providerCandidate)) {
+				const errorResponse = serializeError(
+					new Error(`Provider not supported: ${providerCandidate}`),
+				);
+				return c.json(errorResponse, errorResponse.error.status || 400);
+			}
 			const provider: ProviderId = (() => {
-				if (providerCandidate && hasConfiguredProvider(cfg, providerCandidate))
-					return providerCandidate;
+				if (providerCandidate) return providerCandidate;
 				if (hasConfiguredProvider(cfg, agentCfg.provider))
 					return agentCfg.provider;
 				return cfg.defaults.provider;

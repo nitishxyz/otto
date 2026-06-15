@@ -1,5 +1,11 @@
 import type { ModelInfo } from '../../types/src/index.ts';
 
+function normalizeModelInfo(model: ModelInfo): ModelInfo {
+	return (model.ownedBy as string | undefined) === 'moonshot'
+		? { ...model, ownedBy: 'kimi' }
+		: model;
+}
+
 /**
  * Merge embedded/manual catalog models with cached (remote/local) models by id.
  *
@@ -13,7 +19,7 @@ export function mergeModelLists(
 	cachedModels: ModelInfo[] | undefined,
 ): ModelInfo[] {
 	const base = baseModels ?? [];
-	const cached = cachedModels ?? [];
+	const cached = (cachedModels ?? []).map(normalizeModelInfo);
 	if (!cached.length) return base;
 	if (!base.length) return cached;
 	const cachedById = new Map(cached.map((model) => [model.id, model]));

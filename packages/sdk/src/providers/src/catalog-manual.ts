@@ -46,7 +46,7 @@ const OWNER_NPM: Record<ModelOwner, string> = {
 	google: '@ai-sdk/google',
 	openrouter: '@openrouter/ai-sdk-provider',
 	xai: '@ai-sdk/xai',
-	moonshot: '@ai-sdk/openai-compatible',
+	kimi: '@ai-sdk/openai-compatible',
 	qwen: '@ai-sdk/openai-compatible',
 	zai: '@ai-sdk/openai-compatible',
 	minimax: '@ai-sdk/anthropic',
@@ -162,21 +162,53 @@ const DEPRECATED_KIMI_MODEL_IDS = new Set([
 	'kimi-k2-turbo-preview',
 ]);
 
+const KIMI_MANUAL_MODELS: ModelInfo[] = [
+	{
+		id: 'kimi-k2.7-code-highspeed',
+		ownedBy: 'kimi',
+		label: 'Kimi K2.7 Code Highspeed',
+		modalities: { input: ['text', 'image', 'video'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: true,
+		temperature: false,
+		knowledge: '2025-01',
+		openWeights: true,
+		cost: { input: 1.9, output: 8, cacheRead: 0.38 },
+		limit: { context: 262_144, output: 262_144 },
+	},
+];
+
 export function filterAvailableKimiModels(models: ModelInfo[]): ModelInfo[] {
 	return models.filter((model) => !DEPRECATED_KIMI_MODEL_IDS.has(model.id));
+}
+
+function appendKimiManualModels(models: ModelInfo[]): ModelInfo[] {
+	const manualById = new Map(
+		KIMI_MANUAL_MODELS.map((model) => [model.id, model]),
+	);
+	const mergedModels = models.map((model) => {
+		const override = manualById.get(model.id);
+		return override ? { ...model, ...override } : model;
+	});
+	const existingIds = new Set(mergedModels.map((model) => model.id));
+	const missingModels = KIMI_MANUAL_MODELS.filter(
+		(model) => !existingIds.has(model.id),
+	);
+	return missingModels.length
+		? [...mergedModels, ...missingModels]
+		: mergedModels;
 }
 
 export function applyOfficialKimiCatalogMetadata<
 	T extends ProviderCatalogEntry,
 >(entry: T | undefined): T | undefined {
 	if (!entry) return undefined;
-	const env = Array.from(
-		new Set(['KIMI_API_KEY', 'MOONSHOT_API_KEY', ...(entry.env ?? [])]),
-	);
+	const env = Array.from(new Set(['KIMI_API_KEY', ...(entry.env ?? [])]));
 	return {
 		...entry,
-		models: filterAvailableKimiModels(entry.models),
-		label: entry.label === 'Moonshot AI' ? 'Kimi' : entry.label,
+		models: appendKimiManualModels(filterAvailableKimiModels(entry.models)),
+		label: 'Kimi',
 		env,
 		doc: 'https://platform.kimi.ai/docs/api/overview.md',
 	};
@@ -195,9 +227,9 @@ export function mergeManualCatalog(
 	if (xaiEntry) {
 		merged.xai = xaiEntry;
 	}
-	const moonshotEntry = applyOfficialKimiCatalogMetadata(merged.moonshot);
-	if (moonshotEntry) {
-		merged.moonshot = moonshotEntry;
+	const kimiEntry = applyOfficialKimiCatalogMetadata(merged.kimi);
+	if (kimiEntry) {
+		merged.kimi = kimiEntry;
 	}
 	if (manualEntry) {
 		merged[OTTOROUTER_ID] = manualEntry;

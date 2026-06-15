@@ -39,7 +39,7 @@ const BUILTIN_COMPATIBILITY: Record<BuiltInProviderId, ProviderCompatibility> =
 		xai: 'openai',
 		zai: 'openai-compatible',
 		'zai-coding': 'openai-compatible',
-		moonshot: 'openai-compatible',
+		kimi: 'openai-compatible',
 		minimax: 'anthropic',
 	};
 
@@ -55,7 +55,7 @@ const BUILTIN_FAMILY: Record<BuiltInProviderId, ProviderPromptFamily> = {
 	xai: 'openai',
 	zai: 'glm',
 	'zai-coding': 'glm',
-	moonshot: 'moonshot',
+	kimi: 'kimi',
 	minimax: 'minimax',
 };
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -95,8 +95,6 @@ function resolveCustomFamily(
 	return settings.family ?? 'default';
 }
 
-export const KIMI_PROVIDER_ALIAS = 'kimi' as const;
-
 function isCatalogBuiltInProviderId(
 	value: unknown,
 ): value is BuiltInProviderId {
@@ -109,7 +107,6 @@ function isCatalogBuiltInProviderId(
 export function resolveBuiltInProviderCatalogId(
 	provider: ProviderId,
 ): BuiltInProviderId | undefined {
-	if (provider === KIMI_PROVIDER_ALIAS) return 'moonshot';
 	if (isCatalogBuiltInProviderId(provider)) return provider;
 	return undefined;
 }
@@ -117,7 +114,7 @@ export function resolveBuiltInProviderCatalogId(
 export function isBuiltInProviderId(
 	value: unknown,
 ): value is BuiltInProviderId {
-	return isCatalogBuiltInProviderId(value) || value === KIMI_PROVIDER_ALIAS;
+	return isCatalogBuiltInProviderId(value);
 }
 
 export function getProviderSettings(
@@ -138,21 +135,14 @@ export function getProviderDefinition(
 		if (!entry) return undefined;
 		const cachedEntry = getCachedProviderCatalogEntry(catalogProvider);
 		const models = mergeModelLists(entry.models, cachedEntry?.models);
-		const moonshotSettings =
-			provider === KIMI_PROVIDER_ALIAS
-				? (getProviderSettings(cfg, 'moonshot') ?? settings)
-				: settings;
-		const resolvedSettings =
-			provider === KIMI_PROVIDER_ALIAS
-				? (settings ?? moonshotSettings)
-				: settings;
+		const resolvedSettings = settings;
 		return {
 			id: provider,
 			label:
 				resolvedSettings?.label ??
-				(provider === KIMI_PROVIDER_ALIAS
-					? 'Kimi'
-					: (cachedEntry?.label ?? entry.label ?? provider)),
+				cachedEntry?.label ??
+				entry.label ??
+				provider,
 			source: 'built-in',
 			compatibility: BUILTIN_COMPATIBILITY[catalogProvider],
 			family: BUILTIN_FAMILY[catalogProvider],
@@ -202,7 +192,6 @@ export function getConfiguredProviderIds(
 	const includeDisabled = options?.includeDisabled === true;
 	const ids = new Set<ProviderId>([
 		...providerIds,
-		KIMI_PROVIDER_ALIAS,
 		...Object.keys(cfg.providers),
 		cfg.defaults.provider,
 	]);
@@ -280,7 +269,7 @@ export function getConfiguredProviderApiKey(
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return undefined;
 	if (definition.apiKey?.length) return definition.apiKey;
-	if (provider === KIMI_PROVIDER_ALIAS || provider === 'moonshot') {
+	if (provider === 'kimi') {
 		const envValue = readEnvKey(provider);
 		if (envValue?.length) return envValue;
 	}

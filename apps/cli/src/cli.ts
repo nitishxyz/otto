@@ -175,6 +175,19 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 			const initialProvider = getFlagValue(argv, '--provider')?.trim();
 			const initialModel = getFlagValue(argv, '--model')?.trim();
 			const initialAgent = getFlagValue(argv, '--agent')?.trim();
+			if (initialProvider) {
+				const { loadConfig, hasConfiguredProvider, getConfiguredProviderIds } =
+					await import('@ottocode/sdk');
+				const cfg = await loadConfig(projectRoot);
+				if (!hasConfiguredProvider(cfg, initialProvider)) {
+					logger.error(`Provider not supported: ${initialProvider}`);
+					logger.error(
+						`Available providers: ${getConfiguredProviderIds(cfg).join(', ')}`,
+					);
+					process.exitCode = 1;
+					return;
+				}
+			}
 			const initialSession = {
 				...(initialAgent ? { agent: initialAgent } : {}),
 				...(initialProvider ? { provider: initialProvider } : {}),

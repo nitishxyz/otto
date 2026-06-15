@@ -186,8 +186,8 @@ const MODELS = [
 		],
 	},
 	{
-		provider: 'moonshot',
-		label: 'Moonshot',
+		provider: 'kimi',
+		label: 'Kimi',
 		endpoint: '/v1/chat/completions',
 		models: [
 			{ id: 'kimi-k2.5', label: 'Kimi K2.5', input: 0.6, output: 3 },
@@ -759,7 +759,7 @@ function HeroMockup() {
 									'anthropic',
 									'openai',
 									'google',
-									'moonshot',
+									'kimi',
 									'zai',
 									'minimax',
 								].map((p) => (
@@ -852,7 +852,7 @@ export function OttoRouter() {
 						<div className="mt-8">
 							<TerminalBlock
 								title="architecture"
-								copyText="Client → OttoRouter Router → OpenAI / Anthropic / Google / Moonshot / Zai / MiniMax"
+								copyText="Client → OttoRouter Router → OpenAI / Anthropic / Google / Kimi / Zai / MiniMax"
 							>
 								<div className="space-y-1">
 									<div>
@@ -885,7 +885,7 @@ export function OttoRouter() {
 										</span>
 										<span className="text-otto-dim">
 											{' '}
-											— OpenAI, Anthropic, Google, Moonshot, Zai, MiniMax
+											— OpenAI, Anthropic, Google, Kimi, Zai, MiniMax
 										</span>
 									</div>
 								</div>
@@ -1440,7 +1440,7 @@ const { text } = await generateText({
 										method: 'POST',
 										path: '/v1/chat/completions',
 										auth: true,
-										desc: 'Google / Moonshot / Zai',
+										desc: 'Google / Kimi / Zai',
 									},
 								].map((ep) => (
 									<div

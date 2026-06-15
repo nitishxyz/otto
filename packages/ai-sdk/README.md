@@ -1,6 +1,6 @@
 # @ottorouter/ai-sdk
 
-A drop-in SDK for accessing AI models (OpenAI, Anthropic, Google, Moonshot, MiniMax, Z.AI) through the [OttoRouter](https://github.com/slashforge/ottorouter) proxy with automatic x402 payments via Solana USDC.
+A drop-in SDK for accessing AI models (OpenAI, Anthropic, Google, Kimi, MiniMax, Z.AI) through the [OttoRouter](https://github.com/slashforge/ottorouter) proxy with automatic x402 payments via Solana USDC.
 
 All you need is a Solana wallet — the SDK handles authentication, payment negotiation, and provider routing automatically.
 
@@ -45,7 +45,7 @@ Models are resolved to providers by prefix:
 | `claude-`                          | Anthropic | Messages    |
 | `gpt-`, `o1`, `o3`, `o4`, `codex-` | OpenAI    | Responses   |
 | `gemini-`                          | Google    | Native      |
-| `kimi-`                            | Moonshot  | OpenAI Chat |
+| `kimi-`                            | Kimi      | OpenAI Chat |
 | `MiniMax-`                         | MiniMax   | Messages    |
 | `z1-`                              | Z.AI      | OpenAI Chat |
 
@@ -53,7 +53,7 @@ Models are resolved to providers by prefix:
 ottorouter.model("claude-sonnet-4-20250514"); // → anthropic
 ottorouter.model("gpt-4o"); // → openai
 ottorouter.model("gemini-2.5-pro"); // → google
-ottorouter.model("kimi-k2"); // → moonshot
+ottorouter.model("kimi-k2"); // → kimi
 ```
 
 ## Explicit Provider
@@ -299,7 +299,7 @@ ottorouter.registry.mapModel("some-model", "openai");
 | -------------------- | ------------------------------------ | ------------------ |
 | `openai-responses`   | OpenAI Responses API                 | OpenAI             |
 | `anthropic-messages` | Anthropic Messages API               | Anthropic, MiniMax |
-| `openai-chat`        | OpenAI Chat Completions (compatible) | Moonshot, Z.AI     |
+| `openai-chat`        | OpenAI Chat Completions (compatible) | Kimi, Z.AI         |
 | `google-native`      | Google GenerativeAI native           | Google             |
 
 ## Low-Level: Custom Fetch

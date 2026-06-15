@@ -3,7 +3,7 @@ import {
 	createKimiUsageFetch,
 	hoistKimiSseUsage,
 	sanitizeKimiToolSchema,
-} from '../packages/sdk/src/providers/src/moonshot-client.ts';
+} from '../packages/sdk/src/providers/src/kimi-client.ts';
 
 const FINAL_CHUNK = JSON.stringify({
 	id: 'cmpl-1',
@@ -56,7 +56,7 @@ describe('hoistKimiSseUsage', () => {
 });
 
 describe('createKimiUsageFetch', () => {
-	test('sanitizes tool schemas before Moonshot requests are sent', async () => {
+	test('sanitizes tool schemas before Kimi requests are sent', async () => {
 		let capturedBody: Record<string, unknown> | undefined;
 		const baseFetch = (async (_input, init) => {
 			capturedBody = JSON.parse(String(init?.body ?? '{}'));
@@ -67,7 +67,7 @@ describe('createKimiUsageFetch', () => {
 		}) as typeof fetch;
 
 		const wrapped = createKimiUsageFetch(baseFetch);
-		await wrapped('https://api.moonshot.ai/v1/chat/completions', {
+		await wrapped('https://api.kimi.test/v1/chat/completions', {
 			method: 'POST',
 			body: JSON.stringify({
 				tools: [
@@ -131,7 +131,7 @@ describe('createKimiUsageFetch', () => {
 			})) as typeof fetch;
 
 		const wrapped = createKimiUsageFetch(baseFetch);
-		const res = await wrapped('https://api.moonshot.ai/v1/chat/completions');
+		const res = await wrapped('https://api.kimi.test/v1/chat/completions');
 		const text = await res.text();
 
 		const dataLines = text
@@ -155,7 +155,7 @@ describe('createKimiUsageFetch', () => {
 			})) as typeof fetch;
 
 		const wrapped = createKimiUsageFetch(baseFetch);
-		const res = await wrapped('https://api.moonshot.ai/v1/models');
+		const res = await wrapped('https://api.kimi.test/v1/models');
 		expect(await res.text()).toBe(body);
 	});
 });

@@ -3,7 +3,7 @@ import {
 	getAuth,
 	setAuth,
 	refreshKimiToken,
-	createMoonshotModel,
+	createKimiModel,
 } from '@ottocode/sdk';
 
 const KIMI_REFRESH_SKEW_MS = 5 * 60 * 1000;
@@ -15,7 +15,7 @@ function normalizeExpiresMs(expires: number): number {
 
 async function ensureFreshKimiOAuth(
 	oauth: OAuth,
-	providerKey: 'moonshot' | 'kimi',
+	providerKey: 'kimi',
 	projectRoot: string,
 ): Promise<OAuth> {
 	if (!oauth.refresh) return oauth;
@@ -33,14 +33,13 @@ async function ensureFreshKimiOAuth(
 	return next;
 }
 
-export async function getMoonshotInstance(cfg: OttoConfig, model: string) {
-	const moonshotAuth = await getAuth('moonshot', cfg.projectRoot);
-	const auth = moonshotAuth ?? (await getAuth('kimi', cfg.projectRoot));
-	const providerKey: 'moonshot' | 'kimi' = moonshotAuth ? 'moonshot' : 'kimi';
+export async function getKimiInstance(cfg: OttoConfig, model: string) {
+	const auth = await getAuth('kimi', cfg.projectRoot);
+	const providerKey: 'kimi' = 'kimi';
 	const apiKey = auth?.type === 'api' ? auth.key : undefined;
 	let oauth = auth?.type === 'oauth' ? auth : undefined;
 	if (oauth) {
 		oauth = await ensureFreshKimiOAuth(oauth, providerKey, cfg.projectRoot);
 	}
-	return createMoonshotModel(model, { apiKey, oauth });
+	return createKimiModel(model, { apiKey, oauth });
 }

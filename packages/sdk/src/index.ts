@@ -81,6 +81,7 @@ export type {
 } from './providers/src/index.ts';
 export {
 	isBuiltInProviderId,
+	resolveBuiltInProviderCatalogId,
 	getProviderSettings,
 	getProviderDefinition,
 	hasConfiguredProvider,
@@ -162,13 +163,9 @@ export { createOpencodeModel } from './providers/src/index.ts';
 export type { OpencodeProviderConfig } from './providers/src/index.ts';
 export {
 	createKimiModel,
-	createMoonshotModel,
 	readKimiApiKeyFromEnv,
 } from './providers/src/index.ts';
-export type {
-	KimiProviderConfig,
-	MoonshotProviderConfig,
-} from './providers/src/index.ts';
+export type { KimiProviderConfig } from './providers/src/index.ts';
 export { createMinimaxModel } from './providers/src/index.ts';
 export type { MinimaxProviderConfig } from './providers/src/index.ts';
 export {

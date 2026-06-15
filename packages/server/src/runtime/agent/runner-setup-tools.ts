@@ -117,21 +117,21 @@ export function applyModelFamilyEditToolPolicy(
 		return Array.from(
 			new Set([
 				...next,
+				'apply_patch',
 				'write',
 				'edit',
 				'multiedit',
 				'copy_into',
-				'apply_patch',
 			]),
 		);
 	}
 
 	const preferredEditingTools = [
+		'apply_patch',
 		'write',
 		'edit',
 		'multiedit',
 		'copy_into',
-		'apply_patch',
 	];
 
 	return Array.from(new Set([...next, ...preferredEditingTools]));

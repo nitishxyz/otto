@@ -220,7 +220,7 @@ export const Providers: React.FC = () => {
 								transform: `translateY(${moreY}px)`,
 							}}
 						>
-							+ OpenCode, Moonshot, and more
+							+ OpenCode, Kimi, and more
 						</div>
 					);
 				})()}

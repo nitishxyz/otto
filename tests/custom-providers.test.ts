@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import type { OttoConfig } from '@ottocode/sdk';
 import {
 	getProviderDefinition,
+	isProviderAuthorized,
 	readCachedModelCatalog,
 	validateProviderModel,
+	writeAuth,
 	writeCachedModelCatalog,
 } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
@@ -43,7 +45,7 @@ function createConfig(): OttoConfig {
 			ottorouter: { enabled: false },
 			zai: { enabled: false },
 			'zai-coding': { enabled: false },
-			moonshot: { enabled: false },
+			kimi: { enabled: false },
 			minimax: { enabled: false },
 			'my-ollama': {
 				enabled: true,
@@ -105,6 +107,57 @@ describe('custom declarative providers', () => {
 			{ id: 'qwen2.5-coder:14b', label: 'qwen2.5-coder:14b' },
 			{ id: 'deepseek-r1:32b', label: 'deepseek-r1:32b' },
 		]);
+	});
+
+	test('authorizes the kimi provider from stored auth', async () => {
+		const previousHome = process.env.HOME;
+		const previousKimiKey = process.env.KIMI_API_KEY;
+		const home = await mkdtemp(join(tmpdir(), 'otto-kimi-home-'));
+
+		try {
+			process.env.HOME = home;
+			delete process.env.KIMI_API_KEY;
+			await writeAuth('kimi', { type: 'api', key: 'test-key' });
+			const cfg = createConfig();
+
+			expect(await isProviderAuthorized(cfg, 'kimi')).toBe(true);
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+			if (previousKimiKey === undefined) delete process.env.KIMI_API_KEY;
+			else process.env.KIMI_API_KEY = previousKimiKey;
+			await rm(home, { recursive: true, force: true });
+		}
+	});
+
+	test('rejects unsupported providers when creating sessions', async () => {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-provider-guard-'));
+		const provider = `not-a-provider-${crypto.randomUUID()}`;
+		try {
+			const app = createEmbeddedApp();
+			const response = await app.request(
+				`http://localhost/v1/sessions?project=${encodeURIComponent(projectRoot)}`,
+				{
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						provider,
+						model: 'anything',
+						allowUnknownModel: true,
+					}),
+				},
+			);
+			const payload = (await response.json()) as {
+				error?: { message?: string };
+			};
+
+			expect(response.status).toBe(400);
+			expect(payload.error?.message).toContain(
+				`Provider not supported: ${provider}`,
+			);
+		} finally {
+			await rm(projectRoot, { recursive: true, force: true });
+		}
 	});
 
 	test('validates cached custom provider models', async () => {

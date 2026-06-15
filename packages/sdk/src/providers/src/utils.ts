@@ -46,13 +46,13 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	copilot: ['gpt-4.1-mini'],
-	moonshot: ['kimi-k2.7-code'],
+	kimi: ['kimi-k2.7-code'],
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-5.4-mini'],
 	anthropic: ['claude-haiku-4-5'],
-	moonshot: ['kimi-k2.7-code'],
+	kimi: ['kimi-k2.7-code'],
 };
 
 function preferredFastModelKey(provider: ProviderId): ProviderId {
@@ -148,7 +148,7 @@ const OWNER_TO_FAMILY: Record<ModelOwner, UnderlyingProviderKey> = {
 	google: 'google',
 	openrouter: 'openai-compatible',
 	xai: 'openai',
-	moonshot: 'moonshot',
+	kimi: 'kimi',
 	qwen: 'openai-compatible',
 	zai: 'glm',
 	minimax: 'minimax',
@@ -161,7 +161,7 @@ const DIRECT_PROVIDER_FAMILY: Partial<
 	anthropic: 'anthropic',
 	google: 'google',
 	'ollama-cloud': 'openai-compatible',
-	moonshot: 'moonshot',
+	kimi: 'kimi',
 	minimax: 'minimax',
 	copilot: 'openai',
 	xai: 'openai',
@@ -173,7 +173,7 @@ export type UnderlyingProviderKey =
 	| 'anthropic'
 	| 'openai'
 	| 'google'
-	| 'moonshot'
+	| 'kimi'
 	| 'minimax'
 	| 'glm'
 	| 'openai-compatible'
@@ -193,8 +193,7 @@ function inferFromModelId(model: string): UnderlyingProviderKey {
 	if (lower.includes('grok') || lower.startsWith('xai/')) return 'openai';
 	if (lower.includes('qwen') || lower.startsWith('qwen/'))
 		return 'openai-compatible';
-	if (lower.includes('kimi') || lower.startsWith('moonshotai/'))
-		return 'moonshot';
+	if (lower.includes('kimi') || lower.startsWith('moonshotai/')) return 'kimi';
 	if (
 		lower.includes('glm') ||
 		lower.startsWith('z-ai/') ||
@@ -265,7 +264,7 @@ function getProviderModels(provider: ProviderId): ModelInfo[] {
 		catalogProvider ?? provider,
 	)?.models;
 	const models = mergeModelLists(catalogModels, cachedModels);
-	return catalogProvider === 'moonshot'
+	return catalogProvider === 'kimi'
 		? filterAvailableKimiModels(models)
 		: models;
 }

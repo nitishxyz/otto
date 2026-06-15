@@ -91,7 +91,7 @@ const pricingTable: Record<ProviderName, PricingEntry[]> = {
 	'zai-coding': [
 		// Pricing from catalog entries; leave empty here
 	],
-	moonshot: [
+	kimi: [
 		// Pricing from catalog entries; leave empty here
 	],
 	minimax: [

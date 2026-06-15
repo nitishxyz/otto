@@ -472,7 +472,7 @@ Tasks:
    - OpenAI-compatible instance creation
    - configured provider apiKey/baseURL/header resolution
 3. Move low-risk providers first:
-   - `moonshot`
+   - `kimi`
    - `zai`
    - `zai-coding`
    - `minimax`

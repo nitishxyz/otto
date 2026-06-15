@@ -88,9 +88,9 @@ describe('buildReasoningConfig', () => {
 		});
 	});
 
-	test('uses shared OpenAI-compatible reasoning keys for Moonshot', () => {
+	test('uses shared OpenAI-compatible reasoning keys for Kimi', () => {
 		const result = buildReasoningConfig({
-			provider: 'moonshot',
+			provider: 'kimi',
 			model: 'kimi-k2.5',
 			reasoningText: true,
 			reasoningLevel: 'low',
@@ -100,7 +100,7 @@ describe('buildReasoningConfig', () => {
 		expect(result.enabled).toBe(true);
 		expect(result.providerOptions).toMatchObject({
 			openaiCompatible: { reasoningEffort: 'low' },
-			moonshot: { reasoningEffort: 'low' },
+			kimi: { reasoningEffort: 'low' },
 		});
 	});
 

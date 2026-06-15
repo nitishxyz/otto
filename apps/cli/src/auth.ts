@@ -99,7 +99,7 @@ const PROVIDER_LINKS: Record<
 		url: 'https://z.ai/manage-apikey/apikey-list',
 		env: 'ZAI_CODING_API_KEY',
 	},
-	moonshot: {
+	kimi: {
 		name: 'Kimi',
 		url: 'https://platform.kimi.ai/console/api-keys',
 		env: 'KIMI_API_KEY',
@@ -368,7 +368,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 	const providerAlias = _args.includes('ollama')
 		? 'ollama-cloud'
 		: _args.includes('kimi')
-			? 'moonshot'
+			? 'kimi'
 			: undefined;
 	const providerArg = (providerAlias ??
 		_args.find((arg) =>
@@ -396,7 +396,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				{ value: 'xai', label: PROVIDER_LINKS.xai.name },
 				{ value: 'zai', label: PROVIDER_LINKS.zai.name },
 				{ value: 'zai-coding', label: PROVIDER_LINKS['zai-coding'].name },
-				{ value: 'moonshot', label: PROVIDER_LINKS.moonshot.name },
+				{ value: 'kimi', label: PROVIDER_LINKS.kimi.name },
 				{ value: 'minimax', label: PROVIDER_LINKS.minimax.name },
 			],
 		})) as ProviderId | symbol;
@@ -435,7 +435,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 		return runAuthLoginXai(cfg, wantLocal);
 	}
 
-	if (provider === 'moonshot') {
+	if (provider === 'kimi') {
 		return runAuthLoginKimi(cfg, wantLocal, _args);
 	}
 
@@ -579,7 +579,7 @@ async function runAuthLoginKimi(
 		return false;
 	}
 	if (authMethod === 'key') {
-		const meta = PROVIDER_LINKS.moonshot;
+		const meta = PROVIDER_LINKS.kimi;
 		log.info(`Open in browser: ${meta.url}`);
 		const key = await password({
 			message: `Paste ${meta.env} here`,
@@ -591,12 +591,12 @@ async function runAuthLoginKimi(
 			return false;
 		}
 		await setAuth(
-			'moonshot',
+			'kimi',
 			{ type: 'api', key: String(key) },
 			cfg.projectRoot,
 			'global',
 		);
-		await finalizeSuccessfulLogin('moonshot');
+		await finalizeSuccessfulLogin('kimi');
 		log.success('Saved');
 		outro('Done');
 		return true;
@@ -616,7 +616,7 @@ async function runAuthLoginKimi(
 			try {
 				const token = await pollKimiDeviceToken(device.deviceCode);
 				await setAuth(
-					'moonshot',
+					'kimi',
 					{
 						type: 'oauth',
 						access: token.accessToken,
@@ -631,7 +631,7 @@ async function runAuthLoginKimi(
 					log.warn(
 						'Local credential storage is disabled; saved to secure global location.',
 					);
-				await finalizeSuccessfulLogin('moonshot');
+				await finalizeSuccessfulLogin('kimi');
 				log.success('Kimi Code OAuth tokens saved!');
 				outro('Done');
 				return true;
@@ -1426,7 +1426,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			xai: { enabled: provider === 'xai' },
 			zai: { enabled: provider === 'zai' },
 			'zai-coding': { enabled: provider === 'zai-coding' },
-			moonshot: { enabled: provider === 'moonshot' },
+			kimi: { enabled: provider === 'kimi' },
 			minimax: { enabled: provider === 'minimax' },
 		},
 	};

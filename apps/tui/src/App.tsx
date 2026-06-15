@@ -124,7 +124,14 @@ export function App({
 		sendMessage,
 		abortSession,
 		approveToolCall,
+		sessionError,
 	} = useSession(initialSessionDefaults);
+
+	useEffect(() => {
+		if (sessionError) {
+			showStatus({ type: 'error', label: sessionError }, 5000);
+		}
+	}, [sessionError, showStatus]);
 
 	const { config, isLoaded: isConfigLoaded, updateDefaults } = useConfig();
 

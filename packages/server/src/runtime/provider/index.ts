@@ -11,7 +11,7 @@ import {
 import { getXaiInstance } from './xai.ts';
 import { getZaiInstance, getZaiCodingInstance } from './zai.ts';
 import { resolveOpencodeModel } from './opencode.ts';
-import { getMoonshotInstance } from './moonshot.ts';
+import { getKimiInstance } from './kimi.ts';
 import { getMinimaxInstance } from './minimax.ts';
 import { resolveCopilotModel } from './copilot.ts';
 import { resolveCustomConfiguredModel } from './custom.ts';
@@ -73,8 +73,8 @@ export async function resolveModel(
 	if (provider === 'zai-coding') {
 		return getZaiCodingInstance(cfg, model);
 	}
-	if (provider === 'moonshot' || provider === 'kimi') {
-		return getMoonshotInstance(cfg, model);
+	if (provider === 'kimi') {
+		return getKimiInstance(cfg, model);
 	}
 	if (provider === 'minimax') {
 		return getMinimaxInstance(cfg, model);

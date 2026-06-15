@@ -10,7 +10,7 @@ const OWNER_API_FORMAT: Record<string, ProviderApiFormat> = {
 	anthropic: 'anthropic-messages',
 	google: 'google-native',
 	minimax: 'anthropic-messages',
-	moonshot: 'openai-chat',
+	kimi: 'openai-chat',
 	qwen: 'openai-chat',
 	openrouter: 'openrouter-chat',
 	zai: 'openai-chat',

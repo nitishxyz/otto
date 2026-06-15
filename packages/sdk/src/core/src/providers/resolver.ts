@@ -33,7 +33,6 @@ export type ProviderName =
 	| 'xai'
 	| 'zai'
 	| 'zai-coding'
-	| 'moonshot'
 	| 'kimi'
 	| 'minimax';
 
@@ -222,7 +221,7 @@ export async function resolveModel(
 		});
 	}
 
-	if (provider === 'moonshot' || provider === 'kimi') {
+	if (provider === 'kimi') {
 		return createKimiModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,

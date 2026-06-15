@@ -46,8 +46,8 @@ const PROVIDERS = [
 	},
 	{ id: 'zai', name: 'Zai', models: 'Zai frontier models', auth: ['API key'] },
 	{
-		id: 'moonshot',
-		name: 'Moonshot',
+		id: 'kimi',
+		name: 'Kimi',
 		models: 'Kimi models',
 		auth: ['API key'],
 	},

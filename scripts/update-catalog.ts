@@ -31,8 +31,8 @@ const SINGLE_PROVIDER_OWNER: Record<string, ModelOwner> = {
 	openai: 'openai',
 	anthropic: 'anthropic',
 	google: 'google',
-	moonshotai: 'moonshot',
-	moonshot: 'moonshot',
+	moonshotai: 'kimi',
+	kimi: 'kimi',
 	xai: 'xai',
 	zai: 'zai',
 	'zai-coding-plan': 'zai',
@@ -59,9 +59,9 @@ const FAMILY_TO_OWNER: Record<string, ModelOwner> = {
 	'gemini-flash': 'google',
 	'gemini-flash-lite': 'google',
 	'gemini-pro': 'google',
-	kimi: 'moonshot',
-	'kimi-thinking': 'moonshot',
-	'kimi-free': 'moonshot',
+	kimi: 'kimi',
+	'kimi-thinking': 'kimi',
+	'kimi-free': 'kimi',
 	glm: 'zai',
 	'glm-air': 'zai',
 	'glm-z': 'zai',
@@ -78,7 +78,7 @@ const OWNER_NPM: Partial<Record<ModelOwner, string>> = {
 	google: '@ai-sdk/google',
 	openrouter: '@openrouter/ai-sdk-provider',
 	xai: '@ai-sdk/xai',
-	moonshot: '@ai-sdk/openai-compatible',
+	kimi: '@ai-sdk/openai-compatible',
 	qwen: '@ai-sdk/openai-compatible',
 	zai: '@ai-sdk/openai-compatible',
 	minimax: '@ai-sdk/anthropic',
@@ -102,8 +102,7 @@ function resolveOwnedByFromModelId(modelId: string): ModelOwner | undefined {
 	)
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
-	if (lower.includes('kimi') || lower.startsWith('moonshotai/'))
-		return 'moonshot';
+	if (lower.includes('kimi') || lower.startsWith('moonshotai/')) return 'kimi';
 	if (
 		lower.includes('glm') ||
 		lower.startsWith('z-ai/') ||
@@ -159,7 +158,7 @@ function pickProviders(
 		xai: createEmptyEntry('xai'),
 		zai: createEmptyEntry('zai'),
 		'zai-coding': createEmptyEntry('zai-coding'),
-		moonshot: createEmptyEntry('moonshot'),
+		kimi: createEmptyEntry('kimi'),
 		minimax: createEmptyEntry('minimax'),
 		copilot: createEmptyEntry('copilot'),
 		'ollama-cloud': createEmptyEntry('ollama-cloud'),
@@ -185,7 +184,7 @@ function pickProviders(
 			targetKey = 'zai-coding';
 		}
 		if (providerKey === 'moonshotai') {
-			targetKey = 'moonshot';
+			targetKey = 'kimi';
 		}
 		if (providerKey === 'github-copilot') {
 			targetKey = 'copilot';
@@ -243,11 +242,11 @@ function pickProviders(
 function applyOfficialKimiCatalogMetadata(
 	catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>,
 ) {
-	const entry = catalog.moonshot;
+	const entry = catalog.kimi;
 	if (!entry) return;
-	entry.label = entry.label === 'Moonshot AI' ? 'Kimi' : entry.label;
+	entry.label = 'Kimi';
 	entry.env = Array.from(
-		new Set(['KIMI_API_KEY', 'MOONSHOT_API_KEY', ...(entry.env ?? [])]),
+		new Set(['KIMI_API_KEY', ...(entry.env ?? [])]),
 	);
 	entry.doc = 'https://platform.kimi.ai/docs/api/overview.md';
 }

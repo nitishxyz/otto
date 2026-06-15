@@ -142,7 +142,7 @@ describe('/init command', () => {
 					xai: { enabled: true },
 					zai: { enabled: true },
 					'zai-coding': { enabled: true },
-					moonshot: { enabled: true },
+					kimi: { enabled: true },
 					minimax: { enabled: true },
 				},
 				paths: {
