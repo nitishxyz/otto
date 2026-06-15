@@ -11,6 +11,7 @@ import {
 	optimisticallyQueueMessage,
 } from './useQueueState';
 import { sessionsQueryKey } from './useSessions';
+import { extractStreamingMultiEditPreviewEdits } from './tool-preview-helpers';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
 const TOOL_PREVIEW_THROTTLE_MIN_CHARS = 8_000;
@@ -672,9 +673,10 @@ export function useSessionStream(
 
 		const getMultiEditPreviewEdits = (
 			args: Record<string, unknown> | null,
+			buffer: string,
 		): StringEditPreview[] => {
 			const edits = Array.isArray(args?.edits) ? args.edits : [];
-			return edits.flatMap((edit) => {
+			const parsedEdits = edits.flatMap((edit) => {
 				if (!edit || typeof edit !== 'object' || Array.isArray(edit)) return [];
 				const record = edit as Record<string, unknown>;
 				return typeof record.oldString === 'string' &&
@@ -682,6 +684,9 @@ export function useSessionStream(
 					? [{ oldString: record.oldString, newString: record.newString }]
 					: [];
 			});
+			return parsedEdits.length > 0
+				? parsedEdits
+				: extractStreamingMultiEditPreviewEdits(buffer);
 		};
 
 		const getEditPreviewPatch = (
@@ -701,7 +706,7 @@ export function useSessionStream(
 					: undefined;
 			}
 
-			const edits = getMultiEditPreviewEdits(args);
+			const edits = getMultiEditPreviewEdits(args, buffer);
 			return buildStringEditPatchPreview(path, edits);
 		};
 
