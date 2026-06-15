@@ -142,7 +142,14 @@ async function discoverStaticProjectTools(
 
 	const discoveryPromise = (async () => {
 		const tools = new Map<string, Tool>();
-		for (const { name, tool } of buildFsTools(projectRoot))
+		const fsTools = buildFsTools(projectRoot);
+		for (const { name, tool } of fsTools.filter(({ name }) => name === 'read'))
+			tools.set(name, tool);
+		// Put apply_patch before exact replacement tools so models see it as the
+		// default editing path after reading files.
+		const ap = buildApplyPatchTool(projectRoot);
+		tools.set(ap.name, ap.tool);
+		for (const { name, tool } of fsTools.filter(({ name }) => name !== 'read'))
 			tools.set(name, tool);
 		for (const { name, tool } of buildGitTools(projectRoot))
 			tools.set(name, tool);
@@ -155,9 +162,6 @@ async function discoverStaticProjectTools(
 		tools.set(search.name, search.tool);
 		const glob = buildGlobTool(projectRoot);
 		tools.set(glob.name, glob.tool);
-		// Patch/apply
-		const ap = buildApplyPatchTool(projectRoot);
-		tools.set(ap.name, ap.tool);
 		// Todo tracking
 		tools.set('update_todos', updateTodosTool);
 		// Web search

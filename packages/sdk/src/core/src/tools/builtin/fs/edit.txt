@@ -1,6 +1,6 @@
 Replace an exact text block in an existing file.
 
-Use this for targeted edits instead of structural patch-style editing whenever possible.
+Prefer `apply_patch` for most code/text edits when it is available, because it produces the clearest diff preview. Use `edit` when you have one precise old/new text replacement, when a patch would be awkward, or after patch attempts fail.
 
 Rules:
 - You must read the file first in the current session before editing it.

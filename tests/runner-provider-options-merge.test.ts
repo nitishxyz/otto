@@ -139,11 +139,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -158,11 +158,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -177,11 +177,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -197,11 +197,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -216,11 +216,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -235,11 +235,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -262,11 +262,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -290,11 +290,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 
@@ -309,11 +309,11 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual([
 			'read',
 			'shell',
+			'apply_patch',
 			'write',
 			'edit',
 			'multiedit',
 			'copy_into',
-			'apply_patch',
 		]);
 	});
 

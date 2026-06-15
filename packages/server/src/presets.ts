@@ -64,6 +64,7 @@ export const BUILTIN_AGENTS = {
  */
 export const BUILTIN_TOOLS = [
 	'read',
+	'apply_patch',
 	'edit',
 	'multiedit',
 	'write',
@@ -79,7 +80,6 @@ export const BUILTIN_TOOLS = [
 	'git_status',
 	'git_diff',
 	'git_commit',
-	'apply_patch',
 	'update_todos',
 	'websearch',
 	'progress_update',

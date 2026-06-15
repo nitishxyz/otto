@@ -1,5 +1,7 @@
 Apply a patch to modify one or more files.
 
+Prefer this as the first-choice editing tool for code and text changes when it is available. Use exact-replacement tools (`edit`/`multiedit`) when a patch would be awkward, when you only need a precise old/new string replacement, or after patch attempts fail.
+
 Use the **enveloped format** by default. Standard unified diffs (`---` / `+++`) are also accepted.
 
 ## Fastest / safest mode (recommended): Replace

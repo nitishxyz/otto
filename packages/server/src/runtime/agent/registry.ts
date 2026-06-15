@@ -222,6 +222,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 		firstClass: [
 			'skill',
 			'read',
+			'apply_patch',
 			'edit',
 			'multiedit',
 			'write',
@@ -234,7 +235,6 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'search',
 			'git_status',
 			'terminal',
-			'apply_patch',
 			'websearch',
 		],
 		loadable: [
@@ -274,6 +274,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 		firstClass: [
 			'skill',
 			'read',
+			'apply_patch',
 			'edit',
 			'multiedit',
 			'write',
@@ -285,7 +286,6 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'glob',
 			'search',
 			'git_status',
-			'apply_patch',
 			'websearch',
 		],
 		loadable: ['read_image'],
