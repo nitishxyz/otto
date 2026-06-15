@@ -51,6 +51,7 @@ const configDefaultsSchema = z.object({
 		.enum(['minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
 		.optional(),
 	theme: z.enum(['light', 'dark']).optional(),
+	tuiTheme: z.string().min(1).optional(),
 	vimMode: z.boolean().optional(),
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
@@ -152,6 +153,12 @@ export function registerMainConfigRoute(app: Hono) {
 							embeddedConfig?.defaults?.theme,
 							cfg.defaults.theme,
 						) ?? 'dark',
+					tuiTheme:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.tuiTheme,
+							cfg.defaults.tuiTheme,
+						) ?? 'tokyo-night',
 					vimMode:
 						getDefault(
 							undefined,

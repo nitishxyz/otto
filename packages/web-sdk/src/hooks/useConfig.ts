@@ -39,6 +39,7 @@ export function useUpdateDefaults() {
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 			theme?: 'light' | 'dark';
+			tuiTheme?: string;
 			vimMode?: boolean;
 			compactThread?: boolean;
 			fontFamily?: string;

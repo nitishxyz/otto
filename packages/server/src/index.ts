@@ -238,6 +238,7 @@ export type EmbeddedAppConfig = {
 		agent?: string;
 		toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
 		theme?: 'light' | 'dark';
+		tuiTheme?: string;
 		vimMode?: boolean;
 		compactThread?: boolean;
 		fontFamily?: string;

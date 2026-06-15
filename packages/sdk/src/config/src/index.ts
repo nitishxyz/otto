@@ -42,6 +42,7 @@ const DEFAULTS: {
 		reasoningText: true,
 		reasoningLevel: 'high',
 		theme: 'dark',
+		tuiTheme: 'tokyo-night',
 		vimMode: false,
 		compactThread: true,
 		fontFamily: 'IBM Plex Mono',

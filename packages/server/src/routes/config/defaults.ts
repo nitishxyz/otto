@@ -32,6 +32,7 @@ const reasoningLevelSchema = z.enum([
 	'xhigh',
 ]);
 const themeSchema = z.enum(['light', 'dark']);
+const tuiThemeSchema = z.string().min(1);
 
 const defaultsUpdateBodySchema = z.object({
 	agent: z.string().optional(),
@@ -42,6 +43,7 @@ const defaultsUpdateBodySchema = z.object({
 	reasoningText: z.boolean().optional(),
 	reasoningLevel: reasoningLevelSchema.optional(),
 	theme: themeSchema.optional(),
+	tuiTheme: tuiThemeSchema.optional(),
 	vimMode: z.boolean().optional(),
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
@@ -63,6 +65,7 @@ const defaultsSchema = z.object({
 	reasoningText: z.boolean().optional(),
 	reasoningLevel: reasoningLevelSchema.optional(),
 	theme: themeSchema.optional(),
+	tuiTheme: tuiThemeSchema.optional(),
 	vimMode: z.boolean().optional(),
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
@@ -120,6 +123,7 @@ export function registerDefaultsRoute(app: Hono) {
 					reasoningText?: boolean;
 					reasoningLevel?: ReasoningLevel;
 					theme?: 'light' | 'dark';
+					tuiTheme?: string;
 					vimMode?: boolean;
 					compactThread?: boolean;
 					fontFamily?: string;
@@ -142,6 +146,7 @@ export function registerDefaultsRoute(app: Hono) {
 					reasoningText: boolean;
 					reasoningLevel: ReasoningLevel;
 					theme: 'light' | 'dark';
+					tuiTheme: string;
 					vimMode: boolean;
 					compactThread: boolean;
 					fontFamily: string;
@@ -168,6 +173,10 @@ export function registerDefaultsRoute(app: Hono) {
 				if (body.reasoningLevel) updates.reasoningLevel = body.reasoningLevel;
 				if (body.theme === 'light' || body.theme === 'dark') {
 					updates.theme = body.theme;
+				}
+				if (body.tuiTheme !== undefined) {
+					const tuiTheme = body.tuiTheme.trim();
+					if (tuiTheme) updates.tuiTheme = tuiTheme;
 				}
 				if (body.vimMode !== undefined) updates.vimMode = body.vimMode;
 				if (body.compactThread !== undefined)

@@ -12,6 +12,7 @@ interface Config {
 		reasoningText?: boolean;
 		reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 		theme?: string;
+		tuiTheme?: string;
 		coAuthorCommits?: boolean;
 	};
 }
@@ -53,6 +54,7 @@ export function useConfig() {
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 			theme?: string;
+			tuiTheme?: string;
 			coAuthorCommits?: boolean;
 		}) => {
 			try {

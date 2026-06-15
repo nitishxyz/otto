@@ -130,11 +130,11 @@ export function App({
 
 	const themeSyncedRef = useRef(false);
 	useEffect(() => {
-		if (!themeSyncedRef.current && config.defaults.theme) {
-			setTheme(config.defaults.theme);
+		if (!themeSyncedRef.current && config.defaults.tuiTheme) {
+			setTheme(config.defaults.tuiTheme);
 			themeSyncedRef.current = true;
 		}
-	}, [config.defaults.theme, setTheme]);
+	}, [config.defaults.tuiTheme, setTheme]);
 
 	const sessionId = activeSession?.id ?? null;
 
@@ -648,7 +648,7 @@ export function App({
 	);
 
 	const handleThemeSave = useCallback(
-		(name: string) => updateDefaults({ theme: name }),
+		(name: string) => updateDefaults({ tuiTheme: name }),
 		[updateDefaults],
 	);
 

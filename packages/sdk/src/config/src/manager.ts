@@ -86,6 +86,7 @@ export async function writeDefaults(
 		reasoningText: boolean;
 		reasoningLevel: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 		theme: string;
+		tuiTheme: string;
 		vimMode: boolean;
 		compactThread: boolean;
 		fontFamily: string;

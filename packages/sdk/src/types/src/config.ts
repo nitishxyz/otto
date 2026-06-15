@@ -31,6 +31,7 @@ export type DefaultConfig = {
 	reasoningText?: boolean;
 	reasoningLevel?: ReasoningLevel;
 	theme?: string;
+	tuiTheme?: string;
 	vimMode?: boolean;
 	compactThread?: boolean;
 	fontFamily?: string;
