@@ -3,6 +3,17 @@ import { apiClient } from '../lib/api-client';
 
 const TARGET_SAMPLE_RATE = 16000;
 const PCM_FRAME_BYTES = 3200; // 100ms of 16 kHz mono pcm_s16le
+const PROCESSOR_BUFFER_SIZE = 1024;
+type LowLatencyAudioConstraints = MediaTrackConstraints & {
+	latency?: { ideal: number };
+};
+const LOW_LATENCY_AUDIO_CONSTRAINTS: LowLatencyAudioConstraints = {
+	channelCount: { ideal: 1 },
+	echoCancellation: false,
+	noiseSuppression: false,
+	autoGainControl: false,
+	latency: { ideal: 0 },
+};
 
 type DictationServerEvent =
 	| {
@@ -229,13 +240,7 @@ export function useVoiceInput({
 	const handleAudioProcess = useCallback(
 		(event: AudioProcessingEvent) => {
 			const audioContext = audioContextRef.current;
-			const socket = socketRef.current;
-			if (
-				!audioContext ||
-				!socket ||
-				socket.readyState !== WebSocket.OPEN ||
-				stoppingRef.current
-			) {
+			if (!audioContext || stoppingRef.current) {
 				return;
 			}
 			const input = event.inputBuffer.getChannelData(0);
@@ -280,11 +285,58 @@ export function useVoiceInput({
 		stoppingRef.current = false;
 
 		try {
-			const status = await apiClient.getDictationStatus();
+			const streamPromise = navigator.mediaDevices.getUserMedia({
+				audio: LOW_LATENCY_AUDIO_CONSTRAINTS,
+			});
+			const statusPromise = apiClient.getDictationStatus().then(
+				(status) => ({ status }),
+				(error: unknown) => ({ error }),
+			);
+
+			const stream = await streamPromise;
+			if (stoppingRef.current) {
+				for (const track of stream.getTracks()) track.stop();
+				return;
+			}
+			streamRef.current = stream;
+
+			const AudioContextCtor = getAudioContextConstructor();
+			if (!AudioContextCtor) throw new Error('AudioContext is unavailable');
+			const audioContext = new AudioContextCtor();
+			audioContextRef.current = audioContext;
+			const source = audioContext.createMediaStreamSource(stream);
+			const analyserNode = audioContext.createAnalyser();
+			analyserNode.fftSize = 256;
+			analyserNode.smoothingTimeConstant = 0.55;
+
+			const processor = audioContext.createScriptProcessor(
+				PROCESSOR_BUFFER_SIZE,
+				1,
+				1,
+			) as ScriptProcessorNodeLike;
+			processor.onaudioprocess = handleAudioProcess;
+			source.connect(analyserNode);
+			source.connect(processor);
+			processor.connect(audioContext.destination);
+
+			sourceRef.current = source;
+			processorRef.current = processor;
+			if (audioContext.state === 'suspended') {
+				await audioContext.resume();
+			}
+			if (stoppingRef.current) return;
+			setAnalyser(analyserNode);
+			setIsListening(true);
+
+			const statusResult = await statusPromise;
+			if ('error' in statusResult) throw statusResult.error;
+			const { status } = statusResult;
+			if (stoppingRef.current) return;
 			const model = status.models.find(
 				(item) => item.id === status.defaultModel,
 			);
 			if (!model?.installed) {
+				cleanup();
 				handleMissingModel();
 				return;
 			}
@@ -293,7 +345,9 @@ export function useVoiceInput({
 				model: status.defaultModel,
 				language: toLanguageCode(lang),
 			});
+			if (stoppingRef.current) return;
 			if (!session.modelInstalled) {
+				cleanup();
 				handleMissingModel();
 				return;
 			}
@@ -309,7 +363,6 @@ export function useVoiceInput({
 				}, 5000);
 
 				socket.onopen = () => {
-					window.clearTimeout(timeout);
 					socket.send(
 						JSON.stringify({
 							type: 'start',
@@ -323,7 +376,22 @@ export function useVoiceInput({
 							partialResults: false,
 						}),
 					);
-					resolve();
+				};
+
+				socket.onmessage = (event) => {
+					if (typeof event.data !== 'string') return;
+					const payload = parseServerEvent(event.data);
+					if (!payload) return;
+					if (payload.type === 'ready') {
+						window.clearTimeout(timeout);
+						flushFrameBuffer(false);
+						resolve();
+						return;
+					}
+					if (payload.type === 'error') {
+						window.clearTimeout(timeout);
+						reject(new Error(payload.message));
+					}
 				};
 
 				socket.onerror = () => {
@@ -351,39 +419,6 @@ export function useVoiceInput({
 				if (!stoppingRef.current) setIsListening(false);
 				setIsTranscribing(false);
 			};
-
-			const stream = await navigator.mediaDevices.getUserMedia({
-				audio: {
-					echoCancellation: true,
-					noiseSuppression: true,
-					autoGainControl: true,
-				},
-			});
-			streamRef.current = stream;
-
-			const AudioContextCtor = getAudioContextConstructor();
-			if (!AudioContextCtor) throw new Error('AudioContext is unavailable');
-			const audioContext = new AudioContextCtor();
-			const source = audioContext.createMediaStreamSource(stream);
-			const analyserNode = audioContext.createAnalyser();
-			analyserNode.fftSize = 256;
-			analyserNode.smoothingTimeConstant = 0.55;
-
-			const processor = audioContext.createScriptProcessor(
-				4096,
-				1,
-				1,
-			) as ScriptProcessorNodeLike;
-			processor.onaudioprocess = handleAudioProcess;
-			source.connect(analyserNode);
-			source.connect(processor);
-			processor.connect(audioContext.destination);
-
-			audioContextRef.current = audioContext;
-			sourceRef.current = source;
-			processorRef.current = processor;
-			setAnalyser(analyserNode);
-			setIsListening(true);
 		} catch (err) {
 			const name = err instanceof Error ? err.name : '';
 			const msg =
@@ -400,6 +435,7 @@ export function useVoiceInput({
 		emitError,
 		handleAudioProcess,
 		handleMissingModel,
+		flushFrameBuffer,
 		isSupported,
 		lang,
 	]);

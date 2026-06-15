@@ -45,6 +45,16 @@ function killProcessTree(pid: number) {
 	}
 }
 
+function forceKillProcessTree(pid: number) {
+	try {
+		process.kill(-pid, 'SIGKILL');
+	} catch {
+		try {
+			process.kill(pid, 'SIGKILL');
+		} catch {}
+	}
+}
+
 const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
 const REDIRECTED_GLOB_COMMANDS = new Set(['find', 'fd']);
 
@@ -199,7 +209,7 @@ const shellInputSchema = z
 		cmd: z
 			.string()
 			.describe(
-				'Non-interactive shell command to run using the user shell with login/interactive startup loaded',
+				'Non-interactive shell command to run using the user shell. Login PATH is loaded, but interactive startup files are not sourced per command.',
 			),
 		cwd: z
 			.string()
@@ -318,8 +328,11 @@ export function buildShellTool(projectRoot: string): {
 			let didTimeout = false;
 			let didAbort = false;
 			let settled = false;
+			let terminating = false;
 			let done = false;
 			let timeoutId: ReturnType<typeof setTimeout> | null = null;
+			let killEscalationId: ReturnType<typeof setTimeout> | null = null;
+			let fallbackSettleId: ReturnType<typeof setTimeout> | null = null;
 			const queue: ShellStreamChunk[] = [];
 			let notify: (() => void) | null = null;
 
@@ -382,6 +395,8 @@ export function buildShellTool(projectRoot: string): {
 					details.maxOutputBytes = maxOutputBytes;
 				}
 				if (timeoutId) clearTimeout(timeoutId);
+				if (killEscalationId) clearTimeout(killEscalationId);
+				if (fallbackSettleId) clearTimeout(fallbackSettleId);
 				if (abortSignal) {
 					abortSignal.removeEventListener('abort', onAbort);
 				}
@@ -390,11 +405,52 @@ export function buildShellTool(projectRoot: string): {
 				wake();
 			};
 
+			const abortResult = () =>
+				createToolError(`Command aborted by user: ${cmd}`, 'abort', {
+					cmd,
+					stdout,
+					stderr,
+					...(outputMode === 'tail' || outputMode === 'auto'
+						? { outputMode, tailLines, maxOutputBytes }
+						: { outputMode, maxOutputBytes }),
+				});
+
+			const timeoutResult = () =>
+				createToolError(
+					`Command timed out after ${timeout}ms: ${cmd}`,
+					'timeout',
+					{
+						parameter: 'timeout',
+						value: timeout,
+						stdout,
+						stderr,
+						...(outputMode === 'tail' || outputMode === 'auto'
+							? { outputMode, tailLines, maxOutputBytes }
+							: { outputMode, maxOutputBytes }),
+						suggestion: 'Increase timeout or optimize the command',
+					},
+				);
+
+			const terminate = (fallbackResult: () => ShellResult) => {
+				if (terminating) return;
+				terminating = true;
+				if (proc.pid) {
+					killProcessTree(proc.pid);
+					killEscalationId = setTimeout(() => {
+						if (proc.pid) forceKillProcessTree(proc.pid);
+					}, 1000);
+				} else {
+					proc.kill('SIGTERM');
+				}
+				fallbackSettleId = setTimeout(() => {
+					settle(fallbackResult());
+				}, 2000);
+			};
+
 			const onAbort = () => {
 				if (settled) return;
 				didAbort = true;
-				if (proc.pid) killProcessTree(proc.pid);
-				else proc.kill('SIGTERM');
+				terminate(abortResult);
 			};
 
 			if (abortSignal) {
@@ -404,8 +460,7 @@ export function buildShellTool(projectRoot: string): {
 			if (timeout > 0) {
 				timeoutId = setTimeout(() => {
 					didTimeout = true;
-					if (proc.pid) killProcessTree(proc.pid);
-					else proc.kill();
+					terminate(timeoutResult);
 				}, timeout);
 			}
 

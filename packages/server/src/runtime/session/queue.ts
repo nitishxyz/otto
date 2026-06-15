@@ -1,6 +1,10 @@
 import type { ProviderName } from '../provider/index.ts';
 import { publish, publishClientEvent } from '../../events/bus.ts';
 import type { ToolApprovalMode } from '../tools/approval.ts';
+import {
+	abortActiveShellsForMessage,
+	abortActiveShellsForSession,
+} from '../tools/active-shells.ts';
 import type { ReasoningLevel } from '@ottocode/sdk';
 
 export type RunOpts = {
@@ -149,10 +153,14 @@ export function abortSession(
 	reason?: RunAbortReason,
 ) {
 	const state = runners.get(sessionId);
-	if (!state) return;
+	if (!state) {
+		abortActiveShellsForSession(sessionId);
+		return;
+	}
 
 	// Abort the currently running message
 	if (state.currentMessageId) {
+		abortActiveShellsForMessage(sessionId, state.currentMessageId);
 		const controller = messageAbortControllers.get(state.currentMessageId);
 		if (controller) {
 			controller.abort(reason);
@@ -184,10 +192,14 @@ export function abortMessage(
 	messageId: string,
 ): { removed: boolean; wasRunning: boolean } {
 	const state = runners.get(sessionId);
-	if (!state) return { removed: false, wasRunning: false };
+	if (!state) {
+		const abortedShells = abortActiveShellsForMessage(sessionId, messageId);
+		return { removed: abortedShells > 0, wasRunning: abortedShells > 0 };
+	}
 
 	// Check if this is the currently running message
 	if (state.currentMessageId === messageId) {
+		abortActiveShellsForMessage(sessionId, messageId);
 		const controller = messageAbortControllers.get(messageId);
 		if (controller) {
 			controller.abort();
@@ -211,7 +223,8 @@ export function abortMessage(
 		return { removed: true, wasRunning: false };
 	}
 
-	return { removed: false, wasRunning: false };
+	const abortedShells = abortActiveShellsForMessage(sessionId, messageId);
+	return { removed: abortedShells > 0, wasRunning: abortedShells > 0 };
 }
 
 /**

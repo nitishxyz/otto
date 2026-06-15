@@ -72,23 +72,6 @@ export function getUserShell(): string {
 	return process.env.SHELL || '/bin/bash';
 }
 
-function getShellRcBootstrap(shell: string): string {
-	const shellName = shell.split('/').pop() || '';
-	if (shellName.includes('zsh')) {
-		return 'if [ -f "$HOME/.zshrc" ]; then . "$HOME/.zshrc"; fi';
-	}
-	if (shellName.includes('bash')) {
-		return 'if [ -f "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi';
-	}
-	return '';
-}
-
-function getInteractiveShellFlag(shell: string): string {
-	const shellName = shell.split('/').pop() || '';
-	if (shellName.includes('bash')) return '-ic';
-	return '-ilc';
-}
-
 export function getShellExecutionConfig(cmd: string): {
 	command: string;
 	args: string[];
@@ -106,7 +89,7 @@ export function getShellExecutionConfig(cmd: string): {
 	const command = getUserShell();
 	return {
 		command,
-		args: [getInteractiveShellFlag(command), 'eval "$OTTO_SHELL_COMMAND"'],
+		args: ['-c', 'eval "$OTTO_SHELL_COMMAND"'],
 		env: { ...env, OTTO_SHELL_COMMAND: cmd },
 	};
 }
@@ -131,10 +114,8 @@ function getLoginShellPath(): string | null {
 
 	for (const shell of shellCandidates) {
 		try {
-			const rcBootstrap = getShellRcBootstrap(shell);
-			const pathCommand = `${rcBootstrap ? `${rcBootstrap}\n` : ''}echo "___PATH___:$PATH"`;
-			const result = execFileSync(shell, ['-ilc', pathCommand], {
-				timeout: 5000,
+			const result = execFileSync(shell, ['-lc', 'echo "___PATH___:$PATH"'], {
+				timeout: 1500,
 				stdio: ['ignore', 'pipe', 'ignore'],
 				env: {
 					...process.env,

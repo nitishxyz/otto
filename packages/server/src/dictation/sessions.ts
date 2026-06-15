@@ -47,6 +47,7 @@ export type StartDictationSessionInput = CreateDictationSessionInput;
 
 export class DictationSessionManager {
 	private readonly sessions = new Map<string, DictationSession>();
+	private readonly appendQueues = new Map<string, Promise<DictationSession>>();
 
 	constructor(
 		private readonly transcriptionRunner: DictationTranscriptionRunner = createWhisperCppTranscriptionRunner(),
@@ -87,6 +88,8 @@ export class DictationSessionManager {
 	async delete(id: string): Promise<boolean> {
 		const session = this.sessions.get(id);
 		if (!session) return false;
+		await this.appendQueues.get(id)?.catch(() => undefined);
+		this.appendQueues.delete(id);
 		this.sessions.delete(id);
 		await cleanupSessionFiles(session);
 		return true;
@@ -115,6 +118,7 @@ export class DictationSessionManager {
 		await mkdir(getDictationTempDir(), { recursive: true });
 		await writeFile(session.pcmPath, Buffer.alloc(0));
 		await writeFile(session.wavPath, Buffer.alloc(0));
+		this.appendQueues.delete(id);
 
 		session.status = 'recording';
 		session.model = input.model || session.model;
@@ -131,34 +135,26 @@ export class DictationSessionManager {
 		id: string,
 		frame: Uint8Array,
 	): Promise<DictationSession> {
-		const session = this.requireSession(id);
-		if (session.status !== 'recording') {
-			throw new DictationSessionError(
-				'DICTATION_INVALID_STATE',
-				'Audio frames can only be appended while recording',
-			);
+		const previousAppend = this.appendQueues.get(id);
+		const append =
+			previousAppend
+				?.catch(() => undefined)
+				.then(() => this.appendAudioFrameNow(id, frame)) ??
+			this.appendAudioFrameNow(id, frame);
+		this.appendQueues.set(id, append);
+		try {
+			return await append;
+		} finally {
+			if (this.appendQueues.get(id) === append) {
+				this.appendQueues.delete(id);
+			}
 		}
-		if (session.receivedBytes + frame.byteLength > MAX_DICTATION_BYTES) {
-			session.status = 'error';
-			session.error = 'Audio stream exceeded maximum size';
-			touch(session);
-			throw new DictationSessionError(
-				'DICTATION_AUDIO_TOO_LARGE',
-				'Audio stream exceeded maximum size',
-			);
-		}
-
-		await appendFile(session.pcmPath, frame);
-		session.receivedBytes += frame.byteLength;
-		session.receivedMs = calculateDurationMs(
-			session.receivedBytes,
-			session.format,
-		);
-		touch(session);
-		return { ...session };
 	}
 
 	async stop(id: string): Promise<DictationServerEvent> {
+		await this.appendQueues.get(id)?.catch((error) => {
+			throw error;
+		});
 		const session = this.requireSession(id);
 		if (session.status !== 'recording') {
 			throw new DictationSessionError(
@@ -207,10 +203,43 @@ export class DictationSessionManager {
 	async cancel(id: string): Promise<boolean> {
 		const session = this.sessions.get(id);
 		if (!session) return false;
+		await this.appendQueues.get(id)?.catch(() => undefined);
+		this.appendQueues.delete(id);
 		session.status = 'cancelled';
 		touch(session);
 		await cleanupSessionFiles(session);
 		return true;
+	}
+
+	private async appendAudioFrameNow(
+		id: string,
+		frame: Uint8Array,
+	): Promise<DictationSession> {
+		const session = this.requireSession(id);
+		if (session.status !== 'recording') {
+			throw new DictationSessionError(
+				'DICTATION_INVALID_STATE',
+				'Audio frames can only be appended while recording',
+			);
+		}
+		if (session.receivedBytes + frame.byteLength > MAX_DICTATION_BYTES) {
+			session.status = 'error';
+			session.error = 'Audio stream exceeded maximum size';
+			touch(session);
+			throw new DictationSessionError(
+				'DICTATION_AUDIO_TOO_LARGE',
+				'Audio stream exceeded maximum size',
+			);
+		}
+
+		await appendFile(session.pcmPath, frame);
+		session.receivedBytes += frame.byteLength;
+		session.receivedMs = calculateDurationMs(
+			session.receivedBytes,
+			session.format,
+		);
+		touch(session);
+		return { ...session };
 	}
 
 	private requireSession(id: string): DictationSession {

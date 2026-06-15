@@ -340,7 +340,7 @@ describe('Built-in Tools', () => {
 	});
 
 	describe('shell tool', () => {
-		it('should load PATH from user shell startup files', async () => {
+		it('should load login PATH without sourcing interactive startup per command', async () => {
 			if (process.platform === 'win32') return;
 
 			const originalHome = process.env.HOME;
@@ -354,7 +354,7 @@ describe('Built-in Tools', () => {
 			await writeFile(commandPath, '#!/bin/sh\necho startup-path-ok\n');
 			await chmod(commandPath, 0o755);
 			await writeFile(
-				join(home, '.bashrc'),
+				join(home, '.bash_profile'),
 				`export PATH="${binDir}:$PATH"\nexport OTTO_SHELL_RC_TEST=rc-loaded\n`,
 			);
 
@@ -367,7 +367,7 @@ describe('Built-in Tools', () => {
 				const shellTool = tools.find((t) => t.name === 'shell');
 				const result = await resolveStreamedResult(
 					await shellTool?.tool.execute({
-						cmd: 'otto-shell-path-test && echo "$OTTO_SHELL_RC_TEST"',
+						cmd: 'otto-shell-path-test && printf "rc=%s\\n" "$OTTO_SHELL_RC_TEST"',
 					}),
 				);
 
@@ -375,7 +375,7 @@ describe('Built-in Tools', () => {
 				expect((result as { stdout: string }).stdout).toContain(
 					'startup-path-ok',
 				);
-				expect((result as { stdout: string }).stdout).toContain('rc-loaded');
+				expect((result as { stdout: string }).stdout).toContain('rc=\n');
 			} finally {
 				if (originalHome === undefined) delete process.env.HOME;
 				else process.env.HOME = originalHome;
@@ -439,6 +439,25 @@ describe('Built-in Tools', () => {
 				await shellTool?.tool.execute({ cmd: 'exit 1' }),
 			);
 			expect(result).toMatchObject({ ok: false });
+		});
+
+		it('should abort long-running shell commands promptly', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+			const controller = new AbortController();
+			const startedAt = Date.now();
+
+			const resultPromise = resolveStreamedResult(
+				await shellTool?.tool.execute(
+					{ cmd: 'sleep 10' },
+					{ abortSignal: controller.signal },
+				),
+			);
+			setTimeout(() => controller.abort(), 50);
+
+			const result = await resultPromise;
+			expect(result).toMatchObject({ ok: false, errorType: 'abort' });
+			expect(Date.now() - startedAt).toBeLessThan(3000);
 		});
 
 		it('should allow repository search commands', async () => {

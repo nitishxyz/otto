@@ -1,6 +1,8 @@
-- Execute a non-interactive shell command using the user's shell with login/interactive startup loaded
+- Execute a non-interactive shell command using the user's shell
 - Returns `stdout`, `stderr`, and `exitCode`
 - `cwd` is relative to the project root and sandboxed within it
+
+The shell tool loads the user's login PATH once for command lookup, but it does not source interactive startup files for every command. Use `terminal` when you need an interactive shell, a TTY, or a persistent process.
 
 **Use `shell` for one-off, non-interactive commands.** These may be short-lived checks or long-running commands that finish on their own and do not require stdin. For commands that need interactive input, a TTY, or persistence across turns, use the `terminal` tool instead.
 

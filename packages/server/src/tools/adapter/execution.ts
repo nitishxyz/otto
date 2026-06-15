@@ -11,6 +11,7 @@ import {
 	normalizeSudoCommand,
 } from '../../runtime/tools/secure-prompt.ts';
 import { attachTerminalSecureInput } from '../../runtime/tools/terminal-secure-input.ts';
+import { registerActiveShellProcess } from '../../runtime/tools/active-shells.ts';
 import { getCwd, joinRelative, setCwd } from '../../runtime/utils/cwd.ts';
 import { publishToolDelta } from './events.ts';
 
@@ -49,6 +50,16 @@ function killProcessTree(pid: number) {
 	}
 }
 
+function forceKillProcessTree(pid: number) {
+	try {
+		process.kill(-pid, 'SIGKILL');
+	} catch {
+		try {
+			process.kill(pid, 'SIGKILL');
+		} catch {}
+	}
+}
+
 function createSecureShellExecutor(args: {
 	ctx: ToolAdapterContext;
 	callId?: string;
@@ -66,7 +77,6 @@ function createSecureShellExecutor(args: {
 			env: shellConfig.env,
 			detached: true,
 		});
-
 		let stdout = '';
 		let stderr = '';
 		let recentOutput = '';
@@ -74,8 +84,12 @@ function createSecureShellExecutor(args: {
 		let didTimeout = false;
 		let didAbort = false;
 		let settled = false;
+		let terminating = false;
 		let done = false;
 		let timeoutId: ReturnType<typeof setTimeout> | null = null;
+		let killEscalationId: ReturnType<typeof setTimeout> | null = null;
+		let fallbackSettleId: ReturnType<typeof setTimeout> | null = null;
+		let unregisterActiveShell: () => void = () => {};
 		const queue: SecureShellStreamChunk[] = [];
 		let notify: (() => void) | null = null;
 
@@ -95,11 +109,64 @@ function createSecureShellExecutor(args: {
 			if (settled) return;
 			settled = true;
 			if (timeoutId) clearTimeout(timeoutId);
+			if (killEscalationId) clearTimeout(killEscalationId);
+			if (fallbackSettleId) clearTimeout(fallbackSettleId);
+			unregisterActiveShell();
 			options?.abortSignal?.removeEventListener('abort', onAbort);
 			queue.push({ result });
 			done = true;
 			wake();
 		};
+
+		const abortResult = () =>
+			createToolError(`Command aborted by user: ${input.cmd}`, 'abort', {
+				cmd: input.cmd,
+				stdout,
+				stderr,
+				...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+			});
+
+		const timeoutResult = () =>
+			createToolError(
+				`Command timed out after ${timeout}ms: ${input.cmd}`,
+				'timeout',
+				{
+					parameter: 'timeout',
+					value: timeout,
+					stdout,
+					stderr,
+					...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
+					suggestion: 'Increase timeout or optimize the command',
+				},
+			);
+
+		const terminate = (fallbackResult: () => ShellResult) => {
+			if (terminating) return;
+			terminating = true;
+			if (proc.pid) {
+				killProcessTree(proc.pid);
+				killEscalationId = setTimeout(() => {
+					if (proc.pid) forceKillProcessTree(proc.pid);
+				}, 1000);
+			} else {
+				proc.kill('SIGTERM');
+			}
+			proc.stdin?.destroy();
+			fallbackSettleId = setTimeout(() => {
+				settle(fallbackResult());
+			}, 2000);
+		};
+
+		unregisterActiveShell = registerActiveShellProcess({
+			sessionId: ctx.sessionId,
+			messageId: ctx.messageId,
+			callId,
+			abort: () => {
+				if (settled) return;
+				didAbort = true;
+				terminate(abortResult);
+			},
+		});
 
 		const maybeRequestSecureInput = (text: string) => {
 			recentOutput = `${recentOutput}${text}`.slice(-1000);
@@ -119,8 +186,7 @@ function createSecureShellExecutor(args: {
 				if (settled) return;
 				if (value === null) {
 					didAbort = true;
-					if (proc.pid) killProcessTree(proc.pid);
-					else proc.kill('SIGTERM');
+					terminate(abortResult);
 					return;
 				}
 				proc.stdin?.write(`${value}\n`);
@@ -130,8 +196,7 @@ function createSecureShellExecutor(args: {
 		function onAbort() {
 			if (settled) return;
 			didAbort = true;
-			if (proc.pid) killProcessTree(proc.pid);
-			else proc.kill('SIGTERM');
+			terminate(abortResult);
 		}
 
 		options?.abortSignal?.addEventListener('abort', onAbort, { once: true });
@@ -139,8 +204,7 @@ function createSecureShellExecutor(args: {
 		if (timeout > 0) {
 			timeoutId = setTimeout(() => {
 				didTimeout = true;
-				if (proc.pid) killProcessTree(proc.pid);
-				else proc.kill();
+				terminate(timeoutResult);
 			}, timeout);
 		}
 
@@ -172,32 +236,12 @@ function createSecureShellExecutor(args: {
 
 		proc.on('close', (exitCode) => {
 			if (didAbort) {
-				settle(
-					createToolError(`Command aborted by user: ${input.cmd}`, 'abort', {
-						cmd: input.cmd,
-						stdout,
-						stderr,
-						...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
-					}),
-				);
+				settle(abortResult());
 				return;
 			}
 
 			if (didTimeout) {
-				settle(
-					createToolError(
-						`Command timed out after ${timeout}ms: ${input.cmd}`,
-						'timeout',
-						{
-							parameter: 'timeout',
-							value: timeout,
-							stdout,
-							stderr,
-							...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
-							suggestion: 'Increase timeout or optimize the command',
-						},
-					),
-				);
+				settle(timeoutResult());
 				return;
 			}
 
@@ -252,7 +296,6 @@ function createSecureShellExecutor(args: {
 		}
 	};
 }
-
 export function executeBaseTool(
 	ctx: ToolAdapterContext,
 	args: {
