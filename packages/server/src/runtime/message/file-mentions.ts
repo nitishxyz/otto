@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { rememberFileRead } from '@ottocode/sdk/tools/builtin/fs';
 
 const FILE_MENTION_REGEX = /(^|[\s([{])@(\S+)/g;
 const TRAILING_PUNCTUATION_REGEX = /[.,!?;:)}\]]+$/;
@@ -62,6 +63,7 @@ async function readMentionedTextFile(args: {
 	);
 	if (readLimit <= 0) {
 		return {
+			absolutePath: resolved.absolutePath,
 			path: resolved.relativePath,
 			content: '',
 			truncated: true,
@@ -74,6 +76,7 @@ async function readMentionedTextFile(args: {
 	try {
 		const content = TEXT_DECODER.decode(bytes);
 		return {
+			absolutePath: resolved.absolutePath,
 			path: resolved.relativePath,
 			content,
 			truncated: fileStat.size > readLimit,
@@ -139,7 +142,9 @@ export async function preprocessFileMentionsForModel(args: {
 		);
 		if (seen.has(file.path)) continue;
 		seen.add(file.path);
-		mentionedFiles.push(file);
+		const { absolutePath, ...mentionedFile } = file;
+		mentionedFiles.push(mentionedFile);
+		await rememberFileRead(projectRoot, absolutePath);
 		remainingBytes -= Buffer.byteLength(file.content, 'utf8');
 	}
 

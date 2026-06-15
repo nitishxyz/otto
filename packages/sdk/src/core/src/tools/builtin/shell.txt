@@ -8,6 +8,11 @@ For repository discovery, use `search` for content/code search and `glob` for fi
 
 **Strongly prefer the `search` tool over `grep`/`rg`, and `glob` over `find`.** The `search` tool is indexed and faster, returns structured `file:line` matches, and supports regex, `glob` includes, `path` scoping, and `ignoreCase` — use it for all repository content search. Only fall back to `grep`/`rg` via shell for cases `search` cannot handle (e.g. gitignored files like node_modules or build output). Pipelines that filter program output (e.g. `ps aux | grep node`) are fine.
 
+Mapping from common shell habits:
+- `grep -r` / `rg` / `git grep` over repo files → use `search`.
+- `find` / `fd` / recursive `ls` for filenames → use `glob`.
+- Build, test, package manager, diagnostics, process inspection → use `shell`.
+
 ## Usage tips
 
 - Chain commands with `&&` to fail-fast.

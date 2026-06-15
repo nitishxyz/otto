@@ -46,6 +46,7 @@ function killProcessTree(pid: number) {
 }
 
 const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
+const REDIRECTED_GLOB_COMMANDS = new Set(['find', 'fd']);
 
 /**
  * Detect commands that start with a standalone grep-style search binary.
@@ -53,21 +54,53 @@ const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
  * with grep/rg are redirected to the dedicated `search` tool.
  */
 export function findRedirectedSearchCommand(cmd: string): string | null {
+	return findRepositoryDiscoveryCommand(cmd, 'search')?.command ?? null;
+}
+
+function commandTokens(segment: string): string[] {
+	const tokens = segment.trim().split(/\s+/).filter(Boolean);
+	let index = 0;
+	while (
+		index < tokens.length &&
+		/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? '')
+	) {
+		index++;
+	}
+	if (tokens[index] === 'command') index++;
+	return tokens.slice(index);
+}
+
+function findRepositoryDiscoveryCommand(
+	cmd: string,
+	kind?: 'search' | 'glob',
+): { command: string; tool: 'search' | 'glob' } | null {
 	const segments = cmd.split(/&&|\|\||;|\n/);
 	for (const segment of segments) {
-		const tokens = segment.trim().split(/\s+/);
-		let index = 0;
-		while (
-			index < tokens.length &&
-			/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? '')
-		) {
-			index++;
+		const tokens = commandTokens(segment);
+		const bin = tokens[0]?.split('/').pop() ?? '';
+		const second = tokens[1] ?? '';
+		if ((!kind || kind === 'search') && bin === 'git' && second === 'grep') {
+			return { command: 'git grep', tool: 'search' };
 		}
-		if (tokens[index] === 'command') index++;
-		const bin = tokens[index]?.split('/').pop() ?? '';
-		if (REDIRECTED_SEARCH_COMMANDS.has(bin)) return bin;
+		if ((!kind || kind === 'search') && REDIRECTED_SEARCH_COMMANDS.has(bin)) {
+			return { command: bin, tool: 'search' };
+		}
+		if ((!kind || kind === 'glob') && REDIRECTED_GLOB_COMMANDS.has(bin)) {
+			return { command: bin, tool: 'glob' };
+		}
+		if ((!kind || kind === 'glob') && bin === 'ls' && segment.includes('**')) {
+			return { command: 'ls **', tool: 'glob' };
+		}
 	}
 	return null;
+}
+
+function repositoryDiscoveryHint(cmd: string): string | undefined {
+	const discovery = findRepositoryDiscoveryCommand(cmd);
+	if (!discovery) return undefined;
+	return discovery.tool === 'search'
+		? `Tip: For repository content search, prefer the search tool instead of shelling out to ${discovery.command}. It is indexed, faster, and returns structured file:line matches.`
+		: `Tip: For repository file discovery, prefer the glob tool instead of shelling out to ${discovery.command}. It returns structured paths and skips common build/cache folders.`;
 }
 
 export type ShellOutputMode = 'auto' | 'full' | 'tail';
@@ -136,6 +169,7 @@ type ShellResult = ToolResponse<{
 	stderrTruncated?: boolean;
 	stderrOriginalBytes?: number;
 	stderrShownBytes?: number;
+	discoveryHint?: string;
 }>;
 
 type ShellStreamChunk =
@@ -446,11 +480,13 @@ export function buildShellTool(projectRoot: string): {
 					return;
 				}
 
+				const discoveryHint = repositoryDiscoveryHint(finalCmd);
 				settle({
 					ok: true,
 					exitCode: exitCode ?? 0,
 					stdout,
 					stderr,
+					...(discoveryHint ? { discoveryHint } : {}),
 					...(outputMode === 'tail' || outputMode === 'auto'
 						? { outputMode, tailLines, maxOutputBytes }
 						: { outputMode, maxOutputBytes }),

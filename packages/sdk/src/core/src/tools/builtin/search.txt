@@ -5,6 +5,8 @@
 
 Use this for text/code search across the codebase. It is the primary tool for repository content discovery.
 
+Think of `search` as the repository's fast local `rg`/`grep` replacement: use it for exact string and regex searches before reaching for shell commands.
+
 ## Usage tips
 
 - Narrow broad searches with `path` and `glob` values.
@@ -12,3 +14,5 @@ Use this for text/code search across the codebase. It is the primary tool for re
 - Batch independent searches (e.g. multiple function names) in a single turn for parallel execution.
 - Use `ignoreCase: true` for case-insensitive matching; pass `glob` patterns (e.g. `["*.ts", "*.tsx"]`) to limit file types.
 - For filename/path discovery, use `glob` first when you already know the file pattern.
+- Instead of `grep -r "workspace:" packages apps`, call `search` with `query: "workspace:"`, `path: "."`, and `glob: ["**/package.json"]`.
+- Instead of `rg "function foo" src`, call `search` with `query: "function foo"` and `path: "src"`.

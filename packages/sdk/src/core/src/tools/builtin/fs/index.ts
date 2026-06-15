@@ -9,6 +9,8 @@ import { buildTreeTool } from './tree.ts';
 import { buildPwdTool } from './pwd.ts';
 import { buildCdTool } from './cd.ts';
 
+export { rememberFileRead } from './read-tracker.ts';
+
 export function buildFsTools(
 	projectRoot: string,
 ): Array<{ name: string; tool: Tool }> {

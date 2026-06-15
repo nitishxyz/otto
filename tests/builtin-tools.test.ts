@@ -453,6 +453,25 @@ describe('Built-in Tools', () => {
 
 			expect(result).toMatchObject({ ok: true, exitCode: 0 });
 			expect((result as { stdout: string }).stdout).toContain('Hello World');
+			expect((result as { discoveryHint?: string }).discoveryHint).toContain(
+				'prefer the search tool',
+			);
+		});
+
+		it('should hint to use glob for repository file discovery commands', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+
+			const result = await resolveStreamedResult(
+				await shellTool?.tool.execute({
+					cmd: 'find . -name "*.ts"',
+				}),
+			);
+
+			expect(result).toMatchObject({ ok: true, exitCode: 0 });
+			expect((result as { discoveryHint?: string }).discoveryHint).toContain(
+				'prefer the glob tool',
+			);
 		});
 	});
 
