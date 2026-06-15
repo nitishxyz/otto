@@ -1,7 +1,10 @@
 import type { Tool } from 'ai';
 import { shellExecutorContext, type ShellExecutor } from '@ottocode/sdk';
 import { getShellExecutionConfig } from '@ottocode/sdk/tools/bin-manager';
-import { appendTailLines } from '@ottocode/sdk/tools/builtin/shell';
+import {
+	appendTailLines,
+	detectShellEnvHint,
+} from '@ottocode/sdk/tools/builtin/shell';
 import { createToolError, type ToolResponse } from '@ottocode/sdk/tools/error';
 import { spawn } from 'node:child_process';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
@@ -33,6 +36,8 @@ type ShellResult = ToolResponse<{
 	stderr: string;
 	outputMode?: 'full' | 'tail';
 	tailLines?: number;
+	envMode?: 'fast' | 'login-cache' | 'login-fresh';
+	envHint?: string;
 }>;
 type SecureShellStreamChunk =
 	| { channel: 'output'; delta: string }
@@ -70,7 +75,8 @@ function createSecureShellExecutor(args: {
 		const timeout = input.timeout ?? 300000;
 		const outputMode = input.outputMode ?? 'full';
 		const tailLines = input.tailLines ?? 100;
-		const shellConfig = getShellExecutionConfig(cmd);
+		const envMode = input.envMode ?? 'fast';
+		const shellConfig = getShellExecutionConfig(cmd, { envMode });
 		const proc = spawn(shellConfig.command, shellConfig.args, {
 			cwd: input.cwd,
 			stdio: ['pipe', 'pipe', 'pipe'],
@@ -123,6 +129,7 @@ function createSecureShellExecutor(args: {
 				cmd: input.cmd,
 				stdout,
 				stderr,
+				envMode,
 				...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 			});
 
@@ -135,6 +142,7 @@ function createSecureShellExecutor(args: {
 					value: timeout,
 					stdout,
 					stderr,
+					envMode,
 					...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 					suggestion: 'Increase timeout or optimize the command',
 				},
@@ -235,6 +243,13 @@ function createSecureShellExecutor(args: {
 		});
 
 		proc.on('close', (exitCode) => {
+			const resolvedExitCode = exitCode ?? 0;
+			const envHint = detectShellEnvHint({
+				stdout,
+				stderr,
+				exitCode: resolvedExitCode,
+				envMode,
+			});
 			if (didAbort) {
 				settle(abortResult());
 				return;
@@ -245,15 +260,17 @@ function createSecureShellExecutor(args: {
 				return;
 			}
 
-			if (exitCode !== 0 && !input.allowNonZeroExit) {
+			if (resolvedExitCode !== 0 && !input.allowNonZeroExit) {
 				const errorDetail = stderr.trim() || stdout.trim() || '';
-				const errorMsg = `Command failed with exit code ${exitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
+				const errorMsg = `Command failed with exit code ${resolvedExitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
 				settle(
 					createToolError(errorMsg, 'execution', {
-						exitCode,
+						exitCode: resolvedExitCode,
 						stdout,
 						stderr,
 						cmd: input.cmd,
+						envMode,
+						...(envHint ? { envHint } : {}),
 						...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 						suggestion: 'Check command syntax or use allowNonZeroExit: true',
 					}),
@@ -263,9 +280,11 @@ function createSecureShellExecutor(args: {
 
 			settle({
 				ok: true,
-				exitCode: exitCode ?? 0,
+				exitCode: resolvedExitCode,
 				stdout,
 				stderr,
+				envMode,
+				...(envHint ? { envHint } : {}),
 				...(outputMode === 'tail' ? { outputMode, tailLines } : {}),
 			});
 		});

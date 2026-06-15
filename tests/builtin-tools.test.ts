@@ -355,7 +355,11 @@ describe('Built-in Tools', () => {
 			await chmod(commandPath, 0o755);
 			await writeFile(
 				join(home, '.bash_profile'),
-				`export PATH="${binDir}:$PATH"\nexport OTTO_SHELL_RC_TEST=rc-loaded\n`,
+				`export PATH="${binDir}:$PATH"\n`,
+			);
+			await writeFile(
+				join(home, '.bashrc'),
+				'export OTTO_SHELL_RC_TEST=rc-loaded\n',
 			);
 
 			try {
@@ -376,6 +380,17 @@ describe('Built-in Tools', () => {
 					'startup-path-ok',
 				);
 				expect((result as { stdout: string }).stdout).toContain('rc=\n');
+
+				const loginResult = await resolveStreamedResult(
+					await shellTool?.tool.execute({
+						cmd: 'printf "rc=%s\\n" "$OTTO_SHELL_RC_TEST"',
+						envMode: 'login-fresh',
+					}),
+				);
+				expect(loginResult).toMatchObject({ ok: true, envMode: 'login-fresh' });
+				expect((loginResult as { stdout: string }).stdout).toContain(
+					'rc=rc-loaded\n',
+				);
 			} finally {
 				if (originalHome === undefined) delete process.env.HOME;
 				else process.env.HOME = originalHome;
@@ -439,6 +454,22 @@ describe('Built-in Tools', () => {
 				await shellTool?.tool.execute({ cmd: 'exit 1' }),
 			);
 			expect(result).toMatchObject({ ok: false });
+		});
+
+		it('should hint when a fast command appears to need login shell env', async () => {
+			const { tools } = await discoverProjectTools(projectRoot);
+			const shellTool = tools.find((t) => t.name === 'shell');
+
+			const result = await resolveStreamedResult(
+				await shellTool?.tool.execute({
+					cmd: 'echo "CLOUDFLARE_API_TOKEN is not set" >&2; exit 1',
+				}),
+			);
+
+			expect(result).toMatchObject({ ok: false });
+			expect(
+				(result as { details?: { envHint?: string } }).details?.envHint,
+			).toContain('envMode: "login-cache"');
 		});
 
 		it('should abort long-running shell commands promptly', async () => {

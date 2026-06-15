@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import { z } from 'zod/v3';
 import DESCRIPTION from './shell.txt' with { type: 'text' };
-import { getShellExecutionConfig } from '../bin-manager.ts';
+import { getShellExecutionConfig, type ShellEnvMode } from '../bin-manager.ts';
 import { createToolError, type ToolResponse } from '../error.ts';
 import {
 	injectCoAuthorIntoGitCommit,
@@ -113,6 +113,29 @@ function repositoryDiscoveryHint(cmd: string): string | undefined {
 		: `Tip: For repository file discovery, prefer the glob tool instead of shelling out to ${discovery.command}. It returns structured paths and skips common build/cache folders.`;
 }
 
+const SHELL_ENV_HINT =
+	'This command may require environment from your login/interactive shell. If appropriate, retry with envMode: "login-cache" (or "login-fresh" after changing shell config).';
+
+export function detectShellEnvHint(args: {
+	stdout: string;
+	stderr: string;
+	exitCode: number;
+	envMode?: ShellEnvMode;
+}): string | undefined {
+	if (args.envMode && args.envMode !== 'fast') return undefined;
+	if (args.exitCode === 0) return undefined;
+	const text = `${args.stderr}\n${args.stdout}`;
+	const patterns = [
+		/\b[A-Z][A-Z0-9_]{2,}\b[^\n]*(?:not set|not defined|required|missing|must be set)/i,
+		/(?:missing|required|could not find)[^\n]*(?:api key|token|credential|credentials|secret|environment variable|env var)/i,
+		/(?:no credentials|credentials[^\n]*not found|not authenticated|authentication required|please log in|please login)/i,
+		/(?:asdf|nvm|mise|direnv|op|doppler)[^\n]*(?:not found|not loaded|command not found)/i,
+	];
+	return patterns.some((pattern) => pattern.test(text))
+		? SHELL_ENV_HINT
+		: undefined;
+}
+
 export type ShellOutputMode = 'auto' | 'full' | 'tail';
 
 const DEFAULT_TAIL_LINES = 100;
@@ -180,6 +203,8 @@ type ShellResult = ToolResponse<{
 	stderrOriginalBytes?: number;
 	stderrShownBytes?: number;
 	discoveryHint?: string;
+	envMode?: ShellEnvMode;
+	envHint?: string;
 }>;
 
 type ShellStreamChunk =
@@ -225,6 +250,13 @@ const shellInputSchema = z
 			.optional()
 			.default(300000)
 			.describe('Timeout in milliseconds (default: 300000 = 5 minutes)'),
+		envMode: z
+			.enum(['fast', 'login-cache', 'login-fresh'])
+			.optional()
+			.default('fast')
+			.describe(
+				'Environment loading mode. "fast" is the default one-off shell env. "login-cache" reuses a cached environment captured from the user login/interactive shell for commands that need shell-managed credentials. "login-fresh" refreshes that cache.',
+			),
 		outputMode: z
 			.enum(['auto', 'full', 'tail'])
 			.optional()
@@ -280,6 +312,7 @@ export function buildShellTool(projectRoot: string): {
 				cwd,
 				allowNonZeroExit,
 				timeout = 300000,
+				envMode = 'fast',
 				outputMode = 'auto',
 				tailLines = DEFAULT_TAIL_LINES,
 				maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
@@ -307,6 +340,7 @@ export function buildShellTool(projectRoot: string): {
 						cwd: absCwd,
 						allowNonZeroExit,
 						timeout,
+						envMode,
 						outputMode,
 						tailLines,
 						maxOutputBytes,
@@ -315,7 +349,7 @@ export function buildShellTool(projectRoot: string): {
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
 			}
 
-			const shellConfig = getShellExecutionConfig(finalCmd);
+			const shellConfig = getShellExecutionConfig(finalCmd, { envMode });
 			const proc = spawn(shellConfig.command, shellConfig.args, {
 				cwd: absCwd,
 				stdio: ['ignore', 'pipe', 'pipe'],
@@ -410,6 +444,7 @@ export function buildShellTool(projectRoot: string): {
 					cmd,
 					stdout,
 					stderr,
+					envMode,
 					...(outputMode === 'tail' || outputMode === 'auto'
 						? { outputMode, tailLines, maxOutputBytes }
 						: { outputMode, maxOutputBytes }),
@@ -424,6 +459,7 @@ export function buildShellTool(projectRoot: string): {
 						value: timeout,
 						stdout,
 						stderr,
+						envMode,
 						...(outputMode === 'tail' || outputMode === 'auto'
 							? { outputMode, tailLines, maxOutputBytes }
 							: { outputMode, maxOutputBytes }),
@@ -483,12 +519,20 @@ export function buildShellTool(projectRoot: string): {
 			});
 
 			proc.on('close', (exitCode) => {
+				const resolvedExitCode = exitCode ?? 0;
+				const envHint = detectShellEnvHint({
+					stdout,
+					stderr,
+					exitCode: resolvedExitCode,
+					envMode,
+				});
 				if (didAbort) {
 					settle(
 						createToolError(`Command aborted by user: ${cmd}`, 'abort', {
 							cmd,
 							stdout,
 							stderr,
+							envMode,
 							...(outputMode === 'tail' || outputMode === 'auto'
 								? { outputMode, tailLines, maxOutputBytes }
 								: { outputMode, maxOutputBytes }),
@@ -507,6 +551,7 @@ export function buildShellTool(projectRoot: string): {
 								value: timeout,
 								stdout,
 								stderr,
+								envMode,
 								...(outputMode === 'tail' || outputMode === 'auto'
 									? { outputMode, tailLines, maxOutputBytes }
 									: { outputMode, maxOutputBytes }),
@@ -517,15 +562,17 @@ export function buildShellTool(projectRoot: string): {
 					return;
 				}
 
-				if (exitCode !== 0 && !allowNonZeroExit) {
+				if (resolvedExitCode !== 0 && !allowNonZeroExit) {
 					const errorDetail = stderr.trim() || stdout.trim() || '';
-					const errorMsg = `Command failed with exit code ${exitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
+					const errorMsg = `Command failed with exit code ${resolvedExitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
 					settle(
 						createToolError(errorMsg, 'execution', {
-							exitCode,
+							exitCode: resolvedExitCode,
 							stdout,
 							stderr,
 							cmd,
+							envMode,
+							...(envHint ? { envHint } : {}),
 							...(outputMode === 'tail' || outputMode === 'auto'
 								? { outputMode, tailLines, maxOutputBytes }
 								: { outputMode, maxOutputBytes }),
@@ -538,16 +585,17 @@ export function buildShellTool(projectRoot: string): {
 				const discoveryHint = repositoryDiscoveryHint(finalCmd);
 				settle({
 					ok: true,
-					exitCode: exitCode ?? 0,
+					exitCode: resolvedExitCode,
 					stdout,
 					stderr,
+					envMode,
 					...(discoveryHint ? { discoveryHint } : {}),
+					...(envHint ? { envHint } : {}),
 					...(outputMode === 'tail' || outputMode === 'auto'
 						? { outputMode, tailLines, maxOutputBytes }
 						: { outputMode, maxOutputBytes }),
 				});
 			});
-
 			proc.on('error', (err) => {
 				settle(
 					createToolError(

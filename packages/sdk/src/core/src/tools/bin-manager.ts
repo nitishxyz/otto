@@ -15,6 +15,16 @@ let cachedLoginPath: {
 	path: string | null;
 } | null = null;
 
+let cachedLoginEnv: {
+	key: string;
+	env: NodeJS.ProcessEnv | null;
+} | null = null;
+
+export type ShellEnvMode = 'fast' | 'login-cache' | 'login-fresh';
+
+const ENV_JSON_START = '___OTTO_ENV_JSON_START___';
+const ENV_JSON_END = '___OTTO_ENV_JSON_END___';
+
 export { getAgiBinDir } from './bin-manager/paths.ts';
 
 async function whichBinary(name: string): Promise<string | null> {
@@ -72,12 +82,35 @@ export function getUserShell(): string {
 	return process.env.SHELL || '/bin/bash';
 }
 
-export function getShellExecutionConfig(cmd: string): {
+export function getShellExecutionConfig(
+	cmd: string,
+	options?: { envMode?: ShellEnvMode },
+): {
+	command: string;
+	args: string[];
+	env: NodeJS.ProcessEnv;
+};
+export function getShellExecutionConfig(
+	cmd: string,
+	options: { envMode?: ShellEnvMode } = {},
+): {
 	command: string;
 	args: string[];
 	env: NodeJS.ProcessEnv;
 } {
-	const env = { ...process.env, PATH: getAugmentedPath() };
+	const envMode = options.envMode ?? 'fast';
+	const loginEnv =
+		envMode === 'fast' ? null : getLoginShellEnv(envMode === 'login-fresh');
+	const env = {
+		...process.env,
+		...(loginEnv ?? {}),
+		PATH: mergePaths([
+			getAgiBinDir(),
+			loginEnv?.PATH,
+			getLoginShellPath(),
+			process.env.PATH,
+		]),
+	};
 	if (process.platform === 'win32') {
 		return {
 			command: getUserShell(),
@@ -92,6 +125,51 @@ export function getShellExecutionConfig(cmd: string): {
 		args: ['-c', 'eval "$OTTO_SHELL_COMMAND"'],
 		env: { ...env, OTTO_SHELL_COMMAND: cmd },
 	};
+}
+
+function getLoginShellEnv(refresh: boolean): NodeJS.ProcessEnv | null {
+	const home = process.env.HOME || homedir();
+	const userShell = getUserShell();
+	const cacheKey = [home, userShell, process.env.PATH || ''].join('\0');
+	if (!refresh && cachedLoginEnv?.key === cacheKey) return cachedLoginEnv.env;
+
+	if (process.platform === 'win32') {
+		cachedLoginEnv = { key: cacheKey, env: { ...process.env } };
+		return cachedLoginEnv.env;
+	}
+	try {
+		const output = execFileSync(
+			userShell,
+			[
+				'-ic',
+				`printf '%s\n' ${JSON.stringify(ENV_JSON_START)}; env; printf '%s\n' ${JSON.stringify(ENV_JSON_END)}`,
+			],
+			{
+				timeout: 10000,
+				stdio: ['ignore', 'pipe', 'ignore'],
+				env: {
+					...process.env,
+					HOME: home,
+					USER: process.env.USER || '',
+					SHELL: userShell,
+				},
+			},
+		).toString();
+		const start = output.indexOf(ENV_JSON_START);
+		const end = output.indexOf(ENV_JSON_END, start + ENV_JSON_START.length);
+		if (start >= 0 && end > start) {
+			const env: NodeJS.ProcessEnv = {};
+			const body = output.slice(start + ENV_JSON_START.length, end).trim();
+			for (const line of body.split('\n')) {
+				const separator = line.indexOf('=');
+				if (separator <= 0) continue;
+				env[line.slice(0, separator)] = line.slice(separator + 1);
+			}
+			cachedLoginEnv = { key: cacheKey, env };
+			return env;
+		}
+	} catch {}
+	return null;
 }
 
 function getLoginShellPath(): string | null {
@@ -138,19 +216,15 @@ function getLoginShellPath(): string | null {
 }
 
 export function getAugmentedPath(): string {
-	const sep = process.platform === 'win32' ? ';' : ':';
-	const binDir = getAgiBinDir();
-	const current = process.env.PATH || '';
-	const loginPath = getLoginShellPath();
+	return mergePaths([getAgiBinDir(), getLoginShellPath(), process.env.PATH]);
+}
 
+function mergePaths(paths: Array<string | null | undefined>): string {
+	const sep = process.platform === 'win32' ? ';' : ':';
 	const seen = new Set<string>();
 	const parts: string[] = [];
 
-	for (const p of [
-		binDir,
-		...(loginPath ? loginPath.split(sep) : []),
-		...current.split(sep),
-	]) {
+	for (const p of paths.flatMap((path) => (path ? path.split(sep) : []))) {
 		if (p && !seen.has(p)) {
 			seen.add(p);
 			parts.push(p);

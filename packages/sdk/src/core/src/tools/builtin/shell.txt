@@ -4,6 +4,13 @@
 
 The shell tool loads the user's login PATH once for command lookup, but it does not source interactive startup files for every command. Use `terminal` when you need an interactive shell, a TTY, or a persistent process.
 
+`envMode` controls extra environment loading:
+- `fast` (default): fastest one-off shell environment plus cached login PATH.
+- `login-cache`: reuses a cached environment captured from the user's login/interactive shell. Use this only when a prior fast command reports missing credentials/environment, or when the user explicitly asks to load shell startup environment.
+- `login-fresh`: refreshes that login/interactive shell environment cache before running the command.
+
+If a fast command fails with an `envHint`, retry once with `envMode: "login-cache"` when appropriate. Do not use login env modes for normal repository discovery, simple build/test commands, or as a blanket default.
+
 **Use `shell` for one-off, non-interactive commands.** These may be short-lived checks or long-running commands that finish on their own and do not require stdin. For commands that need interactive input, a TTY, or persistence across turns, use the `terminal` tool instead.
 
 For repository discovery, use `search` for content/code search and `glob` for filename/path discovery. Reserve `shell` for execution, builds, tests, diagnostics, and other command-line tasks.
