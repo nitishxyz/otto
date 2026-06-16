@@ -121,127 +121,127 @@ export function SessionHeader({
 				ref={rootRef}
 				className="border-b border-border bg-background/95 backdrop-blur-sm"
 			>
-			<div className={headerWidthClass}>
-				{isBranch && (
-					<div className="flex items-center gap-2 mb-3 text-sm">
-						<GitBranch className="h-4 w-4 text-violet-500" />
-						<span className="text-violet-600 dark:text-violet-400 font-medium">
-							Branch
-						</span>
-						{parentSession && (
-							<>
-								<span className="text-muted-foreground">from</span>
-								<button
-									type="button"
-									onClick={() => onNavigateToSession?.(parentSession.id)}
-									className="text-primary hover:underline flex items-center gap-1"
-								>
-									{parentSession.title ||
-										`Session ${parentSession.id.slice(0, 8)}`}
-									<ArrowUpRight className="h-3 w-3" />
-								</button>
-							</>
-						)}
-						{!parentSession && session.parentSessionId && (
-							<span className="text-muted-foreground italic text-xs">
-								(parent deleted)
+				<div className={headerWidthClass}>
+					{isBranch && (
+						<div className="flex items-center gap-2 mb-3 text-sm">
+							<GitBranch className="h-4 w-4 text-violet-500" />
+							<span className="text-violet-600 dark:text-violet-400 font-medium">
+								Branch
 							</span>
+							{parentSession && (
+								<>
+									<span className="text-muted-foreground">from</span>
+									<button
+										type="button"
+										onClick={() => onNavigateToSession?.(parentSession.id)}
+										className="text-primary hover:underline flex items-center gap-1"
+									>
+										{parentSession.title ||
+											`Session ${parentSession.id.slice(0, 8)}`}
+										<ArrowUpRight className="h-3 w-3" />
+									</button>
+								</>
+							)}
+							{!parentSession && session.parentSessionId && (
+								<span className="text-muted-foreground italic text-xs">
+									(parent deleted)
+								</span>
+							)}
+						</div>
+					)}
+
+					<div className="flex items-center gap-3">
+						<EditableTitle
+							sessionId={session.id}
+							title={session.title}
+							className="text-2xl font-semibold text-foreground leading-tight"
+						/>
+
+						{shareStatus?.shared && (
+							<button
+								type="button"
+								onClick={() => openUrl(shareStatus.url)}
+								className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium flex-shrink-0"
+							>
+								<Share2 className="h-3 w-3" />
+								<span>Shared</span>
+								{shareStatus.pendingMessages &&
+								shareStatus.pendingMessages > 0 ? (
+									<span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+										<RefreshCw className="h-2.5 w-2.5" />
+										{shareStatus.pendingMessages}
+									</span>
+								) : (
+									<ExternalLink className="h-2.5 w-2.5 opacity-60" />
+								)}
+							</button>
 						)}
 					</div>
-				)}
 
-				<div className="flex items-center gap-3">
-					<EditableTitle
-						sessionId={session.id}
-						title={session.title}
-						className="text-2xl font-semibold text-foreground leading-tight"
-					/>
-
-					{shareStatus?.shared && (
-						<button
-							type="button"
-							onClick={() => openUrl(shareStatus.url)}
-							className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium flex-shrink-0"
-						>
-							<Share2 className="h-3 w-3" />
-							<span>Shared</span>
-							{shareStatus.pendingMessages &&
-							shareStatus.pendingMessages > 0 ? (
-								<span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
-									<RefreshCw className="h-2.5 w-2.5" />
-									{shareStatus.pendingMessages}
-								</span>
-							) : (
-								<ExternalLink className="h-2.5 w-2.5 opacity-60" />
-							)}
-						</button>
-					)}
-				</div>
-
-				<div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm text-muted-foreground">
-					<div className="flex items-center gap-3">
-						<div
-							className="flex items-center gap-1.5"
-							title={`Current context window: ${formatNumber(contextTokens)} tokens`}
-						>
-							<span className="text-xs opacity-70">ctx</span>
-							<span className={`font-medium ${getContextColorClass()}`}>
-								{formatCompactNumber(contextTokens)}
-							</span>
-						</div>
-						{!isCompact && (
+					<div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm text-muted-foreground">
+						<div className="flex items-center gap-3">
 							<div
 								className="flex items-center gap-1.5"
-								title={`Total output: ${formatNumber(outputTokens)} tokens`}
+								title={`Current context window: ${formatNumber(contextTokens)} tokens`}
 							>
-								<span className="text-xs opacity-70">out</span>
+								<span className="text-xs opacity-70">ctx</span>
+								<span className={`font-medium ${getContextColorClass()}`}>
+									{formatCompactNumber(contextTokens)}
+								</span>
+							</div>
+							{!isCompact && (
+								<div
+									className="flex items-center gap-1.5"
+									title={`Total output: ${formatNumber(outputTokens)} tokens`}
+								>
+									<span className="text-xs opacity-70">out</span>
+									<span className="font-medium text-foreground">
+										{formatCompactNumber(outputTokens)}
+									</span>
+								</div>
+							)}
+						</div>
+
+						{!isCompact && (
+							<div className="flex items-center gap-2">
+								<Clock className="w-4 h-4" />
 								<span className="font-medium text-foreground">
-									{formatCompactNumber(outputTokens)}
+									{formatDuration(session.totalToolTimeMs)}
 								</span>
 							</div>
 						)}
-					</div>
 
-					{!isCompact && (
-						<div className="flex items-center gap-2">
-							<Clock className="w-4 h-4" />
-							<span className="font-medium text-foreground">
-								{formatDuration(session.totalToolTimeMs)}
-							</span>
-						</div>
-					)}
-
-					{estimatedCost > 0 && !isCompact && (
-						<div
-							className="flex items-center gap-1.5"
-							title={
-								subagentCost > 0
-									? `Total cost includes $${subagentCost.toFixed(4)} from sub-agents`
-									: 'Estimated session cost'
-							}
-						>
-							<DollarSign className="w-4 h-4" />
-							<span className="font-medium text-foreground">
-								{estimatedCost.toFixed(4)}
-							</span>
-						</div>
-					)}
-
-					<div className="flex items-center gap-2 ml-auto">
-						{isGenerating && <StopButton sessionId={session.id} />}
-						<ToolActivityToggle compact={isCompact} />
-						<UsageRing provider={session.provider} />
-						<ProviderLogo provider={session.provider} size={18} />
-						{!isCompact && (
-							<span className="font-medium text-foreground">
-								{session.model}
-							</span>
+						{estimatedCost > 0 && !isCompact && (
+							<div
+								className="flex items-center gap-1.5"
+								title={
+									subagentCost > 0
+										? `Total cost includes $${subagentCost.toFixed(4)} from sub-agents`
+										: 'Estimated session cost'
+								}
+							>
+								<DollarSign className="w-4 h-4" />
+								<span className="font-medium text-foreground">
+									{estimatedCost.toFixed(4)}
+								</span>
+							</div>
 						)}
+
+						<div className="flex items-center gap-2 ml-auto">
+							{isGenerating && <StopButton sessionId={session.id} />}
+							<ToolActivityToggle compact={isCompact} />
+							<UsageRing provider={session.provider} />
+							<ProviderLogo provider={session.provider} size={18} />
+							{!isCompact && (
+								<span className="font-medium text-foreground">
+									{session.model}
+								</span>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-		<UsageModal />
-	</>
+			<UsageModal />
+		</>
 	);
 }
