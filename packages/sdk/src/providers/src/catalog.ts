@@ -1822,8 +1822,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
-					releaseDate: '2025-03-20',
-					lastUpdated: '2025-06-05',
+					releaseDate: '2025-06-17',
+					lastUpdated: '2025-06-17',
 					openWeights: false,
 					cost: {
 						input: 0.3,
@@ -1874,8 +1874,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: true,
 					temperature: true,
 					knowledge: '2025-01',
-					releaseDate: '2025-03-20',
-					lastUpdated: '2025-06-05',
+					releaseDate: '2025-06-17',
+					lastUpdated: '2025-06-17',
 					openWeights: false,
 					cost: {
 						input: 1.25,
@@ -2370,7 +2370,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				{
 					id: '~moonshotai/kimi-latest',
 					ownedBy: 'kimi',
-					label: 'Kimi Latest',
+					label: 'MoonshotAI Kimi Latest',
 					modalities: {
 						input: ['text', 'image'],
 						output: ['text'],
@@ -2639,33 +2639,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 200000,
 						output: 8192,
-					},
-				},
-				{
-					id: 'anthropic/claude-fable-5',
-					ownedBy: 'anthropic',
-					label: 'Claude Fable 5',
-					modalities: {
-						input: ['text', 'image', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: false,
-					knowledge: '2026-01-31',
-					releaseDate: '2026-06-09',
-					lastUpdated: '2026-06-09',
-					openWeights: false,
-					cost: {
-						input: 10,
-						output: 50,
-						cacheRead: 1,
-						cacheWrite: 12.5,
-					},
-					limit: {
-						context: 1000000,
-						output: 128000,
 					},
 				},
 				{
@@ -3228,6 +3201,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-chat',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek Chat',
 					modalities: {
 						input: ['text'],
@@ -3252,6 +3226,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-chat-v3-0324',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V3 0324',
 					modalities: {
 						input: ['text'],
@@ -3277,6 +3252,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-chat-v3.1',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.1',
 					modalities: {
 						input: ['text'],
@@ -3302,6 +3278,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-r1',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek-R1',
 					modalities: {
 						input: ['text'],
@@ -3326,6 +3303,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-r1-0528',
+					ownedBy: 'deepseek',
 					label: 'R1 0528',
 					modalities: {
 						input: ['text'],
@@ -3351,6 +3329,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-v3.1-terminus',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.1 Terminus',
 					modalities: {
 						input: ['text'],
@@ -3376,6 +3355,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-v3.2',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.2',
 					modalities: {
 						input: ['text'],
@@ -3400,6 +3380,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-v3.2-exp',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.2 Exp',
 					modalities: {
 						input: ['text'],
@@ -3424,6 +3405,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek/deepseek-v4-flash',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash',
 					modalities: {
 						input: ['text'],
@@ -3438,17 +3420,18 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-24',
 					openWeights: true,
 					cost: {
-						input: 0.09,
-						output: 0.18,
+						input: 0.098,
+						output: 0.196,
 						cacheRead: 0.02,
 					},
 					limit: {
-						context: 1000000,
+						context: 1048575,
 						output: 65536,
 					},
 				},
 				{
 					id: 'deepseek/deepseek-v4-pro',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
 					modalities: {
 						input: ['text'],
@@ -7563,7 +7546,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 81920,
 					},
 				},
 				{
@@ -7581,11 +7564,11 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-15',
 					openWeights: true,
 					cost: {
-						input: 0.39,
-						output: 2.34,
+						input: 0.385,
+						output: 2.45,
 					},
 					limit: {
-						context: 262144,
+						context: 131072,
 						output: 65536,
 					},
 				},
@@ -7990,9 +7973,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-20',
 					openWeights: true,
 					cost: {
-						input: 0.063,
-						output: 0.21,
-						cacheRead: 0.021,
+						input: 0.066,
+						output: 0.26,
+						cacheRead: 0.029,
 					},
 					limit: {
 						context: 262144,
@@ -8479,6 +8462,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
+				{
+					id: 'z-ai/glm-5.2',
+					ownedBy: 'zai',
+					label: 'GLM-5.2',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-06-13',
+					lastUpdated: '2026-06-13',
+					openWeights: false,
+					cost: {
+						input: 1.4,
+						output: 4.4,
+						cacheRead: 0.26,
+					},
+					limit: {
+						context: 1048576,
+						output: 131072,
+					},
+				},
 			],
 			label: 'OpenRouter',
 			env: ['OPENROUTER_API_KEY'],
@@ -8846,6 +8854,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v4-flash',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash',
 					modalities: {
 						input: ['text'],
@@ -8871,6 +8880,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v4-flash-free',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash Free',
 					modalities: {
 						input: ['text'],
@@ -8896,6 +8906,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v4-pro',
+					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
 					modalities: {
 						input: ['text'],
@@ -11048,6 +11059,120 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 			api: 'https://api.z.ai/api/coding/paas/v4',
 			doc: 'https://docs.z.ai/devpack/overview',
 		},
+		deepseek: {
+			id: 'deepseek',
+			models: [
+				{
+					id: 'deepseek-chat',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek Chat',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: true,
+					temperature: true,
+					knowledge: '2025-09',
+					releaseDate: '2025-12-01',
+					lastUpdated: '2026-02-28',
+					openWeights: true,
+					cost: {
+						input: 0.14,
+						output: 0.28,
+						cacheRead: 0.0028,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
+					},
+				},
+				{
+					id: 'deepseek-reasoner',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek Reasoner',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2025-09',
+					releaseDate: '2025-12-01',
+					lastUpdated: '2026-02-28',
+					openWeights: true,
+					cost: {
+						input: 0.14,
+						output: 0.28,
+						cacheRead: 0.0028,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
+					},
+				},
+				{
+					id: 'deepseek-v4-flash',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Flash',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-04-24',
+					lastUpdated: '2026-04-24',
+					openWeights: true,
+					cost: {
+						input: 0.14,
+						output: 0.28,
+						cacheRead: 0.0028,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
+					},
+				},
+				{
+					id: 'deepseek-v4-pro',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Pro',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-04-24',
+					lastUpdated: '2026-04-24',
+					openWeights: true,
+					cost: {
+						input: 0.435,
+						output: 0.87,
+						cacheRead: 0.003625,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
+					},
+				},
+			],
+			label: 'DeepSeek',
+			env: ['DEEPSEEK_API_KEY'],
+			npm: '@ai-sdk/openai-compatible',
+			api: 'https://api.deepseek.com',
+			doc: 'https://api-docs.deepseek.com/quick_start/pricing',
+		},
 		kimi: {
 			id: 'kimi',
 			models: [
@@ -11259,9 +11384,35 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
+				{
+					id: 'kimi-k2.7-code-highspeed',
+					ownedBy: 'kimi',
+					label: 'Kimi K2.7 Code HighSpeed',
+					modalities: {
+						input: ['text', 'image', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					knowledge: '2025-01',
+					releaseDate: '2026-06-12',
+					lastUpdated: '2026-06-12',
+					openWeights: true,
+					cost: {
+						input: 1.9,
+						output: 8,
+						cacheRead: 0.38,
+					},
+					limit: {
+						context: 262144,
+						output: 262144,
+					},
+				},
 			],
 			label: 'Kimi',
-			env: ['KIMI_API_KEY'],
+			env: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
 			api: 'https://api.moonshot.ai/v1',
 			doc: 'https://platform.kimi.ai/docs/api/overview.md',
@@ -12092,6 +12243,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v3.1:671b',
+					ownedBy: 'deepseek',
 					label: 'deepseek-v3.1:671b',
 					modalities: {
 						input: ['text'],
@@ -12110,6 +12262,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v3.2',
+					ownedBy: 'deepseek',
 					label: 'deepseek-v3.2',
 					modalities: {
 						input: ['text'],
@@ -12128,6 +12281,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v4-flash',
+					ownedBy: 'deepseek',
 					label: 'deepseek-v4-flash',
 					modalities: {
 						input: ['text'],
@@ -12146,6 +12300,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				{
 					id: 'deepseek-v4-pro',
+					ownedBy: 'deepseek',
 					label: 'deepseek-v4-pro',
 					modalities: {
 						input: ['text'],

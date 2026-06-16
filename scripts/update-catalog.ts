@@ -422,12 +422,16 @@ function toTs(
 	return `${header}\n${imports}\n${body}`;
 }
 
+function normalizeOttoRouterOwner(owner: string): ModelOwner {
+	return owner === 'moonshot' ? 'kimi' : (owner as ModelOwner);
+}
+
 function buildOttoRouterEntry(
 	data: OttoRouterApiModel[],
 ): ProviderCatalogEntry {
 	const models: ModelInfo[] = data
 		.map((m) => {
-			const ownedBy = m.owned_by as ModelOwner;
+			const ownedBy = normalizeOttoRouterOwner(m.owned_by);
 			return {
 				id: m.id,
 				ownedBy,
@@ -590,7 +594,9 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 		);
 	const data = (await res.json()) as { data: OttoRouterApiModel[] };
 
-	const providers = [...new Set(data.data.map((m) => m.owned_by))].sort();
+	const providers = [
+		...new Set(data.data.map((m) => normalizeOttoRouterOwner(m.owned_by))),
+	].sort();
 
 	const models = data.data
 		.filter((m) =>
@@ -603,7 +609,7 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 		.map((m) => ({
 			id: m.id,
 			...(m.name ? { name: m.name } : {}),
-			owned_by: m.owned_by,
+			owned_by: normalizeOttoRouterOwner(m.owned_by),
 			context_length: m.context_length,
 			max_output: m.max_output,
 			reasoning: m.reasoning ?? m.capabilities?.reasoning ?? false,

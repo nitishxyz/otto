@@ -33,6 +33,17 @@ describe('ottorouter catalog entry', () => {
 		expect(model?.ownedBy).toBe('deepseek');
 	});
 
+	it('maps Moonshot-owned OttoRouter models to Kimi', () => {
+		const entry = catalog.ottorouter;
+		const model = entry?.models.find((m) => m.id === 'kimi-k2-thinking');
+		expect(model?.ownedBy).toBe('kimi');
+		expect(
+			entry?.models.some(
+				(m) => (m.ownedBy as string | undefined) === 'moonshot',
+			),
+		).toBe(false);
+	});
+
 	it('has cost and limit from ottorouter API', () => {
 		const entry = catalog.ottorouter;
 		const model = entry?.models.find((m) => m.id === 'gpt-5-codex');

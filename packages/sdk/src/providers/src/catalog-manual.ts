@@ -83,8 +83,12 @@ const OWNER_NPM: Record<ModelOwner, string> = {
 	minimax: '@ai-sdk/anthropic',
 };
 
+function normalizeOttoRouterOwner(owner: string): ModelOwner {
+	return owner === 'moonshot' ? 'kimi' : (owner as ModelOwner);
+}
+
 function convertOttoRouterModel(m: OttoRouterModelCatalogEntry): ModelInfo {
-	const ownedBy = m.owned_by as ModelOwner;
+	const ownedBy = normalizeOttoRouterOwner(m.owned_by);
 	return {
 		id: m.id,
 		ownedBy,
