@@ -8,6 +8,11 @@ use tauri::Emitter;
 #[cfg(target_os = "linux")]
 use tauri::Manager;
 
+#[cfg(target_os = "macos")]
+pub fn run_notification_helper(args: &[String]) -> i32 {
+    commands::notification::run_notification_helper(args)
+}
+
 #[cfg(unix)]
 use std::process::Command;
 

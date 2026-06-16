@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -61,6 +62,7 @@ export function DesktopSessionsLayout({
 	titleBar,
 }: DesktopSessionsLayoutProps) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
@@ -122,6 +124,22 @@ export function DesktopSessionsLayout({
 			focusInput();
 		},
 		[navigate, focusInput],
+	);
+
+	const refreshSessionForNotificationOpen = useCallback(
+		async (id: string) => {
+			await Promise.allSettled([
+				queryClient.fetchQuery({
+					queryKey: ['messages', id],
+					queryFn: () => apiClient.getMessages(id),
+					staleTime: 0,
+				}),
+				queryClient.invalidateQueries({ queryKey: ['queueState', id] }),
+				queryClient.invalidateQueries({ queryKey: ['session', id] }),
+				queryClient.invalidateQueries({ queryKey: ['sessions', 'list'] }),
+			]);
+		},
+		[queryClient],
 	);
 
 	const handleSelectOttoSession = useCallback(
@@ -249,6 +267,7 @@ export function DesktopSessionsLayout({
 			await appWindow.unminimize().catch(() => {});
 			await appWindow.show().catch(() => {});
 			await appWindow.setFocus().catch(() => {});
+			await refreshSessionForNotificationOpen(nextSessionId);
 			handleSelectSession(nextSessionId);
 		};
 		getCurrentWindow()
@@ -268,7 +287,7 @@ export function DesktopSessionsLayout({
 				delete win.OTTO_OPEN_SESSION;
 			}
 		};
-	}, [handleSelectSession]);
+	}, [handleSelectSession, refreshSessionForNotificationOpen]);
 
 	useEffect(() => {
 		if (sessionId) {

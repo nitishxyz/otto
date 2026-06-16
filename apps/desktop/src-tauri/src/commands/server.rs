@@ -47,6 +47,16 @@ fn get_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String>
 
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
 
+    if tauri::is_dev() {
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            candidates.push(
+                std::path::PathBuf::from(&manifest_dir)
+                    .join("resources/binaries")
+                    .join(&binary_name),
+            );
+        }
+    }
+
     if let Ok(resource_dir) = app.path().resource_dir() {
         candidates.push(resource_dir.join("resources/binaries").join(&binary_name));
         candidates.push(resource_dir.join("binaries").join(&binary_name));
