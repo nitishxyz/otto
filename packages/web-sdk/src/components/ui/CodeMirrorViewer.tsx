@@ -423,6 +423,31 @@ export function CodeMirrorViewer({
 			selectionExtension,
 		],
 	);
+	const scrollToRequestedPosition = useCallback(
+		(view: EditorView, options: { line?: number; end?: boolean }) => {
+			try {
+				if (options.end) {
+					view.dispatch({
+						effects: EditorView.scrollIntoView(view.state.doc.length, {
+							y: 'end',
+						}),
+					});
+					return;
+				}
+
+				if (!options.line || options.line < 1) return;
+				const line = view.state.doc.line(
+					Math.min(options.line, view.state.doc.lines),
+				);
+				view.dispatch({
+					effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+				});
+			} catch {
+				view.setState(createEditorState(contentRef.current));
+			}
+		},
+		[createEditorState],
+	);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -509,34 +534,30 @@ export function CodeMirrorViewer({
 			view.setState(createEditorState(content));
 		}
 		contentRef.current = content;
-	}, [content, createEditorState]);
+
+		scrollToRequestedPosition(view, {
+			end: scrollToEndSignal !== undefined,
+			line: scrollToLine,
+		});
+	}, [
+		content,
+		scrollToLine,
+		scrollToEndSignal,
+		scrollToRequestedPosition,
+		createEditorState,
+	]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view || !scrollToLine || scrollToLine < 1) return;
-		const line = view.state.doc.line(
-			Math.min(scrollToLine, view.state.doc.lines),
-		);
-		try {
-			view.dispatch({
-				effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
-			});
-		} catch {
-			view.setState(createEditorState(contentRef.current));
-		}
-	}, [scrollToLine, createEditorState]);
+		scrollToRequestedPosition(view, { line: scrollToLine });
+	}, [scrollToLine, scrollToRequestedPosition]);
 
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view || scrollToEndSignal === undefined) return;
-		try {
-			view.dispatch({
-				effects: EditorView.scrollIntoView(view.state.doc.length, { y: 'end' }),
-			});
-		} catch {
-			view.setState(createEditorState(contentRef.current));
-		}
-	}, [scrollToEndSignal, createEditorState]);
+		scrollToRequestedPosition(view, { end: true });
+	}, [scrollToEndSignal, scrollToRequestedPosition]);
 
 	return <div ref={hostRef} className={className ?? 'h-full w-full'} />;
 }

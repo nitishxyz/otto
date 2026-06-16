@@ -106,12 +106,30 @@ async function isPreviewUrlReady(url: string): Promise<boolean> {
 	const timeout = setTimeout(() => controller.abort(), 750);
 	try {
 		const response = await fetch(url, { signal: controller.signal });
-		return response.ok;
+		return response.ok || response.status < 500;
 	} catch {
 		return false;
 	} finally {
 		clearTimeout(timeout);
 	}
+}
+
+function getPreviewOutput() {
+	return `${previewStdout}\n${previewStderr}`;
+}
+
+function markPreviewConnected(
+	parsed: ReturnType<typeof extractServeSimState>,
+	port: number,
+) {
+	updateState({
+		status: 'connected',
+		url: parsed.url,
+		deviceName: parsed.deviceName ?? state.deviceName,
+		udid: parsed.udid ?? state.udid,
+		port,
+		error: null,
+	});
 }
 
 async function killProcessOnPort(port: number) {
@@ -196,15 +214,9 @@ function startPreviewProcess(args: string[]) {
 		previewProcess.stdout as ReadableStream<Uint8Array> | null,
 		(chunk) => {
 			previewStdout += chunk;
-			const parsed = extractServeSimState(previewStdout, state.port);
+			const parsed = extractServeSimState(getPreviewOutput(), state.port);
 			if (parsed.url && parsed.url !== previewUrlForPort(state.port)) {
-				updateState({
-					status: 'connected',
-					url: parsed.url,
-					deviceName: parsed.deviceName ?? state.deviceName,
-					udid: parsed.udid ?? state.udid,
-					error: null,
-				});
+				markPreviewConnected(parsed, state.port);
 			}
 		},
 	);
@@ -212,8 +224,17 @@ function startPreviewProcess(args: string[]) {
 		previewProcess.stderr as ReadableStream<Uint8Array> | null,
 		(chunk) => {
 			previewStderr += chunk;
+			const parsed = extractServeSimState(getPreviewOutput(), state.port);
+			if (parsed.url && parsed.url !== previewUrlForPort(state.port)) {
+				markPreviewConnected(parsed, state.port);
+			}
 		},
 	);
+	void waitForPreviewUrl(state.port, 300_000).then((parsed) => {
+		if (previewProcess && parsed) {
+			markPreviewConnected(parsed, state.port);
+		}
+	});
 	previewProcess.exited.then((exitCode) => {
 		if (state.status === 'connected' || state.status === 'starting') {
 			updateState({
@@ -229,7 +250,7 @@ async function waitForPreviewUrl(port: number, timeoutMs = 15_000) {
 	const started = Date.now();
 	const fallbackUrl = previewUrlForPort(port);
 	while (Date.now() - started < timeoutMs) {
-		const parsed = extractServeSimState(previewStdout, port);
+		const parsed = extractServeSimState(getPreviewOutput(), port);
 		if (parsed.url && parsed.url !== fallbackUrl) return parsed;
 		if (await isPreviewUrlReady(fallbackUrl)) {
 			return { ...parsed, url: fallbackUrl };
@@ -256,6 +277,10 @@ export async function startSimulator(
 	updateState({ status: 'starting', error: null, port });
 
 	if (previewProcess) {
+		const parsed = await waitForPreviewUrl(port);
+		if (parsed) {
+			markPreviewConnected(parsed, port);
+		}
 		return { ok: true, ...getSimulatorStatus(), stdout: previewStdout };
 	}
 
@@ -273,14 +298,7 @@ export async function startSimulator(
 		updateState({ status: 'error', error });
 		return { ok: false, error, stdout: previewStdout, stderr: previewStderr };
 	}
-	updateState({
-		status: 'connected',
-		url: parsed.url,
-		deviceName: parsed.deviceName,
-		udid: parsed.udid,
-		port,
-		error: null,
-	});
+	markPreviewConnected(parsed, port);
 
 	return { ok: true, ...getSimulatorStatus(), stdout: previewStdout };
 }

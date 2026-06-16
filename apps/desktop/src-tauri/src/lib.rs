@@ -221,6 +221,7 @@ pub fn run() {
             commands::git::git_is_repo,
             commands::fonts::list_system_fonts,
             commands::window::create_new_window,
+            commands::notification::show_native_notification,
             get_initial_project,
             get_initial_remote,
             get_platform,

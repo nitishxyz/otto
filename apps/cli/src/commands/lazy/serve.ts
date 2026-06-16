@@ -10,6 +10,7 @@ export function registerServeCommand(program: Command, version: string) {
 		)
 		.option('--network', 'Bind to 0.0.0.0 for network access', false)
 		.option('--tunnel', 'Enable Cloudflare tunnel for remote access', false)
+		.option('--api-only', 'Start only the API server without Web UI', false)
 		.option('--no-open', 'Do not open browser automatically')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
@@ -17,6 +18,7 @@ export function registerServeCommand(program: Command, version: string) {
 			pushOption(argv, '--port', opts.port);
 			pushFlag(argv, '--network', opts.network);
 			pushFlag(argv, '--tunnel', opts.tunnel);
+			pushFlag(argv, '--api-only', opts.apiOnly);
 			pushFlag(argv, '--no-open', !opts.open);
 			pushOption(argv, '--project', opts.project);
 			const { registerServeCommand: register } = await import('../serve.ts');

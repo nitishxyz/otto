@@ -60,6 +60,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 # macOS: local focused-window Globe/Fn key handling for dictation.
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
+mac-notification-sys = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "block2"] }
 
 # Windows: use native SChannel TLS (no OpenSSL/Perl needed)

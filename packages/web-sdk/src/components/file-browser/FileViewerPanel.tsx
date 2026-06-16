@@ -500,6 +500,10 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 			removals: data?.lineCount ?? 0,
 		};
 	}, [writePreview?.changeCount, writePreview?.content, data?.lineCount]);
+	const writeScrollSignal =
+		writePreview?.content === undefined
+			? undefined
+			: `${writePreview.callId ?? selectedFile}:${writePreview.status}:${writePreview.content.length}`;
 
 	if (!isViewerOpen || !selectedFile) return null;
 
@@ -592,6 +596,7 @@ export const FileViewerPanel = memo(function FileViewerPanel({
 						content={writePreview.content}
 						path={selectedFile}
 						lineTones={writePreviewLineTones}
+						scrollToEndSignal={writeScrollSignal}
 						disableMarkdownSyntax
 					/>
 				) : activePatchPreview ? (

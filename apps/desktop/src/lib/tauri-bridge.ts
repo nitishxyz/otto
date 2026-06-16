@@ -52,6 +52,13 @@ export interface DevicePollResult {
 	error: string | null;
 }
 
+export interface NativeNotificationPayload {
+	title: string;
+	body?: string;
+	sessionId?: string;
+	windowLabel?: string;
+}
+
 export const isDesktopApp = (): boolean => {
 	try {
 		return '__TAURI__' in window;
@@ -77,6 +84,8 @@ export const tauriBridge = {
 	stopAllServers: () => invoke('stop_all_servers'),
 	listServers: () => invoke<ServerInfo[]>('list_servers'),
 	listSystemFonts: () => invoke<string[]>('list_system_fonts'),
+	showNativeNotification: (notification: NativeNotificationPayload) =>
+		invoke('show_native_notification', { notification }),
 
 	createNewWindow: () => invoke('create_new_window'),
 

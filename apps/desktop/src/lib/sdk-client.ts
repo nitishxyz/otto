@@ -1,12 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { onAction } from '@tauri-apps/plugin-notification';
-import {
-	isPermissionGranted,
-	requestPermission,
-	sendNotification,
-} from '@tauri-apps/plugin-notification';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { configureApiClient } from '@ottocode/web-sdk/lib';
 import { registerNativeBrowserBridge } from './native-browser';
@@ -21,7 +14,6 @@ interface OttoWindow extends Window {
 	OTTO_LIST_SYSTEM_FONTS?: () => Promise<string[]>;
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
-	OTTO_NOTIFICATION_ACTION_LISTENER?: boolean;
 	OTTO_VOICE_SHORTCUT_LISTENER?: boolean;
 	OTTO_WINDOW_FOCUS_LISTENER?: boolean;
 	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
@@ -35,45 +27,18 @@ interface OttoPlatformNotification {
 }
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
-let hasRequestedNotificationPermission = false;
 let isDesktopWindowFocused = document.hasFocus();
 let ownsVoiceShortcutPress = false;
-
-function notificationIdFromString(id: string) {
-	let hash = 0;
-	for (let i = 0; i < id.length; i++) {
-		hash = (hash * 31 + id.charCodeAt(i)) | 0;
-	}
-	return Math.abs(hash || Date.now()) % 2_147_483_647;
-}
-
-async function ensureNotificationPermission() {
-	if (await isPermissionGranted()) return true;
-	if (hasRequestedNotificationPermission) return false;
-
-	hasRequestedNotificationPermission = true;
-	const permission = await requestPermission();
-	return permission === 'granted' || (await isPermissionGranted());
-}
 
 async function showNativeNotification(notification: OttoPlatformNotification) {
 	if (!notification.title) return;
 
-	const permissionGranted = await ensureNotificationPermission();
-	if (!permissionGranted) {
-		return;
-	}
-
 	const appWindow = getCurrentWindow();
-	sendNotification({
-		id: notificationIdFromString(notification.id),
+	await tauriBridge.showNativeNotification({
 		title: notification.title,
 		body: notification.body,
-		autoCancel: true,
-		sound: 'Ping',
-		extra: notification.sessionId
-			? { sessionId: notification.sessionId, windowLabel: appWindow.label }
-			: undefined,
+		sessionId: notification.sessionId,
+		windowLabel: appWindow.label,
 	});
 }
 
@@ -138,46 +103,6 @@ function registerDesktopPlatformAdapters() {
 			dispatchVoiceShortcutEvent('otto:voice-shortcut-up');
 		}).catch((error: unknown) => {
 			console.error('[otto] Failed to register voice shortcut up:', error);
-		});
-	}
-
-	if (!win.OTTO_NOTIFICATION_ACTION_LISTENER) {
-		win.OTTO_NOTIFICATION_ACTION_LISTENER = true;
-		const currentWindowLabel = appWindow.label;
-		onAction(async (notification) => {
-			const notificationWindowLabel =
-				typeof notification.extra?.windowLabel === 'string'
-					? notification.extra.windowLabel
-					: undefined;
-			const sessionId =
-				typeof notification.extra?.sessionId === 'string'
-					? notification.extra.sessionId
-					: undefined;
-			if (
-				notificationWindowLabel &&
-				notificationWindowLabel !== currentWindowLabel
-			) {
-				const targetWindow = await WebviewWindow.getByLabel(
-					notificationWindowLabel,
-				).catch(() => null);
-				if (targetWindow) {
-					await targetWindow.unminimize().catch(() => {});
-					await targetWindow.show().catch(() => {});
-					await targetWindow.setFocus().catch(() => {});
-					if (sessionId) {
-						await targetWindow
-							.emit('otto-open-session', sessionId)
-							.catch(() => {});
-					}
-				}
-				return;
-			}
-
-			if (sessionId) {
-				void win.OTTO_OPEN_SESSION?.(sessionId);
-			}
-		}).catch((error: unknown) => {
-			console.error('[otto] Failed to register notification actions:', error);
 		});
 	}
 }

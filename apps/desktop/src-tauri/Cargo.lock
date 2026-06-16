@@ -2815,6 +2815,7 @@ dependencies = [
  "fontdb",
  "git2",
  "keyring",
+ "mac-notification-sys",
  "objc2-app-kit",
  "openssl",
  "rand 0.8.5",
