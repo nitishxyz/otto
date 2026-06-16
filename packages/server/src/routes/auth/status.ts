@@ -104,6 +104,7 @@ export function registerAuthStatusRoutes(app: Hono) {
 						supportsOAuth:
 							id === 'anthropic' ||
 							id === 'openai' ||
+							id === 'xai' ||
 							id === 'copilot' ||
 							id === 'kimi',
 						supportsToken: id === 'copilot',

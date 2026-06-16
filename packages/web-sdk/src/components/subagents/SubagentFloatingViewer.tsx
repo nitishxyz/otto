@@ -5,7 +5,6 @@ import {
 	type SubagentViewerInstance,
 	type SubagentViewerPosition,
 } from '../../stores/subagentViewerStore';
-import { useSessionStream } from '../../hooks/useSessionStream';
 import { MessageThreadContainer } from '../messages/MessageThreadContainer';
 
 const PANEL_WIDTH = 440;
@@ -59,8 +58,6 @@ const SubagentViewerPanel = memo(function SubagentViewerPanel({
 	const setPosition = useSubagentViewerStore((state) => state.setPosition);
 	const bringToFront = useSubagentViewerStore((state) => state.bringToFront);
 	const close = useSubagentViewerStore((state) => state.close);
-
-	useSessionStream(childSessionId, true);
 
 	const position = storedPosition
 		? clampPosition(storedPosition.x, storedPosition.y)

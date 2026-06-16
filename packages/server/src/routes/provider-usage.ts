@@ -4,6 +4,7 @@ import type { Hono } from 'hono';
 import {
 	getAuth,
 	getGrokCliHeaders,
+	refreshKimiToken,
 	refreshToken,
 	refreshOpenAIToken,
 	type ProviderId,
@@ -17,7 +18,7 @@ import { zodOpenApiRoute } from '../openapi/route.ts';
 const USAGE_CACHE_TTL_MS = 60_000;
 
 const providerUsageParamsSchema = z.object({
-	provider: z.enum(['anthropic', 'openai', 'xai']).openapi({
+	provider: z.enum(['anthropic', 'openai', 'xai', 'kimi']).openapi({
 		param: { name: 'provider', in: 'path' },
 	}),
 });
@@ -53,7 +54,12 @@ async function ensureValidOAuth(
 	}
 
 	try {
-		const refreshFn = provider === 'openai' ? refreshOpenAIToken : refreshToken;
+		const refreshFn =
+			provider === 'openai'
+				? refreshOpenAIToken
+				: provider === 'kimi'
+					? refreshKimiToken
+					: refreshToken;
 		const newTokens = await refreshFn(auth.refresh);
 		const updated: OAuth = {
 			...auth,
@@ -245,10 +251,108 @@ async function fetchXaiGrokUsage(access: string) {
 	};
 }
 
+function numericUsageValue(value: unknown): number | null {
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (typeof value === 'string') {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
+
+function kimiUsedPercent(detail?: {
+	limit?: unknown;
+	used?: unknown;
+	remaining?: unknown;
+}) {
+	const limit = numericUsageValue(detail?.limit) ?? 0;
+	const used =
+		numericUsageValue(detail?.used) ??
+		Math.max(0, limit - (numericUsageValue(detail?.remaining) ?? limit));
+	return limit > 0 ? Math.max(0, Math.min((used / limit) * 100, 100)) : 0;
+}
+
+function kimiWindowSeconds(window?: {
+	duration?: unknown;
+	timeUnit?: unknown;
+}) {
+	const duration = numericUsageValue(window?.duration);
+	if (!duration) return undefined;
+	const timeUnit = typeof window?.timeUnit === 'string' ? window.timeUnit : '';
+	if (timeUnit.includes('MINUTE')) return Math.round(duration * 60);
+	if (timeUnit.includes('HOUR')) return Math.round(duration * 3600);
+	if (timeUnit.includes('DAY')) return Math.round(duration * 86400);
+	return Math.round(duration);
+}
+
+async function fetchKimiUsage(access: string) {
+	const response = await fetch('https://api.kimi.com/coding/v1/usages', {
+		headers: {
+			Authorization: `Bearer ${access}`,
+			Accept: 'application/json',
+		},
+	});
+
+	if (!response.ok) {
+		throw new Error(`Kimi usage API returned ${response.status}`);
+	}
+
+	const data = (await response.json()) as {
+		user?: {
+			membership?: { level?: string };
+			discountPlan?: boolean;
+		};
+		usage?: {
+			limit?: unknown;
+			used?: unknown;
+			remaining?: unknown;
+			resetTime?: string;
+		};
+		limits?: Array<{
+			window?: { duration?: unknown; timeUnit?: unknown };
+			detail?: {
+				limit?: unknown;
+				used?: unknown;
+				remaining?: unknown;
+				resetTime?: string;
+			};
+		}>;
+		totalQuota?: { limit?: unknown; used?: unknown; remaining?: unknown };
+		subType?: string;
+	};
+
+	const firstLimit = data.limits?.[0];
+	const quota = data.totalQuota ?? data.usage;
+	const quotaLimit = numericUsageValue(quota?.limit) ?? 0;
+	const quotaRemaining = numericUsageValue(quota?.remaining) ?? quotaLimit;
+
+	return {
+		provider: 'kimi' as const,
+		planType: data.subType ?? data.user?.membership?.level ?? 'Kimi Code OAuth',
+		primaryWindow: data.usage
+			? {
+					usedPercent: kimiUsedPercent(data.usage),
+					windowSeconds: 604800,
+					resetsAt: data.usage.resetTime ?? null,
+				}
+			: null,
+		secondaryWindow: firstLimit?.detail
+			? {
+					usedPercent: kimiUsedPercent(firstLimit.detail),
+					windowSeconds: kimiWindowSeconds(firstLimit.window),
+					resetsAt: firstLimit.detail.resetTime ?? null,
+				}
+			: null,
+		limitReached: quotaLimit > 0 && quotaRemaining <= 0,
+		raw: data,
+	};
+}
+
 type ProviderUsage =
 	| Awaited<ReturnType<typeof fetchAnthropicUsage>>
 	| Awaited<ReturnType<typeof fetchOpenAIUsage>>
-	| Awaited<ReturnType<typeof fetchXaiGrokUsage>>;
+	| Awaited<ReturnType<typeof fetchXaiGrokUsage>>
+	| Awaited<ReturnType<typeof fetchKimiUsage>>;
 
 type UsageCacheEntry = {
 	data?: ProviderUsage;
@@ -291,7 +395,9 @@ async function fetchProviderUsage(
 			? fetchAnthropicUsage(tokenResult.access)
 			: provider === 'xai'
 				? fetchXaiGrokUsage(tokenResult.access)
-				: fetchOpenAIUsage(tokenResult.access, tokenResult.oauth.accountId);
+				: provider === 'kimi'
+					? fetchKimiUsage(tokenResult.access)
+					: fetchOpenAIUsage(tokenResult.access, tokenResult.oauth.accountId);
 
 	usageCache.set(cacheKey, {
 		data: cached?.data,
@@ -356,7 +462,8 @@ export function registerProviderUsageRoutes(app: Hono) {
 				if (
 					provider !== 'anthropic' &&
 					provider !== 'openai' &&
-					provider !== 'xai'
+					provider !== 'xai' &&
+					provider !== 'kimi'
 				) {
 					return c.json(
 						{ error: { message: 'Usage not supported for this provider' } },

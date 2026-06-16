@@ -8,8 +8,82 @@ export type KimiProviderConfig = {
 	oauth?: OAuth;
 };
 
+const KIMI_CODE_CLI_VERSION = '0.16.0';
+
+type BunFileLike = { text: () => Promise<string> };
+type BunLike = {
+	file: (path: string) => BunFileLike;
+};
+
+let fallbackKimiDeviceId: string | undefined;
+
+function processEnv(): Record<string, string | undefined> | undefined {
+	return typeof process !== 'undefined' ? process.env : undefined;
+}
+
 export function readKimiApiKeyFromEnv(): string {
-	return process.env.KIMI_API_KEY || '';
+	return processEnv()?.KIMI_API_KEY || '';
+}
+
+function kimiCodeHomeDir(): string | undefined {
+	const env = processEnv();
+	return (
+		env?.KIMI_CODE_HOME || (env?.HOME ? `${env.HOME}/.kimi-code` : undefined)
+	);
+}
+
+function asciiHeader(value: string, fallback = 'unknown'): string {
+	const cleaned = value.replaceAll(/[^\u0020-\u007E]/g, '').trim();
+	return cleaned.length > 0 ? cleaned : fallback;
+}
+
+function randomDeviceId(): string {
+	return (
+		globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
+	);
+}
+
+async function readKimiDeviceId(): Promise<string | null> {
+	const home = kimiCodeHomeDir();
+	const bun = (globalThis as { Bun?: BunLike }).Bun;
+	if (!home || !bun) return null;
+	try {
+		const existing = (await bun.file(`${home}/device_id`).text()).trim();
+		return existing.length > 0 ? existing : null;
+	} catch {
+		return null;
+	}
+}
+
+async function readOrCreateKimiDeviceId(): Promise<string> {
+	const existing = await readKimiDeviceId();
+	if (existing) return existing;
+	fallbackKimiDeviceId ??= randomDeviceId();
+	return fallbackKimiDeviceId;
+}
+
+async function createKimiCodeHeaders(): Promise<Record<string, string>> {
+	const env = processEnv();
+	const proc = typeof process !== 'undefined' ? process : undefined;
+	const platform = env?.OSTYPE ?? env?.OS ?? proc?.platform ?? 'unknown';
+	const arch =
+		env?.HOSTTYPE ?? env?.PROCESSOR_ARCHITECTURE ?? proc?.arch ?? 'unknown';
+	const deviceModel = `${platform} ${arch}`;
+	return {
+		'User-Agent': `kimi-code-cli/${KIMI_CODE_CLI_VERSION}`,
+		'X-Msh-Platform': 'kimi_code_cli',
+		'X-Msh-Version': KIMI_CODE_CLI_VERSION,
+		'X-Msh-Device-Name': asciiHeader(
+			env?.HOSTNAME ?? env?.COMPUTERNAME ?? 'unknown',
+		),
+		'X-Msh-Device-Model': asciiHeader(deviceModel),
+		'X-Msh-Os-Version': asciiHeader(platform),
+		'X-Msh-Device-Id': await readOrCreateKimiDeviceId(),
+	};
+}
+
+function isKimiCodeBaseURL(baseURL: string): boolean {
+	return /\/coding\/v1\/?$/.test(baseURL);
 }
 
 const KIMI_UNSUPPORTED_SCHEMA_KEYS = new Set([
@@ -139,6 +213,29 @@ function sanitizeKimiFetchInit(init?: RequestInit): RequestInit | undefined {
 	}
 }
 
+function normalizeKimiCodeFetchInit(
+	init?: RequestInit,
+): RequestInit | undefined {
+	if (!init?.headers) return init;
+	const headers = new Headers(init.headers);
+	if (headers.get('x-msh-platform') !== 'kimi_code_cli') return init;
+	headers.set('User-Agent', `kimi-code-cli/${KIMI_CODE_CLI_VERSION}`);
+	return { ...init, headers };
+}
+
+async function withKimiCodeHeaders(
+	init?: RequestInit,
+	enabled = false,
+): Promise<RequestInit | undefined> {
+	if (!enabled) return normalizeKimiCodeFetchInit(init);
+	const headers = new Headers(init?.headers);
+	const kimiHeaders = await createKimiCodeHeaders();
+	for (const [key, value] of Object.entries(kimiHeaders)) {
+		headers.set(key, value);
+	}
+	return normalizeKimiCodeFetchInit({ ...init, headers });
+}
+
 /**
  * Kimi streaming responses report token usage on the final chunk's
  * `choices[0].usage` instead of the OpenAI-standard top-level `usage` field.
@@ -176,12 +273,19 @@ export function hoistKimiSseUsage(line: string): string {
  */
 export function createKimiUsageFetch(
 	baseFetch: typeof fetch = fetch,
+	injectKimiCodeHeaders = false,
 ): typeof fetch {
 	const wrappedFetch = async (
 		input: Parameters<typeof fetch>[0],
 		init?: Parameters<typeof fetch>[1],
 	): Promise<Response> => {
-		const response = await baseFetch(input, sanitizeKimiFetchInit(init));
+		const response = await baseFetch(
+			input,
+			await withKimiCodeHeaders(
+				sanitizeKimiFetchInit(init),
+				injectKimiCodeHeaders,
+			),
+		);
 		const contentType = response.headers.get('content-type') ?? '';
 		if (
 			!response.ok ||
@@ -242,7 +346,7 @@ export function createKimiModel(model: string, config?: KimiProviderConfig) {
 		name: 'Kimi',
 		baseURL,
 		headers,
-		fetch: createKimiUsageFetch(),
+		fetch: createKimiUsageFetch(undefined, isKimiCodeBaseURL(baseURL)),
 	});
 
 	return instance(model);

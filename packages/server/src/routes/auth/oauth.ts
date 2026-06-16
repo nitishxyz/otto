@@ -2,11 +2,13 @@ import { z } from '@hono/zod-openapi';
 import {
 	authorize,
 	authorizeOpenAI,
+	authorizeXai,
 	authorizeWeb,
 	exchange,
 	exchangeOpenAIDeviceCode,
 	exchangeOpenAI,
 	exchangeOpenAIWeb,
+	exchangeXai,
 	exchangeWeb,
 	logger,
 	pollOpenAIDeviceCodeOnce,
@@ -420,6 +422,33 @@ export function registerAuthOAuthRoutes(app: Hono) {
 							);
 						} catch (error) {
 							logger.error('OpenAI OAuth callback failed', error);
+							oauthResult.close();
+						}
+					})();
+
+					return c.redirect(oauthResult.url);
+				} else if (provider === 'xai') {
+					const oauthResult = await authorizeXai();
+					void (async () => {
+						try {
+							const code = await oauthResult.waitForCallback();
+							oauthResult.close();
+							const tokens = await exchangeXai(code, oauthResult.verifier);
+							await setAuth(
+								'xai',
+								{
+									type: 'oauth',
+									refresh: tokens.refresh,
+									access: tokens.access,
+									expires: tokens.expires,
+									idToken: tokens.idToken,
+									scopes: tokens.scopes,
+								},
+								undefined,
+								'global',
+							);
+						} catch (error) {
+							logger.error('xAI OAuth callback failed', error);
 							oauthResult.close();
 						}
 					})();

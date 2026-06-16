@@ -269,7 +269,12 @@ export async function authorizeXai(): Promise<XaiOAuthResult> {
 					<h1>xAI connected!</h1>
 					<p>You can close this window.</p>
 				</div>
-				<script>setTimeout(() => window.close(), 1500);</script>
+				<script>
+					setTimeout(() => {
+						if (window.opener) window.opener.postMessage({ type: 'oauth-success', provider: 'xai' }, '*');
+						setTimeout(() => window.close(), 500);
+					}, 1500);
+				</script>
 			</body>
 			</html>
 		`);

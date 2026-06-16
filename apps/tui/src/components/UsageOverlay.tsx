@@ -87,7 +87,8 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 					authType === 'oauth' &&
 					(currentProvider === 'anthropic' ||
 						currentProvider === 'openai' ||
-						currentProvider === 'xai');
+						currentProvider === 'xai' ||
+						currentProvider === 'kimi');
 
 				if (!cancelled) setIsOAuth(isOAuthProvider);
 
@@ -95,7 +96,7 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 					if (!cancelled) {
 						setLoading(false);
 						setError(
-							'Usage is only available for OAuth providers (OpenAI, Anthropic, xAI)',
+							'Usage is only available for OAuth providers (OpenAI, Anthropic, xAI, Kimi)',
 						);
 					}
 					return;

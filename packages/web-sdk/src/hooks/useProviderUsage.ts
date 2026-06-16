@@ -22,7 +22,10 @@ export function useProviderUsage(
 
 	const isOAuthProvider =
 		authType === 'oauth' &&
-		(provider === 'anthropic' || provider === 'openai' || provider === 'xai');
+		(provider === 'anthropic' ||
+			provider === 'openai' ||
+			provider === 'xai' ||
+			provider === 'kimi');
 
 	const fetchUsage = useCallback(
 		async (force = false) => {
