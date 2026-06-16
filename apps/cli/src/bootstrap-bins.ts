@@ -6,6 +6,7 @@ import {
 	chmodSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { embeddedServeSim } from './generated/embedded-serve-sim.ts';
 import { embeddedWhisperCli } from './generated/embedded-whisper-cli.ts';
 
 function getAgiBinDir(): string {
@@ -21,12 +22,28 @@ export function bootstrapBinaries(): void {
 	const binDir = getAgiBinDir();
 	const whisperCliName =
 		process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
+	const serveSimName =
+		process.platform === 'win32' ? 'serve-sim.exe' : 'serve-sim';
 
 	bootstrapBinary(embeddedWhisperCli, join(binDir, whisperCliName));
+	bootstrapBinary(
+		embeddedServeSim?.executable ?? null,
+		join(binDir, serveSimName),
+		{ overwrite: true },
+	);
+	bootstrapBinary(
+		embeddedServeSim?.helper ?? null,
+		join(binDir, embeddedServeSim?.helperName ?? 'serve-sim-bin'),
+		{ overwrite: true },
+	);
 }
 
-function bootstrapBinary(embeddedPath: string | null, dest: string): void {
-	if (!embeddedPath || existsSync(dest)) return;
+function bootstrapBinary(
+	embeddedPath: string | null,
+	dest: string,
+	options: { overwrite?: boolean } = {},
+): void {
+	if (!embeddedPath || (!options.overwrite && existsSync(dest))) return;
 
 	let buf: Buffer;
 	try {

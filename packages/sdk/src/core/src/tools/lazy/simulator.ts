@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { createToolError } from '../error.ts';
@@ -20,6 +21,10 @@ const HID_KEYBOARD_V = 25;
 let previewProcess: ChildProcess | null = null;
 let previewStdout = '';
 let previewStderr = '';
+let serveSimCommand: {
+	command: string;
+	cwd?: string;
+} | null = null;
 
 const buttonNames = [
 	'home',
@@ -241,10 +246,45 @@ function parseSimulatorInput(
 	}
 }
 
+function getAgiBinDir() {
+	const cfgHome = process.env.XDG_CONFIG_HOME;
+	const home = process.env.HOME || process.env.USERPROFILE || '';
+	const configBase = cfgHome?.trim() || join(home, '.config');
+	return join(configBase, 'otto', 'bin');
+}
+
+function findServeSimCommand() {
+	if (serveSimCommand) return serveSimCommand;
+
+	const installedBin = join(getAgiBinDir(), 'serve-sim');
+	if (existsSync(installedBin)) {
+		serveSimCommand = {
+			command: installedBin,
+			cwd: dirname(installedBin),
+		};
+		return serveSimCommand;
+	}
+
+	throw new Error(
+		`Embedded serve-sim binary is not installed at ${installedBin}. Rebuild or restart Otto so bundled binaries are bootstrapped.`,
+	);
+}
+
+function serveSimSpawnArgs(args: string[]) {
+	const resolvedCommand = findServeSimCommand();
+	return {
+		command: resolvedCommand.command,
+		args,
+		cwd: resolvedCommand.cwd,
+	};
+}
+
 async function execServeSim(args: string[]): Promise<ExecResult> {
 	return new Promise((resolve, reject) => {
-		const child = spawn('npx', ['--yes', 'serve-sim', ...args], {
+		const resolved = serveSimSpawnArgs(args);
+		const child = spawn(resolved.command, resolved.args, {
 			stdio: ['ignore', 'pipe', 'pipe'],
+			cwd: resolved.cwd,
 		});
 		let stdout = '';
 		let stderr = '';
@@ -463,9 +503,13 @@ async function ensurePreviewServer(): Promise<string> {
 	if (!previewProcess || previewProcess.exitCode !== null) {
 		previewStdout = '';
 		previewStderr = '';
-		const args = ['serve-sim', '--port', String(DEFAULT_PREVIEW_PORT)];
-		previewProcess = spawn('bunx', args, {
+		const resolved = serveSimSpawnArgs([
+			'--port',
+			String(DEFAULT_PREVIEW_PORT),
+		]);
+		previewProcess = spawn(resolved.command, resolved.args, {
 			stdio: ['ignore', 'pipe', 'pipe'],
+			cwd: resolved.cwd,
 		});
 		previewProcess.stdout?.setEncoding('utf8');
 		previewProcess.stderr?.setEncoding('utf8');

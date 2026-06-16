@@ -47,7 +47,6 @@ function SessionStreamController({ sessionId }: { sessionId: string }) {
 	useSessionStream(sessionId);
 
 	useEffect(() => {
-		queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 		queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
 		queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
 	}, [queryClient, sessionId]);

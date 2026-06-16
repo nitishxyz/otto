@@ -3,8 +3,8 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	getSimulatorLogs,
-	getSimulatorStatus,
 	listSimulators,
+	refreshSimulatorStatus,
 	rotateSimulator,
 	sendSimulatorButton,
 	sendSimulatorGesture,
@@ -114,7 +114,7 @@ export function registerSimulatorRoutes(app: Hono) {
 				},
 			},
 		},
-		(c) => c.json(getSimulatorStatus()),
+		async (c) => c.json(await refreshSimulatorStatus()),
 	);
 
 	zodOpenApiRoute(

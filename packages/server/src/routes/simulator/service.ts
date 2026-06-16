@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { Context } from 'hono';
 
 export type SimulatorStatus = 'idle' | 'starting' | 'connected' | 'error';
@@ -18,11 +20,17 @@ interface ServeSimCommandResult {
 	stderr: string;
 }
 
+interface ServeSimCommand {
+	command: string;
+	cwd?: string;
+}
+
 const DEFAULT_PORT = 3200;
 let previewProcess: ReturnType<typeof Bun.spawn> | null = null;
 let previewStdout = '';
 let previewStderr = '';
 let cleanupHandlersRegistered = false;
+let serveSimCommand: ServeSimCommand | null = null;
 
 const state: SimulatorState = {
 	status: 'idle',
@@ -113,23 +121,27 @@ async function isPreviewUrlReady(url: string): Promise<boolean> {
 		clearTimeout(timeout);
 	}
 }
-
-function getPreviewOutput() {
-	return `${previewStdout}\n${previewStderr}`;
-}
-
 function markPreviewConnected(
 	parsed: ReturnType<typeof extractServeSimState>,
 	port: number,
 ) {
 	updateState({
 		status: 'connected',
-		url: parsed.url,
+		url: previewUrlForPort(port),
 		deviceName: parsed.deviceName ?? state.deviceName,
 		udid: parsed.udid ?? state.udid,
 		port,
 		error: null,
 	});
+}
+
+async function detectRunningPreview(port: number) {
+	if (!isMacOS()) return null;
+	const previewUrl = previewUrlForPort(port);
+	const runningStream = await getRunningServeSimStream(port);
+	if (!runningStream || !(await isPreviewUrlReady(previewUrl))) return null;
+
+	return { ...runningStream, url: previewUrl };
 }
 
 async function killProcessOnPort(port: number) {
@@ -172,10 +184,44 @@ function registerCleanupHandlers() {
 	});
 }
 
+function getAgiBinDir() {
+	const cfgHome = process.env.XDG_CONFIG_HOME;
+	const home = process.env.HOME || process.env.USERPROFILE || '';
+	const configBase = cfgHome?.trim() || join(home, '.config');
+	return join(configBase, 'otto', 'bin');
+}
+
+function findServeSimCommand(): ServeSimCommand {
+	if (serveSimCommand) return serveSimCommand;
+
+	const installedBin = join(getAgiBinDir(), 'serve-sim');
+	if (existsSync(installedBin)) {
+		serveSimCommand = {
+			command: installedBin,
+			cwd: dirname(installedBin),
+		};
+		return serveSimCommand;
+	}
+
+	throw new Error(
+		`Embedded serve-sim binary is not installed at ${installedBin}. Rebuild or restart Otto so bundled binaries are bootstrapped.`,
+	);
+}
+
+function serveSimSpawnArgs(args: string[]) {
+	const resolvedCommand = findServeSimCommand();
+	return {
+		cmd: [resolvedCommand.command, ...args],
+		cwd: resolvedCommand.cwd,
+	};
+}
+
 async function runServeSim(args: string[]): Promise<ServeSimCommandResult> {
-	const proc = Bun.spawn(['bunx', 'serve-sim', ...args], {
+	const resolved = serveSimSpawnArgs(args);
+	const proc = Bun.spawn(resolved.cmd, {
 		stdout: 'pipe',
 		stderr: 'pipe',
+		cwd: resolved.cwd,
 	});
 	const [stdout, stderr, exitCode] = await Promise.all([
 		new Response(proc.stdout).text(),
@@ -183,6 +229,61 @@ async function runServeSim(args: string[]): Promise<ServeSimCommandResult> {
 		proc.exited,
 	]);
 	return { stdout, stderr, exitCode };
+}
+
+function parseRunningServeSimStream(stdout: string, fallbackPort: number) {
+	for (const value of parseMaybeJsonLines(stdout)) {
+		if (!value || typeof value !== 'object') continue;
+		const record = value as Record<string, unknown>;
+		const candidates = Array.isArray(record.devices)
+			? record.devices
+			: Array.isArray(record.streams)
+				? record.streams
+				: [record];
+
+		for (const candidate of candidates) {
+			if (!candidate || typeof candidate !== 'object') continue;
+			const item = candidate as Record<string, unknown>;
+			if (item.running !== true) continue;
+
+			const streamUrl =
+				typeof item.streamUrl === 'string' ? item.streamUrl : null;
+			const url = typeof item.url === 'string' ? item.url : null;
+			if (!streamUrl && !url) continue;
+
+			return {
+				url: url ?? previewUrlForPort(fallbackPort),
+				streamUrl,
+				deviceName:
+					typeof item.name === 'string'
+						? item.name
+						: typeof item.deviceName === 'string'
+							? item.deviceName
+							: null,
+				udid:
+					typeof item.udid === 'string'
+						? item.udid
+						: typeof item.device === 'string'
+							? item.device
+							: null,
+			};
+		}
+	}
+
+	return null;
+}
+
+async function getRunningServeSimStream(port: number) {
+	const result = await runServeSim(['--list', '--quiet']).catch(() => null);
+	if (!result) return null;
+	if (result.exitCode !== 0) return null;
+
+	const parsed = parseRunningServeSimStream(result.stdout, port);
+	if (!parsed) return null;
+	if (parsed.streamUrl && !(await isPreviewUrlReady(parsed.streamUrl))) {
+		return null;
+	}
+	return parsed;
 }
 
 async function readPreviewStream(
@@ -206,31 +307,25 @@ async function readPreviewStream(
 function startPreviewProcess(args: string[]) {
 	previewStdout = '';
 	previewStderr = '';
-	previewProcess = Bun.spawn(['bunx', 'serve-sim', ...args], {
+	const resolved = serveSimSpawnArgs(args);
+	previewProcess = Bun.spawn(resolved.cmd, {
 		stdout: 'pipe',
 		stderr: 'pipe',
+		cwd: resolved.cwd,
 	});
 	readPreviewStream(
 		previewProcess.stdout as ReadableStream<Uint8Array> | null,
 		(chunk) => {
 			previewStdout += chunk;
-			const parsed = extractServeSimState(getPreviewOutput(), state.port);
-			if (parsed.url && parsed.url !== previewUrlForPort(state.port)) {
-				markPreviewConnected(parsed, state.port);
-			}
 		},
 	);
 	readPreviewStream(
 		previewProcess.stderr as ReadableStream<Uint8Array> | null,
 		(chunk) => {
 			previewStderr += chunk;
-			const parsed = extractServeSimState(getPreviewOutput(), state.port);
-			if (parsed.url && parsed.url !== previewUrlForPort(state.port)) {
-				markPreviewConnected(parsed, state.port);
-			}
 		},
 	);
-	void waitForPreviewUrl(state.port, 300_000).then((parsed) => {
+	void waitForPreviewUrl(state.port, 30_000).then((parsed) => {
 		if (previewProcess && parsed) {
 			markPreviewConnected(parsed, state.port);
 		}
@@ -248,20 +343,35 @@ function startPreviewProcess(args: string[]) {
 
 async function waitForPreviewUrl(port: number, timeoutMs = 15_000) {
 	const started = Date.now();
-	const fallbackUrl = previewUrlForPort(port);
 	while (Date.now() - started < timeoutMs) {
-		const parsed = extractServeSimState(getPreviewOutput(), port);
-		if (parsed.url && parsed.url !== fallbackUrl) return parsed;
-		if (await isPreviewUrlReady(fallbackUrl)) {
-			return { ...parsed, url: fallbackUrl };
-		}
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		const parsed = await detectRunningPreview(port);
+		if (parsed) return parsed;
+		await new Promise((resolve) => setTimeout(resolve, 500));
 	}
 	return null;
 }
 
 export function getSimulatorStatus(): SimulatorState {
 	return { ...state };
+}
+
+export async function refreshSimulatorStatus(): Promise<SimulatorState> {
+	const parsed = await detectRunningPreview(state.port);
+	if (parsed) {
+		markPreviewConnected(parsed, state.port);
+	} else if (
+		state.status === 'connected' ||
+		(state.status === 'starting' && !previewProcess)
+	) {
+		updateState({
+			status: 'idle',
+			url: null,
+			deviceName: null,
+			udid: null,
+			error: null,
+		});
+	}
+	return getSimulatorStatus();
 }
 
 export async function startSimulator(
@@ -275,13 +385,27 @@ export async function startSimulator(
 
 	const port = options.port ?? DEFAULT_PORT;
 	updateState({ status: 'starting', error: null, port });
+	try {
+		findServeSimCommand();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		updateState({ status: 'error', error: message });
+		return { ok: false, ...getSimulatorStatus(), error: message };
+	}
+	const runningPreview = await detectRunningPreview(port);
+	if (runningPreview) {
+		markPreviewConnected(runningPreview, port);
+		return { ok: true, ...getSimulatorStatus(), stdout: previewStdout };
+	}
 
 	if (previewProcess) {
-		const parsed = await waitForPreviewUrl(port);
+		const parsed = await waitForPreviewUrl(port, 1_000);
 		if (parsed) {
 			markPreviewConnected(parsed, port);
+			return { ok: true, ...getSimulatorStatus(), stdout: previewStdout };
 		}
-		return { ok: true, ...getSimulatorStatus(), stdout: previewStdout };
+		cleanupPreviewProcess();
+		await killProcessOnPort(port);
 	}
 
 	await killProcessOnPort(port);
@@ -295,6 +419,8 @@ export async function startSimulator(
 	if (!previewProcess || !parsed) {
 		const error =
 			previewStderr || previewStdout || 'Timed out waiting for serve-sim';
+		cleanupPreviewProcess();
+		await killProcessOnPort(port);
 		updateState({ status: 'error', error });
 		return { ok: false, error, stdout: previewStdout, stderr: previewStderr };
 	}
@@ -304,7 +430,11 @@ export async function startSimulator(
 }
 
 export async function listSimulators() {
-	const result = await runServeSim(['--list', '--quiet']);
+	const result = await runServeSim(['--list', '--quiet']).catch((error) => ({
+		exitCode: 1,
+		stdout: '',
+		stderr: error instanceof Error ? error.message : String(error),
+	}));
 	if (result.exitCode !== 0) {
 		return {
 			ok: false,
@@ -314,13 +444,15 @@ export async function listSimulators() {
 			stderr: result.stderr,
 		};
 	}
-	const parsed = extractServeSimState(result.stdout, state.port);
-	if (parsed.url) {
+	const parsed = parseRunningServeSimStream(result.stdout, state.port);
+	if (parsed && (await isPreviewUrlReady(previewUrlForPort(state.port)))) {
+		markPreviewConnected(parsed, state.port);
+	} else if (state.status === 'connected') {
 		updateState({
-			status: 'connected',
-			url: parsed.url,
-			deviceName: parsed.deviceName ?? state.deviceName,
-			udid: parsed.udid ?? state.udid,
+			status: 'idle',
+			url: null,
+			deviceName: null,
+			udid: null,
 			error: null,
 		});
 	}
@@ -328,15 +460,21 @@ export async function listSimulators() {
 }
 
 export async function stopSimulator(device?: string) {
+	const port = state.port;
 	cleanupPreviewProcess();
 	const args = ['--kill', '--quiet'];
 	if (device) args.push(device);
-	const result = await runServeSim(args);
+	const result = await runServeSim(args).catch((error) => ({
+		exitCode: 1,
+		stdout: '',
+		stderr: error instanceof Error ? error.message : String(error),
+	}));
 	if (result.exitCode !== 0) {
 		const error = result.stderr || result.stdout || 'Failed to stop serve-sim';
 		updateState({ status: 'error', error });
 		return { ok: false, error, stdout: result.stdout, stderr: result.stderr };
 	}
+	await killProcessOnPort(port);
 	updateState({
 		status: 'idle',
 		url: null,

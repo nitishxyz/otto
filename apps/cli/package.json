@@ -34,7 +34,7 @@
 	],
 	"scripts": {
 		"dev": "bun run index.ts",
-		"postinstall": "mkdir -p src/generated && test -f src/generated/embedded-whisper-cli.ts || echo 'export const embeddedWhisperCli: string | null = null;' > src/generated/embedded-whisper-cli.ts",
+		"postinstall": "mkdir -p src/generated && test -f src/generated/embedded-whisper-cli.ts || echo 'export const embeddedWhisperCli: string | null = null;' > src/generated/embedded-whisper-cli.ts; test -f src/generated/embedded-serve-sim.ts || echo 'export const embeddedServeSim: { executable: string; helper: string; helperName: string } | null = null;' > src/generated/embedded-serve-sim.ts",
 		"prebuild": "bun run ../../scripts/build-web.ts && bun run ../../scripts/prepare-embedded-bins.ts",
 		"build": "bun run prebuild && bun build --compile --minify --define FFF_LIBC='\"gnu\"' ./index.ts --outfile dist/otto",
 		"build:darwin-arm64": "bun run ../../scripts/build-web.ts && bun run ../../scripts/prepare-embedded-bins.ts darwin-arm64 && mkdir -p dist && bun build --compile --minify --define FFF_LIBC='\"gnu\"' --target=bun-darwin-arm64 ./index.ts --outfile dist/otto-darwin-arm64",

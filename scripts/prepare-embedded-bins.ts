@@ -3,6 +3,7 @@ import { $ } from 'bun';
 import {
 	copyFileSync,
 	existsSync,
+	chmodSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -61,9 +62,11 @@ const targetArg = scriptArgs.find((arg) => !arg.startsWith('--'));
 const platformKey = getPlatformKey(targetArg);
 const isWindows = platformKey.startsWith('windows');
 const whisperCliName = isWindows ? 'whisper-cli.exe' : 'whisper-cli';
+const serveSimName = isWindows ? 'serve-sim.exe' : 'serve-sim';
 
 const whisperCliSource = join(VENDOR_BIN, platformKey, whisperCliName);
 const whisperCliDest = join(CLI_VENDOR, whisperCliName);
+const serveSimDest = join(CLI_VENDOR, serveSimName);
 
 mkdirSync(CLI_VENDOR, { recursive: true });
 mkdirSync(GENERATED_DIR, { recursive: true });
@@ -168,6 +171,68 @@ function writeVendorAssetDeclaration(fileName: string, exportName: string) {
 	);
 }
 
+function getHostPlatformKey(): string {
+	return getPlatformKey();
+}
+
+function getBunCompileTarget(platform: string): string | null {
+	const map: Record<string, string> = {
+		'darwin-arm64': 'bun-darwin-arm64',
+		'darwin-x64': 'bun-darwin-x64',
+		'linux-x64': 'bun-linux-x64',
+		'linux-arm64': 'bun-linux-arm64',
+		'windows-x64': 'bun-windows-x64',
+	};
+	return map[platform] ?? null;
+}
+
+function getServeSimHelperName(entryContent: string): string {
+	const match = entryContent.match(/\.\/(serve-sim-bin-[^"]+)/);
+	return match?.[1] ?? 'serve-sim-bin-jfcjgebt.';
+}
+
+async function prepareEmbeddedServeSim(): Promise<{
+	hasServeSim: boolean;
+	helperName: string | null;
+}> {
+	if (!platformKey.startsWith('darwin')) {
+		console.log(`serve-sim embedding skipped for ${platformKey} (macOS only)`);
+		return { hasServeSim: false, helperName: null };
+	}
+
+	const hostPlatformKey = getHostPlatformKey();
+	if (platformKey !== hostPlatformKey) {
+		console.log(
+			`serve-sim embedding skipped for ${platformKey}; host has ${hostPlatformKey} helper binaries`,
+		);
+		return { hasServeSim: false, helperName: null };
+	}
+
+	const compileTarget = getBunCompileTarget(platformKey);
+	if (!compileTarget) return { hasServeSim: false, helperName: null };
+
+	const serveSimPackageDir = join(ROOT, 'node_modules', 'serve-sim');
+	const serveSimEntry = join(serveSimPackageDir, 'dist', 'serve-sim.js');
+	const serveSimHelper = join(serveSimPackageDir, 'bin', 'serve-sim-bin');
+	if (!existsSync(serveSimEntry) || !existsSync(serveSimHelper)) {
+		console.log(
+			'serve-sim package missing from node_modules — embedded serve-sim will be null',
+		);
+		return { hasServeSim: false, helperName: null };
+	}
+
+	const helperName = getServeSimHelperName(readFileSync(serveSimEntry, 'utf8'));
+	const helperDest = join(CLI_VENDOR, helperName);
+	await $`bun build --compile --target=${compileTarget} ${serveSimEntry} --outfile ${serveSimDest}`;
+	copyFileSync(serveSimHelper, helperDest);
+	chmodSync(serveSimDest, 0o755);
+	chmodSync(helperDest, 0o755);
+	writeVendorAssetDeclaration(serveSimName, 'embeddedServeSimPath');
+	writeVendorAssetDeclaration(helperName, 'embeddedServeSimHelperPath');
+	console.log(`Generated embedded serve-sim for ${platformKey}`);
+	return { hasServeSim: true, helperName };
+}
+
 await ensureFffBinPackage();
 
 async function ensureVendorWhisperCli() {
@@ -200,6 +265,7 @@ if (await ensureVendorWhisperCli()) {
 }
 
 const generatedWhisperFile = join(GENERATED_DIR, 'embedded-whisper-cli.ts');
+const generatedServeSimFile = join(GENERATED_DIR, 'embedded-serve-sim.ts');
 
 if (hasWhisperCli) {
 	writeFileSync(
@@ -213,4 +279,20 @@ if (hasWhisperCli) {
 		`export const embeddedWhisperCli: string | null = null;\n`,
 	);
 	console.log('Generated embedded-whisper-cli.ts (null — no binary available)');
+}
+
+const serveSim = await prepareEmbeddedServeSim();
+
+if (serveSim.hasServeSim && serveSim.helperName) {
+	writeFileSync(
+		generatedServeSimFile,
+		`import embeddedServeSimPath from '../../vendor/${serveSimName}' with { type: 'file' };\nimport embeddedServeSimHelperPath from '../../vendor/${serveSim.helperName}' with { type: 'file' };\nexport const embeddedServeSim: { executable: string; helper: string; helperName: string } | null = { executable: embeddedServeSimPath, helper: embeddedServeSimHelperPath, helperName: '${serveSim.helperName}' };\n`,
+	);
+	console.log('Generated embedded-serve-sim.ts (with binary)');
+} else {
+	writeFileSync(
+		generatedServeSimFile,
+		`export const embeddedServeSim: { executable: string; helper: string; helperName: string } | null = null;\n`,
+	);
+	console.log('Generated embedded-serve-sim.ts (null — no binary available)');
 }

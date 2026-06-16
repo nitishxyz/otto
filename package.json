@@ -80,7 +80,8 @@
 		"@changesets/cli": "2.31.0",
 		"@types/bun": "1.3.9",
 		"drizzle-kit": "0.31.9",
-		"hono": "4.12.0"
+		"hono": "4.12.0",
+		"serve-sim": "0.1.41"
 	},
 	"overrides": {
 		"react": "19.2.0",
