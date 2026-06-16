@@ -45,6 +45,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	ottorouter: ['glm-5-turbo'],
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
+	deepseek: ['deepseek-v4-flash'],
 	copilot: ['gpt-4.1-mini'],
 	kimi: ['kimi-k2.7-code'],
 };
@@ -151,6 +152,7 @@ const OWNER_TO_FAMILY: Record<ModelOwner, UnderlyingProviderKey> = {
 	kimi: 'kimi',
 	qwen: 'openai-compatible',
 	zai: 'glm',
+	deepseek: 'openai-compatible',
 	minimax: 'minimax',
 };
 
@@ -167,6 +169,7 @@ const DIRECT_PROVIDER_FAMILY: Partial<
 	xai: 'openai',
 	zai: 'glm',
 	'zai-coding': 'glm',
+	deepseek: 'openai-compatible',
 };
 
 export type UnderlyingProviderKey =
@@ -192,6 +195,8 @@ function inferFromModelId(model: string): UnderlyingProviderKey {
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
 	if (lower.includes('grok') || lower.startsWith('xai/')) return 'openai';
 	if (lower.includes('qwen') || lower.startsWith('qwen/'))
+		return 'openai-compatible';
+	if (lower.includes('deepseek') || lower.startsWith('deepseek/'))
 		return 'openai-compatible';
 	if (lower.includes('kimi') || lower.startsWith('moonshotai/')) return 'kimi';
 	if (

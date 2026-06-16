@@ -91,6 +91,9 @@ const pricingTable: Record<ProviderName, PricingEntry[]> = {
 	'zai-coding': [
 		// Pricing from catalog entries; leave empty here
 	],
+	deepseek: [
+		// Pricing from catalog entries; leave empty here
+	],
 	kimi: [
 		// Pricing from catalog entries; leave empty here
 	],

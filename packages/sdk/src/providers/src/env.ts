@@ -13,6 +13,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	xai: 'XAI_API_KEY',
 	zai: 'ZAI_API_KEY',
 	'zai-coding': 'ZAI_CODING_API_KEY',
+	deepseek: 'DEEPSEEK_API_KEY',
 	kimi: 'KIMI_API_KEY',
 	minimax: 'MINIMAX_API_KEY',
 };

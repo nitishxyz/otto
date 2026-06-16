@@ -22,6 +22,11 @@ const skills = [
 	{ name: 'disabled-skill', description: 'Disabled', enabled: false },
 ];
 
+const agents = [
+	{ name: 'plan', description: 'Read-only planner' },
+	{ name: 'code-review', description: 'Agent with same name as a skill' },
+];
+
 describe('skill mentions', () => {
 	let tempDir: string;
 
@@ -75,6 +80,18 @@ describe('skill mentions', () => {
 			),
 		).toBe(
 			'Update [@publish.env](#otto-file:publish.env) with [$debug](#otto-skill:debug) and ignore @unknown',
+		);
+	});
+
+	test('linkifies user message agent mentions before skills or files', () => {
+		expect(
+			linkifyUserMessageMentions(
+				'Ask @plan, prefer @code-review and ignore @unknown',
+				skills,
+				agents,
+			),
+		).toBe(
+			'Ask [@plan](#otto-agent:plan), prefer [@code-review](#otto-agent:code-review) and ignore @unknown',
 		);
 	});
 

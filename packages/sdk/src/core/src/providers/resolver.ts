@@ -6,6 +6,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
 	catalog,
+	createDeepSeekModel,
 	createMinimaxModel,
 	createKimiModel,
 	createOttoRouterModel,
@@ -33,6 +34,7 @@ export type ProviderName =
 	| 'xai'
 	| 'zai'
 	| 'zai-coding'
+	| 'deepseek'
 	| 'kimi'
 	| 'minimax';
 
@@ -217,6 +219,14 @@ export async function resolveModel(
 
 	if (provider === 'zai-coding') {
 		return createZaiCodingModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+			fetch: config.customFetch,
+		});
+	}
+
+	if (provider === 'deepseek') {
+		return createDeepSeekModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,
 			fetch: config.customFetch,

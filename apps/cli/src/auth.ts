@@ -99,6 +99,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://z.ai/manage-apikey/apikey-list',
 		env: 'ZAI_CODING_API_KEY',
 	},
+	deepseek: {
+		name: 'DeepSeek',
+		url: 'https://platform.deepseek.com/api_keys',
+		env: 'DEEPSEEK_API_KEY',
+	},
 	kimi: {
 		name: 'Kimi',
 		url: 'https://platform.kimi.ai/console/api-keys',
@@ -396,6 +401,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				{ value: 'xai', label: PROVIDER_LINKS.xai.name },
 				{ value: 'zai', label: PROVIDER_LINKS.zai.name },
 				{ value: 'zai-coding', label: PROVIDER_LINKS['zai-coding'].name },
+				{ value: 'deepseek', label: PROVIDER_LINKS.deepseek.name },
 				{ value: 'kimi', label: PROVIDER_LINKS.kimi.name },
 				{ value: 'minimax', label: PROVIDER_LINKS.minimax.name },
 			],
@@ -1430,6 +1436,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			xai: { enabled: provider === 'xai' },
 			zai: { enabled: provider === 'zai' },
 			'zai-coding': { enabled: provider === 'zai-coding' },
+			deepseek: { enabled: provider === 'deepseek' },
 			kimi: { enabled: provider === 'kimi' },
 			minimax: { enabled: provider === 'minimax' },
 		},

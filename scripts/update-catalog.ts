@@ -37,6 +37,7 @@ const SINGLE_PROVIDER_OWNER: Record<string, ModelOwner> = {
 	xai: 'xai',
 	zai: 'zai',
 	'zai-coding-plan': 'zai',
+	deepseek: 'deepseek',
 	minimax: 'minimax',
 };
 
@@ -67,6 +68,7 @@ const FAMILY_TO_OWNER: Record<string, ModelOwner> = {
 	'glm-air': 'zai',
 	'glm-z': 'zai',
 	'glm-free': 'zai',
+	deepseek: 'deepseek',
 	minimax: 'minimax',
 	'minimax-free': 'minimax',
 	grok: 'xai',
@@ -82,6 +84,7 @@ const OWNER_NPM: Partial<Record<ModelOwner, string>> = {
 	kimi: '@ai-sdk/openai-compatible',
 	qwen: '@ai-sdk/openai-compatible',
 	zai: '@ai-sdk/openai-compatible',
+	deepseek: '@ai-sdk/openai-compatible',
 	minimax: '@ai-sdk/anthropic',
 };
 
@@ -110,6 +113,8 @@ function resolveOwnedByFromModelId(modelId: string): ModelOwner | undefined {
 		lower.startsWith('thudm/')
 	)
 		return 'zai';
+	if (lower.includes('deepseek') || lower.startsWith('deepseek/'))
+		return 'deepseek';
 	if (lower.includes('minimax')) return 'minimax';
 	if (
 		lower.includes('grok') ||
@@ -159,6 +164,7 @@ function pickProviders(
 		xai: createEmptyEntry('xai'),
 		zai: createEmptyEntry('zai'),
 		'zai-coding': createEmptyEntry('zai-coding'),
+		deepseek: createEmptyEntry('deepseek'),
 		kimi: createEmptyEntry('kimi'),
 		minimax: createEmptyEntry('minimax'),
 		copilot: createEmptyEntry('copilot'),
@@ -175,6 +181,7 @@ function pickProviders(
 				'opencode',
 				'xai',
 				'zai',
+				'deepseek',
 				'minimax',
 				'ollama-cloud',
 			].includes(providerKey)

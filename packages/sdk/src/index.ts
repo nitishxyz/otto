@@ -154,6 +154,8 @@ export {
 export type { XaiProviderConfig } from './providers/src/index.ts';
 export { createZaiModel, createZaiCodingModel } from './providers/src/index.ts';
 export type { ZaiProviderConfig } from './providers/src/index.ts';
+export { createDeepSeekModel } from './providers/src/index.ts';
+export type { DeepSeekProviderConfig } from './providers/src/index.ts';
 export {
 	getOpenRouterInstance,
 	createOpenRouterModel,

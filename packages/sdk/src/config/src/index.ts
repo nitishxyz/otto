@@ -25,6 +25,7 @@ const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = {
 	xai: { enabled: false },
 	zai: { enabled: false },
 	'zai-coding': { enabled: false },
+	deepseek: { enabled: false },
 	kimi: { enabled: false },
 	minimax: { enabled: false },
 };

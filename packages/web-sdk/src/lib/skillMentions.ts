@@ -4,6 +4,11 @@ export interface SkillMentionSkill {
 	enabled?: boolean;
 }
 
+export interface UserMessageMentionAgent {
+	name: string;
+	description?: string;
+}
+
 const SKILL_MENTION_REGEX = /(^|[\s([{])([$@])([a-z0-9]+(?:-[a-z0-9]+)*)/g;
 const MESSAGE_MENTION_REGEX = /(^|[\s([{])(@[^\s@]+|\$[a-z0-9][a-z0-9-]*)/g;
 const TRAILING_PUNCTUATION_REGEX = /[.,;:!?)\]}'"`]+$/;
@@ -53,9 +58,11 @@ export function linkifyExplicitSkillMentions(
 export function linkifyUserMessageMentions(
 	content: string,
 	skills: SkillMentionSkill[],
+	agents: UserMessageMentionAgent[] = [],
 ): string {
 	if (!content.includes('$') && !content.includes('@')) return content;
 
+	const availableAgents = new Set(agents.map((agent) => agent.name));
 	const availableSkills = new Set(
 		skills
 			.filter((skill) => skill.enabled !== false)
@@ -74,6 +81,10 @@ export function linkifyUserMessageMentions(
 		const mentionToken = trailing ? token.slice(0, -trailing.length) : token;
 		const name = mentionToken.slice(1);
 		if (!name) return match;
+
+		if (availableAgents.has(name)) {
+			return `${prefix}[${mentionToken}](#otto-agent:${encodeURIComponent(name)})${trailing}`;
+		}
 
 		if (availableSkills.has(name)) {
 			return `${prefix}[${mentionToken}](#otto-skill:${encodeURIComponent(name)})${trailing}`;

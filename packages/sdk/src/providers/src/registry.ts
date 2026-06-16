@@ -39,6 +39,7 @@ const BUILTIN_COMPATIBILITY: Record<BuiltInProviderId, ProviderCompatibility> =
 		xai: 'openai',
 		zai: 'openai-compatible',
 		'zai-coding': 'openai-compatible',
+		deepseek: 'openai-compatible',
 		kimi: 'openai-compatible',
 		minimax: 'anthropic',
 	};
@@ -55,6 +56,7 @@ const BUILTIN_FAMILY: Record<BuiltInProviderId, ProviderPromptFamily> = {
 	xai: 'openai',
 	zai: 'glm',
 	'zai-coding': 'glm',
+	deepseek: 'openai-compatible',
 	kimi: 'kimi',
 	minimax: 'minimax',
 };

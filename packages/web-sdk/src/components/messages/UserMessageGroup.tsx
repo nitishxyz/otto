@@ -29,6 +29,7 @@ import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
 import { OttoKickoffNotice, isOttoKickoffMessage } from './OttoKickoffNotice';
 import { OttoWakeupNotice, isOttoWakeupMessage } from './OttoWakeupNotice';
 import { useSkills } from '../../hooks/useSkills';
+import { useMentionAgents } from '../../hooks/useAgents';
 import { useSkillsStore } from '../../stores/skillsStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 
@@ -63,8 +64,21 @@ export const UserMessageGroup = memo(
 	}: UserMessageGroupProps) {
 		const [expandedImage, setExpandedImage] = useState<string | null>(null);
 		const parts = message.parts || [];
+		const hasAtMention = parts.some((part) => {
+			if (part.type !== 'text') return false;
+			const data = part.contentJson || part.content;
+			if (data && typeof data === 'object' && 'text' in data) {
+				return String(data.text).includes('@');
+			}
+			if (typeof data === 'string') return data.includes('@');
+			if (data) return JSON.stringify(data).includes('@');
+			return false;
+		});
 		const queryClient = useQueryClient();
 		const { data: skillsConfig } = useSkills();
+		const { data: mentionAgentsData } = useMentionAgents({
+			enabled: hasAtMention,
+		});
 		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
 		const selectSkill = useSkillsStore((state) => state.selectSkill);
 		const openFile = useFileBrowserStore((state) => state.openFile);
@@ -117,6 +131,7 @@ export const UserMessageGroup = memo(
 		const renderedContent = linkifyUserMessageMentions(
 			contentAfterFileSelections,
 			skillsConfig?.items ?? [],
+			mentionAgentsData?.agents ?? [],
 		);
 
 		const images: Array<{ id: string; src: string }> = [];
@@ -335,6 +350,22 @@ export const UserMessageGroup = memo(
 														: href?.startsWith('otto-file:')
 															? href.slice('otto-file:'.length)
 															: null;
+													const agentHref = href?.startsWith('#otto-agent:')
+														? href.slice('#otto-agent:'.length)
+														: href?.startsWith('otto-agent:')
+															? href.slice('otto-agent:'.length)
+															: null;
+													if (agentHref) {
+														const agentName = decodeURIComponent(agentHref);
+														return (
+															<span
+																className={`${mentionHighlightClasses.agent} text-[0.92em] leading-normal`}
+																title={`Agent: ${agentName}`}
+															>
+																{children}
+															</span>
+														);
+													}
 													if (skillHref) {
 														const skillName = decodeURIComponent(skillHref);
 														return (

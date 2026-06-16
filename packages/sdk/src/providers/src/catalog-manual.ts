@@ -14,6 +14,7 @@ type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
 const ZAI_CODING_ID: BuiltInProviderId = 'zai-coding';
+const DEEPSEEK_ID: BuiltInProviderId = 'deepseek';
 
 const ZAI_CODING_MODEL_ORDER = [
 	'glm-5.2',
@@ -78,6 +79,7 @@ const OWNER_NPM: Record<ModelOwner, string> = {
 	kimi: '@ai-sdk/openai-compatible',
 	qwen: '@ai-sdk/openai-compatible',
 	zai: '@ai-sdk/openai-compatible',
+	deepseek: '@ai-sdk/openai-compatible',
 	minimax: '@ai-sdk/anthropic',
 };
 
@@ -208,6 +210,61 @@ const KIMI_MANUAL_MODELS: ModelInfo[] = [
 	},
 ];
 
+const DEEPSEEK_MANUAL_MODELS: ModelInfo[] = [
+	{
+		id: 'deepseek-v4-flash',
+		ownedBy: 'deepseek',
+		label: 'DeepSeek V4 Flash',
+		modalities: { input: ['text'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: false,
+		temperature: true,
+		knowledge: '2025-05',
+		openWeights: true,
+		cost: { input: 0.14, output: 0.28, cacheRead: 0.028 },
+		limit: { context: 1_000_000, output: 384_000 },
+	},
+	{
+		id: 'deepseek-v4-pro',
+		ownedBy: 'deepseek',
+		label: 'DeepSeek V4 Pro',
+		modalities: { input: ['text'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: false,
+		temperature: true,
+		knowledge: '2025-05',
+		openWeights: true,
+		cost: { input: 1.74, output: 3.84, cacheRead: 0.145 },
+		limit: { context: 1_000_000, output: 384_000 },
+	},
+	{
+		id: 'deepseek-chat',
+		ownedBy: 'deepseek',
+		label: 'DeepSeek Chat',
+		modalities: { input: ['text'], output: ['text'] },
+		toolCall: true,
+		reasoningText: false,
+		attachment: false,
+		temperature: true,
+		openWeights: true,
+		limit: { context: 64_000, output: 8_000 },
+	},
+	{
+		id: 'deepseek-reasoner',
+		ownedBy: 'deepseek',
+		label: 'DeepSeek Reasoner',
+		modalities: { input: ['text'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: false,
+		temperature: true,
+		openWeights: true,
+		limit: { context: 64_000, output: 8_000 },
+	},
+];
+
 export function filterAvailableKimiModels(models: ModelInfo[]): ModelInfo[] {
 	return models.filter((model) => !DEPRECATED_KIMI_MODEL_IDS.has(model.id));
 }
@@ -270,15 +327,46 @@ export function applyZaiCodingCatalogMetadata<T extends ProviderCatalogEntry>(
 	};
 }
 
+function buildDeepSeekEntry(
+	entry: ProviderCatalogEntry | undefined,
+): ProviderCatalogEntry {
+	const modelById = new Map(
+		(entry?.models ?? []).map((model) => [model.id, model]),
+	);
+	for (const model of DEEPSEEK_MANUAL_MODELS) {
+		const existing = modelById.get(model.id);
+		modelById.set(model.id, existing ? { ...existing, ...model } : model);
+	}
+	const models = DEEPSEEK_MANUAL_MODELS.map((model) =>
+		modelById.get(model.id),
+	).filter((model): model is ModelInfo => Boolean(model));
+	for (const model of modelById.values()) {
+		if (!models.some((existing) => existing.id === model.id))
+			models.push(model);
+	}
+	return {
+		...entry,
+		id: DEEPSEEK_ID,
+		label: 'DeepSeek',
+		env: ['DEEPSEEK_API_KEY'],
+		npm: '@ai-sdk/openai-compatible',
+		api: 'https://api.deepseek.com',
+		doc: 'https://api-docs.deepseek.com/',
+		models,
+	};
+}
+
 export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
 	const ollamaCloudEntry = base[OLLAMA_CLOUD_ID] ?? buildOllamaCloudEntry();
 	const manualEntry = buildOttoRouterEntry();
+	const deepSeekEntry = buildDeepSeekEntry(base[DEEPSEEK_ID]);
 	const merged: Record<BuiltInProviderId, ProviderCatalogEntry> = {
 		...(base as Record<BuiltInProviderId, ProviderCatalogEntry>),
 	};
 	merged[OLLAMA_CLOUD_ID] = ollamaCloudEntry;
+	merged[DEEPSEEK_ID] = deepSeekEntry;
 	const xaiEntry = appendXaiGrokCliModels(merged.xai);
 	if (xaiEntry) {
 		merged.xai = xaiEntry;

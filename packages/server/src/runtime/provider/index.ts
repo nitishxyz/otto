@@ -11,6 +11,7 @@ import {
 import { getXaiInstance } from './xai.ts';
 import { getZaiInstance, getZaiCodingInstance } from './zai.ts';
 import { resolveOpencodeModel } from './opencode.ts';
+import { getDeepSeekInstance } from './deepseek.ts';
 import { getKimiInstance } from './kimi.ts';
 import { getMinimaxInstance } from './minimax.ts';
 import { resolveCopilotModel } from './copilot.ts';
@@ -72,6 +73,9 @@ export async function resolveModel(
 	}
 	if (provider === 'zai-coding') {
 		return getZaiCodingInstance(cfg, model);
+	}
+	if (provider === 'deepseek') {
+		return getDeepSeekInstance(cfg, model);
 	}
 	if (provider === 'kimi') {
 		return getKimiInstance(cfg, model);

@@ -19,11 +19,6 @@ import { useShareStatus } from '../../hooks/useShareStatus';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { openUrl } from '../../lib/open-url';
 import { UsageRing } from '../common/UsageRing';
-import { UsageModal } from '../common/UsageModal';
-import { useProviderUsage } from '../../hooks/useProviderUsage';
-import { useAllModels } from '../../hooks/useConfig';
-import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
-import { useUsageStore } from '../../stores/usageStore';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { EditableTitle } from './EditableTitle';
@@ -98,28 +93,17 @@ export function LeanHeader({
 		return 'text-foreground';
 	};
 
-	const { data: allModels } = useAllModels();
-	const providerAuthType = allModels?.[session.provider]?.authType;
-	const { usage, isOAuthProvider } = useProviderUsage(
-		session.provider,
-		providerAuthType,
-	);
-	const isOttoRouter = session.provider === 'ottorouter';
-	useOttoRouterBalance(isOttoRouter ? 'ottorouter' : undefined);
-	const ottorouterUsage = useUsageStore((s) => s.usage.ottorouter);
-
 	const rootRef = useRef<HTMLDivElement>(null);
 	const width = useContainerWidth(rootRef);
 	const isCompact = width > 0 && width < 640;
 
 	return (
-		<>
-			<div
-				ref={rootRef}
-				className={`absolute top-0 left-0 right-0 h-12 border-b border-border bg-background/40 backdrop-blur-xl supports-[backdrop-filter]:bg-background/20 z-10 transition-transform duration-200 ${
-					isVisible ? 'translate-y-0' : '-translate-y-full'
-				}`}
-			>
+		<div
+			ref={rootRef}
+			className={`absolute top-0 left-0 right-0 h-12 border-b border-border bg-background/40 backdrop-blur-xl supports-[backdrop-filter]:bg-background/20 z-10 transition-transform duration-200 ${
+				isVisible ? 'translate-y-0' : '-translate-y-full'
+			}`}
+		>
 				<div className="h-full px-2.5 flex items-center justify-between gap-3 text-sm">
 					<div className="flex-1 min-w-0 flex items-center gap-1.5 text-muted-foreground">
 						{isBranch && (
@@ -175,14 +159,7 @@ export function LeanHeader({
 					<div className="flex-shrink-0 flex items-center gap-3 text-muted-foreground">
 						{isGenerating && <StopButton sessionId={session.id} />}
 						<ToolActivityToggle compact />
-
-						{isOAuthProvider && usage && (
-							<UsageRing usage={usage} provider={session.provider} />
-						)}
-
-						{isOttoRouter && ottorouterUsage && (
-							<UsageRing usage={ottorouterUsage} provider="ottorouter" />
-						)}
+						<UsageRing provider={session.provider} />
 
 						<div className="flex items-center gap-2">
 							<div
@@ -222,8 +199,6 @@ export function LeanHeader({
 						</div>
 					</div>
 				</div>
-			</div>
-			<UsageModal />
-		</>
+		</div>
 	);
 }

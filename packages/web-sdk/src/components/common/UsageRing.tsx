@@ -1,9 +1,10 @@
 import { memo } from 'react';
-import type { ProviderUsageResponse } from '../../types/api';
 import { useUsageStore } from '../../stores/usageStore';
+import { useProviderUsage } from '../../hooks/useProviderUsage';
+import { useAllModels } from '../../hooks/useConfig';
+import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 
 interface UsageRingProps {
-	usage: ProviderUsageResponse;
 	provider: string;
 }
 
@@ -18,11 +19,18 @@ function getColor(percent: number): string {
 	return '#3b82f6';
 }
 
-export const UsageRing = memo(function UsageRing({
-	usage,
-	provider,
-}: UsageRingProps) {
+export const UsageRing = memo(function UsageRing({ provider }: UsageRingProps) {
+	const { data: allModels } = useAllModels();
+	const providerAuthType = allModels?.[provider]?.authType;
+	useProviderUsage(provider, providerAuthType);
+	useOttoRouterBalance(provider === 'ottorouter' ? 'ottorouter' : undefined);
+
 	const openModal = useUsageStore((s) => s.openModal);
+	const usage = useUsageStore((s) =>
+		provider ? s.usage[provider] : undefined,
+	);
+
+	if (!usage) return null;
 	const percent = Math.max(
 		0,
 		Math.min(usage.primaryWindow?.usedPercent ?? 0, 100),

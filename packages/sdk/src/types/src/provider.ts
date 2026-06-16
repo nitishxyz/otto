@@ -13,6 +13,7 @@ export type BuiltInProviderId =
 	| 'xai'
 	| 'zai'
 	| 'zai-coding'
+	| 'deepseek'
 	| 'kimi'
 	| 'minimax';
 
@@ -69,6 +70,7 @@ export type ModelOwner =
 	| 'kimi'
 	| 'qwen'
 	| 'zai'
+	| 'deepseek'
 	| 'minimax';
 
 export type ModelProviderBinding = {

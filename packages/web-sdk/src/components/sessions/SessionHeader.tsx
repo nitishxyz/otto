@@ -23,6 +23,8 @@ import { openUrl } from '../../lib/open-url';
 import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { StopButton } from '../chat/StopButton';
 import { EditableTitle } from './EditableTitle';
+import { UsageRing } from '../common/UsageRing';
+import { UsageModal } from '../common/UsageModal';
 
 interface SessionHeaderProps {
 	session: Session;
@@ -114,10 +116,11 @@ export function SessionHeader({
 		: 'max-w-3xl mx-auto px-6 py-6';
 
 	return (
-		<div
-			ref={rootRef}
-			className="border-b border-border bg-background/95 backdrop-blur-sm"
-		>
+		<>
+			<div
+				ref={rootRef}
+				className="border-b border-border bg-background/95 backdrop-blur-sm"
+			>
 			<div className={headerWidthClass}>
 				{isBranch && (
 					<div className="flex items-center gap-2 mb-3 text-sm">
@@ -227,6 +230,7 @@ export function SessionHeader({
 					<div className="flex items-center gap-2 ml-auto">
 						{isGenerating && <StopButton sessionId={session.id} />}
 						<ToolActivityToggle compact={isCompact} />
+						<UsageRing provider={session.provider} />
 						<ProviderLogo provider={session.provider} size={18} />
 						{!isCompact && (
 							<span className="font-medium text-foreground">
@@ -237,5 +241,7 @@ export function SessionHeader({
 				</div>
 			</div>
 		</div>
+		<UsageModal />
+	</>
 	);
 }
