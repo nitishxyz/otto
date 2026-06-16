@@ -25,8 +25,9 @@ export function guardToolCall(
 		case 'read':
 			return guardReadPath(String(a.path ?? ''), context.projectRoot);
 		case 'write':
-		case 'copy_into':
 			return guardWritePath(toolName, a);
+		case 'copy_into':
+			return guardCopyIntoPath(a, context.projectRoot);
 		default:
 			return { type: 'allow' };
 	}
@@ -205,5 +206,20 @@ function guardWritePath(
 	for (const { pattern, reason } of SENSITIVE_WRITE_PATHS) {
 		if (pattern.test(p)) return { type: 'approve', reason };
 	}
+	return { type: 'allow' };
+}
+
+function guardCopyIntoPath(
+	args: Record<string, unknown>,
+	projectRoot?: string,
+): GuardAction {
+	const writeGuard = guardWritePath('copy_into', args);
+	if (writeGuard.type === 'block') return writeGuard;
+
+	const sourcePath = typeof args.sourcePath === 'string' ? args.sourcePath : '';
+	const readGuard = guardReadPath(sourcePath, projectRoot);
+	if (readGuard.type === 'block') return readGuard;
+	if (writeGuard.type === 'approve') return writeGuard;
+	if (readGuard.type === 'approve') return readGuard;
 	return { type: 'allow' };
 }

@@ -630,7 +630,7 @@ export const AssistantMessageGroup = memo(
 							<div className="flex items-center gap-x-1.5 md:gap-x-2 text-xs md:text-sm text-muted-foreground pl-2 md:pl-3 min-w-0">
 								{message.agent && (
 									<span
-										className="font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap"
+										className="font-medium text-violet-700 dark:text-violet-300 whitespace-nowrap flex-shrink-0"
 										title={message.agent}
 									>
 										{message.agent}
@@ -639,22 +639,24 @@ export const AssistantMessageGroup = memo(
 								{message.provider && (
 									<>
 										{message.agent && (
-											<span className="text-muted-foreground/50">·</span>
+											<span className="text-muted-foreground/50 flex-shrink-0">
+												·
+											</span>
 										)}
 										<ProviderLogo
 											provider={message.provider}
 											size={14}
-											className="opacity-70"
+											className="opacity-70 flex-shrink-0"
 										/>
 									</>
 								)}
 								{message.model && (
 									<>
-										<span className="hidden md:inline text-muted-foreground/50">
+										<span className="hidden md:inline text-muted-foreground/50 flex-shrink-0">
 											·
 										</span>
 										<span
-											className="hidden md:inline text-muted-foreground whitespace-nowrap"
+											className="hidden md:inline truncate text-muted-foreground min-w-0"
 											title={message.model}
 										>
 											{message.model}
@@ -663,8 +665,10 @@ export const AssistantMessageGroup = memo(
 								)}
 								{message.createdAt && (
 									<>
-										<span className="text-muted-foreground/50">·</span>
-										<span className="text-muted-foreground whitespace-nowrap">
+										<span className="text-muted-foreground/50 flex-shrink-0">
+											·
+										</span>
+										<span className="text-muted-foreground whitespace-nowrap flex-shrink-0">
 											{formatTime(message.createdAt)}
 										</span>
 									</>

@@ -313,6 +313,56 @@ describe('Built-in Tools', () => {
 				await readFile(join(projectRoot, 'copy-clamp-target.txt'), 'utf-8'),
 			).toBe('X\nY\n');
 		});
+
+		it('should accept absolute source and target paths inside the project', async () => {
+			const sourcePath = join(projectRoot, 'copy-absolute-source.txt');
+			const targetPath = join(projectRoot, 'copy-absolute-target.txt');
+			await writeFile(sourcePath, 'red\ngreen\nblue\n');
+			await writeFile(targetPath, 'alpha\nomega\n');
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+			const copyIntoTool = tools.find((t) => t.name === 'copy_into');
+
+			await readTool?.tool.execute({ path: targetPath });
+			const result = await copyIntoTool?.tool.execute({
+				sourcePath,
+				startLine: 2,
+				endLine: 2,
+				targetPath,
+				insertAtLine: 2,
+			});
+
+			expect(result).toMatchObject({ ok: true, linesCopied: 1 });
+			expect(await readFile(targetPath, 'utf-8')).toBe('alpha\ngreen\nomega\n');
+		});
+
+		it('should copy from an absolute source path outside the project', async () => {
+			const externalDir = join(testDir, 'external-project');
+			await mkdir(externalDir, { recursive: true });
+			const sourcePath = join(externalDir, 'source.txt');
+			await writeFile(sourcePath, 'outside-a\noutside-b\n');
+			await writeFile(
+				join(projectRoot, 'copy-external-target.txt'),
+				'inside\n',
+			);
+			const { tools } = await discoverProjectTools(projectRoot);
+			const readTool = tools.find((t) => t.name === 'read');
+			const copyIntoTool = tools.find((t) => t.name === 'copy_into');
+
+			await readTool?.tool.execute({ path: 'copy-external-target.txt' });
+			const result = await copyIntoTool?.tool.execute({
+				sourcePath,
+				startLine: 1,
+				endLine: 'end',
+				targetPath: 'copy-external-target.txt',
+				insertAtLine: 'append',
+			});
+
+			expect(result).toMatchObject({ ok: true, linesCopied: 2 });
+			expect(
+				await readFile(join(projectRoot, 'copy-external-target.txt'), 'utf-8'),
+			).toBe('inside\noutside-a\noutside-b\n');
+		});
 	});
 
 	describe('ls tool', () => {

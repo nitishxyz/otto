@@ -1,10 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { relative as relativePath, resolve as resolvePath } from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './copy-into.txt' with { type: 'text' };
 import {
 	buildMutationMetadata,
 	buildWriteArtifact,
+	expandTilde,
 	isAbsoluteLike,
 	resolveSafePath,
 } from './util.ts';
@@ -32,7 +34,9 @@ const insertAtLineSchema = z.union([
 const copyIntoSchema = z.object({
 	sourcePath: z
 		.string()
-		.describe('Relative source file path within the project.'),
+		.describe(
+			"Source file path. Relative paths are resolved within the project; absolute ('/...') and home ('~/...') paths are allowed for copying from other projects.",
+		),
 	startLine: z
 		.number()
 		.int()
@@ -43,7 +47,9 @@ const copyIntoSchema = z.object({
 	),
 	targetPath: z
 		.string()
-		.describe('Relative target file path within the project.'),
+		.describe(
+			'Project target file path. Relative paths are resolved within the project; absolute paths are accepted when they are inside the project root.',
+		),
 	insertAtLine: insertAtLineSchema
 		.optional()
 		.describe(
@@ -86,14 +92,27 @@ function joinLinesForEdit(lines: string[], trailingNewline: boolean): string {
 	return trailingNewline ? `${joined}\n` : joined;
 }
 
-function validateRelativePath(path: string, label: string): string | undefined {
+function validatePath(path: string, label: string): string | undefined {
 	if (!path || path.trim().length === 0) {
 		return `Missing required parameter: ${label}`;
 	}
-	if (isAbsoluteLike(path)) {
-		return `Refusing to access outside project root: ${path}. Use a relative path within the project.`;
-	}
 	return undefined;
+}
+
+function resolveSourcePath(projectRoot: string, path: string): string {
+	const expanded = expandTilde(path);
+	return isAbsoluteLike(expanded)
+		? resolvePath(expanded)
+		: resolveSafePath(projectRoot, expanded);
+}
+
+function resolveTargetPath(projectRoot: string, path: string): string {
+	return resolveSafePath(projectRoot, expandTilde(path));
+}
+
+function toProjectRelativePath(projectRoot: string, absPath: string): string {
+	const relative = relativePath(resolvePath(projectRoot), absPath) || '.';
+	return relative.replace(/\\/g, '/');
 }
 
 function resolveEndLine(value: LineEndpoint, lineCount: number): number {
@@ -219,10 +238,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 				artifact: unknown;
 			}>
 		> {
-			const sourcePathError = validateRelativePath(
-				input.sourcePath,
-				'sourcePath',
-			);
+			const sourcePathError = validatePath(input.sourcePath, 'sourcePath');
 			if (sourcePathError) {
 				return createToolError(sourcePathError, 'validation', {
 					parameter: 'sourcePath',
@@ -230,10 +246,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 					suggestion: 'Use a relative path within the project',
 				});
 			}
-			const targetPathError = validateRelativePath(
-				input.targetPath,
-				'targetPath',
-			);
+			const targetPathError = validatePath(input.targetPath, 'targetPath');
 			if (targetPathError) {
 				return createToolError(targetPathError, 'validation', {
 					parameter: 'targetPath',
@@ -242,11 +255,25 @@ export function buildCopyIntoTool(projectRoot: string): {
 				});
 			}
 
-			const sourceAbs = resolveSafePath(projectRoot, input.sourcePath);
-			const targetAbs = resolveSafePath(projectRoot, input.targetPath);
+			let sourceAbs: string;
+			let targetAbs: string;
+			try {
+				sourceAbs = resolveSourcePath(projectRoot, input.sourcePath);
+				targetAbs = resolveTargetPath(projectRoot, input.targetPath);
+			} catch (error: unknown) {
+				return createToolError(
+					`Invalid source or target path: ${error instanceof Error ? error.message : String(error)}`,
+					'validation',
+					{
+						suggestion:
+							'Use a target path inside the current project. Source paths may be relative, absolute, or ~/ paths.',
+					},
+				);
+			}
+			const targetDisplayPath = toProjectRelativePath(projectRoot, targetAbs);
 
 			try {
-				await assertFreshRead(projectRoot, targetAbs, input.targetPath);
+				await assertFreshRead(projectRoot, targetAbs, targetDisplayPath);
 				const [sourceContent, targetContent] = await Promise.all([
 					readFile(sourceAbs, 'utf-8'),
 					readFile(targetAbs, 'utf-8'),
@@ -283,7 +310,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 				await rememberFileWrite(projectRoot, targetAbs);
 				const metadata = buildMutationMetadata(targetContent, nextContent);
 				const artifact = await buildWriteArtifact(
-					input.targetPath,
+					targetDisplayPath,
 					true,
 					targetContent,
 					nextContent,

@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Terminal, FileEdit, Diff, type LucideIcon } from 'lucide-react';
 import type { MessagePart } from '../../types/api';
+import {
+	extractStreamingMultiEditPreviewEdits,
+	type StringEditPreview,
+} from '../../hooks/tool-preview-helpers';
 import { StableSpinner } from '../ui/StableSpinner';
 import { ToolResultRenderer, type ContentJson } from './renderers';
 import { useIsCompactThread } from './threadDensity';
@@ -494,9 +498,50 @@ function getContentFromArgs(
 	if (toolName === 'write') return String(args.content || '');
 	if (toolName === 'apply_patch') return String(args.patch || '');
 	if (toolName === 'edit') return String(args.oldString || '');
-	if (toolName === 'multiedit') return '';
+	if (toolName === 'multiedit') return getMultiEditContentFromArgs(args);
 	if (toolName === 'copy_into') return '';
 	return '';
+}
+
+function getPatchTextLines(value: string): string[] {
+	if (value.length === 0) return [];
+	const lines = value.split('\n');
+	if (value.endsWith('\n')) lines.pop();
+	return lines;
+}
+
+function formatMultiEditContent(edits: StringEditPreview[]): string {
+	const validEdits = edits.filter(
+		(edit) => edit.oldString.length > 0 || edit.newString.length > 0,
+	);
+	if (validEdits.length === 0) return '';
+
+	const lines: string[] = [];
+	for (let index = 0; index < validEdits.length; index += 1) {
+		const edit = validEdits[index];
+		if (lines.length > 0) lines.push('');
+		for (const line of getPatchTextLines(edit.oldString)) {
+			lines.push(`-${line}`);
+		}
+		for (const line of getPatchTextLines(edit.newString)) {
+			lines.push(`+${line}`);
+		}
+	}
+
+	return lines.join('\n');
+}
+
+function getMultiEditContentFromArgs(args: Record<string, unknown>): string {
+	const rawEdits = Array.isArray(args.edits) ? args.edits : [];
+	const edits = rawEdits.flatMap((edit) => {
+		if (!edit || typeof edit !== 'object' || Array.isArray(edit)) return [];
+		const record = edit as Record<string, unknown>;
+		return typeof record.oldString === 'string' &&
+			typeof record.newString === 'string'
+			? [{ oldString: record.oldString, newString: record.newString }]
+			: [];
+	});
+	return formatMultiEditContent(edits);
 }
 
 function extractJsonStringField(raw: string, field: string): string {
@@ -601,7 +646,8 @@ function getContentFromStream(toolName: string, raw: string): string {
 	if (toolName === 'apply_patch')
 		return extractJsonStringFieldPreview(raw, 'patch');
 	if (toolName === 'edit') return extractJsonStringField(raw, 'oldString');
-	if (toolName === 'multiedit') return '';
+	if (toolName === 'multiedit')
+		return formatMultiEditContent(extractStreamingMultiEditPreviewEdits(raw));
 	if (toolName === 'copy_into') return '';
 	return '';
 }

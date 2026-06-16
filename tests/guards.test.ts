@@ -165,6 +165,45 @@ describe('guardToolCall', () => {
 		});
 	});
 
+	describe('copy_into — source and target path guards', () => {
+		test('allows absolute source paths inside the current project root', () => {
+			const projectRoot = resolve('/tmp/otto-project');
+			const sourcePath = join(projectRoot, 'fixtures', 'source.txt');
+
+			expect(
+				guardToolCall(
+					'copy_into',
+					{ sourcePath, targetPath: 'target.txt' },
+					{ projectRoot },
+				).type,
+			).toBe('allow');
+		});
+
+		test('requires approval for absolute source paths outside the project', () => {
+			const projectRoot = resolve('/tmp/otto-project');
+
+			expect(
+				guardToolCall(
+					'copy_into',
+					{
+						sourcePath: '/tmp/other-project/source.txt',
+						targetPath: 'target.txt',
+					},
+					{ projectRoot },
+				).type,
+			).toBe('approve');
+		});
+
+		test('blocks sensitive copy source paths', () => {
+			expect(
+				guardToolCall('copy_into', {
+					sourcePath: '/etc/shadow',
+					targetPath: 'target.txt',
+				}).type,
+			).toBe('block');
+		});
+	});
+
 	describe('write — path guards', () => {
 		test('requires approval for .env files', () => {
 			expect(guardToolCall('write', { path: '.env' }).type).toBe('approve');

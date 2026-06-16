@@ -1,9 +1,10 @@
-Copy a line range from one project file into another project file without reprinting the copied content.
+Copy a line range from one file into a project file without reprinting the copied content.
 
 Use this when duplicating large existing content such as SVGs, licenses, generated blocks, examples, or repeated config snippets.
 
 Rules:
-- Source and target paths must be relative paths within the project.
+- Source paths may be relative to the project, absolute, or `~/...` so content can be copied from another project.
+- Target paths must resolve within the current project. Absolute target paths are accepted only when they are inside the project root.
 - You must read the target file first in the current session before modifying it.
 - Line numbers are 1-indexed and inclusive.
 - `endLine` may be a line number, `"end"`, or `"eof"`. Prefer `"end"` over guessed sentinel values like `999`.

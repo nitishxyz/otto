@@ -37,6 +37,7 @@ import { useSkills } from '../../hooks/useSkills';
 import { useMentionAgents } from '../../hooks/useAgents';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { useVimMode } from '../../hooks/useVimMode';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
@@ -173,6 +174,9 @@ export const ChatInput = memo(
 		>(null);
 		const textareaRef = useRef<HTMLTextAreaElement>(null);
 		const agentDropdownRef = useRef<HTMLDivElement>(null);
+		const footerRef = useRef<HTMLDivElement>(null);
+		const footerWidth = useContainerWidth(footerRef);
+		const isFooterCompact = footerWidth > 0 && footerWidth < 640;
 
 		const { preferences, updatePreferences } = usePreferences();
 		const { data: configData } = useConfig();
@@ -823,7 +827,7 @@ export const ChatInput = memo(
 					/>
 				) : null}
 				<div className="absolute bottom-0 left-0 right-0 px-2 pt-16 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20">
-					<div className={inputWidthClass}>
+					<div ref={footerRef} className={inputWidthClass}>
 						{preferences.vimMode && vimMode === 'normal' && (
 							<div className="absolute -top-6 right-0 px-2 py-0.5 text-xs font-mono font-semibold bg-amber-500/90 text-white rounded shadow-sm">
 								NORMAL
@@ -1011,9 +1015,9 @@ export const ChatInput = memo(
 										showAgentDropdown ? 'overflow-visible' : 'overflow-hidden'
 									}
 								>
-									<div className="grid grid-cols-[auto_1fr_auto] items-center mt-1 px-3">
+									<div className="relative flex items-center justify-between mt-1 px-3">
 										<div
-											className="justify-self-start flex-shrink-0 relative"
+											className="flex justify-start items-center min-w-0 relative z-10 bg-background pr-2"
 											ref={agentDropdownRef}
 										>
 											{agent && agentLocked && (
@@ -1053,13 +1057,13 @@ export const ChatInput = memo(
 												</div>
 											)}
 										</div>
-										<div className="justify-self-center">
+										<div className="absolute inset-x-0 flex justify-center items-center pointer-events-none">
 											{(providerName || modelName || authType) && (
-												<div className="text-[10px] text-muted-foreground flex items-center gap-1 px-2 py-0.5">
+												<div className="text-[10px] text-muted-foreground flex items-center gap-1 px-2 py-0.5 min-w-0 max-w-[55%] pointer-events-auto">
 													<button
 														type="button"
 														onClick={onModelInfoClick}
-														className="flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer"
+														className="flex items-center gap-1 transition-colors hover:text-foreground cursor-pointer min-w-0"
 													>
 														{providerName && (
 															<>
@@ -1071,7 +1075,9 @@ export const ChatInput = memo(
 																<span className="opacity-40">/</span>
 															</>
 														)}
-														{modelName && <span>{modelName}</span>}
+														{modelName && (
+															<span className="truncate">{modelName}</span>
+														)}
 														{isCustomProvider && (
 															<span className="opacity-50">(custom)</span>
 														)}
@@ -1090,19 +1096,23 @@ export const ChatInput = memo(
 												</div>
 											)}
 										</div>
-										<div className="justify-self-end flex-shrink-0 flex items-center gap-2">
+										<div className="flex justify-end items-center gap-2 min-w-0 relative z-10 bg-background pl-2">
 											{reasoningEnabled && (
-												<span className="text-[10px] text-indigo-600 dark:text-indigo-300 flex items-center gap-1 w-[52px] justify-center">
+												<span className="text-[10px] text-indigo-600 dark:text-indigo-300 flex items-center gap-1">
 													<Brain className="h-3 w-3 flex-shrink-0" />
-													{(
-														configData?.defaults?.reasoningLevel ?? 'high'
-													).replace('xhigh', 'x-high')}
+													{!isFooterCompact && (
+														<span>
+															{(
+																configData?.defaults?.reasoningLevel ?? 'high'
+															).replace('xhigh', 'x-high')}
+														</span>
+													)}
 												</span>
 											)}
 											{visionEnabled && (
 												<span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
 													<ImageIcon className="h-3 w-3" />
-													images
+													{!isFooterCompact && <span>images</span>}
 												</span>
 											)}
 										</div>
