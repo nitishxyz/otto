@@ -50,6 +50,7 @@ const defaultsUpdateBodySchema = z.object({
 	smartEdges: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
+	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
@@ -72,6 +73,7 @@ const defaultsSchema = z.object({
 	smartEdges: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
+	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
@@ -130,6 +132,7 @@ export function registerDefaultsRoute(app: Hono) {
 					smartEdges?: boolean;
 					releaseToSend?: boolean;
 					fullWidthContent?: boolean;
+					notificationsEnabled?: boolean;
 					autoCompactThresholdTokens?: number | null;
 					coAuthorCommits?: boolean;
 					ottoEnabled?: boolean;
@@ -153,6 +156,7 @@ export function registerDefaultsRoute(app: Hono) {
 					smartEdges: boolean;
 					releaseToSend: boolean;
 					fullWidthContent: boolean;
+					notificationsEnabled: boolean;
 					autoCompactThresholdTokens: number | null;
 					coAuthorCommits: boolean;
 					ottoEnabled: boolean;
@@ -190,6 +194,8 @@ export function registerDefaultsRoute(app: Hono) {
 					updates.releaseToSend = body.releaseToSend;
 				if (body.fullWidthContent !== undefined)
 					updates.fullWidthContent = body.fullWidthContent;
+				if (body.notificationsEnabled !== undefined)
+					updates.notificationsEnabled = body.notificationsEnabled;
 				if (body.autoCompactThresholdTokens !== undefined) {
 					const threshold = body.autoCompactThresholdTokens;
 					if (threshold === null) {

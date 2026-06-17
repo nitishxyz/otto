@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useConfig, useUpdateDefaults } from './useConfig';
 import { notifyPlatformFontFamilyChanged } from '../lib/platform';
+import { getDefaultNotificationsEnabled } from '../lib/notifications';
 
 interface Preferences {
 	vimMode: boolean;
@@ -9,6 +10,7 @@ interface Preferences {
 	smartEdges: boolean;
 	releaseToSend: boolean;
 	fullWidthContent: boolean;
+	notificationsEnabled: boolean;
 }
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
@@ -19,6 +21,7 @@ const DEFAULT_PREFERENCES: Preferences = {
 	smartEdges: true,
 	releaseToSend: false,
 	fullWidthContent: false,
+	notificationsEnabled: false,
 };
 
 function cssFontFamily(fontFamily: string): string {
@@ -67,6 +70,9 @@ export function usePreferences() {
 			fullWidthContent:
 				config?.defaults?.fullWidthContent ??
 				DEFAULT_PREFERENCES.fullWidthContent,
+			notificationsEnabled:
+				config?.defaults?.notificationsEnabled ??
+				getDefaultNotificationsEnabled(),
 		}),
 		[
 			config?.defaults?.vimMode,
@@ -75,6 +81,7 @@ export function usePreferences() {
 			config?.defaults?.smartEdges,
 			config?.defaults?.releaseToSend,
 			config?.defaults?.fullWidthContent,
+			config?.defaults?.notificationsEnabled,
 		],
 	);
 
@@ -104,6 +111,9 @@ export function usePreferences() {
 			}
 			if (updates.fullWidthContent !== undefined) {
 				nextUpdates.fullWidthContent = updates.fullWidthContent;
+			}
+			if (updates.notificationsEnabled !== undefined) {
+				nextUpdates.notificationsEnabled = updates.notificationsEnabled;
 			}
 
 			if (Object.keys(nextUpdates).length === 0) {

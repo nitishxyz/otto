@@ -58,6 +58,7 @@ const configDefaultsSchema = z.object({
 	smartEdges: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
+	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 	ottoEnabled: z.boolean().optional(),
@@ -195,6 +196,11 @@ export function registerMainConfigRoute(app: Hono) {
 							embeddedConfig?.defaults?.fullWidthContent,
 							cfg.defaults.fullWidthContent,
 						) ?? false,
+					notificationsEnabled: getDefault(
+						undefined,
+						embeddedConfig?.defaults?.notificationsEnabled,
+						cfg.defaults.notificationsEnabled,
+					),
 					autoCompactThresholdTokens:
 						getDefault(
 							undefined,

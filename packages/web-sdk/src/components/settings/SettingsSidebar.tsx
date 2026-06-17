@@ -19,6 +19,7 @@ import {
 	Brain,
 	BarChart3,
 	Mic,
+	Bell,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
@@ -47,6 +48,11 @@ import {
 	listPlatformSystemFonts,
 	isPlatformDesktop,
 } from '../../lib/platform';
+import {
+	getBrowserNotificationPermission,
+	requestBrowserNotificationPermission,
+} from '../../lib/notifications';
+import { toast } from '../../stores/toastStore';
 import { ReasoningTabs, type ReasoningLevel } from '../chat/ReasoningTabs';
 
 const SETTINGS_PANEL_KEY = 'settings';
@@ -577,7 +583,12 @@ interface PreferencesModalProps {
 	onClose: () => void;
 }
 
-type PreferencesTab = 'editor' | 'automation' | 'reasoning' | 'dictation';
+type PreferencesTab =
+	| 'editor'
+	| 'notifications'
+	| 'automation'
+	| 'reasoning'
+	| 'dictation';
 
 const PREFERENCE_TABS: Array<{
 	id: PreferencesTab;
@@ -590,6 +601,12 @@ const PREFERENCE_TABS: Array<{
 		label: 'Editor',
 		description: 'Input, layout, and appearance',
 		icon: <Type className="h-4 w-4" />,
+	},
+	{
+		id: 'notifications',
+		label: 'Notifications',
+		description: 'Background update alerts',
+		icon: <Bell className="h-4 w-4" />,
 	},
 	{
 		id: 'automation',
@@ -617,7 +634,75 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	const updateDefaults = useUpdateDefaults();
 	const isDesktop = isPlatformDesktop();
 	const [activeTab, setActiveTab] = useState<PreferencesTab>('editor');
+	const [notificationPermission, setNotificationPermission] = useState(() =>
+		getBrowserNotificationPermission(),
+	);
 	const activeTabConfig = PREFERENCE_TABS.find((tab) => tab.id === activeTab);
+	const notificationDescription = useMemo(() => {
+		if (isDesktop) {
+			return 'Show native desktop notifications when sessions update in the background.';
+		}
+		if (notificationPermission === 'granted') {
+			return 'Show browser notifications when sessions update in the background.';
+		}
+		if (notificationPermission === 'denied') {
+			return 'Browser notifications are blocked. Re-enable them in browser settings first.';
+		}
+		if (notificationPermission === 'unsupported') {
+			return 'Browser notifications are not supported in this browser.';
+		}
+		return 'Ask for browser permission, then notify when sessions update in the background.';
+	}, [isDesktop, notificationPermission]);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		setNotificationPermission(getBrowserNotificationPermission());
+	}, [isOpen]);
+
+	const handleNotificationsEnabledChange = useCallback(
+		async (checked: boolean) => {
+			if (!checked) {
+				updatePreferences({ notificationsEnabled: false });
+				return;
+			}
+
+			if (isDesktop) {
+				updatePreferences({ notificationsEnabled: true });
+				toast.success('Desktop notifications enabled.');
+				return;
+			}
+
+			const permission = getBrowserNotificationPermission();
+			setNotificationPermission(permission);
+			if (permission === 'unsupported') {
+				updatePreferences({ notificationsEnabled: false });
+				toast.info('Browser notifications are not supported here.');
+				return;
+			}
+			if (permission === 'denied') {
+				updatePreferences({ notificationsEnabled: false });
+				toast.error('Browser notifications are blocked in browser settings.');
+				return;
+			}
+			if (permission === 'granted') {
+				updatePreferences({ notificationsEnabled: true });
+				toast.success('Browser notifications enabled.');
+				return;
+			}
+
+			const nextPermission = await requestBrowserNotificationPermission();
+			setNotificationPermission(nextPermission);
+			if (nextPermission === 'granted') {
+				updatePreferences({ notificationsEnabled: true });
+				toast.success('Browser notifications enabled.');
+				return;
+			}
+
+			updatePreferences({ notificationsEnabled: false });
+			toast.info('Browser notifications were not enabled.');
+		},
+		[isDesktop, updatePreferences],
+	);
 
 	const renderActiveTab = () => {
 		switch (activeTab) {
@@ -662,6 +747,25 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 								onChange={(fontFamily) => updatePreferences({ fontFamily })}
 							/>
 						</div>
+					</div>
+				);
+			case 'notifications':
+				return (
+					<div className="divide-y divide-border/60">
+						<ToggleRow
+							label="System Notifications"
+							description={notificationDescription}
+							checked={preferences.notificationsEnabled}
+							onChange={handleNotificationsEnabledChange}
+						/>
+						{!isDesktop ? (
+							<div className="py-2">
+								<SettingRow
+									label="Browser permission"
+									value={notificationPermission}
+								/>
+							</div>
+						) : null}
 					</div>
 				);
 			case 'automation':

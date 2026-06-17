@@ -38,6 +38,7 @@ export type DefaultConfig = {
 	smartEdges?: boolean;
 	releaseToSend?: boolean;
 	fullWidthContent?: boolean;
+	notificationsEnabled?: boolean;
 	autoCompactThresholdTokens?: number | null;
 	/** Adds the ottocode bot as a co-author on commits made through Otto. */
 	coAuthorCommits?: boolean;

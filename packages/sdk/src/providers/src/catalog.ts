@@ -3420,12 +3420,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-24',
 					openWeights: true,
 					cost: {
-						input: 0.098,
-						output: 0.196,
+						input: 0.09,
+						output: 0.18,
 						cacheRead: 0.02,
 					},
 					limit: {
-						context: 1048575,
+						context: 1000000,
 						output: 65536,
 					},
 				},
@@ -4947,13 +4947,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-12',
 					openWeights: true,
 					cost: {
-						input: 0.75,
+						input: 0.74,
 						output: 3.5,
-						cacheRead: 0.16,
+						cacheRead: 0.15,
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 16384,
 					},
 				},
 				{
@@ -5133,8 +5133,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.5,
-						output: 2.5,
-						cacheRead: 0.15,
+						output: 2.2,
+						cacheRead: 0.1,
 					},
 					limit: {
 						context: 262144,
@@ -8248,13 +8248,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-07-28',
 					openWeights: true,
 					cost: {
-						input: 0.125,
+						input: 0.13,
 						output: 0.85,
-						cacheRead: 0.06,
+						cacheRead: 0.025,
 					},
 					limit: {
-						context: 131070,
-						output: 131070,
+						context: 131072,
+						output: 98304,
 					},
 				},
 				{
@@ -8483,8 +8483,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.26,
 					},
 					limit: {
-						context: 1048576,
-						output: 131072,
+						context: 262144,
+						output: 262144,
 					},
 				},
 			],

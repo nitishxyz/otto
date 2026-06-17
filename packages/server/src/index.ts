@@ -245,6 +245,7 @@ export type EmbeddedAppConfig = {
 		smartEdges?: boolean;
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
+		notificationsEnabled?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
 		ottoEnabled?: boolean;

@@ -13,9 +13,12 @@ import { openUrl } from '../lib/open-url';
 import {
 	getPlatformWindowFocused,
 	hasPlatformOpenUrl,
+	isPlatformDesktop,
 	openPlatformSession,
 	showPlatformNotification,
 } from '../lib/platform';
+import { requestBrowserNotificationPermission } from '../lib/notifications';
+import { usePreferences } from './usePreferences';
 import { sessionsQueryKey } from './useSessions';
 
 type DesktopNotificationMessage = {
@@ -52,32 +55,6 @@ function openNotificationTarget(notification: NotificationEvent) {
 	}
 
 	openUrl(href);
-}
-
-function requestNotificationPermission() {
-	return new Promise<NotificationPermission>((resolve) => {
-		let settled = false;
-		let hasNativeRequest = false;
-		const finish = (permission?: NotificationPermission) => {
-			if (settled) return;
-			settled = true;
-			setTimeout(() => resolve(permission ?? Notification.permission), 100);
-		};
-
-		try {
-			const result = Notification.requestPermission(finish);
-			if (result && typeof result.then === 'function') {
-				hasNativeRequest = true;
-				result.then(finish).catch(() => finish());
-			}
-		} catch {
-			finish();
-		}
-
-		if (!hasNativeRequest) {
-			setTimeout(() => finish(), 60_000);
-		}
-	});
 }
 
 function showInAppNotification(notification: NotificationEvent) {
@@ -257,13 +234,21 @@ async function maybeShowLocalAccessToast(baseUrl: string) {
 
 export function useClientEvents(activeSessionId?: string) {
 	const queryClient = useQueryClient();
+	const { preferences } = usePreferences();
 	const activeSessionIdRef = useRef(activeSessionId);
+	const notificationsEnabledRef = useRef(preferences.notificationsEnabled);
 
 	useEffect(() => {
 		activeSessionIdRef.current = activeSessionId;
 	}, [activeSessionId]);
 
 	useEffect(() => {
+		notificationsEnabledRef.current = preferences.notificationsEnabled;
+	}, [preferences.notificationsEnabled]);
+
+	useEffect(() => {
+		if (!preferences.notificationsEnabled) return;
+		if (isPlatformDesktop()) return;
 		if (typeof window === 'undefined' || window.parent !== window) return;
 		if (!('Notification' in window)) return;
 		if (Notification.permission !== 'default') return;
@@ -281,7 +266,7 @@ export function useClientEvents(activeSessionId?: string) {
 			action: {
 				label: 'Enable',
 				onClick: async () => {
-					const permission = await requestNotificationPermission();
+					const permission = await requestBrowserNotificationPermission();
 					const currentPermission = Notification.permission;
 					if (permission === 'granted' || currentPermission === 'granted') {
 						toast.success('Browser notifications enabled.');
@@ -296,7 +281,7 @@ export function useClientEvents(activeSessionId?: string) {
 				},
 			},
 		});
-	}, []);
+	}, [preferences.notificationsEnabled]);
 
 	useEffect(() => {
 		const controller = new AbortController();
@@ -335,7 +320,7 @@ export function useClientEvents(activeSessionId?: string) {
 						const isSessionNotification =
 							notification.source === 'session' || !!notification.sessionId;
 						let sentSystemNotification = false;
-						if (!isActiveVisibleSession) {
+						if (notificationsEnabledRef.current && !isActiveVisibleSession) {
 							sentSystemNotification = sendBrowserNotification(notification);
 						}
 

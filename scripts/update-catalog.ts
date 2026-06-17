@@ -554,7 +554,8 @@ async function main() {
 	}
 
 	if (picked) {
-		await writeRemoteCatalogJson(picked, ottorouterEntry);
+		const merged = mergeManualCatalog(picked);
+		await writeRemoteCatalogJson(merged, ottorouterEntry);
 	}
 }
 

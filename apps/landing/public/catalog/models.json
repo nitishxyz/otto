@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-06-16T22:47:47.507Z",
+	"updatedAt": "2026-06-17T20:17:57.738Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -3419,12 +3419,12 @@
 					"lastUpdated": "2026-04-24",
 					"openWeights": true,
 					"cost": {
-						"input": 0.098,
-						"output": 0.196,
+						"input": 0.09,
+						"output": 0.18,
 						"cacheRead": 0.02
 					},
 					"limit": {
-						"context": 1048575,
+						"context": 1000000,
 						"output": 65536
 					}
 				},
@@ -4946,13 +4946,13 @@
 					"lastUpdated": "2026-06-12",
 					"openWeights": true,
 					"cost": {
-						"input": 0.75,
+						"input": 0.74,
 						"output": 3.5,
-						"cacheRead": 0.16
+						"cacheRead": 0.15
 					},
 					"limit": {
 						"context": 262144,
-						"output": 262144
+						"output": 16384
 					}
 				},
 				{
@@ -5132,8 +5132,8 @@
 					"openWeights": true,
 					"cost": {
 						"input": 0.5,
-						"output": 2.5,
-						"cacheRead": 0.15
+						"output": 2.2,
+						"cacheRead": 0.1
 					},
 					"limit": {
 						"context": 262144,
@@ -8247,13 +8247,13 @@
 					"lastUpdated": "2025-07-28",
 					"openWeights": true,
 					"cost": {
-						"input": 0.125,
+						"input": 0.13,
 						"output": 0.85,
-						"cacheRead": 0.06
+						"cacheRead": 0.025
 					},
 					"limit": {
-						"context": 131070,
-						"output": 131070
+						"context": 131072,
+						"output": 98304
 					}
 				},
 				{
@@ -8482,8 +8482,8 @@
 						"cacheRead": 0.26
 					},
 					"limit": {
-						"context": 1048576,
-						"output": 131072
+						"context": 262144,
+						"output": 262144
 					}
 				}
 			],
@@ -14582,6 +14582,268 @@
 					}
 				},
 				{
+					"id": "kimi-k2-0711-preview",
+					"ownedBy": "kimi",
+					"label": "Kimi K2 0711",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": false,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-10",
+					"releaseDate": "2025-07-14",
+					"lastUpdated": "2025-07-14",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6029999999999999,
+						"output": 2.5124999999999997,
+						"cacheRead": 0.15074999999999997
+					},
+					"limit": {
+						"context": 131072,
+						"output": 16384
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2-0905-preview",
+					"ownedBy": "kimi",
+					"label": "Kimi K2 0905",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": false,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-10",
+					"releaseDate": "2025-09-05",
+					"lastUpdated": "2025-09-05",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6029999999999999,
+						"output": 2.5124999999999997,
+						"cacheRead": 0.15074999999999997
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2-thinking",
+					"ownedBy": "kimi",
+					"label": "Kimi K2 Thinking",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-08",
+					"releaseDate": "2025-11-06",
+					"lastUpdated": "2025-11-06",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6029999999999999,
+						"output": 2.5124999999999997,
+						"cacheRead": 0.15074999999999997
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2-thinking-turbo",
+					"ownedBy": "kimi",
+					"label": "Kimi K2 Thinking Turbo",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-08",
+					"releaseDate": "2025-11-06",
+					"lastUpdated": "2025-11-06",
+					"openWeights": true,
+					"cost": {
+						"input": 1.1557499999999998,
+						"output": 8.04,
+						"cacheRead": 0.15074999999999997
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2-turbo-preview",
+					"ownedBy": "kimi",
+					"label": "Kimi K2 Turbo",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": false,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-10",
+					"releaseDate": "2025-09-05",
+					"lastUpdated": "2025-09-05",
+					"openWeights": true,
+					"cost": {
+						"input": 2.4119999999999995,
+						"output": 10.049999999999999,
+						"cacheRead": 0.6029999999999999
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2.5",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.5",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-01",
+					"lastUpdated": "2026-01",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6029999999999999,
+						"output": 3.0149999999999997,
+						"cacheRead": 0.10049999999999999,
+						"cacheWrite": 0.6029999999999999
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2.6",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.6",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-04-21",
+					"lastUpdated": "2026-04-21",
+					"openWeights": true,
+					"cost": {
+						"input": 0.9547499999999999,
+						"output": 4.02,
+						"cacheRead": 0.1608
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2.7-code",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.7 Code",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-06-12",
+					"lastUpdated": "2026-06-12",
+					"openWeights": true,
+					"cost": {
+						"input": 0.9547499999999999,
+						"output": 4.02,
+						"cacheRead": 0.19094999999999998
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "kimi-k2.7-code-highspeed",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.7 Code Highspeed",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-06-12",
+					"lastUpdated": "2026-06-12",
+					"openWeights": true,
+					"cost": {
+						"input": 1.9094999999999998,
+						"output": 8.04,
+						"cacheRead": 0.38189999999999996
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
 					"id": "MiniMax-M2.1",
 					"ownedBy": "minimax",
 					"label": "MiniMax-M2.1",
@@ -14664,241 +14926,6 @@
 					},
 					"provider": {
 						"npm": "@ai-sdk/anthropic"
-					}
-				},
-				{
-					"id": "kimi-k2-0711-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 0711",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-07-14",
-					"lastUpdated": "2025-07-14",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 131072,
-						"output": 16384
-					}
-				},
-				{
-					"id": "kimi-k2-0905-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 0905",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-09-05",
-					"lastUpdated": "2025-09-05",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2-thinking",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Thinking",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-08",
-					"releaseDate": "2025-11-06",
-					"lastUpdated": "2025-11-06",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2-thinking-turbo",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Thinking Turbo",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-08",
-					"releaseDate": "2025-11-06",
-					"lastUpdated": "2025-11-06",
-					"openWeights": true,
-					"cost": {
-						"input": 1.1557499999999998,
-						"output": 8.04,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2-turbo-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Turbo",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-09-05",
-					"lastUpdated": "2025-09-05",
-					"openWeights": true,
-					"cost": {
-						"input": 2.4119999999999995,
-						"output": 10.049999999999999,
-						"cacheRead": 0.6029999999999999
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2.5",
-					"ownedBy": "kimi",
-					"label": "Kimi K2.5",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": false,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-01",
-					"lastUpdated": "2026-01",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 3.0149999999999997,
-						"cacheRead": 0.10049999999999999,
-						"cacheWrite": 0.6029999999999999
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2.6",
-					"ownedBy": "kimi",
-					"label": "Kimi K2.6",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-04-21",
-					"lastUpdated": "2026-04-21",
-					"openWeights": true,
-					"cost": {
-						"input": 0.9547499999999999,
-						"output": 4.02,
-						"cacheRead": 0.1608
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2.7-code",
-					"ownedBy": "kimi",
-					"label": "Kimi K2.7 Code",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": false,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-06-12",
-					"lastUpdated": "2026-06-12",
-					"openWeights": true,
-					"cost": {
-						"input": 0.9547499999999999,
-						"output": 4.02,
-						"cacheRead": 0.19094999999999998
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					}
-				},
-				{
-					"id": "kimi-k2.7-code-highspeed",
-					"ownedBy": "kimi",
-					"label": "Kimi K2.7 Code Highspeed",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": false,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-06-12",
-					"lastUpdated": "2026-06-12",
-					"openWeights": true,
-					"cost": {
-						"input": 1.9094999999999998,
-						"output": 8.04,
-						"cacheRead": 0.38189999999999996
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
 					}
 				},
 				{
@@ -15350,6 +15377,34 @@
 					},
 					"limit": {
 						"context": 200000,
+						"output": 131072
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				{
+					"id": "glm-5.2",
+					"ownedBy": "zai",
+					"label": "GLM-5.2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-06-13",
+					"lastUpdated": "2026-06-13",
+					"openWeights": false,
+					"cost": {
+						"input": 1.4069999999999998,
+						"output": 4.422,
+						"cacheRead": 0.2613
+					},
+					"limit": {
+						"context": 1000000,
 						"output": 131072
 					},
 					"provider": {

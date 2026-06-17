@@ -75,6 +75,7 @@ export const configMixin = {
 			smartEdges?: boolean;
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
+			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
@@ -236,6 +237,7 @@ export const configMixin = {
 		smartEdges?: boolean;
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
+		notificationsEnabled?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
 		ottoEnabled?: boolean;
@@ -258,6 +260,7 @@ export const configMixin = {
 			smartEdges?: boolean;
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
+			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
