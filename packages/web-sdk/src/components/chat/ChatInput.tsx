@@ -89,6 +89,15 @@ function isWebVoiceShortcutUp(event: KeyboardEvent): boolean {
 	);
 }
 
+function isTypingElement(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	return (
+		target.tagName === 'INPUT' ||
+		target.tagName === 'TEXTAREA' ||
+		target.isContentEditable
+	);
+}
+
 interface ChatInputProps {
 	onSend: (message: string) => void;
 	onCommand?: (commandId: string) => void;
@@ -691,6 +700,37 @@ export const ChatInput = memo(
 		useEffect(() => {
 			handleSendRef.current = handleSend;
 		}, [handleSend]);
+
+		const cycleAgent = useCallback(() => {
+			if (agentLocked || agents.length === 0) return;
+			const currentIndex = agents.indexOf(agent ?? '');
+			const nextIndex =
+				currentIndex >= 0 ? (currentIndex + 1) % agents.length : 0;
+			const nextAgent = agents[nextIndex];
+			if (!nextAgent) return;
+			onAgentChange?.(nextAgent);
+			textareaRef.current?.focus();
+		}, [agent, agentLocked, agents, onAgentChange]);
+
+		useEffect(() => {
+			const handleGlobalAgentCycle = (event: KeyboardEvent) => {
+				if (!event.ctrlKey || event.key.toLowerCase() !== 'g') {
+					return;
+				}
+				if (agentLocked || agents.length === 0) return;
+
+				const target = event.target;
+				if (isTypingElement(target) && target !== textareaRef.current) return;
+
+				event.preventDefault();
+				event.stopPropagation();
+				cycleAgent();
+			};
+
+			window.addEventListener('keydown', handleGlobalAgentCycle, true);
+			return () =>
+				window.removeEventListener('keydown', handleGlobalAgentCycle, true);
+		}, [agentLocked, agents.length, cycleAgent]);
 
 		const handleChange = useCallback(
 			(e: ChangeEvent<HTMLTextAreaElement>) => {

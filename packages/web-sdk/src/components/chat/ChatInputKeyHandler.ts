@@ -68,7 +68,7 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 			onPlanModeToggle,
 		} = options;
 
-		if (e.key === 'Tab' && e.ctrlKey && agents.length > 0) {
+		if (e.key.toLowerCase() === 'g' && e.ctrlKey && agents.length > 0) {
 			e.preventDefault();
 			const currentIndex = agents.indexOf(agent ?? '');
 			const nextIndex =

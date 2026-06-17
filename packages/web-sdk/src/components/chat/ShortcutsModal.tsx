@@ -95,7 +95,7 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Chat',
 	},
 	{
-		keys: ['Ctrl', 'Tab'],
+		keys: ['Ctrl', 'G'],
 		description: 'Cycle agents',
 		category: 'Chat',
 	},

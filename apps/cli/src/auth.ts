@@ -9,6 +9,7 @@ import {
 	text,
 } from '@clack/prompts';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createInterface } from 'node:readline/promises';
 import { box, table, colors } from './ui.ts';
 import {
 	getAllAuth,
@@ -901,6 +902,37 @@ function parseXaiAuthorizationCode(input: string): string {
 	return trimmed;
 }
 
+async function waitForXaiAuthorizationCode(
+	callbackPromise: Promise<string>,
+): Promise<string> {
+	const controller = new AbortController();
+	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	const promptPromise = (async () => {
+		try {
+			while (true) {
+				const pasted = await rl.question('Paste xAI authorization code: ', {
+					signal: controller.signal,
+				});
+				const code = parseXaiAuthorizationCode(pasted);
+				if (code) return code;
+				console.log('Required');
+			}
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return new Promise<string>(() => {});
+			}
+			throw error;
+		}
+	})();
+
+	try {
+		return await Promise.race([callbackPromise, promptPromise]);
+	} finally {
+		controller.abort();
+		rl.close();
+	}
+}
+
 async function runAuthLoginXai(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
@@ -1010,23 +1042,7 @@ async function runAuthLoginXai(
 
 		try {
 			const callbackPromise = oauthResult.waitForCallback();
-			let code = await Promise.race<string | undefined>([
-				callbackPromise,
-				Bun.sleep(5000).then(() => undefined),
-			]);
-
-			if (!code) {
-				const pastedCode = await text({
-					message: 'Paste xAI authorization code:',
-					validate: (v) =>
-						v && String(v).trim().length > 0 ? undefined : 'Required',
-				});
-				if (isCancel(pastedCode)) {
-					cancel('Cancelled');
-					return false;
-				}
-				code = parseXaiAuthorizationCode(String(pastedCode));
-			}
+			const code = await waitForXaiAuthorizationCode(callbackPromise);
 
 			oauthResult.close();
 
