@@ -9,6 +9,7 @@ export function useFiles(options: { enabled?: boolean; query?: string } = {}) {
 			return result;
 		},
 		enabled: options.enabled ?? true,
+		placeholderData: (previousData) => previousData,
 		staleTime: 10000,
 		refetchOnWindowFocus: true,
 		retry: 1,

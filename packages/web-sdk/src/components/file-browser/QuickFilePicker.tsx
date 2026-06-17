@@ -1,8 +1,11 @@
 import { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { FileCode, Search } from 'lucide-react';
 import { useFilePickerStore } from '../../stores/filePickerStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import { useFiles } from '../../hooks/useFiles';
+
+const PICKER_TRANSITION = { duration: 0.18, ease: [0.2, 0, 0, 1] } as const;
 
 function fuzzyMatch(
 	query: string,
@@ -33,7 +36,9 @@ function fuzzyMatch(
 
 export const QuickFilePicker = memo(function QuickFilePicker() {
 	const isOpen = useFilePickerStore((s) => s.isOpen);
-	return isOpen ? <QuickFilePickerContent /> : null;
+	return (
+		<AnimatePresence>{isOpen && <QuickFilePickerContent />}</AnimatePresence>
+	);
 });
 
 const QuickFilePickerContent = memo(function QuickFilePickerContent() {
@@ -111,16 +116,27 @@ const QuickFilePickerContent = memo(function QuickFilePickerContent() {
 	);
 
 	return (
-		<div
+		<motion.div
 			role="dialog"
 			aria-modal="true"
 			className="fixed inset-0 bg-black/50 flex items-start justify-center z-[60] pt-[15vh]"
+			initial={{ opacity: 0 }}
+			animate={{ opacity: 1 }}
+			exit={{ opacity: 0 }}
+			transition={PICKER_TRANSITION}
 			onClick={handleBackdropClick}
 			onKeyDown={(e) => {
 				if (e.key === 'Escape') close();
 			}}
 		>
-			<div className="bg-background border border-border rounded-lg shadow-2xl w-full max-w-lg overflow-hidden">
+			<motion.div
+				layout
+				className="bg-background border border-border rounded-lg shadow-2xl w-full max-w-lg overflow-hidden"
+				initial={{ opacity: 0, y: -8, scale: 0.98 }}
+				animate={{ opacity: 1, y: 0, scale: 1 }}
+				exit={{ opacity: 0, y: -6, scale: 0.98 }}
+				transition={PICKER_TRANSITION}
+			>
 				<div className="flex items-center gap-2 px-3 border-b border-border">
 					<Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 					<input
@@ -140,7 +156,12 @@ const QuickFilePickerContent = memo(function QuickFilePickerContent() {
 					</kbd>
 				</div>
 
-				<div ref={listRef} className="max-h-[40vh] overflow-y-auto">
+				<motion.div
+					ref={listRef}
+					layout
+					className="max-h-[40vh] overflow-y-auto"
+					transition={PICKER_TRANSITION}
+				>
 					{filtered.length === 0 ? (
 						<div className="px-4 py-8 text-center text-sm text-muted-foreground">
 							{query ? 'No matching files' : 'No files found'}
@@ -170,10 +191,17 @@ const QuickFilePickerContent = memo(function QuickFilePickerContent() {
 							);
 						})
 					)}
-				</div>
+				</motion.div>
 
 				{filtered.length > 0 && (
-					<div className="px-3 py-2 border-t border-border text-xs text-muted-foreground flex items-center gap-3">
+					<motion.div
+						layout
+						className="px-3 py-2 border-t border-border text-xs text-muted-foreground flex items-center gap-3"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={PICKER_TRANSITION}
+					>
 						<span>
 							<kbd className="bg-muted px-1 py-0.5 rounded border border-border font-mono">
 								↑↓
@@ -187,10 +215,10 @@ const QuickFilePickerContent = memo(function QuickFilePickerContent() {
 							open
 						</span>
 						<span className="ml-auto">{filtered.length} files</span>
-					</div>
+					</motion.div>
 				)}
-			</div>
-		</div>
+			</motion.div>
+		</motion.div>
 	);
 });
 

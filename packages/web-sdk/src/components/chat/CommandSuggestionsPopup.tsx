@@ -1,8 +1,11 @@
 import { useEffect, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { useConfig } from '../../hooks/useConfig';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useShareStatus } from '../../hooks/useShareStatus';
 import { filterCommands, getCommandDescription } from '../../lib/commands';
+
+const POPUP_TRANSITION = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
 
 interface CommandSuggestionsPopupProps {
 	query: string;
@@ -58,19 +61,27 @@ export function CommandSuggestionsPopup({
 
 	if (results.length === 0) {
 		return (
-			<div
+			<motion.div
+				layout
 				data-command-popup
 				className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg z-50 p-3"
+				initial={{ opacity: 0, y: 6, scale: 0.98 }}
+				animate={{ opacity: 1, y: 0, scale: 1 }}
+				transition={POPUP_TRANSITION}
 			>
 				<span className="text-muted-foreground text-sm">No commands found</span>
-			</div>
+			</motion.div>
 		);
 	}
 
 	return (
-		<div
+		<motion.div
+			layout
 			data-command-popup
 			className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg max-h-[300px] overflow-y-auto z-50"
+			initial={{ opacity: 0, y: 6, scale: 0.98 }}
+			animate={{ opacity: 1, y: 0, scale: 1 }}
+			transition={POPUP_TRANSITION}
 		>
 			{results.map((command, index) => {
 				const Icon = command.icon;
@@ -101,6 +112,6 @@ export function CommandSuggestionsPopup({
 					</button>
 				);
 			})}
-		</div>
+		</motion.div>
 	);
 }

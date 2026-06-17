@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import Fuse from 'fuse.js';
+import { motion } from 'motion/react';
 import {
 	File,
 	FileCode,
@@ -48,6 +49,7 @@ interface MentionPopupProps {
 const MAX_AGENT_RESULTS = 5;
 const MAX_SKILL_RESULTS = 5;
 const MAX_FILE_RESULTS = 20;
+const POPUP_TRANSITION = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
 
 function getFileIcon(filePath: string): LucideIcon {
 	const ext = filePath.split('.').pop()?.toLowerCase();
@@ -276,16 +278,31 @@ export function MentionPopup({
 	}, [onClose]);
 
 	if (items.length === 0) {
-		return null;
+		return (
+			<motion.div
+				layout
+				data-mention-popup
+				className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg z-50 p-3"
+				initial={{ opacity: 0, y: 6, scale: 0.98 }}
+				animate={{ opacity: 1, y: 0, scale: 1 }}
+				transition={POPUP_TRANSITION}
+			>
+				<span className="text-muted-foreground text-sm">No matches found</span>
+			</motion.div>
+		);
 	}
 
 	const skillSectionOffset = agentResults.length;
 	const fileSectionOffset = agentResults.length + skillResults.length;
 
 	return (
-		<div
+		<motion.div
+			layout
 			data-mention-popup
 			className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-lg shadow-lg max-h-[300px] overflow-y-auto z-50 py-1"
+			initial={{ opacity: 0, y: 6, scale: 0.98 }}
+			animate={{ opacity: 1, y: 0, scale: 1 }}
+			transition={POPUP_TRANSITION}
 		>
 			{agentResults.length > 0 && (
 				<>
@@ -391,6 +408,6 @@ export function MentionPopup({
 					})}
 				</>
 			)}
-		</div>
+		</motion.div>
 	);
 }
