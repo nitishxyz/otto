@@ -24,7 +24,11 @@ export function buildEditTool(projectRoot: string): {
 				.describe(
 					'Relative file path within the project. Absolute paths are not allowed.',
 				),
-			oldString: z.string().describe('Exact text to replace'),
+			oldString: z
+				.string()
+				.describe(
+					'Text to replace. Exact matches are preferred; unique whole-line whitespace-normalized matches are tolerated.',
+				),
 			newString: z.string().describe('Replacement text'),
 			replaceAll: z
 				.boolean()

@@ -4,6 +4,7 @@ Prefer `apply_patch` for most code/text edits when it is available, especially w
 
 Rules:
 - Read the file first before editing.
-- Each edit uses exact `oldString` -> `newString` replacement.
+- Prefer exact `oldString` -> `newString` replacements copied from the latest read output.
+- If an edit has no exact match, the tool may apply a unique whole-line match after whitespace normalization (tabs/spaces, leading/trailing whitespace, and repeated internal whitespace). It will not guess through non-whitespace text differences.
 - All edits must succeed or none are written.
 - Use `replaceAll: true` only when every occurrence should change.

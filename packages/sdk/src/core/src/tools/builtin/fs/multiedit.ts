@@ -21,7 +21,11 @@ const multiEditSchema = z.object({
 	edits: z
 		.array(
 			z.object({
-				oldString: z.string().describe('Exact text to replace'),
+				oldString: z
+					.string()
+					.describe(
+						'Text to replace. Exact matches are preferred; unique whole-line whitespace-normalized matches are tolerated.',
+					),
 				newString: z.string().describe('Replacement text'),
 				replaceAll: z
 					.boolean()

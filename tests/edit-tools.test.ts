@@ -73,6 +73,37 @@ describe('edit and multiedit tools', () => {
 		expect(updated).toContain('\tconst label = "hi";');
 	});
 
+	it('applies unique line replacement with whitespace-only oldString drift', async () => {
+		await writeFile(
+			join(projectRoot, 'fuzzy.ts'),
+			[
+				'export function renderUser() {',
+				'\tconst label = formatName(user.firstName, user.lastName);',
+				'\treturn label;',
+				'}',
+			].join('\n'),
+		);
+		const { tools } = await discoverProjectTools(projectRoot);
+		const readTool = tools.find((tool) => tool.name === 'read');
+		const editTool = tools.find((tool) => tool.name === 'edit');
+		await readTool?.tool.execute({ path: 'fuzzy.ts' });
+
+		const result = await editTool?.tool.execute({
+			path: 'fuzzy.ts',
+			oldString:
+				'  const   label   =   formatName(user.firstName,   user.lastName);',
+			newString: '  const label = formatDisplayName(user);',
+		});
+
+		expect(result).toMatchObject({
+			ok: true,
+			path: 'fuzzy.ts',
+			occurrences: 1,
+		});
+		const updated = await Bun.file(join(projectRoot, 'fuzzy.ts')).text();
+		expect(updated).toContain('\tconst label = formatDisplayName(user);');
+	});
+
 	it('fails when oldString matches multiple times without replaceAll', async () => {
 		const { tools } = await discoverProjectTools(projectRoot);
 		const readTool = tools.find((tool) => tool.name === 'read');
