@@ -45,6 +45,11 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Navigation',
 	},
 	{
+		keys: ['/'],
+		description: 'Return to chat input when not typing',
+		category: 'Navigation',
+	},
+	{
 		keys: ['ESC'],
 		description: 'Close sidebar and return to center',
 		category: 'Navigation',
@@ -86,7 +91,12 @@ const SHORTCUTS: ShortcutItem[] = [
 	},
 	{
 		keys: ['Tab'],
-		description: 'Toggle plan mode',
+		description: 'Toggle plan mode and back to current agent',
+		category: 'Chat',
+	},
+	{
+		keys: ['Ctrl', 'Tab'],
+		description: 'Cycle agents',
 		category: 'Chat',
 	},
 	{

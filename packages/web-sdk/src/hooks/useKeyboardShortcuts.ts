@@ -87,6 +87,21 @@ export function useKeyboardShortcuts({
 			);
 
 			if (
+				!isShortcutModifierPressed &&
+				!e.shiftKey &&
+				!e.altKey &&
+				e.key === '/' &&
+				!isInInput &&
+				!isInTerminal
+			) {
+				e.preventDefault();
+				(document.activeElement as HTMLElement)?.blur();
+				setFocus('input');
+				onReturnToInput?.();
+				return;
+			}
+
+			if (
 				isShortcutModifierPressed &&
 				!e.shiftKey &&
 				!e.altKey &&

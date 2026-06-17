@@ -259,6 +259,8 @@ export function useAuthStatus() {
 				'oauth_popup',
 				`width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`,
 			);
+			snapshotConfiguredProviders();
+			setOauthPolling(true);
 			return { popup, sessionId };
 		},
 		[snapshotConfiguredProviders],
@@ -285,7 +287,7 @@ export function useAuthStatus() {
 	);
 
 	useEffect(() => {
-		if (!oauthPolling || !isInIframe) return;
+		if (!oauthPolling) return;
 		oauthPollingRef.current = setInterval(() => {
 			fetchAuthStatus();
 		}, 3000);

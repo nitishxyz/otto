@@ -82,6 +82,29 @@ const oauthCallbackQuerySchema = z.object({
 		}),
 });
 
+function parseXaiAuthorizationCode(input: string): string {
+	const trimmed = input.trim().replace(/^['"]|['"]$/g, '');
+	try {
+		const url = new URL(trimmed);
+		return url.searchParams.get('code') || trimmed;
+	} catch {}
+
+	try {
+		const params = new URLSearchParams(
+			trimmed.startsWith('?') ? trimmed.slice(1) : trimmed,
+		);
+		return params.get('code') || trimmed;
+	} catch {}
+
+	return trimmed;
+}
+
+function closeOAuthCallback(close: (() => void) | undefined) {
+	try {
+		close?.();
+	} catch {}
+}
+
 export function registerAuthOAuthRoutes(app: Hono) {
 	zodOpenApiRoute(
 		app,
@@ -242,11 +265,46 @@ export function registerAuthOAuthRoutes(app: Hono) {
 
 				let url: string;
 				let verifier: string;
+				let close: (() => void) | undefined;
+				let waitForXaiCallback: ((sessionId: string) => void) | undefined;
 
 				if (provider === 'anthropic') {
 					const result = await authorize(mode);
 					url = result.url;
 					verifier = result.verifier;
+				} else if (provider === 'xai') {
+					const oauthResult = await authorizeXai();
+					url = oauthResult.url;
+					verifier = oauthResult.verifier;
+					close = oauthResult.close;
+					waitForXaiCallback = (sessionId) => {
+						void (async () => {
+							try {
+								const code = await oauthResult.waitForCallback();
+								const tokens = await exchangeXai(code, oauthResult.verifier);
+								await setAuth(
+									'xai',
+									{
+										type: 'oauth',
+										refresh: tokens.refresh,
+										access: tokens.access,
+										expires: tokens.expires,
+										idToken: tokens.idToken,
+										scopes: tokens.scopes,
+									},
+									undefined,
+									'global',
+								);
+							} catch (error) {
+								if (oauthVerifiers.has(sessionId)) {
+									logger.error('xAI OAuth callback failed', error);
+								}
+							} finally {
+								closeOAuthCallback(oauthResult.close);
+								oauthVerifiers.delete(sessionId);
+							}
+						})();
+					};
 				} else if (provider === 'openai') {
 					return c.json(
 						{
@@ -270,7 +328,9 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					provider,
 					createdAt: Date.now(),
 					callbackUrl: '',
+					close,
 				});
+				waitForXaiCallback?.(sessionId);
 
 				return c.json({ url, sessionId, provider });
 			} catch (error) {
@@ -333,6 +393,7 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					return c.json({ error: 'Session expired or invalid' }, 400);
 				}
 				const { verifier } = verifierEntry;
+				closeOAuthCallback(verifierEntry.close);
 				oauthVerifiers.delete(sessionId);
 
 				if (provider === 'anthropic') {
@@ -350,6 +411,24 @@ export function registerAuthOAuthRoutes(app: Hono) {
 					);
 				} else if (provider === 'openai') {
 					return c.json({ error: 'Use redirect flow for OpenAI' }, 400);
+				} else if (provider === 'xai') {
+					const tokens = await exchangeXai(
+						parseXaiAuthorizationCode(code),
+						verifier,
+					);
+					await setAuth(
+						'xai',
+						{
+							type: 'oauth',
+							refresh: tokens.refresh,
+							access: tokens.access,
+							expires: tokens.expires,
+							idToken: tokens.idToken,
+							scopes: tokens.scopes,
+						},
+						undefined,
+						'global',
+					);
 				} else {
 					return c.json({ error: 'Unknown provider' }, 400);
 				}

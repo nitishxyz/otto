@@ -884,6 +884,23 @@ async function runAuthLoginOpenAI(
 	}
 }
 
+function parseXaiAuthorizationCode(input: string): string {
+	const trimmed = input.trim().replace(/^['"]|['"]$/g, '');
+	try {
+		const url = new URL(trimmed);
+		return url.searchParams.get('code') || trimmed;
+	} catch {}
+
+	try {
+		const params = new URLSearchParams(
+			trimmed.startsWith('?') ? trimmed.slice(1) : trimmed,
+		);
+		return params.get('code') || trimmed;
+	} catch {}
+
+	return trimmed;
+}
+
 async function runAuthLoginXai(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
@@ -992,7 +1009,25 @@ async function runAuthLoginXai(
 		log.info('(Complete the login in your browser)\n');
 
 		try {
-			const code = await oauthResult.waitForCallback();
+			const callbackPromise = oauthResult.waitForCallback();
+			let code = await Promise.race<string | undefined>([
+				callbackPromise,
+				Bun.sleep(5000).then(() => undefined),
+			]);
+
+			if (!code) {
+				const pastedCode = await text({
+					message: 'Paste xAI authorization code:',
+					validate: (v) =>
+						v && String(v).trim().length > 0 ? undefined : 'Required',
+				});
+				if (isCancel(pastedCode)) {
+					cancel('Cancelled');
+					return false;
+				}
+				code = parseXaiAuthorizationCode(String(pastedCode));
+			}
+
 			oauthResult.close();
 
 			log.info('🔄 Exchanging xAI authorization code for tokens...');

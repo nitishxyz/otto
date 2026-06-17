@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { forwardRef, memo } from 'react';
 import { Target } from 'lucide-react';
 import { useOttoEnabled } from '../../hooks/useGoals';
 import { NewSessionLanding } from '../chat/NewSessionLanding';
@@ -22,44 +22,48 @@ interface OttoWorkspaceProps {
  * (`useOttoEnabled()`), shows a disabled notice instead — hosts should
  * ideally not route here at all in that case.
  */
-export const OttoWorkspace = memo(function OttoWorkspace({
-	sessionId,
-	onSessionCreated,
-	onNewSession,
-	onDeleteSession,
-}: OttoWorkspaceProps) {
-	const ottoEnabled = useOttoEnabled();
+export const OttoWorkspace = memo(
+	forwardRef<{ focus: () => void }, OttoWorkspaceProps>(function OttoWorkspace(
+		{ sessionId, onSessionCreated, onNewSession, onDeleteSession },
+		ref,
+	) {
+		const ottoEnabled = useOttoEnabled();
 
-	if (!ottoEnabled) {
-		return (
-			<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-				<Target className="h-6 w-6 text-muted-foreground" />
-				<p className="text-sm font-medium text-foreground">Otto is disabled</p>
-				<p className="max-w-sm text-xs text-muted-foreground">
-					Otto is turned off on this server. Enable it in the server config to
-					use goal orchestration.
-				</p>
-			</div>
-		);
-	}
+		if (!ottoEnabled) {
+			return (
+				<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+					<Target className="h-6 w-6 text-muted-foreground" />
+					<p className="text-sm font-medium text-foreground">
+						Otto is disabled
+					</p>
+					<p className="max-w-sm text-xs text-muted-foreground">
+						Otto is turned off on this server. Enable it in the server config to
+						use goal orchestration.
+					</p>
+				</div>
+			);
+		}
 
-	if (sessionId) {
+		if (sessionId) {
+			return (
+				<OttoSessionView
+					ref={ref}
+					sessionId={sessionId}
+					onNewSession={onNewSession}
+					onDeleteSession={onDeleteSession}
+				/>
+			);
+		}
+
 		return (
-			<OttoSessionView
-				sessionId={sessionId}
-				onNewSession={onNewSession}
-				onDeleteSession={onDeleteSession}
+			<NewSessionLanding
+				ref={ref}
+				onSessionCreated={onSessionCreated}
+				defaultAgent="otto"
+				sessionType="otto"
+				lockAgent
+				modalPosition="absolute"
 			/>
 		);
-	}
-
-	return (
-		<NewSessionLanding
-			onSessionCreated={onSessionCreated}
-			defaultAgent="otto"
-			sessionType="otto"
-			lockAgent
-			modalPosition="absolute"
-		/>
-	);
-});
+	}),
+);

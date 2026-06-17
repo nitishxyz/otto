@@ -1,6 +1,12 @@
 export const oauthVerifiers = new Map<
 	string,
-	{ verifier: string; provider: string; createdAt: number; callbackUrl: string }
+	{
+		verifier: string;
+		provider: string;
+		createdAt: number;
+		callbackUrl: string;
+		close?: () => void;
+	}
 >();
 
 export const copilotDeviceSessions = new Map<
@@ -27,6 +33,9 @@ setInterval(() => {
 	const now = Date.now();
 	for (const [key, value] of oauthVerifiers.entries()) {
 		if (now - value.createdAt > 10 * 60 * 1000) {
+			try {
+				value.close?.();
+			} catch {}
 			oauthVerifiers.delete(key);
 		}
 	}

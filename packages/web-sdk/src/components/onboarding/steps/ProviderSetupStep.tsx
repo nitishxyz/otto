@@ -328,6 +328,14 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	}, [oauthSession]);
 
 	useEffect(() => {
+		if (!oauthSession) return;
+		if (authStatus.providers[oauthSession.provider]?.configured) {
+			setOauthSession(null);
+			setOauthCodeInput('');
+		}
+	}, [authStatus.providers, oauthSession]);
+
+	useEffect(() => {
 		if (isImportModalOpen && importPrivateKeyRef.current) {
 			importPrivateKeyRef.current.focus();
 		}
@@ -656,7 +664,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	};
 
 	const handleStartOAuth = async (providerId: string, mode?: string) => {
-		if (providerId === 'anthropic') {
+		if (providerId === 'anthropic' || providerId === 'xai') {
 			setOauthSession({ provider: providerId, sessionId: null, mode });
 		} else if (providerId === 'openai' && onStartOpenAIDeviceFlow) {
 			setOpenAIPolling(false);
@@ -1736,8 +1744,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 									You'll be redirected to{' '}
 									{authStatus.providers[oauthSession.provider]?.label ||
 										oauthSession.provider}{' '}
-									to authorize access. After authorizing, copy the code and
-									return here.
+									to authorize access. If it does not return automatically,
+									paste the authorization code here.
 								</p>
 								<div className="flex gap-3">
 									<button
@@ -1774,7 +1782,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 									ref={oauthCodeInputRef}
 									value={oauthCodeInput}
 									onChange={(e) => setOauthCodeInput(e.target.value)}
-									placeholder="Paste code here..."
+									placeholder="Paste authorization code..."
 									className="w-full h-11 px-4 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors mb-4 font-mono text-sm"
 									onKeyDown={(e) => {
 										if (e.key === 'Enter') handleExchangeCode();

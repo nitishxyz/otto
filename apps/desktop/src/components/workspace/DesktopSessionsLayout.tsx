@@ -299,6 +299,7 @@ export function DesktopSessionsLayout({
 		if (!sessionId) {
 			return (
 				<NewSessionLanding
+					ref={chatInputRef}
 					defaultAgent={defaultAgent}
 					onSessionCreated={handleSessionCreated}
 				/>
@@ -361,6 +362,7 @@ export function DesktopSessionsLayout({
 			>
 				{isOttoTab ? (
 					<OttoWorkspace
+						ref={chatInputRef}
 						sessionId={sessionId}
 						onSessionCreated={handleOttoSessionCreated}
 						onNewSession={handleNewSession}

@@ -199,7 +199,12 @@ export function SessionsLayout({
 
 	const mainContent = useMemo(() => {
 		if (!sessionId) {
-			return <NewSessionLanding onSessionCreated={handleSessionCreated} />;
+			return (
+				<NewSessionLanding
+					ref={chatInputRef}
+					onSessionCreated={handleSessionCreated}
+				/>
+			);
 		}
 
 		return (
@@ -263,6 +268,7 @@ export function SessionsLayout({
 			>
 				{isOttoTab ? (
 					<OttoWorkspace
+						ref={chatInputRef}
 						sessionId={sessionId}
 						onSessionCreated={handleOttoSessionCreated}
 						onNewSession={handleNewSession}

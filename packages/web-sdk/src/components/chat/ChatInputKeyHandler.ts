@@ -12,6 +12,8 @@ interface ChatInputKeyHandlerOptions {
 	currentFileToSelect: string | undefined;
 	currentSkillToSelect: string | undefined;
 	currentCommandToSelect: string | undefined;
+	agent: string | undefined;
+	agents: string[];
 	isPlanMode: boolean;
 	vimModeEnabled: boolean;
 	vimMode: VimMode;
@@ -28,6 +30,7 @@ interface ChatInputKeyHandlerOptions {
 	handleCommandSelect: (commandId: string) => void;
 	handleSend: () => void;
 	handleVimNormalMode: (e: KeyboardEvent<HTMLTextAreaElement>) => boolean;
+	onAgentChange?: (agent: string) => void;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
 }
 
@@ -43,6 +46,8 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 			currentFileToSelect,
 			currentSkillToSelect,
 			currentCommandToSelect,
+			agent,
+			agents,
 			isPlanMode,
 			vimModeEnabled,
 			vimMode,
@@ -59,8 +64,21 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 			handleCommandSelect,
 			handleSend,
 			handleVimNormalMode,
+			onAgentChange,
 			onPlanModeToggle,
 		} = options;
+
+		if (e.key === 'Tab' && e.ctrlKey && agents.length > 0) {
+			e.preventDefault();
+			const currentIndex = agents.indexOf(agent ?? '');
+			const nextIndex =
+				currentIndex >= 0 ? (currentIndex + 1) % agents.length : 0;
+			const nextAgent = agents[nextIndex];
+			if (nextAgent) {
+				onAgentChange?.(nextAgent);
+			}
+			return;
+		}
 
 		if (showCommandSuggestions) {
 			const count = COMMANDS.length;

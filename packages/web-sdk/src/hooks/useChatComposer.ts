@@ -33,12 +33,16 @@ export function useChatComposer({
 	const [provider, setProvider] = useState('');
 	const [model, setModel] = useState('');
 	const initializedRef = useRef(false);
+	const lastNonPlanAgentRef = useRef(defaultAgent || 'build');
 
 	useEffect(() => {
 		if (!sessionId || !session) return;
 		setAgent(session.agent);
 		setProvider(session.provider);
 		setModel(session.model);
+		if (session.agent !== 'plan') {
+			lastNonPlanAgentRef.current = session.agent;
+		}
 	}, [sessionId, session]);
 
 	useEffect(() => {
@@ -50,6 +54,9 @@ export function useChatComposer({
 			(agentDetail) => agentDetail.name === initialAgent,
 		);
 		setAgent(initialAgent);
+		if (initialAgent !== 'plan') {
+			lastNonPlanAgentRef.current = initialAgent;
+		}
 		setProvider(selectedAgent?.provider ?? config.defaults.provider ?? '');
 		setModel(selectedAgent?.model ?? config.defaults.model ?? '');
 	}, [sessionId, agentDetails?.agents, config, defaultAgent]);
@@ -83,6 +90,9 @@ export function useChatComposer({
 	const handleAgentChange = useCallback(
 		async (value: string) => {
 			setAgent(value);
+			if (value !== 'plan') {
+				lastNonPlanAgentRef.current = value;
+			}
 			const selectedAgent = agentDetails?.agents.find(
 				(agentDetail) => agentDetail.name === value,
 			);
@@ -113,7 +123,9 @@ export function useChatComposer({
 
 	const handlePlanModeToggle = useCallback(
 		async (isPlanMode: boolean) => {
-			await handleAgentChange(isPlanMode ? 'plan' : 'build');
+			await handleAgentChange(
+				isPlanMode ? 'plan' : lastNonPlanAgentRef.current || 'build',
+			);
 		},
 		[handleAgentChange],
 	);
