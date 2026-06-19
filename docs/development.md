@@ -65,7 +65,7 @@ For schema changes:
 
 1. update schema files under `packages/database/src/schema/`
 2. generate migrations with Drizzle
-3. update `packages/database/src/migrations-bundled.ts`
+3. update `packages/database/src/runtime/migrations-bundled.ts`
 4. test the migration locally
 
 ## API workflow
@@ -73,7 +73,8 @@ For schema changes:
 When changing server APIs:
 
 1. update `packages/server/src/routes/`
-2. update `packages/server/src/openapi/spec.ts`
+2. update the route's Zod OpenAPI schemas registered with
+   `zodOpenApiRoute(...)`
 3. regenerate the client:
 
 ```bash

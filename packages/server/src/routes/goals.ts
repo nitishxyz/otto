@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { getDb } from '@ottocode/database';
 import { goalTasks, goals } from '@ottocode/database/schema';
 import { loadConfig, logger } from '@ottocode/sdk';
@@ -183,11 +183,23 @@ export function registerGoalsRoutes(app: Hono) {
 					.from(goals)
 					.where(eq(goals.projectPath, cfg.projectRoot))
 					.orderBy(desc(goals.updatedAt));
-				const serialized = [];
-				for (const goal of rows) {
-					const tasks = await listTasksForGoal(db, goal.id);
-					serialized.push(serializeGoal(goal, tasks));
+				const goalIds = rows.map((goal) => goal.id);
+				const taskRows = goalIds.length
+					? await db
+							.select()
+							.from(goalTasks)
+							.where(inArray(goalTasks.goalId, goalIds))
+							.orderBy(asc(goalTasks.position), asc(goalTasks.createdAt))
+					: [];
+				const tasksByGoalId = new Map<string, GoalTaskRow[]>();
+				for (const task of taskRows) {
+					const tasks = tasksByGoalId.get(task.goalId) ?? [];
+					tasks.push(task);
+					tasksByGoalId.set(task.goalId, tasks);
 				}
+				const serialized = rows.map((goal) =>
+					serializeGoal(goal, tasksByGoalId.get(goal.id) ?? []),
+				);
 				return c.json({ goals: serialized });
 			} catch (error) {
 				logger.error('Failed to list goals', error);

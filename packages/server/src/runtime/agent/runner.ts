@@ -302,7 +302,13 @@ export async function runSessionLoop(sessionId: string) {
 		try {
 			const { handleSessionIdle } = await import('../subagents/idle.ts');
 			void handleSessionIdle(sessionId, lastProjectRoot);
-		} catch {}
+		} catch (error) {
+			logger.debug('[agent] failed to schedule session idle handler', {
+				sessionId,
+				projectRoot: lastProjectRoot,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 }
 
@@ -628,87 +634,71 @@ async function runAssistant(opts: RunOpts) {
 				});
 			}
 
-			if (part.type === 'tool-input-start') {
-				continue;
-			}
+			switch (part.type) {
+				case 'tool-input-start':
+				case 'tool-input-delta':
+				case 'tool-input-end':
+				case 'tool-call':
+				case 'tool-result':
+					break;
+				case 'text-delta': {
+					const rawDelta = part.text;
+					if (!rawDelta) break;
 
-			if (part.type === 'tool-input-delta') {
-				continue;
-			}
+					const delta = oauthTextGuard
+						? consumeOauthCodexTextDelta(oauthTextGuard, rawDelta)
+						: rawDelta;
+					if (!delta) break;
 
-			if (part.type === 'tool-input-end') {
-				continue;
-			}
-
-			if (part.type === 'tool-call') {
-				continue;
-			}
-
-			if (part.type === 'tool-result') {
-				continue;
-			}
-
-			if (part.type === 'text-delta') {
-				const rawDelta = part.text;
-				if (!rawDelta) continue;
-
-				const delta = oauthTextGuard
-					? consumeOauthCodexTextDelta(oauthTextGuard, rawDelta)
-					: rawDelta;
-				if (!delta) continue;
-
-				await handleRunnerTextDelta({
-					delta,
-					state: textState,
-					toolObserver: toolObserver.state,
-					opts,
-					db,
-					sharedCtx,
-					stepIndex,
-					dump,
-					firstToolSeen,
-					logFirstOutputLatency,
-					runStartedAt,
-					queueWaitMs,
-					setupMs: timings.totalMs,
-				});
-				continue;
-			}
-
-			if (part.type === 'reasoning-start') {
-				const reasoningId = part.id;
-				if (!reasoningId) continue;
-				await handleReasoningStart(
-					reasoningId,
-					part.providerMetadata,
-					opts,
-					db,
-					sharedCtx,
-					getStepIndex,
-					reasoningStates,
-				);
-				continue;
-			}
-
-			if (part.type === 'reasoning-delta') {
-				if (part.text) {
-					logFirstOutputLatency('reasoning');
+					await handleRunnerTextDelta({
+						delta,
+						state: textState,
+						toolObserver: toolObserver.state,
+						opts,
+						db,
+						sharedCtx,
+						stepIndex,
+						dump,
+						firstToolSeen,
+						logFirstOutputLatency,
+						runStartedAt,
+						queueWaitMs,
+						setupMs: timings.totalMs,
+					});
+					break;
 				}
-				await handleReasoningDelta(
-					part.id,
-					part.text,
-					part.providerMetadata,
-					opts,
-					db,
-					sharedCtx,
-					getStepIndex,
-					reasoningStates,
-				);
-				continue;
-			}
-
-			if (part.type === 'reasoning-end') {
-				await handleReasoningEnd(part.id, db, reasoningStates);
+				case 'reasoning-start': {
+					const reasoningId = part.id;
+					if (!reasoningId) break;
+					await handleReasoningStart(
+						reasoningId,
+						part.providerMetadata,
+						opts,
+						db,
+						sharedCtx,
+						getStepIndex,
+						reasoningStates,
+					);
+					break;
+				}
+				case 'reasoning-delta':
+					if (part.text) {
+						logFirstOutputLatency('reasoning');
+					}
+					await handleReasoningDelta(
+						part.id,
+						part.text,
+						part.providerMetadata,
+						opts,
+						db,
+						sharedCtx,
+						getStepIndex,
+						reasoningStates,
+					);
+					break;
+				case 'reasoning-end':
+					await handleReasoningEnd(part.id, db, reasoningStates);
+					break;
 			}
 		}
 
@@ -772,7 +762,13 @@ async function runAssistant(opts: RunOpts) {
 					}),
 				})
 				.where(eq(messages.id, opts.assistantMessageId));
-		} catch {}
+		} catch (error) {
+			logger.debug('[agent] failed to persist stream finish details', {
+				sessionId: opts.sessionId,
+				messageId: opts.assistantMessageId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 
 		if (dump) {
 			const finalTextSnapshot =
@@ -854,7 +850,13 @@ async function runAssistant(opts: RunOpts) {
 		if (dump) {
 			try {
 				await dump.flush(cfg.projectRoot);
-			} catch {}
+			} catch (error) {
+				logger.debug('[agent] failed to flush turn dump', {
+					sessionId: opts.sessionId,
+					messageId: opts.assistantMessageId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
 		}
 	}
 }

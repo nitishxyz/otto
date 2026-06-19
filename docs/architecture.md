@@ -163,7 +163,9 @@ SQLite + Drizzle ORM local persistence.
 
 Generated API client package.
 
-- generated from `packages/server/src/openapi/spec.ts`
+- generated from the server's Zod OpenAPI routes registered via
+  `packages/server/src/openapi/route.ts` and exposed by
+  `packages/server/src/routes/openapi.ts`
 - publishes `packages/api/openapi.json`
 - intended client for first-party consumers
 
@@ -222,7 +224,8 @@ Major route groups include:
 When the API changes:
 
 1. update route handlers in `packages/server/src/routes/`
-2. update `packages/server/src/openapi/spec.ts`
+2. update the route's Zod OpenAPI schemas registered with
+   `zodOpenApiRoute(...)`
 3. regenerate the client with:
 
 ```bash

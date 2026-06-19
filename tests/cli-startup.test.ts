@@ -39,6 +39,7 @@ mock.module('@ottocode/cli/src/commands/index.ts', () => ({
 	registerShareCommand: () => {},
 	registerMCPCommand: () => {},
 	registerWebCommand: () => {},
+	registerStorageCommand: () => {},
 }));
 
 mock.module('@ottocode/cli/src/custom-commands.ts', () => ({

@@ -191,7 +191,8 @@ Examples:
 Recommended order:
 
 1. update route handlers under `packages/server/src/routes/`
-2. update `packages/server/src/openapi/spec.ts`
+2. update the route's Zod OpenAPI schemas registered with
+   `zodOpenApiRoute(...)`
 3. regenerate the client:
 
 ```bash
@@ -278,16 +279,17 @@ When changing schema:
 
 1. edit schema files under `packages/database/src/schema/`
 2. generate migrations with Drizzle
-3. update `packages/database/src/migrations-bundled.ts`
+3. update `packages/database/src/runtime/migrations-bundled.ts`
 4. test the migration locally
 
 Do not hand-author migration files.
 
 ## API/OpenAPI workflow
 
-The OpenAPI source of truth lives in:
+The OpenAPI source of truth lives in route modules registered with:
 
-- `packages/server/src/openapi/spec.ts`
+- `packages/server/src/openapi/route.ts`
+- `packages/server/src/routes/openapi.ts`
 
 The generated artifacts live in:
 

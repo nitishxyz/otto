@@ -166,9 +166,17 @@ describe('agent config merging', () => {
 	it('returns resolved agent detail metadata', async () => {
 		const workspaceRoot = await mkdtemp(join(tmpdir(), 'otto-agents-'));
 		const projectRoot = join(workspaceRoot, 'project');
+		const homeDir = join(workspaceRoot, 'home');
 		await mkdir(join(projectRoot, '.otto', 'agents', 'build'), {
 			recursive: true,
 		});
+		await mkdir(homeDir, { recursive: true });
+		const prevHome = process.env.HOME;
+		const prevProfile = process.env.USERPROFILE;
+		const prevXdg = process.env.XDG_CONFIG_HOME;
+		process.env.HOME = homeDir;
+		process.env.USERPROFILE = homeDir;
+		process.env.XDG_CONFIG_HOME = join(homeDir, '.config');
 
 		try {
 			await writeFile(
@@ -197,6 +205,12 @@ describe('agent config merging', () => {
 			expect(detail.appendToolConfig.firstClass).toContain('search');
 			expect(detail.hasLocalOverride).toBe(true);
 		} finally {
+			if (prevHome === undefined) delete process.env.HOME;
+			else process.env.HOME = prevHome;
+			if (prevProfile === undefined) delete process.env.USERPROFILE;
+			else process.env.USERPROFILE = prevProfile;
+			if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+			else process.env.XDG_CONFIG_HOME = prevXdg;
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});

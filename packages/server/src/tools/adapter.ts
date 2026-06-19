@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import type { DiscoveredTool } from '@ottocode/sdk';
+import { logger, type DiscoveredTool } from '@ottocode/sdk';
 import type { JSONValue } from '@ai-sdk/provider';
 import type { ToolResultOutput } from '@ai-sdk/provider-utils';
 import type {
@@ -242,7 +242,14 @@ export function adaptTools(
 					firstToolCallReported = true;
 					try {
 						ctx.onFirstToolCall();
-					} catch {}
+					} catch (error) {
+						logger.debug('[tool] onFirstToolCall callback failed', {
+							sessionId: ctx.sessionId,
+							messageId: ctx.messageId,
+							tool: name,
+							error: error instanceof Error ? error.message : String(error),
+						});
+					}
 				}
 
 				// Special-case: progress updates must render instantly. Publish before any DB work.
@@ -264,7 +271,14 @@ export function adaptTools(
 							startTs,
 							stepIndex: ctx.stepIndex,
 						});
-					} catch {}
+					} catch (error) {
+						logger.debug('[tool] failed to persist progress_update call', {
+							sessionId: ctx.sessionId,
+							messageId: ctx.messageId,
+							callId,
+							error: error instanceof Error ? error.message : String(error),
+						});
+					}
 					if (typeof base.onInputAvailable === 'function') {
 						// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
 						await base.onInputAvailable(options as any);
@@ -289,7 +303,15 @@ export function adaptTools(
 						startTs,
 						stepIndex: ctx.stepIndex,
 					});
-				} catch {}
+				} catch (error) {
+					logger.debug('[tool] failed to persist tool call', {
+						sessionId: ctx.sessionId,
+						messageId: ctx.messageId,
+						tool: name,
+						callId,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
 				// Start approval request with full args
 				if (
 					ctx.toolApprovalMode &&
@@ -448,7 +470,18 @@ export function adaptTools(
 										endTs,
 										durationMs,
 									});
-								} catch {}
+								} catch (error) {
+									logger.debug(
+										'[tool] failed to persist progress_update result',
+										{
+											sessionId: ctx.sessionId,
+											messageId: ctx.messageId,
+											callId,
+											error:
+												error instanceof Error ? error.message : String(error),
+										},
+									);
+								}
 							})();
 							return result as ToolExecuteReturn;
 						}

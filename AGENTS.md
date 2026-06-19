@@ -66,7 +66,7 @@ When you need schema/database changes:
 
 1. Update the schema files in `packages/database/src/schema/`
 2. Generate migrations: `bunx drizzle-kit generate`
-3. Update `packages/database/src/migrations-bundled.ts` to include the new migration file
+3. Update `packages/database/src/runtime/migrations-bundled.ts` to include the new migration file
 4. Test the migration locally before committing
 
 **Never manually create migration files** - always use `bunx drizzle-kit generate`
@@ -90,7 +90,7 @@ When you need schema/database changes:
 
 ## AI SDK and Agents
 
-- Use AI SDK v5 APIs (`generateText`, `streamText`, `generateObject`, `streamObject`, `tool`, `embed`, `rerank`)
+- Use AI SDK v6 APIs (`generateText`, `streamText`, `generateObject`, `streamObject`, `tool`, `embed`, `rerank`)
 - Support provider switching via SDK (OpenAI, Anthropic, Google, OpenRouter, OpenCode, OttoRouter)
 - OttoRouter uses Solana wallet auth — store the base58 private key with `otto auth login ottorouter` or via `OTTOROUTER_PRIVATE_KEY`
 - Agents and tools are modular

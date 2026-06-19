@@ -651,7 +651,8 @@ Generated clients cannot consume WebSocket upgrades directly, matching the exist
 Expected files:
 
 ```text
-packages/server/src/openapi/spec.ts
+packages/server/src/openapi/route.ts
+packages/server/src/routes/openapi.ts
 packages/api/openapi.json
 packages/api/src/generated/*
 packages/web-sdk/src/lib/api-client/dictation.ts

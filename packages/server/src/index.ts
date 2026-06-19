@@ -52,6 +52,18 @@ const corsAllowHeaders = [
 	'Access-Control-Request-Private-Network',
 ];
 
+const LOCAL_NETWORK_PATTERN =
+	/^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):\d+$/;
+
+function isLocalhostOrigin(origin: string): boolean {
+	return (
+		origin.startsWith('http://localhost:') ||
+		origin.startsWith('http://127.0.0.1:') ||
+		origin.startsWith('https://localhost:') ||
+		origin.startsWith('https://127.0.0.1:')
+	);
+}
+
 function applyPrivateNetworkAccessHeaders(app: OpenAPIHono<BlankEnv>) {
 	app.use('*', async (c, next) => {
 		c.header('Access-Control-Allow-Private-Network', 'true');
@@ -59,41 +71,24 @@ function applyPrivateNetworkAccessHeaders(app: OpenAPIHono<BlankEnv>) {
 	});
 }
 
-function initApp() {
-	const app = new OpenAPIHono<BlankEnv>();
-	applyPrivateNetworkAccessHeaders(app);
+function buildCorsOptions(extraOrigins?: string[]) {
+	return {
+		origin: (origin: string) => {
+			if (isLocalhostOrigin(origin)) return origin;
+			if (LOCAL_NETWORK_PATTERN.test(origin)) return origin;
+			if (extraOrigins?.includes(origin)) return origin;
+			// Default to allowing the origin (can be restricted in production)
+			return origin;
+		},
+		allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+		allowHeaders: corsAllowHeaders,
+		exposeHeaders: ['Content-Length', 'X-Request-Id'],
+		credentials: true,
+		maxAge: 600,
+	};
+}
 
-	// Enable CORS for localhost and local network access
-	app.use(
-		'*',
-		cors({
-			origin: (origin) => {
-				// Allow all localhost and 127.0.0.1 on any port
-				if (
-					origin.startsWith('http://localhost:') ||
-					origin.startsWith('http://127.0.0.1:') ||
-					origin.startsWith('https://localhost:') ||
-					origin.startsWith('https://127.0.0.1:')
-				) {
-					return origin;
-				}
-				// Allow local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-				const localNetworkPattern =
-					/^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):\d+$/;
-				if (localNetworkPattern.test(origin)) {
-					return origin;
-				}
-				// Default to allowing the origin (can be restricted in production)
-				return origin;
-			},
-			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: corsAllowHeaders,
-			exposeHeaders: ['Content-Length', 'X-Request-Id'],
-			credentials: true,
-			maxAge: 600,
-		}),
-	);
-
+function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerRootRoutes(app);
 	registerOpenApiRoute(app);
 	registerSessionsRoutes(app);
@@ -123,7 +118,13 @@ function initApp() {
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);
 	registerDictationRoutes(app);
+}
 
+function initApp() {
+	const app = new OpenAPIHono<BlankEnv>();
+	applyPrivateNetworkAccessHeaders(app);
+	app.use('*', cors(buildCorsOptions()));
+	registerRoutes(app);
 	return app;
 }
 
@@ -147,63 +148,8 @@ export type StandaloneAppConfig = {
 export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	const honoApp = new OpenAPIHono<BlankEnv>();
 	applyPrivateNetworkAccessHeaders(honoApp);
-
-	honoApp.use(
-		'*',
-		cors({
-			origin: (origin) => {
-				// Allow all localhost and 127.0.0.1 on any port
-				if (
-					origin.startsWith('http://localhost:') ||
-					origin.startsWith('http://127.0.0.1:') ||
-					origin.startsWith('https://localhost:') ||
-					origin.startsWith('https://127.0.0.1:')
-				) {
-					return origin;
-				}
-				// Allow local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-				const localNetworkPattern =
-					/^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):\d+$/;
-				if (localNetworkPattern.test(origin)) {
-					return origin;
-				}
-				// Default to allowing the origin
-				return origin;
-			},
-			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: corsAllowHeaders,
-			exposeHeaders: ['Content-Length', 'X-Request-Id'],
-			credentials: true,
-			maxAge: 600,
-		}),
-	);
-
-	registerRootRoutes(honoApp);
-	registerOpenApiRoute(honoApp);
-	registerSessionsRoutes(honoApp);
-	registerSessionApprovalRoute(honoApp);
-	registerSessionSecureInputRoute(honoApp);
-	registerSessionMessagesRoutes(honoApp);
-	registerSessionStreamRoute(honoApp);
-	registerClientEventsRoute(honoApp);
-	registerAskRoutes(honoApp);
-	registerConfigRoutes(honoApp);
-	registerFilesRoutes(honoApp);
-	registerGitRoutes(honoApp);
-	registerTerminalsRoutes(honoApp, globalTerminalManager);
-	registerSessionFilesRoutes(honoApp);
-	registerBranchRoutes(honoApp);
-	registerResearchRoutes(honoApp);
-	registerOttoRouterRoutes(honoApp);
-	registerAuthRoutes(honoApp);
-	registerTunnelRoutes(honoApp);
-	registerMCPRoutes(honoApp);
-	registerProviderUsageRoutes(honoApp);
-	registerUsageRoutes(honoApp);
-	registerAttachmentRoutes(honoApp);
-	registerSimulatorRoutes(honoApp);
-	registerDictationRoutes(honoApp);
-
+	honoApp.use('*', cors(buildCorsOptions()));
+	registerRoutes(honoApp);
 	return honoApp;
 }
 
@@ -272,66 +218,8 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 		await next();
 	});
 
-	honoApp.use(
-		'*',
-		cors({
-			origin: (origin) => {
-				// Allow all localhost and 127.0.0.1 on any port
-				if (
-					origin.startsWith('http://localhost:') ||
-					origin.startsWith('http://127.0.0.1:') ||
-					origin.startsWith('https://localhost:') ||
-					origin.startsWith('https://127.0.0.1:')
-				) {
-					return origin;
-				}
-				// Allow local network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-				const localNetworkPattern =
-					/^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):\d+$/;
-				if (localNetworkPattern.test(origin)) {
-					return origin;
-				}
-				// Allow custom CORS origins (for Tailscale, proxies, etc.)
-				if (config.corsOrigins?.includes(origin)) {
-					return origin;
-				}
-				// Default to allowing the origin
-				return origin;
-			},
-			allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-			allowHeaders: corsAllowHeaders,
-			exposeHeaders: ['Content-Length', 'X-Request-Id'],
-			credentials: true,
-			maxAge: 600,
-		}),
-	);
-
-	registerRootRoutes(honoApp);
-	registerOpenApiRoute(honoApp);
-	registerSessionsRoutes(honoApp);
-	registerSessionApprovalRoute(honoApp);
-	registerSessionSecureInputRoute(honoApp);
-	registerSessionMessagesRoutes(honoApp);
-	registerSessionStreamRoute(honoApp);
-	registerClientEventsRoute(honoApp);
-	registerAskRoutes(honoApp);
-	registerConfigRoutes(honoApp);
-	registerFilesRoutes(honoApp);
-	registerGitRoutes(honoApp);
-	registerTerminalsRoutes(honoApp, globalTerminalManager);
-	registerSessionFilesRoutes(honoApp);
-	registerBranchRoutes(honoApp);
-	registerResearchRoutes(honoApp);
-	registerOttoRouterRoutes(honoApp);
-	registerAuthRoutes(honoApp);
-	registerTunnelRoutes(honoApp);
-	registerMCPRoutes(honoApp);
-	registerProviderUsageRoutes(honoApp);
-	registerUsageRoutes(honoApp);
-	registerAttachmentRoutes(honoApp);
-	registerSimulatorRoutes(honoApp);
-	registerDictationRoutes(honoApp);
-
+	honoApp.use('*', cors(buildCorsOptions(config.corsOrigins)));
+	registerRoutes(honoApp);
 	return honoApp;
 }
 

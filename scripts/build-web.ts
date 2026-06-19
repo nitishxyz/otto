@@ -146,7 +146,9 @@ const assetFileByUrl = new Map(
 const assetImports = assetFiles
 	.map(
 		(asset) =>
-			`import ${asset.importName} from './web-dist/${asset.relativePath}' with { type: 'file' };`,
+			`// @ts-ignore Bun file-loader import returns a filesystem path at build time
+import ${asset.importName}File from './web-dist/${asset.relativePath}' with { type: 'file' };
+const ${asset.importName} = ${asset.importName}File as unknown as string;`,
 	)
 	.join('\n');
 

@@ -471,7 +471,7 @@ function messageReducer(state: Message[], action: Action): Message[] {
 async function loadSessionMessages(sessionId: string) {
 	const response = await listMessages({ path: { id: sessionId } });
 	if (response.error) throw new Error(JSON.stringify(response.error));
-	return (response.data ?? []) as Message[];
+	return (response.data ?? []) as unknown as Message[];
 }
 
 async function loadPendingSecureInputs(sessionId: string) {
