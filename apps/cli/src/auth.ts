@@ -70,6 +70,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://ollama.com/settings/keys',
 		env: 'OLLAMA_API_KEY',
 	},
+	baseten: {
+		name: 'Baseten',
+		url: 'https://app.baseten.co/settings/api_keys',
+		env: 'BASETEN_API_KEY',
+	},
 	huggingface: {
 		name: 'Hugging Face',
 		url: 'https://huggingface.co/settings/tokens',
@@ -400,6 +405,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 					value: 'ollama-cloud',
 					label: PROVIDER_LINKS['ollama-cloud'].name,
 				},
+				{ value: 'baseten', label: PROVIDER_LINKS.baseten.name },
 				{ value: 'huggingface', label: PROVIDER_LINKS.huggingface.name },
 				{ value: 'openrouter', label: PROVIDER_LINKS.openrouter.name },
 				{ value: 'opencode', label: PROVIDER_LINKS.opencode.name },
@@ -1486,6 +1492,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			openai: { enabled: provider === 'openai' },
 			anthropic: { enabled: provider === 'anthropic' },
 			google: { enabled: provider === 'google' },
+			baseten: { enabled: provider === 'baseten' },
 			huggingface: { enabled: provider === 'huggingface' },
 			openrouter: { enabled: provider === 'openrouter' },
 			opencode: { enabled: provider === 'opencode' },

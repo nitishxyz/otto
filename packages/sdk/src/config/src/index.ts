@@ -18,6 +18,7 @@ const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = {
 	anthropic: { enabled: false },
 	google: { enabled: false },
 	'ollama-cloud': { enabled: false, baseURL: 'https://ollama.com' },
+	baseten: { enabled: false },
 	huggingface: { enabled: false },
 	openrouter: { enabled: false },
 	opencode: { enabled: false },

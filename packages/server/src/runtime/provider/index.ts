@@ -1,5 +1,11 @@
 import type { OttoConfig, ProviderId } from '@ottocode/sdk';
-import { getProviderDefinition, isBuiltInProviderId } from '@ottocode/sdk';
+import {
+	createBasetenModel,
+	createHuggingFaceModel,
+	getConfiguredProviderApiKey,
+	getProviderDefinition,
+	isBuiltInProviderId,
+} from '@ottocode/sdk';
 import { getAnthropicInstance } from './anthropic.ts';
 import { resolveOpenAIModel } from './openai.ts';
 import { resolveGoogleModel } from './google.ts';
@@ -49,12 +55,25 @@ export async function resolveModel(
 		}
 		return resolveCustomConfiguredModel(definition, cfg, model, options);
 	}
+	if (provider === 'baseten') {
+		const definition = getProviderDefinition(cfg, provider);
+		if (!definition) {
+			throw new Error(`Unsupported provider: ${provider}`);
+		}
+		return createBasetenModel(model, {
+			apiKey: getConfiguredProviderApiKey(cfg, provider),
+			baseURL: definition.baseURL,
+		});
+	}
 	if (provider === 'huggingface') {
 		const definition = getProviderDefinition(cfg, provider);
 		if (!definition) {
 			throw new Error(`Unsupported provider: ${provider}`);
 		}
-		return resolveCustomConfiguredModel(definition, cfg, model, options);
+		return createHuggingFaceModel(model, {
+			apiKey: getConfiguredProviderApiKey(cfg, provider),
+			baseURL: definition.baseURL,
+		});
 	}
 	if (provider === 'openrouter') {
 		return resolveOpenRouterModel(model);

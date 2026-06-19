@@ -73,6 +73,9 @@ const pricingTable: Record<ProviderName, PricingEntry[]> = {
 	'ollama-cloud': [
 		// Pricing can vary by your Ollama Cloud model/account; leave undefined here
 	],
+	baseten: [
+		// Pricing from catalog entries; leave empty here
+	],
 	huggingface: [
 		// Pricing from catalog entries; leave empty here
 	],

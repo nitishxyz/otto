@@ -40,6 +40,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-4.1-mini'],
 	anthropic: ['claude-3-5-haiku-latest'],
 	google: ['gemini-2.0-flash-lite'],
+	baseten: ['deepseek-ai/DeepSeek-V4-Pro'],
 	huggingface: ['deepseek-ai/DeepSeek-V4-Flash:deepinfra'],
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],
@@ -164,6 +165,7 @@ const DIRECT_PROVIDER_FAMILY: Partial<
 	anthropic: 'anthropic',
 	google: 'google',
 	'ollama-cloud': 'openai-compatible',
+	baseten: 'openai-compatible',
 	huggingface: 'openai-compatible',
 	kimi: 'kimi',
 	minimax: 'minimax',
@@ -230,6 +232,8 @@ export function getUnderlyingProviderKey(
 	if (npm === '@ai-sdk/anthropic') return 'anthropic';
 	if (npm === '@ai-sdk/openai') return 'openai';
 	if (npm === '@ai-sdk/google') return 'google';
+	if (npm === '@ai-sdk/baseten') return 'openai-compatible';
+	if (npm === '@ai-sdk/huggingface') return 'openai-compatible';
 	if (npm === 'ai-sdk-ollama') return 'openai-compatible';
 	if (npm === '@ai-sdk/openai-compatible') return 'openai-compatible';
 	if (npm === '@openrouter/ai-sdk-provider') return 'openai-compatible';

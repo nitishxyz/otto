@@ -156,6 +156,10 @@ export { createZaiModel, createZaiCodingModel } from './providers/src/index.ts';
 export type { ZaiProviderConfig } from './providers/src/index.ts';
 export { createDeepSeekModel } from './providers/src/index.ts';
 export type { DeepSeekProviderConfig } from './providers/src/index.ts';
+export { createBasetenModel } from './providers/src/index.ts';
+export type { BasetenProviderConfig } from './providers/src/index.ts';
+export { createHuggingFaceModel } from './providers/src/index.ts';
+export type { HuggingFaceProviderConfig } from './providers/src/index.ts';
 export {
 	getOpenRouterInstance,
 	createOpenRouterModel,

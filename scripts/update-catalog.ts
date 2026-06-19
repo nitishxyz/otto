@@ -159,6 +159,7 @@ function pickProviders(
 		openai: createEmptyEntry('openai'),
 		anthropic: createEmptyEntry('anthropic'),
 		google: createEmptyEntry('google'),
+		baseten: createEmptyEntry('baseten'),
 		huggingface: createEmptyEntry('huggingface'),
 		openrouter: createEmptyEntry('openrouter'),
 		opencode: createEmptyEntry('opencode'),
@@ -178,6 +179,7 @@ function pickProviders(
 				'openai',
 				'anthropic',
 				'google',
+				'baseten',
 				'huggingface',
 				'openrouter',
 				'opencode',
@@ -206,6 +208,7 @@ function pickProviders(
 		const entry = feed[providerKey];
 		const key = targetKey;
 		const isAggregate = [
+			'baseten',
 			'huggingface',
 			'openrouter',
 			'opencode',
@@ -241,10 +244,17 @@ function pickProviders(
 			base.npm = 'ai-sdk-ollama';
 			base.api = 'https://ollama.com';
 		}
+		if (key === 'baseten') {
+			base.label = 'Baseten';
+			base.env = ['BASETEN_API_KEY'];
+			base.npm = '@ai-sdk/baseten';
+			base.api = 'https://inference.baseten.co/v1';
+			base.doc = 'https://docs.baseten.co/development/model-apis/overview';
+		}
 		if (key === 'huggingface') {
 			base.label = 'Hugging Face';
 			base.env = ['HF_TOKEN', 'HUGGINGFACE_API_KEY'];
-			base.npm = '@ai-sdk/openai-compatible';
+			base.npm = '@ai-sdk/huggingface';
 			base.api = 'https://router.huggingface.co/v1';
 			base.doc = 'https://huggingface.co/docs/inference-providers/index';
 		}

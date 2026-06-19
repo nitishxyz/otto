@@ -6,7 +6,9 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
 	catalog,
+	createBasetenModel,
 	createDeepSeekModel,
+	createHuggingFaceModel,
 	createMinimaxModel,
 	createKimiModel,
 	createOttoRouterModel,
@@ -27,6 +29,7 @@ export type ProviderName =
 	| 'anthropic'
 	| 'google'
 	| 'ollama-cloud'
+	| 'baseten'
 	| 'huggingface'
 	| 'openrouter'
 	| 'opencode'
@@ -111,22 +114,20 @@ export async function resolveModel(
 		return instance(model);
 	}
 
-	if (provider === 'huggingface') {
-		const entry = catalog[provider];
-		const apiKey =
-			config.apiKey ||
-			process.env.HF_TOKEN ||
-			process.env.HUGGINGFACE_API_KEY ||
-			'';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const instance = createOpenAICompatible({
-			name: entry?.label ?? 'huggingface',
-			baseURL:
-				config.baseURL || entry?.api || 'https://router.huggingface.co/v1',
-			headers,
+	if (provider === 'baseten') {
+		return createBasetenModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
 			fetch: config.customFetch,
 		});
-		return instance(model);
+	}
+
+	if (provider === 'huggingface') {
+		return createHuggingFaceModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+			fetch: config.customFetch,
+		});
 	}
 
 	if (provider === 'openrouter') {

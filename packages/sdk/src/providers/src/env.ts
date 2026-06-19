@@ -6,6 +6,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	anthropic: 'ANTHROPIC_API_KEY',
 	google: 'GOOGLE_GENERATIVE_AI_API_KEY',
 	'ollama-cloud': 'OLLAMA_API_KEY',
+	baseten: 'BASETEN_API_KEY',
 	huggingface: 'HF_TOKEN',
 	openrouter: 'OPENROUTER_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
@@ -27,6 +28,10 @@ export function readEnvKey(provider: ProviderId): string | undefined {
 	if (provider === 'kimi') {
 		const value = readKimiApiKeyFromEnv();
 		return value.length ? value : undefined;
+	}
+	if (provider === 'huggingface') {
+		const value = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_API_KEY;
+		return value?.length ? value : undefined;
 	}
 	if (!(provider in ENV_VARS) && provider !== 'copilot') {
 		return undefined;

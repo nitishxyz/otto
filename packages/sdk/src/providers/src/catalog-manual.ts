@@ -12,6 +12,7 @@ import type {
 type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
+const BASETEN_ID: BuiltInProviderId = 'baseten';
 const HUGGINGFACE_ID: BuiltInProviderId = 'huggingface';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
 const ZAI_ID: BuiltInProviderId = 'zai';
@@ -200,6 +201,63 @@ function buildOllamaCloudEntry(): ProviderCatalogEntry {
 	};
 }
 
+function buildBasetenEntry(
+	entry: ProviderCatalogEntry | undefined,
+): ProviderCatalogEntry {
+	const manual: ProviderCatalogEntry = {
+		id: BASETEN_ID,
+		label: 'Baseten',
+		env: ['BASETEN_API_KEY'],
+		npm: '@ai-sdk/baseten',
+		api: 'https://inference.baseten.co/v1',
+		doc: 'https://docs.baseten.co/development/model-apis/overview',
+		models: [
+			{
+				id: 'deepseek-ai/DeepSeek-V4-Pro',
+				ownedBy: 'deepseek',
+				label: 'DeepSeek V4 Pro',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				provider: { npm: '@ai-sdk/baseten' },
+			},
+			{
+				id: 'moonshotai/Kimi-K2-Instruct-0905',
+				ownedBy: 'kimi',
+				label: 'Kimi K2 Instruct 0905',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				provider: { npm: '@ai-sdk/baseten' },
+			},
+			{
+				id: 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
+				ownedBy: 'qwen',
+				label: 'Qwen3 Coder 480B A35B Instruct',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: false,
+				temperature: true,
+				openWeights: true,
+				provider: { npm: '@ai-sdk/baseten' },
+			},
+		],
+	};
+	const modelById = new Map(manual.models.map((model) => [model.id, model]));
+	for (const model of entry?.models ?? []) {
+		modelById.set(model.id, { ...modelById.get(model.id), ...model });
+	}
+	return {
+		...entry,
+		...manual,
+		models: Array.from(modelById.values()),
+	};
+}
+
 function buildHuggingFaceEntry(
 	entry: ProviderCatalogEntry | undefined,
 ): ProviderCatalogEntry {
@@ -207,7 +265,7 @@ function buildHuggingFaceEntry(
 		id: HUGGINGFACE_ID,
 		label: 'Hugging Face',
 		env: ['HF_TOKEN', 'HUGGINGFACE_API_KEY'],
-		npm: '@ai-sdk/openai-compatible',
+		npm: '@ai-sdk/huggingface',
 		api: 'https://router.huggingface.co/v1',
 		doc: 'https://huggingface.co/docs/inference-providers/index',
 		models: [
@@ -222,7 +280,7 @@ function buildHuggingFaceEntry(
 				openWeights: false,
 				cost: { input: 1.4, output: 4.4 },
 				limit: { context: 262_144 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 			{
 				id: 'moonshotai/Kimi-K2.7-Code:together',
@@ -235,7 +293,7 @@ function buildHuggingFaceEntry(
 				openWeights: true,
 				cost: { input: 0.95, output: 4 },
 				limit: { context: 262_144 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 			{
 				id: 'deepseek-ai/DeepSeek-V4-Flash:deepinfra',
@@ -248,7 +306,7 @@ function buildHuggingFaceEntry(
 				openWeights: true,
 				cost: { input: 0.14, output: 0.28 },
 				limit: { context: 1_048_576 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 			{
 				id: 'Qwen/Qwen3-Coder-480B-A35B-Instruct:novita',
@@ -261,7 +319,7 @@ function buildHuggingFaceEntry(
 				openWeights: true,
 				cost: { input: 0.38, output: 1.55 },
 				limit: { context: 262_144 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 			{
 				id: 'openai/gpt-oss-120b:cerebras',
@@ -273,7 +331,7 @@ function buildHuggingFaceEntry(
 				temperature: true,
 				openWeights: true,
 				cost: { input: 0.25, output: 0.69 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 			{
 				id: 'MiniMaxAI/MiniMax-M3:together',
@@ -286,7 +344,7 @@ function buildHuggingFaceEntry(
 				openWeights: true,
 				cost: { input: 0.3, output: 1.2 },
 				limit: { context: 524_288 },
-				provider: { npm: '@ai-sdk/openai-compatible' },
+				provider: { npm: '@ai-sdk/huggingface' },
 			},
 		],
 	};
@@ -526,6 +584,7 @@ export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
 	const ollamaCloudEntry = base[OLLAMA_CLOUD_ID] ?? buildOllamaCloudEntry();
+	const basetenEntry = buildBasetenEntry(base[BASETEN_ID]);
 	const huggingFaceEntry = buildHuggingFaceEntry(base[HUGGINGFACE_ID]);
 	const manualEntry = buildOttoRouterEntry();
 	const deepSeekEntry = buildDeepSeekEntry(base[DEEPSEEK_ID]);
@@ -533,6 +592,7 @@ export function mergeManualCatalog(
 		...(base as Record<BuiltInProviderId, ProviderCatalogEntry>),
 	};
 	merged[OLLAMA_CLOUD_ID] = ollamaCloudEntry;
+	merged[BASETEN_ID] = basetenEntry;
 	merged[HUGGINGFACE_ID] = huggingFaceEntry;
 	merged[DEEPSEEK_ID] = deepSeekEntry;
 	const xaiEntry = appendXaiGrokCliModels(merged.xai);

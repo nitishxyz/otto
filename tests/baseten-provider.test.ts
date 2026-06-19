@@ -11,16 +11,16 @@ import {
 } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
 
-const HUGGINGFACE_BASE_URL = 'https://router.huggingface.co/v1';
-const HUGGINGFACE_FAST_MODEL = 'deepseek-ai/DeepSeek-V4-Flash:deepinfra';
+const BASETEN_BASE_URL = 'https://inference.baseten.co/v1';
+const BASETEN_FAST_MODEL = 'deepseek-ai/DeepSeek-V4-Pro';
 
 function createConfig(): OttoConfig {
 	return {
 		projectRoot: process.cwd(),
 		defaults: {
 			agent: 'build',
-			provider: 'huggingface',
-			model: HUGGINGFACE_FAST_MODEL,
+			provider: 'baseten',
+			model: BASETEN_FAST_MODEL,
 			toolApproval: 'auto',
 			guidedMode: false,
 			reasoningText: true,
@@ -29,7 +29,7 @@ function createConfig(): OttoConfig {
 			autoCompactThresholdTokens: null,
 		},
 		providers: {
-			huggingface: { enabled: true },
+			baseten: { enabled: true },
 		},
 		paths: {
 			projectConfigDir: '.otto',
@@ -48,64 +48,54 @@ function createConfig(): OttoConfig {
 	};
 }
 
-describe('Hugging Face provider', () => {
-	const previousHfToken = process.env.HF_TOKEN;
-	const previousHuggingFaceKey = process.env.HUGGINGFACE_API_KEY;
+describe('Baseten provider', () => {
+	const previousBasetenKey = process.env.BASETEN_API_KEY;
 
 	afterEach(() => {
-		if (previousHfToken === undefined) {
-			delete process.env.HF_TOKEN;
+		if (previousBasetenKey === undefined) {
+			delete process.env.BASETEN_API_KEY;
 		} else {
-			process.env.HF_TOKEN = previousHfToken;
-		}
-		if (previousHuggingFaceKey === undefined) {
-			delete process.env.HUGGINGFACE_API_KEY;
-		} else {
-			process.env.HUGGINGFACE_API_KEY = previousHuggingFaceKey;
+			process.env.BASETEN_API_KEY = previousBasetenKey;
 		}
 	});
 
-	test('uses Hugging Face token environment variable', () => {
-		expect(providerEnvVar('huggingface')).toBe('HF_TOKEN');
-		expect(catalog.huggingface.env).toEqual([
-			'HF_TOKEN',
-			'HUGGINGFACE_API_KEY',
-		]);
+	test('uses Baseten API-key environment variable', () => {
+		expect(providerEnvVar('baseten')).toBe('BASETEN_API_KEY');
+		expect(catalog.baseten.env).toEqual(['BASETEN_API_KEY']);
 	});
 
-	test('resolves as an OpenAI-compatible router provider', () => {
-		const definition = getProviderDefinition(createConfig(), 'huggingface');
+	test('resolves as an OpenAI-compatible provider', () => {
+		const definition = getProviderDefinition(createConfig(), 'baseten');
 
 		expect(definition).toMatchObject({
-			id: 'huggingface',
-			label: 'Hugging Face',
+			id: 'baseten',
+			label: 'Baseten',
 			source: 'built-in',
 			compatibility: 'openai-compatible',
 			family: 'openai-compatible',
-			baseURL: HUGGINGFACE_BASE_URL,
-			apiKeyEnv: 'HF_TOKEN',
+			baseURL: BASETEN_BASE_URL,
+			apiKeyEnv: 'BASETEN_API_KEY',
 			allowAnyModel: true,
 		});
-		expect(getFastModel('huggingface')).toBe(HUGGINGFACE_FAST_MODEL);
+		expect(getFastModel('baseten')).toBe(BASETEN_FAST_MODEL);
 	});
 
-	test('contains curated Hugging Face router models', () => {
-		const models = new Set(catalog.huggingface.models.map((model) => model.id));
+	test('contains curated Baseten model API models', () => {
+		const models = new Set(catalog.baseten.models.map((model) => model.id));
 
 		for (const model of [
-			'zai-org/GLM-5.2:together',
-			'moonshotai/Kimi-K2.7-Code:together',
-			HUGGINGFACE_FAST_MODEL,
-			'Qwen/Qwen3-Coder-480B-A35B-Instruct:novita',
+			BASETEN_FAST_MODEL,
+			'moonshotai/Kimi-K2-Instruct-0905',
+			'Qwen/Qwen3-Coder-480B-A35B-Instruct',
 		]) {
 			expect(models.has(model)).toBe(true);
 			expect(() =>
-				validateProviderModel('huggingface', model, createConfig()),
+				validateProviderModel('baseten', model, createConfig()),
 			).not.toThrow();
 		}
 	});
 
-	test('sends requests to the Hugging Face router with bearer auth', async () => {
+	test('sends requests to Baseten with bearer auth', async () => {
 		let capturedUrl: string | undefined;
 		let capturedAuthorization: string | undefined;
 		const fetchMock: typeof fetch = async (input, init) => {
@@ -114,37 +104,21 @@ describe('Hugging Face provider', () => {
 			capturedAuthorization = headers.get('authorization') ?? undefined;
 			return new Response(
 				JSON.stringify({
-					id: 'resp-test',
-					model: HUGGINGFACE_FAST_MODEL,
-					object: 'response',
-					created_at: 1,
-					status: 'completed',
-					error: null,
-					instructions: null,
-					max_output_tokens: null,
-					metadata: null,
-					tool_choice: 'auto',
-					tools: [],
-					temperature: 1,
-					top_p: 1,
-					output: [
+					id: 'chatcmpl-test',
+					model: BASETEN_FAST_MODEL,
+					choices: [
 						{
-							type: 'message',
-							id: 'msg-test',
-							content: [{ type: 'output_text', text: 'ok' }],
+							message: { role: 'assistant', content: 'ok' },
+							finish_reason: 'stop',
 						},
 					],
-					usage: {
-						input_tokens: 1,
-						output_tokens: 1,
-						total_tokens: 2,
-					},
+					usage: { prompt_tokens: 1, completion_tokens: 1 },
 				}),
 				{ headers: { 'content-type': 'application/json' } },
 			);
 		};
-		const model = await resolveModel('huggingface', HUGGINGFACE_FAST_MODEL, {
-			apiKey: 'hf-test-token',
+		const model = await resolveModel('baseten', BASETEN_FAST_MODEL, {
+			apiKey: 'baseten-test-key',
 			customFetch: fetchMock,
 		});
 		const options: LanguageModelV3CallOptions = {
@@ -153,12 +127,12 @@ describe('Hugging Face provider', () => {
 
 		await model.doGenerate(options);
 
-		expect(capturedUrl).toBe(`${HUGGINGFACE_BASE_URL}/responses`);
-		expect(capturedAuthorization).toBe('Bearer hf-test-token');
+		expect(capturedUrl).toBe(`${BASETEN_BASE_URL}/chat/completions`);
+		expect(capturedAuthorization).toBe('Bearer baseten-test-key');
 	});
 
 	test('auth status reports API-key auth and no OAuth support', async () => {
-		process.env.HF_TOKEN = 'hf-env-token';
+		process.env.BASETEN_API_KEY = 'baseten-env-key';
 		const app = createEmbeddedApp();
 		const response = await app.request('http://localhost/v1/auth/status');
 		const payload = (await response.json()) as {
@@ -169,7 +143,7 @@ describe('Hugging Face provider', () => {
 		};
 
 		expect(response.status).toBe(200);
-		expect(payload.providers.huggingface).toMatchObject({
+		expect(payload.providers.baseten).toMatchObject({
 			configured: true,
 			type: 'api',
 			supportsOAuth: false,
