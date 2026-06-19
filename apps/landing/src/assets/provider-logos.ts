@@ -28,6 +28,14 @@ export const opencodeLogo = `<svg width="24" height="24" viewBox="0 0 24 24" fil
 <path d="M8.40005 17.4H19.2001V21H4.80005V13.8H8.40005V17.4ZM15.6001 10.2V13.8H8.40005V10.2H15.6001ZM19.2001 10.2H15.6001V6.6H4.80005V3H19.2001V10.2Z" fill="currentColor"/>
 </svg>`;
 
+export const huggingfaceLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+<circle cx="20" cy="20" r="16" fill="currentColor" opacity="0.14"/>
+<path d="M13 13.5C13 12.6716 13.6716 12 14.5 12C15.3284 12 16 12.6716 16 13.5V18.5H24V13.5C24 12.6716 24.6716 12 25.5 12C26.3284 12 27 12.6716 27 13.5V26.5C27 27.3284 26.3284 28 25.5 28C24.6716 28 24 27.3284 24 26.5V21.5H16V26.5C16 27.3284 15.3284 28 14.5 28C13.6716 28 13 27.3284 13 26.5V13.5Z" fill="currentColor"/>
+<circle cx="12" cy="10" r="2" fill="currentColor"/>
+<circle cx="28" cy="10" r="2" fill="currentColor"/>
+<path d="M17.2 26.2C18.8 27.4 21.2 27.4 22.8 26.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+</svg>`;
+
 export const copilotLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
 <path d="M35.3993 26.4544C34.2871 28.3855 27.8314 32.9425 20 32.9425C12.1686 32.9425 5.71288 28.3855 4.60075 26.4544C4.5427 26.3532 4.50826 26.2401 4.5 26.1237V22.418C4.51199 22.3209 4.53496 22.2256 4.56846 22.1338C5.04896 20.9261 6.30833 19.1733 7.93325 18.7031C8.14896 18.149 8.468 17.3404 8.76508 16.7437C8.71727 16.2776 8.69485 15.8094 8.69792 15.3409C8.69792 13.6217 9.06217 12.113 10.1601 10.9906C10.6729 10.4662 11.3097 10.0644 12.064 9.76091C13.871 8.29357 16.4453 7.05745 19.9716 7.05745C23.4978 7.05745 26.129 8.29357 27.936 9.76091C28.6903 10.0644 29.3271 10.4662 29.8399 10.9906C30.9378 12.113 31.3021 13.6217 31.3021 15.3409C31.3021 15.8162 31.284 16.2877 31.2349 16.7437C31.532 17.3404 31.851 18.149 32.0667 18.7031C33.6917 19.1733 34.951 20.9261 35.4315 22.1338C35.4677 22.2248 35.4908 22.3205 35.5 22.418V26.1237C35.4917 26.2401 35.4573 26.3532 35.3993 26.4544Z" fill="currentColor"/>
 </svg>`;
@@ -53,6 +61,7 @@ export const providerLogos: Record<string, string> = {
 	openai: openaiLogo,
 	google: googleLogo,
 	openrouter: openrouterLogo,
+	huggingface: huggingfaceLogo,
 	ottorouter: ottorouterLogo,
 	opencode: opencodeLogo,
 	copilot: copilotLogo,

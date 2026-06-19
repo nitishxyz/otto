@@ -49,6 +49,13 @@ export async function resolveModel(
 		}
 		return resolveCustomConfiguredModel(definition, cfg, model, options);
 	}
+	if (provider === 'huggingface') {
+		const definition = getProviderDefinition(cfg, provider);
+		if (!definition) {
+			throw new Error(`Unsupported provider: ${provider}`);
+		}
+		return resolveCustomConfiguredModel(definition, cfg, model, options);
+	}
 	if (provider === 'openrouter') {
 		return resolveOpenRouterModel(model);
 	}

@@ -6,6 +6,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	anthropic: 'ANTHROPIC_API_KEY',
 	google: 'GOOGLE_GENERATIVE_AI_API_KEY',
 	'ollama-cloud': 'OLLAMA_API_KEY',
+	huggingface: 'HF_TOKEN',
 	openrouter: 'OPENROUTER_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
 	copilot: 'GITHUB_TOKEN',

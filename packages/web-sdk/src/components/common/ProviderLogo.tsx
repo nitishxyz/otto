@@ -14,6 +14,7 @@ import {
 	minimaxLogo,
 	kimiLogo,
 	opencodeLogo,
+	huggingfaceLogo,
 	copilotLogo,
 } from '../../assets/provider-logos';
 
@@ -33,6 +34,7 @@ const providerLogos: Record<string, string> = {
 	minimax: minimaxLogo,
 	kimi: kimiLogo,
 	opencode: opencodeLogo,
+	huggingface: huggingfaceLogo,
 	copilot: copilotLogo,
 };
 

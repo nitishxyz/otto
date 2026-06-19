@@ -159,6 +159,7 @@ function pickProviders(
 		openai: createEmptyEntry('openai'),
 		anthropic: createEmptyEntry('anthropic'),
 		google: createEmptyEntry('google'),
+		huggingface: createEmptyEntry('huggingface'),
 		openrouter: createEmptyEntry('openrouter'),
 		opencode: createEmptyEntry('opencode'),
 		xai: createEmptyEntry('xai'),
@@ -177,6 +178,7 @@ function pickProviders(
 				'openai',
 				'anthropic',
 				'google',
+				'huggingface',
 				'openrouter',
 				'opencode',
 				'xai',
@@ -204,6 +206,7 @@ function pickProviders(
 		const entry = feed[providerKey];
 		const key = targetKey;
 		const isAggregate = [
+			'huggingface',
 			'openrouter',
 			'opencode',
 			'copilot',
@@ -237,6 +240,13 @@ function pickProviders(
 		if (key === 'ollama-cloud') {
 			base.npm = 'ai-sdk-ollama';
 			base.api = 'https://ollama.com';
+		}
+		if (key === 'huggingface') {
+			base.label = 'Hugging Face';
+			base.env = ['HF_TOKEN', 'HUGGINGFACE_API_KEY'];
+			base.npm = '@ai-sdk/openai-compatible';
+			base.api = 'https://router.huggingface.co/v1';
+			base.doc = 'https://huggingface.co/docs/inference-providers/index';
 		}
 		const doc = normalizeString(entry.doc);
 		if (doc) base.doc = doc;

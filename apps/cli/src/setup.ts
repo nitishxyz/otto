@@ -11,6 +11,7 @@ import { loadConfig } from '@ottocode/sdk';
 import {
 	catalog,
 	isBuiltInProviderId,
+	providerEnvVar,
 	type ModelInfo,
 	type ProviderId,
 } from '@ottocode/sdk';
@@ -26,12 +27,14 @@ export async function runSetup(projectRoot?: string) {
 			{ value: 'anthropic', label: 'Anthropic' },
 			{ value: 'google', label: 'Google (Gemini)' },
 			{ value: 'ollama-cloud', label: 'Ollama Cloud' },
+			{ value: 'huggingface', label: 'Hugging Face' },
 			{ value: 'openrouter', label: 'OpenRouter' },
 			{ value: 'opencode', label: 'OpenCode' },
 			{ value: 'ottorouter', label: 'OttoRouter' },
 			{ value: 'xai', label: 'xAI' },
 			{ value: 'zai', label: 'Z.AI (GLM)' },
 			{ value: 'zai-coding', label: 'Z.AI Coding Plan' },
+			{ value: 'deepseek', label: 'DeepSeek' },
 			{ value: 'kimi', label: 'Kimi' },
 			{ value: 'minimax', label: 'MiniMax' },
 		],
@@ -46,6 +49,7 @@ export async function runSetup(projectRoot?: string) {
 		anthropic: { enabled: false },
 		google: { enabled: false },
 		'ollama-cloud': { enabled: false },
+		huggingface: { enabled: false },
 		openrouter: { enabled: false },
 		opencode: { enabled: false },
 		copilot: { enabled: false },
@@ -53,6 +57,7 @@ export async function runSetup(projectRoot?: string) {
 		xai: { enabled: false },
 		zai: { enabled: false },
 		'zai-coding': { enabled: false },
+		deepseek: { enabled: false },
 		kimi: { enabled: false },
 		minimax: { enabled: false },
 	};
@@ -61,30 +66,7 @@ export async function runSetup(projectRoot?: string) {
 	// Collect API keys for enabled providers
 	for (const p of Object.keys(providers) as ProviderId[]) {
 		if (!providers[p].enabled) continue;
-		const keyLabel =
-			p === 'openai'
-				? 'OPENAI_API_KEY'
-				: p === 'anthropic'
-					? 'ANTHROPIC_API_KEY'
-					: p === 'google'
-						? 'GOOGLE_GENERATIVE_AI_API_KEY'
-						: p === 'ollama-cloud'
-							? 'OLLAMA_API_KEY'
-							: p === 'openrouter'
-								? 'OPENROUTER_API_KEY'
-								: p === 'opencode'
-									? 'OPENCODE_API_KEY'
-									: p === 'ottorouter'
-										? 'OTTOROUTER_PRIVATE_KEY'
-										: p === 'xai'
-											? 'XAI_API_KEY'
-											: p === 'zai'
-												? 'ZAI_API_KEY'
-												: p === 'zai-coding'
-													? 'ZAI_CODING_API_KEY'
-													: p === 'kimi'
-														? 'KIMI_API_KEY'
-														: 'MINIMAX_API_KEY';
+		const keyLabel = providerEnvVar(p) ?? `${String(p).toUpperCase()}_API_KEY`;
 		const key = await text({
 			message: `Enter ${keyLabel} (leave empty to skip)`,
 			initialValue: '',

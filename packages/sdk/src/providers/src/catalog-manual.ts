@@ -12,6 +12,7 @@ import type {
 type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 
 const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
+const HUGGINGFACE_ID: BuiltInProviderId = 'huggingface';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
 const ZAI_ID: BuiltInProviderId = 'zai';
 const ZAI_CODING_ID: BuiltInProviderId = 'zai-coding';
@@ -196,6 +197,107 @@ function buildOllamaCloudEntry(): ProviderCatalogEntry {
 		api: 'https://ollama.com',
 		doc: 'https://docs.ollama.com/cloud',
 		models: [],
+	};
+}
+
+function buildHuggingFaceEntry(
+	entry: ProviderCatalogEntry | undefined,
+): ProviderCatalogEntry {
+	const manual: ProviderCatalogEntry = {
+		id: HUGGINGFACE_ID,
+		label: 'Hugging Face',
+		env: ['HF_TOKEN', 'HUGGINGFACE_API_KEY'],
+		npm: '@ai-sdk/openai-compatible',
+		api: 'https://router.huggingface.co/v1',
+		doc: 'https://huggingface.co/docs/inference-providers/index',
+		models: [
+			{
+				id: 'zai-org/GLM-5.2:together',
+				ownedBy: 'zai',
+				label: 'GLM-5.2 (Together)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: false,
+				cost: { input: 1.4, output: 4.4 },
+				limit: { context: 262_144 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+			{
+				id: 'moonshotai/Kimi-K2.7-Code:together',
+				ownedBy: 'kimi',
+				label: 'Kimi K2.7 Code (Together)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				cost: { input: 0.95, output: 4 },
+				limit: { context: 262_144 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+			{
+				id: 'deepseek-ai/DeepSeek-V4-Flash:deepinfra',
+				ownedBy: 'deepseek',
+				label: 'DeepSeek V4 Flash (DeepInfra)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				cost: { input: 0.14, output: 0.28 },
+				limit: { context: 1_048_576 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+			{
+				id: 'Qwen/Qwen3-Coder-480B-A35B-Instruct:novita',
+				ownedBy: 'qwen',
+				label: 'Qwen3 Coder 480B A35B (Novita)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: false,
+				temperature: true,
+				openWeights: true,
+				cost: { input: 0.38, output: 1.55 },
+				limit: { context: 262_144 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+			{
+				id: 'openai/gpt-oss-120b:cerebras',
+				ownedBy: 'openai',
+				label: 'GPT OSS 120B (Cerebras)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				cost: { input: 0.25, output: 0.69 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+			{
+				id: 'MiniMaxAI/MiniMax-M3:together',
+				ownedBy: 'minimax',
+				label: 'MiniMax M3 (Together)',
+				modalities: { input: ['text'], output: ['text'] },
+				toolCall: true,
+				reasoningText: true,
+				temperature: true,
+				openWeights: true,
+				cost: { input: 0.3, output: 1.2 },
+				limit: { context: 524_288 },
+				provider: { npm: '@ai-sdk/openai-compatible' },
+			},
+		],
+	};
+	const modelById = new Map(manual.models.map((model) => [model.id, model]));
+	for (const model of entry?.models ?? []) {
+		modelById.set(model.id, { ...modelById.get(model.id), ...model });
+	}
+	return {
+		...entry,
+		...manual,
+		models: Array.from(modelById.values()),
 	};
 }
 
@@ -424,12 +526,14 @@ export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
 	const ollamaCloudEntry = base[OLLAMA_CLOUD_ID] ?? buildOllamaCloudEntry();
+	const huggingFaceEntry = buildHuggingFaceEntry(base[HUGGINGFACE_ID]);
 	const manualEntry = buildOttoRouterEntry();
 	const deepSeekEntry = buildDeepSeekEntry(base[DEEPSEEK_ID]);
 	const merged: Record<BuiltInProviderId, ProviderCatalogEntry> = {
 		...(base as Record<BuiltInProviderId, ProviderCatalogEntry>),
 	};
 	merged[OLLAMA_CLOUD_ID] = ollamaCloudEntry;
+	merged[HUGGINGFACE_ID] = huggingFaceEntry;
 	merged[DEEPSEEK_ID] = deepSeekEntry;
 	const xaiEntry = appendXaiGrokCliModels(merged.xai);
 	if (xaiEntry) {

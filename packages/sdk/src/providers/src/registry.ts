@@ -32,6 +32,7 @@ const BUILTIN_COMPATIBILITY: Record<BuiltInProviderId, ProviderCompatibility> =
 		anthropic: 'anthropic',
 		google: 'google',
 		'ollama-cloud': 'ollama',
+		huggingface: 'openai-compatible',
 		openrouter: 'openrouter',
 		opencode: 'openai-compatible',
 		copilot: 'openai',
@@ -49,6 +50,7 @@ const BUILTIN_FAMILY: Record<BuiltInProviderId, ProviderPromptFamily> = {
 	anthropic: 'anthropic',
 	google: 'google',
 	'ollama-cloud': 'openai-compatible',
+	huggingface: 'openai-compatible',
 	openrouter: 'openai-compatible',
 	opencode: 'openai-compatible',
 	copilot: 'openai',
@@ -154,7 +156,8 @@ export function getProviderDefinition(
 				normalizeOptionalText(resolvedSettings?.apiKeyEnv) ??
 				providerEnvVar(provider),
 			models,
-			allowAnyModel: catalogProvider === 'ollama-cloud',
+			allowAnyModel:
+				catalogProvider === 'ollama-cloud' || catalogProvider === 'huggingface',
 		};
 	}
 

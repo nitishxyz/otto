@@ -27,6 +27,7 @@ export type ProviderName =
 	| 'anthropic'
 	| 'google'
 	| 'ollama-cloud'
+	| 'huggingface'
 	| 'openrouter'
 	| 'opencode'
 	| 'copilot'
@@ -106,6 +107,24 @@ export async function resolveModel(
 		const instance = createOllama({
 			baseURL,
 			headers,
+		});
+		return instance(model);
+	}
+
+	if (provider === 'huggingface') {
+		const entry = catalog[provider];
+		const apiKey =
+			config.apiKey ||
+			process.env.HF_TOKEN ||
+			process.env.HUGGINGFACE_API_KEY ||
+			'';
+		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+		const instance = createOpenAICompatible({
+			name: entry?.label ?? 'huggingface',
+			baseURL:
+				config.baseURL || entry?.api || 'https://router.huggingface.co/v1',
+			headers,
+			fetch: config.customFetch,
 		});
 		return instance(model);
 	}

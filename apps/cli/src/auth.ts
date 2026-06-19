@@ -70,6 +70,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://ollama.com/settings/keys',
 		env: 'OLLAMA_API_KEY',
 	},
+	huggingface: {
+		name: 'Hugging Face',
+		url: 'https://huggingface.co/settings/tokens',
+		env: 'HF_TOKEN',
+	},
 	openrouter: {
 		name: 'OpenRouter',
 		url: 'https://openrouter.ai/keys',
@@ -395,6 +400,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 					value: 'ollama-cloud',
 					label: PROVIDER_LINKS['ollama-cloud'].name,
 				},
+				{ value: 'huggingface', label: PROVIDER_LINKS.huggingface.name },
 				{ value: 'openrouter', label: PROVIDER_LINKS.openrouter.name },
 				{ value: 'opencode', label: PROVIDER_LINKS.opencode.name },
 				{ value: 'copilot', label: PROVIDER_LINKS.copilot.name },
@@ -1480,6 +1486,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			openai: { enabled: provider === 'openai' },
 			anthropic: { enabled: provider === 'anthropic' },
 			google: { enabled: provider === 'google' },
+			huggingface: { enabled: provider === 'huggingface' },
 			openrouter: { enabled: provider === 'openrouter' },
 			opencode: { enabled: provider === 'opencode' },
 			copilot: { enabled: provider === 'copilot' },
