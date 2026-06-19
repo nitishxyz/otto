@@ -1,5 +1,6 @@
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { AssistantMessageGroup } from '../../../../packages/web-sdk/src/components/messages/AssistantMessageGroup';
+import { ThreadDensityProvider } from '../../../../packages/web-sdk/src/components/messages/threadDensity';
 import { UserMessageGroup } from '../../../../packages/web-sdk/src/components/messages/UserMessageGroup';
 import type { Message } from '../../../../packages/web-sdk/src/types/api';
 
@@ -171,6 +172,7 @@ function formatDuration(ms: number): string {
 
 const ChatPreview: FC<ChatPreviewProps> = ({ data }) => {
 	const { sessionData, shareId, title, createdAt, viewCount } = data;
+	const [isCompactThread, setIsCompactThread] = useState(true);
 	const messages = transformMessages(
 		sessionData.messages,
 		sessionData,
@@ -191,6 +193,7 @@ const ChatPreview: FC<ChatPreviewProps> = ({ data }) => {
 		: [];
 
 	const estimatedCost = stats ? estimateCostUsd(sessionData.model, stats) : 0;
+	const threadDensity = isCompactThread ? 'compact' : 'normal';
 
 	return (
 		<div className="min-h-screen bg-background">
@@ -215,7 +218,7 @@ const ChatPreview: FC<ChatPreviewProps> = ({ data }) => {
 					</div>
 
 					{/* Model & Provider */}
-					<div className="flex items-center justify-between text-sm text-muted-foreground">
+					<div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
 						<div className="flex items-center gap-2">
 							<span className="font-medium text-foreground">
 								{sessionData.model}
@@ -223,57 +226,89 @@ const ChatPreview: FC<ChatPreviewProps> = ({ data }) => {
 							<span className="opacity-50">·</span>
 							<span>{sessionData.provider}</span>
 						</div>
-						<span>{viewCount} views</span>
+						<div className="flex items-center gap-3">
+							<span>{viewCount} views</span>
+							<fieldset className="inline-flex rounded-full border border-border bg-muted/40 p-0.5 text-xs">
+								<legend className="sr-only">Thread density</legend>
+								<button
+									type="button"
+									onClick={() => setIsCompactThread(true)}
+									aria-pressed={isCompactThread}
+									className={`rounded-full px-2.5 py-1 transition-colors ${
+										isCompactThread
+											? 'bg-background text-foreground shadow-sm'
+											: 'text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									Compact
+								</button>
+								<button
+									type="button"
+									onClick={() => setIsCompactThread(false)}
+									aria-pressed={!isCompactThread}
+									className={`rounded-full px-2.5 py-1 transition-colors ${
+										!isCompactThread
+											? 'bg-background text-foreground shadow-sm'
+											: 'text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									Normal
+								</button>
+							</fieldset>
+						</div>
 					</div>
 				</div>
 			</header>
 
 			{/* Messages */}
 			<main className="max-w-3xl mx-auto px-6 py-8">
-				<div className="space-y-6">
-					{filteredMessages.map((message, idx) => {
-						const prevMessage = filteredMessages[idx - 1];
-						const nextMessage = filteredMessages[idx + 1];
-						const isLastMessage = idx === filteredMessages.length - 1;
+				<ThreadDensityProvider density={threadDensity}>
+					<div className={isCompactThread ? 'space-y-4' : 'space-y-6'}>
+						{filteredMessages.map((message, idx) => {
+							const prevMessage = filteredMessages[idx - 1];
+							const nextMessage = filteredMessages[idx + 1];
+							const isLastMessage = idx === filteredMessages.length - 1;
 
-						if (message.role === 'user') {
-							const nextAssistantMessage =
-								nextMessage && nextMessage.role === 'assistant'
-									? nextMessage
-									: undefined;
-							return (
-								<UserMessageGroup
-									key={message.id}
-									sessionId={shareId}
-									message={message}
-									isFirst={idx === 0}
-									nextAssistantMessageId={nextAssistantMessage?.id}
-								/>
-							);
-						}
+							if (message.role === 'user') {
+								const nextAssistantMessage =
+									nextMessage && nextMessage.role === 'assistant'
+										? nextMessage
+										: undefined;
+								return (
+									<UserMessageGroup
+										key={message.id}
+										sessionId={shareId}
+										message={message}
+										isFirst={idx === 0}
+										nextAssistantMessageId={nextAssistantMessage?.id}
+									/>
+								);
+							}
 
-						if (message.role === 'assistant') {
-							const showHeader =
-								!prevMessage || prevMessage.role !== 'assistant';
-							const nextIsAssistant =
-								nextMessage && nextMessage.role === 'assistant';
+							if (message.role === 'assistant') {
+								const showHeader =
+									!prevMessage || prevMessage.role !== 'assistant';
+								const nextIsAssistant =
+									nextMessage && nextMessage.role === 'assistant';
 
-							return (
-								<AssistantMessageGroup
-									key={message.id}
-									sessionId={shareId}
-									message={message}
-									showHeader={showHeader}
-									hasNextAssistantMessage={nextIsAssistant}
-									isLastMessage={isLastMessage}
-									showBranchButton={false}
-								/>
-							);
-						}
+								return (
+									<AssistantMessageGroup
+										key={message.id}
+										sessionId={shareId}
+										message={message}
+										showHeader={showHeader}
+										hasNextAssistantMessage={nextIsAssistant}
+										isLastMessage={isLastMessage}
+										showBranchButton={false}
+										compact={isCompactThread}
+									/>
+								);
+							}
 
-						return null;
-					})}
-				</div>
+							return null;
+						})}
+					</div>
+				</ThreadDensityProvider>
 			</main>
 
 			{/* Session Stats Summary */}
