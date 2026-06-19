@@ -44,6 +44,7 @@ import {
 } from './runner/runner-dump.ts';
 import { createRunnerStreamHandlers } from './runner/runner-handlers.ts';
 import { invokeRunnerStreamText } from './runner/runner-invoke.ts';
+import { markEmptyResponseAfterFinalAttempt } from './runner/runner-empty-response.ts';
 
 export {
 	enqueueAssistantRun,
@@ -262,12 +263,21 @@ async function runAssistant(opts: RunOpts) {
 			aborted: runnerHandlers.getAbortedByUser(),
 		});
 
-		await retryAfterMaxOutputTokensFinish({
+		const queuedContinuation = await retryAfterMaxOutputTokensFinish({
 			opts,
 			db,
 			finishReason,
 			rawFinishReason,
 			runSessionLoop,
+		});
+		if (queuedContinuation) return;
+
+		await markEmptyResponseAfterFinalAttempt({
+			opts,
+			db,
+			finishReason,
+			rawFinishReason,
+			toolObserver: toolObserver.state,
 		});
 	} catch (err) {
 		unsubscribeFinish();

@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { getDb } from '@ottocode/database';
 import { messageParts, messages, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
-import { createFinishHandler } from '../packages/server/src/runtime/stream/finish-handler.ts';
-import type { FinishEvent } from '../packages/server/src/runtime/stream/types.ts';
+import { markEmptyResponseAfterFinalAttempt } from '../packages/server/src/runtime/agent/runner/runner-empty-response.ts';
 import type { RunOpts } from '../packages/server/src/runtime/session/queue.ts';
 
 let projectRoot = '';
@@ -43,7 +42,7 @@ async function insertPendingAssistantRun(sessionId: string, messageId: string) {
 	return db;
 }
 
-describe('finish handler empty assistant response guard', () => {
+describe('runner empty assistant response guard', () => {
 	test('converts a successful finish with no assistant parts into an error part', async () => {
 		const sessionId = 'empty-response-session';
 		const messageId = 'empty-response-message';
@@ -56,24 +55,26 @@ describe('finish handler empty assistant response guard', () => {
 			model: 'zai-org/GLM-5.2:together',
 			projectRoot,
 		};
-		const completeAssistantMessage = async (
-			fin: FinishEvent,
-			_runOpts: RunOpts,
-			_db: Awaited<ReturnType<typeof getDb>>,
-		) => {
-			await db
-				.update(messages)
-				.set({
-					status: 'complete',
-					completedAt: Date.now(),
-					finishReason: fin.finishReason,
-					rawFinishReason: fin.rawFinishReason,
-				})
-				.where(eq(messages.id, messageId));
-		};
+		await db
+			.update(messages)
+			.set({
+				status: 'complete',
+				completedAt: Date.now(),
+				finishReason: 'other',
+			})
+			.where(eq(messages.id, messageId));
 
-		const handler = createFinishHandler(opts, db, completeAssistantMessage);
-		await handler({ finishReason: 'other' });
+		const marked = await markEmptyResponseAfterFinalAttempt({
+			opts,
+			db,
+			finishReason: 'other',
+			rawFinishReason: undefined,
+			toolObserver: {
+				toolActivityObserved: false,
+				trailingAssistantTextAfterTool: false,
+				endedWithToolActivity: false,
+			},
+		});
 
 		const [message] = await db
 			.select()
@@ -87,6 +88,7 @@ describe('finish handler empty assistant response guard', () => {
 			.limit(1);
 		const partContent = JSON.parse(part.content ?? '{}');
 
+		expect(marked).toBe(true);
 		expect(message.status).toBe('error');
 		expect(message.errorType).toBe('empty_response');
 		expect(message.finishReason).toBe('error');
@@ -100,5 +102,40 @@ describe('finish handler empty assistant response guard', () => {
 			provider: 'huggingface',
 			model: 'zai-org/GLM-5.2:together',
 		});
+	});
+
+	test('does not mark tool-only runs as empty while retry/continuation can recover', async () => {
+		const sessionId = 'tool-only-session';
+		const messageId = 'tool-only-message';
+		const db = await insertPendingAssistantRun(sessionId, messageId);
+		const opts: RunOpts = {
+			sessionId,
+			assistantMessageId: messageId,
+			agent: 'build',
+			provider: 'huggingface',
+			model: 'zai-org/GLM-5.2:together',
+			projectRoot,
+		};
+
+		const marked = await markEmptyResponseAfterFinalAttempt({
+			opts,
+			db,
+			finishReason: 'other',
+			rawFinishReason: undefined,
+			toolObserver: {
+				toolActivityObserved: true,
+				trailingAssistantTextAfterTool: false,
+				endedWithToolActivity: true,
+				lastToolName: 'write',
+			},
+		});
+
+		const [message] = await db
+			.select()
+			.from(messages)
+			.where(eq(messages.id, messageId))
+			.limit(1);
+		expect(marked).toBe(false);
+		expect(message.status).toBe('pending');
 	});
 });

@@ -12,7 +12,7 @@ import {
 	resolveUsageProvider,
 } from '../session/db-operations.ts';
 
-async function markEmptyAssistantResponseAsError(args: {
+export async function markEmptyAssistantResponseAsError(args: {
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
 	fin: FinishEvent;
@@ -58,10 +58,6 @@ export function createFinishHandler(
 			.select()
 			.from(messageParts)
 			.where(eq(messageParts.messageId, opts.assistantMessageId));
-		if (fin.finishReason !== 'error' && assistantParts.length === 0) {
-			await markEmptyAssistantResponseAsError({ opts, db, fin });
-			return;
-		}
 
 		if (opts.isCompactCommand && fin.finishReason !== 'error') {
 			const hasTextContent = assistantParts.some(
