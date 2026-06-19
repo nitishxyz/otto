@@ -1,10 +1,10 @@
 import { wrapLanguageModel } from 'ai';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
 import type { OttoConfig } from '@ottocode/sdk';
-import { isDevtoolsEnabled } from '../debug/state.ts';
-import { resolveModel } from '../provider/index.ts';
-import { buildReasoningConfig } from '../provider/reasoning.ts';
-import type { RunOpts } from '../session/queue.ts';
+import { isDevtoolsEnabled } from '../../debug/state.ts';
+import { resolveModel } from '../../provider/index.ts';
+import { buildReasoningConfig } from '../../provider/reasoning.ts';
+import type { RunOpts } from '../../session/queue.ts';
 import { mergeProviderOptions } from './runner-setup-tools.ts';
 import { nowMs } from './runner-setup-utils.ts';
 

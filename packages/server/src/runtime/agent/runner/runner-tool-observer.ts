@@ -1,6 +1,6 @@
-import { subscribe } from '../../events/bus.ts';
-import type { OttoEvent } from '../../events/types.ts';
-import type { createTurnDumpCollector } from '../debug/turn-dump.ts';
+import { subscribe } from '../../../events/bus.ts';
+import type { OttoEvent } from '../../../events/types.ts';
+import type { createTurnDumpCollector } from '../../debug/turn-dump.ts';
 
 export type RunnerToolObserverState = {
 	toolActivityObserved: boolean;

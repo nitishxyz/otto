@@ -1,4 +1,5 @@
 import { isDebugEnabled, isTraceEnabled, getDebugScopes } from './debug.ts';
+import { normalizeLogError } from './logger/errors.ts';
 import { colorizeLine, safeHasMeta, type LogLevel } from './logger/format.ts';
 import { writeLogLine } from './logger/sinks.ts';
 
@@ -11,18 +12,8 @@ function shouldWriteDebugLog(message: string): boolean {
 	return scopes.includes(match[1]);
 }
 
-function printLine(
-	level: LogLevel,
-	line: string,
-	meta?: Record<string, unknown>,
-) {
+function printLine(level: LogLevel, line: string) {
 	const colored = colorizeLine(line, level);
-	if (safeHasMeta(meta)) {
-		if (level === 'warn') console.warn(colored, meta);
-		else if (level === 'error') console.error(colored, meta);
-		else console.log(colored, meta);
-		return;
-	}
 	if (level === 'warn') console.warn(colored);
 	else if (level === 'error') console.error(colored);
 	else console.log(colored);
@@ -32,7 +23,7 @@ export function debug(message: string, meta?: Record<string, unknown>): void {
 	if (!shouldWriteDebugLog(message)) return;
 	try {
 		const line = writeLogLine(`[debug] ${message}`, meta);
-		printLine('debug', line, meta);
+		printLine('debug', line);
 	} catch {
 		// ignore logging errors
 	}
@@ -42,7 +33,7 @@ export function info(message: string, meta?: Record<string, unknown>): void {
 	if (!shouldWriteDebugLog(message) && !isTraceEnabled()) return;
 	try {
 		const line = writeLogLine(`[info] ${message}`, meta);
-		printLine('info', line, meta);
+		printLine('info', line);
 	} catch {
 		// ignore logging errors
 	}
@@ -51,7 +42,7 @@ export function info(message: string, meta?: Record<string, unknown>): void {
 export function warn(message: string, meta?: Record<string, unknown>): void {
 	try {
 		const line = writeLogLine(`[warn] ${message}`, meta);
-		printLine('warn', line, meta);
+		printLine('warn', line);
 	} catch {
 		// ignore logging errors
 	}
@@ -62,48 +53,14 @@ export function error(
 	err?: unknown,
 	meta?: Record<string, unknown>,
 ): void {
-	if (!isDebugEnabled()) return;
-
 	try {
 		const logMeta: Record<string, unknown> = meta ? { ...meta } : {};
-
-		if (err) {
-			if (err instanceof Error) {
-				logMeta.error = {
-					name: err.name,
-					message: err.message,
-				};
-				if (isTraceEnabled() && err.stack) {
-					(logMeta.error as { stack?: string }).stack = err.stack;
-				}
-			} else if (typeof err === 'string') {
-				logMeta.error = err;
-			} else if (typeof err === 'object') {
-				const errObj = err as Record<string, unknown>;
-				const details: Record<string, unknown> = {};
-				if (typeof errObj.name === 'string') details.name = errObj.name;
-				if (typeof errObj.message === 'string')
-					details.message = errObj.message;
-				if (typeof errObj.code === 'string') details.code = errObj.code;
-				if (typeof errObj.status === 'number') details.status = errObj.status;
-				if (typeof errObj.statusCode === 'number')
-					details.statusCode = errObj.statusCode;
-				if (
-					isTraceEnabled() &&
-					typeof errObj.stack === 'string' &&
-					!details.stack
-				) {
-					details.stack = errObj.stack;
-				}
-				logMeta.error = Object.keys(details).length ? details : errObj;
-			} else {
-				logMeta.error = String(err);
-			}
-		}
+		const normalizedError = normalizeLogError(err);
+		if (normalizedError !== undefined) logMeta.error = normalizedError;
 
 		if (safeHasMeta(logMeta)) {
 			const line = writeLogLine(`[error] ${message}`, logMeta);
-			printLine('error', line, logMeta);
+			printLine('error', line);
 		} else {
 			const line = writeLogLine(`[error] ${message}`);
 			printLine('error', line);
@@ -153,7 +110,7 @@ export function time(label: string): Timer {
 					`[timing] ${label} ${duration.toFixed(1)}ms`,
 					meta,
 				);
-				printLine('info', base, meta);
+				printLine('info', base);
 			} catch {
 				// ignore timing log errors
 			}

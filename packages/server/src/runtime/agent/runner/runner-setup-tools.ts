@@ -1,6 +1,6 @@
 import { getConfiguredProviderModels, type OttoConfig } from '@ottocode/sdk';
 import type { DiscoveredTool, ModelInfo } from '@ottocode/sdk';
-import type { RunOpts } from '../session/queue.ts';
+import type { RunOpts } from '../../session/queue.ts';
 
 const EDITING_TOOL_NAMES = [
 	'edit',

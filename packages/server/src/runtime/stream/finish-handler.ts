@@ -5,11 +5,40 @@ import { publish, publishClientEvent } from '../../events/bus.ts';
 import { estimateModelCostUsd } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
 import { markSessionCompacted } from '../message/compaction.ts';
+import { publishAssistantMessageError } from '../errors/assistant-message-error.ts';
 import type { FinishEvent } from './types.ts';
 import {
 	normalizeUsage,
 	resolveUsageProvider,
 } from '../session/db-operations.ts';
+
+async function markEmptyAssistantResponseAsError(args: {
+	opts: RunOpts;
+	db: Awaited<ReturnType<typeof getDb>>;
+	fin: FinishEvent;
+}) {
+	const { opts, db, fin } = args;
+	const message = 'Assistant response finished without returning any content.';
+	const details = {
+		finishReason: fin.finishReason,
+		rawFinishReason: fin.rawFinishReason,
+		provider: opts.provider,
+		model: opts.model,
+	};
+	await publishAssistantMessageError({
+		db,
+		opts,
+		error: {
+			message,
+			type: 'empty_response',
+			details,
+			isAborted: false,
+		},
+		partIndex: 0,
+		publishNotification: true,
+		notificationBody: message,
+	});
+}
 
 export function createFinishHandler(
 	opts: RunOpts,
@@ -25,11 +54,16 @@ export function createFinishHandler(
 			await completeAssistantMessageFn(fin, opts, db);
 		} catch {}
 
+		const assistantParts = await db
+			.select()
+			.from(messageParts)
+			.where(eq(messageParts.messageId, opts.assistantMessageId));
+		if (fin.finishReason !== 'error' && assistantParts.length === 0) {
+			await markEmptyAssistantResponseAsError({ opts, db, fin });
+			return;
+		}
+
 		if (opts.isCompactCommand && fin.finishReason !== 'error') {
-			const assistantParts = await db
-				.select()
-				.from(messageParts)
-				.where(eq(messageParts.messageId, opts.assistantMessageId));
 			const hasTextContent = assistantParts.some(
 				(p) => p.type === 'text' && p.content && p.content !== '{"text":""}',
 			);

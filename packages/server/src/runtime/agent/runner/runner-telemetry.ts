@@ -1,6 +1,6 @@
 import { logger } from '@ottocode/sdk';
-import { time } from '../debug/index.ts';
-import type { RunOpts } from '../session/queue.ts';
+import { time } from '../../debug/index.ts';
+import type { RunOpts } from '../../session/queue.ts';
 import type { SetupResult } from './runner-setup.ts';
 
 type RunnerMessage =

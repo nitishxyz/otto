@@ -6,12 +6,12 @@ import {
 } from '@ottocode/sdk';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { composeSystemPrompt } from '../prompt/builder.ts';
-import { isDebugEnabled } from '../debug/state.ts';
-import { getMaxOutputTokens } from '../utils/token.ts';
-import { getCompactionSystemPrompt } from '../message/compaction.ts';
-import { adaptRunnerCall, detectOAuth } from '../provider/oauth-adapter.ts';
-import type { RunOpts } from '../session/queue.ts';
+import { composeSystemPrompt } from '../../prompt/builder.ts';
+import { isDebugEnabled } from '../../debug/state.ts';
+import { getMaxOutputTokens } from '../../utils/token.ts';
+import { getCompactionSystemPrompt } from '../../message/compaction.ts';
+import { adaptRunnerCall, detectOAuth } from '../../provider/oauth-adapter.ts';
+import type { RunOpts } from '../../session/queue.ts';
 import { nowMs } from './runner-setup-utils.ts';
 
 export type RunnerPromptSetup = {

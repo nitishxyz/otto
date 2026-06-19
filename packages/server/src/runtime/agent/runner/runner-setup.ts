@@ -8,18 +8,18 @@ import { getDb } from '@ottocode/database';
 import { sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import type { Tool } from 'ai';
-import { adaptTools } from '../../tools/adapter.ts';
-import type { ToolAdapterContext } from '../../tools/adapter.ts';
-import { buildDatabaseTools } from '../../tools/database/index.ts';
-import { buildSubagentTools } from '../../tools/subagents/index.ts';
-import { buildGoalTools } from '../../tools/goals/index.ts';
-import { buildEnqueueSessionMessageTool } from '../../tools/otto/index.ts';
-import { time } from '../debug/index.ts';
-import { buildHistoryMessages } from '../message/history-builder.ts';
-import { setupToolContext } from '../tools/setup.ts';
-import type { RunOpts } from '../session/queue.ts';
-import { flattenAgentToolConfig, resolveAgentConfig } from './registry.ts';
-import { buildExplicitAgentMentionContext } from '../prompt/agent-mentions.ts';
+import { adaptTools } from '../../../tools/adapter.ts';
+import type { ToolAdapterContext } from '../../../tools/adapter.ts';
+import { buildDatabaseTools } from '../../../tools/database/index.ts';
+import { buildSubagentTools } from '../../../tools/subagents/index.ts';
+import { buildGoalTools } from '../../../tools/goals/index.ts';
+import { buildEnqueueSessionMessageTool } from '../../../tools/otto/index.ts';
+import { time } from '../../debug/index.ts';
+import { buildHistoryMessages } from '../../message/history-builder.ts';
+import { setupToolContext } from '../../tools/setup.ts';
+import type { RunOpts } from '../../session/queue.ts';
+import { flattenAgentToolConfig, resolveAgentConfig } from '../registry.ts';
+import { buildExplicitAgentMentionContext } from '../../prompt/agent-mentions.ts';
 import {
 	appendRunnerPromptMessages,
 	buildRunnerPrompt,
@@ -165,7 +165,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 			injectedToolNames.push(item.name);
 		}
 		try {
-			const { listAgentDescriptions } = await import('./registry.ts');
+			const { listAgentDescriptions } = await import('../registry.ts');
 			const agentList = await listAgentDescriptions(cfg.projectRoot);
 			const delegatable = agentList.filter(
 				(a) => a.name !== opts.agent && a.name !== 'otto',

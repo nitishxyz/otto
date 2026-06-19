@@ -1,18 +1,19 @@
 import type { getDb } from '@ottocode/database';
-import { messageParts, messages, sessions } from '@ottocode/database/schema';
+import { sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
-import { publish, publishClientEvent } from '../../events/bus.ts';
-import { toErrorPayload } from '../errors/handling.ts';
+import { publish } from '../../../events/bus.ts';
+import { publishAssistantMessageError } from '../../errors/assistant-message-error.ts';
+import { toErrorPayload } from '../../errors/handling.ts';
 import {
 	pruneSession,
 	shouldAutoCompactBeforeOverflow,
-} from '../message/compaction.ts';
+} from '../../message/compaction.ts';
 import type {
 	completeAssistantMessage,
 	updateMessageTokensIncremental,
 	updateSessionTokensIncremental,
-} from '../session/db-operations.ts';
-import type { RunOpts } from '../session/queue.ts';
+} from '../../session/db-operations.ts';
+import type { RunOpts } from '../../session/queue.ts';
 
 type CompleteAssistantMessage = typeof completeAssistantMessage;
 type UpdateSessionTokensIncremental = typeof updateSessionTokensIncremental;
@@ -92,23 +93,6 @@ export async function handleRunnerError(args: {
 		} catch {}
 	}
 
-	publish({
-		type: 'error',
-		sessionId: opts.sessionId,
-		payload: {
-			...payload,
-			messageId: opts.assistantMessageId,
-		},
-	});
-
-	const errorPartId = crypto.randomUUID();
-	const errorContent = JSON.stringify({
-		message: payload.message,
-		type: payload.type,
-		details: payload.details,
-		isAborted: false,
-	});
-
 	try {
 		await args.updateSessionTokensIncremental(
 			{ inputTokens: 0, outputTokens: 0 },
@@ -122,63 +106,18 @@ export async function handleRunnerError(args: {
 			opts,
 			db,
 		);
-		await db.insert(messageParts).values({
-			id: errorPartId,
-			messageId: opts.assistantMessageId,
-			index: args.nextPartIndex ? await args.nextPartIndex() : 0,
-			stepIndex: null,
-			type: 'error',
-			content: errorContent,
-			agent: opts.agent,
-			provider: opts.provider,
-			model: opts.model,
-			startedAt: Date.now(),
-			completedAt: Date.now(),
-		});
-		await db
-			.update(messages)
-			.set({
-				status: 'error',
-				completedAt: Date.now(),
-				error: payload.message,
-				errorType: payload.type,
-				errorDetails: JSON.stringify(payload.details ?? {}),
-				finishReason: 'error',
-				isAborted: false,
-			})
-			.where(eq(messages.id, opts.assistantMessageId));
 	} catch {}
 
-	publish({
-		type: 'message.part.delta',
-		sessionId: opts.sessionId,
-		payload: {
-			messageId: opts.assistantMessageId,
-			partId: errorPartId,
-			type: 'error',
-			content: errorContent,
+	await publishAssistantMessageError({
+		db,
+		opts,
+		error: {
+			message: payload.message,
+			type: payload.type,
+			details: payload.details,
+			isAborted: false,
 		},
-	});
-
-	publish({
-		type: 'message.updated',
-		sessionId: opts.sessionId,
-		payload: {
-			id: opts.assistantMessageId,
-			status: 'error',
-			error: payload.message,
-		},
-	});
-
-	const createdAt = new Date().toISOString();
-	publishClientEvent({
-		type: 'session.status',
-		payload: {
-			sessionId: opts.sessionId,
-			status: 'failed',
-			messageId: opts.assistantMessageId,
-			createdAt,
-		},
+		nextPartIndex: args.nextPartIndex,
 	});
 	return 'rethrow';
 }
