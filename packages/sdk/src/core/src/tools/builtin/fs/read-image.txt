@@ -2,4 +2,5 @@
 - Accepts project-relative paths by default; absolute and home paths are allowed
 - Uses Bun.Image to downscale/compress supported images before model submission when possible
 - Returns metadata plus the visual image payload; use when you need to inspect screenshots, icons, diagrams, or other images
+- Do not use this tool to inspect an image already attached to the current user message; attached images are provided directly to vision-capable models
 - For text files, use the read tool instead

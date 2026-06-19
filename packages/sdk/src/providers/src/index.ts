@@ -112,6 +112,7 @@ export {
 	createXaiModel,
 	getGrokCliHeaders,
 	isXaiGrokCliModel,
+	normalizeXaiResponsesImagePayload,
 	XAI_GROK_CLI_MODEL_IDS,
 } from './xai-client.ts';
 export type { XaiProviderConfig } from './xai-client.ts';

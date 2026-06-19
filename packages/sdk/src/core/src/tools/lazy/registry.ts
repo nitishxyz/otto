@@ -20,13 +20,13 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 		{
 			name: 'read_image',
 			description:
-				'Read and inspect a local image file such as a screenshot, icon, or diagram.',
+				'Read and inspect a local image file. Do not use for images already attached to the current message; those are visible via native vision.',
 			build: buildReadImageTool,
 		},
 		{
 			name: 'copy_attachment_to_project',
 			description:
-				'Copy an original uploaded chat attachment into the project without recompression.',
+				'Copy an uploaded chat attachment into the project only when the user explicitly asks to save/add/copy it.',
 			build: buildCopyAttachmentTool,
 		},
 		{

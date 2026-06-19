@@ -532,7 +532,7 @@ describe('oauth codex text guard', () => {
 				{ type: 'text', text: 'use this image' },
 				{
 					type: 'text',
-					text: '[image attachment; name: image.png; mediaType: image/png; attachmentId: att_image_123; originalBytes: 1234] To copy the original upload into the project, use copy_attachment_to_project with attachmentId "att_image_123".',
+					text: '[image attachment; name: image.png; mediaType: image/png; attachmentId: att_image_123; originalBytes: 1234]',
 				},
 				{
 					type: 'file',

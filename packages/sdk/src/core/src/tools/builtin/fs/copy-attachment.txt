@@ -1,6 +1,7 @@
 Copy an original uploaded chat attachment into the project.
 
 Use this when the user drops/uploads a file and asks you to add it to the repo. The copied bytes are the untouched original upload, not the compressed image sent to the model.
+Do not use this just to inspect or describe an image attached to the current message; vision-capable models receive those images directly.
 
 Rules:
 - `targetPath` must be project-relative and cannot escape the project root.

@@ -18,8 +18,7 @@ function formatAttachmentContext(args: {
 		`attachmentId: ${args.attachmentId}`,
 		args.original?.size ? `originalBytes: ${args.original.size}` : undefined,
 	].filter(Boolean);
-	const copyHint = ` To copy the original upload into the project, use copy_attachment_to_project with attachmentId "${args.attachmentId}".`;
-	return `[${details.join('; ')}]${copyHint}`;
+	return `[${details.join('; ')}]`;
 }
 
 export function findLatestUserImageMessageId(
