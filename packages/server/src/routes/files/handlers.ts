@@ -255,6 +255,15 @@ function getSafeFilePath(c: Context) {
 	return { projectRoot, filePath, absPath };
 }
 
+function isNotFoundError(err: unknown): boolean {
+	return (
+		err !== null &&
+		typeof err === 'object' &&
+		'code' in err &&
+		(err as { code?: unknown }).code === 'ENOENT'
+	);
+}
+
 function sniffImageMimeType(data: Buffer): string | undefined {
 	if (
 		data.length >= 8 &&
@@ -299,6 +308,12 @@ export async function handleReadFile(c: Context) {
 			lineCount,
 		});
 	} catch (err) {
+		if (isNotFoundError(err)) {
+			logger.debug('Files read route file not found', {
+				path: c.req.query('path'),
+			});
+			return c.json({ error: 'File not found' }, 404);
+		}
 		logger.error('Files read route error:', err);
 		return c.json({ error: serializeError(err) }, 500);
 	}
