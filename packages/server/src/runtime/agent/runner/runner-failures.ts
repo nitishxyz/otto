@@ -3,7 +3,7 @@ import { messages } from '@ottocode/database/schema';
 import { loadConfig, logger } from '@ottocode/sdk';
 import { eq } from 'drizzle-orm';
 import { publishAssistantMessageError } from '../../errors/assistant-message-error.ts';
-import { toErrorPayload } from '../../errors/handling.ts';
+import { toErrorLogPayload, toErrorPayload } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
 
 export async function markUnhandledAssistantRunFailure(
@@ -41,14 +41,8 @@ export async function markUnhandledAssistantRunFailure(
 		logger.warn('[agent] failed to mark assistant run failure', {
 			sessionId: opts.sessionId,
 			messageId: opts.assistantMessageId,
-			error:
-				failure instanceof Error
-					? { name: failure.name, message: failure.message }
-					: { message: String(failure) },
-			originalError:
-				err instanceof Error
-					? { name: err.name, message: err.message }
-					: { message: String(err) },
+			error: toErrorLogPayload(failure),
+			originalError: toErrorLogPayload(err),
 		});
 	}
 }

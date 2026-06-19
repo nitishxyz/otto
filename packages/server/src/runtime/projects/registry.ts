@@ -7,6 +7,7 @@ import {
 	logger,
 } from '@ottocode/sdk';
 import { mkdir, readdir } from 'node:fs/promises';
+import { toErrorLogPayload } from '../errors/handling.ts';
 
 /**
  * Project registry — tracks otto projects this user has opened.
@@ -111,7 +112,7 @@ async function discoverStateProjects(
 		} catch (error) {
 			logger.warn('Failed to load project metadata from state directory', {
 				stateDir,
-				error: String(error),
+				error: toErrorLogPayload(error),
 			});
 		}
 	}
@@ -151,7 +152,9 @@ async function loadRegistry(): Promise<RegistryFile> {
 			};
 		}
 	} catch (error) {
-		logger.warn('Failed to load projects registry', { error: String(error) });
+		logger.warn('Failed to load projects registry', {
+			error: toErrorLogPayload(error),
+		});
 	}
 	return { version: 1, projects: [] };
 }
@@ -161,7 +164,9 @@ async function saveRegistry(reg: RegistryFile): Promise<void> {
 		await mkdir(getGlobalConfigDir(), { recursive: true });
 		await Bun.write(registryPath(), `${JSON.stringify(reg, null, 2)}\n`);
 	} catch (error) {
-		logger.warn('Failed to write projects registry', { error: String(error) });
+		logger.warn('Failed to write projects registry', {
+			error: toErrorLogPayload(error),
+		});
 	}
 }
 
@@ -205,7 +210,7 @@ export async function touchProject(
 		await saveRegistry(reg);
 	} catch (error) {
 		logger.warn('Failed to touch project registry', {
-			error: String(error),
+			error: toErrorLogPayload(error),
 		});
 	}
 }

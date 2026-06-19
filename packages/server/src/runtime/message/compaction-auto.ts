@@ -10,6 +10,7 @@ import { buildCompactionContext } from './compaction-context.ts';
 import { getCompactionSystemPrompt } from './compaction-detect.ts';
 import { markSessionCompacted } from './compaction-mark.ts';
 import { detectOAuth, adaptSimpleCall } from '../provider/oauth-adapter.ts';
+import { toErrorMessage } from '../errors/handling.ts';
 
 export async function performAutoCompaction(
 	db: Awaited<ReturnType<typeof getDb>>,
@@ -131,7 +132,7 @@ export async function performAutoCompaction(
 
 		return { success: true, summary, compactMessageId: assistantMessageId };
 	} catch (err) {
-		const errorMsg = err instanceof Error ? err.message : String(err);
+		const errorMsg = toErrorMessage(err);
 		return { success: false, error: errorMsg };
 	}
 }

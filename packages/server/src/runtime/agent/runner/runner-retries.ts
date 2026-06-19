@@ -6,6 +6,7 @@ import { publish } from '../../../events/bus.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import { enqueueAssistantRun } from '../../session/queue.ts';
 import { cleanupEmptyTextParts } from '../../session/db-operations.ts';
+import { toErrorMessage } from '../../errors/handling.ts';
 
 const OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX = 2;
 const MAX_OUTPUT_CONTINUATION_RETRY_MAX = 2;
@@ -49,7 +50,7 @@ function isMaxOutputTokensFinish(
 }
 
 function isOpenAIOAuthCodexStreamIdleTimeout(error: unknown): boolean {
-	const message = error instanceof Error ? error.message : String(error);
+	const message = toErrorMessage(error);
 	return message.includes('OpenAI OAuth Codex stream idle timeout');
 }
 
@@ -131,7 +132,7 @@ export async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 			model: opts.model,
 			attempt: continuationCount + 1,
 			maxRetries,
-			error: err instanceof Error ? err.message : String(err),
+			error: toErrorMessage(err),
 		},
 	);
 	return true;

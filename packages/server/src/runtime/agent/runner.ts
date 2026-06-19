@@ -14,7 +14,7 @@ import {
 	completeAssistantMessage,
 	cleanupEmptyTextParts,
 } from '../session/db-operations.ts';
-import { toErrorPayload } from '../errors/handling.ts';
+import { toErrorMessage, toErrorPayload } from '../errors/handling.ts';
 import { setupRunner } from './runner/runner-setup.ts';
 import { setupLazyToolLoading } from './runner/runner-lazy-tools.ts';
 import type { ReasoningState } from './runner/runner-reasoning.ts';
@@ -84,7 +84,7 @@ export async function runSessionLoop(sessionId: string) {
 			logger.debug('[agent] failed to schedule session idle handler', {
 				sessionId,
 				projectRoot: lastProjectRoot,
-				error: error instanceof Error ? error.message : String(error),
+				error: toErrorMessage(error),
 			});
 		}
 	}

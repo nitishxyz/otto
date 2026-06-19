@@ -3,7 +3,7 @@ import { sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish } from '../../../events/bus.ts';
 import { publishAssistantMessageError } from '../../errors/assistant-message-error.ts';
-import { toErrorPayload } from '../../errors/handling.ts';
+import { toErrorMessage, toErrorPayload } from '../../errors/handling.ts';
 import {
 	pruneSession,
 	shouldAutoCompactBeforeOverflow,
@@ -40,7 +40,7 @@ export async function shouldPreemptivelyAutoCompact(
 }
 
 function isPromptTooLongError(err: unknown): boolean {
-	const errorMessage = err instanceof Error ? err.message : String(err);
+	const errorMessage = toErrorMessage(err);
 	const errorCode = (err as { code?: string })?.code ?? '';
 	const responseBody = (err as { responseBody?: string })?.responseBody ?? '';
 	const apiErrorType = (err as { apiErrorType?: string })?.apiErrorType ?? '';

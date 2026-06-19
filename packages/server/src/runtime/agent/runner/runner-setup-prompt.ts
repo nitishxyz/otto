@@ -11,6 +11,7 @@ import { isDebugEnabled } from '../../debug/state.ts';
 import { getMaxOutputTokens } from '../../utils/token.ts';
 import { getCompactionSystemPrompt } from '../../message/compaction.ts';
 import { adaptRunnerCall, detectOAuth } from '../../provider/oauth-adapter.ts';
+import { toErrorMessage } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import { nowMs } from './runner-setup-utils.ts';
 
@@ -158,7 +159,7 @@ async function writeDebugSystemPrompt(args: {
 		logger.warn('[prompt] failed to write system prompt file', {
 			sessionId: opts.sessionId,
 			messageId: opts.assistantMessageId,
-			error: error instanceof Error ? error.message : String(error),
+			error: toErrorMessage(error),
 		});
 	}
 }

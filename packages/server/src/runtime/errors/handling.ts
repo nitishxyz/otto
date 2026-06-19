@@ -6,6 +6,27 @@ export type ErrorPayload = {
 	details?: Record<string, unknown>;
 };
 
+export type ErrorLogPayload = {
+	message: string;
+	type?: string;
+	details?: Record<string, unknown>;
+};
+
+export function toErrorMessage(err: unknown): string {
+	return toErrorPayload(err).message;
+}
+
+export function toErrorLogPayload(err: unknown): ErrorLogPayload {
+	const payload = toErrorPayload(err);
+	return {
+		message: payload.message,
+		...(payload.type && payload.type !== 'unknown'
+			? { type: payload.type }
+			: {}),
+		...(payload.details ? { details: payload.details } : {}),
+	};
+}
+
 export function toErrorPayload(err: unknown): ErrorPayload {
 	let actualError = err;
 	if (

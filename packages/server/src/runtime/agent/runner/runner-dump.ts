@@ -1,5 +1,6 @@
 import { logger } from '@ottocode/sdk';
 import { createTurnDumpCollector } from '../../debug/turn-dump.ts';
+import { toErrorMessage } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import type { SetupResult } from './runner-setup.ts';
 import type { RunnerTextState } from './runner-text.ts';
@@ -90,7 +91,7 @@ export async function flushRunnerTurnDump(args: {
 		logger.debug('[agent] failed to flush turn dump', {
 			sessionId: args.sessionId,
 			messageId: args.messageId,
-			error: error instanceof Error ? error.message : String(error),
+			error: toErrorMessage(error),
 		});
 	}
 }

@@ -13,6 +13,7 @@ import {
 import { createSession } from '../session/manager.ts';
 import { resolveAgentConfig } from '../agent/registry.ts';
 import { selectProviderAndModel } from '../provider/selection.ts';
+import { toErrorMessage } from '../errors/handling.ts';
 import { publish } from '../../events/bus.ts';
 
 const MAX_STALLED_WAKEUPS = 3;
@@ -390,7 +391,7 @@ async function createOttoSession(
 		});
 	} catch (error) {
 		logger.warn('[otto] failed to create otto session', {
-			error: error instanceof Error ? error.message : String(error),
+			error: toErrorMessage(error),
 		});
 		return undefined;
 	}

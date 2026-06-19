@@ -3,6 +3,7 @@ import { getDb } from '@ottocode/database';
 import { and, desc, eq } from 'drizzle-orm';
 import { messages } from '@ottocode/database/schema';
 import { getSessionById } from '../session/manager.ts';
+import { toErrorMessage } from '../errors/handling.ts';
 import {
 	finalizeSubagentForChildSession,
 	reportFinishedSubagents,
@@ -81,7 +82,7 @@ export async function handleSessionIdle(
 	} catch (error) {
 		logger.warn('[idle] session idle hook failed', {
 			sessionId,
-			error: error instanceof Error ? error.message : String(error),
+			error: toErrorMessage(error),
 		});
 	}
 }

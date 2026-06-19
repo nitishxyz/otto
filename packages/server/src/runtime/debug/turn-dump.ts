@@ -1,6 +1,7 @@
 import { loadConfig } from '@ottocode/sdk';
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
+import { toErrorMessage } from '../errors/handling.ts';
 import { isDebugEnabled } from './state.ts';
 
 function isDumpEnabled(): boolean {
@@ -279,7 +280,7 @@ export class TurnDumpCollector {
 
 	recordError(err: unknown) {
 		this.data.error = {
-			message: err instanceof Error ? err.message : String(err),
+			message: toErrorMessage(err),
 			name: err instanceof Error ? err.name : undefined,
 			stack: err instanceof Error ? err.stack : undefined,
 		};

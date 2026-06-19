@@ -2,6 +2,7 @@ import { logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
 import { messages } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
+import { toErrorMessage } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import type { RunnerTextState } from './runner-text.ts';
 import type { RunnerToolObserverState } from './runner-tool-observer.ts';
@@ -85,7 +86,7 @@ export async function persistRunnerStreamFinishDetails(args: {
 		logger.debug('[agent] failed to persist stream finish details', {
 			sessionId: args.opts.sessionId,
 			messageId: args.opts.assistantMessageId,
-			error: error instanceof Error ? error.message : String(error),
+			error: toErrorMessage(error),
 		});
 	}
 
