@@ -29,6 +29,7 @@ import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ThreadDensityProvider } from './threadDensity';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
+import { getUserMessageText, isCompactSlashCommand } from './compactionSummary';
 
 interface MessageThreadProps {
 	messages: Message[];
@@ -360,7 +361,14 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
 	}
 
 	if (message.role === 'assistant') {
-		const showHeader = !previousMessage || previousMessage.role !== 'assistant';
+		const previousUserMessage =
+			previousMessage?.role === 'user' ? previousMessage : undefined;
+		const isCompactCommandResult = isCompactSlashCommand(
+			getUserMessageText(previousUserMessage),
+		);
+		const showHeader =
+			!isCompactCommandResult &&
+			(!previousMessage || previousMessage.role !== 'assistant');
 		const nextIsAssistant = Boolean(nextAssistantMessage);
 
 		return (
@@ -376,9 +384,7 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
 				compact={compact}
 				onCompact={isLastMessage ? onCompact : undefined}
 				isThreadScrolling={isThreadScrolling}
-				previousUserMessage={
-					previousMessage?.role === 'user' ? previousMessage : undefined
-				}
+				previousUserMessage={previousUserMessage}
 			/>
 		);
 	}

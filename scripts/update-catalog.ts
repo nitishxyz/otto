@@ -8,6 +8,7 @@ import type {
 	ModelProviderBinding,
 	ProviderCatalogEntry,
 } from '@ottocode/sdk';
+import { mergeManualCatalog } from '../packages/sdk/src/providers/src/catalog-manual.ts';
 
 const SOURCE = 'https://models.dev/api.json';
 const TARGET = 'packages/sdk/src/providers/src/catalog.ts';
