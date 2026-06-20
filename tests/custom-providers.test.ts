@@ -54,7 +54,16 @@ function createConfig(): OttoConfig {
 				compatibility: 'ollama',
 				family: 'default',
 				baseURL: 'http://127.0.0.1:11434/api',
-				models: ['qwen2.5-coder:14b', 'deepseek-r1:32b'],
+				models: {
+					'qwen2.5-coder:14b': {
+						id: 'qwen2.5-coder:14b',
+						label: 'qwen2.5-coder:14b',
+					},
+					'deepseek-r1:32b': {
+						id: 'deepseek-r1:32b',
+						label: 'deepseek-r1:32b',
+					},
+				},
 			},
 		},
 		paths: {
@@ -103,10 +112,16 @@ describe('custom declarative providers', () => {
 			baseURL: 'http://127.0.0.1:11434/api',
 			allowAnyModel: false,
 		});
-		expect(definition?.models).toEqual([
-			{ id: 'qwen2.5-coder:14b', label: 'qwen2.5-coder:14b' },
-			{ id: 'deepseek-r1:32b', label: 'deepseek-r1:32b' },
-		]);
+		expect(definition?.models).toEqual({
+			'qwen2.5-coder:14b': {
+				id: 'qwen2.5-coder:14b',
+				label: 'qwen2.5-coder:14b',
+			},
+			'deepseek-r1:32b': {
+				id: 'deepseek-r1:32b',
+				label: 'deepseek-r1:32b',
+			},
+		});
 	});
 
 	test('authorizes the kimi provider from stored auth', async () => {
@@ -170,7 +185,9 @@ describe('custom declarative providers', () => {
 				'my-ollama': {
 					id: 'my-ollama',
 					label: 'Local Ollama',
-					models: [{ id: 'cached-model', label: 'cached-model' }],
+					models: {
+						'cached-model': { id: 'cached-model', label: 'cached-model' },
+					},
 				},
 			});
 			const cfg = createConfig();
@@ -267,7 +284,9 @@ describe('custom declarative providers', () => {
 						family: 'default',
 						label: 'Local Ollama',
 						baseURL: 'http://127.0.0.1:11434/api',
-						models: ['qwen2.5-coder:14b'],
+						models: {
+							'qwen2.5-coder:14b': { id: 'qwen2.5-coder:14b' },
+						},
 					}),
 				},
 			);
@@ -336,7 +355,9 @@ describe('custom declarative providers', () => {
 				'my-ollama': {
 					id: 'my-ollama',
 					label: 'Local Ollama',
-					models: [{ id: 'cached-only', label: 'cached-only' }],
+					models: {
+						'cached-only': { id: 'cached-only', label: 'cached-only' },
+					},
 				},
 			});
 
@@ -352,7 +373,10 @@ describe('custom declarative providers', () => {
 						family: 'default',
 						label: 'Local Ollama',
 						baseURL: 'http://127.0.0.1:11434/api',
-						models: ['configured-one', 'configured-two'],
+						models: {
+							'configured-one': { id: 'configured-one' },
+							'configured-two': { id: 'configured-two' },
+						},
 					}),
 				},
 			);
@@ -406,12 +430,12 @@ describe('custom declarative providers', () => {
 				anthropic: {
 					id: 'anthropic',
 					label: 'Anthropic Cached',
-					models: [
-						{
+					models: {
+						'cached-anthropic-only': {
 							id: 'cached-anthropic-only',
 							label: 'Cached Anthropic Only',
 						},
-					],
+					},
 				},
 			});
 
@@ -450,7 +474,12 @@ describe('custom declarative providers', () => {
 				ollama: {
 					id: 'ollama',
 					label: 'Ollama',
-					models: [{ id: 'gemma4:latest', label: 'gemma4:latest' }],
+					models: {
+						'gemma4:latest': {
+							id: 'gemma4:latest',
+							label: 'gemma4:latest',
+						},
+					},
 				},
 			});
 
@@ -495,16 +524,21 @@ describe('custom declarative providers', () => {
 						'my-ollama': {
 							id: 'my-ollama',
 							label: 'Local Ollama',
-							models: [{ id: 'catalog-cached', label: 'catalog-cached' }],
+							models: {
+								'catalog-cached': {
+									id: 'catalog-cached',
+									label: 'catalog-cached',
+								},
+							},
 						},
 					},
 				}),
 			);
 
 			const catalog = await readCachedModelCatalog();
-			expect(catalog?.providers['my-ollama']?.models[0]?.id).toBe(
-				'catalog-cached',
-			);
+			expect(
+				catalog?.providers['my-ollama']?.models['catalog-cached']?.id,
+			).toBe('catalog-cached');
 		} finally {
 			if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
 			else process.env.XDG_CONFIG_HOME = previousConfigHome;

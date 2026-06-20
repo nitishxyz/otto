@@ -1,4 +1,4 @@
-import type { ProviderId, ModelInfo } from '../../types/src/index.ts';
+import type { ProviderId, ModelInfoMap } from '../../types/src/index.ts';
 
 const OAUTH_MODEL_PREFIXES: Partial<Record<ProviderId, string[]>> = {
 	anthropic: [
@@ -56,16 +56,23 @@ export function isModelAllowedForOAuth(
 
 export function filterModelsForAuthType(
 	provider: ProviderId,
-	models: ModelInfo[],
+	models: ModelInfoMap,
 	authType: 'api' | 'oauth' | 'wallet' | undefined,
-): ModelInfo[] {
+): ModelInfoMap {
+	const filtered: ModelInfoMap = {};
 	if (authType !== 'oauth') {
-		return models.filter((model) => !isOAuthOnlyModel(provider, model.id));
+		for (const [id, model] of Object.entries(models)) {
+			if (!isOAuthOnlyModel(provider, id)) filtered[id] = model;
+		}
+		return filtered;
 	}
 	const exactIds = OAUTH_MODEL_IDS[provider];
 	const prefixes = OAUTH_MODEL_PREFIXES[provider];
 	if (!exactIds && !prefixes) return models;
-	return models.filter((model) => matchesOAuthModel(provider, model.id));
+	for (const [id, model] of Object.entries(models)) {
+		if (matchesOAuthModel(provider, id)) filtered[id] = model;
+	}
+	return filtered;
 }
 
 export function getOAuthModelPrefixes(

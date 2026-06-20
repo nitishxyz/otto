@@ -81,7 +81,7 @@ describe('Baseten provider', () => {
 	});
 
 	test('contains curated Baseten model API models', () => {
-		const models = new Set(catalog.baseten.models.map((model) => model.id));
+		const models = new Set(Object.keys(catalog.baseten.models));
 
 		for (const model of [
 			BASETEN_FAST_MODEL,

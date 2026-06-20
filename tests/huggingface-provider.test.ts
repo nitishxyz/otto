@@ -90,7 +90,7 @@ describe('Hugging Face provider', () => {
 	});
 
 	test('contains curated Hugging Face router models', () => {
-		const models = new Set(catalog.huggingface.models.map((model) => model.id));
+		const models = new Set(Object.keys(catalog.huggingface.models));
 
 		for (const model of [
 			'zai-org/GLM-5.2:together',

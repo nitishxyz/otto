@@ -9,6 +9,7 @@ import type {
 	ProviderCatalogEntry,
 } from '@ottocode/sdk';
 import { mergeManualCatalog } from '../packages/sdk/src/providers/src/catalog-manual.ts';
+import { modelListToMap } from '../packages/sdk/src/providers/src/model-map.ts';
 
 const SOURCE = 'https://models.dev/api.json';
 const TARGET = 'packages/sdk/src/providers/src/catalog.ts';
@@ -127,7 +128,7 @@ function resolveOwnedByFromModelId(modelId: string): ModelOwner | undefined {
 }
 
 function createEmptyEntry(id: BuiltInProviderId): ProviderCatalogEntry {
-	return { id, models: [] };
+	return { id, models: {} };
 }
 
 function normalizeString(value: unknown): string | undefined {
@@ -261,7 +262,7 @@ function pickProviders(
 		}
 		const doc = normalizeString(entry.doc);
 		if (doc) base.doc = doc;
-		base.models = models;
+		base.models = modelListToMap(models);
 		out[key] = base;
 	}
 	applyOfficialKimiCatalogMetadata(out);
@@ -510,7 +511,7 @@ function buildOttoRouterEntry(
 		env: ['OTTOROUTER_PRIVATE_KEY'],
 		api: 'https://api.ottorouter.org/v1',
 		doc: 'https://ottorouter.org/docs',
-		models,
+		models: modelListToMap(models),
 	};
 }
 

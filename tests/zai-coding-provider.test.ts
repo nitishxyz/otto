@@ -4,6 +4,7 @@ import {
 	catalog,
 	createZaiCodingModel,
 	getProviderDefinition,
+	modelMapToList,
 	providerEnvVar,
 	validateProviderModel,
 	type OttoConfig,
@@ -74,13 +75,11 @@ describe('Z.AI Coding Plan provider', () => {
 			baseURL: ZAI_CODING_BASE_URL,
 			apiKeyEnv: 'ZAI_CODING_API_KEY',
 		});
-		expect(definition?.models[0]?.id).toBe('glm-5.2');
+		expect(modelMapToList(definition?.models ?? {})[0]?.id).toBe('glm-5.2');
 	});
 
 	test('contains documented GLM Coding Plan models', () => {
-		const models = new Set(
-			catalog['zai-coding'].models.map((model) => model.id),
-		);
+		const models = new Set(Object.keys(catalog['zai-coding'].models));
 
 		for (const model of [
 			'glm-5.2',

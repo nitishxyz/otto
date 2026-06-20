@@ -5,9 +5,11 @@ import {
 import type {
 	BuiltInProviderId,
 	ModelInfo,
+	ModelInfoMap,
 	ModelOwner,
 	ProviderCatalogEntry,
 } from '../../types/src/index.ts';
+import { modelListToMap, modelMapToList } from './model-map.ts';
 
 type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
 
@@ -185,7 +187,7 @@ function buildOttoRouterEntry(): ProviderCatalogEntry | null {
 		env: ['OTTOROUTER_PRIVATE_KEY'],
 		api: 'https://api.ottorouter.org/v1',
 		doc: 'https://ottorouter.org/docs',
-		models: ottorouterModels,
+		models: modelListToMap(ottorouterModels),
 	};
 }
 
@@ -197,7 +199,7 @@ function buildOllamaCloudEntry(): ProviderCatalogEntry {
 		npm: 'ai-sdk-ollama',
 		api: 'https://ollama.com',
 		doc: 'https://docs.ollama.com/cloud',
-		models: [],
+		models: {},
 	};
 }
 
@@ -211,7 +213,7 @@ function buildBasetenEntry(
 		npm: '@ai-sdk/baseten',
 		api: 'https://inference.baseten.co/v1',
 		doc: 'https://docs.baseten.co/development/model-apis/overview',
-		models: [
+		models: modelListToMap([
 			{
 				id: 'deepseek-ai/DeepSeek-V4-Pro',
 				ownedBy: 'deepseek',
@@ -245,16 +247,16 @@ function buildBasetenEntry(
 				openWeights: true,
 				provider: { npm: '@ai-sdk/baseten' },
 			},
-		],
+		]),
 	};
-	const modelById = new Map(manual.models.map((model) => [model.id, model]));
-	for (const model of entry?.models ?? []) {
-		modelById.set(model.id, { ...modelById.get(model.id), ...model });
+	const models: ModelInfoMap = { ...manual.models };
+	for (const [modelId, model] of Object.entries(entry?.models ?? {})) {
+		models[modelId] = { ...models[modelId], ...model };
 	}
 	return {
 		...entry,
 		...manual,
-		models: Array.from(modelById.values()),
+		models,
 	};
 }
 
@@ -268,7 +270,7 @@ function buildHuggingFaceEntry(
 		npm: '@ai-sdk/huggingface',
 		api: 'https://router.huggingface.co/v1',
 		doc: 'https://huggingface.co/docs/inference-providers/index',
-		models: [
+		models: modelListToMap([
 			{
 				id: 'zai-org/GLM-5.2:together',
 				ownedBy: 'zai',
@@ -346,43 +348,37 @@ function buildHuggingFaceEntry(
 				limit: { context: 524_288 },
 				provider: { npm: '@ai-sdk/huggingface' },
 			},
-		],
+		]),
 	};
-	const modelById = new Map(manual.models.map((model) => [model.id, model]));
-	for (const model of entry?.models ?? []) {
-		modelById.set(model.id, { ...modelById.get(model.id), ...model });
+	const models: ModelInfoMap = { ...manual.models };
+	for (const [modelId, model] of Object.entries(entry?.models ?? {})) {
+		models[modelId] = { ...models[modelId], ...model };
 	}
 	return {
 		...entry,
 		...manual,
-		models: Array.from(modelById.values()),
+		models,
 	};
 }
 
-export function appendXaiGrokCliModels<T extends { models: ModelInfo[] }>(
+export function appendXaiGrokCliModels<T extends { models: ModelInfoMap }>(
 	entry: T | undefined,
 ): T | undefined {
 	if (!entry) return undefined;
-	const grokCliModelsById = new Map(
-		XAI_GROK_CLI_MODELS.map((model) => [model.id, model]),
-	);
-	const mergedModels = entry.models.map((model) => {
-		const override = grokCliModelsById.get(model.id);
-		if (!override) return model;
-		return {
-			...model,
-			...override,
-			label: model.label ?? override.label,
-			cost: model.cost ?? override.cost,
-			limit: model.limit ?? override.limit,
-		};
-	});
-	const existingIds = new Set(mergedModels.map((model) => model.id));
-	const missingModels = XAI_GROK_CLI_MODELS.filter(
-		(model) => !existingIds.has(model.id),
-	);
-	if (!missingModels.length && mergedModels === entry.models) return entry;
-	return { ...entry, models: [...mergedModels, ...missingModels] };
+	const models: ModelInfoMap = { ...entry.models };
+	for (const override of XAI_GROK_CLI_MODELS) {
+		const model = models[override.id];
+		models[override.id] = model
+			? {
+					...model,
+					...override,
+					label: model.label ?? override.label,
+					cost: model.cost ?? override.cost,
+					limit: model.limit ?? override.limit,
+				}
+			: override;
+	}
+	return { ...entry, models };
 }
 
 const DEPRECATED_KIMI_MODEL_IDS = new Set([
@@ -465,25 +461,22 @@ const DEEPSEEK_MANUAL_MODELS: ModelInfo[] = [
 	},
 ];
 
-export function filterAvailableKimiModels(models: ModelInfo[]): ModelInfo[] {
-	return models.filter((model) => !DEPRECATED_KIMI_MODEL_IDS.has(model.id));
+export function filterAvailableKimiModels(models: ModelInfoMap): ModelInfoMap {
+	const filtered: ModelInfoMap = {};
+	for (const [modelId, model] of Object.entries(models)) {
+		if (!DEPRECATED_KIMI_MODEL_IDS.has(modelId)) filtered[modelId] = model;
+	}
+	return filtered;
 }
 
-function appendKimiManualModels(models: ModelInfo[]): ModelInfo[] {
-	const manualById = new Map(
-		KIMI_MANUAL_MODELS.map((model) => [model.id, model]),
-	);
-	const mergedModels = models.map((model) => {
-		const override = manualById.get(model.id);
-		return override ? { ...model, ...override } : model;
-	});
-	const existingIds = new Set(mergedModels.map((model) => model.id));
-	const missingModels = KIMI_MANUAL_MODELS.filter(
-		(model) => !existingIds.has(model.id),
-	);
-	return missingModels.length
-		? [...mergedModels, ...missingModels]
-		: mergedModels;
+function appendKimiManualModels(models: ModelInfoMap): ModelInfoMap {
+	const merged: ModelInfoMap = { ...models };
+	for (const model of KIMI_MANUAL_MODELS) {
+		merged[model.id] = merged[model.id]
+			? { ...merged[model.id], ...model }
+			: model;
+	}
+	return merged;
 }
 
 export function applyOfficialKimiCatalogMetadata<
@@ -507,12 +500,12 @@ export function applyZaiCatalogMetadata<T extends ProviderCatalogEntry>(
 	const order = new Map(
 		ZAI_MODEL_ORDER.map((modelId, index) => [modelId, index]),
 	);
-	const modelById = new Map(entry.models.map((model) => [model.id, model]));
+	const modelById: ModelInfoMap = { ...entry.models };
 	for (const model of ZAI_MANUAL_MODELS) {
-		const existing = modelById.get(model.id);
-		modelById.set(model.id, existing ? { ...existing, ...model } : model);
+		const existing = modelById[model.id];
+		modelById[model.id] = existing ? { ...existing, ...model } : model;
 	}
-	const models = Array.from(modelById.values()).sort((a, b) => {
+	const models = modelMapToList(modelById).sort((a, b) => {
 		const orderA = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
 		const orderB = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
 		if (orderA !== orderB) return orderA - orderB;
@@ -520,7 +513,7 @@ export function applyZaiCatalogMetadata<T extends ProviderCatalogEntry>(
 	});
 	return {
 		...entry,
-		models,
+		models: modelListToMap(models),
 	};
 }
 
@@ -531,11 +524,11 @@ export function applyZaiCodingCatalogMetadata<T extends ProviderCatalogEntry>(
 	const order = new Map(
 		ZAI_CODING_MODEL_ORDER.map((modelId, index) => [modelId, index]),
 	);
-	const modelById = new Map(entry.models.map((model) => [model.id, model]));
+	const modelById: ModelInfoMap = { ...entry.models };
 	for (const model of ZAI_CODING_MANUAL_MODELS) {
-		if (!modelById.has(model.id)) modelById.set(model.id, model);
+		if (!modelById[model.id]) modelById[model.id] = model;
 	}
-	const models = Array.from(modelById.values()).sort((a, b) => {
+	const models = modelMapToList(modelById).sort((a, b) => {
 		const orderA = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
 		const orderB = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
 		if (orderA !== orderB) return orderA - orderB;
@@ -543,7 +536,7 @@ export function applyZaiCodingCatalogMetadata<T extends ProviderCatalogEntry>(
 	});
 	return {
 		...entry,
-		models,
+		models: modelListToMap(models),
 		label: 'Z.AI Coding Plan',
 		env: ['ZAI_CODING_API_KEY'],
 		api: 'https://api.z.ai/api/coding/paas/v4',
@@ -554,19 +547,19 @@ export function applyZaiCodingCatalogMetadata<T extends ProviderCatalogEntry>(
 function buildDeepSeekEntry(
 	entry: ProviderCatalogEntry | undefined,
 ): ProviderCatalogEntry {
-	const modelById = new Map(
-		(entry?.models ?? []).map((model) => [model.id, model]),
-	);
+	const modelById: ModelInfoMap = { ...(entry?.models ?? {}) };
 	for (const model of DEEPSEEK_MANUAL_MODELS) {
-		const existing = modelById.get(model.id);
-		modelById.set(model.id, existing ? { ...existing, ...model } : model);
+		const existing = modelById[model.id];
+		modelById[model.id] = existing ? { ...existing, ...model } : model;
 	}
-	const models = DEEPSEEK_MANUAL_MODELS.map((model) =>
-		modelById.get(model.id),
-	).filter((model): model is ModelInfo => Boolean(model));
-	for (const model of modelById.values()) {
-		if (!models.some((existing) => existing.id === model.id))
+	const models: ModelInfo[] = [];
+	for (const manualModel of DEEPSEEK_MANUAL_MODELS) {
+		models.push(modelById[manualModel.id]);
+	}
+	for (const model of modelMapToList(modelById)) {
+		if (!models.some((existing) => existing.id === model.id)) {
 			models.push(model);
+		}
 	}
 	return {
 		...entry,
@@ -576,7 +569,7 @@ function buildDeepSeekEntry(
 		npm: '@ai-sdk/openai-compatible',
 		api: 'https://api.deepseek.com',
 		doc: 'https://api-docs.deepseek.com/',
-		models,
+		models: modelListToMap(models),
 	};
 }
 

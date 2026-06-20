@@ -1,4 +1,5 @@
 import { catalog } from './catalog-merged.ts';
+import { modelMapToList } from './model-map.ts';
 import type { ModelInfo, ProviderId } from '../../types/src/index.ts';
 
 type ProviderName = ProviderId;
@@ -131,7 +132,9 @@ function findCatalogModel(
 	const entry = catalog[provider as keyof typeof catalog];
 	if (!entry) return undefined;
 	const idLower = model.toLowerCase();
-	return entry.models.find((m) => m.id?.toLowerCase() === idLower);
+	return modelMapToList(entry.models).find(
+		(m) => m.id?.toLowerCase() === idLower,
+	);
 }
 
 export function estimateModelCostUsd(

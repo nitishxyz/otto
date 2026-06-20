@@ -114,15 +114,15 @@ describe('ollama discovery', () => {
 				ollama: {
 					id: 'ollama',
 					label: 'Ollama',
-					models: [
-						{
+					models: {
+						'gemma4:latest': {
 							id: 'gemma4:latest',
 							label: 'Gemma 4',
 							toolCall: true,
 							reasoningText: true,
 							modalities: { input: ['text', 'image'], output: ['text'] },
 						},
-					],
+					},
 				},
 			});
 
@@ -167,14 +167,14 @@ describe('ollama discovery', () => {
 			};
 
 			const definition = getProviderDefinition(cfg, 'ollama');
-			expect(definition?.models).toEqual([
-				expect.objectContaining({
+			expect(definition?.models).toEqual({
+				'gemma4:latest': expect.objectContaining({
 					id: 'gemma4:latest',
 					label: 'Gemma 4',
 					toolCall: true,
 					reasoningText: true,
 				}),
-			]);
+			});
 		} finally {
 			if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
 			else process.env.XDG_CONFIG_HOME = previousConfigHome;

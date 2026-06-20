@@ -20,9 +20,7 @@ export function createOpencodeModel(
 ) {
 	const entry = catalog.opencode;
 	const normalizedModel = normalizeModelIdentifier('opencode', model);
-	const modelInfo =
-		entry?.models.find((m) => m.id === normalizedModel) ??
-		entry?.models.find((m) => m.id === model);
+	const modelInfo = entry?.models[normalizedModel] ?? entry?.models[model];
 	const resolvedModelId = modelInfo?.id ?? normalizedModel ?? model;
 	const binding = modelInfo?.provider?.npm ?? entry?.npm;
 	const apiKey = config?.apiKey ?? process.env.OPENCODE_API_KEY ?? '';

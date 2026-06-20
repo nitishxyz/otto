@@ -8,6 +8,7 @@ import {
 	getConfiguredProviderModels,
 	isProviderAuthorized,
 	loadConfig,
+	modelMapToList,
 	type ProviderId,
 } from '@ottocode/sdk';
 import { toModelId } from './model';
@@ -121,7 +122,9 @@ async function buildModelOptions(
 
 		for (const provider of providers) {
 			if (!(await isProviderAuthorized(cfg, provider))) continue;
-			for (const model of getConfiguredProviderModels(cfg, provider)) {
+			for (const model of modelMapToList(
+				getConfiguredProviderModels(cfg, provider),
+			)) {
 				const modelId = model.id;
 				options.push({
 					value: toModelId(provider, modelId),

@@ -19,9 +19,7 @@ describe('kimi fast model selection', () => {
 	});
 
 	test('includes Kimi K2.7 Code Highspeed manual catalog metadata', () => {
-		const model = catalog.kimi.models.find(
-			(entry) => entry.id === 'kimi-k2.7-code-highspeed',
-		);
+		const model = catalog.kimi.models['kimi-k2.7-code-highspeed'];
 
 		expect(model).toMatchObject({
 			id: 'kimi-k2.7-code-highspeed',

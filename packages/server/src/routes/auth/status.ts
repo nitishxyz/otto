@@ -92,7 +92,7 @@ export function registerAuthStatusRoutes(app: Hono) {
 					const authType =
 						providerAuth?.type ??
 						(configured ? (id === 'copilot' ? 'oauth' : 'api') : undefined);
-					const models = entry.models || [];
+					const models = Object.values(entry.models);
 					const costs = models
 						.map((m) => m.cost?.input)
 						.filter((c): c is number => c !== undefined);

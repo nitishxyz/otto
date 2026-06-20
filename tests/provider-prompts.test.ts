@@ -7,6 +7,7 @@ import {
 	getModelFamily,
 	getUnderlyingProviderKey,
 	catalog,
+	modelMapToList,
 } from '@ottocode/sdk';
 
 describe('provider base prompts', () => {
@@ -195,16 +196,15 @@ describe('provider base prompts', () => {
 		it('reads ownedBy from catalog for ottorouter models', () => {
 			const ottorouterEntry = catalog.ottorouter;
 			expect(ottorouterEntry).toBeDefined();
+			const ottorouterModels = modelMapToList(ottorouterEntry.models);
 
-			const kimiModel = ottorouterEntry?.models.find((m) =>
-				m.id.includes('kimi'),
-			);
+			const kimiModel = ottorouterModels.find((m) => m.id.includes('kimi'));
 			if (kimiModel) {
 				expect(kimiModel.ownedBy).toBe('kimi');
 				expect(getModelFamily('ottorouter', kimiModel.id)).toBe('kimi');
 			}
 
-			const claudeModel = ottorouterEntry?.models.find((m) =>
+			const claudeModel = ottorouterModels.find((m) =>
 				m.id.startsWith('claude'),
 			);
 			if (claudeModel) {
@@ -212,7 +212,7 @@ describe('provider base prompts', () => {
 				expect(getModelFamily('ottorouter', claudeModel.id)).toBe('anthropic');
 			}
 
-			const gptModel = ottorouterEntry?.models.find(
+			const gptModel = ottorouterModels.find(
 				(m) => m.id.startsWith('gpt') || m.id.startsWith('codex'),
 			);
 			if (gptModel) {
@@ -220,7 +220,7 @@ describe('provider base prompts', () => {
 				expect(getModelFamily('ottorouter', gptModel.id)).toBe('openai');
 			}
 
-			const openrouterModel = ottorouterEntry?.models.find(
+			const openrouterModel = ottorouterModels.find(
 				(m) => m.id === 'healer-alpha',
 			);
 			if (openrouterModel) {
@@ -284,9 +284,10 @@ describe('provider base prompts', () => {
 		it('ottorouter models have ownedBy field', () => {
 			const ottorouterEntry = catalog.ottorouter;
 			expect(ottorouterEntry).toBeDefined();
-			expect(ottorouterEntry?.models.length).toBeGreaterThan(0);
+			const ottorouterModels = modelMapToList(ottorouterEntry.models);
+			expect(ottorouterModels.length).toBeGreaterThan(0);
 
-			for (const model of ottorouterEntry?.models || []) {
+			for (const model of ottorouterModels) {
 				expect(model.ownedBy).toBeDefined();
 				expect([
 					'openai',
@@ -305,13 +306,13 @@ describe('provider base prompts', () => {
 		it('single-provider models have ownedBy matching their provider', () => {
 			const openaiEntry = catalog.openai;
 			if (openaiEntry) {
-				for (const model of openaiEntry.models.slice(0, 3)) {
+				for (const model of modelMapToList(openaiEntry.models).slice(0, 3)) {
 					expect(model.ownedBy).toBe('openai');
 				}
 			}
 			const anthropicEntry = catalog.anthropic;
 			if (anthropicEntry) {
-				for (const model of anthropicEntry.models.slice(0, 3)) {
+				for (const model of modelMapToList(anthropicEntry.models).slice(0, 3)) {
 					expect(model.ownedBy).toBe('anthropic');
 				}
 			}
@@ -322,7 +323,7 @@ describe('provider base prompts', () => {
 			expect(kimiEntry).toBeDefined();
 			expect(kimiEntry?.npm).toBe('@ai-sdk/openai-compatible');
 
-			for (const model of kimiEntry?.models || []) {
+			for (const model of modelMapToList(kimiEntry?.models ?? {})) {
 				expect(model.id).toContain('kimi');
 			}
 		});

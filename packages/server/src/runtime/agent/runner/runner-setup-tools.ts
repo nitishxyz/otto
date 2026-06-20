@@ -34,9 +34,7 @@ function findConfiguredModelInfo(
 	model: string,
 ): ModelInfo | undefined {
 	if (!cfg) return undefined;
-	return getConfiguredProviderModels(cfg, provider).find(
-		(entry) => entry.id === model,
-	);
+	return getConfiguredProviderModels(cfg, provider)[model];
 }
 
 function isLowCostModel(modelInfo: ModelInfo | undefined): boolean {

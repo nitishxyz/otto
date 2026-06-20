@@ -1,12 +1,14 @@
 import { catalog } from './catalog-merged.ts';
 import { filterAvailableKimiModels } from './catalog-manual.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
-import { mergeModelLists } from './model-merge.ts';
+import { modelMapToList } from './model-map.ts';
+import { mergeModelMaps } from './model-merge.ts';
 import type {
 	BuiltInProviderId,
 	ProviderId,
 	ModelInfo,
 	ModelOwner,
+	ModelInfoMap,
 } from '../../types/src/index.ts';
 import { filterModelsForAuthType } from './oauth-models.ts';
 import { resolveBuiltInProviderCatalogId } from './registry.ts';
@@ -21,11 +23,11 @@ export function isProviderId(value: unknown): value is BuiltInProviderId {
 }
 
 export function defaultModelFor(provider: ProviderId): string | undefined {
-	return getProviderModels(provider)[0]?.id;
+	return modelMapToList(getProviderModels(provider))[0]?.id;
 }
 
 export function listModels(provider: ProviderId): string[] {
-	return getProviderModels(provider).map((m) => m.id);
+	return Object.keys(getProviderModels(provider));
 }
 
 export function hasModel(
@@ -33,7 +35,7 @@ export function hasModel(
 	model: string | undefined,
 ): boolean {
 	if (!model) return false;
-	return listModels(provider).includes(model);
+	return getProviderModels(provider)[model] !== undefined;
 }
 
 const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
@@ -67,7 +69,7 @@ export type FastModelAuthType = 'api' | 'oauth' | 'wallet' | undefined;
 
 export function selectFastModel(
 	provider: ProviderId,
-	providerModels: ModelInfo[],
+	providerModels: ModelInfoMap,
 	options?: {
 		authType?: FastModelAuthType;
 		configuredFastModels?: readonly string[];
@@ -80,9 +82,10 @@ export function selectFastModel(
 		providerModels,
 		options?.authType,
 	);
-	const candidateModels = filteredModels.length
+	const candidateModels = Object.keys(filteredModels).length
 		? filteredModels
 		: providerModels;
+	const candidateModelList = modelMapToList(candidateModels);
 	const configuredFastModels = options?.configuredFastModels?.filter(
 		(modelId) => typeof modelId === 'string' && modelId.trim().length > 0,
 	);
@@ -91,15 +94,17 @@ export function selectFastModel(
 		for (const modelId of configuredFastModels) {
 			if (
 				options?.allowAnyModel === true ||
-				candidateModels.some((m) => m.id === modelId)
+				candidateModels[modelId] !== undefined
 			) {
 				return modelId;
 			}
 		}
 	}
 
-	if (!candidateModels.length) return undefined;
-	if (options?.useBuiltInPreferred === false) return candidateModels[0]?.id;
+	if (!candidateModelList.length) return undefined;
+	if (options?.useBuiltInPreferred === false) {
+		return candidateModelList[0]?.id;
+	}
 
 	const preferredMap =
 		options?.authType === 'oauth'
@@ -107,12 +112,12 @@ export function selectFastModel(
 			: PREFERRED_FAST_MODELS;
 	const preferred = preferredMap[preferredFastModelKey(provider)] ?? [];
 	for (const modelId of preferred) {
-		if (candidateModels.some((m) => m.id === modelId)) {
+		if (candidateModels[modelId] !== undefined) {
 			return modelId;
 		}
 	}
 
-	const sorted = [...candidateModels]
+	const sorted = [...candidateModelList]
 		.filter(
 			(m: ModelInfo) => m.cost?.input !== undefined && m.toolCall !== false,
 		)
@@ -121,7 +126,7 @@ export function selectFastModel(
 				(a.cost?.input ?? Infinity) - (b.cost?.input ?? Infinity),
 		);
 
-	return sorted[0]?.id ?? candidateModels[0]?.id;
+	return sorted[0]?.id ?? candidateModelList[0]?.id;
 }
 
 export function getFastModel(provider: ProviderId): string | undefined {
@@ -141,13 +146,13 @@ export function getModelNpmBinding(
 ): string | undefined {
 	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
 	const entry = catalogProvider ? catalog[catalogProvider] : undefined;
-	const modelInfo = getProviderModels(provider).find((m) => m.id === model);
+	const modelInfo = getProviderModels(provider)[model];
 	if (modelInfo?.provider?.npm) return modelInfo.provider.npm;
 	if (entry?.npm) return entry.npm;
 
 	for (const key of Object.keys(catalog) as BuiltInProviderId[]) {
 		const e = catalog[key];
-		const m = getProviderModels(key).find((x) => x.id === model);
+		const m = getProviderModels(key)[model];
 		if (m?.provider?.npm) return m.provider.npm;
 		if (m && e?.npm) return e.npm;
 	}
@@ -282,10 +287,10 @@ export function getModelInfo(
 	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
 	const entry = catalogProvider ? catalog[catalogProvider] : undefined;
 	if (!entry) return undefined;
-	return getProviderModels(provider).find((m) => m.id === model);
+	return getProviderModels(provider)[model];
 }
 
-function getProviderModels(provider: ProviderId): ModelInfo[] {
+function getProviderModels(provider: ProviderId): ModelInfoMap {
 	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
 	const catalogModels = catalogProvider
 		? catalog[catalogProvider]?.models
@@ -293,7 +298,7 @@ function getProviderModels(provider: ProviderId): ModelInfo[] {
 	const cachedModels = getCachedProviderCatalogEntry(
 		catalogProvider ?? provider,
 	)?.models;
-	const models = mergeModelLists(catalogModels, cachedModels);
+	const models = mergeModelMaps(catalogModels, cachedModels);
 	return catalogProvider === 'kimi'
 		? filterAvailableKimiModels(models)
 		: models;

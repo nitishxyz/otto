@@ -1,11 +1,15 @@
 import { getGlobalConfigDir, joinPath } from '../../config/src/paths.ts';
-import type { ModelInfo, ProviderId } from '../../types/src/index.ts';
+import type {
+	ModelInfo,
+	ModelInfoMap,
+	ProviderId,
+} from '../../types/src/index.ts';
 import { appendXaiGrokCliModels } from './catalog-manual.ts';
 
 export type CachedProviderCatalogEntry = {
 	id: ProviderId;
 	label?: string;
-	models: ModelInfo[];
+	models: ModelInfoMap;
 };
 
 export type CachedModelCatalog = {
@@ -47,12 +51,12 @@ function normalizeProviderEntry(
 	value: unknown,
 ): CachedProviderCatalogEntry | null {
 	if (!isRecord(value)) return null;
-	const models = Array.isArray(value.models)
-		? value.models.filter(
-				(model): model is ModelInfo =>
-					isRecord(model) && typeof model.id === 'string',
-			)
-		: [];
+	if (!isRecord(value.models)) return null;
+	const models: ModelInfoMap = {};
+	for (const [modelId, model] of Object.entries(value.models)) {
+		if (!isRecord(model)) continue;
+		models[modelId] = { ...(model as ModelInfo), id: modelId };
+	}
 	return {
 		id: (typeof value.id === 'string' ? value.id : id) as ProviderId,
 		label: typeof value.label === 'string' ? value.label : undefined,

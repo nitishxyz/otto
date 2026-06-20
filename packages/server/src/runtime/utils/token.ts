@@ -20,9 +20,7 @@ export function getMaxOutputTokens(
 		if (!providerCatalog) {
 			return undefined;
 		}
-		const modelInfo = providerCatalog.models.find(
-			(m: { id: string }) => m.id === modelId,
-		);
+		const modelInfo = providerCatalog.models[modelId];
 		if (!modelInfo) {
 			return undefined;
 		}

@@ -119,6 +119,8 @@ export type ModelInfo = {
 	provider?: ModelProviderBinding;
 };
 
+export type ModelInfoMap = Record<string, ModelInfo>;
+
 export type ProviderCatalogEntry = {
 	id: BuiltInProviderId;
 	label?: string;
@@ -126,5 +128,5 @@ export type ProviderCatalogEntry = {
 	npm?: string;
 	api?: string;
 	doc?: string;
-	models: ModelInfo[];
+	models: ModelInfoMap;
 };

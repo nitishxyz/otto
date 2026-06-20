@@ -79,6 +79,21 @@ const discoverProviderModelsResponseSchema = z.object({
 	message: z.string().optional(),
 });
 
+const providerModelSettingsSchema = z.object({
+	id: z.string().optional(),
+	label: z.string().optional(),
+	toolCall: z.boolean().optional(),
+	reasoningText: z.boolean().optional(),
+	attachment: z.boolean().optional(),
+	temperature: z.union([z.boolean(), z.number()]).optional(),
+	limit: z
+		.object({
+			context: z.number().optional(),
+			output: z.number().optional(),
+		})
+		.optional(),
+});
+
 const providerSettingsBodySchema = z.object({
 	enabled: z.boolean().optional(),
 	custom: z.boolean().optional(),
@@ -88,7 +103,7 @@ const providerSettingsBodySchema = z.object({
 	baseURL: z.string().nullable().optional(),
 	apiKey: z.string().nullable().optional(),
 	apiKeyEnv: z.string().nullable().optional(),
-	models: z.array(z.string()).optional(),
+	models: z.record(z.string(), providerModelSettingsSchema).optional(),
 	allowAnyModel: z.boolean().optional(),
 });
 

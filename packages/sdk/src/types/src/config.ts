@@ -1,5 +1,5 @@
 import type {
-	ModelInfo,
+	ModelInfoMap,
 	ProviderCompatibility,
 	ProviderId,
 	ProviderPromptFamily,
@@ -55,7 +55,7 @@ export type ProviderSettingsEntry = {
 	custom?: boolean;
 	compatibility?: ProviderCompatibility;
 	family?: ProviderPromptFamily;
-	models?: Array<string | ModelInfo>;
+	models?: ModelInfoMap;
 	/** Ordered model IDs to prefer for lightweight/fast tasks like titles. */
 	fastModels?: string[];
 	allowAnyModel?: boolean;

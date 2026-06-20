@@ -12,18 +12,19 @@ describe('oauth model filtering', () => {
 			'openai',
 			catalog.openai.models,
 			'oauth',
-		).map((model) => model.id);
+		);
+		const filteredIds = Object.keys(filtered);
 
-		expect(filtered).toContain('gpt-5.1-codex');
-		expect(filtered).toContain('gpt-5.2');
-		expect(filtered).toContain('gpt-5.2-codex');
-		expect(filtered).toContain('gpt-5.3-codex');
-		expect(filtered).toContain('gpt-5.4');
-		expect(filtered).toContain('gpt-5.5');
-		expect(filtered).not.toContain('gpt-5.2-chat-latest');
-		expect(filtered).not.toContain('gpt-5.2-pro');
-		expect(filtered).not.toContain('gpt-5.3-codex-spark');
-		expect(filtered).not.toContain('gpt-5.4-pro');
+		expect(filteredIds).toContain('gpt-5.1-codex');
+		expect(filteredIds).toContain('gpt-5.2');
+		expect(filteredIds).toContain('gpt-5.2-codex');
+		expect(filteredIds).toContain('gpt-5.3-codex');
+		expect(filteredIds).toContain('gpt-5.4');
+		expect(filteredIds).toContain('gpt-5.5');
+		expect(filteredIds).not.toContain('gpt-5.2-chat-latest');
+		expect(filteredIds).not.toContain('gpt-5.2-pro');
+		expect(filteredIds).not.toContain('gpt-5.3-codex-spark');
+		expect(filteredIds).not.toContain('gpt-5.4-pro');
 	});
 
 	test('does not filter OpenAI models for non-OAuth auth types', () => {
@@ -33,7 +34,9 @@ describe('oauth model filtering', () => {
 			'api',
 		);
 
-		expect(filtered).toHaveLength(catalog.openai.models.length);
+		expect(Object.keys(filtered)).toHaveLength(
+			Object.keys(catalog.openai.models).length,
+		);
 	});
 
 	test('shows Grok CLI models only for xAI OAuth', () => {
@@ -41,24 +44,20 @@ describe('oauth model filtering', () => {
 			'xai',
 			catalog.xai.models,
 			'oauth',
-		).map((model) => model.id);
-		const apiModels = filterModelsForAuthType(
-			'xai',
-			catalog.xai.models,
-			'api',
-		).map((model) => model.id);
+		);
+		const apiModels = filterModelsForAuthType('xai', catalog.xai.models, 'api');
+		const oauthModelIds = Object.keys(oauthModels);
+		const apiModelIds = Object.keys(apiModels);
 
-		expect(oauthModels).toContain('grok-build');
-		expect(oauthModels).toContain('grok-composer-2.5-fast');
-		expect(oauthModels).toContain('grok-4.3');
-		expect(apiModels).not.toContain('grok-build');
-		expect(apiModels).not.toContain('grok-composer-2.5-fast');
+		expect(oauthModelIds).toContain('grok-build');
+		expect(oauthModelIds).toContain('grok-composer-2.5-fast');
+		expect(oauthModelIds).toContain('grok-4.3');
+		expect(apiModelIds).not.toContain('grok-build');
+		expect(apiModelIds).not.toContain('grok-composer-2.5-fast');
 		expect(isModelAllowedForOAuth('xai', 'grok-composer-2.5-fast')).toBe(true);
 
-		const composer = catalog.xai.models.find(
-			(model) => model.id === 'grok-composer-2.5-fast',
-		);
-		const build = catalog.xai.models.find((model) => model.id === 'grok-build');
+		const composer = catalog.xai.models['grok-composer-2.5-fast'];
+		const build = catalog.xai.models['grok-build'];
 		expect(build?.limit?.context).toBe(512_000);
 		expect(composer?.limit?.context).toBe(200_000);
 		expect(composer?.modalities?.input).toEqual(['text']);
@@ -69,21 +68,19 @@ describe('oauth model filtering', () => {
 		const providers = normalizeModelCatalogPayload({
 			xai: {
 				id: 'xai',
-				models: [
-					{ id: 'grok-4.3', label: 'Grok 4.3' },
-					{
+				models: {
+					'grok-4.3': { id: 'grok-4.3', label: 'Grok 4.3' },
+					'grok-composer-2.5-fast': {
 						id: 'grok-composer-2.5-fast',
 						label: 'Grok Composer 2.5 Fast',
 						modalities: { input: ['text'], output: ['text'] },
 						attachment: false,
 					},
-				],
+				},
 			},
 		});
-		const modelIds = providers.xai.models.map((model) => model.id);
-		const composer = providers.xai.models.find(
-			(model) => model.id === 'grok-composer-2.5-fast',
-		);
+		const modelIds = Object.keys(providers.xai.models);
+		const composer = providers.xai.models['grok-composer-2.5-fast'];
 
 		expect(modelIds).toContain('grok-4.3');
 		expect(modelIds).toContain('grok-build');

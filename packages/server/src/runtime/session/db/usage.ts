@@ -55,7 +55,7 @@ export function resolveUsageProvider(
 	}
 	const entry = isBuiltInProviderId(provider) ? catalog[provider] : undefined;
 	const normalizedModel = model.includes('/') ? model.split('/').at(-1) : model;
-	const modelEntry = entry?.models.find(
+	const modelEntry = Object.values(entry?.models ?? {}).find(
 		(modelConfig: { id?: string }) =>
 			modelConfig.id?.toLowerCase() === normalizedModel?.toLowerCase(),
 	);

@@ -1,7 +1,6 @@
 import {
 	getConfiguredProviderApiKey,
 	getConfiguredProviderIds,
-	getConfiguredProviderModels,
 	getProviderDefinition,
 	getProviderSettings,
 	type ProviderId,
@@ -107,7 +106,7 @@ export async function getProviderDetails(
 				apiKeyEnv: definition.apiKeyEnv,
 				hasApiKey: Boolean(getConfiguredProviderApiKey(fileConfig, provider)),
 				allowAnyModel: definition.allowAnyModel,
-				modelCount: getConfiguredProviderModels(fileConfig, provider).length,
+				modelCount: Object.keys(definition.models).length,
 				authType,
 			} satisfies ProviderDetail;
 		}),

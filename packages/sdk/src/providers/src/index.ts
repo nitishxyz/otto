@@ -20,9 +20,18 @@ export type {
 	ProviderCompatibility,
 	ProviderPromptFamily,
 	ModelInfo,
+	ModelInfoMap,
 	ModelProviderBinding,
 	ProviderCatalogEntry,
 } from '../../types/src/index.ts';
+export {
+	getModelFromMap,
+	hasModelInMap,
+	mapConfiguredModelEntries,
+	modelListToMap,
+	modelMapToList,
+} from './model-map.ts';
+export { mergeModelMaps } from './model-merge.ts';
 export {
 	isProviderId,
 	providerIds,

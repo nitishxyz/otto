@@ -41,6 +41,7 @@ import {
 	pollForCopilotToken,
 	openCopilotAuthUrl,
 	isBuiltInProviderId,
+	modelMapToList,
 } from '@ottocode/sdk';
 import { loadConfig } from '@ottocode/sdk';
 import { catalog } from '@ottocode/sdk';
@@ -1472,7 +1473,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 	const f = Bun.file(path);
 	if (await f.exists()) return;
 	const models = isBuiltInProviderId(provider)
-		? (catalog[provider]?.models ?? [])
+		? modelMapToList(catalog[provider]?.models ?? {})
 		: [];
 	const defaultModel =
 		(provider === 'xai' ? 'grok-4.3' : undefined) ||

@@ -9,8 +9,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 	{
 		openai: {
 			id: 'openai',
-			models: [
-				{
+			models: {
+				'gpt-4': {
 					id: 'gpt-4',
 					ownedBy: 'openai',
 					label: 'GPT-4',
@@ -35,7 +35,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'gpt-4-turbo': {
 					id: 'gpt-4-turbo',
 					ownedBy: 'openai',
 					label: 'GPT-4 Turbo',
@@ -60,7 +60,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'gpt-4.1': {
 					id: 'gpt-4.1',
 					ownedBy: 'openai',
 					label: 'GPT-4.1',
@@ -86,7 +86,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'gpt-4.1-mini': {
 					id: 'gpt-4.1-mini',
 					ownedBy: 'openai',
 					label: 'GPT-4.1 mini',
@@ -112,7 +112,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'gpt-4.1-nano': {
 					id: 'gpt-4.1-nano',
 					ownedBy: 'openai',
 					label: 'GPT-4.1 nano',
@@ -138,7 +138,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'gpt-4o': {
 					id: 'gpt-4o',
 					ownedBy: 'openai',
 					label: 'GPT-4o',
@@ -164,7 +164,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-4o-2024-05-13': {
 					id: 'gpt-4o-2024-05-13',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-05-13)',
@@ -189,7 +189,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'gpt-4o-2024-08-06': {
 					id: 'gpt-4o-2024-08-06',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-08-06)',
@@ -215,7 +215,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-4o-2024-11-20': {
 					id: 'gpt-4o-2024-11-20',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-11-20)',
@@ -241,7 +241,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-4o-mini': {
 					id: 'gpt-4o-mini',
 					ownedBy: 'openai',
 					label: 'GPT-4o mini',
@@ -267,7 +267,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-5': {
 					id: 'gpt-5',
 					ownedBy: 'openai',
 					label: 'GPT-5',
@@ -293,7 +293,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5-codex': {
 					id: 'gpt-5-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5-Codex',
@@ -319,7 +319,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5-mini': {
 					id: 'gpt-5-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5 Mini',
@@ -345,7 +345,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5-nano': {
 					id: 'gpt-5-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5 Nano',
@@ -371,7 +371,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5-pro': {
 					id: 'gpt-5-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5 Pro',
@@ -396,7 +396,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 272000,
 					},
 				},
-				{
+				'gpt-5.1': {
 					id: 'gpt-5.1',
 					ownedBy: 'openai',
 					label: 'GPT-5.1',
@@ -422,7 +422,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.1-chat-latest': {
 					id: 'gpt-5.1-chat-latest',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Chat',
@@ -448,7 +448,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-5.1-codex': {
 					id: 'gpt-5.1-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex',
@@ -474,7 +474,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.1-codex-max': {
 					id: 'gpt-5.1-codex-max',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex Max',
@@ -500,7 +500,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.1-codex-mini': {
 					id: 'gpt-5.1-codex-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex mini',
@@ -526,7 +526,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.2': {
 					id: 'gpt-5.2',
 					ownedBy: 'openai',
 					label: 'GPT-5.2',
@@ -552,7 +552,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.2-chat-latest': {
 					id: 'gpt-5.2-chat-latest',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Chat',
@@ -578,7 +578,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-5.2-codex': {
 					id: 'gpt-5.2-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Codex',
@@ -604,7 +604,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.2-pro': {
 					id: 'gpt-5.2-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Pro',
@@ -629,7 +629,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.3-chat-latest': {
 					id: 'gpt-5.3-chat-latest',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Chat (latest)',
@@ -655,7 +655,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-5.3-codex': {
 					id: 'gpt-5.3-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex',
@@ -681,7 +681,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.3-codex-spark': {
 					id: 'gpt-5.3-codex-spark',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex Spark',
@@ -707,7 +707,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'gpt-5.4': {
 					id: 'gpt-5.4',
 					ownedBy: 'openai',
 					label: 'GPT-5.4',
@@ -733,7 +733,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4-mini': {
 					id: 'gpt-5.4-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 mini',
@@ -759,7 +759,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4-nano': {
 					id: 'gpt-5.4-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 nano',
@@ -785,7 +785,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4-pro': {
 					id: 'gpt-5.4-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 Pro',
@@ -810,7 +810,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.5': {
 					id: 'gpt-5.5',
 					ownedBy: 'openai',
 					label: 'GPT-5.5',
@@ -836,7 +836,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.5-pro': {
 					id: 'gpt-5.5-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.5 Pro',
@@ -861,7 +861,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				o1: {
 					id: 'o1',
 					ownedBy: 'openai',
 					label: 'o1',
@@ -887,7 +887,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o1-pro': {
 					id: 'o1-pro',
 					ownedBy: 'openai',
 					label: 'o1-pro',
@@ -912,7 +912,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				o3: {
 					id: 'o3',
 					ownedBy: 'openai',
 					label: 'o3',
@@ -938,7 +938,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o3-deep-research': {
 					id: 'o3-deep-research',
 					ownedBy: 'openai',
 					label: 'o3-deep-research',
@@ -964,7 +964,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o3-mini': {
 					id: 'o3-mini',
 					ownedBy: 'openai',
 					label: 'o3-mini',
@@ -990,7 +990,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o3-pro': {
 					id: 'o3-pro',
 					ownedBy: 'openai',
 					label: 'o3-pro',
@@ -1015,7 +1015,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o4-mini': {
 					id: 'o4-mini',
 					ownedBy: 'openai',
 					label: 'o4-mini',
@@ -1041,7 +1041,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'o4-mini-deep-research': {
 					id: 'o4-mini-deep-research',
 					ownedBy: 'openai',
 					label: 'o4-mini-deep-research',
@@ -1067,7 +1067,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-			],
+			},
 			label: 'OpenAI',
 			env: ['OPENAI_API_KEY'],
 			npm: '@ai-sdk/openai',
@@ -1075,8 +1075,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		anthropic: {
 			id: 'anthropic',
-			models: [
-				{
+			models: {
+				'claude-3-5-haiku-20241022': {
 					id: 'claude-3-5-haiku-20241022',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 3.5',
@@ -1103,7 +1103,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'claude-3-5-haiku-latest': {
 					id: 'claude-3-5-haiku-latest',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 3.5 (latest)',
@@ -1130,7 +1130,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'claude-3-5-sonnet-20240620': {
 					id: 'claude-3-5-sonnet-20240620',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 3.5',
@@ -1157,7 +1157,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'claude-3-5-sonnet-20241022': {
 					id: 'claude-3-5-sonnet-20241022',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 3.5 v2',
@@ -1184,7 +1184,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'claude-3-7-sonnet-20250219': {
 					id: 'claude-3-7-sonnet-20250219',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 3.7',
@@ -1211,7 +1211,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-3-haiku-20240307': {
 					id: 'claude-3-haiku-20240307',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 3',
@@ -1238,7 +1238,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'claude-3-opus-20240229': {
 					id: 'claude-3-opus-20240229',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 3',
@@ -1265,7 +1265,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'claude-3-sonnet-20240229': {
 					id: 'claude-3-sonnet-20240229',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 3',
@@ -1292,7 +1292,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'claude-fable-5': {
 					id: 'claude-fable-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Fable 5',
@@ -1318,7 +1318,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'claude-haiku-4-5': {
 					id: 'claude-haiku-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5 (latest)',
@@ -1345,7 +1345,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-haiku-4-5-20251001': {
 					id: 'claude-haiku-4-5-20251001',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5',
@@ -1372,7 +1372,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-opus-4-0': {
 					id: 'claude-opus-4-0',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4 (latest)',
@@ -1399,7 +1399,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4-1': {
 					id: 'claude-opus-4-1',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.1 (latest)',
@@ -1426,7 +1426,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4-1-20250805': {
 					id: 'claude-opus-4-1-20250805',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.1',
@@ -1453,7 +1453,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4-20250514': {
 					id: 'claude-opus-4-20250514',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4',
@@ -1480,7 +1480,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4-5': {
 					id: 'claude-opus-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.5 (latest)',
@@ -1507,7 +1507,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-opus-4-5-20251101': {
 					id: 'claude-opus-4-5-20251101',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.5',
@@ -1534,7 +1534,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-opus-4-6': {
 					id: 'claude-opus-4-6',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.6',
@@ -1561,7 +1561,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'claude-opus-4-7': {
 					id: 'claude-opus-4-7',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.7',
@@ -1588,7 +1588,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'claude-opus-4-8': {
 					id: 'claude-opus-4-8',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.8',
@@ -1614,7 +1614,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'claude-sonnet-4-0': {
 					id: 'claude-sonnet-4-0',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4 (latest)',
@@ -1641,7 +1641,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-sonnet-4-20250514': {
 					id: 'claude-sonnet-4-20250514',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4',
@@ -1668,7 +1668,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-sonnet-4-5': {
 					id: 'claude-sonnet-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.5 (latest)',
@@ -1695,7 +1695,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-sonnet-4-5-20250929': {
 					id: 'claude-sonnet-4-5-20250929',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.5',
@@ -1722,7 +1722,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-sonnet-4-6': {
 					id: 'claude-sonnet-4-6',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.6',
@@ -1749,7 +1749,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-			],
+			},
 			label: 'Anthropic',
 			env: ['ANTHROPIC_API_KEY'],
 			npm: '@ai-sdk/anthropic',
@@ -1757,8 +1757,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		google: {
 			id: 'google',
-			models: [
-				{
+			models: {
+				'gemini-2.0-flash': {
 					id: 'gemini-2.0-flash',
 					ownedBy: 'google',
 					label: 'Gemini 2.0 Flash',
@@ -1784,7 +1784,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'gemini-2.0-flash-lite': {
 					id: 'gemini-2.0-flash-lite',
 					ownedBy: 'google',
 					label: 'Gemini 2.0 Flash-Lite',
@@ -1809,7 +1809,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'gemini-2.5-flash': {
 					id: 'gemini-2.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Flash',
@@ -1835,7 +1835,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-2.5-flash-lite': {
 					id: 'gemini-2.5-flash-lite',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Flash-Lite',
@@ -1861,7 +1861,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-2.5-pro': {
 					id: 'gemini-2.5-pro',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Pro',
@@ -1887,7 +1887,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3-flash-preview': {
 					id: 'gemini-3-flash-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3 Flash Preview',
@@ -1913,7 +1913,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3-pro-preview': {
 					id: 'gemini-3-pro-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3 Pro Preview',
@@ -1939,7 +1939,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3.1-flash-lite': {
 					id: 'gemini-3.1-flash-lite',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Flash Lite',
@@ -1965,7 +1965,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3.1-flash-lite-preview': {
 					id: 'gemini-3.1-flash-lite-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Flash Lite Preview',
@@ -1991,7 +1991,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3.1-pro-preview': {
 					id: 'gemini-3.1-pro-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview',
@@ -2017,7 +2017,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3.1-pro-preview-customtools': {
 					id: 'gemini-3.1-pro-preview-customtools',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview Custom Tools',
@@ -2043,7 +2043,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-3.5-flash': {
 					id: 'gemini-3.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 3.5 Flash',
@@ -2069,7 +2069,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-flash-latest': {
 					id: 'gemini-flash-latest',
 					ownedBy: 'google',
 					label: 'Gemini Flash Latest',
@@ -2095,7 +2095,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemini-flash-lite-latest': {
 					id: 'gemini-flash-lite-latest',
 					ownedBy: 'google',
 					label: 'Gemini Flash-Lite Latest',
@@ -2121,7 +2121,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemma-4-26b-a4b-it': {
 					id: 'gemma-4-26b-a4b-it',
 					ownedBy: 'google',
 					label: 'Gemma 4 26B A4B IT',
@@ -2141,7 +2141,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'gemma-4-31b-it': {
 					id: 'gemma-4-31b-it',
 					ownedBy: 'google',
 					label: 'Gemma 4 31B IT',
@@ -2161,47 +2161,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
-					id: 'gemma-4-E2B-it',
-					ownedBy: 'google',
-					label: 'Gemma 4 E2B IT',
-					modalities: {
-						input: ['text', 'image', 'audio'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					releaseDate: '2026-04-02',
-					lastUpdated: '2026-04-02',
-					openWeights: true,
-					limit: {
-						context: 131072,
-						output: 8192,
-					},
-				},
-				{
-					id: 'gemma-4-E4B-it',
-					ownedBy: 'google',
-					label: 'Gemma 4 E4B IT',
-					modalities: {
-						input: ['text', 'image', 'audio'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					releaseDate: '2026-04-02',
-					lastUpdated: '2026-04-02',
-					openWeights: true,
-					limit: {
-						context: 131072,
-						output: 8192,
-					},
-				},
-			],
+			},
 			label: 'Google',
 			env: ['GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY'],
 			npm: '@ai-sdk/google',
@@ -2209,8 +2169,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		baseten: {
 			id: 'baseten',
-			models: [
-				{
+			models: {
+				'deepseek-ai/DeepSeek-V3.1': {
 					id: 'deepseek-ai/DeepSeek-V3.1',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.1',
@@ -2234,7 +2194,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131000,
 					},
 				},
-				{
+				'deepseek-ai/DeepSeek-V4-Pro': {
 					id: 'deepseek-ai/DeepSeek-V4-Pro',
 					ownedBy: 'deepseek',
 					label: 'Deepseek V4 Pro',
@@ -2260,7 +2220,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131000,
 					},
 				},
-				{
+				'MiniMaxAI/MiniMax-M2.5': {
 					id: 'MiniMaxAI/MiniMax-M2.5',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.5',
@@ -2285,7 +2245,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 204000,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2.5': {
 					id: 'moonshotai/Kimi-K2.5',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.5',
@@ -2311,7 +2271,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262000,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2.6': {
 					id: 'moonshotai/Kimi-K2.6',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.6',
@@ -2337,7 +2297,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262000,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2.7-Code': {
 					id: 'moonshotai/Kimi-K2.7-Code',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.7 Code',
@@ -2363,7 +2323,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262000,
 					},
 				},
-				{
+				'nvidia/Nemotron-120B-A12B': {
 					id: 'nvidia/Nemotron-120B-A12B',
 					label: 'Nemotron Super',
 					modalities: {
@@ -2388,7 +2348,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 202800,
 					},
 				},
-				{
+				'nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B': {
 					id: 'nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B',
 					label: 'Nemotron Ultra',
 					modalities: {
@@ -2412,7 +2372,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 202800,
 					},
 				},
-				{
+				'openai/gpt-oss-120b': {
 					id: 'openai/gpt-oss-120b',
 					ownedBy: 'openai',
 					label: 'OpenAI GPT 120B',
@@ -2437,7 +2397,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128072,
 					},
 				},
-				{
+				'zai-org/GLM-4.7': {
 					id: 'zai-org/GLM-4.7',
 					ownedBy: 'zai',
 					label: 'GLM 4.7',
@@ -2463,7 +2423,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 200000,
 					},
 				},
-				{
+				'zai-org/GLM-5': {
 					id: 'zai-org/GLM-5',
 					ownedBy: 'zai',
 					label: 'GLM 5',
@@ -2489,7 +2449,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 202800,
 					},
 				},
-				{
+				'zai-org/GLM-5.1': {
 					id: 'zai-org/GLM-5.1',
 					ownedBy: 'zai',
 					label: 'GLM 5.1',
@@ -2514,7 +2474,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 202800,
 					},
 				},
-				{
+				'zai-org/GLM-5.2': {
 					id: 'zai-org/GLM-5.2',
 					ownedBy: 'zai',
 					label: 'GLM 5.2',
@@ -2528,7 +2488,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-06-13',
 					lastUpdated: '2026-06-13',
-					openWeights: false,
+					openWeights: true,
 					cost: {
 						input: 1.5,
 						output: 4.5,
@@ -2539,7 +2499,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'Baseten',
 			env: ['BASETEN_API_KEY'],
 			npm: '@ai-sdk/baseten',
@@ -2548,8 +2508,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		huggingface: {
 			id: 'huggingface',
-			models: [
-				{
+			models: {
+				'deepseek-ai/DeepSeek-R1-0528': {
 					id: 'deepseek-ai/DeepSeek-R1-0528',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek-R1-0528',
@@ -2574,7 +2534,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 163840,
 					},
 				},
-				{
+				'deepseek-ai/DeepSeek-V3.2': {
 					id: 'deepseek-ai/DeepSeek-V3.2',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek-V3.2',
@@ -2599,7 +2559,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'deepseek-ai/DeepSeek-V4-Pro': {
 					id: 'deepseek-ai/DeepSeek-V4-Pro',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
@@ -2625,7 +2585,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 393216,
 					},
 				},
-				{
+				'MiniMaxAI/MiniMax-M2.1': {
 					id: 'MiniMaxAI/MiniMax-M2.1',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.1',
@@ -2650,7 +2610,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMaxAI/MiniMax-M2.5': {
 					id: 'MiniMaxAI/MiniMax-M2.5',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.5',
@@ -2675,7 +2635,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMaxAI/MiniMax-M2.7': {
 					id: 'MiniMaxAI/MiniMax-M2.7',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.7',
@@ -2700,7 +2660,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2-Instruct': {
 					id: 'moonshotai/Kimi-K2-Instruct',
 					ownedBy: 'kimi',
 					label: 'Kimi-K2-Instruct',
@@ -2725,7 +2685,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2-Instruct-0905': {
 					id: 'moonshotai/Kimi-K2-Instruct-0905',
 					ownedBy: 'kimi',
 					label: 'Kimi-K2-Instruct-0905',
@@ -2750,7 +2710,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2-Thinking': {
 					id: 'moonshotai/Kimi-K2-Thinking',
 					ownedBy: 'kimi',
 					label: 'Kimi-K2-Thinking',
@@ -2776,7 +2736,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2.5': {
 					id: 'moonshotai/Kimi-K2.5',
 					ownedBy: 'kimi',
 					label: 'Kimi-K2.5',
@@ -2802,7 +2762,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'moonshotai/Kimi-K2.6': {
 					id: 'moonshotai/Kimi-K2.6',
 					ownedBy: 'kimi',
 					label: 'Kimi-K2.6',
@@ -2828,7 +2788,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'Qwen/Qwen3-235B-A22B-Thinking-2507': {
 					id: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
 					label: 'Qwen3-235B-A22B-Thinking-2507',
 					modalities: {
@@ -2852,7 +2812,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'Qwen/Qwen3-Coder-480B-A35B-Instruct': {
 					id: 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
 					label: 'Qwen3-Coder-480B-A35B-Instruct',
 					modalities: {
@@ -2876,7 +2836,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 66536,
 					},
 				},
-				{
+				'Qwen/Qwen3-Coder-Next': {
 					id: 'Qwen/Qwen3-Coder-Next',
 					label: 'Qwen3-Coder-Next',
 					modalities: {
@@ -2900,7 +2860,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'Qwen/Qwen3-Next-80B-A3B-Instruct': {
 					id: 'Qwen/Qwen3-Next-80B-A3B-Instruct',
 					label: 'Qwen3-Next-80B-A3B-Instruct',
 					modalities: {
@@ -2924,7 +2884,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 66536,
 					},
 				},
-				{
+				'Qwen/Qwen3-Next-80B-A3B-Thinking': {
 					id: 'Qwen/Qwen3-Next-80B-A3B-Thinking',
 					label: 'Qwen3-Next-80B-A3B-Thinking',
 					modalities: {
@@ -2948,7 +2908,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'Qwen/Qwen3.5-397B-A17B': {
 					id: 'Qwen/Qwen3.5-397B-A17B',
 					label: 'Qwen3.5-397B-A17B',
 					modalities: {
@@ -2972,7 +2932,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'XiaomiMiMo/MiMo-V2-Flash': {
 					id: 'XiaomiMiMo/MiMo-V2-Flash',
 					label: 'MiMo-V2-Flash',
 					modalities: {
@@ -2996,7 +2956,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'zai-org/GLM-4.7': {
 					id: 'zai-org/GLM-4.7',
 					ownedBy: 'zai',
 					label: 'GLM-4.7',
@@ -3022,7 +2982,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'zai-org/GLM-4.7-Flash': {
 					id: 'zai-org/GLM-4.7-Flash',
 					ownedBy: 'zai',
 					label: 'GLM-4.7-Flash',
@@ -3047,7 +3007,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'zai-org/GLM-5': {
 					id: 'zai-org/GLM-5',
 					ownedBy: 'zai',
 					label: 'GLM-5',
@@ -3072,7 +3032,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'zai-org/GLM-5.1': {
 					id: 'zai-org/GLM-5.1',
 					ownedBy: 'zai',
 					label: 'GLM-5.1',
@@ -3097,7 +3057,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'Hugging Face',
 			env: ['HF_TOKEN', 'HUGGINGFACE_API_KEY'],
 			npm: '@ai-sdk/huggingface',
@@ -3106,8 +3066,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		openrouter: {
 			id: 'openrouter',
-			models: [
-				{
+			models: {
+				'~anthropic/claude-fable-latest': {
 					id: '~anthropic/claude-fable-latest',
 					ownedBy: 'anthropic',
 					label: 'Claude Fable Latest',
@@ -3133,7 +3093,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'~anthropic/claude-haiku-latest': {
 					id: '~anthropic/claude-haiku-latest',
 					ownedBy: 'anthropic',
 					label: 'Anthropic Claude Haiku Latest',
@@ -3159,7 +3119,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'~anthropic/claude-opus-latest': {
 					id: '~anthropic/claude-opus-latest',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus Latest',
@@ -3185,7 +3145,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'~anthropic/claude-sonnet-latest': {
 					id: '~anthropic/claude-sonnet-latest',
 					ownedBy: 'anthropic',
 					label: 'Anthropic Claude Sonnet Latest',
@@ -3211,7 +3171,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'~google/gemini-flash-latest': {
 					id: '~google/gemini-flash-latest',
 					ownedBy: 'google',
 					label: 'Google Gemini Flash Latest',
@@ -3238,7 +3198,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'~google/gemini-pro-latest': {
 					id: '~google/gemini-pro-latest',
 					ownedBy: 'google',
 					label: 'Google Gemini Pro Latest',
@@ -3264,7 +3224,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'~moonshotai/kimi-latest': {
 					id: '~moonshotai/kimi-latest',
 					ownedBy: 'kimi',
 					label: 'MoonshotAI Kimi Latest',
@@ -3280,16 +3240,16 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 0.68,
-						output: 3.41,
-						cacheRead: 0.34,
+						input: 0.67,
+						output: 3.5,
+						cacheRead: 0.2,
 					},
 					limit: {
-						context: 262142,
-						output: 262142,
+						context: 262144,
+						output: 262144,
 					},
 				},
-				{
+				'~openai/gpt-latest': {
 					id: '~openai/gpt-latest',
 					ownedBy: 'openai',
 					label: 'OpenAI GPT Latest',
@@ -3315,7 +3275,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'~openai/gpt-mini-latest': {
 					id: '~openai/gpt-mini-latest',
 					ownedBy: 'openai',
 					label: 'OpenAI GPT Mini Latest',
@@ -3341,7 +3301,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'ai21/jamba-large-1.7': {
 					id: 'ai21/jamba-large-1.7',
 					label: 'Jamba Large 1.7',
 					modalities: {
@@ -3365,7 +3325,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'amazon/nova-2-lite-v1': {
 					id: 'amazon/nova-2-lite-v1',
 					label: 'Nova 2 Lite',
 					modalities: {
@@ -3388,7 +3348,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'amazon/nova-lite-v1': {
 					id: 'amazon/nova-lite-v1',
 					label: 'Nova Lite 1.0',
 					modalities: {
@@ -3412,7 +3372,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 5120,
 					},
 				},
-				{
+				'amazon/nova-micro-v1': {
 					id: 'amazon/nova-micro-v1',
 					label: 'Nova Micro 1.0',
 					modalities: {
@@ -3436,7 +3396,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 5120,
 					},
 				},
-				{
+				'amazon/nova-premier-v1': {
 					id: 'amazon/nova-premier-v1',
 					label: 'Nova Premier 1.0',
 					modalities: {
@@ -3460,7 +3420,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'amazon/nova-pro-v1': {
 					id: 'amazon/nova-pro-v1',
 					label: 'Nova Pro 1.0',
 					modalities: {
@@ -3484,7 +3444,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 5120,
 					},
 				},
-				{
+				'anthropic/claude-3-haiku': {
 					id: 'anthropic/claude-3-haiku',
 					ownedBy: 'anthropic',
 					label: 'Claude 3 Haiku',
@@ -3511,7 +3471,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'anthropic/claude-3.5-haiku': {
 					id: 'anthropic/claude-3.5-haiku',
 					ownedBy: 'anthropic',
 					label: 'Claude 3.5 Haiku',
@@ -3538,7 +3498,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'anthropic/claude-haiku-4.5': {
 					id: 'anthropic/claude-haiku-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5 (latest)',
@@ -3565,7 +3525,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4': {
 					id: 'anthropic/claude-opus-4',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4',
@@ -3592,7 +3552,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.1': {
 					id: 'anthropic/claude-opus-4.1',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.1 (latest)',
@@ -3619,7 +3579,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.5': {
 					id: 'anthropic/claude-opus-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.5 (latest)',
@@ -3646,7 +3606,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.6': {
 					id: 'anthropic/claude-opus-4.6',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.6',
@@ -3673,7 +3633,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.6-fast': {
 					id: 'anthropic/claude-opus-4.6-fast',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.6 (Fast)',
@@ -3699,7 +3659,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.7': {
 					id: 'anthropic/claude-opus-4.7',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.7',
@@ -3726,7 +3686,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.7-fast': {
 					id: 'anthropic/claude-opus-4.7-fast',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.7 (Fast)',
@@ -3752,7 +3712,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.8': {
 					id: 'anthropic/claude-opus-4.8',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.8',
@@ -3778,7 +3738,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-opus-4.8-fast': {
 					id: 'anthropic/claude-opus-4.8-fast',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.8 (Fast)',
@@ -3804,7 +3764,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'anthropic/claude-sonnet-4': {
 					id: 'anthropic/claude-sonnet-4',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4',
@@ -3831,7 +3791,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'anthropic/claude-sonnet-4.5': {
 					id: 'anthropic/claude-sonnet-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.5 (latest)',
@@ -3858,7 +3818,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'anthropic/claude-sonnet-4.6': {
 					id: 'anthropic/claude-sonnet-4.6',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.6',
@@ -3885,7 +3845,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'arcee-ai/trinity-large-thinking': {
 					id: 'arcee-ai/trinity-large-thinking',
 					label: 'Trinity Large Thinking',
 					modalities: {
@@ -3909,7 +3869,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'arcee-ai/trinity-mini': {
 					id: 'arcee-ai/trinity-mini',
 					label: 'Trinity Mini',
 					modalities: {
@@ -3932,7 +3892,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'arcee-ai/virtuoso-large': {
 					id: 'arcee-ai/virtuoso-large',
 					label: 'Virtuoso Large',
 					modalities: {
@@ -3956,7 +3916,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'bytedance-seed/seed-1.6': {
 					id: 'bytedance-seed/seed-1.6',
 					label: 'Seed 1.6',
 					modalities: {
@@ -3979,7 +3939,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'bytedance-seed/seed-1.6-flash': {
 					id: 'bytedance-seed/seed-1.6-flash',
 					label: 'Seed 1.6 Flash',
 					modalities: {
@@ -4002,7 +3962,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'bytedance-seed/seed-2.0-lite': {
 					id: 'bytedance-seed/seed-2.0-lite',
 					label: 'Seed-2.0-Lite',
 					modalities: {
@@ -4025,7 +3985,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'bytedance-seed/seed-2.0-mini': {
 					id: 'bytedance-seed/seed-2.0-mini',
 					label: 'Seed-2.0-Mini',
 					modalities: {
@@ -4048,7 +4008,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'cohere/command-r-08-2024': {
 					id: 'cohere/command-r-08-2024',
 					label: 'Command R',
 					modalities: {
@@ -4072,7 +4032,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4000,
 					},
 				},
-				{
+				'cohere/command-r-plus-08-2024': {
 					id: 'cohere/command-r-plus-08-2024',
 					label: 'Command R+',
 					modalities: {
@@ -4096,7 +4056,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4000,
 					},
 				},
-				{
+				'cohere/north-mini-code:free': {
 					id: 'cohere/north-mini-code:free',
 					label: 'North Mini Code (free)',
 					modalities: {
@@ -4119,7 +4079,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'deepseek/deepseek-chat': {
 					id: 'deepseek/deepseek-chat',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek Chat',
@@ -4144,7 +4104,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16000,
 					},
 				},
-				{
+				'deepseek/deepseek-chat-v3-0324': {
 					id: 'deepseek/deepseek-chat-v3-0324',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3 0324',
@@ -4170,7 +4130,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'deepseek/deepseek-chat-v3.1': {
 					id: 'deepseek/deepseek-chat-v3.1',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.1',
@@ -4196,7 +4156,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'deepseek/deepseek-r1': {
 					id: 'deepseek/deepseek-r1',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek-R1',
@@ -4221,7 +4181,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16000,
 					},
 				},
-				{
+				'deepseek/deepseek-r1-0528': {
 					id: 'deepseek/deepseek-r1-0528',
 					ownedBy: 'deepseek',
 					label: 'R1 0528',
@@ -4247,7 +4207,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'deepseek/deepseek-v3.1-terminus': {
 					id: 'deepseek/deepseek-v3.1-terminus',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.1 Terminus',
@@ -4273,7 +4233,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'deepseek/deepseek-v3.2': {
 					id: 'deepseek/deepseek-v3.2',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.2',
@@ -4298,7 +4258,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'deepseek/deepseek-v3.2-exp': {
 					id: 'deepseek/deepseek-v3.2-exp',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V3.2 Exp',
@@ -4323,7 +4283,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'deepseek/deepseek-v4-flash': {
 					id: 'deepseek/deepseek-v4-flash',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash',
@@ -4349,7 +4309,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'deepseek/deepseek-v4-pro': {
 					id: 'deepseek/deepseek-v4-pro',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
@@ -4375,7 +4335,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'essentialai/rnj-1-instruct': {
 					id: 'essentialai/rnj-1-instruct',
 					label: 'Rnj 1 Instruct',
 					modalities: {
@@ -4398,7 +4358,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'google/gemini-2.5-flash': {
 					id: 'google/gemini-2.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Flash',
@@ -4425,7 +4385,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'google/gemini-2.5-flash-lite': {
 					id: 'google/gemini-2.5-flash-lite',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Flash-Lite',
@@ -4452,7 +4412,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'google/gemini-2.5-flash-lite-preview-09-2025': {
 					id: 'google/gemini-2.5-flash-lite-preview-09-2025',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Flash Lite Preview 09-2025',
@@ -4479,7 +4439,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'google/gemini-2.5-pro': {
 					id: 'google/gemini-2.5-pro',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Pro',
@@ -4506,7 +4466,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-2.5-pro-preview': {
 					id: 'google/gemini-2.5-pro-preview',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Pro Preview 06-05',
@@ -4533,7 +4493,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-2.5-pro-preview-05-06': {
 					id: 'google/gemini-2.5-pro-preview-05-06',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Pro Preview 05-06',
@@ -4560,7 +4520,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'google/gemini-3-flash-preview': {
 					id: 'google/gemini-3-flash-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3 Flash Preview',
@@ -4587,7 +4547,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65535,
 					},
 				},
-				{
+				'google/gemini-3-pro-image': {
 					id: 'google/gemini-3-pro-image',
 					ownedBy: 'google',
 					label: 'Nano Banana Pro (Gemini 3 Pro Image)',
@@ -4613,7 +4573,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'google/gemini-3.1-flash-lite': {
 					id: 'google/gemini-3.1-flash-lite',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Flash Lite',
@@ -4640,7 +4600,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-3.1-flash-lite-preview': {
 					id: 'google/gemini-3.1-flash-lite-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Flash Lite Preview',
@@ -4667,7 +4627,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-3.1-pro-preview': {
 					id: 'google/gemini-3.1-pro-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview',
@@ -4694,7 +4654,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-3.1-pro-preview-customtools': {
 					id: 'google/gemini-3.1-pro-preview-customtools',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview Custom Tools',
@@ -4721,7 +4681,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemini-3.5-flash': {
 					id: 'google/gemini-3.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 3.5 Flash',
@@ -4748,7 +4708,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'google/gemma-3-12b-it': {
 					id: 'google/gemma-3-12b-it',
 					ownedBy: 'google',
 					label: 'Gemma 3 12B',
@@ -4773,7 +4733,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'google/gemma-3-27b-it': {
 					id: 'google/gemma-3-27b-it',
 					ownedBy: 'google',
 					label: 'Gemma 3 27B',
@@ -4798,7 +4758,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'google/gemma-4-26b-a4b-it': {
 					id: 'google/gemma-4-26b-a4b-it',
 					ownedBy: 'google',
 					label: 'Gemma 4 26B A4B IT',
@@ -4822,7 +4782,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'google/gemma-4-26b-a4b-it:free': {
 					id: 'google/gemma-4-26b-a4b-it:free',
 					ownedBy: 'google',
 					label: 'Gemma 4 26B A4B  (free)',
@@ -4846,7 +4806,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'google/gemma-4-31b-it': {
 					id: 'google/gemma-4-31b-it',
 					ownedBy: 'google',
 					label: 'Gemma 4 31B IT',
@@ -4871,7 +4831,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'google/gemma-4-31b-it:free': {
 					id: 'google/gemma-4-31b-it:free',
 					ownedBy: 'google',
 					label: 'Gemma 4 31B (free)',
@@ -4895,7 +4855,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'ibm-granite/granite-4.1-8b': {
 					id: 'ibm-granite/granite-4.1-8b',
 					label: 'Granite 4.1 8B',
 					modalities: {
@@ -4919,7 +4879,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'inception/mercury-2': {
 					id: 'inception/mercury-2',
 					label: 'Mercury 2',
 					modalities: {
@@ -4943,7 +4903,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 50000,
 					},
 				},
-				{
+				'inclusionai/ling-2.6-1t': {
 					id: 'inclusionai/ling-2.6-1t',
 					label: 'Ling-2.6-1T',
 					modalities: {
@@ -4967,7 +4927,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'inclusionai/ling-2.6-flash': {
 					id: 'inclusionai/ling-2.6-flash',
 					label: 'Ling-2.6-flash',
 					modalities: {
@@ -4991,7 +4951,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'inclusionai/ring-2.6-1t': {
 					id: 'inclusionai/ring-2.6-1t',
 					label: 'Ring-2.6-1T',
 					modalities: {
@@ -5015,7 +4975,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'kwaipilot/kat-coder-pro-v2': {
 					id: 'kwaipilot/kat-coder-pro-v2',
 					label: 'KAT-Coder-Pro V2',
 					modalities: {
@@ -5039,7 +4999,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 80000,
 					},
 				},
-				{
+				'liquid/lfm-2.5-1.2b-thinking:free': {
 					id: 'liquid/lfm-2.5-1.2b-thinking:free',
 					label: 'LFM2.5-1.2B-Thinking (free)',
 					modalities: {
@@ -5063,7 +5023,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'meta-llama/llama-3.1-70b-instruct': {
 					id: 'meta-llama/llama-3.1-70b-instruct',
 					label: 'Llama 3.1 70B Instruct',
 					modalities: {
@@ -5087,7 +5047,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'meta-llama/llama-3.1-8b-instruct': {
 					id: 'meta-llama/llama-3.1-8b-instruct',
 					label: 'Llama 3.1 8B Instruct',
 					modalities: {
@@ -5111,7 +5071,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'meta-llama/llama-3.3-70b-instruct': {
 					id: 'meta-llama/llama-3.3-70b-instruct',
 					label: 'Llama-3.3-70B-Instruct',
 					modalities: {
@@ -5135,7 +5095,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'meta-llama/llama-3.3-70b-instruct:free': {
 					id: 'meta-llama/llama-3.3-70b-instruct:free',
 					label: 'Llama 3.3 70B Instruct (free)',
 					modalities: {
@@ -5159,7 +5119,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'meta-llama/llama-4-maverick': {
 					id: 'meta-llama/llama-4-maverick',
 					label: 'Llama 4 Maverick',
 					modalities: {
@@ -5183,7 +5143,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'meta-llama/llama-4-scout': {
 					id: 'meta-llama/llama-4-scout',
 					label: 'Llama 4 Scout',
 					modalities: {
@@ -5207,7 +5167,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'minimax/minimax-m1': {
 					id: 'minimax/minimax-m1',
 					ownedBy: 'minimax',
 					label: 'MiniMax M1',
@@ -5232,7 +5192,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 40000,
 					},
 				},
-				{
+				'minimax/minimax-m2': {
 					id: 'minimax/minimax-m2',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2',
@@ -5257,7 +5217,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 196608,
 					},
 				},
-				{
+				'minimax/minimax-m2.1': {
 					id: 'minimax/minimax-m2.1',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.1',
@@ -5282,7 +5242,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 196608,
 					},
 				},
-				{
+				'minimax/minimax-m2.5': {
 					id: 'minimax/minimax-m2.5',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.5',
@@ -5307,7 +5267,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 196608,
 					},
 				},
-				{
+				'minimax/minimax-m2.7': {
 					id: 'minimax/minimax-m2.7',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.7',
@@ -5332,7 +5292,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax/minimax-m3': {
 					id: 'minimax/minimax-m3',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M3',
@@ -5357,7 +5317,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 512000,
 					},
 				},
-				{
+				'mistralai/codestral-2508': {
 					id: 'mistralai/codestral-2508',
 					label: 'Codestral 2508',
 					modalities: {
@@ -5382,7 +5342,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'mistralai/devstral-2512': {
 					id: 'mistralai/devstral-2512',
 					label: 'Devstral 2',
 					modalities: {
@@ -5407,7 +5367,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/ministral-14b-2512': {
 					id: 'mistralai/ministral-14b-2512',
 					label: 'Ministral 3 14B 2512',
 					modalities: {
@@ -5431,7 +5391,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/ministral-3b-2512': {
 					id: 'mistralai/ministral-3b-2512',
 					label: 'Ministral 3 3B 2512',
 					modalities: {
@@ -5455,7 +5415,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'mistralai/ministral-8b-2512': {
 					id: 'mistralai/ministral-8b-2512',
 					label: 'Ministral 3 8B 2512',
 					modalities: {
@@ -5479,7 +5439,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/mistral-large': {
 					id: 'mistralai/mistral-large',
 					label: 'Mistral Large',
 					modalities: {
@@ -5504,7 +5464,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'mistralai/mistral-large-2407': {
 					id: 'mistralai/mistral-large-2407',
 					label: 'Mistral Large 2407',
 					modalities: {
@@ -5529,7 +5489,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'mistralai/mistral-large-2512': {
 					id: 'mistralai/mistral-large-2512',
 					label: 'Mistral Large 3',
 					modalities: {
@@ -5554,7 +5514,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/mistral-medium-3': {
 					id: 'mistralai/mistral-medium-3',
 					label: 'Mistral Medium 3',
 					modalities: {
@@ -5579,7 +5539,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'mistralai/mistral-medium-3-5': {
 					id: 'mistralai/mistral-medium-3-5',
 					label: 'Mistral Medium 3.5',
 					modalities: {
@@ -5602,7 +5562,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/mistral-medium-3.1': {
 					id: 'mistralai/mistral-medium-3.1',
 					label: 'Mistral Medium 3.1',
 					modalities: {
@@ -5627,7 +5587,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/mistral-nemo': {
 					id: 'mistralai/mistral-nemo',
 					label: 'Mistral Nemo',
 					modalities: {
@@ -5651,7 +5611,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'mistralai/mistral-saba': {
 					id: 'mistralai/mistral-saba',
 					label: 'Saba',
 					modalities: {
@@ -5676,7 +5636,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'mistralai/mistral-small-2603': {
 					id: 'mistralai/mistral-small-2603',
 					label: 'Mistral Small 4',
 					modalities: {
@@ -5701,7 +5661,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'mistralai/mistral-small-3.2-24b-instruct': {
 					id: 'mistralai/mistral-small-3.2-24b-instruct',
 					label: 'Mistral Small 3.2 24B',
 					modalities: {
@@ -5725,7 +5685,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'mistralai/mixtral-8x22b-instruct': {
 					id: 'mistralai/mixtral-8x22b-instruct',
 					label: 'Mixtral 8x22B Instruct',
 					modalities: {
@@ -5750,7 +5710,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'mistralai/voxtral-small-24b-2507': {
 					id: 'mistralai/voxtral-small-24b-2507',
 					label: 'Voxtral Small 24B 2507',
 					modalities: {
@@ -5774,7 +5734,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'moonshotai/kimi-k2': {
 					id: 'moonshotai/kimi-k2',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 0711',
@@ -5799,7 +5759,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'moonshotai/kimi-k2-0905': {
 					id: 'moonshotai/kimi-k2-0905',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 0905',
@@ -5824,7 +5784,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'moonshotai/kimi-k2-thinking': {
 					id: 'moonshotai/kimi-k2-thinking',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 Thinking',
@@ -5849,7 +5809,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'moonshotai/kimi-k2.5': {
 					id: 'moonshotai/kimi-k2.5',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.5',
@@ -5874,7 +5834,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'moonshotai/kimi-k2.6': {
 					id: 'moonshotai/kimi-k2.6',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.6',
@@ -5891,16 +5851,16 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.68,
-						output: 3.41,
-						cacheRead: 0.34,
+						input: 0.67,
+						output: 3.5,
+						cacheRead: 0.2,
 					},
 					limit: {
-						context: 262142,
-						output: 262142,
+						context: 262144,
+						output: 262144,
 					},
 				},
-				{
+				'moonshotai/kimi-k2.7-code': {
 					id: 'moonshotai/kimi-k2.7-code',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.7 Code',
@@ -5917,16 +5877,16 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-12',
 					openWeights: true,
 					cost: {
-						input: 0.74,
-						output: 3.5,
-						cacheRead: 0.15,
+						input: 0.68,
+						output: 3.41,
+						cacheRead: 0.144,
 					},
 					limit: {
 						context: 262144,
-						output: 16384,
+						output: 262144,
 					},
 				},
-				{
+				'nex-agi/nex-n2-pro:free': {
 					id: 'nex-agi/nex-n2-pro:free',
 					label: 'Nex-N2-Pro (free)',
 					modalities: {
@@ -5949,7 +5909,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'nvidia/llama-3.3-nemotron-super-49b-v1.5': {
 					id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
 					label: 'Llama 3.3 Nemotron Super 49B v1.5',
 					modalities: {
@@ -5972,7 +5932,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'nvidia/nemotron-3-nano-30b-a3b': {
 					id: 'nvidia/nemotron-3-nano-30b-a3b',
 					label: 'Nemotron 3 Nano 30B A3B',
 					modalities: {
@@ -5995,7 +5955,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 228000,
 					},
 				},
-				{
+				'nvidia/nemotron-3-nano-30b-a3b:free': {
 					id: 'nvidia/nemotron-3-nano-30b-a3b:free',
 					label: 'Nemotron 3 Nano 30B A3B (free)',
 					modalities: {
@@ -6018,7 +5978,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': {
 					id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
 					label: 'Nemotron 3 Nano Omni (free)',
 					modalities: {
@@ -6041,7 +6001,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'nvidia/nemotron-3-super-120b-a12b': {
 					id: 'nvidia/nemotron-3-super-120b-a12b',
 					label: 'Nemotron 3 Super 120B A12B',
 					modalities: {
@@ -6064,7 +6024,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'nvidia/nemotron-3-super-120b-a12b:free': {
 					id: 'nvidia/nemotron-3-super-120b-a12b:free',
 					label: 'Nemotron 3 Super (free)',
 					modalities: {
@@ -6087,7 +6047,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'nvidia/nemotron-3-ultra-550b-a55b': {
 					id: 'nvidia/nemotron-3-ultra-550b-a55b',
 					label: 'Nemotron 3 Ultra 550B A55B',
 					modalities: {
@@ -6111,7 +6071,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'nvidia/nemotron-3-ultra-550b-a55b:free': {
 					id: 'nvidia/nemotron-3-ultra-550b-a55b:free',
 					label: 'Nemotron 3 Ultra (free)',
 					modalities: {
@@ -6134,7 +6094,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'nvidia/nemotron-nano-12b-v2-vl:free': {
 					id: 'nvidia/nemotron-nano-12b-v2-vl:free',
 					label: 'Nemotron Nano 12B 2 VL (free)',
 					modalities: {
@@ -6157,7 +6117,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'nvidia/nemotron-nano-9b-v2:free': {
 					id: 'nvidia/nemotron-nano-9b-v2:free',
 					label: 'Nemotron Nano 9B V2 (free)',
 					modalities: {
@@ -6180,7 +6140,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-3.5-turbo': {
 					id: 'openai/gpt-3.5-turbo',
 					ownedBy: 'openai',
 					label: 'GPT-3.5-turbo',
@@ -6205,7 +6165,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-3.5-turbo-0613': {
 					id: 'openai/gpt-3.5-turbo-0613',
 					ownedBy: 'openai',
 					label: 'GPT-3.5 Turbo (older v0613)',
@@ -6230,7 +6190,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-3.5-turbo-16k': {
 					id: 'openai/gpt-3.5-turbo-16k',
 					ownedBy: 'openai',
 					label: 'GPT-3.5 Turbo 16k',
@@ -6255,7 +6215,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-4': {
 					id: 'openai/gpt-4',
 					ownedBy: 'openai',
 					label: 'GPT-4',
@@ -6280,7 +6240,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-4-turbo': {
 					id: 'openai/gpt-4-turbo',
 					ownedBy: 'openai',
 					label: 'GPT-4 Turbo',
@@ -6305,7 +6265,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-4-turbo-preview': {
 					id: 'openai/gpt-4-turbo-preview',
 					ownedBy: 'openai',
 					label: 'GPT-4 Turbo Preview',
@@ -6330,7 +6290,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-4.1': {
 					id: 'openai/gpt-4.1',
 					ownedBy: 'openai',
 					label: 'GPT-4.1',
@@ -6356,7 +6316,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'openai/gpt-4.1-mini': {
 					id: 'openai/gpt-4.1-mini',
 					ownedBy: 'openai',
 					label: 'GPT-4.1 mini',
@@ -6382,7 +6342,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'openai/gpt-4.1-nano': {
 					id: 'openai/gpt-4.1-nano',
 					ownedBy: 'openai',
 					label: 'GPT-4.1 nano',
@@ -6408,7 +6368,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'openai/gpt-4o': {
 					id: 'openai/gpt-4o',
 					ownedBy: 'openai',
 					label: 'GPT-4o',
@@ -6433,7 +6393,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-4o-2024-05-13': {
 					id: 'openai/gpt-4o-2024-05-13',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-05-13)',
@@ -6458,7 +6418,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-				{
+				'openai/gpt-4o-2024-08-06': {
 					id: 'openai/gpt-4o-2024-08-06',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-08-06)',
@@ -6484,7 +6444,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-4o-2024-11-20': {
 					id: 'openai/gpt-4o-2024-11-20',
 					ownedBy: 'openai',
 					label: 'GPT-4o (2024-11-20)',
@@ -6510,7 +6470,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-4o-mini': {
 					id: 'openai/gpt-4o-mini',
 					ownedBy: 'openai',
 					label: 'GPT-4o mini',
@@ -6536,7 +6496,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-4o-mini-2024-07-18': {
 					id: 'openai/gpt-4o-mini-2024-07-18',
 					ownedBy: 'openai',
 					label: 'GPT-4o-mini (2024-07-18)',
@@ -6562,7 +6522,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-5': {
 					id: 'openai/gpt-5',
 					ownedBy: 'openai',
 					label: 'GPT-5',
@@ -6588,7 +6548,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5-codex': {
 					id: 'openai/gpt-5-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5-Codex',
@@ -6614,7 +6574,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5-mini': {
 					id: 'openai/gpt-5-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5 Mini',
@@ -6640,7 +6600,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5-nano': {
 					id: 'openai/gpt-5-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5 Nano',
@@ -6666,7 +6626,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5-pro': {
 					id: 'openai/gpt-5-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5 Pro',
@@ -6691,7 +6651,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.1': {
 					id: 'openai/gpt-5.1',
 					ownedBy: 'openai',
 					label: 'GPT-5.1',
@@ -6717,7 +6677,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.1-chat': {
 					id: 'openai/gpt-5.1-chat',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Chat',
@@ -6743,7 +6703,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'openai/gpt-5.1-codex': {
 					id: 'openai/gpt-5.1-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex',
@@ -6769,7 +6729,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.1-codex-max': {
 					id: 'openai/gpt-5.1-codex-max',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex Max',
@@ -6795,7 +6755,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.1-codex-mini': {
 					id: 'openai/gpt-5.1-codex-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex mini',
@@ -6821,7 +6781,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/gpt-5.2': {
 					id: 'openai/gpt-5.2',
 					ownedBy: 'openai',
 					label: 'GPT-5.2',
@@ -6847,7 +6807,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.2-chat': {
 					id: 'openai/gpt-5.2-chat',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Chat',
@@ -6873,7 +6833,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-5.2-codex': {
 					id: 'openai/gpt-5.2-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Codex',
@@ -6899,7 +6859,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.2-pro': {
 					id: 'openai/gpt-5.2-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Pro',
@@ -6924,7 +6884,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.3-chat': {
 					id: 'openai/gpt-5.3-chat',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Chat',
@@ -6949,7 +6909,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-5.3-codex': {
 					id: 'openai/gpt-5.3-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex',
@@ -6975,7 +6935,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.4': {
 					id: 'openai/gpt-5.4',
 					ownedBy: 'openai',
 					label: 'GPT-5.4',
@@ -7001,7 +6961,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.4-mini': {
 					id: 'openai/gpt-5.4-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 mini',
@@ -7027,7 +6987,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.4-nano': {
 					id: 'openai/gpt-5.4-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 nano',
@@ -7053,7 +7013,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.4-pro': {
 					id: 'openai/gpt-5.4-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 Pro',
@@ -7078,7 +7038,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.5': {
 					id: 'openai/gpt-5.5',
 					ownedBy: 'openai',
 					label: 'GPT-5.5',
@@ -7104,7 +7064,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-5.5-pro': {
 					id: 'openai/gpt-5.5-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.5 Pro',
@@ -7129,7 +7089,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-audio': {
 					id: 'openai/gpt-audio',
 					ownedBy: 'openai',
 					label: 'GPT Audio',
@@ -7153,7 +7113,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-audio-mini': {
 					id: 'openai/gpt-audio-mini',
 					ownedBy: 'openai',
 					label: 'GPT Audio Mini',
@@ -7177,7 +7137,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'openai/gpt-chat-latest': {
 					id: 'openai/gpt-chat-latest',
 					ownedBy: 'openai',
 					label: 'GPT Chat Latest',
@@ -7202,7 +7162,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'openai/gpt-oss-120b': {
 					id: 'openai/gpt-oss-120b',
 					ownedBy: 'openai',
 					label: 'gpt-oss-120b',
@@ -7227,7 +7187,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'openai/gpt-oss-120b:free': {
 					id: 'openai/gpt-oss-120b:free',
 					ownedBy: 'openai',
 					label: 'gpt-oss-120b (free)',
@@ -7252,7 +7212,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'openai/gpt-oss-20b': {
 					id: 'openai/gpt-oss-20b',
 					ownedBy: 'openai',
 					label: 'gpt-oss-20b',
@@ -7277,7 +7237,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'openai/gpt-oss-20b:free': {
 					id: 'openai/gpt-oss-20b:free',
 					ownedBy: 'openai',
 					label: 'gpt-oss-20b (free)',
@@ -7302,7 +7262,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'openai/gpt-oss-safeguard-20b': {
 					id: 'openai/gpt-oss-safeguard-20b',
 					ownedBy: 'openai',
 					label: 'gpt-oss-safeguard-20b',
@@ -7320,14 +7280,14 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.075,
 						output: 0.3,
-						cacheRead: 0.037,
+						cacheRead: 0.0375,
 					},
 					limit: {
 						context: 131072,
 						output: 65536,
 					},
 				},
-				{
+				'openai/o1': {
 					id: 'openai/o1',
 					ownedBy: 'openai',
 					label: 'o1',
@@ -7353,7 +7313,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o3': {
 					id: 'openai/o3',
 					ownedBy: 'openai',
 					label: 'o3',
@@ -7379,7 +7339,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o3-deep-research': {
 					id: 'openai/o3-deep-research',
 					ownedBy: 'openai',
 					label: 'o3-deep-research',
@@ -7405,7 +7365,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o3-mini': {
 					id: 'openai/o3-mini',
 					ownedBy: 'openai',
 					label: 'o3-mini',
@@ -7431,7 +7391,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o3-mini-high': {
 					id: 'openai/o3-mini-high',
 					ownedBy: 'openai',
 					label: 'o3 Mini High',
@@ -7457,7 +7417,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o3-pro': {
 					id: 'openai/o3-pro',
 					ownedBy: 'openai',
 					label: 'o3-pro',
@@ -7482,7 +7442,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o4-mini': {
 					id: 'openai/o4-mini',
 					ownedBy: 'openai',
 					label: 'o4-mini',
@@ -7508,7 +7468,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o4-mini-deep-research': {
 					id: 'openai/o4-mini-deep-research',
 					ownedBy: 'openai',
 					label: 'o4-mini-deep-research',
@@ -7534,7 +7494,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openai/o4-mini-high': {
 					id: 'openai/o4-mini-high',
 					ownedBy: 'openai',
 					label: 'o4 Mini High',
@@ -7560,7 +7520,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				{
+				'openrouter/auto': {
 					id: 'openrouter/auto',
 					label: 'Auto Router',
 					modalities: {
@@ -7579,7 +7539,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 2000000,
 					},
 				},
-				{
+				'openrouter/free': {
 					id: 'openrouter/free',
 					label: 'Free Models Router',
 					modalities: {
@@ -7602,7 +7562,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8000,
 					},
 				},
-				{
+				'openrouter/owl-alpha': {
 					id: 'openrouter/owl-alpha',
 					label: 'Owl Alpha',
 					modalities: {
@@ -7625,7 +7585,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'poolside/laguna-m.1': {
+					id: 'poolside/laguna-m.1',
+					label: 'Laguna M.1',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-04-28',
+					lastUpdated: '2026-04-28',
+					openWeights: true,
+					cost: {
+						input: 0.2,
+						output: 0.4,
+						cacheRead: 0.1,
+					},
+					limit: {
+						context: 262144,
+						output: 32768,
+					},
+				},
+				'poolside/laguna-m.1:free': {
 					id: 'poolside/laguna-m.1:free',
 					label: 'Laguna M.1 (free)',
 					modalities: {
@@ -7638,7 +7622,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-04-28',
 					lastUpdated: '2026-04-28',
-					openWeights: false,
+					openWeights: true,
 					cost: {
 						input: 0,
 						output: 0,
@@ -7648,7 +7632,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'poolside/laguna-xs.2': {
+					id: 'poolside/laguna-xs.2',
+					label: 'Laguna XS.2',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-04-28',
+					lastUpdated: '2026-04-28',
+					openWeights: true,
+					cost: {
+						input: 0.1,
+						output: 0.2,
+						cacheRead: 0.05,
+					},
+					limit: {
+						context: 262144,
+						output: 32768,
+					},
+				},
+				'poolside/laguna-xs.2:free': {
 					id: 'poolside/laguna-xs.2:free',
 					label: 'Laguna XS.2 (free)',
 					modalities: {
@@ -7671,7 +7679,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'prime-intellect/intellect-3': {
 					id: 'prime-intellect/intellect-3',
 					ownedBy: 'zai',
 					label: 'INTELLECT-3',
@@ -7696,7 +7704,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'qwen/qwen-2.5-72b-instruct': {
 					id: 'qwen/qwen-2.5-72b-instruct',
 					label: 'Qwen2.5 72B Instruct',
 					modalities: {
@@ -7720,7 +7728,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen-2.5-7b-instruct': {
 					id: 'qwen/qwen-2.5-7b-instruct',
 					label: 'Qwen2.5 7B Instruct',
 					modalities: {
@@ -7744,7 +7752,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen-plus': {
 					id: 'qwen/qwen-plus',
 					label: 'Qwen Plus',
 					modalities: {
@@ -7770,7 +7778,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen-plus-2025-07-28': {
 					id: 'qwen/qwen-plus-2025-07-28',
 					label: 'Qwen Plus 0728',
 					modalities: {
@@ -7794,7 +7802,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen-plus-2025-07-28:thinking': {
 					id: 'qwen/qwen-plus-2025-07-28:thinking',
 					label: 'Qwen Plus 0728 (thinking)',
 					modalities: {
@@ -7819,7 +7827,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-14b': {
 					id: 'qwen/qwen3-14b',
 					label: 'Qwen3 14B',
 					modalities: {
@@ -7843,7 +7851,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 40960,
 					},
 				},
-				{
+				'qwen/qwen3-235b-a22b': {
 					id: 'qwen/qwen3-235b-a22b',
 					label: 'Qwen3 235B-A22B',
 					modalities: {
@@ -7867,7 +7875,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'qwen/qwen3-235b-a22b-2507': {
 					id: 'qwen/qwen3-235b-a22b-2507',
 					label: 'Qwen3 235B A22B Instruct 2507',
 					modalities: {
@@ -7891,7 +7899,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen3-235b-a22b-thinking-2507': {
 					id: 'qwen/qwen3-235b-a22b-thinking-2507',
 					label: 'Qwen3 235B A22B Thinking 2507',
 					modalities: {
@@ -7916,7 +7924,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3-30b-a3b': {
 					id: 'qwen/qwen3-30b-a3b',
 					label: 'Qwen3 30B A3B',
 					modalities: {
@@ -7940,7 +7948,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen3-30b-a3b-instruct-2507': {
 					id: 'qwen/qwen3-30b-a3b-instruct-2507',
 					label: 'Qwen3 30B A3B Instruct 2507',
 					modalities: {
@@ -7964,7 +7972,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'qwen/qwen3-30b-a3b-thinking-2507': {
 					id: 'qwen/qwen3-30b-a3b-thinking-2507',
 					label: 'Qwen3 30B A3B Thinking 2507',
 					modalities: {
@@ -7989,7 +7997,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'qwen/qwen3-32b': {
 					id: 'qwen/qwen3-32b',
 					label: 'Qwen3 32B',
 					modalities: {
@@ -8013,7 +8021,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen3-8b': {
 					id: 'qwen/qwen3-8b',
 					label: 'Qwen3 8B',
 					modalities: {
@@ -8038,7 +8046,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
-				{
+				'qwen/qwen3-coder': {
 					id: 'qwen/qwen3-coder',
 					label: 'Qwen3 Coder 480B A35B',
 					modalities: {
@@ -8062,7 +8070,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3-coder-30b-a3b-instruct': {
 					id: 'qwen/qwen3-coder-30b-a3b-instruct',
 					label: 'Qwen3-Coder 30B-A3B Instruct',
 					modalities: {
@@ -8086,7 +8094,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-coder-flash': {
 					id: 'qwen/qwen3-coder-flash',
 					label: 'Qwen3 Coder Flash',
 					modalities: {
@@ -8112,7 +8120,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3-coder-next': {
 					id: 'qwen/qwen3-coder-next',
 					label: 'Qwen3 Coder Next',
 					modalities: {
@@ -8136,7 +8144,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3-coder-plus': {
 					id: 'qwen/qwen3-coder-plus',
 					label: 'Qwen3 Coder Plus',
 					modalities: {
@@ -8162,7 +8170,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3-coder:free': {
 					id: 'qwen/qwen3-coder:free',
 					label: 'Qwen3 Coder 480B A35B (free)',
 					modalities: {
@@ -8186,7 +8194,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262000,
 					},
 				},
-				{
+				'qwen/qwen3-max': {
 					id: 'qwen/qwen3-max',
 					label: 'Qwen3 Max',
 					modalities: {
@@ -8212,7 +8220,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-max-thinking': {
 					id: 'qwen/qwen3-max-thinking',
 					label: 'Qwen3 Max Thinking',
 					modalities: {
@@ -8235,7 +8243,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-next-80b-a3b-instruct': {
 					id: 'qwen/qwen3-next-80b-a3b-instruct',
 					label: 'Qwen3-Next 80B-A3B Instruct',
 					modalities: {
@@ -8259,7 +8267,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen3-next-80b-a3b-instruct:free': {
 					id: 'qwen/qwen3-next-80b-a3b-instruct:free',
 					label: 'Qwen3 Next 80B A3B Instruct (free)',
 					modalities: {
@@ -8283,7 +8291,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3-next-80b-a3b-thinking': {
 					id: 'qwen/qwen3-next-80b-a3b-thinking',
 					label: 'Qwen3-Next 80B-A3B (Thinking)',
 					modalities: {
@@ -8307,7 +8315,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-235b-a22b-instruct': {
 					id: 'qwen/qwen3-vl-235b-a22b-instruct',
 					label: 'Qwen3 VL 235B A22B Instruct',
 					modalities: {
@@ -8332,7 +8340,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'qwen/qwen3-vl-235b-a22b-thinking': {
 					id: 'qwen/qwen3-vl-235b-a22b-thinking',
 					label: 'Qwen3 VL 235B A22B Thinking',
 					modalities: {
@@ -8356,7 +8364,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-30b-a3b-instruct': {
 					id: 'qwen/qwen3-vl-30b-a3b-instruct',
 					label: 'Qwen3 VL 30B A3B Instruct',
 					modalities: {
@@ -8380,7 +8388,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-30b-a3b-thinking': {
 					id: 'qwen/qwen3-vl-30b-a3b-thinking',
 					label: 'Qwen3 VL 30B A3B Thinking',
 					modalities: {
@@ -8404,7 +8412,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-32b-instruct': {
 					id: 'qwen/qwen3-vl-32b-instruct',
 					label: 'Qwen3 VL 32B Instruct',
 					modalities: {
@@ -8427,7 +8435,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-8b-instruct': {
 					id: 'qwen/qwen3-vl-8b-instruct',
 					label: 'Qwen3 VL 8B Instruct',
 					modalities: {
@@ -8450,7 +8458,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3-vl-8b-thinking': {
 					id: 'qwen/qwen3-vl-8b-thinking',
 					label: 'Qwen3 VL 8B Thinking',
 					modalities: {
@@ -8473,7 +8481,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen/qwen3.5-122b-a10b': {
 					id: 'qwen/qwen3.5-122b-a10b',
 					label: 'Qwen3.5 122B-A10B',
 					modalities: {
@@ -8496,7 +8504,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3.5-27b': {
 					id: 'qwen/qwen3.5-27b',
 					label: 'Qwen3.5 27B',
 					modalities: {
@@ -8519,7 +8527,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.5-35b-a3b': {
 					id: 'qwen/qwen3.5-35b-a3b',
 					label: 'Qwen3.5 35B-A3B',
 					modalities: {
@@ -8536,14 +8544,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.14,
 						output: 1,
-						cacheRead: 0.05,
 					},
 					limit: {
 						context: 262144,
-						output: 81920,
+						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3.5-397b-a17b': {
 					id: 'qwen/qwen3.5-397b-a17b',
 					label: 'Qwen3.5 397B-A17B',
 					modalities: {
@@ -8566,7 +8573,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.5-9b': {
 					id: 'qwen/qwen3.5-9b',
 					label: 'Qwen3.5-9B',
 					modalities: {
@@ -8589,7 +8596,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3.5-flash-02-23': {
 					id: 'qwen/qwen3.5-flash-02-23',
 					label: 'Qwen3.5-Flash',
 					modalities: {
@@ -8612,7 +8619,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.5-plus-02-15': {
 					id: 'qwen/qwen3.5-plus-02-15',
 					label: 'Qwen3.5 Plus 2026-02-15',
 					modalities: {
@@ -8636,7 +8643,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.5-plus-20260420': {
 					id: 'qwen/qwen3.5-plus-20260420',
 					label: 'Qwen3.5 Plus 2026-04-20',
 					modalities: {
@@ -8660,7 +8667,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.6-27b': {
 					id: 'qwen/qwen3.6-27b',
 					label: 'Qwen3.6 27B',
 					modalities: {
@@ -8683,7 +8690,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262140,
 					},
 				},
-				{
+				'qwen/qwen3.6-35b-a3b': {
 					id: 'qwen/qwen3.6-35b-a3b',
 					label: 'Qwen3.6 35B-A3B',
 					modalities: {
@@ -8698,16 +8705,15 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-17',
 					openWeights: true,
 					cost: {
-						input: 0.15,
+						input: 0.14,
 						output: 1,
-						cacheRead: 0.05,
 					},
 					limit: {
 						context: 262144,
 						output: 262144,
 					},
 				},
-				{
+				'qwen/qwen3.6-flash': {
 					id: 'qwen/qwen3.6-flash',
 					label: 'Qwen3.6 Flash',
 					modalities: {
@@ -8731,7 +8737,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.6-max-preview': {
 					id: 'qwen/qwen3.6-max-preview',
 					label: 'Qwen3.6 Max Preview',
 					modalities: {
@@ -8756,7 +8762,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.6-plus': {
 					id: 'qwen/qwen3.6-plus',
 					label: 'Qwen3.6 Plus',
 					modalities: {
@@ -8781,7 +8787,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.7-max': {
 					id: 'qwen/qwen3.7-max',
 					label: 'Qwen3.7 Max',
 					modalities: {
@@ -8806,7 +8812,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen/qwen3.7-plus': {
 					id: 'qwen/qwen3.7-plus',
 					label: 'Qwen3.7 Plus',
 					modalities: {
@@ -8832,7 +8838,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'rekaai/reka-edge': {
 					id: 'rekaai/reka-edge',
 					label: 'Reka Edge',
 					modalities: {
@@ -8855,7 +8861,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'relace/relace-search': {
 					id: 'relace/relace-search',
 					label: 'Relace Search',
 					modalities: {
@@ -8878,7 +8884,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'sao10k/l3.1-euryale-70b': {
 					id: 'sao10k/l3.1-euryale-70b',
 					label: 'Llama 3.1 Euryale 70B v2.2',
 					modalities: {
@@ -8902,7 +8908,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'stepfun/step-3.5-flash': {
 					id: 'stepfun/step-3.5-flash',
 					label: 'Step 3.5 Flash',
 					modalities: {
@@ -8927,7 +8933,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'stepfun/step-3.7-flash': {
 					id: 'stepfun/step-3.7-flash',
 					label: 'Step 3.7 Flash',
 					modalities: {
@@ -8952,7 +8958,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'tencent/hy3-preview': {
 					id: 'tencent/hy3-preview',
 					label: 'Hy3 preview',
 					modalities: {
@@ -8976,7 +8982,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'thedrummer/rocinante-12b': {
 					id: 'thedrummer/rocinante-12b',
 					label: 'Rocinante 12B',
 					modalities: {
@@ -9000,7 +9006,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'thedrummer/unslopnemo-12b': {
 					id: 'thedrummer/unslopnemo-12b',
 					label: 'UnslopNemo 12B',
 					modalities: {
@@ -9024,7 +9030,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'upstage/solar-pro-3': {
 					id: 'upstage/solar-pro-3',
 					label: 'Solar Pro 3',
 					modalities: {
@@ -9048,7 +9054,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'x-ai/grok-4.20': {
 					id: 'x-ai/grok-4.20',
 					ownedBy: 'xai',
 					label: 'Grok 4.20',
@@ -9074,7 +9080,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 2000000,
 					},
 				},
-				{
+				'x-ai/grok-4.3': {
 					id: 'x-ai/grok-4.3',
 					ownedBy: 'xai',
 					label: 'Grok 4.3',
@@ -9099,7 +9105,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 1000000,
 					},
 				},
-				{
+				'x-ai/grok-build-0.1': {
 					id: 'x-ai/grok-build-0.1',
 					ownedBy: 'xai',
 					label: 'Grok Build 0.1',
@@ -9124,7 +9130,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'xiaomi/mimo-v2.5': {
 					id: 'xiaomi/mimo-v2.5',
 					label: 'MiMo-V2.5',
 					modalities: {
@@ -9149,7 +9155,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'xiaomi/mimo-v2.5-pro': {
 					id: 'xiaomi/mimo-v2.5-pro',
 					label: 'MiMo-V2.5-Pro',
 					modalities: {
@@ -9174,7 +9180,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'z-ai/glm-4.5': {
 					id: 'z-ai/glm-4.5',
 					ownedBy: 'zai',
 					label: 'GLM-4.5',
@@ -9200,7 +9206,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'z-ai/glm-4.5-air': {
 					id: 'z-ai/glm-4.5-air',
 					ownedBy: 'zai',
 					label: 'GLM-4.5-Air',
@@ -9226,7 +9232,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'z-ai/glm-4.5v': {
 					id: 'z-ai/glm-4.5v',
 					ownedBy: 'zai',
 					label: 'GLM-4.5V',
@@ -9252,7 +9258,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'z-ai/glm-4.6': {
 					id: 'z-ai/glm-4.6',
 					ownedBy: 'zai',
 					label: 'GLM-4.6',
@@ -9278,7 +9284,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'z-ai/glm-4.6v': {
 					id: 'z-ai/glm-4.6v',
 					ownedBy: 'zai',
 					label: 'GLM-4.6V',
@@ -9304,7 +9310,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'z-ai/glm-4.7': {
 					id: 'z-ai/glm-4.7',
 					ownedBy: 'zai',
 					label: 'GLM-4.7',
@@ -9330,7 +9336,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'z-ai/glm-4.7-flash': {
 					id: 'z-ai/glm-4.7-flash',
 					ownedBy: 'zai',
 					label: 'GLM-4.7-Flash',
@@ -9356,7 +9362,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'z-ai/glm-5': {
 					id: 'z-ai/glm-5',
 					ownedBy: 'zai',
 					label: 'GLM-5',
@@ -9381,7 +9387,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'z-ai/glm-5-turbo': {
 					id: 'z-ai/glm-5-turbo',
 					ownedBy: 'zai',
 					label: 'GLM-5-Turbo',
@@ -9406,7 +9412,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'z-ai/glm-5.1': {
 					id: 'z-ai/glm-5.1',
 					ownedBy: 'zai',
 					label: 'GLM-5.1',
@@ -9431,7 +9437,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'z-ai/glm-5.2': {
 					id: 'z-ai/glm-5.2',
 					ownedBy: 'zai',
 					label: 'GLM-5.2',
@@ -9445,18 +9451,18 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-06-13',
 					lastUpdated: '2026-06-13',
-					openWeights: false,
+					openWeights: true,
 					cost: {
-						input: 1.4,
-						output: 4.4,
-						cacheRead: 0.26,
+						input: 1.2,
+						output: 4.1,
+						cacheRead: 0.2,
 					},
 					limit: {
-						context: 262144,
-						output: 262144,
+						context: 1048576,
+						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'OpenRouter',
 			env: ['OPENROUTER_API_KEY'],
 			npm: '@openrouter/ai-sdk-provider',
@@ -9465,8 +9471,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		opencode: {
 			id: 'opencode',
-			models: [
-				{
+			models: {
+				'big-pickle': {
 					id: 'big-pickle',
 					label: 'Big Pickle',
 					modalities: {
@@ -9492,7 +9498,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-3-5-haiku': {
 					id: 'claude-3-5-haiku',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 3.5',
@@ -9522,7 +9528,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-fable-5': {
 					id: 'claude-fable-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Fable 5',
@@ -9552,7 +9558,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-haiku-4-5': {
 					id: 'claude-haiku-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5',
@@ -9582,7 +9588,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-opus-4-1': {
 					id: 'claude-opus-4-1',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.1',
@@ -9612,7 +9618,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-opus-4-5': {
 					id: 'claude-opus-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.5',
@@ -9642,7 +9648,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-opus-4-6': {
 					id: 'claude-opus-4-6',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.6',
@@ -9672,7 +9678,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-opus-4-7': {
 					id: 'claude-opus-4-7',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.7',
@@ -9702,7 +9708,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-opus-4-8': {
 					id: 'claude-opus-4-8',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.8',
@@ -9731,7 +9737,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-sonnet-4': {
 					id: 'claude-sonnet-4',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4',
@@ -9761,7 +9767,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-sonnet-4-5': {
 					id: 'claude-sonnet-4-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.5',
@@ -9791,7 +9797,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'claude-sonnet-4-6': {
 					id: 'claude-sonnet-4-6',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.6',
@@ -9821,7 +9827,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'deepseek-v4-flash': {
 					id: 'deepseek-v4-flash',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash',
@@ -9847,7 +9853,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'deepseek-v4-flash-free': {
 					id: 'deepseek-v4-flash-free',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash Free',
@@ -9873,7 +9879,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'deepseek-v4-pro': {
 					id: 'deepseek-v4-pro',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
@@ -9899,7 +9905,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'gemini-3-flash': {
 					id: 'gemini-3-flash',
 					ownedBy: 'google',
 					label: 'Gemini 3 Flash',
@@ -9928,7 +9934,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/google',
 					},
 				},
-				{
+				'gemini-3-pro': {
 					id: 'gemini-3-pro',
 					ownedBy: 'google',
 					label: 'Gemini 3 Pro',
@@ -9957,7 +9963,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/google',
 					},
 				},
-				{
+				'gemini-3.1-pro': {
 					id: 'gemini-3.1-pro',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview',
@@ -9986,7 +9992,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/google',
 					},
 				},
-				{
+				'gemini-3.5-flash': {
 					id: 'gemini-3.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 3.5 Flash',
@@ -10015,7 +10021,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/google',
 					},
 				},
-				{
+				'glm-4.6': {
 					id: 'glm-4.6',
 					ownedBy: 'zai',
 					label: 'GLM-4.6',
@@ -10041,7 +10047,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.7': {
 					id: 'glm-4.7',
 					ownedBy: 'zai',
 					label: 'GLM-4.7',
@@ -10067,7 +10073,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.7-free': {
 					id: 'glm-4.7-free',
 					ownedBy: 'zai',
 					label: 'GLM-4.7 Free',
@@ -10093,7 +10099,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5': {
 					id: 'glm-5',
 					ownedBy: 'zai',
 					label: 'GLM-5',
@@ -10119,7 +10125,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5-free': {
 					id: 'glm-5-free',
 					ownedBy: 'zai',
 					label: 'GLM-5 Free',
@@ -10145,7 +10151,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.1': {
 					id: 'glm-5.1',
 					ownedBy: 'zai',
 					label: 'GLM-5.1',
@@ -10171,7 +10177,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'gpt-5': {
 					id: 'gpt-5',
 					ownedBy: 'openai',
 					label: 'GPT-5',
@@ -10200,7 +10206,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5-codex': {
 					id: 'gpt-5-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5 Codex',
@@ -10229,7 +10235,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5-nano': {
 					id: 'gpt-5-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5 Nano',
@@ -10258,7 +10264,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.1': {
 					id: 'gpt-5.1',
 					ownedBy: 'openai',
 					label: 'GPT-5.1',
@@ -10287,7 +10293,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.1-codex': {
 					id: 'gpt-5.1-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex',
@@ -10316,7 +10322,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.1-codex-max': {
 					id: 'gpt-5.1-codex-max',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex Max',
@@ -10345,7 +10351,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.1-codex-mini': {
 					id: 'gpt-5.1-codex-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.1 Codex Mini',
@@ -10374,7 +10380,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.2': {
 					id: 'gpt-5.2',
 					ownedBy: 'openai',
 					label: 'GPT-5.2',
@@ -10403,7 +10409,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.2-codex': {
 					id: 'gpt-5.2-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Codex',
@@ -10432,7 +10438,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.3-codex': {
 					id: 'gpt-5.3-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex',
@@ -10461,7 +10467,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.3-codex-spark': {
 					id: 'gpt-5.3-codex-spark',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex Spark',
@@ -10490,7 +10496,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.4': {
 					id: 'gpt-5.4',
 					ownedBy: 'openai',
 					label: 'GPT-5.4',
@@ -10519,7 +10525,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.4-mini': {
 					id: 'gpt-5.4-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 Mini',
@@ -10548,7 +10554,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.4-nano': {
 					id: 'gpt-5.4-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 Nano',
@@ -10577,7 +10583,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.4-pro': {
 					id: 'gpt-5.4-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 Pro',
@@ -10606,7 +10612,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.5': {
 					id: 'gpt-5.5',
 					ownedBy: 'openai',
 					label: 'GPT-5.5',
@@ -10635,7 +10641,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'gpt-5.5-pro': {
 					id: 'gpt-5.5-pro',
 					ownedBy: 'openai',
 					label: 'GPT-5.5 Pro',
@@ -10664,7 +10670,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				{
+				'grok-build-0.1': {
 					id: 'grok-build-0.1',
 					ownedBy: 'xai',
 					label: 'Grok Build 0.1',
@@ -10689,7 +10695,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'grok-code': {
 					id: 'grok-code',
 					ownedBy: 'xai',
 					label: 'Grok Code Fast 1',
@@ -10715,7 +10721,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-				{
+				'hy3-preview-free': {
 					id: 'hy3-preview-free',
 					label: 'Hy3 preview Free',
 					modalities: {
@@ -10740,7 +10746,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'kimi-k2': {
 					id: 'kimi-k2',
 					ownedBy: 'kimi',
 					label: 'Kimi K2',
@@ -10766,7 +10772,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2-thinking': {
 					id: 'kimi-k2-thinking',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 Thinking',
@@ -10792,7 +10798,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.5': {
 					id: 'kimi-k2.5',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.5',
@@ -10818,7 +10824,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'kimi-k2.5-free': {
 					id: 'kimi-k2.5-free',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.5 Free',
@@ -10844,7 +10850,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.6': {
 					id: 'kimi-k2.6',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.6',
@@ -10870,7 +10876,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'ling-2.6-flash-free': {
 					id: 'ling-2.6-flash-free',
 					label: 'Ling 2.6 Flash Free',
 					modalities: {
@@ -10894,7 +10900,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32800,
 					},
 				},
-				{
+				'mimo-v2-flash-free': {
 					id: 'mimo-v2-flash-free',
 					label: 'MiMo V2 Flash Free',
 					modalities: {
@@ -10919,7 +10925,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'mimo-v2-omni-free': {
 					id: 'mimo-v2-omni-free',
 					label: 'MiMo V2 Omni Free',
 					modalities: {
@@ -10944,7 +10950,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'mimo-v2-pro-free': {
 					id: 'mimo-v2-pro-free',
 					label: 'MiMo V2 Pro Free',
 					modalities: {
@@ -10969,7 +10975,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'mimo-v2.5-free': {
 					id: 'mimo-v2.5-free',
 					label: 'MiMo V2.5 Free',
 					modalities: {
@@ -10994,7 +11000,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'minimax-m2.1': {
 					id: 'minimax-m2.1',
 					ownedBy: 'minimax',
 					label: 'MiniMax M2.1',
@@ -11020,7 +11026,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax-m2.1-free': {
 					id: 'minimax-m2.1-free',
 					ownedBy: 'minimax',
 					label: 'MiniMax M2.1 Free',
@@ -11049,7 +11055,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'minimax-m2.5': {
 					id: 'minimax-m2.5',
 					ownedBy: 'minimax',
 					label: 'MiniMax M2.5',
@@ -11075,7 +11081,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax-m2.5-free': {
 					id: 'minimax-m2.5-free',
 					ownedBy: 'minimax',
 					label: 'MiniMax M2.5 Free',
@@ -11104,7 +11110,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'minimax-m2.7': {
 					id: 'minimax-m2.7',
 					ownedBy: 'minimax',
 					label: 'MiniMax M2.7',
@@ -11130,7 +11136,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax-m3-free': {
 					id: 'minimax-m3-free',
 					ownedBy: 'minimax',
 					label: 'MiniMax M3 Free',
@@ -11159,7 +11165,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'nemotron-3-super-free': {
 					id: 'nemotron-3-super-free',
 					label: 'Nemotron 3 Super Free',
 					modalities: {
@@ -11184,7 +11190,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'nemotron-3-ultra-free': {
 					id: 'nemotron-3-ultra-free',
 					label: 'Nemotron 3 Ultra Free',
 					modalities: {
@@ -11209,7 +11215,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'north-mini-code-free': {
 					id: 'north-mini-code-free',
 					label: 'North Mini Code Free',
 					modalities: {
@@ -11233,7 +11239,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'qwen3-coder': {
 					id: 'qwen3-coder',
 					label: 'Qwen3 Coder',
 					modalities: {
@@ -11257,7 +11263,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen3.5-plus': {
 					id: 'qwen3.5-plus',
 					label: 'Qwen3.5 Plus',
 					modalities: {
@@ -11286,7 +11292,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'qwen3.6-plus': {
 					id: 'qwen3.6-plus',
 					label: 'Qwen3.6 Plus',
 					modalities: {
@@ -11315,7 +11321,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'qwen3.6-plus-free': {
 					id: 'qwen3.6-plus-free',
 					label: 'Qwen3.6 Plus Free',
 					modalities: {
@@ -11343,7 +11349,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
-				{
+				'ring-2.6-1t-free': {
 					id: 'ring-2.6-1t-free',
 					label: 'Ring 2.6 1T Free',
 					modalities: {
@@ -11367,7 +11373,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 66000,
 					},
 				},
-				{
+				'trinity-large-preview-free': {
 					id: 'trinity-large-preview-free',
 					label: 'Trinity Large Preview',
 					modalities: {
@@ -11391,7 +11397,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'OpenCode Zen',
 			env: ['OPENCODE_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
@@ -11400,8 +11406,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		xai: {
 			id: 'xai',
-			models: [
-				{
+			models: {
+				'grok-4.20-0309-non-reasoning': {
 					id: 'grok-4.20-0309-non-reasoning',
 					ownedBy: 'xai',
 					label: 'Grok 4.20 (Non-Reasoning)',
@@ -11426,7 +11432,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 30000,
 					},
 				},
-				{
+				'grok-4.20-0309-reasoning': {
 					id: 'grok-4.20-0309-reasoning',
 					ownedBy: 'xai',
 					label: 'Grok 4.20 (Reasoning)',
@@ -11451,7 +11457,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 30000,
 					},
 				},
-				{
+				'grok-4.3': {
 					id: 'grok-4.3',
 					ownedBy: 'xai',
 					label: 'Grok 4.3',
@@ -11476,7 +11482,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 30000,
 					},
 				},
-				{
+				'grok-build-0.1': {
 					id: 'grok-build-0.1',
 					ownedBy: 'xai',
 					label: 'Grok Build 0.1',
@@ -11501,7 +11507,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 256000,
 					},
 				},
-			],
+			},
 			label: 'xAI',
 			env: ['XAI_API_KEY'],
 			npm: '@ai-sdk/xai',
@@ -11509,8 +11515,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		zai: {
 			id: 'zai',
-			models: [
-				{
+			models: {
+				'glm-4.5': {
 					id: 'glm-4.5',
 					ownedBy: 'zai',
 					label: 'GLM-4.5',
@@ -11537,7 +11543,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'glm-4.5-air': {
 					id: 'glm-4.5-air',
 					ownedBy: 'zai',
 					label: 'GLM-4.5-Air',
@@ -11564,7 +11570,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'glm-4.5-flash': {
 					id: 'glm-4.5-flash',
 					ownedBy: 'zai',
 					label: 'GLM-4.5-Flash',
@@ -11591,7 +11597,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'glm-4.5v': {
 					id: 'glm-4.5v',
 					ownedBy: 'zai',
 					label: 'GLM-4.5V',
@@ -11616,7 +11622,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'glm-4.6': {
 					id: 'glm-4.6',
 					ownedBy: 'zai',
 					label: 'GLM-4.6',
@@ -11643,7 +11649,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.6v': {
 					id: 'glm-4.6v',
 					ownedBy: 'zai',
 					label: 'GLM-4.6V',
@@ -11668,7 +11674,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'glm-4.7': {
 					id: 'glm-4.7',
 					ownedBy: 'zai',
 					label: 'GLM-4.7',
@@ -11695,7 +11701,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.7-flash': {
 					id: 'glm-4.7-flash',
 					ownedBy: 'zai',
 					label: 'GLM-4.7-Flash',
@@ -11722,7 +11728,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.7-flashx': {
 					id: 'glm-4.7-flashx',
 					ownedBy: 'zai',
 					label: 'GLM-4.7-FlashX',
@@ -11749,7 +11755,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5': {
 					id: 'glm-5',
 					ownedBy: 'zai',
 					label: 'GLM-5',
@@ -11775,7 +11781,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5-turbo': {
 					id: 'glm-5-turbo',
 					ownedBy: 'zai',
 					label: 'GLM-5-Turbo',
@@ -11801,7 +11807,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.1': {
 					id: 'glm-5.1',
 					ownedBy: 'zai',
 					label: 'GLM-5.1',
@@ -11827,7 +11833,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5v-turbo': {
 					id: 'glm-5v-turbo',
 					ownedBy: 'zai',
 					label: 'GLM-5V-Turbo',
@@ -11853,7 +11859,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'Z.AI',
 			env: ['ZHIPU_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
@@ -11862,8 +11868,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		'zai-coding': {
 			id: 'zai-coding',
-			models: [
-				{
+			models: {
+				'glm-4.5-air': {
 					id: 'glm-4.5-air',
 					ownedBy: 'zai',
 					label: 'GLM-4.5-Air',
@@ -11890,7 +11896,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 98304,
 					},
 				},
-				{
+				'glm-4.7': {
 					id: 'glm-4.7',
 					ownedBy: 'zai',
 					label: 'GLM-4.7',
@@ -11917,7 +11923,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5-turbo': {
 					id: 'glm-5-turbo',
 					ownedBy: 'zai',
 					label: 'GLM-5-Turbo',
@@ -11943,7 +11949,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.1': {
 					id: 'glm-5.1',
 					ownedBy: 'zai',
 					label: 'GLM-5.1',
@@ -11969,7 +11975,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.2': {
 					id: 'glm-5.2',
 					ownedBy: 'zai',
 					label: 'GLM-5.2',
@@ -11983,7 +11989,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-06-13',
 					lastUpdated: '2026-06-13',
-					openWeights: false,
+					openWeights: true,
 					cost: {
 						input: 0,
 						output: 0,
@@ -11995,7 +12001,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5v-turbo': {
 					id: 'glm-5v-turbo',
 					ownedBy: 'zai',
 					label: 'GLM-5V-Turbo',
@@ -12021,7 +12027,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-			],
+			},
 			label: 'Z.AI Coding Plan',
 			env: ['ZHIPU_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
@@ -12030,8 +12036,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		deepseek: {
 			id: 'deepseek',
-			models: [
-				{
+			models: {
+				'deepseek-chat': {
 					id: 'deepseek-chat',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek Chat',
@@ -12057,7 +12063,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'deepseek-reasoner': {
 					id: 'deepseek-reasoner',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek Reasoner',
@@ -12083,7 +12089,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'deepseek-v4-flash': {
 					id: 'deepseek-v4-flash',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Flash',
@@ -12109,7 +12115,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-				{
+				'deepseek-v4-pro': {
 					id: 'deepseek-v4-pro',
 					ownedBy: 'deepseek',
 					label: 'DeepSeek V4 Pro',
@@ -12135,7 +12141,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 384000,
 					},
 				},
-			],
+			},
 			label: 'DeepSeek',
 			env: ['DEEPSEEK_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
@@ -12144,8 +12150,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		kimi: {
 			id: 'kimi',
-			models: [
-				{
+			models: {
+				'kimi-k2-0711-preview': {
 					id: 'kimi-k2-0711-preview',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 0711',
@@ -12171,7 +12177,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'kimi-k2-0905-preview': {
 					id: 'kimi-k2-0905-preview',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 0905',
@@ -12197,7 +12203,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2-thinking': {
 					id: 'kimi-k2-thinking',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 Thinking',
@@ -12223,7 +12229,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2-thinking-turbo': {
 					id: 'kimi-k2-thinking-turbo',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 Thinking Turbo',
@@ -12249,7 +12255,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2-turbo-preview': {
 					id: 'kimi-k2-turbo-preview',
 					ownedBy: 'kimi',
 					label: 'Kimi K2 Turbo',
@@ -12275,7 +12281,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.5': {
 					id: 'kimi-k2.5',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.5',
@@ -12301,7 +12307,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.6': {
 					id: 'kimi-k2.6',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.6',
@@ -12327,7 +12333,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.7-code': {
 					id: 'kimi-k2.7-code',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.7 Code',
@@ -12353,7 +12359,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.7-code-highspeed': {
 					id: 'kimi-k2.7-code-highspeed',
 					ownedBy: 'kimi',
 					label: 'Kimi K2.7 Code HighSpeed',
@@ -12379,7 +12385,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-			],
+			},
 			label: 'Kimi',
 			env: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
 			npm: '@ai-sdk/openai-compatible',
@@ -12388,8 +12394,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		minimax: {
 			id: 'minimax',
-			models: [
-				{
+			models: {
+				'MiniMax-M2': {
 					id: 'MiniMax-M2',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2',
@@ -12413,7 +12419,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'MiniMax-M2.1': {
 					id: 'MiniMax-M2.1',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.1',
@@ -12437,7 +12443,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMax-M2.5': {
 					id: 'MiniMax-M2.5',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.5',
@@ -12463,7 +12469,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMax-M2.5-highspeed': {
 					id: 'MiniMax-M2.5-highspeed',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.5-highspeed',
@@ -12489,7 +12495,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMax-M2.7': {
 					id: 'MiniMax-M2.7',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.7',
@@ -12515,7 +12521,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMax-M2.7-highspeed': {
 					id: 'MiniMax-M2.7-highspeed',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M2.7-highspeed',
@@ -12541,7 +12547,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'MiniMax-M3': {
 					id: 'MiniMax-M3',
 					ownedBy: 'minimax',
 					label: 'MiniMax-M3',
@@ -12566,7 +12572,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-			],
+			},
 			label: 'MiniMax (minimax.io)',
 			env: ['MINIMAX_API_KEY'],
 			npm: '@ai-sdk/anthropic',
@@ -12575,8 +12581,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		copilot: {
 			id: 'copilot',
-			models: [
-				{
+			models: {
+				'claude-fable-5': {
 					id: 'claude-fable-5',
 					ownedBy: 'anthropic',
 					label: 'Claude Fable 5',
@@ -12603,7 +12609,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'claude-haiku-4.5': {
 					id: 'claude-haiku-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Haiku 4.5 (latest)',
@@ -12630,7 +12636,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-opus-4.5': {
 					id: 'claude-opus-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.5 (latest)',
@@ -12657,7 +12663,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4.6': {
 					id: 'claude-opus-4.6',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.6',
@@ -12684,7 +12690,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4.7': {
 					id: 'claude-opus-4.7',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.7',
@@ -12711,7 +12717,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-opus-4.8': {
 					id: 'claude-opus-4.8',
 					ownedBy: 'anthropic',
 					label: 'Claude Opus 4.8',
@@ -12737,7 +12743,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'claude-sonnet-4': {
 					id: 'claude-sonnet-4',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4 (latest)',
@@ -12764,7 +12770,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16000,
 					},
 				},
-				{
+				'claude-sonnet-4.5': {
 					id: 'claude-sonnet-4.5',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.5 (latest)',
@@ -12791,7 +12797,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'claude-sonnet-4.6': {
 					id: 'claude-sonnet-4.6',
 					ownedBy: 'anthropic',
 					label: 'Claude Sonnet 4.6',
@@ -12818,7 +12824,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'gemini-2.5-pro': {
 					id: 'gemini-2.5-pro',
 					ownedBy: 'google',
 					label: 'Gemini 2.5 Pro',
@@ -12844,7 +12850,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'gemini-3-flash-preview': {
 					id: 'gemini-3-flash-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3 Flash Preview',
@@ -12870,7 +12876,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'gemini-3.1-pro-preview': {
 					id: 'gemini-3.1-pro-preview',
 					ownedBy: 'google',
 					label: 'Gemini 3.1 Pro Preview',
@@ -12896,7 +12902,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'gemini-3.5-flash': {
 					id: 'gemini-3.5-flash',
 					ownedBy: 'google',
 					label: 'Gemini 3.5 Flash',
@@ -12922,7 +12928,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'gpt-4.1': {
 					id: 'gpt-4.1',
 					ownedBy: 'openai',
 					label: 'GPT-4.1',
@@ -12948,7 +12954,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
-				{
+				'gpt-5-mini': {
 					id: 'gpt-5-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5 Mini',
@@ -12974,7 +12980,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
-				{
+				'gpt-5.2': {
 					id: 'gpt-5.2',
 					ownedBy: 'openai',
 					label: 'GPT-5.2',
@@ -13000,7 +13006,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.2-codex': {
 					id: 'gpt-5.2-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.2 Codex',
@@ -13026,7 +13032,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.3-codex': {
 					id: 'gpt-5.3-codex',
 					ownedBy: 'openai',
 					label: 'GPT-5.3 Codex',
@@ -13052,7 +13058,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4': {
 					id: 'gpt-5.4',
 					ownedBy: 'openai',
 					label: 'GPT-5.4',
@@ -13078,7 +13084,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4-mini': {
 					id: 'gpt-5.4-mini',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 mini',
@@ -13104,7 +13110,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.4-nano': {
 					id: 'gpt-5.4-nano',
 					ownedBy: 'openai',
 					label: 'GPT-5.4 nano',
@@ -13130,7 +13136,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'gpt-5.5': {
 					id: 'gpt-5.5',
 					ownedBy: 'openai',
 					label: 'GPT-5.5',
@@ -13156,7 +13162,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-			],
+			},
 			label: 'GitHub Copilot',
 			env: ['GITHUB_TOKEN'],
 			npm: '@ai-sdk/openai-compatible',
@@ -13165,8 +13171,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		},
 		'ollama-cloud': {
 			id: 'ollama-cloud',
-			models: [
-				{
+			models: {
+				'cogito-2.1:671b': {
 					id: 'cogito-2.1:671b',
 					label: 'cogito-2.1:671b',
 					modalities: {
@@ -13184,7 +13190,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
-				{
+				'deepseek-v3.1:671b': {
 					id: 'deepseek-v3.1:671b',
 					ownedBy: 'deepseek',
 					label: 'deepseek-v3.1:671b',
@@ -13203,7 +13209,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 163840,
 					},
 				},
-				{
+				'deepseek-v3.2': {
 					id: 'deepseek-v3.2',
 					ownedBy: 'deepseek',
 					label: 'deepseek-v3.2',
@@ -13222,7 +13228,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'deepseek-v4-flash': {
 					id: 'deepseek-v4-flash',
 					ownedBy: 'deepseek',
 					label: 'deepseek-v4-flash',
@@ -13241,7 +13247,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 1048576,
 					},
 				},
-				{
+				'deepseek-v4-pro': {
 					id: 'deepseek-v4-pro',
 					ownedBy: 'deepseek',
 					label: 'deepseek-v4-pro',
@@ -13260,7 +13266,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 1048576,
 					},
 				},
-				{
+				'devstral-2:123b': {
 					id: 'devstral-2:123b',
 					label: 'devstral-2:123b',
 					modalities: {
@@ -13278,7 +13284,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'devstral-small-2:24b': {
 					id: 'devstral-small-2:24b',
 					label: 'devstral-small-2:24b',
 					modalities: {
@@ -13296,7 +13302,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'gemini-3-flash-preview': {
 					id: 'gemini-3-flash-preview',
 					ownedBy: 'google',
 					label: 'gemini-3-flash-preview',
@@ -13316,7 +13322,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'gemma4:31b': {
 					id: 'gemma4:31b',
 					label: 'gemma4:31b',
 					modalities: {
@@ -13335,7 +13341,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'glm-4.6': {
 					id: 'glm-4.6',
 					ownedBy: 'zai',
 					label: 'glm-4.6',
@@ -13354,7 +13360,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-4.7': {
 					id: 'glm-4.7',
 					ownedBy: 'zai',
 					label: 'glm-4.7',
@@ -13373,7 +13379,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5': {
 					id: 'glm-5',
 					ownedBy: 'zai',
 					label: 'glm-5',
@@ -13392,7 +13398,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.1': {
 					id: 'glm-5.1',
 					ownedBy: 'zai',
 					label: 'glm-5.1',
@@ -13411,7 +13417,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'glm-5.2': {
 					id: 'glm-5.2',
 					ownedBy: 'zai',
 					label: 'GLM-5.2',
@@ -13431,7 +13437,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'gpt-oss:120b': {
 					id: 'gpt-oss:120b',
 					ownedBy: 'openai',
 					label: 'gpt-oss:120b',
@@ -13450,7 +13456,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'gpt-oss:20b': {
 					id: 'gpt-oss:20b',
 					ownedBy: 'openai',
 					label: 'gpt-oss:20b',
@@ -13469,7 +13475,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'kimi-k2-thinking': {
 					id: 'kimi-k2-thinking',
 					ownedBy: 'kimi',
 					label: 'kimi-k2-thinking',
@@ -13489,7 +13495,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2:1t': {
 					id: 'kimi-k2:1t',
 					ownedBy: 'kimi',
 					label: 'kimi-k2:1t',
@@ -13509,7 +13515,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.5': {
 					id: 'kimi-k2.5',
 					ownedBy: 'kimi',
 					label: 'kimi-k2.5',
@@ -13528,7 +13534,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.6': {
 					id: 'kimi-k2.6',
 					ownedBy: 'kimi',
 					label: 'kimi-k2.6',
@@ -13547,7 +13553,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'kimi-k2.7-code': {
 					id: 'kimi-k2.7-code',
 					ownedBy: 'kimi',
 					label: 'kimi-k2.7-code',
@@ -13568,7 +13574,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'minimax-m2': {
 					id: 'minimax-m2',
 					ownedBy: 'minimax',
 					label: 'minimax-m2',
@@ -13587,7 +13593,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'minimax-m2.1': {
 					id: 'minimax-m2.1',
 					ownedBy: 'minimax',
 					label: 'minimax-m2.1',
@@ -13606,7 +13612,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax-m2.5': {
 					id: 'minimax-m2.5',
 					ownedBy: 'minimax',
 					label: 'minimax-m2.5',
@@ -13626,7 +13632,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'minimax-m2.7': {
 					id: 'minimax-m2.7',
 					ownedBy: 'minimax',
 					label: 'minimax-m2.7',
@@ -13645,7 +13651,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 196608,
 					},
 				},
-				{
+				'minimax-m3': {
 					id: 'minimax-m3',
 					ownedBy: 'minimax',
 					label: 'minimax-m3',
@@ -13666,7 +13672,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'ministral-3:14b': {
 					id: 'ministral-3:14b',
 					label: 'ministral-3:14b',
 					modalities: {
@@ -13684,7 +13690,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'ministral-3:3b': {
 					id: 'ministral-3:3b',
 					label: 'ministral-3:3b',
 					modalities: {
@@ -13702,7 +13708,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'ministral-3:8b': {
 					id: 'ministral-3:8b',
 					label: 'ministral-3:8b',
 					modalities: {
@@ -13720,7 +13726,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'mistral-large-3:675b': {
 					id: 'mistral-large-3:675b',
 					label: 'mistral-large-3:675b',
 					modalities: {
@@ -13738,7 +13744,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 262144,
 					},
 				},
-				{
+				'nemotron-3-nano:30b': {
 					id: 'nemotron-3-nano:30b',
 					label: 'nemotron-3-nano:30b',
 					modalities: {
@@ -13757,7 +13763,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'nemotron-3-super': {
 					id: 'nemotron-3-super',
 					label: 'nemotron-3-super',
 					modalities: {
@@ -13776,7 +13782,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'nemotron-3-ultra': {
 					id: 'nemotron-3-ultra',
 					label: 'nemotron-3-ultra',
 					modalities: {
@@ -13795,7 +13801,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				{
+				'qwen3-coder-next': {
 					id: 'qwen3-coder-next',
 					label: 'qwen3-coder-next',
 					modalities: {
@@ -13813,7 +13819,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen3-coder:480b': {
 					id: 'qwen3-coder:480b',
 					label: 'qwen3-coder:480b',
 					modalities: {
@@ -13831,7 +13837,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'qwen3-next:80b': {
 					id: 'qwen3-next:80b',
 					label: 'qwen3-next:80b',
 					modalities: {
@@ -13849,7 +13855,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen3-vl:235b': {
 					id: 'qwen3-vl:235b',
 					label: 'qwen3-vl:235b',
 					modalities: {
@@ -13867,7 +13873,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				{
+				'qwen3-vl:235b-instruct': {
 					id: 'qwen3-vl:235b-instruct',
 					label: 'qwen3-vl:235b-instruct',
 					modalities: {
@@ -13885,7 +13891,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				{
+				'qwen3.5:397b': {
 					id: 'qwen3.5:397b',
 					label: 'qwen3.5:397b',
 					modalities: {
@@ -13903,7 +13909,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				{
+				'rnj-1:8b': {
 					id: 'rnj-1:8b',
 					label: 'rnj-1:8b',
 					modalities: {
@@ -13921,7 +13927,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 4096,
 					},
 				},
-			],
+			},
 			label: 'Ollama Cloud',
 			env: ['OLLAMA_API_KEY'],
 			npm: 'ai-sdk-ollama',

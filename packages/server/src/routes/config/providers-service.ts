@@ -3,9 +3,11 @@ import {
 	isBuiltInProviderId,
 	loadConfig,
 	logger,
+	mapConfiguredModelEntries,
 	removeProviderSettings,
 	writeProviderSettings,
 	type ModelInfo,
+	type ModelInfoMap,
 	type ProviderCompatibility,
 	type ProviderId,
 	type ProviderPromptFamily,
@@ -29,7 +31,7 @@ type ProviderMutationBody = {
 	baseURL?: string | null;
 	apiKey?: string | null;
 	apiKeyEnv?: string | null;
-	models?: string[];
+	models?: ModelInfoMap;
 	allowAnyModel?: boolean;
 };
 
@@ -175,7 +177,7 @@ function buildProviderUpdates(
 		updates.apiKeyEnv = body.apiKeyEnv?.trim() || undefined;
 	}
 	if (body.models !== undefined) {
-		updates.models = body.models.map((model) => model.trim()).filter(Boolean);
+		updates.models = mapConfiguredModelEntries(body.models);
 	}
 	if (body.allowAnyModel !== undefined) {
 		updates.allowAnyModel = body.allowAnyModel;

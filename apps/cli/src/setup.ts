@@ -11,6 +11,7 @@ import { loadConfig } from '@ottocode/sdk';
 import {
 	catalog,
 	isBuiltInProviderId,
+	modelMapToList,
 	providerEnvVar,
 	type ModelInfo,
 	type ProviderId,
@@ -91,7 +92,7 @@ export async function runSetup(projectRoot?: string) {
 	// Choose default model from catalog for that provider
 	const selectedProvider = defaultProvider as ProviderId;
 	const models = isBuiltInProviderId(selectedProvider)
-		? (catalog[selectedProvider]?.models ?? [])
+		? modelMapToList(catalog[selectedProvider]?.models ?? {})
 		: [];
 	const defaultModel =
 		models.length > 0

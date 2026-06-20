@@ -37,14 +37,20 @@ describe('configured fast model selection', () => {
 								enabled: true,
 								custom: true,
 								compatibility: 'openai-compatible',
-								models: ['slow-model', 'fast-model'],
+								models: {
+									'slow-model': { id: 'slow-model' },
+									'fast-model': { id: 'fast-model' },
+								},
 								fastModels: ['fast-model'],
 							},
 							customslow: {
 								enabled: true,
 								custom: true,
 								compatibility: 'openai-compatible',
-								models: ['slow-model', 'fast-model'],
+								models: {
+									'slow-model': { id: 'slow-model' },
+									'fast-model': { id: 'fast-model' },
+								},
 							},
 						},
 					},

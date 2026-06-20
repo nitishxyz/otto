@@ -1,4 +1,4 @@
-import type { ModelInfo } from '../../types/src/index.ts';
+import type { ModelInfo, ModelInfoMap } from '../../types/src/index.ts';
 
 function normalizeModelInfo(model: ModelInfo): ModelInfo {
 	return (model.ownedBy as string | undefined) === 'moonshot'
@@ -14,20 +14,14 @@ function normalizeModelInfo(model: ModelInfo): ModelInfo {
  * the manual xai grok-cli models) are always retained even when a stale cache
  * does not include them.
  */
-export function mergeModelLists(
-	baseModels: ModelInfo[] | undefined,
-	cachedModels: ModelInfo[] | undefined,
-): ModelInfo[] {
-	const base = baseModels ?? [];
-	const cached = (cachedModels ?? []).map(normalizeModelInfo);
-	if (!cached.length) return base;
-	if (!base.length) return cached;
-	const cachedById = new Map(cached.map((model) => [model.id, model]));
-	const merged = base.map((model) => {
-		const override = cachedById.get(model.id);
-		return override ? { ...model, ...override } : model;
-	});
-	const baseIds = new Set(base.map((model) => model.id));
-	const extras = cached.filter((model) => !baseIds.has(model.id));
-	return extras.length ? [...merged, ...extras] : merged;
+export function mergeModelMaps(
+	baseModels: ModelInfoMap | undefined,
+	cachedModels: ModelInfoMap | undefined,
+): ModelInfoMap {
+	const merged: ModelInfoMap = { ...(baseModels ?? {}) };
+	for (const [id, model] of Object.entries(cachedModels ?? {})) {
+		const normalized = normalizeModelInfo({ ...model, id });
+		merged[id] = merged[id] ? { ...merged[id], ...normalized } : normalized;
+	}
+	return merged;
 }

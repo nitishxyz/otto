@@ -1,7 +1,8 @@
 import { catalog } from './catalog-merged.ts';
 import { providerEnvVar, readEnvKey } from './env.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
-import { mergeModelLists } from './model-merge.ts';
+import { mapConfiguredModelEntries, modelMapToList } from './model-map.ts';
+import { mergeModelMaps } from './model-merge.ts';
 import {
 	getUnderlyingProviderKey,
 	providerIds,
@@ -10,12 +11,12 @@ import {
 } from './utils.ts';
 import type {
 	BuiltInProviderId,
-	ModelInfo,
 	OttoConfig,
 	ProviderCompatibility,
 	ProviderId,
 	ProviderPromptFamily,
 	ProviderSettingsEntry,
+	ModelInfoMap,
 } from '../../types/src/index.ts';
 
 export type ResolvedProviderDefinition = {
@@ -27,7 +28,7 @@ export type ResolvedProviderDefinition = {
 	baseURL?: string;
 	apiKey?: string;
 	apiKeyEnv?: string;
-	models: ModelInfo[];
+	models: ModelInfoMap;
 	allowAnyModel: boolean;
 };
 
@@ -80,18 +81,8 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 
 function normalizeConfiguredModels(
 	models: ProviderSettingsEntry['models'] | undefined,
-): ModelInfo[] {
-	if (!models) return [];
-	return models
-		.map((model): ModelInfo | null => {
-			if (typeof model === 'string') {
-				const id = model.trim();
-				return id ? { id, label: id } : null;
-			}
-			const id = normalizeOptionalText(model.id);
-			return id ? { ...model, id, label: model.label ?? id } : null;
-		})
-		.filter((model): model is ModelInfo => model !== null);
+): ModelInfoMap {
+	return mapConfiguredModelEntries(models);
 }
 
 function resolveCustomCompatibility(
@@ -145,7 +136,7 @@ export function getProviderDefinition(
 		const entry = catalog[catalogProvider];
 		if (!entry) return undefined;
 		const cachedEntry = getCachedProviderCatalogEntry(catalogProvider);
-		const models = mergeModelLists(entry.models, cachedEntry?.models);
+		const models = mergeModelMaps(entry.models, cachedEntry?.models);
 		const resolvedSettings = settings;
 		return {
 			id: provider,
@@ -184,7 +175,8 @@ export function getProviderDefinition(
 		apiKey: normalizeOptionalText(settings.apiKey),
 		apiKeyEnv: normalizeOptionalText(settings.apiKeyEnv),
 		models,
-		allowAnyModel: settings.allowAnyModel === true || models.length === 0,
+		allowAnyModel:
+			settings.allowAnyModel === true || Object.keys(models).length === 0,
 	};
 }
 
@@ -221,15 +213,15 @@ export function getConfiguredProviderIds(
 export function getConfiguredProviderModels(
 	cfg: OttoConfig,
 	provider: ProviderId,
-): ModelInfo[] {
-	return getProviderDefinition(cfg, provider)?.models ?? [];
+): ModelInfoMap {
+	return getProviderDefinition(cfg, provider)?.models ?? {};
 }
 
 export function getConfiguredProviderDefaultModel(
 	cfg: OttoConfig,
 	provider: ProviderId,
 ): string | undefined {
-	return getConfiguredProviderModels(cfg, provider)[0]?.id;
+	return modelMapToList(getConfiguredProviderModels(cfg, provider))[0]?.id;
 }
 
 export function getConfiguredFastModelForAuth(
@@ -270,7 +262,7 @@ export function hasConfiguredModel(
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return false;
 	if (definition.allowAnyModel) return model.trim().length > 0;
-	return definition.models.some((entry) => entry.id === model);
+	return definition.models[model] !== undefined;
 }
 
 export function getConfiguredProviderFamily(

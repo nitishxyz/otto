@@ -7,6 +7,7 @@ export type {
 	ProviderFamily,
 	ModelOwner,
 	ModelInfo,
+	ModelInfoMap,
 	ModelProviderBinding,
 	ProviderCatalogEntry,
 } from './provider';

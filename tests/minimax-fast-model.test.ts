@@ -15,9 +15,7 @@ describe('minimax fast model selection', () => {
 	});
 
 	test('MiniMax-M2.7 manual catalog metadata', () => {
-		const model = catalog.minimax.models.find(
-			(entry) => entry.id === 'MiniMax-M2.7',
-		);
+		const model = catalog.minimax.models['MiniMax-M2.7'];
 
 		expect(model).toMatchObject({
 			id: 'MiniMax-M2.7',

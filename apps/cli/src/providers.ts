@@ -14,6 +14,8 @@ import {
 	getProviderDefinition,
 	isProviderAuthorized,
 	loadConfig,
+	modelListToMap,
+	modelMapToList,
 	normalizeOllamaBaseURL,
 	removeProviderSettings,
 	setConfig,
@@ -61,9 +63,9 @@ function defaultFamilyForCompatibility(
 	}
 }
 
-function parseModelsCsv(input: string): string[] {
+function parseModelIds(input: string): string[] {
 	return input
-		.split(',')
+		.split(/[\n,]/)
 		.map((part) => part.trim())
 		.filter(Boolean);
 }
@@ -133,7 +135,7 @@ export async function runProvidersList(
 		const enabled = setting?.enabled !== false;
 		const authorized = await isProviderAuthorized(cfg, id);
 		const label = definition.label === id ? '—' : definition.label;
-		const modelIds = definition.models.map((model) => model.id);
+		const modelIds = modelMapToList(definition.models).map((model) => model.id);
 		const notes: string[] = [];
 		if (
 			definition.apiKeyEnv &&
@@ -292,18 +294,20 @@ export async function runProvidersAdd(projectRoot?: string) {
 	}
 
 	if (!discoveredModels.length) {
-		const modelsCsv = await text({
-			message: 'Static models (comma-separated, optional)',
+		const modelIdsInput = await text({
+			message: 'Static model IDs (optional)',
 			placeholder: 'e.g. qwen2.5-coder:14b, deepseek-r1:32b',
 		});
-		if (isCancel(modelsCsv)) return cancel('Cancelled');
-		manualModelIds = parseModelsCsv(String(modelsCsv));
+		if (isCancel(modelIdsInput)) return cancel('Cancelled');
+		manualModelIds = parseModelIds(String(modelIdsInput));
 	}
-	const models = discoveredModels.length ? discoveredModels : manualModelIds;
+	const models = discoveredModels.length
+		? modelListToMap(discoveredModels)
+		: modelListToMap(manualModelIds.map((id) => ({ id, label: id })));
 
 	const allowAnyModel = (await confirm({
 		message: 'Allow arbitrary model ids?',
-		initialValue: models.length === 0,
+		initialValue: Object.keys(models).length === 0,
 	})) as boolean | symbol;
 	if (isCancel(allowAnyModel)) return cancel('Cancelled');
 

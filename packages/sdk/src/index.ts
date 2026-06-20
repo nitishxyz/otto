@@ -20,6 +20,7 @@ export type {
 	ProviderPromptFamily,
 	ModelOwner,
 	ModelInfo,
+	ModelInfoMap,
 	ModelProviderBinding,
 	ProviderCatalogEntry,
 } from './types/src/index.ts';
@@ -55,6 +56,12 @@ export type {
 	CachedProviderCatalogEntry,
 } from './providers/src/index.ts';
 export {
+	getModelFromMap,
+	hasModelInMap,
+	mapConfiguredModelEntries,
+	mergeModelMaps,
+	modelListToMap,
+	modelMapToList,
 	isProviderId,
 	providerIds,
 	defaultModelFor,

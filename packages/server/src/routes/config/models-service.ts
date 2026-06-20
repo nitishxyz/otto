@@ -8,12 +8,16 @@ import {
 	resolveBuiltInProviderCatalogId,
 	loadConfig,
 	logger,
+	modelListToMap,
+	modelMapToList,
 	mergeCachedModelCatalog,
+	mergeModelMaps,
 	normalizeModelCatalogPayload,
 	providerAllowsAnyModel,
 	readCachedModelCatalog,
 	readEnvKey,
 	type ModelInfo,
+	type ModelInfoMap,
 	type ProviderId,
 } from '@ottocode/sdk';
 import type { Context } from 'hono';
@@ -84,27 +88,10 @@ function getRemoteCatalogUrl(): string {
 	);
 }
 
-function mergeModelLists(
-	bundledModels: ModelInfo[] | undefined,
-	cachedModels: ModelInfo[] | undefined,
-): ModelInfo[] {
-	const bundledById = new Map(
-		(bundledModels ?? []).map((model) => [model.id, model]),
-	);
-	const merged: ModelInfo[] = [];
-	for (const cachedModel of cachedModels ?? []) {
-		const bundledModel = bundledById.get(cachedModel.id);
-		if (bundledModel) bundledById.delete(cachedModel.id);
-		merged.push({ ...bundledModel, ...cachedModel });
-	}
-	merged.push(...bundledById.values());
-	return merged;
-}
-
 function getModelCatalogProviders(
 	cachedCatalog: Awaited<ReturnType<typeof readCachedModelCatalog>>,
-): Record<string, { models?: ModelInfo[]; label?: string }> {
-	const providers: Record<string, { models?: ModelInfo[]; label?: string }> = {
+): Record<string, { models?: ModelInfoMap; label?: string }> {
+	const providers: Record<string, { models?: ModelInfoMap; label?: string }> = {
 		...catalog,
 	};
 	for (const [provider, cachedEntry] of Object.entries(
@@ -115,7 +102,7 @@ function getModelCatalogProviders(
 			...bundledEntry,
 			...cachedEntry,
 			label: cachedEntry.label ?? bundledEntry?.label,
-			models: mergeModelLists(bundledEntry?.models, cachedEntry.models),
+			models: mergeModelMaps(bundledEntry?.models, cachedEntry.models),
 		};
 	}
 	return providers;
@@ -215,7 +202,7 @@ async function refreshProviderModelsInBackground(args: {
 			[provider]: {
 				id: provider,
 				label: providerDefinition.label,
-				models: discoveredModels,
+				models: modelListToMap(discoveredModels),
 			},
 		});
 	} catch (error) {
@@ -238,12 +225,14 @@ function shouldLazyLoadProviderModels(
 }
 
 function getProviderModelsForUi(args: {
-	catalogModels: ModelInfo[] | undefined;
+	catalogModels: ModelInfoMap | undefined;
 	provider: ProviderId;
 	authType: 'api' | 'oauth' | 'wallet' | undefined;
 }): ModelInfo[] {
-	const catalogModels = args.catalogModels ?? [];
-	return filterModelsForAuthType(args.provider, catalogModels, args.authType);
+	const catalogModels = args.catalogModels ?? {};
+	return modelMapToList(
+		filterModelsForAuthType(args.provider, catalogModels, args.authType),
+	);
 }
 
 function getUiProviderLabel(

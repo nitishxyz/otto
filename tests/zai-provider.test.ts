@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { catalog, validateProviderModel, type OttoConfig } from '@ottocode/sdk';
+import {
+	catalog,
+	modelMapToList,
+	validateProviderModel,
+	type OttoConfig,
+} from '@ottocode/sdk';
 
 function createConfig(): OttoConfig {
 	return {
@@ -37,7 +42,7 @@ function createConfig(): OttoConfig {
 
 describe('Z.AI provider catalog', () => {
 	test('includes glm-5.2 in the zai provider catalog', () => {
-		const models = new Set(catalog.zai.models.map((model) => model.id));
+		const models = new Set(Object.keys(catalog.zai.models));
 
 		expect(models.has('glm-5.2')).toBe(true);
 		expect(() =>
@@ -46,6 +51,6 @@ describe('Z.AI provider catalog', () => {
 	});
 
 	test('prioritizes glm-5.2 in the zai model list', () => {
-		expect(catalog.zai.models[0]?.id).toBe('glm-5.2');
+		expect(modelMapToList(catalog.zai.models)[0]?.id).toBe('glm-5.2');
 	});
 });

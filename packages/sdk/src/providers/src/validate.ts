@@ -1,6 +1,7 @@
 import { catalog } from './catalog-merged.ts';
+import { modelMapToList } from './model-map.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
-import { mergeModelLists } from './model-merge.ts';
+import { mergeModelMaps } from './model-merge.ts';
 import type { OttoConfig, ProviderId } from '../../types/src/index.ts';
 import {
 	getProviderDefinition,
@@ -31,14 +32,14 @@ export function validateProviderModel(
 		const cachedModels =
 			getCachedProviderCatalogEntry(
 				resolveBuiltInProviderCatalogId(providerId) ?? providerId,
-			)?.models ?? [];
+			)?.models ?? {};
 		if (!definition) {
-			if (!cachedModels.length) {
+			if (!Object.keys(cachedModels).length) {
 				throw new Error(`Provider not supported: ${providerId}`);
 			}
-			const entry = cachedModels.find((m) => m.id === modelId);
+			const entry = cachedModels[modelId];
 			if (!entry) {
-				throwModelNotFound(providerId, modelId, cachedModels);
+				throwModelNotFound(providerId, modelId, modelMapToList(cachedModels));
 			}
 			applyCapabilityValidation(modelId, entry, effectiveCap, {
 				strict: false,
@@ -49,20 +50,18 @@ export function validateProviderModel(
 			!effectiveCap?.allowUnknownModel &&
 			!providerAllowsAnyModel(cfg, providerId)
 		) {
-			const knownModels = definition.models.length
-				? definition.models
-				: cachedModels;
+			const knownModels = Object.keys(definition.models).length
+				? modelMapToList(definition.models)
+				: modelMapToList(cachedModels);
 			const hasModel =
 				hasConfiguredModel(cfg, providerId, modelId) ||
-				cachedModels.some((m) => m.id === modelId);
+				cachedModels[modelId] !== undefined;
 			if (!hasModel) {
 				throwModelNotFound(providerId, modelId, knownModels);
 			}
 		}
 
-		const entry =
-			definition.models.find((m) => m.id === modelId) ??
-			cachedModels.find((m) => m.id === modelId);
+		const entry = definition.models[modelId] ?? cachedModels[modelId];
 		if (entry) {
 			applyCapabilityValidation(modelId, entry, effectiveCap, {
 				strict: definition.source !== 'custom',
@@ -78,10 +77,10 @@ export function validateProviderModel(
 	if (!builtInEntry && !cachedEntry) {
 		throw new Error(`Provider not supported: ${providerId}`);
 	}
-	const models = mergeModelLists(builtInEntry?.models, cachedEntry?.models);
-	const entry = models.find((m: { id: string }) => m.id === modelId);
+	const models = mergeModelMaps(builtInEntry?.models, cachedEntry?.models);
+	const entry = models[modelId];
 	if (!entry) {
-		throwModelNotFound(providerId, modelId, models);
+		throwModelNotFound(providerId, modelId, modelMapToList(models));
 	}
 	applyCapabilityValidation(modelId, entry, effectiveCap, { strict: true });
 }

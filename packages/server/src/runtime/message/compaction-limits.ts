@@ -56,7 +56,7 @@ export function getModelLimits(
 	}
 	for (const key of Object.keys(catalog) as BuiltInProviderId[]) {
 		const entry = catalog[key];
-		const m = entry?.models?.find((x: { id: string }) => x.id === model);
+		const m = entry?.models?.[model];
 		if (m?.limit?.context && m?.limit?.output) {
 			return { context: m.limit.context, output: m.limit.output };
 		}

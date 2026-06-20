@@ -5,6 +5,7 @@ import {
 	createDeepSeekModel,
 	getFastModel,
 	getProviderDefinition,
+	modelMapToList,
 	providerEnvVar,
 	validateProviderModel,
 	type OttoConfig,
@@ -75,12 +76,14 @@ describe('DeepSeek provider', () => {
 			baseURL: DEEPSEEK_BASE_URL,
 			apiKeyEnv: 'DEEPSEEK_API_KEY',
 		});
-		expect(definition?.models[0]?.id).toBe('deepseek-v4-flash');
+		expect(modelMapToList(definition?.models ?? {})[0]?.id).toBe(
+			'deepseek-v4-flash',
+		);
 		expect(getFastModel('deepseek')).toBe('deepseek-v4-flash');
 	});
 
 	test('contains documented DeepSeek API models', () => {
-		const models = new Set(catalog.deepseek.models.map((model) => model.id));
+		const models = new Set(Object.keys(catalog.deepseek.models));
 
 		for (const model of [
 			'deepseek-v4-flash',
