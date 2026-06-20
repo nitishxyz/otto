@@ -50,6 +50,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	deepseek: ['deepseek-v4-flash'],
 	copilot: ['gpt-4.1-mini'],
 	kimi: ['kimi-k2.7-code'],
+	minimax: ['MiniMax-M2.7'],
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
