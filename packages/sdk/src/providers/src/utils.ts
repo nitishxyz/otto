@@ -42,7 +42,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-4.1-mini'],
 	anthropic: ['claude-3-5-haiku-latest'],
 	google: ['gemini-2.0-flash-lite'],
-	baseten: ['nvidia/Nemotron-3-Ultra'],
+	baseten: ['nvidia/Nemotron-120B-A12B'],
 	huggingface: ['deepseek-ai/DeepSeek-V4-Flash:deepinfra'],
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],

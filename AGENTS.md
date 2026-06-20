@@ -18,6 +18,15 @@ This file defines conventions for AI agents and human contributors working in th
 - Avoid circular dependencies
 - If a module grows beyond ~200–300 lines, consider refactoring
 
+## Auto-generated Files
+
+- Do not edit auto-generated files directly; regenerate them from their source script instead.
+- Auto-generated files include, but are not limited to:
+  - `packages/sdk/src/providers/src/catalog.ts`
+  - `packages/ai-sdk/src/catalog.ts`
+  - `apps/landing/public/catalog/models.json`
+- Regenerate with `bun run scripts/update-catalog.ts` (and `--ottorouter` for the OttoRouter catalog) rather than hand-editing.
+
 ## Frontend Performance Boundaries
 
 - Keep React parent/layout components focused on structure, not feature-specific state.

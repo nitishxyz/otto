@@ -12,7 +12,7 @@ import {
 import { createEmbeddedApp } from '../packages/server/src/index.js';
 
 const BASETEN_BASE_URL = 'https://inference.baseten.co/v1';
-const BASETEN_FAST_MODEL = 'deepseek-ai/DeepSeek-V4-Pro';
+const BASETEN_FAST_MODEL = 'nvidia/Nemotron-120B-A12B';
 
 function createConfig(): OttoConfig {
 	return {
