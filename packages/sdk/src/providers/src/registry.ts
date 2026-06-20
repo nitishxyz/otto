@@ -2,7 +2,12 @@ import { catalog } from './catalog-merged.ts';
 import { providerEnvVar, readEnvKey } from './env.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
 import { mergeModelLists } from './model-merge.ts';
-import { getUnderlyingProviderKey, providerIds } from './utils.ts';
+import {
+	getUnderlyingProviderKey,
+	providerIds,
+	selectFastModel,
+	type FastModelAuthType,
+} from './utils.ts';
 import type {
 	BuiltInProviderId,
 	ModelInfo,
@@ -225,6 +230,28 @@ export function getConfiguredProviderDefaultModel(
 	provider: ProviderId,
 ): string | undefined {
 	return getConfiguredProviderModels(cfg, provider)[0]?.id;
+}
+
+export function getConfiguredFastModelForAuth(
+	cfg: OttoConfig,
+	provider: ProviderId,
+	authType: FastModelAuthType,
+): string | undefined {
+	const definition = getProviderDefinition(cfg, provider);
+	if (!definition) return undefined;
+	const configuredFastModels = getProviderSettings(cfg, provider)?.fastModels;
+	if (
+		!configuredFastModels?.length &&
+		(definition.source === 'custom' || definition.compatibility === 'ollama')
+	) {
+		return undefined;
+	}
+	return selectFastModel(provider, definition.models, {
+		authType,
+		configuredFastModels,
+		allowAnyModel: definition.allowAnyModel,
+		useBuiltInPreferred: definition.source === 'built-in',
+	});
 }
 
 export function providerAllowsAnyModel(

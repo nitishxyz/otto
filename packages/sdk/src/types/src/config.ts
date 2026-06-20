@@ -56,6 +56,8 @@ export type ProviderSettingsEntry = {
 	compatibility?: ProviderCompatibility;
 	family?: ProviderPromptFamily;
 	models?: Array<string | ModelInfo>;
+	/** Ordered model IDs to prefer for lightweight/fast tasks like titles. */
+	fastModels?: string[];
 	allowAnyModel?: boolean;
 	modelDiscovery?: {
 		type: 'openai-models' | 'ollama';

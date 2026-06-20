@@ -3,8 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
-	getFastModelForAuth,
-	getProviderDefinition,
+	getConfiguredFastModelForAuth,
 	type OttoConfig,
 	type ProviderId,
 } from '@ottocode/sdk';
@@ -99,13 +98,9 @@ async function generateSessionTitle(args: {
 		const { getAuth } = await import('@ottocode/sdk');
 		const auth = await getAuth(provider, cfg.projectRoot);
 		const oauth = detectOAuth(provider, auth);
-		const providerDefinition = getProviderDefinition(cfg, provider);
 
 		const titleModel =
-			providerDefinition?.source === 'custom' ||
-			providerDefinition?.compatibility === 'ollama'
-				? modelName
-				: (getFastModelForAuth(provider, auth?.type) ?? modelName);
+			getConfiguredFastModelForAuth(cfg, provider, auth?.type) ?? modelName;
 		const model = await resolveModel(provider, titleModel, cfg);
 
 		const promptText = String(content ?? '').slice(0, 2000);

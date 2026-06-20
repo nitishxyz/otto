@@ -5,8 +5,7 @@ import { sessions } from '@ottocode/database/schema';
 import {
 	appendCoAuthorTrailer,
 	getAuth,
-	getFastModelForAuth,
-	getProviderDefinition,
+	getConfiguredFastModelForAuth,
 	loadConfig,
 	type ProviderId,
 } from '@ottocode/sdk';
@@ -154,12 +153,9 @@ export async function handleGenerateCommitMessage(c: Context) {
 			session.model ?? config.defaults?.model ?? 'claude-3-5-sonnet-20241022';
 		const auth = await getAuth(provider, config.projectRoot);
 		const oauth = detectOAuth(provider, auth);
-		const providerDefinition = getProviderDefinition(config, provider);
 		const modelId =
-			providerDefinition?.source === 'custom' ||
-			providerDefinition?.compatibility === 'ollama'
-				? currentModel
-				: (getFastModelForAuth(provider, auth?.type) ?? currentModel);
+			getConfiguredFastModelForAuth(config, provider, auth?.type) ??
+			currentModel;
 		const model = await resolveModel(provider, modelId, config);
 
 		const adapted = adaptSimpleCall(oauth, {

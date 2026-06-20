@@ -63,49 +63,56 @@ function preferredFastModelKey(provider: ProviderId): ProviderId {
 	return resolveBuiltInProviderCatalogId(provider) ?? provider;
 }
 
-export function getFastModel(provider: ProviderId): string | undefined {
-	const providerModels = getProviderModels(provider);
-	if (!providerModels.length) return undefined;
+export type FastModelAuthType = 'api' | 'oauth' | 'wallet' | undefined;
 
-	const preferred =
-		PREFERRED_FAST_MODELS[preferredFastModelKey(provider)] ?? [];
-	for (const modelId of preferred) {
-		if (providerModels.some((m) => m.id === modelId)) {
-			return modelId;
-		}
-	}
-
-	const sorted = [...providerModels]
-		.filter((m) => m.cost?.input !== undefined && m.toolCall !== false)
-		.sort((a, b) => (a.cost?.input ?? Infinity) - (b.cost?.input ?? Infinity));
-
-	return sorted[0]?.id ?? providerModels[0]?.id;
-}
-
-export function getFastModelForAuth(
+export function selectFastModel(
 	provider: ProviderId,
-	authType: 'api' | 'oauth' | 'wallet' | undefined,
+	providerModels: ModelInfo[],
+	options?: {
+		authType?: FastModelAuthType;
+		configuredFastModels?: readonly string[];
+		allowAnyModel?: boolean;
+		useBuiltInPreferred?: boolean;
+	},
 ): string | undefined {
-	const providerModels = getProviderModels(provider);
-	if (!providerModels.length) return undefined;
-
 	const filteredModels = filterModelsForAuthType(
 		provider,
 		providerModels,
-		authType,
+		options?.authType,
 	);
-	if (!filteredModels.length) return getFastModel(provider);
+	const candidateModels = filteredModels.length
+		? filteredModels
+		: providerModels;
+	const configuredFastModels = options?.configuredFastModels?.filter(
+		(modelId) => typeof modelId === 'string' && modelId.trim().length > 0,
+	);
+
+	if (configuredFastModels?.length) {
+		for (const modelId of configuredFastModels) {
+			if (
+				options?.allowAnyModel === true ||
+				candidateModels.some((m) => m.id === modelId)
+			) {
+				return modelId;
+			}
+		}
+	}
+
+	if (!candidateModels.length) return undefined;
+	if (options?.useBuiltInPreferred === false) return candidateModels[0]?.id;
 
 	const preferredMap =
-		authType === 'oauth' ? PREFERRED_FAST_MODELS_OAUTH : PREFERRED_FAST_MODELS;
+		options?.authType === 'oauth'
+			? PREFERRED_FAST_MODELS_OAUTH
+			: PREFERRED_FAST_MODELS;
 	const preferred = preferredMap[preferredFastModelKey(provider)] ?? [];
 	for (const modelId of preferred) {
-		if (filteredModels.some((m) => m.id === modelId)) {
+		if (candidateModels.some((m) => m.id === modelId)) {
 			return modelId;
 		}
 	}
 
-	const sorted = [...filteredModels]
+	const sorted = [...candidateModels]
 		.filter(
 			(m: ModelInfo) => m.cost?.input !== undefined && m.toolCall !== false,
 		)
@@ -114,7 +121,18 @@ export function getFastModelForAuth(
 				(a.cost?.input ?? Infinity) - (b.cost?.input ?? Infinity),
 		);
 
-	return sorted[0]?.id ?? filteredModels[0]?.id;
+	return sorted[0]?.id ?? candidateModels[0]?.id;
+}
+
+export function getFastModel(provider: ProviderId): string | undefined {
+	return selectFastModel(provider, getProviderModels(provider));
+}
+
+export function getFastModelForAuth(
+	provider: ProviderId,
+	authType: FastModelAuthType,
+): string | undefined {
+	return selectFastModel(provider, getProviderModels(provider), { authType });
 }
 
 export function getModelNpmBinding(

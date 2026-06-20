@@ -59,6 +59,7 @@ export {
 	getConfiguredProviderIds,
 	getConfiguredProviderModels,
 	getConfiguredProviderDefaultModel,
+	getConfiguredFastModelForAuth,
 	providerAllowsAnyModel,
 	hasConfiguredModel,
 	getConfiguredProviderFamily,
