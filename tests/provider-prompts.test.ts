@@ -69,7 +69,7 @@ describe('provider base prompts', () => {
 				process.cwd(),
 			);
 			expect(result.resolvedType).toBe('openai');
-			expect(result.prompt).toContain('coding agent');
+			expect(result.prompt).toContain('OpenAI');
 		});
 
 		it('uses anthropic prompt for anthropic provider', async () => {
@@ -89,7 +89,7 @@ describe('provider base prompts', () => {
 				process.cwd(),
 			);
 			expect(result.resolvedType).toBe('google');
-			expect(result.prompt).toContain('software engineering');
+			expect(result.prompt).toContain('Gemini');
 		});
 
 		it('uses kimi prompt for kimi provider', async () => {
@@ -112,7 +112,7 @@ describe('provider base prompts', () => {
 				process.cwd(),
 			);
 			expect(result.resolvedType).toBe('openai');
-			expect(result.prompt).toContain('coding agent');
+			expect(result.prompt).toContain('OpenAI');
 		});
 
 		it('detects anthropic family for OttoRouter claude models', async () => {
@@ -355,17 +355,19 @@ describe('provider base prompts', () => {
 				process.cwd(),
 			);
 			expect(result.prompt).toContain('Claude');
-			expect(result.prompt.length).toBeGreaterThan(100);
 		});
 
-		it('default prompt has communication style', async () => {
+		it('default prompt has tool-use guidance for unknown providers', async () => {
 			const result = await providerBasePrompt(
 				'unknown-provider',
 				undefined,
 				process.cwd(),
 			);
-			expect(result.prompt).toContain('coding agent');
-			expect(result.prompt.length).toBeGreaterThan(100);
+			expect(result.resolvedType).toBe('default');
+			expect(result.prompt).toContain(
+				'Use the tool definitions exactly as provided',
+			);
+			expect(result.prompt.length).toBeGreaterThan(50);
 		});
 
 		it('all provider prompts are present and non-trivial', async () => {
