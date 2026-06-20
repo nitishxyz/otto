@@ -21,6 +21,10 @@ const ZAI_ID: BuiltInProviderId = 'zai';
 const ZAI_CODING_ID: BuiltInProviderId = 'zai-coding';
 const DEEPSEEK_ID: BuiltInProviderId = 'deepseek';
 
+const OLLAMA_CLOUD_MODEL_OUTPUT_OVERRIDES: Record<string, number> = {
+	'nemotron-3-ultra': 65_536,
+};
+
 const ZAI_MODEL_ORDER = ['glm-5.2', 'glm-5.1', 'glm-5-turbo', 'glm-5'];
 
 const ZAI_MANUAL_MODELS: ModelInfo[] = [
@@ -201,6 +205,26 @@ function buildOllamaCloudEntry(): ProviderCatalogEntry {
 		doc: 'https://docs.ollama.com/cloud',
 		models: {},
 	};
+}
+
+function applyOllamaCloudCatalogMetadata(
+	entry: ProviderCatalogEntry,
+): ProviderCatalogEntry {
+	const models: ModelInfoMap = { ...entry.models };
+	for (const [modelId, output] of Object.entries(
+		OLLAMA_CLOUD_MODEL_OUTPUT_OVERRIDES,
+	)) {
+		const model = models[modelId];
+		if (!model) continue;
+		models[modelId] = {
+			...model,
+			limit: {
+				...model.limit,
+				output,
+			},
+		};
+	}
+	return { ...entry, models };
 }
 
 function buildBasetenEntry(
@@ -576,7 +600,9 @@ function buildDeepSeekEntry(
 export function mergeManualCatalog(
 	base: CatalogMap,
 ): Record<BuiltInProviderId, ProviderCatalogEntry> {
-	const ollamaCloudEntry = base[OLLAMA_CLOUD_ID] ?? buildOllamaCloudEntry();
+	const ollamaCloudEntry = applyOllamaCloudCatalogMetadata(
+		base[OLLAMA_CLOUD_ID] ?? buildOllamaCloudEntry(),
+	);
 	const basetenEntry = buildBasetenEntry(base[BASETEN_ID]);
 	const huggingFaceEntry = buildHuggingFaceEntry(base[HUGGINGFACE_ID]);
 	const manualEntry = buildOttoRouterEntry();

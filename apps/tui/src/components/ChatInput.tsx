@@ -2,8 +2,8 @@ import { useKeyboard } from '@opentui/react';
 import { decodePasteBytes } from '@opentui/core';
 import type { TextareaOptions, TextareaRenderable } from '@opentui/core';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import Fuse from 'fuse.js';
 import { searchFiles } from '@ottocode/api';
+import { fuzzyMatchFilePath } from '@ottocode/sdk/search/file-rank';
 import { useTheme } from '../theme.ts';
 import { TinySpinner } from './TinySpinner.tsx';
 import { COMMANDS } from '../commands.ts';
@@ -99,37 +99,17 @@ export function ChatInput({
 	showFileMentionRef.current = showFileMention;
 	mentionSelectedIdxRef.current = mentionSelectedIdx;
 
-	const fuse = useMemo(
-		() =>
-			new Fuse(
-				files.map((f) => ({
-					path: f,
-					filename: f.split('/').pop() || f,
-					normalized: f.replace(/[.\-_/]/g, ''),
-				})),
-				{
-					keys: [
-						{ name: 'filename', weight: 2 },
-						{ name: 'normalized', weight: 1.5 },
-						{ name: 'path', weight: 1 },
-					],
-					threshold: 0.3,
-					distance: 200,
-					ignoreLocation: true,
-					includeScore: true,
-				},
-			),
-		[files],
-	);
-
 	const filteredFiles = useMemo(() => {
 		if (!mentionQuery) {
 			return files.slice(0, MAX_FILE_RESULTS);
 		}
-		const normalizedQuery = mentionQuery.replace(/[.\-_/]/g, '');
-		const searchResults = fuse.search(normalizedQuery);
-		return searchResults.slice(0, MAX_FILE_RESULTS).map((r) => r.item.path);
-	}, [fuse, mentionQuery, files]);
+		return files
+			.map((file) => ({ file, ...fuzzyMatchFilePath(mentionQuery, file) }))
+			.filter((result) => result.match)
+			.sort((a, b) => b.score - a.score)
+			.slice(0, MAX_FILE_RESULTS)
+			.map((result) => result.file);
+	}, [mentionQuery, files]);
 
 	const filteredFilesRef = useRef(filteredFiles);
 	filteredFilesRef.current = filteredFiles;

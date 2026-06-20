@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+	catalog,
 	discoverOllamaModels,
 	normalizeOllamaBaseURL,
 	getProviderDefinition,
@@ -11,6 +12,12 @@ import {
 } from '@ottocode/sdk';
 
 describe('ollama discovery', () => {
+	test('applies Ollama Cloud output limit overrides', () => {
+		expect(
+			catalog['ollama-cloud'].models['nemotron-3-ultra']?.limit?.output,
+		).toBe(65_536);
+	});
+
 	test('normalizes common ollama endpoint shapes to a canonical base URL', () => {
 		expect(normalizeOllamaBaseURL('http://127.0.0.1:11434/api')).toBe(
 			'http://127.0.0.1:11434',

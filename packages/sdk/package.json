@@ -85,6 +85,10 @@
 			"import": "./src/core/src/search/fff.ts",
 			"types": "./src/core/src/search/fff.ts"
 		},
+		"./search/file-rank": {
+			"import": "./src/core/src/search/file-rank.ts",
+			"types": "./src/core/src/search/file-rank.ts"
+		},
 		"./prompts/*": "./src/prompts/src/*"
 	},
 	"files": [
