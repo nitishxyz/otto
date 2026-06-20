@@ -5,6 +5,7 @@ This file defines conventions for AI agents and human contributors working in th
 ## Formatting and Linting
 
 - Use Biome for linting/formatting: `bun lint` (or `bun lint --fix` to auto-fix issues)
+- Run `bun lint` before considering work done. If it reports formatting issues, run `bun lint --fix`; any remaining issues will still be shown.
 - Do not disable rules globally
 - If an exception is required, limit scope and add rationale in PR/commit message
 - Keep imports sorted and remove unused code
