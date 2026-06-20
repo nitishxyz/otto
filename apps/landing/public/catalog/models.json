@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-06-20T10:42:40.045Z",
+	"updatedAt": "2026-06-20T19:07:29.026Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -3409,13 +3409,13 @@
 					"lastUpdated": "2026-04-27",
 					"openWeights": false,
 					"cost": {
-						"input": 0.67,
+						"input": 0.66,
 						"output": 3.5,
-						"cacheRead": 0.2
+						"cacheRead": 0.33
 					},
 					"limit": {
-						"context": 262144,
-						"output": 262144
+						"context": 262142,
+						"output": 262142
 					}
 				},
 				"~openai/gpt-latest": {
@@ -4029,13 +4029,13 @@
 					"lastUpdated": "2026-04-01",
 					"openWeights": true,
 					"cost": {
-						"input": 0.22,
-						"output": 0.85,
+						"input": 0.25,
+						"output": 0.8,
 						"cacheRead": 0.06
 					},
 					"limit": {
 						"context": 262144,
-						"output": 262144
+						"output": 80000
 					}
 				},
 				"arcee-ai/trinity-mini": {
@@ -6020,13 +6020,13 @@
 					"lastUpdated": "2026-04-21",
 					"openWeights": true,
 					"cost": {
-						"input": 0.67,
+						"input": 0.66,
 						"output": 3.5,
-						"cacheRead": 0.2
+						"cacheRead": 0.33
 					},
 					"limit": {
-						"context": 262144,
-						"output": 262144
+						"context": 262142,
+						"output": 262142
 					}
 				},
 				"moonshotai/kimi-k2.7-code": {
@@ -6046,9 +6046,9 @@
 					"lastUpdated": "2026-06-12",
 					"openWeights": true,
 					"cost": {
-						"input": 0.68,
-						"output": 3.41,
-						"cacheRead": 0.144
+						"input": 0.612,
+						"output": 3.069,
+						"cacheRead": 0.1296
 					},
 					"limit": {
 						"context": 262144,
@@ -9142,9 +9142,9 @@
 					"lastUpdated": "2026-04-20",
 					"openWeights": true,
 					"cost": {
-						"input": 0.066,
-						"output": 0.26,
-						"cacheRead": 0.029
+						"input": 0.063,
+						"output": 0.21,
+						"cacheRead": 0.021
 					},
 					"limit": {
 						"context": 262144,
@@ -9599,11 +9599,11 @@
 					"cost": {
 						"input": 0.98,
 						"output": 3.08,
-						"cacheRead": 0.182
+						"cacheRead": 0.49
 					},
 					"limit": {
 						"context": 202752,
-						"output": 131072
+						"output": 65535
 					}
 				},
 				"z-ai/glm-5.2": {
@@ -13926,7 +13926,7 @@
 					"openWeights": true,
 					"limit": {
 						"context": 262144,
-						"output": 128000
+						"output": 65536
 					}
 				},
 				"qwen3-coder-next": {
@@ -15363,65 +15363,7 @@
 				"deepseek-chat": {
 					"id": "deepseek-chat",
 					"ownedBy": "deepseek",
-					"label": "DeepSeek Chat",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-09",
-					"releaseDate": "2025-12-01",
-					"lastUpdated": "2026-02-28",
-					"openWeights": true,
-					"cost": {
-						"input": 0.1407,
-						"output": 0.2814,
-						"cacheRead": 0.0028139999999999997
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 384000
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"deepseek-reasoner": {
-					"id": "deepseek-reasoner",
-					"ownedBy": "deepseek",
-					"label": "DeepSeek Reasoner",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-09",
-					"releaseDate": "2025-12-01",
-					"lastUpdated": "2026-02-28",
-					"openWeights": true,
-					"cost": {
-						"input": 0.1407,
-						"output": 0.2814,
-						"cacheRead": 0.0028139999999999997
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 384000
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"deepseek-v4-flash": {
-					"id": "deepseek-v4-flash",
-					"ownedBy": "deepseek",
-					"label": "DeepSeek V4 Flash",
+					"label": "DeepSeek V3.1",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -15430,18 +15372,16 @@
 					"reasoningText": true,
 					"attachment": false,
 					"temperature": true,
-					"knowledge": "2025-05",
-					"releaseDate": "2026-04-24",
-					"lastUpdated": "2026-04-24",
+					"releaseDate": "2025-08-25",
+					"lastUpdated": "2025-08-25",
 					"openWeights": true,
 					"cost": {
-						"input": 0.1407,
-						"output": 0.2814,
-						"cacheRead": 0.0028139999999999997
+						"input": 0.5025,
+						"output": 1.5074999999999998
 					},
 					"limit": {
-						"context": 1000000,
-						"output": 384000
+						"context": 164000,
+						"output": 131000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -15450,7 +15390,7 @@
 				"deepseek-v4-pro": {
 					"id": "deepseek-v4-pro",
 					"ownedBy": "deepseek",
-					"label": "DeepSeek V4 Pro",
+					"label": "Deepseek V4 Pro",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -15464,13 +15404,13 @@
 					"lastUpdated": "2026-04-24",
 					"openWeights": true,
 					"cost": {
-						"input": 0.4371749999999999,
-						"output": 0.8743499999999998,
-						"cacheRead": 0.0036431249999999997
+						"input": 1.7486999999999997,
+						"output": 3.4973999999999994,
+						"cacheRead": 0.14572499999999997
 					},
 					"limit": {
-						"context": 1000000,
-						"output": 384000
+						"context": 131000,
+						"output": 131000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -15679,176 +15619,30 @@
 						"npm": "@ai-sdk/google"
 					}
 				},
-				"kimi-k2-0711-preview": {
-					"id": "kimi-k2-0711-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 0711",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-07-14",
-					"lastUpdated": "2025-07-14",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 131072,
-						"output": 16384
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"kimi-k2-0905-preview": {
-					"id": "kimi-k2-0905-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 0905",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-09-05",
-					"lastUpdated": "2025-09-05",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"kimi-k2-thinking": {
-					"id": "kimi-k2-thinking",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Thinking",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-08",
-					"releaseDate": "2025-11-06",
-					"lastUpdated": "2025-11-06",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 2.5124999999999997,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"kimi-k2-thinking-turbo": {
-					"id": "kimi-k2-thinking-turbo",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Thinking Turbo",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-08",
-					"releaseDate": "2025-11-06",
-					"lastUpdated": "2025-11-06",
-					"openWeights": true,
-					"cost": {
-						"input": 1.1557499999999998,
-						"output": 8.04,
-						"cacheRead": 0.15074999999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"kimi-k2-turbo-preview": {
-					"id": "kimi-k2-turbo-preview",
-					"ownedBy": "kimi",
-					"label": "Kimi K2 Turbo",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-09-05",
-					"lastUpdated": "2025-09-05",
-					"openWeights": true,
-					"cost": {
-						"input": 2.4119999999999995,
-						"output": 10.049999999999999,
-						"cacheRead": 0.6029999999999999
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
 				"kimi-k2.5": {
 					"id": "kimi-k2.5",
 					"ownedBy": "kimi",
 					"label": "Kimi K2.5",
 					"modalities": {
-						"input": ["text", "image", "video"],
+						"input": ["text", "image"],
 						"output": ["text"]
 					},
 					"toolCall": true,
 					"reasoningText": true,
-					"attachment": false,
-					"temperature": false,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-01",
-					"lastUpdated": "2026-01",
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-12",
+					"releaseDate": "2026-01-30",
+					"lastUpdated": "2026-02-12",
 					"openWeights": true,
 					"cost": {
 						"input": 0.6029999999999999,
 						"output": 3.0149999999999997,
-						"cacheRead": 0.10049999999999999,
-						"cacheWrite": 0.6029999999999999
+						"cacheRead": 0.12059999999999998
 					},
 					"limit": {
-						"context": 262144,
-						"output": 262144
+						"context": 262000,
+						"output": 262000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -15859,7 +15653,7 @@
 					"ownedBy": "kimi",
 					"label": "Kimi K2.6",
 					"modalities": {
-						"input": ["text", "image", "video"],
+						"input": ["text", "image"],
 						"output": ["text"]
 					},
 					"toolCall": true,
@@ -15876,8 +15670,8 @@
 						"cacheRead": 0.1608
 					},
 					"limit": {
-						"context": 262144,
-						"output": 262144
+						"context": 262000,
+						"output": 262000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -15888,13 +15682,13 @@
 					"ownedBy": "kimi",
 					"label": "Kimi K2.7 Code",
 					"modalities": {
-						"input": ["text", "image", "video"],
+						"input": ["text", "image"],
 						"output": ["text"]
 					},
 					"toolCall": true,
 					"reasoningText": true,
 					"attachment": true,
-					"temperature": false,
+					"temperature": true,
 					"knowledge": "2025-01",
 					"releaseDate": "2026-06-12",
 					"lastUpdated": "2026-06-12",
@@ -15902,40 +15696,11 @@
 					"cost": {
 						"input": 0.9547499999999999,
 						"output": 4.02,
-						"cacheRead": 0.19094999999999998
+						"cacheRead": 0.1608
 					},
 					"limit": {
-						"context": 262144,
-						"output": 262144
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"kimi-k2.7-code-highspeed": {
-					"id": "kimi-k2.7-code-highspeed",
-					"ownedBy": "kimi",
-					"label": "Kimi K2.7 Code Highspeed",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": false,
-					"knowledge": "2025-01",
-					"releaseDate": "2026-06-12",
-					"lastUpdated": "2026-06-12",
-					"openWeights": true,
-					"cost": {
-						"input": 1.9094999999999998,
-						"output": 8.04,
-						"cacheRead": 0.38189999999999996
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
+						"context": 262000,
+						"output": 262000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -16026,207 +15791,6 @@
 						"npm": "@ai-sdk/anthropic"
 					}
 				},
-				"qwen3.6-27b": {
-					"id": "qwen3.6-27b",
-					"ownedBy": "qwen",
-					"label": "Qwen3.6 27B",
-					"modalities": {
-						"input": ["text", "image", "video", "audio"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"releaseDate": "2026-04-22",
-					"lastUpdated": "2026-04-22",
-					"openWeights": true,
-					"cost": {
-						"input": 0.6029999999999999,
-						"output": 3.618
-					},
-					"limit": {
-						"context": 262144,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.6-35b-a3b": {
-					"id": "qwen3.6-35b-a3b",
-					"ownedBy": "qwen",
-					"label": "Qwen3.6 35B-A3B",
-					"modalities": {
-						"input": ["text", "image", "video", "audio"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"releaseDate": "2026-04-17",
-					"lastUpdated": "2026-04-17",
-					"openWeights": true,
-					"cost": {
-						"input": 0.24923999999999996,
-						"output": 1.492425
-					},
-					"limit": {
-						"context": 262144,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.6-flash": {
-					"id": "qwen3.6-flash",
-					"ownedBy": "qwen",
-					"label": "Qwen3.6 Flash",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"releaseDate": "2026-04-27",
-					"lastUpdated": "2026-04-27",
-					"openWeights": false,
-					"cost": {
-						"input": 0.18843749999999998,
-						"output": 1.1306249999999998,
-						"cacheWrite": 0.235546875
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.6-max-preview": {
-					"id": "qwen3.6-max-preview",
-					"ownedBy": "qwen",
-					"label": "Qwen3.6 Max Preview",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2025-04",
-					"releaseDate": "2026-04-20",
-					"lastUpdated": "2026-04-20",
-					"openWeights": false,
-					"cost": {
-						"input": 1.3065,
-						"output": 7.838999999999999,
-						"cacheRead": 0.13065,
-						"cacheWrite": 1.6331249999999997
-					},
-					"limit": {
-						"context": 262144,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.6-plus": {
-					"id": "qwen3.6-plus",
-					"ownedBy": "qwen",
-					"label": "Qwen3.6 Plus",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2025-04",
-					"releaseDate": "2026-04-02",
-					"lastUpdated": "2026-04-02",
-					"openWeights": false,
-					"cost": {
-						"input": 0.5025,
-						"output": 3.0149999999999997,
-						"cacheRead": 0.050249999999999996,
-						"cacheWrite": 0.6281249999999999
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.7-max": {
-					"id": "qwen3.7-max",
-					"ownedBy": "qwen",
-					"label": "Qwen3.7 Max",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"releaseDate": "2026-05-21",
-					"lastUpdated": "2026-05-21",
-					"openWeights": false,
-					"cost": {
-						"input": 2.5124999999999997,
-						"output": 7.5375,
-						"cacheRead": 0.5025,
-						"cacheWrite": 3.1406249999999996
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"qwen3.7-plus": {
-					"id": "qwen3.7-plus",
-					"ownedBy": "qwen",
-					"label": "Qwen3.7 Plus",
-					"modalities": {
-						"input": ["text", "image", "video"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2025-04",
-					"releaseDate": "2026-06-02",
-					"lastUpdated": "2026-06-04",
-					"openWeights": false,
-					"cost": {
-						"input": 0.5025,
-						"output": 3.0149999999999997,
-						"cacheRead": 0.050249999999999996,
-						"cacheWrite": 0.6281249999999999
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 65536
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
 				"grok-4.20-0309-non-reasoning": {
 					"id": "grok-4.20-0309-non-reasoning",
 					"ownedBy": "xai",
@@ -16314,7 +15878,7 @@
 				"glm-4.7": {
 					"id": "glm-4.7",
 					"ownedBy": "zai",
-					"label": "GLM-4.7",
+					"label": "GLM 4.7",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -16330,68 +15894,11 @@
 					"cost": {
 						"input": 0.6029999999999999,
 						"output": 2.211,
-						"cacheRead": 0.11055
-					},
-					"limit": {
-						"context": 204800,
-						"output": 131072
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"glm-4.7-flash": {
-					"id": "glm-4.7-flash",
-					"ownedBy": "zai",
-					"label": "GLM-4.7-Flash",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2025-04",
-					"releaseDate": "2026-01-19",
-					"lastUpdated": "2026-01-19",
-					"openWeights": true,
-					"cost": {
-						"input": 0,
-						"output": 0
+						"cacheRead": 0.12059999999999998
 					},
 					"limit": {
 						"context": 200000,
-						"output": 131072
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"glm-4.7-flashx": {
-					"id": "glm-4.7-flashx",
-					"ownedBy": "zai",
-					"label": "GLM-4.7-FlashX",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2025-04",
-					"releaseDate": "2026-01-19",
-					"lastUpdated": "2026-01-19",
-					"openWeights": true,
-					"cost": {
-						"input": 0.07035,
-						"output": 0.40199999999999997,
-						"cacheRead": 0.01005
-					},
-					"limit": {
-						"context": 200000,
-						"output": 131072
+						"output": 200000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -16400,7 +15907,7 @@
 				"glm-5": {
 					"id": "glm-5",
 					"ownedBy": "zai",
-					"label": "GLM-5",
+					"label": "GLM 5",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -16409,45 +15916,18 @@
 					"reasoningText": true,
 					"attachment": false,
 					"temperature": true,
-					"releaseDate": "2026-02-11",
-					"lastUpdated": "2026-02-11",
+					"knowledge": "2026-01",
+					"releaseDate": "2026-02-12",
+					"lastUpdated": "2026-02-12",
 					"openWeights": true,
 					"cost": {
-						"input": 1.005,
-						"output": 3.2159999999999997,
+						"input": 0.9547499999999999,
+						"output": 3.1657499999999996,
 						"cacheRead": 0.20099999999999998
 					},
 					"limit": {
-						"context": 204800,
-						"output": 131072
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"glm-5-turbo": {
-					"id": "glm-5-turbo",
-					"ownedBy": "zai",
-					"label": "GLM-5-Turbo",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"releaseDate": "2026-03-16",
-					"lastUpdated": "2026-03-16",
-					"openWeights": false,
-					"cost": {
-						"input": 1.2059999999999997,
-						"output": 4.02,
-						"cacheRead": 0.24119999999999997
-					},
-					"limit": {
-						"context": 200000,
-						"output": 131072
+						"context": 202800,
+						"output": 202800
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -16456,7 +15936,7 @@
 				"glm-5.1": {
 					"id": "glm-5.1",
 					"ownedBy": "zai",
-					"label": "GLM-5.1",
+					"label": "GLM 5.1",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -16465,17 +15945,17 @@
 					"reasoningText": true,
 					"attachment": false,
 					"temperature": true,
-					"releaseDate": "2026-03-27",
-					"lastUpdated": "2026-03-27",
-					"openWeights": false,
+					"releaseDate": "2026-04-07",
+					"lastUpdated": "2026-04-07",
+					"openWeights": true,
 					"cost": {
-						"input": 1.4069999999999998,
-						"output": 4.422,
+						"input": 1.3065,
+						"output": 4.3214999999999995,
 						"cacheRead": 0.2613
 					},
 					"limit": {
-						"context": 200000,
-						"output": 131072
+						"context": 202800,
+						"output": 202800
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -16484,7 +15964,7 @@
 				"glm-5.2": {
 					"id": "glm-5.2",
 					"ownedBy": "zai",
-					"label": "GLM-5.2",
+					"label": "GLM 5.2",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -16495,42 +15975,14 @@
 					"temperature": true,
 					"releaseDate": "2026-06-13",
 					"lastUpdated": "2026-06-13",
-					"openWeights": false,
+					"openWeights": true,
 					"cost": {
-						"input": 1.4069999999999998,
-						"output": 4.422,
-						"cacheRead": 0.2613
+						"input": 1.5074999999999998,
+						"output": 4.522499999999999,
+						"cacheRead": 0.30149999999999993
 					},
 					"limit": {
-						"context": 1000000,
-						"output": 131072
-					},
-					"provider": {
-						"npm": "@ai-sdk/openai-compatible"
-					}
-				},
-				"glm-5v-turbo": {
-					"id": "glm-5v-turbo",
-					"ownedBy": "zai",
-					"label": "GLM-5V-Turbo",
-					"modalities": {
-						"input": ["text", "image", "video", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"releaseDate": "2026-04-01",
-					"lastUpdated": "2026-04-01",
-					"openWeights": false,
-					"cost": {
-						"input": 1.2059999999999997,
-						"output": 4.02,
-						"cacheRead": 0.24119999999999997
-					},
-					"limit": {
-						"context": 200000,
+						"context": 131072,
 						"output": 131072
 					},
 					"provider": {

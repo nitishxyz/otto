@@ -187,7 +187,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const [customProviderLabel, setCustomProviderLabel] = useState('');
 	const [customProviderBaseURL, setCustomProviderBaseURL] = useState('');
 	const [customProviderApiKey, setCustomProviderApiKey] = useState('');
-	const [customProviderModels, setCustomProviderModels] = useState('');
+	const [customProviderModels, setCustomProviderModels] = useState<string[]>(
+		[],
+	);
+	const [customProviderModelInput, setCustomProviderModelInput] = useState('');
 	const [customProviderCompatibility, setCustomProviderCompatibility] =
 		useState<CustomProviderCompatibility>('openai-compatible');
 	const [customProviderAllowAnyModel, setCustomProviderAllowAnyModel] =
@@ -496,12 +499,38 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		} catch {}
 	};
 
+	const addCustomProviderModels = (rawValue: string) => {
+		const models = rawValue
+			.split(/[\n,]/)
+			.map((model) => model.trim())
+			.filter(Boolean);
+		if (models.length === 0) return;
+		setCustomProviderModels((current) => {
+			const seen = new Set(current);
+			const next = [...current];
+			for (const model of models) {
+				if (seen.has(model)) continue;
+				seen.add(model);
+				next.push(model);
+			}
+			return next;
+		});
+		setCustomProviderModelInput('');
+	};
+
+	const removeCustomProviderModel = (modelId: string) => {
+		setCustomProviderModels((current) =>
+			current.filter((model) => model !== modelId),
+		);
+	};
+
 	const resetCustomProviderForm = () => {
 		setCustomProviderId('');
 		setCustomProviderLabel('');
 		setCustomProviderBaseURL('');
 		setCustomProviderApiKey('');
-		setCustomProviderModels('');
+		setCustomProviderModels([]);
+		setCustomProviderModelInput('');
 		setCustomProviderCompatibility('openai-compatible');
 		setCustomProviderAllowAnyModel(true);
 		setCustomProviderError(null);
@@ -534,7 +563,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			if (result.baseURL) setCustomProviderBaseURL(result.baseURL);
 			setDiscoveredCustomModels(result.models);
 			if (result.models.length > 0) {
-				setCustomProviderModels(
+				addCustomProviderModels(
 					result.models.map((model) => model.id).join('\n'),
 				);
 			}
@@ -562,7 +591,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		const baseURL = customProviderBaseURL.trim();
 		const apiKey = customProviderApiKey.trim();
 		const models = customProviderModels
-			.split(/[\n,]/)
 			.map((model) => model.trim())
 			.filter(Boolean);
 
@@ -916,7 +944,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					setCustomProviderLabel('');
 					setCustomProviderBaseURL('');
 					setCustomProviderApiKey('');
-					setCustomProviderModels('');
+					setCustomProviderModels([]);
+					setCustomProviderModelInput('');
 					setCustomProviderCompatibility('openai-compatible');
 					setCustomProviderAllowAnyModel(true);
 					setCustomProviderError(null);
@@ -1504,53 +1533,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 								</p>
 							)}
 
-							{discoveredCustomModels.length > 0 && (
-								<div className="space-y-2 max-h-44 overflow-y-auto border border-border rounded-lg p-2">
-									{discoveredCustomModels.map((model) => (
-										<div
-											key={model.id}
-											className="flex items-center justify-between gap-3 p-2 bg-card rounded-md"
-										>
-											<div className="min-w-0">
-												<div className="text-sm font-medium text-foreground truncate">
-													{model.label}
-												</div>
-												<div className="text-xs text-muted-foreground font-mono truncate">
-													{model.id}
-												</div>
-											</div>
-											<div className="flex flex-wrap justify-end gap-1 shrink-0">
-												{model.contextWindow && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
-														{formatTokenCount(model.contextWindow)} ctx
-													</span>
-												)}
-												{model.maxOutputTokens && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-cyan-600/20 text-cyan-400 rounded">
-														{formatTokenCount(model.maxOutputTokens)} out
-													</span>
-												)}
-												{model.toolCall && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-green-600/20 text-green-400 rounded">
-														Tools
-													</span>
-												)}
-												{model.reasoningText && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-purple-600/20 text-purple-400 rounded">
-														Reasoning
-													</span>
-												)}
-												{model.vision && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-orange-600/20 text-orange-400 rounded">
-														Vision
-													</span>
-												)}
-											</div>
-										</div>
-									))}
-								</div>
-							)}
-
 							<label className="space-y-2 block">
 								<span className="text-sm font-medium text-foreground">
 									Base URL
@@ -1599,20 +1581,124 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 								</label>
 							</div>
 
-							<label className="space-y-2 block">
-								<span className="text-sm font-medium text-foreground">
-									Models
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-2">
+									<span className="text-sm font-medium text-foreground">
+										Models
+									</span>
+									<span className="text-xs text-muted-foreground">
+										{customProviderModels.length} listed
+									</span>
+								</div>
+								<div className="flex gap-2">
+									<input
+										type="text"
+										value={customProviderModelInput}
+										onChange={(e) =>
+											setCustomProviderModelInput(e.target.value)
+										}
+										onKeyDown={(e) => {
+											if (e.key !== 'Enter') return;
+											e.preventDefault();
+											addCustomProviderModels(customProviderModelInput);
+										}}
+										placeholder="gpt-4o or llama3.3"
+										className="flex-1 h-11 px-4 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-sm"
+									/>
+									<button
+										type="button"
+										onClick={() =>
+											addCustomProviderModels(customProviderModelInput)
+										}
+										disabled={!customProviderModelInput.trim()}
+										className="shrink-0 h-11 px-3 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+									>
+										<Plus className="w-3.5 h-3.5" />
+										Add
+									</button>
+								</div>
+								<span className="block text-xs text-muted-foreground">
+									Paste comma/newline lists to add multiple. Leave empty to
+									allow any model.
 								</span>
-								<textarea
-									value={customProviderModels}
-									onChange={(e) => setCustomProviderModels(e.target.value)}
-									placeholder="gpt-4o, claude-sonnet-4-5, llama3.3"
-									className="w-full min-h-[90px] px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-sm resize-y"
-								/>
-								<span className="text-xs text-muted-foreground">
-									Comma or newline separated. Leave blank to allow any model.
-								</span>
-							</label>
+
+								<div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2">
+									{customProviderModels.length === 0 ? (
+										<div className="p-3 text-sm text-muted-foreground bg-card rounded-md">
+											No models listed yet. Fetch models or add one manually.
+										</div>
+									) : (
+										customProviderModels.map((modelId) => {
+											const discoveredModel = discoveredCustomModels.find(
+												(model) => model.id === modelId,
+											);
+											return (
+												<div
+													key={modelId}
+													className="flex items-center justify-between gap-3 p-2 bg-card rounded-md"
+												>
+													<div className="min-w-0">
+														<div className="text-sm font-medium text-foreground truncate">
+															{discoveredModel?.label ?? modelId}
+														</div>
+														{discoveredModel?.label &&
+															discoveredModel.label !== modelId && (
+																<div className="text-xs text-muted-foreground font-mono truncate">
+																	{modelId}
+																</div>
+															)}
+													</div>
+													<div className="flex items-center justify-end gap-2 shrink-0">
+														{discoveredModel && (
+															<div className="flex flex-wrap justify-end gap-1">
+																{discoveredModel.contextWindow && (
+																	<span className="text-[10px] px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
+																		{formatTokenCount(
+																			discoveredModel.contextWindow,
+																		)}{' '}
+																		ctx
+																	</span>
+																)}
+																{discoveredModel.maxOutputTokens && (
+																	<span className="text-[10px] px-1.5 py-0.5 bg-cyan-600/20 text-cyan-400 rounded">
+																		{formatTokenCount(
+																			discoveredModel.maxOutputTokens,
+																		)}{' '}
+																		out
+																	</span>
+																)}
+																{discoveredModel.toolCall && (
+																	<span className="text-[10px] px-1.5 py-0.5 bg-green-600/20 text-green-400 rounded">
+																		Tools
+																	</span>
+																)}
+																{discoveredModel.reasoningText && (
+																	<span className="text-[10px] px-1.5 py-0.5 bg-purple-600/20 text-purple-400 rounded">
+																		Reasoning
+																	</span>
+																)}
+																{discoveredModel.vision && (
+																	<span className="text-[10px] px-1.5 py-0.5 bg-orange-600/20 text-orange-400 rounded">
+																		Vision
+																	</span>
+																)}
+															</div>
+														)}
+														<button
+															type="button"
+															onClick={() => removeCustomProviderModel(modelId)}
+															className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+															aria-label={`Remove ${modelId}`}
+														>
+															<X className="w-3.5 h-3.5" />
+														</button>
+													</div>
+												</div>
+											);
+										})
+									)}
+								</div>
+							</div>
 
 							<label className="flex items-center gap-3 text-sm text-muted-foreground">
 								<input

@@ -3240,13 +3240,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 0.67,
+						input: 0.66,
 						output: 3.5,
-						cacheRead: 0.2,
+						cacheRead: 0.33,
 					},
 					limit: {
-						context: 262144,
-						output: 262144,
+						context: 262142,
+						output: 262142,
 					},
 				},
 				'~openai/gpt-latest': {
@@ -3860,13 +3860,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-01',
 					openWeights: true,
 					cost: {
-						input: 0.22,
-						output: 0.85,
+						input: 0.25,
+						output: 0.8,
 						cacheRead: 0.06,
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 80000,
 					},
 				},
 				'arcee-ai/trinity-mini': {
@@ -5851,13 +5851,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.67,
+						input: 0.66,
 						output: 3.5,
-						cacheRead: 0.2,
+						cacheRead: 0.33,
 					},
 					limit: {
-						context: 262144,
-						output: 262144,
+						context: 262142,
+						output: 262142,
 					},
 				},
 				'moonshotai/kimi-k2.7-code': {
@@ -5877,9 +5877,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-12',
 					openWeights: true,
 					cost: {
-						input: 0.68,
-						output: 3.41,
-						cacheRead: 0.144,
+						input: 0.612,
+						output: 3.069,
+						cacheRead: 0.1296,
 					},
 					limit: {
 						context: 262144,
@@ -8973,9 +8973,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-20',
 					openWeights: true,
 					cost: {
-						input: 0.066,
-						output: 0.26,
-						cacheRead: 0.029,
+						input: 0.063,
+						output: 0.21,
+						cacheRead: 0.021,
 					},
 					limit: {
 						context: 262144,
@@ -9430,11 +9430,11 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.98,
 						output: 3.08,
-						cacheRead: 0.182,
+						cacheRead: 0.49,
 					},
 					limit: {
 						context: 202752,
-						output: 131072,
+						output: 65535,
 					},
 				},
 				'z-ai/glm-5.2': {
