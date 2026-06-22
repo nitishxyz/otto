@@ -3,12 +3,15 @@ import { Globe2 } from 'lucide-react';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 
 export const BrowserPanelToggle = memo(function BrowserPanelToggle() {
-	const tabs = useViewerTabsStore((state) => state.tabs);
+	const browserTab = useViewerTabsStore((state) =>
+		state.tabOrder
+			.map((id) => state.tabsById[id])
+			.find((tab) => tab?.type === 'browser'),
+	);
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
 	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
 	const setActiveTab = useViewerTabsStore((state) => state.setActiveTab);
 	const closeTab = useViewerTabsStore((state) => state.closeTab);
-	const browserTab = tabs.find((tab) => tab.type === 'browser');
 	const isActive = browserTab?.id === activeTabId;
 
 	return (

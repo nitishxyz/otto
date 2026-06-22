@@ -1,9 +1,77 @@
 import type { FileOperation, ToolResultData } from './types.ts';
 
+function addUniquePath(paths: string[], path: string | undefined): void {
+	const normalized = path?.trim();
+	if (normalized && !paths.includes(normalized)) paths.push(normalized);
+}
+
+function stripUnifiedHeaderMetadata(path: string): string {
+	return path.split(/\s+/)[0] ?? path;
+}
+
+function extractPathsFromPatch(patch: string): string[] {
+	const paths: string[] = [];
+	const envelopedDirective = /^\*\*\* (?:Update|Add|Delete) File: (.+)$/gm;
+	for (const match of patch.matchAll(envelopedDirective)) {
+		addUniquePath(paths, match[1]);
+	}
+
+	const lineDirective =
+		/^\*\*\* (?:Replace in|Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/gm;
+	for (const match of patch.matchAll(lineDirective)) {
+		addUniquePath(paths, match[1]);
+	}
+
+	const unifiedFile = /^(?:---|\+\+\+) (?:[ab]\/)?(.+)$/gm;
+	for (const match of patch.matchAll(unifiedFile)) {
+		const path = stripUnifiedHeaderMetadata(match[1]?.trim() ?? '');
+		if (!path || path === '/dev/null') continue;
+		addUniquePath(paths, path);
+	}
+
+	return paths;
+}
+
+export function extractFilePathsFromToolCall(
+	toolName: string,
+	content: unknown,
+): string[] {
+	if (!content || typeof content !== 'object') return [];
+
+	const c = content as Record<string, unknown>;
+	const args = c.args as Record<string, unknown> | undefined;
+	const name = toolName.toLowerCase();
+	const paths: string[] = [];
+
+	if (name === 'write' || name === 'edit' || name === 'multiedit') {
+		addUniquePath(paths, args?.path as string | undefined);
+		addUniquePath(paths, c.path as string | undefined);
+	}
+	if (name === 'copyinto' || name === 'copy_into') {
+		addUniquePath(paths, args?.targetPath as string | undefined);
+		addUniquePath(paths, c.targetPath as string | undefined);
+	}
+
+	if (name === 'applypatch' || name === 'apply_patch') {
+		const patch = args?.patch ?? c.patch;
+		if (typeof patch === 'string') {
+			for (const path of extractPathsFromPatch(patch))
+				addUniquePath(paths, path);
+		}
+		addUniquePath(paths, args?.path as string | undefined);
+		addUniquePath(paths, c.path as string | undefined);
+	}
+
+	return paths;
+}
+
 export function extractFilePathFromToolCall(
 	toolName: string,
 	content: unknown,
 ): string | null {
+	const paths = extractFilePathsFromToolCall(toolName, content);
+	if (paths.length > 0) return paths[0];
+
 	if (!content || typeof content !== 'object') return null;
 
 	const c = content as Record<string, unknown>;
@@ -23,12 +91,8 @@ export function extractFilePathFromToolCall(
 	if (name === 'applypatch' || name === 'apply_patch') {
 		const patch = args?.patch ?? c.patch;
 		if (typeof patch === 'string') {
-			const matches = [
-				...patch.matchAll(/\*\*\* (?:Update|Add|Delete) File: (.+)/g),
-			];
-			if (matches.length > 0) return matches[0][1].trim();
-			const unifiedMatch = patch.match(/^(?:---|\+\+\+) [ab]\/(.+)$/m);
-			if (unifiedMatch) return unifiedMatch[1].trim();
+			const patchPaths = extractPathsFromPatch(patch);
+			if (patchPaths.length > 0) return patchPaths[0];
 		}
 		if (args && typeof args.path === 'string') return args.path;
 		if (typeof c.path === 'string') return c.path;
@@ -117,13 +181,8 @@ export function extractFilesFromToolResult(
 			(args?.patch as string | undefined) ??
 			c.result?.artifact?.patch;
 		if (typeof patch === 'string') {
-			const matches = patch.matchAll(
-				/\*\*\* (?:Update|Add|Delete) File: (.+)/g,
-			);
-			for (const match of matches) {
-				const fp = match[1].trim();
-				if (!files.includes(fp)) files.push(fp);
-			}
+			for (const path of extractPathsFromPatch(patch))
+				addUniquePath(files, path);
 		}
 	}
 

@@ -164,7 +164,9 @@ const SessionFilesSidebarContent = memo(function SessionFilesSidebarContent({
 	const openDiff = useSessionFilesStore((state) => state.openDiff);
 	const selectedFile = useSessionFilesStore((state) => state.selectedFile);
 	const activeViewerTabPath = useViewerTabsStore((state) => {
-		const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+		const activeTab = state.activeTabId
+			? state.tabsById[state.activeTabId]
+			: undefined;
 		return getViewerTabPath(activeTab);
 	});
 	const { data, isLoading, error, refetch } = useSessionFiles(sessionId, true);

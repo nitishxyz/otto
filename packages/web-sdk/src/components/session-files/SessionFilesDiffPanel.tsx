@@ -13,41 +13,6 @@ import {
 	normalizeChangeCount,
 } from '../workspace/ViewerStatusBar';
 
-function transformToUnifiedDiff(patch: string): string {
-	const lines = patch.split('\n');
-	const result: string[] = [];
-	const diffLines: string[] = [];
-
-	const flushDiffLines = () => {
-		if (diffLines.length === 0) return;
-		result.push(...diffLines);
-		diffLines.length = 0;
-	};
-
-	for (const line of lines) {
-		if (isSessionPatchMetadataLine(line)) {
-			flushDiffLines();
-			continue;
-		}
-
-		if (line.startsWith('+')) {
-			diffLines.push(line);
-		} else if (line.startsWith('-')) {
-			diffLines.push(line);
-		} else if (line.startsWith(' ') || line.startsWith('\t')) {
-			diffLines.push(line.startsWith('\t') ? ` ${line}` : line);
-		} else if (line.trim() === '') {
-			diffLines.push(' ');
-		} else {
-			diffLines.push(` ${line}`);
-		}
-	}
-
-	flushDiffLines();
-
-	return result.join('\n');
-}
-
 function isSessionPatchSeparatorLine(line: string): boolean {
 	const trimmed = line.trim();
 	return trimmed.length > 0 && /^=+$/.test(trimmed);
@@ -86,17 +51,60 @@ function parseHunkHeader(
 	};
 }
 
+function normalizePatchPath(path: string): string {
+	return path
+		.trim()
+		.replace(/^a\//, '')
+		.replace(/^b\//, '')
+		.replace(/^\.\//, '')
+		.replace(/\/+/g, '/')
+		.replace(/\/+$/, '');
+}
+
+function patchPathsMatch(left: string, right: string): boolean {
+	const normalizedLeft = normalizePatchPath(left);
+	const normalizedRight = normalizePatchPath(right);
+	return (
+		normalizedLeft === normalizedRight ||
+		normalizedLeft.endsWith(`/${normalizedRight}`) ||
+		normalizedRight.endsWith(`/${normalizedLeft}`)
+	);
+}
+
+function pathFromUnifiedHeader(line: string): string | null {
+	const match = /^(?:---|\+\+\+)\s+(.+)$/.exec(line);
+	if (!match) return null;
+	const path = match[1].trim().split(/\s+/)[0] ?? '';
+	return path === '/dev/null' ? null : normalizePatchPath(path);
+}
+
+function createRawPatchDisplay(patch: string) {
+	return {
+		content: patch,
+		lineNumbers: new Map<number, string>(),
+		lineTones: new Map<number, CodeMirrorLineTone>(),
+	};
+}
+
 function buildSessionPatchDisplay(patch: string): {
 	content: string;
 	lineNumbers: Map<number, string>;
 	lineTones: Map<number, CodeMirrorLineTone>;
 } {
+	return createRawPatchDisplay(patch);
+}
+
+function buildDiffDisplayFromLines(lines: string[]): {
+	content: string;
+	lineNumbers: Map<number, string>;
+	lineTones: Map<number, CodeMirrorLineTone>;
+} | null {
 	const contentLines: string[] = [];
 	const lineNumbers = new Map<number, string>();
 	const lineTones = new Map<number, CodeMirrorLineTone>();
-	const lines = patch.split('\n');
 	let oldLine: number | null = null;
 	let newLine: number | null = null;
+	let sawDiffLine = false;
 
 	for (const line of lines) {
 		const hunk = parseHunkHeader(line);
@@ -112,12 +120,14 @@ function buildSessionPatchDisplay(patch: string): {
 
 		contentLines.push(line);
 		if (line.startsWith('+') && !line.startsWith('+++')) {
+			sawDiffLine = true;
 			if (newLine !== null) {
 				lineNumbers.set(lineNumber, String(newLine));
 				newLine += 1;
 			}
 			lineTones.set(lineNumber, 'add');
 		} else if (line.startsWith('-') && !line.startsWith('---')) {
+			sawDiffLine = true;
 			if (oldLine !== null) {
 				lineNumbers.set(lineNumber, String(oldLine));
 				oldLine += 1;
@@ -129,12 +139,118 @@ function buildSessionPatchDisplay(patch: string): {
 			newLine += 1;
 		}
 	}
+	if (!sawDiffLine && contentLines.length === 0) return null;
 
 	return {
 		content: contentLines.join('\n'),
 		lineNumbers,
 		lineTones,
 	};
+}
+
+function buildUnifiedPatchDisplay(patch: string, filePath: string) {
+	const selectedLines: string[] = [];
+	const lines = patch.split('\n');
+	let currentFileMatches = false;
+	let sawUnifiedFileHeader = false;
+
+	for (const line of lines) {
+		if (line.startsWith('diff --git ')) {
+			currentFileMatches = false;
+			continue;
+		}
+		const headerPath = pathFromUnifiedHeader(line);
+		if (headerPath) {
+			sawUnifiedFileHeader = true;
+			if (patchPathsMatch(headerPath, filePath)) currentFileMatches = true;
+			continue;
+		}
+		if (!currentFileMatches && sawUnifiedFileHeader) continue;
+		if (currentFileMatches) selectedLines.push(line);
+	}
+
+	return selectedLines.length > 0
+		? buildDiffDisplayFromLines(selectedLines)
+		: null;
+}
+
+function buildEnvelopedPatchDisplay(patch: string, filePath: string) {
+	const outputLines: string[] = [];
+	const lines = patch.split('\n');
+	let currentMatches = false;
+	let mode: 'diff' | 'add' | 'find' | 'with' | 'unsupported' | null = null;
+	let unsupportedForTarget = false;
+
+	for (const line of lines) {
+		const fileDirective = /^\*\*\* (Update|Add|Delete) File: (.+)$/.exec(line);
+		if (fileDirective) {
+			currentMatches = patchPathsMatch(fileDirective[2], filePath);
+			mode =
+				fileDirective[1] === 'Update'
+					? 'diff'
+					: fileDirective[1] === 'Add'
+						? 'add'
+						: 'unsupported';
+			if (currentMatches && mode === 'unsupported') unsupportedForTarget = true;
+			continue;
+		}
+
+		const replaceDirective = /^\*\*\* Replace in: (.+)$/.exec(line);
+		if (replaceDirective) {
+			currentMatches = patchPathsMatch(replaceDirective[1], filePath);
+			mode = null;
+			continue;
+		}
+
+		const lineDirective =
+			/^\*\*\* (?:Delete Lines in|Replace Lines in|Insert Before in|Insert After in): (.+)$/.exec(
+				line,
+			);
+		if (lineDirective) {
+			currentMatches = patchPathsMatch(lineDirective[1], filePath);
+			mode = 'unsupported';
+			if (currentMatches) unsupportedForTarget = true;
+			continue;
+		}
+
+		if (!currentMatches) continue;
+
+		if (line === '*** Find:') {
+			mode = 'find';
+			continue;
+		}
+		if (line === '*** With:') {
+			mode = 'with';
+			continue;
+		}
+		if (line.startsWith('*** ')) continue;
+
+		if (mode === 'unsupported') continue;
+		if (mode === 'find') {
+			outputLines.push(`-${line}`);
+			continue;
+		}
+		if (mode === 'with') {
+			outputLines.push(`+${line}`);
+			continue;
+		}
+		if (mode === 'add') {
+			outputLines.push(line.startsWith('+') ? line : `+${line}`);
+			continue;
+		}
+		outputLines.push(line);
+	}
+
+	if (unsupportedForTarget && outputLines.length === 0) return null;
+	return outputLines.length > 0 ? buildDiffDisplayFromLines(outputLines) : null;
+}
+
+function buildSessionPatchDisplayForFile(patch: string, filePath: string) {
+	const unifiedDisplay = buildUnifiedPatchDisplay(patch, filePath);
+	if (unifiedDisplay) return unifiedDisplay;
+	const envelopedDisplay = buildEnvelopedPatchDisplay(patch, filePath);
+	if (envelopedDisplay) return envelopedDisplay;
+	return buildSessionPatchDisplay(patch);
 }
 
 function FullHeightDiffView({
@@ -144,7 +260,10 @@ function FullHeightDiffView({
 	patch: string;
 	filePath: string;
 }) {
-	const display = useMemo(() => buildSessionPatchDisplay(patch), [patch]);
+	const display = useMemo(
+		() => buildSessionPatchDisplayForFile(patch, filePath),
+		[patch, filePath],
+	);
 
 	return (
 		<CodeMirrorViewer
@@ -219,13 +338,6 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 		}
 
 		if (!rawPatch) return null;
-
-		const hasProperHunkHeader = /@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(
-			rawPatch,
-		);
-		if (!hasProperHunkHeader) {
-			return transformToUnifiedDiff(rawPatch);
-		}
 
 		return rawPatch;
 	}, [selectedOperation, selectedFile]);

@@ -6,7 +6,7 @@ import { FILE_EDIT_TOOLS } from './constants.ts';
 import {
 	extractContentFromToolCall,
 	extractDataFromToolResult,
-	extractFilePathFromToolCall,
+	extractFilePathsFromToolCall,
 	extractFilesFromToolResult,
 	extractPatchFromToolCall,
 	getOperationType,
@@ -108,26 +108,28 @@ function recordToolCall(
 
 	toolCallDataMap.set(callId, { patch, content: writeContent });
 
-	const path = extractFilePathFromToolCall(part.toolName, content);
-	if (!path) return;
+	const paths = extractFilePathsFromToolCall(part.toolName, content);
+	if (paths.length === 0) return;
 
-	const operation: FileOperation = {
-		path,
-		operation: getOperationType(part.toolName),
-		timestamp: part.startedAt || Date.now(),
-		toolCallId: callId,
-		toolName: part.toolName,
-		patch,
-		content: writeContent,
-	};
+	for (const path of paths) {
+		const operation: FileOperation = {
+			path,
+			operation: getOperationType(part.toolName),
+			timestamp: part.startedAt || Date.now(),
+			toolCallId: callId,
+			toolName: part.toolName,
+			patch,
+			content: writeContent,
+		};
 
-	const existing = fileOperationsMap.get(path) || [];
-	const isDuplicate = existing.some(
-		(op) => op.toolCallId === operation.toolCallId,
-	);
-	if (!isDuplicate) {
-		existing.push(operation);
-		fileOperationsMap.set(path, existing);
+		const existing = fileOperationsMap.get(path) || [];
+		const isDuplicate = existing.some(
+			(op) => op.toolCallId === operation.toolCallId,
+		);
+		if (!isDuplicate) {
+			existing.push(operation);
+			fileOperationsMap.set(path, existing);
+		}
 	}
 }
 

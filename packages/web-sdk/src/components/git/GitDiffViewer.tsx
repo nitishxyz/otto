@@ -1,4 +1,5 @@
 import { client } from '@ottocode/api';
+import { useCallback, useMemo } from 'react';
 import type { GitDiffResponse } from '../../types/api';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
 import {
@@ -18,6 +19,10 @@ const IMAGE_EXTENSIONS = new Set([
 	'avif',
 ]);
 
+const LARGE_DIFF_LIMITED_PREVIEW_CHARS = 200_000;
+const LARGE_DIFF_NOTICE_CHARS = 500_000;
+const LARGE_DIFF_TAIL_CHARS = 120_000;
+
 function isImageFile(filePath: string): boolean {
 	const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
 	return IMAGE_EXTENSIONS.has(ext);
@@ -33,6 +38,23 @@ interface GitDiffViewerProps {
 function getFileName(path: string): string {
 	const parts = path.split('/');
 	return parts[parts.length - 1];
+}
+
+function getLimitedPreview(content: string): {
+	content: string;
+	notice?: string;
+} {
+	if (content.length <= LARGE_DIFF_LIMITED_PREVIEW_CHARS) return { content };
+	const notice =
+		content.length >= LARGE_DIFF_NOTICE_CHARS
+			? 'Very large diff/file: showing the tail only to keep the viewer responsive.'
+			: 'Large diff/file: showing the tail only to keep the viewer responsive.';
+	return {
+		content: `… showing the latest ${LARGE_DIFF_TAIL_CHARS.toLocaleString()} characters only …\n${content.slice(
+			-LARGE_DIFF_TAIL_CHARS,
+		)}`,
+		notice,
+	};
 }
 
 interface DiffDisplay {
@@ -123,9 +145,38 @@ function buildDiffDisplay(diffText: string): DiffDisplay {
 	};
 }
 
+function NormalGitDiffViewer({ diff }: GitDiffViewerProps) {
+	const display = useMemo(() => buildDiffDisplay(diff.diff), [diff.diff]);
+	const lineNumberFormatter = useCallback(
+		(lineNumber: number) => display.lineNumbers.get(lineNumber) ?? '',
+		[display.lineNumbers],
+	);
+
+	return (
+		<div className="flex flex-col h-full bg-transparent">
+			<div className="flex-1 min-h-0">
+				{display.content.trim() === '' ? (
+					<div className="p-4 text-[12px] text-muted-foreground">
+						No changes to display
+					</div>
+				) : (
+					<CodeMirrorViewer
+						content={display.content}
+						path={diff.file}
+						lineTones={display.lineTones}
+						lineNumberFormatter={lineNumberFormatter}
+						disableMarkdownSyntax
+					/>
+				)}
+			</div>
+		</div>
+	);
+}
+
 export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 	// Handle new files - show full content instead of diff
 	if (diff.isNewFile && diff.content) {
+		const preview = getLimitedPreview(diff.content);
 		return (
 			<div className="flex flex-col h-full bg-transparent">
 				<div className="px-4 py-3 bg-green-500/10 border-b border-green-500/20">
@@ -133,10 +184,15 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 						New file: {diff.insertions} lines
 					</p>
 				</div>
+				{preview.notice ? (
+					<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
+						{preview.notice}
+					</div>
+				) : null}
 
 				<div className="flex-1 min-h-0">
 					<CodeMirrorViewer
-						content={diff.content}
+						content={preview.content}
 						path={diff.file}
 						disableMarkdownSyntax
 					/>
@@ -179,27 +235,25 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 		);
 	}
 
-	const display = buildDiffDisplay(diff.diff);
-
-	return (
-		<div className="flex flex-col h-full bg-transparent">
-			<div className="flex-1 min-h-0">
-				{display.content.trim() === '' ? (
-					<div className="p-4 text-[12px] text-muted-foreground">
-						No changes to display
+	if (diff.diff.length > LARGE_DIFF_LIMITED_PREVIEW_CHARS) {
+		const preview = getLimitedPreview(diff.diff);
+		return (
+			<div className="flex flex-col h-full bg-transparent">
+				{preview.notice ? (
+					<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
+						{preview.notice}
 					</div>
-				) : (
+				) : null}
+				<div className="flex-1 min-h-0">
 					<CodeMirrorViewer
-						content={display.content}
-						path={diff.file}
-						lineTones={display.lineTones}
-						lineNumberFormatter={(lineNumber) =>
-							display.lineNumbers.get(lineNumber) ?? ''
-						}
+						content={preview.content}
+						path="preview.diff"
 						disableMarkdownSyntax
 					/>
-				)}
+				</div>
 			</div>
-		</div>
-	);
+		);
+	}
+
+	return <NormalGitDiffViewer diff={diff} />;
 }

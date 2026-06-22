@@ -21,7 +21,11 @@ import { useOttoRouterStore } from '../../../stores/ottorouterStore';
 import { useOttoRouterBalance } from '../../../hooks/useOttoRouterBalance';
 import { openUrl } from '../../../lib/open-url';
 import { apiClient } from '../../../lib/api-client';
-import type { DiscoveredProviderModel } from '../../../lib/api-client/config';
+import type {
+	DiscoveredProviderModel,
+	ProviderModelSettings,
+	ProviderModelSettingsMap,
+} from '../../../lib/api-client/config';
 
 type CustomProviderCompatibility =
 	| 'openai-compatible'
@@ -49,6 +53,50 @@ function formatTokenCount(tokens: number): string {
 	return String(tokens);
 }
 
+function buildCustomProviderModelMap(
+	modelIds: string[],
+	discoveredModels: DiscoveredProviderModel[],
+): ProviderModelSettingsMap {
+	const discoveredById = new Map(
+		discoveredModels.map((model) => [model.id, model]),
+	);
+	const models: ProviderModelSettingsMap = {};
+
+	for (const modelId of modelIds) {
+		const id = modelId.trim();
+		if (!id || models[id]) continue;
+
+		const discovered = discoveredById.get(id);
+		const entry: ProviderModelSettings = {
+			id,
+			label: discovered?.label || id,
+		};
+
+		if (discovered?.toolCall !== undefined) {
+			entry.toolCall = discovered.toolCall;
+		}
+		if (discovered?.reasoningText !== undefined) {
+			entry.reasoningText = discovered.reasoningText;
+		}
+		if (discovered?.attachment !== undefined) {
+			entry.attachment = discovered.attachment;
+		}
+		if (
+			discovered?.contextWindow !== undefined ||
+			discovered?.maxOutputTokens !== undefined
+		) {
+			entry.limit = {
+				context: discovered.contextWindow,
+				output: discovered.maxOutputTokens,
+			};
+		}
+
+		models[id] = entry;
+	}
+
+	return models;
+}
+
 interface ProviderSetupStepProps {
 	authStatus: AuthStatus;
 	onSetupWallet: () => Promise<unknown>;
@@ -60,7 +108,7 @@ interface ProviderSetupStepProps {
 		baseURL: string;
 		apiKey?: string;
 		compatibility: CustomProviderCompatibility;
-		models: string[];
+		models: ProviderModelSettingsMap;
 		allowAnyModel: boolean;
 	}) => Promise<unknown>;
 	onRemoveProvider: (provider: string) => Promise<unknown>;
@@ -590,9 +638,13 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		const label = customProviderLabel.trim() || id;
 		const baseURL = customProviderBaseURL.trim();
 		const apiKey = customProviderApiKey.trim();
-		const models = customProviderModels
+		const modelIds = customProviderModels
 			.map((model) => model.trim())
 			.filter(Boolean);
+		const models = buildCustomProviderModelMap(
+			modelIds,
+			discoveredCustomModels,
+		);
 
 		if (!id || !baseURL) {
 			setCustomProviderError('Provider ID and base URL are required.');

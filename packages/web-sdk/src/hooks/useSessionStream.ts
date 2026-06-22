@@ -744,7 +744,9 @@ export function useSessionStream(
 			}
 
 			const viewerStore = useViewerTabsStore.getState();
-			if (!viewerStore.followToolActivity) return;
+			if (!viewerStore.followToolActivity) {
+				return;
+			}
 
 			viewerStore.openToolReadTab(path, {
 				startLine,
@@ -1743,6 +1745,7 @@ export function useSessionStream(
 					const role = typeof payload?.role === 'string' ? payload.role : null;
 					const id = typeof payload?.id === 'string' ? payload.id : null;
 					if (role === 'assistant' && id) {
+						useViewerTabsStore.getState().resetFollowTurnChanges();
 						assistantMessageIdRef.current = id;
 						optimisticallyQueueMessage(queryClient, sessionId, id);
 					}

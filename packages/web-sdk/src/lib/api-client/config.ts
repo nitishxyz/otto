@@ -42,6 +42,21 @@ export type DiscoveredProviderModel = {
 	maxOutputTokens?: number;
 };
 
+export type ProviderModelSettings = {
+	id?: string;
+	label?: string;
+	toolCall?: boolean;
+	reasoningText?: boolean;
+	attachment?: boolean;
+	temperature?: boolean | number;
+	limit?: {
+		context?: number;
+		output?: number;
+	};
+};
+
+export type ProviderModelSettingsMap = Record<string, ProviderModelSettings>;
+
 export type AgentDetail = GetAgentResponse['agent'];
 
 export type AgentToolGroups = {
@@ -194,7 +209,7 @@ export const configMixin = {
 			compatibility?: ProviderCompatibility;
 			baseURL?: string | null;
 			apiKey?: string | null;
-			models?: string[];
+			models?: ProviderModelSettingsMap;
 			allowAnyModel?: boolean;
 		},
 	): Promise<{ success: boolean; provider: string }> {

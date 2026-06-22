@@ -82,7 +82,7 @@ export function GitFileItem({
 		(state) => state.openConfirmation,
 	);
 	const activeViewerTab = useViewerTabsStore((state) =>
-		state.tabs.find((tab) => tab.id === state.activeTabId),
+		state.activeTabId ? state.tabsById[state.activeTabId] : undefined,
 	);
 	const [isChecked, setIsChecked] = useState(staged);
 	const activeViewerTabPath = getViewerTabPath(activeViewerTab);

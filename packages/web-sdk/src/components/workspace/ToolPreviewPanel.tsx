@@ -2,6 +2,10 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFileContent } from '../../hooks/useFileBrowser';
 import {
+	hashViewerText,
+	type LineToneRange,
+	lineToneEntriesToRanges,
+	resolvePatchPreviewBodies,
 	type ViewerTab,
 	useViewerTabsStore,
 } from '../../stores/viewerTabsStore';
@@ -27,6 +31,7 @@ export interface LivePatchPreview {
 	content: string;
 	resultContent: string;
 	lineTones: Map<number, 'add' | 'remove'>;
+	lineToneRanges?: LineToneRange[];
 	firstLine?: number;
 	latestLine?: number;
 }
@@ -69,6 +74,25 @@ interface OptimizedWritePreview {
 	content: string;
 	notice?: string;
 	usePlainText: boolean;
+}
+
+function lineToneRangesMatch(
+	left: LineToneRange[] | undefined,
+	right: LineToneRange[] | undefined,
+): boolean {
+	const leftRanges = left ?? [];
+	const rightRanges = right ?? [];
+	return (
+		leftRanges.length === rightRanges.length &&
+		leftRanges.every((range, index) => {
+			const other = rightRanges[index];
+			return (
+				range.from === other?.from &&
+				range.to === other.to &&
+				range.tone === other.tone
+			);
+		})
+	);
 }
 
 function hasAtLeastLineCount(content: string, lineLimit: number): boolean {
@@ -779,6 +803,7 @@ interface SourceViewerProps {
 	highlightedLines?: Set<number>;
 	highlightTone?: 'primary' | 'add';
 	lineTones?: Map<number, 'add' | 'remove' | 'primary'>;
+	lineToneRanges?: LineToneRange[];
 	scrollToLine?: number;
 	scrollToEndSignal?: string | number;
 }
@@ -789,6 +814,7 @@ function SourceViewer({
 	highlightedLines,
 	highlightTone = 'primary',
 	lineTones,
+	lineToneRanges,
 	scrollToLine,
 	scrollToEndSignal,
 }: SourceViewerProps) {
@@ -799,6 +825,7 @@ function SourceViewer({
 			highlightedLines={highlightedLines}
 			highlightTone={highlightTone}
 			lineTones={lineTones}
+			lineToneRanges={lineToneRanges}
 			scrollToLine={scrollToLine}
 			scrollToEndSignal={scrollToEndSignal}
 			disableMarkdownSyntax
@@ -847,41 +874,50 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 		[tab.toolName, tab.content, tab.status],
 	);
 	const scrollSignal = `${tab.content?.length ?? 0}:${tab.patch?.length ?? 0}:${appliedFile?.content?.length ?? 0}`;
+	const patchPreviewBodies = useMemo(
+		() => (isPatchPreview ? resolvePatchPreviewBodies(tab) : undefined),
+		[isPatchPreview, tab],
+	);
+	const patchBaseContent =
+		patchPreviewBodies?.baseContent ?? appliedFile?.content;
 	const livePatchPreview = useMemo(
 		() =>
 			isPatchPreview &&
 			tab.status !== 'success' &&
 			!shouldUseLargePatchFallback &&
-			appliedFile?.content !== undefined
-				? buildLivePatchPreview(
-						tab.baseContent ?? appliedFile.content,
-						tab.patch,
-						tab.path,
-					)
+			patchBaseContent !== undefined
+				? buildLivePatchPreview(patchBaseContent, tab.patch, tab.path)
 				: null,
 		[
 			isPatchPreview,
 			tab.status,
-			tab.baseContent,
+			patchBaseContent,
 			tab.patch,
 			tab.path,
-			appliedFile?.content,
 			shouldUseLargePatchFallback,
 		],
 	);
 	const persistedPatchPreview = useMemo<LivePatchPreview | null>(() => {
-		if (!tab.previewContent || !tab.previewLineTones) return null;
+		const previewContent = patchPreviewBodies?.previewContent;
+		const resultContent = patchPreviewBodies?.resultContent ?? previewContent;
+		if (
+			!previewContent ||
+			(!tab.previewLineTones && !tab.previewLineToneRanges)
+		) {
+			return null;
+		}
 		return {
-			content: tab.previewContent,
-			resultContent: tab.resultContent ?? tab.previewContent,
+			content: previewContent,
+			resultContent: resultContent ?? previewContent,
 			lineTones: new Map(tab.previewLineTones),
+			lineToneRanges: tab.previewLineToneRanges,
 			firstLine: tab.previewFirstLine,
 			latestLine: tab.previewLatestLine,
 		};
 	}, [
-		tab.previewContent,
-		tab.resultContent,
+		patchPreviewBodies,
 		tab.previewLineTones,
+		tab.previewLineToneRanges,
 		tab.previewFirstLine,
 		tab.previewLatestLine,
 	]);
@@ -899,21 +935,27 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 
 	useEffect(() => {
 		if (!isPatchPreviewTool(tab.toolName) || !livePatchPreview) return;
-		const baseContent = tab.baseContent ?? appliedFile?.content;
+		const baseContent = patchPreviewBodies?.baseContent ?? appliedFile?.content;
 		const previewLineTones = [...livePatchPreview.lineTones.entries()];
+		const previewLineToneRanges = lineToneEntriesToRanges(previewLineTones);
 		const existingLineTones = tab.previewLineTones ?? [];
+		const hasSameLineTones =
+			existingLineTones.length > 0
+				? existingLineTones.length === previewLineTones.length &&
+					existingLineTones.every(
+						(entry, index) =>
+							entry[0] === previewLineTones[index]?.[0] &&
+							entry[1] === previewLineTones[index]?.[1],
+					)
+				: lineToneRangesMatch(tab.previewLineToneRanges, previewLineToneRanges);
 		const hasSameSnapshot =
-			tab.baseContent === baseContent &&
-			tab.previewContent === livePatchPreview.content &&
-			tab.resultContent === livePatchPreview.resultContent &&
+			tab.baseContentHash === hashViewerText(baseContent) &&
+			tab.previewContentHash === hashViewerText(livePatchPreview.content) &&
+			tab.resultContentHash ===
+				hashViewerText(livePatchPreview.resultContent) &&
 			tab.previewFirstLine === livePatchPreview.firstLine &&
 			tab.previewLatestLine === livePatchPreview.latestLine &&
-			existingLineTones.length === previewLineTones.length &&
-			existingLineTones.every(
-				(entry, index) =>
-					entry[0] === previewLineTones[index]?.[0] &&
-					entry[1] === previewLineTones[index]?.[1],
-			);
+			hasSameLineTones;
 		if (hasSameSnapshot) return;
 		useViewerTabsStore.getState().openToolPreviewTab({
 			path: tab.path,
@@ -925,12 +967,13 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 			previewContent: livePatchPreview.content,
 			resultContent: livePatchPreview.resultContent,
 			previewLineTones,
+			previewLineToneRanges,
 			previewFirstLine: livePatchPreview.firstLine,
 			previewLatestLine: livePatchPreview.latestLine,
 			status: tab.status,
 			error: tab.error,
 		});
-	}, [tab, appliedFile?.content, livePatchPreview]);
+	}, [tab, appliedFile?.content, patchPreviewBodies, livePatchPreview]);
 
 	useEffect(() => {
 		if (shouldLoadAppliedFile) void refetchAppliedFile();
@@ -996,6 +1039,7 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 						content={stablePatchPreview.content}
 						path={tab.path}
 						lineTones={stablePatchPreview.lineTones}
+						lineToneRanges={stablePatchPreview.lineToneRanges}
 						scrollToLine={stablePatchPreview.latestLine}
 					/>
 				) : isPatchPreview && tab.patch ? (
@@ -1071,7 +1115,10 @@ export function ToolPreviewPanel({ tab }: ToolPreviewPanelProps) {
 					const fromPatch = countPatchTextChanges(tab.patch, tab.path);
 					if (fromPatch) return fromPatch;
 					const fromTones: ChangeCount | undefined = normalizeChangeCount(
-						countLineTones(stablePatchPreview?.lineTones),
+						countLineTones(
+							stablePatchPreview?.lineTones ?? tab.previewLineTones,
+							stablePatchPreview ? undefined : tab.previewLineToneRanges,
+						),
 					);
 					return fromTones;
 				})()}

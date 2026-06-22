@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import type { ProviderModelSettingsMap } from '../lib/api-client/config';
 import { openPlatformUrl } from '../lib/platform';
 import { useOnboardingStore } from '../stores/onboardingStore';
 
@@ -123,7 +124,7 @@ export function useAuthStatus() {
 				| 'google'
 				| 'openrouter'
 				| 'ollama';
-			models: string[];
+			models: ProviderModelSettingsMap;
 			allowAnyModel: boolean;
 		}) => {
 			setLoading(true);

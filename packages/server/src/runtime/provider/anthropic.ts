@@ -9,13 +9,15 @@ import {
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { toClaudeCodeName } from '../tools/mapping.ts';
 
+const TOKEN_REFRESH_BUFFER_MS = 3 * 60 * 1000;
+
 export async function getAnthropicInstance(cfg: OttoConfig) {
 	const auth = await getAuth('anthropic', cfg.projectRoot);
 
 	if (auth?.type === 'oauth') {
 		let currentAuth = auth;
 
-		if (currentAuth.expires < Date.now()) {
+		if (currentAuth.expires - TOKEN_REFRESH_BUFFER_MS < Date.now()) {
 			const tokens = await refreshToken(currentAuth.refresh);
 			await setAuth(
 				'anthropic',

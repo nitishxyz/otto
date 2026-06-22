@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
+import type { LineToneRange } from '../../stores/viewerTabsStore';
 import { StableSpinner } from '../ui/StableSpinner';
 
 export interface ChangeCount {
@@ -20,12 +21,18 @@ export function countLineTones(
 		| Map<number, 'add' | 'remove'>
 		| Array<[number, 'add' | 'remove']>
 		| undefined,
+	lineToneRanges?: LineToneRange[],
 ): ChangeCount {
 	let additions = 0;
 	let removals = 0;
 	for (const [, tone] of lineTones ?? []) {
 		if (tone === 'add') additions += 1;
 		else removals += 1;
+	}
+	for (const range of lineToneRanges ?? []) {
+		const count = Math.max(0, range.to - range.from + 1);
+		if (range.tone === 'add') additions += count;
+		else removals += count;
 	}
 	return { additions, removals };
 }

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
 
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const CLAUDE_CLI_VERSION = '1.0.61';
 
 type Mode = 'max' | 'console';
 
@@ -116,28 +117,40 @@ export async function refreshToken(refreshToken: string) {
 	const response = await fetch('https://console.anthropic.com/v1/oauth/token', {
 		method: 'POST',
 		headers: {
-			'Content-Type': 'application/json',
+			'Content-Type': 'application/x-www-form-urlencoded',
+			Accept: 'application/json, text/plain, */*',
+			'User-Agent': `claude-cli/${CLAUDE_CLI_VERSION} (external, cli)`,
 		},
-		body: JSON.stringify({
+		body: new URLSearchParams({
 			grant_type: 'refresh_token',
 			refresh_token: refreshToken,
 			client_id: CLIENT_ID,
-		}),
+		}).toString(),
 	});
+	const json = (await response.json().catch(() => ({}))) as {
+		refresh_token?: string;
+		access_token?: string;
+		expires_in?: number;
+		error?: string;
+		error_description?: string;
+	};
 
-	if (!response.ok) {
-		throw new Error('Failed to refresh token');
+	if (!response.ok || typeof json.access_token !== 'string') {
+		const description =
+			json.error_description ?? json.error ?? `HTTP ${response.status}`;
+		if (response.status === 401 || response.status === 403) {
+			throw new Error(
+				`Claude OAuth refresh token rejected (${description}). Run \`otto auth login anthropic\` again.`,
+			);
+		}
+		throw new Error(`Claude OAuth token refresh failed: ${description}`);
 	}
 
-	const json = (await response.json()) as {
-		refresh_token: string;
-		access_token: string;
-		expires_in: number;
-	};
+	const expiresIn = Number(json.expires_in ?? 0);
 	return {
-		refresh: json.refresh_token,
+		refresh: json.refresh_token || refreshToken,
 		access: json.access_token,
-		expires: Date.now() + json.expires_in * 1000,
+		expires: Date.now() + expiresIn * 1000,
 	};
 }
 

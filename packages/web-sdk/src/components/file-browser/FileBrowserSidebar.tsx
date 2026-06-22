@@ -93,7 +93,7 @@ function TreeItem({
 	const openFile = useFileBrowserStore((s) => s.openFile);
 	const selectedFile = useFileBrowserStore((s) => s.selectedFile);
 	const activeViewerTab = useViewerTabsStore((state) =>
-		state.tabs.find((tab) => tab.id === state.activeTabId),
+		state.activeTabId ? state.tabsById[state.activeTabId] : undefined,
 	);
 	const isExpanded = expandedDirs.has(path);
 	const activeViewerTabPath = getViewerTabPath(activeViewerTab);
@@ -159,7 +159,9 @@ const FileBrowserSidebarContent = memo(function FileBrowserSidebarContent() {
 	const collapseSidebar = useFileBrowserStore((s) => s.collapseSidebar);
 	const revealFile = useFileBrowserStore((s) => s.revealFile);
 	const activeFileTabPath = useViewerTabsStore((state) => {
-		const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+		const activeTab = state.activeTabId
+			? state.tabsById[state.activeTabId]
+			: undefined;
 		return getActiveFileTabPath(activeTab);
 	});
 	const panelWidth = usePanelWidthStore(

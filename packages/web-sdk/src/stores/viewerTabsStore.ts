@@ -14,13 +14,20 @@ export interface ToolActivityAnnotation {
 	reason: 'write' | 'apply_patch';
 	callId?: string;
 	status: 'streaming' | 'success' | 'error';
-	lineTones: Array<[number, 'add' | 'remove']>;
+	lineTones?: Array<[number, 'add' | 'remove']>;
+	lineToneRanges?: LineToneRange[];
 	createdAt: number;
 }
 
 export interface ToolChangeCount {
 	additions: number;
 	removals: number;
+}
+
+export interface LineToneRange {
+	from: number;
+	to: number;
+	tone: 'add' | 'remove';
 }
 
 export type ToolPatchPreviewName = 'apply_patch' | 'edit' | 'multiedit';
@@ -31,11 +38,18 @@ export interface ToolPreviewTabInput {
 	callId?: string;
 	content?: string;
 	baseContent?: string;
+	baseContentHash?: string;
+	baseContentCacheKey?: string;
 	patch?: string;
 	changedLines?: number[];
 	previewContent?: string;
+	previewContentHash?: string;
+	previewContentCacheKey?: string;
 	resultContent?: string;
+	resultContentHash?: string;
+	resultContentCacheKey?: string;
 	previewLineTones?: Array<[number, 'add' | 'remove']>;
+	previewLineToneRanges?: LineToneRange[];
 	previewFirstLine?: number;
 	previewLatestLine?: number;
 	changeCount?: ToolChangeCount;
@@ -54,16 +68,27 @@ export type ToolWritePreview = Omit<
 	ToolPreviewTabInput,
 	| 'toolName'
 	| 'baseContent'
+	| 'baseContentHash'
+	| 'baseContentCacheKey'
 	| 'patch'
 	| 'changedLines'
 	| 'previewContent'
+	| 'previewContentHash'
+	| 'previewContentCacheKey'
 	| 'resultContent'
+	| 'resultContentHash'
+	| 'resultContentCacheKey'
 	| 'previewLineTones'
+	| 'previewLineToneRanges'
 	| 'previewFirstLine'
 	| 'previewLatestLine'
 > & {
 	toolName: 'write';
 };
+
+const MAX_FOLLOW_CREATED_TABS = 10;
+const MAX_STORED_LINE_TONES = 500;
+const MAX_PATCH_PREVIEW_BODY_CACHE_ENTRIES = 24;
 
 export type ViewerTab =
 	| {
@@ -86,6 +111,20 @@ export type ViewerTab =
 			type: 'file';
 			title: string;
 			path: string;
+			createdBy?: 'user' | 'follow';
+			pinned?: boolean;
+			lastAccessedAt?: number;
+			highlight?: ToolActivityHighlight;
+			annotations?: ToolActivityAnnotation[];
+			patchPreview?: ToolPatchPreview;
+			writePreview?: ToolWritePreview;
+	  }
+	| {
+			id: string;
+			type: 'agent-activity';
+			title: string;
+			path: string;
+			lastAccessedAt?: number;
 			highlight?: ToolActivityHighlight;
 			annotations?: ToolActivityAnnotation[];
 			patchPreview?: ToolPatchPreview;
@@ -100,11 +139,18 @@ export type ViewerTab =
 			callId?: string;
 			content?: string;
 			baseContent?: string;
+			baseContentHash?: string;
+			baseContentCacheKey?: string;
 			patch?: string;
 			changedLines?: number[];
 			previewContent?: string;
+			previewContentHash?: string;
+			previewContentCacheKey?: string;
 			resultContent?: string;
+			resultContentHash?: string;
+			resultContentCacheKey?: string;
 			previewLineTones?: Array<[number, 'add' | 'remove']>;
+			previewLineToneRanges?: LineToneRange[];
 			previewFirstLine?: number;
 			previewLatestLine?: number;
 			changeCount?: ToolChangeCount;
@@ -129,15 +175,33 @@ export type ViewerTab =
 
 export type ViewerMode = 'work' | 'preview';
 
-interface ViewerTabsState {
+export interface ViewerTabPayloadCache {
+	patchPreviews: Record<string, ToolPatchPreview | undefined>;
+	writePreviews: Record<string, ToolWritePreview | undefined>;
+}
+
+export interface ViewerTurnFileChange {
+	baselineContent: string;
+	latestContent: string;
+}
+
+export interface ViewerTabsState {
 	tabs: ViewerTab[];
+	tabOrder: string[];
+	tabsById: Record<string, ViewerTab | undefined>;
+	tabPayloads: ViewerTabPayloadCache;
+	turnFileChanges: Record<string, ViewerTurnFileChange | undefined>;
+	markdownPreviewPaths: Record<string, boolean | undefined>;
 	activeTabId: string | null;
 	activeMode: ViewerMode;
 	activeWorkTabId: string | null;
 	activePreviewTabId: string | null;
 	followToolActivity: boolean;
+	followReadActivity: boolean;
 	toggleFollowToolActivity: () => void;
+	toggleFollowReadActivity: () => void;
 	setFollowToolActivity: (enabled: boolean) => void;
+	setFollowReadActivity: (enabled: boolean) => void;
 	setViewerMode: (mode: ViewerMode) => void;
 	openGitDiffTab: (path: string, staged: boolean) => void;
 	openSessionFileDiffTab: (
@@ -147,6 +211,8 @@ interface ViewerTabsState {
 	openFileTab: (path: string) => void;
 	openToolReadTab: (path: string, highlight: ToolActivityHighlight) => void;
 	openToolPreviewTab: (preview: ToolPreviewTabInput) => void;
+	resetFollowTurnChanges: () => void;
+	setMarkdownPreviewEnabled: (path: string, enabled: boolean) => void;
 	openSkillFileTab: (skill: string, file: string | null) => void;
 	openBrowserTab: (
 		url?: string,
@@ -158,6 +224,7 @@ interface ViewerTabsState {
 	) => void;
 	updateBrowserTabUrl: (id: string, url: string) => void;
 	reloadBrowserTab: (id: string) => void;
+	toggleFileTabPinned: (id: string) => void;
 	setActiveTab: (id: string) => void;
 	closeTab: (id: string) => void;
 	updateSessionFileOperationIndex: (id: string, index: number) => void;
@@ -190,6 +257,10 @@ function viewerPathsMatch(left: string, right: string): boolean {
 
 function fileTabId(path: string): string {
 	return `file:${normalizeViewerPath(path)}`;
+}
+
+function agentActivityTabId(path: string): string {
+	return `agent-activity:${normalizeViewerPath(path)}`;
 }
 
 function browserTabId(kind: 'browser' | 'simulator'): string {
@@ -227,6 +298,79 @@ function activeIdForWorkUpdate(
 		: targetId;
 }
 
+function indexTabs(
+	tabs: ViewerTab[],
+): Pick<ViewerTabsState, 'tabOrder' | 'tabsById'> {
+	return {
+		tabOrder: tabs.map((tab) => tab.id),
+		tabsById: Object.fromEntries(tabs.map((tab) => [tab.id, tab])),
+	};
+}
+
+function tabsState(
+	tabs: ViewerTab[],
+): Pick<ViewerTabsState, 'tabs' | 'tabOrder' | 'tabsById'> {
+	return {
+		tabs,
+		...indexTabs(tabs),
+	};
+}
+
+export function hydrateViewerTab(
+	tab: ViewerTab | undefined,
+	payloads: ViewerTabPayloadCache,
+): ViewerTab | undefined {
+	if (!tab) return undefined;
+	if (tab.type === 'file' || tab.type === 'agent-activity') {
+		return {
+			...tab,
+			patchPreview: payloads.patchPreviews[tab.id] ?? tab.patchPreview,
+			writePreview: payloads.writePreviews[tab.id] ?? tab.writePreview,
+		};
+	}
+	if (tab.type === 'tool-preview') {
+		const patchPreview = payloads.patchPreviews[tab.id];
+		if (patchPreview) return { ...tab, ...patchPreview };
+		const writePreview = payloads.writePreviews[tab.id];
+		if (writePreview) return { ...tab, ...writePreview };
+	}
+	return tab;
+}
+
+export function getHydratedViewerTab(
+	state: ViewerTabsState,
+	id: string | null,
+): ViewerTab | undefined {
+	return id
+		? hydrateViewerTab(state.tabsById[id], state.tabPayloads)
+		: undefined;
+}
+
+export function getHydratedViewerTabs(state: ViewerTabsState): ViewerTab[] {
+	return state.tabOrder
+		.map((id) => hydrateViewerTab(state.tabsById[id], state.tabPayloads))
+		.filter((tab): tab is ViewerTab => Boolean(tab));
+}
+
+function withoutTabPayloads(
+	payloads: ViewerTabPayloadCache,
+	ids: Iterable<string>,
+): ViewerTabPayloadCache {
+	const removedIds = new Set(ids);
+	return {
+		patchPreviews: Object.fromEntries(
+			Object.entries(payloads.patchPreviews).filter(
+				([id]) => !removedIds.has(id),
+			),
+		),
+		writePreviews: Object.fromEntries(
+			Object.entries(payloads.writePreviews).filter(
+				([id]) => !removedIds.has(id),
+			),
+		),
+	};
+}
+
 function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
 	const existingIndex = tabs.findIndex((item) => item.id === tab.id);
 	if (existingIndex === -1) {
@@ -238,6 +382,24 @@ function upsertTab(tabs: ViewerTab[], tab: ViewerTab): ViewerTab[] {
 	return next;
 }
 
+function capFollowCreatedTabs(tabs: ViewerTab[]): ViewerTab[] {
+	const candidates = tabs
+		.filter(
+			(tab): tab is Extract<ViewerTab, { type: 'agent-activity' }> =>
+				tab.type === 'agent-activity',
+		)
+		.sort(
+			(left, right) => (left.lastAccessedAt ?? 0) - (right.lastAccessedAt ?? 0),
+		);
+	const overflow = candidates.length - MAX_FOLLOW_CREATED_TABS;
+	if (overflow <= 0) return tabs;
+
+	const evictedIds = new Set(
+		candidates.slice(0, overflow).map((tab) => tab.id),
+	);
+	return tabs.filter((tab) => !evictedIds.has(tab.id));
+}
+
 function isPatchPreviewTool(
 	toolName: ToolPreviewTabInput['toolName'],
 ): toolName is ToolPatchPreviewName {
@@ -246,6 +408,12 @@ function isPatchPreviewTool(
 		toolName === 'edit' ||
 		toolName === 'multiedit'
 	);
+}
+
+function isWritePreviewTool(
+	tab: Extract<ViewerTab, { type: 'tool-preview' }> | undefined,
+): tab is Extract<ViewerTab, { type: 'tool-preview' }> & ToolWritePreview {
+	return tab?.toolName === 'write';
 }
 
 function isSamePatchCall(
@@ -280,6 +448,169 @@ function countContentLines(content: string): number {
 	return content.length === 0 ? 1 : content.split('\n').length;
 }
 
+export function hashViewerText(
+	content: string | undefined,
+): string | undefined {
+	if (content === undefined) return undefined;
+	let hash = 5381;
+	for (let index = 0; index < content.length; index += 1) {
+		hash = (hash * 33) ^ content.charCodeAt(index);
+	}
+	return `${content.length}:${(hash >>> 0).toString(36)}`;
+}
+
+interface PatchPreviewBodyCacheEntry {
+	baseContent?: string;
+	previewContent?: string;
+	resultContent?: string;
+	updatedAt: number;
+}
+
+const patchPreviewBodyCache = new Map<string, PatchPreviewBodyCacheEntry>();
+
+function getPatchPreviewBodyCacheKey(input: {
+	path: string;
+	callId?: string;
+	patch?: string;
+	baseContentHash?: string;
+}): string {
+	return [
+		normalizeViewerPath(input.path),
+		input.callId ?? 'no-call',
+		hashViewerText(input.patch) ?? 'no-patch',
+		input.baseContentHash ?? 'no-base',
+	].join('|');
+}
+
+function prunePatchPreviewBodyCache() {
+	if (patchPreviewBodyCache.size <= MAX_PATCH_PREVIEW_BODY_CACHE_ENTRIES)
+		return;
+	const entries = [...patchPreviewBodyCache.entries()].sort(
+		(left, right) => left[1].updatedAt - right[1].updatedAt,
+	);
+	for (const [key] of entries.slice(
+		0,
+		patchPreviewBodyCache.size - MAX_PATCH_PREVIEW_BODY_CACHE_ENTRIES,
+	)) {
+		patchPreviewBodyCache.delete(key);
+	}
+}
+
+function cachePatchPreviewBodies(
+	key: string,
+	entry: Omit<PatchPreviewBodyCacheEntry, 'updatedAt'>,
+) {
+	const existing = patchPreviewBodyCache.get(key);
+	patchPreviewBodyCache.set(key, {
+		baseContent: entry.baseContent ?? existing?.baseContent,
+		previewContent: entry.previewContent ?? existing?.previewContent,
+		resultContent: entry.resultContent ?? existing?.resultContent,
+		updatedAt: Date.now(),
+	});
+	prunePatchPreviewBodyCache();
+}
+
+export function resolvePatchPreviewBodies(
+	preview: Pick<
+		ToolPatchPreview,
+		| 'baseContent'
+		| 'baseContentCacheKey'
+		| 'previewContent'
+		| 'previewContentCacheKey'
+		| 'resultContent'
+		| 'resultContentCacheKey'
+	>,
+): {
+	baseContent?: string;
+	previewContent?: string;
+	resultContent?: string;
+} {
+	const baseEntry = preview.baseContentCacheKey
+		? patchPreviewBodyCache.get(preview.baseContentCacheKey)
+		: undefined;
+	const previewEntry = preview.previewContentCacheKey
+		? patchPreviewBodyCache.get(preview.previewContentCacheKey)
+		: undefined;
+	const resultEntry = preview.resultContentCacheKey
+		? patchPreviewBodyCache.get(preview.resultContentCacheKey)
+		: undefined;
+	return {
+		baseContent: preview.baseContent ?? baseEntry?.baseContent,
+		previewContent: preview.previewContent ?? previewEntry?.previewContent,
+		resultContent: preview.resultContent ?? resultEntry?.resultContent,
+	};
+}
+
+export function lineToneEntriesToRanges(
+	lineTones: Array<[number, 'add' | 'remove']> | undefined,
+): LineToneRange[] | undefined {
+	if (!lineTones?.length) return undefined;
+	const sorted = [...lineTones].sort((left, right) => left[0] - right[0]);
+	const ranges: LineToneRange[] = [];
+	for (const [line, tone] of sorted) {
+		if (line <= 0) continue;
+		const previous = ranges.at(-1);
+		if (previous && previous.tone === tone && previous.to + 1 === line) {
+			previous.to = line;
+			continue;
+		}
+		ranges.push({ from: line, to: line, tone });
+	}
+	return ranges.length > 0 ? ranges : undefined;
+}
+
+function compactLineTones(
+	lineTones: Array<[number, 'add' | 'remove']> | undefined,
+	lineToneRanges: LineToneRange[] | undefined,
+): Pick<ToolActivityAnnotation, 'lineTones' | 'lineToneRanges'> {
+	if (lineToneRanges?.length) return { lineToneRanges };
+	if (!lineTones?.length) return {};
+	if (lineTones.length > MAX_STORED_LINE_TONES) {
+		return { lineToneRanges: lineToneEntriesToRanges(lineTones) };
+	}
+	return { lineTones };
+}
+
+function compactPreviewLineTones(
+	lineTones: Array<[number, 'add' | 'remove']> | undefined,
+	lineToneRanges: LineToneRange[] | undefined,
+): Pick<ToolPatchPreview, 'previewLineTones' | 'previewLineToneRanges'> {
+	if (lineToneRanges?.length) return { previewLineToneRanges: lineToneRanges };
+	if (!lineTones?.length) return {};
+	if (lineTones.length > MAX_STORED_LINE_TONES) {
+		return { previewLineToneRanges: lineToneEntriesToRanges(lineTones) };
+	}
+	return { previewLineTones: lineTones };
+}
+
+function compactPreviewContent(
+	content: string | undefined,
+	existingContent: string | undefined,
+): Pick<ToolPatchPreview, 'previewContentHash'> {
+	if (content === undefined) {
+		return {
+			previewContentHash: hashViewerText(existingContent),
+		};
+	}
+	return {
+		previewContentHash: hashViewerText(content),
+	};
+}
+
+function compactResultContent(
+	content: string | undefined,
+	existingContent: string | undefined,
+): Pick<ToolPatchPreview, 'resultContentHash'> {
+	if (content === undefined) {
+		return {
+			resultContentHash: hashViewerText(existingContent),
+		};
+	}
+	return {
+		resultContentHash: hashViewerText(content),
+	};
+}
+
 function annotationId(
 	preview: ToolPreviewTabInput,
 	targetPath: string,
@@ -297,14 +628,22 @@ function buildAnnotation(
 	if (preview.toolName === 'write') {
 		const content = preview.content;
 		if (content === undefined) return existing;
+		const lineCount = countContentLines(content);
 		return {
 			id,
 			reason: 'write',
 			callId: preview.callId,
 			status: preview.status,
-			lineTones: Array.from(
-				{ length: countContentLines(content) },
-				(_, index) => [index + 1, 'add' as const],
+			...compactLineTones(
+				lineCount > MAX_STORED_LINE_TONES
+					? undefined
+					: Array.from({ length: lineCount }, (_, index) => [
+							index + 1,
+							'add' as const,
+						]),
+				lineCount > MAX_STORED_LINE_TONES
+					? [{ from: 1, to: lineCount, tone: 'add' }]
+					: undefined,
 			),
 			createdAt: existing?.createdAt ?? Date.now(),
 		};
@@ -316,13 +655,15 @@ function buildAnnotation(
 		: preview.changedLines?.length
 			? preview.changedLines.map((line) => [line, 'add'])
 			: existing?.lineTones;
-	if (!lineTones?.length) return existing;
+	const lineToneRanges =
+		preview.previewLineToneRanges ?? existing?.lineToneRanges;
+	if (!lineTones?.length && !lineToneRanges?.length) return existing;
 	return {
 		id,
 		reason: 'apply_patch',
 		callId: preview.callId,
 		status: preview.status,
-		lineTones,
+		...compactLineTones(lineTones, lineToneRanges),
 		createdAt: existing?.createdAt ?? Date.now(),
 	};
 }
@@ -340,18 +681,101 @@ function upsertAnnotation(
 	return next;
 }
 
+function replaceCurrentAnnotation(
+	annotation: ToolActivityAnnotation | undefined,
+): ToolActivityAnnotation[] | undefined {
+	return annotation ? [annotation] : undefined;
+}
+
+function resolveWriteBaselineContent(input: {
+	turnChange?: ViewerTurnFileChange;
+	existingPatchPreview?: ToolPatchPreview;
+	existingWritePreview?: ToolWritePreview;
+}): string | undefined {
+	if (input.turnChange) return input.turnChange.baselineContent;
+	if (input.existingPatchPreview) {
+		const bodies = resolvePatchPreviewBodies(input.existingPatchPreview);
+		return (
+			bodies.resultContent ??
+			bodies.previewContent ??
+			bodies.baseContent ??
+			input.existingWritePreview?.content
+		);
+	}
+	return input.existingWritePreview?.content;
+}
+
+function resolvePatchLatestContent(input: {
+	preview: ToolPreviewTabInput;
+	existingBodies: ReturnType<typeof resolvePatchPreviewBodies>;
+	samePatchCall: boolean;
+}): string | undefined {
+	return (
+		input.preview.resultContent ??
+		input.preview.previewContent ??
+		(input.samePatchCall
+			? (input.existingBodies.resultContent ??
+				input.existingBodies.previewContent)
+			: undefined)
+	);
+}
+
+function updateTurnFileChange(input: {
+	turnFileChanges: ViewerTabsState['turnFileChanges'];
+	path: string;
+	baselineContent?: string;
+	latestContent?: string;
+}): {
+	turnFileChanges: ViewerTabsState['turnFileChanges'];
+	turnChange?: ViewerTurnFileChange;
+	netUnchanged: boolean;
+} {
+	const key = normalizeViewerPath(input.path);
+	const existing = input.turnFileChanges[key];
+	const baselineContent = existing?.baselineContent ?? input.baselineContent;
+	const latestContent = input.latestContent;
+	if (baselineContent === undefined || latestContent === undefined) {
+		return {
+			turnFileChanges: input.turnFileChanges,
+			turnChange: existing,
+			netUnchanged: false,
+		};
+	}
+	const turnChange = { baselineContent, latestContent };
+	return {
+		turnFileChanges: {
+			...input.turnFileChanges,
+			[key]: turnChange,
+		},
+		turnChange,
+		netUnchanged: latestContent === baselineContent,
+	};
+}
+
 export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	tabs: [],
+	tabOrder: [],
+	tabsById: {},
+	tabPayloads: {
+		patchPreviews: {},
+		writePreviews: {},
+	},
+	turnFileChanges: {},
+	markdownPreviewPaths: {},
 	activeTabId: null,
 	activeMode: 'work',
 	activeWorkTabId: null,
 	activePreviewTabId: null,
 	followToolActivity: false,
+	followReadActivity: false,
 
 	toggleFollowToolActivity: () =>
 		set((state) => ({ followToolActivity: !state.followToolActivity })),
+	toggleFollowReadActivity: () =>
+		set((state) => ({ followReadActivity: !state.followReadActivity })),
 
 	setFollowToolActivity: (enabled) => set({ followToolActivity: enabled }),
+	setFollowReadActivity: (enabled) => set({ followReadActivity: enabled }),
 
 	setViewerMode: (mode) =>
 		set((state) => {
@@ -366,13 +790,15 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openGitDiffTab: (path, staged) => {
 		const id = `git-diff:${staged ? 'staged' : 'unstaged'}:${path}`;
 		set((state) => ({
-			tabs: upsertTab(state.tabs, {
-				id,
-				type: 'git-diff',
-				title: titleFromPath(path),
-				path,
-				staged,
-			}),
+			...tabsState(
+				upsertTab(state.tabs, {
+					id,
+					type: 'git-diff',
+					title: titleFromPath(path),
+					path,
+					staged,
+				}),
+			),
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
@@ -382,14 +808,16 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openSessionFileDiffTab: (path, operations) => {
 		const id = `session-file-diff:${path}`;
 		set((state) => ({
-			tabs: upsertTab(state.tabs, {
-				id,
-				type: 'session-file-diff',
-				title: titleFromPath(path),
-				path,
-				operations,
-				selectedOperationIndex: Math.max(0, operations.length - 1),
-			}),
+			...tabsState(
+				upsertTab(state.tabs, {
+					id,
+					type: 'session-file-diff',
+					title: titleFromPath(path),
+					path,
+					operations,
+					selectedOperationIndex: Math.max(0, operations.length - 1),
+				}),
+			),
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
@@ -399,6 +827,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	openFileTab: (path) => {
 		const id = fileTabId(path);
 		set((state) => {
+			const now = Date.now();
 			const matchingFileTabs = state.tabs.filter(
 				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
 					tab.type === 'file' && viewerPathsMatch(tab.path, path),
@@ -417,16 +846,21 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					),
 			);
 			return {
-				tabs: upsertTab(tabs, {
-					id: targetId,
-					type: 'file',
-					title: existingFile?.title ?? titleFromPath(targetPath),
-					path: targetPath,
-					highlight: existingFile?.highlight,
-					annotations: existingFile?.annotations,
-					patchPreview: existingFile?.patchPreview,
-					writePreview: existingFile?.writePreview,
-				}),
+				...tabsState(
+					upsertTab(tabs, {
+						id: targetId,
+						type: 'file',
+						title: existingFile?.title ?? titleFromPath(targetPath),
+						path: targetPath,
+						createdBy: 'user',
+						pinned: existingFile?.pinned,
+						lastAccessedAt: now,
+						highlight: existingFile?.highlight,
+						annotations: existingFile?.annotations,
+						patchPreview: existingFile?.patchPreview,
+						writePreview: existingFile?.writePreview,
+					}),
+				),
 				activeMode: 'work',
 				activeWorkTabId: targetId,
 				activeTabId: targetId,
@@ -435,36 +869,57 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	},
 
 	openToolReadTab: (path, highlight) => {
-		const id = fileTabId(path);
+		const id = agentActivityTabId(path);
 		set((state) => {
-			const matchingFileTabs = state.tabs.filter(
-				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
-					tab.type === 'file' && viewerPathsMatch(tab.path, path),
+			const now = Date.now();
+			const existingActivity = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'agent-activity' }> =>
+					tab.type === 'agent-activity' && viewerPathsMatch(tab.path, path),
 			);
-			const existingFile =
-				matchingFileTabs.find((tab) => tab.id === state.activeTabId) ??
-				matchingFileTabs[0];
-			const targetId = existingFile?.id ?? id;
-			const targetPath = existingFile?.path ?? path;
+			const targetId = existingActivity?.id ?? id;
+			const targetPath = existingActivity?.path ?? path;
 			const tabs = state.tabs.filter(
 				(tab) =>
 					!(
-						(tab.type === 'tool-preview' || tab.type === 'file') &&
+						(tab.type === 'tool-preview' || tab.type === 'agent-activity') &&
 						tab.id !== targetId &&
 						viewerPathsMatch(tab.path, path)
 					),
 			);
-			return {
-				tabs: upsertTab(tabs, {
+			const nextTabs = capFollowCreatedTabs(
+				upsertTab(tabs, {
 					id: targetId,
-					type: 'file',
-					title: existingFile?.title ?? titleFromPath(targetPath),
+					type: 'agent-activity',
+					title: existingActivity?.title ?? titleFromPath(targetPath),
 					path: targetPath,
+					lastAccessedAt: now,
 					highlight,
-					annotations: existingFile?.annotations,
+					annotations: existingActivity?.annotations,
 					patchPreview: undefined,
 					writePreview: undefined,
 				}),
+			);
+			const removedIds = new Set(
+				state.tabs
+					.map((tab) => tab.id)
+					.filter((tabId) => !nextTabs.some((tab) => tab.id === tabId)),
+			);
+			const retainedPayloads = withoutTabPayloads(
+				state.tabPayloads,
+				removedIds,
+			);
+			return {
+				...tabsState(nextTabs),
+				tabPayloads: {
+					patchPreviews: {
+						...retainedPayloads.patchPreviews,
+						[targetId]: undefined,
+					},
+					writePreviews: {
+						...retainedPayloads.writePreviews,
+						[targetId]: undefined,
+					},
+				},
 				activeWorkTabId: targetId,
 				activeTabId: activeIdForWorkUpdate(state, targetId),
 			};
@@ -472,17 +927,17 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	},
 
 	openToolPreviewTab: (preview) => {
-		const id = fileTabId(preview.path);
+		const id = agentActivityTabId(preview.path);
 		set((state) => {
-			const matchingFileTabs = state.tabs.filter(
-				(tab): tab is Extract<ViewerTab, { type: 'file' }> =>
-					tab.type === 'file' && viewerPathsMatch(tab.path, preview.path),
+			const now = Date.now();
+			let nextTurnFileChanges = state.turnFileChanges;
+			const existingActivity = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'agent-activity' }> =>
+					tab.type === 'agent-activity' &&
+					viewerPathsMatch(tab.path, preview.path),
 			);
-			const existingFile =
-				matchingFileTabs.find((tab) => tab.id === state.activeTabId) ??
-				matchingFileTabs[0];
-			const targetId = existingFile?.id ?? id;
-			const targetPath = existingFile?.path ?? preview.path;
+			const targetId = existingActivity?.id ?? id;
+			const targetPath = existingActivity?.path ?? preview.path;
 			const existing = state.tabs.find(
 				(tab): tab is Extract<ViewerTab, { type: 'tool-preview' }> =>
 					tab.type === 'tool-preview' &&
@@ -491,7 +946,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			const tabs = state.tabs.filter(
 				(tab) =>
 					!(
-						(tab.type === 'tool-preview' || tab.type === 'file') &&
+						(tab.type === 'tool-preview' || tab.type === 'agent-activity') &&
 						tab.id !== targetId &&
 						(viewerPathsMatch(tab.path, preview.path) ||
 							Boolean(
@@ -503,153 +958,354 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			);
 			if (isPatchPreviewTool(preview.toolName)) {
 				const existingPatchPreview =
-					existingFile?.patchPreview ??
+					state.tabPayloads.patchPreviews[targetId] ??
+					existingActivity?.patchPreview ??
 					(existing && isPatchPreviewTool(existing.toolName)
 						? existing
 						: undefined);
+				const existingBodies = existingPatchPreview
+					? resolvePatchPreviewBodies(existingPatchPreview)
+					: {};
 				const samePatchCall = isSamePatchCall(existingPatchPreview, preview);
-				const baseContent =
-					preview.baseContent ??
-					(samePatchCall
-						? existingPatchPreview?.baseContent
-						: (existingPatchPreview?.resultContent ??
-							existingPatchPreview?.baseContent));
+				const compactPreview = compactPreviewContent(
+					preview.previewContent,
+					samePatchCall ? existingBodies.previewContent : undefined,
+				);
+				const compactResult = compactResultContent(
+					preview.resultContent,
+					samePatchCall ? existingBodies.resultContent : undefined,
+				);
+				const compactTones = compactPreviewLineTones(
+					preview.previewLineTones ??
+						(samePatchCall
+							? existingPatchPreview?.previewLineTones
+							: undefined),
+					preview.previewLineToneRanges ??
+						(samePatchCall
+							? existingPatchPreview?.previewLineToneRanges
+							: undefined),
+				);
+				const baseContent = preview.baseContent ?? existingBodies.baseContent;
+				const baseContentHash = hashViewerText(baseContent);
+				const turnChangeResult =
+					preview.status === 'success'
+						? updateTurnFileChange({
+								turnFileChanges: state.turnFileChanges,
+								path: targetPath,
+								baselineContent: baseContent,
+								latestContent: resolvePatchLatestContent({
+									preview,
+									existingBodies,
+									samePatchCall,
+								}),
+							})
+						: undefined;
+				nextTurnFileChanges =
+					turnChangeResult?.turnFileChanges ?? nextTurnFileChanges;
+				const bodyCacheKey = getPatchPreviewBodyCacheKey({
+					path: targetPath,
+					callId: preview.callId ?? existingPatchPreview?.callId,
+					patch: turnChangeResult?.netUnchanged
+						? undefined
+						: (preview.patch ?? existingPatchPreview?.patch),
+					baseContentHash: turnChangeResult?.turnChange
+						? hashViewerText(turnChangeResult.turnChange.baselineContent)
+						: baseContentHash,
+				});
+				const effectiveBaseContent =
+					turnChangeResult?.turnChange?.baselineContent ?? baseContent;
+				const effectiveLatestContent =
+					turnChangeResult?.turnChange?.latestContent ??
+					preview.resultContent ??
+					preview.previewContent ??
+					(samePatchCall ? existingBodies.resultContent : undefined);
+				cachePatchPreviewBodies(bodyCacheKey, {
+					baseContent: effectiveBaseContent,
+					previewContent:
+						effectiveLatestContent ??
+						preview.previewContent ??
+						(samePatchCall ? existingBodies.previewContent : undefined),
+					resultContent:
+						effectiveLatestContent ??
+						preview.resultContent ??
+						(samePatchCall ? existingBodies.resultContent : undefined),
+				});
 				const changedLines = samePatchCall
 					? (preview.changedLines ?? existingPatchPreview?.changedLines)
 					: mergeChangedLines(
 							existingPatchPreview?.changedLines,
 							preview.changedLines,
 						);
-				const annotationPreview = {
-					...preview,
-					changedLines: preview.changedLines,
+				const shouldClearNetPreview = turnChangeResult?.netUnchanged === true;
+				const shouldShowOperationPreview =
+					preview.status === 'streaming' ||
+					(preview.status === 'success' && !shouldClearNetPreview);
+				const patchPreview: ToolPatchPreview = {
+					path: targetPath,
+					toolName: preview.toolName,
+					callId: preview.callId ?? existingPatchPreview?.callId,
+					baseContent: undefined,
+					baseContentHash: hashViewerText(effectiveBaseContent),
+					baseContentCacheKey: bodyCacheKey,
+					patch: shouldClearNetPreview
+						? undefined
+						: (preview.patch ?? existingPatchPreview?.patch),
+					changedLines: shouldClearNetPreview ? undefined : changedLines,
+					...(shouldClearNetPreview
+						? { previewContentHash: hashViewerText(effectiveLatestContent) }
+						: compactPreview),
+					previewContent: undefined,
+					previewContentCacheKey: bodyCacheKey,
+					...(shouldClearNetPreview
+						? { resultContentHash: hashViewerText(effectiveLatestContent) }
+						: compactResult),
+					resultContent: undefined,
+					resultContentCacheKey: bodyCacheKey,
+					...(shouldClearNetPreview ? {} : compactTones),
+					previewFirstLine: shouldClearNetPreview
+						? undefined
+						: (preview.previewFirstLine ??
+							(samePatchCall
+								? existingPatchPreview?.previewFirstLine
+								: undefined)),
+					previewLatestLine: shouldClearNetPreview
+						? undefined
+						: (preview.previewLatestLine ??
+							(samePatchCall
+								? existingPatchPreview?.previewLatestLine
+								: undefined)),
+					status: preview.status,
+					error: preview.error ?? existingPatchPreview?.error,
 				};
-				const existingAnnotation = existingFile?.annotations?.find(
-					(annotation) =>
-						annotation.id === annotationId(annotationPreview, targetPath),
+				const nextTabs = capFollowCreatedTabs(
+					upsertTab(tabs, {
+						id: targetId,
+						type: 'agent-activity',
+						title: existingActivity?.title ?? titleFromPath(targetPath),
+						path: targetPath,
+						lastAccessedAt: now,
+						highlight: undefined,
+						annotations: undefined,
+						writePreview: undefined,
+						patchPreview: undefined,
+					}),
 				);
-				const annotations = upsertAnnotation(
-					existingFile?.annotations,
-					buildAnnotation(annotationPreview, targetPath, existingAnnotation),
+				const removedIds = new Set(
+					state.tabs
+						.map((tab) => tab.id)
+						.filter((tabId) => !nextTabs.some((tab) => tab.id === tabId)),
+				);
+				const retainedPayloads = withoutTabPayloads(
+					state.tabPayloads,
+					removedIds,
 				);
 				return {
-					tabs: upsertTab(tabs, {
-						id: targetId,
-						type: 'file',
-						title: existingFile?.title ?? titleFromPath(targetPath),
-						path: targetPath,
-						highlight: undefined,
-						annotations,
-						writePreview: undefined,
-						patchPreview: {
-							path: targetPath,
-							toolName: preview.toolName,
-							callId: preview.callId ?? existingPatchPreview?.callId,
-							baseContent,
-							patch: preview.patch ?? existingPatchPreview?.patch,
-							changedLines,
-							previewContent:
-								preview.previewContent ??
-								(samePatchCall
-									? existingPatchPreview?.previewContent
-									: undefined),
-							resultContent:
-								preview.resultContent ??
-								(samePatchCall
-									? existingPatchPreview?.resultContent
-									: undefined),
-							previewLineTones:
-								preview.previewLineTones ??
-								(samePatchCall
-									? existingPatchPreview?.previewLineTones
-									: undefined),
-							previewFirstLine:
-								preview.previewFirstLine ??
-								(samePatchCall
-									? existingPatchPreview?.previewFirstLine
-									: undefined),
-							previewLatestLine:
-								preview.previewLatestLine ??
-								(samePatchCall
-									? existingPatchPreview?.previewLatestLine
-									: undefined),
-							status: preview.status,
-							error: preview.error ?? existingPatchPreview?.error,
+					...tabsState(nextTabs),
+					tabPayloads: {
+						patchPreviews: {
+							...retainedPayloads.patchPreviews,
+							[targetId]: shouldShowOperationPreview ? patchPreview : undefined,
 						},
-					}),
+						writePreviews: {
+							...retainedPayloads.writePreviews,
+							[targetId]: undefined,
+						},
+					},
+					turnFileChanges: nextTurnFileChanges,
 					activeWorkTabId: targetId,
 					activeTabId: activeIdForWorkUpdate(state, targetId),
 				};
 			}
-			if (existingFile) {
-				const existingWritePreview = existingFile.writePreview;
-				const existingAnnotation = existingFile.annotations?.find(
+			if (existingActivity) {
+				const existingWritePreview =
+					state.tabPayloads.writePreviews[targetId] ??
+					existingActivity.writePreview;
+				const existingPatchPreview =
+					state.tabPayloads.patchPreviews[targetId] ??
+					existingActivity.patchPreview;
+				const turnChangeResult =
+					preview.status === 'success'
+						? updateTurnFileChange({
+								turnFileChanges: state.turnFileChanges,
+								path: targetPath,
+								baselineContent: resolveWriteBaselineContent({
+									turnChange:
+										state.turnFileChanges[normalizeViewerPath(targetPath)],
+									existingPatchPreview,
+									existingWritePreview,
+								}),
+								latestContent: preview.content ?? existingWritePreview?.content,
+							})
+						: undefined;
+				nextTurnFileChanges =
+					turnChangeResult?.turnFileChanges ?? nextTurnFileChanges;
+				const existingAnnotation = existingActivity.annotations?.find(
 					(annotation) => annotation.id === annotationId(preview, targetPath),
 				);
-				const annotations = upsertAnnotation(
-					existingFile.annotations,
-					buildAnnotation(preview, targetPath, existingAnnotation),
+				const sameWriteCall = Boolean(
+					preview.callId && existingWritePreview?.callId === preview.callId,
+				);
+				const annotations = sameWriteCall
+					? upsertAnnotation(
+							existingActivity.annotations,
+							buildAnnotation(preview, targetPath, existingAnnotation),
+						)
+					: replaceCurrentAnnotation(
+							buildAnnotation(preview, targetPath, existingAnnotation),
+						);
+				const writePreview: ToolWritePreview = {
+					path: targetPath,
+					toolName: 'write',
+					callId: preview.callId ?? existingWritePreview?.callId,
+					content: preview.content ?? existingWritePreview?.content,
+					changeCount: preview.changeCount ?? existingWritePreview?.changeCount,
+					status: preview.status,
+					error: preview.error ?? existingWritePreview?.error,
+				};
+				const shouldClearNetPreview = turnChangeResult?.netUnchanged === true;
+				const shouldShowOperationPreview =
+					preview.status === 'streaming' ||
+					(preview.status === 'success' && !shouldClearNetPreview);
+				const nextTabs = capFollowCreatedTabs(
+					upsertTab(tabs, {
+						...existingActivity,
+						lastAccessedAt: now,
+						highlight: undefined,
+						annotations:
+							shouldShowOperationPreview && !shouldClearNetPreview
+								? annotations
+								: undefined,
+						patchPreview: undefined,
+						writePreview: undefined,
+					}),
+				);
+				const removedIds = new Set(
+					state.tabs
+						.map((tab) => tab.id)
+						.filter((tabId) => !nextTabs.some((tab) => tab.id === tabId)),
+				);
+				const retainedPayloads = withoutTabPayloads(
+					state.tabPayloads,
+					removedIds,
 				);
 				return {
-					tabs: upsertTab(tabs, {
-						...existingFile,
-						highlight: undefined,
-						annotations,
-						patchPreview: undefined,
-						writePreview: {
-							path: targetPath,
-							toolName: 'write',
-							callId: preview.callId ?? existingWritePreview?.callId,
-							content: preview.content ?? existingWritePreview?.content,
-							changeCount:
-								preview.changeCount ?? existingWritePreview?.changeCount,
-							status: preview.status,
-							error: preview.error ?? existingWritePreview?.error,
+					...tabsState(nextTabs),
+					tabPayloads: {
+						patchPreviews: {
+							...retainedPayloads.patchPreviews,
+							[targetId]: undefined,
 						},
-					}),
+						writePreviews: {
+							...retainedPayloads.writePreviews,
+							[targetId]: shouldShowOperationPreview ? writePreview : undefined,
+						},
+					},
+					turnFileChanges: nextTurnFileChanges,
 					activeWorkTabId: targetId,
 					activeTabId: activeIdForWorkUpdate(state, targetId),
 				};
 			}
 			const existingWrite =
-				existing?.toolName === 'write' ? existing : undefined;
+				state.tabPayloads.writePreviews[id] ??
+				(isWritePreviewTool(existing) ? existing : undefined);
+			const turnChangeResult =
+				preview.status === 'success'
+					? updateTurnFileChange({
+							turnFileChanges: state.turnFileChanges,
+							path: preview.path,
+							baselineContent: resolveWriteBaselineContent({
+								turnChange:
+									state.turnFileChanges[normalizeViewerPath(preview.path)],
+								existingWritePreview: existingWrite,
+							}),
+							latestContent: preview.content ?? existingWrite?.content,
+						})
+					: undefined;
+			nextTurnFileChanges =
+				turnChangeResult?.turnFileChanges ?? nextTurnFileChanges;
 			const annotation = buildAnnotation(preview, preview.path);
-			return {
-				tabs: upsertTab(tabs, {
+			const writePreview: ToolWritePreview = {
+				path: preview.path,
+				toolName: 'write',
+				callId: preview.callId,
+				content: preview.content ?? existingWrite?.content,
+				changeCount: preview.changeCount ?? existingWrite?.changeCount,
+				status: preview.status,
+				error: preview.error ?? existingWrite?.error,
+			};
+			const shouldClearNetPreview = turnChangeResult?.netUnchanged === true;
+			const shouldShowOperationPreview =
+				preview.status === 'streaming' ||
+				(preview.status === 'success' && !shouldClearNetPreview);
+			const nextTabs = capFollowCreatedTabs(
+				upsertTab(tabs, {
 					id,
-					type: 'file',
+					type: 'agent-activity',
 					title: titleFromPath(preview.path),
 					path: preview.path,
+					lastAccessedAt: now,
 					highlight: undefined,
-					annotations: annotation ? [annotation] : undefined,
+					annotations:
+						shouldShowOperationPreview && !shouldClearNetPreview
+							? annotation
+								? [annotation]
+								: undefined
+							: undefined,
 					patchPreview: undefined,
-					writePreview: {
-						path: preview.path,
-						toolName: 'write',
-						callId: preview.callId,
-						content: preview.content ?? existingWrite?.content,
-						changeCount: preview.changeCount ?? existingWrite?.changeCount,
-						status: preview.status,
-						error: preview.error ?? existingWrite?.error,
-					},
+					writePreview: undefined,
 				}),
+			);
+			const removedIds = new Set(
+				state.tabs
+					.map((tab) => tab.id)
+					.filter((tabId) => !nextTabs.some((tab) => tab.id === tabId)),
+			);
+			const retainedPayloads = withoutTabPayloads(
+				state.tabPayloads,
+				removedIds,
+			);
+			return {
+				...tabsState(nextTabs),
+				tabPayloads: {
+					patchPreviews: {
+						...retainedPayloads.patchPreviews,
+						[id]: undefined,
+					},
+					writePreviews: {
+						...retainedPayloads.writePreviews,
+						[id]: shouldShowOperationPreview ? writePreview : undefined,
+					},
+				},
+				turnFileChanges: nextTurnFileChanges,
 				activeWorkTabId: id,
 				activeTabId: activeIdForWorkUpdate(state, id),
 			};
 		});
 	},
 
+	resetFollowTurnChanges: () => set({ turnFileChanges: {} }),
+
+	setMarkdownPreviewEnabled: (path, enabled) =>
+		set((state) => ({
+			markdownPreviewPaths: {
+				...state.markdownPreviewPaths,
+				[normalizeViewerPath(path)]: enabled,
+			},
+		})),
+
 	openSkillFileTab: (skill, file) => {
 		const displayFile = file ?? 'SKILL.md';
 		const id = `skill-file:${skill}:${displayFile}`;
 		set((state) => ({
-			tabs: upsertTab(state.tabs, {
-				id,
-				type: 'skill-file',
-				title: titleFromPath(displayFile),
-				skill,
-				file,
-			}),
+			...tabsState(
+				upsertTab(state.tabs, {
+					id,
+					type: 'skill-file',
+					title: titleFromPath(displayFile),
+					skill,
+					file,
+				}),
+			),
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
@@ -666,14 +1322,16 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 					!shouldCreate && tab.type === 'browser' && tab.id === id,
 			);
 			return {
-				tabs: upsertTab(state.tabs, {
-					id,
-					type: 'browser',
-					title: options.title ?? existing?.title ?? 'Browser',
-					url: url || existing?.url || '',
-					kind,
-					reloadKey: existing?.reloadKey ?? 0,
-				}),
+				...tabsState(
+					upsertTab(state.tabs, {
+						id,
+						type: 'browser',
+						title: options.title ?? existing?.title ?? 'Browser',
+						url: url || existing?.url || '',
+						kind,
+						reloadKey: existing?.reloadKey ?? 0,
+					}),
+				),
 				activeMode: 'preview',
 				activePreviewTabId: id,
 				activeTabId: id,
@@ -683,23 +1341,38 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 
 	updateBrowserTabUrl: (id, url) =>
 		set((state) => ({
-			tabs: state.tabs.map((tab) =>
-				tab.id === id && tab.type === 'browser'
-					? {
-							...tab,
-							url,
-							title: tab.kind === 'simulator' ? 'Simulator' : 'Browser',
-						}
-					: tab,
+			...tabsState(
+				state.tabs.map((tab) =>
+					tab.id === id && tab.type === 'browser'
+						? {
+								...tab,
+								url,
+								title: tab.kind === 'simulator' ? 'Simulator' : 'Browser',
+							}
+						: tab,
+				),
 			),
 		})),
 
 	reloadBrowserTab: (id) =>
 		set((state) => ({
-			tabs: state.tabs.map((tab) =>
-				tab.id === id && tab.type === 'browser'
-					? { ...tab, reloadKey: tab.reloadKey + 1 }
-					: tab,
+			...tabsState(
+				state.tabs.map((tab) =>
+					tab.id === id && tab.type === 'browser'
+						? { ...tab, reloadKey: tab.reloadKey + 1 }
+						: tab,
+				),
+			),
+		})),
+
+	toggleFileTabPinned: (id) =>
+		set((state) => ({
+			...tabsState(
+				state.tabs.map((tab) =>
+					tab.id === id && tab.type === 'file'
+						? { ...tab, pinned: !tab.pinned }
+						: tab,
+				),
 			),
 		})),
 
@@ -749,7 +1422,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			}
 
 			return {
-				tabs,
+				...tabsState(tabs),
+				tabPayloads: withoutTabPayloads(state.tabPayloads, [id]),
 				activeMode,
 				activeWorkTabId,
 				activePreviewTabId,
@@ -760,16 +1434,26 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 
 	updateSessionFileOperationIndex: (id, index) =>
 		set((state) => ({
-			tabs: state.tabs.map((tab) =>
-				tab.id === id && tab.type === 'session-file-diff'
-					? { ...tab, selectedOperationIndex: index }
-					: tab,
+			...tabsState(
+				state.tabs.map((tab) =>
+					tab.id === id && tab.type === 'session-file-diff'
+						? { ...tab, selectedOperationIndex: index }
+						: tab,
+				),
 			),
 		})),
 
 	closeAllTabs: () =>
 		set({
 			tabs: [],
+			tabOrder: [],
+			tabsById: {},
+			tabPayloads: {
+				patchPreviews: {},
+				writePreviews: {},
+			},
+			turnFileChanges: {},
+			markdownPreviewPaths: {},
 			activeTabId: null,
 			activeMode: 'work',
 			activeWorkTabId: null,

@@ -35,7 +35,15 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CodeMirrorTextSelection } from '../../lib/fileSelectionContext';
 
 export type CodeMirrorLineTone = 'add' | 'remove' | 'primary';
+export interface CodeMirrorLineToneRange {
+	from: number;
+	to: number;
+	tone: CodeMirrorLineTone;
+}
 type CodeMirrorLineNumberFormatter = (lineNumber: number) => string;
+
+const LARGE_SYNTAX_DISABLE_CHARS = 80_000;
+const SMALL_CHANGE_MAX_CHARS = 20_000;
 
 interface CodeMirrorViewerProps {
 	content: string;
@@ -44,6 +52,7 @@ interface CodeMirrorViewerProps {
 	highlightedLines?: Set<number>;
 	highlightTone?: CodeMirrorLineTone;
 	lineTones?: Map<number, CodeMirrorLineTone>;
+	lineToneRanges?: readonly CodeMirrorLineToneRange[];
 	scrollToLine?: number;
 	scrollToEndSignal?: string | number;
 	disableMarkdownSyntax?: boolean;
@@ -212,27 +221,58 @@ function lineDecorationsExtension(
 	highlightedLines?: Set<number>,
 	highlightTone: CodeMirrorLineTone = 'primary',
 	lineTones?: Map<number, CodeMirrorLineTone>,
+	lineToneRanges?: readonly CodeMirrorLineToneRange[],
 ): Extension {
 	return EditorView.decorations.compute(['doc'], (state): DecorationSet => {
-		const decorations: Array<{ line: number; tone: CodeMirrorLineTone }> = [];
-		for (const [line, tone] of lineTones ?? []) {
-			if (line > 0) decorations.push({ line, tone });
-		}
-		for (const line of highlightedLines ?? []) {
-			if (line > 0 && !lineTones?.has(line)) {
-				decorations.push({ line, tone: highlightTone });
-			}
-		}
-		decorations.sort((a, b) => a.line - b.line);
+		const sortedRanges = lineToneRanges?.length
+			? [...lineToneRanges]
+					.filter((range) => range.to > 0 && range.from <= state.doc.lines)
+					.sort((left, right) => left.from - right.from)
+			: [];
+		const sortedToneLines = lineTones?.size
+			? [...lineTones.entries()]
+					.filter(([line]) => line > 0 && line <= state.doc.lines)
+					.sort((left, right) => left[0] - right[0])
+			: [];
+		const sortedHighlightedLines = highlightedLines?.size
+			? [...highlightedLines]
+					.filter((line) => line > 0 && line <= state.doc.lines)
+					.sort((left, right) => left - right)
+			: [];
+		let toneIndex = 0;
+		let highlightIndex = 0;
+		let rangeIndex = 0;
 
 		const builder = new RangeSetBuilder<Decoration>();
-		for (const { line, tone } of decorations) {
-			if (line > state.doc.lines) continue;
+		for (let line = 1; line <= state.doc.lines; line += 1) {
+			while (sortedToneLines[toneIndex]?.[0] < line) toneIndex += 1;
+			while (sortedHighlightedLines[highlightIndex] < line) highlightIndex += 1;
+			while (sortedRanges[rangeIndex]?.to < line) rangeIndex += 1;
+			const range = sortedRanges[rangeIndex];
+			const rangeTone =
+				range && line >= range.from && line <= range.to
+					? range.tone
+					: undefined;
+			const tone =
+				sortedToneLines[toneIndex]?.[0] === line
+					? sortedToneLines[toneIndex]?.[1]
+					: (rangeTone ??
+						(sortedHighlightedLines[highlightIndex] === line
+							? highlightTone
+							: undefined));
+			if (!tone) continue;
+			const position = state.doc.line(line).from;
 			builder.add(
-				state.doc.line(line).from,
-				state.doc.line(line).from,
+				position,
+				position,
 				Decoration.line({ class: `cm-line-${tone}` }),
 			);
+			if (
+				toneIndex < sortedToneLines.length &&
+				sortedToneLines[toneIndex]?.[0] === line
+			) {
+				toneIndex += 1;
+			}
 		}
 		return builder.finish();
 	});
@@ -300,6 +340,50 @@ function lineNumbersExtension(
 	return lineNumbers({ formatNumber: lineNumberFormatter });
 }
 
+function getIncrementalContentChange(
+	previous: string,
+	next: string,
+): { from: number; to: number; insert: string } | null {
+	if (previous === next) return null;
+	if (next.startsWith(previous)) {
+		return {
+			from: previous.length,
+			to: previous.length,
+			insert: next.slice(previous.length),
+		};
+	}
+
+	let prefixLength = 0;
+	const maxPrefixLength = Math.min(previous.length, next.length);
+	while (
+		prefixLength < maxPrefixLength &&
+		previous.charCodeAt(prefixLength) === next.charCodeAt(prefixLength)
+	) {
+		prefixLength += 1;
+	}
+
+	let previousSuffix = previous.length;
+	let nextSuffix = next.length;
+	while (
+		previousSuffix > prefixLength &&
+		nextSuffix > prefixLength &&
+		previous.charCodeAt(previousSuffix - 1) === next.charCodeAt(nextSuffix - 1)
+	) {
+		previousSuffix -= 1;
+		nextSuffix -= 1;
+	}
+
+	const removedLength = previousSuffix - prefixLength;
+	const insertedLength = nextSuffix - prefixLength;
+	if (removedLength + insertedLength > SMALL_CHANGE_MAX_CHARS) return null;
+
+	return {
+		from: prefixLength,
+		to: previousSuffix,
+		insert: next.slice(prefixLength, nextSuffix),
+	};
+}
+
 function getTextSelection(view: EditorView): CodeMirrorTextSelection | null {
 	const { state } = view;
 	const range = state.selection.main;
@@ -354,6 +438,7 @@ export function CodeMirrorViewer({
 	highlightedLines,
 	highlightTone = 'primary',
 	lineTones,
+	lineToneRanges,
 	scrollToLine,
 	scrollToEndSignal,
 	disableMarkdownSyntax = false,
@@ -382,12 +467,22 @@ export function CodeMirrorViewer({
 		[lineNumberFormatter],
 	);
 	const languageExtension = useMemo(
-		() => getLanguageExtension(path, disableMarkdownSyntax),
-		[path, disableMarkdownSyntax],
+		() =>
+			getLanguageExtension(
+				path,
+				disableMarkdownSyntax || content.length > LARGE_SYNTAX_DISABLE_CHARS,
+			),
+		[path, disableMarkdownSyntax, content.length],
 	);
 	const decorationsExtension = useMemo(
-		() => lineDecorationsExtension(highlightedLines, highlightTone, lineTones),
-		[highlightedLines, highlightTone, lineTones],
+		() =>
+			lineDecorationsExtension(
+				highlightedLines,
+				highlightTone,
+				lineTones,
+				lineToneRanges,
+			),
+		[highlightedLines, highlightTone, lineTones, lineToneRanges],
 	);
 	const selectionExtension = useMemo(
 		() =>
@@ -527,8 +622,13 @@ export function CodeMirrorViewer({
 		}
 
 		try {
+			const change = getIncrementalContentChange(contentRef.current, content);
 			view.dispatch({
-				changes: { from: 0, to: view.state.doc.length, insert: content },
+				changes: change ?? {
+					from: 0,
+					to: view.state.doc.length,
+					insert: content,
+				},
 			});
 		} catch {
 			view.setState(createEditorState(content));
