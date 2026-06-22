@@ -86,8 +86,9 @@ export function usePreferences() {
 	);
 
 	useEffect(() => {
+		if (!config) return;
 		applyFontFamily(resolvedPreferences.fontFamily);
-	}, [resolvedPreferences.fontFamily]);
+	}, [config, resolvedPreferences.fontFamily]);
 
 	const updatePreferences = useCallback(
 		(updates: Partial<Preferences>) => {
