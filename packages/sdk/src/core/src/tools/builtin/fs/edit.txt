@@ -1,10 +1,10 @@
 Replace an exact text block in an existing file.
 
-Prefer `apply_patch` for most code/text edits when it is available, because it produces the clearest diff preview. Use `edit` when you have one precise old/new text replacement, when a patch would be awkward, or after patch attempts fail.
+Use this tool for one precise old/new text replacement in one existing file.
 
 Rules:
 - You must read the file first in the current session before editing it.
 - Prefer exact `oldString` text copied from the latest read output.
 - If there is no exact match, the tool may apply a unique whole-line match after whitespace normalization (tabs/spaces, leading/trailing whitespace, and repeated internal whitespace). It will not guess through non-whitespace text differences.
 - If `oldString` appears multiple times, provide more context or set `replaceAll: true`.
-- Use `write` for new files and a structural editing tool for multi-file diffs when that capability exists.
+- This tool only modifies existing files.

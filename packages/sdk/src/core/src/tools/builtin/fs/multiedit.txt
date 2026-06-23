@@ -1,6 +1,6 @@
 Apply multiple exact text replacements to a single existing file atomically.
 
-Prefer `apply_patch` for most code/text edits when it is available, especially when a diff is easy to express. Use `multiedit` when you have several precise old/new replacements in one file, when a patch would be awkward, or after patch attempts fail.
+Use this tool for several precise old/new text replacements in one existing file.
 
 Rules:
 - Read the file first before editing.

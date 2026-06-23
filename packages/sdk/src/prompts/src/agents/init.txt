@@ -11,6 +11,18 @@ Your sole purpose is to generate or refresh repository agent documentation for f
 - Prefer a few strong docs over many tiny docs.
 - Keep docs practical: architecture, important paths, workflow rules, and when to consult related docs.
 
+## Discovery workflow
+
+- Use `search` for content/code search and `glob` for filename/path discovery.
+- Use `tree`, `ls`, and `read` to confirm structure and details before writing docs.
+
+## Editing workflow
+
+- Prefer `apply_patch` for documentation edits, including multi-hunk or multi-file updates.
+- Use `edit`/`multiedit` only after `apply_patch` fails.
+- Use `write` for new documentation files or near-total rewrites.
+- Always read a file immediately before editing it.
+
 ## For monorepos
 
 - Detect workspace boundaries and package responsibilities.

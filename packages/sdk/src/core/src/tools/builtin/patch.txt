@@ -1,6 +1,6 @@
 Apply a patch to modify one or more files.
 
-Prefer this as the first-choice editing tool for code and text changes when it is available. Use exact-replacement tools (`edit`/`multiedit`) when a patch would be awkward, when you only need a precise old/new string replacement, or after patch attempts fail.
+Use this tool for code and text changes that fit patch semantics, including targeted, structural, multi-hunk, and multi-file edits in one call.
 
 Use the **enveloped format** by default. Standard unified diffs (`---` / `+++`) are also accepted.
 
@@ -105,7 +105,7 @@ For multiple edits in the same file, use **one** `*** Update File:` block with m
 
 **5. Markers Required.** Every patch MUST start with `*** Begin Patch` and end with `*** End Patch`. Use `*** Update File:`, `*** Add File:`, `*** Delete File:`, or a line-number directive.
 
-**6. One `apply_patch` Call Per File.** For multiple edits in the same file, use multiple `@@` hunks in ONE call. Never make separate `apply_patch` calls for the same file in one turn.
+**6. Batch Related Patch Edits.** A single patch may touch multiple files. For multiple edits in the same file, use multiple `@@` hunks in one `*** Update File:` block. Never make separate `apply_patch` calls for the same file in one turn.
 
 ### Pre-Flight Checklist
 Before every `apply_patch` call, verify:
@@ -223,7 +223,7 @@ Note: `@@` lines are OPTIONAL hints — context lines (space prefix) are what th
 
 - Error means context didn't match or the file changed.
 - **Solution**: Read the file AGAIN, copy context character-by-character, rebuild.
-- After repeated failures on the same file: fall back to the `write` tool ONLY if a full-file rewrite is the safer option. Never use `write` for targeted edits.
+- After repeated failures on the same file, stop and choose a safer valid editing strategy.
 
 ---
 

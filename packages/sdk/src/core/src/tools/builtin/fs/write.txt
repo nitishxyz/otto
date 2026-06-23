@@ -6,6 +6,6 @@
 Usage tips:
 - Use for creating NEW files
 - Use when replacing >70% of a file's content (almost complete rewrite)
-- NEVER use for partial/targeted edits - use the dedicated exact-editing tools first, or a structural editing tool for larger changes when available
+- NEVER use for partial/targeted edits
 - Using write for partial edits wastes output tokens and risks hallucinating unchanged parts
 - Prefer idempotent writes by providing the full intended content when you do use write
