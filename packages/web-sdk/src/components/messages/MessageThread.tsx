@@ -50,6 +50,11 @@ const TODO_TOOL_NAMES = new Set([
 	'UpdatePlan',
 ]);
 
+// True bottom tolerance. Auto-follow only resumes when the user is essentially
+// pinned to the bottom, not merely "near" it. Resuming inside a large band is
+// what made the thread yank the user back down mid-stream.
+const BOTTOM_RESUME_THRESHOLD_PX = 8;
+
 const TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT = 12;
 const TODO_SNAPSHOT_SCAN_PART_LIMIT = 500;
 
@@ -527,6 +532,66 @@ export const MessageThread = memo(function MessageThread({
 		}
 	}, [latestTodoSnapshot, messages.length, sessionId, setSessionTodos]);
 
+	const disableAutoFollow = useCallback(() => {
+		autoScrollRef.current = false;
+		userScrollingRef.current = true;
+		setAutoScroll(false);
+		if (userScrollTimeoutRef.current) {
+			clearTimeout(userScrollTimeoutRef.current);
+		}
+		userScrollTimeoutRef.current = setTimeout(() => {
+			userScrollingRef.current = false;
+		}, 150);
+	}, []);
+
+	// Wheel / touch give us an unambiguous "user wants to scroll up" signal that
+	// is impossible to confuse with programmatic follow scrolls. The moment the
+	// user scrolls up we stop following, even within the bottom band.
+	const lastTouchYRef = useRef(0);
+	const handleWheelIntent = useCallback(
+		(event: WheelEvent) => {
+			if (event.deltaY < 0) disableAutoFollow();
+		},
+		[disableAutoFollow],
+	);
+	const handleTouchStartIntent = useCallback((event: TouchEvent) => {
+		lastTouchYRef.current = event.touches[0]?.clientY ?? 0;
+	}, []);
+	const handleTouchMoveIntent = useCallback(
+		(event: TouchEvent) => {
+			const y = event.touches[0]?.clientY ?? 0;
+			// Finger dragging downward scrolls content up.
+			if (y > lastTouchYRef.current + 2) disableAutoFollow();
+			lastTouchYRef.current = y;
+		},
+		[disableAutoFollow],
+	);
+
+	const detachScrollIntentRef = useRef<(() => void) | undefined>(undefined);
+	const attachScrollIntentListeners = useCallback(
+		(element: HTMLElement | null) => {
+			if (detachScrollIntentRef.current) {
+				detachScrollIntentRef.current();
+				detachScrollIntentRef.current = undefined;
+			}
+			scrollContainerRef.current = element;
+			if (!element) return;
+			element.addEventListener('wheel', handleWheelIntent, { passive: true });
+			element.addEventListener('touchstart', handleTouchStartIntent, {
+				passive: true,
+			});
+			element.addEventListener('touchmove', handleTouchMoveIntent, {
+				passive: true,
+			});
+			detachScrollIntentRef.current = () => {
+				element.removeEventListener('wheel', handleWheelIntent);
+				element.removeEventListener('touchstart', handleTouchStartIntent);
+				element.removeEventListener('touchmove', handleTouchMoveIntent);
+			};
+		},
+		[handleWheelIntent, handleTouchStartIntent, handleTouchMoveIntent],
+	);
+
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
@@ -534,29 +599,21 @@ export const MessageThread = memo(function MessageThread({
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-		const userScrolledUp = scrollTop < lastScrollTopRef.current - 5;
+		// Programmatic follow scrolls only ever move downward, so a decrease in
+		// scrollTop is always user-initiated. Use a small tolerance so trackpad
+		// nudges still count.
+		const userScrolledUp = scrollTop < lastScrollTopRef.current - 2;
 
 		lastScrollHeightRef.current = scrollHeight;
 		lastScrollTopRef.current = scrollTop;
 
-		if (distanceFromBottom < 100) {
+		if (userScrolledUp && distanceFromBottom > BOTTOM_RESUME_THRESHOLD_PX) {
+			disableAutoFollow();
+		} else if (distanceFromBottom <= BOTTOM_RESUME_THRESHOLD_PX) {
+			// Back at the true bottom → resume following.
 			autoScrollRef.current = true;
+			userScrollingRef.current = false;
 			setAutoScroll(true);
-		} else if (userScrolledUp) {
-			autoScrollRef.current = false;
-			setAutoScroll(false);
-			userScrollingRef.current = true;
-		}
-		if (
-			userScrolledUp ||
-			(!autoScrollRef.current && distanceFromBottom >= 100)
-		) {
-			if (userScrollTimeoutRef.current) {
-				clearTimeout(userScrollTimeoutRef.current);
-			}
-			userScrollTimeoutRef.current = setTimeout(() => {
-				userScrollingRef.current = false;
-			}, 150);
 		}
 
 		const headerElement = sessionHeaderRef.current;
@@ -565,7 +622,7 @@ export const MessageThread = memo(function MessageThread({
 			const containerRect = container.getBoundingClientRect();
 			setShowLeanHeader(headerRect.bottom < containerRect.top);
 		}
-	}, []);
+	}, [disableAutoFollow]);
 
 	const scrollToThreadBottom = useCallback(
 		(behavior: ScrollBehavior = 'auto') => {
@@ -658,6 +715,10 @@ export const MessageThread = memo(function MessageThread({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: messages dep needed for streaming content updates
 	useLayoutEffect(() => {
 		if (disableAutoScroll) return;
+		// `autoScrollRef` is the single source of truth for "should follow". It is
+		// flipped off the instant the user scrolls up (wheel/touch/scrollbar) and
+		// back on only when they return to the true bottom, so this no longer
+		// fights the user mid-stream.
 		if (!autoScrollRef.current || userScrollingRef.current) return;
 		scheduleScrollToThreadBottom('auto', 1);
 	}, [messages, disableAutoScroll, scheduleScrollToThreadBottom]);
@@ -669,6 +730,10 @@ export const MessageThread = memo(function MessageThread({
 			}
 			if (animationFrameRef.current) {
 				cancelAnimationFrame(animationFrameRef.current);
+			}
+			if (detachScrollIntentRef.current) {
+				detachScrollIntentRef.current();
+				detachScrollIntentRef.current = undefined;
 			}
 		};
 	}, []);
@@ -809,8 +874,9 @@ export const MessageThread = memo(function MessageThread({
 						autoScrollRef.current && isAtBottom ? 'auto' : false
 					}
 					scrollerRef={(ref) => {
-						scrollContainerRef.current =
-							ref instanceof HTMLElement ? ref : null;
+						attachScrollIntentListeners(
+							ref instanceof HTMLElement ? ref : null,
+						);
 					}}
 					onScroll={handleScroll}
 					isScrolling={setIsThreadScrolling}

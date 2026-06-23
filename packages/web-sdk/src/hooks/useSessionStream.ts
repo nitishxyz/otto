@@ -1067,7 +1067,98 @@ export function useSessionStream(
 			return indexes.length > 0 ? Math.max(...indexes) + 0.001 : 0;
 		};
 
-		const applyReasoningDelta = (
+		// Streaming text/reasoning deltas arrive faster than the browser can
+		// usefully repaint (often several per frame). Applying each one
+		// synchronously forces a full thread re-render and a full markdown
+		// re-parse per token, which makes streaming look jagged. Instead we
+		// coalesce deltas and flush them at most once per animation frame.
+		type PendingDelta = {
+			messageId: string;
+			partId: string;
+			type: 'text' | 'reasoning';
+			delta: string;
+			stepIndex: number | null;
+		};
+
+		const pendingDeltas = new Map<string, PendingDelta>();
+		let deltaFlushHandle: ReturnType<typeof requestAnimationFrame> | null =
+			null;
+
+		const buildStreamingPart = (
+			targetMessage: Message,
+			entry: PendingDelta,
+			index: number,
+		): MessagePart => ({
+			id: entry.partId,
+			messageId: entry.messageId,
+			index,
+			stepIndex: entry.stepIndex,
+			type: entry.type,
+			content: JSON.stringify({ text: entry.delta }),
+			contentJson: { text: entry.delta },
+			agent: targetMessage.agent,
+			provider: targetMessage.provider,
+			model: targetMessage.model,
+			startedAt: Date.now(),
+			completedAt: null,
+			toolName: null,
+			toolCallId: null,
+			toolDurationMs: null,
+		});
+
+		const flushPendingDeltas = () => {
+			if (deltaFlushHandle !== null) {
+				cancelAnimationFrame(deltaFlushHandle);
+				deltaFlushHandle = null;
+			}
+			if (pendingDeltas.size === 0) return;
+			const batch = [...pendingDeltas.values()];
+			pendingDeltas.clear();
+			queryClient.setQueryData<Message[]>(
+				['messages', sessionId],
+				(oldMessages) => {
+					if (!oldMessages) return oldMessages;
+					let nextMessages: Message[] | null = null;
+					for (const entry of batch) {
+						const source = nextMessages ?? oldMessages;
+						const messageIndex = source.findIndex(
+							(message) => message.id === entry.messageId,
+						);
+						if (messageIndex === -1) continue;
+						if (!nextMessages) nextMessages = [...oldMessages];
+						const targetMessage = nextMessages[messageIndex];
+						const parts = targetMessage.parts ? [...targetMessage.parts] : [];
+						const partIndex = parts.findIndex(
+							(part) => part.id === entry.partId,
+						);
+						if (partIndex === -1) {
+							parts.push(
+								buildStreamingPart(
+									targetMessage,
+									entry,
+									getOptimisticPartIndex(parts, entry.stepIndex),
+								),
+							);
+						} else {
+							const existing = parts[partIndex];
+							const nextText = `${extractText(existing)}${entry.delta}`;
+							parts[partIndex] = {
+								...existing,
+								content: JSON.stringify({ text: nextText }),
+								contentJson: { text: nextText },
+								stepIndex: entry.stepIndex ?? existing.stepIndex ?? null,
+								completedAt: null,
+							};
+						}
+						nextMessages[messageIndex] = { ...targetMessage, parts };
+					}
+					return nextMessages ?? oldMessages;
+				},
+			);
+		};
+
+		const enqueueStreamingDelta = (
+			type: 'text' | 'reasoning',
 			payload: Record<string, unknown> | undefined,
 		) => {
 			const messageId =
@@ -1076,123 +1167,38 @@ export function useSessionStream(
 				typeof payload?.partId === 'string' ? payload.partId : null;
 			const delta = typeof payload?.delta === 'string' ? payload.delta : null;
 			if (!messageId || !partId || delta === null) return;
-			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
-				(oldMessages) => {
-					if (!oldMessages) return oldMessages;
-					const nextMessages = [...oldMessages];
-					const messageIndex = nextMessages.findIndex(
-						(message) => message.id === messageId,
-					);
-					if (messageIndex === -1) return oldMessages;
-					const targetMessage = nextMessages[messageIndex];
-					const parts = targetMessage.parts ? [...targetMessage.parts] : [];
-					let partIndex = parts.findIndex((part) => part.id === partId);
-					const stepIndex =
-						typeof payload?.stepIndex === 'number' ? payload.stepIndex : null;
-					if (partIndex === -1) {
-						const newPart: MessagePart = {
-							id: partId,
-							messageId,
-							index: getOptimisticPartIndex(parts, stepIndex),
-							stepIndex,
-							type: 'reasoning',
-							content: JSON.stringify({ text: delta }),
-							contentJson: { text: delta },
-							agent: targetMessage.agent,
-							provider: targetMessage.provider,
-							model: targetMessage.model,
-							startedAt: Date.now(),
-							completedAt: null,
-							toolName: null,
-							toolCallId: null,
-							toolDurationMs: null,
-						};
-						parts.push(newPart);
-						partIndex = parts.length - 1;
-					} else {
-						const existing = parts[partIndex];
-						const previous = extractText(existing);
-						const nextText = `${previous}${delta}`;
-						parts[partIndex] = {
-							...existing,
-							content: JSON.stringify({ text: nextText }),
-							contentJson: { text: nextText },
-							stepIndex: stepIndex ?? existing.stepIndex ?? null,
-							completedAt: null,
-						};
-					}
-					nextMessages[messageIndex] = { ...targetMessage, parts };
-					return nextMessages;
-				},
-			);
+			const stepIndex =
+				typeof payload?.stepIndex === 'number' ? payload.stepIndex : null;
+			const key = `${messageId}:${partId}`;
+			const existing = pendingDeltas.get(key);
+			if (existing) {
+				existing.delta += delta;
+				if (stepIndex !== null) existing.stepIndex = stepIndex;
+			} else {
+				pendingDeltas.set(key, { messageId, partId, type, delta, stepIndex });
+			}
+			if (deltaFlushHandle === null) {
+				deltaFlushHandle = requestAnimationFrame(flushPendingDeltas);
+			}
+		};
+
+		const applyReasoningDelta = (
+			payload: Record<string, unknown> | undefined,
+		) => {
+			enqueueStreamingDelta('reasoning', payload);
 		};
 
 		const applyMessageDelta = (
 			payload: Record<string, unknown> | undefined,
 		) => {
-			const messageId =
-				typeof payload?.messageId === 'string' ? payload.messageId : null;
-			const partId =
-				typeof payload?.partId === 'string' ? payload.partId : null;
 			const payloadType =
 				typeof payload?.type === 'string' ? payload.type : undefined;
 			if (payloadType === 'error') {
+				flushPendingDeltas();
 				upsertErrorPart(payload);
 				return;
 			}
-			const delta = typeof payload?.delta === 'string' ? payload.delta : null;
-			if (!messageId || !partId || delta === null) return;
-			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
-				(oldMessages) => {
-					if (!oldMessages) return oldMessages;
-					const nextMessages = [...oldMessages];
-					const messageIndex = nextMessages.findIndex(
-						(message) => message.id === messageId,
-					);
-					if (messageIndex === -1) return oldMessages;
-					const targetMessage = nextMessages[messageIndex];
-					const parts = targetMessage.parts ? [...targetMessage.parts] : [];
-					let partIndex = parts.findIndex((part) => part.id === partId);
-					const stepIndex =
-						typeof payload?.stepIndex === 'number' ? payload.stepIndex : null;
-					if (partIndex === -1) {
-						const newPart: MessagePart = {
-							id: partId,
-							messageId,
-							index: getOptimisticPartIndex(parts, stepIndex),
-							stepIndex,
-							type: 'text',
-							content: JSON.stringify({ text: delta }),
-							contentJson: { text: delta },
-							agent: targetMessage.agent,
-							provider: targetMessage.provider,
-							model: targetMessage.model,
-							startedAt: Date.now(),
-							completedAt: null,
-							toolName: null,
-							toolCallId: null,
-							toolDurationMs: null,
-						};
-						parts.push(newPart);
-						partIndex = parts.length - 1;
-					} else {
-						const existing = parts[partIndex];
-						const previous = extractText(existing);
-						const nextText = `${previous}${delta}`;
-						parts[partIndex] = {
-							...existing,
-							content: JSON.stringify({ text: nextText }),
-							contentJson: { text: nextText },
-							stepIndex: stepIndex ?? existing.stepIndex ?? null,
-							completedAt: null,
-						};
-					}
-					nextMessages[messageIndex] = { ...targetMessage, parts };
-					return nextMessages;
-				},
-			);
+			enqueueStreamingDelta('text', payload);
 		};
 
 		const toRecord = (value: unknown): Record<string, unknown> | null => {
@@ -1740,6 +1746,15 @@ export function useSessionStream(
 			// console.log('[useSessionStream] Event received:', event);
 			const payload = event.payload as Record<string, unknown> | undefined;
 
+			// Apply any buffered streaming text before handling structural events
+			// (tool calls, completion, etc.) so ordering stays correct.
+			if (
+				event.type !== 'message.part.delta' &&
+				event.type !== 'reasoning.delta'
+			) {
+				flushPendingDeltas();
+			}
+
 			switch (event.type) {
 				case 'message.created': {
 					const role = typeof payload?.role === 'string' ? payload.role : null;
@@ -2033,6 +2048,11 @@ export function useSessionStream(
 		});
 
 		return () => {
+			if (deltaFlushHandle !== null) {
+				cancelAnimationFrame(deltaFlushHandle);
+				deltaFlushHandle = null;
+			}
+			pendingDeltas.clear();
 			unsubscribe();
 			client.disconnect();
 		};
