@@ -15,6 +15,7 @@ export type ProjectRecipe = {
 	name: string;
 	description?: string;
 	agent: string;
+	includeInHistory: boolean;
 	path: string;
 	content: string;
 	instructions: string;
@@ -61,13 +62,15 @@ export async function loadProjectRecipe(
 		return null;
 	}
 
-	const { agent, description, instructions } = parseRecipeContent(content);
+	const { agent, description, includeInHistory, instructions } =
+		parseRecipeContent(content);
 	if (!instructions.trim()) return null;
 
 	return {
 		name,
 		agent,
 		description,
+		includeInHistory,
 		path: recipePath,
 		content,
 		instructions,
@@ -104,6 +107,7 @@ export async function prepareRecipeCommand(args: {
 	name: string;
 	description?: string;
 	agent: string;
+	includeInHistory: boolean;
 	provider?: string;
 	model?: string;
 	prompt: string;
@@ -121,6 +125,7 @@ export async function prepareRecipeCommand(args: {
 		name: recipe.name,
 		description: recipe.description,
 		agent,
+		includeInHistory: recipe.includeInHistory,
 		provider: agentConfig.provider,
 		model: agentConfig.model,
 		prompt: buildRecipePrompt(args.projectRoot, recipe, invocation.args),
@@ -130,11 +135,16 @@ export async function prepareRecipeCommand(args: {
 export function parseRecipeContent(content: string): {
 	agent: string;
 	description?: string;
+	includeInHistory: boolean;
 	instructions: string;
 } {
 	const parsed = extractFrontmatter(content);
 	if (!parsed) {
-		return { agent: DEFAULT_RECIPE_AGENT, instructions: content.trim() };
+		return {
+			agent: DEFAULT_RECIPE_AGENT,
+			includeInHistory: true,
+			instructions: content.trim(),
+		};
 	}
 
 	return {
@@ -142,6 +152,8 @@ export function parseRecipeContent(content: string): {
 			readFrontmatterString(parsed.frontmatter, 'agent') ??
 			DEFAULT_RECIPE_AGENT,
 		description: readFrontmatterString(parsed.frontmatter, 'description'),
+		includeInHistory:
+			readFrontmatterBoolean(parsed.frontmatter, 'includeInHistory') ?? true,
 		instructions: parsed.body.trim(),
 	};
 }
@@ -170,6 +182,16 @@ function readFrontmatterString(
 		if (!value) return undefined;
 		return value.replace(/^['"]|['"]$/g, '');
 	}
+	return undefined;
+}
+
+function readFrontmatterBoolean(
+	frontmatter: string,
+	key: string,
+): boolean | undefined {
+	const value = readFrontmatterString(frontmatter, key)?.toLowerCase();
+	if (value === 'true' || value === 'yes' || value === '1') return true;
+	if (value === 'false' || value === 'no' || value === '0') return false;
 	return undefined;
 }
 

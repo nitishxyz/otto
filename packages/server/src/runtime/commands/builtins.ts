@@ -93,7 +93,7 @@ export async function prepareBuiltinCommand(args: {
 			agent: recipeCommand.agent,
 			provider: recipeCommand.provider,
 			model: recipeCommand.model,
-			omitHistory: true,
+			omitHistory: !recipeCommand.includeInHistory,
 			additionalPromptMessages: [
 				{ role: 'user', content: recipeCommand.prompt },
 			],

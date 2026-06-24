@@ -58,7 +58,7 @@ function readUserTextPart(parts: MessagePartRow[]): string | null {
 	return null;
 }
 
-async function isRecipeInvocationMessage(args: {
+async function shouldExcludeRecipeInvocationFromHistory(args: {
 	projectRoot?: string;
 	parts: MessagePartRow[];
 }): Promise<boolean> {
@@ -67,7 +67,8 @@ async function isRecipeInvocationMessage(args: {
 	if (!text) return false;
 	const invocation = parseRecipeInvocation(text);
 	if (!invocation) return false;
-	return Boolean(await loadProjectRecipe(args.projectRoot, invocation.name));
+	const recipe = await loadProjectRecipe(args.projectRoot, invocation.name);
+	return recipe ? !recipe.includeInHistory : false;
 }
 
 /**
@@ -138,7 +139,7 @@ export async function buildHistoryMessages(
 
 		if (message.role === 'user') {
 			if (
-				await isRecipeInvocationMessage({
+				await shouldExcludeRecipeInvocationFromHistory({
 					projectRoot: options?.projectRoot,
 					parts,
 				})

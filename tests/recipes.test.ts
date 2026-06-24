@@ -50,6 +50,7 @@ describe('project recipes', () => {
 			const recipes = await discoverProjectRecipes(projectRoot);
 			expect(recipes.map((recipe) => recipe.name)).toEqual(['publish-ready']);
 			expect(recipes[0]?.agent).toBe('build');
+			expect(recipes[0]?.includeInHistory).toBe(true);
 			expect(recipes[0]?.description).toBe('Set publish flags');
 			expect(recipes[0]?.instructions).toBe('Update publish.env.');
 		} finally {
@@ -76,6 +77,7 @@ describe('project recipes', () => {
 				content: '/publish-ready web',
 			});
 			expect(command?.name).toBe('publish-ready');
+			expect(command?.includeInHistory).toBe(true);
 			expect(command?.prompt).toContain(
 				'Run the project recipe /publish-ready.',
 			);
@@ -157,7 +159,7 @@ describe('project recipes', () => {
 		}
 	});
 
-	it('omits prior recipe invocations and replies from future history', async () => {
+	it('omits recipe invocations and replies from history when configured', async () => {
 		const { projectRoot, recipesDir, cleanup } = await setupProject();
 		try {
 			await writeFile(
@@ -165,6 +167,7 @@ describe('project recipes', () => {
 				[
 					'---',
 					'description: Set publish flags',
+					'includeInHistory: false',
 					'---',
 					'',
 					'Update publish.env and run bun lint.',
@@ -226,6 +229,81 @@ describe('project recipes', () => {
 			expect(serialized).toContain('after recipe');
 			expect(serialized).not.toContain('/publish-ready');
 			expect(serialized).not.toContain('recipe reply');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('keeps recipe invocations and replies in history when configured', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			await writeFile(
+				join(recipesDir, 'refactor-thing.md'),
+				[
+					'---',
+					'description: Refactor a specific area',
+					'includeInHistory: true',
+					'---',
+					'',
+					'Refactor the requested area.',
+				].join('\n'),
+			);
+
+			const command = await prepareRecipeCommand({
+				projectRoot,
+				content: '/refactor-thing auth',
+			});
+			expect(command?.includeInHistory).toBe(true);
+
+			const db = await getDb(projectRoot);
+			const now = Date.now();
+			await db.insert(sessions).values({
+				id: 'recipe-include-history-session',
+				agent: 'build',
+				provider: 'openai',
+				model: 'gpt-4.1',
+				projectPath: projectRoot,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+
+			const rows = [
+				{ id: 'user-recipe', role: 'user', text: '/refactor-thing auth' },
+				{ id: 'assistant-recipe', role: 'assistant', text: 'refactor reply' },
+			];
+			for (let index = 0; index < rows.length; index++) {
+				const row = rows[index];
+				await db.insert(messages).values({
+					id: row.id,
+					sessionId: 'recipe-include-history-session',
+					role: row.role,
+					status: 'complete',
+					agent: 'build',
+					provider: 'openai',
+					model: 'gpt-4.1',
+					createdAt: now + index,
+				});
+				await db.insert(messageParts).values({
+					id: `${row.id}-part`,
+					messageId: row.id,
+					index: 0,
+					type: 'text',
+					content: JSON.stringify({ text: row.text }),
+					agent: 'build',
+					provider: 'openai',
+					model: 'gpt-4.1',
+				});
+			}
+
+			const history = await buildHistoryMessages(
+				db,
+				'recipe-include-history-session',
+				undefined,
+				{ projectRoot },
+			);
+			const serialized = JSON.stringify(history);
+			expect(serialized).toContain('/refactor-thing auth');
+			expect(serialized).toContain('refactor reply');
 		} finally {
 			await cleanup();
 		}

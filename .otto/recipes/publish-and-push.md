@@ -1,6 +1,7 @@
 ---
 description: Set publish.env flags, commit, and push to trigger release
 agent: composer
+includeInHistory: false
 ---
 
 Update `publish.env` for a publish run, then commit and push.

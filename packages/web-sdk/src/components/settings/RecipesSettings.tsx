@@ -18,6 +18,7 @@ function defaultRecipeContent(name: string) {
 		'---',
 		`description: Describe what /${name || 'recipe-name'} does`,
 		`agent: ${DEFAULT_RECIPE_AGENT}`,
+		'includeInHistory: true',
 		'---',
 		'',
 		'Write natural-language instructions for Otto here.',
@@ -50,6 +51,7 @@ function setFrontmatterField(content: string, key: string, value: string) {
 export function RecipesSettings() {
 	const recipeNameId = useId();
 	const recipeAgentId = useId();
+	const recipeIncludeInHistoryId = useId();
 	const recipeContentId = useId();
 	const recipesQuery = useRecipes();
 	const agentsQuery = useMentionAgents();
@@ -59,11 +61,13 @@ export function RecipesSettings() {
 	const agents = agentsQuery.data?.agents ?? [];
 	const [selectedName, setSelectedName] = useState('');
 	const [draftAgent, setDraftAgent] = useState(DEFAULT_RECIPE_AGENT);
+	const [draftIncludeInHistory, setDraftIncludeInHistory] = useState(true);
 	const [draftName, setDraftName] = useState('');
 	const [draftContent, setDraftContent] = useState('');
 	const [savedDraft, setSavedDraft] = useState<{
 		name: string;
 		agent: string;
+		includeInHistory: boolean;
 		content: string;
 	} | null>(null);
 
@@ -83,6 +87,7 @@ export function RecipesSettings() {
 		(!savedDraft ||
 			effectiveName !== savedDraft.name ||
 			draftAgent !== savedDraft.agent ||
+			draftIncludeInHistory !== savedDraft.includeInHistory ||
 			draftContent !== savedDraft.content);
 
 	function selectRecipe(name: string) {
@@ -90,12 +95,14 @@ export function RecipesSettings() {
 		setSelectedName(name);
 		setDraftName(name);
 		setDraftAgent(recipe?.agent || DEFAULT_RECIPE_AGENT);
+		setDraftIncludeInHistory(recipe?.includeInHistory ?? true);
 		setDraftContent(recipe?.content ?? '');
 		setSavedDraft(
 			recipe
 				? {
 						name: recipe.name,
 						agent: recipe.agent || DEFAULT_RECIPE_AGENT,
+						includeInHistory: recipe.includeInHistory,
 						content: recipe.content,
 					}
 				: null,
@@ -107,6 +114,7 @@ export function RecipesSettings() {
 		setSelectedName('');
 		setDraftName(name);
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
+		setDraftIncludeInHistory(true);
 		setDraftContent(defaultRecipeContent(name));
 		setSavedDraft(null);
 	}
@@ -115,6 +123,7 @@ export function RecipesSettings() {
 		setSelectedName('');
 		setDraftName('');
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
+		setDraftIncludeInHistory(true);
 		setDraftContent('');
 		setSavedDraft(null);
 	}
@@ -131,9 +140,13 @@ export function RecipesSettings() {
 
 		try {
 			const content = setFrontmatterField(
-				draftContent,
-				'agent',
-				draftAgent || DEFAULT_RECIPE_AGENT,
+				setFrontmatterField(
+					draftContent,
+					'agent',
+					draftAgent || DEFAULT_RECIPE_AGENT,
+				),
+				'includeInHistory',
+				String(draftIncludeInHistory),
 			);
 			await saveRecipe.mutateAsync({
 				name: effectiveName,
@@ -145,6 +158,7 @@ export function RecipesSettings() {
 			setSavedDraft({
 				name: effectiveName,
 				agent: draftAgent || DEFAULT_RECIPE_AGENT,
+				includeInHistory: draftIncludeInHistory,
 				content,
 			});
 			toast.success(`Saved /${effectiveName}`);
@@ -299,6 +313,24 @@ export function RecipesSettings() {
 							</div>
 						</div>
 					</div>
+					<label
+						className="mb-3 flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-2.5 py-2 text-xs text-muted-foreground"
+						htmlFor={recipeIncludeInHistoryId}
+					>
+						<input
+							id={recipeIncludeInHistoryId}
+							type="checkbox"
+							checked={draftIncludeInHistory}
+							onChange={(event) =>
+								setDraftIncludeInHistory(event.target.checked)
+							}
+							className="mt-0.5 h-3.5 w-3.5 rounded border-border bg-background accent-primary"
+						/>
+						<span>
+							Include this recipe run in session history and let it use prior
+							context.
+						</span>
+					</label>
 
 					{/* Instructions */}
 					<div className="flex min-h-0 flex-1 flex-col">

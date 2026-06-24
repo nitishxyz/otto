@@ -8,6 +8,7 @@ import { extractErrorMessage } from './utils';
 export interface Recipe {
 	name: string;
 	agent: string;
+	includeInHistory: boolean;
 	description: string;
 	path: string;
 	content: string;

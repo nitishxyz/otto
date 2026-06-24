@@ -36,6 +36,7 @@ function recipeToResponse(
 	return {
 		name: recipe.name,
 		agent: recipe.agent,
+		includeInHistory: recipe.includeInHistory,
 		description: recipe.description ?? '',
 		path: recipe.path,
 		content: recipe.content,
@@ -50,6 +51,7 @@ export async function listRecipes(c: Context) {
 			recipes: recipes.map((recipe) => ({
 				name: recipe.name,
 				agent: recipe.agent,
+				includeInHistory: recipe.includeInHistory,
 				description: recipe.description ?? '',
 				path: recipe.path,
 				content: recipe.content,

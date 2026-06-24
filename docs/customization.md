@@ -20,6 +20,7 @@ Create `.otto/recipes/publish-ready.md`:
 ---
 description: Set publish flags and verify readiness
 agent: build
+includeInHistory: false
 ---
 
 Update `publish.env` for publishing.
@@ -36,7 +37,7 @@ Usage:
 /publish-ready web cli
 ```
 
-Arguments after the recipe name are passed to Otto as recipe arguments. Recipes run through the normal agent flow and keep the usual tool approval, editing, and safety rules. The optional `agent` frontmatter chooses which agent runs the recipe; it defaults to `build`, and unavailable agents fall back to `build`. You can also ask Otto to create or edit a recipe; it should write markdown files under `.otto/recipes/`.
+Arguments after the recipe name are passed to Otto as recipe arguments. Recipes run through the normal agent flow and keep the usual tool approval, editing, and safety rules. The optional `agent` frontmatter chooses which agent runs the recipe; it defaults to `build`, and unavailable agents fall back to `build`. By default, recipes are included in session history, so they can use prior context and remain in future context. Set `includeInHistory: false` when a recipe should run isolated from session history. You can also ask Otto to create or edit a recipe; it should write markdown files under `.otto/recipes/`.
 
 ## Custom commands
 

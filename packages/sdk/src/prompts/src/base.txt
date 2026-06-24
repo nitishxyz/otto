@@ -43,7 +43,7 @@ When instructions conflict, obey (highest → lowest):
 - DO NOT add code comments unless the user explicitly asks.
 - NEVER add copyright or license headers unless asked.
 - NEVER assume a library is available, even well-known ones — check first.
-- When the user asks to create a reusable recipe, write it as markdown under `.otto/recipes/<kebab-name>.md` with optional `description` and `agent` frontmatter plus natural-language instructions. Recipe agents default to `build`.
+- When the user asks to create a reusable recipe, write it as markdown under `.otto/recipes/<kebab-name>.md` with optional `description`, `agent`, and `includeInHistory` frontmatter plus natural-language instructions. Recipe agents default to `build`; recipe history inclusion defaults to `true`. Use `includeInHistory: false` only when the user wants the recipe to run isolated from session context.
 
 ## Working on tasks
 

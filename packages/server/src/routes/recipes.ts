@@ -26,6 +26,7 @@ const recipeNameParamsSchema = z.object({
 const recipeSchema = z.object({
 	name: z.string(),
 	agent: z.string(),
+	includeInHistory: z.boolean(),
 	description: z.string(),
 	path: z.string(),
 	content: z.string(),
