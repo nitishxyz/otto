@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { createToolError } from '../error.ts';
@@ -21,10 +21,14 @@ const HID_KEYBOARD_V = 25;
 let previewProcess: ChildProcess | null = null;
 let previewStdout = '';
 let previewStderr = '';
-let serveSimCommand: {
+type ServeSimCommand = {
 	command: string;
+	argsPrefix: string[];
 	cwd?: string;
-} | null = null;
+	runner: string;
+};
+
+let serveSimCommand: ServeSimCommand | null = null;
 
 const buttonNames = [
 	'home',
@@ -253,20 +257,96 @@ function getAgiBinDir() {
 	return join(configBase, 'otto', 'bin');
 }
 
-function findServeSimCommand() {
+const SERVE_SIM_PACKAGE = 'serve-sim@latest';
+
+function executableName(name: string): string {
+	return process.platform === 'win32' ? `${name}.exe` : name;
+}
+
+function findExecutable(name: string): string | null {
+	const binary = executableName(name);
+	const pathDirs = (process.env.PATH || '').split(
+		process.platform === 'win32' ? ';' : ':',
+	);
+	const home = process.env.HOME || process.env.USERPROFILE || '';
+	const candidates = [
+		...pathDirs.map((dir) => join(dir, binary)),
+		...(home ? [join(home, '.bun', 'bin', binary)] : []),
+		join('/opt', 'homebrew', 'bin', binary),
+		join('/usr', 'local', 'bin', binary),
+		join('/usr', 'bin', binary),
+	];
+	return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+function resolveConfiguredServeSim(): ServeSimCommand | null {
+	const configured = process.env.OTTO_SERVE_SIM_BIN?.trim();
+	if (!configured) return null;
+	const command = isAbsolute(configured) ? configured : configured;
+	return existsSync(command) || !isAbsolute(command)
+		? { command, argsPrefix: [], cwd: dirname(command), runner: 'custom' }
+		: null;
+}
+
+function resolvePackageRunner(): ServeSimCommand | null {
+	const bun = findExecutable('bun');
+	if (bun) {
+		return {
+			command: bun,
+			argsPrefix: ['x', SERVE_SIM_PACKAGE],
+			runner: 'bun x serve-sim@latest',
+		};
+	}
+
+	const npx = findExecutable('npx');
+	if (npx) {
+		return {
+			command: npx,
+			argsPrefix: ['--yes', SERVE_SIM_PACKAGE],
+			runner: 'npx --yes serve-sim@latest',
+		};
+	}
+
+	return null;
+}
+
+function resolvePathServeSim(): ServeSimCommand | null {
+	const serveSim = findExecutable('serve-sim');
+	if (!serveSim) return null;
+	return {
+		command: serveSim,
+		argsPrefix: [],
+		cwd: dirname(serveSim),
+		runner: serveSim,
+	};
+}
+
+function resolveLegacyServeSim(): ServeSimCommand | null {
+	const installedBin = join(getAgiBinDir(), executableName('serve-sim'));
+	if (!existsSync(installedBin)) return null;
+	return {
+		command: installedBin,
+		argsPrefix: [],
+		cwd: dirname(installedBin),
+		runner: installedBin,
+	};
+}
+
+function findServeSimCommand(): ServeSimCommand {
 	if (serveSimCommand) return serveSimCommand;
 
-	const installedBin = join(getAgiBinDir(), 'serve-sim');
-	if (existsSync(installedBin)) {
-		serveSimCommand = {
-			command: installedBin,
-			cwd: dirname(installedBin),
-		};
-		return serveSimCommand;
+	const resolved =
+		resolveConfiguredServeSim() ??
+		resolvePackageRunner() ??
+		resolvePathServeSim() ??
+		resolveLegacyServeSim();
+	if (resolved) {
+		serveSimCommand = resolved;
+		return resolved;
 	}
 
 	throw new Error(
-		`Embedded serve-sim binary is not installed at ${installedBin}. Rebuild or restart Otto so bundled binaries are bootstrapped.`,
+		'serve-sim requires Bun or npm. Install Bun or Node.js, then try the simulator tool again.',
 	);
 }
 
@@ -274,7 +354,7 @@ function serveSimSpawnArgs(args: string[]) {
 	const resolvedCommand = findServeSimCommand();
 	return {
 		command: resolvedCommand.command,
-		args,
+		args: [...resolvedCommand.argsPrefix, ...args],
 		cwd: resolvedCommand.cwd,
 	};
 }

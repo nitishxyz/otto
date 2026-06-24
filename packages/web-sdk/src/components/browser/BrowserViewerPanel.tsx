@@ -98,6 +98,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		null,
 	);
 	const isLoadingRef = useRef(false);
+	const simulatorConnectedRef = useRef(false);
 	const [draftUrl, setDraftUrl] = useState(tab.url);
 	const [historyEntries, setHistoryEntries] = useState<string[]>(() =>
 		tab.url ? [normalizeBrowserUrl(tab.url)] : [],
@@ -126,17 +127,29 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		historyIndex >= 0 && historyIndex < historyEntries.length - 1;
 	const simulatorStateStatus = simulatorStatus.data?.status;
 	const simulatorStateUrl = simulatorStatus.data?.url;
+	const simulatorSetupStatus = simulatorStatus.data?.setupStatus;
+	const simulatorSetupMessage = simulatorStatus.data?.setupMessage;
+	const simulatorRunner = simulatorStatus.data?.runner;
 	const isSimulatorPreview = tab.kind === 'simulator';
 	const isStartingSimulator =
-		isStartingSimulatorPreview || simulatorStateStatus === 'starting';
+		isStartingSimulatorPreview ||
+		simulatorStateStatus === 'starting' ||
+		simulatorSetupStatus === 'preparing';
+	const shouldShowSimulatorSetup =
+		isSimulatorPreview &&
+		(simulatorSetupStatus === 'unsupported' ||
+			simulatorSetupStatus === 'missing_runner');
 	const simulatorError =
-		isSimulatorPreview && simulatorStatus.data?.status === 'error'
+		isSimulatorPreview &&
+		!shouldShowSimulatorSetup &&
+		simulatorStatus.data?.status === 'error'
 			? simulatorStatus.data.error
 			: isSimulatorPreview
 				? startSimulatorError?.message
 				: null;
 	const shouldHoldSimulatorPreview =
 		isSimulatorPreview &&
+		!shouldShowSimulatorSetup &&
 		!simulatorError &&
 		simulatorStateStatus !== 'connected';
 
@@ -240,7 +253,20 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	}, [shouldHoldSimulatorPreview]);
 
 	useEffect(() => {
-		if (!isSimulatorPreview || simulatorStateStatus !== 'connected') return;
+		if (!isSimulatorPreview) {
+			simulatorConnectedRef.current = false;
+			return;
+		}
+		if (simulatorStateStatus !== 'connected') {
+			// Reset so the next genuine reconnect shows the loading overlay once.
+			simulatorConnectedRef.current = false;
+			return;
+		}
+		// Only react to the transition into "connected", not every poll that keeps
+		// reporting "connected" (which would re-show the loading overlay and make
+		// the live preview appear to refresh).
+		if (simulatorConnectedRef.current) return;
+		simulatorConnectedRef.current = true;
 
 		setEmbedError(null);
 		setIsLoading(true);
@@ -271,18 +297,24 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	}, [tab.url, historyIndex]);
 
 	useEffect(() => {
-		const url = simulatorStatus.data?.url ?? SIMULATOR_URL;
-		if (
-			tab.kind === 'simulator' &&
-			simulatorStatus.data?.status === 'connected' &&
-			url !== tab.url
-		) {
-			openBrowserTab(url, {
-				kind: 'simulator',
-				title: 'Simulator',
-			});
+		if (tab.kind !== 'simulator' || simulatorStateStatus !== 'connected') {
+			return;
 		}
-	}, [openBrowserTab, simulatorStatus.data, tab.kind, tab.url]);
+		const nextUrl = simulatorStateUrl ?? SIMULATOR_URL;
+		// Update the existing simulator tab's URL in place. Using
+		// updateBrowserTabUrl (instead of openBrowserTab) avoids stealing focus or
+		// remounting the iframe on every status poll.
+		if (nextUrl !== tab.url) {
+			updateBrowserTabUrl(tab.id, nextUrl);
+		}
+	}, [
+		updateBrowserTabUrl,
+		simulatorStateStatus,
+		simulatorStateUrl,
+		tab.kind,
+		tab.id,
+		tab.url,
+	]);
 
 	useEffect(() => {
 		if (!useNativeBrowser || !nativeBrowser?.isAvailable) return;
@@ -537,7 +569,37 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 			)}
 
 			<div ref={contentRef} className="min-h-0 flex-1 bg-muted/20">
-				{shouldHoldSimulatorPreview ? (
+				{shouldShowSimulatorSetup ? (
+					<div className="h-full w-full flex items-center justify-center p-6 text-center">
+						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
+							<Smartphone className="mx-auto mb-3 h-8 w-8 text-violet-500" />
+							<h2 className="mb-2 text-sm font-semibold text-foreground">
+								{simulatorSetupStatus === 'unsupported'
+									? 'Simulator preview requires macOS'
+									: 'serve-sim runner is not available'}
+							</h2>
+							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+								{simulatorSetupMessage ??
+									'Install Bun or Node.js so Otto can run serve-sim@latest without bundling it into the CLI.'}
+							</p>
+							{simulatorSetupStatus === 'missing_runner' && (
+								<div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-left font-mono text-[11px] text-muted-foreground">
+									bun x serve-sim@latest --version
+									<br />
+									npx --yes serve-sim@latest --version
+								</div>
+							)}
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								onClick={openSimulatorPreview}
+							>
+								Check again
+							</Button>
+						</div>
+					</div>
+				) : shouldHoldSimulatorPreview ? (
 					<div className="h-full w-full flex items-center justify-center p-6 text-center">
 						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
 							<Smartphone className="mx-auto mb-3 h-8 w-8 animate-pulse text-violet-500" />
@@ -548,8 +610,8 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 							</h2>
 							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
 								{isStartingSimulator || simulatorStatus.isLoading
-									? 'Otto is waiting for serve-sim to publish a preview URL.'
-									: 'Start serve-sim before loading the simulator web preview.'}
+									? `Otto is running ${simulatorRunner ?? 'serve-sim@latest'} and waiting for a preview URL.`
+									: 'Start serve-sim@latest before loading the simulator web preview.'}
 							</p>
 							{!isStartingSimulator && !simulatorStatus.isLoading && (
 								<Button

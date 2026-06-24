@@ -1,4 +1,8 @@
-import { runServeSim, serveSimSpawnArgs } from './command.ts';
+import {
+	getServeSimAvailability,
+	runServeSim,
+	serveSimSpawnArgs,
+} from './command.ts';
 import {
 	DEFAULT_PORT,
 	getSimulatorStatus,
@@ -74,9 +78,12 @@ function extractServeSimState(
 	};
 }
 
-export async function isPreviewUrlReady(url: string): Promise<boolean> {
+export async function isPreviewUrlReady(
+	url: string,
+	timeoutMs = 2_000,
+): Promise<boolean> {
 	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 750);
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
 	try {
 		const response = await fetch(url, { signal: controller.signal });
 		return response.ok || response.status < 500;
@@ -91,6 +98,7 @@ export function markPreviewConnected(
 	parsed: ReturnType<typeof extractServeSimState>,
 	port: number,
 ): void {
+	simulatorRuntime.consecutiveProbeFailures = 0;
 	updateState({
 		status: 'connected',
 		url: previewUrlForPort(port),
@@ -104,10 +112,19 @@ export function markPreviewConnected(
 export async function detectRunningPreview(port: number) {
 	if (!isMacOS()) return null;
 	const previewUrl = previewUrlForPort(port);
-	const runningStream = await getRunningServeSimStream(port);
-	if (!runningStream || !(await isPreviewUrlReady(previewUrl))) return null;
+	// The reachable preview server is the source of truth. `serve-sim --list`
+	// runs as a separate short-lived process (especially via `bun x`/`npx`) and
+	// may not observe the just-started stream yet, so it is only used to enrich
+	// device metadata once the preview page is confirmed live.
+	if (!(await isPreviewUrlReady(previewUrl))) return null;
 
-	return { ...runningStream, url: previewUrl };
+	const runningStream = await getRunningServeSimStream(port).catch(() => null);
+	return {
+		url: previewUrl,
+		streamUrl: runningStream?.streamUrl ?? null,
+		deviceName: runningStream?.deviceName ?? null,
+		udid: runningStream?.udid ?? null,
+	};
 }
 
 export async function killProcessOnPort(port: number): Promise<void> {
@@ -199,9 +216,6 @@ async function getRunningServeSimStream(port: number) {
 
 	const parsed = parseRunningServeSimStream(result.stdout, port);
 	if (!parsed) return null;
-	if (parsed.streamUrl && !(await isPreviewUrlReady(parsed.streamUrl))) {
-		return null;
-	}
 	return parsed;
 }
 
@@ -249,7 +263,24 @@ export function startPreviewProcess(args: string[]): void {
 			markPreviewConnected(parsed, simulatorState.port);
 		}
 	});
-	simulatorRuntime.previewProcess.exited.then((exitCode) => {
+	simulatorRuntime.previewProcess.exited.then(async (exitCode) => {
+		simulatorRuntime.previewProcess = null;
+
+		// The foreground runner (e.g. `bun x`/`npx`) can exit while serve-sim's
+		// helper keeps the preview server alive. Treat a still-reachable preview
+		// URL as connected instead of reporting a spurious failure.
+		if (await isPreviewUrlReady(previewUrlForPort(simulatorState.port))) {
+			markPreviewConnected(
+				{
+					url: previewUrlForPort(simulatorState.port),
+					deviceName: simulatorState.deviceName,
+					udid: simulatorState.udid,
+				},
+				simulatorState.port,
+			);
+			return;
+		}
+
 		if (
 			simulatorState.status === 'connected' ||
 			simulatorState.status === 'starting'
@@ -262,7 +293,6 @@ export function startPreviewProcess(args: string[]): void {
 						: simulatorRuntime.previewStderr || 'serve-sim exited',
 			});
 		}
-		simulatorRuntime.previewProcess = null;
 	});
 }
 
@@ -276,22 +306,91 @@ export async function waitForPreviewUrl(port: number, timeoutMs = 15_000) {
 	return null;
 }
 
-export async function refreshSimulatorStatus() {
-	const parsed = await detectRunningPreview(simulatorState.port);
-	if (parsed) {
-		markPreviewConnected(parsed, simulatorState.port);
-	} else if (
-		simulatorState.status === 'connected' ||
-		(simulatorState.status === 'starting' && !simulatorRuntime.previewProcess)
-	) {
-		updateState({
-			status: 'idle',
-			url: null,
-			deviceName: null,
-			udid: null,
-			error: null,
-		});
+// Number of consecutive failed probes tolerated before a connected preview is
+// considered gone. Status polling runs ~every 3s, so this keeps a working
+// preview stable through transient probe timeouts / first-paint stalls.
+const MAX_PROBE_FAILURES = 3;
+
+async function probePreviewLive(url: string): Promise<boolean> {
+	// Two quick attempts smooth over a single slow response without delaying
+	// the status endpoint noticeably.
+	for (let attempt = 0; attempt < 2; attempt++) {
+		if (await isPreviewUrlReady(url)) return true;
 	}
+	return false;
+}
+
+export async function refreshSimulatorStatus() {
+	const availability = getServeSimAvailability();
+	updateState({
+		setupStatus: availability.setupStatus,
+		setupMessage: availability.setupMessage,
+		runner: availability.runner,
+	});
+
+	// A live preview server is authoritative: if the page still responds we keep
+	// the connected state even if the runner check or `--list` momentarily fail.
+	const port = simulatorState.port;
+	const previewLive = await probePreviewLive(previewUrlForPort(port));
+	if (previewLive) {
+		simulatorRuntime.consecutiveProbeFailures = 0;
+		const parsed = await detectRunningPreview(port);
+		markPreviewConnected(
+			parsed ?? {
+				url: previewUrlForPort(port),
+				deviceName: simulatorState.deviceName,
+				udid: simulatorState.udid,
+			},
+			port,
+		);
+		return getSimulatorStatus();
+	}
+
+	if (availability.setupStatus !== 'ready') {
+		if (
+			simulatorState.status === 'connected' ||
+			simulatorState.status === 'starting'
+		) {
+			updateState({
+				status: 'error',
+				url: null,
+				deviceName: null,
+				udid: null,
+				error: availability.setupMessage,
+			});
+		}
+		return getSimulatorStatus();
+	}
+
+	// Preview is not reachable. Tolerate a few transient failures before tearing
+	// down a connected preview, and never reset while the spawned process is
+	// still alive (it may still be starting up).
+	const wasActive =
+		simulatorState.status === 'connected' ||
+		simulatorState.status === 'starting';
+	if (!wasActive) {
+		simulatorRuntime.consecutiveProbeFailures = 0;
+		return getSimulatorStatus();
+	}
+
+	if (simulatorRuntime.previewProcess) {
+		// Process still running: keep waiting, don't count this as a teardown.
+		return getSimulatorStatus();
+	}
+
+	simulatorRuntime.consecutiveProbeFailures += 1;
+	if (simulatorRuntime.consecutiveProbeFailures < MAX_PROBE_FAILURES) {
+		return getSimulatorStatus();
+	}
+
+	simulatorRuntime.consecutiveProbeFailures = 0;
+	updateState({
+		status: 'idle',
+		url: null,
+		deviceName: null,
+		udid: null,
+		error: null,
+	});
 	return getSimulatorStatus();
 }
 

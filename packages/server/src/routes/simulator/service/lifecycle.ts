@@ -1,4 +1,8 @@
-import { findServeSimCommand, runServeSim } from './command.ts';
+import {
+	findServeSimCommand,
+	getServeSimAvailability,
+	runServeSim,
+} from './command.ts';
 import {
 	DEFAULT_PORT,
 	getSimulatorStatus,
@@ -25,17 +29,40 @@ export async function startSimulator(
 ) {
 	if (!isMacOS()) {
 		const error = 'serve-sim requires macOS with Xcode command line tools';
-		updateState({ status: 'error', error });
+		updateState({
+			status: 'error',
+			setupStatus: 'unsupported',
+			setupMessage: error,
+			runner: null,
+			error: error,
+		});
 		return { ok: false, ...getSimulatorStatus() };
 	}
 
 	const port = options.port ?? DEFAULT_PORT;
-	updateState({ status: 'starting', error: null, port });
+	const availability = getServeSimAvailability();
+	updateState({
+		status: 'starting',
+		setupStatus:
+			availability.setupStatus === 'ready'
+				? 'preparing'
+				: availability.setupStatus,
+		setupMessage: availability.setupMessage,
+		runner: availability.runner,
+		error: null,
+		port,
+	});
 	try {
 		findServeSimCommand();
 	} catch (error) {
 		const message = toErrorMessage(error);
-		updateState({ status: 'error', error: message });
+		updateState({
+			status: 'error',
+			setupStatus: 'missing_runner',
+			setupMessage: message,
+			runner: null,
+			error: message,
+		});
 		return { ok: false, ...getSimulatorStatus(), error: message };
 	}
 	const runningPreview = await detectRunningPreview(port);
@@ -68,9 +95,13 @@ export async function startSimulator(
 	const args = ['--port', String(port)];
 	if (options.device) args.push(options.device);
 
+	updateState({ setupStatus: 'ready', setupMessage: null });
 	startPreviewProcess(args);
-	const parsed = await waitForPreviewUrl(port);
-	if (!simulatorRuntime.previewProcess || !parsed) {
+	// Allow extra time for a cold `bun x`/`npx serve-sim@latest` download on the
+	// first run. Readiness is judged by the preview URL, not the process handle,
+	// because the foreground runner may re-exec/exit while serve-sim stays up.
+	const parsed = await waitForPreviewUrl(port, 60_000);
+	if (!parsed) {
 		const error =
 			simulatorRuntime.previewStderr ||
 			simulatorRuntime.previewStdout ||

@@ -4,6 +4,12 @@ export const DEFAULT_PORT = 3200;
 
 export const simulatorState: SimulatorState = {
 	status: 'idle',
+	setupStatus: process.platform === 'darwin' ? 'ready' : 'unsupported',
+	setupMessage:
+		process.platform === 'darwin'
+			? null
+			: 'serve-sim requires macOS with Xcode command line tools',
+	runner: null,
 	url: null,
 	deviceName: null,
 	udid: null,
@@ -18,12 +24,14 @@ export const simulatorRuntime: {
 	previewStderr: string;
 	cleanupHandlersRegistered: boolean;
 	serveSimCommand: ServeSimCommand | null;
+	consecutiveProbeFailures: number;
 } = {
 	previewProcess: null,
 	previewStdout: '',
 	previewStderr: '',
 	cleanupHandlersRegistered: false,
 	serveSimCommand: null,
+	consecutiveProbeFailures: 0,
 };
 
 export function updateState(

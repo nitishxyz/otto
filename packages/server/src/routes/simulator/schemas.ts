@@ -2,6 +2,9 @@ import { z } from '@hono/zod-openapi';
 
 export const simulatorStateSchema = z.object({
 	status: z.enum(['idle', 'starting', 'connected', 'error']),
+	setupStatus: z.enum(['unsupported', 'missing_runner', 'ready', 'preparing']),
+	setupMessage: z.string().nullable(),
+	runner: z.string().nullable(),
 	url: z.string().nullable(),
 	deviceName: z.string().nullable(),
 	udid: z.string().nullable(),

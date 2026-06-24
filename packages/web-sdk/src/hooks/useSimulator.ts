@@ -7,6 +7,9 @@ import {
 
 export interface SimulatorState {
 	status: 'idle' | 'starting' | 'connected' | 'error';
+	setupStatus: 'unsupported' | 'missing_runner' | 'ready' | 'preparing';
+	setupMessage: string | null;
+	runner: string | null;
 	url: string | null;
 	deviceName: string | null;
 	udid: string | null;
@@ -84,6 +87,12 @@ export function useStartSimulator() {
 			]);
 			queryClient.setQueryData<SimulatorState>(['simulator', 'status'], {
 				status: 'starting',
+				setupStatus:
+					previous?.setupStatus === 'ready'
+						? 'preparing'
+						: (previous?.setupStatus ?? 'preparing'),
+				setupMessage: previous?.setupMessage ?? null,
+				runner: previous?.runner ?? null,
 				url: previous?.url ?? null,
 				deviceName: previous?.deviceName ?? null,
 				udid: previous?.udid ?? null,
