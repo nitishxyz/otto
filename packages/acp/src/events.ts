@@ -1,8 +1,4 @@
-import type {
-	AgentSideConnection,
-	ClientCapabilities,
-	Usage,
-} from '@agentclientprotocol/sdk';
+import type { AgentSideConnection, Usage } from '@agentclientprotocol/sdk';
 import { resolveApproval } from '@ottocode/server/runtime/tools/approval';
 import type { OttoEvent } from '@ottocode/server/events/types';
 import { getSession as apiGetSession } from '@ottocode/api';
@@ -22,7 +18,6 @@ import { isConnectionClosedError } from './errors';
 
 export async function handleOttoEvent(
 	client: AgentSideConnection,
-	clientCapabilities: ClientCapabilities | undefined,
 	event: OttoEvent,
 	acpSessionId: string,
 	session: AcpSession,
@@ -103,13 +98,7 @@ export async function handleOttoEvent(
 				if (payload?.name === 'progress_update') {
 					break;
 				}
-				await handleToolResult(
-					client,
-					clientCapabilities,
-					payload,
-					acpSessionId,
-					session,
-				);
+				await handleToolResult(client, payload, acpSessionId, session);
 				break;
 			}
 

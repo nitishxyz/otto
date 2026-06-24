@@ -144,6 +144,7 @@ export class OttoAcpAgent implements Agent {
 			activeTerminals: new Map(),
 			streamedToolCalls: new Set(),
 			streamedToolContent: new Map(),
+			terminalToolCalls: new Map(),
 			mode: defaults.agent,
 			provider: defaults.provider,
 			model: defaults.model,
@@ -410,7 +411,6 @@ export class OttoAcpAgent implements Agent {
 				if (!currentSession) return;
 				void handleOttoEvent(
 					this.client,
-					this.clientCapabilities,
 					event,
 					params.sessionId,
 					currentSession,
@@ -535,6 +535,7 @@ export class OttoAcpAgent implements Agent {
 			activeTerminals: new Map(),
 			streamedToolCalls: new Set(),
 			streamedToolContent: new Map(),
+			terminalToolCalls: new Map(),
 			mode: row.agent || DEFAULT_MODE,
 			provider: row.provider,
 			model: row.model,
@@ -559,13 +560,7 @@ export class OttoAcpAgent implements Agent {
 				if (event.type !== 'session.updated') return;
 				const currentSession = this.sessions.get(acpSessionId);
 				if (!currentSession) return;
-				void handleOttoEvent(
-					this.client,
-					this.clientCapabilities,
-					event,
-					acpSessionId,
-					currentSession,
-				);
+				void handleOttoEvent(this.client, event, acpSessionId, currentSession);
 			},
 		);
 	}

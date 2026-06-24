@@ -31,8 +31,26 @@ const OAUTH_ONLY_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
 	xai: ['grok-build', 'grok-composer-2.5-fast'],
 };
 
+const OAUTH_MODEL_CONTEXT_OVERRIDES: Partial<
+	Record<ProviderId, Record<string, number>>
+> = {
+	openai: {
+		'gpt-5.5': 264_000,
+	},
+};
+
 function isOAuthOnlyModel(provider: ProviderId, modelId: string): boolean {
 	return OAUTH_ONLY_MODEL_IDS[provider]?.includes(modelId) === true;
+}
+
+function applyOAuthContextOverride(
+	provider: ProviderId,
+	modelId: string,
+	model: ModelInfoMap[string],
+): ModelInfoMap[string] {
+	const context = OAUTH_MODEL_CONTEXT_OVERRIDES[provider]?.[modelId];
+	if (context == null) return model;
+	return { ...model, limit: { ...model.limit, context } };
 }
 
 function matchesOAuthModel(provider: ProviderId, modelId: string): boolean {
@@ -68,9 +86,16 @@ export function filterModelsForAuthType(
 	}
 	const exactIds = OAUTH_MODEL_IDS[provider];
 	const prefixes = OAUTH_MODEL_PREFIXES[provider];
-	if (!exactIds && !prefixes) return models;
+	if (!exactIds && !prefixes) {
+		for (const [id, model] of Object.entries(models)) {
+			filtered[id] = applyOAuthContextOverride(provider, id, model);
+		}
+		return filtered;
+	}
 	for (const [id, model] of Object.entries(models)) {
-		if (matchesOAuthModel(provider, id)) filtered[id] = model;
+		if (matchesOAuthModel(provider, id)) {
+			filtered[id] = applyOAuthContextOverride(provider, id, model);
+		}
 	}
 	return filtered;
 }

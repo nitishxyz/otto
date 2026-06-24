@@ -27,6 +27,21 @@ describe('oauth model filtering', () => {
 		expect(filteredIds).not.toContain('gpt-5.4-pro');
 	});
 
+	test('overrides gpt-5.5 context limit to 264k only for OAuth', () => {
+		const oauth = filterModelsForAuthType(
+			'openai',
+			catalog.openai.models,
+			'oauth',
+		);
+		const api = filterModelsForAuthType('openai', catalog.openai.models, 'api');
+
+		expect(oauth['gpt-5.5']?.limit?.context).toBe(264_000);
+		expect(api['gpt-5.5']?.limit?.context).toBe(
+			catalog.openai.models['gpt-5.5']?.limit?.context,
+		);
+		expect(api['gpt-5.5']?.limit?.context).not.toBe(264_000);
+	});
+
 	test('does not filter OpenAI models for non-OAuth auth types', () => {
 		const filtered = filterModelsForAuthType(
 			'openai',

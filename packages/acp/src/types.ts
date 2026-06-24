@@ -21,6 +21,7 @@ export type AcpSession = {
 	>;
 	streamedToolCalls: Set<string>;
 	streamedToolContent: Map<string, string>;
+	terminalToolCalls: Map<string, string>;
 	mode: string;
 	provider?: string;
 	model?: string;
