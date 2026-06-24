@@ -1,9 +1,5 @@
 import { useMemo, useRef } from 'react';
-import {
-	estimateModelCostUsd,
-	type ProviderId,
-	getModelInfo,
-} from '@ottocode/sdk/browser';
+import { estimateModelCostUsd, type ProviderId } from '@ottocode/sdk/browser';
 import type { Session } from '../../types/api';
 import {
 	DollarSign,
@@ -19,6 +15,7 @@ import { useShareStatus } from '../../hooks/useShareStatus';
 import { ProviderLogo } from '../common/ProviderLogo';
 import { openUrl } from '../../lib/open-url';
 import { UsageRing } from '../common/UsageRing';
+import { ContextUsageIndicator } from '../common/ContextUsageIndicator';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { EditableTitle } from './EditableTitle';
@@ -66,32 +63,8 @@ export function LeanHeader({
 	]);
 	const subagentCost = session.subagentCostUsd ?? 0;
 
-	const formatCompactNumber = (num: number) => {
-		if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-		if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-		return num.toString();
-	};
-
-	const contextTokens = session.currentContextTokens || 0;
-
 	const isBranch = session.sessionType === 'branch';
 	const parentSession = parentData?.parent;
-
-	// Calculate context usage for color indication
-	const contextLimit = useMemo(() => {
-		const info = getModelInfo(session.provider as ProviderId, session.model);
-		return info?.limit?.context;
-	}, [session.provider, session.model]);
-
-	const contextUsagePercent = contextLimit
-		? (contextTokens / contextLimit) * 100
-		: 0;
-
-	const getContextColorClass = () => {
-		if (contextUsagePercent >= 90) return 'text-red-600 dark:text-red-400';
-		if (contextUsagePercent >= 70) return 'text-amber-600 dark:text-amber-400';
-		return 'text-foreground';
-	};
 
 	const rootRef = useRef<HTMLDivElement>(null);
 	const width = useContainerWidth(rootRef);
@@ -161,17 +134,12 @@ export function LeanHeader({
 					<ToolActivityToggle compact />
 					<UsageRing provider={session.provider} />
 
-					<div className="flex items-center gap-2">
-						<div
-							className="flex items-center gap-1"
-							title={`Current context window: ${contextTokens.toLocaleString()} tokens`}
-						>
-							<span className="text-xs opacity-70">ctx</span>
-							<span className={`font-medium ${getContextColorClass()}`}>
-								{formatCompactNumber(contextTokens)}
-							</span>
-						</div>
-					</div>
+					<ContextUsageIndicator
+						provider={session.provider}
+						model={session.model}
+						contextTokens={session.currentContextTokens || 0}
+						compact={isCompact}
+					/>
 
 					{estimatedCost > 0 && !isCompact && (
 						<div

@@ -1,9 +1,5 @@
 import { useMemo, useRef } from 'react';
-import {
-	estimateModelCostUsd,
-	type ProviderId,
-	getModelInfo,
-} from '@ottocode/sdk/browser';
+import { estimateModelCostUsd, type ProviderId } from '@ottocode/sdk/browser';
 import type { Session } from '../../types/api';
 import {
 	Clock,
@@ -24,6 +20,7 @@ import { ToolActivityToggle } from '../workspace/ToolActivityToggle';
 import { StopButton } from '../chat/StopButton';
 import { EditableTitle } from './EditableTitle';
 import { UsageRing } from '../common/UsageRing';
+import { ContextUsageIndicator } from '../common/ContextUsageIndicator';
 import { UsageModal } from '../common/UsageModal';
 
 interface SessionHeaderProps {
@@ -89,27 +86,10 @@ export function SessionHeader({
 		return num.toString();
 	};
 
-	const contextTokens = session.currentContextTokens || 0;
 	const outputTokens = session.totalOutputTokens || 0;
 
 	const isBranch = session.sessionType === 'branch';
 	const parentSession = parentData?.parent;
-
-	// Calculate context usage for color indication
-	const contextLimit = useMemo(() => {
-		const info = getModelInfo(session.provider as ProviderId, session.model);
-		return info?.limit?.context;
-	}, [session.provider, session.model]);
-
-	const contextUsagePercent = contextLimit
-		? (contextTokens / contextLimit) * 100
-		: 0;
-
-	const getContextColorClass = () => {
-		if (contextUsagePercent >= 90) return 'text-red-600 dark:text-red-400';
-		if (contextUsagePercent >= 70) return 'text-amber-600 dark:text-amber-400';
-		return 'text-foreground';
-	};
 
 	const headerWidthClass = preferences.fullWidthContent
 		? 'w-full px-6 py-6'
@@ -180,15 +160,12 @@ export function SessionHeader({
 
 					<div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm text-muted-foreground">
 						<div className="flex items-center gap-3">
-							<div
-								className="flex items-center gap-1.5"
-								title={`Current context window: ${formatNumber(contextTokens)} tokens`}
-							>
-								<span className="text-xs opacity-70">ctx</span>
-								<span className={`font-medium ${getContextColorClass()}`}>
-									{formatCompactNumber(contextTokens)}
-								</span>
-							</div>
+							<ContextUsageIndicator
+								provider={session.provider}
+								model={session.model}
+								contextTokens={session.currentContextTokens || 0}
+								compact={isCompact}
+							/>
 							{!isCompact && (
 								<div
 									className="flex items-center gap-1.5"
