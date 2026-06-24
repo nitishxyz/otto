@@ -29,9 +29,16 @@ import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
 import { OttoKickoffNotice, isOttoKickoffMessage } from './OttoKickoffNotice';
 import { OttoWakeupNotice, isOttoWakeupMessage } from './OttoWakeupNotice';
 import { useSkills } from '../../hooks/useSkills';
+import { useRecipes } from '../../hooks/useRecipes';
 import { useMentionAgents } from '../../hooks/useAgents';
 import { useSkillsStore } from '../../stores/skillsStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
+import {
+	COMMAND_KIND_STYLES,
+	getSlashCommandKind,
+	parseSlashCommandName,
+	type CommandKind,
+} from '../../lib/commands';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -56,6 +63,45 @@ interface FileData {
 	attachmentId?: string;
 }
 
+function linkifySlashCommand(content: string, recipeNames: string[]) {
+	const commandName = parseSlashCommandName(content);
+	if (!commandName) return content;
+	const kind = getSlashCommandKind(content, recipeNames);
+	if (!kind) return content;
+	return content.replace(
+		new RegExp(`(^|\\s)(/${commandName})(?=\\s|$)`, 'i'),
+		(_, prefix: string, command: string) =>
+			`${prefix}[${command}](otto-command:${kind}:${encodeURIComponent(command)})`,
+	);
+}
+
+function parseCommandHref(href?: string): {
+	kind: CommandKind;
+	command: string;
+} | null {
+	const normalized = href?.startsWith('#otto-command:')
+		? href.slice('#otto-command:'.length)
+		: href?.startsWith('otto-command:')
+			? href.slice('otto-command:'.length)
+			: null;
+	if (!normalized) return null;
+	const [kind, encodedCommand] = normalized.split(':', 2);
+	if (
+		kind !== 'app' &&
+		kind !== 'runtime' &&
+		kind !== 'git' &&
+		kind !== 'session' &&
+		kind !== 'danger' &&
+		kind !== 'recipe'
+	) {
+		return null;
+	}
+	return {
+		kind,
+		command: decodeURIComponent(encodedCommand ?? ''),
+	};
+}
+
 export const UserMessageGroup = memo(
 	function UserMessageGroup({
 		sessionId,
@@ -64,33 +110,6 @@ export const UserMessageGroup = memo(
 	}: UserMessageGroupProps) {
 		const [expandedImage, setExpandedImage] = useState<string | null>(null);
 		const parts = message.parts || [];
-		const hasAtMention = parts.some((part) => {
-			if (part.type !== 'text') return false;
-			const data = part.contentJson || part.content;
-			if (data && typeof data === 'object' && 'text' in data) {
-				return String(data.text).includes('@');
-			}
-			if (typeof data === 'string') return data.includes('@');
-			if (data) return JSON.stringify(data).includes('@');
-			return false;
-		});
-		const queryClient = useQueryClient();
-		const { data: skillsConfig } = useSkills();
-		const { data: mentionAgentsData } = useMentionAgents({
-			enabled: hasAtMention,
-		});
-		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
-		const selectSkill = useSkillsStore((state) => state.selectSkill);
-		const openFile = useFileBrowserStore((state) => state.openFile);
-
-		const { isQueued, position } = useMessageQueuePosition(
-			sessionId,
-			nextAssistantMessageId ?? '',
-		);
-		const setPendingRestoreText = useQueueStore(
-			(state) => state.setPendingRestoreText,
-		);
-
 		const textParts = parts.filter((p) => p.type === 'text');
 		const imageParts = parts.filter((p) => p.type === 'image');
 		const fileParts = parts.filter((p) => p.type === 'file');
@@ -108,6 +127,35 @@ export const UserMessageGroup = memo(
 				rawContent = JSON.stringify(data, null, 2);
 			}
 		}
+
+		const hasAtMention = parts.some((part) => {
+			if (part.type !== 'text') return false;
+			const data = part.contentJson || part.content;
+			if (data && typeof data === 'object' && 'text' in data) {
+				return String(data.text).includes('@');
+			}
+			if (typeof data === 'string') return data.includes('@');
+			if (data) return JSON.stringify(data).includes('@');
+			return false;
+		});
+		const queryClient = useQueryClient();
+		const { data: skillsConfig } = useSkills();
+		const hasSlashCommand = Boolean(parseSlashCommandName(rawContent));
+		const { data: recipesData } = useRecipes({ enabled: hasSlashCommand });
+		const { data: mentionAgentsData } = useMentionAgents({
+			enabled: hasAtMention,
+		});
+		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
+		const selectSkill = useSkillsStore((state) => state.selectSkill);
+		const openFile = useFileBrowserStore((state) => state.openFile);
+
+		const { isQueued, position } = useMessageQueuePosition(
+			sessionId,
+			nextAssistantMessageId ?? '',
+		);
+		const setPendingRestoreText = useQueueStore(
+			(state) => state.setPendingRestoreText,
+		);
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
 			parseResearchContext(rawContent);
@@ -128,10 +176,13 @@ export const UserMessageGroup = memo(
 			fileSelections: parsedFileSelections,
 			cleanContent: contentAfterFileSelections,
 		} = parseFileSelections(content);
-		const renderedContent = linkifyUserMessageMentions(
-			contentAfterFileSelections,
-			skillsConfig?.items ?? [],
-			mentionAgentsData?.agents ?? [],
+		const renderedContent = linkifySlashCommand(
+			linkifyUserMessageMentions(
+				contentAfterFileSelections,
+				skillsConfig?.items ?? [],
+				mentionAgentsData?.agents ?? [],
+			),
+			recipesData?.recipes.map((recipe) => recipe.name) ?? [],
 		);
 
 		const images: Array<{ id: string; src: string }> = [];
@@ -340,6 +391,17 @@ export const UserMessageGroup = memo(
 													children,
 													...props
 												}: ComponentPropsWithoutRef<'a'>) => {
+													const commandHref = parseCommandHref(href);
+													if (commandHref) {
+														return (
+															<span
+																className={`${COMMAND_KIND_STYLES[commandHref.kind]} font-mono font-medium`}
+																title={commandHref.command}
+															>
+																{children}
+															</span>
+														);
+													}
 													const skillHref = href?.startsWith('#otto-skill:')
 														? href.slice('#otto-skill:'.length)
 														: href?.startsWith('otto-skill:')

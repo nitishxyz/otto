@@ -8,6 +8,7 @@ import { approvalMixin } from './approval';
 import { ottorouterMixin } from './ottorouter';
 import { authMixin } from './auth';
 import { skillsMixin } from './skills';
+import { recipesMixin } from './recipes';
 import { usageMixin } from './usage';
 import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
@@ -33,6 +34,7 @@ export type {
 	InstallDictationModelResponse,
 	RemoveDictationModelResponse,
 } from './dictation';
+export type { Recipe } from './recipes';
 
 class ApiClient {
 	getSessions = sessionsMixin.getSessions;
@@ -157,6 +159,10 @@ class ApiClient {
 	getSkillFileContent = skillsMixin.getSkillFileContent;
 	getSkillsConfig = skillsMixin.getSkillsConfig;
 	updateSkillsConfig = skillsMixin.updateSkillsConfig;
+
+	listRecipes = recipesMixin.listRecipes;
+	saveRecipe = recipesMixin.saveRecipe;
+	deleteRecipe = recipesMixin.deleteRecipe;
 
 	getUsageStats = usageMixin.getUsageStats;
 	getGlobalUsageStats = usageMixin.getGlobalUsageStats;

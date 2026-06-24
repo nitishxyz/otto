@@ -413,6 +413,14 @@ export function App({
 						}
 					}
 					break;
+				default:
+					if (activeSession) {
+						await sendMessage(
+							activeSession.id,
+							`/${cmd}${args ? ` ${args}` : ''}`,
+						);
+					}
+					break;
 			}
 		},
 		[

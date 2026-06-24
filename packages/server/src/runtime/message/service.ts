@@ -52,12 +52,14 @@ export async function dispatchAssistantMessage(
 		content,
 	});
 	const effectiveAgent = builtinCommand?.agent ?? agent;
+	const effectiveProvider = builtinCommand?.provider ?? provider;
+	const effectiveModel = builtinCommand?.model ?? model;
 	const effectiveOneShot = builtinCommand?.oneShot ?? oneShot;
 	logger.debug('[agent] dispatching assistant message', {
 		sessionId,
 		agent: effectiveAgent,
-		provider,
-		model,
+		provider: effectiveProvider,
+		model: effectiveModel,
 		oneShot: Boolean(effectiveOneShot),
 		hasUserContext: Boolean(userContext),
 		builtinCommand: builtinCommand?.id,
@@ -67,8 +69,8 @@ export async function dispatchAssistantMessage(
 		db,
 		sessionId,
 		agent: effectiveAgent,
-		provider,
-		model,
+		provider: effectiveProvider,
+		model: effectiveModel,
 		content,
 		createdAt: now,
 		images: compressedImages,
@@ -79,8 +81,8 @@ export async function dispatchAssistantMessage(
 		db,
 		sessionId,
 		agent: effectiveAgent,
-		provider,
-		model,
+		provider: effectiveProvider,
+		model: effectiveModel,
 	});
 
 	const commandPromptText =
@@ -102,8 +104,8 @@ export async function dispatchAssistantMessage(
 			sessionId,
 			assistantMessageId,
 			agent: effectiveAgent,
-			provider,
-			model,
+			provider: effectiveProvider,
+			model: effectiveModel,
 			projectRoot: cfg.projectRoot,
 			oneShot: Boolean(effectiveOneShot),
 			userContent: content,
@@ -123,8 +125,8 @@ export async function dispatchAssistantMessage(
 		sessionId,
 		assistantMessageId,
 		agent: effectiveAgent,
-		provider,
-		model,
+		provider: effectiveProvider,
+		model: effectiveModel,
 		builtinCommand: builtinCommand?.id,
 		isCompactCommand: builtinCommand?.isCompactCommand,
 	});

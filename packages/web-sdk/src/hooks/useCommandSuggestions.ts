@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { apiClient } from '../lib/api-client';
 import {
 	getCommandLabel,
+	getRecipeCommandName,
 	shouldSendSlashCommandAsMessage,
 } from '../lib/commands';
 
@@ -85,6 +86,12 @@ export function useCommandSuggestions({
 						console.error('Failed to stop generation:', error);
 					}
 				}
+				resetInput();
+				return;
+			}
+			const recipeName = getRecipeCommandName(commandId);
+			if (recipeName && onSendCommandMessage) {
+				await onSendCommandMessage(`/${recipeName}`);
 				resetInput();
 				return;
 			}

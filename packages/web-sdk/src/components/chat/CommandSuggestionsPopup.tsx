@@ -1,9 +1,15 @@
 import { useEffect, useMemo } from 'react';
+import { ChefHat } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useConfig } from '../../hooks/useConfig';
 import { usePreferences } from '../../hooks/usePreferences';
+import { useRecipes } from '../../hooks/useRecipes';
 import { useShareStatus } from '../../hooks/useShareStatus';
-import { filterCommands, getCommandDescription } from '../../lib/commands';
+import {
+	COMMAND_KIND_STYLES,
+	filterCommands,
+	getCommandDescription,
+} from '../../lib/commands';
 
 const POPUP_TRANSITION = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
 
@@ -27,6 +33,7 @@ export function CommandSuggestionsPopup({
 	const { preferences } = usePreferences();
 	const { data: config } = useConfig();
 	const { data: shareStatus } = useShareStatus(sessionId);
+	const { data: recipesData } = useRecipes();
 
 	const state = useMemo(
 		() => ({
@@ -37,7 +44,22 @@ export function CommandSuggestionsPopup({
 		[preferences.vimMode, config?.defaults?.reasoningText, shareStatus?.shared],
 	);
 
-	const results = useMemo(() => filterCommands(query, state), [query, state]);
+	const recipeCommands = useMemo(
+		() =>
+			(recipesData?.recipes ?? []).map((recipe) => ({
+				id: `recipe:${recipe.name}`,
+				label: `/${recipe.name}`,
+				description: recipe.description || 'Project recipe',
+				icon: ChefHat,
+				kind: 'recipe' as const,
+			})),
+		[recipesData?.recipes],
+	);
+
+	const results = useMemo(
+		() => filterCommands(query, state, recipeCommands),
+		[query, state, recipeCommands],
+	);
 
 	useEffect(() => {
 		const element = document.getElementById(`command-item-${selectedIndex}`);
@@ -85,6 +107,7 @@ export function CommandSuggestionsPopup({
 		>
 			{results.map((command, index) => {
 				const Icon = command.icon;
+				const iconClass = COMMAND_KIND_STYLES[command.kind];
 				return (
 					<button
 						type="button"
@@ -99,7 +122,7 @@ export function CommandSuggestionsPopup({
 						}`}
 					>
 						<div className="flex items-center gap-3 w-full">
-							<Icon className="w-4 h-4 flex-shrink-0 text-primary" />
+							<Icon className={`w-4 h-4 flex-shrink-0 ${iconClass}`} />
 							<div className="flex-1 min-w-0">
 								<div className="font-mono text-sm font-medium text-foreground">
 									{command.label}

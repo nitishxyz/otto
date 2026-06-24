@@ -20,6 +20,7 @@ import {
 	BarChart3,
 	Mic,
 	Bell,
+	ChefHat,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
@@ -38,6 +39,7 @@ import { usePreferences } from '../../hooks/usePreferences';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { OttoRouterTopupModal } from './OttoRouterTopupModal';
 import { DictationSettings } from './DictationSettings';
+import { RecipesSettings } from './RecipesSettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -588,7 +590,8 @@ type PreferencesTab =
 	| 'notifications'
 	| 'automation'
 	| 'reasoning'
-	| 'dictation';
+	| 'dictation'
+	| 'recipes';
 
 const PREFERENCE_TABS: Array<{
 	id: PreferencesTab;
@@ -625,6 +628,12 @@ const PREFERENCE_TABS: Array<{
 		label: 'Dictation',
 		description: 'Voice input and local models',
 		icon: <Mic className="h-4 w-4" />,
+	},
+	{
+		id: 'recipes',
+		label: 'Recipes',
+		description: 'Reusable project slash commands',
+		icon: <ChefHat className="h-4 w-4" />,
 	},
 ];
 
@@ -899,6 +908,8 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 						</div>
 					</div>
 				);
+			case 'recipes':
+				return <RecipesSettings />;
 		}
 	};
 
@@ -952,6 +963,7 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 						<AnimatePresence mode="wait">
 							<motion.div
 								key={activeTab}
+								className="h-full min-h-0"
 								initial={{ opacity: 0, y: 6 }}
 								animate={{ opacity: 1, y: 0 }}
 								exit={{ opacity: 0, y: -6 }}

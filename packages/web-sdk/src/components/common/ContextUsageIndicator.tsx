@@ -31,12 +31,6 @@ function getTextColorClass(usagePercent: number): string {
 	return 'text-foreground';
 }
 
-function getMeterColor(usagePercent: number): string {
-	if (usagePercent >= 90) return '#ef4444';
-	if (usagePercent >= 70) return '#f59e0b';
-	return 'hsl(var(--foreground) / 0.35)';
-}
-
 export const ContextUsageIndicator = memo(function ContextUsageIndicator({
 	provider,
 	model,
@@ -75,7 +69,7 @@ export const ContextUsageIndicator = memo(function ContextUsageIndicator({
 	const colorClass = getTextColorClass(usagePercent ?? 0);
 
 	return (
-		<div className={`flex flex-col gap-0.5 ${className}`.trim()} title={title}>
+		<div className={`flex items-center ${className}`.trim()} title={title}>
 			<div className="flex items-center gap-1">
 				<span className="text-xs opacity-70">ctx</span>
 				{emphasizePercent ? (
@@ -98,20 +92,6 @@ export const ContextUsageIndicator = memo(function ContextUsageIndicator({
 					</span>
 				)}
 			</div>
-			{usagePercent != null && (
-				<div
-					className="h-[3px] w-full rounded-full bg-muted overflow-hidden"
-					aria-hidden
-				>
-					<div
-						className="h-full rounded-full transition-all duration-500"
-						style={{
-							width: `${Math.max(usagePercent, 2)}%`,
-							backgroundColor: getMeterColor(usagePercent),
-						}}
-					/>
-				</div>
-			)}
 		</div>
 	);
 });

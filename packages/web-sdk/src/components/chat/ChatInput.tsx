@@ -1245,12 +1245,15 @@ const VoiceInputPanel = memo(function VoiceInputPanel({
 }: VoiceInputPanelProps) {
 	return (
 		<>
-			<div className="flex items-center gap-1">
-				<div className="flex-1 min-w-0 text-primary" style={{ height: '3rem' }}>
+			<div className="flex items-end gap-1">
+				<div
+					className="flex-1 min-w-0 text-primary"
+					style={{ height: '2.5rem' }}
+				>
 					<LiveWaveform
 						active={isListening}
 						analyser={analyser}
-						height="3rem"
+						height="2.5rem"
 						loading={isTranscribing}
 					/>
 				</div>

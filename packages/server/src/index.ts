@@ -29,6 +29,7 @@ import { registerMCPRoutes } from './routes/mcp.ts';
 import { registerProviderUsageRoutes } from './routes/provider-usage.ts';
 import { registerDoctorRoutes } from './routes/doctor.ts';
 import { registerSkillsRoutes } from './routes/skills.ts';
+import { registerRecipesRoutes } from './routes/recipes.ts';
 import { registerUsageRoutes } from './routes/usage.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
@@ -114,6 +115,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerProviderUsageRoutes(app);
 	registerDoctorRoutes(app);
 	registerSkillsRoutes(app);
+	registerRecipesRoutes(app);
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);

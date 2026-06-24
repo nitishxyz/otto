@@ -4,6 +4,40 @@
 
 Customize otto with project-local `.otto/` files or global `~/.config/otto/` files.
 
+## Recipes
+
+Recipes are project-local markdown instructions that become reusable slash commands in chat. They are discovered from:
+
+- `.otto/recipes/*.md`
+
+The filename is the command name, so `.otto/recipes/publish-ready.md` runs with `/publish-ready`. Recipe names must use lowercase letters, numbers, and dashes.
+
+### Example
+
+Create `.otto/recipes/publish-ready.md`:
+
+```md
+---
+description: Set publish flags and verify readiness
+agent: build
+---
+
+Update `publish.env` for publishing.
+
+Set the relevant publish flags to `true`, preserve unrelated values and comments, then run `bun lint` and summarize the result.
+
+Do not commit.
+```
+
+Usage:
+
+```text
+/publish-ready
+/publish-ready web cli
+```
+
+Arguments after the recipe name are passed to Otto as recipe arguments. Recipes run through the normal agent flow and keep the usual tool approval, editing, and safety rules. The optional `agent` frontmatter chooses which agent runs the recipe; it defaults to `build`, and unavailable agents fall back to `build`. You can also ask Otto to create or edit a recipe; it should write markdown files under `.otto/recipes/`.
+
 ## Custom commands
 
 Command manifests are discovered from:

@@ -11,6 +11,7 @@ import {
 	getInitCommandSystemPrompt,
 	isInitCommand,
 } from './init.ts';
+import { prepareRecipeCommand } from './recipes.ts';
 
 export type BuiltinCommandPromptMessage = {
 	role: 'system' | 'user';
@@ -18,8 +19,10 @@ export type BuiltinCommandPromptMessage = {
 };
 
 export type BuiltinCommandSpec = {
-	id: 'compact' | 'init';
+	id: 'compact' | 'init' | `recipe:${string}`;
 	agent?: string;
+	provider?: string;
+	model?: string;
 	oneShot?: boolean;
 	/**
 	 * Controls prompt construction only. The run still executes in the current
@@ -76,6 +79,22 @@ export async function prepareBuiltinCommand(args: {
 					role: 'user',
 					content: buildInitCommandUserPrompt(args.cfg.projectRoot, snapshot),
 				},
+			],
+		};
+	}
+
+	const recipeCommand = await prepareRecipeCommand({
+		projectRoot: args.cfg.projectRoot,
+		content: args.content,
+	});
+	if (recipeCommand) {
+		return {
+			id: `recipe:${recipeCommand.name}`,
+			agent: recipeCommand.agent,
+			provider: recipeCommand.provider,
+			model: recipeCommand.model,
+			additionalPromptMessages: [
+				{ role: 'user', content: recipeCommand.prompt },
 			],
 		};
 	}
