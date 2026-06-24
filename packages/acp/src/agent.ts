@@ -27,6 +27,7 @@ import type {
 	SetSessionConfigOptionResponse,
 } from '@agentclientprotocol/sdk';
 import { handleAskRequest } from '@ottocode/server/runtime/ask/service';
+import { resolveAgentConfig } from '@ottocode/server/runtime/agent-registry';
 import { subscribe } from '@ottocode/server/events/bus';
 import {
 	abortMessage,
@@ -247,8 +248,17 @@ export class OttoAcpAgent implements Agent {
 	): Promise<SetSessionModeResponse | undefined> {
 		const session = this.sessions.get(params.sessionId);
 		if (!session) throw new Error('Session not found');
-		await this.persistSessionPreferences(session, { agent: params.modeId });
 		session.mode = params.modeId;
+
+		const modelChanged = await this.applyAgentModelPreference(
+			session,
+			params.modeId,
+		);
+
+		if (!modelChanged) {
+			await this.persistSessionPreferences(session, { agent: params.modeId });
+		}
+
 		await this.client.sessionUpdate({
 			sessionId: params.sessionId,
 			update: {
@@ -256,7 +266,47 @@ export class OttoAcpAgent implements Agent {
 				currentModeId: params.modeId,
 			},
 		});
+
+		if (modelChanged) {
+			const state = await buildSessionState(session);
+			await this.client.sessionUpdate({
+				sessionId: params.sessionId,
+				update: {
+					sessionUpdate: 'config_option_update',
+					configOptions: state.configOptions ?? [],
+				},
+			});
+		}
+
 		return undefined;
+	}
+
+	private async applyAgentModelPreference(
+		session: AcpSession,
+		modeId: string,
+	): Promise<boolean> {
+		try {
+			const cfg = await loadConfig(session.cwd);
+			const agentCfg = await resolveAgentConfig(cfg.projectRoot, modeId);
+			if (!agentCfg.model) return false;
+			const nextProvider = agentCfg.provider ?? session.provider;
+			const nextModel = agentCfg.model;
+			if (nextProvider === session.provider && nextModel === session.model) {
+				await this.persistSessionPreferences(session, { agent: modeId });
+				return false;
+			}
+			session.provider = nextProvider;
+			session.model = nextModel;
+			await this.persistSessionPreferences(session, {
+				agent: modeId,
+				...(nextProvider ? { provider: nextProvider } : {}),
+				model: nextModel,
+			});
+			return true;
+		} catch (err) {
+			console.error('[acp] Failed to apply agent model preference:', err);
+			return false;
+		}
 	}
 
 	async setSessionConfigOption(
@@ -267,8 +317,11 @@ export class OttoAcpAgent implements Agent {
 
 		if (params.configId === 'agent' && 'value' in params) {
 			const mode = String(params.value);
-			await this.persistSessionPreferences(session, { agent: mode });
 			session.mode = mode;
+			const modelChanged = await this.applyAgentModelPreference(session, mode);
+			if (!modelChanged) {
+				await this.persistSessionPreferences(session, { agent: mode });
+			}
 		} else if (params.configId === 'model' && 'value' in params) {
 			const parsed = parseModelId(String(params.value));
 			await this.persistSessionPreferences(session, {

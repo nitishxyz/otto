@@ -172,6 +172,11 @@ export async function handleOttoEvent(
 				return;
 			}
 
+			case 'usage': {
+				await sendUsageUpdate(client, payload, acpSessionId, session);
+				break;
+			}
+
 			case 'message.completed': {
 				await sendUsageUpdate(client, payload, acpSessionId, session);
 				if (
