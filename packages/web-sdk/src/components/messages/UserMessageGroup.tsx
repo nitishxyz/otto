@@ -71,7 +71,7 @@ function linkifySlashCommand(content: string, recipeNames: string[]) {
 	return content.replace(
 		new RegExp(`(^|\\s)(/${commandName})(?=\\s|$)`, 'i'),
 		(_, prefix: string, command: string) =>
-			`${prefix}[${command}](otto-command:${kind}:${encodeURIComponent(command)})`,
+			`${prefix}[${command}](#otto-command:${kind}:${encodeURIComponent(command)})`,
 	);
 }
 
