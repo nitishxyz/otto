@@ -36,6 +36,10 @@ function stringField(record: StreamPartRecord, field: string): string {
 	return typeof value === 'string' ? value : '';
 }
 
+function deltaTextField(record: StreamPartRecord): string {
+	return stringField(record, 'text') || stringField(record, 'delta');
+}
+
 export async function consumeRunnerStreamParts(args: {
 	fullStream: AsyncIterable<unknown>;
 	opts: RunOpts;
@@ -82,7 +86,7 @@ export async function consumeRunnerStreamParts(args: {
 			case 'tool-result':
 				break;
 			case 'text-delta': {
-				const rawDelta = stringField(part, 'text');
+				const rawDelta = deltaTextField(part);
 				if (!rawDelta) break;
 
 				const delta = args.oauthTextGuard
@@ -124,7 +128,7 @@ export async function consumeRunnerStreamParts(args: {
 			case 'reasoning-delta': {
 				const reasoningId = stringField(part, 'id');
 				if (!reasoningId) break;
-				const text = stringField(part, 'text');
+				const text = deltaTextField(part);
 				if (text) args.logFirstOutputLatency('reasoning');
 				await handleReasoningDelta(
 					reasoningId,
