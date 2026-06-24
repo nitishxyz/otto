@@ -2,6 +2,10 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
+import {
+	loadProjectRecipe,
+	parseRecipeInvocation,
+} from '../commands/recipes.ts';
 import { getQueueState } from '../session/queue.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
 import { appendAssistantHistoryEntries } from './history/assistant-parts.ts';
@@ -39,6 +43,31 @@ function shouldSkipAssistantMessage(args: {
 		args.status !== 'error' &&
 		args.parts.length === 0
 	);
+}
+
+function readUserTextPart(parts: MessagePartRow[]): string | null {
+	for (const part of parts) {
+		if (part.type !== 'text') continue;
+		try {
+			const parsed = JSON.parse(part.content || '{}') as { text?: unknown };
+			if (typeof parsed.text === 'string') return parsed.text;
+		} catch {
+			return part.content;
+		}
+	}
+	return null;
+}
+
+async function isRecipeInvocationMessage(args: {
+	projectRoot?: string;
+	parts: MessagePartRow[];
+}): Promise<boolean> {
+	if (!args.projectRoot) return false;
+	const text = readUserTextPart(args.parts);
+	if (!text) return false;
+	const invocation = parseRecipeInvocation(text);
+	if (!invocation) return false;
+	return Boolean(await loadProjectRecipe(args.projectRoot, invocation.name));
 }
 
 /**
@@ -84,6 +113,7 @@ export async function buildHistoryMessages(
 
 	const history: ModelMessage[] = [];
 	const toolHistory = new ToolHistoryTracker();
+	let skipNextAssistantMessage = false;
 
 	for (const message of rows) {
 		if (
@@ -94,6 +124,10 @@ export async function buildHistoryMessages(
 		}
 
 		const parts = partsByMessageId.get(message.id) ?? [];
+		if (message.role === 'assistant' && skipNextAssistantMessage) {
+			skipNextAssistantMessage = false;
+			continue;
+		}
 
 		if (
 			message.role === 'assistant' &&
@@ -103,6 +137,16 @@ export async function buildHistoryMessages(
 		}
 
 		if (message.role === 'user') {
+			if (
+				await isRecipeInvocationMessage({
+					projectRoot: options?.projectRoot,
+					parts,
+				})
+			) {
+				skipNextAssistantMessage = true;
+				continue;
+			}
+
 			const userParts = await buildUserModelParts({
 				message,
 				parts,
