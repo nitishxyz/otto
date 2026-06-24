@@ -1,9 +1,7 @@
 import { memo } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Moon, Sun } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useRightRailStore } from '../../stores/rightRailStore';
-import type { Theme } from '../../hooks/useTheme';
 
 interface TitleBarButtonProps {
 	onClick: () => void;
@@ -59,30 +57,6 @@ export const TitleBarRightRailToggle = memo(function TitleBarRightRailToggle() {
 	return (
 		<TitleBarButton onClick={togglePinned} title={label} ariaPressed={isPinned}>
 			<PanelIcon side="right" />
-		</TitleBarButton>
-	);
-});
-
-interface TitleBarThemeToggleProps {
-	theme: Theme;
-	onToggleTheme: () => void;
-}
-
-/** Light/dark theme toggle button for the {@link TitleBar}. */
-export const TitleBarThemeToggle = memo(function TitleBarThemeToggle({
-	theme,
-	onToggleTheme,
-}: TitleBarThemeToggleProps) {
-	return (
-		<TitleBarButton
-			onClick={onToggleTheme}
-			title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-		>
-			{theme === 'dark' ? (
-				<Sun className="w-4 h-4" />
-			) : (
-				<Moon className="w-4 h-4" />
-			)}
 		</TitleBarButton>
 	);
 });

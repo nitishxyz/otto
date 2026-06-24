@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const nord: OttoTheme = theme({
+	id: 'nord',
+	displayName: 'Nord',
+	mode: 'dark',
+	bg: '#2e3440',
+	bgDark: '#242933',
+	bgHighlight: '#3b4252',
+	bgSubtle: '#2b303b',
+	fg: '#d8dee9',
+	fgBright: '#eceff4',
+	fgMuted: '#c0c8d8',
+	fgDark: '#81a1c1',
+	fgDimmed: '#4c566a',
+	blue: '#81a1c1',
+	green: '#a3be8c',
+	red: '#bf616a',
+	yellow: '#ebcb8b',
+	purple: '#b48ead',
+	cyan: '#88c0d0',
+	orange: '#d08770',
+	magenta: '#b48ead',
+	syntax: syntax({
+		keyword: '#81a1c1',
+		string: '#a3be8c',
+		comment: '#616e88',
+		number: '#b48ead',
+		function: '#88c0d0',
+		type: '#8fbcbb',
+		variable: '#d8dee9',
+		property: '#81a1c1',
+		operator: '#81a1c1',
+		punctuation: '#d8dee9',
+	}),
+});

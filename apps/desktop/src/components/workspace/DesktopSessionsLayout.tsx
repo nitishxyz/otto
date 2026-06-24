@@ -26,6 +26,7 @@ import {
 	useRestoreFiles,
 	useSessions,
 	useStageFiles,
+	useTheme,
 	useUnstageFiles,
 	useWorkingDirectory,
 } from '@ottocode/web-sdk/hooks';
@@ -35,14 +36,11 @@ import {
 	useGitStore,
 	useWorkspaceTabStore,
 } from '@ottocode/web-sdk/stores';
-import type { Theme } from '@ottocode/web-sdk/hooks';
 import type { Project } from '../../lib/tauri-bridge';
 import { DesktopAppLayout } from './DesktopAppLayout';
 
 interface DesktopSessionsLayoutProps {
 	project: Project;
-	theme: Theme;
-	onToggleTheme: () => void;
 	sessionId?: string;
 	/** Workspace view: 'agents' (default, /sessions) or 'otto' (/otto). */
 	view?: 'agents' | 'otto';
@@ -53,8 +51,6 @@ interface DesktopSessionsLayoutProps {
 
 export function DesktopSessionsLayout({
 	project,
-	theme,
-	onToggleTheme,
 	sessionId,
 	view = 'agents',
 	dashboardOpen,
@@ -63,6 +59,8 @@ export function DesktopSessionsLayout({
 }: DesktopSessionsLayoutProps) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	// Applies the active theme from server config (in-workspace settings picker).
+	useTheme();
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
@@ -335,8 +333,6 @@ export function DesktopSessionsLayout({
 		<>
 			<DesktopAppLayout
 				onNewSession={handleNewSession}
-				theme={theme}
-				onToggleTheme={onToggleTheme}
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}

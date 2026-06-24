@@ -20,6 +20,7 @@ import type {
 	UpsertAgentResponse,
 	DeleteAgentResponse,
 } from '@ottocode/api';
+import type { ThemeId } from '@ottocode/themes';
 import type { AllModelsResponse } from '../../types/api';
 import { extractErrorMessage } from './utils';
 
@@ -82,7 +83,7 @@ export const configMixin = {
 			guidedMode?: boolean;
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
-			theme?: 'light' | 'dark';
+			theme?: ThemeId;
 			tuiTheme?: string;
 			vimMode?: boolean;
 			compactThread?: boolean;
@@ -244,7 +245,7 @@ export const configMixin = {
 		guidedMode?: boolean;
 		reasoningText?: boolean;
 		reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
-		theme?: 'light' | 'dark';
+		theme?: ThemeId;
 		tuiTheme?: string;
 		vimMode?: boolean;
 		compactThread?: boolean;
@@ -267,7 +268,7 @@ export const configMixin = {
 			guidedMode?: boolean;
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
-			theme?: 'light' | 'dark';
+			theme?: ThemeId;
 			tuiTheme?: string;
 			vimMode?: boolean;
 			compactThread?: boolean;

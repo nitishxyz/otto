@@ -14,14 +14,11 @@ import {
 	GitBranch,
 	Link,
 	MessageCircle,
-	Moon,
 	RotateCw,
 	Search,
 	Star,
-	Sun,
 	X,
 } from 'lucide-react';
-import { useDesktopTheme } from '../theme';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';
@@ -59,7 +56,6 @@ export function ProjectPicker({
 	const [projectVisibleCount, setProjectVisibleCount] =
 		useState(PROJECTS_PER_PAGE);
 	const platform = usePlatform();
-	const { theme, toggleTheme } = useDesktopTheme();
 	const pageRef = useRef(1);
 	const projectLoadMoreRef = useRef<HTMLDivElement | null>(null);
 	const {
@@ -289,18 +285,7 @@ export function ProjectPicker({
 								{downloading ? `${updateProgress}%` : 'Update'}
 							</button>
 						))}
-					<button
-						type="button"
-						onClick={toggleTheme}
-						className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-						title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-					>
-						{theme === 'dark' ? (
-							<Sun className="w-4 h-4" />
-						) : (
-							<Moon className="w-4 h-4" />
-						)}
-					</button>
+
 					<button
 						type="button"
 						onClick={() => tauriBridge.createNewWindow()}

@@ -1,0 +1,30 @@
+{
+	"name": "@ottocode/themes",
+	"version": "0.1.326",
+	"description": "Shared theme registry and adapters for ottocode apps",
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"types": "./src/index.ts"
+		}
+	},
+	"files": [
+		"src",
+		"README.md"
+	],
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"keywords": [
+		"otto",
+		"themes"
+	],
+	"author": "nitishxyz",
+	"license": "MIT",
+	"devDependencies": {
+		"typescript": "5.9.3"
+	}
+}

@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const tokyoNight: OttoTheme = theme({
+	id: 'tokyo-night',
+	displayName: 'Tokyo Night',
+	mode: 'dark',
+	bg: '#1a1b26',
+	bgDark: '#16161e',
+	bgHighlight: '#292e42',
+	bgSubtle: '#24283b',
+	fg: '#c0caf5',
+	fgBright: '#ffffff',
+	fgMuted: '#a9b1d6',
+	fgDark: '#565f89',
+	fgDimmed: '#414868',
+	blue: '#7aa2f7',
+	green: '#9ece6a',
+	red: '#f7768e',
+	yellow: '#e0af68',
+	purple: '#bb9af7',
+	cyan: '#7dcfff',
+	orange: '#ff9e64',
+	magenta: '#bb9af7',
+	syntax: syntax({
+		keyword: '#bb9af7',
+		string: '#9ece6a',
+		comment: '#565f89',
+		number: '#ff9e64',
+		function: '#7aa2f7',
+		type: '#2ac3de',
+		variable: '#c0caf5',
+		property: '#7dcfff',
+		operator: '#89ddff',
+		punctuation: '#a9b1d6',
+	}),
+});

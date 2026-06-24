@@ -58,7 +58,8 @@ export function SessionsLayout({
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
-	const { theme, toggleTheme } = useTheme();
+	// Applies the active theme to the document (side effect only).
+	useTheme();
 	const navigate = useNavigate();
 	const isOttoTab = view === 'otto';
 
@@ -250,8 +251,6 @@ export function SessionsLayout({
 			/>
 			<AppLayout
 				onNewSession={handleNewSession}
-				theme={theme}
-				onToggleTheme={toggleTheme}
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}

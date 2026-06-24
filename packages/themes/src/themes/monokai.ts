@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const monokai: OttoTheme = theme({
+	id: 'monokai',
+	displayName: 'Monokai',
+	mode: 'dark',
+	bg: '#272822',
+	bgDark: '#1e1f1c',
+	bgHighlight: '#3e3d32',
+	bgSubtle: '#2d2e27',
+	fg: '#f8f8f2',
+	fgBright: '#ffffff',
+	fgMuted: '#cfcfc2',
+	fgDark: '#75715e',
+	fgDimmed: '#49483e',
+	blue: '#66d9ef',
+	green: '#a6e22e',
+	red: '#f92672',
+	yellow: '#e6db74',
+	purple: '#ae81ff',
+	cyan: '#66d9ef',
+	orange: '#fd971f',
+	magenta: '#f92672',
+	syntax: syntax({
+		keyword: '#f92672',
+		string: '#e6db74',
+		comment: '#75715e',
+		number: '#ae81ff',
+		function: '#a6e22e',
+		type: '#66d9ef',
+		variable: '#f8f8f2',
+		property: '#66d9ef',
+		operator: '#f92672',
+		punctuation: '#f8f8f2',
+	}),
+});

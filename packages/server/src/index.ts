@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BlankEnv } from 'hono/types';
 import { cors } from 'hono/cors';
 import type { ProviderId, AuthInfo } from '@ottocode/sdk';
+import type { ThemeId } from '@ottocode/themes';
 import { TerminalManager } from '@ottocode/sdk';
 import { setTerminalManager } from '@ottocode/sdk';
 import { registerRootRoutes } from './routes/root.ts';
@@ -185,7 +186,7 @@ export type EmbeddedAppConfig = {
 		model?: string;
 		agent?: string;
 		toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
-		theme?: 'light' | 'dark';
+		theme?: ThemeId | 'light' | 'dark';
 		tuiTheme?: string;
 		vimMode?: boolean;
 		compactThread?: boolean;

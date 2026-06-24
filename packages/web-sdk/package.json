@@ -76,6 +76,7 @@
 		"@lezer/highlight": "1.2.3",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
+		"@ottocode/themes": "workspace:*",
 		"axios": "1.13.5",
 		"fuse.js": "7.1.0",
 		"ghostty-web": "0.4.0",

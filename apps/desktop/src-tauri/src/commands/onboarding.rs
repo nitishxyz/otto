@@ -301,10 +301,21 @@ pub async fn set_defaults(
     if tool_approval.is_some() {
         config.defaults.tool_approval = tool_approval;
     }
-    if matches!(theme.as_deref(), Some("light" | "dark")) {
-        config.defaults.theme = theme;
+    if let Some(theme_id) = theme {
+        config.defaults.theme = Some(normalize_theme_id(&theme_id).to_string());
     }
     write_config(&config)
+}
+
+fn normalize_theme_id(theme: &str) -> &str {
+    match theme {
+        "dark" => "otto-dark",
+        "light" => "otto-light",
+        "otto-dark" | "otto-light" | "rose-pine" | "rose-pine-moon" | "rose-pine-dawn"
+        | "ayu-dark" | "ayu-mirage" | "ayu-light" | "tokyo-night" | "catppuccin-mocha"
+        | "nord" | "gruvbox" | "monokai" | "dracula" | "solarized-dark" => theme,
+        _ => "otto-dark",
+    }
 }
 
 #[tauri::command]

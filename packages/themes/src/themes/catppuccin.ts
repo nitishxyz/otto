@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const catppuccinMocha: OttoTheme = theme({
+	id: 'catppuccin-mocha',
+	displayName: 'Catppuccin Mocha',
+	mode: 'dark',
+	bg: '#1e1e2e',
+	bgDark: '#181825',
+	bgHighlight: '#313244',
+	bgSubtle: '#11111b',
+	fg: '#cdd6f4',
+	fgBright: '#f5e0dc',
+	fgMuted: '#bac2de',
+	fgDark: '#7f849c',
+	fgDimmed: '#585b70',
+	blue: '#89b4fa',
+	green: '#a6e3a1',
+	red: '#f38ba8',
+	yellow: '#f9e2af',
+	purple: '#cba6f7',
+	cyan: '#89dceb',
+	orange: '#fab387',
+	magenta: '#f5c2e7',
+	syntax: syntax({
+		keyword: '#cba6f7',
+		string: '#a6e3a1',
+		comment: '#7f849c',
+		number: '#fab387',
+		function: '#89b4fa',
+		type: '#f9e2af',
+		variable: '#cdd6f4',
+		property: '#89dceb',
+		operator: '#89dceb',
+		punctuation: '#bac2de',
+	}),
+});

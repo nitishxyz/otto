@@ -1,10 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent } from 'react';
-import {
-	useEdgeHover,
-	usePreferences,
-	type Theme,
-} from '@ottocode/web-sdk/hooks';
+import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
 import {
 	clearRuntimeApiBaseUrl,
 	configureApiClient,
@@ -62,11 +58,9 @@ import {
 	FolderOpen,
 	GitBranch,
 	Menu,
-	Moon,
 	Network,
 	PanelRight,
 	Settings,
-	Sun,
 	Terminal,
 	Wrench,
 	X,
@@ -136,8 +130,6 @@ interface AppLayoutProps {
 	sidebar: ReactNode;
 	children: ReactNode;
 	onNewSession?: () => void;
-	theme: Theme;
-	onToggleTheme: () => void;
 	sessionId?: string;
 	onNavigateToSession?: (sessionId: string) => void;
 	onFixWithAI?: (errorMessage: string) => void;
@@ -147,8 +139,6 @@ export const AppLayout = memo(function AppLayout({
 	sidebar,
 	children,
 	onNewSession,
-	theme,
-	onToggleTheme,
 	sessionId,
 	onFixWithAI,
 }: AppLayoutProps) {
@@ -270,7 +260,7 @@ export const AppLayout = memo(function AppLayout({
 			onTouchEnd={handleTouchEnd}
 		>
 			{/* App title bar - spans the full window width (desktop only) */}
-			<WorkspaceTitleBar theme={theme} onToggleTheme={onToggleTheme} />
+			<WorkspaceTitleBar />
 
 			<div className="flex-1 flex min-h-0 overflow-hidden">
 				{/* Left sidebar - Sessions */}
@@ -333,8 +323,6 @@ export const AppLayout = memo(function AppLayout({
 							isMobile={isMobile}
 							sessionId={sessionId}
 							onFixWithAI={onFixWithAI}
-							theme={theme}
-							onToggleTheme={onToggleTheme}
 						/>
 					</div>
 
@@ -346,8 +334,6 @@ export const AppLayout = memo(function AppLayout({
 			<MobilePanelMenu
 				isOpen={isMobilePanelMenuOpen}
 				onClose={handleCloseMobilePanelMenu}
-				theme={theme}
-				onToggleTheme={onToggleTheme}
 			/>
 
 			{/* Modals */}
@@ -433,16 +419,12 @@ interface RightPanelAreaProps {
 	isMobile: boolean;
 	sessionId?: string;
 	onFixWithAI?: (errorMessage: string) => void;
-	theme: Theme;
-	onToggleTheme: () => void;
 }
 
 const RightPanelArea = memo(function RightPanelArea({
 	isMobile,
 	sessionId,
 	onFixWithAI,
-	theme,
-	onToggleTheme,
 }: RightPanelAreaProps) {
 	const navigate = useNavigate();
 	const gitExpanded = useGitStore((s) => s.isExpanded);
@@ -630,22 +612,6 @@ const RightPanelArea = memo(function RightPanelArea({
 					<SettingsSidebarToggle />
 					<div className="flex-1" />
 					<TerminalPanelToggle />
-					<div className="h-12 border-t border-border flex items-center justify-center">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={onToggleTheme}
-							title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-							aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-							className="touch-manipulation"
-						>
-							{theme === 'dark' ? (
-								<Sun className="w-4 h-4" />
-							) : (
-								<Moon className="w-4 h-4" />
-							)}
-						</Button>
-					</div>
 				</div>
 			</div>
 		</div>
@@ -655,15 +621,11 @@ const RightPanelArea = memo(function RightPanelArea({
 interface MobilePanelMenuProps {
 	isOpen: boolean;
 	onClose: () => void;
-	theme: Theme;
-	onToggleTheme: () => void;
 }
 
 const MobilePanelMenu = memo(function MobilePanelMenu({
 	isOpen,
 	onClose,
-	theme,
-	onToggleTheme,
 }: MobilePanelMenuProps) {
 	const openMobilePanel = useCallback(
 		(togglePanel: () => void) => {
@@ -759,18 +721,6 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
 					>
 						<Settings className="h-4 w-4" /> Settings
-					</button>
-					<button
-						type="button"
-						onClick={onToggleTheme}
-						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
-					>
-						{theme === 'dark' ? (
-							<Sun className="h-4 w-4" />
-						) : (
-							<Moon className="h-4 w-4" />
-						)}
-						Theme
 					</button>
 				</div>
 			</div>

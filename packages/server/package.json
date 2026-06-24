@@ -67,6 +67,7 @@
 	"dependencies": {
 		"@ottocode/database": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
+		"@ottocode/themes": "workspace:*",
 		"@ai-sdk/devtools": "0.0.18",
 		"@ai-sdk/provider": "3.0.10",
 		"@ai-sdk/provider-utils": "4.0.27",

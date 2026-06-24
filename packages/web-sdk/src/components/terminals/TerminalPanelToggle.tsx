@@ -14,7 +14,7 @@ export const TerminalPanelToggle = memo(function TerminalPanelToggle() {
 		<button
 			type="button"
 			onClick={togglePanel}
-			className={`relative h-14 w-full transition-colors touch-manipulation flex items-center justify-center ${
+			className={`relative h-12 w-full transition-colors touch-manipulation flex items-center justify-center ${
 				isOpen ? 'bg-muted border-r-2 border-primary' : 'hover:bg-muted/50'
 			}`}
 			title="Terminals (⌘J / Ctrl+J)"

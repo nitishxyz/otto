@@ -1,19 +1,12 @@
 import { memo, useCallback, useEffect } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import type { Theme } from '@ottocode/web-sdk/hooks';
 import { useWorkspaceTabStore } from '@ottocode/web-sdk/stores';
 import {
 	OttoTabBar,
 	TitleBar,
 	TitleBarRightRailToggle,
-	TitleBarThemeToggle,
 	type WorkspaceTab,
 } from '@ottocode/web-sdk/components';
-
-interface WorkspaceTitleBarProps {
-	theme: Theme;
-	onToggleTheme: () => void;
-}
 
 /**
  * Agents | Otto tabs backed by routes: the active tab reflects the current
@@ -65,23 +58,15 @@ export const RoutedOttoTabs = memo(function RoutedOttoTabs() {
 
 /**
  * Web app title bar: sidebar toggle + Agents | Otto tabs on the left,
- * theme toggle on the right. Tabs are backed by routes (/sessions vs /otto)
+ * right rail toggle on the right. Tabs are backed by routes (/sessions vs /otto)
  * so refreshes land on the same workspace.
  */
-export const WorkspaceTitleBar = memo(function WorkspaceTitleBar({
-	theme,
-	onToggleTheme,
-}: WorkspaceTitleBarProps) {
+export const WorkspaceTitleBar = memo(function WorkspaceTitleBar() {
 	return (
 		<TitleBar
 			className="hidden md:flex"
 			leading={<RoutedOttoTabs />}
-			trailing={
-				<>
-					<TitleBarRightRailToggle />
-					<TitleBarThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
-				</>
-			}
+			trailing={<TitleBarRightRailToggle />}
 		/>
 	);
 });

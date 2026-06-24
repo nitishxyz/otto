@@ -98,7 +98,7 @@ const routeTree = rootRoute.addChildren([
 const defaultRouterContext: DesktopRouterContext = {
 	initialized: false,
 	selectedProject: null,
-	theme: 'dark',
+	theme: 'otto-dark',
 	setTheme: () => {},
 	toggleTheme: () => {},
 	onSelectProject: () => {},

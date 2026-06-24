@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ThemeId } from '@ottocode/themes';
 import { apiClient } from '../lib/api-client';
 
 type ConfigData = Awaited<ReturnType<typeof apiClient.getConfig>>;
@@ -38,7 +39,7 @@ export function useUpdateDefaults() {
 			guidedMode?: boolean;
 			reasoningText?: boolean;
 			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
-			theme?: 'light' | 'dark';
+			theme?: ThemeId;
 			tuiTheme?: string;
 			vimMode?: boolean;
 			compactThread?: boolean;

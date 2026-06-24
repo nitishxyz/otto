@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const dracula: OttoTheme = theme({
+	id: 'dracula',
+	displayName: 'Dracula',
+	mode: 'dark',
+	bg: '#282a36',
+	bgDark: '#21222c',
+	bgHighlight: '#44475a',
+	bgSubtle: '#343746',
+	fg: '#f8f8f2',
+	fgBright: '#ffffff',
+	fgMuted: '#cfcfc2',
+	fgDark: '#6272a4',
+	fgDimmed: '#44475a',
+	blue: '#8be9fd',
+	green: '#50fa7b',
+	red: '#ff5555',
+	yellow: '#f1fa8c',
+	purple: '#bd93f9',
+	cyan: '#8be9fd',
+	orange: '#ffb86c',
+	magenta: '#ff79c6',
+	syntax: syntax({
+		keyword: '#ff79c6',
+		string: '#f1fa8c',
+		comment: '#6272a4',
+		number: '#bd93f9',
+		function: '#50fa7b',
+		type: '#8be9fd',
+		variable: '#f8f8f2',
+		property: '#8be9fd',
+		operator: '#ff79c6',
+		punctuation: '#f8f8f2',
+	}),
+});

@@ -5,8 +5,15 @@ import {
 	useEffect,
 	useState,
 } from 'react';
-import type { Theme } from '@ottocode/web-sdk/hooks';
+import {
+	applyCssTheme,
+	getOppositeThemeId,
+	normalizeThemeId,
+	type ThemeId,
+} from '@ottocode/themes';
 import { tauriOnboarding } from './lib/tauri-onboarding';
+
+type Theme = ThemeId;
 
 export interface DesktopThemeContextValue {
 	theme: Theme;
@@ -15,34 +22,15 @@ export interface DesktopThemeContextValue {
 }
 
 export const DesktopThemeContext = createContext<DesktopThemeContextValue>({
-	theme: 'dark',
+	theme: 'otto-dark',
 	setTheme: () => {},
 	toggleTheme: () => {},
 });
 
 export const useDesktopTheme = () => useContext(DesktopThemeContext);
 
-function normalizeTheme(theme: string | undefined): Theme {
-	return theme === 'light' ? 'light' : 'dark';
-}
-
-function applyTheme(theme: Theme) {
-	if (typeof document === 'undefined') return;
-
-	const root = document.documentElement;
-	if (theme === 'dark') {
-		root.classList.add('dark');
-	} else {
-		root.classList.remove('dark');
-	}
-}
-
-function getOppositeTheme(theme: Theme): Theme {
-	return theme === 'dark' ? 'light' : 'dark';
-}
-
 export function useNativeDesktopTheme(): DesktopThemeContextValue {
-	const [theme, setThemeState] = useState<Theme>('dark');
+	const [theme, setThemeState] = useState<Theme>('otto-dark');
 
 	useEffect(() => {
 		let cancelled = false;
@@ -51,7 +39,7 @@ export function useNativeDesktopTheme(): DesktopThemeContextValue {
 			.getStatus()
 			.then((status) => {
 				if (cancelled) return;
-				setThemeState(normalizeTheme(status.defaults.theme));
+				setThemeState(normalizeThemeId(status.defaults.theme));
 			})
 			.catch(() => {});
 
@@ -61,7 +49,7 @@ export function useNativeDesktopTheme(): DesktopThemeContextValue {
 	}, []);
 
 	useEffect(() => {
-		applyTheme(theme);
+		applyCssTheme(theme);
 	}, [theme]);
 
 	const setTheme = useCallback((nextTheme: Theme) => {
@@ -82,7 +70,7 @@ export function useNativeDesktopTheme(): DesktopThemeContextValue {
 
 	const toggleTheme = useCallback(() => {
 		setThemeState((currentTheme) => {
-			const nextTheme = getOppositeTheme(currentTheme);
+			const nextTheme = getOppositeThemeId(currentTheme);
 			tauriOnboarding.setDefaults({ theme: nextTheme }).catch(() => {
 				setThemeState((latestTheme) =>
 					latestTheme === nextTheme ? currentTheme : latestTheme,

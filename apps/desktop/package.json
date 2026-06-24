@@ -11,6 +11,7 @@
 		"icon": "tauri icon src-tauri/icons/icon.png"
 	},
 	"dependencies": {
+		"@ottocode/themes": "workspace:*",
 		"@ottocode/web-sdk": "workspace:*",
 		"@tanstack/react-query": "5.90.21",
 		"@tanstack/react-router": "1.161.3",

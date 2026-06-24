@@ -1,6 +1,7 @@
 import { memo, useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
+import { normalizeThemeId, themeList, type ThemeId } from '@ottocode/themes';
 import {
 	Settings,
 	ChevronRight,
@@ -713,6 +714,22 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 		[isDesktop, updatePreferences],
 	);
 
+	const themeOptions = useMemo(
+		() =>
+			themeList.map((theme) => ({ id: theme.id, label: theme.displayName })),
+		[],
+	);
+
+	const handleThemeChange = useCallback(
+		(theme: string) => {
+			updateDefaults.mutate({
+				theme: normalizeThemeId(theme) as ThemeId,
+				scope: 'global',
+			});
+		},
+		[updateDefaults],
+	);
+
 	const renderActiveTab = () => {
 		switch (activeTab) {
 			case 'editor':
@@ -750,6 +767,16 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 								}
 							/>
 						) : null}
+						<div className="py-2">
+							<SelectRow
+								label="Theme"
+								value={normalizeThemeId(config?.defaults?.theme)}
+								options={themeOptions}
+								onChange={handleThemeChange}
+								disabled={updateDefaults.isPending}
+								description="Choose the color theme for web and desktop."
+							/>
+						</div>
 						<div className="py-2">
 							<FontPickerRow
 								value={preferences.fontFamily}
@@ -1074,6 +1101,19 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 		updateDefaults.mutate({ agent, scope: 'global' });
 	};
 
+	const themeOptions = useMemo(
+		() =>
+			themeList.map((theme) => ({ id: theme.id, label: theme.displayName })),
+		[],
+	);
+
+	const handleThemeChange = (theme: string) => {
+		updateDefaults.mutate({
+			theme: normalizeThemeId(theme) as ThemeId,
+			scope: 'global',
+		});
+	};
+
 	const handleOpenPreferences = useCallback(() => {
 		setIsPreferencesOpen(true);
 	}, []);
@@ -1125,6 +1165,19 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 							value={config?.defaults?.agent ?? ''}
 							options={agentOptions}
 							onChange={handleAgentChange}
+							disabled={updateDefaults.isPending}
+						/>
+					</SettingsSection>
+
+					<SettingsSection
+						title="Appearance"
+						icon={<Type className="w-4 h-4 text-muted-foreground" />}
+					>
+						<SelectRow
+							label="Theme"
+							value={normalizeThemeId(config?.defaults?.theme)}
+							options={themeOptions}
+							onChange={handleThemeChange}
 							disabled={updateDefaults.isPending}
 						/>
 					</SettingsSection>

@@ -1,11 +1,9 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Moon, Sun } from 'lucide-react';
-import { usePreferences, type Theme } from '@ottocode/web-sdk/hooks';
+import { usePreferences } from '@ottocode/web-sdk/hooks';
 import {
 	BrowserPanelToggle,
 	BtwFloatingChat,
-	Button,
 	ConfirmationDialog,
 	AgentsManagerModal,
 	AgentsSidebar,
@@ -79,8 +77,6 @@ interface DesktopAppLayoutProps {
 	sidebar: ReactNode;
 	children: ReactNode;
 	onNewSession?: () => void;
-	theme: Theme;
-	onToggleTheme: () => void;
 	sessionId?: string;
 	onNavigateToSession?: (sessionId: string) => void;
 	onFixWithAI?: (errorMessage: string) => void;
@@ -94,8 +90,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	sidebar,
 	children,
 	onNewSession,
-	theme,
-	onToggleTheme,
 	sessionId,
 	onFixWithAI,
 	dashboardOpen,
@@ -447,22 +441,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								<SettingsSidebarToggle />
 								<div className="flex-1" />
 								<TerminalPanelToggle />
-								<div className="h-12 border-t border-border flex items-center justify-center">
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={onToggleTheme}
-										title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-										aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-										className="touch-manipulation"
-									>
-										{theme === 'dark' ? (
-											<Sun className="w-4 h-4" />
-										) : (
-											<Moon className="w-4 h-4" />
-										)}
-									</Button>
-								</div>
 							</div>
 						</div>
 					</div>

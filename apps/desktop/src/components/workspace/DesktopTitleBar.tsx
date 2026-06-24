@@ -7,7 +7,6 @@ import {
 	TitleBar,
 	TitleBarButton,
 	TitleBarRightRailToggle,
-	TitleBarThemeToggle,
 	type WorkspaceTab,
 } from '@ottocode/web-sdk/components';
 import { useUpdate } from '../../hooks/useUpdate';
@@ -16,7 +15,6 @@ import { useFullscreen } from '../../hooks/useFullscreen';
 import { useVersion } from '../../hooks/useVersion';
 import { handleTitleBarDrag } from '../../utils/title-bar';
 import { tauriBridge } from '../../lib/tauri-bridge';
-import { useDesktopTheme } from '../../theme';
 import { WindowControls } from '../WindowControls';
 
 /**
@@ -78,8 +76,8 @@ interface DesktopTitleBarProps {
 
 /**
  * Desktop app title bar: shared TitleBar composition (sidebar toggle,
- * Agents | Otto tabs, right-rail + theme toggles) plus desktop-specific
- * content — back button, update controls, API port + app version, and a
+ * Agents | Otto tabs and right-rail toggle) plus desktop-specific content —
+ * back button, update controls, API port + app version, and a
  * new-window button. Acts as the native drag region.
  */
 export const DesktopTitleBar = memo(function DesktopTitleBar({
@@ -91,7 +89,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 }: DesktopTitleBarProps) {
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
-	const { theme, toggleTheme } = useDesktopTheme();
 	const appVersion = useVersion();
 	const {
 		available,
@@ -163,7 +160,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 						</div>
 					)}
 					<TitleBarRightRailToggle />
-					<TitleBarThemeToggle theme={theme} onToggleTheme={toggleTheme} />
 					<TitleBarButton
 						onClick={() => tauriBridge.createNewWindow()}
 						title="New Window"

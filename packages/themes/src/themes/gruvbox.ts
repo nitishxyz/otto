@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const gruvbox: OttoTheme = theme({
+	id: 'gruvbox',
+	displayName: 'Gruvbox',
+	mode: 'dark',
+	bg: '#282828',
+	bgDark: '#1d2021',
+	bgHighlight: '#3c3836',
+	bgSubtle: '#32302f',
+	fg: '#ebdbb2',
+	fgBright: '#fbf1c7',
+	fgMuted: '#d5c4a1',
+	fgDark: '#928374',
+	fgDimmed: '#665c54',
+	blue: '#83a598',
+	green: '#b8bb26',
+	red: '#fb4934',
+	yellow: '#fabd2f',
+	purple: '#d3869b',
+	cyan: '#8ec07c',
+	orange: '#fe8019',
+	magenta: '#d3869b',
+	syntax: syntax({
+		keyword: '#fb4934',
+		string: '#b8bb26',
+		comment: '#928374',
+		number: '#d3869b',
+		function: '#fabd2f',
+		type: '#fabd2f',
+		variable: '#ebdbb2',
+		property: '#83a598',
+		operator: '#fe8019',
+		punctuation: '#ebdbb2',
+	}),
+});

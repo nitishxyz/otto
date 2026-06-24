@@ -1,0 +1,37 @@
+import { syntax, theme } from '../builder';
+import type { OttoTheme } from '../types';
+
+export const solarizedDark: OttoTheme = theme({
+	id: 'solarized-dark',
+	displayName: 'Solarized Dark',
+	mode: 'dark',
+	bg: '#002b36',
+	bgDark: '#073642',
+	bgHighlight: '#073642',
+	bgSubtle: '#003847',
+	fg: '#839496',
+	fgBright: '#fdf6e3',
+	fgMuted: '#93a1a1',
+	fgDark: '#586e75',
+	fgDimmed: '#073642',
+	blue: '#268bd2',
+	green: '#859900',
+	red: '#dc322f',
+	yellow: '#b58900',
+	purple: '#6c71c4',
+	cyan: '#2aa198',
+	orange: '#cb4b16',
+	magenta: '#d33682',
+	syntax: syntax({
+		keyword: '#859900',
+		string: '#2aa198',
+		comment: '#586e75',
+		number: '#d33682',
+		function: '#268bd2',
+		type: '#b58900',
+		variable: '#839496',
+		property: '#268bd2',
+		operator: '#859900',
+		punctuation: '#839496',
+	}),
+});

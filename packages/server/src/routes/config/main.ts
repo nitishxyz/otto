@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { loadConfig, logger } from '@ottocode/sdk';
+import { normalizeThemeId, themeIds } from '@ottocode/themes';
 import type { Hono } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
@@ -50,7 +51,7 @@ const configDefaultsSchema = z.object({
 	reasoningLevel: z
 		.enum(['minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
 		.optional(),
-	theme: z.enum(['light', 'dark']).optional(),
+	theme: z.enum(themeIds).optional(),
 	tuiTheme: z.string().min(1).optional(),
 	vimMode: z.boolean().optional(),
 	compactThread: z.boolean().optional(),
@@ -148,12 +149,13 @@ export function registerMainConfigRoute(app: Hono) {
 					guidedMode: cfg.defaults.guidedMode ?? false,
 					reasoningText: cfg.defaults.reasoningText ?? true,
 					reasoningLevel: cfg.defaults.reasoningLevel ?? 'high',
-					theme:
+					theme: normalizeThemeId(
 						getDefault(
 							undefined,
 							embeddedConfig?.defaults?.theme,
 							cfg.defaults.theme,
-						) ?? 'dark',
+						),
+					),
 					tuiTheme:
 						getDefault(
 							undefined,

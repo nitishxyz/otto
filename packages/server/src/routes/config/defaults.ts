@@ -8,6 +8,7 @@ import {
 	type ReasoningLevel,
 } from '@ottocode/sdk';
 import type { Hono } from 'hono';
+import { normalizeThemeId, themeIds, type ThemeId } from '@ottocode/themes';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 
@@ -31,7 +32,7 @@ const reasoningLevelSchema = z.enum([
 	'max',
 	'xhigh',
 ]);
-const themeSchema = z.enum(['light', 'dark']);
+const themeSchema = z.enum(themeIds);
 const tuiThemeSchema = z.string().min(1);
 
 const defaultsUpdateBodySchema = z.object({
@@ -124,7 +125,7 @@ export function registerDefaultsRoute(app: Hono) {
 					guidedMode?: boolean;
 					reasoningText?: boolean;
 					reasoningLevel?: ReasoningLevel;
-					theme?: 'light' | 'dark';
+					theme?: ThemeId | 'light' | 'dark';
 					tuiTheme?: string;
 					vimMode?: boolean;
 					compactThread?: boolean;
@@ -148,7 +149,7 @@ export function registerDefaultsRoute(app: Hono) {
 					guidedMode: boolean;
 					reasoningText: boolean;
 					reasoningLevel: ReasoningLevel;
-					theme: 'light' | 'dark';
+					theme: ThemeId;
 					tuiTheme: string;
 					vimMode: boolean;
 					compactThread: boolean;
@@ -175,8 +176,8 @@ export function registerDefaultsRoute(app: Hono) {
 				if (body.reasoningText !== undefined)
 					updates.reasoningText = body.reasoningText;
 				if (body.reasoningLevel) updates.reasoningLevel = body.reasoningLevel;
-				if (body.theme === 'light' || body.theme === 'dark') {
-					updates.theme = body.theme;
+				if (body.theme) {
+					updates.theme = normalizeThemeId(body.theme);
 				}
 				if (body.tuiTheme !== undefined) {
 					const tuiTheme = body.tuiTheme.trim();

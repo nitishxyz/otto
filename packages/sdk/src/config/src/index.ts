@@ -44,7 +44,7 @@ const DEFAULTS: {
 		guidedMode: false,
 		reasoningText: true,
 		reasoningLevel: 'high',
-		theme: 'dark',
+		theme: 'otto-dark',
 		tuiTheme: 'tokyo-night',
 		vimMode: false,
 		compactThread: true,

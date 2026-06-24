@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { ThemeId } from '@ottocode/themes';
 
 export interface OnboardingStatus {
 	onboardingComplete: boolean;
@@ -18,7 +19,7 @@ export interface OnboardingStatus {
 		provider?: string;
 		model?: string;
 		toolApproval?: string;
-		theme?: 'light' | 'dark';
+		theme?: ThemeId;
 	};
 }
 
@@ -27,7 +28,7 @@ interface DefaultsUpdate {
 	provider?: string;
 	model?: string;
 	toolApproval?: string;
-	theme?: 'light' | 'dark';
+	theme?: ThemeId;
 }
 
 export const tauriOnboarding = {

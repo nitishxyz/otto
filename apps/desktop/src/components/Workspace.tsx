@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useServer } from '../hooks/useServer';
 import type { Project } from '../lib/tauri-bridge';
 import { OttoRouterLoader } from './OttoRouterLoader';
-import { useDesktopTheme } from '../theme';
 import { DesktopTitleBar } from './workspace/DesktopTitleBar';
 import { DesktopWorkspaceApp } from './workspace/DesktopWorkspaceApp';
 
@@ -32,7 +31,6 @@ export function Workspace({
 }) {
 	const { server, loading, error, startServer, stopServer } = useServer();
 	const startedRef = useRef(false);
-	const { theme, toggleTheme } = useDesktopTheme();
 	const isRemote = !!project.remoteUrl;
 	const workspaceApiUrl = isRemote
 		? project.remoteUrl
@@ -100,8 +98,6 @@ export function Workspace({
 						key={`${workspaceApiUrl}:${project.path}`}
 						apiUrl={workspaceApiUrl}
 						project={project}
-						theme={theme}
-						onToggleTheme={toggleTheme}
 						sessionId={sessionId}
 						view={view}
 						dashboardOpen={dashboardOpen}
