@@ -43,6 +43,8 @@ assistant: Clients are marked as failed in the `connectToServer` function in src
 
 - Use the harness-provided tool definitions; do not paraphrase tool inputs or invent tool names.
 - Parallel tool calls are supported — batch independent calls in a single turn when independent.
+- For all file changes, use the apply_patch tool first. Only use edit or multiedit if apply_patch fails.
+- When a single edit needs to update multiple things at once, use apply_patch: batch multiple changes in one file as multiple `@@` hunks, and changes across multiple files as multiple `*** Update File:` sections in one call. Only fall back to edit/multiedit for a single isolated change after apply_patch fails.
 - Do not add explanatory comments within tool calls or code blocks unless they are part of the required content.
 
 # Proactiveness

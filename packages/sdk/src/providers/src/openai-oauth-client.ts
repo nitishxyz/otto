@@ -15,9 +15,33 @@ const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const TOKEN_REFRESH_MAX_RETRIES = 2;
 const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;
 const CODEX_INSTALLATION_ID = crypto.randomUUID();
-const CODEX_REQUEST_TIMEOUT_MS = 20_000;
-const CODEX_STREAM_IDLE_TIMEOUT_MS = 20_000;
-const CODEX_REQUEST_MAX_RETRIES = 3;
+// The root cause of the old "sits idle forever" hang: we pass `timeout: false`
+// to Bun's fetch (see fetchWithCodexRequestTimeout), which disables Bun's
+// native socket timeout. If the Codex backend accepts the TCP connection but
+// never returns response headers (or the socket silently dies), nothing aborts
+// it. These explicit timeouts restore that break. They mirror opencode's
+// headerTimeout + chunkTimeout model (packages/opencode/src/provider/provider.ts,
+// where OpenAI's headerTimeout default is 10_000ms):
+//
+//   REQUEST_TIMEOUT  = time to receive response HEADERS (connection liveness).
+//                      Cleared the instant fetch() resolves, i.e. before the
+//                      body/reasoning streams — so it never kills a legitimate
+//                      reasoning turn. This is THE server-break lever: if Codex
+//                      doesn't respond, abort fast and let the retry recover,
+//                      instead of hanging. opencode uses 10s; we allow a little
+//                      headroom for cold starts.
+//   STREAM_IDLE      = max silence BETWEEN streamed SSE chunks after headers.
+//                      Resets on every chunk. Because we request
+//                      `reasoningSummary: 'auto'`, Codex emits reasoning deltas
+//                      while it thinks (these render in the UI), so a live turn
+//                      keeps resetting this timer; only a genuinely dead stream
+//                      trips it.
+//
+// Both remain overridable via OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS /
+// OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS for tuning.
+const CODEX_REQUEST_TIMEOUT_MS = 15_000;
+const CODEX_STREAM_IDLE_TIMEOUT_MS = 60_000;
+const CODEX_REQUEST_MAX_RETRIES = 2;
 const CODEX_REQUEST_RETRY_DELAY_MS = 500;
 
 type OpenAIOAuthSessionState = {
@@ -440,108 +464,6 @@ function trackResponsesStream(
 	});
 }
 
-async function waitForCodexStreamStart(
-	response: Response,
-	args: {
-		sessionId?: string;
-		model?: string;
-		parentSignal?: AbortSignal | null;
-	},
-): Promise<Response> {
-	if (!response.ok || !response.body) {
-		return response;
-	}
-
-	const reader = response.body.getReader();
-	const idleTimeoutMs = getCodexStreamIdleTimeoutMs();
-	let timeout: Timer | undefined;
-	let removeAbortListener: (() => void) | undefined;
-	const cleanup = () => {
-		if (timeout) clearTimeout(timeout);
-		timeout = undefined;
-		removeAbortListener?.();
-		removeAbortListener = undefined;
-	};
-
-	try {
-		const first = await Promise.race([
-			reader.read(),
-			new Promise<never>((_resolve, reject) => {
-				timeout = setTimeout(() => {
-					reject(
-						new Error(
-							`OpenAI OAuth Codex stream idle timeout before first chunk after ${idleTimeoutMs}ms`,
-						),
-					);
-				}, idleTimeoutMs);
-
-				if (args.parentSignal) {
-					const onAbort = () => {
-						reject(args.parentSignal?.reason ?? new Error('Request aborted'));
-					};
-					if (args.parentSignal.aborted) {
-						onAbort();
-					} else {
-						args.parentSignal.addEventListener('abort', onAbort, {
-							once: true,
-						});
-						removeAbortListener = () =>
-							args.parentSignal?.removeEventListener('abort', onAbort);
-					}
-				}
-			}),
-		]);
-		cleanup();
-
-		if (first.done) {
-			return new Response(null, {
-				status: response.status,
-				statusText: response.statusText,
-				headers: response.headers,
-			});
-		}
-
-		const body = new ReadableStream<Uint8Array>({
-			start(controller) {
-				controller.enqueue(first.value);
-			},
-			async pull(controller) {
-				try {
-					const next = await reader.read();
-					if (next.done) {
-						controller.close();
-						return;
-					}
-					controller.enqueue(next.value);
-				} catch (error) {
-					controller.error(error);
-				}
-			},
-			async cancel(reason) {
-				await reader.cancel(reason);
-			},
-		});
-
-		return new Response(body, {
-			status: response.status,
-			statusText: response.statusText,
-			headers: response.headers,
-		});
-	} catch (error) {
-		cleanup();
-		loggerWarn('[openai-oauth] response stream did not start before timeout', {
-			sessionId: args.sessionId,
-			model: args.model,
-			timeoutMs: idleTimeoutMs,
-			error: summarizeError(error),
-		});
-		try {
-			await reader.cancel(error);
-		} catch {}
-		throw error;
-	}
-}
-
 async function fetchWithCodexRequestTimeout(
 	url: string,
 	init: RequestInit,
@@ -560,19 +482,24 @@ async function fetchWithCodexRequestTimeout(
 		});
 	}
 
+	// Retry only covers the HEADER phase: fetchCodexRequestAttemptWithTimeout
+	// throws if response headers don't arrive within CODEX_REQUEST_TIMEOUT_MS.
+	// Once headers arrive we return the response as-is — there is intentionally
+	// no first-chunk gate here. A long single reasoning step before the first
+	// streamed delta is therefore never cut. Liveness after headers is handled
+	// downstream by the between-chunk idle watchdog in trackResponsesStream,
+	// whose timer arms at stream start (covering a body that never produces a
+	// first chunk) and resets on every SSE/reasoning delta. This matches
+	// opencode, which retries on header timeout but applies no post-header
+	// first-chunk timeout for OpenAI.
 	const maxRetries = getCodexRequestMaxRetries();
 	let lastError: unknown;
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
 		const attemptStartedAt = Date.now();
 		try {
-			const response = await fetchCodexRequestAttemptWithTimeout(url, init, {
+			return await fetchCodexRequestAttemptWithTimeout(url, init, {
 				...args,
 				requestStartedAt: attemptStartedAt,
-			});
-			return await waitForCodexStreamStart(response, {
-				sessionId: args.sessionId,
-				model: args.model,
-				parentSignal: init.signal,
 			});
 		} catch (error) {
 			lastError = error;
@@ -581,7 +508,7 @@ async function fetchWithCodexRequestTimeout(
 			}
 
 			const retryDelayMs = getCodexRequestRetryDelayMs() * (attempt + 1);
-			loggerWarn('[openai-oauth] request attempt failed before stream start', {
+			loggerWarn('[openai-oauth] request attempt failed before headers', {
 				sessionId: args.sessionId,
 				model: args.model,
 				attempt: attempt + 1,
