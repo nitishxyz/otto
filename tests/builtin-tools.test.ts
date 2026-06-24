@@ -390,7 +390,7 @@ describe('Built-in Tools', () => {
 	});
 
 	describe('shell tool', () => {
-		it('should load login PATH without sourcing interactive startup per command', async () => {
+		it('should default to cached interactive env and support minimal env', async () => {
 			if (process.platform === 'win32') return;
 
 			const originalHome = process.env.HOME;
@@ -409,7 +409,7 @@ describe('Built-in Tools', () => {
 			);
 			await writeFile(
 				join(home, '.bashrc'),
-				'export OTTO_SHELL_RC_TEST=rc-loaded\n',
+				`export PATH="${binDir}:$PATH"\nexport OTTO_SHELL_RC_TEST=rc-loaded\n`,
 			);
 
 			try {
@@ -425,11 +425,26 @@ describe('Built-in Tools', () => {
 					}),
 				);
 
-				expect(result).toMatchObject({ ok: true });
+				expect(result).toMatchObject({ ok: true, envMode: 'login-cache' });
 				expect((result as { stdout: string }).stdout).toContain(
 					'startup-path-ok',
 				);
-				expect((result as { stdout: string }).stdout).toContain('rc=\n');
+				expect((result as { stdout: string }).stdout).toContain(
+					'rc=rc-loaded\n',
+				);
+
+				const minimalResult = await resolveStreamedResult(
+					await shellTool?.tool.execute({
+						cmd: 'otto-shell-path-test && printf "rc=%s\\n" "$OTTO_SHELL_RC_TEST"',
+						envMode: 'minimal',
+					}),
+				);
+
+				expect(minimalResult).toMatchObject({ ok: true, envMode: 'minimal' });
+				expect((minimalResult as { stdout: string }).stdout).toContain(
+					'startup-path-ok',
+				);
+				expect((minimalResult as { stdout: string }).stdout).toContain('rc=\n');
 
 				const loginResult = await resolveStreamedResult(
 					await shellTool?.tool.execute({
@@ -506,13 +521,14 @@ describe('Built-in Tools', () => {
 			expect(result).toMatchObject({ ok: false });
 		});
 
-		it('should hint when a fast command appears to need login shell env', async () => {
+		it('should hint when a minimal command appears to need login shell env', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');
 
 			const result = await resolveStreamedResult(
 				await shellTool?.tool.execute({
 					cmd: 'echo "CLOUDFLARE_API_TOKEN is not set" >&2; exit 1',
+					envMode: 'minimal',
 				}),
 			);
 

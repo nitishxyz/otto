@@ -20,7 +20,8 @@ let cachedLoginEnv: {
 	env: NodeJS.ProcessEnv | null;
 } | null = null;
 
-export type ShellEnvMode = 'fast' | 'login-cache' | 'login-fresh';
+export type ShellEnvMode = 'minimal' | 'login-cache' | 'login-fresh';
+type ShellEnvModeInput = ShellEnvMode | 'fast';
 
 const ENV_JSON_START = '___OTTO_ENV_JSON_START___';
 const ENV_JSON_END = '___OTTO_ENV_JSON_END___';
@@ -84,7 +85,7 @@ export function getUserShell(): string {
 
 export function getShellExecutionConfig(
 	cmd: string,
-	options?: { envMode?: ShellEnvMode },
+	options?: { envMode?: ShellEnvModeInput },
 ): {
 	command: string;
 	args: string[];
@@ -92,15 +93,15 @@ export function getShellExecutionConfig(
 };
 export function getShellExecutionConfig(
 	cmd: string,
-	options: { envMode?: ShellEnvMode } = {},
+	options: { envMode?: ShellEnvModeInput } = {},
 ): {
 	command: string;
 	args: string[];
 	env: NodeJS.ProcessEnv;
 } {
-	const envMode = options.envMode ?? 'fast';
+	const envMode = normalizeShellEnvMode(options.envMode);
 	const loginEnv =
-		envMode === 'fast' ? null : getLoginShellEnv(envMode === 'login-fresh');
+		envMode === 'minimal' ? null : getLoginShellEnv(envMode === 'login-fresh');
 	const env = {
 		...process.env,
 		...(loginEnv ?? {}),
@@ -125,6 +126,11 @@ export function getShellExecutionConfig(
 		args: ['-c', 'eval "$OTTO_SHELL_COMMAND"'],
 		env: { ...env, OTTO_SHELL_COMMAND: cmd },
 	};
+}
+
+function normalizeShellEnvMode(envMode?: ShellEnvModeInput): ShellEnvMode {
+	if (envMode === 'fast') return 'minimal';
+	return envMode ?? 'login-cache';
 }
 
 function getLoginShellEnv(refresh: boolean): NodeJS.ProcessEnv | null {

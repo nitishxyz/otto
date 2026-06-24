@@ -122,7 +122,7 @@ export function detectShellEnvHint(args: {
 	exitCode: number;
 	envMode?: ShellEnvMode;
 }): string | undefined {
-	if (args.envMode && args.envMode !== 'fast') return undefined;
+	if (args.envMode && args.envMode !== 'minimal') return undefined;
 	if (args.exitCode === 0) return undefined;
 	const text = `${args.stderr}\n${args.stdout}`;
 	const patterns = [
@@ -234,7 +234,7 @@ const shellInputSchema = z
 		cmd: z
 			.string()
 			.describe(
-				'Non-interactive shell command to run using the user shell. Login PATH is loaded, but interactive startup files are not sourced per command.',
+				'Non-interactive shell command to run using the user shell. The default environment comes from a cached interactive shell env.',
 			),
 		cwd: z
 			.string()
@@ -251,11 +251,11 @@ const shellInputSchema = z
 			.default(300000)
 			.describe('Timeout in milliseconds (default: 300000 = 5 minutes)'),
 		envMode: z
-			.enum(['fast', 'login-cache', 'login-fresh'])
+			.enum(['minimal', 'login-cache', 'login-fresh'])
 			.optional()
-			.default('fast')
+			.default('login-cache')
 			.describe(
-				'Environment loading mode. "fast" is the default one-off shell env. "login-cache" reuses a cached environment captured from the user login/interactive shell for commands that need shell-managed credentials. "login-fresh" refreshes that cache.',
+				'Environment loading mode. "login-cache" is the default terminal-like environment captured from the user interactive shell and reused. "login-fresh" refreshes that cache. "minimal" skips interactive shell startup and uses only process env plus cached login PATH.',
 			),
 		outputMode: z
 			.enum(['auto', 'full', 'tail'])
@@ -312,7 +312,7 @@ export function buildShellTool(projectRoot: string): {
 				cwd,
 				allowNonZeroExit,
 				timeout = 300000,
-				envMode = 'fast',
+				envMode = 'login-cache',
 				outputMode = 'auto',
 				tailLines = DEFAULT_TAIL_LINES,
 				maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,

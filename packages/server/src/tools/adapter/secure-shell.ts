@@ -20,7 +20,7 @@ type ShellResult = ToolResponse<{
 	stderr: string;
 	outputMode?: 'full' | 'tail';
 	tailLines?: number;
-	envMode?: 'fast' | 'login-cache' | 'login-fresh';
+	envMode?: 'minimal' | 'login-cache' | 'login-fresh';
 	envHint?: string;
 }>;
 
@@ -60,7 +60,7 @@ export function createSecureShellExecutor(args: {
 		const timeout = input.timeout ?? 300000;
 		const outputMode = input.outputMode ?? 'full';
 		const tailLines = input.tailLines ?? 100;
-		const envMode = input.envMode ?? 'fast';
+		const envMode = input.envMode ?? 'login-cache';
 		const shellConfig = getShellExecutionConfig(cmd, { envMode });
 		const proc = spawn(shellConfig.command, shellConfig.args, {
 			cwd: input.cwd,

@@ -2,14 +2,14 @@
 - Returns `stdout`, `stderr`, and `exitCode`
 - `cwd` is relative to the project root and sandboxed within it
 
-The shell tool loads the user's login PATH once for command lookup, but it does not source interactive startup files for every command. Use `terminal` when you need an interactive shell, a TTY, or a persistent process.
+The shell tool uses a cached interactive shell environment by default, so commands usually see the same PATH and exported variables as the user's terminal. Use `terminal` when you need an interactive shell, a TTY, or a persistent process.
 
 `envMode` controls extra environment loading:
-- `fast` (default): fastest one-off shell environment plus cached login PATH.
-- `login-cache`: reuses a cached environment captured from the user's login/interactive shell. Use this only when a prior fast command reports missing credentials/environment, or when the user explicitly asks to load shell startup environment.
+- `login-cache` (default): reuses a cached environment captured from the user's interactive shell startup files.
 - `login-fresh`: refreshes that login/interactive shell environment cache before running the command.
+- `minimal`: skips interactive shell startup and uses only the process environment plus cached login PATH. Use this as a fallback when shell startup is slow, broken, or undesirable.
 
-If a fast command fails with an `envHint`, retry once with `envMode: "login-cache"` when appropriate. Do not use login env modes for normal repository discovery, simple build/test commands, or as a blanket default.
+Use `login-fresh` after the user changes shell configuration or credentials. Use `minimal` for CI-style commands or to work around problematic shell startup files.
 
 **Use `shell` for one-off, non-interactive commands.** These may be short-lived checks or long-running commands that finish on their own and do not require stdin. For commands that need interactive input, a TTY, or persistence across turns, use the `terminal` tool instead.
 
