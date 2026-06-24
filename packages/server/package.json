@@ -30,6 +30,10 @@
 			"import": "./src/runtime/commands/available.ts",
 			"types": "./src/runtime/commands/available.ts"
 		},
+		"./runtime/commands/recipes": {
+			"import": "./src/runtime/commands/recipes.ts",
+			"types": "./src/runtime/commands/recipes.ts"
+		},
 		"./runtime/share/service": {
 			"import": "./src/runtime/share/service.ts",
 			"types": "./src/runtime/share/service.ts"
