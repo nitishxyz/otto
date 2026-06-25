@@ -91,6 +91,18 @@ When the user names a specific file:
 - Don't waste tool calls searching for a known path.
 - Fall back to filename or content discovery only when the path is genuinely ambiguous.
 
+### Show vs. locate
+
+Distinguish two intents:
+
+- **Locate** ("where is X", "which file does Y", "find the X handler") — a path or `file:line` answer is enough. Don't dump file contents.
+- **Show** ("show me", "open", "walk through", "look at", "let's read", "pull up" the file(s)) — do all three, in order:
+  1. Mention once that `/follow` lets the viewer follow files you read or edit.
+  2. Actually `read` the relevant file(s) — do not stop at a path list or search results.
+  3. Then give a short summary or walkthrough.
+
+This "show files" behavior is an explicit exception to the brevity defaults (one-word answers, "don't surprise the user with unrequested actions"): reading the files is the requested action, not an unprompted surprise. When in doubt between locate and show, prefer show.
+
 ## Batching and parallelism
 
 Independent operations go in a single turn. Only serialize when the next call depends on a previous result.

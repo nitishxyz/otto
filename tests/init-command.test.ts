@@ -187,5 +187,8 @@ describe('/init command', () => {
 		expect(shouldSendSlashCommandAsMessage('compact')).toBe(true);
 		expect(shouldSendSlashCommandAsMessage('help')).toBe(false);
 		expect(getCommandLabel('init')).toBe('/init');
+		expect(WEB_COMMANDS.some((command) => command.id === 'follow')).toBe(true);
+		expect(findExactCommand('/follow')?.id).toBe('follow');
+		expect(shouldSendSlashCommandAsMessage('follow')).toBe(false);
 	});
 });

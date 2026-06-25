@@ -5,6 +5,7 @@ import {
 	getRecipeCommandName,
 	shouldSendSlashCommandAsMessage,
 } from '../lib/commands';
+import { useViewerTabsStore } from '../stores/viewerTabsStore';
 
 interface UseCommandSuggestionsOptions {
 	onCommand?: (commandId: string) => void;
@@ -75,6 +76,11 @@ export function useCommandSuggestions({
 			}
 			if (commandId === 'reasoning') {
 				updateReasoningText(!reasoningEnabled);
+				resetInput();
+				return;
+			}
+			if (commandId === 'follow') {
+				useViewerTabsStore.getState().toggleFollowToolActivity();
 				resetInput();
 				return;
 			}

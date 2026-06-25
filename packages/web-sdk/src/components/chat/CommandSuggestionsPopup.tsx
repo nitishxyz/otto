@@ -5,6 +5,7 @@ import { useConfig } from '../../hooks/useConfig';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useRecipes } from '../../hooks/useRecipes';
 import { useShareStatus } from '../../hooks/useShareStatus';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import {
 	COMMAND_KIND_STYLES,
 	filterCommands,
@@ -34,14 +35,23 @@ export function CommandSuggestionsPopup({
 	const { data: config } = useConfig();
 	const { data: shareStatus } = useShareStatus(sessionId);
 	const { data: recipesData } = useRecipes();
+	const followToolActivity = useViewerTabsStore(
+		(state) => state.followToolActivity,
+	);
 
 	const state = useMemo(
 		() => ({
 			vimModeEnabled: preferences.vimMode,
 			reasoningEnabled: config?.defaults?.reasoningText ?? true,
+			followToolActivity,
 			isShared: shareStatus?.shared,
 		}),
-		[preferences.vimMode, config?.defaults?.reasoningText, shareStatus?.shared],
+		[
+			preferences.vimMode,
+			config?.defaults?.reasoningText,
+			followToolActivity,
+			shareStatus?.shared,
+		],
 	);
 
 	const recipeCommands = useMemo(

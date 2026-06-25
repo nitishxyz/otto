@@ -40,6 +40,39 @@ function deltaTextField(record: StreamPartRecord): string {
 	return stringField(record, 'text') || stringField(record, 'delta');
 }
 
+function createAbortError(signal: AbortSignal): Error {
+	if (signal.reason instanceof Error) return signal.reason;
+	const error = new Error(
+		typeof signal.reason === 'string' ? signal.reason : 'Operation aborted',
+	);
+	error.name = 'AbortError';
+	return error;
+}
+
+function cancelIterator(iterator: AsyncIterator<unknown>) {
+	try {
+		const returned = iterator.return?.();
+		if (returned) void Promise.resolve(returned).catch(() => undefined);
+	} catch {}
+}
+
+function nextStreamPart(
+	iterator: AsyncIterator<unknown>,
+	signal?: AbortSignal,
+): Promise<IteratorResult<unknown>> {
+	if (!signal) return iterator.next();
+	if (signal.aborted) return Promise.reject(createAbortError(signal));
+
+	return new Promise((resolve, reject) => {
+		const onAbort = () => reject(createAbortError(signal));
+		signal.addEventListener('abort', onAbort, { once: true });
+		iterator
+			.next()
+			.then(resolve, reject)
+			.finally(() => signal.removeEventListener('abort', onAbort));
+	});
+}
+
 export async function consumeRunnerStreamParts(args: {
 	fullStream: AsyncIterable<unknown>;
 	opts: RunOpts;
@@ -58,8 +91,21 @@ export async function consumeRunnerStreamParts(args: {
 	dump: TurnDumpCollector | null;
 }) {
 	let firstFullStreamPartSeen = false;
+	const iterator = args.fullStream[Symbol.asyncIterator]();
 
-	for await (const rawPart of args.fullStream) {
+	while (true) {
+		let next: IteratorResult<unknown>;
+		try {
+			next = await nextStreamPart(iterator, args.opts.abortSignal);
+		} catch (error) {
+			if (args.opts.abortSignal?.aborted) {
+				cancelIterator(iterator);
+			}
+			throw error;
+		}
+		if (next.done) break;
+
+		const rawPart = next.value;
 		const part = asStreamPartRecord(rawPart);
 		if (!part) continue;
 

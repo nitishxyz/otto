@@ -10,6 +10,7 @@ const OLD_ROOT_RUNTIME_PATTERNS = new Set([
 	'.otto/logs/',
 	'.otto/tmp/',
 	'.otto/cache/',
+	'.otto/artifacts/',
 	'.otto/*.local.json',
 ]);
 const NESTED_ROOT_RUNTIME_PATTERNS = new Set([
@@ -20,6 +21,7 @@ const NESTED_ROOT_RUNTIME_PATTERNS = new Set([
 	'**/.otto/logs/',
 	'**/.otto/tmp/',
 	'**/.otto/cache/',
+	'**/.otto/artifacts/',
 	'**/.otto/*.local.json',
 ]);
 

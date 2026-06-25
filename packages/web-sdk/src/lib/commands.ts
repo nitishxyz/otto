@@ -15,6 +15,7 @@ import {
 	RefreshCw,
 	FileText,
 	ArrowRightLeft,
+	Eye,
 } from 'lucide-react';
 
 export interface Command {
@@ -54,6 +55,7 @@ export const COMMAND_KIND_STYLES: Record<CommandKind, string> = {
 export interface CommandState {
 	vimModeEnabled: boolean;
 	reasoningEnabled: boolean;
+	followToolActivity: boolean;
 	isShared?: boolean;
 }
 
@@ -91,6 +93,14 @@ export const COMMANDS: Command[] = [
 		label: '/help',
 		description: 'Show keyboard shortcuts and help',
 		icon: Keyboard,
+		kind: 'app',
+	},
+	{
+		id: 'follow',
+		label: '/follow',
+		description: (state) =>
+			state.followToolActivity ? 'Disable Follow Agent' : 'Enable Follow Agent',
+		icon: Eye,
 		kind: 'app',
 	},
 	{

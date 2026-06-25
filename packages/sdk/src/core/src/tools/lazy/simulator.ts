@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
+import { getProjectTmpDir } from '../../../../config/src/paths.ts';
 import { createToolError } from '../error.ts';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -12,7 +13,7 @@ const FETCH_TIMEOUT_MS = 5_000;
 const LOG_TIMEOUT_MS = 2_000;
 const DEFAULT_PREVIEW_PORT = 3200;
 const DEFAULT_PREVIEW_URL = `http://localhost:${DEFAULT_PREVIEW_PORT}`;
-const SCREENSHOT_ARTIFACTS_DIR = '.otto/artifacts/simulator';
+const SCREENSHOT_ARTIFACTS_DIR = 'artifacts/simulator';
 const SCREENSHOT_MODEL_MAX_EDGE = 1024;
 const SCREENSHOT_MODEL_JPEG_QUALITY = 70;
 const HID_KEYBOARD_LEFT_GUI = 227;
@@ -189,6 +190,7 @@ const simulatorInputSchema = z.object({
 	bundleId: z.string().optional(),
 	url: z.string().optional(),
 	args: z.array(z.string()).optional(),
+	storeScreenshot: z.boolean().optional(),
 	outputPath: z.string().optional(),
 	timeoutMs: z.number().min(250).max(10_000).optional(),
 	durationMs: z.number().min(16).max(10_000).optional(),
@@ -261,7 +263,12 @@ type SimulatorInput =
 	| { action: 'config'; device?: string }
 	| { action: 'accessibility_tree'; device?: string }
 	| { action: 'foreground'; device?: string }
-	| { action: 'take_screenshot'; device?: string; outputPath?: string }
+	| {
+			action: 'take_screenshot';
+			device?: string;
+			storeScreenshot?: boolean;
+			outputPath?: string;
+	  }
 	| { action: 'launch'; device?: string; bundleId: string; args?: string[] }
 	| { action: 'terminate'; device?: string; bundleId: string }
 	| { action: 'open_url'; device?: string; url: string }
@@ -386,6 +393,7 @@ function parseSimulatorInput(
 			return {
 				action: 'take_screenshot',
 				device: input.device,
+				storeScreenshot: input.storeScreenshot ?? false,
 				outputPath: input.outputPath,
 			};
 		case 'launch':
@@ -1068,13 +1076,13 @@ async function prepareScreenshotForModel(bytes: Uint8Array): Promise<{
 	}
 }
 
-function buildScreenshotArtifactPath(
+async function buildScreenshotArtifactPath(
 	projectRoot: string,
 	outputPath?: string,
-): {
+): Promise<{
 	relativePath: string;
 	absPath: string;
-} {
+}> {
 	const requestedName = outputPath?.trim()
 		? basename(outputPath.trim())
 		: `screenshot-${Date.now()}-${randomUUID()}.jpg`;
@@ -1084,9 +1092,10 @@ function buildScreenshotArtifactPath(
 		: `${requestedName || `screenshot-${randomUUID()}`}.jpg`;
 	const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '-');
 	const relativePath = `${SCREENSHOT_ARTIFACTS_DIR}/${safeName}`;
+	const tmpDir = await getProjectTmpDir(projectRoot);
 	return {
 		relativePath,
-		absPath: join(projectRoot, relativePath),
+		absPath: join(tmpDir, relativePath),
 	};
 }
 
@@ -1246,7 +1255,7 @@ export function buildSimulatorTool(projectRoot: string): {
 		name: 'simulator',
 		tool: tool({
 			description:
-				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use click for taps, drag for reliable swipes/drags over one WebSocket, gesture for raw serve-sim gesture JSON, take_screenshot/config/accessibility_tree/foreground/logs for inspection, launch/terminate/open_url/list_apps for app control, camera_* for camera injection, ca_debug/memory_warning/permissions for simulator testing, and stop when done. Prefer this tool over shell for simulator operations after the serve-sim stream is running.',
+				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use click for taps, drag for reliable swipes/drags over one WebSocket, gesture for raw serve-sim gesture JSON, take_screenshot/config/accessibility_tree/foreground/logs for inspection, launch/terminate/open_url/list_apps for app control, camera_* for camera injection, ca_debug/memory_warning/permissions for simulator testing, and stop when done. Screenshot image data is sent to the model by default; set storeScreenshot true only when you need a persisted file. Prefer this tool over shell for simulator operations after the serve-sim stream is running.',
 			inputSchema: simulatorInputSchema,
 			toModelOutput({ output }) {
 				const result = output as {
@@ -1440,21 +1449,34 @@ export function buildSimulatorTool(projectRoot: string): {
 								`${getStreamUrl(stream)}/stream.mjpeg?raw=1`,
 							);
 							const screenshot = await prepareScreenshotForModel(bytes);
-							const { relativePath, absPath } = buildScreenshotArtifactPath(
-								projectRoot,
-								input.outputPath,
-							);
-							await mkdir(join(projectRoot, SCREENSHOT_ARTIFACTS_DIR), {
-								recursive: true,
-							});
-							await writeFile(absPath, bytes);
+							const storedScreenshot = input.storeScreenshot
+								? await buildScreenshotArtifactPath(
+										projectRoot,
+										input.outputPath,
+									)
+								: null;
+							if (storedScreenshot) {
+								await mkdir(dirname(storedScreenshot.absPath), {
+									recursive: true,
+								});
+								await writeFile(storedScreenshot.absPath, bytes);
+							}
+							const storedScreenshotMetadata = storedScreenshot
+								? {
+										path: storedScreenshot.absPath,
+										relativePath: storedScreenshot.relativePath,
+										storageRoot: 'project-state-tmp' as const,
+									}
+								: {};
 							return {
 								ok: true,
-								path: relativePath,
-								message: `Simulator screenshot stored in Otto artifacts at ${relativePath}`,
+								...storedScreenshotMetadata,
+								message: storedScreenshot
+									? `Simulator screenshot stored in Otto project state tmp at ${storedScreenshot.absPath}`
+									: 'Simulator screenshot captured and sent to the model; not stored on disk. Set storeScreenshot true to persist it.',
 								artifact: {
 									kind: 'simulator_screenshot',
-									path: relativePath,
+									...storedScreenshotMetadata,
 									mediaType: screenshot.mediaType,
 									data: Buffer.from(screenshot.data).toString('base64'),
 									originalSize: bytes.byteLength,

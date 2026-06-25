@@ -28,6 +28,20 @@ async function* streamParts(parts: unknown[]) {
 	for (const part of parts) yield part;
 }
 
+function hangingStream(onReturn: () => void): AsyncIterable<unknown> {
+	return {
+		[Symbol.asyncIterator]() {
+			return {
+				next: () => new Promise<IteratorResult<unknown>>(() => {}),
+				return: async () => {
+					onReturn();
+					return { done: true, value: undefined };
+				},
+			};
+		},
+	};
+}
+
 function createConsumeArgs(parts: unknown[]) {
 	const opts: RunOpts = {
 		sessionId: crypto.randomUUID(),
@@ -126,5 +140,22 @@ describe('consumeRunnerStreamParts', () => {
 				payload: expect.objectContaining({ delta: 'hello' }),
 			}),
 		);
+	});
+
+	test('aborts while waiting for the first stream part', async () => {
+		const controller = new AbortController();
+		let returned = false;
+		const args = createConsumeArgs([]);
+		args.opts.abortSignal = controller.signal;
+		args.fullStream = hangingStream(() => {
+			returned = true;
+		});
+
+		const promise = consumeRunnerStreamParts(args);
+		await Promise.resolve();
+		controller.abort(new Error('stop now'));
+
+		await expect(promise).rejects.toThrow('stop now');
+		expect(returned).toBe(true);
 	});
 });

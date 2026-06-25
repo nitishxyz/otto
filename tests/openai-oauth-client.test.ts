@@ -290,26 +290,18 @@ describe('openai oauth client', () => {
 		expect(callCount).toBe(3);
 	});
 
-	test('retries Codex responses that return headers but no stream chunks', async () => {
+	test('times out Codex responses that return headers but no stream chunks', async () => {
 		process.env.OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS = '1';
-		process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES = '3';
-		process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS = '1';
 
 		let callCount = 0;
 		globalThis.fetch = async () => {
 			callCount += 1;
-			if (callCount < 3) {
-				return new Response(
-					new ReadableStream<Uint8Array>({
-						start() {},
-					}),
-					{ headers: { 'content-type': 'text/event-stream' } },
-				);
-			}
-
-			return new Response('data: [DONE]\n\n', {
-				headers: { 'content-type': 'text/event-stream' },
-			});
+			return new Response(
+				new ReadableStream<Uint8Array>({
+					start() {},
+				}),
+				{ headers: { 'content-type': 'text/event-stream' } },
+			);
 		};
 
 		const customFetch = createOpenAIOAuthFetch({
@@ -322,8 +314,10 @@ describe('openai oauth client', () => {
 			body: JSON.stringify({ model: 'gpt-5.3-codex', input: [] }),
 		});
 
-		expect(await response.text()).toBe('data: [DONE]\n\n');
-		expect(callCount).toBe(3);
+		await expect(response.text()).rejects.toThrow(
+			'OpenAI OAuth Codex stream idle timeout',
+		);
+		expect(callCount).toBe(1);
 	});
 
 	test('injects previous_response_id when explicitly enabled', async () => {

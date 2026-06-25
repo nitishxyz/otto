@@ -36,6 +36,7 @@ export function createRunnerStreamHandlers(args: {
 	const state = {
 		abortedByUser: false,
 		sendNowPreemptHandled: false,
+		abortHandled: false,
 		titleGenerationTriggered: false,
 	};
 
@@ -92,10 +93,12 @@ export function createRunnerStreamHandlers(args: {
 			args.opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined
 		)?.reason;
 		const isSendNowPreempt = isSendNowPreemptReason(abortReason);
+		if (state.abortHandled) return;
+		state.abortHandled = true;
 		state.abortedByUser =
 			!isSendNowPreempt && !isSystemAbortReason(abortReason);
-		await baseOnAbort(event);
 		state.sendNowPreemptHandled = isSendNowPreempt;
+		await baseOnAbort(event);
 	};
 
 	return {

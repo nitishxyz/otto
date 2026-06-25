@@ -299,6 +299,12 @@ async function runAssistant(opts: RunOpts) {
 			}
 			return;
 		}
+		if (opts.abortSignal?.aborted) {
+			if (!runnerHandlers.getAbortedByUser()) {
+				await runnerHandlers.onAbort({ steps: [] });
+			}
+			return;
+		}
 		if (
 			await retryOpenAIOAuthCodexAfterStreamIdleTimeout({
 				err,

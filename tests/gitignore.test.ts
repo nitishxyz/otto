@@ -69,7 +69,7 @@ describe('gitignore helper', () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 		await writeFile(
 			join(projectDir, '.gitignore'),
-			'dist\n.otto/otto.sqlite*\n.otto/attachments/\n**/.otto/cache/\n',
+			'dist\n.otto/otto.sqlite*\n.otto/attachments/\n.otto/artifacts/\n**/.otto/cache/\n**/.otto/artifacts/\n',
 		);
 
 		const changed = await ensureProjectOttoIgnored(projectDir);
