@@ -115,6 +115,12 @@ export async function composeSystemPrompt(options: {
 		}
 	}
 
+	const simulatorPrompt = buildSimulatorPrompt();
+	if (simulatorPrompt) {
+		parts.push(simulatorPrompt);
+		components.push('simulator-guidance');
+	}
+
 	if (options.includeEnvironment !== false) {
 		const envAndInstructions = await composeEnvironmentAndInstructions(
 			options.projectRoot,
@@ -219,6 +225,20 @@ export function getProviderSpoofPrompt(provider: string): string | undefined {
 		return (ANTHROPIC_SPOOF_PROMPT || '').trim();
 	}
 	return undefined;
+}
+
+function buildSimulatorPrompt(): string {
+	return [
+		'<simulator-guidance>',
+		'iOS Simulator workflows are only supported on macOS. If the user asks you to run or inspect an iOS Simulator and the current platform is not macOS, say that it is unavailable on this machine.',
+		'On macOS, prefer this flow when a simulator stream is needed:',
+		'1. Start serve-sim in a terminal so the process stays visible/running: `bun x serve-sim@latest --port 3200`.',
+		'2. If Bun is unavailable, use `npx --yes serve-sim@latest --port 3200`.',
+		'3. Open the preview URL printed by serve-sim in the browser preview or an external browser; it is usually `http://localhost:3200`.',
+		'4. After the stream is running, use simulator automation tools for taps, typing, screenshots, accessibility trees, foreground app checks, logs, and cleanup.',
+		'Do not install or register serve-sim skills/plugins unless the user explicitly asks for that.',
+		'</simulator-guidance>',
+	].join('\n');
 }
 
 function dedupeComponents(input: string[]): string[] {

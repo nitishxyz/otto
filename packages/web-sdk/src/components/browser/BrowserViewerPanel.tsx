@@ -6,52 +6,17 @@ import {
 	Globe2,
 	Plus,
 	RefreshCw,
-	Smartphone,
 	X,
 } from 'lucide-react';
 import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
-import {
-	useSimulatorStatus,
-	useStartSimulator,
-} from '../../hooks/useSimulator';
 import { Button } from '../ui/Button';
 
 const DEFAULT_BROWSER_URL = 'http://localhost:3000';
-const SIMULATOR_URL = 'http://localhost:3200';
-const SIMULATOR_TAB_ID = 'browser:simulator';
+const DEFAULT_SIMULATOR_URL = 'http://localhost:3200';
 const IFRAME_EMBED_TIMEOUT_MS = 6000;
 
 type BrowserViewerTab = Extract<ViewerTab, { type: 'browser' }>;
-
-interface NativeBrowserBounds {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-}
-
-interface NativeBrowserMountOptions {
-	id: string;
-	url: string;
-	reloadKey: number;
-	bounds: NativeBrowserBounds;
-	visible: boolean;
-}
-
-interface NativeBrowserBridge {
-	isAvailable: true;
-	mount: (options: NativeBrowserMountOptions) => Promise<void>;
-	unmount: (id: string) => Promise<void>;
-	setVisible: (id: string, visible: boolean) => Promise<void>;
-	openWindow?: (url: string) => Promise<void>;
-}
-
-declare global {
-	interface Window {
-		OTTO_NATIVE_BROWSER?: NativeBrowserBridge;
-	}
-}
 
 function normalizeBrowserUrl(value: string): string {
 	const trimmed = value.trim();
@@ -89,7 +54,6 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		(state) => state.reloadBrowserTab,
 	);
 	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
-	const contentRef = useRef<HTMLDivElement>(null);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const loadingDoneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
@@ -97,8 +61,6 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	const iframeEmbedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
 	);
-	const isLoadingRef = useRef(false);
-	const simulatorConnectedRef = useRef(false);
 	const [draftUrl, setDraftUrl] = useState(tab.url);
 	const [historyEntries, setHistoryEntries] = useState<string[]>(() =>
 		tab.url ? [normalizeBrowserUrl(tab.url)] : [],
@@ -111,47 +73,11 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		isEmbeddableUrl(normalizeBrowserUrl(tab.url)) ? 12 : 0,
 	);
 	const [embedError, setEmbedError] = useState<string | null>(null);
-	const simulatorStatus = useSimulatorStatus();
-	const {
-		mutate: startSimulatorPreview,
-		isPending: isStartingSimulatorPreview,
-		error: startSimulatorError,
-	} = useStartSimulator();
-	const nativeBrowser =
-		typeof window !== 'undefined' ? window.OTTO_NATIVE_BROWSER : undefined;
 	const normalizedUrl = normalizeBrowserUrl(tab.url);
 	const canRenderUrl = isEmbeddableUrl(normalizedUrl);
-	const useNativeBrowser = Boolean(nativeBrowser?.isAvailable && canRenderUrl);
 	const canGoBack = historyIndex > 0;
 	const canGoForward =
 		historyIndex >= 0 && historyIndex < historyEntries.length - 1;
-	const simulatorStateStatus = simulatorStatus.data?.status;
-	const simulatorStateUrl = simulatorStatus.data?.url;
-	const simulatorSetupStatus = simulatorStatus.data?.setupStatus;
-	const simulatorSetupMessage = simulatorStatus.data?.setupMessage;
-	const simulatorRunner = simulatorStatus.data?.runner;
-	const isSimulatorPreview = tab.kind === 'simulator';
-	const isStartingSimulator =
-		isStartingSimulatorPreview ||
-		simulatorStateStatus === 'starting' ||
-		simulatorSetupStatus === 'preparing';
-	const shouldShowSimulatorSetup =
-		isSimulatorPreview &&
-		(simulatorSetupStatus === 'unsupported' ||
-			simulatorSetupStatus === 'missing_runner');
-	const simulatorError =
-		isSimulatorPreview &&
-		!shouldShowSimulatorSetup &&
-		simulatorStatus.data?.status === 'error'
-			? simulatorStatus.data.error
-			: isSimulatorPreview
-				? startSimulatorError?.message
-				: null;
-	const shouldHoldSimulatorPreview =
-		isSimulatorPreview &&
-		!shouldShowSimulatorSetup &&
-		!simulatorError &&
-		simulatorStateStatus !== 'connected';
 
 	const clearIframeEmbedTimeout = useCallback(() => {
 		if (iframeEmbedTimeoutRef.current) {
@@ -177,10 +103,6 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	useEffect(() => {
 		setDraftUrl(tab.url);
 	}, [tab.url]);
-
-	useEffect(() => {
-		isLoadingRef.current = isLoading;
-	}, [isLoading]);
 
 	useEffect(() => {
 		if (!isLoading) return;
@@ -209,16 +131,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 	);
 
 	useEffect(() => {
-		if (shouldHoldSimulatorPreview) {
-			clearIframeEmbedTimeout();
-			return;
-		}
-
-		if (!isLoading || !canRenderUrl || useNativeBrowser) {
-			clearIframeEmbedTimeout();
-			return;
-		}
-		if (isSimulatorPreview) {
+		if (!isLoading || !canRenderUrl) {
 			clearIframeEmbedTimeout();
 			return;
 		}
@@ -233,54 +146,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		}, IFRAME_EMBED_TIMEOUT_MS);
 
 		return clearIframeEmbedTimeout;
-	}, [
-		canRenderUrl,
-		clearIframeEmbedTimeout,
-		isSimulatorPreview,
-		isLoading,
-		shouldHoldSimulatorPreview,
-		useNativeBrowser,
-	]);
-
-	useEffect(() => {
-		if (!shouldHoldSimulatorPreview) return;
-
-		setEmbedError(null);
-		setIsLoading(true);
-		setLoadingProgress((progress) =>
-			progress <= 0 || progress >= 100 ? 12 : progress,
-		);
-	}, [shouldHoldSimulatorPreview]);
-
-	useEffect(() => {
-		if (!isSimulatorPreview) {
-			simulatorConnectedRef.current = false;
-			return;
-		}
-		if (simulatorStateStatus !== 'connected') {
-			// Reset so the next genuine reconnect shows the loading overlay once.
-			simulatorConnectedRef.current = false;
-			return;
-		}
-		// Only react to the transition into "connected", not every poll that keeps
-		// reporting "connected" (which would re-show the loading overlay and make
-		// the live preview appear to refresh).
-		if (simulatorConnectedRef.current) return;
-		simulatorConnectedRef.current = true;
-
-		setEmbedError(null);
-		setIsLoading(true);
-		setLoadingProgress(12);
-	}, [isSimulatorPreview, simulatorStateStatus]);
-
-	useEffect(
-		() => () => {
-			if (nativeBrowser?.isAvailable) {
-				void nativeBrowser.unmount(tab.id);
-			}
-		},
-		[nativeBrowser, tab.id],
-	);
+	}, [canRenderUrl, clearIframeEmbedTimeout, isLoading]);
 
 	useEffect(() => {
 		const nextUrl = normalizeBrowserUrl(tab.url);
@@ -295,86 +161,6 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 			return nextEntries;
 		});
 	}, [tab.url, historyIndex]);
-
-	useEffect(() => {
-		if (tab.kind !== 'simulator' || simulatorStateStatus !== 'connected') {
-			return;
-		}
-		const nextUrl = simulatorStateUrl ?? SIMULATOR_URL;
-		// Update the existing simulator tab's URL in place. Using
-		// updateBrowserTabUrl (instead of openBrowserTab) avoids stealing focus or
-		// remounting the iframe on every status poll.
-		if (nextUrl !== tab.url) {
-			updateBrowserTabUrl(tab.id, nextUrl);
-		}
-	}, [
-		updateBrowserTabUrl,
-		simulatorStateStatus,
-		simulatorStateUrl,
-		tab.kind,
-		tab.id,
-		tab.url,
-	]);
-
-	useEffect(() => {
-		if (!useNativeBrowser || !nativeBrowser?.isAvailable) return;
-		const content = contentRef.current;
-		if (!content) return;
-
-		let cancelled = false;
-		const mountNativeBrowser = () => {
-			const rect = content.getBoundingClientRect();
-			const visible = rect.width > 1 && rect.height > 1;
-			if (!visible) {
-				void nativeBrowser.setVisible(tab.id, false);
-				return;
-			}
-
-			void nativeBrowser
-				.mount({
-					id: tab.id,
-					url: normalizedUrl,
-					reloadKey: tab.reloadKey,
-					bounds: {
-						x: rect.x,
-						y: rect.y,
-						width: rect.width,
-						height: rect.height,
-					},
-					visible,
-				})
-				.then(() => {
-					if (!cancelled && isLoadingRef.current) completeLoading();
-				})
-				.catch((error) => {
-					if (cancelled) return;
-					const message =
-						error instanceof Error
-							? error.message
-							: 'Unable to open the native desktop webview.';
-					setEmbedError(message);
-					setIsLoading(false);
-					setLoadingProgress(0);
-				});
-		};
-
-		mountNativeBrowser();
-		const resizeObserver = new ResizeObserver(mountNativeBrowser);
-		resizeObserver.observe(content);
-		window.addEventListener('resize', mountNativeBrowser);
-		return () => {
-			cancelled = true;
-			resizeObserver.disconnect();
-			window.removeEventListener('resize', mountNativeBrowser);
-		};
-	}, [
-		completeLoading,
-		nativeBrowser,
-		normalizedUrl,
-		tab.id,
-		tab.reloadKey,
-		useNativeBrowser,
-	]);
 
 	const navigate = (value: string) => {
 		const nextUrl = normalizeBrowserUrl(value);
@@ -412,43 +198,7 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 		setIsLoading(false);
 		setLoadingProgress(0);
 		clearIframeEmbedTimeout();
-		if (nativeBrowser?.isAvailable) {
-			void nativeBrowser.setVisible(tab.id, false);
-		}
 	};
-
-	const openSimulatorPreview = useCallback(() => {
-		const previewUrl = simulatorStateUrl ?? SIMULATOR_URL;
-		openBrowserTab(previewUrl, {
-			kind: 'simulator',
-			title: 'Simulator',
-		});
-
-		if (
-			simulatorStateStatus === 'connected' ||
-			simulatorStateStatus === 'starting' ||
-			isStartingSimulatorPreview
-		) {
-			return;
-		}
-
-		startSimulatorPreview(3200, {
-			onSuccess: (result) => {
-				openBrowserTab(result.url ?? SIMULATOR_URL, {
-					kind: 'simulator',
-					title: 'Simulator',
-				});
-				reloadBrowserTab(SIMULATOR_TAB_ID);
-			},
-		});
-	}, [
-		isStartingSimulatorPreview,
-		openBrowserTab,
-		reloadBrowserTab,
-		simulatorStateStatus,
-		simulatorStateUrl,
-		startSimulatorPreview,
-	]);
 
 	return (
 		<div className="h-full w-full min-w-0 bg-background flex flex-col">
@@ -545,89 +295,12 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 						>
 							<Plus className="h-4 w-4" />
 						</button>
-						<button
-							type="button"
-							onClick={openSimulatorPreview}
-							title={
-								isStartingSimulator
-									? 'Starting simulator preview'
-									: 'Start simulator preview'
-							}
-							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
-						>
-							<Smartphone
-								className={`h-4 w-4 ${isStartingSimulator ? 'animate-pulse' : ''}`}
-							/>
-						</button>
 					</div>
 				</div>
 			</div>
-			{simulatorError && (
-				<div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-					{simulatorError}
-				</div>
-			)}
 
-			<div ref={contentRef} className="min-h-0 flex-1 bg-muted/20">
-				{shouldShowSimulatorSetup ? (
-					<div className="h-full w-full flex items-center justify-center p-6 text-center">
-						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
-							<Smartphone className="mx-auto mb-3 h-8 w-8 text-violet-500" />
-							<h2 className="mb-2 text-sm font-semibold text-foreground">
-								{simulatorSetupStatus === 'unsupported'
-									? 'Simulator preview requires macOS'
-									: 'serve-sim runner is not available'}
-							</h2>
-							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-								{simulatorSetupMessage ??
-									'Install Bun or Node.js so Otto can run serve-sim@latest without bundling it into the CLI.'}
-							</p>
-							{simulatorSetupStatus === 'missing_runner' && (
-								<div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-left font-mono text-[11px] text-muted-foreground">
-									bun x serve-sim@latest --version
-									<br />
-									npx --yes serve-sim@latest --version
-								</div>
-							)}
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								onClick={openSimulatorPreview}
-							>
-								Check again
-							</Button>
-						</div>
-					</div>
-				) : shouldHoldSimulatorPreview ? (
-					<div className="h-full w-full flex items-center justify-center p-6 text-center">
-						<div className="max-w-md rounded-lg border border-border bg-background p-6 shadow-sm">
-							<Smartphone className="mx-auto mb-3 h-8 w-8 animate-pulse text-violet-500" />
-							<h2 className="mb-2 text-sm font-semibold text-foreground">
-								{isStartingSimulator || simulatorStatus.isLoading
-									? 'Starting simulator preview'
-									: 'Simulator preview is not running'}
-							</h2>
-							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-								{isStartingSimulator || simulatorStatus.isLoading
-									? `Otto is running ${simulatorRunner ?? 'serve-sim@latest'} and waiting for a preview URL.`
-									: 'Start serve-sim@latest before loading the simulator web preview.'}
-							</p>
-							{!isStartingSimulator && !simulatorStatus.isLoading && (
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									onClick={openSimulatorPreview}
-								>
-									Start simulator
-								</Button>
-							)}
-						</div>
-					</div>
-				) : useNativeBrowser && canRenderUrl ? (
-					<div className="h-full w-full bg-background" />
-				) : canRenderUrl && !embedError ? (
+			<div className="min-h-0 flex-1 bg-muted/20">
+				{canRenderUrl && !embedError ? (
 					<iframe
 						ref={iframeRef}
 						key={`${tab.id}:${tab.reloadKey}`}
@@ -661,16 +334,6 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 								>
 									Try again
 								</Button>
-								{nativeBrowser?.openWindow && (
-									<Button
-										type="button"
-										variant="secondary"
-										size="sm"
-										onClick={() => nativeBrowser.openWindow?.(normalizedUrl)}
-									>
-										Open in desktop window
-									</Button>
-								)}
 								<Button
 									type="button"
 									variant="secondary"
@@ -692,9 +355,14 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 								Open a browser preview
 							</h2>
 							<p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-								Preview localhost apps or hosted URLs. Simulator previews open
-								when serve-sim is started by the agent.
+								Preview localhost apps or hosted URLs. For iOS Simulator, start
+								serve-sim in a terminal and open its preview URL here.
 							</p>
+							<div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-left font-mono text-[11px] text-muted-foreground">
+								bun x serve-sim@latest --port 3200
+								<br />
+								open {DEFAULT_SIMULATOR_URL}
+							</div>
 							<div className="flex flex-wrap justify-center gap-2">
 								<Button
 									type="button"
@@ -703,6 +371,14 @@ export function BrowserViewerPanel({ tab }: BrowserViewerPanelProps) {
 									onClick={() => navigate(DEFAULT_BROWSER_URL)}
 								>
 									localhost:3000
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => navigate(DEFAULT_SIMULATOR_URL)}
+								>
+									serve-sim:3200
 								</Button>
 							</div>
 						</div>

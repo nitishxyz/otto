@@ -14,7 +14,7 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 		{
 			name: 'simulator',
 			description:
-				'Control Apple Simulator via serve-sim: start, status, click, type, button, rotate, screenshot, accessibility tree, foreground app, logs, stop.',
+				'Control Apple Simulator via serve-sim: start, status, click, drag, type, button, rotate, camera, permissions, screenshots, accessibility tree, foreground app, logs, stop.',
 			build: buildSimulatorTool,
 		},
 		{

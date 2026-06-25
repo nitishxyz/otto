@@ -46,15 +46,66 @@ const orientations = [
 	'landscape_right',
 ] as const;
 
+const caDebugOptions = [
+	'blended',
+	'copies',
+	'misaligned',
+	'offscreen',
+	'slow-animations',
+] as const;
+
+const cameraSources = ['placeholder', 'webcam', 'file'] as const;
+
+const mirrorModes = ['auto', 'on', 'off'] as const;
+
+const permissionActions = ['grant', 'revoke', 'reset', 'list'] as const;
+
+const permissionNames = [
+	'all',
+	'notifications',
+	'push',
+	'location',
+	'location-always',
+	'location-inuse',
+	'camera',
+	'microphone',
+	'mic',
+	'photos',
+	'photo-library',
+	'photo',
+	'photos-add',
+	'contacts',
+	'calendar',
+	'reminders',
+	'motion',
+	'media-library',
+	'siri',
+	'speech',
+	'faceid',
+	'user-tracking',
+	'homekit',
+] as const;
+
 const simulatorActions = [
 	'start',
 	'status',
 	'stop',
 	'click',
+	'gesture',
+	'drag',
 	'type',
 	'paste',
 	'button',
 	'rotate',
+	'ca_debug',
+	'memory_warning',
+	'camera_start',
+	'camera_switch',
+	'camera_mirror',
+	'camera_status',
+	'camera_stop',
+	'camera_list_webcams',
+	'permissions',
 	'config',
 	'accessibility_tree',
 	'foreground',
@@ -118,14 +169,30 @@ const simulatorInputSchema = z.object({
 	device: z.string().optional(),
 	x: z.number().min(0).max(1).optional(),
 	y: z.number().min(0).max(1).optional(),
+	startX: z.number().min(0).max(1).optional(),
+	startY: z.number().min(0).max(1).optional(),
+	endX: z.number().min(0).max(1).optional(),
+	endY: z.number().min(0).max(1).optional(),
+	gesture: z.unknown().optional(),
 	text: z.string().optional(),
 	name: z.enum(buttonNames).optional(),
 	orientation: z.enum(orientations).optional(),
+	caDebug: z.enum(caDebugOptions).optional(),
+	enabled: z.boolean().optional(),
+	cameraSource: z.enum(cameraSources).optional(),
+	file: z.string().optional(),
+	webcam: z.string().optional(),
+	mirror: z.enum(mirrorModes).optional(),
+	permissionAction: z.enum(permissionActions).optional(),
+	permission: z.enum(permissionNames).optional(),
+	value: z.string().optional(),
 	bundleId: z.string().optional(),
 	url: z.string().optional(),
 	args: z.array(z.string()).optional(),
 	outputPath: z.string().optional(),
 	timeoutMs: z.number().min(250).max(10_000).optional(),
+	durationMs: z.number().min(16).max(10_000).optional(),
+	steps: z.number().int().min(2).max(240).optional(),
 });
 
 type SimulatorInput =
@@ -133,12 +200,62 @@ type SimulatorInput =
 	| { action: 'status'; device?: string }
 	| { action: 'stop'; device?: string }
 	| { action: 'click'; x: number; y: number; device?: string }
+	| { action: 'gesture'; gesture: unknown; device?: string }
+	| {
+			action: 'drag';
+			startX: number;
+			startY: number;
+			endX: number;
+			endY: number;
+			device?: string;
+			durationMs?: number;
+			steps?: number;
+	  }
 	| { action: 'type'; text: string; device?: string }
 	| { action: 'paste'; text: string; device?: string }
 	| { action: 'button'; name: (typeof buttonNames)[number]; device?: string }
 	| {
 			action: 'rotate';
 			orientation: (typeof orientations)[number];
+			device?: string;
+	  }
+	| {
+			action: 'ca_debug';
+			caDebug: (typeof caDebugOptions)[number];
+			enabled: boolean;
+			device?: string;
+	  }
+	| { action: 'memory_warning'; device?: string }
+	| {
+			action: 'camera_start';
+			bundleId: string;
+			cameraSource?: (typeof cameraSources)[number];
+			file?: string;
+			webcam?: string;
+			mirror?: (typeof mirrorModes)[number];
+			device?: string;
+	  }
+	| {
+			action: 'camera_switch';
+			cameraSource: (typeof cameraSources)[number];
+			file?: string;
+			webcam?: string;
+			device?: string;
+	  }
+	| {
+			action: 'camera_mirror';
+			mirror: (typeof mirrorModes)[number];
+			device?: string;
+	  }
+	| { action: 'camera_status'; device?: string }
+	| { action: 'camera_stop'; device?: string }
+	| { action: 'camera_list_webcams' }
+	| {
+			action: 'permissions';
+			permissionAction: (typeof permissionActions)[number];
+			permission?: (typeof permissionNames)[number];
+			bundleId?: string;
+			value?: string;
 			device?: string;
 	  }
 	| { action: 'config'; device?: string }
@@ -189,6 +306,23 @@ function parseSimulatorInput(
 				y: requireNumber(input.y, 'y'),
 				device: input.device,
 			};
+		case 'gesture':
+			return {
+				action: 'gesture',
+				gesture: input.gesture,
+				device: input.device,
+			};
+		case 'drag':
+			return {
+				action: 'drag',
+				startX: requireNumber(input.startX, 'startX'),
+				startY: requireNumber(input.startY, 'startY'),
+				endX: requireNumber(input.endX, 'endX'),
+				endY: requireNumber(input.endY, 'endY'),
+				device: input.device,
+				durationMs: input.durationMs,
+				steps: input.steps,
+			};
 		case 'type':
 		case 'paste':
 			return {
@@ -206,6 +340,46 @@ function parseSimulatorInput(
 			return {
 				action: 'rotate',
 				orientation: input.orientation ?? 'portrait',
+				device: input.device,
+			};
+		case 'ca_debug':
+			return {
+				action: 'ca_debug',
+				caDebug: input.caDebug ?? 'blended',
+				enabled: input.enabled ?? true,
+				device: input.device,
+			};
+		case 'camera_start':
+			return {
+				action: 'camera_start',
+				bundleId: requireString(input.bundleId, 'bundleId'),
+				cameraSource: input.cameraSource,
+				file: input.file,
+				webcam: input.webcam,
+				mirror: input.mirror,
+				device: input.device,
+			};
+		case 'camera_switch':
+			return {
+				action: 'camera_switch',
+				cameraSource: input.cameraSource ?? 'placeholder',
+				file: input.file,
+				webcam: input.webcam,
+				device: input.device,
+			};
+		case 'camera_mirror':
+			return {
+				action: 'camera_mirror',
+				mirror: input.mirror ?? 'auto',
+				device: input.device,
+			};
+		case 'permissions':
+			return {
+				action: 'permissions',
+				permissionAction: input.permissionAction ?? 'list',
+				permission: input.permission,
+				bundleId: input.bundleId,
+				value: input.value,
 				device: input.device,
 			};
 		case 'take_screenshot':
@@ -490,6 +664,96 @@ async function sendKeyboardEvents(
 		socket.onerror = () =>
 			reject(new Error(`WebSocket connection failed: ${wsUrl}`));
 	});
+}
+
+type TouchEventPayload = {
+	subtype: 0 | 1 | 2;
+	x: number;
+	y: number;
+	seq: number;
+};
+
+function encodeTouchEvent(event: TouchEventPayload): Uint8Array {
+	const buffer = new ArrayBuffer(12);
+	const view = new DataView(buffer);
+	view.setUint8(0, 0x10);
+	view.setUint8(1, event.subtype);
+	view.setFloat32(2, event.x, true);
+	view.setFloat32(6, event.y, true);
+	view.setUint16(10, event.seq, true);
+	return new Uint8Array(buffer);
+}
+
+async function sendTouchEvents(
+	wsUrl: string,
+	events: TouchEventPayload[],
+	delayMs: number,
+): Promise<void> {
+	await new Promise<void>((resolve, reject) => {
+		const socket = new WebSocket(wsUrl);
+		socket.binaryType = 'arraybuffer';
+		socket.onopen = async () => {
+			try {
+				for (const event of events) {
+					socket.send(encodeTouchEvent(event));
+					await new Promise((done) => setTimeout(done, delayMs));
+				}
+				setTimeout(() => {
+					socket.close();
+					resolve();
+				}, 50);
+			} catch (error) {
+				socket.close();
+				reject(error);
+			}
+		};
+		socket.onerror = () =>
+			reject(new Error(`WebSocket connection failed: ${wsUrl}`));
+	});
+}
+
+async function runDragAction(
+	input: Extract<SimulatorInput, { action: 'drag' }>,
+) {
+	const stream = await ensureStream(input.device);
+	if (!stream.wsUrl) {
+		return createToolError(
+			'No serve-sim WebSocket URL found for drag action',
+			'execution',
+			{ action: 'drag' },
+		);
+	}
+
+	const steps = input.steps ?? 24;
+	const durationMs = input.durationMs ?? 350;
+	const delayMs = Math.max(1, Math.round(durationMs / steps));
+	const events: TouchEventPayload[] = [
+		{ subtype: 0, x: input.startX, y: input.startY, seq: 0 },
+	];
+	for (let step = 1; step < steps; step++) {
+		const t = step / steps;
+		events.push({
+			subtype: 1,
+			x: input.startX + (input.endX - input.startX) * t,
+			y: input.startY + (input.endY - input.startY) * t,
+			seq: step,
+		});
+	}
+	events.push({
+		subtype: 2,
+		x: input.endX,
+		y: input.endY,
+		seq: steps,
+	});
+
+	await sendTouchEvents(stream.wsUrl, events, delayMs);
+	return {
+		ok: true,
+		method: 'websocket_drag',
+		steps,
+		durationMs,
+		stream,
+	};
 }
 
 function parseJson<T>(raw: string): T | null {
@@ -830,6 +1094,48 @@ async function runCliAction(args: string[]) {
 	};
 }
 
+function buildCameraStartArgs(
+	input: Extract<SimulatorInput, { action: 'camera_start' }>,
+): string[] {
+	const args = ['camera', input.bundleId];
+	if (input.cameraSource === 'file') {
+		args.push('--file', requireString(input.file, 'file'));
+	} else if (input.cameraSource === 'webcam') {
+		args.push('--webcam');
+		if (input.webcam?.trim()) args.push(input.webcam.trim());
+	}
+	if (input.mirror) args.push('--mirror', input.mirror);
+	return withDevice(args, input.device);
+}
+
+function buildCameraSwitchArgs(
+	input: Extract<SimulatorInput, { action: 'camera_switch' }>,
+): string[] {
+	const args = ['camera', 'switch', input.cameraSource];
+	if (input.cameraSource === 'file') {
+		args.push(requireString(input.file, 'file'));
+	} else if (input.cameraSource === 'webcam' && input.webcam?.trim()) {
+		args.push(input.webcam.trim());
+	}
+	return withDevice(args, input.device);
+}
+
+function buildPermissionsArgs(
+	input: Extract<SimulatorInput, { action: 'permissions' }>,
+): string[] {
+	const args = ['permissions', input.permissionAction];
+	if (input.permissionAction === 'list') {
+		if (input.bundleId?.trim()) args.push(input.bundleId.trim());
+		args.push('-q');
+		return withDevice(args, input.device);
+	}
+
+	args.push(requireString(input.permission, 'permission'));
+	args.push(requireString(input.bundleId, 'bundleId'));
+	if (input.value?.trim()) args.push('--value', input.value.trim());
+	return withDevice(args, input.device);
+}
+
 function shouldPasteForText(text: string): boolean {
 	return text.length > 8 || /[:/.?#&=%]/.test(text);
 }
@@ -913,7 +1219,7 @@ export function buildSimulatorTool(projectRoot: string): {
 		name: 'simulator',
 		tool: tool({
 			description:
-				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use action=start to open the simulator preview, launch to open an app bundle, take_screenshot for screenshots, click for taps, type for short keyboard input, paste for URLs/long strings in focused fields, and button/rotate/status/config/accessibility_tree/foreground/list_apps/logs/stop as needed. Prefer this tool over shell for simulator operations.',
+				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use click for taps, drag for reliable swipes/drags over one WebSocket, gesture for raw serve-sim gesture JSON, take_screenshot/config/accessibility_tree/foreground/logs for inspection, launch/terminate/open_url/list_apps for app control, camera_* for camera injection, ca_debug/memory_warning/permissions for simulator testing, and stop when done. Prefer this tool over shell for simulator operations after the serve-sim stream is running.',
 			inputSchema: simulatorInputSchema,
 			toModelOutput({ output }) {
 				const result = output as {
@@ -990,6 +1296,18 @@ export function buildSimulatorTool(projectRoot: string): {
 								),
 							);
 						}
+						case 'gesture': {
+							const gestureDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								withDevice(
+									['gesture', JSON.stringify(input.gesture)],
+									gestureDevice,
+								),
+							);
+						}
+						case 'drag': {
+							return runDragAction(input);
+						}
 						case 'type': {
 							return runTextInputAction(input.text, input.device);
 						}
@@ -1024,6 +1342,58 @@ export function buildSimulatorTool(projectRoot: string): {
 							const rotateDevice = await resolveDeviceTarget(input.device);
 							return runCliAction(
 								withDevice(['rotate', input.orientation], rotateDevice),
+							);
+						}
+						case 'ca_debug': {
+							const caDebugDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								withDevice(
+									['ca-debug', input.caDebug, input.enabled ? 'on' : 'off'],
+									caDebugDevice,
+								),
+							);
+						}
+						case 'memory_warning': {
+							const memoryDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(withDevice(['memory-warning'], memoryDevice));
+						}
+						case 'camera_start': {
+							const cameraDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								buildCameraStartArgs({ ...input, device: cameraDevice }),
+							);
+						}
+						case 'camera_switch': {
+							const cameraDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								buildCameraSwitchArgs({ ...input, device: cameraDevice }),
+							);
+						}
+						case 'camera_mirror': {
+							const cameraDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								withDevice(['camera', 'mirror', input.mirror], cameraDevice),
+							);
+						}
+						case 'camera_status': {
+							const cameraDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								withDevice(['camera', 'status', '-q'], cameraDevice),
+							);
+						}
+						case 'camera_stop': {
+							const cameraDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								withDevice(['camera', '--stop-webcam'], cameraDevice),
+							);
+						}
+						case 'camera_list_webcams': {
+							return runCliAction(['camera', '--list-webcams']);
+						}
+						case 'permissions': {
+							const permissionsDevice = await resolveDeviceTarget(input.device);
+							return runCliAction(
+								buildPermissionsArgs({ ...input, device: permissionsDevice }),
 							);
 						}
 						case 'config': {
