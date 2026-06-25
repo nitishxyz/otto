@@ -54,17 +54,25 @@ export function CommandSuggestionsPopup({
 		],
 	);
 
-	const recipeCommands = useMemo(
-		() =>
-			(recipesData?.recipes ?? []).map((recipe) => ({
+	const recipeCommands = useMemo(() => {
+		const seen = new Set<string>();
+		return (recipesData?.recipes ?? [])
+			.filter((recipe) => !recipe.conflict)
+			.filter((recipe) => {
+				if (seen.has(recipe.name)) return false;
+				seen.add(recipe.name);
+				return true;
+			})
+			.map((recipe) => ({
 				id: `recipe:${recipe.name}`,
 				label: `/${recipe.name}`,
-				description: recipe.description || 'Project recipe',
+				description: recipe.description
+					? `${recipe.description} (${recipe.scope})`
+					: `${recipe.scope} recipe`,
 				icon: ChefHat,
 				kind: 'recipe' as const,
-			})),
-		[recipesData?.recipes],
-	);
+			}));
+	}, [recipesData?.recipes]);
 
 	const results = useMemo(
 		() => filterCommands(query, state, recipeCommands),

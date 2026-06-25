@@ -9,8 +9,18 @@ import {
 } from '../../hooks/useRecipes';
 import { useMentionAgents } from '../../hooks/useAgents';
 import { toast } from '../../stores/toastStore';
+import type { RecipeScope } from '../../lib/api-client/recipes';
+import { isReservedRecipeCommandName } from '../../lib/reserved-recipe-names';
 
 const RECIPE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const RECIPE_SCOPE_PATHS: Record<RecipeScope, string> = {
+	project: '.otto/recipes',
+	global: '~/.config/otto/recipes',
+};
+
+function recipeKey(scope: RecipeScope, name: string) {
+	return `${scope}:${name}`;
+}
 const DEFAULT_RECIPE_AGENT = 'build';
 
 function defaultRecipeContent(name: string) {
@@ -53,18 +63,22 @@ export function RecipesSettings() {
 	const recipeAgentId = useId();
 	const recipeIncludeInHistoryId = useId();
 	const recipeContentId = useId();
-	const recipesQuery = useRecipes();
+	const [editorScope, setEditorScope] = useState<RecipeScope>('project');
+	const recipesQuery = useRecipes({ scope: editorScope });
+	const allRecipesQuery = useRecipes({ scope: 'all' });
 	const agentsQuery = useMentionAgents();
 	const saveRecipe = useSaveRecipe();
 	const deleteRecipe = useDeleteRecipe();
 	const recipes = recipesQuery.data?.recipes ?? [];
+	const allRecipes = allRecipesQuery.data?.recipes ?? [];
 	const agents = agentsQuery.data?.agents ?? [];
-	const [selectedName, setSelectedName] = useState('');
+	const [selectedKey, setSelectedKey] = useState('');
 	const [draftAgent, setDraftAgent] = useState(DEFAULT_RECIPE_AGENT);
 	const [draftIncludeInHistory, setDraftIncludeInHistory] = useState(true);
 	const [draftName, setDraftName] = useState('');
 	const [draftContent, setDraftContent] = useState('');
 	const [savedDraft, setSavedDraft] = useState<{
+		scope: RecipeScope;
 		name: string;
 		agent: string;
 		includeInHistory: boolean;
@@ -72,27 +86,53 @@ export function RecipesSettings() {
 	} | null>(null);
 
 	const selectedRecipe = useMemo(
-		() => recipes.find((recipe) => recipe.name === selectedName),
-		[recipes, selectedName],
+		() =>
+			recipes.find(
+				(recipe) => recipeKey(recipe.scope, recipe.name) === selectedKey,
+			),
+		[recipes, selectedKey],
 	);
 	const effectiveName = draftName.trim().toLowerCase();
 	const isNameValid = RECIPE_NAME_PATTERN.test(effectiveName);
+	const isReservedName =
+		effectiveName !== '' && isReservedRecipeCommandName(effectiveName);
+	const crossScopeDuplicate = useMemo(
+		() =>
+			allRecipes.find(
+				(recipe) =>
+					recipe.name === effectiveName && recipe.scope !== editorScope,
+			),
+		[allRecipes, effectiveName, editorScope],
+	);
+	const saveBlockedReason = !isNameValid
+		? null
+		: isReservedName
+			? 'This name is reserved by a built-in slash command.'
+			: crossScopeDuplicate
+				? `A ${crossScopeDuplicate.scope} recipe with this name already exists.`
+				: null;
 	const isSaving = saveRecipe.isPending;
 	const isDeleting = deleteRecipe.isPending;
 	const hasDraft = draftName !== '' || draftContent !== '';
 	const isEditingExisting =
-		selectedRecipe && selectedRecipe.name === effectiveName;
+		selectedRecipe &&
+		selectedRecipe.name === effectiveName &&
+		selectedRecipe.scope === editorScope;
 	const hasChanges =
 		hasDraft &&
 		(!savedDraft ||
+			editorScope !== savedDraft.scope ||
 			effectiveName !== savedDraft.name ||
 			draftAgent !== savedDraft.agent ||
 			draftIncludeInHistory !== savedDraft.includeInHistory ||
 			draftContent !== savedDraft.content);
 
-	function selectRecipe(name: string) {
-		const recipe = recipes.find((item) => item.name === name);
-		setSelectedName(name);
+	function selectRecipe(scope: RecipeScope, name: string) {
+		const recipe = recipes.find(
+			(item) => item.scope === scope && item.name === name,
+		);
+		setSelectedKey(recipeKey(scope, name));
+		setEditorScope(scope);
 		setDraftName(name);
 		setDraftAgent(recipe?.agent || DEFAULT_RECIPE_AGENT);
 		setDraftIncludeInHistory(recipe?.includeInHistory ?? true);
@@ -100,6 +140,7 @@ export function RecipesSettings() {
 		setSavedDraft(
 			recipe
 				? {
+						scope: recipe.scope,
 						name: recipe.name,
 						agent: recipe.agent || DEFAULT_RECIPE_AGENT,
 						includeInHistory: recipe.includeInHistory,
@@ -111,7 +152,7 @@ export function RecipesSettings() {
 
 	function createRecipe() {
 		const name = 'new-recipe';
-		setSelectedName('');
+		setSelectedKey('');
 		setDraftName(name);
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
 		setDraftIncludeInHistory(true);
@@ -120,7 +161,7 @@ export function RecipesSettings() {
 	}
 
 	function clearDraft() {
-		setSelectedName('');
+		setSelectedKey('');
 		setDraftName('');
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
 		setDraftIncludeInHistory(true);
@@ -137,6 +178,10 @@ export function RecipesSettings() {
 			toast.error('Recipe instructions are required.');
 			return;
 		}
+		if (saveBlockedReason) {
+			toast.error(saveBlockedReason);
+			return;
+		}
 
 		try {
 			const content = setFrontmatterField(
@@ -151,11 +196,13 @@ export function RecipesSettings() {
 			await saveRecipe.mutateAsync({
 				name: effectiveName,
 				content,
+				scope: editorScope,
 			});
-			setSelectedName(effectiveName);
+			setSelectedKey(recipeKey(editorScope, effectiveName));
 			setDraftName(effectiveName);
 			setDraftContent(content);
 			setSavedDraft({
+				scope: editorScope,
 				name: effectiveName,
 				agent: draftAgent || DEFAULT_RECIPE_AGENT,
 				includeInHistory: draftIncludeInHistory,
@@ -172,7 +219,10 @@ export function RecipesSettings() {
 	async function handleDelete() {
 		if (!selectedRecipe) return;
 		try {
-			await deleteRecipe.mutateAsync(selectedRecipe.name);
+			await deleteRecipe.mutateAsync({
+				name: selectedRecipe.name,
+				scope: selectedRecipe.scope,
+			});
 			toast.success(`Deleted /${selectedRecipe.name}`);
 			clearDraft();
 		} catch (error) {
@@ -186,6 +236,31 @@ export function RecipesSettings() {
 		<div className="flex h-full min-h-0 gap-4 overflow-hidden">
 			{/* Recipe list */}
 			<div className="flex w-48 shrink-0 flex-col">
+				<div className="mb-2 grid grid-cols-2 gap-1 rounded-md border border-border/60 p-0.5">
+					{(['project', 'global'] as const).map((scope) => (
+						<button
+							key={scope}
+							type="button"
+							onClick={() => {
+								setEditorScope(scope);
+								setSelectedKey('');
+								setDraftName('');
+								setDraftContent('');
+								setSavedDraft(null);
+							}}
+							className={`rounded px-2 py-1 text-xs capitalize transition-colors ${
+								editorScope === scope
+									? 'bg-primary/10 text-foreground'
+									: 'text-muted-foreground hover:text-foreground'
+							}`}
+						>
+							{scope}
+						</button>
+					))}
+				</div>
+				<p className="mb-2 text-[10px] text-muted-foreground/80">
+					{RECIPE_SCOPE_PATHS[editorScope]}
+				</p>
 				<div className="mb-2 flex items-center justify-between">
 					<span className="text-xs font-medium text-muted-foreground">
 						{recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}
@@ -213,18 +288,26 @@ export function RecipesSettings() {
 						<div className="space-y-0.5">
 							{recipes.map((recipe) => (
 								<button
-									key={recipe.name}
+									key={recipeKey(recipe.scope, recipe.name)}
 									type="button"
-									onClick={() => selectRecipe(recipe.name)}
+									onClick={() => selectRecipe(recipe.scope, recipe.name)}
 									className={`w-full rounded-md px-2.5 py-1.5 text-left transition-colors ${
-										selectedName === recipe.name
+										selectedKey === recipeKey(recipe.scope, recipe.name)
 											? 'bg-primary/10 text-foreground'
 											: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
 									}`}
 								>
-									<div className="font-mono text-xs font-medium">
-										/{recipe.name}
+									<div className="flex items-center gap-1.5 font-mono text-xs font-medium">
+										<span>/{recipe.name}</span>
+										<span className="rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">
+											{recipe.scope}
+										</span>
 									</div>
+									{recipe.conflict ? (
+										<div className="mt-0.5 text-[10px] text-amber-500">
+											Conflict: {recipe.conflict.reason}
+										</div>
+									) : null}
 									{recipe.description ? (
 										<div className="mt-0.5 truncate text-[11px] text-muted-foreground">
 											{recipe.description}
@@ -281,6 +364,11 @@ export function RecipesSettings() {
 							{!isNameValid && effectiveName !== '' ? (
 								<p className="mt-1 text-[11px] text-red-400">
 									Lowercase letters, numbers, and dashes only.
+								</p>
+							) : null}
+							{saveBlockedReason ? (
+								<p className="mt-1 text-[11px] text-red-400">
+									{saveBlockedReason}
 								</p>
 							) : null}
 						</div>
@@ -376,7 +464,11 @@ export function RecipesSettings() {
 							size="sm"
 							onClick={handleSave}
 							disabled={
-								!isNameValid || !draftContent.trim() || !hasChanges || isSaving
+								!isNameValid ||
+								Boolean(saveBlockedReason) ||
+								!draftContent.trim() ||
+								!hasChanges ||
+								isSaving
 							}
 							className="gap-1.5"
 						>

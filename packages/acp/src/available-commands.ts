@@ -3,7 +3,7 @@ import type {
 	AvailableCommand,
 } from '@agentclientprotocol/sdk';
 import { listAvailableSlashCommands } from '@ottocode/server/runtime/commands/available';
-import { discoverProjectRecipes } from '@ottocode/server/runtime/commands/recipes';
+import { discoverAllRecipes } from '@ottocode/server/runtime/commands/recipes';
 import {
 	discoverSkills,
 	filterDiscoveredSkills,
@@ -78,12 +78,13 @@ async function listRecipeCommands(cwd?: string): Promise<AvailableCommand[]> {
 	if (!cwd) return [];
 	try {
 		const cfg = await loadConfig(cwd);
-		const recipes = await discoverProjectRecipes(cfg.projectRoot);
+		const recipes = await discoverAllRecipes(cfg.projectRoot);
 		return recipes
+			.filter((recipe) => !recipe.conflict)
 			.filter((recipe) => !ACP_COMMAND_NAMES.has(recipe.name))
 			.map((recipe) => ({
 				name: recipe.name,
-				description: recipe.description || 'Project recipe',
+				description: recipe.description || `${recipe.scope} recipe`,
 				input: { hint: '[args]' },
 			}));
 	} catch (err) {

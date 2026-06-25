@@ -8,6 +8,13 @@ import {
 	upsertRecipe,
 } from './recipes/service.ts';
 
+const recipeScopeSchema = z.enum(['project', 'global']);
+
+const recipeConflictSchema = z.object({
+	reason: z.enum(['reserved', 'duplicate']),
+	scopes: z.array(recipeScopeSchema).optional(),
+});
+
 const projectQuerySchema = z.object({
 	project: z
 		.string()
@@ -19,17 +26,37 @@ const projectQuerySchema = z.object({
 		}),
 });
 
+const listRecipesQuerySchema = projectQuerySchema.extend({
+	scope: z
+		.enum(['all', 'project', 'global'])
+		.optional()
+		.openapi({
+			param: { name: 'scope', in: 'query' },
+			description:
+				'Recipe scope filter. Defaults to all for listing project and global recipes.',
+		}),
+});
+
+const recipeScopeQuerySchema = projectQuerySchema.extend({
+	scope: recipeScopeSchema.optional().openapi({
+		param: { name: 'scope', in: 'query' },
+		description: 'Recipe scope. Defaults to project.',
+	}),
+});
+
 const recipeNameParamsSchema = z.object({
 	name: z.string().openapi({ param: { name: 'name', in: 'path' } }),
 });
 
 const recipeSchema = z.object({
 	name: z.string(),
+	scope: recipeScopeSchema,
 	agent: z.string(),
 	includeInHistory: z.boolean(),
 	description: z.string(),
 	path: z.string(),
 	content: z.string(),
+	conflict: recipeConflictSchema.optional(),
 });
 
 const recipeBodySchema = z.object({
@@ -46,8 +73,8 @@ export function registerRecipesRoutes(app: Hono) {
 			path: '/v1/recipes',
 			tags: ['config'],
 			operationId: 'listRecipes',
-			summary: 'List project recipes',
-			request: { query: projectQuerySchema },
+			summary: 'List recipes',
+			request: { query: listRecipesQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
@@ -73,10 +100,10 @@ export function registerRecipesRoutes(app: Hono) {
 			path: '/v1/recipes/{name}',
 			tags: ['config'],
 			operationId: 'getRecipe',
-			summary: 'Get a project recipe',
+			summary: 'Get a recipe',
 			request: {
 				params: recipeNameParamsSchema,
-				query: projectQuerySchema,
+				query: recipeScopeQuerySchema,
 			},
 			responses: {
 				'200': {
@@ -107,10 +134,10 @@ export function registerRecipesRoutes(app: Hono) {
 			path: '/v1/recipes/{name}',
 			tags: ['config'],
 			operationId: 'upsertRecipe',
-			summary: 'Create or update a project recipe',
+			summary: 'Create or update a recipe',
 			request: {
 				params: recipeNameParamsSchema,
-				query: projectQuerySchema,
+				query: recipeScopeQuerySchema,
 				body: {
 					required: true,
 					content: {
@@ -134,6 +161,10 @@ export function registerRecipesRoutes(app: Hono) {
 					description: 'Invalid request',
 					content: { 'application/json': { schema: errorResponseSchema } },
 				},
+				'409': {
+					description: 'Reserved or duplicate recipe name',
+					content: { 'application/json': { schema: errorResponseSchema } },
+				},
 				'500': {
 					description: 'Server error',
 					content: { 'application/json': { schema: errorResponseSchema } },
@@ -150,10 +181,10 @@ export function registerRecipesRoutes(app: Hono) {
 			path: '/v1/recipes/{name}',
 			tags: ['config'],
 			operationId: 'deleteRecipe',
-			summary: 'Delete a project recipe',
+			summary: 'Delete a recipe',
 			request: {
 				params: recipeNameParamsSchema,
-				query: projectQuerySchema,
+				query: recipeScopeQuerySchema,
 			},
 			responses: {
 				'200': {

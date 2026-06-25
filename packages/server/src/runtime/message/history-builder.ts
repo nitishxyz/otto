@@ -3,8 +3,8 @@ import { messages, messageParts } from '@ottocode/database/schema';
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
 import {
-	loadProjectRecipe,
 	parseRecipeInvocation,
+	resolveInvokableRecipe,
 } from '../commands/recipes.ts';
 import { getQueueState } from '../session/queue.ts';
 import { ToolHistoryTracker } from './tool-history-tracker.ts';
@@ -67,7 +67,10 @@ async function shouldExcludeRecipeInvocationFromHistory(args: {
 	if (!text) return false;
 	const invocation = parseRecipeInvocation(text);
 	if (!invocation) return false;
-	const recipe = await loadProjectRecipe(args.projectRoot, invocation.name);
+	const recipe = await resolveInvokableRecipe(
+		args.projectRoot,
+		invocation.name,
+	);
 	return recipe ? !recipe.includeInHistory : false;
 }
 

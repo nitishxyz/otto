@@ -5,10 +5,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHistoryMessages } from '../packages/server/src/runtime/message/history-builder.ts';
+import { getGlobalRecipesDir } from '@ottocode/sdk';
 import {
+	discoverAllRecipes,
 	discoverProjectRecipes,
 	parseRecipeInvocation,
 	prepareRecipeCommand,
+	validateRecipeNameForScope,
 } from '../packages/server/src/runtime/commands/recipes.ts';
 
 describe('project recipes', () => {
@@ -49,6 +52,7 @@ describe('project recipes', () => {
 
 			const recipes = await discoverProjectRecipes(projectRoot);
 			expect(recipes.map((recipe) => recipe.name)).toEqual(['publish-ready']);
+			expect(recipes[0]?.scope).toBe('project');
 			expect(recipes[0]?.agent).toBe('build');
 			expect(recipes[0]?.includeInHistory).toBe(true);
 			expect(recipes[0]?.description).toBe('Set publish flags');
@@ -304,6 +308,259 @@ describe('project recipes', () => {
 			const serialized = JSON.stringify(history);
 			expect(serialized).toContain('/refactor-thing auth');
 			expect(serialized).toContain('refactor reply');
+		} finally {
+			await cleanup();
+		}
+	});
+});
+
+describe('global and scoped recipes', () => {
+	const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+
+	async function setupProject() {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-recipes-'));
+		const recipesDir = join(projectRoot, '.otto', 'recipes');
+		await mkdir(recipesDir, { recursive: true });
+		return {
+			projectRoot,
+			recipesDir,
+			cleanup: async () => {
+				await rm(projectRoot, { recursive: true, force: true });
+				if (originalXdgConfigHome === undefined) {
+					delete process.env.XDG_CONFIG_HOME;
+				} else {
+					process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+				}
+			},
+		};
+	}
+
+	async function setupGlobalRecipesDir() {
+		const xdgConfigHome = await mkdtemp(join(tmpdir(), 'otto-xdg-'));
+		process.env.XDG_CONFIG_HOME = xdgConfigHome;
+		const globalRecipesDir = getGlobalRecipesDir();
+		await mkdir(globalRecipesDir, { recursive: true });
+		return globalRecipesDir;
+	}
+
+	it('discovers global recipes from the global config recipes dir', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			await writeFile(
+				join(globalRecipesDir, 'ship-it.md'),
+				['---', 'description: Ship', '---', '', 'Run release checks.'].join(
+					'\n',
+				),
+			);
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			expect(recipes.map((recipe) => [recipe.scope, recipe.name])).toEqual([
+				['global', 'ship-it'],
+			]);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('lists project and global recipes together with scope metadata', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			await writeFile(
+				join(recipesDir, 'project-only.md'),
+				['---', 'description: Project', '---', '', 'Project task.'].join('\n'),
+			);
+			await writeFile(
+				join(globalRecipesDir, 'global-only.md'),
+				['---', 'description: Global', '---', '', 'Global task.'].join('\n'),
+			);
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			expect(recipes.map((recipe) => [recipe.scope, recipe.name])).toEqual([
+				['global', 'global-only'],
+				['project', 'project-only'],
+			]);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('invokes a global recipe when no project recipe exists', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			await writeFile(
+				join(globalRecipesDir, 'global-ship.md'),
+				[
+					'---',
+					'description: Global ship',
+					'---',
+					'',
+					'Ship from global recipe.',
+				].join('\n'),
+			);
+
+			const command = await prepareRecipeCommand({
+				projectRoot,
+				content: '/global-ship',
+			});
+			expect(command?.name).toBe('global-ship');
+			expect(command?.prompt).toContain('Run the global recipe /global-ship.');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('rejects creating a recipe named like a built-in slash command', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await setupGlobalRecipesDir();
+			const validation = await validateRecipeNameForScope({
+				projectRoot,
+				scope: 'project',
+				name: 'compact',
+			});
+			expect(validation).toEqual({
+				ok: false,
+				status: 409,
+				message: 'Recipe name is reserved',
+			});
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('rejects duplicate recipe names across project and global scopes', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			await writeFile(
+				join(recipesDir, 'shared-name.md'),
+				['---', 'description: Project', '---', '', 'Project task.'].join('\n'),
+			);
+
+			const validation = await validateRecipeNameForScope({
+				projectRoot,
+				scope: 'global',
+				name: 'shared-name',
+			});
+			expect(validation.ok).toBe(false);
+			if (!validation.ok) {
+				expect(validation.status).toBe(409);
+				expect(validation.message).toContain('project recipes');
+			}
+
+			await writeFile(
+				join(globalRecipesDir, 'other-global.md'),
+				['---', 'description: Global', '---', '', 'Global task.'].join('\n'),
+			);
+			const reverseValidation = await validateRecipeNameForScope({
+				projectRoot,
+				scope: 'project',
+				name: 'other-global',
+			});
+			expect(reverseValidation.ok).toBe(false);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('does not invoke conflicted duplicate recipes', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			const body = ['---', 'description: Dup', '---', '', 'Dup task.'].join(
+				'\n',
+			);
+			await writeFile(join(recipesDir, 'dup-name.md'), body);
+			await writeFile(join(globalRecipesDir, 'dup-name.md'), body);
+
+			const command = await prepareRecipeCommand({
+				projectRoot,
+				content: '/dup-name',
+			});
+			expect(command).toBeNull();
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			expect(
+				recipes.filter((recipe) => recipe.name === 'dup-name').length,
+			).toBe(2);
+			expect(
+				recipes
+					.filter((recipe) => recipe.name === 'dup-name')
+					.every((recipe) => recipe.conflict?.reason === 'duplicate'),
+			).toBe(true);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('applies includeInHistory false for global recipes', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			const globalRecipesDir = await setupGlobalRecipesDir();
+			await writeFile(
+				join(globalRecipesDir, 'quiet-global.md'),
+				[
+					'---',
+					'description: Quiet global',
+					'includeInHistory: false',
+					'---',
+					'',
+					'Run quietly.',
+				].join('\n'),
+			);
+
+			const db = await getDb(projectRoot);
+			const now = Date.now();
+			await db.insert(sessions).values({
+				id: 'global-recipe-history-session',
+				agent: 'build',
+				provider: 'openai',
+				model: 'gpt-4.1',
+				projectPath: projectRoot,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+
+			const rows = [
+				{ id: 'user-recipe', role: 'user', text: '/quiet-global' },
+				{ id: 'assistant-recipe', role: 'assistant', text: 'global reply' },
+			];
+			for (let index = 0; index < rows.length; index++) {
+				const row = rows[index];
+				await db.insert(messages).values({
+					id: row.id,
+					sessionId: 'global-recipe-history-session',
+					role: row.role,
+					status: 'complete',
+					agent: 'build',
+					provider: 'openai',
+					model: 'gpt-4.1',
+					createdAt: now + index,
+				});
+				await db.insert(messageParts).values({
+					id: `${row.id}-part`,
+					messageId: row.id,
+					index: 0,
+					type: 'text',
+					content: JSON.stringify({ text: row.text }),
+					agent: 'build',
+					provider: 'openai',
+					model: 'gpt-4.1',
+				});
+			}
+
+			const history = await buildHistoryMessages(
+				db,
+				'global-recipe-history-session',
+				undefined,
+				{ projectRoot },
+			);
+			const serialized = JSON.stringify(history);
+			expect(serialized).not.toContain('/quiet-global');
+			expect(serialized).not.toContain('global reply');
 		} finally {
 			await cleanup();
 		}

@@ -3,22 +3,39 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logger } from '@ottocode/sdk';
 import {
-	discoverProjectRecipes,
-	getProjectRecipesDir,
+	discoverAllRecipes,
+	getRecipesDir,
 	isValidRecipeName,
-	loadProjectRecipe,
+	loadRecipe,
 	parseRecipeContent,
+	type Recipe,
+	type RecipeScope,
+	validateRecipeNameForScope,
 } from '../../runtime/commands/recipes.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+
+type ListRecipesScope = 'all' | RecipeScope;
 
 function projectRootFromQuery(c: Context): string {
 	return c.req.query('project') || process.cwd();
 }
 
+function listScopeFromQuery(c: Context): ListRecipesScope {
+	const scope = c.req.query('scope');
+	if (scope === 'project' || scope === 'global') return scope;
+	return 'all';
+}
+
+function recipeScopeFromQuery(c: Context): RecipeScope {
+	const scope = c.req.query('scope');
+	return scope === 'global' ? 'global' : 'project';
+}
+
 function jsonError(c: Context, message: string, error: unknown) {
 	logger.error(message, error);
 	const errorResponse = serializeError(error);
-	return c.json(errorResponse, (errorResponse.error.status || 500) as 500);
+	const status = (errorResponse.error.status || 500) as 400 | 409 | 500;
+	return c.json(errorResponse, status);
 }
 
 function validateRecipeNameRoute(c: Context): string | null {
@@ -29,33 +46,39 @@ function validateRecipeNameRoute(c: Context): string | null {
 	return name;
 }
 
-function recipeToResponse(
-	recipe: Awaited<ReturnType<typeof loadProjectRecipe>>,
-) {
+function recipeToResponse(recipe: Recipe | null) {
 	if (!recipe) return null;
 	return {
 		name: recipe.name,
+		scope: recipe.scope,
 		agent: recipe.agent,
 		includeInHistory: recipe.includeInHistory,
 		description: recipe.description ?? '',
 		path: recipe.path,
 		content: recipe.content,
+		...(recipe.conflict ? { conflict: recipe.conflict } : {}),
 	};
+}
+
+async function listRecipesForScope(
+	projectRoot: string,
+	scope: ListRecipesScope,
+): Promise<Recipe[]> {
+	const recipes = await discoverAllRecipes(projectRoot);
+	if (scope === 'all') return recipes;
+	return recipes.filter((recipe) => recipe.scope === scope);
 }
 
 export async function listRecipes(c: Context) {
 	try {
 		const projectRoot = projectRootFromQuery(c);
-		const recipes = await discoverProjectRecipes(projectRoot);
+		const scope = listScopeFromQuery(c);
+		const recipes = await listRecipesForScope(projectRoot, scope);
 		return c.json({
-			recipes: recipes.map((recipe) => ({
-				name: recipe.name,
-				agent: recipe.agent,
-				includeInHistory: recipe.includeInHistory,
-				description: recipe.description ?? '',
-				path: recipe.path,
-				content: recipe.content,
-			})),
+			recipes: recipes.flatMap((recipe) => {
+				const response = recipeToResponse(recipe);
+				return response ? [response] : [];
+			}),
 		});
 	} catch (error) {
 		return jsonError(c, 'Failed to list recipes', error);
@@ -67,7 +90,12 @@ export async function getRecipe(c: Context) {
 		const name = validateRecipeNameRoute(c);
 		if (!name) return c.json({ error: 'Invalid recipe name' }, 400);
 
-		const recipe = await loadProjectRecipe(projectRootFromQuery(c), name);
+		const projectRoot = projectRootFromQuery(c);
+		const scope = recipeScopeFromQuery(c);
+		const recipes = await discoverAllRecipes(projectRoot);
+		const recipe = recipes.find(
+			(item) => item.name === name && item.scope === scope,
+		);
 		if (!recipe) return c.json({ error: 'Recipe not found' }, 404);
 		return c.json(recipeToResponse(recipe));
 	} catch (error) {
@@ -92,12 +120,22 @@ export async function upsertRecipe(c: Context) {
 		}
 
 		const projectRoot = projectRootFromQuery(c);
-		const recipesDir = getProjectRecipesDir(projectRoot);
+		const scope = recipeScopeFromQuery(c);
+		const validation = await validateRecipeNameForScope({
+			projectRoot,
+			scope,
+			name,
+		});
+		if (!validation.ok) {
+			return c.json({ error: validation.message }, validation.status);
+		}
+
+		const recipesDir = getRecipesDir(scope, projectRoot);
 		await mkdir(recipesDir, { recursive: true });
 		const recipePath = join(recipesDir, `${name}.md`);
 		await writeFile(recipePath, content, 'utf8');
 
-		const recipe = await loadProjectRecipe(projectRoot, name);
+		const recipe = await loadRecipe({ projectRoot, scope, name });
 		return c.json({ success: true, recipe: recipeToResponse(recipe) });
 	} catch (error) {
 		return jsonError(c, 'Failed to save recipe', error);
@@ -109,10 +147,9 @@ export async function deleteRecipe(c: Context) {
 		const name = validateRecipeNameRoute(c);
 		if (!name) return c.json({ error: 'Invalid recipe name' }, 400);
 
-		const recipePath = join(
-			getProjectRecipesDir(projectRootFromQuery(c)),
-			`${name}.md`,
-		);
+		const projectRoot = projectRootFromQuery(c);
+		const scope = recipeScopeFromQuery(c);
+		const recipePath = join(getRecipesDir(scope, projectRoot), `${name}.md`);
 		await rm(recipePath, { force: true });
 		return c.json({ success: true });
 	} catch (error) {

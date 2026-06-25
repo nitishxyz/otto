@@ -289,6 +289,7 @@ export {
 	getGlobalAgentsDir,
 	getGlobalToolsDir,
 	getGlobalCommandsDir,
+	getGlobalRecipesDir,
 	getGlobalDebugDir,
 	getGlobalDebugLogPath,
 	getGlobalDebugSessionsDir,

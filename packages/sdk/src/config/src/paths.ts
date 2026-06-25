@@ -91,6 +91,10 @@ export function getGlobalCommandsDir(): string {
 	return joinPath(getGlobalConfigDir(), 'commands');
 }
 
+export function getGlobalRecipesDir(): string {
+	return joinPath(getGlobalConfigDir(), 'recipes');
+}
+
 export function getGlobalDebugDir(): string {
 	return joinPath(getGlobalConfigDir(), 'debug');
 }
