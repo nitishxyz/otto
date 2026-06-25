@@ -724,25 +724,23 @@ async function runClickAction(
 	input: Extract<SimulatorInput, { action: 'click' }>,
 ) {
 	const stream = await ensureStream(input.device);
-	if (!stream.wsUrl) {
+	const clickDevice = await resolveDeviceTarget(input.device);
+	const result = await execServeSim(
+		withDevice(['tap', String(input.x), String(input.y)], clickDevice),
+	);
+	if (result.exitCode !== 0) {
 		return createToolError(
-			'No serve-sim WebSocket URL found for click action',
+			result.stderr.trim() || result.stdout.trim() || 'serve-sim tap failed',
 			'execution',
-			{ action: 'click' },
+			{ action: 'click', method: 'tap' },
 		);
 	}
 
-	await sendTouchEvents(
-		stream.wsUrl,
-		[
-			{ subtype: 0, x: input.x, y: input.y, seq: 0 },
-			{ subtype: 2, x: input.x, y: input.y, seq: 1 },
-		],
-		24,
-	);
 	return {
 		ok: true,
-		method: 'websocket_click',
+		method: 'tap',
+		stdout: result.stdout.trim(),
+		stderr: result.stderr.trim(),
 		stream,
 	};
 }
@@ -1255,7 +1253,7 @@ export function buildSimulatorTool(projectRoot: string): {
 		name: 'simulator',
 		tool: tool({
 			description:
-				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use click for taps, drag for reliable swipes/drags over one WebSocket, gesture for raw serve-sim gesture JSON, take_screenshot/config/accessibility_tree/foreground/logs for inspection, launch/terminate/open_url/list_apps for app control, camera_* for camera injection, ca_debug/memory_warning/permissions for simulator testing, and stop when done. Screenshot image data is sent to the model by default; set storeScreenshot true only when you need a persisted file. Prefer this tool over shell for simulator operations after the serve-sim stream is running.',
+				'Control an Apple Simulator through serve-sim and simctl. Coordinates are normalized 0..1. Use click for taps, drag for reliable swipes/drags over one WebSocket, gesture for raw serve-sim gesture JSON, take_screenshot/config/accessibility_tree/foreground/logs for inspection, launch/terminate/open_url/list_apps for app control, camera_* for camera injection, ca_debug/memory_warning/permissions for simulator testing, and stop when done. Screenshot image data is sent to the model by default; if image understanding is unreliable, use accessibility_tree/config/foreground as the source of truth. Set storeScreenshot true only when you need a persisted file. Prefer this tool over shell for simulator operations after the serve-sim stream is running.',
 			inputSchema: simulatorInputSchema,
 			toModelOutput({ output }) {
 				const result = output as {
@@ -1286,7 +1284,7 @@ export function buildSimulatorTool(projectRoot: string): {
 						value: [
 							{
 								type: 'text',
-								text: `Simulator screenshot captured from ${result.path ?? 'current screen'} (${image.mediaType}${dimensions}${compressed}, ${image.transmittedSize ?? image.data.length} bytes sent to the model). Inspect the following image content.`,
+								text: `Simulator screenshot captured from ${result.path ?? 'current screen'} (${image.mediaType}${dimensions}${compressed}, ${image.transmittedSize ?? image.data.length} bytes sent to the model). Inspect the following image content. If the image is not readable in this model, use simulator accessibility_tree/config/foreground instead of guessing from pixels.`,
 							},
 							{
 								type: 'image-data',
@@ -1470,6 +1468,7 @@ export function buildSimulatorTool(projectRoot: string): {
 								: {};
 							return {
 								ok: true,
+								method: 'mjpeg',
 								...storedScreenshotMetadata,
 								message: storedScreenshot
 									? `Simulator screenshot stored in Otto project state tmp at ${storedScreenshot.absPath}`
