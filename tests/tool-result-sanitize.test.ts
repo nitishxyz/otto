@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { tool } from 'ai';
+import { z } from 'zod/v3';
+import { adaptTools } from '../packages/server/src/tools/adapter.ts';
+import type { ToolAdapterContext } from '../packages/server/src/tools/adapter.ts';
 import { stripToolResultArtifactsForModel } from '../packages/server/src/tools/adapter/results.ts';
 
 describe('tool result model sanitization', () => {
@@ -106,5 +110,57 @@ describe('tool result model sanitization', () => {
 		expect(sanitized.content).toBeUndefined();
 		expect(sanitized.compacted).toBe(true);
 		expect(sanitized.compactedReason).toContain('Superseded');
+	});
+
+	it('lets custom model outputs render image artifacts directly', () => {
+		const imageTool = tool({
+			description: 'test image tool',
+			inputSchema: z.object({}),
+			execute: async () => ({ ok: true }),
+			toModelOutput({ output }) {
+				const artifact = (output as { artifact?: { data?: string } }).artifact;
+				return {
+					type: 'content',
+					value: [
+						{
+							type: 'image-data',
+							data: artifact?.data ?? '',
+							mediaType: 'image/png',
+						},
+					],
+				};
+			},
+		});
+		const adapted = adaptTools([{ name: 'custom_image', tool: imageTool }], {
+			sessionId: 'session',
+			messageId: 'message',
+			assistantPartId: 'assistant-part',
+			db: {} as ToolAdapterContext['db'],
+			agent: 'default',
+			provider: 'openai',
+			model: 'model',
+			projectRoot: '/tmp/project',
+			nextIndex: () => 0,
+		});
+
+		const modelOutput = adapted.custom_image?.toModelOutput?.({
+			toolCallId: 'call-1',
+			input: {},
+			output: {
+				ok: true,
+				artifact: { kind: 'simulator_screenshot', data: 'base64-image' },
+			},
+		});
+
+		expect(modelOutput).toEqual({
+			type: 'content',
+			value: [
+				{
+					type: 'image-data',
+					data: 'base64-image',
+					mediaType: 'image/png',
+				},
+			],
+		});
 	});
 });

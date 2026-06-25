@@ -234,7 +234,7 @@ function buildSimulatorPrompt(): string {
 		'On macOS, prefer this flow when a simulator stream is needed:',
 		'1. Start serve-sim in a terminal so the process stays visible/running: `bun x serve-sim@latest --port 3200`.',
 		'2. If Bun is unavailable, use `npx --yes serve-sim@latest --port 3200`.',
-		'3. Open the preview URL printed by serve-sim in the browser preview or an external browser; it is usually `http://localhost:3200`.',
+		'3. To show the user the preview in Otto, load/use the browser tool and open the preview URL, usually `http://localhost:3200`.',
 		'4. After the stream is running, use simulator automation tools for taps, typing, screenshots, accessibility trees, foreground app checks, logs, and cleanup.',
 		'Do not install or register serve-sim skills/plugins unless the user explicitly asks for that.',
 		'</simulator-guidance>',

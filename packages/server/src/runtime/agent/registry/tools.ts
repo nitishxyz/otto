@@ -87,6 +87,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'read_image',
 			'copy_attachment_to_project',
 			'simulator',
+			'browser',
 			'mcp_manager',
 		],
 	},
@@ -100,7 +101,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'update_todos',
 			'websearch',
 		],
-		loadable: ['read_image'],
+		loadable: ['read_image', 'browser'],
 	},
 	general: {
 		firstClass: [
@@ -114,7 +115,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 			'update_todos',
 		],
-		loadable: ['mcp_manager'],
+		loadable: ['browser', 'mcp_manager'],
 	},
 	init: {
 		firstClass: [
@@ -154,7 +155,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'search_history',
 			'present_action',
 		],
-		loadable: ['read_image', 'copy_attachment_to_project'],
+		loadable: ['read_image', 'copy_attachment_to_project', 'browser'],
 	},
 	otto: {
 		firstClass: [

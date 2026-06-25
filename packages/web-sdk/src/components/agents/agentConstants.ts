@@ -208,7 +208,7 @@ export const TOOL_PRESETS: Record<
 				'search',
 				'websearch',
 			],
-			loadable: ['read_image'],
+			loadable: ['read_image', 'browser'],
 		},
 	},
 	planning: {
@@ -224,7 +224,7 @@ export const TOOL_PRESETS: Record<
 				'search',
 				'websearch',
 			],
-			loadable: ['read_image'],
+			loadable: ['read_image', 'browser'],
 		},
 	},
 	research: {
@@ -244,7 +244,7 @@ export const TOOL_PRESETS: Record<
 				'search_history',
 				'present_action',
 			],
-			loadable: ['read_image'],
+			loadable: ['read_image', 'browser'],
 		},
 	},
 };

@@ -91,14 +91,15 @@ export function adaptTools(
 			...base,
 			...(providerOptions ? { providerOptions } : {}),
 			toModelOutput(options: ToModelOutputOptions): ToolResultOutput {
-				const sanitizedOutput = stripToolResultArtifactsForModel(
-					options.output,
-				);
 				const baseToModelOutput = (base as { toModelOutput?: ToModelOutputFn })
 					.toModelOutput;
 				if (typeof baseToModelOutput === 'function') {
-					return baseToModelOutput({ ...options, output: sanitizedOutput });
+					return baseToModelOutput(options);
 				}
+				const sanitizedOutput = stripToolResultArtifactsForModel(
+					options.output,
+					{ toolName: name },
+				);
 				return {
 					type: 'json',
 					value: toJsonValue(sanitizedOutput),

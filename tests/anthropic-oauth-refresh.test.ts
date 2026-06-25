@@ -71,4 +71,42 @@ describe('refreshToken', () => {
 			/refresh token rejected.*otto auth login anthropic/,
 		);
 	});
+
+	it('formats nested Claude token errors without object coercion', async () => {
+		globalThis.fetch = (async () =>
+			new Response(
+				JSON.stringify({
+					type: 'error',
+					error: { type: 'not_found_error', message: 'Not found' },
+				}),
+				{ status: 404, headers: { 'Content-Type': 'application/json' } },
+			)) as typeof fetch;
+
+		try {
+			await refreshToken('dead-refresh');
+			throw new Error('expected refreshToken to reject');
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			expect(message).toContain('Not found');
+			expect(message).toContain('not_found_error');
+			expect(message).toContain('HTTP 404');
+			expect(message).not.toContain('[object Object]');
+			expect(message).toMatch(
+				/refresh token rejected.*otto auth login anthropic/,
+			);
+		}
+	});
+
+	it('uses a one-hour expiry fallback when Claude omits expires_in', async () => {
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({ access_token: 'new-access' }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' },
+			})) as typeof fetch;
+
+		const before = Date.now();
+		const tokens = await refreshToken('old-refresh');
+		expect(tokens.expires).toBeGreaterThanOrEqual(before + 3_600_000);
+		expect(tokens.expires).toBeLessThanOrEqual(Date.now() + 3_600_000);
+	});
 });

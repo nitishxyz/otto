@@ -1,12 +1,21 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
+import type { OAuth } from '../../types/src/index.ts';
+import { getAuth, setAuth } from '../../auth/src/index.ts';
+import { refreshToken } from '../../auth/src/oauth.ts';
+import { warn as loggerWarn } from '../../core/src/utils/logger.ts';
 import { addAnthropicCacheControl } from './anthropic-caching.ts';
 
 const CLAUDE_CLI_VERSION = '1.0.61';
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+const TOKEN_REFRESH_MAX_RETRIES = 2;
+const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;
 
 type FetchLike = (
 	input: Parameters<typeof fetch>[0],
 	init?: Parameters<typeof fetch>[1],
 ) => Promise<Response>;
+
+const refreshPromises = new Map<string, Promise<OAuth>>();
 
 export type AnthropicOAuthConfig = {
 	oauth: {
@@ -14,8 +23,102 @@ export type AnthropicOAuthConfig = {
 		refresh: string;
 		expires: number;
 	};
+	projectRoot?: string;
 	toolNameTransformer?: (name: string) => string;
 };
+
+function sleep(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function refreshKey(projectRoot?: string) {
+	return projectRoot ?? 'global';
+}
+
+function toOAuth(oauth: AnthropicOAuthConfig['oauth']): OAuth {
+	return {
+		type: 'oauth',
+		access: oauth.access,
+		refresh: oauth.refresh,
+		expires: oauth.expires,
+	};
+}
+
+function isAccessValidBeyondBuffer(oauth: OAuth) {
+	return Boolean(
+		oauth.access && oauth.expires > Date.now() + TOKEN_EXPIRY_BUFFER_MS,
+	);
+}
+
+async function refreshAndPersist(
+	oauth: OAuth,
+	projectRoot?: string,
+): Promise<OAuth> {
+	const key = refreshKey(projectRoot);
+	const inFlight = refreshPromises.get(key);
+	if (inFlight) {
+		return inFlight;
+	}
+
+	const promise = (async () => {
+		const diskAuth = await getAuth('anthropic', projectRoot);
+		if (diskAuth?.type === 'oauth' && isAccessValidBeyondBuffer(diskAuth)) {
+			return diskAuth;
+		}
+
+		const refreshFrom =
+			diskAuth?.type === 'oauth' ? diskAuth.refresh : oauth.refresh;
+		let lastError: Error | undefined;
+
+		for (let attempt = 0; attempt <= TOKEN_REFRESH_MAX_RETRIES; attempt++) {
+			try {
+				const tokens = await refreshToken(refreshFrom);
+				const updated: OAuth = {
+					type: 'oauth',
+					access: tokens.access,
+					refresh: tokens.refresh,
+					expires: tokens.expires,
+				};
+				await setAuth('anthropic', updated, projectRoot, 'global');
+				return updated;
+			} catch (err) {
+				lastError = err instanceof Error ? err : new Error(String(err));
+				if (lastError.message.includes('refresh token rejected')) {
+					throw lastError;
+				}
+				if (attempt < TOKEN_REFRESH_MAX_RETRIES) {
+					await sleep(TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1));
+				}
+			}
+		}
+
+		throw lastError ?? new Error('Claude OAuth token refresh failed');
+	})().finally(() => {
+		refreshPromises.delete(key);
+	});
+
+	refreshPromises.set(key, promise);
+	return promise;
+}
+
+async function ensureValidToken(
+	currentOAuth: OAuth,
+	projectRoot?: string,
+): Promise<OAuth> {
+	if (isAccessValidBeyondBuffer(currentOAuth)) {
+		return currentOAuth;
+	}
+
+	try {
+		return await refreshAndPersist(currentOAuth, projectRoot);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		loggerWarn(
+			`[anthropic-oauth] Token refresh failed: ${message.replace(/\s+/g, ' ').trim()}`,
+		);
+		throw error;
+	}
+}
 
 function buildOAuthHeaders(accessToken: string): Record<string, string> {
 	const headers: Record<string, string> = {
@@ -78,75 +181,118 @@ function filterExistingHeaders(
 	return headers;
 }
 
+function prepareAnthropicRequest(
+	input: string | URL | Request,
+	init: RequestInit | undefined,
+	accessToken: string,
+	toolNameTransformer?: (name: string) => string,
+) {
+	const existingHeaders = filterExistingHeaders(init?.headers);
+	const oauthHeaders = buildOAuthHeaders(accessToken);
+	const headers = { ...existingHeaders, ...oauthHeaders };
+
+	let url = typeof input === 'string' ? input : input.toString();
+	if (url.includes('/v1/messages') && !url.includes('beta=true')) {
+		url += url.includes('?') ? '&beta=true' : '?beta=true';
+	}
+
+	let body = init?.body;
+	if (body && typeof body === 'string') {
+		try {
+			const parsed = JSON.parse(body);
+
+			if (toolNameTransformer) {
+				if (parsed.tools && Array.isArray(parsed.tools)) {
+					parsed.tools = parsed.tools.map(
+						(tool: { name: string; [key: string]: unknown }) => ({
+							...tool,
+							name: toolNameTransformer(tool.name),
+						}),
+					);
+				}
+
+				if (parsed.messages && Array.isArray(parsed.messages)) {
+					parsed.messages = parsed.messages.map(
+						(msg: { content: unknown; [key: string]: unknown }) => {
+							if (Array.isArray(msg.content)) {
+								const content = msg.content.map(
+									(block: {
+										type: string;
+										name?: string;
+										[key: string]: unknown;
+									}) => {
+										if (
+											(block.type === 'tool_use' ||
+												block.type === 'tool_result') &&
+											block.name
+										) {
+											return {
+												...block,
+												name: toolNameTransformer(block.name),
+											};
+										}
+										return block;
+									},
+								);
+								return { ...msg, content };
+							}
+							return msg;
+						},
+					);
+				}
+			}
+
+			const withCache = addAnthropicCacheControl(parsed);
+			body = JSON.stringify(withCache);
+		} catch {
+			// If parsing fails, send as-is
+		}
+	}
+
+	return { url, body, headers };
+}
+
 export function createAnthropicOAuthFetch(
 	config: AnthropicOAuthConfig,
 ): FetchLike {
-	const { oauth, toolNameTransformer } = config;
+	const { toolNameTransformer, projectRoot } = config;
+	let currentOAuth = toOAuth(config.oauth);
 
 	return async (input: string | URL | Request, init?: RequestInit) => {
-		const existingHeaders = filterExistingHeaders(init?.headers);
-		const oauthHeaders = buildOAuthHeaders(oauth.access);
-		const headers = { ...existingHeaders, ...oauthHeaders };
+		currentOAuth = await ensureValidToken(currentOAuth, projectRoot);
 
-		let url = typeof input === 'string' ? input : input.toString();
-		if (url.includes('/v1/messages') && !url.includes('beta=true')) {
-			url += url.includes('?') ? '&beta=true' : '?beta=true';
-		}
+		const execute = async (accessToken: string) => {
+			const prepared = prepareAnthropicRequest(
+				input,
+				init,
+				accessToken,
+				toolNameTransformer,
+			);
+			return fetch(prepared.url, {
+				...init,
+				body: prepared.body,
+				headers: prepared.headers,
+			});
+		};
 
-		let body = init?.body;
-		if (body && typeof body === 'string') {
-			try {
-				const parsed = JSON.parse(body);
+		let response = await execute(currentOAuth.access);
 
-				if (toolNameTransformer) {
-					if (parsed.tools && Array.isArray(parsed.tools)) {
-						parsed.tools = parsed.tools.map(
-							(tool: { name: string; [key: string]: unknown }) => ({
-								...tool,
-								name: toolNameTransformer(tool.name),
-							}),
-						);
-					}
-
-					if (parsed.messages && Array.isArray(parsed.messages)) {
-						parsed.messages = parsed.messages.map(
-							(msg: { content: unknown; [key: string]: unknown }) => {
-								if (Array.isArray(msg.content)) {
-									const content = msg.content.map(
-										(block: {
-											type: string;
-											name?: string;
-											[key: string]: unknown;
-										}) => {
-											if (
-												(block.type === 'tool_use' ||
-													block.type === 'tool_result') &&
-												block.name
-											) {
-												return {
-													...block,
-													name: toolNameTransformer(block.name),
-												};
-											}
-											return block;
-										},
-									);
-									return { ...msg, content };
-								}
-								return msg;
-							},
-						);
-					}
-				}
-
-				const withCache = addAnthropicCacheControl(parsed);
-				body = JSON.stringify(withCache);
-			} catch {
-				// If parsing fails, send as-is
+		if (response.status === 401) {
+			const diskAuth = await getAuth('anthropic', projectRoot);
+			if (
+				diskAuth?.type === 'oauth' &&
+				diskAuth.access !== currentOAuth.access &&
+				isAccessValidBeyondBuffer(diskAuth)
+			) {
+				currentOAuth = diskAuth;
+			} else {
+				currentOAuth = await refreshAndPersist(currentOAuth, projectRoot);
 			}
+
+			response = await execute(currentOAuth.access);
 		}
 
-		return fetch(url, { ...init, body, headers });
+		return response;
 	};
 }
 

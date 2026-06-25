@@ -113,6 +113,138 @@ export async function exchange(code: string, verifier: string) {
 	};
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+	if (value && typeof value === 'object' && !Array.isArray(value)) {
+		return value as Record<string, unknown>;
+	}
+	return undefined;
+}
+
+function readString(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function formatHttpStatus(response: Response): string {
+	const statusText = response.statusText?.trim();
+	return statusText
+		? `HTTP ${response.status} ${statusText}`
+		: `HTTP ${response.status}`;
+}
+
+function extractTokenRefreshErrorDescription(
+	json: unknown,
+	response: Response,
+): string {
+	const record = asRecord(json);
+	if (!record) {
+		if (typeof json === 'string' && json.trim()) {
+			const preview = json.trim().replace(/\s+/g, ' ');
+			return preview.length > 200 ? `${preview.slice(0, 200)}…` : preview;
+		}
+		return formatHttpStatus(response);
+	}
+
+	const errorDescription = readString(record.error_description);
+	if (errorDescription) {
+		return errorDescription.includes(`HTTP ${response.status}`)
+			? errorDescription
+			: `${errorDescription} (${formatHttpStatus(response)})`;
+	}
+
+	const errorField = record.error;
+	const nestedError = asRecord(errorField);
+	if (nestedError) {
+		const message = readString(nestedError.message);
+		const type = readString(nestedError.type);
+		if (message && type) {
+			return `${message} (${type}, ${formatHttpStatus(response)})`;
+		}
+		if (message) {
+			return message.includes(`HTTP ${response.status}`)
+				? message
+				: `${message} (${formatHttpStatus(response)})`;
+		}
+		if (type) {
+			return type.includes(`HTTP ${response.status}`)
+				? type
+				: `${type} (${formatHttpStatus(response)})`;
+		}
+	}
+
+	const errorString = readString(errorField);
+	if (errorString) {
+		return errorString.includes(`HTTP ${response.status}`)
+			? errorString
+			: `${errorString} (${formatHttpStatus(response)})`;
+	}
+
+	const topMessage = readString(record.message);
+	if (topMessage) {
+		return topMessage.includes(`HTTP ${response.status}`)
+			? topMessage
+			: `${topMessage} (${formatHttpStatus(response)})`;
+	}
+
+	return formatHttpStatus(response);
+}
+
+function isRefreshTokenRejected(
+	response: Response,
+	description: string,
+	json: unknown,
+): boolean {
+	if (response.status === 401 || response.status === 403) {
+		return true;
+	}
+
+	const record = asRecord(json);
+	const nestedError = asRecord(record?.error);
+	const nestedType = readString(nestedError?.type);
+	const nestedMessage = readString(nestedError?.message);
+	const errorCode =
+		readString(record?.error) ?? nestedType ?? readString(record?.type);
+	const normalizedDescription = description.toLowerCase();
+
+	if (errorCode === 'invalid_grant') {
+		return true;
+	}
+
+	if (errorCode === 'not_found_error') {
+		return true;
+	}
+
+	if (
+		nestedType === 'not_found_error' ||
+		nestedMessage?.toLowerCase() === 'not found'
+	) {
+		return true;
+	}
+
+	if (
+		errorCode === 'invalid_request' &&
+		/refresh[- ]?token/i.test(normalizedDescription)
+	) {
+		return true;
+	}
+
+	return false;
+}
+
+async function readTokenRefreshResponseBody(
+	response: Response,
+): Promise<unknown> {
+	const body = await response.text();
+	if (!body) {
+		return {};
+	}
+
+	try {
+		return JSON.parse(body) as unknown;
+	} catch {
+		return body;
+	}
+}
+
 export async function refreshToken(refreshToken: string) {
 	const response = await fetch('https://console.anthropic.com/v1/oauth/token', {
 		method: 'POST',
@@ -127,18 +259,13 @@ export async function refreshToken(refreshToken: string) {
 			client_id: CLIENT_ID,
 		}).toString(),
 	});
-	const json = (await response.json().catch(() => ({}))) as {
-		refresh_token?: string;
-		access_token?: string;
-		expires_in?: number;
-		error?: string;
-		error_description?: string;
-	};
+	const json = await readTokenRefreshResponseBody(response);
+	const record = asRecord(json);
+	const accessToken = readString(record?.access_token);
 
-	if (!response.ok || typeof json.access_token !== 'string') {
-		const description =
-			json.error_description ?? json.error ?? `HTTP ${response.status}`;
-		if (response.status === 401 || response.status === 403) {
+	if (!response.ok || !accessToken) {
+		const description = extractTokenRefreshErrorDescription(json, response);
+		if (isRefreshTokenRejected(response, description, json)) {
 			throw new Error(
 				`Claude OAuth refresh token rejected (${description}). Run \`otto auth login anthropic\` again.`,
 			);
@@ -146,10 +273,17 @@ export async function refreshToken(refreshToken: string) {
 		throw new Error(`Claude OAuth token refresh failed: ${description}`);
 	}
 
-	const expiresIn = Number(json.expires_in ?? 0);
+	const expiresInRaw = record?.expires_in;
+	const expiresInNumber =
+		typeof expiresInRaw === 'number' ? expiresInRaw : Number(expiresInRaw);
+	const expiresIn =
+		Number.isFinite(expiresInNumber) && expiresInNumber > 0
+			? expiresInNumber
+			: 3600;
+
 	return {
-		refresh: json.refresh_token || refreshToken,
-		access: json.access_token,
+		refresh: readString(record?.refresh_token) || refreshToken,
+		access: accessToken,
 		expires: Date.now() + expiresIn * 1000,
 	};
 }

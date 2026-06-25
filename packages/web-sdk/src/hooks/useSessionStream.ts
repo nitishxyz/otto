@@ -990,7 +990,7 @@ export function useSessionStream(
 			}
 		};
 
-		const handleSimulatorToolActivity = (
+		const handleBrowserToolActivity = (
 			eventType: string,
 			payload: Record<string, unknown> | undefined,
 		) => {
@@ -999,24 +999,22 @@ export function useSessionStream(
 			if (!result || typeof result !== 'object' || Array.isArray(result))
 				return;
 			const resultRecord = result as Record<string, unknown>;
-			const firstStream = Array.isArray(resultRecord.streams)
-				? resultRecord.streams[0]
-				: undefined;
-			const stream = resultRecord.stream ?? firstStream;
-			const previewUrl = resultRecord.previewUrl;
-			if (typeof previewUrl === 'string' && previewUrl.trim()) {
-				useViewerTabsStore.getState().openBrowserTab(previewUrl, {
-					kind: 'simulator',
-					title: 'Simulator',
-				});
-				return;
-			}
-			if (!stream || typeof stream !== 'object' || Array.isArray(stream))
-				return;
-
-			useViewerTabsStore.getState().openBrowserTab('http://localhost:3200', {
-				kind: 'simulator',
-				title: 'Simulator',
+			if (resultRecord.action !== 'open') return;
+			const url = resultRecord.url;
+			if (typeof url !== 'string' || !url.trim()) return;
+			const kind = resultRecord.kind === 'simulator' ? 'simulator' : 'browser';
+			const title =
+				typeof resultRecord.title === 'string' && resultRecord.title.trim()
+					? resultRecord.title
+					: kind === 'simulator'
+						? 'Simulator'
+						: 'Browser';
+			const newTab =
+				kind === 'browser' && resultRecord.newTab === true ? true : undefined;
+			useViewerTabsStore.getState().openBrowserTab(url, {
+				kind,
+				title,
+				newTab,
 			});
 		};
 
@@ -1034,8 +1032,8 @@ export function useSessionStream(
 			if (name === 'apply_patch') {
 				handleApplyPatchToolActivity(eventType, payload, delta);
 			}
-			if (name === 'simulator') {
-				handleSimulatorToolActivity(eventType, payload);
+			if (name === 'browser') {
+				handleBrowserToolActivity(eventType, payload);
 			}
 		};
 

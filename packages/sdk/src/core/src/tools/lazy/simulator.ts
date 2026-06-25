@@ -712,6 +712,33 @@ async function sendTouchEvents(
 	});
 }
 
+async function runClickAction(
+	input: Extract<SimulatorInput, { action: 'click' }>,
+) {
+	const stream = await ensureStream(input.device);
+	if (!stream.wsUrl) {
+		return createToolError(
+			'No serve-sim WebSocket URL found for click action',
+			'execution',
+			{ action: 'click' },
+		);
+	}
+
+	await sendTouchEvents(
+		stream.wsUrl,
+		[
+			{ subtype: 0, x: input.x, y: input.y, seq: 0 },
+			{ subtype: 2, x: input.x, y: input.y, seq: 1 },
+		],
+		24,
+	);
+	return {
+		ok: true,
+		method: 'websocket_click',
+		stream,
+	};
+}
+
 async function runDragAction(
 	input: Extract<SimulatorInput, { action: 'drag' }>,
 ) {
@@ -1288,13 +1315,7 @@ export function buildSimulatorTool(projectRoot: string): {
 								input.device ? ['--kill', input.device] : ['--kill'],
 							);
 						case 'click': {
-							const clickDevice = await resolveDeviceTarget(input.device);
-							return runCliAction(
-								withDevice(
-									['tap', String(input.x), String(input.y)],
-									clickDevice,
-								),
-							);
+							return runClickAction(input);
 						}
 						case 'gesture': {
 							const gestureDevice = await resolveDeviceTarget(input.device);

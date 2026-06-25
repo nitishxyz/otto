@@ -193,6 +193,29 @@ describe('Built-in Tools', () => {
 		});
 	});
 
+	describe('browser tool', () => {
+		it('should normalize local preview URLs', async () => {
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const browserTool = lazyToolsRecord.browser;
+			expect(browserTool).toBeDefined();
+
+			const result = await browserTool?.execute?.({
+				action: 'open',
+				url: 'localhost:3200',
+				title: 'Simulator',
+				kind: 'simulator',
+			});
+
+			expect(result).toMatchObject({
+				ok: true,
+				action: 'open',
+				url: 'http://localhost:3200/',
+				title: 'Simulator',
+				kind: 'simulator',
+			});
+		});
+	});
+
 	describe('write tool', () => {
 		it('should write content to file', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);

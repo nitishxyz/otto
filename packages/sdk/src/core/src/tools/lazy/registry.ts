@@ -1,6 +1,7 @@
 import type { Tool } from 'ai';
 import { buildCopyAttachmentTool } from '../builtin/fs/copy-attachment.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
+import { buildBrowserTool } from './browser.ts';
 import { buildMCPManagerTool } from './mcp-manager.ts';
 import { buildSimulatorTool } from './simulator.ts';
 import { buildLoadToolsTool, type LazyToolBrief } from './load-tools.ts';
@@ -16,6 +17,12 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 			description:
 				'Control Apple Simulator via serve-sim: start, status, click, drag, type, button, rotate, camera, permissions, screenshots, accessibility tree, foreground app, logs, stop.',
 			build: buildSimulatorTool,
+		},
+		{
+			name: 'browser',
+			description:
+				'Open a URL in Otto built-in browser preview for user-visible app, web, or serve-sim previews. Display-only; browser automation controls will be added later.',
+			build: buildBrowserTool,
 		},
 		{
 			name: 'read_image',

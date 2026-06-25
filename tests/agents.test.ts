@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
 	createApp,
+	defaultToolConfigForAgent,
 	getAgentDetail,
 	resolveAgentConfig,
 	validateAgentName,
@@ -14,6 +15,12 @@ import {
 } from '../packages/server/src/runtime/session/queue.ts';
 
 describe('agent config merging', () => {
+	it('includes browser as a loadable tool for collaborative agents', () => {
+		for (const agent of ['build', 'general', 'plan', 'research']) {
+			expect(defaultToolConfigForAgent(agent).loadable).toContain('browser');
+		}
+	});
+
 	it('combines default and appended tools from global and local configs', async () => {
 		const workspaceRoot = await mkdtemp(join(tmpdir(), 'otto-agents-'));
 		const projectRoot = join(workspaceRoot, 'project');
