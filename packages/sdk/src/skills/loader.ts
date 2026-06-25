@@ -1,4 +1,4 @@
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { promises as fs } from 'node:fs';
 import fg from 'fast-glob';
 import { parseSkillFile } from './parser.ts';
@@ -9,6 +9,7 @@ import type {
 	SkillFileInfo,
 } from './types.ts';
 import { getGlobalConfigDir, getHomeDir } from '../config/src/paths.ts';
+import { resolveEffectivePlugins } from '../plugins/index.ts';
 
 const skillCache = new Map<string, SkillDefinition>();
 
@@ -55,6 +56,7 @@ export async function discoverSkills(
 	for (const dir of globalDirs) {
 		await loadSkillsFromDir(dir, 'user', skills);
 	}
+	await loadSkillsFromPlugins(repoRoot ?? cwd, 'global', 'user', skills);
 
 	const projectDirs = [
 		join(cwd, '.otto/skills'),
@@ -81,6 +83,7 @@ export async function discoverSkills(
 			await loadSkillsFromDir(dir, 'repo', skills);
 		}
 	}
+	await loadSkillsFromPlugins(repoRoot ?? cwd, 'project', 'repo', skills);
 
 	skillCache.clear();
 	for (const [name, def] of skills) {
@@ -198,6 +201,47 @@ async function loadSkillsFromDir(
 
 			skills.set(skill.metadata.name, skill);
 		} catch {}
+	}
+}
+
+async function loadSkillsFromPlugins(
+	projectRoot: string,
+	pluginScope: 'global' | 'project',
+	skillScope: SkillScope,
+	skills: Map<string, SkillDefinition>,
+): Promise<void> {
+	let effectivePlugins: Awaited<ReturnType<typeof resolveEffectivePlugins>>;
+	try {
+		effectivePlugins = await resolveEffectivePlugins(projectRoot);
+	} catch {
+		return;
+	}
+
+	for (const plugin of effectivePlugins.plugins) {
+		if (plugin.scope !== pluginScope) continue;
+		if (
+			!plugin.enabled ||
+			plugin.status !== 'installed' ||
+			!plugin.manifest?.skills
+		)
+			continue;
+
+		for (const pluginSkill of plugin.manifest.skills) {
+			if (!pluginSkill.path) continue;
+			try {
+				const skillPath = resolve(plugin.dir, pluginSkill.path);
+				const pluginDir = resolve(plugin.dir);
+				if (!skillPath.startsWith(`${pluginDir}/`) && skillPath !== pluginDir)
+					continue;
+
+				const content = await fs.readFile(skillPath, 'utf-8');
+				const skill = parseSkillFile(content, skillPath, skillScope);
+				if (pluginSkill.description) {
+					skill.metadata.description = pluginSkill.description;
+				}
+				skills.set(skill.metadata.name, skill);
+			} catch {}
+		}
 	}
 }
 

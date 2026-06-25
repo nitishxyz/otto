@@ -11,6 +11,7 @@ export {
 } from './lazy/simple.ts';
 export { registerProvidersCommand } from './lazy/providers.ts';
 export { registerSkillsCommand } from './lazy/skills.ts';
+export { registerPluginsCommand } from './lazy/plugins.ts';
 export { registerDebugCommand } from './lazy/debug.ts';
 export { registerUpgradeCommand } from './lazy/upgrade.ts';
 export { registerOttoRouterCommand } from './lazy/ottorouter.ts';

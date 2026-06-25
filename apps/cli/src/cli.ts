@@ -10,6 +10,7 @@ import {
 	registerAgentsCommand,
 	registerToolsCommand,
 	registerSkillsCommand,
+	registerPluginsCommand,
 	registerScaffoldCommand,
 	registerDoctorCommand,
 	registerDebugCommand,
@@ -38,6 +39,7 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'sessions',
 	'share',
 	'storage',
+	'plugins',
 ]);
 
 const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
@@ -49,6 +51,7 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'debug',
 	'web',
 	'storage',
+	'plugins',
 ]);
 
 export function createCli(version: string): Command {
@@ -87,6 +90,7 @@ export function createCli(version: string): Command {
 	registerAgentsCommand(program);
 	registerToolsCommand(program);
 	registerSkillsCommand(program);
+	registerPluginsCommand(program);
 	registerScaffoldCommand(program);
 	registerDoctorCommand(program);
 	registerDebugCommand(program);

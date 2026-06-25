@@ -22,6 +22,7 @@ import {
 	Mic,
 	Bell,
 	ChefHat,
+	Puzzle,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
@@ -41,6 +42,7 @@ import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { OttoRouterTopupModal } from './OttoRouterTopupModal';
 import { DictationSettings } from './DictationSettings';
 import { RecipesSettings } from './RecipesSettings';
+import { PluginsSettings } from './PluginsSettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -592,7 +594,8 @@ type PreferencesTab =
 	| 'automation'
 	| 'reasoning'
 	| 'dictation'
-	| 'recipes';
+	| 'recipes'
+	| 'plugins';
 
 const PREFERENCE_TABS: Array<{
 	id: PreferencesTab;
@@ -635,6 +638,12 @@ const PREFERENCE_TABS: Array<{
 		label: 'Recipes',
 		description: 'Reusable project slash commands',
 		icon: <ChefHat className="h-4 w-4" />,
+	},
+	{
+		id: 'plugins',
+		label: 'Plugins',
+		description: 'Installed capability packs and registry plugins',
+		icon: <Puzzle className="h-4 w-4" />,
 	},
 ];
 
@@ -937,6 +946,8 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 				);
 			case 'recipes':
 				return <RecipesSettings />;
+			case 'plugins':
+				return <PluginsSettings />;
 		}
 	};
 

@@ -1,0 +1,11 @@
+{
+	"name": "@ottocode/plugin-registry",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Official Otto plugin registry payloads",
+	"files": [
+		"registry.json",
+		"official"
+	]
+}

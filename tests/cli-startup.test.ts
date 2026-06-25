@@ -31,6 +31,7 @@ mock.module('@ottocode/cli/src/commands/index.ts', () => ({
 	registerAgentsCommand: () => {},
 	registerToolsCommand: () => {},
 	registerSkillsCommand: () => {},
+	registerPluginsCommand: () => {},
 	registerScaffoldCommand: () => {},
 	registerDoctorCommand: () => {},
 	registerDebugCommand: () => {},

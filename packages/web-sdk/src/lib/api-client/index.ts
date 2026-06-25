@@ -12,6 +12,7 @@ import { recipesMixin } from './recipes';
 import { usageMixin } from './usage';
 import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
+import { pluginsMixin } from './plugins';
 
 export { configureApiClient } from './utils';
 export type {
@@ -35,6 +36,22 @@ export type {
 	RemoveDictationModelResponse,
 } from './dictation';
 export type { Recipe } from './recipes';
+export type {
+	DiscoveredPlugin,
+	EffectivePlugin,
+	PluginCommand,
+	PluginInstallInput,
+	PluginManifest,
+	PluginMutationInput,
+	PluginMutationResponse,
+	PluginProjectOptions,
+	PluginRegistryEntry,
+	PluginRegistryResponse,
+	PluginsListResponse,
+	PluginScope,
+	PluginUpdateInput,
+	PluginUpdateResponse,
+} from './plugins';
 
 class ApiClient {
 	getSessions = sessionsMixin.getSessions;
@@ -163,6 +180,14 @@ class ApiClient {
 	listRecipes = recipesMixin.listRecipes;
 	saveRecipe = recipesMixin.saveRecipe;
 	deleteRecipe = recipesMixin.deleteRecipe;
+
+	listPlugins = pluginsMixin.listPlugins;
+	listPluginRegistry = pluginsMixin.listPluginRegistry;
+	installPlugin = pluginsMixin.installPlugin;
+	removePlugin = pluginsMixin.removePlugin;
+	enablePlugin = pluginsMixin.enablePlugin;
+	disablePlugin = pluginsMixin.disablePlugin;
+	updatePlugin = pluginsMixin.updatePlugin;
 
 	getUsageStats = usageMixin.getUsageStats;
 	getGlobalUsageStats = usageMixin.getGlobalUsageStats;

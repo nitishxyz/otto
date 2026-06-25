@@ -35,6 +35,14 @@ export function getGlobalSkillsConfigPath(): string {
 	return joinPath(getGlobalConfigDir(), 'skills.json');
 }
 
+export function getGlobalPluginsConfigPath(): string {
+	return joinPath(getGlobalConfigDir(), 'plugins.json');
+}
+
+export function getGlobalPluginsDir(): string {
+	return joinPath(getGlobalConfigDir(), 'plugins');
+}
+
 export function getGlobalAuthPath(): string {
 	return joinPath(getGlobalConfigDir(), 'auth.json');
 }
@@ -159,6 +167,16 @@ export function getProjectConfigDir(projectRoot: string): string {
 /** Resolve the repository-local Otto project config file path. */
 export function getProjectConfigPath(projectRoot: string): string {
 	return joinPath(getProjectConfigDir(projectRoot), 'config.json');
+}
+
+/** Resolve the repository-local Otto project plugins config file path. */
+export function getProjectPluginsConfigPath(projectRoot: string): string {
+	return joinPath(getProjectConfigDir(projectRoot), 'plugins.json');
+}
+
+/** Resolve the repository-local Otto project plugins directory. */
+export function getProjectPluginsDir(projectRoot: string): string {
+	return joinPath(getProjectConfigDir(projectRoot), 'plugins');
 }
 
 /** Resolve the user-level state directory for a project. */

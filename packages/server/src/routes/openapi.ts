@@ -22,6 +22,7 @@ export function registerOpenApiRoute(app: OpenAPIHono) {
 			{ name: 'auth' },
 			{ name: 'mcp' },
 			{ name: 'tunnel' },
+			{ name: 'plugins' },
 		],
 	});
 }

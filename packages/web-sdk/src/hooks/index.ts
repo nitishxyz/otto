@@ -35,3 +35,4 @@ export * from './useContainerWidth';
 export * from './useEdgeHover';
 export * from './useVoiceInput';
 export * from './useDictationModels';
+export * from './usePlugins';

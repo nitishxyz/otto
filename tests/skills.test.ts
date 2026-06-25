@@ -6,12 +6,16 @@ import {
 	parseSkillFile,
 	validateSkillName,
 	discoverSkills,
+	initializeSkills,
+	buildSkillTool,
+	rebuildSkillDescription,
 	clearSkillCache,
 } from '../packages/sdk/src/skills/index.ts';
 
 describe('Skills', () => {
 	let tempDir: string;
 	const originalHome = process.env.HOME;
+	const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 	beforeEach(async () => {
 		tempDir = join(tmpdir(), `otto-skills-test-${Date.now()}`);
@@ -25,6 +29,11 @@ describe('Skills', () => {
 			await fs.rm(tempDir, { recursive: true, force: true });
 		} catch {}
 		process.env.HOME = originalHome;
+		if (originalXdgConfigHome === undefined) {
+			delete process.env.XDG_CONFIG_HOME;
+		} else {
+			process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+		}
 	});
 
 	describe('validateSkillName', () => {
@@ -498,6 +507,122 @@ Content.
 			const invalidSkill = skills.find((s) => s.name === 'invalid-skill');
 			expect(validSkill).toBeDefined();
 			expect(invalidSkill).toBeUndefined();
+		});
+
+		test('discovers enabled plugin skills and loads content through the skill tool', async () => {
+			const projectRoot = join(tempDir, 'project');
+			const pluginDir = join(projectRoot, '.otto/plugins/demo-plugin');
+			const skillDir = join(pluginDir, 'skills/plugin-skill');
+			process.env.XDG_CONFIG_HOME = join(tempDir, 'xdg-config');
+			process.env.HOME = join(tempDir, 'home');
+
+			await fs.mkdir(skillDir, { recursive: true });
+			await fs.writeFile(
+				join(pluginDir, 'otto.plugin.json'),
+				`${JSON.stringify(
+					{
+						name: 'demo-plugin',
+						version: '1.0.0',
+						skills: [
+							{
+								name: 'plugin-skill',
+								path: 'skills/plugin-skill/SKILL.md',
+								description:
+									'Compact plugin capability. Also use when extra routing text appears.',
+							},
+						],
+					},
+					null,
+					2,
+				)}\n`,
+			);
+			await fs.writeFile(
+				join(skillDir, 'SKILL.md'),
+				`---
+name: plugin-skill
+description: Full plugin skill description that should not appear in summaries.
+---
+
+FULL_PLUGIN_SKILL_CONTENT
+`,
+			);
+
+			const skills = await initializeSkills(projectRoot, projectRoot);
+			const pluginSkill = skills.find((s) => s.name === 'plugin-skill');
+			const description = rebuildSkillDescription();
+
+			expect(pluginSkill).toBeDefined();
+			expect(pluginSkill?.scope).toBe('repo');
+			expect(description).toContain(
+				'- plugin-skill: Compact plugin capability.',
+			);
+			expect(description).not.toContain('FULL_PLUGIN_SKILL_CONTENT');
+			expect(description).not.toContain(
+				'Full plugin skill description that should not appear in summaries',
+			);
+
+			const skillTool = buildSkillTool();
+			const result = await skillTool.tool.execute({ name: 'plugin-skill' });
+
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.content).toContain('FULL_PLUGIN_SKILL_CONTENT');
+			}
+		});
+
+		test('excludes disabled plugin skills', async () => {
+			const projectRoot = join(tempDir, 'project');
+			const pluginDir = join(projectRoot, '.otto/plugins/disabled-plugin');
+			const skillDir = join(pluginDir, 'skills/disabled-skill');
+			process.env.XDG_CONFIG_HOME = join(tempDir, 'xdg-config');
+			process.env.HOME = join(tempDir, 'home');
+
+			await fs.mkdir(skillDir, { recursive: true });
+			await fs.writeFile(
+				join(projectRoot, '.otto/plugins.json'),
+				`${JSON.stringify(
+					{
+						version: 1,
+						registries: [],
+						plugins: {
+							'disabled-plugin': { enabled: false },
+						},
+					},
+					null,
+					2,
+				)}\n`,
+			);
+			await fs.writeFile(
+				join(pluginDir, 'otto.plugin.json'),
+				`${JSON.stringify(
+					{
+						name: 'disabled-plugin',
+						version: '1.0.0',
+						skills: [
+							{
+								name: 'disabled-skill',
+								path: 'skills/disabled-skill/SKILL.md',
+							},
+						],
+					},
+					null,
+					2,
+				)}\n`,
+			);
+			await fs.writeFile(
+				join(skillDir, 'SKILL.md'),
+				`---
+name: disabled-skill
+description: Disabled plugin skill
+---
+
+Disabled content.
+`,
+			);
+
+			const skills = await discoverSkills(projectRoot, projectRoot);
+
+			expect(skills.find((s) => s.name === 'disabled-skill')).toBeUndefined();
 		});
 	});
 });

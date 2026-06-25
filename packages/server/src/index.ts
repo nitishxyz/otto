@@ -35,6 +35,7 @@ import { registerUsageRoutes } from './routes/usage.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
 import { registerDictationRoutes } from './routes/dictation.ts';
+import { registerPluginsRoutes } from './routes/plugins/index.ts';
 import type {
 	AgentConfigEntry,
 	AgentToolConfig,
@@ -117,6 +118,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerDoctorRoutes(app);
 	registerSkillsRoutes(app);
 	registerRecipesRoutes(app);
+	registerPluginsRoutes(app);
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);

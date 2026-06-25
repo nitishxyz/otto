@@ -1,0 +1,58 @@
+{
+	"$schema": "https://ottocode.ai/schemas/plugin-registry.json",
+	"version": 1,
+	"plugins": [
+		{
+			"name": "serve-sim",
+			"displayName": "serve-sim",
+			"publisher": "EvanBacon",
+			"official": true,
+			"version": "1.0.0",
+			"description": "Apple Simulator workflows via serve-sim.",
+			"homepage": "https://github.com/EvanBacon/serve-sim",
+			"repository": "https://github.com/EvanBacon/serve-sim",
+			"platforms": ["darwin"],
+			"tags": ["ios", "simulator", "mobile"],
+			"skills": [
+				{
+					"name": "serve-sim",
+					"description": "Control and stream a running iOS, iPad, or Apple Watch Simulator with npx serve-sim.",
+					"source": {
+						"type": "github",
+						"repo": "EvanBacon/serve-sim",
+						"ref": "main",
+						"path": "skills/serve-sim",
+						"include": ["SKILL.md", "references/**"]
+					}
+				}
+			],
+			"commands": {
+				"start": {
+					"label": "Start serve-sim",
+					"command": "npx",
+					"args": ["serve-sim"]
+				}
+			},
+			"browser": {
+				"previewUrl": "http://localhost:3200"
+			},
+			"requirements": [
+				{
+					"kind": "platform",
+					"value": "darwin",
+					"message": "serve-sim requires macOS."
+				},
+				{
+					"kind": "command",
+					"value": "xcrun",
+					"message": "Install Xcode command line tools."
+				},
+				{
+					"kind": "command",
+					"value": "node",
+					"message": "Install Node.js 18 or newer."
+				}
+			]
+		}
+	]
+}
