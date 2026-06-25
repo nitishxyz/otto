@@ -1170,7 +1170,7 @@ async function runAuthLoginAnthropic(
 
 		log.info("After authorizing, you'll be redirected to a URL like:");
 		log.info(
-			'https://console.anthropic.com/oauth/code/callback?code=ABC123#XYZ789&state=...\n',
+			'https://platform.claude.com/oauth/code/callback?code=ABC123#XYZ789&state=...\n',
 		);
 
 		const code = await text({

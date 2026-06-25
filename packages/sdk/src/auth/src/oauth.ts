@@ -3,6 +3,8 @@ import { randomBytes, createHash } from 'node:crypto';
 
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const CLAUDE_CLI_VERSION = '1.0.61';
+const OAUTH_TOKEN_ENDPOINT = 'https://platform.claude.com/v1/oauth/token';
+const OAUTH_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback';
 
 type Mode = 'max' | 'console';
 
@@ -56,15 +58,12 @@ export async function authorize(mode: Mode) {
 	const pkce = generatePKCE();
 
 	const url = new URL(
-		`https://${mode === 'console' ? 'console.anthropic.com' : 'claude.ai'}/oauth/authorize`,
+		`https://${mode === 'console' ? 'platform.claude.com' : 'claude.ai'}/oauth/authorize`,
 	);
 	url.searchParams.set('code', 'true');
 	url.searchParams.set('client_id', CLIENT_ID);
 	url.searchParams.set('response_type', 'code');
-	url.searchParams.set(
-		'redirect_uri',
-		'https://console.anthropic.com/oauth/code/callback',
-	);
+	url.searchParams.set('redirect_uri', OAUTH_REDIRECT_URI);
 	url.searchParams.set(
 		'scope',
 		'org:create_api_key user:profile user:inference',
@@ -81,7 +80,7 @@ export async function authorize(mode: Mode) {
 
 export async function exchange(code: string, verifier: string) {
 	const splits = code.split('#');
-	const result = await fetch('https://console.anthropic.com/v1/oauth/token', {
+	const result = await fetch(OAUTH_TOKEN_ENDPOINT, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -91,7 +90,7 @@ export async function exchange(code: string, verifier: string) {
 			state: splits[1],
 			grant_type: 'authorization_code',
 			client_id: CLIENT_ID,
-			redirect_uri: 'https://console.anthropic.com/oauth/code/callback',
+			redirect_uri: OAUTH_REDIRECT_URI,
 			code_verifier: verifier,
 		}),
 	});
@@ -246,7 +245,7 @@ async function readTokenRefreshResponseBody(
 }
 
 export async function refreshToken(refreshToken: string) {
-	const response = await fetch('https://console.anthropic.com/v1/oauth/token', {
+	const response = await fetch(OAUTH_TOKEN_ENDPOINT, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
@@ -322,7 +321,7 @@ export function authorizeWeb(mode: Mode, redirectUri: string) {
 	const pkce = generatePKCE();
 
 	const url = new URL(
-		`https://${mode === 'console' ? 'console.anthropic.com' : 'claude.ai'}/oauth/authorize`,
+		`https://${mode === 'console' ? 'platform.claude.com' : 'claude.ai'}/oauth/authorize`,
 	);
 	url.searchParams.set('code', 'true');
 	url.searchParams.set('client_id', CLIENT_ID);
@@ -348,7 +347,7 @@ export async function exchangeWeb(
 	redirectUri: string,
 ) {
 	const splits = code.split('#');
-	const result = await fetch('https://console.anthropic.com/v1/oauth/token', {
+	const result = await fetch(OAUTH_TOKEN_ENDPOINT, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',

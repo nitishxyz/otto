@@ -11,6 +11,7 @@ export type AgentDetailSource =
 	| 'local'
 	| 'global'
 	| 'merged'
+	| 'plugin'
 	| 'embedded';
 
 export type AgentDetail = {

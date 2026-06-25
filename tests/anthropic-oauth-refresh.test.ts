@@ -29,7 +29,7 @@ describe('refreshToken', () => {
 		const before = Date.now();
 		const tokens = await refreshToken('old-refresh');
 
-		expect(capturedUrl).toBe('https://console.anthropic.com/v1/oauth/token');
+		expect(capturedUrl).toBe('https://platform.claude.com/v1/oauth/token');
 		expect(capturedHeaders).toMatchObject({
 			'Content-Type': 'application/x-www-form-urlencoded',
 			Accept: 'application/json, text/plain, */*',

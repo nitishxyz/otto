@@ -14,6 +14,7 @@ import {
 	normalizePath,
 } from './paths.ts';
 import type { AgentDetail, AgentDetailSource } from './types.ts';
+import { getPluginProvidedAgentNames } from '../registry/plugins.ts';
 import { normalizeToolGroups, validateAgentName } from './validation.ts';
 
 function isBuiltinAgent(name: string): boolean {
@@ -26,6 +27,7 @@ function getAgentSource(args: {
 	hasGlobalEntry: boolean;
 	hasLocalPrompt: boolean;
 	hasGlobalPrompt: boolean;
+	hasPluginEntry: boolean;
 	promptSource: string;
 }): AgentDetailSource {
 	const hasLocal = args.hasLocalEntry || args.hasLocalPrompt;
@@ -33,6 +35,7 @@ function getAgentSource(args: {
 	if (hasLocal && hasGlobal) return 'merged';
 	if (hasLocal) return 'local';
 	if (hasGlobal) return 'global';
+	if (args.hasPluginEntry) return 'plugin';
 	if (args.promptSource.startsWith('fallback:embedded:')) return 'embedded';
 	if (isBuiltinAgent(args.name)) return 'builtin';
 	return 'embedded';
@@ -58,6 +61,9 @@ export async function getAgentDetail(
 		promptResolution.source,
 	);
 	const hasGlobalPrompt = isGlobalPromptSource(promptResolution.source);
+	const pluginProvidedNames = await getPluginProvidedAgentNames(projectRoot);
+	const hasPluginEntry =
+		pluginProvidedNames.has(name) && !hasLocalEntry && !hasGlobalEntry;
 	const builtin = isBuiltinAgent(name);
 
 	return {
@@ -70,6 +76,7 @@ export async function getAgentDetail(
 			hasGlobalEntry,
 			hasLocalPrompt,
 			hasGlobalPrompt,
+			hasPluginEntry,
 			promptSource: promptResolution.source,
 		}),
 		prompt: promptResolution.prompt,

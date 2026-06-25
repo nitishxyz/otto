@@ -5,12 +5,17 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHistoryMessages } from '../packages/server/src/runtime/message/history-builder.ts';
-import { getGlobalRecipesDir } from '@ottocode/sdk';
+import {
+	getGlobalRecipesDir,
+	getProjectPluginsDir,
+	writePluginsConfig,
+} from '@ottocode/sdk';
 import {
 	discoverAllRecipes,
 	discoverProjectRecipes,
 	parseRecipeInvocation,
 	prepareRecipeCommand,
+	resolveInvokableRecipe,
 	validateRecipeNameForScope,
 } from '../packages/server/src/runtime/commands/recipes.ts';
 
@@ -561,6 +566,218 @@ describe('global and scoped recipes', () => {
 			const serialized = JSON.stringify(history);
 			expect(serialized).not.toContain('/quiet-global');
 			expect(serialized).not.toContain('global reply');
+		} finally {
+			await cleanup();
+		}
+	});
+});
+
+describe('plugin recipes', () => {
+	const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+
+	async function setupProject() {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-recipes-plugin-'));
+		const recipesDir = join(projectRoot, '.otto', 'recipes');
+		await mkdir(recipesDir, { recursive: true });
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		return {
+			projectRoot,
+			recipesDir,
+			cleanup: async () => {
+				await rm(projectRoot, { recursive: true, force: true });
+				if (originalXdgConfigHome === undefined) {
+					delete process.env.XDG_CONFIG_HOME;
+				} else {
+					process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+				}
+			},
+		};
+	}
+
+	async function installProjectPlugin(
+		projectRoot: string,
+		options: {
+			name: string;
+			enabled?: boolean;
+			recipes?: Array<{ name: string; path: string; description?: string }>;
+		},
+	) {
+		const pluginDir = join(getProjectPluginsDir(projectRoot), options.name);
+		await mkdir(join(pluginDir, 'recipes'), { recursive: true });
+		for (const recipe of options.recipes ?? []) {
+			await writeFile(
+				join(pluginDir, recipe.path),
+				[
+					'---',
+					recipe.description ? `description: ${recipe.description}` : undefined,
+					'---',
+					'',
+					`Run ${recipe.name} from plugin.`,
+				]
+					.filter(Boolean)
+					.join('\n'),
+			);
+		}
+		await writeFile(
+			join(pluginDir, 'otto.plugin.json'),
+			`${JSON.stringify(
+				{
+					name: options.name,
+					version: '1.0.0',
+					recipes: options.recipes,
+				},
+				null,
+				2,
+			)}\n`,
+		);
+		await writePluginsConfig(
+			'project',
+			{
+				version: 1,
+				registries: [],
+				plugins: {
+					[options.name]: { enabled: options.enabled ?? true },
+				},
+			},
+			projectRoot,
+		);
+	}
+
+	it('discovers enabled plugin recipes', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'recipe-plugin',
+				recipes: [
+					{
+						name: 'plugin-ship',
+						path: 'recipes/plugin-ship.md',
+						description: 'Ship from plugin',
+					},
+				],
+			});
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			expect(recipes).toEqual([
+				expect.objectContaining({
+					name: 'plugin-ship',
+					scope: 'project',
+					description: 'Ship from plugin',
+				}),
+			]);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('invokes plugin recipes through prepareRecipeCommand', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'recipe-plugin',
+				recipes: [
+					{
+						name: 'plugin-ship',
+						path: 'recipes/plugin-ship.md',
+						description: 'Ship from plugin',
+					},
+				],
+			});
+
+			const command = await prepareRecipeCommand({
+				projectRoot,
+				content: '/plugin-ship ios',
+			});
+			expect(command?.name).toBe('plugin-ship');
+			expect(command?.prompt).toContain('Run the project recipe /plugin-ship.');
+			expect(command?.prompt).toContain('Run plugin-ship from plugin.');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('marks duplicate plugin and file recipes as conflicted and not invokable', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'recipe-plugin',
+				recipes: [
+					{
+						name: 'shared-recipe',
+						path: 'recipes/shared-recipe.md',
+					},
+				],
+			});
+			await writeFile(
+				join(recipesDir, 'shared-recipe.md'),
+				['---', 'description: File recipe', '---', '', 'File body.'].join('\n'),
+			);
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			const matches = recipes.filter(
+				(recipe) => recipe.name === 'shared-recipe',
+			);
+			expect(matches).toHaveLength(2);
+			expect(
+				matches.every((recipe) => recipe.conflict?.reason === 'duplicate'),
+			).toBe(true);
+			expect(
+				await resolveInvokableRecipe(projectRoot, 'shared-recipe'),
+			).toBeNull();
+			expect(
+				await prepareRecipeCommand({
+					projectRoot,
+					content: '/shared-recipe',
+				}),
+			).toBeNull();
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('ignores disabled plugin recipes', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'recipe-plugin',
+				enabled: false,
+				recipes: [
+					{
+						name: 'hidden-recipe',
+						path: 'recipes/hidden-recipe.md',
+					},
+				],
+			});
+
+			const recipes = await discoverAllRecipes(projectRoot);
+			expect(recipes).toHaveLength(0);
+			expect(
+				await resolveInvokableRecipe(projectRoot, 'hidden-recipe'),
+			).toBeNull();
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('rejects creating a file recipe that conflicts with a plugin recipe', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'recipe-plugin',
+				recipes: [
+					{
+						name: 'plugin-only',
+						path: 'recipes/plugin-only.md',
+					},
+				],
+			});
+
+			const validation = await validateRecipeNameForScope({
+				projectRoot,
+				scope: 'project',
+				name: 'plugin-only',
+			});
+			expect(validation.ok).toBe(false);
 		} finally {
 			await cleanup();
 		}

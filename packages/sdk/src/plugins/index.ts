@@ -55,6 +55,31 @@ export const pluginRecipeSchema = z.object({
 	description: z.string().optional(),
 });
 
+const pluginAgentNameSchema = z
+	.string()
+	.min(1)
+	.regex(/^[a-zA-Z0-9_-]+$/);
+
+export const pluginAgentToolGroupsSchema = z.object({
+	firstClass: z.array(z.string()).optional(),
+	loadable: z.array(z.string()).optional(),
+});
+
+export const pluginAgentSchema = z
+	.object({
+		name: pluginAgentNameSchema,
+		path: z.string().min(1).optional(),
+		prompt: z.string().optional(),
+		description: z.string().optional(),
+		provider: z.string().optional(),
+		model: z.string().optional(),
+		tools: pluginAgentToolGroupsSchema.optional(),
+		appendTools: pluginAgentToolGroupsSchema.optional(),
+	})
+	.refine((agent) => agent.path || agent.prompt, {
+		message: 'Plugin agent requires either path or prompt',
+	});
+
 export const pluginCommandSchema: z.ZodType<PluginCommand> = z.lazy(() =>
 	z.object({
 		label: z.string().optional(),
@@ -85,6 +110,7 @@ export const pluginManifestSchema = z.object({
 	tags: z.array(z.string()).optional(),
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
+	agents: z.array(pluginAgentSchema).optional(),
 	mcpServers: z.record(z.unknown()).optional(),
 	commands: z.record(pluginCommandSchema).optional(),
 	browser: z
@@ -137,6 +163,7 @@ export const pluginRegistryEntrySchema = pluginManifestSchema
 		tags: true,
 		skills: true,
 		recipes: true,
+		agents: true,
 		mcpServers: true,
 		commands: true,
 		browser: true,

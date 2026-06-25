@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { getProjectPluginsDir, writePluginsConfig } from '@ottocode/sdk';
 import {
 	createApp,
 	defaultToolConfigForAgent,
@@ -9,6 +10,7 @@ import {
 	resolveAgentConfig,
 	validateAgentName,
 } from '@ottocode/server';
+import { discoverAllAgents } from '../packages/server/src/runtime/agent/registry.ts';
 import {
 	abortSession,
 	getRunnerState,
@@ -507,6 +509,182 @@ describe('agent config merging', () => {
 				delete process.env.ANTHROPIC_API_KEY;
 			else process.env.ANTHROPIC_API_KEY = prevAnthropicApiKey;
 			await rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('plugin agents', () => {
+	const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+
+	async function setupProject() {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-agents-plugin-'));
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		return {
+			projectRoot,
+			cleanup: async () => {
+				await rm(projectRoot, { recursive: true, force: true });
+				if (originalXdgConfigHome === undefined) {
+					delete process.env.XDG_CONFIG_HOME;
+				} else {
+					process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+				}
+			},
+		};
+	}
+
+	async function installProjectPlugin(
+		projectRoot: string,
+		options: {
+			name: string;
+			enabled?: boolean;
+			agents?: Array<Record<string, unknown>>;
+			files?: Record<string, string>;
+		},
+	) {
+		const pluginDir = join(getProjectPluginsDir(projectRoot), options.name);
+		await mkdir(pluginDir, { recursive: true });
+		for (const [relativePath, content] of Object.entries(options.files ?? {})) {
+			const filePath = join(pluginDir, relativePath);
+			await mkdir(join(filePath, '..'), { recursive: true });
+			await writeFile(filePath, content);
+		}
+		await writeFile(
+			join(pluginDir, 'otto.plugin.json'),
+			`${JSON.stringify(
+				{
+					name: options.name,
+					version: '1.0.0',
+					agents: options.agents,
+				},
+				null,
+				2,
+			)}\n`,
+		);
+		await writePluginsConfig(
+			'project',
+			{
+				version: 1,
+				registries: [],
+				plugins: {
+					[options.name]: { enabled: options.enabled ?? true },
+				},
+			},
+			projectRoot,
+		);
+	}
+
+	it('discovers plugin agents and resolves their config', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'agent-plugin',
+				agents: [
+					{
+						name: 'plugin_reviewer',
+						prompt: 'Review plugin code.',
+						description: 'Plugin reviewer',
+						provider: 'openai',
+						model: 'gpt-4.1',
+						tools: { firstClass: ['read', 'search'] },
+					},
+				],
+			});
+
+			const agents = await discoverAllAgents(projectRoot);
+			expect(agents).toContain('plugin_reviewer');
+
+			const cfg = await resolveAgentConfig(projectRoot, 'plugin_reviewer');
+			expect(cfg.prompt).toBe('Review plugin code.');
+			expect(cfg.description).toBe('Plugin reviewer');
+			expect(cfg.provider).toBe('openai');
+			expect(cfg.model).toBe('gpt-4.1');
+			expect(cfg.toolConfig.firstClass).toContain('read');
+			expect(cfg.toolConfig.firstClass).toContain('search');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('resolves plugin agent prompts from manifest paths', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'agent-plugin',
+				agents: [{ name: 'plugin_coder', path: 'agents/plugin-coder.md' }],
+				files: {
+					'agents/plugin-coder.md': 'Write plugin-safe code.',
+				},
+			});
+
+			const cfg = await resolveAgentConfig(projectRoot, 'plugin_coder');
+			expect(cfg.prompt).toBe('Write plugin-safe code.');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('lets local agents.json override plugin agent defaults', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'agent-plugin',
+				agents: [
+					{
+						name: 'plugin_reviewer',
+						prompt: 'Plugin prompt',
+						model: 'gpt-4.1',
+					},
+				],
+			});
+			await mkdir(join(projectRoot, '.otto'), { recursive: true });
+			await writeFile(
+				join(projectRoot, '.otto', 'agents.json'),
+				JSON.stringify({
+					plugin_reviewer: {
+						prompt: 'Local override prompt',
+						model: 'gpt-4.1-mini',
+					},
+				}),
+			);
+
+			const cfg = await resolveAgentConfig(projectRoot, 'plugin_reviewer');
+			expect(cfg.prompt).toBe('Local override prompt');
+			expect(cfg.model).toBe('gpt-4.1-mini');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('ignores disabled plugin agents', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'agent-plugin',
+				enabled: false,
+				agents: [{ name: 'hidden_agent', prompt: 'Hidden prompt' }],
+			});
+
+			const agents = await discoverAllAgents(projectRoot);
+			expect(agents).not.toContain('hidden_agent');
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('classifies plugin-only agents with plugin detail source', async () => {
+		const { projectRoot, cleanup } = await setupProject();
+		try {
+			await installProjectPlugin(projectRoot, {
+				name: 'agent-plugin',
+				agents: [{ name: 'plugin_reviewer', prompt: 'Review plugin code.' }],
+			});
+
+			const detail = await getAgentDetail(projectRoot, 'plugin_reviewer');
+			expect(detail.custom).toBe(true);
+			expect(detail.source).toBe('plugin');
+			expect(detail.prompt).toBe('Review plugin code.');
+		} finally {
+			await cleanup();
 		}
 	});
 });

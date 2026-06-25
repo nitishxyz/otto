@@ -1,6 +1,10 @@
-import { extractFrontmatter, getGlobalRecipesDir } from '@ottocode/sdk';
+import {
+	extractFrontmatter,
+	getGlobalRecipesDir,
+	resolveEffectivePlugins,
+} from '@ottocode/sdk';
 import { readdir, readFile } from 'node:fs/promises';
-import { basename, join, relative } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { discoverAllAgents, resolveAgentConfig } from '../agent/registry.ts';
 import { isReservedRecipeSlashCommandName } from './reserved-slash-commands.ts';
 
@@ -84,18 +88,25 @@ export async function validateRecipeNameForScope(args: {
 		return { ok: false, status: 409, message: 'Recipe name is reserved' };
 	}
 
-	const oppositeScope: RecipeScope =
-		args.scope === 'project' ? 'global' : 'project';
-	const duplicate = await loadRecipe({
-		projectRoot: args.projectRoot,
-		scope: oppositeScope,
-		name,
-	});
-	if (duplicate) {
+	const targetPath = join(
+		getRecipesDir(args.scope, args.projectRoot),
+		`${name}.md`,
+	);
+	const existing = (await discoverAllRecipes(args.projectRoot)).filter(
+		(recipe) => recipe.name === name,
+	);
+	const conflicting = existing.filter((recipe) => recipe.path !== targetPath);
+	if (conflicting.length > 0) {
+		const scopes = Array.from(
+			new Set(conflicting.map((recipe) => recipe.scope)),
+		).sort() as RecipeScope[];
 		return {
 			ok: false,
 			status: 409,
-			message: `Recipe name already exists in ${oppositeScope} recipes`,
+			message:
+				scopes.length === 1
+					? `Recipe name already exists in ${scopes[0]} recipes`
+					: `Recipe name already exists in ${scopes.join(' and ')} recipes`,
 		};
 	}
 
@@ -104,17 +115,86 @@ export async function validateRecipeNameForScope(args: {
 
 function buildRecipeConflict(args: {
 	name: string;
-	scope: RecipeScope;
-	projectNames: Set<string>;
-	globalNames: Set<string>;
+	scopes: RecipeScope[];
 }): RecipeConflict | undefined {
 	if (isReservedRecipeSlashCommandName(args.name)) {
 		return { reason: 'reserved' };
 	}
-	if (args.projectNames.has(args.name) && args.globalNames.has(args.name)) {
-		return { reason: 'duplicate', scopes: ['project', 'global'] };
+	const uniqueScopes = Array.from(new Set(args.scopes)).sort();
+	if (uniqueScopes.length > 1) {
+		return { reason: 'duplicate', scopes: uniqueScopes };
+	}
+	if (args.scopes.length > 1) {
+		return { reason: 'duplicate', scopes: uniqueScopes };
 	}
 	return undefined;
+}
+
+function isPathInsidePluginDir(
+	pluginDir: string,
+	candidatePath: string,
+): boolean {
+	const resolvedPluginDir = resolve(pluginDir);
+	const resolvedPath = resolve(candidatePath);
+	return (
+		resolvedPath === resolvedPluginDir ||
+		resolvedPath.startsWith(`${resolvedPluginDir}/`)
+	);
+}
+
+async function discoverPluginRecipes(projectRoot: string): Promise<Recipe[]> {
+	let effectivePlugins: Awaited<ReturnType<typeof resolveEffectivePlugins>>;
+	try {
+		effectivePlugins = await resolveEffectivePlugins(projectRoot);
+	} catch {
+		return [];
+	}
+
+	const recipes: Recipe[] = [];
+	for (const plugin of effectivePlugins.plugins) {
+		if (
+			!plugin.enabled ||
+			plugin.status !== 'installed' ||
+			!plugin.manifest?.recipes?.length
+		) {
+			continue;
+		}
+
+		const scope: RecipeScope = plugin.scope;
+		for (const pluginRecipe of plugin.manifest.recipes) {
+			const name = pluginRecipe.name.toLowerCase();
+			if (!isValidRecipeName(name)) continue;
+
+			const recipePath = resolve(plugin.dir, pluginRecipe.path);
+			if (!isPathInsidePluginDir(plugin.dir, recipePath)) continue;
+
+			let content: string;
+			try {
+				content = (await readFile(recipePath, 'utf8')).replace(/\r\n?/g, '\n');
+			} catch {
+				continue;
+			}
+
+			const { agent, description, includeInHistory, instructions } =
+				parseRecipeContent(content);
+			if (!instructions.trim()) continue;
+
+			recipes.push({
+				name,
+				scope,
+				agent,
+				description: pluginRecipe.description ?? description,
+				includeInHistory,
+				path: recipePath,
+				content,
+				instructions,
+			});
+		}
+	}
+
+	return recipes.sort(
+		(a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope),
+	);
 }
 
 export async function loadRecipe(args: {
@@ -183,26 +263,34 @@ export async function discoverRecipes(args: {
 export async function discoverAllRecipes(
 	projectRoot: string,
 ): Promise<Recipe[]> {
-	const [projectRecipes, globalRecipes] = await Promise.all([
+	const [projectRecipes, globalRecipes, pluginRecipes] = await Promise.all([
 		discoverRecipes({ projectRoot, scope: 'project' }),
 		discoverRecipes({ projectRoot, scope: 'global' }),
+		discoverPluginRecipes(projectRoot),
 	]);
-	const projectNames = new Set(projectRecipes.map((recipe) => recipe.name));
-	const globalNames = new Set(globalRecipes.map((recipe) => recipe.name));
+
+	const recipes = [...projectRecipes, ...globalRecipes, ...pluginRecipes];
+	const scopesByName = new Map<string, RecipeScope[]>();
+	for (const recipe of recipes) {
+		const scopes = scopesByName.get(recipe.name) ?? [];
+		scopes.push(recipe.scope);
+		scopesByName.set(recipe.name, scopes);
+	}
 
 	const annotate = (recipe: Recipe): Recipe => {
+		const scopes = scopesByName.get(recipe.name) ?? [recipe.scope];
 		const conflict = buildRecipeConflict({
 			name: recipe.name,
-			scope: recipe.scope,
-			projectNames,
-			globalNames,
+			scopes,
 		});
 		return conflict ? { ...recipe, conflict } : recipe;
 	};
 
-	return [...projectRecipes.map(annotate), ...globalRecipes.map(annotate)].sort(
-		(a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope),
-	);
+	return recipes
+		.map(annotate)
+		.sort(
+			(a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope),
+		);
 }
 
 export async function resolveInvokableRecipe(
@@ -213,13 +301,11 @@ export async function resolveInvokableRecipe(
 	if (!isValidRecipeName(normalized)) return null;
 	if (isReservedRecipeSlashCommandName(normalized)) return null;
 
-	const [projectRecipe, globalRecipe] = await Promise.all([
-		loadRecipe({ projectRoot, scope: 'project', name: normalized }),
-		loadRecipe({ projectRoot, scope: 'global', name: normalized }),
-	]);
-
-	if (projectRecipe && globalRecipe) return null;
-	return projectRecipe ?? globalRecipe;
+	const matches = (await discoverAllRecipes(projectRoot)).filter(
+		(recipe) => recipe.name === normalized && !recipe.conflict,
+	);
+	if (matches.length !== 1) return null;
+	return matches[0] ?? null;
 }
 
 export async function loadProjectRecipe(

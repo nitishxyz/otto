@@ -61,6 +61,22 @@ export const pluginRecipeSchema = z.object({
 	description: z.string().optional(),
 });
 
+export const pluginAgentToolGroupsSchema = z.object({
+	firstClass: z.array(z.string()).optional(),
+	loadable: z.array(z.string()).optional(),
+});
+
+export const pluginAgentSchema = z.object({
+	name: z.string(),
+	path: z.string().optional(),
+	prompt: z.string().optional(),
+	description: z.string().optional(),
+	provider: z.string().optional(),
+	model: z.string().optional(),
+	tools: pluginAgentToolGroupsSchema.optional(),
+	appendTools: pluginAgentToolGroupsSchema.optional(),
+});
+
 const pluginCommandBaseSchema = z.object({
 	label: z.string().optional(),
 	command: z.string(),
@@ -92,6 +108,7 @@ export const pluginManifestSchema = z.object({
 	tags: z.array(z.string()).optional(),
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
+	agents: z.array(pluginAgentSchema).optional(),
 	mcpServers: z.record(z.string(), z.unknown()).optional(),
 	commands: z.record(z.string(), pluginCommandSchema).optional(),
 	browser: z.object({ previewUrl: z.string().optional() }).optional(),
@@ -170,6 +187,7 @@ export const pluginRegistryEntrySchema = z.object({
 	tags: z.array(z.string()).optional(),
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
+	agents: z.array(pluginAgentSchema).optional(),
 	mcpServers: z.record(z.string(), z.unknown()).optional(),
 	commands: z.record(z.string(), pluginCommandSchema).optional(),
 	browser: z.object({ previewUrl: z.string().optional() }).optional(),
