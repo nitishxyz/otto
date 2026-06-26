@@ -1,5 +1,7 @@
 export type {
 	MCPServerConfig,
+	MCPServerSource,
+	MCPServerSourceKind,
 	MCPConfig,
 	MCPServerStatus,
 	MCPTransport,
@@ -38,6 +40,11 @@ export {
 	addMCPServerToConfig,
 	removeMCPServerFromConfig,
 } from './lifecycle.ts';
+export {
+	formatMcpServerSourceLabel,
+	isPluginManagedMcpServer,
+	loadEffectiveMCPConfig,
+} from './effective-config.ts';
 
 export {
 	OAuthCredentialStore,

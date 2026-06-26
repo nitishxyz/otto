@@ -1,6 +1,5 @@
 import type { KeyboardEvent } from 'react';
 import type { VimMode } from '../../hooks/useVimMode';
-import { COMMANDS } from '../../lib/commands';
 
 interface ChatInputKeyHandlerOptions {
 	showFileMention: boolean;
@@ -9,6 +8,9 @@ interface ChatInputKeyHandlerOptions {
 	mentionSelectedIndex: number;
 	skillMentionSelectedIndex: number;
 	commandSelectedIndex: number;
+	commandResultCount: number;
+	commandMissingRequired: string[];
+	commandStageKind: 'root' | 'namespace' | 'params';
 	currentFileToSelect: string | undefined;
 	currentSkillToSelect: string | undefined;
 	currentCommandToSelect: string | undefined;
@@ -43,6 +45,9 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 			mentionSelectedIndex,
 			skillMentionSelectedIndex,
 			commandSelectedIndex,
+			commandResultCount,
+			commandMissingRequired,
+			commandStageKind,
 			currentFileToSelect,
 			currentSkillToSelect,
 			currentCommandToSelect,
@@ -81,7 +86,7 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 		}
 
 		if (showCommandSuggestions) {
-			const count = COMMANDS.length;
+			const count = Math.max(commandResultCount, 1);
 			if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'j')) {
 				e.preventDefault();
 				setCommandSelectedIndex((commandSelectedIndex + 1) % count);
@@ -90,7 +95,15 @@ export function createChatInputKeyHandler(options: ChatInputKeyHandlerOptions) {
 				setCommandSelectedIndex((commandSelectedIndex - 1 + count) % count);
 			} else if (e.key === 'Enter') {
 				e.preventDefault();
-				if (currentCommandToSelect) {
+				// In the parameter stage, once required args are satisfied, Enter
+				// sends the message rather than inserting another flag. If required
+				// args are missing, keep focus and surface the popup guidance.
+				if (commandStageKind === 'params') {
+					if (commandMissingRequired.length === 0) {
+						setShowCommandSuggestions(false);
+						handleSend();
+					}
+				} else if (currentCommandToSelect) {
 					handleCommandSelect(currentCommandToSelect);
 				}
 			} else if (e.key === 'Escape') {

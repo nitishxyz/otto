@@ -20,6 +20,10 @@ import { SidebarHeader } from '../ui/SidebarHeader';
 import { StableSpinner } from '../ui/StableSpinner';
 import { Modal } from '../ui/Modal';
 import { useMCPStore, type MCPServerInfo } from '../../stores/mcpStore';
+import {
+	getMcpSourceLabel,
+	isPluginManagedMcpServer,
+} from '../../lib/mcp-source';
 import { useQueryClient } from '@tanstack/react-query';
 import {
 	useMCPServers,
@@ -116,6 +120,8 @@ const MCPServerCard = memo(function MCPServerCard({
 	const hasTools = server.connected && server.tools.length > 0;
 	const isRemote = server.transport === 'http' || server.transport === 'sse';
 	const isAwaitingAuth = (!!authUrl || !!copilotDevice) && !server.connected;
+	const isPluginManaged = isPluginManagedMcpServer(server);
+	const sourceLabel = getMcpSourceLabel(server);
 
 	const handleToggle = useCallback(() => {
 		if (server.authRequired && !server.connected) {
@@ -157,6 +163,15 @@ const MCPServerCard = memo(function MCPServerCard({
 						{server.authRequired && !server.connected && (
 							<Lock className="w-3 h-3 text-yellow-500 flex-shrink-0" />
 						)}
+						{isPluginManaged && (
+							<span
+								className="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] leading-none font-medium text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1 py-0.5"
+								title={`Provided by ${sourceLabel}`}
+							>
+								<Plug className="w-2.5 h-2.5" />
+								{server.sourcePlugin ?? 'plugin'}
+							</span>
+						)}
 					</div>
 					<div className="flex items-center gap-1.5 mt-0.5">
 						<span className="text-xs text-muted-foreground truncate">
@@ -166,7 +181,7 @@ const MCPServerCard = memo(function MCPServerCard({
 						</span>
 						<span
 							className="flex items-center flex-shrink-0 opacity-50"
-							title={server.scope === 'project' ? 'Project-local' : 'Global'}
+							title={`${server.name} — ${sourceLabel}`}
 						>
 							{server.scope === 'project' ? (
 								<FolderDot className="w-3 h-3" />
@@ -416,6 +431,13 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 
 	const connectedCount = servers.filter((s) => s.connected).length;
 
+	const deleteServer = deleteTarget
+		? servers.find((s) => s.name === deleteTarget)
+		: undefined;
+	const deleteIsPluginManaged = deleteServer
+		? isPluginManagedMcpServer(deleteServer)
+		: false;
+
 	return (
 		<div className="w-full min-w-80 border-l border-sidebar-border sidebar-fade-in flex flex-col h-full">
 			<SidebarHeader
@@ -528,14 +550,39 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 			<Modal
 				isOpen={!!deleteTarget}
 				onClose={() => setDeleteTarget(null)}
-				title="Remove MCP Server"
+				title={
+					deleteIsPluginManaged
+						? 'Disable Plugin MCP Server'
+						: 'Remove MCP Server'
+				}
 				maxWidth="sm"
 				showCloseButton={false}
 			>
 				<p className="text-sm text-muted-foreground mb-4">
-					Are you sure you want to remove{' '}
-					<span className="font-medium text-foreground">{deleteTarget}</span>?
-					This will stop the server and remove its configuration.
+					{deleteIsPluginManaged ? (
+						<>
+							<span className="font-medium text-foreground">
+								{deleteTarget}
+							</span>{' '}
+							is provided by{' '}
+							<span className="font-medium text-foreground">
+								{deleteServer?.sourcePlugin
+									? `plugin: ${deleteServer.sourcePlugin}`
+									: 'a plugin'}
+							</span>
+							. This stops it and saves a project override that disables it,
+							without changing the plugin. Re-enable it by removing the override
+							or disabling the plugin.
+						</>
+					) : (
+						<>
+							Are you sure you want to remove{' '}
+							<span className="font-medium text-foreground">
+								{deleteTarget}
+							</span>
+							? This will stop the server and remove its configuration.
+						</>
+					)}
 				</p>
 				<div className="flex justify-end gap-2">
 					<Button
@@ -556,7 +603,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 							setDeleteTarget(null);
 						}}
 					>
-						Remove
+						{deleteIsPluginManaged ? 'Disable' : 'Remove'}
 					</Button>
 				</div>
 			</Modal>

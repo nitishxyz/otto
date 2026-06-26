@@ -21,6 +21,7 @@ import ANTHROPIC_SPOOF_PROMPT from '@ottocode/sdk/prompts/providers/anthropicSpo
 
 import { getTerminalManager } from '@ottocode/sdk';
 import { buildCapabilitySummary } from './capabilities.ts';
+import { buildPluginCommandsPrompt } from './plugin-commands.ts';
 import { buildExplicitSkillMentionContext } from './skill-mentions.ts';
 
 export type ComposedSystemPrompt = {
@@ -149,6 +150,13 @@ export async function composeSystemPrompt(options: {
 		parts.push(capabilitySummary.prompt);
 		components.push(...capabilitySummary.components);
 	}
+
+	const pluginCommands = await buildPluginCommandsPrompt(options.projectRoot);
+	if (pluginCommands.prompt) {
+		parts.push(pluginCommands.prompt);
+		components.push(...pluginCommands.components);
+	}
+
 	const explicitSkillContext = await buildExplicitSkillMentionContext({
 		content: options.userContent,
 		skills,

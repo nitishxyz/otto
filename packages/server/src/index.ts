@@ -97,7 +97,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerSessionsRoutes(app);
 	registerSessionApprovalRoute(app);
 	registerSessionSecureInputRoute(app);
-	registerSessionMessagesRoutes(app);
+	registerSessionMessagesRoutes(app, globalTerminalManager);
 	registerSessionStreamRoute(app);
 	registerClientEventsRoute(app);
 	registerAskRoutes(app);
@@ -118,7 +118,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerDoctorRoutes(app);
 	registerSkillsRoutes(app);
 	registerRecipesRoutes(app);
-	registerPluginsRoutes(app);
+	registerPluginsRoutes(app, globalTerminalManager);
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);

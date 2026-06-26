@@ -2,32 +2,57 @@ import { useEffect, useMemo } from 'react';
 import { ChefHat } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useConfig } from '../../hooks/useConfig';
+import { usePluginCommands } from '../../hooks/usePluginCommands';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useRecipes } from '../../hooks/useRecipes';
 import { useShareStatus } from '../../hooks/useShareStatus';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import {
+	type Command,
 	COMMAND_KIND_STYLES,
 	filterCommands,
+	findPluginCommandEntry,
 	getCommandDescription,
+	getMissingRequiredParams,
+	getPluginCommandStage,
+	getPluginNamespaces,
+	pluginCommandRows,
+	pluginNamespaceCommands,
+	pluginParameterRows,
 } from '../../lib/commands';
 
 const POPUP_TRANSITION = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
 
 interface CommandSuggestionsPopupProps {
 	query: string;
+	inputValue: string;
 	selectedIndex: number;
 	onSelect: (commandId: string) => void;
 	onEnterSelect: (commandId: string | undefined) => void;
+	onResultsChange?: (count: number) => void;
+	onMissingRequiredChange?: (params: string[]) => void;
+	onStageChange?: (kind: 'root' | 'namespace' | 'params') => void;
 	onClose: () => void;
 	sessionId?: string;
 }
 
+function matchesQuery(command: Command, lowerQuery: string): boolean {
+	if (!lowerQuery) return true;
+	if (command.label.toLowerCase().includes(lowerQuery)) return true;
+	const desc =
+		typeof command.description === 'string' ? command.description : '';
+	return desc.toLowerCase().includes(lowerQuery);
+}
+
 export function CommandSuggestionsPopup({
 	query,
+	inputValue,
 	selectedIndex,
 	onSelect,
 	onEnterSelect,
+	onResultsChange,
+	onMissingRequiredChange,
+	onStageChange,
 	onClose,
 	sessionId,
 }: CommandSuggestionsPopupProps) {
@@ -35,6 +60,7 @@ export function CommandSuggestionsPopup({
 	const { data: config } = useConfig();
 	const { data: shareStatus } = useShareStatus(sessionId);
 	const { data: recipesData } = useRecipes();
+	const { data: pluginCommandsData } = usePluginCommands();
 	const followToolActivity = useViewerTabsStore(
 		(state) => state.followToolActivity,
 	);
@@ -52,6 +78,25 @@ export function CommandSuggestionsPopup({
 			followToolActivity,
 			shareStatus?.shared,
 		],
+	);
+
+	const pluginCommands = useMemo(
+		() => pluginCommandsData?.commands ?? [],
+		[pluginCommandsData?.commands],
+	);
+
+	const namespaces = useMemo(
+		() => getPluginNamespaces(pluginCommands),
+		[pluginCommands],
+	);
+
+	const stage = useMemo(
+		() =>
+			getPluginCommandStage(
+				inputValue,
+				namespaces.map((ns) => ns.name),
+			),
+		[inputValue, namespaces],
 	);
 
 	const recipeCommands = useMemo(() => {
@@ -74,10 +119,44 @@ export function CommandSuggestionsPopup({
 			}));
 	}, [recipesData?.recipes]);
 
-	const results = useMemo(
-		() => filterCommands(query, state, recipeCommands),
-		[query, state, recipeCommands],
+	const namespaceCommands = useMemo(
+		() => pluginNamespaceCommands(namespaces),
+		[namespaces],
 	);
+
+	const results = useMemo<Command[]>(() => {
+		if (stage?.kind === 'namespace') {
+			const rows = pluginCommandRows(stage.namespace, pluginCommands);
+			const lower = stage.query.toLowerCase();
+			return rows.filter((cmd) => matchesQuery(cmd, lower));
+		}
+		if (stage?.kind === 'params') {
+			const entry = findPluginCommandEntry(
+				pluginCommands,
+				stage.namespace,
+				stage.command,
+			);
+			if (!entry) return [];
+			const rows = pluginParameterRows(entry);
+			const lower = stage.query.toLowerCase();
+			return rows.filter((cmd) => matchesQuery(cmd, lower));
+		}
+		return filterCommands(query, state, [
+			...recipeCommands,
+			...namespaceCommands,
+		]);
+	}, [stage, pluginCommands, query, state, recipeCommands, namespaceCommands]);
+
+	const missingRequired = useMemo(() => {
+		if (stage?.kind !== 'params') return [];
+		const entry = findPluginCommandEntry(
+			pluginCommands,
+			stage.namespace,
+			stage.command,
+		);
+		if (!entry) return [];
+		return getMissingRequiredParams(entry, inputValue);
+	}, [stage, pluginCommands, inputValue]);
 
 	useEffect(() => {
 		const element = document.getElementById(`command-item-${selectedIndex}`);
@@ -87,6 +166,18 @@ export function CommandSuggestionsPopup({
 	useEffect(() => {
 		onEnterSelect(results[selectedIndex]?.id);
 	}, [results, selectedIndex, onEnterSelect]);
+
+	useEffect(() => {
+		onResultsChange?.(results.length);
+	}, [results.length, onResultsChange]);
+
+	useEffect(() => {
+		onMissingRequiredChange?.(missingRequired);
+	}, [missingRequired, onMissingRequiredChange]);
+
+	useEffect(() => {
+		onStageChange?.(stage?.kind ?? 'root');
+	}, [stage?.kind, onStageChange]);
 
 	useEffect(() => {
 		const handleClickOutside = (e: MouseEvent) => {
@@ -99,6 +190,11 @@ export function CommandSuggestionsPopup({
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [onClose]);
 
+	const guidance =
+		stage?.kind === 'params' && missingRequired.length > 0
+			? `Missing required: ${missingRequired.map((p) => `--${p}`).join(', ')}`
+			: undefined;
+
 	if (results.length === 0) {
 		return (
 			<motion.div
@@ -109,7 +205,9 @@ export function CommandSuggestionsPopup({
 				animate={{ opacity: 1, y: 0, scale: 1 }}
 				transition={POPUP_TRANSITION}
 			>
-				<span className="text-muted-foreground text-sm">No commands found</span>
+				<span className="text-muted-foreground text-sm">
+					{guidance ?? 'No commands found'}
+				</span>
 			</motion.div>
 		);
 	}
@@ -153,6 +251,11 @@ export function CommandSuggestionsPopup({
 					</button>
 				);
 			})}
+			{guidance && (
+				<div className="px-3 py-2 border-t border-border text-xs text-amber-400">
+					{guidance}
+				</div>
+			)}
 		</motion.div>
 	);
 }

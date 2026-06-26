@@ -17,6 +17,7 @@ export const RESERVED_RECIPE_SLASH_COMMAND_NAMES = [
 	'delete',
 	'share',
 	'sync',
+	'plugin',
 ] as const;
 
 const RESERVED_RECIPE_SLASH_COMMAND_NAME_SET = new Set<string>(

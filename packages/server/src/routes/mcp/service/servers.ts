@@ -1,8 +1,10 @@
 import {
 	addMCPServerToConfig,
+	formatMcpServerSourceLabel,
 	getGlobalConfigDir,
 	getMCPManager,
 	isGitHubCopilotUrl,
+	isPluginManagedMcpServer,
 	loadMCPConfig,
 	removeMCPServerFromConfig,
 	type MCPServerConfig,
@@ -29,6 +31,11 @@ export async function listMCPServers(projectRoot = process.cwd()) {
 			authRequired: status?.authRequired ?? false,
 			authenticated: status?.authenticated ?? false,
 			scope: server.scope ?? 'global',
+			sourceKind: server.source?.kind ?? 'user',
+			sourcePlugin: server.source?.plugin,
+			sourceLabel: formatMcpServerSourceLabel(server),
+			managedByPlugin: isPluginManagedMcpServer(server),
+			overridesPlugin: server.source?.overridesPlugin,
 			...(isGitHubCopilotUrl(server.url) ? { authType: 'copilot-device' } : {}),
 		};
 	});
@@ -142,11 +149,28 @@ export async function removeMCPServer(
 			await manager.stopServer(name);
 		}
 
-		const removed = await removeMCPServerFromConfig(
+		let removed = await removeMCPServerFromConfig(
 			projectRoot,
 			name,
 			getGlobalConfigDir(),
 		);
+		if (!removed) {
+			const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
+			const server = config.servers.find((entry) => entry.name === name);
+			if (server && isPluginManagedMcpServer(server)) {
+				const { source: _source, ...serverWithoutSource } = server;
+				await addMCPServerToConfig(
+					projectRoot,
+					{
+						...serverWithoutSource,
+						scope: 'project',
+						disabled: true,
+					},
+					getGlobalConfigDir(),
+				);
+				removed = true;
+			}
+		}
 		if (!removed) {
 			return {
 				ok: false as const,

@@ -1,6 +1,7 @@
 import {
-	buildLoadFirstPartyToolsTool,
+	buildLoadToolsTool,
 	discoverProjectTools,
+	getLazyToolDefinitions,
 	loadConfig,
 	logger,
 } from '@ottocode/sdk';
@@ -14,6 +15,7 @@ import { buildDatabaseTools } from '../../../tools/database/index.ts';
 import { buildSubagentTools } from '../../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../../tools/goals/index.ts';
 import { buildEnqueueSessionMessageTool } from '../../../tools/otto/index.ts';
+import { buildRunPluginCommandTool } from '../../../tools/plugins/run-plugin-command.ts';
 import { time } from '../../debug/index.ts';
 import { buildHistoryMessages } from '../../message/history-builder.ts';
 import { setupToolContext } from '../../tools/setup.ts';
@@ -225,6 +227,10 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	}
 
 	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);
+	if (configuredLoadableNames.has('run_plugin_command')) {
+		const runPluginTool = buildRunPluginCommandTool(cfg.projectRoot);
+		discovered.tools.push(runPluginTool);
+	}
 	for (const toolItem of allTools) {
 		if (!configuredLoadableNames.has(toolItem.name)) continue;
 		if (toolItem.name === 'load_tools' || toolItem.name === 'load_mcp_tools')
@@ -239,7 +245,17 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		lazyToolsRecord = Object.fromEntries(
 			allowedLazyToolNames.map((name) => [name, lazyToolsRecord[name]]),
 		) as Record<string, Tool>;
-		const loadTools = buildLoadFirstPartyToolsTool(allowedLazyToolNames);
+		const lazyBriefs = getLazyToolDefinitions()
+			.filter(({ name }) => allowedLazyToolNames.includes(name))
+			.map(({ name, description }) => ({ name, description }));
+		if (allowedLazyToolNames.includes('run_plugin_command')) {
+			lazyBriefs.push({
+				name: 'run_plugin_command',
+				description:
+					'Run an enabled installed plugin command in a visible terminal using the shared plugin command executor.',
+			});
+		}
+		const loadTools = buildLoadToolsTool(lazyBriefs);
 		allTools = allTools.map((item) =>
 			item.name === loadTools.name ? loadTools : item,
 		);

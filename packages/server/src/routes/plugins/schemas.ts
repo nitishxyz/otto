@@ -77,16 +77,27 @@ export const pluginAgentSchema = z.object({
 	appendTools: pluginAgentToolGroupsSchema.optional(),
 });
 
-const pluginCommandBaseSchema = z.object({
+export const pluginCommandParameterSchema = z.object({
+	type: z.enum(['string', 'number', 'boolean', 'enum']),
+	description: z.string().optional(),
+	required: z.boolean().optional(),
+	default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+	values: z.array(z.string()).optional(),
+});
+
+const pluginCommandDefinitionSchema = z.object({
 	label: z.string().optional(),
+	description: z.string().optional(),
 	command: z.string(),
 	args: z.array(z.string()).optional(),
 	env: z.record(z.string(), z.string()).optional(),
 	cwd: z.string().optional(),
+	parameters: z.record(z.string(), pluginCommandParameterSchema).optional(),
+	allowExtraArgs: z.boolean().optional(),
 });
 
-export const pluginCommandSchema = pluginCommandBaseSchema.extend({
-	fallback: pluginCommandBaseSchema.optional(),
+export const pluginCommandSchema = pluginCommandDefinitionSchema.extend({
+	fallback: pluginCommandDefinitionSchema.optional(),
 });
 
 export const pluginRequirementSchema = z.object({
@@ -239,6 +250,43 @@ export const pluginUpdateResponseSchema = z.object({
 	success: z.boolean(),
 	plugin: discoveredPluginSchema.optional(),
 	plugins: z.array(discoveredPluginSchema).optional(),
+});
+
+export const pluginCommandListEntrySchema = z.object({
+	plugin: z.string(),
+	command: z.string(),
+	label: z.string().optional(),
+	description: z.string().optional(),
+	parameters: z.record(z.string(), pluginCommandParameterSchema).optional(),
+	allowExtraArgs: z.boolean().optional(),
+	previewUrl: z.string().optional(),
+	scope: pluginScopeSchema,
+});
+
+export const pluginCommandsListResponseSchema = z.object({
+	commands: z.array(pluginCommandListEntrySchema),
+});
+
+export const pluginCommandParamsSchema = z.object({
+	plugin: z.string().openapi({ param: { name: 'plugin', in: 'path' } }),
+	command: z.string().openapi({ param: { name: 'command', in: 'path' } }),
+});
+
+export const pluginCommandRunBodySchema = z.object({
+	project: z.string().optional(),
+	argsText: z.string().optional(),
+	args: z
+		.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+		.optional(),
+	extraArgs: z.array(z.string()).optional(),
+});
+
+export const pluginCommandRunResponseSchema = z.object({
+	command: z.string(),
+	terminalId: z.string(),
+	title: z.string(),
+	previewUrl: z.string().optional(),
+	execution: z.literal('started'),
 });
 
 export const apiErrorResponseSchema = z.object({

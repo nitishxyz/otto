@@ -270,7 +270,7 @@ export const ChatInputContainer = memo(
 									}))
 								: undefined;
 
-						await sendMessage.mutateAsync({
+						const result = await sendMessage.mutateAsync({
 							content: finalContent,
 							files: fileData,
 							agent: agent || undefined,
@@ -283,10 +283,19 @@ export const ChatInputContainer = memo(
 							reasoningLevel: config?.defaults?.reasoningLevel ?? 'high',
 						});
 
+						if (result.pluginCommand) {
+							toast.success(
+								`Started ${result.pluginCommand.title} in terminal`,
+							);
+						}
+
 						clearFiles();
 						clearFileSelections(sessionId);
 					} catch (error) {
 						console.error('Failed to send message:', error);
+						toast.error(
+							error instanceof Error ? error.message : 'Failed to send message',
+						);
 					}
 				},
 				[

@@ -209,6 +209,116 @@ describe('plugins', () => {
 		}
 	});
 
+	it('installs github-sourced registry plugins from sibling local paths when registry is local', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-local-registry-github-',
+		);
+
+		try {
+			const registryDir = join(projectRoot, 'plugin-registry');
+			const payloadDir = join(registryDir, 'official', 'local-official');
+			await writePluginPayload(
+				join(registryDir, 'official'),
+				'local-official',
+				'1.4.0',
+			);
+			const registryPath = join(registryDir, 'registry.json');
+			await writeFile(
+				registryPath,
+				`${JSON.stringify(
+					{
+						$schema: 'https://ottocode.ai/schemas/plugin-registry.json',
+						version: 1,
+						plugins: [
+							{
+								name: 'local-official',
+								version: '1.4.0',
+								description: 'local-official plugin',
+								source: {
+									type: 'github',
+									repo: 'nitishxyz/otto',
+									ref: 'main',
+									path: 'packages/plugin-registry/official/local-official',
+								},
+							},
+						],
+					},
+					null,
+					2,
+				)}\n`,
+			);
+
+			const installed = await installPlugin('local-official', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+				fetch: async () => {
+					throw new Error(
+						'GitHub fetch should not run for local registry payload',
+					);
+				},
+			});
+
+			expect(installed.name).toBe('local-official');
+			expect(installed.installed).toBe(true);
+			expect(installed.manifest?.version).toBe('1.4.0');
+			expect(
+				await Bun.file(join(payloadDir, 'otto.plugin.json')).exists(),
+			).toBe(true);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('resolves registry-local source paths relative to the registry file', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-local-registry-relative-',
+		);
+
+		try {
+			const registryDir = join(projectRoot, 'plugin-registry');
+			await writePluginPayload(
+				join(registryDir, 'official'),
+				'relative-official',
+				'0.9.0',
+			);
+			const registryPath = join(registryDir, 'registry.json');
+			await writeFile(
+				registryPath,
+				`${JSON.stringify(
+					{
+						$schema: 'https://ottocode.ai/schemas/plugin-registry.json',
+						version: 1,
+						plugins: [
+							{
+								name: 'relative-official',
+								version: '0.9.0',
+								description: 'relative-official plugin',
+								source: {
+									type: 'local',
+									path: 'official/relative-official',
+								},
+							},
+						],
+					},
+					null,
+					2,
+				)}\n`,
+			);
+
+			const installed = await installPlugin('relative-official', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+
+			expect(installed.name).toBe('relative-official');
+			expect(installed.manifest?.version).toBe('0.9.0');
+		} finally {
+			await cleanup();
+		}
+	});
+
 	it('installs, disables, enables, updates, and removes registry plugins', async () => {
 		const { projectRoot, cleanup } = await createPluginTestRoot(
 			'otto-plugins-install-',

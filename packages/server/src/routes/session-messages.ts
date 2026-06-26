@@ -16,7 +16,10 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
+import { tryExecutePluginSlashMessage } from '../runtime/commands/plugin-slash.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
+import type { TerminalManager } from '@ottocode/sdk';
+import { pluginCommandRunResponseSchema } from './plugins/schemas.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
@@ -151,15 +154,23 @@ const createMessageBodySchema = z.object({
 	oneShot: z.boolean().optional(),
 });
 
-const createMessageResponseSchema = z.object({
-	messageId: z.string(),
-});
+const createMessageResponseSchema = z
+	.object({
+		messageId: z.string().optional(),
+		pluginCommand: pluginCommandRunResponseSchema.optional(),
+	})
+	.refine((value) => Boolean(value.messageId || value.pluginCommand), {
+		message: 'Response must include messageId or pluginCommand',
+	});
 
 const messageErrorSchema = z.object({
 	error: z.string(),
 });
 
-export function registerSessionMessagesRoutes(app: Hono) {
+export function registerSessionMessagesRoutes(
+	app: Hono,
+	terminalManager?: TerminalManager,
+) {
 	zodOpenApiRoute(
 		app,
 		{
@@ -261,6 +272,12 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				},
 			},
 			responses: {
+				'200': {
+					description: 'Plugin command started in a visible terminal',
+					content: {
+						'application/json': { schema: createMessageResponseSchema },
+					},
+				},
 				'202': {
 					description: 'Accepted',
 					content: {
@@ -361,6 +378,15 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				}
 				await ensureProviderEnv(cfg, provider);
 				const providerDefinition = getProviderDefinition(cfg, provider);
+
+				const pluginCommand = await tryExecutePluginSlashMessage({
+					projectRoot: cfg.projectRoot,
+					content,
+					terminalManager,
+				});
+				if (pluginCommand) {
+					return c.json({ pluginCommand }, 200);
+				}
 
 				const { assistantMessageId } = await dispatchAssistantMessage({
 					cfg,

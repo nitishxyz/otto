@@ -55,6 +55,7 @@ export { buildTerminalTool } from './tools/builtin/terminal';
 export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
+	buildLoadToolsTool,
 	buildMCPManagerTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
@@ -138,6 +139,9 @@ export {
 	isStoredCopilotMCPAuthenticated,
 	shutdownMCP,
 	loadMCPConfig,
+	loadEffectiveMCPConfig,
+	formatMcpServerSourceLabel,
+	isPluginManagedMcpServer,
 	addMCPServerToConfig,
 	removeMCPServerFromConfig,
 	OAuthCredentialStore,
@@ -146,6 +150,8 @@ export {
 } from './mcp/index.ts';
 export type {
 	MCPServerConfig,
+	MCPServerSource,
+	MCPServerSourceKind,
 	MCPConfig,
 	MCPServerStatus,
 	MCPToolInfo,

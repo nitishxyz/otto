@@ -38,6 +38,11 @@ export function useSendMessage(sessionId: string) {
 			return apiClient.sendMessage(sessionId, data);
 		},
 		onSuccess: (result) => {
+			if (result.pluginCommand) {
+				queryClient.invalidateQueries({ queryKey: ['terminals'] });
+				return;
+			}
+			if (!result.messageId) return;
 			optimisticallyQueueMessage(queryClient, sessionId, result.messageId);
 			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
 			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });

@@ -80,13 +80,24 @@ export const pluginAgentSchema = z
 		message: 'Plugin agent requires either path or prompt',
 	});
 
+export const pluginCommandParameterSchema = z.object({
+	type: z.enum(['string', 'number', 'boolean', 'enum']),
+	description: z.string().optional(),
+	required: z.boolean().optional(),
+	default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+	values: z.array(z.string()).optional(),
+});
+
 export const pluginCommandSchema: z.ZodType<PluginCommand> = z.lazy(() =>
 	z.object({
 		label: z.string().optional(),
+		description: z.string().optional(),
 		command: z.string().min(1),
 		args: z.array(z.string()).optional(),
 		env: z.record(z.string()).optional(),
 		cwd: z.string().optional(),
+		parameters: z.record(pluginCommandParameterSchema).optional(),
+		allowExtraArgs: z.boolean().optional(),
 		fallback: pluginCommandSchema.optional(),
 	}),
 );
@@ -185,12 +196,29 @@ export const DEFAULT_PLUGIN_REGISTRY_URL =
 
 export type PluginScope = 'global' | 'project';
 export type PluginStatus = 'installed' | 'missing' | 'invalid';
+export type PluginCommandParameterType =
+	| 'string'
+	| 'number'
+	| 'boolean'
+	| 'enum';
+
+export type PluginCommandParameter = {
+	type: PluginCommandParameterType;
+	description?: string;
+	required?: boolean;
+	default?: string | number | boolean;
+	values?: string[];
+};
+
 export type PluginCommand = {
 	label?: string;
+	description?: string;
 	command: string;
 	args?: string[];
 	env?: Record<string, string>;
 	cwd?: string;
+	parameters?: Record<string, PluginCommandParameter>;
+	allowExtraArgs?: boolean;
 	fallback?: PluginCommand;
 };
 export type PluginSource = z.infer<typeof pluginSourceSchema>;
@@ -384,9 +412,14 @@ export async function installPlugin(
 		);
 		sourceLabel = `local:${sourceDir}`;
 	} else {
-		const { entry } = await resolveRegistryPlugin(source, options);
+		const { registryUrl, entry } = await resolveRegistryPlugin(source, options);
 		const targetDir = joinPath(pluginsDir, entry.name);
-		await installRegistryEntryPayload(entry, targetDir, options.fetch);
+		await installRegistryEntryPayload(
+			entry,
+			targetDir,
+			options.fetch,
+			registryUrl,
+		);
 		manifest = await readPluginManifestFromDir(targetDir);
 		manifest = await materializePluginSkillSources(
 			targetDir,
@@ -602,19 +635,83 @@ async function copyPluginDir(
 	await cp(sourceDir, targetDir, { recursive: true, force: true });
 }
 
+function getLocalRegistryDirectory(registryUrl: string): string | null {
+	if (!isLocalSource(registryUrl)) return null;
+	const normalized = normalizeLocalSource(registryUrl);
+	if (normalized.endsWith('/registry.json')) {
+		return normalized.slice(0, -'/registry.json'.length);
+	}
+	const lastSlash = normalized.lastIndexOf('/');
+	return lastSlash === -1 ? '.' : normalized.slice(0, lastSlash);
+}
+
+function isAbsoluteSourcePath(path: string): boolean {
+	return (
+		path.startsWith('/') ||
+		path.startsWith('file:') ||
+		/^[A-Za-z]:[\\/]/.test(path)
+	);
+}
+
+function resolveRegistrySourcePath(
+	sourcePath: string,
+	localRegistryDir: string | null,
+): string {
+	if (isAbsoluteSourcePath(sourcePath) || sourcePath.startsWith('~')) {
+		return normalizeLocalSource(sourcePath);
+	}
+	if (localRegistryDir) {
+		return joinPath(localRegistryDir, sourcePath);
+	}
+	return sourcePath;
+}
+
+function resolveLocalRegistryGithubPayloadDir(
+	entry: PluginRegistryEntry,
+	source: Extract<PluginSource, { type: 'github' }>,
+	localRegistryDir: string,
+): string {
+	const registryPrefix = 'packages/plugin-registry/';
+	if (source.path.startsWith(registryPrefix)) {
+		return joinPath(localRegistryDir, source.path.slice(registryPrefix.length));
+	}
+	return joinPath(localRegistryDir, 'official', entry.name);
+}
+
 async function installRegistryEntryPayload(
 	entry: PluginRegistryEntry,
 	targetDir: string,
 	fetchImpl?: typeof fetch,
+	registryUrl?: string,
 ): Promise<void> {
+	const localRegistryDir = registryUrl
+		? getLocalRegistryDirectory(registryUrl)
+		: null;
+
 	if (!entry.source) {
 		await writeRegistryEntryPayload(entry, targetDir);
 		return;
 	}
 
 	if (entry.source.type === 'local') {
-		await copyPluginDir(entry.source.path, targetDir);
+		const sourcePath = resolveRegistrySourcePath(
+			entry.source.path,
+			localRegistryDir,
+		);
+		await copyPluginDir(sourcePath, targetDir);
 		return;
+	}
+
+	if (entry.source.type === 'github' && localRegistryDir) {
+		const localPayloadDir = resolveLocalRegistryGithubPayloadDir(
+			entry,
+			entry.source,
+			localRegistryDir,
+		);
+		if (await fileExists(joinPath(localPayloadDir, 'otto.plugin.json'))) {
+			await copyPluginDir(localPayloadDir, targetDir);
+			return;
+		}
 	}
 
 	await rm(targetDir, { recursive: true, force: true });

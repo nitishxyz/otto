@@ -17,6 +17,7 @@ const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 const RISKY_TOOLS = new Set([
 	'shell',
 	'terminal',
+	'run_plugin_command',
 	'write',
 	'apply_patch',
 	'git_commit',

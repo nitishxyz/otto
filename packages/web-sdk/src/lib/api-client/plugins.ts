@@ -2,16 +2,21 @@ import {
 	disablePlugin as apiDisablePlugin,
 	enablePlugin as apiEnablePlugin,
 	installPlugin as apiInstallPlugin,
+	listPluginCommands as apiListPluginCommands,
 	listPluginRegistry as apiListPluginRegistry,
 	listPlugins as apiListPlugins,
 	removePlugin as apiRemovePlugin,
+	runPluginCommand as apiRunPluginCommand,
 	updatePlugin as apiUpdatePlugin,
 	type DisablePluginResponses,
 	type EnablePluginResponses,
 	type InstallPluginResponses,
+	type ListPluginCommandsResponses,
 	type ListPluginRegistryResponses,
 	type ListPluginsResponses,
 	type RemovePluginResponses,
+	type RunPluginCommandData,
+	type RunPluginCommandResponses,
 	type UpdatePluginResponses,
 } from '@ottocode/api';
 import { extractErrorMessage } from './utils';
@@ -24,6 +29,14 @@ export type DiscoveredPlugin = PluginsListResponse['global']['plugins'][number];
 export type PluginRegistryEntry = PluginRegistryResponse['plugins'][number];
 export type PluginManifest = NonNullable<EffectivePlugin['manifest']>;
 export type PluginCommand = NonNullable<PluginManifest['commands']>[string];
+export type PluginCommandsListResponse = ListPluginCommandsResponses[200];
+export type PluginCommandListEntry =
+	PluginCommandsListResponse['commands'][number];
+export type PluginCommandParameter = NonNullable<
+	PluginCommandListEntry['parameters']
+>[string];
+export type PluginCommandRunResponse = RunPluginCommandResponses[200];
+export type PluginCommandRunInput = RunPluginCommandData['body'];
 export type PluginMutationResponse =
 	| InstallPluginResponses[200]
 	| RemovePluginResponses[200]
@@ -66,6 +79,27 @@ export const pluginsMixin = {
 		const response = await apiListPluginRegistry({ query: options });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as PluginRegistryResponse;
+	},
+
+	async listPluginCommands(
+		options: PluginProjectOptions = {},
+	): Promise<PluginCommandsListResponse> {
+		const response = await apiListPluginCommands({ query: options });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as PluginCommandsListResponse;
+	},
+
+	async runPluginCommand(
+		plugin: string,
+		command: string,
+		body: PluginCommandRunInput = {},
+	): Promise<PluginCommandRunResponse> {
+		const response = await apiRunPluginCommand({
+			path: { plugin, command },
+			body,
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as PluginCommandRunResponse;
 	},
 
 	async installPlugin(

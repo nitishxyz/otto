@@ -122,6 +122,13 @@ export function serializeError(err: unknown): APIErrorResponse {
 		},
 	};
 
+	if (err instanceof APIError && err.details) {
+		response.error.details = {
+			...(response.error.details ?? {}),
+			...err.details,
+		};
+	}
+
 	// Include stack trace in debug mode
 	if (isDebugEnabled() && err instanceof Error && err.stack) {
 		response.error.stack = err.stack;

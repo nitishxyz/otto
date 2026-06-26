@@ -17,6 +17,11 @@ const mcpServerSchema = z
 		authenticated: z.boolean(),
 		scope: z.enum(['global', 'project']),
 		authType: z.string().optional(),
+		sourceKind: z.enum(['user', 'plugin']).optional(),
+		sourcePlugin: z.string().optional(),
+		sourceLabel: z.string().optional(),
+		managedByPlugin: z.boolean().optional(),
+		overridesPlugin: z.string().optional(),
 	})
 	.passthrough()
 	.openapi('MCPServer');

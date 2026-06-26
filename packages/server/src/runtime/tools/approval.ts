@@ -11,6 +11,7 @@ export const DANGEROUS_TOOLS = new Set([
 	'copy_into',
 	'apply_patch',
 	'terminal',
+	'run_plugin_command',
 	'git_commit',
 	'git_push',
 ]);

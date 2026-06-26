@@ -89,6 +89,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'simulator',
 			'browser',
 			'mcp_manager',
+			'run_plugin_command',
 		],
 	},
 	plan: {
@@ -115,7 +116,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 			'update_todos',
 		],
-		loadable: ['browser', 'mcp_manager'],
+		loadable: ['browser', 'mcp_manager', 'run_plugin_command'],
 	},
 	init: {
 		firstClass: [

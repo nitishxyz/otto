@@ -53,6 +53,208 @@
 					"message": "Install Node.js 18 or newer."
 				}
 			]
+		},
+		{
+			"name": "argent",
+			"displayName": "Argent",
+			"publisher": "Software Mansion",
+			"official": true,
+			"version": "0.13.0",
+			"description": "Agentic MCP toolkit to control, debug, and profile iOS Simulators and Android Emulators.",
+			"homepage": "https://argent.swmansion.com",
+			"repository": "https://github.com/software-mansion/argent",
+			"platforms": ["darwin", "linux"],
+			"tags": [
+				"ios",
+				"android",
+				"simulator",
+				"emulator",
+				"mcp",
+				"react-native"
+			],
+			"source": {
+				"type": "github",
+				"repo": "nitishxyz/otto",
+				"ref": "main",
+				"path": "packages/plugin-registry/official/argent"
+			},
+			"skills": [
+				{
+					"name": "argent-android-emulator-setup",
+					"description": "Set up and connect to an Android emulator using Argent MCP tools.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-android-emulator-setup",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-create-flow",
+					"description": "Record a reusable flow of MCP tool calls for later replay.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-create-flow",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-device-interact",
+					"description": "Interact with iOS simulators, Android emulators, or Chromium (CDP) apps using Argent MCP tools.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-device-interact",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "argent-ios-simulator-setup",
+					"description": "Set up and connect to an iOS simulator using Argent MCP tools.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-ios-simulator-setup",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-lens",
+					"description": "Propose visual design variants and collect user picks via Argent Lens.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-lens",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-metro-debugger",
+					"description": "Debug JavaScript via CDP (Metro/React Native or Chromium CDP targets).",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-metro-debugger",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "argent-native-profiler",
+					"description": "Native CPU, UI hang, and memory profiling (xctrace and Perfetto).",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-native-profiler",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-react-native-app-workflow",
+					"description": "React Native develop and debug workflows on simulators or emulators.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-react-native-app-workflow",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-react-native-optimization",
+					"description": "Profile-first React Native performance optimization workflows.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-react-native-optimization",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "argent-react-native-profiler",
+					"description": "Profile Hermes React Native apps for re-renders and CPU hotspots.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-react-native-profiler",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "argent-screenshot-diff",
+					"description": "Compare screenshots for visual regressions and UI differences.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-screenshot-diff",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-test-ui-flow",
+					"description": "Autonomously test app UI flows with interact-screenshot-verify loops.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-test-ui-flow",
+						"include": ["SKILL.md"]
+					}
+				},
+				{
+					"name": "argent-vega",
+					"description": "Control and inspect Amazon Fire TV (Vega) virtual devices via Argent.",
+					"source": {
+						"type": "github",
+						"repo": "software-mansion/argent",
+						"ref": "main",
+						"path": "packages/skills/skills/argent-vega",
+						"include": ["SKILL.md"]
+					}
+				}
+			],
+			"commands": {
+				"init": {
+					"label": "Initialize Argent",
+					"description": "Install Argent and register its MCP server, skills, and rules in this workspace.",
+					"command": "npx",
+					"args": ["-y", "@swmansion/argent", "init"]
+				},
+				"update": {
+					"label": "Update Argent",
+					"description": "Update Argent and refresh workspace MCP and skill configuration.",
+					"command": "npx",
+					"args": ["-y", "@swmansion/argent", "update"]
+				}
+			},
+			"mcpServers": {
+				"argent": {
+					"command": "npx",
+					"args": ["-y", "@swmansion/argent", "mcp"]
+				}
+			},
+			"requirements": [
+				{
+					"kind": "command",
+					"value": "node",
+					"message": "Install Node.js 20.11 or newer (https://nodejs.org)."
+				},
+				{
+					"kind": "command",
+					"value": "xcrun",
+					"message": "iOS Simulator workflows require macOS with Xcode command line tools."
+				}
+			]
 		}
 	]
 }

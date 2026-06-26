@@ -9,6 +9,8 @@ import { useSkillsStore } from './skillsStore';
 
 export type MCPScope = 'global' | 'project';
 
+export type MCPSourceKind = 'user' | 'plugin';
+
 export interface MCPServerInfo {
 	name: string;
 	transport: string;
@@ -22,6 +24,11 @@ export interface MCPServerInfo {
 	authenticated: boolean;
 	scope: MCPScope;
 	authType?: string;
+	sourceKind?: MCPSourceKind;
+	sourcePlugin?: string;
+	sourceLabel?: string;
+	managedByPlugin?: boolean;
+	overridesPlugin?: string;
 }
 
 export interface CopilotDeviceInfo {

@@ -40,6 +40,10 @@ export type {
 	DiscoveredPlugin,
 	EffectivePlugin,
 	PluginCommand,
+	PluginCommandListEntry,
+	PluginCommandParameter,
+	PluginCommandRunInput,
+	PluginCommandsListResponse,
 	PluginInstallInput,
 	PluginManifest,
 	PluginMutationInput,
@@ -183,6 +187,8 @@ class ApiClient {
 
 	listPlugins = pluginsMixin.listPlugins;
 	listPluginRegistry = pluginsMixin.listPluginRegistry;
+	listPluginCommands = pluginsMixin.listPluginCommands;
+	runPluginCommand = pluginsMixin.runPluginCommand;
 	installPlugin = pluginsMixin.installPlugin;
 	removePlugin = pluginsMixin.removePlugin;
 	enablePlugin = pluginsMixin.enablePlugin;

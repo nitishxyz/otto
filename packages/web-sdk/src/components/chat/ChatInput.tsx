@@ -299,9 +299,15 @@ export const ChatInput = memo(
 			showCommandSuggestions,
 			commandQuery,
 			commandSelectedIndex,
+			commandResultCount,
+			commandMissingRequired,
+			commandStageKind,
 			currentCommandToSelect,
 			setShowCommandSuggestions,
 			setCommandSelectedIndex,
+			setCommandResultCount,
+			setCommandMissingRequired,
+			setCommandStageKind,
 			setCurrentCommandToSelect,
 			handleCommandSelect,
 			handleCommandEnterSelect,
@@ -779,6 +785,9 @@ export const ChatInput = memo(
 					mentionSelectedIndex,
 					skillMentionSelectedIndex,
 					commandSelectedIndex,
+					commandResultCount,
+					commandMissingRequired,
+					commandStageKind,
 					currentFileToSelect,
 					currentSkillToSelect,
 					currentCommandToSelect,
@@ -810,6 +819,9 @@ export const ChatInput = memo(
 				mentionSelectedIndex,
 				skillMentionSelectedIndex,
 				commandSelectedIndex,
+				commandResultCount,
+				commandMissingRequired,
+				commandStageKind,
 				currentFileToSelect,
 				currentSkillToSelect,
 				currentCommandToSelect,
@@ -912,9 +924,13 @@ export const ChatInput = memo(
 									{showCommandSuggestions && (
 										<CommandSuggestionsPopup
 											query={commandQuery}
+											inputValue={message}
 											selectedIndex={commandSelectedIndex}
 											onSelect={handleCommandSelect}
 											onEnterSelect={handleCommandEnterSelect}
+											onResultsChange={setCommandResultCount}
+											onMissingRequiredChange={setCommandMissingRequired}
+											onStageChange={setCommandStageKind}
 											onClose={handleCommandClose}
 											sessionId={sessionId}
 										/>

@@ -1,4 +1,5 @@
 import { MCPServerManager } from './server-manager.ts';
+import { loadEffectiveMCPConfig } from './effective-config.ts';
 import type { MCPConfig, MCPServerConfig, MCPScope } from './types.ts';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
@@ -35,54 +36,7 @@ export async function loadMCPConfig(
 	projectRoot: string,
 	globalConfigDir?: string,
 ): Promise<MCPConfig> {
-	const servers: MCPServerConfig[] = [];
-	const seen = new Set<string>();
-
-	const globalPath = globalConfigDir
-		? join(globalConfigDir, 'config.json')
-		: null;
-	if (globalPath) {
-		const globalServers = await readMCPServersFromFile(globalPath);
-		for (const s of globalServers) {
-			seen.add(s.name);
-			servers.push({ ...s, scope: 'global' });
-		}
-	}
-
-	const projectPath = join(projectRoot, '.otto', 'config.json');
-	const projectServers = await readMCPServersFromFile(projectPath);
-	for (const s of projectServers) {
-		if (seen.has(s.name)) {
-			const idx = servers.findIndex((existing) => existing.name === s.name);
-			if (idx >= 0) servers[idx] = { ...s, scope: 'project' };
-		} else {
-			servers.push({ ...s, scope: 'project' });
-		}
-	}
-
-	return { servers };
-}
-
-async function readMCPServersFromFile(
-	filePath: string,
-): Promise<MCPServerConfig[]> {
-	try {
-		const text = await fs.readFile(filePath, 'utf-8');
-		const json = JSON.parse(text);
-		if (!json?.mcp?.servers) return [];
-		const raw = json.mcp.servers;
-		if (!Array.isArray(raw)) return [];
-		return raw.filter(
-			(s: unknown): s is MCPServerConfig =>
-				typeof s === 'object' &&
-				s !== null &&
-				typeof (s as MCPServerConfig).name === 'string' &&
-				(typeof (s as MCPServerConfig).command === 'string' ||
-					typeof (s as MCPServerConfig).url === 'string'),
-		);
-	} catch {
-		return [];
-	}
+	return loadEffectiveMCPConfig(projectRoot, globalConfigDir);
 }
 
 function resolveConfigPath(

@@ -16,7 +16,9 @@ import {
 	FileText,
 	ArrowRightLeft,
 	Eye,
+	Plug,
 } from 'lucide-react';
+import type { PluginCommandListEntry } from './api-client/plugins';
 
 export interface Command {
 	id: string;
@@ -32,7 +34,8 @@ export type CommandKind =
 	| 'git'
 	| 'session'
 	| 'danger'
-	| 'recipe';
+	| 'recipe'
+	| 'plugin';
 
 export const COMMAND_KIND_LABELS: Record<CommandKind, string> = {
 	app: 'App',
@@ -41,6 +44,7 @@ export const COMMAND_KIND_LABELS: Record<CommandKind, string> = {
 	session: 'Session',
 	danger: 'Danger',
 	recipe: 'Recipe',
+	plugin: 'Plugin',
 };
 
 export const COMMAND_KIND_STYLES: Record<CommandKind, string> = {
@@ -50,6 +54,7 @@ export const COMMAND_KIND_STYLES: Record<CommandKind, string> = {
 	session: 'text-indigo-400',
 	danger: 'text-red-400',
 	recipe: 'text-purple-400',
+	plugin: 'text-amber-400',
 };
 
 export interface CommandState {
@@ -276,4 +281,170 @@ export function filterCommands(
 		if (scoreDiff !== 0) return scoreDiff;
 		return a.label.localeCompare(b.label);
 	});
+}
+
+export const PLUGIN_COMMAND_ICON = Plug;
+
+export type PluginCommandStage =
+	| { kind: 'root'; query: string }
+	| { kind: 'namespace'; namespace: string; query: string }
+	| {
+			kind: 'params';
+			namespace: string;
+			command: string;
+			query: string;
+	  };
+
+export interface PluginNamespace {
+	name: string;
+	description?: string;
+}
+
+/**
+ * Build the unique plugin namespaces from the flat command list, keeping the
+ * first description seen for each namespace.
+ */
+export function getPluginNamespaces(
+	commands: PluginCommandListEntry[],
+): PluginNamespace[] {
+	const namespaces: PluginNamespace[] = [];
+	const seen = new Set<string>();
+	for (const entry of commands) {
+		if (seen.has(entry.plugin)) continue;
+		seen.add(entry.plugin);
+		namespaces.push({ name: entry.plugin });
+	}
+	return namespaces;
+}
+
+/**
+ * Convert plugin namespaces into slash-root command rows.
+ */
+export function pluginNamespaceCommands(
+	namespaces: PluginNamespace[],
+): Command[] {
+	return namespaces.map((ns) => ({
+		id: `plugin:${ns.name}`,
+		label: `/${ns.name}`,
+		description: ns.description?.trim()
+			? ns.description.trim()
+			: `${ns.name} plugin commands`,
+		icon: PLUGIN_COMMAND_ICON,
+		kind: 'plugin' as const,
+	}));
+}
+
+/**
+ * Convert a plugin's commands into namespace-stage command rows.
+ */
+export function pluginCommandRows(
+	namespace: string,
+	commands: PluginCommandListEntry[],
+): Command[] {
+	return commands
+		.filter((entry) => entry.plugin === namespace)
+		.map((entry) => ({
+			id: `plugin-command:${entry.plugin}:${entry.command}`,
+			label: `/${entry.plugin} ${entry.command}`,
+			description:
+				entry.description?.trim() ||
+				entry.label?.trim() ||
+				`${entry.command} command`,
+			icon: PLUGIN_COMMAND_ICON,
+			kind: 'plugin' as const,
+		}));
+}
+
+/**
+ * Convert a plugin command's parameters into params-stage command rows.
+ */
+export function pluginParameterRows(entry: PluginCommandListEntry): Command[] {
+	const parameters = entry.parameters ?? {};
+	return Object.entries(parameters).map(([name, param]) => {
+		const parts: string[] = [];
+		if (param.description?.trim()) parts.push(param.description.trim());
+		if (param.default !== undefined && param.default !== '') {
+			parts.push(`default ${String(param.default)}`);
+		}
+		if (param.required) parts.push('required');
+		return {
+			id: `plugin-param:${entry.plugin}:${entry.command}:${name}`,
+			label: `--${name}`,
+			description: parts.length ? parts.join(', ') : `${name} parameter`,
+			icon: PLUGIN_COMMAND_ICON,
+			kind: 'plugin' as const,
+		};
+	});
+}
+
+/**
+ * Determine the active plugin autocomplete stage from the raw input value and
+ * the set of known plugin namespaces. Returns undefined when the input is not a
+ * slash command at all.
+ */
+export function getPluginCommandStage(
+	value: string,
+	namespaces: string[],
+): PluginCommandStage | undefined {
+	if (!value.startsWith('/')) return undefined;
+	const rest = value.slice(1);
+	// Split while preserving a trailing space as an empty final token so that
+	// "/serve-sim " advances to the namespace stage.
+	const tokens = rest.split(' ');
+	const namespaceToken = tokens[0] ?? '';
+
+	if (tokens.length === 1) {
+		return { kind: 'root', query: namespaceToken };
+	}
+
+	const matched = namespaces.find((ns) => ns === namespaceToken);
+	if (!matched) {
+		// Not a known plugin namespace: fall back to root-style filtering.
+		return { kind: 'root', query: namespaceToken };
+	}
+
+	if (tokens.length === 2) {
+		return {
+			kind: 'namespace',
+			namespace: matched,
+			query: tokens[1] ?? '',
+		};
+	}
+
+	const command = tokens[1] ?? '';
+	const lastToken = tokens[tokens.length - 1] ?? '';
+	return {
+		kind: 'params',
+		namespace: matched,
+		command,
+		query: lastToken.startsWith('--') ? lastToken.slice(2) : lastToken,
+	};
+}
+
+export function findPluginCommandEntry(
+	commands: PluginCommandListEntry[],
+	namespace: string,
+	command: string,
+): PluginCommandListEntry | undefined {
+	return commands.find(
+		(entry) => entry.plugin === namespace && entry.command === command,
+	);
+}
+
+/**
+ * Names of required parameters not present as `--name` flags in the raw input.
+ */
+export function getMissingRequiredParams(
+	entry: PluginCommandListEntry,
+	value: string,
+): string[] {
+	const parameters = entry.parameters ?? {};
+	const missing: string[] = [];
+	for (const [name, param] of Object.entries(parameters)) {
+		if (!param.required) continue;
+		if (param.default !== undefined && param.default !== '') continue;
+		const flag = new RegExp(`(^|\\s)--${name}(=|\\s|$)`);
+		if (!flag.test(value)) missing.push(name);
+	}
+	return missing;
 }

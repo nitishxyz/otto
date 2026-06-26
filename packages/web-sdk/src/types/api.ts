@@ -126,8 +126,17 @@ export interface SendMessageRequest {
 	reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
 }
 
+export interface PluginCommandRunResponse {
+	command: string;
+	terminalId: string;
+	title: string;
+	previewUrl?: string;
+	execution: 'started';
+}
+
 export interface SendMessageResponse {
-	messageId: string;
+	messageId?: string;
+	pluginCommand?: PluginCommandRunResponse;
 }
 
 export interface ModelInfo {

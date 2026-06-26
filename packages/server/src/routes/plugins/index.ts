@@ -10,12 +10,22 @@ import {
 	updatePlugin,
 	type PluginRegistryEntry,
 	type PluginScope,
+	type TerminalManager,
 } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { APIError, serializeError } from '../../runtime/errors/api-error.ts';
 import {
+	createServerTerminalBridge,
+	listPluginCommands,
+	runPluginCommand,
+} from '../../runtime/plugins/commands/index.ts';
+import {
 	apiErrorResponseSchema,
+	pluginCommandParamsSchema,
+	pluginCommandRunBodySchema,
+	pluginCommandRunResponseSchema,
+	pluginCommandsListResponseSchema,
 	pluginDetailResponseSchema,
 	pluginInstallBodySchema,
 	pluginMutationBodySchema,
@@ -93,7 +103,11 @@ function errorJson(
 	return c.json(errorResponse, errorResponse.error.status || 500);
 }
 
-export function registerPluginsRoutes(app: Hono) {
+export function registerPluginsRoutes(
+	app: Hono,
+	terminalManager?: TerminalManager,
+) {
+	const terminalBridge = createServerTerminalBridge(terminalManager);
 	zodOpenApiRoute(
 		app,
 		{
@@ -123,6 +137,105 @@ export function registerPluginsRoutes(app: Hono) {
 				);
 			} catch (error) {
 				logger.error('Failed to list plugins', error);
+				return errorJson(c, error);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/plugins/commands',
+			tags: ['plugins'],
+			operationId: 'listPluginCommands',
+			summary: 'List enabled plugin commands for autocomplete',
+			request: { query: projectQuerySchema },
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': {
+							schema: pluginCommandsListResponseSchema,
+						},
+					},
+				},
+				'400': {
+					description: 'Invalid request',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const commands = await listPluginCommands(
+					getProjectRoot(c.req.query('project')),
+				);
+				return c.json({ commands });
+			} catch (error) {
+				logger.error('Failed to list plugin commands', error);
+				return errorJson(c, error);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/plugins/{plugin}/commands/{command}/run',
+			tags: ['plugins'],
+			operationId: 'runPluginCommand',
+			summary: 'Run a plugin command in a visible terminal',
+			request: {
+				params: pluginCommandParamsSchema,
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: pluginCommandRunBodySchema },
+					},
+				},
+			},
+			responses: {
+				'200': {
+					description: 'Terminal started',
+					content: {
+						'application/json': {
+							schema: pluginCommandRunResponseSchema,
+						},
+					},
+				},
+				'400': {
+					description: 'Invalid request',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+				'404': {
+					description: 'Plugin command not found',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+				'503': {
+					description: 'Terminal execution unavailable',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const parsed = pluginCommandRunBodySchema.parse(await c.req.json());
+				const result = await runPluginCommand(
+					{
+						projectRoot: getProjectRoot(parsed.project),
+						plugin: c.req.param('plugin'),
+						command: c.req.param('command'),
+						argsText: parsed.argsText,
+						args: parsed.args,
+						extraArgs: parsed.extraArgs,
+					},
+					terminalBridge,
+				);
+				return c.json(result);
+			} catch (error) {
+				logger.error('Failed to run plugin command', error);
 				return errorJson(c, error);
 			}
 		},

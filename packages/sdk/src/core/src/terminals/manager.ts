@@ -15,6 +15,7 @@ export interface CreateTerminalOptions {
 	purpose: string;
 	createdBy: 'user' | 'llm';
 	title?: string;
+	env?: Record<string, string>;
 }
 
 export class TerminalManager {
@@ -36,6 +37,7 @@ export class TerminalManager {
 				cwd: options.cwd,
 				env: {
 					...process.env,
+					...options.env,
 					TERM: 'xterm-256color',
 					PATH: getAugmentedPath(),
 					PROMPT_EOL_MARK: '',
