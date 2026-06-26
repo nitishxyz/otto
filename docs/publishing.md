@@ -24,6 +24,7 @@ There are two different publishing tracks in the repo:
 - `packages/web-sdk` → `@ottocode/web-sdk`
 - `packages/install` → `@ottocode/install`
 - `packages/database` → `@ottocode/database`
+- `packages/themes` → `@ottocode/themes`
 - `packages/server` → `@ottocode/server`
 
 It also collects version information for:
@@ -37,6 +38,7 @@ It also collects version information for:
 - `@ottocode/install`
 - `@ottocode/api`
 - `@ottocode/sdk`
+- `@ottocode/themes`
 - `@ottocode/web-sdk`
 - `@ottocode/web-ui`
 - `@ottocode/database`
@@ -83,6 +85,7 @@ For the CLI path, it synchronizes versions across files including:
 - `packages/web-ui/package.json`
 - `packages/web-sdk/package.json`
 - `packages/database/package.json`
+- `packages/themes/package.json`
 - `packages/server/package.json`
 
 ### `publish-from-tag.yml`
@@ -130,6 +133,7 @@ These should share the same version during the main release flow:
 - `packages/web-ui/package.json`
 - `packages/web-sdk/package.json`
 - `packages/database/package.json`
+- `packages/themes/package.json`
 - `packages/server/package.json`
 
 ### Separately versioned packages

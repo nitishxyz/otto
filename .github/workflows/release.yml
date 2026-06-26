@@ -87,7 +87,7 @@ jobs:
               MINOR=$(echo "$CURRENT" | awk -F. '{print $2}')
               PATCH=$(echo "$CURRENT" | awk -F. '{print $3}')
               CLI_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-              for pkg in package.json apps/cli/package.json packages/install/package.json packages/api/package.json packages/sdk/package.json packages/web-ui/package.json packages/web-sdk/package.json packages/database/package.json packages/server/package.json; do
+              for pkg in package.json apps/cli/package.json packages/install/package.json packages/api/package.json packages/sdk/package.json packages/web-ui/package.json packages/web-sdk/package.json packages/database/package.json packages/themes/package.json packages/server/package.json; do
                 tmpfile=$(mktemp)
                 jq ".version = \"${CLI_VERSION}\"" "$pkg" > "$tmpfile"
                 mv "$tmpfile" "$pkg"

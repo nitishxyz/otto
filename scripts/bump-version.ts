@@ -282,6 +282,13 @@ function main() {
 	);
 	updatePackageVersion(databasePackagePath, nextVersion, dryRun);
 
+	// Update themes package.json
+	const themesPackagePath = resolve(
+		process.cwd(),
+		'packages/themes/package.json',
+	);
+	updatePackageVersion(themesPackagePath, nextVersion, dryRun);
+
 	// Update server package.json
 	const serverPackagePath = resolve(
 		process.cwd(),

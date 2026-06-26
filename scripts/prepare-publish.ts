@@ -60,6 +60,7 @@ function main() {
 		'packages/web-sdk',
 		'packages/install',
 		'packages/database',
+		'packages/themes',
 		'packages/server',
 	];
 
