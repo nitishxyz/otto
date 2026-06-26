@@ -1,8 +1,11 @@
 import { memo, useMemo } from 'react';
 import {
 	Box,
+	ChevronRight,
 	Download,
 	ExternalLink,
+	FolderGit2,
+	Github,
 	Globe2,
 	PackageCheck,
 	Puzzle,
@@ -61,13 +64,79 @@ function commandText(command: PluginCommand) {
 	return [command.command, ...(command.args ?? [])].join(' ');
 }
 
-function sourceText(source: PluginRegistryEntry['source']) {
+function pluralize(count: number, noun: string) {
+	return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+interface CapabilitySource {
+	skills?: unknown[];
+	recipes?: unknown[];
+	mcpServers?: Record<string, unknown>;
+	commands?: Record<string, unknown>;
+}
+
+function capabilityCounts(source?: CapabilitySource): string[] {
+	const skills = source?.skills?.length ?? 0;
+	const recipes = source?.recipes?.length ?? 0;
+	const mcp = Object.keys(source?.mcpServers ?? {}).length;
+	const commands = Object.keys(source?.commands ?? {}).length;
+	return [
+		skills ? pluralize(skills, 'skill') : null,
+		recipes ? pluralize(recipes, 'recipe') : null,
+		mcp ? `${mcp} MCP` : null,
+		commands ? pluralize(commands, 'command') : null,
+	].filter((value): value is string => Boolean(value));
+}
+
+type PluginSource = PluginRegistryEntry['source'];
+
+function sourceLabel(source: PluginSource) {
 	if (!source) return 'inline registry metadata';
-	if (source.type === 'github') {
-		return `github:${source.repo}/${source.path}${source.ref ? `#${source.ref}` : ''}`;
-	}
+	if (source.type === 'github') return source.repo;
 	return source.path;
 }
+
+function sourceUrl(source: PluginSource): string | undefined {
+	if (source?.type !== 'github') return undefined;
+	const ref = source.ref ?? 'main';
+	const path = source.path ? `/tree/${ref}/${source.path}` : '';
+	return `https://github.com/${source.repo}${path}`;
+}
+
+const SourceLink = memo(function SourceLink({
+	source,
+}: {
+	source: PluginSource;
+}) {
+	const label = sourceLabel(source);
+	const url = sourceUrl(source);
+	const isGithub = source?.type === 'github';
+	const Icon = isGithub ? Github : FolderGit2;
+
+	if (!url) {
+		return (
+			<span className="inline-flex max-w-full items-center gap-1.5 text-[11px] text-muted-foreground">
+				<Icon className="h-3.5 w-3.5 shrink-0" />
+				<span className="truncate font-mono">{label}</span>
+			</span>
+		);
+	}
+
+	return (
+		<a
+			href={url}
+			target="_blank"
+			rel="noreferrer noopener"
+			onClick={(event) => event.stopPropagation()}
+			title={url}
+			className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+		>
+			<Icon className="h-3.5 w-3.5 shrink-0" />
+			<span className="truncate font-mono">{label}</span>
+			<ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+		</a>
+	);
+});
 
 interface BadgeProps {
 	children: React.ReactNode;
@@ -93,6 +162,32 @@ const Badge = memo(function Badge({
 	);
 });
 
+interface TagOverflowProps {
+	tags?: string[];
+	max?: number;
+}
+
+const TagOverflow = memo(function TagOverflow({
+	tags,
+	max = 4,
+}: TagOverflowProps) {
+	if (!tags?.length) return null;
+	const visible = tags.slice(0, max);
+	const hidden = tags.length - visible.length;
+	return (
+		<>
+			{visible.map((tag) => (
+				<Badge key={tag}>{tag}</Badge>
+			))}
+			{hidden > 0 ? (
+				<Badge>
+					<span title={tags.slice(max).join(', ')}>+{hidden}</span>
+				</Badge>
+			) : null}
+		</>
+	);
+});
+
 interface EnabledSwitchProps {
 	checked: boolean;
 	disabled: boolean;
@@ -110,7 +205,10 @@ const EnabledSwitch = memo(function EnabledSwitch({
 			role="switch"
 			aria-checked={checked}
 			disabled={disabled}
-			onClick={onToggle}
+			onClick={(event) => {
+				event.stopPropagation();
+				onToggle();
+			}}
 			className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${
 				checked ? 'bg-primary' : 'bg-muted'
 			}`}
@@ -128,7 +226,7 @@ interface CapabilityListProps {
 	plugin: EffectivePlugin;
 }
 
-const CapabilityList = memo(function CapabilityList({
+const CapabilityGroups = memo(function CapabilityGroups({
 	plugin,
 }: CapabilityListProps) {
 	const manifest = plugin.manifest;
@@ -149,7 +247,7 @@ const CapabilityList = memo(function CapabilityList({
 	}
 
 	return (
-		<div className="space-y-2 border-t border-border/60 pt-3 text-xs">
+		<div className="space-y-2 text-xs">
 			{skills.length ? (
 				<CapabilityGroup
 					label="Skills"
@@ -249,81 +347,84 @@ const InstalledPluginCard = memo(function InstalledPluginCard({
 	const hasUpdate = compareVersions(installedVersion, latestVersion) < 0;
 	const official =
 		registry?.official || plugin.configEntry?.source?.startsWith('official:');
+	const counts = capabilityCounts(plugin.manifest);
 
 	return (
-		<article className="rounded-xl border border-border bg-background/70 p-4 shadow-sm">
-			<div className="flex items-start gap-3">
-				<div className="mt-0.5 rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground">
-					<Puzzle className="h-4 w-4" />
-				</div>
-				<div className="min-w-0 flex-1">
-					<div className="flex min-w-0 flex-wrap items-center gap-2">
-						<h3 className="truncate text-sm font-semibold text-foreground">
-							{displayName}
-						</h3>
-						<span className="font-mono text-xs text-muted-foreground">
-							{plugin.name}
-						</span>
-						{official ? (
-							<Badge variant="success">
-								<ShieldCheck className="h-3 w-3" /> Official
-							</Badge>
-						) : null}
-						{plugin.status !== 'installed' ? (
-							<Badge variant="warning">{plugin.status}</Badge>
-						) : null}
-					</div>
-					{description ? (
-						<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-							{description}
-						</p>
-					) : null}
-				</div>
+		<details className="group rounded-lg border border-border bg-background/70 open:bg-background/90 open:shadow-sm">
+			<summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2 [&::-webkit-details-marker]:hidden">
+				<Puzzle className="h-4 w-4 shrink-0 text-muted-foreground" />
+				<span className="truncate text-sm font-medium text-foreground">
+					{displayName}
+				</span>
+				<span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
+					{plugin.name}
+				</span>
+				{official ? (
+					<ShieldCheck className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+				) : null}
+				{plugin.status !== 'installed' ? (
+					<Badge variant="warning">{plugin.status}</Badge>
+				) : null}
+				{hasUpdate ? <Badge variant="warning">Update</Badge> : null}
+				<span className="ml-auto hidden truncate text-[11px] text-muted-foreground md:inline">
+					{counts.join(' · ')}
+				</span>
 				<EnabledSwitch
 					checked={plugin.enabled}
 					disabled={pending}
 					onToggle={() => onEnableToggle(plugin)}
 				/>
-			</div>
+				<ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+			</summary>
 
-			<div className="mt-3 flex flex-wrap gap-2">
-				<Badge>{plugin.scope}</Badge>
-				<Badge>
-					{formatPlatforms(manifest?.platforms ?? registry?.platforms)}
-				</Badge>
-				{installedVersion ? <Badge>Installed {installedVersion}</Badge> : null}
-				{latestVersion ? (
-					<Badge variant={hasUpdate ? 'warning' : 'default'}>
-						Latest {latestVersion}
-					</Badge>
+			<div className="space-y-3 border-t border-border/60 px-3 pb-3 pt-3">
+				{description ? (
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{description}
+					</p>
 				) : null}
-				{plugin.overriddenByProject ? <Badge>Project override</Badge> : null}
-			</div>
 
-			<CapabilityList plugin={plugin} />
+				<div className="flex flex-wrap gap-1.5">
+					<Badge>{plugin.scope}</Badge>
+					<Badge>
+						{formatPlatforms(manifest?.platforms ?? registry?.platforms)}
+					</Badge>
+					{installedVersion ? (
+						<Badge>Installed {installedVersion}</Badge>
+					) : null}
+					{latestVersion ? (
+						<Badge variant={hasUpdate ? 'warning' : 'default'}>
+							Latest {latestVersion}
+						</Badge>
+					) : null}
+					{plugin.overriddenByProject ? <Badge>Project override</Badge> : null}
+				</div>
 
-			<div className="mt-3 flex flex-wrap gap-2">
-				<Button
-					variant="secondary"
-					size="sm"
-					onClick={() => onUpdate(plugin)}
-					disabled={pending || !registry}
-					className="gap-2"
-				>
-					<RefreshCw className="h-3.5 w-3.5" />
-					{hasUpdate ? 'Update' : 'Check Update'}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={() => onRemove(plugin)}
-					disabled={pending}
-					className="gap-2 text-red-600 hover:text-red-600 dark:text-red-400"
-				>
-					<Trash2 className="h-3.5 w-3.5" /> Remove
-				</Button>
+				<CapabilityGroups plugin={plugin} />
+
+				<div className="flex flex-wrap gap-2">
+					<Button
+						variant="secondary"
+						size="sm"
+						onClick={() => onUpdate(plugin)}
+						disabled={pending || !registry}
+						className="gap-2"
+					>
+						<RefreshCw className="h-3.5 w-3.5" />
+						{hasUpdate ? 'Update' : 'Check Update'}
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => onRemove(plugin)}
+						disabled={pending}
+						className="gap-2 text-red-600 hover:text-red-600 dark:text-red-400"
+					>
+						<Trash2 className="h-3.5 w-3.5" /> Remove
+					</Button>
+				</div>
 			</div>
-		</article>
+		</details>
 	);
 });
 
@@ -342,76 +443,69 @@ const AvailablePluginCard = memo(function AvailablePluginCard({
 	onInstall,
 	showInstalledState = false,
 }: AvailablePluginCardProps) {
+	const counts = capabilityCounts(plugin);
 	return (
-		<article className="rounded-xl border border-border bg-muted/20 p-4">
-			<div className="flex items-start gap-3">
-				<div className="mt-0.5 rounded-lg border border-border bg-background/70 p-2 text-muted-foreground">
-					<PackageCheck className="h-4 w-4" />
+		<details className="group rounded-lg border border-border bg-muted/20 open:bg-muted/30">
+			<summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2 [&::-webkit-details-marker]:hidden">
+				<PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
+				<span className="truncate text-sm font-medium text-foreground">
+					{plugin.displayName ?? plugin.name}
+				</span>
+				<span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
+					{plugin.name}
+				</span>
+				{plugin.official ? (
+					<ShieldCheck className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+				) : null}
+				{installed && showInstalledState ? (
+					<Badge variant="success">Installed</Badge>
+				) : null}
+				<span className="ml-auto hidden truncate text-[11px] text-muted-foreground md:inline">
+					{counts.join(' · ')}
+				</span>
+				<ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+			</summary>
+
+			<div className="space-y-3 border-t border-border/60 px-3 pb-3 pt-3">
+				{plugin.description ? (
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{plugin.description}
+					</p>
+				) : null}
+
+				<div className="flex flex-wrap items-center gap-1.5">
+					<Badge>v{plugin.version}</Badge>
+					<Badge>{formatPlatforms(plugin.platforms)}</Badge>
+					{plugin.publisher ? <Badge>{plugin.publisher}</Badge> : null}
+					<TagOverflow tags={plugin.tags} max={4} />
 				</div>
-				<div className="min-w-0 flex-1">
-					<div className="flex min-w-0 flex-wrap items-center gap-2">
-						<h3 className="truncate text-sm font-semibold text-foreground">
-							{plugin.displayName ?? plugin.name}
-						</h3>
-						<span className="font-mono text-xs text-muted-foreground">
-							{plugin.name}
-						</span>
-						{plugin.official ? (
-							<Badge variant="success">
-								<ShieldCheck className="h-3 w-3" /> Official
-							</Badge>
-						) : null}
-						{installed && showInstalledState ? <Badge>Installed</Badge> : null}
+
+				<SourceLink source={plugin.source} />
+
+				{installed ? null : (
+					<div className="flex flex-wrap gap-2">
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => onInstall(plugin, 'global')}
+							disabled={pending}
+							className="gap-2"
+						>
+							<Download className="h-3.5 w-3.5" /> Install Global
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => onInstall(plugin, 'project')}
+							disabled={pending}
+							className="gap-2"
+						>
+							<Download className="h-3.5 w-3.5" /> Install Project
+						</Button>
 					</div>
-					{plugin.description ? (
-						<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-							{plugin.description}
-						</p>
-					) : null}
-				</div>
+				)}
 			</div>
-
-			<div className="mt-3 flex flex-wrap gap-2">
-				<Badge>Latest {plugin.version}</Badge>
-				<Badge>{formatPlatforms(plugin.platforms)}</Badge>
-				{plugin.publisher ? <Badge>{plugin.publisher}</Badge> : null}
-				{plugin.tags?.map((tag) => (
-					<Badge key={tag}>{tag}</Badge>
-				))}
-			</div>
-
-			<div className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
-				<div className="flex items-center gap-2">
-					<ExternalLink className="h-3.5 w-3.5" />
-					<span className="break-all font-mono text-[11px]">
-						{sourceText(plugin.source)}
-					</span>
-				</div>
-			</div>
-
-			{installed ? null : (
-				<div className="mt-3 flex flex-wrap gap-2">
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => onInstall(plugin, 'global')}
-						disabled={pending}
-						className="gap-2"
-					>
-						<Download className="h-3.5 w-3.5" /> Install Global
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => onInstall(plugin, 'project')}
-						disabled={pending}
-						className="gap-2"
-					>
-						<Download className="h-3.5 w-3.5" /> Install Project
-					</Button>
-				</div>
-			)}
-		</article>
+		</details>
 	);
 });
 
@@ -565,7 +659,7 @@ export function PluginsSettings() {
 					</p>
 				</div>
 				{pluginsQuery.data?.plugins.length ? (
-					<div className="space-y-3">
+					<div className="space-y-2">
 						{pluginsQuery.data.plugins.map((plugin) => (
 							<InstalledPluginCard
 								key={`${plugin.scope}:${plugin.name}`}
@@ -594,7 +688,7 @@ export function PluginsSettings() {
 					</p>
 				</div>
 				{availablePlugins.length ? (
-					<div className="space-y-3">
+					<div className="space-y-2">
 						{availablePlugins.map((plugin) => (
 							<AvailablePluginCard
 								key={plugin.name}

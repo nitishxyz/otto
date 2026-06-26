@@ -952,8 +952,8 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	};
 
 	return (
-		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="4xl">
-			<div className="-m-6 flex h-[clamp(420px,70vh,560px)] overflow-hidden">
+		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="5xl">
+			<div className="-m-6 flex h-[clamp(480px,82vh,760px)] overflow-hidden">
 				<nav className="flex w-48 shrink-0 flex-col border-r border-border bg-muted/20 py-1">
 					{PREFERENCE_TABS.map((tab) => {
 						const isActive = activeTab === tab.id;

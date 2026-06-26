@@ -34,9 +34,18 @@ describe('argent official plugin registry', () => {
 		);
 		const registry = pluginRegistrySchema.parse(JSON.parse(raw));
 		const argent = registry.plugins.find((plugin) => plugin.name === 'argent');
+		const serveSim = registry.plugins.find(
+			(plugin) => plugin.name === 'serve-sim',
+		);
 		expect(argent).toBeDefined();
 		expect(argent?.official).toBe(true);
 		expect(argent?.homepage).toBe('https://argent.swmansion.com');
+		expect(serveSim?.source).toEqual({
+			type: 'github',
+			repo: 'nitishxyz/otto',
+			ref: 'main',
+			path: 'packages/plugin-registry/official/serve-sim',
+		});
 		expect(argent?.mcpServers?.argent).toEqual({
 			command: 'npx',
 			args: ['-y', '@swmansion/argent', 'mcp'],

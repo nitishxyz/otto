@@ -13,6 +13,12 @@
 			"repository": "https://github.com/EvanBacon/serve-sim",
 			"platforms": ["darwin"],
 			"tags": ["ios", "simulator", "mobile"],
+			"source": {
+				"type": "github",
+				"repo": "nitishxyz/otto",
+				"ref": "main",
+				"path": "packages/plugin-registry/official/serve-sim"
+			},
 			"skills": [
 				{
 					"name": "serve-sim",
@@ -253,6 +259,237 @@
 					"kind": "command",
 					"value": "xcrun",
 					"message": "iOS Simulator workflows require macOS with Xcode command line tools."
+				}
+			]
+		},
+		{
+			"name": "expo",
+			"displayName": "Expo",
+			"publisher": "Expo",
+			"official": true,
+			"version": "1.0.0",
+			"description": "Official Expo AI agent skills, EAS setup recipes, dev commands, and the remote Expo MCP server.",
+			"homepage": "https://docs.expo.dev/skills/",
+			"repository": "https://github.com/expo/skills",
+			"platforms": ["darwin", "linux", "win32"],
+			"tags": ["expo", "react-native", "eas", "mcp", "mobile"],
+			"source": {
+				"type": "github",
+				"repo": "nitishxyz/otto",
+				"ref": "main",
+				"path": "packages/plugin-registry/official/expo"
+			},
+			"skills": [
+				{
+					"name": "add-app-clip",
+					"description": "Add an iOS App Clip target to an Expo app (AASA, associated domains, TestFlight).",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/add-app-clip",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "building-native-ui",
+					"description": "Build apps with Expo Router, styling, components, navigation, and animations.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/building-native-ui",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-api-routes",
+					"description": "Create API routes in Expo Router with EAS Hosting.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-api-routes",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-brownfield",
+					"description": "Integrate Expo and React Native into existing native iOS or Android apps.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-brownfield",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-cicd-workflows",
+					"description": "Write and validate EAS Workflow YAML files for CI/CD pipelines.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-cicd-workflows",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-dev-client",
+					"description": "Build and distribute Expo development clients locally or via TestFlight.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-dev-client",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-deployment",
+					"description": "Deploy to iOS App Store, Android Play Store, and web hosting via EAS.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-deployment",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-tailwind-setup",
+					"description": "Set up Tailwind CSS v4 in Expo with NativeWind v5.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-tailwind-setup",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "expo-ui",
+					"description": "Native UI with @expo/ui: universal components plus SwiftUI and Jetpack Compose.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/expo-ui",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "eas-update-insights",
+					"description": "Check EAS Update health, crash rates, adoption, and payload size.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/eas-update-insights",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "native-data-fetching",
+					"description": "Network requests, API calls, caching, and offline support in Expo apps.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/native-data-fetching",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "upgrading-expo",
+					"description": "Upgrade Expo SDK versions and fix dependency issues.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/upgrading-expo",
+						"include": ["SKILL.md", "references/**"]
+					}
+				},
+				{
+					"name": "use-dom",
+					"description": "Run web code in a webview on native using Expo DOM components.",
+					"source": {
+						"type": "github",
+						"repo": "expo/skills",
+						"ref": "main",
+						"path": "plugins/expo/skills/use-dom",
+						"include": ["SKILL.md", "references/**"]
+					}
+				}
+			],
+			"mcpServers": {
+				"expo": {
+					"transport": "http",
+					"url": "https://mcp.expo.dev/mcp",
+					"oauth": {},
+					"disabled": true
+				}
+			},
+			"commands": {
+				"start": {
+					"label": "Start Expo dev server",
+					"description": "Start the Expo development server.",
+					"command": "npx",
+					"args": ["expo", "start"]
+				},
+				"start-clear": {
+					"label": "Start Expo (clear cache)",
+					"description": "Start the Expo development server with a cleared bundler cache.",
+					"command": "npx",
+					"args": ["expo", "start", "--clear"]
+				},
+				"run-ios": {
+					"label": "Run on iOS",
+					"description": "Build and run the native iOS app locally.",
+					"command": "npx",
+					"args": ["expo", "run:ios"]
+				},
+				"run-android": {
+					"label": "Run on Android",
+					"description": "Build and run the native Android app locally.",
+					"command": "npx",
+					"args": ["expo", "run:android"]
+				},
+				"prebuild": {
+					"label": "Prebuild native projects",
+					"description": "Regenerate the native iOS and Android directories.",
+					"command": "npx",
+					"args": ["expo", "prebuild", "--clean"]
+				},
+				"doctor": {
+					"label": "Run Expo Doctor",
+					"description": "Diagnose project dependencies and configuration issues.",
+					"command": "npx",
+					"args": ["expo-doctor"]
+				},
+				"install": {
+					"label": "Install Expo dependency",
+					"description": "Install a compatible package version with expo install.",
+					"command": "npx",
+					"args": ["expo", "install"],
+					"allowExtraArgs": true
+				}
+			},
+			"browser": {
+				"previewUrl": "http://localhost:8081"
+			},
+			"requirements": [
+				{
+					"kind": "command",
+					"value": "node",
+					"message": "Install Node.js 18 or newer (https://nodejs.org)."
+				},
+				{
+					"kind": "command",
+					"value": "npx",
+					"message": "npx ships with Node.js; install Node.js 18 or newer."
 				}
 			]
 		}
