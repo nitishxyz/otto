@@ -318,7 +318,6 @@ interface ThreadMessageRowProps {
 	currentMessageId: string | null;
 	queueLength: number;
 	compact: boolean;
-	isThreadScrolling: boolean;
 	onSelectSession?: (sessionId: string) => void;
 	createRetryHandler: (messageId: string) => () => Promise<void>;
 	onCompact: () => Promise<void>;
@@ -334,7 +333,6 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
 	currentMessageId,
 	queueLength,
 	compact,
-	isThreadScrolling,
 	onSelectSession,
 	createRetryHandler,
 	onCompact,
@@ -388,7 +386,6 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
 				onRetry={retryHandler}
 				compact={compact}
 				onCompact={isLastMessage ? onCompact : undefined}
-				isThreadScrolling={isThreadScrolling}
 				previousUserMessage={previousUserMessage}
 			/>
 		);
@@ -474,7 +471,6 @@ export const MessageThread = memo(function MessageThread({
 			? 'compact'
 			: 'normal';
 	const [autoScroll, setAutoScroll] = useState(true);
-	const [isThreadScrolling, setIsThreadScrolling] = useState(false);
 	const autoScrollRef = useRef(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
 	const userScrollingRef = useRef(false);
@@ -666,7 +662,6 @@ export const MessageThread = memo(function MessageThread({
 		if (sessionChanged) {
 			initialScrollDoneRef.current = false;
 			userScrollingRef.current = false;
-			setIsThreadScrolling(false);
 			lastScrollHeightRef.current = 0;
 			lastScrollTopRef.current = 0;
 			setShowLeanHeader(false);
@@ -879,7 +874,6 @@ export const MessageThread = memo(function MessageThread({
 						);
 					}}
 					onScroll={handleScroll}
-					isScrolling={setIsThreadScrolling}
 					computeItemKey={(_, message) => message.id}
 					components={THREAD_VIRTUOSO_COMPONENTS}
 					context={virtuosoContext}
@@ -898,7 +892,6 @@ export const MessageThread = memo(function MessageThread({
 									currentMessageId={queueState.currentMessageId}
 									queueLength={queueState.queueLength}
 									compact={compact}
-									isThreadScrolling={isThreadScrolling}
 									onSelectSession={onSelectSession}
 									createRetryHandler={createRetryHandler}
 									onCompact={handleCompact}

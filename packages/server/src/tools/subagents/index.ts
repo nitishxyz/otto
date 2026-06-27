@@ -8,6 +8,7 @@ import {
 	listSubagentsForSession,
 	markSubagentsReported,
 	messageSubagent,
+	retrySubagent,
 	spawnSubagent,
 } from '../../runtime/subagents/service.ts';
 
@@ -65,7 +66,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 					subagentId: result.subagentId,
 					childSessionId: result.childSessionId,
 					agent: result.agent,
-					status: 'started',
+					status: 'running',
 					note: 'Task ownership transferred to the sub-agent. Do not perform the delegated task yourself unless it fails or the user explicitly requested independent verification. Continue unrelated work, or wait/check list_subagents.',
 				};
 			},
@@ -112,6 +113,8 @@ export function buildListSubagentsTool(projectRoot: string, sessionId: string) {
 						task: record.task,
 						status: record.status,
 						summary: record.summary ?? undefined,
+						canRetry: record.status === 'failed',
+						canMessage: record.status !== 'cancelled',
 						childSessionId: record.childSessionId,
 					})),
 				};
@@ -139,7 +142,7 @@ export function buildMessageSubagentTool(
 		name: 'message_subagent',
 		tool: tool({
 			description:
-				'Send a follow-up message to a finished sub-agent. It resumes in the same session with full prior context, runs asynchronously, and reports back like the original delegation. Use this for clarifications or incremental follow-up work instead of re-delegating from scratch.',
+				'Send a follow-up message to a sub-agent session. If it is running, the message queues behind the current run; otherwise it resumes with full prior context. Use this for clarifications or incremental follow-up work instead of re-delegating from scratch.',
 			inputSchema: messageInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -159,8 +162,48 @@ export function buildMessageSubagentTool(
 					subagentId: result.subagentId,
 					childSessionId: result.childSessionId,
 					agent: result.agent,
-					status: 'started',
-					note: 'Follow-up sent. The sub-agent resumes with its prior context; the result arrives automatically when you go idle.',
+					status: 'running',
+					note: 'Follow-up queued/sent. The sub-agent result arrives automatically when it finishes.',
+				};
+			},
+		}),
+	};
+}
+
+const retryInputSchema = z.object({
+	subagentId: z
+		.string()
+		.min(1)
+		.describe('Id of the failed sub-agent to retry (from list_subagents)'),
+});
+
+export function buildRetrySubagentTool(projectRoot: string, sessionId: string) {
+	return {
+		name: 'retry_subagent',
+		tool: tool({
+			description:
+				'Retry the latest failed assistant run inside a sub-agent session, equivalent to pressing Retry in the UI. Use this when list_subagents shows a failed sub-agent whose work should be attempted again with the same context.',
+			inputSchema: retryInputSchema,
+			async execute(input) {
+				const cfg = await loadConfig(projectRoot);
+				const db = await getDb(cfg.projectRoot);
+				const result = await retrySubagent({
+					db,
+					cfg,
+					parentSessionId: sessionId,
+					subagentId: input.subagentId,
+				});
+				if (!result.ok) {
+					return { ok: false, error: result.error };
+				}
+				return {
+					ok: true,
+					subagentId: result.subagentId,
+					childSessionId: result.childSessionId,
+					agent: result.agent,
+					messageId: result.messageId,
+					status: 'running',
+					note: 'Retry queued. The sub-agent result arrives automatically when it finishes.',
 				};
 			},
 		}),
@@ -172,5 +215,6 @@ export function buildSubagentTools(projectRoot: string, sessionId: string) {
 		buildDelegateTaskTool(projectRoot, sessionId),
 		buildListSubagentsTool(projectRoot, sessionId),
 		buildMessageSubagentTool(projectRoot, sessionId),
+		buildRetrySubagentTool(projectRoot, sessionId),
 	];
 }

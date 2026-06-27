@@ -1,9 +1,14 @@
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+	mkdir,
+	mkdtemp,
+	readFile,
+	realpath,
+	rm,
+	writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { promisify } from 'node:util';
 import { describe, expect, it } from 'bun:test';
 import {
 	getGlobalConfigPath,
@@ -28,8 +33,6 @@ import {
 	writeSkillSettings,
 } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
-
-const execFileAsync = promisify(execFile);
 
 describe('config loader', () => {
 	it('loads defaults when no config files present', async () => {
@@ -369,20 +372,19 @@ describe('project storage path helpers', () => {
 		}
 	});
 
-	it('uses git remote URL for stable readable project IDs', async () => {
+	it('uses canonical path for stable readable project IDs', async () => {
 		const tmpRoot = await mkdtemp(join(tmpdir(), 'otto-path-id-'));
 		const projectRoot = join(tmpRoot, 'my project!');
-		const remoteUrl = 'git@example.com:otto/my-project.git';
 
 		try {
 			await mkdir(projectRoot, { recursive: true });
-			await execFileAsync('git', ['init'], { cwd: projectRoot });
-			await execFileAsync('git', ['remote', 'add', 'origin', remoteUrl], {
-				cwd: projectRoot,
-			});
+			const canonicalProjectRoot = (await realpath(projectRoot)).replace(
+				/\\/g,
+				'/',
+			);
 
 			const expectedHash = createHash('sha256')
-				.update(remoteUrl)
+				.update(canonicalProjectRoot)
 				.digest('hex')
 				.slice(0, 8);
 

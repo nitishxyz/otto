@@ -46,7 +46,6 @@ interface AssistantMessageGroupProps {
 	onNavigateToSession?: (sessionId: string) => void;
 	onRetry?: () => void;
 	onCompact?: () => void;
-	isThreadScrolling?: boolean;
 	previousUserMessage?: Message;
 }
 
@@ -226,14 +225,12 @@ export const AssistantMessageGroup = memo(
 		onNavigateToSession,
 		onRetry,
 		onCompact,
-		isThreadScrolling = false,
 		previousUserMessage,
 	}: AssistantMessageGroupProps) {
 		const { isQueued } = useMessageQueuePosition(sessionId, message.id);
 		const isCompactDensity = useIsCompactThread();
 		const isCompactThread = Boolean(compact || isCompactDensity);
 		const [isHovered, setIsHovered] = useState(false);
-		const effectiveHovered = isHovered && !isThreadScrolling;
 		const [showBranchModal, setShowBranchModal] = useState(false);
 		const [copied, setCopied] = useState(false);
 		const [showAllParts, setShowAllParts] = useState(false);
@@ -616,9 +613,7 @@ export const AssistantMessageGroup = memo(
 			// biome-ignore lint/a11y/noStaticElementInteractions: hover state for showing actions
 			<div
 				className="relative group"
-				onMouseEnter={() => {
-					if (!isThreadScrolling) setIsHovered(true);
-				}}
+				onMouseEnter={() => setIsHovered(true)}
 				onMouseLeave={() => setIsHovered(false)}
 			>
 				{showHeader && (
@@ -675,19 +670,16 @@ export const AssistantMessageGroup = memo(
 								)}
 							</div>
 						</div>
-						{effectiveHovered &&
-							isComplete &&
-							sessionId &&
-							showBranchButton && (
-								<button
-									type="button"
-									onClick={handleBranchClick}
-									className="ml-4 p-1.5 text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
-									title="Branch from this message"
-								>
-									<GitBranch className="h-4 w-4" />
-								</button>
-							)}
+						{isHovered && isComplete && sessionId && showBranchButton && (
+							<button
+								type="button"
+								onClick={handleBranchClick}
+								className="ml-4 p-1.5 text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+								title="Branch from this message"
+							>
+								<GitBranch className="h-4 w-4" />
+							</button>
+						)}
 					</div>
 				)}
 
@@ -801,40 +793,41 @@ export const AssistantMessageGroup = memo(
 				</div>
 
 				{isComplete && sessionId && (
-					<div
-						className="grid ml-7 transition-[grid-template-rows] duration-200 ease-out"
-						style={{ gridTemplateRows: effectiveHovered ? '1fr' : '0fr' }}
-					>
-						<div className="overflow-hidden">
-							<div className="flex gap-2 mt-2">
-								{showBranchButton && (
-									<button
-										type="button"
-										onClick={handleBranchClick}
-										className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
-									>
-										<GitBranch className="h-3 w-3" />
-										Branch
-									</button>
-								)}
+					<div className="ml-7 mt-2 min-h-7">
+						<div
+							className={`flex gap-2 transition-opacity duration-150 ${
+								isHovered ? 'opacity-100' : 'pointer-events-none opacity-0'
+							}`}
+						>
+							{showBranchButton && (
 								<button
 									type="button"
-									onClick={handleCopy}
+									onClick={handleBranchClick}
+									tabIndex={isHovered ? 0 : -1}
 									className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
 								>
-									{copied ? (
-										<>
-											<Check className="h-3 w-3 text-green-500" />
-											Copied
-										</>
-									) : (
-										<>
-											<Copy className="h-3 w-3" />
-											Copy
-										</>
-									)}
+									<GitBranch className="h-3 w-3" />
+									Branch
 								</button>
-							</div>
+							)}
+							<button
+								type="button"
+								onClick={handleCopy}
+								tabIndex={isHovered ? 0 : -1}
+								className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
+							>
+								{copied ? (
+									<>
+										<Check className="h-3 w-3 text-green-500" />
+										Copied
+									</>
+								) : (
+									<>
+										<Copy className="h-3 w-3" />
+										Copy
+									</>
+								)}
+							</button>
 						</div>
 					</div>
 				)}

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
 use std::io::{Read as _, Write as _};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::ipc::Channel;
 use tauri_plugin_updater::UpdaterExt;
@@ -105,8 +107,48 @@ fn serve_json_once(json_bytes: Vec<u8>) -> Result<u16, String> {
     Ok(port)
 }
 
+fn global_debug_log_path() -> Option<PathBuf> {
+    let config_home = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".config")))?;
+
+    Some(config_home.join("otto").join("debug").join("latest.log"))
+}
+
+fn write_update_trace(message: impl AsRef<str>) {
+    let Some(path) = global_debug_log_path() else {
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(
+            file,
+            "{} [trace] [desktop:update] {}",
+            chrono::Utc::now().to_rfc3339(),
+            message.as_ref()
+        );
+    }
+}
+
 #[tauri::command]
 pub async fn check_for_update(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, PendingUpdate>,
+) -> Result<Option<UpdateInfo>, String> {
+    match check_for_update_impl(app, state).await {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            write_update_trace(format!("check_for_update failed: {error}"));
+            Ok(None)
+        }
+    }
+}
+
+async fn check_for_update_impl(
     app: tauri::AppHandle,
     state: tauri::State<'_, PendingUpdate>,
 ) -> Result<Option<UpdateInfo>, String> {

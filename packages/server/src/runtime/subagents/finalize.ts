@@ -42,6 +42,12 @@ export async function finalizeSubagentForChildSession(
 			assistantMessage.status === 'error' ||
 			assistantMessage.finishReason === 'error';
 		summary = await extractAssistantText(db, assistantMessage.id);
+		if (failed) {
+			const errorSummary = buildAssistantErrorSummary(assistantMessage);
+			if (errorSummary) {
+				summary = summary ? `${summary}\n\n${errorSummary}` : errorSummary;
+			}
+		}
 	}
 	if (!summary) {
 		summary = failed
@@ -85,4 +91,43 @@ async function extractAssistantText(
 		} catch {}
 	}
 	return chunks.join('\n').trim();
+}
+
+function buildAssistantErrorSummary(
+	assistantMessage: typeof messages.$inferSelect,
+): string {
+	const lines = ['Sub-agent run failed.'];
+	if (assistantMessage.error?.trim()) {
+		lines.push(`Error: ${assistantMessage.error.trim()}`);
+	}
+	if (assistantMessage.errorType?.trim()) {
+		lines.push(`Type: ${assistantMessage.errorType.trim()}`);
+	}
+	const details = extractErrorDetails(assistantMessage.errorDetails);
+	if (details.length) lines.push(...details);
+	return lines.length > 1 ? lines.join('\n') : '';
+}
+
+function extractErrorDetails(errorDetails: string | null): string[] {
+	if (!errorDetails) return [];
+	try {
+		const parsed = JSON.parse(errorDetails) as unknown;
+		const detailLines: string[] = [];
+		if (parsed && typeof parsed === 'object') {
+			const record = parsed as Record<string, unknown>;
+			const name = readString(record.name);
+			const message = readString(record.message);
+			const type = readString(record.type);
+			if (name) detailLines.push(`Name: ${name}`);
+			if (type) detailLines.push(`Provider type: ${type}`);
+			if (message) detailLines.push(`Details: ${message}`);
+		}
+		return detailLines;
+	} catch {
+		return [`Details: ${errorDetails}`];
+	}
+}
+
+function readString(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }

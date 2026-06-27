@@ -98,7 +98,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 		progress,
 		downloadUpdate,
 		applyUpdate,
-		error: updateError,
 	} = useUpdate();
 
 	return (
@@ -134,14 +133,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 								{downloading ? `${progress}%` : 'Update'}
 							</button>
 						))}
-					{updateError && (
-						<span
-							className="text-sm text-red-400 max-w-[200px] truncate"
-							title={updateError}
-						>
-							⚠ {updateError}
-						</span>
-					)}
 					{serverPort != null && !isRemote && (
 						<div className="flex items-center gap-1.5 text-sm">
 							<span className="w-2.5 h-2.5 rounded-full bg-green-500" />

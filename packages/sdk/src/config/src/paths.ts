@@ -141,7 +141,7 @@ export function getProjectsStateRoot(): string {
 
 const projectIdCache = new Map<string, Promise<string>>();
 
-/** Build a stable readable project ID from basename and git remote/path hash. */
+/** Build a stable readable project ID from basename and canonical path hash. */
 export async function getProjectId(projectRoot: string): Promise<string> {
 	const normalizedProjectRoot = projectRoot.replace(/\\/g, '/');
 	const cached = projectIdCache.get(normalizedProjectRoot);
@@ -156,9 +156,7 @@ async function resolveProjectId(
 	normalizedProjectRoot: string,
 ): Promise<string> {
 	const slug = sanitizeProjectSlug(getPathBasename(normalizedProjectRoot));
-	const hashInput =
-		(await readGitRemoteUrl(normalizedProjectRoot)) ??
-		(await getCanonicalProjectRoot(normalizedProjectRoot));
+	const hashInput = await getCanonicalProjectRoot(normalizedProjectRoot);
 	const hash = (await sha256Hex(hashInput)).slice(0, 8);
 	return `${slug}-${hash}`;
 }
@@ -270,89 +268,8 @@ async function getCanonicalProjectRoot(projectRoot: string): Promise<string> {
 	}
 }
 
-async function readGitRemoteUrl(
-	projectRoot: string,
-): Promise<string | undefined> {
-	const currentBranchRemote = await readCurrentBranchRemote(projectRoot);
-	const remoteNames = currentBranchRemote
-		? [currentBranchRemote, 'origin']
-		: ['origin'];
-
-	for (const remoteName of remoteNames) {
-		const remoteUrl = await readGitConfigValue(
-			projectRoot,
-			`remote.${remoteName}.url`,
-		);
-		if (remoteUrl) return remoteUrl;
-	}
-
-	const remoteList = await readGitConfigValues(
-		projectRoot,
-		'config',
-		'--get-regexp',
-		'remote\\..*\\.url',
-	);
-	return remoteList
-		.map((line) => line.trim().split(/\s+/, 2)[1])
-		.find((url) => url?.trim());
-}
-
-async function readCurrentBranchRemote(
-	projectRoot: string,
-): Promise<string | undefined> {
-	const branch = await readGitConfigValues(
-		projectRoot,
-		'rev-parse',
-		'--abbrev-ref',
-		'HEAD',
-	);
-	const branchName = branch[0];
-	if (!branchName || branchName === 'HEAD') return undefined;
-	return readGitConfigValue(projectRoot, `branch.${branchName}.remote`);
-}
-
-async function readGitConfigValue(
-	projectRoot: string,
-	key: string,
-): Promise<string | undefined> {
-	const values = await readGitConfigValues(projectRoot, 'config', '--get', key);
-	return values[0];
-}
-
-async function readGitConfigValues(
-	projectRoot: string,
-	...args: string[]
-): Promise<string[]> {
-	try {
-		const { execFile } = await loadChildProcess();
-		const { promisify } = await loadUtil();
-		const execFileAsync = promisify(execFile);
-		const { stdout } = await execFileAsync('git', ['-C', projectRoot, ...args]);
-		const output = String(stdout);
-		return output
-			.split('\n')
-			.map((line) => line.trim())
-			.filter(Boolean);
-	} catch {
-		return [];
-	}
-}
-
 async function loadFsPromises(): Promise<typeof import('node:fs/promises')> {
 	return Function('specifier', 'return import(specifier)')('node:fs/promises');
-}
-
-async function loadChildProcess(): Promise<
-	typeof import('node:child_process')
-> {
-	return Function(
-		'specifier',
-		'return import(specifier)',
-	)('node:child_process');
-}
-
-async function loadUtil(): Promise<typeof import('node:util')> {
-	return Function('specifier', 'return import(specifier)')('node:util');
 }
 
 async function loadCrypto(): Promise<typeof import('node:crypto')> {

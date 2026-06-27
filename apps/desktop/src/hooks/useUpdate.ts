@@ -86,9 +86,8 @@ async function checkForUpdate() {
 				error: null,
 			});
 		}
-	} catch (e) {
-		console.error('[otto] Update check failed:', e);
-		setState({ error: String(e) });
+	} catch {
+		// Native update-check failures are traced to local debug logs only.
 	}
 }
 

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { Database } from 'bun:sqlite';
 import {
 	mkdir,
 	mkdtemp,
@@ -12,10 +13,13 @@ import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'bun:test';
 import {
+	formatProjectStateMigrationReport,
 	formatStoragePlan,
+	migrateProjectStateStorage,
 	migrateStorage,
 	planStorageMigration,
 } from '../apps/cli/src/storage.ts';
+import { getProjectStateDir } from '@ottocode/sdk';
 
 const execFileAsync = promisify(execFile);
 
@@ -80,6 +84,124 @@ async function writeLegacyRuntimeDirs(projectRoot: string) {
 	}
 	return legacyDir;
 }
+
+async function writeProjectStateDir(
+	stateDir: string,
+	projectRoot: string,
+	sessionIds: string[],
+) {
+	await mkdir(stateDir, { recursive: true });
+	await writeFile(
+		join(stateDir, 'project.json'),
+		`${JSON.stringify(
+			{
+				id: stateDir.split('/').at(-1),
+				name: projectRoot.split('/').at(-1),
+				root: projectRoot,
+				createdAt: new Date().toISOString(),
+				lastSeenAt: new Date().toISOString(),
+			},
+			null,
+			2,
+		)}\n`,
+	);
+	const db = new Database(join(stateDir, 'otto.sqlite'), { create: true });
+	try {
+		db.exec(
+			'CREATE TABLE sessions (id TEXT PRIMARY KEY NOT NULL, project_path TEXT NOT NULL)',
+		);
+		const insert = db.query(
+			'INSERT INTO sessions (id, project_path) VALUES (?, ?)',
+		);
+		for (const sessionId of sessionIds) insert.run(sessionId, projectRoot);
+	} finally {
+		db.close();
+	}
+}
+
+function readSessionIds(stateDir: string): string[] {
+	const db = new Database(join(stateDir, 'otto.sqlite'), { readonly: true });
+	try {
+		return (
+			db.query('SELECT id FROM sessions ORDER BY id').all() as Array<{
+				id: string;
+			}>
+		).map((row) => row.id);
+	} finally {
+		db.close();
+	}
+}
+
+describe('project state ID migration', () => {
+	it('moves old state dirs into path-based project IDs', async () => {
+		await withProject('otto-state-move-', async (projectRoot, ottoHome) => {
+			const oldStateDir = join(ottoHome, 'projects', 'example-aaaaaaaa');
+			const targetStateDir = await getProjectStateDir(projectRoot);
+			await writeProjectStateDir(oldStateDir, projectRoot, ['old-session']);
+
+			const dryRun = await migrateProjectStateStorage({ dryRun: true });
+
+			expect(
+				dryRun.items.some(
+					(item) => item.from === oldStateDir && item.status === 'would-move',
+				),
+			).toBe(true);
+			expect(await Bun.file(targetStateDir).exists()).toBe(false);
+
+			const result = await migrateProjectStateStorage();
+
+			expect(
+				result.items.some(
+					(item) => item.from === oldStateDir && item.status === 'moved',
+				),
+			).toBe(true);
+			expect(await Bun.file(oldStateDir).exists()).toBe(false);
+			expect(readSessionIds(targetStateDir)).toEqual(['old-session']);
+			const output = formatProjectStateMigrationReport(result);
+			expect(output).toContain('Moved: 1');
+		});
+	});
+
+	it('merges old state dirs when the path-based target already exists', async () => {
+		await withProject('otto-state-merge-', async (projectRoot, ottoHome) => {
+			const oldStateDir = join(ottoHome, 'projects', 'example-bbbbbbbb');
+			const targetStateDir = await getProjectStateDir(projectRoot);
+			await writeProjectStateDir(oldStateDir, projectRoot, ['source-session']);
+			await writeProjectStateDir(targetStateDir, projectRoot, [
+				'target-session',
+			]);
+			await mkdir(join(oldStateDir, 'attachments', 'att_source'), {
+				recursive: true,
+			});
+			await writeFile(
+				join(oldStateDir, 'attachments', 'att_source', 'original.txt'),
+				'source attachment',
+			);
+
+			const result = await migrateProjectStateStorage();
+
+			expect(
+				result.items.some(
+					(item) => item.from === oldStateDir && item.status === 'merged',
+				),
+			).toBe(true);
+			expect(await Bun.file(oldStateDir).exists()).toBe(false);
+			expect(readSessionIds(targetStateDir)).toEqual([
+				'source-session',
+				'target-session',
+			]);
+			expect(
+				await readFile(
+					join(targetStateDir, 'attachments', 'att_source', 'original.txt'),
+					'utf8',
+				),
+			).toBe('source attachment');
+			expect(
+				result.items.find((item) => item.from === oldStateDir)?.archiveDir,
+			).toContain('migrated-projects');
+		});
+	});
+});
 
 describe('storage SQLite migration', () => {
 	it('plans SQLite migration without touching state files', async () => {

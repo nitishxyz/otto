@@ -38,3 +38,20 @@ export type MessageSubagentInput = {
 export type MessageSubagentResult =
 	| { ok: true; subagentId: string; childSessionId: string; agent: string }
 	| { ok: false; error: string };
+
+export type RetrySubagentInput = {
+	db: DB;
+	cfg: OttoConfig;
+	parentSessionId: string;
+	subagentId: string;
+};
+
+export type RetrySubagentResult =
+	| {
+			ok: true;
+			subagentId: string;
+			childSessionId: string;
+			agent: string;
+			messageId: string;
+	  }
+	| { ok: false; error: string };

@@ -1,10 +1,13 @@
 import { execFile } from 'node:child_process';
+import { Database } from 'bun:sqlite';
 import {
 	cp,
 	copyFile,
 	mkdir,
+	readdir,
 	readFile,
 	realpath,
+	rename,
 	rm,
 	stat,
 	writeFile,
@@ -21,6 +24,7 @@ import {
 	getProjectDebugDumpsDir,
 	getProjectId,
 	getProjectLogsDir,
+	getProjectsStateRoot,
 	getProjectStateDir,
 	getProjectTmpDir,
 } from '@ottocode/sdk';
@@ -111,6 +115,162 @@ type MigrationManifest = {
 	stateDir: string;
 	items: StorageMigrationItem[];
 };
+
+export type ProjectStateMigrationStatus =
+	| 'already-path'
+	| 'would-move'
+	| 'moved'
+	| 'would-merge'
+	| 'merged'
+	| 'skipped'
+	| 'error';
+
+export type ProjectStateMigrationItem = {
+	projectRoot?: string;
+	projectId?: string;
+	from: string;
+	to?: string;
+	status: ProjectStateMigrationStatus;
+	sessions: number;
+	reason?: string;
+	archiveDir?: string;
+};
+
+export type ProjectStateMigrationReport = {
+	projectsRoot: string;
+	dryRun: boolean;
+	items: ProjectStateMigrationItem[];
+};
+
+export type ProjectStateMigrationOptions = {
+	projectRoot?: string;
+	dryRun?: boolean;
+};
+
+/** Move or merge old project state directories into canonical path-based IDs. */
+export async function migrateProjectStateStorage(
+	options: ProjectStateMigrationOptions = {},
+): Promise<ProjectStateMigrationReport> {
+	const dryRun = options.dryRun === true;
+	const filterRoot = options.projectRoot
+		? await resolveProjectRoot(options.projectRoot)
+		: undefined;
+	const projectsRoot = getProjectsStateRoot();
+	const planned = await planProjectStateDirectoryMigration(
+		projectsRoot,
+		filterRoot,
+	);
+	if (dryRun) return { projectsRoot, dryRun, items: planned };
+
+	const items: ProjectStateMigrationItem[] = [];
+	for (const item of planned) {
+		if (item.status === 'would-move' && item.to && item.projectRoot) {
+			try {
+				await mkdir(projectsRoot, { recursive: true });
+				await rename(item.from, item.to);
+				await writeStateProjectMetadata(item.to, item.projectRoot);
+				items.push({ ...item, status: 'moved' });
+			} catch (error) {
+				items.push({
+					...item,
+					status: 'error',
+					reason: error instanceof Error ? error.message : String(error),
+				});
+			}
+			continue;
+		}
+
+		if (item.status === 'would-merge' && item.to && item.projectRoot) {
+			try {
+				await mergeProjectStateDirectories(item.from, item.to);
+				await writeStateProjectMetadata(item.to, item.projectRoot);
+				const archiveDir = await archiveMigratedStateDir(item.from);
+				items.push({ ...item, status: 'merged', archiveDir });
+			} catch (error) {
+				items.push({
+					...item,
+					status: 'error',
+					reason: error instanceof Error ? error.message : String(error),
+				});
+			}
+			continue;
+		}
+
+		items.push(item);
+	}
+
+	return { projectsRoot, dryRun, items };
+}
+
+export function formatProjectStateMigrationReport(
+	report: ProjectStateMigrationReport,
+): string {
+	const counts = countProjectStateMigrationStatuses(report.items);
+	const lines = [
+		'Otto project state migration',
+		`Mode: ${report.dryRun ? 'dry-run' : 'execute'}`,
+		`Projects root: ${report.projectsRoot}`,
+		'',
+		`Moved: ${counts.moved}`,
+		`Merged: ${counts.merged}`,
+		`Already path-based: ${counts.alreadyPath}`,
+		`Skipped: ${counts.skipped}`,
+		`Errors: ${counts.error}`,
+	];
+
+	const actionable = report.items.filter((item) =>
+		['would-move', 'would-merge', 'moved', 'merged', 'error'].includes(
+			item.status,
+		),
+	);
+	if (actionable.length > 0) {
+		lines.push('', 'Actions:');
+		for (const item of actionable) {
+			lines.push(`  - ${formatProjectStateMigrationItem(item)}`);
+		}
+	}
+
+	const skippedWithSessions = report.items.filter(
+		(item) => item.status === 'skipped' && item.sessions > 0,
+	);
+	if (skippedWithSessions.length > 0) {
+		lines.push('', 'Skipped items with sessions:');
+		for (const item of skippedWithSessions) {
+			lines.push(`  - ${formatProjectStateMigrationItem(item)}`);
+		}
+	}
+
+	if (report.dryRun) {
+		lines.push('', 'Run without --dry-run to apply these changes.');
+	}
+	return lines.join('\n');
+}
+
+function countProjectStateMigrationStatuses(
+	items: ProjectStateMigrationItem[],
+) {
+	return {
+		moved: items.filter((item) => ['would-move', 'moved'].includes(item.status))
+			.length,
+		merged: items.filter((item) =>
+			['would-merge', 'merged'].includes(item.status),
+		).length,
+		alreadyPath: items.filter((item) => item.status === 'already-path').length,
+		skipped: items.filter((item) => item.status === 'skipped').length,
+		error: items.filter((item) => item.status === 'error').length,
+	};
+}
+
+function formatProjectStateMigrationItem(
+	item: ProjectStateMigrationItem,
+): string {
+	const root = item.projectRoot ? ` ${item.projectRoot}` : '';
+	const target = item.to ? ` -> ${item.to}` : '';
+	const sessions = ` (${item.sessions} sessions)`;
+	const reason = item.reason ? `: ${item.reason}` : '';
+	const archive = item.archiveDir ? ` archived at ${item.archiveDir}` : '';
+	return `${item.status}${root}${sessions}: ${item.from}${target}${archive}${reason}`;
+}
 
 /** Build a SQLite-only storage migration plan without touching files. */
 export async function planStorageMigration(
@@ -525,6 +685,301 @@ function getPlanStatus(plan: StorageMigrationPlan): string {
 		return 'migration recommended';
 	}
 	return 'nothing to migrate';
+}
+
+async function planProjectStateDirectoryMigration(
+	projectsRoot: string,
+	filterRoot?: string,
+): Promise<ProjectStateMigrationItem[]> {
+	let entries: Array<{ isDirectory(): boolean; name: string }>;
+	try {
+		entries = await readdir(projectsRoot, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+
+	const items: ProjectStateMigrationItem[] = [];
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		const from = join(projectsRoot, entry.name);
+		const sessions = await readSessionCount(from);
+		const rootResult = await readProjectRootFromStateDir(from);
+		if (!rootResult.root) {
+			items.push({
+				from,
+				status: 'skipped',
+				sessions,
+				reason: rootResult.reason ?? 'could not resolve project root',
+			});
+			continue;
+		}
+
+		const projectRoot = await resolveProjectRoot(rootResult.root);
+		if (filterRoot && projectRoot !== filterRoot) continue;
+
+		const projectId = await getProjectId(projectRoot);
+		const to = await getProjectStateDir(projectRoot);
+		if (from === to) {
+			items.push({
+				projectRoot,
+				projectId,
+				from,
+				to,
+				status: 'already-path',
+				sessions,
+			});
+			continue;
+		}
+
+		items.push({
+			projectRoot,
+			projectId,
+			from,
+			to,
+			status: (await exists(to)) ? 'would-merge' : 'would-move',
+			sessions,
+		});
+	}
+
+	return items.sort((a, b) => {
+		const priority = (item: ProjectStateMigrationItem) =>
+			item.status === 'would-merge' || item.status === 'would-move' ? 0 : 1;
+		return (
+			priority(a) - priority(b) ||
+			b.sessions - a.sessions ||
+			a.from.localeCompare(b.from)
+		);
+	});
+}
+
+async function readProjectRootFromStateDir(
+	stateDir: string,
+): Promise<{ root?: string; reason?: string }> {
+	const metadata = await readProjectMetadataLoose(
+		join(stateDir, 'project.json'),
+	);
+	if (metadata?.root) return { root: metadata.root };
+
+	const dbRoots = await readProjectRootsFromDb(join(stateDir, 'otto.sqlite'));
+	if (dbRoots.length === 1) return { root: dbRoots[0] };
+	if (dbRoots.length > 1) {
+		return { reason: `ambiguous project roots: ${dbRoots.join(', ')}` };
+	}
+	return { reason: 'missing project metadata and session project paths' };
+}
+
+async function readProjectMetadataLoose(
+	path: string,
+): Promise<Partial<ProjectMetadata> | undefined> {
+	try {
+		const parsed = JSON.parse(
+			await readFile(path, 'utf8'),
+		) as Partial<ProjectMetadata>;
+		return parsed && typeof parsed === 'object' ? parsed : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+async function readProjectRootsFromDb(dbPath: string): Promise<string[]> {
+	if (!(await exists(dbPath))) return [];
+	try {
+		const db = new Database(dbPath, { readonly: true });
+		try {
+			const rows = db
+				.query(
+					"SELECT DISTINCT project_path AS projectPath FROM sessions WHERE project_path IS NOT NULL AND project_path != '' LIMIT 3",
+				)
+				.all() as Array<{ projectPath: string }>;
+			return rows.map((row) => row.projectPath).filter(Boolean);
+		} finally {
+			db.close();
+		}
+	} catch {
+		return [];
+	}
+}
+
+async function readSessionCount(stateDir: string): Promise<number> {
+	const dbPath = join(stateDir, 'otto.sqlite');
+	if (!(await exists(dbPath))) return 0;
+	try {
+		const db = new Database(dbPath, { readonly: true });
+		try {
+			const row = db.query('SELECT COUNT(*) AS count FROM sessions').get() as
+				| { count: number }
+				| undefined;
+			return row?.count ?? 0;
+		} finally {
+			db.close();
+		}
+	} catch {
+		return 0;
+	}
+}
+
+async function writeStateProjectMetadata(
+	stateDir: string,
+	projectRoot: string,
+): Promise<void> {
+	const projectId = await getProjectId(projectRoot);
+	const metadataPath = join(stateDir, 'project.json');
+	const existing = await readProjectMetadataLoose(metadataPath);
+	const now = new Date().toISOString();
+	await writeJson(metadataPath, {
+		id: projectId,
+		name: basename(projectRoot),
+		root: projectRoot,
+		...(existing?.gitRemote ? { gitRemote: existing.gitRemote } : {}),
+		createdAt: existing?.createdAt ?? now,
+		lastSeenAt: now,
+	});
+	await writeJson(join(stateDir, 'migration.json'), {
+		version: 2,
+		projectRoot,
+		projectId,
+		migratedAt: now,
+		stateDir,
+		reason: 'path-based-project-state-id',
+	});
+}
+
+async function mergeProjectStateDirectories(
+	from: string,
+	to: string,
+): Promise<void> {
+	await mkdir(to, { recursive: true });
+	await mergeSqliteDatabases(
+		join(from, 'otto.sqlite'),
+		join(to, 'otto.sqlite'),
+	);
+
+	for (const entry of await readdir(from, { withFileTypes: true })) {
+		if (SQLITE_FILES.includes(entry.name as SqliteFileName)) continue;
+		if (entry.name === 'project.json' || entry.name === 'migration.json')
+			continue;
+		const sourcePath = join(from, entry.name);
+		const targetPath = join(to, entry.name);
+		if (entry.isDirectory()) {
+			await copyDirectoryContents(sourcePath, targetPath);
+			continue;
+		}
+		if (!(await exists(targetPath))) await copyFile(sourcePath, targetPath);
+	}
+}
+
+async function mergeSqliteDatabases(
+	fromDbPath: string,
+	toDbPath: string,
+): Promise<void> {
+	if (!(await exists(fromDbPath))) return;
+	if (!(await exists(toDbPath))) {
+		for (const file of SQLITE_FILES) {
+			const fromFile = join(fromDbPath, '..', file);
+			const toFile = join(toDbPath, '..', file);
+			if (await exists(fromFile)) await copyFile(fromFile, toFile);
+		}
+		return;
+	}
+
+	const db = new Database(toDbPath, { create: true });
+	try {
+		db.exec('PRAGMA busy_timeout = 5000');
+		db.exec('PRAGMA foreign_keys = OFF');
+		db.exec(`ATTACH DATABASE ${quoteSqlString(fromDbPath)} AS source`);
+		try {
+			const tables = db
+				.query(
+					"SELECT name FROM source.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+				)
+				.all() as Array<{ name: string }>;
+			db.exec('BEGIN TRANSACTION');
+			try {
+				for (const table of tables) {
+					if (!(await tableExistsInMain(db, table.name))) continue;
+					const columns = getCommonTableColumns(db, table.name);
+					if (columns.length === 0) continue;
+					const columnList = columns.map(quoteIdent).join(', ');
+					db.exec(
+						`INSERT OR IGNORE INTO ${quoteIdent(table.name)} (${columnList}) SELECT ${columnList} FROM source.${quoteIdent(table.name)}`,
+					);
+				}
+				db.exec('COMMIT');
+			} catch (error) {
+				db.exec('ROLLBACK');
+				throw error;
+			}
+		} finally {
+			db.exec('DETACH DATABASE source');
+		}
+	} finally {
+		db.close();
+	}
+}
+
+async function tableExistsInMain(
+	db: Database,
+	table: string,
+): Promise<boolean> {
+	const row = db
+		.query(
+			"SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?",
+		)
+		.get(table) as { ok: number } | undefined;
+	return row?.ok === 1;
+}
+
+function getCommonTableColumns(db: Database, table: string): string[] {
+	const mainColumns = new Set(getTableColumns(db, 'main', table));
+	return getTableColumns(db, 'source', table).filter((column) =>
+		mainColumns.has(column),
+	);
+}
+
+function getTableColumns(
+	db: Database,
+	schema: 'main' | 'source',
+	table: string,
+) {
+	const rows = db
+		.query(`PRAGMA ${schema}.table_info(${quoteIdent(table)})`)
+		.all() as Array<{ name: string }>;
+	return rows.map((row) => row.name);
+}
+
+async function copyDirectoryContents(from: string, to: string): Promise<void> {
+	await mkdir(to, { recursive: true });
+	for (const entry of await readdir(from, { withFileTypes: true })) {
+		const sourcePath = join(from, entry.name);
+		const targetPath = join(to, entry.name);
+		if (entry.isDirectory()) {
+			await copyDirectoryContents(sourcePath, targetPath);
+			continue;
+		}
+		if (!(await exists(targetPath))) await copyFile(sourcePath, targetPath);
+	}
+}
+
+async function archiveMigratedStateDir(sourceDir: string): Promise<string> {
+	const backupRoot = join(getProjectsStateRoot(), '..', 'migrated-projects');
+	await mkdir(backupRoot, { recursive: true });
+	const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+	let target = join(backupRoot, `${basename(sourceDir)}-${stamp}`);
+	let index = 2;
+	while (await exists(target)) {
+		target = join(backupRoot, `${basename(sourceDir)}-${stamp}-${index}`);
+		index += 1;
+	}
+	await rename(sourceDir, target);
+	return target;
+}
+
+function quoteIdent(value: string): string {
+	return `"${value.replace(/"/g, '""')}"`;
+}
+
+function quoteSqlString(value: string): string {
+	return `'${value.replace(/'/g, "''")}'`;
 }
 
 async function hasAnyRuntimeDir(root: string): Promise<boolean> {

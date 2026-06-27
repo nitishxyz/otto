@@ -8,8 +8,8 @@ import type { MessageSubagentInput, MessageSubagentResult } from './types.ts';
 
 /**
  * Sends a follow-up message to an existing sub-agent's child session,
- * resuming it with full prior context. The record goes back to 'running'
- * and the parent is woken again when the follow-up finishes.
+ * resuming it with full prior context. If the child session is already
+ * running, the message queues behind the current run like normal chat input.
  */
 export async function messageSubagent(
 	input: MessageSubagentInput,
@@ -31,13 +31,6 @@ export async function messageSubagent(
 		return {
 			ok: false,
 			error: `No sub-agent with id "${subagentId}" for this session. Use list_subagents to find ids.`,
-		};
-	}
-	if (record.status === 'running') {
-		return {
-			ok: false,
-			error:
-				'Sub-agent is still running. Wait for its result before following up.',
 		};
 	}
 	if (record.status === 'cancelled') {
@@ -74,6 +67,7 @@ export async function messageSubagent(
 		subagentId: record.id,
 		parentSessionId,
 		childSessionId: record.childSessionId,
+		wasRunning: record.status === 'running',
 	});
 
 	return {

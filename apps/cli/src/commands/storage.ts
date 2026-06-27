@@ -1,8 +1,9 @@
 import type { Command } from 'commander';
 import {
+	formatProjectStateMigrationReport,
 	formatStorageDoctor,
 	formatStoragePlan,
-	migrateStorage,
+	migrateProjectStateStorage,
 	planStorageMigration,
 } from '../storage.ts';
 
@@ -12,7 +13,9 @@ type StorageCommandOptions = {
 
 type StorageMigrateOptions = StorageCommandOptions & {
 	dryRun?: boolean;
-	deleteLegacy?: boolean;
+};
+
+type StoragePlanOptions = StorageCommandOptions & {
 	force?: boolean;
 };
 
@@ -37,7 +40,7 @@ export function registerStorageCommand(program: Command) {
 		)
 		.option('--project <path>', 'Use project at <path>')
 		.option('--force', 'Plan overwriting existing target SQLite files', false)
-		.action(async (opts: StorageMigrateOptions) => {
+		.action(async (opts: StoragePlanOptions) => {
 			const plan = await planStorageMigration({
 				projectRoot: opts.project,
 				force: opts.force,
@@ -47,26 +50,18 @@ export function registerStorageCommand(program: Command) {
 
 	storage
 		.command('migrate')
-		.description('Copy legacy SQLite files into project state storage')
-		.option('--project <path>', 'Use project at <path>')
+		.description('Migrate all project state directories to path-based IDs')
+		.option('--project <path>', 'Only migrate state for one project path')
 		.option(
 			'--dry-run',
 			'Show the migration plan without touching files',
 			false,
 		)
-		.option(
-			'--delete-legacy',
-			'Delete legacy SQLite files after successful copy',
-			false,
-		)
-		.option('--force', 'Overwrite existing target SQLite files', false)
 		.action(async (opts: StorageMigrateOptions) => {
-			const result = await migrateStorage({
+			const result = await migrateProjectStateStorage({
 				projectRoot: opts.project,
 				dryRun: opts.dryRun,
-				deleteLegacy: opts.deleteLegacy,
-				force: opts.force,
 			});
-			console.log(formatStoragePlan(result));
+			console.log(formatProjectStateMigrationReport(result));
 		});
 }
