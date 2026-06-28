@@ -1,4 +1,5 @@
 import { tool, type Tool } from 'ai';
+import { dirname } from 'node:path';
 import { z } from 'zod/v3';
 import {
 	loadSkill,
@@ -56,12 +57,14 @@ export function buildSkillTool(): { name: string; tool: Tool } {
 	const skillTool = tool({
 		description: buildSkillDescription(),
 		inputSchema: z.object({
-			name: z.string().describe('Name of the skill to load'),
+			name: z
+				.string()
+				.describe('The name of the skill from the available skills list'),
 			file: z
 				.string()
 				.optional()
 				.describe(
-					'Optional relative file path within the skill directory to load a specific sub-file (e.g. "rules/animations.md")',
+					'Optional relative path within the skill base directory to load a specific supporting file (e.g. "rules/animations.md")',
 				),
 		}),
 		async execute({
@@ -98,6 +101,9 @@ async function loadMainSkill(name: string): Promise<SkillResult> {
 		description: skill.metadata.description,
 		content: skill.content,
 		path: skill.path,
+		baseDirectory: dirname(skill.path),
+		resourceInstructions:
+			'Supporting file paths are relative to this baseDirectory. Load a listed file with the skill tool file parameter only when the skill instructions or task make it relevant.',
 		scope: skill.scope,
 		allowedTools: skill.metadata.allowedTools,
 		...(availableFiles.length > 0 && { availableFiles }),
@@ -132,6 +138,9 @@ async function loadSubFile(
 		description: `Sub-file: ${filePath}`,
 		content: result.content,
 		path: result.resolvedPath,
+		baseDirectory: dirname(skill.path),
+		resourceInstructions:
+			'This is a supporting file from the skill baseDirectory. Use it together with the main SKILL.md instructions.',
 		scope: skill.scope,
 		...(securityNotices.length > 0 && { securityNotices }),
 	};
@@ -143,7 +152,7 @@ function buildSkillDescription(): string {
 		cachedSkillSettings,
 	);
 	if (enabledSkills.length === 0) {
-		return 'Load a skill by name to get detailed, task-specific instructions. No skills are currently available.';
+		return 'Load a specialized skill when the task matches one of the skills listed in the system prompt. No skills are currently available.';
 	}
 
 	// Dedupe by name — later scopes (cwd > repo > user) have already overwritten
@@ -163,7 +172,7 @@ function buildSkillDescription(): string {
 		.map((s) => `- ${s.name}: ${summarizeDescription(s.description)}`)
 		.join('\n');
 
-	return `Load a skill by name to get detailed, task-specific instructions. Use only when the user's request clearly matches a listed skill. Available skills:\n${catalog}`;
+	return `Load a specialized skill when the task at hand matches one of the skills listed in the system prompt. Use this tool to inject the skill's instructions and supporting resources into the current conversation. The output contains the full SKILL.md content, the skill base directory, and any available supporting files. Load supporting files with the optional file parameter only when relevant. The skill name must match one of these available skills:\n${catalog}`;
 }
 
 // Condense a SKILL.md description to "what it does + when to use it".

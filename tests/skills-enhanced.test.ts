@@ -93,6 +93,32 @@ Content.
 			expect(result).toBeNull();
 		});
 
+		test('blocks traversal into sibling directories with the same prefix', async () => {
+			const skillDir = join(tempDir, '.otto/skills/my-skill');
+			const siblingDir = join(tempDir, '.otto/skills/my-skill-secret');
+			await fs.mkdir(skillDir, { recursive: true });
+			await fs.mkdir(siblingDir, { recursive: true });
+			await fs.writeFile(
+				join(skillDir, 'SKILL.md'),
+				`---
+name: my-skill
+description: Test
+---
+
+Content.
+`,
+			);
+			await fs.writeFile(join(siblingDir, 'secret.md'), 'SECRET');
+
+			await discoverSkills(tempDir);
+
+			const result = await loadSkillFile(
+				'my-skill',
+				'../my-skill-secret/secret.md',
+			);
+			expect(result).toBeNull();
+		});
+
 		test('blocks disallowed file extensions', async () => {
 			const skillDir = join(tempDir, '.otto/skills/my-skill');
 			await fs.mkdir(skillDir, { recursive: true });
@@ -174,6 +200,26 @@ Content.
 		test('returns empty for unknown skill', async () => {
 			const files = await discoverSkillFiles('nonexistent');
 			expect(files).toEqual([]);
+		});
+	});
+
+	describe('discoverSkills compatibility', () => {
+		test('discovers nested SKILL.md files under skill roots', async () => {
+			const skillDir = join(tempDir, '.otto/skills/nested/group/nested-skill');
+			await fs.mkdir(skillDir, { recursive: true });
+			await fs.writeFile(
+				join(skillDir, 'SKILL.md'),
+				`---
+name: nested-skill
+description: Nested skill
+---
+
+Content.
+`,
+			);
+
+			const skills = await discoverSkills(tempDir, tempDir);
+			expect(skills.find((s) => s.name === 'nested-skill')).toBeDefined();
 		});
 	});
 

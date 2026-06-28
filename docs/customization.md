@@ -190,6 +190,4 @@ Skills are markdown-based instruction bundles discovered from:
 - `~/.agents/skills/`
 - built-in bundled skills
 
-Compatibility aliases are also supported at `.agenst/skills/` and `~/.agenst/skills/`.
-
 Use `otto skills` to inspect them, or the `skill` tool from the runtime.

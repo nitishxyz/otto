@@ -2,6 +2,7 @@ import type { SkillDefinition, SkillMetadata, SkillScope } from './types.ts';
 import { validateMetadata } from './validator.ts';
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+const MAX_DERIVED_DESCRIPTION_LENGTH = 100;
 
 export function parseSkillFile(
 	content: string,
@@ -19,6 +20,12 @@ export function parseSkillFile(
 	}
 
 	const metadata = parseYamlFrontmatter(yamlStr, path);
+	if (
+		metadata.description === undefined ||
+		(typeof metadata.description === 'string' && !metadata.description.trim())
+	) {
+		metadata.description = deriveDescriptionFromContent(body);
+	}
 	validateMetadata(metadata, path);
 
 	return {
@@ -27,6 +34,22 @@ export function parseSkillFile(
 		path,
 		scope,
 	};
+}
+
+function deriveDescriptionFromContent(body: string | undefined): string {
+	const firstLine = (body ?? '')
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.find(Boolean);
+	const normalized = (firstLine ?? 'Skill instructions')
+		.replace(/^#{1,6}\s+/, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	if (normalized.length <= MAX_DERIVED_DESCRIPTION_LENGTH) {
+		return normalized;
+	}
+	return `${normalized.slice(0, MAX_DERIVED_DESCRIPTION_LENGTH - 3).trimEnd()}...`;
 }
 
 function parseYamlFrontmatter(

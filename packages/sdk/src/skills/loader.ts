@@ -1,4 +1,4 @@
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { promises as fs } from 'node:fs';
 import fg from 'fast-glob';
 import { parseSkillFile } from './parser.ts';
@@ -48,9 +48,7 @@ export async function discoverSkills(
 	const globalDirs = [
 		join(getGlobalConfigDir(), 'skills'),
 		join(home, '.agents/skills'),
-		join(home, '.agenst/skills'),
 		join(home, '.claude/skills'),
-		join(home, '.config/opencode/skills'),
 		join(home, '.codex/skills'),
 	];
 	for (const dir of globalDirs) {
@@ -61,9 +59,7 @@ export async function discoverSkills(
 	const projectDirs = [
 		join(cwd, '.otto/skills'),
 		join(cwd, '.agents/skills'),
-		join(cwd, '.agenst/skills'),
 		join(cwd, '.claude/skills'),
-		join(cwd, '.config/opencode/skills'),
 		join(cwd, '.codex/skills'),
 	];
 	for (const dir of projectDirs) {
@@ -74,9 +70,7 @@ export async function discoverSkills(
 		const repoDirs = [
 			join(repoRoot, '.otto/skills'),
 			join(repoRoot, '.agents/skills'),
-			join(repoRoot, '.agenst/skills'),
 			join(repoRoot, '.claude/skills'),
-			join(repoRoot, '.config/opencode/skills'),
 			join(repoRoot, '.codex/skills'),
 		];
 		for (const dir of repoDirs) {
@@ -109,10 +103,10 @@ export async function loadSkillFile(
 	const skill = skillCache.get(name);
 	if (!skill) return null;
 
-	const skillDir = dirname(skill.path);
-	const resolved = join(skillDir, filePath);
+	const skillDir = resolve(dirname(skill.path));
+	const resolved = resolve(skillDir, filePath);
 
-	if (!resolved.startsWith(skillDir)) {
+	if (resolved !== skillDir && !resolved.startsWith(`${skillDir}${sep}`)) {
 		return null;
 	}
 
@@ -183,7 +177,7 @@ async function loadSkillsFromDir(
 		return;
 	}
 
-	const pattern = '*/SKILL.md';
+	const pattern = '**/SKILL.md';
 	let files: string[];
 	try {
 		files = await fg(pattern, { cwd: dir, absolute: true });
@@ -271,7 +265,7 @@ export async function listSkillsInDir(dir: string): Promise<string[]> {
 		return [];
 	}
 
-	const pattern = '*/SKILL.md';
+	const pattern = '**/SKILL.md';
 	const files = await fg(pattern, { cwd: dir, absolute: false });
 
 	return files.map((f) => dirname(f));

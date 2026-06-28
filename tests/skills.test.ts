@@ -169,15 +169,33 @@ Content.
 			);
 		});
 
-		test('throws on missing description', () => {
+		test('derives missing description from first content line', () => {
 			const content = `---
 name: my-skill
 ---
 
+# My Skill Workflow
+
 Content.
 `;
-			expect(() => parseSkillFile(content, '/path/to/SKILL.md', 'cwd')).toThrow(
-				"Missing required 'description'",
+			const skill = parseSkillFile(content, '/path/to/SKILL.md', 'cwd');
+
+			expect(skill.metadata.description).toBe('My Skill Workflow');
+		});
+
+		test('limits derived descriptions to 100 characters', () => {
+			const content = `---
+name: my-skill
+---
+
+This is a very long first line that should be used as the derived description but truncated before it becomes too large for the skill catalog.
+`;
+			const skill = parseSkillFile(content, '/path/to/SKILL.md', 'cwd');
+
+			expect(skill.metadata.description.length).toBeLessThanOrEqual(100);
+			expect(skill.metadata.description.endsWith('...')).toBe(true);
+			expect(skill.metadata.description).toBe(
+				'This is a very long first line that should be used as the derived description but truncated befor...',
 			);
 		});
 
@@ -238,28 +256,6 @@ Content.
 			expect(agentsSkill).toBeDefined();
 			expect(agentsSkill?.name).toBe('agents-skill');
 			expect(agentsSkill?.scope).toBe('cwd');
-		});
-
-		test('discovers skills from .agenst/skills/ for compatibility', async () => {
-			const skillDir = join(tempDir, '.agenst/skills/agenst-skill');
-			await fs.mkdir(skillDir, { recursive: true });
-			await fs.writeFile(
-				join(skillDir, 'SKILL.md'),
-				`---
-name: agenst-skill
-description: Compatibility skill
----
-
-Content.
-`,
-			);
-
-			const skills = await discoverSkills(tempDir);
-
-			const agenstSkill = skills.find((s) => s.name === 'agenst-skill');
-			expect(agenstSkill).toBeDefined();
-			expect(agenstSkill?.name).toBe('agenst-skill');
-			expect(agenstSkill?.scope).toBe('cwd');
 		});
 
 		test('discovers skills from .claude/skills/', async () => {
@@ -556,6 +552,9 @@ FULL_PLUGIN_SKILL_CONTENT
 			expect(description).toContain(
 				'- plugin-skill: Compact plugin capability.',
 			);
+			expect(description).toContain(
+				'Load a specialized skill when the task at hand matches one of the skills listed in the system prompt.',
+			);
 			expect(description).not.toContain('FULL_PLUGIN_SKILL_CONTENT');
 			expect(description).not.toContain(
 				'Full plugin skill description that should not appear in summaries',
@@ -567,6 +566,10 @@ FULL_PLUGIN_SKILL_CONTENT
 			expect(result.ok).toBe(true);
 			if (result.ok) {
 				expect(result.content).toContain('FULL_PLUGIN_SKILL_CONTENT');
+				expect(result.baseDirectory).toBe(skillDir);
+				expect(result.resourceInstructions).toContain(
+					'Supporting file paths are relative to this baseDirectory',
+				);
 			}
 		});
 

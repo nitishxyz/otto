@@ -45,6 +45,8 @@ export interface SkillLoadResult {
 	description: string;
 	content: string;
 	path: string;
+	baseDirectory: string;
+	resourceInstructions: string;
 	scope: SkillScope;
 	allowedTools?: string[];
 	availableFiles?: SkillFileInfo[];

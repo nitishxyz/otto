@@ -38,7 +38,15 @@ export function buildCapabilitySummary(options?: {
 	const sections: string[] = [];
 
 	if (skillLines.length > 0) {
-		sections.push(['Skills:', ...skillLines].join('\n'));
+		sections.push(
+			[
+				'Skills provide specialized instructions and workflows for specific tasks.',
+				'Use the skill tool to load a skill when the task matches its description.',
+				'',
+				'Available skills:',
+				...skillLines,
+			].join('\n'),
+		);
 		components.push('capabilities:skills');
 	}
 	if (mcpLines.length > 0) {
@@ -91,7 +99,7 @@ function buildSkillLines(
 	const visible = unique.slice(0, MAX_SKILLS).map((skill) => {
 		const summary = finalizeSentence(summarizeDescription(skill.description));
 		const description = summary || 'Task-specific instructions and guidance';
-		return `- ${skill.name}: ${description}. Load with \`skill\` when it matches the task.`;
+		return `- ${skill.name}: ${description}`;
 	});
 
 	const remaining = unique.length - visible.length;
