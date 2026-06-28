@@ -8,6 +8,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	'ollama-cloud': 'OLLAMA_API_KEY',
 	baseten: 'BASETEN_API_KEY',
 	huggingface: 'HF_TOKEN',
+	wafer: 'WAFER_API_KEY',
 	openrouter: 'OPENROUTER_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
 	copilot: 'GITHUB_TOKEN',

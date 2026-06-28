@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-06-20T19:07:29.026Z",
+	"updatedAt": "2026-06-28T21:26:27.942Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -1071,60 +1071,6 @@
 		"anthropic": {
 			"id": "anthropic",
 			"models": {
-				"claude-3-5-haiku-20241022": {
-					"id": "claude-3-5-haiku-20241022",
-					"ownedBy": "anthropic",
-					"label": "Claude Haiku 3.5",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-07-31",
-					"releaseDate": "2024-10-22",
-					"lastUpdated": "2024-10-22",
-					"openWeights": false,
-					"cost": {
-						"input": 0.8,
-						"output": 4,
-						"cacheRead": 0.08,
-						"cacheWrite": 1
-					},
-					"limit": {
-						"context": 200000,
-						"output": 8192
-					}
-				},
-				"claude-3-5-haiku-latest": {
-					"id": "claude-3-5-haiku-latest",
-					"ownedBy": "anthropic",
-					"label": "Claude Haiku 3.5 (latest)",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-07-31",
-					"releaseDate": "2024-10-22",
-					"lastUpdated": "2024-10-22",
-					"openWeights": false,
-					"cost": {
-						"input": 0.8,
-						"output": 4,
-						"cacheRead": 0.08,
-						"cacheWrite": 1
-					},
-					"limit": {
-						"context": 200000,
-						"output": 8192
-					}
-				},
 				"claude-3-5-sonnet-20240620": {
 					"id": "claude-3-5-sonnet-20240620",
 					"ownedBy": "anthropic",
@@ -2194,8 +2140,8 @@
 						"cacheRead": 0.145
 					},
 					"limit": {
-						"context": 131000,
-						"output": 131000
+						"context": 262144,
+						"output": 262144
 					}
 				},
 				"moonshotai/Kimi-K2-Instruct-0905": {
@@ -2524,13 +2470,13 @@
 					"lastUpdated": "2026-06-13",
 					"openWeights": true,
 					"cost": {
-						"input": 1.5,
-						"output": 4.5,
+						"input": 1.4,
+						"output": 4.4,
 						"cacheRead": 0.3
 					},
 					"limit": {
-						"context": 131072,
-						"output": 131072
+						"context": 202720,
+						"output": 202720
 					}
 				}
 			},
@@ -2678,6 +2624,31 @@
 						"npm": "@ai-sdk/huggingface"
 					}
 				},
+				"deepseek-ai/DeepSeek-R1": {
+					"id": "deepseek-ai/DeepSeek-R1",
+					"ownedBy": "deepseek",
+					"label": "DeepSeek-R1",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-07",
+					"releaseDate": "2025-01-20",
+					"lastUpdated": "2025-05-29",
+					"openWeights": true,
+					"cost": {
+						"input": 0.7,
+						"output": 2.5
+					},
+					"limit": {
+						"context": 64000,
+						"output": 32768
+					}
+				},
 				"deepseek-ai/DeepSeek-R1-0528": {
 					"id": "deepseek-ai/DeepSeek-R1-0528",
 					"ownedBy": "deepseek",
@@ -2728,6 +2699,31 @@
 						"output": 65536
 					}
 				},
+				"deepseek-ai/DeepSeek-V4-Flash": {
+					"id": "deepseek-ai/DeepSeek-V4-Flash",
+					"ownedBy": "deepseek",
+					"label": "DeepSeek V4 Flash",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-05",
+					"releaseDate": "2026-04-24",
+					"lastUpdated": "2026-04-24",
+					"openWeights": true,
+					"cost": {
+						"input": 0.14,
+						"output": 0.28
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 384000
+					}
+				},
 				"deepseek-ai/DeepSeek-V4-Pro": {
 					"id": "deepseek-ai/DeepSeek-V4-Pro",
 					"ownedBy": "deepseek",
@@ -2752,6 +2748,102 @@
 					"limit": {
 						"context": 1048576,
 						"output": 393216
+					}
+				},
+				"google/gemma-4-26B-A4B-it": {
+					"id": "google/gemma-4-26B-A4B-it",
+					"ownedBy": "google",
+					"label": "Gemma 4 26B A4B IT",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-02",
+					"lastUpdated": "2026-04-02",
+					"openWeights": true,
+					"cost": {
+						"input": 0.13,
+						"output": 0.4
+					},
+					"limit": {
+						"context": 262144,
+						"output": 32768
+					}
+				},
+				"google/gemma-4-31B-it": {
+					"id": "google/gemma-4-31B-it",
+					"ownedBy": "google",
+					"label": "Gemma 4 31B IT",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-02",
+					"lastUpdated": "2026-04-02",
+					"openWeights": true,
+					"cost": {
+						"input": 0.14,
+						"output": 0.4
+					},
+					"limit": {
+						"context": 262144,
+						"output": 32768
+					}
+				},
+				"meta-llama/Llama-3.3-70B-Instruct": {
+					"id": "meta-llama/Llama-3.3-70B-Instruct",
+					"label": "Llama-3.3-70B-Instruct",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": false,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2023-12",
+					"releaseDate": "2024-12-06",
+					"lastUpdated": "2024-12-06",
+					"openWeights": true,
+					"cost": {
+						"input": 0.59,
+						"output": 0.79
+					},
+					"limit": {
+						"context": 131072,
+						"output": 4096
+					}
+				},
+				"MiniMaxAI/MiniMax-M2": {
+					"id": "MiniMaxAI/MiniMax-M2",
+					"ownedBy": "minimax",
+					"label": "MiniMax-M2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2025-10-27",
+					"lastUpdated": "2025-10-27",
+					"openWeights": true,
+					"cost": {
+						"input": 0.3,
+						"output": 1.2
+					},
+					"limit": {
+						"context": 204800,
+						"output": 128000
 					}
 				},
 				"MiniMaxAI/MiniMax-M2.1": {
@@ -2827,6 +2919,30 @@
 					"limit": {
 						"context": 204800,
 						"output": 131072
+					}
+				},
+				"MiniMaxAI/MiniMax-M3": {
+					"id": "MiniMaxAI/MiniMax-M3",
+					"ownedBy": "minimax",
+					"label": "MiniMax-M3",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-06-01",
+					"lastUpdated": "2026-06-01",
+					"openWeights": true,
+					"cost": {
+						"input": 0.3,
+						"output": 1.2
+					},
+					"limit": {
+						"context": 524288,
+						"output": 128000
 					}
 				},
 				"moonshotai/Kimi-K2-Instruct": {
@@ -2957,8 +3073,83 @@
 						"output": 262144
 					}
 				},
+				"moonshotai/Kimi-K2.7-Code": {
+					"id": "moonshotai/Kimi-K2.7-Code",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.7 Code",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-06-12",
+					"lastUpdated": "2026-06-12",
+					"openWeights": true,
+					"cost": {
+						"input": 0.95,
+						"output": 4
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					}
+				},
+				"openai/gpt-oss-120b": {
+					"id": "openai/gpt-oss-120b",
+					"ownedBy": "openai",
+					"label": "GPT OSS 120B",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2025-08-05",
+					"lastUpdated": "2025-08-05",
+					"openWeights": true,
+					"cost": {
+						"input": 0.25,
+						"output": 0.69
+					},
+					"limit": {
+						"context": 131072,
+						"output": 32768
+					}
+				},
+				"Qwen/Qwen3-235B-A22B": {
+					"id": "Qwen/Qwen3-235B-A22B",
+					"ownedBy": "qwen",
+					"label": "Qwen3 235B-A22B",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-04",
+					"lastUpdated": "2025-04",
+					"openWeights": true,
+					"cost": {
+						"input": 0.2,
+						"output": 0.8
+					},
+					"limit": {
+						"context": 40960,
+						"output": 16384
+					}
+				},
 				"Qwen/Qwen3-235B-A22B-Thinking-2507": {
 					"id": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+					"ownedBy": "qwen",
 					"label": "Qwen3-235B-A22B-Thinking-2507",
 					"modalities": {
 						"input": ["text"],
@@ -2981,8 +3172,59 @@
 						"output": 131072
 					}
 				},
+				"Qwen/Qwen3-32B": {
+					"id": "Qwen/Qwen3-32B",
+					"ownedBy": "qwen",
+					"label": "Qwen3 32B",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-04",
+					"lastUpdated": "2025-04",
+					"openWeights": true,
+					"cost": {
+						"input": 0.29,
+						"output": 0.59
+					},
+					"limit": {
+						"context": 131072,
+						"output": 16384
+					}
+				},
+				"Qwen/Qwen3-Coder-30B-A3B-Instruct": {
+					"id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+					"ownedBy": "qwen",
+					"label": "Qwen3-Coder 30B-A3B Instruct",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": false,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-04",
+					"lastUpdated": "2025-04",
+					"openWeights": true,
+					"cost": {
+						"input": 0.07,
+						"output": 0.26
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
 				"Qwen/Qwen3-Coder-480B-A35B-Instruct": {
 					"id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Coder-480B-A35B-Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -3007,6 +3249,7 @@
 				},
 				"Qwen/Qwen3-Coder-Next": {
 					"id": "Qwen/Qwen3-Coder-Next",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Coder-Next",
 					"modalities": {
 						"input": ["text"],
@@ -3031,6 +3274,7 @@
 				},
 				"Qwen/Qwen3-Next-80B-A3B-Instruct": {
 					"id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Next-80B-A3B-Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -3055,6 +3299,7 @@
 				},
 				"Qwen/Qwen3-Next-80B-A3B-Thinking": {
 					"id": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Next-80B-A3B-Thinking",
 					"modalities": {
 						"input": ["text"],
@@ -3077,8 +3322,81 @@
 						"output": 131072
 					}
 				},
+				"Qwen/Qwen3.5-122B-A10B": {
+					"id": "Qwen/Qwen3.5-122B-A10B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5 122B-A10B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-02-23",
+					"lastUpdated": "2026-02-23",
+					"openWeights": true,
+					"cost": {
+						"input": 0.4,
+						"output": 3.2
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen/Qwen3.5-27B": {
+					"id": "Qwen/Qwen3.5-27B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5 27B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-02-23",
+					"lastUpdated": "2026-02-23",
+					"openWeights": true,
+					"cost": {
+						"input": 0.3,
+						"output": 2.4
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen/Qwen3.5-35B-A3B": {
+					"id": "Qwen/Qwen3.5-35B-A3B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5 35B-A3B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-02-23",
+					"lastUpdated": "2026-02-23",
+					"openWeights": true,
+					"cost": {
+						"input": 0.25,
+						"output": 2
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
 				"Qwen/Qwen3.5-397B-A17B": {
 					"id": "Qwen/Qwen3.5-397B-A17B",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5-397B-A17B",
 					"modalities": {
 						"input": ["text", "image"],
@@ -3099,6 +3417,126 @@
 					"limit": {
 						"context": 262144,
 						"output": 32768
+					}
+				},
+				"Qwen/Qwen3.5-9B": {
+					"id": "Qwen/Qwen3.5-9B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5 9B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-02-23",
+					"lastUpdated": "2026-02-23",
+					"openWeights": true,
+					"cost": {
+						"input": 0.17,
+						"output": 0.25
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen/Qwen3.6-27B": {
+					"id": "Qwen/Qwen3.6-27B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.6 27B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-22",
+					"lastUpdated": "2026-04-22",
+					"openWeights": true,
+					"cost": {
+						"input": 0.47,
+						"output": 3.19
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen/Qwen3.6-35B-A3B": {
+					"id": "Qwen/Qwen3.6-35B-A3B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.6 35B-A3B",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-17",
+					"lastUpdated": "2026-04-17",
+					"openWeights": true,
+					"cost": {
+						"input": 0.15,
+						"output": 0.95
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"stepfun-ai/Step-3.5-Flash": {
+					"id": "stepfun-ai/Step-3.5-Flash",
+					"label": "Step 3.5 Flash",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-01-29",
+					"lastUpdated": "2026-02-13",
+					"openWeights": true,
+					"cost": {
+						"input": 0.1,
+						"output": 0.3
+					},
+					"limit": {
+						"context": 262144,
+						"output": 256000
+					}
+				},
+				"stepfun-ai/Step-3.7-Flash": {
+					"id": "stepfun-ai/Step-3.7-Flash",
+					"label": "Step 3.7 Flash",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2026-01-01",
+					"releaseDate": "2026-05-29",
+					"lastUpdated": "2026-05-29",
+					"openWeights": true,
+					"cost": {
+						"input": 0.2,
+						"output": 1.15
+					},
+					"limit": {
+						"context": 262144,
+						"output": 256000
 					}
 				},
 				"XiaomiMiMo/MiMo-V2-Flash": {
@@ -3123,6 +3561,130 @@
 					"limit": {
 						"context": 262144,
 						"output": 4096
+					}
+				},
+				"XiaomiMiMo/MiMo-V2.5-Pro": {
+					"id": "XiaomiMiMo/MiMo-V2.5-Pro",
+					"label": "MiMo-V2.5-Pro",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2024-12",
+					"releaseDate": "2026-04-22",
+					"lastUpdated": "2026-04-22",
+					"openWeights": true,
+					"cost": {
+						"input": 1,
+						"output": 3
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 131072
+					}
+				},
+				"zai-org/GLM-4.5": {
+					"id": "zai-org/GLM-4.5",
+					"ownedBy": "zai",
+					"label": "GLM-4.5",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-07-28",
+					"lastUpdated": "2025-07-28",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6,
+						"output": 2.2
+					},
+					"limit": {
+						"context": 131072,
+						"output": 98304
+					}
+				},
+				"zai-org/GLM-4.5-Air": {
+					"id": "zai-org/GLM-4.5-Air",
+					"ownedBy": "zai",
+					"label": "GLM-4.5-Air",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-07-28",
+					"lastUpdated": "2025-07-28",
+					"openWeights": true,
+					"cost": {
+						"input": 0.13,
+						"output": 0.85
+					},
+					"limit": {
+						"context": 131072,
+						"output": 98304
+					}
+				},
+				"zai-org/GLM-4.5V": {
+					"id": "zai-org/GLM-4.5V",
+					"ownedBy": "zai",
+					"label": "GLM-4.5V",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-08-11",
+					"lastUpdated": "2025-08-11",
+					"openWeights": true,
+					"cost": {
+						"input": 0.6,
+						"output": 1.8
+					},
+					"limit": {
+						"context": 65536,
+						"output": 16384
+					}
+				},
+				"zai-org/GLM-4.6": {
+					"id": "zai-org/GLM-4.6",
+					"ownedBy": "zai",
+					"label": "GLM-4.6",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2025-09-30",
+					"lastUpdated": "2025-09-30",
+					"openWeights": true,
+					"cost": {
+						"input": 0.55,
+						"output": 2.2
+					},
+					"limit": {
+						"context": 204800,
+						"output": 131072
 					}
 				},
 				"zai-org/GLM-4.7": {
@@ -3223,6 +3785,30 @@
 					},
 					"limit": {
 						"context": 202752,
+						"output": 131072
+					}
+				},
+				"zai-org/GLM-5.2": {
+					"id": "zai-org/GLM-5.2",
+					"ownedBy": "zai",
+					"label": "GLM-5.2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-06-13",
+					"lastUpdated": "2026-06-13",
+					"openWeights": true,
+					"cost": {
+						"input": 1.4,
+						"output": 4.4
+					},
+					"limit": {
+						"context": 262144,
 						"output": 131072
 					}
 				}
@@ -3410,12 +3996,12 @@
 					"openWeights": false,
 					"cost": {
 						"input": 0.66,
-						"output": 3.5,
-						"cacheRead": 0.33
+						"output": 3.41,
+						"cacheRead": 0.144
 					},
 					"limit": {
-						"context": 262142,
-						"output": 262142
+						"context": 262144,
+						"output": 262144
 					}
 				},
 				"~openai/gpt-latest": {
@@ -3638,33 +4224,6 @@
 					"limit": {
 						"context": 200000,
 						"output": 4096
-					}
-				},
-				"anthropic/claude-3.5-haiku": {
-					"id": "anthropic/claude-3.5-haiku",
-					"ownedBy": "anthropic",
-					"label": "Claude 3.5 Haiku",
-					"modalities": {
-						"input": ["text", "image"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-07-31",
-					"releaseDate": "2024-11-04",
-					"lastUpdated": "2024-11-04",
-					"openWeights": false,
-					"cost": {
-						"input": 0.8,
-						"output": 4,
-						"cacheRead": 0.08,
-						"cacheWrite": 1
-					},
-					"limit": {
-						"context": 200000,
-						"output": 8192
 					}
 				},
 				"anthropic/claude-haiku-4.5": {
@@ -4420,7 +4979,8 @@
 					"openWeights": true,
 					"cost": {
 						"input": 0.2288,
-						"output": 0.3432
+						"output": 0.3432,
+						"cacheRead": 0.02288
 					},
 					"limit": {
 						"context": 128000,
@@ -4502,29 +5062,6 @@
 					"limit": {
 						"context": 1048576,
 						"output": 384000
-					}
-				},
-				"essentialai/rnj-1-instruct": {
-					"id": "essentialai/rnj-1-instruct",
-					"label": "Rnj 1 Instruct",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"releaseDate": "2025-12-07",
-					"lastUpdated": "2025-12-07",
-					"openWeights": true,
-					"cost": {
-						"input": 0.15,
-						"output": 0.15
-					},
-					"limit": {
-						"context": 32768,
-						"output": 32768
 					}
 				},
 				"google/gemini-2.5-flash": {
@@ -5427,9 +5964,8 @@
 					"lastUpdated": "2026-02-12",
 					"openWeights": true,
 					"cost": {
-						"input": 0.15,
-						"output": 0.9,
-						"cacheRead": 0.05
+						"input": 0.12,
+						"output": 0.48
 					},
 					"limit": {
 						"context": 196608,
@@ -5452,13 +5988,12 @@
 					"lastUpdated": "2026-03-18",
 					"openWeights": true,
 					"cost": {
-						"input": 0.25,
-						"output": 1,
-						"cacheRead": 0.05
+						"input": 0.18,
+						"output": 0.72
 					},
 					"limit": {
 						"context": 196608,
-						"output": 131072
+						"output": 196608
 					}
 				},
 				"minimax/minimax-m3": {
@@ -5971,7 +6506,8 @@
 					"openWeights": true,
 					"cost": {
 						"input": 0.6,
-						"output": 2.5
+						"output": 2.5,
+						"cacheRead": 0.6
 					},
 					"limit": {
 						"context": 262144,
@@ -6000,7 +6536,7 @@
 					},
 					"limit": {
 						"context": 256000,
-						"output": 262144
+						"output": 256000
 					}
 				},
 				"moonshotai/kimi-k2.6": {
@@ -6021,12 +6557,12 @@
 					"openWeights": true,
 					"cost": {
 						"input": 0.66,
-						"output": 3.5,
-						"cacheRead": 0.33
+						"output": 3.41,
+						"cacheRead": 0.144
 					},
 					"limit": {
-						"context": 262142,
-						"output": 262142
+						"context": 262144,
+						"output": 262144
 					}
 				},
 				"moonshotai/kimi-k2.7-code": {
@@ -6046,36 +6582,13 @@
 					"lastUpdated": "2026-06-12",
 					"openWeights": true,
 					"cost": {
-						"input": 0.612,
-						"output": 3.069,
-						"cacheRead": 0.1296
+						"input": 0.74,
+						"output": 3.5,
+						"cacheRead": 0.15
 					},
 					"limit": {
 						"context": 262144,
-						"output": 262144
-					}
-				},
-				"nex-agi/nex-n2-pro:free": {
-					"id": "nex-agi/nex-n2-pro:free",
-					"label": "Nex-N2-Pro (free)",
-					"modalities": {
-						"input": ["text", "image"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"releaseDate": "2026-06-08",
-					"lastUpdated": "2026-06-08",
-					"openWeights": true,
-					"cost": {
-						"input": 0,
-						"output": 0
-					},
-					"limit": {
-						"context": 262144,
-						"output": 262144
+						"output": 16384
 					}
 				},
 				"nvidia/llama-3.3-nemotron-super-49b-v1.5": {
@@ -6185,12 +6698,12 @@
 					"lastUpdated": "2026-03-11",
 					"openWeights": true,
 					"cost": {
-						"input": 0.09,
-						"output": 0.45
+						"input": 0.085,
+						"output": 0.4
 					},
 					"limit": {
 						"context": 262144,
-						"output": 262144
+						"output": 16384
 					}
 				},
 				"nvidia/nemotron-3-super-120b-a12b:free": {
@@ -7334,7 +7847,7 @@
 				"openai/gpt-oss-120b": {
 					"id": "openai/gpt-oss-120b",
 					"ownedBy": "openai",
-					"label": "gpt-oss-120b",
+					"label": "GPT OSS 120B",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -7343,17 +7856,16 @@
 					"reasoningText": true,
 					"attachment": false,
 					"temperature": true,
-					"knowledge": "2024-06-30",
 					"releaseDate": "2025-08-05",
 					"lastUpdated": "2025-08-05",
 					"openWeights": true,
 					"cost": {
-						"input": 0.039,
-						"output": 0.18
+						"input": 0.03,
+						"output": 0.15
 					},
 					"limit": {
 						"context": 131072,
-						"output": 32768
+						"output": 131072
 					}
 				},
 				"openai/gpt-oss-120b:free": {
@@ -7368,7 +7880,6 @@
 					"reasoningText": true,
 					"attachment": false,
 					"temperature": true,
-					"knowledge": "2024-06-30",
 					"releaseDate": "2025-08-05",
 					"lastUpdated": "2025-08-05",
 					"openWeights": true,
@@ -7848,33 +8359,9 @@
 						"output": 32768
 					}
 				},
-				"prime-intellect/intellect-3": {
-					"id": "prime-intellect/intellect-3",
-					"ownedBy": "zai",
-					"label": "INTELLECT-3",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-10",
-					"releaseDate": "2025-11-27",
-					"lastUpdated": "2025-11-27",
-					"openWeights": true,
-					"cost": {
-						"input": 0.2,
-						"output": 1.1
-					},
-					"limit": {
-						"context": 131072,
-						"output": 131072
-					}
-				},
 				"qwen/qwen-2.5-72b-instruct": {
 					"id": "qwen/qwen-2.5-72b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen2.5 72B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -7899,6 +8386,7 @@
 				},
 				"qwen/qwen-2.5-7b-instruct": {
 					"id": "qwen/qwen-2.5-7b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen2.5 7B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -7923,6 +8411,7 @@
 				},
 				"qwen/qwen-plus": {
 					"id": "qwen/qwen-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen Plus",
 					"modalities": {
 						"input": ["text"],
@@ -7949,6 +8438,7 @@
 				},
 				"qwen/qwen-plus-2025-07-28": {
 					"id": "qwen/qwen-plus-2025-07-28",
+					"ownedBy": "qwen",
 					"label": "Qwen Plus 0728",
 					"modalities": {
 						"input": ["text"],
@@ -7973,6 +8463,7 @@
 				},
 				"qwen/qwen-plus-2025-07-28:thinking": {
 					"id": "qwen/qwen-plus-2025-07-28:thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen Plus 0728 (thinking)",
 					"modalities": {
 						"input": ["text"],
@@ -7998,6 +8489,7 @@
 				},
 				"qwen/qwen3-14b": {
 					"id": "qwen/qwen3-14b",
+					"ownedBy": "qwen",
 					"label": "Qwen3 14B",
 					"modalities": {
 						"input": ["text"],
@@ -8022,6 +8514,7 @@
 				},
 				"qwen/qwen3-235b-a22b": {
 					"id": "qwen/qwen3-235b-a22b",
+					"ownedBy": "qwen",
 					"label": "Qwen3 235B-A22B",
 					"modalities": {
 						"input": ["text"],
@@ -8046,6 +8539,7 @@
 				},
 				"qwen/qwen3-235b-a22b-2507": {
 					"id": "qwen/qwen3-235b-a22b-2507",
+					"ownedBy": "qwen",
 					"label": "Qwen3 235B A22B Instruct 2507",
 					"modalities": {
 						"input": ["text"],
@@ -8070,6 +8564,7 @@
 				},
 				"qwen/qwen3-235b-a22b-thinking-2507": {
 					"id": "qwen/qwen3-235b-a22b-thinking-2507",
+					"ownedBy": "qwen",
 					"label": "Qwen3 235B A22B Thinking 2507",
 					"modalities": {
 						"input": ["text"],
@@ -8095,6 +8590,7 @@
 				},
 				"qwen/qwen3-30b-a3b": {
 					"id": "qwen/qwen3-30b-a3b",
+					"ownedBy": "qwen",
 					"label": "Qwen3 30B A3B",
 					"modalities": {
 						"input": ["text"],
@@ -8119,6 +8615,7 @@
 				},
 				"qwen/qwen3-30b-a3b-instruct-2507": {
 					"id": "qwen/qwen3-30b-a3b-instruct-2507",
+					"ownedBy": "qwen",
 					"label": "Qwen3 30B A3B Instruct 2507",
 					"modalities": {
 						"input": ["text"],
@@ -8143,6 +8640,7 @@
 				},
 				"qwen/qwen3-30b-a3b-thinking-2507": {
 					"id": "qwen/qwen3-30b-a3b-thinking-2507",
+					"ownedBy": "qwen",
 					"label": "Qwen3 30B A3B Thinking 2507",
 					"modalities": {
 						"input": ["text"],
@@ -8168,6 +8666,7 @@
 				},
 				"qwen/qwen3-32b": {
 					"id": "qwen/qwen3-32b",
+					"ownedBy": "qwen",
 					"label": "Qwen3 32B",
 					"modalities": {
 						"input": ["text"],
@@ -8192,6 +8691,7 @@
 				},
 				"qwen/qwen3-8b": {
 					"id": "qwen/qwen3-8b",
+					"ownedBy": "qwen",
 					"label": "Qwen3 8B",
 					"modalities": {
 						"input": ["text"],
@@ -8217,6 +8717,7 @@
 				},
 				"qwen/qwen3-coder": {
 					"id": "qwen/qwen3-coder",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder 480B A35B",
 					"modalities": {
 						"input": ["text"],
@@ -8241,6 +8742,7 @@
 				},
 				"qwen/qwen3-coder-30b-a3b-instruct": {
 					"id": "qwen/qwen3-coder-30b-a3b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Coder 30B-A3B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -8265,6 +8767,7 @@
 				},
 				"qwen/qwen3-coder-flash": {
 					"id": "qwen/qwen3-coder-flash",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder Flash",
 					"modalities": {
 						"input": ["text"],
@@ -8291,6 +8794,7 @@
 				},
 				"qwen/qwen3-coder-next": {
 					"id": "qwen/qwen3-coder-next",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder Next",
 					"modalities": {
 						"input": ["text"],
@@ -8315,6 +8819,7 @@
 				},
 				"qwen/qwen3-coder-plus": {
 					"id": "qwen/qwen3-coder-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder Plus",
 					"modalities": {
 						"input": ["text"],
@@ -8341,6 +8846,7 @@
 				},
 				"qwen/qwen3-coder:free": {
 					"id": "qwen/qwen3-coder:free",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder 480B A35B (free)",
 					"modalities": {
 						"input": ["text"],
@@ -8365,6 +8871,7 @@
 				},
 				"qwen/qwen3-max": {
 					"id": "qwen/qwen3-max",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Max",
 					"modalities": {
 						"input": ["text"],
@@ -8391,6 +8898,7 @@
 				},
 				"qwen/qwen3-max-thinking": {
 					"id": "qwen/qwen3-max-thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Max Thinking",
 					"modalities": {
 						"input": ["text"],
@@ -8414,6 +8922,7 @@
 				},
 				"qwen/qwen3-next-80b-a3b-instruct": {
 					"id": "qwen/qwen3-next-80b-a3b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Next 80B-A3B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -8438,6 +8947,7 @@
 				},
 				"qwen/qwen3-next-80b-a3b-instruct:free": {
 					"id": "qwen/qwen3-next-80b-a3b-instruct:free",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Next 80B A3B Instruct (free)",
 					"modalities": {
 						"input": ["text"],
@@ -8462,6 +8972,7 @@
 				},
 				"qwen/qwen3-next-80b-a3b-thinking": {
 					"id": "qwen/qwen3-next-80b-a3b-thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3-Next 80B-A3B (Thinking)",
 					"modalities": {
 						"input": ["text"],
@@ -8486,6 +8997,7 @@
 				},
 				"qwen/qwen3-vl-235b-a22b-instruct": {
 					"id": "qwen/qwen3-vl-235b-a22b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 235B A22B Instruct",
 					"modalities": {
 						"input": ["text", "image"],
@@ -8511,6 +9023,7 @@
 				},
 				"qwen/qwen3-vl-235b-a22b-thinking": {
 					"id": "qwen/qwen3-vl-235b-a22b-thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 235B A22B Thinking",
 					"modalities": {
 						"input": ["text", "image"],
@@ -8535,6 +9048,7 @@
 				},
 				"qwen/qwen3-vl-30b-a3b-instruct": {
 					"id": "qwen/qwen3-vl-30b-a3b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 30B A3B Instruct",
 					"modalities": {
 						"input": ["text", "image"],
@@ -8559,6 +9073,7 @@
 				},
 				"qwen/qwen3-vl-30b-a3b-thinking": {
 					"id": "qwen/qwen3-vl-30b-a3b-thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 30B A3B Thinking",
 					"modalities": {
 						"input": ["text", "image"],
@@ -8583,6 +9098,7 @@
 				},
 				"qwen/qwen3-vl-32b-instruct": {
 					"id": "qwen/qwen3-vl-32b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 32B Instruct",
 					"modalities": {
 						"input": ["text", "image"],
@@ -8606,6 +9122,7 @@
 				},
 				"qwen/qwen3-vl-8b-instruct": {
 					"id": "qwen/qwen3-vl-8b-instruct",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 8B Instruct",
 					"modalities": {
 						"input": ["image", "text"],
@@ -8629,6 +9146,7 @@
 				},
 				"qwen/qwen3-vl-8b-thinking": {
 					"id": "qwen/qwen3-vl-8b-thinking",
+					"ownedBy": "qwen",
 					"label": "Qwen3 VL 8B Thinking",
 					"modalities": {
 						"input": ["image", "text"],
@@ -8652,6 +9170,7 @@
 				},
 				"qwen/qwen3.5-122b-a10b": {
 					"id": "qwen/qwen3.5-122b-a10b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 122B-A10B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8675,6 +9194,7 @@
 				},
 				"qwen/qwen3.5-27b": {
 					"id": "qwen/qwen3.5-27b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 27B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8698,6 +9218,7 @@
 				},
 				"qwen/qwen3.5-35b-a3b": {
 					"id": "qwen/qwen3.5-35b-a3b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 35B-A3B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8712,15 +9233,17 @@
 					"openWeights": true,
 					"cost": {
 						"input": 0.14,
-						"output": 1
+						"output": 1,
+						"cacheRead": 0.05
 					},
 					"limit": {
 						"context": 262144,
-						"output": 262144
+						"output": 81920
 					}
 				},
 				"qwen/qwen3.5-397b-a17b": {
 					"id": "qwen/qwen3.5-397b-a17b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 397B-A17B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8739,12 +9262,13 @@
 					},
 					"limit": {
 						"context": 131072,
-						"output": 65536
+						"output": 64000
 					}
 				},
 				"qwen/qwen3.5-9b": {
 					"id": "qwen/qwen3.5-9b",
-					"label": "Qwen3.5-9B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5 9B",
 					"modalities": {
 						"input": ["text", "image", "video"],
 						"output": ["text"]
@@ -8753,8 +9277,8 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": true,
-					"releaseDate": "2026-03-10",
-					"lastUpdated": "2026-03-10",
+					"releaseDate": "2026-02-23",
+					"lastUpdated": "2026-02-23",
 					"openWeights": true,
 					"cost": {
 						"input": 0.1,
@@ -8767,6 +9291,7 @@
 				},
 				"qwen/qwen3.5-flash-02-23": {
 					"id": "qwen/qwen3.5-flash-02-23",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5-Flash",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8790,6 +9315,7 @@
 				},
 				"qwen/qwen3.5-plus-02-15": {
 					"id": "qwen/qwen3.5-plus-02-15",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 Plus 2026-02-15",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8814,6 +9340,7 @@
 				},
 				"qwen/qwen3.5-plus-20260420": {
 					"id": "qwen/qwen3.5-plus-20260420",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 Plus 2026-04-20",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8838,6 +9365,7 @@
 				},
 				"qwen/qwen3.6-27b": {
 					"id": "qwen/qwen3.6-27b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 27B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8851,8 +9379,8 @@
 					"lastUpdated": "2026-04-22",
 					"openWeights": true,
 					"cost": {
-						"input": 0.2885,
-						"output": 3.17
+						"input": 0.2596,
+						"output": 2.385
 					},
 					"limit": {
 						"context": 262140,
@@ -8861,6 +9389,7 @@
 				},
 				"qwen/qwen3.6-35b-a3b": {
 					"id": "qwen/qwen3.6-35b-a3b",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 35B-A3B",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8884,6 +9413,7 @@
 				},
 				"qwen/qwen3.6-flash": {
 					"id": "qwen/qwen3.6-flash",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 Flash",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8908,6 +9438,7 @@
 				},
 				"qwen/qwen3.6-max-preview": {
 					"id": "qwen/qwen3.6-max-preview",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 Max Preview",
 					"modalities": {
 						"input": ["text"],
@@ -8933,6 +9464,7 @@
 				},
 				"qwen/qwen3.6-plus": {
 					"id": "qwen/qwen3.6-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 Plus",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -8958,6 +9490,7 @@
 				},
 				"qwen/qwen3.7-max": {
 					"id": "qwen/qwen3.7-max",
+					"ownedBy": "qwen",
 					"label": "Qwen3.7 Max",
 					"modalities": {
 						"input": ["text"],
@@ -8983,6 +9516,7 @@
 				},
 				"qwen/qwen3.7-plus": {
 					"id": "qwen/qwen3.7-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen3.7 Plus",
 					"modalities": {
 						"input": ["text", "image"],
@@ -9050,6 +9584,30 @@
 					},
 					"limit": {
 						"context": 256000,
+						"output": 128000
+					}
+				},
+				"sakana/fugu-ultra": {
+					"id": "sakana/fugu-ultra",
+					"label": "Fugu Ultra",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"releaseDate": "2026-06-24",
+					"lastUpdated": "2026-06-24",
+					"openWeights": false,
+					"cost": {
+						"input": 5,
+						"output": 30,
+						"cacheRead": 0.5
+					},
+					"limit": {
+						"context": 1000000,
 						"output": 128000
 					}
 				},
@@ -9151,30 +9709,6 @@
 						"output": 262144
 					}
 				},
-				"thedrummer/rocinante-12b": {
-					"id": "thedrummer/rocinante-12b",
-					"label": "Rocinante 12B",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": false,
-					"temperature": true,
-					"knowledge": "2024-04-30",
-					"releaseDate": "2024-09-30",
-					"lastUpdated": "2024-09-30",
-					"openWeights": true,
-					"cost": {
-						"input": 0.17,
-						"output": 0.43
-					},
-					"limit": {
-						"context": 32768,
-						"output": 32768
-					}
-				},
 				"thedrummer/unslopnemo-12b": {
 					"id": "thedrummer/unslopnemo-12b",
 					"label": "UnslopNemo 12B",
@@ -9254,7 +9788,7 @@
 					"ownedBy": "xai",
 					"label": "Grok 4.3",
 					"modalities": {
-						"input": ["text", "image"],
+						"input": ["text", "image", "pdf"],
 						"output": ["text"]
 					},
 					"toolCall": true,
@@ -9315,12 +9849,11 @@
 					"lastUpdated": "2026-04-22",
 					"openWeights": true,
 					"cost": {
-						"input": 0.14,
-						"output": 0.28,
-						"cacheRead": 0.0028
+						"input": 0.105,
+						"output": 0.28
 					},
 					"limit": {
-						"context": 1048576,
+						"context": 32000,
 						"output": 131072
 					}
 				},
@@ -9553,7 +10086,7 @@
 					},
 					"limit": {
 						"context": 202752,
-						"output": 16384
+						"output": 128000
 					}
 				},
 				"z-ai/glm-5-turbo": {
@@ -9599,11 +10132,11 @@
 					"cost": {
 						"input": 0.98,
 						"output": 3.08,
-						"cacheRead": 0.49
+						"cacheRead": 0.182
 					},
 					"limit": {
 						"context": 202752,
-						"output": 65535
+						"output": 128000
 					}
 				},
 				"z-ai/glm-5.2": {
@@ -9622,12 +10155,37 @@
 					"lastUpdated": "2026-06-13",
 					"openWeights": true,
 					"cost": {
-						"input": 1.2,
-						"output": 4.1,
-						"cacheRead": 0.2
+						"input": 0.95,
+						"output": 3,
+						"cacheRead": 0.18
 					},
 					"limit": {
 						"context": 1048576,
+						"output": 32768
+					}
+				},
+				"z-ai/glm-5v-turbo": {
+					"id": "z-ai/glm-5v-turbo",
+					"ownedBy": "zai",
+					"label": "GLM-5V-Turbo",
+					"modalities": {
+						"input": ["image", "text", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-01",
+					"lastUpdated": "2026-04-01",
+					"openWeights": false,
+					"cost": {
+						"input": 1.2,
+						"output": 4,
+						"cacheRead": 0.24
+					},
+					"limit": {
+						"context": 202752,
 						"output": 131072
 					}
 				}
@@ -10343,6 +10901,31 @@
 					},
 					"limit": {
 						"context": 204800,
+						"output": 131072
+					}
+				},
+				"glm-5.2": {
+					"id": "glm-5.2",
+					"ownedBy": "zai",
+					"label": "GLM-5.2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-06-13",
+					"lastUpdated": "2026-06-13",
+					"openWeights": true,
+					"cost": {
+						"input": 1.4,
+						"output": 4.4,
+						"cacheRead": 0.26
+					},
+					"limit": {
+						"context": 1000000,
 						"output": 131072
 					}
 				},
@@ -11410,6 +11993,7 @@
 				},
 				"qwen3-coder": {
 					"id": "qwen3-coder",
+					"ownedBy": "qwen",
 					"label": "Qwen3 Coder",
 					"modalities": {
 						"input": ["text"],
@@ -11434,6 +12018,7 @@
 				},
 				"qwen3.5-plus": {
 					"id": "qwen3.5-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen3.5 Plus",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -11463,6 +12048,7 @@
 				},
 				"qwen3.6-plus": {
 					"id": "qwen3.6-plus",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 Plus",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -11492,6 +12078,7 @@
 				},
 				"qwen3.6-plus-free": {
 					"id": "qwen3.6-plus-free",
+					"ownedBy": "qwen",
 					"label": "Qwen3.6 Plus Free",
 					"modalities": {
 						"input": ["text", "image", "video"],
@@ -12688,15 +13275,15 @@
 					"attachment": true,
 					"temperature": true,
 					"releaseDate": "2026-06-01",
-					"lastUpdated": "2026-06-01",
+					"lastUpdated": "2026-06-25",
 					"openWeights": true,
 					"cost": {
-						"input": 0.6,
-						"output": 2.4,
-						"cacheRead": 0.12
+						"input": 0.3,
+						"output": 1.2,
+						"cacheRead": 0.06
 					},
 					"limit": {
-						"context": 512000,
+						"context": 1000000,
 						"output": 128000
 					}
 				}
@@ -13931,6 +14518,7 @@
 				},
 				"qwen3-coder-next": {
 					"id": "qwen3-coder-next",
+					"ownedBy": "qwen",
 					"label": "qwen3-coder-next",
 					"modalities": {
 						"input": ["text"],
@@ -13949,6 +14537,7 @@
 				},
 				"qwen3-coder:480b": {
 					"id": "qwen3-coder:480b",
+					"ownedBy": "qwen",
 					"label": "qwen3-coder:480b",
 					"modalities": {
 						"input": ["text"],
@@ -13967,6 +14556,7 @@
 				},
 				"qwen3-next:80b": {
 					"id": "qwen3-next:80b",
+					"ownedBy": "qwen",
 					"label": "qwen3-next:80b",
 					"modalities": {
 						"input": ["text"],
@@ -13985,6 +14575,7 @@
 				},
 				"qwen3-vl:235b": {
 					"id": "qwen3-vl:235b",
+					"ownedBy": "qwen",
 					"label": "qwen3-vl:235b",
 					"modalities": {
 						"input": ["text", "image"],
@@ -14003,6 +14594,7 @@
 				},
 				"qwen3-vl:235b-instruct": {
 					"id": "qwen3-vl:235b-instruct",
+					"ownedBy": "qwen",
 					"label": "qwen3-vl:235b-instruct",
 					"modalities": {
 						"input": ["text", "image"],
@@ -14021,6 +14613,7 @@
 				},
 				"qwen3.5:397b": {
 					"id": "qwen3.5:397b",
+					"ownedBy": "qwen",
 					"label": "qwen3.5:397b",
 					"modalities": {
 						"input": ["text", "image"],
@@ -14061,6 +14654,230 @@
 			"npm": "ai-sdk-ollama",
 			"api": "https://ollama.com",
 			"doc": "https://docs.ollama.com/cloud"
+		},
+		"wafer": {
+			"id": "wafer",
+			"models": {
+				"deepseek-v4-flash": {
+					"id": "deepseek-v4-flash",
+					"ownedBy": "deepseek",
+					"label": "DeepSeek V4 Flash",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-05",
+					"releaseDate": "2026-04-24",
+					"lastUpdated": "2026-05-30",
+					"openWeights": true,
+					"cost": {
+						"input": 0.14,
+						"output": 0.28,
+						"cacheRead": 0.01,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 384000
+					}
+				},
+				"deepseek-v4-pro": {
+					"id": "deepseek-v4-pro",
+					"ownedBy": "deepseek",
+					"label": "DeepSeek V4 Pro",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-05",
+					"releaseDate": "2026-04-24",
+					"lastUpdated": "2026-05-30",
+					"openWeights": true,
+					"cost": {
+						"input": 1.74,
+						"output": 3.48,
+						"cacheRead": 0.02,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 384000
+					}
+				},
+				"GLM-5.1": {
+					"id": "GLM-5.1",
+					"ownedBy": "zai",
+					"label": "GLM-5.1",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2026-04-07",
+					"lastUpdated": "2026-06-01",
+					"openWeights": true,
+					"cost": {
+						"input": 1,
+						"output": 3.2,
+						"cacheRead": 0.1,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 202752,
+						"output": 131072
+					}
+				},
+				"GLM-5.2": {
+					"id": "GLM-5.2",
+					"ownedBy": "zai",
+					"label": "GLM-5.2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-06-13",
+					"lastUpdated": "2026-06-22",
+					"openWeights": true,
+					"cost": {
+						"input": 1.2,
+						"output": 4.1,
+						"cacheRead": 0.2,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 131072
+					}
+				},
+				"Kimi-K2.6": {
+					"id": "Kimi-K2.6",
+					"ownedBy": "kimi",
+					"label": "Kimi-K2.6",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-05-13",
+					"lastUpdated": "2026-06-01",
+					"openWeights": true,
+					"cost": {
+						"input": 0.68,
+						"output": 3.15,
+						"cacheRead": 0.07,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen3.5-397B-A17B": {
+					"id": "Qwen3.5-397B-A17B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.5-397B-A17B",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2026-02-16",
+					"lastUpdated": "2026-06-01",
+					"openWeights": true,
+					"cost": {
+						"input": 0.43,
+						"output": 2.6,
+						"cacheRead": 0.04,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 262144,
+						"output": 65536
+					}
+				},
+				"Qwen3.6-35B-A3B": {
+					"id": "Qwen3.6-35B-A3B",
+					"ownedBy": "qwen",
+					"label": "Qwen3.6-35B-A3B",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"knowledge": "2025-04",
+					"releaseDate": "2026-05-11",
+					"lastUpdated": "2026-05-30",
+					"openWeights": true,
+					"cost": {
+						"input": 0.15,
+						"output": 1,
+						"cacheRead": 0.02,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 256000,
+						"output": 65536
+					}
+				},
+				"qwen3.7-max": {
+					"id": "qwen3.7-max",
+					"ownedBy": "qwen",
+					"label": "Qwen3.7-Max",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-05-21",
+					"lastUpdated": "2026-05-30",
+					"openWeights": false,
+					"cost": {
+						"input": 5,
+						"output": 15,
+						"cacheRead": 0.5,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 256000,
+						"output": 65536
+					}
+				}
+			},
+			"label": "Wafer",
+			"env": ["WAFER_API_KEY"],
+			"npm": "@ai-sdk/openai-compatible",
+			"api": "https://pass.wafer.ai/v1",
+			"doc": "https://docs.wafer.ai/serverless"
 		},
 		"ottorouter": {
 			"id": "ottorouter",

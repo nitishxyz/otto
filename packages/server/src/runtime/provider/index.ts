@@ -2,6 +2,7 @@ import type { OttoConfig, ProviderId } from '@ottocode/sdk';
 import {
 	createBasetenModel,
 	createHuggingFaceModel,
+	createWaferModel,
 	getConfiguredProviderApiKey,
 	getProviderDefinition,
 	isBuiltInProviderId,
@@ -71,6 +72,16 @@ export async function resolveModel(
 			throw new Error(`Unsupported provider: ${provider}`);
 		}
 		return createHuggingFaceModel(model, {
+			apiKey: getConfiguredProviderApiKey(cfg, provider),
+			baseURL: definition.baseURL,
+		});
+	}
+	if (provider === 'wafer') {
+		const definition = getProviderDefinition(cfg, provider);
+		if (!definition) {
+			throw new Error(`Unsupported provider: ${provider}`);
+		}
+		return createWaferModel(model, {
 			apiKey: getConfiguredProviderApiKey(cfg, provider),
 			baseURL: definition.baseURL,
 		});

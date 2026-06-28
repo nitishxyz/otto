@@ -20,6 +20,7 @@ const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = {
 	'ollama-cloud': { enabled: false, baseURL: 'https://ollama.com' },
 	baseten: { enabled: false },
 	huggingface: { enabled: false },
+	wafer: { enabled: false },
 	openrouter: { enabled: false },
 	opencode: { enabled: false },
 	copilot: { enabled: false },

@@ -81,6 +81,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://huggingface.co/settings/tokens',
 		env: 'HF_TOKEN',
 	},
+	wafer: {
+		name: 'Wafer',
+		url: 'https://app.wafer.ai/api-keys',
+		env: 'WAFER_API_KEY',
+	},
 	openrouter: {
 		name: 'OpenRouter',
 		url: 'https://openrouter.ai/keys',
@@ -408,6 +413,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				},
 				{ value: 'baseten', label: PROVIDER_LINKS.baseten.name },
 				{ value: 'huggingface', label: PROVIDER_LINKS.huggingface.name },
+				{ value: 'wafer', label: PROVIDER_LINKS.wafer.name },
 				{ value: 'openrouter', label: PROVIDER_LINKS.openrouter.name },
 				{ value: 'opencode', label: PROVIDER_LINKS.opencode.name },
 				{ value: 'copilot', label: PROVIDER_LINKS.copilot.name },
@@ -1495,6 +1501,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			google: { enabled: provider === 'google' },
 			baseten: { enabled: provider === 'baseten' },
 			huggingface: { enabled: provider === 'huggingface' },
+			wafer: { enabled: provider === 'wafer' },
 			openrouter: { enabled: provider === 'openrouter' },
 			opencode: { enabled: provider === 'opencode' },
 			copilot: { enabled: provider === 'copilot' },

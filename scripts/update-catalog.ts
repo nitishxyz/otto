@@ -64,13 +64,18 @@ const FAMILY_TO_OWNER: Record<string, ModelOwner> = {
 	'gemini-flash-lite': 'google',
 	'gemini-pro': 'google',
 	kimi: 'kimi',
+	'kimi-k2': 'kimi',
 	'kimi-thinking': 'kimi',
 	'kimi-free': 'kimi',
+	qwen: 'qwen',
+	'qwen3.7-max': 'qwen',
 	glm: 'zai',
 	'glm-air': 'zai',
 	'glm-z': 'zai',
 	'glm-free': 'zai',
 	deepseek: 'deepseek',
+	'deepseek-flash': 'deepseek',
+	'deepseek-thinking': 'deepseek',
 	minimax: 'minimax',
 	'minimax-free': 'minimax',
 	grok: 'xai',
@@ -109,6 +114,7 @@ function resolveOwnedByFromModelId(modelId: string): ModelOwner | undefined {
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
 	if (lower.includes('kimi') || lower.startsWith('moonshotai/')) return 'kimi';
+	if (lower.includes('qwen')) return 'qwen';
 	if (
 		lower.includes('glm') ||
 		lower.startsWith('z-ai/') ||
@@ -173,6 +179,7 @@ function pickProviders(
 		minimax: createEmptyEntry('minimax'),
 		copilot: createEmptyEntry('copilot'),
 		'ollama-cloud': createEmptyEntry('ollama-cloud'),
+		wafer: createEmptyEntry('wafer'),
 	};
 	for (const providerKey of Object.keys(feed)) {
 		let targetKey: BuiltInProviderId | undefined;
@@ -206,6 +213,9 @@ function pickProviders(
 		if (providerKey === 'minimax') {
 			targetKey = 'minimax';
 		}
+		if (providerKey === 'wafer.ai') {
+			targetKey = 'wafer';
+		}
 		if (!targetKey) continue;
 		const entry = feed[providerKey];
 		const key = targetKey;
@@ -216,6 +226,7 @@ function pickProviders(
 			'opencode',
 			'copilot',
 			'ollama-cloud',
+			'wafer',
 		].includes(key);
 		const staticOwner = SINGLE_PROVIDER_OWNER[providerKey];
 		const models: ModelInfo[] = [];
@@ -262,6 +273,13 @@ function pickProviders(
 		}
 		const doc = normalizeString(entry.doc);
 		if (doc) base.doc = doc;
+		if (key === 'wafer') {
+			base.label = 'Wafer';
+			base.env = ['WAFER_API_KEY'];
+			base.npm = '@ai-sdk/openai-compatible';
+			base.api = 'https://pass.wafer.ai/v1';
+			base.doc = 'https://docs.wafer.ai/serverless';
+		}
 		base.models = modelListToMap(models);
 		out[key] = base;
 	}

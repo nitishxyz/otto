@@ -134,6 +134,8 @@ export { createBasetenModel } from './baseten-client.ts';
 export type { BasetenProviderConfig } from './baseten-client.ts';
 export { createHuggingFaceModel } from './huggingface-client.ts';
 export type { HuggingFaceProviderConfig } from './huggingface-client.ts';
+export { createWaferModel } from './wafer-client.ts';
+export type { WaferProviderConfig } from './wafer-client.ts';
 export {
 	getOpenRouterInstance,
 	createOpenRouterModel,

@@ -56,6 +56,10 @@ export const minimaxLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmln
 <path d="M6 32V12L13 22L20 12V32H17V20L13 26L9 20V32H6ZM22 32V12L29 22L36 12V32H33V20L29 26L25 20V32H22Z" fill="currentColor"/>
 </svg>`;
 
+export const waferLogo = `<svg width="24" height="24" viewBox="0 0 24.5486 24.0014" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.7458 21.6347L13.8742 10.0014C13.8585 9.95184 13.8407 9.9043 13.8229 9.85666L13.7498 9.66439H10.8304L10.7593 9.85666C10.7414 9.90229 10.7257 9.94983 10.7079 9.99939L6.86996 21.5614L2.52834 7.17285H0L5.01124 23.7239C5.01717 23.7417 5.02112 23.7576 5.02704 23.7735L5.10013 24.0014H8.53314L12.2743 12.7506L16.0154 24.0014H19.4484L24.5486 7.17285H22.0894L17.7458 21.6347Z" fill="currentColor"/>
+</svg>`;
+
 export const providerLogos: Record<string, string> = {
 	anthropic: anthropicLogo,
 	openai: openaiLogo,
@@ -71,4 +75,5 @@ export const providerLogos: Record<string, string> = {
 	'zai-coding': zaiLogo,
 	kimi: kimiLogo,
 	minimax: minimaxLogo,
+	wafer: waferLogo,
 };

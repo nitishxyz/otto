@@ -9,6 +9,7 @@ import {
 	createBasetenModel,
 	createDeepSeekModel,
 	createHuggingFaceModel,
+	createWaferModel,
 	createMinimaxModel,
 	createKimiModel,
 	createOttoRouterModel,
@@ -31,6 +32,7 @@ export type ProviderName =
 	| 'ollama-cloud'
 	| 'baseten'
 	| 'huggingface'
+	| 'wafer'
 	| 'openrouter'
 	| 'opencode'
 	| 'copilot'
@@ -124,6 +126,14 @@ export async function resolveModel(
 
 	if (provider === 'huggingface') {
 		return createHuggingFaceModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+			fetch: config.customFetch,
+		});
+	}
+
+	if (provider === 'wafer') {
+		return createWaferModel(model, {
 			apiKey: config.apiKey,
 			baseURL: config.baseURL,
 			fetch: config.customFetch,

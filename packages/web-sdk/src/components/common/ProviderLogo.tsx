@@ -16,6 +16,7 @@ import {
 	opencodeLogo,
 	basetenLogo,
 	huggingfaceLogo,
+	waferLogo,
 	copilotLogo,
 } from '../../assets/provider-logos';
 
@@ -37,6 +38,7 @@ const providerLogos: Record<string, string> = {
 	opencode: opencodeLogo,
 	baseten: basetenLogo,
 	huggingface: huggingfaceLogo,
+	wafer: waferLogo,
 	copilot: copilotLogo,
 };
 

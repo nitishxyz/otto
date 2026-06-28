@@ -80,6 +80,9 @@ const pricingTable: Record<ProviderName, PricingEntry[]> = {
 	huggingface: [
 		// Pricing from catalog entries; leave empty here
 	],
+	wafer: [
+		// Pricing from catalog entries; leave empty here
+	],
 	openrouter: [
 		// Prefer catalog pricing; keep empty to defer to catalog or undefined
 	],

@@ -8,6 +8,7 @@ export type BuiltInProviderId =
 	| 'ollama-cloud'
 	| 'baseten'
 	| 'huggingface'
+	| 'wafer'
 	| 'openrouter'
 	| 'opencode'
 	| 'copilot'
