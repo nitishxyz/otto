@@ -19,12 +19,13 @@ export function registerAskCommand(program: Command) {
 		.option('--last', 'Continue most recent session', false)
 		.option('--session <id>', 'Continue specific session')
 		.option('-y, --yes', 'Auto-approve all tool executions')
-		.action(async (prompt, opts) => {
+		.action(async (prompt, opts, command) => {
+			const parentOpts = command.parent?.opts() ?? {};
 			const argv = ['ask'];
 			if (prompt) argv.push(prompt);
-			pushOption(argv, '--agent', opts.agent);
-			pushOption(argv, '--provider', opts.provider);
-			pushOption(argv, '--model', opts.model);
+			pushOption(argv, '--agent', opts.agent ?? parentOpts.agent);
+			pushOption(argv, '--provider', opts.provider ?? parentOpts.provider);
+			pushOption(argv, '--model', opts.model ?? parentOpts.model);
 			pushFlag(argv, '--wild', opts.wild);
 			pushOption(argv, '--project', opts.project);
 			pushFlag(argv, '--last', opts.last);

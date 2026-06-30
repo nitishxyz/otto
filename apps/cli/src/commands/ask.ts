@@ -70,11 +70,14 @@ export function registerAskCommand(program: Command) {
 		.option('--last', 'Continue most recent session', false)
 		.option('--session <id>', 'Continue specific session')
 		.option('-y, --yes', 'Auto-approve all tool executions')
-		.action(async (prompt, opts) => {
+		.action(async (prompt, opts, command) => {
+			const parentOpts = command.parent?.opts() ?? {};
 			await handleAsk(prompt, {
-				agent: opts.agent,
-				provider: opts.provider as ProviderId | undefined,
-				model: opts.model,
+				agent: opts.agent ?? parentOpts.agent,
+				provider: (opts.provider ?? parentOpts.provider) as
+					| ProviderId
+					| undefined,
+				model: opts.model ?? parentOpts.model,
 				wild: opts.wild,
 				project: opts.project,
 				last: opts.last,

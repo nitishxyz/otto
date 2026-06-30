@@ -57,7 +57,7 @@
     },
     "apps/cli": {
       "name": "@ottocode/cli",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "bin": {
         "otto": "./dist/otto",
       },
@@ -84,7 +84,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.169",
+      "version": "0.1.170",
       "dependencies": {
         "@ottocode/themes": "workspace:*",
         "@ottocode/web-sdk": "workspace:*",
@@ -455,7 +455,7 @@
     },
     "packages/api": {
       "name": "@ottocode/api",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "axios": "1.13.5",
         "eventsource-parser": "2.0.1",
@@ -468,7 +468,7 @@
     },
     "packages/database": {
       "name": "@ottocode/database",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "drizzle-orm": "0.44.7",
@@ -481,7 +481,7 @@
     },
     "packages/install": {
       "name": "@ottocode/install",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "bin": {
         "otto": "./start.js",
       },
@@ -508,7 +508,7 @@
     },
     "packages/sdk": {
       "name": "@ottocode/sdk",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.82",
         "@ai-sdk/baseten": "1.0.54",
@@ -526,7 +526,7 @@
         "@ottorouter/ai-sdk": "workspace:*",
         "@solana/web3.js": "1.98.4",
         "ai": "6.0.199",
-        "ai-sdk-ollama": "3.8.3",
+        "ai-sdk-ollama": "3.8.8",
         "bs58": "6.0.0",
         "bun-pty": "0.3.2",
         "diff": "8.0.3",
@@ -546,7 +546,7 @@
     },
     "packages/server": {
       "name": "@ottocode/server",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "@ai-sdk/devtools": "0.0.18",
         "@ai-sdk/provider": "3.0.10",
@@ -557,7 +557,7 @@
         "@ottocode/themes": "workspace:*",
         "@solana/web3.js": "1.98.4",
         "ai": "6.0.199",
-        "ai-sdk-ollama": "3.8.3",
+        "ai-sdk-ollama": "3.8.8",
         "bs58": "6.0.0",
         "drizzle-orm": "0.44.7",
         "hono": "4.12.0",
@@ -571,14 +571,14 @@
     },
     "packages/themes": {
       "name": "@ottocode/themes",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "devDependencies": {
         "typescript": "5.9.3",
       },
     },
     "packages/web-sdk": {
       "name": "@ottocode/web-sdk",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "@codemirror/lang-css": "6.3.1",
         "@codemirror/lang-html": "6.4.11",
@@ -635,7 +635,7 @@
     },
     "packages/web-ui": {
       "name": "@ottocode/web-ui",
-      "version": "0.1.331",
+      "version": "0.1.332",
       "dependencies": {
         "express": "5.2.1",
       },
@@ -2476,7 +2476,7 @@
 
     "ai": ["ai@6.0.199", "", { "dependencies": { "@ai-sdk/gateway": "3.0.127", "@ai-sdk/provider": "3.0.10", "@ai-sdk/provider-utils": "4.0.27", "@opentelemetry/api": "^1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-6H9RPEjzBQECM+eU1JxAh6jHcZPU/6q5QZ8D8QV8agubf0Mm/kcBlwqrFcFtup6RQzmEvMkVaQOoLCZ8bQ13lA=="],
 
-    "ai-sdk-ollama": ["ai-sdk-ollama@3.8.3", "", { "dependencies": { "@ai-sdk/provider": "^3.0.8", "@ai-sdk/provider-utils": "^4.0.23", "jsonrepair": "^3.13.3", "ollama": "^0.6.3" }, "peerDependencies": { "ai": "^6.0.154" } }, "sha512-KId/S++eb0CgTPFTtHzCGCrO73kXZLK+hyyZx5k8LVqU2XOEHYKVbIwDiQ+hm3okHjnsGehn4zR4QNm14SUM3Q=="],
+    "ai-sdk-ollama": ["ai-sdk-ollama@3.8.8", "", { "dependencies": { "@ai-sdk/provider": "^3.0.10", "@ai-sdk/provider-utils": "^4.0.30", "jsonrepair": "^3.14.0", "ollama": "^0.6.3" }, "peerDependencies": { "ai": "^6.0.197" } }, "sha512-peWelPf6sVsRULQyYhfyu1dMZhwewRszsbQVfbuhNLflh+ncRXn6pe1BRE3NAcSsWd7JMRZAV5RzcuR3R9ZfaQ=="],
 
     "ajv": ["ajv@8.18.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A=="],
 
@@ -5468,9 +5468,7 @@
 
     "@walletconnect/window-metadata/tslib": ["tslib@1.14.1", "", {}, "sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg=="],
 
-    "ai-sdk-ollama/@ai-sdk/provider": ["@ai-sdk/provider@3.0.8", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ=="],
-
-    "ai-sdk-ollama/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.23", "", { "dependencies": { "@ai-sdk/provider": "3.0.8", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-z8GlDaCmRSDlqkMF2f4/RFgWxdarvIbyuk+m6WXT1LYgsnGiXRJGTD2Z1+SDl3LqtFuRtGX1aghYvQLoHL/9pg=="],
+    "ai-sdk-ollama/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.30", "", { "dependencies": { "@ai-sdk/provider": "3.0.10", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.8" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-VO7I+vPffqI5sMnPoUq5DCSqKIgQIk/naJWRdQVpz2ma2zoprC/lqiJiUEl2s6DfvTD76TbhD3q39ROjlA6rGw=="],
 
     "ajv-keywords/ajv": ["ajv@6.12.6", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g=="],
 
@@ -6264,7 +6262,7 @@
 
     "@walletconnect/utils/viem/ws": ["ws@8.18.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw=="],
 
-    "ai-sdk-ollama/@ai-sdk/provider-utils/eventsource-parser": ["eventsource-parser@3.0.6", "", {}, "sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg=="],
+    "ai-sdk-ollama/@ai-sdk/provider-utils/eventsource-parser": ["eventsource-parser@3.0.8", "", {}, "sha512-70QWGkr4snxr0OXLRWsFLeRBIRPuQOvt4s8QYjmUlmlkyTZkRqS7EDVRZtzU3TiyDbXSzaOeF0XUKy8PchzukQ=="],
 
     "ajv-keywords/ajv/json-schema-traverse": ["json-schema-traverse@0.4.1", "", {}, "sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg=="],
 
