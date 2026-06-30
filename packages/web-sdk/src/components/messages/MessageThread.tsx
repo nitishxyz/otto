@@ -14,6 +14,7 @@ import { Virtuoso, type Components, type VirtuosoHandle } from 'react-virtuoso';
 import type { Message, MessagePart, Session } from '../../types/api';
 import { AssistantMessageGroup } from './AssistantMessageGroup';
 import { UserMessageGroup } from './UserMessageGroup';
+import { ThreadNavigatorRail } from './ThreadNavigatorRail';
 import { SessionHeader } from '../sessions/SessionHeader';
 import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
@@ -740,6 +741,18 @@ export const MessageThread = memo(function MessageThread({
 		scheduleScrollToThreadBottom('auto', 3);
 	};
 
+	const handleNavigateToIndex = useCallback(
+		(index: number) => {
+			disableAutoFollow();
+			virtuosoRef.current?.scrollToIndex({
+				index,
+				align: 'start',
+				behavior: 'smooth',
+			});
+		},
+		[disableAutoFollow],
+	);
+
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
 			? 'w-full space-y-4'
@@ -899,6 +912,12 @@ export const MessageThread = memo(function MessageThread({
 							</div>
 						</div>
 					)}
+				/>
+
+				{/* Quick-jump navigator rail with dock-style magnification */}
+				<ThreadNavigatorRail
+					messages={filteredMessages}
+					onNavigate={handleNavigateToIndex}
 				/>
 
 				{/* Scroll to bottom button - only shown when user has scrolled up */}

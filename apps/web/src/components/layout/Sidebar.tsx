@@ -11,6 +11,7 @@ const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
 const LEFT_SIDEBAR_HOVER_RATIO = 0.02;
+const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 
 function getConnectionLabel(url: string): string {
 	try {
@@ -44,6 +45,7 @@ export const Sidebar = memo(function Sidebar({
 		enabled: isCollapsed && preferences.smartEdges,
 		hoverRatio: LEFT_SIDEBAR_HOVER_RATIO,
 		activeWidth: panelWidth,
+		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,
 	});
 	const shouldShowSidebar = !isCollapsed || isAutoVisible;
 	const shouldShowEdgeHint = isCollapsed && isHoverPending && !isAutoVisible;
