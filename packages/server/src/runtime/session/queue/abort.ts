@@ -30,14 +30,26 @@ export function abortSession(
 
 	// Abort the currently running message.
 	if (state.currentMessageId) {
-		abortActiveShellsForMessage(sessionId, state.currentMessageId);
-		abortAndDeleteMessageController(state.currentMessageId, reason);
+		abortActiveShellsForMessage(
+			sessionId,
+			state.currentMessageId,
+			state.projectRoot,
+		);
+		abortAndDeleteMessageController(
+			state.currentMessageId,
+			reason,
+			state.projectRoot,
+		);
 	}
 
 	// Optionally clear the queue and abort all queued messages.
 	if (clearQueue && state.queue.length > 0) {
 		for (const opts of state.queue) {
-			abortAndDeleteMessageController(opts.assistantMessageId, reason);
+			abortAndDeleteMessageController(
+				opts.assistantMessageId,
+				reason,
+				opts.projectRoot,
+			);
 		}
 		state.queue = [];
 		publishQueueState(sessionId);
@@ -61,8 +73,8 @@ export function abortMessage(
 
 	// Check if this is the currently running message.
 	if (state.currentMessageId === messageId) {
-		abortActiveShellsForMessage(sessionId, messageId);
-		abortAndDeleteMessageController(messageId);
+		abortActiveShellsForMessage(sessionId, messageId, state.projectRoot);
+		abortAndDeleteMessageController(messageId, undefined, state.projectRoot);
 		return { removed: true, wasRunning: true };
 	}
 
@@ -71,13 +83,17 @@ export function abortMessage(
 		(opts) => opts.assistantMessageId === messageId,
 	);
 	if (index !== -1) {
-		state.queue.splice(index, 1);
-		abortAndDeleteMessageController(messageId);
+		const [removed] = state.queue.splice(index, 1);
+		abortAndDeleteMessageController(messageId, undefined, removed.projectRoot);
 		publishQueueState(sessionId);
 		return { removed: true, wasRunning: false };
 	}
 
-	const abortedShells = abortActiveShellsForMessage(sessionId, messageId);
+	const abortedShells = abortActiveShellsForMessage(
+		sessionId,
+		messageId,
+		state.projectRoot,
+	);
 	return { removed: abortedShells > 0, wasRunning: abortedShells > 0 };
 }
 
@@ -98,8 +114,8 @@ export function removeFromQueue(sessionId: string, messageId: string): boolean {
 	);
 	if (index === -1) return false;
 
-	state.queue.splice(index, 1);
-	abortAndDeleteMessageController(messageId);
+	const [removed] = state.queue.splice(index, 1);
+	abortAndDeleteMessageController(messageId, undefined, removed.projectRoot);
 
 	publishQueueState(sessionId);
 	return true;
@@ -138,10 +154,14 @@ export function sendQueuedMessageNow(
 	const preemptedMessageId = wasRunning ? state.currentMessageId : null;
 
 	if (preemptedMessageId) {
-		abortAndDeleteMessageController(preemptedMessageId, {
-			type: 'send-now-preempt',
-			nextMessageId: messageId,
-		} satisfies SendNowPreemptReason);
+		abortAndDeleteMessageController(
+			preemptedMessageId,
+			{
+				type: 'send-now-preempt',
+				nextMessageId: messageId,
+			} satisfies SendNowPreemptReason,
+			state.projectRoot,
+		);
 	}
 
 	publishQueueState(sessionId);

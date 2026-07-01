@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { startMCPServer, stopMCPServer, testMCPServer } from './service.ts';
 import { copilotMCPOAuthStore, copilotMCPSessions } from './state.ts';
 
@@ -70,6 +71,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		async (c) => {
 			const result = await startMCPServer({
 				name: c.req.param('name'),
+				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
 			});
@@ -106,7 +108,10 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const result = await stopMCPServer(c.req.param('name'));
+			const result = await stopMCPServer(
+				c.req.param('name'),
+				await resolveRequestProjectRoot(c),
+			);
 			return result.ok
 				? c.json(result.body)
 				: c.json(result.body, result.status);
@@ -140,7 +145,10 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const result = await testMCPServer(c.req.param('name'));
+			const result = await testMCPServer(
+				c.req.param('name'),
+				await resolveRequestProjectRoot(c),
+			);
 			return result.ok
 				? c.json(result.body)
 				: c.json(result.body, result.status);

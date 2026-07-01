@@ -4,6 +4,7 @@ import type { Hono } from 'hono';
 import { basename } from 'node:path';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const cwdResponseSchema = z.object({
 	cwd: z.string(),
@@ -30,9 +31,9 @@ export function registerCwdRoute(app: Hono) {
 				},
 			},
 		},
-		(c) => {
+		async (c) => {
 			try {
-				const cwd = process.cwd();
+				const cwd = await resolveRequestProjectRoot(c);
 				const dirName = basename(cwd);
 				return c.json({
 					cwd,

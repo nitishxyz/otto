@@ -35,6 +35,8 @@ export type OttoEventType =
 export interface OttoEvent<T = unknown> {
 	type: OttoEventType;
 	sessionId: string;
+	projectId?: string;
+	projectRoot?: string;
 	payload?: T;
 }
 
@@ -59,6 +61,8 @@ export interface NotificationEvent {
 
 export interface SessionStatusEvent {
 	sessionId: string;
+	projectId?: string;
+	projectRoot?: string;
 	status: 'running' | 'completed' | 'failed' | 'needs_attention';
 	messageId?: string;
 	createdAt: string;

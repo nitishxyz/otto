@@ -237,6 +237,7 @@ export function createErrorHandler(
 						publishWrapper,
 						opts.provider,
 						opts.model,
+						opts.projectRoot,
 						opts.assistantMessageId,
 					);
 					if (compactResult.success) {

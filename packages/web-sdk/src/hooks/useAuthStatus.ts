@@ -4,6 +4,7 @@ import { apiClient } from '../lib/api-client';
 import type { ProviderModelSettingsMap } from '../lib/api-client/config';
 import { openPlatformUrl } from '../lib/platform';
 import { useOnboardingStore } from '../stores/onboardingStore';
+import { allModelsQueryKey, configQueryKey } from './useConfig';
 
 const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
@@ -27,8 +28,8 @@ export function useAuthStatus() {
 		try {
 			const status = await apiClient.getAuthStatus();
 			setAuthStatus(status);
-			queryClient.invalidateQueries({ queryKey: ['config'] });
-			queryClient.invalidateQueries({ queryKey: ['models'] });
+			queryClient.invalidateQueries({ queryKey: configQueryKey() });
+			queryClient.invalidateQueries({ queryKey: allModelsQueryKey() });
 			return status;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to load';

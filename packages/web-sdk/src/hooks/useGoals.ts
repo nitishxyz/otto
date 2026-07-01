@@ -7,16 +7,16 @@ import type {
 	SubagentStatus,
 } from '../lib/api-client';
 import { useConfig } from './useConfig';
+import { getMessagesQueryKey } from './useMessages';
+import { getSessionsQueryKey } from './useSessions';
+import { projectScopedKey } from '../lib/api-client/utils';
 
-export const goalQueryKey = (sessionId: string | undefined) => [
-	'goal',
-	sessionId,
-];
-export const projectGoalsQueryKey = ['goals', 'project'] as const;
-export const subagentsQueryKey = (sessionId: string | undefined) => [
-	'subagents',
-	sessionId,
-];
+export const goalQueryKey = (sessionId: string | undefined) =>
+	projectScopedKey(['goal', sessionId] as const);
+export const projectGoalsQueryKey = () =>
+	projectScopedKey(['goals', 'project'] as const);
+export const subagentsQueryKey = (sessionId: string | undefined) =>
+	projectScopedKey(['subagents', sessionId] as const);
 
 export function useOttoEnabled(): boolean {
 	const { data: config } = useConfig();
@@ -30,7 +30,7 @@ export function useOttoEnabled(): boolean {
 export function useProjectGoals() {
 	const ottoEnabled = useOttoEnabled();
 	return useQuery({
-		queryKey: projectGoalsQueryKey,
+		queryKey: projectGoalsQueryKey(),
 		queryFn: () => apiClient.listGoals(),
 		enabled: ottoEnabled,
 		refetchInterval: 10000,
@@ -41,10 +41,10 @@ function applyGoalToProjectCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	goal: Goal,
 ) {
-	queryClient.setQueryData<{ goals: Goal[] }>(projectGoalsQueryKey, (old) =>
+	queryClient.setQueryData<{ goals: Goal[] }>(projectGoalsQueryKey(), (old) =>
 		old ? { goals: old.goals.map((g) => (g.id === goal.id ? goal : g)) } : old,
 	);
-	queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey });
+	queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey() });
 }
 
 /**
@@ -113,7 +113,7 @@ export function useUpdateGoal(sessionId: string | undefined) {
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: goalQueryKey(sessionId) });
-			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey });
+			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey() });
 		},
 	});
 }
@@ -125,7 +125,7 @@ export function useAddGoalTasks(sessionId: string | undefined) {
 			apiClient.addGoalTasks(input.goalId, input.tasks),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: goalQueryKey(sessionId) });
-			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey });
+			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey() });
 		},
 	});
 }
@@ -147,7 +147,7 @@ export function useUpdateGoalTask(sessionId: string | undefined) {
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: goalQueryKey(sessionId) });
-			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey });
+			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey() });
 		},
 	});
 }
@@ -157,7 +157,11 @@ export function useSessionSubagents(
 	status?: SubagentStatus,
 ) {
 	return useQuery({
-		queryKey: [...subagentsQueryKey(sessionId), status ?? 'all'],
+		queryKey: projectScopedKey([
+			'subagents',
+			sessionId,
+			status ?? 'all',
+		] as const),
 		queryFn: () => {
 			if (!sessionId) throw new Error('No session ID');
 			return apiClient.listSessionSubagents(sessionId, status);
@@ -183,10 +187,12 @@ export function useStartGoal(sessionId: string | undefined) {
 			apiClient.startGoal(input.goalId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: goalQueryKey(sessionId) });
-			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey });
-			queryClient.invalidateQueries({ queryKey: ['sessions', 'list'] });
+			queryClient.invalidateQueries({ queryKey: projectGoalsQueryKey() });
+			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 			if (sessionId) {
-				queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+				queryClient.invalidateQueries({
+					queryKey: getMessagesQueryKey(sessionId),
+				});
 			}
 		},
 	});

@@ -1,6 +1,7 @@
 import { client } from '@ottocode/api';
 import {
 	getRuntimeApiBaseUrl,
+	getRuntimeProjectContext,
 	setRuntimeApiBaseUrl as persistRuntimeApiBaseUrl,
 } from '../config';
 import type { Session, Message } from '../../types/api';
@@ -47,9 +48,24 @@ export function extractErrorMessage(error: unknown): string {
 
 export function configureApiClient() {
 	const baseURL = getRuntimeApiBaseUrl();
+	const projectContext = getRuntimeProjectContext();
 	client.setConfig({
 		baseURL,
 		adapter: getClientAdapter(),
+		headers: {
+			...(projectContext?.serverToken
+				? {
+						Authorization: `Bearer ${projectContext.serverToken}`,
+						'X-Otto-Server-Token': projectContext.serverToken,
+					}
+				: {}),
+			...(projectContext?.projectId
+				? { 'X-Otto-Project-Id': projectContext.projectId }
+				: {}),
+			...(projectContext?.projectRoot
+				? { 'X-Otto-Project': projectContext.projectRoot }
+				: {}),
+		},
 	});
 }
 
@@ -57,6 +73,45 @@ configureApiClient();
 
 export function getBaseUrl(): string {
 	return getRuntimeApiBaseUrl();
+}
+
+export function getProjectId(): string | undefined {
+	return getRuntimeProjectContext()?.projectId;
+}
+
+export function getProjectRoot(): string | undefined {
+	return getRuntimeProjectContext()?.projectRoot;
+}
+
+export function getAuthHeaders(): Record<string, string> {
+	const context = getRuntimeProjectContext();
+	return {
+		...(context?.serverToken
+			? {
+					Authorization: `Bearer ${context.serverToken}`,
+					'X-Otto-Server-Token': context.serverToken,
+				}
+			: {}),
+		...(context?.projectId ? { 'X-Otto-Project-Id': context.projectId } : {}),
+		...(context?.projectRoot ? { 'X-Otto-Project': context.projectRoot } : {}),
+	};
+}
+
+export function getProjectQuery() {
+	const projectId = getProjectId();
+	const project = getProjectRoot();
+	return {
+		...(projectId ? { projectId } : {}),
+		...(project ? { project } : {}),
+	};
+}
+
+export function getProjectKey(): string {
+	return getProjectId() || getProjectRoot() || 'default';
+}
+
+export function projectScopedKey<T extends readonly unknown[]>(key: T) {
+	return ['project', getProjectKey(), ...key] as const;
 }
 
 export function setRuntimeApiBaseUrl(value: string): string {

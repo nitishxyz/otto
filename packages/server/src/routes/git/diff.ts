@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { gitDiffSchema } from './schemas.ts';
 import {
 	checkIfNewFile,
@@ -103,12 +104,12 @@ export function registerDiffRoute(app: Hono) {
 		async (c) => {
 			try {
 				const query = gitDiffSchema.parse({
-					project: c.req.query('project'),
+					project: undefined,
 					file: c.req.query('file'),
 					staged: c.req.query('staged'),
 				});
 
-				const requestedPath = query.project || process.cwd();
+				const requestedPath = await resolveRequestProjectRoot(c);
 
 				const validation = await validateAndGetGitRoot(requestedPath);
 				if ('error' in validation) {

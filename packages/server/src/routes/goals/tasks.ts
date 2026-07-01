@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { publish } from '../../events/bus.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	DISABLED_ERROR,
@@ -67,7 +68,9 @@ function registerAddGoalTasksRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(c.req.query('project'));
+				const { db, enabled } = await loadGoalsContext(
+					await resolveRequestProjectRoot(c),
+				);
 				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const body = addTasksBodySchema.parse(await c.req.json());
@@ -154,7 +157,9 @@ function registerUpdateGoalTaskRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(c.req.query('project'));
+				const { db, enabled } = await loadGoalsContext(
+					await resolveRequestProjectRoot(c),
+				);
 				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const taskId = c.req.param('taskId');
@@ -228,7 +233,9 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(c.req.query('project'));
+				const { db, enabled } = await loadGoalsContext(
+					await resolveRequestProjectRoot(c),
+				);
 				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const taskId = c.req.param('taskId');

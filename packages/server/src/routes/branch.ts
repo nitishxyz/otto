@@ -4,6 +4,7 @@ import { hasConfiguredProvider, loadConfig, logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from './project-context.ts';
 import {
 	createBranch,
 	getParentSession,
@@ -108,7 +109,7 @@ export function registerBranchRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
 
@@ -187,7 +188,7 @@ export function registerBranchRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
 
@@ -226,7 +227,7 @@ export function registerBranchRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
 

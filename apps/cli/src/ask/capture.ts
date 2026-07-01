@@ -1,6 +1,6 @@
 import { ask, buildSessionStreamUrl } from '@ottocode/api';
 import type { AskHandshake, AskOptions } from './types.ts';
-import { getOrStartServerUrl } from './server.ts';
+import { getOrStartServerContext } from './server.ts';
 import { safeJson, connectSSE } from './http.ts';
 import { printToolCall, printToolResult, dim, logToolError } from './render.ts';
 import { extractToolError, isToolError } from '@ottocode/sdk/tools/error';
@@ -27,9 +27,10 @@ export async function runAskStreamCapture(
 	opts: AskOptions = {},
 ) {
 	const projectRoot = opts.project ?? process.cwd();
-	const baseUrl = await getOrStartServerUrl();
+	const serverContext = await getOrStartServerContext(projectRoot);
+	const baseUrl = serverContext.baseUrl;
 	const handshakeResponse = await ask({
-		query: { project: projectRoot },
+		query: { projectId: serverContext.projectId },
 		body: {
 			prompt,
 			agent: opts.agent,
@@ -48,8 +49,9 @@ export async function runAskStreamCapture(
 		buildSessionStreamUrl({
 			baseUrl,
 			sessionId: handshake.sessionId,
-			projectPath: projectRoot,
+			projectId: serverContext.projectId,
 		}),
+		serverContext.authHeaders,
 	);
 	const assistantMessageId = handshake.assistantMessageId;
 

@@ -4,11 +4,8 @@ import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { resolveAgentConfig } from '../../../runtime/agent/registry.ts';
 import { serializeError } from '../../../runtime/errors/api-error.ts';
 import { createSession as createSessionRow } from '../../../runtime/session/manager.ts';
-import {
-	attachSessionCostSummary,
-	loadProjectDb,
-	normalizeSessionRow,
-} from '../service.ts';
+import { resolveRequestProject } from '../../project-context.ts';
+import { attachSessionCostSummary, normalizeSessionRow } from '../service.ts';
 import {
 	createSessionBodySchema,
 	errorResponseSchema,
@@ -46,8 +43,7 @@ export function registerCreateSessionRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectRoot = c.req.query('project') || process.cwd();
-			const { cfg, db } = await loadProjectDb(projectRoot);
+			const { cfg, db } = await resolveRequestProject(c);
 			const body = (await c.req.json().catch(() => ({}))) as Record<
 				string,
 				unknown

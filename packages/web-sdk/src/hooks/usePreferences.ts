@@ -8,6 +8,7 @@ interface Preferences {
 	compactThread: boolean;
 	fontFamily: string;
 	smartEdges: boolean;
+	threadNavigatorRail: boolean;
 	releaseToSend: boolean;
 	fullWidthContent: boolean;
 	notificationsEnabled: boolean;
@@ -19,6 +20,7 @@ const DEFAULT_PREFERENCES: Preferences = {
 	compactThread: true,
 	fontFamily: DEFAULT_FONT_FAMILY,
 	smartEdges: true,
+	threadNavigatorRail: true,
 	releaseToSend: false,
 	fullWidthContent: false,
 	notificationsEnabled: false,
@@ -65,6 +67,9 @@ export function usePreferences() {
 				config?.defaults?.fontFamily?.trim() || DEFAULT_PREFERENCES.fontFamily,
 			smartEdges:
 				config?.defaults?.smartEdges ?? DEFAULT_PREFERENCES.smartEdges,
+			threadNavigatorRail:
+				config?.defaults?.threadNavigatorRail ??
+				DEFAULT_PREFERENCES.threadNavigatorRail,
 			releaseToSend:
 				config?.defaults?.releaseToSend ?? DEFAULT_PREFERENCES.releaseToSend,
 			fullWidthContent:
@@ -79,6 +84,7 @@ export function usePreferences() {
 			config?.defaults?.compactThread,
 			config?.defaults?.fontFamily,
 			config?.defaults?.smartEdges,
+			config?.defaults?.threadNavigatorRail,
 			config?.defaults?.releaseToSend,
 			config?.defaults?.fullWidthContent,
 			config?.defaults?.notificationsEnabled,
@@ -107,6 +113,9 @@ export function usePreferences() {
 			if (updates.smartEdges !== undefined) {
 				nextUpdates.smartEdges = updates.smartEdges;
 			}
+			if (updates.threadNavigatorRail !== undefined) {
+				nextUpdates.threadNavigatorRail = updates.threadNavigatorRail;
+			}
 			if (updates.releaseToSend !== undefined) {
 				nextUpdates.releaseToSend = updates.releaseToSend;
 			}
@@ -121,7 +130,9 @@ export function usePreferences() {
 				return;
 			}
 
-			updateDefaults.mutate({ ...nextUpdates, scope: 'global' });
+			const scope =
+				updates.threadNavigatorRail !== undefined ? 'local' : 'global';
+			updateDefaults.mutate({ ...nextUpdates, scope });
 		},
 		[updateDefaults],
 	);

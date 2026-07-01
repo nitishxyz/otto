@@ -24,7 +24,7 @@ import { useSession } from './hooks/useSession.ts';
 import { useStream } from './hooks/useStream.ts';
 import { useConfig } from './hooks/useConfig.ts';
 import { parseCommand, resolveCommand } from './commands.ts';
-import { getBaseUrl } from './api.ts';
+import { getBaseUrl, getProjectContext, getProjectQuery } from './api.ts';
 import { useTheme } from './theme.ts';
 import { useOverlayStore } from './stores/overlay.ts';
 import type { Session } from './types.ts';
@@ -253,8 +253,10 @@ export function App({
 				case 'push':
 					showStatus({ type: 'loading', label: 'pushing…' });
 					try {
-						// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
-						const pushResponse = await pushCommits({ body: {} as any });
+						const pushResponse = await pushCommits({
+							query: getProjectQuery(),
+							body: {},
+						} as never);
 						if (pushResponse.error) {
 							// biome-ignore lint/suspicious/noExplicitAny: SDK error type
 							const err = pushResponse.error as any;
@@ -295,8 +297,10 @@ export function App({
 				}
 				case 'stage':
 					try {
-						// biome-ignore lint/suspicious/noExplicitAny: SDK body type mismatch
-						await stageFiles({ body: { files: ['.'] } as any });
+						await stageFiles({
+							query: getProjectQuery(),
+							body: { files: ['.'] },
+						} as never);
 						showStatus({ type: 'success', label: 'staged all' }, 3000);
 					} catch {
 						showStatus({ type: 'error', label: 'stage failed' }, 3000);
@@ -343,7 +347,8 @@ export function App({
 						try {
 							const response = await createSessionHandoff({
 								path: { sessionId: activeSession.id },
-							});
+								query: getProjectQuery(),
+							} as never);
 							if (
 								response.error ||
 								typeof response.data?.sessionId !== 'string'
@@ -377,7 +382,8 @@ export function App({
 						try {
 							const shareResponse = await shareSession({
 								path: { sessionId: activeSession.id },
-							});
+								query: getProjectQuery(),
+							} as never);
 							// biome-ignore lint/suspicious/noExplicitAny: SDK response structure
 							const shareData = shareResponse.data as any;
 							const shareUrl = shareData?.url;
@@ -398,7 +404,8 @@ export function App({
 						try {
 							const syncResponse = await syncShare({
 								path: { sessionId: activeSession.id },
-							});
+								query: getProjectQuery(),
+							} as never);
 							// biome-ignore lint/suspicious/noExplicitAny: SDK response structure
 							const syncData = syncResponse.data as any;
 							const syncUrl = syncData?.url;
@@ -533,8 +540,9 @@ export function App({
 			if (!sid) return;
 			const response = await resolveSecureInput({
 				path: { id: sid },
+				query: getProjectQuery(),
 				body: { promptId, value },
-			});
+			} as never);
 			if (response.error) {
 				showStatus({ type: 'error', label: 'secure input failed' }, 3000);
 				return;
@@ -552,8 +560,9 @@ export function App({
 			if (!sid) return;
 			const response = await resolveSecureInput({
 				path: { id: sid },
+				query: getProjectQuery(),
 				body: { promptId, cancelled: true },
-			});
+			} as never);
 			if (response.error) {
 				showStatus(
 					{ type: 'error', label: 'secure input cancel failed' },
@@ -698,6 +707,7 @@ export function App({
 		>
 			<StatusBar
 				sessionTitle={activeSession?.title ?? null}
+				projectRoot={getProjectContext().projectRoot}
 				queueSize={queueSize}
 				contextTokens={contextTokens}
 				estimatedCost={estimatedCost}

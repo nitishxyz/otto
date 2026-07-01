@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../../project-context.ts';
 import { listShares, loadProjectDb } from '../service.ts';
 import { listSharesResponseSchema, projectQuerySchema } from './schemas.ts';
 
@@ -25,7 +26,7 @@ export function registerListSharesRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectRoot = c.req.query('project') || process.cwd();
+			const projectRoot = await resolveRequestProjectRoot(c);
 			const { cfg, db } = await loadProjectDb(projectRoot);
 			return c.json({ shares: await listShares(cfg, db) });
 		},

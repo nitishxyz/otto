@@ -9,6 +9,7 @@ import {
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const setupWalletResponseSchema = z.object({
 	success: z.boolean(),
@@ -55,7 +56,7 @@ export function registerAuthWalletRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const existing = await getOttoRouterWallet(projectRoot);
 				const wallet = await ensureOttoRouterWallet(projectRoot);
 
@@ -160,7 +161,7 @@ export function registerAuthWalletRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const wallet = await getOttoRouterWallet(projectRoot);
 
 				if (!wallet) {

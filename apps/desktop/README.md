@@ -22,7 +22,11 @@ Requires Rust toolchain and Tauri CLI prerequisites. See [Tauri prerequisites](h
 
 ## How It Works
 
-The desktop app embeds the compiled ottocode binary and starts a local server on launch. The Tauri window loads the web UI which connects to this local server.
+The desktop app embeds the compiled ottocode binary and ensures a single shared local daemon is running. Opening a folder reuses that daemon and calls `POST /v1/projects/open`; the returned `projectId` and daemon token are passed to the web UI so API and streaming calls are scoped with `X-Otto-Project-Id`, `X-Otto-Project`, and daemon auth headers.
+
+Desktop compares the registered daemon version with the selected CLI version before reuse. If the daemon is stale or the versions differ, desktop stops the registered daemon only after verifying its daemon id/pid through `/v1/server/info`, clears the registration, and starts a replacement daemon.
+
+CLI selection is conservative: desktop checks the embedded CLI and a local installed CLI (`OTTO_CLI_PATH`, `~/.config/otto/bin/otto`, then `PATH`). If the embedded CLI is newer than the local CLI, desktop prefers the embedded CLI instead of replacing files on disk. Replacing a user-installed CLI from the app bundle is intentionally avoided because install locations can have different ownership, package-manager provenance, quarantine/signature state, and no reliable cross-platform rollback. If the local CLI is the same version or newer, desktop uses the local CLI.
 
 When the CLI detects the desktop app is installed, running `otto` with no arguments opens the desktop app instead of the browser.
 

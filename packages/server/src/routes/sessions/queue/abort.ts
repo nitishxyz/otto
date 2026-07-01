@@ -1,9 +1,10 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
-import { loadProjectDb } from '../service.ts';
+import { resolveRequestProject } from '../../project-context.ts';
 import {
 	abortBodySchema,
 	abortResponseSchema,
+	projectQuerySchema,
 	sessionIdParamsSchema,
 } from './schemas.ts';
 
@@ -20,6 +21,7 @@ export function registerAbortSessionRoute(app: Hono) {
 				'Aborts any currently running assistant generation for the session',
 			request: {
 				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
 				body: {
 					required: false,
 					content: {
@@ -61,8 +63,7 @@ export function registerAbortSessionRoute(app: Hono) {
 
 			abortSession(sessionId, clearQueue);
 			try {
-				const project = c.req.query('project');
-				const { db } = await loadProjectDb(project);
+				const { db } = await resolveRequestProject(c);
 				const { abortChildSubagents } = await import(
 					'../../../runtime/subagents/service.ts'
 				);

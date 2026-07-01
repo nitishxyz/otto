@@ -25,6 +25,29 @@ function getMimeType(path: string): string {
 	return MIME_TYPES[ext] || 'application/octet-stream';
 }
 
+export interface WebServerContext {
+	projectId?: string;
+	projectRoot?: string;
+	serverToken?: string | null;
+}
+
+function injectRuntimeContext(
+	html: string,
+	serverUrl: string,
+	context?: WebServerContext,
+): string {
+	const runtime = {
+		serverUrl,
+		projectId: context?.projectId,
+		projectRoot: context?.projectRoot,
+		serverToken: context?.serverToken,
+	};
+	return html.replace(
+		'</head>',
+		`<script>window.OTTO_SERVER_URL = ${JSON.stringify(serverUrl)};window.OTTO_RUNTIME_CONTEXT = ${JSON.stringify(runtime)};</script></head>`,
+	);
+}
+
 /**
  * Create the web UI server
  */
@@ -32,6 +55,7 @@ export function createWebServer(
 	port: number,
 	agiServerPortOrUrl: number | string,
 	network = false,
+	context?: WebServerContext,
 ): { port: number; server: ReturnType<typeof Bun.serve> } {
 	// Build asset map - maps URL paths to file paths
 	const assetMap = new Map<string, string>();
@@ -84,10 +108,7 @@ export function createWebServer(
 					if (await indexFile.exists()) {
 						try {
 							let html = await indexFile.text();
-							html = html.replace(
-								'</head>',
-								`<script>window.OTTO_SERVER_URL = '${serverUrl}';</script></head>`,
-							);
+							html = injectRuntimeContext(html, serverUrl, context);
 							return new Response(html, {
 								headers: {
 									'Content-Type': 'text/html; charset=utf-8',
@@ -103,10 +124,7 @@ export function createWebServer(
 				const embeddedIndex = await getEmbeddedAsset('/index.html');
 				if (embeddedIndex) {
 					let html = decoder.decode(embeddedIndex);
-					html = html.replace(
-						'</head>',
-						`<script>window.OTTO_SERVER_URL = '${serverUrl}';</script></head>`,
-					);
+					html = injectRuntimeContext(html, serverUrl, context);
 					return new Response(html, {
 						headers: {
 							'Content-Type': 'text/html; charset=utf-8',

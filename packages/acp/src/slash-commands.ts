@@ -231,7 +231,7 @@ export async function handleMcpCommand(
 					);
 					break;
 				}
-				const manager = getMCPManager();
+				const manager = getMCPManager(session.cwd);
 				if (!manager) {
 					await sendAgentText(
 						client,
@@ -276,7 +276,7 @@ export async function handleMcpCommand(
 
 async function formatMcpStatus(session: AcpSession): Promise<string> {
 	const configured = await getMcpServerConfigs(session);
-	const manager = getMCPManager();
+	const manager = getMCPManager(session.cwd);
 	const statuses = manager ? await manager.getStatusAsync() : [];
 
 	if (configured.length === 0 && statuses.length === 0) {
@@ -328,7 +328,7 @@ async function getMcpServerConfigs(
 }
 
 async function getOrCreateMcpManager(cwd: string) {
-	let manager = getMCPManager();
+	let manager = getMCPManager(cwd);
 	if (!manager) {
 		manager = await initializeMCP({ servers: [] }, cwd);
 	}

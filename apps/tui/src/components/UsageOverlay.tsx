@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { getAllModels, getProviderUsage } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame } from './ModalFrame.tsx';
+import { getProjectQuery } from '../api.ts';
 
 interface UsageWindow {
 	usedPercent?: number;
@@ -73,7 +74,9 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 
 		async function fetchUsage() {
 			try {
-				const modelsRes = await getAllModels();
+				const modelsRes = await getAllModels({
+					query: getProjectQuery(),
+				} as never);
 				// biome-ignore lint/suspicious/noExplicitAny: SDK response type
 				const modelsData = modelsRes.data as any;
 				if (!modelsData) {
@@ -105,7 +108,8 @@ export function UsageOverlay({ currentProvider, onClose }: UsageOverlayProps) {
 				const usageRes = await getProviderUsage({
 					// biome-ignore lint/suspicious/noExplicitAny: API path type
 					path: { provider: currentProvider } as any,
-				});
+					query: getProjectQuery(),
+				} as never);
 
 				if (!cancelled) {
 					if (usageRes.error) {

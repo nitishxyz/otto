@@ -19,7 +19,7 @@ One runtime. Many surfaces. Your agents, your tools, your repo — on your machi
 
 ## What is otto
 
-otto is a local-first coding platform built around a single runtime — `otto serve` — that gives AI models controlled access to your repo through built-in tools: file IO, search, patching, git, terminals, web fetch, skills, MCP, and task tracking.
+otto is a local-first coding platform built around a single local runtime that gives AI models controlled access to your repo through built-in tools: file IO, search, patching, git, terminals, web fetch, skills, MCP, and task tracking.
 
 You pick the surface. The runtime, agents, tools, sessions, and providers stay the same across all of them.
 
@@ -46,8 +46,8 @@ Then:
 
 ```bash
 otto           # interactive TUI
-otto --web     # web UI in your browser
-otto serve     # run the API + web UI
+otto web       # web UI in your browser
+otto serve     # advanced foreground API/Web server
 ```
 
 ---
@@ -76,8 +76,9 @@ otto "write tests" --agent build
 otto "review the architecture" --agent plan
 otto "research this codebase" --agent research
 otto --last "continue"                # resume last session
-otto --web                            # start API + web UI and open browser
-otto serve --port 3000                # API on :3000, web UI on :3001
+otto web                              # open this project in the Web UI
+otto web --url http://localhost:3000  # open Web UI for an existing API
+otto serve --port 3000                # advanced: API on :3000, web UI on :3001
 otto serve --network                  # bind for LAN access
 ```
 
@@ -98,14 +99,14 @@ Canvas is otto's native tiled workspace — a Tauri + React desktop app where ea
 |---|---|---|
 | **Terminal** | GPU-rendered native terminal | [Ghostty](https://ghostty.org) (libghostty) |
 | **Browser** | Inline preview for localhost or any URL | macOS WKWebView |
-| **Otto** | AI chat with full tool access to your repo | `otto serve` runtime |
+| **Otto** | AI chat with full tool access to your repo | local otto runtime |
 | **Claude Code** | Claude Code in a Ghostty surface | Ghostty preset |
 | **Codex** | OpenAI Codex in a Ghostty surface | Ghostty preset |
 | **Otto TUI** | Run the otto TUI inside Canvas | Ghostty preset |
 | **OpenCode** | OpenCode in a Ghostty surface | Ghostty preset |
 | **Custom command** | Any shell command as a terminal block | Ghostty preset |
 
-- **Multi-workspace** — each workspace binds to a project path and launches its own `otto serve` runtime
+- **Multi-workspace** — each workspace binds to a project path and launches its own local otto runtime
 - **Tabs & splits** — `⌘N` add block · `⌘T` new tab · `⌘D` split right · `⌘⇧D` split down · `⌘1-9` switch · `Ctrl+H/J/K/L` vim nav
 - **Shareable layouts** — export tabs, splits, and presets as `otto.yaml`
 - **Native performance** — libghostty + WKWebView, no Electron

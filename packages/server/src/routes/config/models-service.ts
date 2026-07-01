@@ -23,6 +23,7 @@ import {
 import type { Context } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	getAuthTypeForProvider,
 	getAuthorizedProviders,
@@ -300,7 +301,7 @@ export async function handleGetProviderModels(c: Context) {
 	try {
 		const embeddedConfig = getEmbeddedConfig(c);
 		const provider = c.req.param('provider') as ProviderId;
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const cfg = await loadConfig(projectRoot);
 		const cachedCatalog = await readCachedModelCatalog();
 		const modelCatalogProviders = getModelCatalogProviders(cachedCatalog);
@@ -380,7 +381,7 @@ export async function handleGetProviderModels(c: Context) {
 export async function handleGetAllModels(c: Context) {
 	try {
 		const embeddedConfig = getEmbeddedConfig(c);
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const cfg = await loadConfig(projectRoot);
 		const authorizedProviders = await getAuthorizedProviders(
 			embeddedConfig,

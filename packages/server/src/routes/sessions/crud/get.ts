@@ -2,11 +2,11 @@ import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { serializeError } from '../../../runtime/errors/api-error.ts';
+import { resolveRequestProject } from '../../project-context.ts';
 import {
 	attachSessionCostSummary,
 	findSessionById,
 	getSessionCostSummaries,
-	loadProjectDb,
 	normalizeSessionRow,
 } from '../service.ts';
 import {
@@ -43,8 +43,7 @@ export function registerGetSessionRoute(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
-				const { db } = await loadProjectDb(projectRoot);
+				const { db } = await resolveRequestProject(c);
 				const session = await findSessionById(db, sessionId);
 				if (!session) {
 					return c.json(

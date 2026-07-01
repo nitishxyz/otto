@@ -4,11 +4,8 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { serializeError } from '../../../runtime/errors/api-error.ts';
-import {
-	deleteSessionMessagesAndParts,
-	findSessionById,
-	loadProjectDb,
-} from '../service.ts';
+import { resolveRequestProject } from '../../project-context.ts';
+import { deleteSessionMessagesAndParts, findSessionById } from '../service.ts';
 import {
 	errorResponseSchema,
 	sessionParamsSchema,
@@ -43,8 +40,7 @@ export function registerDeleteSessionRoute(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
-				const { cfg, db } = await loadProjectDb(projectRoot);
+				const { cfg, db } = await resolveRequestProject(c);
 
 				const existingSession = await findSessionById(db, sessionId);
 

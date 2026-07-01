@@ -5,6 +5,7 @@ import Fuse from 'fuse.js';
 import { getAllModels } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import { getProjectQuery } from '../api.ts';
 
 interface ModelItem {
 	id: string;
@@ -61,7 +62,7 @@ export function ModelsOverlay({
 	const [scrollOffset, setScrollOffset] = useState(0);
 
 	useEffect(() => {
-		getAllModels().then((res) => {
+		getAllModels({ query: getProjectQuery() } as never).then((res) => {
 			// biome-ignore lint/suspicious/noExplicitAny: SDK response type
 			const data = res.data as any;
 			if (data) setAllModels(data);

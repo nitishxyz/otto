@@ -5,6 +5,7 @@ import { realpath, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { gitStatusSchema } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
 
@@ -63,8 +64,10 @@ export function registerInitRoute(app: Hono) {
 		async (c) => {
 			try {
 				const body = await c.req.json().catch(() => ({}));
-				const { project } = gitStatusSchema.parse(body);
-				const requestedPath = await realpath(resolve(project || process.cwd()));
+				gitStatusSchema.parse(body);
+				const requestedPath = await realpath(
+					resolve(await resolveRequestProjectRoot(c)),
+				);
 
 				const pathStats = await stat(requestedPath);
 				if (!pathStats.isDirectory()) {

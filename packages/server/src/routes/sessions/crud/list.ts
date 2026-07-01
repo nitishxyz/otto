@@ -3,11 +3,11 @@ import { sessions } from '@ottocode/database/schema';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { resolveRequestProject } from '../../project-context.ts';
 import {
 	attachSessionCostSummary,
 	getSessionCostSummaries,
 	getSessionFileStats,
-	loadProjectDb,
 	normalizeSessionRow,
 } from '../service.ts';
 import { listSessionsQuerySchema, sessionSchema } from './schemas.ts';
@@ -38,7 +38,6 @@ export function registerListSessionsRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectRoot = c.req.query('project') || process.cwd();
 			const limit = Math.min(
 				Math.max(parseInt(c.req.query('limit') || '50', 10) || 50, 1),
 				200,
@@ -48,7 +47,7 @@ export function registerListSessionsRoute(app: Hono) {
 				0,
 			);
 			const sessionTypeFilter = c.req.query('sessionType');
-			const { cfg, db } = await loadProjectDb(projectRoot);
+			const { cfg, db } = await resolveRequestProject(c);
 			const rows = await db
 				.select()
 				.from(sessions)

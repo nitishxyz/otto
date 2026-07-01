@@ -8,6 +8,7 @@ import {
 	listProjects,
 	touchProject,
 } from '../../runtime/projects/registry.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { loadProjectDb } from '../sessions/service.ts';
 import {
 	aggregateProject,
@@ -41,7 +42,7 @@ export function registerGlobalUsageRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const cwd = process.cwd();
+				const cwd = await resolveRequestProjectRoot(c);
 				// Ensure the current project is registered even if usage/stats
 				// hasn't been hit yet this session.
 				try {

@@ -12,6 +12,7 @@ import { serializeError } from '../../runtime/errors/api-error.ts';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
 import { buildSubagentTools } from '../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../tools/goals/index.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 const RISKY_TOOLS = new Set([
@@ -209,7 +210,7 @@ export function registerToolsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const discovered = await discoverProjectTools(
 					cfg.projectRoot,

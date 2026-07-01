@@ -5,6 +5,7 @@ import { serializeError } from '../../runtime/errors/api-error.ts';
 import { aggregateProject } from './aggregate.ts';
 import { finalizeResponse } from './response.ts';
 import { usageStatsQuerySchema, usageStatsResponseSchema } from './schemas.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 export function registerProjectUsageRoute(app: Hono) {
 	zodOpenApiRoute(
@@ -32,7 +33,7 @@ export function registerProjectUsageRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const { projectRoot: resolvedRoot, agg } =
 					await aggregateProject(projectRoot);
 				const response = finalizeResponse('project', resolvedRoot, agg);

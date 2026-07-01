@@ -133,6 +133,7 @@ export * from './common/ProviderLogo';
 export * from './common/StatusIndicator';
 export * from './common/UsageRing';
 export * from './common/UsageModal';
+export * from './common/ProjectSwitcher';
 
 // Onboarding Components
 export * from './onboarding';

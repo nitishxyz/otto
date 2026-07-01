@@ -9,6 +9,7 @@ import {
 } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame } from './ModalFrame.tsx';
+import { getProjectQuery } from '../api.ts';
 
 interface GitFileInfo {
 	path: string;
@@ -43,7 +44,7 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 
 	const loadStatus = useCallback(async () => {
 		try {
-			const res = await getGitStatus();
+			const res = await getGitStatus({ query: getProjectQuery() } as never);
 			// biome-ignore lint/suspicious/noExplicitAny: SDK response type
 			const data = (res.data as any)?.data;
 			if (data) {
@@ -78,12 +79,17 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 				unstagedRef.current.length > 0 || untrackedRef.current.length > 0;
 			if (stagedRef.current.length === 0 && hasUnstaged) {
 				setStatusText('Staging files…');
-				// biome-ignore lint/suspicious/noExplicitAny: SDK body type mismatch
-				await stageFiles({ body: { files: ['.'] } as any });
+				await stageFiles({
+					query: getProjectQuery(),
+					body: { files: ['.'] },
+				} as never);
 				await loadStatus();
 				setStatusText('Generating commit message…');
 			}
-			const res = await generateCommitMessage({ body: {} });
+			const res = await generateCommitMessage({
+				query: getProjectQuery(),
+				body: {},
+			} as never);
 			// biome-ignore lint/suspicious/noExplicitAny: SDK response type
 			if ((res as any).error) {
 				// biome-ignore lint/suspicious/noExplicitAny: SDK error type
@@ -126,12 +132,16 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 		try {
 			if (stagedRef.current.length === 0) {
 				setStatusText('Staging files…');
-				// biome-ignore lint/suspicious/noExplicitAny: SDK body type mismatch
-				await stageFiles({ body: { files: ['.'] } as any });
+				await stageFiles({
+					query: getProjectQuery(),
+					body: { files: ['.'] },
+				} as never);
 				setStatusText('Committing…');
 			}
-			// biome-ignore lint/suspicious/noExplicitAny: SDK body type mismatch
-			const commitRes = await commitChanges({ body: { message: msg } as any });
+			const commitRes = await commitChanges({
+				query: getProjectQuery(),
+				body: { message: msg },
+			} as never);
 			// biome-ignore lint/suspicious/noExplicitAny: SDK error check
 			if ((commitRes as any).error) {
 				// biome-ignore lint/suspicious/noExplicitAny: SDK error type

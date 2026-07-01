@@ -14,6 +14,7 @@ import type {
 	ImageAttachment,
 	FileAttachment,
 } from '../hooks/useFileAttachments.ts';
+import { getProjectQuery } from '../api.ts';
 
 interface ChatInputProps {
 	onSubmit: (
@@ -116,11 +117,13 @@ export function ChatInput({
 
 	useEffect(() => {
 		if (!showFileMention) return;
-		searchFiles({ query: { q: mentionQuery } }).then((res) => {
-			if (res.data) {
-				setFiles(res.data.files);
-			}
-		});
+		searchFiles({ query: { ...getProjectQuery(), q: mentionQuery } }).then(
+			(res) => {
+				if (res.data) {
+					setFiles(res.data.files);
+				}
+			},
+		);
 	}, [showFileMention, mentionQuery]);
 
 	const checkForMention = useCallback((text: string, cursorOffset: number) => {

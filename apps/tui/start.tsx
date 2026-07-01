@@ -7,7 +7,7 @@ import treeSitterWorkerPath from '../../node_modules/@opentui/core/parser.worker
 import 'opentui-spinner/react';
 import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
-import { setPort, configureApi } from './src/api.ts';
+import { setPort, configureApi, configureProjectContext } from './src/api.ts';
 
 export async function startTui(
 	port: number,
@@ -19,8 +19,15 @@ export async function startTui(
 		model?: string;
 		allowUnknownModel?: boolean;
 	},
+	serverContext?: {
+		baseUrl?: string;
+		projectId?: string;
+		projectRoot?: string;
+		token?: string | null;
+	},
 ): Promise<void> {
 	setPort(port);
+	if (serverContext) configureProjectContext(serverContext);
 	configureApi();
 	if (!process.env.OTUI_TREE_SITTER_WORKER_PATH) {
 		process.env.OTUI_TREE_SITTER_WORKER_PATH = treeSitterWorkerPath;

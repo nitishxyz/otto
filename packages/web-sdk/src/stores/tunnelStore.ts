@@ -7,76 +7,102 @@ import { useFileBrowserStore } from './fileBrowserStore';
 import { useMCPStore } from './mcpStore';
 import { useSkillsStore } from './skillsStore';
 
+export type TunnelScope = 'remote-control' | 'project-share';
 export type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
+
+export interface TunnelScopeState {
+	status: TunnelStatus;
+	url: string | null;
+	error: string | null;
+	progress: string | null;
+}
+
+function createScopeState(): TunnelScopeState {
+	return { status: 'idle', url: null, error: null, progress: null };
+}
 
 interface TunnelState {
 	isExpanded: boolean;
-	status: TunnelStatus;
-	url: string | null;
-	qrCode: string | null;
-	error: string | null;
-	progress: string | null;
+	remoteControl: TunnelScopeState;
+	projectShare: TunnelScopeState;
 
 	toggleSidebar: () => void;
 	expandSidebar: () => void;
 	collapseSidebar: () => void;
-	setStatus: (status: TunnelStatus) => void;
-	setUrl: (url: string | null) => void;
-	setQrCode: (qrCode: string | null) => void;
-	setError: (error: string | null) => void;
-	setProgress: (progress: string | null) => void;
-	reset: () => void;
+	setScopeStatus: (scope: TunnelScope, status: TunnelStatus) => void;
+	setScopeUrl: (scope: TunnelScope, url: string | null) => void;
+	setScopeError: (scope: TunnelScope, error: string | null) => void;
+	setScopeProgress: (scope: TunnelScope, progress: string | null) => void;
+	patchScope: (scope: TunnelScope, patch: Partial<TunnelScopeState>) => void;
+	resetScope: (scope: TunnelScope) => void;
+}
+
+function scopeKey(scope: TunnelScope): 'remoteControl' | 'projectShare' {
+	return scope === 'project-share' ? 'projectShare' : 'remoteControl';
+}
+
+function collapseOtherSidebars() {
+	useGitStore.getState().collapseSidebar();
+	useSessionFilesStore.getState().collapseSidebar();
+	useSettingsStore.getState().collapseSidebar();
+	useResearchStore.getState().collapseSidebar();
+	useFileBrowserStore.getState().collapseSidebar();
+	useMCPStore.getState().collapseSidebar();
+	useSkillsStore.getState().collapseSidebar();
 }
 
 export const useTunnelStore = create<TunnelState>((set) => ({
 	isExpanded: false,
-	status: 'idle',
-	url: null,
-	qrCode: null,
-	error: null,
-	progress: null,
+	remoteControl: createScopeState(),
+	projectShare: createScopeState(),
 
 	toggleSidebar: () => {
 		set((state) => {
 			const newExpanded = !state.isExpanded;
-			if (newExpanded) {
-				useGitStore.getState().collapseSidebar();
-				useSessionFilesStore.getState().collapseSidebar();
-				useSettingsStore.getState().collapseSidebar();
-				useResearchStore.getState().collapseSidebar();
-				useFileBrowserStore.getState().collapseSidebar();
-				useMCPStore.getState().collapseSidebar();
-				useSkillsStore.getState().collapseSidebar();
-			}
+			if (newExpanded) collapseOtherSidebars();
 			return { isExpanded: newExpanded };
 		});
 	},
 
 	expandSidebar: () => {
-		useGitStore.getState().collapseSidebar();
-		useSessionFilesStore.getState().collapseSidebar();
-		useSettingsStore.getState().collapseSidebar();
-		useResearchStore.getState().collapseSidebar();
-		useFileBrowserStore.getState().collapseSidebar();
-		useMCPStore.getState().collapseSidebar();
-		useSkillsStore.getState().collapseSidebar();
+		collapseOtherSidebars();
 		set({ isExpanded: true });
 	},
 
 	collapseSidebar: () => set({ isExpanded: false }),
 
-	setStatus: (status) => set({ status }),
-	setUrl: (url) => set({ url }),
-	setQrCode: (qrCode) => set({ qrCode }),
-	setError: (error) => set({ error }),
-	setProgress: (progress) => set({ progress }),
-
-	reset: () =>
-		set({
-			status: 'idle',
-			url: null,
-			qrCode: null,
-			error: null,
-			progress: null,
+	setScopeStatus: (scope, status) =>
+		set((state) => {
+			const key = scopeKey(scope);
+			return { [key]: { ...state[key], status } } as Partial<TunnelState>;
 		}),
+
+	setScopeUrl: (scope, url) =>
+		set((state) => {
+			const key = scopeKey(scope);
+			return { [key]: { ...state[key], url } } as Partial<TunnelState>;
+		}),
+
+	setScopeError: (scope, error) =>
+		set((state) => {
+			const key = scopeKey(scope);
+			return { [key]: { ...state[key], error } } as Partial<TunnelState>;
+		}),
+
+	setScopeProgress: (scope, progress) =>
+		set((state) => {
+			const key = scopeKey(scope);
+			return { [key]: { ...state[key], progress } } as Partial<TunnelState>;
+		}),
+
+	patchScope: (scope, patch) =>
+		set((state) => {
+			const key = scopeKey(scope);
+			return { [key]: { ...state[key], ...patch } } as Partial<TunnelState>;
+		}),
+
+	resetScope: (scope) =>
+		set(
+			() => ({ [scopeKey(scope)]: createScopeState() }) as Partial<TunnelState>,
+		),
 }));

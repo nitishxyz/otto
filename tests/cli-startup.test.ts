@@ -5,6 +5,13 @@ const startApiServerMock = mock(async () => ({
 	port: 4317,
 	stop: async () => {},
 }));
+const ensureDaemonProjectMock = mock(async () => ({
+	baseUrl: 'http://127.0.0.1:4317',
+	projectId: 'project-id',
+	projectRoot: process.cwd(),
+	token: 'token',
+	authHeaders: { Authorization: 'Bearer token' },
+}));
 const handleServeMock = mock(async () => {});
 const startTuiMock = mock(async () => {});
 const ensureServerMock = mock(async () => 'http://localhost:4317');
@@ -41,6 +48,8 @@ mock.module('@ottocode/cli/src/commands/index.ts', () => ({
 	registerMCPCommand: () => {},
 	registerWebCommand: () => {},
 	registerStorageCommand: () => {},
+	registerServiceCommand: () => {},
+	registerProjectsCommand: () => {},
 }));
 
 mock.module('@ottocode/cli/src/custom-commands.ts', () => ({
@@ -54,6 +63,10 @@ mock.module('@ottocode/cli/src/gitignore.ts', () => ({
 mock.module('@ottocode/cli/src/commands/serve.ts', () => ({
 	startApiServer: startApiServerMock,
 	handleServe: handleServeMock,
+}));
+
+mock.module('@ottocode/cli/src/daemon.ts', () => ({
+	ensureDaemonProject: ensureDaemonProjectMock,
 }));
 
 mock.module('@ottocode/tui', () => ({ startTui: startTuiMock }));
@@ -79,6 +92,14 @@ describe('cli startup auth gating', () => {
 			port: 4317,
 			stop: async () => {},
 		}));
+		ensureDaemonProjectMock.mockReset();
+		ensureDaemonProjectMock.mockImplementation(async () => ({
+			baseUrl: 'http://127.0.0.1:4317',
+			projectId: 'project-id',
+			projectRoot: process.cwd(),
+			token: 'token',
+			authHeaders: { Authorization: 'Bearer token' },
+		}));
 		handleServeMock.mockReset();
 		startTuiMock.mockReset();
 		ensureServerMock.mockReset();
@@ -101,6 +122,7 @@ describe('cli startup auth gating', () => {
 
 		expect(ensureAuthMock).toHaveBeenCalledTimes(1);
 		expect(startApiServerMock).toHaveBeenCalledTimes(0);
+		expect(ensureDaemonProjectMock).toHaveBeenCalledTimes(0);
 		expect(startTuiMock).toHaveBeenCalledTimes(0);
 	});
 
@@ -110,11 +132,14 @@ describe('cli startup auth gating', () => {
 			order.push('auth');
 			return true;
 		});
-		startApiServerMock.mockImplementation(async () => {
-			order.push('server');
+		ensureDaemonProjectMock.mockImplementation(async () => {
+			order.push('daemon');
 			return {
-				port: 4317,
-				stop: async () => {},
+				baseUrl: 'http://127.0.0.1:4317',
+				projectId: 'project-id',
+				projectRoot: process.cwd(),
+				token: 'token',
+				authHeaders: { Authorization: 'Bearer token' },
 			};
 		});
 		startTuiMock.mockImplementation(async () => {
@@ -124,7 +149,7 @@ describe('cli startup auth gating', () => {
 		const { runCli } = await cliModulePromise;
 		await runCli([], 'test');
 
-		expect(order).toEqual(['auth', 'server', 'tui']);
+		expect(order).toEqual(['auth', 'daemon', 'tui']);
 	});
 
 	it('enables ci auth mode when launched with --ci', async () => {

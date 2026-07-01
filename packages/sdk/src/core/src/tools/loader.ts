@@ -109,15 +109,31 @@ type FsHelpers = {
 	exists: (path: string) => Promise<boolean>;
 };
 
-let globalTerminalManager: TerminalManager | null = null;
+const legacyTerminalManagerKey = 'legacy';
+const terminalManagersByProject = new Map<string, TerminalManager>();
 const staticToolDiscoveryCache = new Map<string, Promise<DiscoveredTool[]>>();
 
-export function setTerminalManager(manager: TerminalManager): void {
-	globalTerminalManager = manager;
+function getTerminalManagerKey(projectRoot?: string): string {
+	return projectRoot || legacyTerminalManagerKey;
 }
 
-export function getTerminalManager(): TerminalManager | null {
-	return globalTerminalManager;
+export function setTerminalManager(
+	manager: TerminalManager,
+	projectRoot?: string,
+): void {
+	terminalManagersByProject.set(getTerminalManagerKey(projectRoot), manager);
+}
+
+export function unsetTerminalManager(projectRoot?: string): void {
+	terminalManagersByProject.delete(getTerminalManagerKey(projectRoot));
+}
+
+export function getTerminalManager(
+	projectRoot?: string,
+): TerminalManager | null {
+	return (
+		terminalManagersByProject.get(getTerminalManagerKey(projectRoot)) ?? null
+	);
 }
 
 function getStaticToolDiscoveryCacheKey(
@@ -213,8 +229,10 @@ export async function discoverProjectTools(
 		staticTools.map(({ name, tool }) => [name, tool]),
 	);
 
-	if (globalTerminalManager) {
-		const term = buildTerminalTool(projectRoot, globalTerminalManager);
+	const terminalManager =
+		getTerminalManager(projectRoot) ?? getTerminalManager();
+	if (terminalManager) {
+		const term = buildTerminalTool(projectRoot, terminalManager);
 		tools.set(term.name, term.tool);
 	}
 
@@ -222,7 +240,7 @@ export async function discoverProjectTools(
 	const loadFirstPartyTools = buildLoadFirstPartyToolsTool();
 	tools.set(loadFirstPartyTools.name, loadFirstPartyTools.tool);
 
-	const mcpManager = getMCPManager();
+	const mcpManager = getMCPManager(projectRoot);
 	let mcpToolsRecord: Record<string, Tool> = {};
 	let mcpBriefs: MCPToolBrief[] = [];
 	if (mcpManager?.started) {

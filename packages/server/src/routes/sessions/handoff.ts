@@ -4,6 +4,7 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { createHandoffSession } from '../../runtime/session/handoff.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	findSessionById,
 	loadProjectDb,
@@ -94,7 +95,7 @@ export function registerSessionHandoffRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const { cfg, db } = await loadProjectDb(projectRoot);
 				const sourceSession = await findSessionById(db, sessionId);
 				if (!sourceSession || sourceSession.projectPath !== cfg.projectRoot) {

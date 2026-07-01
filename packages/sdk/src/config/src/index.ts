@@ -51,6 +51,7 @@ const DEFAULTS: {
 		compactThread: true,
 		fontFamily: 'IBM Plex Mono',
 		smartEdges: true,
+		threadNavigatorRail: true,
 		releaseToSend: false,
 		fullWidthContent: false,
 		autoCompactThresholdTokens: null,

@@ -2,18 +2,23 @@ import { useState, useCallback, useRef } from 'react';
 import { tauriBridge, type ServerInfo } from '../lib/tauri-bridge';
 
 async function waitForServer(
-	apiPort: number,
+	server: ServerInfo,
 	maxAttempts = 60,
 ): Promise<boolean> {
-	const apiUrl = `http://localhost:${apiPort}`;
+	const apiUrl = `${server.url}/v1/server/info`;
 
 	for (let i = 0; i < maxAttempts; i++) {
 		try {
 			const response = await fetch(apiUrl, {
 				method: 'GET',
-				mode: 'no-cors',
+				headers: server.token
+					? {
+							Authorization: `Bearer ${server.token}`,
+							'X-Otto-Server-Token': server.token,
+						}
+					: undefined,
 			});
-			if (response.ok || response.type === 'opaque') {
+			if (response.ok) {
 				return true;
 			}
 		} catch {
@@ -40,10 +45,10 @@ export function useServer() {
 				setLoading(true);
 				setError(null);
 
-				// Always start a fresh server for this project
+				// Ensure/reuse the shared daemon and open this project on it.
 				const info = await tauriBridge.startServer(projectPath, port);
 
-				const ready = await waitForServer(info.port);
+				const ready = await waitForServer(info);
 				if (ready) {
 					setServer(info);
 					serverRef.current = info;

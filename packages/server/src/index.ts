@@ -3,8 +3,6 @@ import type { BlankEnv } from 'hono/types';
 import { cors } from 'hono/cors';
 import type { ProviderId, AuthInfo } from '@ottocode/sdk';
 import type { ThemeId } from '@ottocode/themes';
-import { TerminalManager } from '@ottocode/sdk';
-import { setTerminalManager } from '@ottocode/sdk';
 import { registerRootRoutes } from './routes/root.ts';
 import { registerOpenApiRoute } from './routes/openapi.ts';
 import { registerSessionsRoutes } from './routes/sessions.ts';
@@ -36,14 +34,12 @@ import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
 import { registerDictationRoutes } from './routes/dictation.ts';
 import { registerPluginsRoutes } from './routes/plugins/index.ts';
+import { registerProjectsRoutes } from './routes/projects.ts';
 import type {
 	AgentConfigEntry,
 	AgentToolConfig,
 } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
-
-const globalTerminalManager = new TerminalManager();
-setTerminalManager(globalTerminalManager);
 
 // Suppress noisy AI SDK provider warnings unless debug mode is enabled.
 installAiSdkWarningHandler();
@@ -52,6 +48,9 @@ const corsAllowHeaders = [
 	'Content-Type',
 	'Authorization',
 	'X-Requested-With',
+	'X-Otto-Project',
+	'X-Otto-Project-Id',
+	'X-Otto-Server-Token',
 	'Access-Control-Request-Private-Network',
 ];
 
@@ -94,17 +93,18 @@ function buildCorsOptions(extraOrigins?: string[]) {
 function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerRootRoutes(app);
 	registerOpenApiRoute(app);
+	registerProjectsRoutes(app);
 	registerSessionsRoutes(app);
 	registerSessionApprovalRoute(app);
 	registerSessionSecureInputRoute(app);
-	registerSessionMessagesRoutes(app, globalTerminalManager);
+	registerSessionMessagesRoutes(app);
 	registerSessionStreamRoute(app);
 	registerClientEventsRoute(app);
 	registerAskRoutes(app);
 	registerConfigRoutes(app);
 	registerFilesRoutes(app);
 	registerGitRoutes(app);
-	registerTerminalsRoutes(app, globalTerminalManager);
+	registerTerminalsRoutes(app);
 	registerSessionFilesRoutes(app);
 	registerBranchRoutes(app);
 	registerResearchRoutes(app);
@@ -118,7 +118,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerDoctorRoutes(app);
 	registerSkillsRoutes(app);
 	registerRecipesRoutes(app);
-	registerPluginsRoutes(app, globalTerminalManager);
+	registerPluginsRoutes(app);
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerSimulatorRoutes(app);
@@ -194,6 +194,7 @@ export type EmbeddedAppConfig = {
 		compactThread?: boolean;
 		fontFamily?: string;
 		smartEdges?: boolean;
+		threadNavigatorRail?: boolean;
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		notificationsEnabled?: boolean;
@@ -281,7 +282,14 @@ export {
 export { logger } from '@ottocode/sdk';
 
 // Export server state management
-export { setServerPort, getServerPort, getServerInfo } from './state.ts';
+export {
+	setDaemonId,
+	setServerPort,
+	setServerVersion,
+	getServerPort,
+	getServerInfo,
+} from './state.ts';
+export { shutdownProjectManager } from './runtime/projects/manager.ts';
 
 // Export WebSocket handler for Bun.serve()
 export { websocket as bunWebSocket } from './ws.ts';

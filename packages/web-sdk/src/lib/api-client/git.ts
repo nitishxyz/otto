@@ -33,20 +33,23 @@ import type {
 	GitRemoteInfo,
 	GitBranchListResponse,
 } from '../../types/api';
-import { extractErrorMessage } from './utils';
+import { extractErrorMessage, getProjectQuery } from './utils';
 
 export const gitMixin = {
 	async initGitRepo(): Promise<{ initialized: boolean; path: string }> {
 		const response = await apiInitGitRepo({
+			query: getProjectQuery(),
 			body: {},
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data;
 	},
 
 	async getGitStatus(): Promise<GitStatusResponse> {
-		const response = await apiGetGitStatus();
+		const response = await apiGetGitStatus({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitStatusResponse;
@@ -57,7 +60,7 @@ export const gitMixin = {
 		staged: boolean = false,
 	): Promise<GitDiffResponse> {
 		const response = await apiGetGitDiff({
-			query: { file, staged: staged ? 'true' : 'false' },
+			query: { ...getProjectQuery(), file, staged: staged ? 'true' : 'false' },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
@@ -70,6 +73,7 @@ export const gitMixin = {
 	): Promise<GitDiffResponse> {
 		const response = await apiGetGitDiff({
 			query: {
+				...getProjectQuery(),
 				file,
 				staged: staged ? 'true' : 'false',
 				fullFile: 'true',
@@ -84,8 +88,9 @@ export const gitMixin = {
 		sessionId?: string,
 	): Promise<GitGenerateCommitMessageResponse> {
 		const response = await apiGenerateCommitMessage({
+			query: getProjectQuery(),
 			body: sessionId ? { sessionId } : {},
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitGenerateCommitMessageResponse;
@@ -93,9 +98,10 @@ export const gitMixin = {
 
 	async stageFiles(files: string[]): Promise<GitStageResponse> {
 		const response = await apiStageFiles({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { files } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitStageResponse;
@@ -103,9 +109,10 @@ export const gitMixin = {
 
 	async unstageFiles(files: string[]): Promise<GitUnstageResponse> {
 		const response = await apiUnstageFiles({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { files } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitUnstageResponse;
@@ -113,9 +120,10 @@ export const gitMixin = {
 
 	async restoreFiles(files: string[]): Promise<{ restored: string[] }> {
 		const response = await apiRestoreFiles({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { files } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { restored: string[] };
@@ -123,9 +131,10 @@ export const gitMixin = {
 
 	async deleteFiles(files: string[]): Promise<{ deleted: string[] }> {
 		const response = await apiDeleteFiles({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { files } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { deleted: string[] };
@@ -133,16 +142,19 @@ export const gitMixin = {
 
 	async commitChanges(message: string): Promise<GitCommitResponse> {
 		const response = await apiCommitChanges({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { message } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitCommitResponse;
 	},
 
 	async getGitBranch(): Promise<GitBranchInfo> {
-		const response = await apiGetGitBranch();
+		const response = await apiGetGitBranch({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitBranchInfo;
@@ -150,9 +162,10 @@ export const gitMixin = {
 
 	async pushCommits(): Promise<GitPushResponse> {
 		const response = await apiPushCommits({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: {} as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitPushResponse;
@@ -160,9 +173,10 @@ export const gitMixin = {
 
 	async pullChanges(): Promise<GitPullResponse> {
 		const response = await apiPullChanges({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: {} as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitPullResponse;
@@ -172,15 +186,18 @@ export const gitMixin = {
 		action: 'continue' | 'abort' | 'skip',
 	): Promise<GitRebaseActionResponse> {
 		const response = await apiPerformGitRebaseAction({
+			query: getProjectQuery(),
 			body: { action },
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitRebaseActionResponse;
 	},
 
 	async getRemotes(): Promise<GitRemoteInfo[]> {
-		const response = await apiGetGitRemotes();
+		const response = await apiGetGitRemotes({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data?.remotes as GitRemoteInfo[];
@@ -191,9 +208,10 @@ export const gitMixin = {
 		url: string,
 	): Promise<{ name: string; url: string }> {
 		const response = await apiAddGitRemote({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { name, url } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { name: string; url: string };
@@ -201,16 +219,19 @@ export const gitMixin = {
 
 	async removeRemote(name: string): Promise<{ removed: string }> {
 		const response = await apiRemoveGitRemote({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { name } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { removed: string };
 	},
 
 	async listGitBranches(): Promise<GitBranchListResponse> {
-		const response = await apiListGitBranches();
+		const response = await apiListGitBranches({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitBranchListResponse;
@@ -218,9 +239,10 @@ export const gitMixin = {
 
 	async checkoutBranch(branch: string): Promise<{ branch: string }> {
 		const response = await apiCheckoutGitBranch({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { branch } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as { branch: string };
@@ -231,6 +253,7 @@ export const gitMixin = {
 		options?: { startPoint?: string; checkout?: boolean },
 	): Promise<{ branch: string; checkedOut: boolean }> {
 		const response = await apiCreateGitBranch({
+			query: getProjectQuery(),
 			body: {
 				name,
 				...(options?.startPoint ? { startPoint: options.startPoint } : {}),
@@ -239,7 +262,7 @@ export const gitMixin = {
 					: {}),
 				// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			} as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as {

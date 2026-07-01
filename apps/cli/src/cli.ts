@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { logger, setDebugEnabled, setTraceEnabled } from './cli-deps.ts';
 import {
 	registerServeCommand,
@@ -20,6 +20,8 @@ import {
 	registerMCPCommand,
 	registerWebCommand,
 	registerStorageCommand,
+	registerServiceCommand,
+	registerProjectsCommand,
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
 import { ensureProjectOttoIgnored } from './gitignore.ts';
@@ -40,6 +42,8 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'share',
 	'storage',
 	'plugins',
+	'service',
+	'projects',
 ]);
 
 const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
@@ -52,6 +56,8 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'web',
 	'storage',
 	'plugins',
+	'service',
+	'projects',
 ]);
 
 export function createCli(version: string): Command {
@@ -65,7 +71,9 @@ export function createCli(version: string): Command {
 			'--ci',
 			'Disable interactive auth onboarding and rely on env/stored auth',
 		)
-		.option('--web', 'Open Web UI instead of TUI')
+		.addOption(
+			new Option('--web', 'Deprecated alias for `otto web`').hideHelp(),
+		)
 		.option('--agent <name>', 'Initial TUI agent')
 		.option('--provider <provider>', 'Initial TUI provider')
 		.option('--model <model>', 'Initial TUI model')
@@ -76,8 +84,9 @@ export function createCli(version: string): Command {
 				!SKIP_SERVER_COMMANDS.has(cmdName) &&
 				!(parentName && SKIP_SERVER_COMMANDS.has(parentName))
 			) {
+				const projectRoot = actionCommand.opts().project ?? process.cwd();
 				const { ensureServer } = await import('./ask/server.ts');
-				await ensureServer();
+				await ensureServer(projectRoot);
 			}
 		});
 
@@ -100,6 +109,8 @@ export function createCli(version: string): Command {
 	registerMCPCommand(program);
 	registerWebCommand(program, version);
 	registerStorageCommand(program);
+	registerServiceCommand(program, version);
+	registerProjectsCommand(program, version);
 
 	return program;
 }
@@ -199,30 +210,45 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 				...(initialModel ? { allowUnknownModel: true } : {}),
 			};
 
+			const { ensureAuth } = await import('./middleware/with-auth.ts');
+			if (!(await ensureAuth(projectRoot))) return;
+			const { ensureDaemonProject } = await import('./daemon.ts');
+			const serverContext = await ensureDaemonProject({
+				version,
+				projectRoot,
+			});
+			const serverUrl = new URL(serverContext.baseUrl);
+			const serverPort = Number(serverUrl.port);
+
 			if (useWeb) {
 				const noOpen = argv.includes('--no-open');
-				const networkFlag = argv.includes('--network');
-				const { handleServe } = await import('./commands/serve.ts');
-				await handleServe(
+				const { startWebUi } = await import('./commands/web.ts');
+				await startWebUi(
 					{
-						project: projectRoot,
-						port,
-						network: networkFlag,
+						url: serverContext.baseUrl,
+						port: port ?? serverPort + 1,
+						network: false,
 						noOpen,
-						tunnel: false,
-						apiOnly: false,
+						project: serverContext.projectRoot,
+						context: {
+							projectId: serverContext.projectId,
+							projectRoot: serverContext.projectRoot,
+							serverToken: serverContext.token,
+						},
 					},
 					version,
 				);
+				await new Promise(() => {});
 				return;
 			}
 
-			const { ensureAuth } = await import('./middleware/with-auth.ts');
-			if (!(await ensureAuth(projectRoot))) return;
-			const { startApiServer } = await import('./commands/serve.ts');
-			const server = await startApiServer({ project: projectRoot, port });
 			const { startTui } = await import('@ottocode/tui');
-			await startTui(server.port, server.stop, server.webUrl, initialSession);
+			await startTui(serverPort, undefined, undefined, initialSession, {
+				baseUrl: serverContext.baseUrl,
+				projectId: serverContext.projectId,
+				projectRoot: serverContext.projectRoot,
+				token: serverContext.token,
+			});
 			return;
 		}
 

@@ -6,11 +6,11 @@ import {
 	getSessionFiles as apiGetSessionFiles,
 } from '@ottocode/api';
 import type { SessionFilesResponse } from '../../types/api';
-import { extractErrorMessage } from './utils';
+import { extractErrorMessage, getProjectQuery } from './utils';
 
 export const filesMixin = {
 	async listFiles() {
-		const response = await apiListFiles();
+		const response = await apiListFiles({ query: getProjectQuery() } as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as {
 			files: string[];
@@ -21,7 +21,9 @@ export const filesMixin = {
 	},
 
 	async searchFiles(query = '') {
-		const response = await apiSearchFiles({ query: { q: query } });
+		const response = await apiSearchFiles({
+			query: { ...getProjectQuery(), q: query },
+		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as {
 			files: string[];
@@ -44,7 +46,7 @@ export const filesMixin = {
 		truncated: boolean;
 	}> {
 		const response = await apiGetFileTree({
-			query: { path: dirPath },
+			query: { ...getProjectQuery(), path: dirPath },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
@@ -58,7 +60,7 @@ export const filesMixin = {
 		lineCount: number;
 	}> {
 		const response = await apiReadFile({
-			query: { path: filePath },
+			query: { ...getProjectQuery(), path: filePath },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
@@ -66,7 +68,10 @@ export const filesMixin = {
 	},
 
 	async getSessionFiles(sessionId: string): Promise<SessionFilesResponse> {
-		const response = await apiGetSessionFiles({ path: { sessionId } });
+		const response = await apiGetSessionFiles({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as SessionFilesResponse;
 	},

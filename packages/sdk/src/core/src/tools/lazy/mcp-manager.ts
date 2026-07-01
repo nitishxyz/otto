@@ -58,8 +58,8 @@ function summarizeServer(
 	};
 }
 
-async function getStatuses(): Promise<MCPServerStatus[]> {
-	const manager = getMCPManager();
+async function getStatuses(projectRoot: string): Promise<MCPServerStatus[]> {
+	const manager = getMCPManager(projectRoot);
 	if (!manager) return [];
 	try {
 		return await manager.getStatusAsync();
@@ -72,7 +72,7 @@ async function startServer(
 	projectRoot: string,
 	server: MCPServerConfig,
 ): Promise<MCPServerStatus | undefined> {
-	let manager = getMCPManager();
+	let manager = getMCPManager(projectRoot);
 	if (!manager) {
 		manager = await initializeMCP({ servers: [] }, projectRoot);
 	}
@@ -84,8 +84,8 @@ async function startServer(
 	return statuses.find((status) => status.name === server.name);
 }
 
-async function stopServer(name: string): Promise<void> {
-	const manager = getMCPManager();
+async function stopServer(projectRoot: string, name: string): Promise<void> {
+	const manager = getMCPManager(projectRoot);
 	if (!manager) return;
 	await manager.stopServer(name);
 }
@@ -256,7 +256,7 @@ Set "start": true on add/update to start the server immediately. Newly started s
 
 				if (action === 'list') {
 					const config = await loadMCPConfig(projectRoot, globalConfigDir);
-					const statuses = await getStatuses();
+					const statuses = await getStatuses(projectRoot);
 					return {
 						ok: true,
 						servers: config.servers.map((server) =>
@@ -328,7 +328,7 @@ Set "start": true on add/update to start the server immediately. Newly started s
 
 				if (action === 'remove') {
 					try {
-						await stopServer(name);
+						await stopServer(projectRoot, name);
 					} catch {}
 					const removed = await removeMCPServerFromConfig(
 						projectRoot,
@@ -370,7 +370,7 @@ Set "start": true on add/update to start the server immediately. Newly started s
 					const server: MCPServerConfig = { ...existing, disabled: true };
 					await addMCPServerToConfig(projectRoot, server, globalConfigDir);
 					try {
-						await stopServer(name);
+						await stopServer(projectRoot, name);
 					} catch {}
 					return { ok: true, action, server: summarizeServer(server) };
 				}

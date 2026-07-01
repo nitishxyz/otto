@@ -23,6 +23,7 @@ export async function performAutoCompaction(
 	}) => void,
 	provider: string,
 	modelId: string,
+	projectRoot: string,
 	throughMessageId?: string,
 ): Promise<{
 	success: boolean;
@@ -46,7 +47,7 @@ export async function performAutoCompaction(
 			return { success: false, error: 'Not enough context to compact' };
 		}
 
-		const cfg = await loadConfig();
+		const cfg = await loadConfig(projectRoot);
 
 		const auth = await getAuth(
 			provider as Parameters<typeof getAuth>[0],

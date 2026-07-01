@@ -145,6 +145,7 @@ export async function composeSystemPrompt(options: {
 	const capabilitySummary = buildCapabilitySummary({
 		skillSettings: options.skillSettings,
 		skills,
+		projectRoot: options.projectRoot,
 	});
 	if (capabilitySummary.prompt) {
 		parts.push(capabilitySummary.prompt);
@@ -200,7 +201,7 @@ export async function composeSystemPrompt(options: {
 	}
 
 	// Add terminal context if available
-	const terminalManager = getTerminalManager();
+	const terminalManager = getTerminalManager(options.projectRoot);
 	if (terminalManager) {
 		const terminalContext = terminalManager.getContext();
 		if (terminalContext) {

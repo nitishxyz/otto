@@ -21,6 +21,7 @@ import { CompactActivityGroup } from './CompactActivityGroup';
 import { CompactionSummaryBox } from './CompactionSummaryBox';
 import { ActionToolBox } from './ActionToolBox';
 import { shouldRenderCompactionSummaryBox } from './compactionSummary';
+import { shouldRenderTurnFooter } from './turnFooter';
 import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { BranchModal } from '../branch/BranchModal';
 import { ProviderLogo } from '../common/ProviderLogo';
@@ -614,7 +615,15 @@ export const AssistantMessageGroup = memo(
 			<div
 				className="relative group"
 				onMouseEnter={() => setIsHovered(true)}
-				onMouseLeave={() => setIsHovered(false)}
+				onMouseLeave={() => {
+					setIsHovered(false);
+					setCopied(false);
+				}}
+				onBlur={(e) => {
+					if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+						setIsHovered(false);
+					}
+				}}
 			>
 				{showHeader && (
 					<div className="pb-2 flex items-center justify-between">
@@ -792,7 +801,11 @@ export const AssistantMessageGroup = memo(
 					)}
 				</div>
 
-				{isComplete && sessionId && (
+				{shouldRenderTurnFooter(
+					message,
+					sessionId,
+					hasNextAssistantMessage,
+				) && (
 					<div className="ml-7 mt-2 min-h-7">
 						<div
 							className={`flex gap-2 transition-opacity duration-150 ${

@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import type { CreateBranchRequest } from '../types/api';
-import { sessionsQueryKey } from './useSessions';
+import { projectScopedKey } from '../lib/api-client/utils';
+import { getSessionsQueryKey } from './useSessions';
 
 export function useCreateBranch(sessionId: string | undefined) {
 	const queryClient = useQueryClient();
@@ -12,10 +13,10 @@ export function useCreateBranch(sessionId: string | undefined) {
 			return apiClient.createBranch(sessionId, data);
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 			if (sessionId) {
 				queryClient.invalidateQueries({
-					queryKey: ['branches', sessionId],
+					queryKey: projectScopedKey(['branches', sessionId] as const),
 				});
 			}
 		},
@@ -24,7 +25,7 @@ export function useCreateBranch(sessionId: string | undefined) {
 
 export function useBranches(sessionId: string | undefined) {
 	return useQuery({
-		queryKey: ['branches', sessionId],
+		queryKey: projectScopedKey(['branches', sessionId] as const),
 		queryFn: () => {
 			if (!sessionId) throw new Error('No session ID');
 			return apiClient.listBranches(sessionId);
@@ -35,7 +36,7 @@ export function useBranches(sessionId: string | undefined) {
 
 export function useParentSession(sessionId: string | undefined) {
 	return useQuery({
-		queryKey: ['parentSession', sessionId],
+		queryKey: projectScopedKey(['parentSession', sessionId] as const),
 		queryFn: () => {
 			if (!sessionId) throw new Error('No session ID');
 			return apiClient.getParentSession(sessionId);

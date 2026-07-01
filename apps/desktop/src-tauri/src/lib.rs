@@ -13,30 +13,6 @@ pub fn run_notification_helper(args: &[String]) -> i32 {
     commands::notification::run_notification_helper(args)
 }
 
-#[cfg(unix)]
-use std::process::Command;
-
-#[cfg(unix)]
-fn kill_orphan_servers() {
-    for port in (19000..19100).step_by(2) {
-        if let Ok(output) = Command::new("lsof")
-            .args(["-ti", &format!(":{}", port)])
-            .output()
-        {
-            let pids = String::from_utf8_lossy(&output.stdout);
-            for pid in pids.lines() {
-                if let Ok(pid_num) = pid.trim().parse::<i32>() {
-                    eprintln!("[otto] Killing orphan process {} on port {}", pid_num, port);
-                    let _ = Command::new("kill").arg("-9").arg(pid.trim()).output();
-                }
-            }
-        }
-    }
-}
-
-#[cfg(not(unix))]
-fn kill_orphan_servers() {}
-
 pub struct InitialProjectState {
     pub path: Mutex<Option<String>>,
 }
@@ -99,9 +75,6 @@ fn get_platform() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    eprintln!("[otto] Cleaning up orphan servers on startup...");
-    kill_orphan_servers();
-
     let initial_project = parse_project_arg();
     if let Some(ref p) = initial_project {
         eprintln!("[otto] CLI requested project: {}", p);
@@ -208,6 +181,7 @@ pub fn run() {
             commands::server::stop_server,
             commands::server::stop_all_servers,
             commands::server::list_servers,
+            commands::server::get_cli_selection,
             commands::github::github_save_token,
             commands::github::github_get_token,
             commands::github::github_logout,

@@ -10,8 +10,8 @@ import {
 
 export async function ensureValidOAuth(
 	provider: ProviderId,
+	projectRoot: string,
 ): Promise<{ access: string; oauth: OAuth } | null> {
-	const projectRoot = process.cwd();
 	const auth = await getAuth(provider, projectRoot);
 	if (!auth || auth.type !== 'oauth') return null;
 

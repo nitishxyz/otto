@@ -22,7 +22,7 @@ import type {
 } from '@ottocode/api';
 import type { ThemeId } from '@ottocode/themes';
 import type { AllModelsResponse } from '../../types/api';
-import { extractErrorMessage } from './utils';
+import { extractErrorMessage, getProjectQuery } from './utils';
 
 type ProviderCompatibility =
 	| 'openai'
@@ -89,6 +89,7 @@ export const configMixin = {
 			compactThread?: boolean;
 			fontFamily?: string;
 			smartEdges?: boolean;
+			threadNavigatorRail?: boolean;
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			notificationsEnabled?: boolean;
@@ -97,26 +98,33 @@ export const configMixin = {
 			ottoEnabled?: boolean;
 		};
 	}> {
-		const response = await apiGetConfig();
+		const response = await apiGetConfig({ query: getProjectQuery() } as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
 	},
 
 	async getAgentDetails(): Promise<GetAgentDetailsResponse> {
-		const response = await apiGetAgentDetails();
+		const response = await apiGetAgentDetails({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as GetAgentDetailsResponse;
 	},
 
 	async getAgent(name: string): Promise<GetAgentResponse> {
-		const response = await apiGetAgent({ path: { agent: name } });
+		const response = await apiGetAgent({
+			path: { agent: name },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as GetAgentResponse;
 	},
 
 	async getConfigTools(): Promise<GetConfigToolsResponse> {
-		const response = await apiGetConfigTools();
+		const response = await apiGetConfigTools({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as GetConfigToolsResponse;
 	},
@@ -127,8 +135,9 @@ export const configMixin = {
 	): Promise<UpsertAgentResponse> {
 		const response = await apiUpsertAgent({
 			path: { agent: name },
+			query: getProjectQuery(),
 			body: input,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as UpsertAgentResponse;
 	},
@@ -139,7 +148,7 @@ export const configMixin = {
 	): Promise<DeleteAgentResponse> {
 		const response = await apiDeleteAgent({
 			path: { agent: name },
-			query: { scope },
+			query: { ...getProjectQuery(), scope },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as DeleteAgentResponse;
@@ -167,14 +176,17 @@ export const configMixin = {
 		const response = await apiGetProviderModels({
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			path: { provider: providerId as any },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
 	},
 
 	async getAllModels(): Promise<AllModelsResponse> {
-		const response = await apiGetAllModels();
+		const response = await apiGetAllModels({
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as AllModelsResponse;
 	},
@@ -190,8 +202,9 @@ export const configMixin = {
 		message?: string;
 	}> {
 		const response = await apiDiscoverProviderModels({
+			query: getProjectQuery(),
 			body: data,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as {
 			baseURL?: string;
@@ -217,9 +230,10 @@ export const configMixin = {
 		const response = await apiUpdateProviderSettings({
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			path: { provider: provider as any },
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: data as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -231,7 +245,8 @@ export const configMixin = {
 		const response = await apiDeleteProviderSettings({
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			path: { provider: provider as any },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -251,6 +266,7 @@ export const configMixin = {
 		compactThread?: boolean;
 		fontFamily?: string;
 		smartEdges?: boolean;
+		threadNavigatorRail?: boolean;
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		notificationsEnabled?: boolean;
@@ -274,6 +290,7 @@ export const configMixin = {
 			compactThread?: boolean;
 			fontFamily?: string;
 			smartEdges?: boolean;
+			threadNavigatorRail?: boolean;
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			notificationsEnabled?: boolean;
@@ -283,9 +300,10 @@ export const configMixin = {
 		};
 	}> {
 		const response = await apiUpdateDefaults({
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: { scope: 'global', ...data } as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;

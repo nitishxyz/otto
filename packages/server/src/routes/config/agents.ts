@@ -18,6 +18,7 @@ import {
 } from '../../runtime/agent/registry.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { discoverAllAgents, getDefault } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const projectQuerySchema = z.object({
 	project: z
@@ -225,7 +226,7 @@ export function registerAgentsRoute(app: Hono) {
 					});
 				}
 
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const allAgents = await discoverAllAgents(cfg.projectRoot);
 
@@ -264,7 +265,7 @@ export function registerAgentsRoute(app: Hono) {
 				const embeddedConfig = getEmbeddedConfig(c);
 				if (embeddedConfig)
 					return c.json(getEmbeddedAgentDetails(embeddedConfig));
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				return c.json(await getAllAgentDetails(projectRoot));
 			} catch (error) {
 				logger.error('Failed to get agent details', error);
@@ -292,7 +293,7 @@ export function registerAgentsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const agent = c.req.param('agent');
 				return c.json({ agent: await getAgentDetail(projectRoot, agent) });
 			} catch (error) {
@@ -330,7 +331,7 @@ export function registerAgentsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const body = upsertAgentBodySchema.parse(
 					await c.req.json().catch(() => ({})),
 				);
@@ -368,7 +369,7 @@ export function registerAgentsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const scope = c.req.query('scope') === 'global' ? 'global' : 'local';
 				return c.json(
 					await deleteAgentConfig({

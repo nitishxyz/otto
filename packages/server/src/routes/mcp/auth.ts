@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	completeMCPAuth,
 	getMCPAuthStatus,
@@ -87,6 +88,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		async (c) => {
 			const result = await initiateMCPAuth({
 				name: c.req.param('name'),
+				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
 			});
@@ -131,6 +133,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		async (c) => {
 			const result = await completeMCPAuth({
 				name: c.req.param('name'),
+				projectRoot: await resolveRequestProjectRoot(c),
 				body: await c.req.json(),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
@@ -165,6 +168,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 			return c.json(
 				await getMCPAuthStatus({
 					name: c.req.param('name'),
+					projectRoot: await resolveRequestProjectRoot(c),
 					oAuthStore: copilotMCPOAuthStore,
 				}),
 			);
@@ -200,6 +204,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		async (c) => {
 			const result = await revokeMCPAuth({
 				name: c.req.param('name'),
+				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 			});
 			return result.ok

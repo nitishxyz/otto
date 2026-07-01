@@ -3,6 +3,7 @@ import { useTheme } from '../theme.ts';
 
 interface StatusBarProps {
 	sessionTitle: string | null;
+	projectRoot?: string | null;
 	queueSize?: number;
 	contextTokens?: number;
 	estimatedCost?: number;
@@ -17,6 +18,7 @@ function formatCompact(num: number): string {
 
 export function StatusBar({
 	sessionTitle,
+	projectRoot,
 	queueSize = 0,
 	contextTokens = 0,
 	estimatedCost = 0,
@@ -34,6 +36,11 @@ export function StatusBar({
 				: colors.fgDimmed;
 
 	const rightParts: string[] = [];
+	if (projectRoot) {
+		rightParts.push(
+			`proj ${projectRoot.split('/').filter(Boolean).at(-1) ?? projectRoot}`,
+		);
+	}
 	if (queueSize > 0) rightParts.push(`${queueSize} queued`);
 	if (contextTokens > 0) rightParts.push(`ctx ${formatCompact(contextTokens)}`);
 	if (estimatedCost > 0) rightParts.push(`$${estimatedCost.toFixed(2)}`);
@@ -83,10 +90,12 @@ export function StatusBar({
 					const isCtx = part.startsWith('ctx ');
 					const isCost = part.startsWith('$');
 					const isQueued = part.includes('queued');
+					const isProject = part.startsWith('proj ');
 					let color = colors.fgDimmed;
 					if (isCtx) color = contextColor;
 					if (isCost) color = colors.fg;
 					if (isQueued) color = colors.yellow;
+					if (isProject) color = colors.blue;
 					return (
 						<box key={part} style={{ flexDirection: 'row', flexShrink: 0 }}>
 							{i > 0 ? (

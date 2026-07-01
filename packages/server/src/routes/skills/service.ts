@@ -13,6 +13,7 @@ import {
 	writeSkillSettings,
 } from '@ottocode/sdk';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 function dedupeSkillsByName<T extends { name: string }>(skills: T[]): T[] {
 	const seen = new Set<string>();
@@ -63,8 +64,8 @@ async function ensureSkillsDiscovered(projectRoot: string): Promise<void> {
 	await discoverSkills(projectRoot, repoRoot);
 }
 
-function projectRootFromQuery(c: Context): string {
-	return c.req.query('project') || process.cwd();
+async function projectRootFromQuery(c: Context): Promise<string> {
+	return resolveRequestProjectRoot(c);
 }
 
 function jsonError(c: Context, message: string, error: unknown) {
@@ -75,7 +76,7 @@ function jsonError(c: Context, message: string, error: unknown) {
 
 export async function listSkills(c: Context) {
 	try {
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const cfg = await loadConfig(projectRoot);
 		const repoRoot = (await findGitRoot(projectRoot)) ?? projectRoot;
 		const discovered = sortSkillsByName(
@@ -94,7 +95,7 @@ export async function listSkills(c: Context) {
 export async function getSkillsConfig(c: Context) {
 	try {
 		const { cfg, discovered, filtered } = await loadProjectSkills(
-			projectRootFromQuery(c),
+			await projectRootFromQuery(c),
 		);
 		return c.json({
 			enabled: cfg.skills?.enabled !== false,
@@ -109,7 +110,7 @@ export async function getSkillsConfig(c: Context) {
 
 export async function updateSkillsConfig(c: Context) {
 	try {
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const body = await c.req.json<{
 			enabled?: boolean;
 			items?: Record<string, { enabled?: boolean }>;
@@ -139,7 +140,7 @@ export async function updateSkillsConfig(c: Context) {
 export async function getSkill(c: Context) {
 	try {
 		const name = c.req.param('name');
-		await ensureSkillsDiscovered(projectRootFromQuery(c));
+		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 
 		const skill = await loadSkill(name);
 		if (!skill) {
@@ -165,7 +166,7 @@ export async function getSkill(c: Context) {
 export async function listSkillFiles(c: Context) {
 	try {
 		const name = c.req.param('name');
-		await ensureSkillsDiscovered(projectRootFromQuery(c));
+		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 		const files = await discoverSkillFiles(name);
 		return c.json({ files });
 	} catch (error) {
@@ -180,7 +181,7 @@ export async function getSkillFile(c: Context) {
 			c.req.param('filePath') ||
 			c.req.path.replace(`/v1/skills/${name}/files/`, '');
 		const filePath = decodeURIComponent(rawFilePath);
-		await ensureSkillsDiscovered(projectRootFromQuery(c));
+		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 
 		const result = await loadSkillFile(name, filePath);
 		if (!result) {

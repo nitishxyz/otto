@@ -8,6 +8,7 @@ import {
 	gitUnstageSchema,
 } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -55,8 +56,8 @@ async function handleStagingAction(c: Context, action: StagingAction) {
 	const config = actionConfig[action];
 	try {
 		const body = await c.req.json();
-		const { files, project } = config.schema.parse(body);
-		const requestedPath = project || process.cwd();
+		const { files } = config.schema.parse(body);
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {

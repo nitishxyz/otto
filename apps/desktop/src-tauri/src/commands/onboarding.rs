@@ -312,8 +312,8 @@ fn normalize_theme_id(theme: &str) -> &str {
         "dark" => "otto-dark",
         "light" => "otto-light",
         "otto-dark" | "otto-light" | "rose-pine" | "rose-pine-moon" | "rose-pine-dawn"
-        | "ayu-dark" | "ayu-mirage" | "ayu-light" | "tokyo-night" | "catppuccin-mocha"
-        | "nord" | "gruvbox" | "monokai" | "dracula" | "solarized-dark" => theme,
+        | "ayu-dark" | "ayu-mirage" | "ayu-light" | "tokyo-night" | "catppuccin-mocha" | "nord"
+        | "gruvbox" | "monokai" | "dracula" | "solarized-dark" => theme,
         _ => "otto-dark",
     }
 }

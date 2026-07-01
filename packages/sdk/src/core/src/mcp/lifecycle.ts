@@ -4,31 +4,48 @@ import type { MCPConfig, MCPServerConfig, MCPScope } from './types.ts';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
-let globalMCPManager: MCPServerManager | null = null;
+const legacyMCPManagerKey = 'legacy';
+const mcpManagersByProject = new Map<string, MCPServerManager>();
 
-export function getMCPManager(): MCPServerManager | null {
-	return globalMCPManager;
+function getMCPManagerKey(projectRoot?: string): string {
+	return projectRoot || legacyMCPManagerKey;
+}
+
+export function getMCPManager(projectRoot?: string): MCPServerManager | null {
+	return mcpManagersByProject.get(getMCPManagerKey(projectRoot)) ?? null;
 }
 
 export async function initializeMCP(
 	config: MCPConfig,
 	projectRoot?: string,
 ): Promise<MCPServerManager> {
-	if (globalMCPManager) {
-		await globalMCPManager.stopAll();
+	const managerKey = getMCPManagerKey(projectRoot);
+	const existingManager = mcpManagersByProject.get(managerKey);
+	if (existingManager) {
+		await existingManager.stopAll();
 	}
-	globalMCPManager = new MCPServerManager();
+	const manager = new MCPServerManager();
 	if (projectRoot) {
-		globalMCPManager.setProjectRoot(projectRoot);
+		manager.setProjectRoot(projectRoot);
 	}
-	await globalMCPManager.startServers(config.servers);
-	return globalMCPManager;
+	await manager.startServers(config.servers);
+	mcpManagersByProject.set(managerKey, manager);
+	return manager;
 }
 
-export async function shutdownMCP(): Promise<void> {
-	if (globalMCPManager) {
-		await globalMCPManager.stopAll();
-		globalMCPManager = null;
+export async function shutdownMCP(projectRoot?: string): Promise<void> {
+	if (projectRoot) {
+		const managerKey = getMCPManagerKey(projectRoot);
+		const manager = mcpManagersByProject.get(managerKey);
+		if (!manager) return;
+		await manager.stopAll();
+		mcpManagersByProject.delete(managerKey);
+		return;
+	}
+
+	for (const [managerKey, manager] of mcpManagersByProject) {
+		await manager.stopAll();
+		mcpManagersByProject.delete(managerKey);
 	}
 }
 

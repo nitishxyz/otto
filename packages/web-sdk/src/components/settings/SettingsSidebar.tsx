@@ -766,6 +766,14 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 								updatePreferences({ fullWidthContent: checked })
 							}
 						/>
+						<ToggleRow
+							label="Thread Navigator Rail"
+							description="Show the quick-jump rail beside message threads."
+							checked={preferences.threadNavigatorRail}
+							onChange={(checked) =>
+								updatePreferences({ threadNavigatorRail: checked })
+							}
+						/>
 						{isDesktop ? (
 							<ToggleRow
 								label="Smart Sidebar Edges"

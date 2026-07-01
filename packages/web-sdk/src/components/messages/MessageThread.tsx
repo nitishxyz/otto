@@ -55,6 +55,8 @@ const TODO_TOOL_NAMES = new Set([
 // pinned to the bottom, not merely "near" it. Resuming inside a large band is
 // what made the thread yank the user back down mid-stream.
 const BOTTOM_RESUME_THRESHOLD_PX = 8;
+const LEAN_HEADER_HEIGHT_PX = 48;
+const CHAT_INPUT_BOUNDARY_SELECTOR = '[data-chat-input-boundary]';
 
 const TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT = 12;
 const TODO_SNAPSHOT_SCAN_PART_LIMIT = 500;
@@ -474,6 +476,7 @@ export const MessageThread = memo(function MessageThread({
 	const [autoScroll, setAutoScroll] = useState(true);
 	const autoScrollRef = useRef(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
+	const [railInsets, setRailInsets] = useState({ top: 0, bottom: 0 });
 	const userScrollingRef = useRef(false);
 	const userScrollTimeoutRef = useRef<
 		ReturnType<typeof setTimeout> | undefined
@@ -589,6 +592,55 @@ export const MessageThread = memo(function MessageThread({
 		[handleWheelIntent, handleTouchStartIntent, handleTouchMoveIntent],
 	);
 
+	const updateRailInsets = useCallback(
+		(leanHeaderVisible = showLeanHeader) => {
+			const root = threadRootRef.current;
+			if (!root) return;
+
+			const rootRect = root.getBoundingClientRect();
+			const rootHeight = rootRect.height;
+			let top = leanHeaderVisible ? LEAN_HEADER_HEIGHT_PX : 0;
+
+			const headerElement = sessionHeaderRef.current;
+			if (headerElement) {
+				const headerRect = headerElement.getBoundingClientRect();
+				if (headerRect.bottom > rootRect.top) {
+					top = Math.max(
+						top,
+						Math.min(headerRect.bottom, rootRect.bottom) - rootRect.top,
+					);
+				}
+			}
+
+			let bottom = 0;
+			const inputBoundary = root.parentElement?.querySelector(
+				CHAT_INPUT_BOUNDARY_SELECTOR,
+			);
+			if (inputBoundary instanceof HTMLElement) {
+				const inputRect = inputBoundary.getBoundingClientRect();
+				if (inputRect.top < rootRect.bottom) {
+					bottom = rootRect.bottom - Math.max(inputRect.top, rootRect.top);
+				}
+			}
+
+			const nextTop = Math.max(0, Math.min(rootHeight, top));
+			const nextBottom = Math.max(
+				0,
+				Math.min(Math.max(0, rootHeight - nextTop), bottom),
+			);
+			setRailInsets((previous) => {
+				if (
+					Math.abs(previous.top - nextTop) < 1 &&
+					Math.abs(previous.bottom - nextBottom) < 1
+				) {
+					return previous;
+				}
+				return { top: nextTop, bottom: nextBottom };
+			});
+		},
+		[showLeanHeader],
+	);
+
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
@@ -614,12 +666,42 @@ export const MessageThread = memo(function MessageThread({
 		}
 
 		const headerElement = sessionHeaderRef.current;
+		let nextShowLeanHeader = showLeanHeader;
 		if (headerElement) {
 			const headerRect = headerElement.getBoundingClientRect();
 			const containerRect = container.getBoundingClientRect();
-			setShowLeanHeader(headerRect.bottom < containerRect.top);
+			nextShowLeanHeader = headerRect.bottom < containerRect.top;
+			setShowLeanHeader(nextShowLeanHeader);
 		}
-	}, [disableAutoFollow]);
+		updateRailInsets(nextShowLeanHeader);
+	}, [disableAutoFollow, showLeanHeader, updateRailInsets]);
+
+	useLayoutEffect(() => {
+		updateRailInsets(showLeanHeader);
+
+		const handleResize = () => updateRailInsets(showLeanHeader);
+		const root = threadRootRef.current;
+		const inputBoundary = root?.parentElement?.querySelector(
+			CHAT_INPUT_BOUNDARY_SELECTOR,
+		);
+		const headerElement = sessionHeaderRef.current;
+		window.addEventListener('resize', handleResize);
+
+		if (typeof ResizeObserver === 'undefined') {
+			return () => window.removeEventListener('resize', handleResize);
+		}
+
+		const resizeObserver = new ResizeObserver(handleResize);
+		if (root) resizeObserver.observe(root);
+		if (inputBoundary instanceof HTMLElement)
+			resizeObserver.observe(inputBoundary);
+		if (headerElement) resizeObserver.observe(headerElement);
+
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			resizeObserver.disconnect();
+		};
+	}, [showLeanHeader, updateRailInsets]);
 
 	const scrollToThreadBottom = useCallback(
 		(behavior: ScrollBehavior = 'auto') => {
@@ -666,6 +748,7 @@ export const MessageThread = memo(function MessageThread({
 			lastScrollHeightRef.current = 0;
 			lastScrollTopRef.current = 0;
 			setShowLeanHeader(false);
+			setRailInsets({ top: 0, bottom: 0 });
 		}
 
 		if (!initialScrollDoneRef.current && filteredMessages.length > 0) {
@@ -760,8 +843,22 @@ export const MessageThread = memo(function MessageThread({
 		: compact
 			? 'max-w-3xl mx-auto space-y-4'
 			: 'max-w-3xl mx-auto space-y-6';
+	// The navigator rail always sits on the LEFT edge and is narrow in roomy
+	// mode. The whole assistant turn (avatar/header pill, timeline, text) starts
+	// at the row's left padding edge, so reserve a symmetric horizontal inset on
+	// the row wrapper wide enough to clear the rail on the left and mirror it on
+	// the right. This shifts the ENTIRE group, not just text, and works for both
+	// full-width and near-full centered layouts (where auto margins can collapse
+	// to ~0 and otherwise let the rail overlap the avatar). Use explicit
+	// pl-*/pr-* only (never px-* + pl-*) to avoid Tailwind padding-left
+	// conflicts. Compact density keeps the thin far-left dots, so it stays on the
+	// tight px-2 spacing.
 	const rowOuterClass =
-		density === 'compact' ? 'px-2 pb-3' : compact ? 'px-4 pb-4' : 'px-6 pb-6';
+		density === 'compact'
+			? 'px-2 pb-3'
+			: compact
+				? 'pl-14 pr-14 pb-4'
+				: 'pl-14 pr-14 pb-6';
 	const firstRowTopClass =
 		density === 'compact' ? 'pt-3' : compact ? 'pt-4' : 'pt-6';
 	const footerBottomPaddingClass =
@@ -894,7 +991,11 @@ export const MessageThread = memo(function MessageThread({
 						<div
 							className={`${rowOuterClass} ${idx === 0 ? firstRowTopClass : ''}`}
 						>
-							<div className={contentWidthClass}>
+							<div
+								data-smart-edge-ignore="left"
+								data-smart-edge-ignore-mode="content"
+								className={contentWidthClass}
+							>
 								<ThreadMessageRow
 									sessionId={sessionId}
 									message={message}
@@ -914,11 +1015,15 @@ export const MessageThread = memo(function MessageThread({
 					)}
 				/>
 
-				{/* Quick-jump navigator rail with dock-style magnification */}
-				<ThreadNavigatorRail
-					messages={filteredMessages}
-					onNavigate={handleNavigateToIndex}
-				/>
+				{preferences.threadNavigatorRail && (
+					<ThreadNavigatorRail
+						messages={filteredMessages}
+						onNavigate={handleNavigateToIndex}
+						threadWidth={threadWidth}
+						topInset={railInsets.top}
+						bottomInset={railInsets.bottom}
+					/>
+				)}
 
 				{/* Scroll to bottom button - only shown when user has scrolled up */}
 				{!autoScroll && (

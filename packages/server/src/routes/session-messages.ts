@@ -1,12 +1,10 @@
 import { z } from '@hono/zod-openapi';
-import { getDb } from '@ottocode/database';
 import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
 	ensureProviderEnv,
 	getProviderDefinition,
 	hasConfiguredProvider,
 	isProviderAuthorized,
-	loadConfig,
 	logger,
 	type ReasoningLevel,
 	validateProviderModel,
@@ -18,8 +16,11 @@ import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
 import { tryExecutePluginSlashMessage } from '../runtime/commands/plugin-slash.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
-import type { TerminalManager } from '@ottocode/sdk';
 import { pluginCommandRunResponseSchema } from './plugins/schemas.ts';
+import {
+	projectQuerySchema,
+	resolveRequestProject,
+} from './project-context.ts';
 
 type MessagePartRow = typeof messageParts.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
@@ -80,15 +81,7 @@ const messageParamsSchema = z.object({
 	}),
 });
 
-const listMessagesQuerySchema = z.object({
-	project: z
-		.string()
-		.optional()
-		.openapi({
-			param: { name: 'project', in: 'query' },
-			description:
-				'Project root override (defaults to current working directory).',
-		}),
+const listMessagesQuerySchema = projectQuerySchema.extend({
 	without: z
 		.enum(['parts'])
 		.optional()
@@ -105,16 +98,7 @@ const listMessagesQuerySchema = z.object({
 		}),
 });
 
-const createMessageQuerySchema = z.object({
-	project: z
-		.string()
-		.optional()
-		.openapi({
-			param: { name: 'project', in: 'query' },
-			description:
-				'Project root override (defaults to current working directory).',
-		}),
-});
+const createMessageQuerySchema = projectQuerySchema;
 
 const createMessageBodySchema = z.object({
 	content: z.string(),
@@ -167,10 +151,7 @@ const messageErrorSchema = z.object({
 	error: z.string(),
 });
 
-export function registerSessionMessagesRoutes(
-	app: Hono,
-	terminalManager?: TerminalManager,
-) {
+export function registerSessionMessagesRoutes(app: Hono) {
 	zodOpenApiRoute(
 		app,
 		{
@@ -194,9 +175,7 @@ export function registerSessionMessagesRoutes(
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const cfg = await loadConfig(projectRoot);
-				const db = await getDb(cfg.projectRoot);
+				const { db } = await resolveRequestProject(c);
 				const id = c.req.param('id');
 				const rows = await db
 					.select()
@@ -294,9 +273,7 @@ export function registerSessionMessagesRoutes(
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
-				const cfg = await loadConfig(projectRoot);
-				const db = await getDb(cfg.projectRoot);
+				const { cfg, db, runtime } = await resolveRequestProject(c);
 				const sessionId = c.req.param('id');
 				const body = await c.req.json().catch(() => ({}));
 
@@ -382,7 +359,7 @@ export function registerSessionMessagesRoutes(
 				const pluginCommand = await tryExecutePluginSlashMessage({
 					projectRoot: cfg.projectRoot,
 					content,
-					terminalManager,
+					terminalManager: runtime.terminalManager,
 				});
 				if (pluginCommand) {
 					return c.json({ pluginCommand }, 200);

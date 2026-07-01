@@ -9,7 +9,7 @@ import {
 	startGoal as apiStartGoal,
 	listSessionSubagents as apiListSessionSubagents,
 } from '@ottocode/api';
-import { extractErrorMessage } from './utils';
+import { extractErrorMessage, getProjectQuery } from './utils';
 
 export type GoalTaskStatus =
 	| 'pending'
@@ -62,13 +62,16 @@ export type Subagent = {
 
 export const goalsMixin = {
 	async listGoals(): Promise<{ goals: Goal[] }> {
-		const response = await apiListGoals();
+		const response = await apiListGoals({ query: getProjectQuery() } as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goals: Goal[] };
 	},
 
 	async getSessionGoal(sessionId: string): Promise<{ goal: Goal | null }> {
-		const response = await apiGetSessionGoal({ path: { sessionId } });
+		const response = await apiGetSessionGoal({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal | null };
 	},
@@ -79,8 +82,9 @@ export const goalsMixin = {
 	): Promise<{ goal: Goal }> {
 		const response = await apiCreateSessionGoal({
 			path: { sessionId },
+			query: getProjectQuery(),
 			body: data,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal };
 	},
@@ -91,8 +95,9 @@ export const goalsMixin = {
 	): Promise<{ goal: Goal }> {
 		const response = await apiUpdateGoal({
 			path: { goalId },
+			query: getProjectQuery(),
 			body: data,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal };
 	},
@@ -100,8 +105,9 @@ export const goalsMixin = {
 	async addGoalTasks(goalId: string, tasks: string[]): Promise<{ goal: Goal }> {
 		const response = await apiAddGoalTasks({
 			path: { goalId },
+			query: getProjectQuery(),
 			body: { tasks },
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal };
 	},
@@ -117,8 +123,9 @@ export const goalsMixin = {
 	): Promise<{ task: GoalTask }> {
 		const response = await apiUpdateGoalTask({
 			path: { goalId, taskId },
+			query: getProjectQuery(),
 			body: data,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { task: GoalTask };
 	},
@@ -127,13 +134,19 @@ export const goalsMixin = {
 		goalId: string,
 		taskId: string,
 	): Promise<{ goal: Goal }> {
-		const response = await apiDeleteGoalTask({ path: { goalId, taskId } });
+		const response = await apiDeleteGoalTask({
+			path: { goalId, taskId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal };
 	},
 
 	async startGoal(goalId: string): Promise<{ goal: Goal }> {
-		const response = await apiStartGoal({ path: { goalId } });
+		const response = await apiStartGoal({
+			path: { goalId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { goal: Goal };
 	},
@@ -144,7 +157,7 @@ export const goalsMixin = {
 	): Promise<{ subagents: Subagent[] }> {
 		const response = await apiListSessionSubagents({
 			path: { sessionId },
-			query: status ? { status } : undefined,
+			query: status ? { ...getProjectQuery(), status } : getProjectQuery(),
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as unknown as { subagents: Subagent[] };

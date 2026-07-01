@@ -3,6 +3,7 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	getActiveTunnelUrl,
+	getTunnelScopeOptionsFromContext,
 	getTunnelQRCode,
 	getTunnelStatus,
 	handleTunnelStream,
@@ -16,6 +17,8 @@ import {
 export { getActiveTunnelUrl, setExternalTunnel, stopActiveTunnel };
 
 const tunnelStatusSchema = z.object({
+	scope: z.enum(['remote-control', 'project-share']),
+	projectId: z.string().nullable(),
 	status: z.enum(['idle', 'starting', 'connected', 'error']),
 	url: z.string().nullable(),
 	error: z.string().nullable(),
@@ -25,10 +28,32 @@ const tunnelStatusSchema = z.object({
 
 const startTunnelBodySchema = z.object({
 	port: z.number().int().optional(),
+	scope: z.enum(['remote-control', 'project-share']).optional(),
+	projectId: z.string().optional(),
+});
+
+const tunnelScopeQuerySchema = z.object({
+	scope: z
+		.enum(['remote-control', 'project-share'])
+		.optional()
+		.openapi({
+			param: { name: 'scope', in: 'query' },
+			description:
+				'Tunnel scope to inspect or stream. Defaults to remote-control.',
+		}),
+	projectId: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'projectId', in: 'query' },
+			description: 'Required when scope is project-share.',
+		}),
 });
 
 const tunnelActionResponseSchema = z.object({
 	ok: z.boolean(),
+	scope: z.enum(['remote-control', 'project-share']).optional(),
+	projectId: z.string().nullable().optional(),
 	url: z.string().nullable().optional(),
 	message: z.string().optional(),
 	error: z.string().optional(),
@@ -36,6 +61,8 @@ const tunnelActionResponseSchema = z.object({
 
 const registerTunnelBodySchema = z.object({
 	url: z.string(),
+	scope: z.enum(['remote-control', 'project-share']).optional(),
+	projectId: z.string().optional(),
 });
 
 const tunnelErrorResponseSchema = z.object({
@@ -45,6 +72,8 @@ const tunnelErrorResponseSchema = z.object({
 
 const tunnelQrResponseSchema = z.object({
 	ok: z.boolean(),
+	scope: z.enum(['remote-control', 'project-share']).optional(),
+	projectId: z.string().nullable().optional(),
 	url: z.string().optional(),
 	qrCode: z.string().optional(),
 	error: z.string().optional(),
@@ -78,6 +107,7 @@ export function registerTunnelRoutes(app: Hono) {
 			tags: ['tunnel'],
 			operationId: 'getTunnelStatus',
 			summary: 'Get tunnel status',
+			request: { query: tunnelScopeQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
@@ -87,7 +117,8 @@ export function registerTunnelRoutes(app: Hono) {
 				},
 			},
 		},
-		async (c) => c.json(await getTunnelStatus()),
+		async (c) =>
+			c.json(await getTunnelStatus(getTunnelScopeOptionsFromContext(c))),
 	);
 
 	zodOpenApiRoute(
@@ -125,7 +156,10 @@ export function registerTunnelRoutes(app: Hono) {
 			const body: z.infer<typeof startTunnelBodySchema> = await c.req
 				.json<z.infer<typeof startTunnelBodySchema>>()
 				.catch(() => ({}));
-			const result = await startTunnel(body.port);
+			const result = await startTunnel(body.port, {
+				scope: body.scope,
+				projectId: body.projectId,
+			});
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
@@ -162,10 +196,14 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body: { url?: string } = await c.req
-				.json<z.infer<typeof registerTunnelBodySchema>>()
-				.catch(() => ({ url: undefined }));
-			const result = registerExternalTunnel(body.url);
+			const body: Partial<z.infer<typeof registerTunnelBodySchema>> =
+				await c.req
+					.json<z.infer<typeof registerTunnelBodySchema>>()
+					.catch(() => ({ url: undefined }));
+			const result = registerExternalTunnel(body.url, {
+				scope: body.scope,
+				projectId: body.projectId,
+			});
 			return c.json(result, result.ok ? 200 : 400);
 		},
 	);
@@ -178,6 +216,7 @@ export function registerTunnelRoutes(app: Hono) {
 			tags: ['tunnel'],
 			operationId: 'stopTunnel',
 			summary: 'Stop the tunnel',
+			request: { query: tunnelScopeQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
@@ -194,7 +233,7 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		(c) => {
-			const result = stopTunnel();
+			const result = stopTunnel(getTunnelScopeOptionsFromContext(c));
 			return c.json(result, result.ok ? 200 : 500);
 		},
 	);
@@ -207,6 +246,7 @@ export function registerTunnelRoutes(app: Hono) {
 			tags: ['tunnel'],
 			operationId: 'getTunnelQR',
 			summary: 'Get QR code for tunnel URL',
+			request: { query: tunnelScopeQuerySchema },
 			responses: {
 				'200': {
 					description: 'OK',
@@ -223,7 +263,7 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const result = await getTunnelQRCode();
+			const result = await getTunnelQRCode(getTunnelScopeOptionsFromContext(c));
 			return c.json(result, result.ok ? 200 : 400);
 		},
 	);
@@ -234,6 +274,7 @@ export function registerTunnelRoutes(app: Hono) {
 			method: 'get',
 			path: '/v1/tunnel/stream',
 			operationId: 'subscribeTunnelStream',
+			request: { query: tunnelScopeQuerySchema },
 			...tunnelStreamRoute,
 		},
 		handleTunnelStream,
@@ -244,6 +285,7 @@ export function registerTunnelRoutes(app: Hono) {
 			method: 'post',
 			path: '/v1/tunnel/stream',
 			operationId: 'subscribeTunnelStreamPost',
+			request: { query: tunnelScopeQuerySchema },
 			...tunnelStreamRoute,
 		},
 		handleTunnelStream,

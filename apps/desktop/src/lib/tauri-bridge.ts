@@ -13,6 +13,22 @@ export interface ServerInfo {
 	pid: number;
 	port: number;
 	projectPath: string;
+	projectId: string;
+	url: string;
+	token?: string | null;
+	cliPath: string;
+	cliVersion: string;
+}
+
+export interface CliSelectionInfo {
+	path: string;
+	version: string;
+	source: string;
+	embeddedPath: string;
+	embeddedVersion: string;
+	localPath?: string | null;
+	localVersion?: string | null;
+	reason: string;
 }
 
 export interface GitHubRepo {
@@ -83,6 +99,7 @@ export const tauriBridge = {
 	stopServer: (pid: number) => invoke('stop_server', { pid }),
 	stopAllServers: () => invoke('stop_all_servers'),
 	listServers: () => invoke<ServerInfo[]>('list_servers'),
+	getCliSelection: () => invoke<CliSelectionInfo>('get_cli_selection'),
 	listSystemFonts: () => invoke<string[]>('list_system_fonts'),
 	showNativeNotification: (notification: NativeNotificationPayload) =>
 		invoke('show_native_notification', { notification }),

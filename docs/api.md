@@ -4,6 +4,8 @@
 
 The otto server exposes a generated OpenAPI document and a versioned HTTP API.
 
+Default local clients talk to a shared daemon. Daemon requests use a local token, sent as `Authorization: Bearer <token>` and/or `X-Otto-Server-Token: <token>`.
+
 ## Source of truth
 
 Use these in order:
@@ -33,6 +35,7 @@ The current OpenAPI spec exposes route groups including:
 - `files`
 - `git`
 - `mcp`
+- `projects`
 - `provider-usage`
 - `research`
 - `sessions`
@@ -43,6 +46,17 @@ The current OpenAPI spec exposes route groups including:
 - `tunnel`
 
 ## Representative routes
+
+### Projects
+
+- `GET /v1/projects` — list open and known projects
+- `POST /v1/projects/open` — open a project runtime from `{ "path": "/absolute/path" }`
+- `GET /v1/projects/{projectId}` — get an open or known project
+- `DELETE /v1/projects/{projectId}` — forget a known project without deleting files
+- `DELETE /v1/projects/{projectId}/close` — close an open project runtime
+- `POST /v1/projects/{projectId}/touch` — update last-used time for an open runtime
+
+Project summaries include `id`, `name`, `path`, `stateDir`, `dbPath`, `lastUsedAt`, and `open`.
 
 ### Ask
 
@@ -126,6 +140,27 @@ Common event types include:
 
 Exact event payloads should be derived from the OpenAPI/client implementation rather than copied manually into downstream apps.
 
+## Project context
+
+Most operational routes are project-scoped. First-party clients should send the stable project id returned by `POST /v1/projects/open`:
+
+```txt
+GET /v1/sessions?projectId=<project-id>
+GET /v1/sessions/{id}/stream?projectId=<project-id>
+X-Otto-Project-Id: <project-id>
+```
+
+Compatibility path-based context is still supported:
+
+```txt
+GET /v1/sessions?project=/absolute/project/path
+X-Otto-Project: /absolute/project/path
+```
+
+`?project=` remains useful for scripts and old clients. New code should prefer `projectId` once a project is opened. When both id and path forms are present, `projectId` / `X-Otto-Project-Id` wins. Requests without project context use only the centralized compatibility fallback in `packages/server/src/routes/project-context.ts`; route handlers should not call `process.cwd()` directly.
+
+`OTTO_SERVER_URL` remains supported for clients that point at an existing server. Those clients still need to open/select a project with `POST /v1/projects/open` and send project context through query parameters or headers.
+
 ## Client guidance
 
 If you are building a first-party or external client:
@@ -133,3 +168,5 @@ If you are building a first-party or external client:
 - prefer `@ottocode/api` over handwritten `fetch`
 - treat `/openapi.json` as the authoritative contract
 - assume versioned operational routes are under `/v1/*`
+- call `POST /v1/projects/open` before project-scoped workflows
+- include daemon token headers when talking to the local daemon

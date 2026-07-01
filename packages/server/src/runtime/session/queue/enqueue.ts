@@ -15,9 +15,15 @@ export function enqueueAssistantRun(
 	options?: { front?: boolean },
 ): void {
 	const abortController = new AbortController();
-	setMessageAbortController(opts.assistantMessageId, abortController);
+	setMessageAbortController(
+		opts.assistantMessageId,
+		abortController,
+		opts.projectRoot,
+	);
 
 	const state = getOrCreateRunnerState(opts.sessionId);
+	state.projectId = opts.projectId;
+	state.projectRoot = opts.projectRoot;
 	const job = {
 		...opts,
 		queuedAt: globalThis.performance?.now?.() ?? Date.now(),

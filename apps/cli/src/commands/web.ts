@@ -1,6 +1,6 @@
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { openAuthUrl } from '@ottocode/sdk';
-import { createWebServer } from '../web-server.ts';
+import { createWebServer, type WebServerContext } from '../web-server.ts';
 import { colors } from '../ui.ts';
 
 function getLocalIP(): string {
@@ -19,40 +19,80 @@ function getLocalIP(): string {
 }
 
 export interface WebOptions {
-	api: string;
+	url?: string;
+	api?: string;
 	port?: number;
 	network: boolean;
 	noOpen: boolean;
+	project?: string;
+	context?: WebServerContext;
 }
 
-export async function handleWeb(opts: WebOptions, version: string) {
-	let _apiUrl: URL;
+export interface StartedWebUi {
+	apiUrl: string;
+	webUrl: string;
+	server: ReturnType<typeof createWebServer>['server'];
+}
+
+function validateApiUrl(apiUrl: string): void {
 	try {
-		_apiUrl = new URL(opts.api);
+		new URL(apiUrl);
 	} catch {
-		console.error(`Invalid API URL: ${opts.api}`);
+		console.error(`Invalid API URL: ${apiUrl}`);
 		process.exit(1);
 	}
+}
 
+async function ensureRemoteApi(apiUrl: string): Promise<void> {
 	try {
-		await fetch(opts.api, { method: 'GET', signal: AbortSignal.timeout(3000) });
+		await fetch(apiUrl, { method: 'GET', signal: AbortSignal.timeout(3000) });
 	} catch {
-		console.log(
-			colors.yellow(`  ⚠ API server at ${opts.api} is not responding`),
-		);
+		console.log(colors.yellow(`  ⚠ API server at ${apiUrl} is not responding`));
 		console.log(
 			colors.dim(
 				'    Starting web UI anyway — it will retry when the server comes up',
 			),
 		);
 	}
+}
 
-	const webPort = opts.port ?? 0;
+export async function startWebUi(
+	opts: WebOptions,
+	version: string,
+): Promise<StartedWebUi | null> {
+	const explicitApiUrl = opts.url ?? opts.api;
+	let apiUrl = explicitApiUrl;
+	let webPort = opts.port ?? 0;
+	let context = opts.context;
+
+	if (apiUrl) {
+		validateApiUrl(apiUrl);
+		await ensureRemoteApi(apiUrl);
+	} else {
+		const projectRoot = opts.project ?? process.cwd();
+		const { ensureAuth } = await import('../middleware/with-auth.ts');
+		if (!(await ensureAuth(projectRoot))) return null;
+		const { ensureDaemonProject } = await import('../daemon.ts');
+		const serverContext = await ensureDaemonProject({
+			version,
+			projectRoot,
+		});
+		apiUrl = serverContext.baseUrl;
+		const serverUrl = new URL(serverContext.baseUrl);
+		const serverPort = Number(serverUrl.port);
+		webPort = opts.port ?? serverPort + 1;
+		context = {
+			projectId: serverContext.projectId,
+			projectRoot: serverContext.projectRoot,
+			serverToken: serverContext.token,
+		};
+	}
 
 	const { port: actualWebPort, server } = createWebServer(
 		webPort,
-		opts.api,
+		apiUrl,
 		opts.network,
+		context,
 	);
 
 	const displayHost = opts.network ? getLocalIP() : 'localhost';
@@ -62,7 +102,12 @@ export async function handleWeb(opts: WebOptions, version: string) {
 	console.log(colors.bold('  ⚡ otto web') + colors.dim(` v${version}`));
 	console.log('');
 	console.log(`  ${colors.dim('Web UI')}  ${colors.cyan(webUrl)}`);
-	console.log(`  ${colors.dim('API')}     ${colors.cyan(opts.api)}`);
+	console.log(`  ${colors.dim('API')}     ${colors.cyan(apiUrl)}`);
+	if (context?.projectRoot) {
+		console.log(
+			`  ${colors.dim('Project')} ${colors.cyan(context.projectRoot)}`,
+		);
+	}
 	console.log('');
 	console.log(colors.dim('  Press Ctrl+C to stop'));
 	console.log('');
@@ -71,8 +116,15 @@ export async function handleWeb(opts: WebOptions, version: string) {
 		await openAuthUrl(webUrl);
 	}
 
+	return { apiUrl, webUrl, server };
+}
+
+export async function handleWeb(opts: WebOptions, version: string) {
+	const started = await startWebUi(opts, version);
+	if (!started) return;
+
 	const shutdown = () => {
-		server.stop(true);
+		started.server.stop(true);
 		process.exit(0);
 	};
 	process.once('SIGINT', shutdown);
@@ -84,18 +136,27 @@ export async function handleWeb(opts: WebOptions, version: string) {
 export function registerWebCommand(program: Command, version: string) {
 	program
 		.command('web')
-		.description('Start Web UI only, connected to a remote API server')
-		.requiredOption('--api <url>', 'API server URL to connect to')
+		.description('Open Web UI for this project')
+		.option(
+			'--url <api-url>',
+			'Use an existing API server instead of the local daemon',
+		)
+		.addOption(
+			new Option('--api <url>', 'Deprecated alias for --url').hideHelp(),
+		)
 		.option('-p, --port <port>', 'Web UI port', (v) => parseInt(v, 10))
 		.option('--network', 'Bind to 0.0.0.0 for network access', false)
 		.option('--no-open', 'Do not open browser automatically')
+		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
 			await handleWeb(
 				{
+					url: opts.url,
 					api: opts.api,
 					port: opts.port,
 					network: opts.network,
 					noOpen: !opts.open,
+					project: opts.project,
 				},
 				version,
 			);

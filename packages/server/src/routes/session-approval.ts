@@ -6,6 +6,7 @@ import {
 	getPendingApprovalsForSession,
 	resolveApproval,
 } from '../runtime/tools/approval.ts';
+import { resolveRequestProject } from './project-context.ts';
 
 const sessionIdParamsSchema = z.object({
 	id: z.string().openapi({
@@ -88,6 +89,7 @@ export function registerSessionApprovalRoute(app: Hono) {
 			},
 		},
 		async (c) => {
+			const project = await resolveRequestProject(c);
 			const sessionId = c.req.param('id');
 			const body = resolveApprovalBodySchema.parse(await c.req.json());
 
@@ -99,7 +101,7 @@ export function registerSessionApprovalRoute(app: Hono) {
 				return c.json({ ok: false, error: 'approved must be a boolean' }, 400);
 			}
 
-			const pending = getPendingApproval(body.callId);
+			const pending = getPendingApproval(body.callId, project.runtime.root);
 			if (!pending) {
 				return c.json(
 					{ ok: false, error: 'No pending approval found for this callId' },
@@ -114,7 +116,11 @@ export function registerSessionApprovalRoute(app: Hono) {
 				);
 			}
 
-			const result = resolveApproval(body.callId, body.approved);
+			const result = resolveApproval(
+				body.callId,
+				body.approved,
+				project.runtime.root,
+			);
 
 			if (!result.ok) {
 				return c.json(result, 404);
@@ -145,8 +151,12 @@ export function registerSessionApprovalRoute(app: Hono) {
 			},
 		},
 		async (c) => {
+			const project = await resolveRequestProject(c);
 			const sessionId = c.req.param('id');
-			const pending = getPendingApprovalsForSession(sessionId);
+			const pending = getPendingApprovalsForSession(
+				sessionId,
+				project.runtime.root,
+			);
 
 			return c.json({
 				ok: true,

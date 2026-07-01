@@ -4,6 +4,11 @@ import { isPlatformDesktop } from './platform';
 interface OttoWindow extends Window {
 	__OTTO_API_URL__?: string;
 	OTTO_SERVER_URL?: string;
+	OTTO_RUNTIME_CONTEXT?: {
+		projectId?: string;
+		projectRoot?: string;
+		serverToken?: string;
+	};
 }
 
 export const RUNTIME_API_BASE_URL_STORAGE_KEY = 'otto-api-base-url';
@@ -57,6 +62,18 @@ export function getConfiguredRuntimeApiBaseUrl(): string | undefined {
 	if (storedUrl) return normalizeApiBaseUrl(storedUrl);
 
 	return undefined;
+}
+
+export function getRuntimeProjectContext() {
+	if (typeof window === 'undefined') return undefined;
+	return (window as OttoWindow).OTTO_RUNTIME_CONTEXT;
+}
+
+export function setRuntimeProjectContext(
+	context: OttoWindow['OTTO_RUNTIME_CONTEXT'],
+) {
+	if (typeof window === 'undefined') return;
+	(window as OttoWindow).OTTO_RUNTIME_CONTEXT = context;
 }
 
 export function hasConfiguredRuntimeApiBaseUrl(): boolean {

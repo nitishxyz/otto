@@ -1,5 +1,5 @@
 import { getAuth, logger, readEnvKey } from '@ottocode/sdk';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
 import {
@@ -8,6 +8,7 @@ import {
 	getGhImportCapability,
 } from '../service.ts';
 import { copilotDiagnosticsSchema } from './schemas.ts';
+import { resolveRequestProjectRoot } from '../../project-context.ts';
 
 type CopilotTokenSourceDiagnostic = {
 	source: 'env' | 'stored';
@@ -39,7 +40,7 @@ export function registerCopilotDiagnosticsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const entries = await buildCopilotTokenDiagnostics();
+				const entries = await buildCopilotTokenDiagnostics(c);
 
 				return c.json({
 					tokenSources: entries,
@@ -58,8 +59,8 @@ export function registerCopilotDiagnosticsRoute(app: Hono) {
 	);
 }
 
-async function buildCopilotTokenDiagnostics() {
-	const projectRoot = process.cwd();
+async function buildCopilotTokenDiagnostics(c: Context) {
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const entries: CopilotTokenSourceDiagnostic[] = [];
 
 	const envToken = readEnvKey('copilot');

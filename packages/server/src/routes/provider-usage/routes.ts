@@ -2,6 +2,7 @@ import { logger, type ProviderId } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { fetchProviderUsage } from './cache.ts';
 import { ensureValidOAuth } from './oauth.ts';
 import {
@@ -54,7 +55,8 @@ export function registerProviderUsageRoutes(app: Hono) {
 					);
 				}
 
-				const tokenResult = await ensureValidOAuth(provider);
+				const projectRoot = await resolveRequestProjectRoot(c);
+				const tokenResult = await ensureValidOAuth(provider, projectRoot);
 				if (!tokenResult) {
 					return c.json(
 						{

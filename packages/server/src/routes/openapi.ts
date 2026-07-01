@@ -10,6 +10,7 @@ export function registerOpenApiRoute(app: OpenAPIHono) {
 				'Server-side API for otto sessions, messages, and streaming events. All AI work runs on the server. Streaming uses SSE.',
 		},
 		tags: [
+			{ name: 'projects' },
 			{ name: 'sessions' },
 			{ name: 'messages' },
 			{ name: 'stream' },

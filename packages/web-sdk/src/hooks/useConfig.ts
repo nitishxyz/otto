@@ -1,12 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ThemeId } from '@ottocode/themes';
 import { apiClient } from '../lib/api-client';
+import { projectScopedKey } from '../lib/api-client/utils';
 
 type ConfigData = Awaited<ReturnType<typeof apiClient.getConfig>>;
 
+export const configQueryKey = () => projectScopedKey(['config'] as const);
+export const providerModelsQueryKey = (provider: string | undefined) =>
+	projectScopedKey(['models', provider] as const);
+export const allModelsQueryKey = () =>
+	projectScopedKey(['models', 'all'] as const);
+
 export function useConfig() {
 	return useQuery({
-		queryKey: ['config'],
+		queryKey: configQueryKey(),
 		queryFn: () => apiClient.getConfig(),
 		staleTime: 30000,
 	});
@@ -14,7 +21,7 @@ export function useConfig() {
 
 export function useModels(provider?: string) {
 	return useQuery({
-		queryKey: ['models', provider],
+		queryKey: providerModelsQueryKey(provider),
 		queryFn: () => (provider ? apiClient.getModels(provider) : null),
 		enabled: !!provider,
 	});
@@ -22,7 +29,7 @@ export function useModels(provider?: string) {
 
 export function useAllModels() {
 	return useQuery({
-		queryKey: ['models', 'all'],
+		queryKey: allModelsQueryKey(),
 		queryFn: () => apiClient.getAllModels(),
 	});
 }
@@ -45,18 +52,20 @@ export function useUpdateDefaults() {
 			compactThread?: boolean;
 			fontFamily?: string;
 			smartEdges?: boolean;
+			threadNavigatorRail?: boolean;
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
 			ottoEnabled?: boolean;
-			scope?: 'global';
+			scope?: 'global' | 'local';
 		}) => apiClient.updateDefaults(data),
 		onMutate: async (data) => {
-			await queryClient.cancelQueries({ queryKey: ['config'] });
+			const queryKey = configQueryKey();
+			await queryClient.cancelQueries({ queryKey });
 
-			const previousConfig = queryClient.getQueryData<ConfigData>(['config']);
+			const previousConfig = queryClient.getQueryData<ConfigData>(queryKey);
 			if (previousConfig) {
 				const defaultUpdates = Object.fromEntries(
 					Object.entries(data).filter(
@@ -64,7 +73,7 @@ export function useUpdateDefaults() {
 					),
 				) as Partial<ConfigData['defaults']>;
 
-				queryClient.setQueryData<ConfigData>(['config'], {
+				queryClient.setQueryData<ConfigData>(queryKey, {
 					...previousConfig,
 					defaults: {
 						...previousConfig.defaults,
@@ -77,11 +86,11 @@ export function useUpdateDefaults() {
 		},
 		onError: (_error, _data, context) => {
 			if (context?.previousConfig) {
-				queryClient.setQueryData(['config'], context.previousConfig);
+				queryClient.setQueryData(configQueryKey(), context.previousConfig);
 			}
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['config'] });
+			queryClient.invalidateQueries({ queryKey: configQueryKey() });
 		},
 	});
 }

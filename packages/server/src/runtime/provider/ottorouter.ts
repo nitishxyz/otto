@@ -16,16 +16,17 @@ const MIN_TOPUP_USD = 5;
 
 export interface ResolveOttoRouterModelOptions {
 	messageId?: string;
+	projectRoot?: string;
 	topupApprovalMode?: 'auto' | 'approval';
 	autoPayThresholdUsd?: number;
 }
 
-async function getOttoRouterPrivateKey(): Promise<string> {
+async function getOttoRouterPrivateKey(projectRoot?: string): Promise<string> {
 	if (process.env.OTTOROUTER_PRIVATE_KEY) {
 		return process.env.OTTOROUTER_PRIVATE_KEY;
 	}
 	try {
-		const cfg = await loadConfig(process.cwd());
+		const cfg = await loadConfig(projectRoot);
 		const auth = await getAuth('ottorouter', cfg.projectRoot);
 		if (auth?.type === 'wallet' && auth.secret) {
 			return auth.secret;
@@ -39,7 +40,7 @@ export async function resolveOttoRouterModel(
 	sessionId?: string,
 	options: ResolveOttoRouterModelOptions = {},
 ) {
-	const privateKey = await getOttoRouterPrivateKey();
+	const privateKey = await getOttoRouterPrivateKey(options.projectRoot);
 	if (!privateKey) {
 		throw new Error(
 			'OttoRouter provider requires OTTOROUTER_PRIVATE_KEY (base58 Solana secret).',

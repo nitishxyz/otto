@@ -1,7 +1,12 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { resolveRequestProject } from '../../project-context.ts';
 import { getSessionQueueState } from '../service.ts';
-import { queueStateSchema, sessionIdParamsSchema } from './schemas.ts';
+import {
+	projectQuerySchema,
+	queueStateSchema,
+	sessionIdParamsSchema,
+} from './schemas.ts';
 
 export function registerSessionQueueStatusRoute(app: Hono) {
 	zodOpenApiRoute(
@@ -14,6 +19,7 @@ export function registerSessionQueueStatusRoute(app: Hono) {
 			summary: 'Get queue state for a session',
 			request: {
 				params: sessionIdParamsSchema,
+				query: projectQuerySchema,
 			},
 			responses: {
 				'200': {
@@ -25,6 +31,7 @@ export function registerSessionQueueStatusRoute(app: Hono) {
 			},
 		},
 		async (c) => {
+			await resolveRequestProject(c);
 			const sessionId = c.req.param('sessionId');
 			return c.json(getSessionQueueState(sessionId));
 		},

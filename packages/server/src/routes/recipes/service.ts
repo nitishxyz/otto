@@ -13,11 +13,12 @@ import {
 	validateRecipeNameForScope,
 } from '../../runtime/commands/recipes.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 type ListRecipesScope = 'all' | RecipeScope;
 
-function projectRootFromQuery(c: Context): string {
-	return c.req.query('project') || process.cwd();
+async function projectRootFromQuery(c: Context): Promise<string> {
+	return resolveRequestProjectRoot(c);
 }
 
 function listScopeFromQuery(c: Context): ListRecipesScope {
@@ -71,7 +72,7 @@ async function listRecipesForScope(
 
 export async function listRecipes(c: Context) {
 	try {
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const scope = listScopeFromQuery(c);
 		const recipes = await listRecipesForScope(projectRoot, scope);
 		return c.json({
@@ -90,7 +91,7 @@ export async function getRecipe(c: Context) {
 		const name = validateRecipeNameRoute(c);
 		if (!name) return c.json({ error: 'Invalid recipe name' }, 400);
 
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const scope = recipeScopeFromQuery(c);
 		const recipes = await discoverAllRecipes(projectRoot);
 		const recipe = recipes.find(
@@ -119,7 +120,7 @@ export async function upsertRecipe(c: Context) {
 			return c.json({ error: 'Recipe instructions are required' }, 400);
 		}
 
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const scope = recipeScopeFromQuery(c);
 		const validation = await validateRecipeNameForScope({
 			projectRoot,
@@ -147,7 +148,7 @@ export async function deleteRecipe(c: Context) {
 		const name = validateRecipeNameRoute(c);
 		if (!name) return c.json({ error: 'Invalid recipe name' }, 400);
 
-		const projectRoot = projectRootFromQuery(c);
+		const projectRoot = await projectRootFromQuery(c);
 		const scope = recipeScopeFromQuery(c);
 		const recipePath = join(getRecipesDir(scope, projectRoot), `${name}.md`);
 		await rm(recipePath, { force: true });

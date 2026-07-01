@@ -158,6 +158,8 @@ export async function handleAdaptedToolInputAvailable(
 				callId,
 				args.name,
 				input,
+				undefined,
+				args.ctx.projectRoot,
 			);
 		}
 		const guard = guardToolCall(args.name, input, {
@@ -177,6 +179,8 @@ export async function handleAdaptedToolInputAvailable(
 				callId,
 				args.name,
 				input,
+				undefined,
+				args.ctx.projectRoot,
 			);
 		}
 	}

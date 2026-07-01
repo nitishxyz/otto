@@ -5,7 +5,12 @@ import {
 	listPendingSecureInputs,
 	listMessages,
 } from '@ottocode/api';
-import { getBaseUrl } from '../api.ts';
+import {
+	getBaseUrl,
+	getProjectContext,
+	getProjectKey,
+	getProjectQuery,
+} from '../api.ts';
 import type {
 	Message,
 	MessagePart,
@@ -469,13 +474,19 @@ function messageReducer(state: Message[], action: Action): Message[] {
 }
 
 async function loadSessionMessages(sessionId: string) {
-	const response = await listMessages({ path: { id: sessionId } });
+	const response = await listMessages({
+		path: { id: sessionId },
+		query: getProjectQuery(),
+	} as never);
 	if (response.error) throw new Error(JSON.stringify(response.error));
 	return (response.data ?? []) as unknown as Message[];
 }
 
 async function loadPendingSecureInputs(sessionId: string) {
-	const response = await listPendingSecureInputs({ path: { id: sessionId } });
+	const response = await listPendingSecureInputs({
+		path: { id: sessionId },
+		query: getProjectQuery(),
+	} as never);
 	if (response.error) return [];
 	return Array.isArray(response.data?.pending)
 		? (response.data.pending as PendingSecureInput[])
@@ -487,6 +498,10 @@ async function loadSessionQueueState(sessionId: string, baseUrl: string) {
 		`/v1/sessions/${encodeURIComponent(sessionId)}/queue`,
 		baseUrl,
 	);
+	const projectQuery = getProjectQuery();
+	for (const [key, value] of Object.entries(projectQuery)) {
+		url.searchParams.set(key, String(value));
+	}
 	const response = await fetch(url);
 	if (!response.ok) return null;
 	return (await response.json()) as Record<string, unknown>;
@@ -517,6 +532,7 @@ async function connectSSE(
 		{
 			baseUrl: parsedUrl.origin,
 			sessionId: parsedUrl.pathname.split('/').at(-2) ?? '',
+			projectId: parsedUrl.searchParams.get('projectId') ?? undefined,
 			projectPath: parsedUrl.searchParams.get('project') ?? undefined,
 			onEvent: (event) => {
 				try {
@@ -545,6 +561,7 @@ export function useStream(
 	const [queuedMessageIds, setQueuedMessageIds] = useState<Set<string>>(
 		new Set(),
 	);
+	const projectKey = getProjectKey();
 	const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(
 		[],
 	);
@@ -568,6 +585,7 @@ export function useStream(
 	);
 
 	useEffect(() => {
+		void projectKey;
 		if (!sessionId) {
 			dispatch({ type: 'CLEAR' });
 			setStreamingMessageId(null);
@@ -614,7 +632,13 @@ export function useStream(
 			})
 			.catch(() => {});
 
-		const streamUrl = buildSessionStreamUrl({ baseUrl, sessionId });
+		const { projectId, projectRoot } = getProjectContext();
+		const streamUrl = buildSessionStreamUrl({
+			baseUrl,
+			sessionId,
+			projectId: projectId ?? undefined,
+			projectPath: projectRoot ?? undefined,
+		});
 		connectSSE(streamUrl, controller.signal, (event) => {
 			if (controller.signal.aborted) return;
 			const payload = event.payload as Record<string, unknown>;
@@ -773,7 +797,7 @@ export function useStream(
 			controller.abort();
 			abortRef.current = null;
 		};
-	}, [sessionId]);
+	}, [sessionId, projectKey]);
 
 	const reload = () => {
 		if (!sessionId) return;

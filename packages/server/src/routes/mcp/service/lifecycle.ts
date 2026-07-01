@@ -13,7 +13,14 @@ import type { MCPAuthSessionOptions } from './types.ts';
 
 export async function startMCPServer(options: MCPAuthSessionOptions) {
 	const { name, oAuthStore, sessions } = options;
-	const projectRoot = options.projectRoot ?? process.cwd();
+	const { projectRoot } = options;
+	if (!projectRoot) {
+		return {
+			ok: false as const,
+			body: { ok: false, error: 'Project root is required' },
+			status: 400 as const,
+		};
+	}
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const serverConfig = config.servers.find((server) => server.name === name);
 
@@ -26,7 +33,7 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 	}
 
 	try {
-		let manager = getMCPManager();
+		let manager = getMCPManager(projectRoot);
 		if (!manager) {
 			manager = await initializeMCP({ servers: [] }, projectRoot);
 		}
@@ -53,6 +60,7 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 					deviceCode: deviceData.deviceCode,
 					interval: deviceData.interval,
 					serverName: name,
+					projectRoot,
 					createdAt: Date.now(),
 				});
 				return {
@@ -92,8 +100,8 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 	}
 }
 
-export async function stopMCPServer(name: string) {
-	const manager = getMCPManager();
+export async function stopMCPServer(name: string, projectRoot: string) {
+	const manager = getMCPManager(projectRoot);
 	if (!manager) {
 		return {
 			ok: false as const,
@@ -114,7 +122,7 @@ export async function stopMCPServer(name: string) {
 	}
 }
 
-export async function testMCPServer(name: string, projectRoot = process.cwd()) {
+export async function testMCPServer(name: string, projectRoot: string) {
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const serverConfig = config.servers.find((server) => server.name === name);
 

@@ -1,9 +1,14 @@
 import type { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import type { TerminalManager } from '@ottocode/sdk';
 import { logger } from '@ottocode/sdk';
+import { resolveRequestProject } from '../project-context.ts';
 
-export function listTerminals(terminalManager: TerminalManager) {
+async function getRequestTerminalManager(c: Context) {
+	return (await resolveRequestProject(c)).runtime.terminalManager;
+}
+
+export async function listTerminals(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const terminals = terminalManager.list();
 	return {
 		terminals: terminals.map((terminal) => terminal.toJSON()),
@@ -11,11 +16,9 @@ export function listTerminals(terminalManager: TerminalManager) {
 	};
 }
 
-export async function createTerminal(
-	c: Context,
-	terminalManager: TerminalManager,
-) {
+export async function createTerminal(c: Context) {
 	try {
+		const { projectRoot, runtime } = await resolveRequestProject(c);
 		const body = await c.req.json();
 		const { command, args, purpose, cwd, title } = body;
 
@@ -34,9 +37,9 @@ export async function createTerminal(
 				resolvedArgs = process.platform === 'darwin' ? ['-il'] : ['-i'];
 			}
 		}
-		const resolvedCwd = cwd || process.cwd();
+		const resolvedCwd = cwd || projectRoot;
 
-		const terminal = terminalManager.create({
+		const terminal = runtime.terminalManager.create({
 			command: resolvedCommand,
 			args: resolvedArgs,
 			purpose,
@@ -58,7 +61,8 @@ export async function createTerminal(
 	}
 }
 
-export function getTerminal(c: Context, terminalManager: TerminalManager) {
+export async function getTerminal(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const id = c.req.param('id');
 	const terminal = terminalManager.get(id);
 
@@ -69,21 +73,21 @@ export function getTerminal(c: Context, terminalManager: TerminalManager) {
 	return c.json({ terminal: terminal.toJSON() });
 }
 
-export function createTerminalWebSocketHandler(
-	terminalManager: TerminalManager,
-	id: string,
-) {
+export function createTerminalWebSocketHandler(c: Context) {
+	const terminalManagerPromise = getRequestTerminalManager(c);
+	const id = c.req.param('id');
 	let onData: ((data: string) => void) | null = null;
 	let onExit: ((exitCode: number) => void) | null = null;
 
 	return {
-		onOpen(
+		async onOpen(
 			_event: unknown,
 			ws: {
 				send: (data: string) => void;
 				close: (code?: number, reason?: string) => void;
 			},
 		) {
+			const terminalManager = await terminalManagerPromise;
 			const terminal = terminalManager.get(id);
 			if (!terminal) {
 				ws.close(4004, 'Terminal not found');
@@ -119,7 +123,8 @@ export function createTerminalWebSocketHandler(
 				onExit(terminal.exitCode ?? 0);
 			}
 		},
-		onMessage(event: { data: unknown }, _ws: unknown) {
+		async onMessage(event: { data: unknown }, _ws: unknown) {
+			const terminalManager = await terminalManagerPromise;
 			const terminal = terminalManager.get(id);
 			if (!terminal) return;
 
@@ -145,7 +150,8 @@ export function createTerminalWebSocketHandler(
 
 			terminal.write(message);
 		},
-		onClose() {
+		async onClose() {
+			const terminalManager = await terminalManagerPromise;
 			const terminal = terminalManager.get(id);
 			if (terminal) {
 				if (onData) terminal.removeDataListener(onData);
@@ -154,7 +160,8 @@ export function createTerminalWebSocketHandler(
 			onData = null;
 			onExit = null;
 		},
-		onError() {
+		async onError() {
+			const terminalManager = await terminalManagerPromise;
 			const terminal = terminalManager.get(id);
 			if (terminal) {
 				if (onData) terminal.removeDataListener(onData);
@@ -166,10 +173,8 @@ export function createTerminalWebSocketHandler(
 	};
 }
 
-export async function handleTerminalOutput(
-	c: Context,
-	terminalManager: TerminalManager,
-) {
+export async function handleTerminalOutput(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const id = c.req.param('id');
 	const terminal = terminalManager.get(id);
 
@@ -260,10 +265,8 @@ export async function handleTerminalOutput(
 	});
 }
 
-export async function sendTerminalInput(
-	c: Context,
-	terminalManager: TerminalManager,
-) {
+export async function sendTerminalInput(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const id = c.req.param('id');
 	const terminal = terminalManager.get(id);
 
@@ -287,10 +290,8 @@ export async function sendTerminalInput(
 	}
 }
 
-export async function killTerminal(
-	c: Context,
-	terminalManager: TerminalManager,
-) {
+export async function killTerminal(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const id = c.req.param('id');
 
 	try {
@@ -302,10 +303,8 @@ export async function killTerminal(
 	}
 }
 
-export async function resizeTerminal(
-	c: Context,
-	terminalManager: TerminalManager,
-) {
+export async function resizeTerminal(c: Context) {
+	const terminalManager = await getRequestTerminalManager(c);
 	const id = c.req.param('id');
 	const terminal = terminalManager.get(id);
 

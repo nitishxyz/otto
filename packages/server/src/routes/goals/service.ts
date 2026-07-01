@@ -39,8 +39,8 @@ export function serializeGoalTask(task: GoalTaskRow) {
 	};
 }
 
-export async function loadGoalsContext(projectRoot?: string) {
-	const cfg = await loadConfig(projectRoot || process.cwd());
+export async function loadGoalsContext(projectRoot: string) {
+	const cfg = await loadConfig(projectRoot);
 	const db = await getDb(cfg.projectRoot);
 	const enabled = cfg.defaults.ottoEnabled !== false;
 	return { cfg, db, enabled };

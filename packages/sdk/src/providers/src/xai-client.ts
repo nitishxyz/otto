@@ -100,7 +100,10 @@ export function normalizeXaiResponsesImagePayload(body: unknown): unknown {
 function createXaiResponsesFetch(
 	baseFetch: typeof fetch = fetch,
 ): typeof fetch {
-	return async (input, init) => {
+	const responsesFetch = async (
+		input: Parameters<typeof fetch>[0],
+		init?: Parameters<typeof fetch>[1],
+	): Promise<Response> => {
 		if (init?.body && typeof init.body === 'string') {
 			try {
 				const body = JSON.parse(init.body);
@@ -113,6 +116,8 @@ function createXaiResponsesFetch(
 		}
 		return baseFetch(input, init);
 	};
+
+	return Object.assign(responsesFetch, { preconnect: baseFetch.preconnect });
 }
 
 export function createXaiModel(model: string, config?: XaiProviderConfig) {

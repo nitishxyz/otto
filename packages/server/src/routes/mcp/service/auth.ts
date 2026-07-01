@@ -15,7 +15,14 @@ import type { MCPAuthSessionOptions, MCPAuthStoreOptions } from './types.ts';
 
 export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
 	const { name, oAuthStore, sessions } = options;
-	const projectRoot = options.projectRoot ?? process.cwd();
+	const { projectRoot } = options;
+	if (!projectRoot) {
+		return {
+			ok: false as const,
+			body: { ok: false, error: 'Project root is required' },
+			status: 400 as const,
+		};
+	}
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const serverConfig = config.servers.find((server) => server.name === name);
 
@@ -54,6 +61,7 @@ export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
 				deviceCode: deviceData.deviceCode,
 				interval: deviceData.interval,
 				serverName: name,
+				projectRoot,
 				createdAt: Date.now(),
 			});
 			return {
@@ -78,7 +86,7 @@ export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
 	}
 
 	try {
-		let manager = getMCPManager();
+		let manager = getMCPManager(projectRoot);
 		if (!manager) {
 			manager = await initializeMCP({ servers: [] }, projectRoot);
 		}
@@ -114,11 +122,22 @@ export async function completeMCPAuth(
 ) {
 	const { name, body, oAuthStore, sessions } = options;
 	const { code, sessionId } = body;
-	const projectRoot = options.projectRoot ?? process.cwd();
+	const { projectRoot } = options;
+	if (!projectRoot) {
+		return {
+			ok: false as const,
+			body: { ok: false, error: 'Project root is required' },
+			status: 400 as const,
+		};
+	}
 
 	if (typeof sessionId === 'string' && sessionId.length > 0) {
 		const session = sessions.get(sessionId);
-		if (!session || session.serverName !== name) {
+		if (
+			!session ||
+			session.serverName !== name ||
+			session.projectRoot !== projectRoot
+		) {
 			return {
 				ok: false as const,
 				body: { ok: false, error: 'Session expired or invalid' },
@@ -151,12 +170,12 @@ export async function completeMCPAuth(
 						scope: COPILOT_MCP_SCOPE,
 					},
 				);
-				let mcpManager = getMCPManager();
+				let mcpManager = getMCPManager(projectRoot);
 				if (!mcpManager) {
 					mcpManager = await initializeMCP({ servers: [] }, projectRoot);
 				}
 				await mcpManager.restartServer(serverConfig);
-				mcpManager = getMCPManager();
+				mcpManager = getMCPManager(projectRoot);
 				const status = mcpManager
 					? (await mcpManager.getStatusAsync()).find(
 							(server) => server.name === name,
@@ -202,7 +221,7 @@ export async function completeMCPAuth(
 		};
 	}
 
-	const manager = getMCPManager();
+	const manager = getMCPManager(projectRoot);
 	if (!manager) {
 		return {
 			ok: false as const,
@@ -243,7 +262,8 @@ export async function completeMCPAuth(
 
 export async function getMCPAuthStatus(options: MCPAuthStoreOptions) {
 	const { name, oAuthStore } = options;
-	const projectRoot = options.projectRoot ?? process.cwd();
+	const { projectRoot } = options;
+	if (!projectRoot) return { authenticated: false };
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const serverConfig = config.servers.find((server) => server.name === name);
 
@@ -262,7 +282,7 @@ export async function getMCPAuthStatus(options: MCPAuthStoreOptions) {
 		}
 	}
 
-	const manager = getMCPManager();
+	const manager = getMCPManager(projectRoot);
 	if (!manager) {
 		return { authenticated: false };
 	}
@@ -276,7 +296,14 @@ export async function getMCPAuthStatus(options: MCPAuthStoreOptions) {
 
 export async function revokeMCPAuth(options: MCPAuthStoreOptions) {
 	const { name, oAuthStore } = options;
-	const projectRoot = options.projectRoot ?? process.cwd();
+	const { projectRoot } = options;
+	if (!projectRoot) {
+		return {
+			ok: false as const,
+			body: { ok: false, error: 'Project root is required' },
+			status: 400 as const,
+		};
+	}
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const serverConfig = config.servers.find((server) => server.name === name);
 
@@ -291,7 +318,7 @@ export async function revokeMCPAuth(options: MCPAuthStoreOptions) {
 			if (key !== name) {
 				await oAuthStore.clearServer(name);
 			}
-			const manager = getMCPManager();
+			const manager = getMCPManager(projectRoot);
 			if (manager) {
 				await manager.clearAuthData(
 					name,
@@ -310,7 +337,7 @@ export async function revokeMCPAuth(options: MCPAuthStoreOptions) {
 		}
 	}
 
-	const manager = getMCPManager();
+	const manager = getMCPManager(projectRoot);
 	if (!manager) {
 		return {
 			ok: false as const,

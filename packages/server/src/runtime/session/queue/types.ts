@@ -9,6 +9,7 @@ export type RunOpts = {
 	provider: ProviderName;
 	model: string;
 	projectRoot: string;
+	projectId?: string;
 	queuedAt?: number;
 	oneShot?: boolean;
 	userContent?: string;
@@ -50,6 +51,8 @@ export type SystemAbortReason = {
 export type RunAbortReason = SendNowPreemptReason | SystemAbortReason;
 
 export type RunnerState = {
+	projectId?: string;
+	projectRoot?: string;
 	queue: RunOpts[];
 	running: boolean;
 	currentMessageId: string | null;

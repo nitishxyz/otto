@@ -390,7 +390,11 @@ export type { ProviderName, ModelConfig } from './core/src/index.ts';
 // Tools
 export { discoverProjectTools } from './core/src/index.ts';
 export type { DiscoveredTool, DiscoverResult } from './core/src/index.ts';
-export { setTerminalManager, getTerminalManager } from './core/src/index.ts';
+export {
+	setTerminalManager,
+	unsetTerminalManager,
+	getTerminalManager,
+} from './core/src/index.ts';
 export { shellExecutorContext } from './core/src/index.ts';
 export type { ShellExecutor } from './core/src/index.ts';
 export { createToolError } from './core/src/index.ts';

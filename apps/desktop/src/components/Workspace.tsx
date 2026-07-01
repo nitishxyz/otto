@@ -35,7 +35,7 @@ export function Workspace({
 	const workspaceApiUrl = isRemote
 		? project.remoteUrl
 		: server
-			? `http://localhost:${server.port}`
+			? server.url
 			: null;
 
 	const handleBack = async () => {
@@ -71,7 +71,7 @@ export function Workspace({
 			<div className="flex-1 min-h-0 relative bg-background">
 				{loading && (
 					<div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-						<OttoRouterLoader label="Starting server..." />
+						<OttoRouterLoader label="Opening project..." />
 					</div>
 				)}
 				{error && !loading && (
@@ -97,6 +97,7 @@ export function Workspace({
 					<DesktopWorkspaceApp
 						key={`${workspaceApiUrl}:${project.path}`}
 						apiUrl={workspaceApiUrl}
+						server={server}
 						project={project}
 						sessionId={sessionId}
 						view={view}

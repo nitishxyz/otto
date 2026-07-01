@@ -2,6 +2,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { getTerminalManager } from '@ottocode/sdk';
 import { APIError } from '../../runtime/errors/api-error.ts';
+import { getProjectManager } from '../../runtime/projects/manager.ts';
 import {
 	createServerTerminalBridge,
 	formatRenderedCommand,
@@ -39,7 +40,11 @@ export function buildRunPluginCommandTool(projectRoot: string): {
 				'Run an enabled installed plugin command in a visible terminal. Only use for plugins that are currently enabled. Requires normal tool approval. Load this tool with `load_tools` before calling.',
 			inputSchema,
 			execute: async (input) => {
-				const bridge = createServerTerminalBridge(getTerminalManager());
+				const terminalManager =
+					getTerminalManager(projectRoot) ??
+					(await getProjectManager().getProject({ path: projectRoot }))
+						.terminalManager;
+				const bridge = createServerTerminalBridge(terminalManager);
 				const resolved = await resolvePluginCommand(
 					projectRoot,
 					input.plugin,

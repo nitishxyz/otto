@@ -10,17 +10,10 @@ import type {
 } from '../runtime/ask/service.ts';
 import { handleAskRequest } from '../runtime/ask/service.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
-
-const askQuerySchema = z.object({
-	project: z
-		.string()
-		.optional()
-		.openapi({
-			param: { name: 'project', in: 'query' },
-			description:
-				'Project root override (defaults to current working directory).',
-		}),
-});
+import {
+	projectQuerySchema as askQuerySchema,
+	resolveRequestProject,
+} from './project-context.ts';
 
 const agentToolGroupsSchema = z.object({
 	firstClass: z.array(z.string()).optional(),
@@ -139,7 +132,7 @@ export function registerAskRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectRoot = c.req.query('project') || process.cwd();
+			const { projectRoot } = await resolveRequestProject(c);
 			const body = (await c.req.json().catch(() => ({}))) as Record<
 				string,
 				unknown

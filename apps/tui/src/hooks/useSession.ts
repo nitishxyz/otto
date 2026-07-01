@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
 	listSessions,
 	createSession as apiCreateSession,
@@ -10,6 +10,7 @@ import {
 	getSession as apiGetSession,
 } from '@ottocode/api';
 import type { Session } from '../types.ts';
+import { getProjectKey, getProjectQuery } from '../api.ts';
 
 const PAGE_SIZE = 50;
 
@@ -48,11 +49,16 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [sessionError, setSessionError] = useState<string | null>(null);
 	const nextOffsetRef = useRef<number | null>(null);
+	const projectKey = getProjectKey();
+	const projectQuery = useMemo(() => {
+		void projectKey;
+		return getProjectQuery();
+	}, [projectKey]);
 
 	const loadSessions = useCallback(async () => {
 		try {
 			const response = await listSessions({
-				query: { limit: PAGE_SIZE, offset: 0 },
+				query: { ...projectQuery, limit: PAGE_SIZE, offset: 0 },
 			});
 			const data = response.data;
 			const sorted = sortSessions((data?.items ?? []) as Session[]);
@@ -63,14 +69,18 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 		} catch {
 			return [];
 		}
-	}, []);
+	}, [projectQuery]);
 
 	const loadMoreSessions = useCallback(async () => {
 		if (loadingMore || !hasMore || nextOffsetRef.current === null) return;
 		setLoadingMore(true);
 		try {
 			const response = await listSessions({
-				query: { limit: PAGE_SIZE, offset: nextOffsetRef.current },
+				query: {
+					...projectQuery,
+					limit: PAGE_SIZE,
+					offset: nextOffsetRef.current,
+				},
 			});
 			const data = response.data;
 			const newItems = (data?.items ?? []) as Session[];
@@ -85,13 +95,14 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 		} finally {
 			setLoadingMore(false);
 		}
-	}, [loadingMore, hasMore]);
+	}, [loadingMore, hasMore, projectQuery]);
 
 	const createSession = useCallback(
 		async (title?: string): Promise<Session | null> => {
 			try {
 				setSessionError(null);
 				const response = await apiCreateSession({
+					query: projectQuery,
 					body: { ...defaultCreateSession, title },
 				} as never);
 				if (response.error) {
@@ -109,20 +120,23 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 				return null;
 			}
 		},
-		[defaultCreateSession],
+		[defaultCreateSession, projectQuery],
 	);
 
 	const deleteSessionFn = useCallback(
 		async (id: string) => {
 			try {
-				await apiDeleteSession({ path: { sessionId: id } });
+				await apiDeleteSession({
+					path: { sessionId: id },
+					query: projectQuery,
+				} as never);
 				setSessions((prev) => prev.filter((s) => s.id !== id));
 				if (activeSession?.id === id) {
 					setActiveSession(null);
 				}
 			} catch {}
 		},
-		[activeSession],
+		[activeSession, projectQuery],
 	);
 
 	const switchSession = useCallback((session: Session) => {
@@ -154,6 +168,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 			try {
 				await apiUpdateSession({
 					path: { sessionId },
+					query: projectQuery,
 					body: changes,
 				} as never);
 				setActiveSession((prev) => {
@@ -165,7 +180,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 				);
 			} catch {}
 		},
-		[],
+		[projectQuery],
 	);
 
 	const sendMessage = useCallback(
@@ -179,6 +194,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 				setSessionError(null);
 				const response = await createMessage({
 					path: { id: sessionId },
+					query: projectQuery,
 					body: {
 						content,
 						...(defaultCreateSession?.allowUnknownModel
@@ -198,40 +214,54 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 				setSessionError(getApiErrorMessage(error, 'failed to send message'));
 			}
 		},
-		[defaultCreateSession?.allowUnknownModel],
+		[defaultCreateSession?.allowUnknownModel, projectQuery],
 	);
 
-	const abortSessionFn = useCallback(async (sessionId: string) => {
-		try {
-			await apiAbortSession({ path: { sessionId }, body: {} });
-		} catch {}
-	}, []);
+	const abortSessionFn = useCallback(
+		async (sessionId: string) => {
+			try {
+				await apiAbortSession({
+					path: { sessionId },
+					query: projectQuery,
+					body: {},
+				} as never);
+			} catch {}
+		},
+		[projectQuery],
+	);
 
 	const approveToolCall = useCallback(
 		async (sessionId: string, callId: string, approved: boolean) => {
 			try {
 				await resolveApproval({
 					path: { id: sessionId },
+					query: projectQuery,
 					body: { callId, approved },
-				});
+				} as never);
 			} catch {}
 		},
-		[],
+		[projectQuery],
 	);
 
-	const refreshActiveSession = useCallback(async (sessionId: string) => {
-		try {
-			const response = await apiGetSession({ path: { sessionId } });
-			const session = response.data as Session | undefined;
-			if (!session) return;
-			setActiveSession((prev) =>
-				prev?.id === sessionId ? { ...prev, ...session } : prev,
-			);
-			setSessions((prev) =>
-				prev.map((s) => (s.id === sessionId ? { ...s, ...session } : s)),
-			);
-		} catch {}
-	}, []);
+	const refreshActiveSession = useCallback(
+		async (sessionId: string) => {
+			try {
+				const response = await apiGetSession({
+					path: { sessionId },
+					query: projectQuery,
+				} as never);
+				const session = response.data as Session | undefined;
+				if (!session) return;
+				setActiveSession((prev) =>
+					prev?.id === sessionId ? { ...prev, ...session } : prev,
+				);
+				setSessions((prev) =>
+					prev.map((s) => (s.id === sessionId ? { ...s, ...session } : s)),
+				);
+			} catch {}
+		},
+		[projectQuery],
+	);
 
 	useEffect(() => {
 		loadSessions();

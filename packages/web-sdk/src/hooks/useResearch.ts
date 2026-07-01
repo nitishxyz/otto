@@ -6,8 +6,9 @@ import {
 	injectResearchContext as apiInjectResearchContext,
 	listResearchSessions as apiListResearchSessions,
 } from '@ottocode/api';
+import { getProjectQuery, projectScopedKey } from '../lib/api-client/utils';
 import { usePendingResearchStore } from '../stores/pendingResearchStore';
-import { sessionsQueryKey } from './useSessions';
+import { getSessionsQueryKey } from './useSessions';
 
 export interface ResearchSession {
 	id: string;
@@ -53,7 +54,8 @@ class ResearchApiClient {
 	): Promise<ResearchSessionsResponse> {
 		const response = await apiListResearchSessions({
 			path: { parentId: parentSessionId },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(JSON.stringify(response.error));
 		return response.data as unknown as ResearchSessionsResponse;
 	}
@@ -64,8 +66,9 @@ class ResearchApiClient {
 	): Promise<CreateResearchResponse> {
 		const response = await apiCreateResearchSession({
 			path: { parentId: parentSessionId },
+			query: getProjectQuery(),
 			body: data,
-		});
+		} as never);
 		if (response.error) throw new Error(JSON.stringify(response.error));
 		return response.data as unknown as CreateResearchResponse;
 	}
@@ -75,7 +78,8 @@ class ResearchApiClient {
 	): Promise<{ success: boolean }> {
 		const response = await apiDeleteResearchSession({
 			path: { researchId },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(JSON.stringify(response.error));
 		return response.data as { success: boolean };
 	}
@@ -87,8 +91,9 @@ class ResearchApiClient {
 	): Promise<InjectContextResponse> {
 		const response = await apiInjectResearchContext({
 			path: { parentId: parentSessionId },
+			query: getProjectQuery(),
 			body: { researchSessionId, label },
-		});
+		} as never);
 		if (response.error) throw new Error(JSON.stringify(response.error));
 		return response.data as InjectContextResponse;
 	}
@@ -99,8 +104,9 @@ class ResearchApiClient {
 	): Promise<ExportToSessionResponse> {
 		const response = await apiExportResearchSession({
 			path: { researchId },
+			query: getProjectQuery(),
 			body: data ?? {},
-		});
+		} as never);
 		if (response.error) throw new Error(JSON.stringify(response.error));
 		return response.data as ExportToSessionResponse;
 	}
@@ -113,7 +119,11 @@ export function useResearchSessions(
 	enabled = true,
 ) {
 	return useQuery({
-		queryKey: ['research', 'sessions', parentSessionId],
+		queryKey: projectScopedKey([
+			'research',
+			'sessions',
+			parentSessionId,
+		] as const),
 		queryFn: () => researchApi.listResearchSessions(parentSessionId as string),
 		enabled: !!parentSessionId && enabled,
 		staleTime: 30000,
@@ -133,7 +143,11 @@ export function useCreateResearchSession() {
 		}) => researchApi.createResearchSession(parentSessionId, data ?? {}),
 		onSuccess: (_, { parentSessionId }) => {
 			queryClient.invalidateQueries({
-				queryKey: ['research', 'sessions', parentSessionId],
+				queryKey: projectScopedKey([
+					'research',
+					'sessions',
+					parentSessionId,
+				] as const),
 			});
 		},
 	});
@@ -146,7 +160,9 @@ export function useDeleteResearchSession() {
 		mutationFn: (researchId: string) =>
 			researchApi.deleteResearchSession(researchId),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['research', 'sessions'] });
+			queryClient.invalidateQueries({
+				queryKey: projectScopedKey(['research', 'sessions'] as const),
+			});
 		},
 	});
 }
@@ -187,7 +203,7 @@ export function useExportToSession() {
 			data?: { provider?: string; model?: string; agent?: string };
 		}) => researchApi.exportToNewSession(researchId, data),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 		},
 	});
 }

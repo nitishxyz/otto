@@ -37,6 +37,36 @@ bun run --filter @ottocode/server dev
 bun run --filter @ottocode/sdk dev
 ```
 
+## Local daemon workflow
+
+Default CLI, TUI, web, and ask flows reuse one authenticated local daemon per user. Manual foreground serving remains available through `otto serve`.
+
+Useful daemon commands:
+
+```bash
+bun run apps/cli/index.ts service status
+bun run apps/cli/index.ts service start
+bun run apps/cli/index.ts service restart
+bun run apps/cli/index.ts service stop
+bun run apps/cli/index.ts service password
+```
+
+Project commands:
+
+```bash
+bun run apps/cli/index.ts projects list
+bun run apps/cli/index.ts projects open /path/to/project
+bun run apps/cli/index.ts projects close <project-id>
+bun run apps/cli/index.ts projects forget <project-id-or-path>
+```
+
+Daemon state is stored in the global otto state directory (for example `~/.local/state/otto/` on Linux/macOS):
+
+- `server.json` registers the daemon URL/PID/version/id.
+- `server-token` is the local auth secret and should have `0600` permissions.
+
+When debugging daemon reuse, first run `service status`; stale registrations are removed automatically when authenticated health checks fail. Stop the daemon before rotating the token.
+
 ## SST / infra
 
 Current `sst.config.ts` wires:
@@ -80,6 +110,15 @@ When changing server APIs:
 ```bash
 bun run --filter @ottocode/api generate
 ```
+
+Project-aware routes should use `resolveRequestProject(c)` or `resolveRequestProjectRoot(c)` from `packages/server/src/routes/project-context.ts`. Do not add new route-level `process.cwd()` fallbacks; `tests/server-routes-cwd-guard.test.ts` enforces that the compatibility fallback stays centralized.
+
+For first-party clients, include selected project context in all route calls and streams:
+
+- preferred: `projectId=<id>` or `X-Otto-Project-Id`
+- compatibility: `project=<absolute-path>` or `X-Otto-Project`
+
+React Query keys and TUI hook dependencies should include the project id/key so sessions, messages, config, files, and git state do not cross projects.
 
 ## Build targets
 

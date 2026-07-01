@@ -5,6 +5,7 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { listSubagentsForSession } from '../runtime/subagents/service.ts';
+import { resolveRequestProjectRoot } from './project-context.ts';
 
 const projectQuerySchema = z.object({
 	project: z
@@ -71,7 +72,7 @@ export function registerSubagentsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const status = c.req.query('status');
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);

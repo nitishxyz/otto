@@ -1,11 +1,12 @@
 import { z } from '@hono/zod-openapi';
-import { loadConfig, logger } from '@ottocode/sdk';
+import { logger } from '@ottocode/sdk';
 import { normalizeThemeId, themeIds } from '@ottocode/themes';
 import type { Hono } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { isHiddenAgent } from '../../runtime/agent/registry.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProject } from '../project-context.ts';
 import {
 	discoverAllAgents,
 	getAuthorizedProviders,
@@ -57,6 +58,7 @@ const configDefaultsSchema = z.object({
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
 	smartEdges: z.boolean().optional(),
+	threadNavigatorRail: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
@@ -96,14 +98,12 @@ export function registerMainConfigRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const { cfg } = await resolveRequestProject(c);
 				const embeddedConfig = (
 					c as unknown as {
 						get: (key: 'embeddedConfig') => EmbeddedAppConfig | undefined;
 					}
 				).get('embeddedConfig');
-
-				const cfg = await loadConfig(projectRoot);
 
 				let allAgents: string[];
 
@@ -185,6 +185,12 @@ export function registerMainConfigRoute(app: Hono) {
 							undefined,
 							embeddedConfig?.defaults?.smartEdges,
 							cfg.defaults.smartEdges,
+						) ?? true,
+					threadNavigatorRail:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.threadNavigatorRail,
+							cfg.defaults.threadNavigatorRail,
 						) ?? true,
 					releaseToSend:
 						getDefault(

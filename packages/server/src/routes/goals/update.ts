@@ -3,6 +3,7 @@ import { logger } from '@ottocode/sdk';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
 	DISABLED_ERROR,
@@ -56,7 +57,9 @@ export function registerUpdateGoalRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(c.req.query('project'));
+				const { db, enabled } = await loadGoalsContext(
+					await resolveRequestProjectRoot(c),
+				);
 				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const body = updateGoalBodySchema.parse(await c.req.json());

@@ -86,16 +86,60 @@ export function useEdgeHover({
 			return;
 		}
 
-		const handleMouseMove = (event: MouseEvent) => {
+		const getIgnoredTargetMode = (event: MouseEvent) => {
+			if (!ignoreSelector) return null;
+			const appliesToSide = (element: Element) => {
+				const ignoredSide = element.getAttribute('data-smart-edge-ignore');
+				return !ignoredSide || ignoredSide === side;
+			};
 			const target = event.target;
-			if (
-				ignoreSelector &&
-				target instanceof Element &&
-				target.closest(ignoreSelector)
-			) {
+			const ignoredTarget =
+				target instanceof Element ? target.closest(ignoreSelector) : null;
+			if (ignoredTarget && appliesToSide(ignoredTarget)) {
+				return (
+					ignoredTarget.getAttribute('data-smart-edge-ignore-mode') ?? 'target'
+				);
+			}
+
+			for (const element of document.querySelectorAll(ignoreSelector)) {
+				if (!appliesToSide(element)) {
+					continue;
+				}
+
+				if (element.getAttribute('data-smart-edge-ignore-mode') === 'content') {
+					continue;
+				}
+
+				const rect = element.getBoundingClientRect();
+				const triggerWidth = window.innerWidth * hoverRatio;
+				const leftEdgeLimit = Math.max(rect.right + triggerWidth, triggerWidth);
+				const rightEdgeLimit = Math.min(
+					rect.left - triggerWidth,
+					window.innerWidth - triggerWidth,
+				);
+				const isWithinY =
+					event.clientY >= rect.top && event.clientY <= rect.bottom;
+				const isWithinX =
+					event.clientX >= rect.left && event.clientX <= rect.right;
+				const isWithinEdgeCorridor =
+					side === 'left'
+						? event.clientX <= leftEdgeLimit
+						: event.clientX >= rightEdgeLimit;
+				if (isWithinY && (isWithinX || isWithinEdgeCorridor)) {
+					return (
+						element.getAttribute('data-smart-edge-ignore-mode') ?? 'target'
+					);
+				}
+			}
+
+			return null;
+		};
+
+		const handleMouseMove = (event: MouseEvent) => {
+			const ignoredTargetMode = getIgnoredTargetMode(event);
+			if (ignoredTargetMode && !isVisibleRef.current) {
 				clearHoverTimeouts();
 				setIsHoverPending(false);
-				setVisible(false);
 				return;
 			}
 

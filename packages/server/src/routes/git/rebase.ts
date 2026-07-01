@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitRebaseSchema } from './schemas.ts';
 import { getGitOperationState, validateAndGetGitRoot } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -84,8 +85,8 @@ export function registerRebaseRoute(app: Hono) {
 		async (c) => {
 			try {
 				const body = await c.req.json().catch(() => ({}));
-				const { project, action } = gitRebaseSchema.parse(body);
-				const requestedPath = project || process.cwd();
+				const { action } = gitRebaseSchema.parse(body);
+				const requestedPath = await resolveRequestProjectRoot(c);
 
 				const validation = await validateAndGetGitRoot(requestedPath);
 				if ('error' in validation) {

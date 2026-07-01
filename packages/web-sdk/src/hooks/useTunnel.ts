@@ -7,11 +7,18 @@ import {
 	startTunnel as apiStartTunnel,
 	stopTunnel as apiStopTunnel,
 } from '@ottocode/api';
-import { useTunnelStore } from '../stores/tunnelStore';
+import {
+	useTunnelStore,
+	type TunnelScope,
+	type TunnelStatus,
+} from '../stores/tunnelStore';
+import { getProjectId } from '../lib/api-client/utils';
 import { API_BASE_URL } from '../lib/config';
 
 interface TunnelStatusResponse {
-	status: 'idle' | 'starting' | 'connected' | 'error';
+	scope: TunnelScope;
+	projectId: string | null;
+	status: TunnelStatus;
 	url: string | null;
 	error: string | null;
 	binaryInstalled: boolean;
@@ -20,7 +27,7 @@ interface TunnelStatusResponse {
 
 interface TunnelStartResponse {
 	ok: boolean;
-	url?: string;
+	url?: string | null;
 	message?: string;
 	error?: string;
 }
@@ -32,154 +39,201 @@ interface TunnelQrResponse {
 	error?: string;
 }
 
+export interface TunnelScopeArgs {
+	scope: TunnelScope;
+	projectId?: string | null;
+}
+
+function scopeQuery(args: TunnelScopeArgs) {
+	const query: { scope: TunnelScope; projectId?: string } = {
+		scope: args.scope,
+	};
+	if (args.scope === 'project-share' && args.projectId) {
+		query.projectId = args.projectId;
+	}
+	return query;
+}
+
+function resolveProjectId(args: TunnelScopeArgs): string | undefined {
+	if (args.scope !== 'project-share') return undefined;
+	return args.projectId ?? getProjectId() ?? undefined;
+}
+
+function isProjectShareReady(args: TunnelScopeArgs): boolean {
+	return args.scope !== 'project-share' || Boolean(resolveProjectId(args));
+}
+
 function normalizeTunnelStatus(data: {
-	status: TunnelStatusResponse['status'];
+	status: TunnelStatus;
 	url: string | null;
 	isRunning?: boolean;
-}): TunnelStatusResponse['status'] {
+}): TunnelStatus {
 	if (data.isRunning && data.url) return 'connected';
 	if (data.isRunning && data.status === 'idle') return 'starting';
 	if (data.status === 'connected' && !data.url) return 'starting';
 	return data.status;
 }
 
-async function fetchTunnelStatus(): Promise<TunnelStatusResponse> {
-	const response = await getTunnelStatus();
+async function fetchTunnelStatus(
+	args: TunnelScopeArgs,
+): Promise<TunnelStatusResponse> {
+	const response = await getTunnelStatus({
+		query: scopeQuery({ ...args, projectId: resolveProjectId(args) }),
+	});
 	if (response.error) throw new Error(JSON.stringify(response.error));
 	return response.data as TunnelStatusResponse;
 }
 
-async function startTunnel(): Promise<TunnelStartResponse> {
-	// Server uses its own port automatically - no need to pass it
+async function startTunnel(
+	args: TunnelScopeArgs,
+): Promise<TunnelStartResponse> {
+	const projectId = resolveProjectId(args);
 	const response = await apiStartTunnel({
-		body: {},
+		body: {
+			scope: args.scope,
+			...(projectId ? { projectId } : {}),
+		},
 	});
 	if (response.error) throw new Error(JSON.stringify(response.error));
 	return response.data as TunnelStartResponse;
 }
 
-async function stopTunnel(): Promise<{
+async function stopTunnel(args: TunnelScopeArgs): Promise<{
 	ok: boolean;
 	message?: string;
 	error?: string;
 }> {
-	const response = await apiStopTunnel();
+	const response = await apiStopTunnel({
+		query: scopeQuery({ ...args, projectId: resolveProjectId(args) }),
+	});
 	if (response.error) throw new Error(JSON.stringify(response.error));
 	return response.data as { ok: boolean; message?: string; error?: string };
 }
 
-async function fetchTunnelQr(): Promise<TunnelQrResponse> {
-	const response = await getTunnelQr();
+async function fetchTunnelQr(args: TunnelScopeArgs): Promise<TunnelQrResponse> {
+	const response = await getTunnelQr({
+		query: scopeQuery({ ...args, projectId: resolveProjectId(args) }),
+	});
 	if (response.error) throw new Error(JSON.stringify(response.error));
 	return response.data as TunnelQrResponse;
 }
 
-export function useTunnelStatus() {
-	const setStatus = useTunnelStore((s) => s.setStatus);
-	const setUrl = useTunnelStore((s) => s.setUrl);
-	const setError = useTunnelStore((s) => s.setError);
+export function useTunnelStatus(args: TunnelScopeArgs) {
+	const patchScope = useTunnelStore((s) => s.patchScope);
 
 	const query = useQuery<TunnelStatusResponse>({
-		queryKey: ['tunnel', 'status'],
-		queryFn: fetchTunnelStatus,
+		queryKey: ['tunnel', 'status', args.scope, resolveProjectId(args) ?? null],
+		queryFn: () => fetchTunnelStatus(args),
 		refetchInterval: 3000,
 		refetchOnMount: 'always',
+		enabled: isProjectShareReady(args),
 	});
 
 	useEffect(() => {
 		if (query.data) {
-			setStatus(normalizeTunnelStatus(query.data));
-			setUrl(query.data.url);
-			setError(query.data.error);
+			patchScope(args.scope, {
+				status: normalizeTunnelStatus(query.data),
+				url: query.data.url,
+				error: query.data.error,
+			});
 		}
-	}, [query.data, setStatus, setUrl, setError]);
+	}, [query.data, patchScope, args.scope]);
 
 	return query;
 }
 
-export function useStartTunnel() {
+export function useStartTunnel(args: TunnelScopeArgs) {
 	const queryClient = useQueryClient();
-	const setStatus = useTunnelStore((s) => s.setStatus);
-	const setUrl = useTunnelStore((s) => s.setUrl);
-	const setError = useTunnelStore((s) => s.setError);
-	const setProgress = useTunnelStore((s) => s.setProgress);
+	const patchScope = useTunnelStore((s) => s.patchScope);
 
 	return useMutation<TunnelStartResponse, Error, void>({
-		mutationFn: () => startTunnel(),
+		mutationFn: () => startTunnel(args),
 		onMutate: () => {
-			setStatus('starting');
-			setProgress('Connecting...');
-			setError(null);
+			patchScope(args.scope, {
+				status: 'starting',
+				progress: 'Connecting...',
+				error: null,
+			});
 		},
 		onSuccess: (data) => {
 			if (data.ok) {
 				if (data.url) {
-					setStatus('connected');
-					setUrl(data.url);
+					patchScope(args.scope, {
+						status: 'connected',
+						url: data.url,
+						progress: null,
+					});
+				} else {
+					patchScope(args.scope, { progress: null });
 				}
-				setProgress(null);
 			} else {
-				setStatus('error');
-				setError(data.error || 'Failed to start tunnel');
-				setProgress(null);
+				patchScope(args.scope, {
+					status: 'error',
+					error: data.error || 'Failed to start tunnel',
+					progress: null,
+				});
 			}
 			queryClient.invalidateQueries({ queryKey: ['tunnel'] });
 		},
 		onError: (error) => {
-			setStatus('error');
-			setError(error.message);
-			setProgress(null);
+			patchScope(args.scope, {
+				status: 'error',
+				error: error.message,
+				progress: null,
+			});
 		},
 	});
 }
 
-export function useStopTunnel() {
+export function useStopTunnel(args: TunnelScopeArgs) {
 	const queryClient = useQueryClient();
-	const reset = useTunnelStore((s) => s.reset);
+	const resetScope = useTunnelStore((s) => s.resetScope);
 
 	return useMutation({
-		mutationFn: stopTunnel,
+		mutationFn: () => stopTunnel(args),
 		onSuccess: () => {
-			reset();
+			resetScope(args.scope);
 			queryClient.invalidateQueries({ queryKey: ['tunnel'] });
 		},
 	});
 }
 
-export function useTunnelQr() {
-	const url = useTunnelStore((s) => s.url);
-	const setQrCode = useTunnelStore((s) => s.setQrCode);
+export function useTunnelQr(args: TunnelScopeArgs) {
+	const url = useTunnelStore((s) =>
+		args.scope === 'project-share' ? s.projectShare.url : s.remoteControl.url,
+	);
 
-	const query = useQuery<TunnelQrResponse>({
-		queryKey: ['tunnel', 'qr', url],
-		queryFn: fetchTunnelQr,
-		enabled: !!url,
+	return useQuery<TunnelQrResponse>({
+		queryKey: ['tunnel', 'qr', args.scope, resolveProjectId(args) ?? null, url],
+		queryFn: () => fetchTunnelQr(args),
+		enabled: !!url && isProjectShareReady(args),
 	});
-
-	useEffect(() => {
-		if (query.data?.ok && query.data.qrCode) {
-			setQrCode(query.data.qrCode);
-		}
-	}, [query.data, setQrCode]);
-
-	return query;
 }
 
-export function useTunnelStream() {
-	const setStatus = useTunnelStore((s) => s.setStatus);
-	const setUrl = useTunnelStore((s) => s.setUrl);
-	const setError = useTunnelStore((s) => s.setError);
-	const setProgress = useTunnelStore((s) => s.setProgress);
+export function useTunnelStream(args: TunnelScopeArgs) {
+	const patchScope = useTunnelStore((s) => s.patchScope);
 	const isExpanded = useTunnelStore((s) => s.isExpanded);
 	const eventSourceRef = useRef<EventSource | null>(null);
+
+	const projectId = resolveProjectId(args);
+	const ready = isProjectShareReady(args);
 
 	const connect = useCallback(() => {
 		if (eventSourceRef.current) {
 			eventSourceRef.current.close();
 		}
 
+		const query: Record<string, string> = { scope: args.scope };
+		if (args.scope === 'project-share' && projectId) {
+			query.projectId = projectId;
+		}
+
 		const es = new EventSource(
-			client.buildUrl({ baseURL: API_BASE_URL, url: '/v1/tunnel/stream' }),
+			client.buildUrl({
+				baseURL: API_BASE_URL,
+				url: '/v1/tunnel/stream',
+				query,
+			}),
 		);
 		eventSourceRef.current = es;
 
@@ -187,10 +241,12 @@ export function useTunnelStream() {
 			try {
 				const data = JSON.parse(event.data);
 				if (data.type === 'status') {
-					setStatus(normalizeTunnelStatus(data));
-					setUrl(data.url);
-					setError(data.error);
-					setProgress(data.progress);
+					patchScope(args.scope, {
+						status: normalizeTunnelStatus(data),
+						url: data.url,
+						error: data.error,
+						progress: data.progress,
+					});
 				}
 			} catch {
 				// ignore parse errors
@@ -206,10 +262,10 @@ export function useTunnelStream() {
 			es.close();
 			eventSourceRef.current = null;
 		};
-	}, [setStatus, setUrl, setError, setProgress]);
+	}, [patchScope, args.scope, projectId]);
 
 	useEffect(() => {
-		if (isExpanded) {
+		if (isExpanded && ready) {
 			const cleanup = connect();
 			return cleanup;
 		}
@@ -219,7 +275,7 @@ export function useTunnelStream() {
 				eventSourceRef.current = null;
 			}
 		};
-	}, [isExpanded, connect]);
+	}, [isExpanded, ready, connect]);
 
 	return { connect };
 }

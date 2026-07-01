@@ -9,6 +9,7 @@ import {
 	sessionFilesResponseSchema,
 } from './schemas.ts';
 import { getSessionFiles } from './service.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 export function registerSessionFilesRoutes(app: Hono) {
 	zodOpenApiRoute(
@@ -41,7 +42,7 @@ export function registerSessionFilesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				return c.json(await getSessionFiles(sessionId, projectRoot));
 			} catch (error) {
 				if (

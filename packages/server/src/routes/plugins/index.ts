@@ -10,11 +10,12 @@ import {
 	updatePlugin,
 	type PluginRegistryEntry,
 	type PluginScope,
-	type TerminalManager,
 } from '@ottocode/sdk';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { APIError, serializeError } from '../../runtime/errors/api-error.ts';
+import { getProjectManager } from '../../runtime/projects/manager.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	createServerTerminalBridge,
 	listPluginCommands,
@@ -39,8 +40,8 @@ import {
 	registryQuerySchema,
 } from './schemas.ts';
 
-function getProjectRoot(project?: string): string {
-	return project || process.cwd();
+async function getProjectRoot(c: Context, project?: string): Promise<string> {
+	return project || (await resolveRequestProjectRoot(c));
 }
 
 function getRegistryOptions(input: { url?: string; registries?: string[] }): {
@@ -103,11 +104,7 @@ function errorJson(
 	return c.json(errorResponse, errorResponse.error.status || 500);
 }
 
-export function registerPluginsRoutes(
-	app: Hono,
-	terminalManager?: TerminalManager,
-) {
-	const terminalBridge = createServerTerminalBridge(terminalManager);
+export function registerPluginsRoutes(app: Hono) {
 	zodOpenApiRoute(
 		app,
 		{
@@ -132,9 +129,7 @@ export function registerPluginsRoutes(
 		},
 		async (c) => {
 			try {
-				return c.json(
-					await resolveEffectivePlugins(getProjectRoot(c.req.query('project'))),
-				);
+				return c.json(await resolveEffectivePlugins(await getProjectRoot(c)));
 			} catch (error) {
 				logger.error('Failed to list plugins', error);
 				return errorJson(c, error);
@@ -168,9 +163,7 @@ export function registerPluginsRoutes(
 		},
 		async (c) => {
 			try {
-				const commands = await listPluginCommands(
-					getProjectRoot(c.req.query('project')),
-				);
+				const commands = await listPluginCommands(await getProjectRoot(c));
 				return c.json({ commands });
 			} catch (error) {
 				logger.error('Failed to list plugin commands', error);
@@ -222,16 +215,20 @@ export function registerPluginsRoutes(
 		async (c) => {
 			try {
 				const parsed = pluginCommandRunBodySchema.parse(await c.req.json());
+				const projectRoot = await getProjectRoot(c, parsed.project);
+				const runtime = await getProjectManager().getProject({
+					path: projectRoot,
+				});
 				const result = await runPluginCommand(
 					{
-						projectRoot: getProjectRoot(parsed.project),
+						projectRoot,
 						plugin: c.req.param('plugin'),
 						command: c.req.param('command'),
 						argsText: parsed.argsText,
 						args: parsed.args,
 						extraArgs: parsed.extraArgs,
 					},
-					terminalBridge,
+					createServerTerminalBridge(runtime.terminalManager),
 				);
 				return c.json(result);
 			} catch (error) {
@@ -266,10 +263,7 @@ export function registerPluginsRoutes(
 		async (c) => {
 			try {
 				return c.json(
-					await fetchRegistries(
-						getProjectRoot(c.req.query('project')),
-						c.req.query('url'),
-					),
+					await fetchRegistries(await getProjectRoot(c), c.req.query('url')),
 				);
 			} catch (error) {
 				logger.error('Failed to list plugin registry', error);
@@ -306,7 +300,7 @@ export function registerPluginsRoutes(
 		async (c) => {
 			try {
 				const name = c.req.param('name');
-				const projectRoot = getProjectRoot(c.req.query('project'));
+				const projectRoot = await getProjectRoot(c);
 				const effective = await resolveEffectivePlugins(projectRoot);
 				const plugin = effective.plugins.find((item) => item.name === name);
 				let registry:
@@ -366,7 +360,7 @@ export function registerPluginsRoutes(
 				const parsed = pluginInstallBodySchema.parse(body);
 				const plugin = await installPlugin(parsed.source, {
 					scope: parsed.scope,
-					projectRoot: getProjectRoot(parsed.project),
+					projectRoot: await getProjectRoot(c, parsed.project),
 					enabled: parsed.enabled,
 					...getRegistryOptions(parsed),
 				});
@@ -382,8 +376,8 @@ export function registerPluginsRoutes(
 		path: '/v1/plugins/remove',
 		operationId: 'removePlugin',
 		summary: 'Remove a plugin from a scope',
-		handler: async ({ name, scope, project }) => {
-			await removePlugin(name, { scope, projectRoot: getProjectRoot(project) });
+		handler: async ({ name, scope, projectRoot }) => {
+			await removePlugin(name, { scope, projectRoot });
 			return undefined;
 		},
 	});
@@ -391,24 +385,24 @@ export function registerPluginsRoutes(
 		path: '/v1/plugins/enable',
 		operationId: 'enablePlugin',
 		summary: 'Enable a plugin in a scope',
-		handler: async ({ name, scope, project }) => {
+		handler: async ({ name, scope, projectRoot }) => {
 			await setPluginEnabled(name, true, {
 				scope,
-				projectRoot: getProjectRoot(project),
+				projectRoot,
 			});
-			return resolveMutationPlugin(name, scope, project);
+			return resolveMutationPlugin(name, scope, projectRoot);
 		},
 	});
 	registerPluginMutation(app, {
 		path: '/v1/plugins/disable',
 		operationId: 'disablePlugin',
 		summary: 'Disable a plugin in a scope',
-		handler: async ({ name, scope, project }) => {
+		handler: async ({ name, scope, projectRoot }) => {
 			await setPluginEnabled(name, false, {
 				scope,
-				projectRoot: getProjectRoot(project),
+				projectRoot,
 			});
-			return resolveMutationPlugin(name, scope, project);
+			return resolveMutationPlugin(name, scope, projectRoot);
 		},
 	});
 
@@ -443,7 +437,7 @@ export function registerPluginsRoutes(
 			try {
 				const parsed = pluginUpdateBodySchema.parse(await c.req.json());
 				const scope = parsed.scope ?? 'global';
-				const projectRoot = getProjectRoot(parsed.project);
+				const projectRoot = await getProjectRoot(c, parsed.project);
 				const options = {
 					scope,
 					projectRoot,
@@ -479,6 +473,7 @@ function registerPluginMutation(
 			name: string;
 			scope?: PluginScope;
 			project?: string;
+			projectRoot: string;
 		}) => Promise<unknown>;
 	},
 ) {
@@ -512,7 +507,10 @@ function registerPluginMutation(
 		async (c) => {
 			try {
 				const parsed = pluginMutationBodySchema.parse(await c.req.json());
-				const plugin = await options.handler(parsed);
+				const plugin = await options.handler({
+					...parsed,
+					projectRoot: await getProjectRoot(c, parsed.project),
+				});
 				return c.json({
 					success: true,
 					...(plugin && typeof plugin === 'object' ? { plugin } : {}),
@@ -528,9 +526,9 @@ function registerPluginMutation(
 async function resolveMutationPlugin(
 	name: string,
 	scope: PluginScope | undefined,
-	project: string | undefined,
+	projectRoot: string,
 ) {
-	const effective = await resolveEffectivePlugins(getProjectRoot(project));
+	const effective = await resolveEffectivePlugins(projectRoot);
 	return effective.plugins.find(
 		(plugin) => plugin.name === name && (!scope || plugin.scope === scope),
 	);

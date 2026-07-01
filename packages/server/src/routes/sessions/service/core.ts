@@ -6,7 +6,7 @@ import { touchProject } from '../../../runtime/projects/registry.ts';
 import type { ProjectDbContext } from './types.ts';
 
 export async function loadProjectDb(
-	projectRoot = process.cwd(),
+	projectRoot: string,
 ): Promise<ProjectDbContext> {
 	const cfg = await loadConfig(projectRoot);
 	const db = await getDbForConfig(cfg);

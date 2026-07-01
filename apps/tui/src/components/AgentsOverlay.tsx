@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAgents } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { getVisibleWindow, ModalFrame, SelectRow } from './ModalFrame.tsx';
+import { getProjectQuery } from '../api.ts';
 
 const MAX_VISIBLE_AGENTS = 12;
 
@@ -27,7 +28,7 @@ export function AgentsOverlay({
 		let cancelled = false;
 		(async () => {
 			try {
-				const response = await getAgents();
+				const response = await getAgents({ query: getProjectQuery() } as never);
 				if (cancelled) return;
 				const list = response.data?.agents ?? [];
 				setAgents(list);

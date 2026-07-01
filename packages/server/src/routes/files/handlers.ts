@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { readdir, readFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	TREE_ENTRY_LIMIT,
 	clampNumber,
@@ -75,8 +76,8 @@ async function getSortedFileResult(args: {
 	return { result, changedFiles, ignoredFiles };
 }
 
-function getFilePolicyFromQuery(c: Context) {
-	const projectRoot = c.req.query('project') || process.cwd();
+async function getFilePolicyFromQuery(c: Context) {
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const policy = getSearchPolicy(projectRoot);
 	const maxDepth = clampNumber(
 		Number.parseInt(c.req.query('maxDepth') || String(policy.maxDepth), 10),
@@ -119,7 +120,7 @@ function fileListResponse(args: {
 
 export async function handleListFiles(c: Context) {
 	try {
-		const { projectRoot, maxDepth, limit } = getFilePolicyFromQuery(c);
+		const { projectRoot, maxDepth, limit } = await getFilePolicyFromQuery(c);
 		const { result, changedFiles, ignoredFiles } = await getSortedFileResult({
 			projectRoot,
 			maxDepth,
@@ -143,7 +144,7 @@ export async function handleListFiles(c: Context) {
 
 export async function handleSearchFiles(c: Context) {
 	try {
-		const { projectRoot, maxDepth, limit } = getFilePolicyFromQuery(c);
+		const { projectRoot, maxDepth, limit } = await getFilePolicyFromQuery(c);
 		const query = c.req.query('q') || '';
 		const { result, changedFiles, ignoredFiles } = await getSortedFileResult({
 			projectRoot,
@@ -169,7 +170,7 @@ export async function handleSearchFiles(c: Context) {
 
 export async function handleFileTree(c: Context) {
 	try {
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const dirPath = c.req.query('path') || '.';
 		const targetDir = resolve(projectRoot, dirPath);
 		if (!targetDir.startsWith(resolve(projectRoot))) {
@@ -237,8 +238,8 @@ function isPathInsideRoot(path: string, root: string) {
 	);
 }
 
-function getSafeFilePath(c: Context) {
-	const projectRoot = resolve(c.req.query('project') || process.cwd());
+async function getSafeFilePath(c: Context) {
+	const projectRoot = resolve(await resolveRequestProjectRoot(c));
 	const filePath = c.req.query('path');
 	if (!filePath) {
 		return { error: 'Missing required query parameter: path' as const };
@@ -295,7 +296,7 @@ function sniffImageMimeType(data: Buffer): string | undefined {
 
 export async function handleReadFile(c: Context) {
 	try {
-		const target = getSafeFilePath(c);
+		const target = await getSafeFilePath(c);
 		if ('error' in target)
 			return c.json({ error: target.error }, target.status ?? 400);
 		const content = await readFile(target.absPath, 'utf-8');
@@ -321,7 +322,7 @@ export async function handleReadFile(c: Context) {
 
 export async function handleRawFile(c: Context) {
 	try {
-		const target = getSafeFilePath(c);
+		const target = await getSafeFilePath(c);
 		if ('error' in target)
 			return c.json({ error: target.error }, target.status ?? 400);
 		const data = await readFile(target.absPath);

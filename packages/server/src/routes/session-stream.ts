@@ -4,6 +4,10 @@ import type { Hono } from 'hono';
 import { subscribe } from '../events/bus.ts';
 import type { OttoEvent } from '../events/types.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import {
+	projectQuerySchema,
+	resolveRequestProject,
+} from './project-context.ts';
 
 const STREAM_DESCRIPTION =
 	'SSE event stream. Events include session.created, message.created, message.part.delta, tool.call, tool.delta, tool.result, message.completed, error.';
@@ -14,16 +18,7 @@ const sessionStreamParamsSchema = z.object({
 	}),
 });
 
-const sessionStreamQuerySchema = z.object({
-	project: z
-		.string()
-		.optional()
-		.openapi({
-			param: { name: 'project', in: 'query' },
-			description:
-				'Project root override (defaults to current working directory).',
-		}),
-});
+const sessionStreamQuerySchema = projectQuerySchema;
 
 const sessionStreamResponseSchema = z.string().openapi({
 	description: STREAM_DESCRIPTION,
@@ -35,7 +30,8 @@ function safeStringify(obj: unknown): string {
 	);
 }
 
-function handleSessionStream(c: Context) {
+async function handleSessionStream(c: Context) {
+	const project = await resolveRequestProject(c);
 	const sessionId = c.req.param('id');
 	const headers = new Headers({
 		'Content-Type': 'text/event-stream',
@@ -48,6 +44,7 @@ function handleSessionStream(c: Context) {
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
 			const write = (evt: OttoEvent) => {
+				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
 				let line: string;
 				try {
 					line =
@@ -58,7 +55,12 @@ function handleSessionStream(c: Context) {
 				}
 				controller.enqueue(encoder.encode(line));
 			};
-			const unsubscribe = subscribe(sessionId, write);
+			const unsubscribeProject = subscribe(
+				sessionId,
+				write,
+				project.runtime.root,
+			);
+			const unsubscribeLegacy = subscribe(sessionId, write);
 			controller.enqueue(encoder.encode(`: connected ${sessionId}\n\n`));
 			const hb = setInterval(() => {
 				try {
@@ -71,7 +73,8 @@ function handleSessionStream(c: Context) {
 			const signal = c.req.raw?.signal as AbortSignal | undefined;
 			signal?.addEventListener('abort', () => {
 				clearInterval(hb);
-				unsubscribe();
+				unsubscribeProject();
+				unsubscribeLegacy();
 				try {
 					controller.close();
 				} catch {}

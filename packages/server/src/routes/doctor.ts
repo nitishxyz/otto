@@ -17,6 +17,7 @@ import type { Hono } from 'hono';
 import { readdir } from 'node:fs/promises';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from './project-context.ts';
 
 async function fileExists(path: string | null): Promise<boolean> {
 	if (!path) return false;
@@ -131,7 +132,7 @@ export function registerDoctorRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const { cfg, auth } = await readConfig(projectRoot);
 				const configuredProviders = getConfiguredProviderIds(cfg, {
 					includeDisabled: true,

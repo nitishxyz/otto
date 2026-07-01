@@ -1,4 +1,5 @@
 import { publish } from '../../events/bus.ts';
+import { scopedCallKey } from '../projects/scope.ts';
 
 export type ToolApprovalMode = 'auto' | 'dangerous' | 'all' | 'yolo';
 
@@ -19,6 +20,7 @@ export const DANGEROUS_TOOLS = new Set([
 export const SAFE_TOOLS = new Set(['progress_update', 'update_todos']);
 
 export interface PendingApproval {
+	projectRoot?: string;
 	callId: string;
 	toolName: string;
 	args: unknown;
@@ -52,9 +54,11 @@ export async function requestApproval(
 	toolName: string,
 	args: unknown,
 	timeoutMs = 120000,
+	projectRoot?: string,
 ): Promise<boolean> {
 	return new Promise((resolve) => {
 		const approval: PendingApproval = {
+			projectRoot,
 			callId,
 			toolName,
 			args,
@@ -64,11 +68,13 @@ export async function requestApproval(
 			createdAt: Date.now(),
 		};
 
-		pendingApprovals.set(callId, approval);
+		const key = scopedCallKey(projectRoot, callId);
+		pendingApprovals.set(key, approval);
 
 		publish({
 			type: 'tool.approval.required',
 			sessionId,
+			projectRoot,
 			payload: {
 				callId,
 				toolName,
@@ -78,12 +84,13 @@ export async function requestApproval(
 		});
 
 		setTimeout(() => {
-			if (pendingApprovals.has(callId)) {
-				pendingApprovals.delete(callId);
+			if (pendingApprovals.has(key)) {
+				pendingApprovals.delete(key);
 				resolve(false);
 				publish({
 					type: 'tool.approval.resolved',
 					sessionId,
+					projectRoot,
 					payload: {
 						callId,
 						toolName,
@@ -99,18 +106,21 @@ export async function requestApproval(
 export function resolveApproval(
 	callId: string,
 	approved: boolean,
+	projectRoot?: string,
 ): { ok: boolean; error?: string } {
-	const approval = pendingApprovals.get(callId);
+	const key = scopedCallKey(projectRoot, callId);
+	const approval = pendingApprovals.get(key);
 	if (!approval) {
 		return { ok: false, error: 'No pending approval found for this callId' };
 	}
 
-	pendingApprovals.delete(callId);
+	pendingApprovals.delete(key);
 	approval.resolve(approved);
 
 	publish({
 		type: 'tool.approval.resolved',
 		sessionId: approval.sessionId,
+		projectRoot: approval.projectRoot,
 		payload: {
 			callId,
 			toolName: approval.toolName,
@@ -124,12 +134,17 @@ export function resolveApproval(
 
 export function getPendingApproval(
 	callId: string,
+	projectRoot?: string,
 ): PendingApproval | undefined {
-	return pendingApprovals.get(callId);
+	return pendingApprovals.get(scopedCallKey(projectRoot, callId));
 }
 
-export function updateApprovalArgs(callId: string, args: unknown): boolean {
-	const approval = pendingApprovals.get(callId);
+export function updateApprovalArgs(
+	callId: string,
+	args: unknown,
+	projectRoot?: string,
+): boolean {
+	const approval = pendingApprovals.get(scopedCallKey(projectRoot, callId));
 	if (!approval) return false;
 
 	approval.args = args;
@@ -137,6 +152,7 @@ export function updateApprovalArgs(callId: string, args: unknown): boolean {
 	publish({
 		type: 'tool.approval.updated',
 		sessionId: approval.sessionId,
+		projectRoot: approval.projectRoot,
 		payload: {
 			callId,
 			toolName: approval.toolName,
@@ -150,15 +166,22 @@ export function updateApprovalArgs(callId: string, args: unknown): boolean {
 
 export function getPendingApprovalsForSession(
 	sessionId: string,
+	projectRoot?: string,
 ): PendingApproval[] {
 	return Array.from(pendingApprovals.values()).filter(
-		(a) => a.sessionId === sessionId,
+		(a) => a.sessionId === sessionId && a.projectRoot === projectRoot,
 	);
 }
 
-export function clearPendingApprovalsForSession(sessionId: string): void {
+export function clearPendingApprovalsForSession(
+	sessionId: string,
+	projectRoot?: string,
+): void {
 	for (const [callId, approval] of pendingApprovals) {
-		if (approval.sessionId === sessionId) {
+		if (
+			approval.sessionId === sessionId &&
+			approval.projectRoot === projectRoot
+		) {
 			approval.resolve(false);
 			pendingApprovals.delete(callId);
 		}

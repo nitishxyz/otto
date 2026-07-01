@@ -1,4 +1,5 @@
 export type SSEEvent = { event: string; data: string };
+type RequestHeaders = Record<string, string>;
 
 async function* sseIterator(resp: Response): AsyncGenerator<SSEEvent> {
 	if (!resp.body) return;
@@ -27,10 +28,10 @@ async function* sseIterator(resp: Response): AsyncGenerator<SSEEvent> {
 	}
 }
 
-export async function connectSSE(url: string) {
+export async function connectSSE(url: string, headers?: RequestHeaders) {
 	const controller = new AbortController();
 	const res = await fetch(url, {
-		headers: { Accept: 'text/event-stream' },
+		headers: { ...headers, Accept: 'text/event-stream' },
 		signal: controller.signal,
 	});
 	const iterator = sseIterator(res);

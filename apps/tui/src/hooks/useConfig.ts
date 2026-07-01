@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { getConfig, updateDefaults as apiUpdateDefaults } from '@ottocode/api';
+import { getProjectKey, getProjectQuery } from '../api.ts';
 
 interface Config {
 	agents: string[];
@@ -31,10 +32,15 @@ export function useConfig() {
 		},
 	});
 	const [isLoaded, setIsLoaded] = useState(false);
+	const projectKey = getProjectKey();
+	const projectQuery = useMemo(() => {
+		void projectKey;
+		return getProjectQuery();
+	}, [projectKey]);
 
 	const loadConfig = useCallback(async () => {
 		try {
-			const response = await getConfig();
+			const response = await getConfig({ query: projectQuery } as never);
 			const data = response.data as unknown as Config;
 			if (data) setConfig(data);
 			return data;
@@ -43,7 +49,7 @@ export function useConfig() {
 		} finally {
 			setIsLoaded(true);
 		}
-	}, []);
+	}, [projectQuery]);
 
 	const updateDefaults = useCallback(
 		async (changes: {
@@ -59,8 +65,9 @@ export function useConfig() {
 		}) => {
 			try {
 				const response = await apiUpdateDefaults({
+					query: projectQuery,
 					body: { ...changes, scope: 'global' } as never,
-				});
+				} as never);
 				const result = response.data as unknown as {
 					defaults: Config['defaults'];
 				};
@@ -69,13 +76,12 @@ export function useConfig() {
 				}
 			} catch {}
 		},
-		[],
+		[projectQuery],
 	);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally empty deps — loadConfig is stable but including it caused an infinite fetch loop (config was in its dependency chain)
 	useEffect(() => {
 		loadConfig();
-	}, []);
+	}, [loadConfig]);
 
 	return { config, isLoaded, loadConfig, updateDefaults };
 }

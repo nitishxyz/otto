@@ -1,10 +1,15 @@
 import type { ClientEvent, NotificationEvent, OttoEvent } from './types.ts';
+import { scopedSessionKey } from '../runtime/projects/scope.ts';
 
 type Subscriber = (evt: OttoEvent) => void;
 type ClientSubscriber = (evt: ClientEvent) => void;
 
-const subscribers = new Map<string, Set<Subscriber>>(); // sessionId -> subs
+const subscribers = new Map<string, Set<Subscriber>>(); // project/session -> subs
 const clientSubscribers = new Set<ClientSubscriber>();
+
+function eventProjectKey(event: OttoEvent): string | undefined {
+	return event.projectId ?? event.projectRoot;
+}
 
 function sanitizeBigInt<T>(obj: T): T {
 	if (obj === null || obj === undefined) return obj;
@@ -22,7 +27,9 @@ function sanitizeBigInt<T>(obj: T): T {
 
 export function publish(event: OttoEvent) {
 	const sanitizedEvent = sanitizeBigInt(event);
-	const subs = subscribers.get(event.sessionId);
+	const subs = subscribers.get(
+		scopedSessionKey(eventProjectKey(event), event.sessionId),
+	);
 	if (!subs) return;
 	for (const sub of subs) {
 		try {
@@ -54,16 +61,21 @@ export function publishNotification(payload: NotificationEvent) {
 	publishClientEvent({ type: 'notification', payload });
 }
 
-export function subscribe(sessionId: string, handler: Subscriber) {
-	let set = subscribers.get(sessionId);
+export function subscribe(
+	sessionId: string,
+	handler: Subscriber,
+	projectKey?: string,
+) {
+	const key = scopedSessionKey(projectKey, sessionId);
+	let set = subscribers.get(key);
 	if (!set) {
 		set = new Set();
-		subscribers.set(sessionId, set);
+		subscribers.set(key, set);
 	}
 	set.add(handler);
 	return () => {
 		set?.delete(handler);
-		if (set && set.size === 0) subscribers.delete(sessionId);
+		if (set && set.size === 0) subscribers.delete(key);
 	};
 }
 

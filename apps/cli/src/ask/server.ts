@@ -1,8 +1,14 @@
 import { createApp, bunWebSocket } from '@ottocode/server';
 import { client } from '@ottocode/api';
+import PKG from '../../package.json' with { type: 'json' };
+import {
+	ensureDaemonProject,
+	openProjectOnServer,
+	readDaemonToken,
+	type OpenProjectContext,
+} from '../daemon.ts';
 
 let currentServer: ReturnType<typeof Bun.serve> | null = null;
-let configured = false;
 
 export async function startEphemeralServer(): Promise<string> {
 	if (currentServer) return `http://localhost:${currentServer.port}`;
@@ -18,17 +24,35 @@ export async function startEphemeralServer(): Promise<string> {
 	return url;
 }
 
-export async function getOrStartServerUrl(): Promise<string> {
+export async function getOrStartServerContext(
+	projectRoot: string,
+): Promise<OpenProjectContext> {
 	if (process.env.OTTO_SERVER_URL) {
 		const url = String(process.env.OTTO_SERVER_URL);
-		configureClient(url);
-		return url;
+		const context = await openProjectOnServer({
+			baseUrl: url,
+			projectRoot,
+			token: await readDaemonToken(),
+		});
+		configureClient(context.baseUrl, context);
+		return context;
 	}
-	return await startEphemeralServer();
+	const context = await ensureDaemonProject({
+		version: (PKG as { version: string }).version,
+		projectRoot,
+	});
+	configureClient(context.baseUrl, context);
+	return context;
 }
 
-export async function ensureServer(): Promise<string> {
-	return await getOrStartServerUrl();
+export async function getOrStartServerUrl(): Promise<string> {
+	return (await getOrStartServerContext(process.cwd())).baseUrl;
+}
+
+export async function ensureServer(
+	projectRoot = process.cwd(),
+): Promise<string> {
+	return (await getOrStartServerContext(projectRoot)).baseUrl;
 }
 
 export async function stopEphemeralServer(): Promise<void> {
@@ -40,8 +64,16 @@ export async function stopEphemeralServer(): Promise<void> {
 	}
 }
 
-function configureClient(baseURL: string) {
-	if (configured) return;
-	client.setConfig({ baseURL, adapter: 'fetch' });
-	configured = true;
+function configureClient(baseURL: string, context?: OpenProjectContext) {
+	client.setConfig({
+		baseURL,
+		adapter: 'fetch',
+		headers: context
+			? {
+					...context.authHeaders,
+					'X-Otto-Project-Id': context.projectId,
+					'X-Otto-Project': context.projectRoot,
+				}
+			: undefined,
+	});
 }

@@ -11,6 +11,7 @@ import {
 } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import { getProjectQuery } from '../api.ts';
 
 interface MCPServerInfo {
 	name: string;
@@ -119,7 +120,9 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 
 	const fetchServers = useCallback(async () => {
 		try {
-			const { data } = await listMcpServers();
+			const { data } = await listMcpServers({
+				query: getProjectQuery(),
+			} as never);
 			const resp = data as MCPServerListResponse | undefined;
 			if (resp?.servers) {
 				setServers(resp.servers);
@@ -170,8 +173,9 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				try {
 					const { data } = await completeMcpAuth({
 						path: { name: device.serverName },
+						query: getProjectQuery(),
 						body: { sessionId: device.sessionId },
-					});
+					} as never);
 					const result = data as MCPMutationResponse | undefined;
 					if (result?.status === 'complete') {
 						stopCopilotPolling();
@@ -200,7 +204,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				if (server.connected) {
 					const { data, error: err } = await stopMcpServer({
 						path: { name: server.name },
-					});
+						query: getProjectQuery(),
+					} as never);
 					if (err) throw new Error('Failed to stop server');
 					const result = data as MCPMutationResponse | undefined;
 					if (!result?.ok) throw new Error(result?.error || 'Failed to stop');
@@ -208,7 +213,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				} else if (server.authRequired && !server.authenticated) {
 					const { data, error: err } = await initiateMcpAuth({
 						path: { name: server.name },
-					});
+						query: getProjectQuery(),
+					} as never);
 					if (err) throw new Error('Failed to initiate auth');
 					const result = data as MCPMutationResponse | undefined;
 					if (!result?.ok) throw new Error(result?.error || 'Auth failed');
@@ -243,7 +249,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				} else {
 					const { data, error: err } = await startMcpServer({
 						path: { name: server.name },
-					});
+						query: getProjectQuery(),
+					} as never);
 					if (err) throw new Error('Failed to start server');
 					const result = data as MCPMutationResponse | undefined;
 					if (!result?.ok) throw new Error(result?.error || 'Failed to start');
@@ -289,7 +296,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		try {
 			const { error: err } = await removeMcpServer({
 				path: { name: server.name },
-			});
+				query: getProjectQuery(),
+			} as never);
 			if (err) throw new Error('Failed to remove');
 			showStatus(`${server.name} removed`);
 			setView('list');
@@ -316,6 +324,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				}
 				const parts = cmdStr.split(/\s+/);
 				await addMcpServer({
+					query: getProjectQuery(),
 					body: {
 						name,
 						transport: 'stdio',
@@ -323,7 +332,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 						args: parts.slice(1),
 						scope: addScope,
 					},
-				});
+				} as never);
 			} else {
 				const urlStr = addUrl.trim();
 				if (!urlStr) {
@@ -331,13 +340,14 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 					return;
 				}
 				await addMcpServer({
+					query: getProjectQuery(),
 					body: {
 						name,
 						transport: 'http',
 						url: urlStr,
 						scope: addScope,
 					},
-				});
+				} as never);
 			}
 			showStatus(`${name} added`);
 			setAddName('');

@@ -1,5 +1,6 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { projectScopedKey } from '../lib/api-client/utils';
 
 export type QueueState = {
 	currentMessageId: string | null;
@@ -7,6 +8,10 @@ export type QueueState = {
 	queueLength: number;
 	isRunning: boolean;
 };
+
+export function getQueueStateQueryKey(sessionId: string | undefined) {
+	return projectScopedKey(['queueState', sessionId] as const);
+}
 
 const defaultQueueState: QueueState = {
 	currentMessageId: null,
@@ -38,29 +43,32 @@ export function optimisticallyQueueMessage(
 	sessionId: string,
 	messageId: string,
 ) {
-	queryClient.setQueryData<QueueState>(['queueState', sessionId], (current) => {
-		if (!current) return current;
-		if (!current.isRunning || !current.currentMessageId) return current;
-		if (current.currentMessageId === messageId) return current;
-		if (current.queuedMessages.some((item) => item.messageId === messageId)) {
-			return current;
-		}
+	queryClient.setQueryData<QueueState>(
+		getQueueStateQueryKey(sessionId),
+		(current) => {
+			if (!current) return current;
+			if (!current.isRunning || !current.currentMessageId) return current;
+			if (current.currentMessageId === messageId) return current;
+			if (current.queuedMessages.some((item) => item.messageId === messageId)) {
+				return current;
+			}
 
-		const queuedMessages = [
-			...current.queuedMessages,
-			{ messageId, position: current.queuedMessages.length },
-		];
-		return {
-			...current,
-			queuedMessages,
-			queueLength: queuedMessages.length,
-		};
-	});
+			const queuedMessages = [
+				...current.queuedMessages,
+				{ messageId, position: current.queuedMessages.length },
+			];
+			return {
+				...current,
+				queuedMessages,
+				queueLength: queuedMessages.length,
+			};
+		},
+	);
 }
 
 export function useQueueState(sessionId: string | undefined): QueueState {
 	const { data } = useQuery<QueueState>({
-		queryKey: ['queueState', sessionId],
+		queryKey: getQueueStateQueryKey(sessionId),
 		queryFn: async () => {
 			if (!sessionId) return defaultQueueState;
 			const queueState = await apiClient.getQueueState(sessionId);

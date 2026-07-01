@@ -2,11 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import type { SendMessageRequest } from '../types/api';
 import { optimisticallyQueueMessage } from './useQueueState';
-import { sessionsQueryKey } from './useSessions';
+import { getSessionsQueryKey } from './useSessions';
+import { projectScopedKey } from '../lib/api-client/utils';
 
 interface UseMessagesOptions {
 	enabled?: boolean;
 	staleTime?: number;
+}
+
+export function getMessagesQueryKey(sessionId: string | undefined) {
+	return projectScopedKey(['messages', sessionId] as const);
 }
 
 export function useMessages(
@@ -16,7 +21,7 @@ export function useMessages(
 	const { enabled = true, staleTime = 15_000 } = options;
 
 	return useQuery({
-		queryKey: ['messages', sessionId],
+		queryKey: getMessagesQueryKey(sessionId),
 		queryFn: () => {
 			if (!sessionId) {
 				throw new Error('Session ID is required');
@@ -44,8 +49,10 @@ export function useSendMessage(sessionId: string) {
 			}
 			if (!result.messageId) return;
 			optimisticallyQueueMessage(queryClient, sessionId, result.messageId);
-			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
-			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			queryClient.invalidateQueries({
+				queryKey: getMessagesQueryKey(sessionId),
+			});
+			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 		},
 	});
 }

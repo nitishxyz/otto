@@ -1,5 +1,4 @@
 import { z } from '@hono/zod-openapi';
-import type { TerminalManager } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { upgradeWebSocket } from '../ws.ts';
@@ -60,10 +59,7 @@ const successResponseSchema = z.object({
 	success: z.boolean(),
 });
 
-export function registerTerminalsRoutes(
-	app: Hono,
-	terminalManager: TerminalManager,
-) {
+export function registerTerminalsRoutes(app: Hono) {
 	zodOpenApiRoute(
 		app,
 		{
@@ -86,7 +82,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => c.json(listTerminals(terminalManager)),
+		async (c) => c.json(await listTerminals(c)),
 	);
 
 	zodOpenApiRoute(
@@ -121,7 +117,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => createTerminal(c, terminalManager),
+		(c) => createTerminal(c),
 	);
 
 	zodOpenApiRoute(
@@ -145,7 +141,7 @@ export function registerTerminalsRoutes(
 				'404': { description: 'Terminal not found' },
 			},
 		},
-		(c) => getTerminal(c, terminalManager),
+		(c) => getTerminal(c),
 	);
 
 	zodOpenApiRoute(
@@ -163,10 +159,7 @@ export function registerTerminalsRoutes(
 				'404': { description: 'Terminal not found' },
 			},
 		},
-		upgradeWebSocket((c) => {
-			const id = c.req.param('id');
-			return createTerminalWebSocketHandler(terminalManager, id);
-		}),
+		upgradeWebSocket((c) => createTerminalWebSocketHandler(c)),
 	);
 
 	zodOpenApiRoute(
@@ -187,7 +180,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => handleTerminalOutput(c, terminalManager),
+		(c) => handleTerminalOutput(c),
 	);
 
 	zodOpenApiRoute(
@@ -208,7 +201,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => handleTerminalOutput(c, terminalManager),
+		(c) => handleTerminalOutput(c),
 	);
 
 	zodOpenApiRoute(
@@ -237,7 +230,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => sendTerminalInput(c, terminalManager),
+		(c) => sendTerminalInput(c),
 	);
 
 	zodOpenApiRoute(
@@ -258,7 +251,7 @@ export function registerTerminalsRoutes(
 				},
 			},
 		},
-		(c) => killTerminal(c, terminalManager),
+		(c) => killTerminal(c),
 	);
 
 	zodOpenApiRoute(
@@ -289,6 +282,6 @@ export function registerTerminalsRoutes(
 				'404': { description: 'Terminal not found' },
 			},
 		},
-		(c) => resizeTerminal(c, terminalManager),
+		(c) => resizeTerminal(c),
 	);
 }

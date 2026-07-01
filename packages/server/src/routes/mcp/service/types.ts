@@ -4,6 +4,7 @@ export type CopilotMCPSession = {
 	deviceCode: string;
 	interval: number;
 	serverName: string;
+	projectRoot: string;
 	createdAt: number;
 };
 

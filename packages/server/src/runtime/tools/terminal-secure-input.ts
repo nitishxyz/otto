@@ -18,11 +18,11 @@ export function attachTerminalSecureInput(args: {
 	terminalId: string;
 	callId?: string;
 }): TerminalSecureInputWatcher | null {
-	const terminalManager = getTerminalManager();
+	const terminalManager = getTerminalManager(args.ctx.projectRoot);
 	const terminal = terminalManager?.get(args.terminalId);
 	if (!terminal) return null;
 
-	const watchKey = `${args.ctx.sessionId}:${args.terminalId}`;
+	const watchKey = `${args.ctx.projectRoot}:${args.ctx.sessionId}:${args.terminalId}`;
 	const existing = watchedTerminals.get(watchKey);
 	if (existing) return existing;
 
@@ -75,6 +75,7 @@ export function attachTerminalSecureInput(args: {
 
 		securePromptPending = true;
 		currentPromptPromise = requestSecureInput({
+			projectRoot: args.ctx.projectRoot,
 			sessionId: args.ctx.sessionId,
 			messageId: args.ctx.messageId,
 			callId: args.callId,

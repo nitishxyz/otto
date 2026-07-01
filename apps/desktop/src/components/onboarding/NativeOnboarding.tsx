@@ -11,9 +11,9 @@ import {
 	OttoRouterTopupModal,
 	Toaster,
 } from '@ottocode/web-sdk';
-import { configureApiClient } from '@ottocode/web-sdk/lib';
 import { useOnboardingStore } from '@ottocode/web-sdk/stores';
 import { useAuthStatus } from '@ottocode/web-sdk/hooks';
+import { configureDesktopSdk } from '../../lib/sdk-client';
 
 interface NativeOnboardingProps {
 	onComplete: () => void;
@@ -123,9 +123,7 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 
 	useEffect(() => {
 		if (!server) return;
-		const win = window as Window & { OTTO_SERVER_URL?: string };
-		win.OTTO_SERVER_URL = `http://localhost:${server.port}`;
-		configureApiClient();
+		configureDesktopSdk(server.url, server);
 		setServerReady(true);
 	}, [server]);
 

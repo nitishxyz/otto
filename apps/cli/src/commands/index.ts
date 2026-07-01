@@ -19,3 +19,5 @@ export { registerShareCommand } from './lazy/share.ts';
 export { registerMCPCommand } from './lazy/mcp.ts';
 export { registerWebCommand } from './lazy/web.ts';
 export { registerStorageCommand } from './lazy/storage.ts';
+export { registerServiceCommand } from './lazy/service.ts';
+export { registerProjectsCommand } from './lazy/projects.ts';

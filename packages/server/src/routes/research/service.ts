@@ -10,6 +10,7 @@ import {
 import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { publish } from '../../events/bus.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 async function loadProjectDb(projectRoot: string) {
 	const cfg = await loadConfig(projectRoot);
@@ -53,7 +54,7 @@ async function buildResearchContext(
 
 export async function listResearchSessions(c: Context) {
 	const parentId = c.req.param('parentId');
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 
 	const parentRows = await db
@@ -103,7 +104,7 @@ export async function listResearchSessions(c: Context) {
 
 export async function createResearchSession(c: Context) {
 	const parentId = c.req.param('parentId');
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 	const body = (await c.req.json().catch(() => ({}))) as Record<
 		string,
@@ -168,7 +169,7 @@ export async function createResearchSession(c: Context) {
 
 export async function deleteResearchSession(c: Context) {
 	const researchId = c.req.param('researchId');
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 
 	const rows = await db
@@ -198,7 +199,7 @@ export async function deleteResearchSession(c: Context) {
 
 export async function injectResearchContext(c: Context) {
 	const parentId = c.req.param('parentId');
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 	const body = (await c.req.json().catch(() => ({}))) as Record<
 		string,
@@ -242,7 +243,7 @@ export async function injectResearchContext(c: Context) {
 
 export async function exportResearchSession(c: Context) {
 	const researchId = c.req.param('researchId');
-	const projectRoot = c.req.query('project') || process.cwd();
+	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 	const body = (await c.req.json().catch(() => ({}))) as Record<
 		string,

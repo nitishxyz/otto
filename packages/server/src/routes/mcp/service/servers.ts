@@ -12,9 +12,9 @@ import {
 } from '@ottocode/sdk';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
 
-export async function listMCPServers(projectRoot = process.cwd()) {
+export async function listMCPServers(projectRoot: string) {
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
-	const manager = getMCPManager();
+	const manager = getMCPManager(projectRoot);
 	const statuses = manager ? await manager.getStatusAsync() : [];
 
 	return config.servers.map((server) => {
@@ -108,7 +108,7 @@ export function buildMCPServerConfig(body: Record<string, unknown>) {
 
 export async function addMCPServer(
 	body: Record<string, unknown>,
-	projectRoot = process.cwd(),
+	projectRoot: string,
 ) {
 	const built = buildMCPServerConfig(body);
 	if (!built.ok)
@@ -133,12 +133,9 @@ export async function addMCPServer(
 	}
 }
 
-export async function removeMCPServer(
-	name: string,
-	projectRoot = process.cwd(),
-) {
+export async function removeMCPServer(name: string, projectRoot: string) {
 	try {
-		const manager = getMCPManager();
+		const manager = getMCPManager(projectRoot);
 		if (manager) {
 			const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 			const serverConfig = config.servers.find(

@@ -98,6 +98,7 @@ export async function resolveModel(
 	if (provider === 'ottorouter') {
 		return await resolveOttoRouterModel(model, options?.sessionId, {
 			messageId: options?.messageId,
+			projectRoot: cfg.projectRoot,
 			topupApprovalMode: options?.topupApprovalMode,
 			autoPayThresholdUsd: options?.autoPayThresholdUsd,
 		});

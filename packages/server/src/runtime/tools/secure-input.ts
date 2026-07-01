@@ -1,6 +1,8 @@
 import { publish } from '../../events/bus.ts';
+import { scopedCallKey } from '../projects/scope.ts';
 
 export interface PendingSecureInput {
+	projectRoot?: string;
 	promptId: string;
 	sessionId: string;
 	messageId: string;
@@ -13,6 +15,7 @@ export interface PendingSecureInput {
 const pendingSecureInputs = new Map<string, PendingSecureInput>();
 
 export function requestSecureInput(args: {
+	projectRoot?: string;
 	sessionId: string;
 	messageId: string;
 	callId?: string;
@@ -24,6 +27,7 @@ export function requestSecureInput(args: {
 
 	return new Promise((resolve) => {
 		const pending: PendingSecureInput = {
+			projectRoot: args.projectRoot,
 			promptId,
 			sessionId: args.sessionId,
 			messageId: args.messageId,
@@ -33,11 +37,13 @@ export function requestSecureInput(args: {
 			createdAt: Date.now(),
 		};
 
-		pendingSecureInputs.set(promptId, pending);
+		const key = scopedCallKey(args.projectRoot, promptId);
+		pendingSecureInputs.set(key, pending);
 
 		publish({
 			type: 'shell.secure_input.required',
 			sessionId: args.sessionId,
+			projectRoot: args.projectRoot,
 			payload: {
 				promptId,
 				messageId: args.messageId,
@@ -48,12 +54,13 @@ export function requestSecureInput(args: {
 		});
 
 		setTimeout(() => {
-			if (!pendingSecureInputs.has(promptId)) return;
-			pendingSecureInputs.delete(promptId);
+			if (!pendingSecureInputs.has(key)) return;
+			pendingSecureInputs.delete(key);
 			resolve(null);
 			publish({
 				type: 'shell.secure_input.resolved',
 				sessionId: args.sessionId,
+				projectRoot: args.projectRoot,
 				payload: {
 					promptId,
 					messageId: args.messageId,
@@ -69,8 +76,10 @@ export function requestSecureInput(args: {
 export function resolveSecureInput(
 	promptId: string,
 	value: string | null,
+	projectRoot?: string,
 ): { ok: boolean; error?: string } {
-	const pending = pendingSecureInputs.get(promptId);
+	const key = scopedCallKey(projectRoot, promptId);
+	const pending = pendingSecureInputs.get(key);
 	if (!pending) {
 		return {
 			ok: false,
@@ -78,12 +87,13 @@ export function resolveSecureInput(
 		};
 	}
 
-	pendingSecureInputs.delete(promptId);
+	pendingSecureInputs.delete(key);
 	pending.resolve(value);
 
 	publish({
 		type: 'shell.secure_input.resolved',
 		sessionId: pending.sessionId,
+		projectRoot: pending.projectRoot,
 		payload: {
 			promptId,
 			messageId: pending.messageId,
@@ -98,21 +108,30 @@ export function resolveSecureInput(
 
 export function getPendingSecureInput(
 	promptId: string,
+	projectRoot?: string,
 ): PendingSecureInput | undefined {
-	return pendingSecureInputs.get(promptId);
+	return pendingSecureInputs.get(scopedCallKey(projectRoot, promptId));
 }
 
 export function getPendingSecureInputsForSession(
 	sessionId: string,
+	projectRoot?: string,
 ): PendingSecureInput[] {
 	return Array.from(pendingSecureInputs.values()).filter(
-		(input) => input.sessionId === sessionId,
+		(input) =>
+			input.sessionId === sessionId && input.projectRoot === projectRoot,
 	);
 }
 
-export function clearPendingSecureInputsForSession(sessionId: string): void {
+export function clearPendingSecureInputsForSession(
+	sessionId: string,
+	projectRoot?: string,
+): void {
 	for (const [promptId, pending] of pendingSecureInputs) {
-		if (pending.sessionId === sessionId) {
+		if (
+			pending.sessionId === sessionId &&
+			pending.projectRoot === projectRoot
+		) {
 			pending.resolve(null);
 			pendingSecureInputs.delete(promptId);
 		}

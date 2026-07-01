@@ -16,6 +16,7 @@ import {
 import type { Context } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	getAuthorizedProviders,
 	getDefault,
@@ -100,7 +101,7 @@ export async function handleGetProviders(c: Context) {
 			});
 		}
 
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const cfg = await loadConfig(projectRoot);
 		const authorizedProviders = await getAuthorizedProviders(undefined, cfg);
 		const details = await getProviderDetails(undefined, cfg);
@@ -192,7 +193,7 @@ export async function handleUpdateProviderSettings(c: Context) {
 			return c.json({ error: 'Embedded config cannot be modified' }, 400);
 		}
 
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const provider = c.req.param('provider').trim();
 		const body = await c.req.json<ProviderMutationBody>();
 		if (!provider) return c.json({ error: 'Provider is required' }, 400);
@@ -223,7 +224,7 @@ export async function handleDeleteProviderSettings(c: Context) {
 			return c.json({ error: 'Embedded config cannot be modified' }, 400);
 		}
 
-		const projectRoot = c.req.query('project') || process.cwd();
+		const projectRoot = await resolveRequestProjectRoot(c);
 		const provider = c.req.param('provider').trim();
 		if (!provider) return c.json({ error: 'Provider is required' }, 400);
 

@@ -6,6 +6,7 @@ import {
 	getPendingSecureInputsForSession,
 	resolveSecureInput,
 } from '../runtime/tools/secure-input.ts';
+import { resolveRequestProject } from './project-context.ts';
 
 const sessionSecureInputParamsSchema = z.object({
 	id: z.string().openapi({
@@ -101,10 +102,14 @@ export function registerSessionSecureInputRoute(app: Hono) {
 			},
 		},
 		async (c) => {
+			const project = await resolveRequestProject(c);
 			const sessionId = c.req.param('id');
 			const body = secureInputResolveBodySchema.parse(await c.req.json());
 
-			const pending = getPendingSecureInput(body.promptId);
+			const pending = getPendingSecureInput(
+				body.promptId,
+				project.runtime.root,
+			);
 			if (!pending) {
 				return c.json(
 					{
@@ -123,7 +128,11 @@ export function registerSessionSecureInputRoute(app: Hono) {
 			}
 
 			const value = body.cancelled === true ? null : (body.value ?? '');
-			const result = resolveSecureInput(body.promptId, value);
+			const result = resolveSecureInput(
+				body.promptId,
+				value,
+				project.runtime.root,
+			);
 			if (!result.ok) {
 				return c.json({ ok: false, error: result.error }, 400);
 			}
@@ -158,18 +167,20 @@ export function registerSessionSecureInputRoute(app: Hono) {
 				},
 			},
 		},
-		(c) => {
+		async (c) => {
+			const project = await resolveRequestProject(c);
 			const sessionId = c.req.param('id');
-			const pending = getPendingSecureInputsForSession(sessionId).map(
-				(input) => ({
-					promptId: input.promptId,
-					messageId: input.messageId,
-					callId: input.callId,
-					prompt: input.prompt,
-					inputKind: 'password' as const,
-					createdAt: input.createdAt,
-				}),
-			);
+			const pending = getPendingSecureInputsForSession(
+				sessionId,
+				project.runtime.root,
+			).map((input) => ({
+				promptId: input.promptId,
+				messageId: input.messageId,
+				callId: input.callId,
+				prompt: input.prompt,
+				inputKind: 'password' as const,
+				createdAt: input.createdAt,
+			}));
 
 			return c.json({ ok: true, pending });
 		},

@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { addMCPServer, listMCPServers, removeMCPServer } from './service.ts';
 
 const mcpServerSchema = z
@@ -77,7 +78,9 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			return c.json({ servers: await listMCPServers() });
+			return c.json({
+				servers: await listMCPServers(await resolveRequestProjectRoot(c)),
+			});
 		},
 	);
 
@@ -113,7 +116,10 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const result = await addMCPServer(await c.req.json());
+			const result = await addMCPServer(
+				await c.req.json(),
+				await resolveRequestProjectRoot(c),
+			);
 			return result.ok
 				? c.json(result.body)
 				: c.json(result.body, result.status);
@@ -147,7 +153,10 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const result = await removeMCPServer(c.req.param('name'));
+			const result = await removeMCPServer(
+				c.req.param('name'),
+				await resolveRequestProjectRoot(c),
+			);
 			return result.ok
 				? c.json(result.body)
 				: c.json(result.body, result.status);

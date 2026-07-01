@@ -8,7 +8,12 @@ import {
 } from '@ottocode/api';
 import { toast, useToastStore } from '../stores/toastStore';
 import type { SessionsPage } from '../types/api';
-import { getBaseUrl } from '../lib/api-client/utils';
+import {
+	getAuthHeaders,
+	getBaseUrl,
+	getProjectId,
+	getProjectKey,
+} from '../lib/api-client/utils';
 import { openUrl } from '../lib/open-url';
 import {
 	getPlatformWindowFocused,
@@ -19,7 +24,7 @@ import {
 } from '../lib/platform';
 import { requestBrowserNotificationPermission } from '../lib/notifications';
 import { usePreferences } from './usePreferences';
-import { sessionsQueryKey } from './useSessions';
+import { getSessionsQueryKey } from './useSessions';
 
 type DesktopNotificationMessage = {
 	type: 'otto-notification';
@@ -121,7 +126,7 @@ function updateSessionStatusInCache(
 	status: SessionStatusEvent,
 ) {
 	queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-		sessionsQueryKey,
+		getSessionsQueryKey(),
 		(old) => {
 			if (!old) return old;
 			return {
@@ -282,14 +287,19 @@ export function useClientEvents(activeSessionId?: string) {
 			},
 		});
 	}, [preferences.notificationsEnabled]);
+	const projectKey = getProjectKey();
 
 	useEffect(() => {
+		void projectKey;
 		const controller = new AbortController();
 		const baseUrl = getBaseUrl();
+		const projectId = getProjectId();
 
 		void createClientEventsStream(
 			{
 				baseUrl,
+				projectId,
+				headers: getAuthHeaders(),
 				onEvent: (event) => {
 					if (event.event === 'heartbeat') return;
 
@@ -306,7 +316,7 @@ export function useClientEvents(activeSessionId?: string) {
 						updateSessionStatusInCache(queryClient, status);
 						if (status.status !== 'running') {
 							void queryClient.invalidateQueries({
-								queryKey: sessionsQueryKey,
+								queryKey: getSessionsQueryKey(),
 							});
 						}
 						return;
@@ -343,7 +353,10 @@ export function useClientEvents(activeSessionId?: string) {
 		);
 
 		return () => controller.abort();
-	}, [queryClient]);
+	}, [queryClient, projectKey]);
 
-	return buildClientEventsStreamUrl({ baseUrl: getBaseUrl() });
+	return buildClientEventsStreamUrl({
+		baseUrl: getBaseUrl(),
+		projectId: getProjectId(),
+	});
 }

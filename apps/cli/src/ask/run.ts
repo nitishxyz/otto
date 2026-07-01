@@ -36,7 +36,7 @@ import type {
 	Transcript,
 } from './types.ts';
 import { connectSSE, safeJson } from './http.ts';
-import { getOrStartServerUrl } from './server.ts';
+import { getOrStartServerContext } from './server.ts';
 import { extractToolError, isToolError } from '@ottocode/sdk/tools/error';
 
 const SAFE_TOOLS = new Set(['finish', 'progress_update', 'update_todos']);
@@ -44,7 +44,8 @@ const SAFE_TOOLS = new Set(['finish', 'progress_update', 'update_todos']);
 export async function runAsk(prompt: string, opts: AskOptions = {}) {
 	const startedAt = Date.now();
 	const projectRoot = opts.project ?? process.cwd();
-	const baseUrl = await getOrStartServerUrl();
+	const serverContext = await getOrStartServerContext(projectRoot);
+	const baseUrl = serverContext.baseUrl;
 
 	const flags = parseFlags(process.argv);
 	const jsonMode = flags.jsonEnabled || flags.jsonStreamEnabled;
@@ -64,7 +65,7 @@ export async function runAsk(prompt: string, opts: AskOptions = {}) {
 		};
 
 		const handshakeResponse = await ask({
-			query: { project: projectRoot },
+			query: { projectId: serverContext.projectId },
 			body: askBody,
 		});
 		if (handshakeResponse.error) {
@@ -92,9 +93,9 @@ export async function runAsk(prompt: string, opts: AskOptions = {}) {
 		const sseUrl = buildSessionStreamUrl({
 			baseUrl,
 			sessionId: handshake.sessionId,
-			projectPath: projectRoot,
+			projectId: serverContext.projectId,
 		});
-		sse = await connectSSE(sseUrl);
+		sse = await connectSSE(sseUrl, serverContext.authHeaders);
 
 		const streamResult = await consumeAskStream({
 			sse,

@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { apiClient } from '../lib/api-client';
+import { projectScopedKey } from '../lib/api-client/utils';
 import type {
 	CreateSessionRequest,
 	UpdateSessionRequest,
@@ -17,13 +18,21 @@ const SESSIONS_PAGE_SIZE = 50;
 
 export const sessionsQueryKey = ['sessions', 'list'] as const;
 
+export function getSessionsQueryKey(sessionType?: SessionListFilter) {
+	return sessionType
+		? projectScopedKey([...sessionsQueryKey, sessionType] as const)
+		: projectScopedKey(sessionsQueryKey);
+}
+
+export function getSessionQueryKey(sessionId: string) {
+	return projectScopedKey(['session', sessionId] as const);
+}
+
 export type SessionListFilter = 'otto' | undefined;
 
 export function useSessionsInfinite(sessionType?: SessionListFilter) {
 	return useInfiniteQuery({
-		queryKey: sessionType
-			? ([...sessionsQueryKey, sessionType] as const)
-			: sessionsQueryKey,
+		queryKey: getSessionsQueryKey(sessionType),
 		queryFn: ({ pageParam = 0 }) =>
 			apiClient.getSessionsPage({
 				limit: SESSIONS_PAGE_SIZE,
@@ -66,7 +75,7 @@ export function useSession(sessionId: string) {
 	const { data: sessions } = useSessions();
 	const listed = sessions?.find((s) => s.id === sessionId);
 	const { data: detail } = useQuery({
-		queryKey: ['session', sessionId],
+		queryKey: getSessionQueryKey(sessionId),
 		queryFn: () => apiClient.getSession(sessionId),
 		enabled: Boolean(sessionId) && !listed,
 		staleTime: 15_000,
@@ -80,8 +89,9 @@ export function useCreateSession() {
 	return useMutation({
 		mutationFn: (data: CreateSessionRequest) => apiClient.createSession(data),
 		onSuccess: (newSession) => {
+			const queryKey = getSessionsQueryKey();
 			queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-				sessionsQueryKey,
+				queryKey,
 				(old) => {
 					if (!old) return old;
 					const firstPage = old.pages[0];
@@ -95,7 +105,7 @@ export function useCreateSession() {
 					};
 				},
 			);
-			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			queryClient.invalidateQueries({ queryKey });
 		},
 	});
 }
@@ -107,8 +117,10 @@ export function useUpdateSession(sessionId: string) {
 		mutationFn: (data: UpdateSessionRequest) =>
 			apiClient.updateSession(sessionId, data),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
-			await queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+			await queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
+			await queryClient.invalidateQueries({
+				queryKey: getSessionQueryKey(sessionId),
+			});
 		},
 	});
 }
@@ -125,8 +137,9 @@ export function useSetSessionPinned() {
 			isPinned: boolean;
 		}) => apiClient.updateSession(sessionId, { isPinned }),
 		onSuccess: async (updatedSession) => {
+			const queryKey = getSessionsQueryKey();
 			queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-				sessionsQueryKey,
+				queryKey,
 				(old) => {
 					if (!old) return old;
 					return {
@@ -142,9 +155,9 @@ export function useSetSessionPinned() {
 					};
 				},
 			);
-			await queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			await queryClient.invalidateQueries({ queryKey });
 			await queryClient.invalidateQueries({
-				queryKey: ['session', updatedSession.id],
+				queryKey: getSessionQueryKey(updatedSession.id),
 			});
 		},
 	});
@@ -156,8 +169,9 @@ export function useMarkSessionViewed() {
 	return useMutation({
 		mutationFn: (sessionId: string) => apiClient.markSessionViewed(sessionId),
 		onSuccess: (updatedSession) => {
+			const queryKey = getSessionsQueryKey();
 			queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-				sessionsQueryKey,
+				queryKey,
 				(old) => {
 					if (!old) return old;
 					return {
@@ -183,7 +197,7 @@ export function useDeleteSession() {
 	return useMutation({
 		mutationFn: (sessionId: string) => apiClient.deleteSession(sessionId),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 		},
 	});
 }

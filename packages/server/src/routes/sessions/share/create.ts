@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../../project-context.ts';
 import { createShare, loadProjectDb } from '../service.ts';
 import {
 	projectQuerySchema,
@@ -44,7 +45,7 @@ export function registerCreateShareRoute(app: Hono) {
 		},
 		async (c) => {
 			const sessionId = c.req.param('sessionId');
-			const projectRoot = c.req.query('project') || process.cwd();
+			const projectRoot = await resolveRequestProjectRoot(c);
 			const { db } = await loadProjectDb(projectRoot);
 			const result = await createShare(db, sessionId);
 			return result.ok

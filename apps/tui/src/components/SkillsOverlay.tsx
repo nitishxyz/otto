@@ -1,11 +1,10 @@
 import { useKeyboard } from '@opentui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-	client,
 	getSkillsConfig,
 	updateSkillsConfig as updateSkillsConfigApi,
 } from '@ottocode/api';
-import { getBaseUrl } from '../api.ts';
+import { getProjectQuery } from '../api.ts';
 import { useTheme } from '../theme.ts';
 import { getVisibleWindow, ModalFrame, SelectRow } from './ModalFrame.tsx';
 
@@ -38,8 +37,7 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 
 async function fetchSkillsConfig(): Promise<SkillsConfigResponse> {
-	client.setConfig({ baseURL: getBaseUrl() });
-	const response = await getSkillsConfig();
+	const response = await getSkillsConfig({ query: getProjectQuery() } as never);
 	if (response.error) {
 		throw new Error(
 			typeof response.error === 'object' &&
@@ -56,8 +54,10 @@ async function updateSkillsConfig(input: {
 	enabled?: boolean;
 	items?: Record<string, { enabled?: boolean }>;
 }): Promise<SkillsConfigResponse> {
-	client.setConfig({ baseURL: getBaseUrl() });
-	const response = await updateSkillsConfigApi({ body: input });
+	const response = await updateSkillsConfigApi({
+		query: getProjectQuery(),
+		body: input,
+	} as never);
 	if (response.error) {
 		throw new Error(
 			typeof response.error === 'object' &&

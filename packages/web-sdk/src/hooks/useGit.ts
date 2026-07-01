@@ -1,12 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { useGitStore } from '../stores/gitStore';
+import { projectScopedKey } from '../lib/api-client/utils';
+
+export const gitStatusQueryKey = () =>
+	projectScopedKey(['git', 'status'] as const);
+export const gitBranchQueryKey = () =>
+	projectScopedKey(['git', 'branch'] as const);
+export const gitRemotesQueryKey = () =>
+	projectScopedKey(['git', 'remotes'] as const);
+export const gitBranchesQueryKey = () =>
+	projectScopedKey(['git', 'branches'] as const);
+export const gitDiffQueryKey = (file: string | null, staged = false) =>
+	projectScopedKey(['git', 'diff', file, staged] as const);
 
 export function useGitStatus() {
 	const isExpanded = useGitStore((state) => state.isExpanded);
 
 	return useQuery({
-		queryKey: ['git', 'status'],
+		queryKey: gitStatusQueryKey(),
 		queryFn: () => apiClient.getGitStatus(),
 		// Only poll when sidebar is expanded to reduce unnecessary requests
 		// Disabled during active generation to prevent interference
@@ -19,7 +31,7 @@ export function useGitStatus() {
 
 export function useGitDiff(file: string | null, staged = false) {
 	return useQuery({
-		queryKey: ['git', 'diff', file, staged],
+		queryKey: gitDiffQueryKey(file, staged),
 		queryFn: () => (file ? apiClient.getGitDiff(file, staged) : null),
 		enabled: !!file,
 		retry: 1,
@@ -32,7 +44,7 @@ export function useGitBranch() {
 	const isExpanded = useGitStore((state) => state.isExpanded);
 
 	return useQuery({
-		queryKey: ['git', 'branch'],
+		queryKey: gitBranchQueryKey(),
 		queryFn: () => apiClient.getGitBranch(),
 		// Only poll when sidebar is expanded
 		refetchInterval: isExpanded ? 10000 : false, // Poll every 10 seconds
@@ -53,7 +65,7 @@ export function useStageFiles() {
 	return useMutation({
 		mutationFn: (files: string[]) => apiClient.stageFiles(files),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
@@ -64,7 +76,7 @@ export function useUnstageFiles() {
 	return useMutation({
 		mutationFn: (files: string[]) => apiClient.unstageFiles(files),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
@@ -75,7 +87,7 @@ export function useRestoreFiles() {
 	return useMutation({
 		mutationFn: (files: string[]) => apiClient.restoreFiles(files),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
@@ -86,7 +98,7 @@ export function useDeleteFiles() {
 	return useMutation({
 		mutationFn: (files: string[]) => apiClient.deleteFiles(files),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
@@ -97,8 +109,8 @@ export function useCommitChanges() {
 	return useMutation({
 		mutationFn: (message: string) => apiClient.commitChanges(message),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
 		},
 	});
 }
@@ -109,8 +121,8 @@ export function usePushCommits() {
 	return useMutation({
 		mutationFn: () => apiClient.pushCommits(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
 		},
 	});
 }
@@ -121,8 +133,8 @@ export function usePullChanges() {
 	return useMutation({
 		mutationFn: () => apiClient.pullChanges(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
 		},
 	});
 }
@@ -134,8 +146,8 @@ export function useGitRebaseAction() {
 		mutationFn: (action: 'continue' | 'abort' | 'skip') =>
 			apiClient.performRebaseAction(action),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
 		},
 	});
 }
@@ -146,8 +158,8 @@ export function useGitInit() {
 	return useMutation({
 		mutationFn: () => apiClient.initGitRepo(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
 		},
 	});
 }
@@ -156,7 +168,7 @@ export function useGitRemotes() {
 	const isExpanded = useGitStore((state) => state.isExpanded);
 
 	return useQuery({
-		queryKey: ['git', 'remotes'],
+		queryKey: gitRemotesQueryKey(),
 		queryFn: () => apiClient.getRemotes(),
 		enabled: isExpanded,
 		retry: 1,
@@ -171,8 +183,8 @@ export function useAddRemote() {
 		mutationFn: ({ name, url }: { name: string; url: string }) =>
 			apiClient.addRemote(name, url),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'remotes'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitRemotesQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
@@ -183,15 +195,15 @@ export function useRemoveRemote() {
 	return useMutation({
 		mutationFn: (name: string) => apiClient.removeRemote(name),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'remotes'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+			queryClient.invalidateQueries({ queryKey: gitRemotesQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 		},
 	});
 }
 
 export function useGitBranches(enabled = true) {
 	return useQuery({
-		queryKey: ['git', 'branches'],
+		queryKey: gitBranchesQueryKey(),
 		queryFn: () => apiClient.listGitBranches(),
 		enabled,
 		retry: 1,
@@ -205,9 +217,9 @@ export function useCheckoutBranch() {
 	return useMutation({
 		mutationFn: (branch: string) => apiClient.checkoutBranch(branch),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branches'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchesQueryKey() });
 		},
 	});
 }
@@ -226,9 +238,9 @@ export function useCreateGitBranch() {
 			checkout?: boolean;
 		}) => apiClient.createGitBranch(name, { startPoint, checkout }),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branch'] });
-			queryClient.invalidateQueries({ queryKey: ['git', 'branches'] });
+			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
+			queryClient.invalidateQueries({ queryKey: gitBranchesQueryKey() });
 		},
 	});
 }

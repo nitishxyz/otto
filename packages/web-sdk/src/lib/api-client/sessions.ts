@@ -31,6 +31,9 @@ import {
 	convertSession,
 	convertMessage,
 	getBaseUrl,
+	getProjectId,
+	getProjectRoot,
+	getProjectQuery,
 } from './utils';
 
 type ApiSession = Parameters<typeof convertSession>[0];
@@ -46,7 +49,9 @@ export const sessionsMixin = {
 	): Promise<SessionsPage> {
 		const { limit = 50, offset = 0, sessionType } = params;
 		const response = await apiListSessions({
-			query: sessionType ? { limit, offset, sessionType } : { limit, offset },
+			query: sessionType
+				? { ...getProjectQuery(), limit, offset, sessionType }
+				: { ...getProjectQuery(), limit, offset },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		const data = response.data;
@@ -59,15 +64,19 @@ export const sessionsMixin = {
 
 	async createSession(data: CreateSessionRequest): Promise<Session> {
 		const response = await apiCreateSession({
+			query: getProjectQuery(),
 			body: data as CreateSessionData['body'],
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		if (!response.data) throw new Error('No data returned from create session');
 		return convertSession(response.data as ApiSession);
 	},
 
 	async getSession(sessionId: string): Promise<Session> {
-		const response = await apiGetSession({ path: { sessionId } });
+		const response = await apiGetSession({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return convertSession(response.data as ApiSession);
 	},
@@ -78,21 +87,28 @@ export const sessionsMixin = {
 	): Promise<Session> {
 		const response = await apiUpdateSession({
 			path: { sessionId },
+			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
 			body: data as any,
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return convertSession(response.data as ApiSession);
 	},
 
 	async markSessionViewed(sessionId: string): Promise<Session> {
-		const response = await apiMarkSessionViewed({ path: { sessionId } });
+		const response = await apiMarkSessionViewed({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return convertSession(response.data as ApiSession);
 	},
 
 	async deleteSession(sessionId: string): Promise<{ success: boolean }> {
-		const response = await apiDeleteSession({ path: { sessionId } });
+		const response = await apiDeleteSession({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as { success: boolean };
 	},
@@ -103,7 +119,10 @@ export const sessionsMixin = {
 		sourceSessionId: string;
 		message: string;
 	}> {
-		const response = await apiCreateSessionHandoff({ path: { sessionId } });
+		const response = await apiCreateSessionHandoff({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		const data = response.data;
 		if (!data?.session || !data?.sessionId) {
@@ -120,8 +139,9 @@ export const sessionsMixin = {
 	async abortSession(sessionId: string): Promise<{ success: boolean }> {
 		const response = await apiAbortSession({
 			path: { sessionId },
+			query: getProjectQuery(),
 			body: {},
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as { success: boolean };
 	},
@@ -132,8 +152,9 @@ export const sessionsMixin = {
 	): Promise<{ success: boolean; wasRunning: boolean; messageId: string }> {
 		const response = await apiAbortSession({
 			path: { sessionId },
+			query: getProjectQuery(),
 			body: {},
-		});
+		} as never);
 		if (response.error) throw new Error('Failed to abort message');
 		return response.data as {
 			success: boolean;
@@ -147,7 +168,10 @@ export const sessionsMixin = {
 		queuedMessages: Array<{ messageId: string; position: number }>;
 		isRunning: boolean;
 	}> {
-		const response = await apiGetSessionQueue({ path: { sessionId } });
+		const response = await apiGetSessionQueue({
+			path: { sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error('Failed to get queue state');
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -164,7 +188,8 @@ export const sessionsMixin = {
 	}> {
 		const response = await apiRemoveFromQueue({
 			path: { sessionId, messageId },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error('Failed to remove from queue');
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -182,7 +207,8 @@ export const sessionsMixin = {
 	}> {
 		const response = await apiSendQueuedMessageNow({
 			path: { sessionId, messageId },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as {
 			success: boolean;
@@ -194,7 +220,10 @@ export const sessionsMixin = {
 	},
 
 	async getMessages(sessionId: string): Promise<Message[]> {
-		const response = await apiListMessages({ path: { id: sessionId } });
+		const response = await apiListMessages({
+			path: { id: sessionId },
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return (response.data || []).map(convertMessage);
 	},
@@ -205,14 +234,20 @@ export const sessionsMixin = {
 	): Promise<SendMessageResponse> {
 		const response = await apiCreateMessage({
 			path: { id: sessionId },
+			query: getProjectQuery(),
 			body: data as CreateMessageData['body'],
-		});
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as SendMessageResponse;
 	},
 
 	getStreamUrl(sessionId: string): string {
-		return buildSessionStreamUrl({ baseUrl: getBaseUrl(), sessionId });
+		return buildSessionStreamUrl({
+			baseUrl: getBaseUrl(),
+			sessionId,
+			projectId: getProjectId(),
+			projectPath: getProjectRoot(),
+		});
 	},
 
 	async retryMessage(
@@ -221,7 +256,8 @@ export const sessionsMixin = {
 	): Promise<{ success: boolean; messageId: string }> {
 		const response = await apiRetryMessage({
 			path: { sessionId, messageId },
-		});
+			query: getProjectQuery(),
+		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;

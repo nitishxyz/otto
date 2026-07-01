@@ -7,7 +7,7 @@ export class SSEClient {
 	private handlers: Map<string, Set<SSEEventHandler>> = new Map();
 	private running = false;
 
-	async connect(url: string) {
+	async connect(url: string, headers?: HeadersInit) {
 		if (this.abortController) {
 			this.abortController.abort();
 		}
@@ -20,7 +20,7 @@ export class SSEClient {
 		try {
 			const response = await fetch(url, {
 				method: isTunnel ? 'POST' : 'GET',
-				headers: { Accept: 'text/event-stream' },
+				headers: { ...headers, Accept: 'text/event-stream' },
 				signal: this.abortController.signal,
 			});
 

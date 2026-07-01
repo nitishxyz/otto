@@ -3,6 +3,7 @@ import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { loadProjectDb, retryAssistantMessage } from './service.ts';
 
 const retryMessageParamsSchema = z.object({
@@ -73,7 +74,7 @@ export function registerSessionRetryRoutes(app: Hono) {
 			try {
 				const sessionId = c.req.param('sessionId');
 				const messageId = c.req.param('messageId');
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const { cfg, db } = await loadProjectDb(projectRoot);
 				const result = await retryAssistantMessage(
 					cfg,

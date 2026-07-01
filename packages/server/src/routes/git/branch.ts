@@ -3,7 +3,7 @@ import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
-import { gitStatusSchema } from './schemas.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	getAheadBehind,
 	getCurrentBranch,
@@ -74,11 +74,7 @@ export function registerBranchRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const query = gitStatusSchema.parse({
-					project: c.req.query('project'),
-				});
-
-				const requestedPath = query.project || process.cwd();
+				const requestedPath = await resolveRequestProjectRoot(c);
 
 				const validation = await validateAndGetGitRoot(requestedPath);
 				if ('error' in validation) {

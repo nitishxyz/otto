@@ -7,11 +7,17 @@ import {
 	publishQueueState,
 } from './state.ts';
 
-function publishRunningStatus(sessionId: string, messageId: string): void {
+function publishRunningStatus(
+	sessionId: string,
+	messageId: string,
+	state?: RunnerState,
+): void {
 	publishClientEvent({
 		type: 'session.status',
 		payload: {
 			sessionId,
+			projectId: state?.projectId,
+			projectRoot: state?.projectRoot,
 			status: 'running',
 			messageId,
 			createdAt: new Date().toISOString(),
@@ -53,7 +59,7 @@ export function setCurrentMessage(
 	if (state) {
 		state.currentMessageId = messageId;
 		publishQueueState(sessionId);
-		if (messageId) publishRunningStatus(sessionId, messageId);
+		if (messageId) publishRunningStatus(sessionId, messageId, state);
 	}
 }
 
@@ -63,7 +69,7 @@ export function dequeueJob(sessionId: string): RunOpts | undefined {
 	if (job && state) {
 		state.currentMessageId = job.assistantMessageId;
 		publishQueueState(sessionId);
-		publishRunningStatus(sessionId, job.assistantMessageId);
+		publishRunningStatus(sessionId, job.assistantMessageId, state);
 	}
 	return job;
 }
@@ -73,7 +79,7 @@ export function cleanupSession(sessionId: string): void {
 	if (state && state.queue.length === 0 && !state.running) {
 		// Clean up any lingering abort controller for current message.
 		if (state.currentMessageId) {
-			deleteMessageAbortController(state.currentMessageId);
+			deleteMessageAbortController(state.currentMessageId, state.projectRoot);
 		}
 		state.currentMessageId = null;
 		deleteRunnerState(sessionId);

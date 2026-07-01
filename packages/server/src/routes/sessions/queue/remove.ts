@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
-import { loadProjectDb, removeSessionQueueMessage } from '../service.ts';
+import { resolveRequestProject } from '../../project-context.ts';
+import { removeSessionQueueMessage } from '../service.ts';
 import {
 	projectQuerySchema,
 	queueErrorSchema,
@@ -39,8 +40,7 @@ export function registerRemoveQueuedMessageRoute(app: Hono) {
 		async (c) => {
 			const sessionId = c.req.param('sessionId');
 			const messageId = c.req.param('messageId');
-			const projectRoot = c.req.query('project') || process.cwd();
-			const { db } = await loadProjectDb(projectRoot);
+			const { db } = await resolveRequestProject(c);
 			const result = await removeSessionQueueMessage(db, sessionId, messageId);
 			return result.status
 				? c.json(result.body, result.status)

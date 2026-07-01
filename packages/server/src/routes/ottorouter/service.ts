@@ -3,7 +3,6 @@ import {
 	fetchOttoRouterBalance,
 	getAuth,
 	getPublicKeyFromPrivate,
-	loadConfig,
 } from '@ottocode/sdk';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
@@ -17,14 +16,16 @@ export function getOttoRouterBaseUrl(): string {
 		: OTTOROUTER_BASE_URL;
 }
 
-export async function getOttoRouterPrivateKey(): Promise<string | null> {
+export async function getOttoRouterPrivateKey(
+	projectRoot?: string,
+): Promise<string | null> {
 	if (process.env.OTTOROUTER_PRIVATE_KEY) {
 		return process.env.OTTOROUTER_PRIVATE_KEY;
 	}
+	if (!projectRoot) return null;
 
 	try {
-		const cfg = await loadConfig(process.cwd());
-		const auth = await getAuth('ottorouter', cfg.projectRoot);
+		const auth = await getAuth('ottorouter', projectRoot);
 		if (auth?.type === 'wallet' && auth.secret) {
 			return auth.secret;
 		}

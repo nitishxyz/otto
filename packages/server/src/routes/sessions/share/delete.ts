@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../../project-context.ts';
 import { deleteShare, loadProjectDb } from '../service.ts';
 import {
 	projectQuerySchema,
@@ -38,7 +39,7 @@ export function registerDeleteShareRoute(app: Hono) {
 		},
 		async (c) => {
 			const sessionId = c.req.param('sessionId');
-			const projectRoot = c.req.query('project') || process.cwd();
+			const projectRoot = await resolveRequestProjectRoot(c);
 			const { db } = await loadProjectDb(projectRoot);
 			const result = await deleteShare(db, sessionId);
 			return result.ok

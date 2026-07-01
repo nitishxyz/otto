@@ -11,6 +11,7 @@ import type { Hono } from 'hono';
 import { normalizeThemeId, themeIds, type ThemeId } from '@ottocode/themes';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const projectQuerySchema = z.object({
 	project: z
@@ -49,6 +50,7 @@ const defaultsUpdateBodySchema = z.object({
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
 	smartEdges: z.boolean().optional(),
+	threadNavigatorRail: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
@@ -72,6 +74,7 @@ const defaultsSchema = z.object({
 	compactThread: z.boolean().optional(),
 	fontFamily: z.string().optional(),
 	smartEdges: z.boolean().optional(),
+	threadNavigatorRail: z.boolean().optional(),
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
@@ -115,7 +118,7 @@ export function registerDefaultsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const body = await c.req.json<{
 					agent?: string;
@@ -131,6 +134,7 @@ export function registerDefaultsRoute(app: Hono) {
 					compactThread?: boolean;
 					fontFamily?: string;
 					smartEdges?: boolean;
+					threadNavigatorRail?: boolean;
 					releaseToSend?: boolean;
 					fullWidthContent?: boolean;
 					notificationsEnabled?: boolean;
@@ -155,6 +159,7 @@ export function registerDefaultsRoute(app: Hono) {
 					compactThread: boolean;
 					fontFamily: string;
 					smartEdges: boolean;
+					threadNavigatorRail: boolean;
 					releaseToSend: boolean;
 					fullWidthContent: boolean;
 					notificationsEnabled: boolean;
@@ -191,6 +196,8 @@ export function registerDefaultsRoute(app: Hono) {
 					if (fontFamily) updates.fontFamily = fontFamily;
 				}
 				if (body.smartEdges !== undefined) updates.smartEdges = body.smartEdges;
+				if (body.threadNavigatorRail !== undefined)
+					updates.threadNavigatorRail = body.threadNavigatorRail;
 				if (body.releaseToSend !== undefined)
 					updates.releaseToSend = body.releaseToSend;
 				if (body.fullWidthContent !== undefined)

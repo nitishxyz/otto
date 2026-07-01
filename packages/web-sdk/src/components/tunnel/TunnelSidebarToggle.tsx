@@ -1,14 +1,16 @@
 import { memo } from 'react';
-import { Globe } from 'lucide-react';
+import { Network } from 'lucide-react';
 import { useTunnelStore } from '../../stores/tunnelStore';
 import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
 	const isExpanded = useTunnelStore((state) => state.isExpanded);
 	const toggleSidebar = useTunnelStore((state) => state.toggleSidebar);
-	const status = useTunnelStore((state) => state.status);
+	const remoteStatus = useTunnelStore((state) => state.remoteControl.status);
+	const shareStatus = useTunnelStore((state) => state.projectShare.status);
 
-	const isConnected = status === 'connected';
+	const isConnected =
+		remoteStatus === 'connected' || shareStatus === 'connected';
 
 	return (
 		<button
@@ -19,9 +21,9 @@ export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
 					? 'bg-muted border-primary'
 					: 'border-transparent hover:bg-muted/50'
 			}`}
-			title="Remote Access"
+			title="Connections"
 		>
-			<Globe className="size-[18px] text-muted-foreground mx-auto" />
+			<Network className="size-[18px] text-muted-foreground mx-auto" />
 			{isConnected && (
 				<span className="absolute top-1.5 right-1.5 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
 			)}

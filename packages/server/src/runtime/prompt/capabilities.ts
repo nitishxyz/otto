@@ -29,11 +29,12 @@ export function buildCapabilitySummary(options?: {
 	skillSettings?: OttoConfig['skills'];
 	skills?: DiscoveredSkill[];
 	mcpTools?: CapabilitySummaryMCPTool[];
+	projectRoot?: string;
 }): CapabilitySummaryResult {
 	const skillLines = options?.skills
 		? buildSkillLines(options.skills, options.skillSettings)
 		: [];
-	const mcpLines = buildMCPLines(options?.mcpTools);
+	const mcpLines = buildMCPLines(options?.mcpTools, options?.projectRoot);
 	const components = ['capabilities'];
 	const sections: string[] = [];
 
@@ -114,8 +115,9 @@ function buildSkillLines(
 
 function buildMCPLines(
 	providedMCPTools: CapabilitySummaryMCPTool[] | undefined,
+	projectRoot?: string,
 ): string[] {
-	const tools = providedMCPTools ?? getLiveMCPTools();
+	const tools = providedMCPTools ?? getLiveMCPTools(projectRoot);
 	if (tools.length === 0) return [];
 
 	const grouped = new Map<string, CapabilitySummaryMCPTool[]>();
@@ -145,8 +147,8 @@ function buildMCPLines(
 	return visible;
 }
 
-function getLiveMCPTools(): CapabilitySummaryMCPTool[] {
-	const manager = getMCPManager();
+function getLiveMCPTools(projectRoot?: string): CapabilitySummaryMCPTool[] {
+	const manager = getMCPManager(projectRoot);
 	if (!manager?.started) return [];
 	return manager.getTools().map(({ name, server, tool }) => ({
 		name,

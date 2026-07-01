@@ -119,7 +119,9 @@ export async function runPluginsInfo(
 	}
 
 	printRegistryEntry(entry);
-	console.log(`  ${colors.dim(`source: ${entry.source.type}`)}`);
+	if (entry.source) {
+		console.log(`  ${colors.dim(`source: ${entry.source.type}`)}`);
+	}
 }
 
 export async function runPluginsInstall(

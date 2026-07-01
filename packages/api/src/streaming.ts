@@ -5,7 +5,6 @@
  */
 
 import { createParser } from 'eventsource-parser';
-import { client } from './generated/client.gen';
 
 export interface SSEEvent {
 	id?: string;
@@ -31,9 +30,19 @@ export interface SSEStreamOptions {
 	projectPath?: string;
 
 	/**
+	 * Project id (optional)
+	 */
+	projectId?: string;
+
+	/**
 	 * Custom fetch implementation
 	 */
 	fetch?: typeof fetch;
+
+	/**
+	 * Additional request headers
+	 */
+	headers?: HeadersInit;
 
 	/**
 	 * Callback for each parsed SSE event
@@ -63,9 +72,19 @@ export interface ClientEventsStreamOptions {
 	projectPath?: string;
 
 	/**
+	 * Project id (optional)
+	 */
+	projectId?: string;
+
+	/**
 	 * Custom fetch implementation
 	 */
 	fetch?: typeof fetch;
+
+	/**
+	 * Additional request headers
+	 */
+	headers?: HeadersInit;
 
 	/**
 	 * Callback for each parsed SSE event
@@ -87,24 +106,28 @@ export function buildSessionStreamUrl(options: {
 	baseUrl: string;
 	sessionId: string;
 	projectPath?: string;
+	projectId?: string;
 }) {
-	return client.buildUrl({
-		baseURL: options.baseUrl,
-		url: '/v1/sessions/{id}/stream',
-		path: { id: options.sessionId },
-		query: options.projectPath ? { project: options.projectPath } : undefined,
-	});
+	const url = new URL(
+		`/v1/sessions/${encodeURIComponent(options.sessionId)}/stream`,
+		options.baseUrl,
+	);
+	if (options.projectId) url.searchParams.set('projectId', options.projectId);
+	else if (options.projectPath)
+		url.searchParams.set('project', options.projectPath);
+	return url.toString();
 }
 
 export function buildClientEventsStreamUrl(options: {
 	baseUrl: string;
 	projectPath?: string;
+	projectId?: string;
 }) {
-	return client.buildUrl({
-		baseURL: options.baseUrl,
-		url: '/v1/events/stream',
-		query: options.projectPath ? { project: options.projectPath } : undefined,
-	});
+	const url = new URL('/v1/events/stream', options.baseUrl);
+	if (options.projectId) url.searchParams.set('projectId', options.projectId);
+	else if (options.projectPath)
+		url.searchParams.set('project', options.projectPath);
+	return url.toString();
 }
 
 async function createStreamToUrl(
@@ -112,6 +135,7 @@ async function createStreamToUrl(
 		baseUrl: string;
 		url: string;
 		fetch?: typeof fetch;
+		headers?: HeadersInit;
 		onEvent: (event: SSEEvent) => void;
 		onError?: (error: Error) => void;
 		onClose?: () => void;
@@ -122,6 +146,7 @@ async function createStreamToUrl(
 		baseUrl,
 		url,
 		fetch: customFetch,
+		headers,
 		onEvent,
 		onError,
 		onClose,
@@ -135,6 +160,7 @@ async function createStreamToUrl(
 		const response = await fetchImpl(url, {
 			method: isTunnel ? 'POST' : 'GET',
 			headers: {
+				...headers,
 				Accept: 'text/event-stream',
 			},
 			signal,
@@ -222,6 +248,7 @@ export async function createSSEStream(
 	const url = buildSessionStreamUrl({
 		baseUrl: options.baseUrl,
 		sessionId: options.sessionId,
+		projectId: options.projectId,
 		projectPath: options.projectPath,
 	});
 
@@ -237,6 +264,7 @@ export async function createClientEventsStream(
 ): Promise<void> {
 	const url = buildClientEventsStreamUrl({
 		baseUrl: options.baseUrl,
+		projectId: options.projectId,
 		projectPath: options.projectPath,
 	});
 

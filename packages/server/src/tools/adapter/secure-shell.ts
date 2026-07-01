@@ -151,6 +151,7 @@ export function createSecureShellExecutor(args: {
 		};
 
 		unregisterActiveShell = registerActiveShellProcess({
+			projectRoot: ctx.projectRoot,
 			sessionId: ctx.sessionId,
 			messageId: ctx.messageId,
 			callId,
@@ -169,6 +170,7 @@ export function createSecureShellExecutor(args: {
 
 			securePromptPending = true;
 			void requestSecureInput({
+				projectRoot: ctx.projectRoot,
 				sessionId: ctx.sessionId,
 				messageId: ctx.messageId,
 				callId,

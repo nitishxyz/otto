@@ -91,6 +91,7 @@ export async function writeDefaults(
 		compactThread: boolean;
 		fontFamily: string;
 		smartEdges: boolean;
+		threadNavigatorRail: boolean;
 		releaseToSend: boolean;
 		fullWidthContent: boolean;
 		notificationsEnabled: boolean;

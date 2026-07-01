@@ -692,7 +692,7 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 						onClick={() => openMobilePanel(toggleTunnelPanel)}
 						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
 					>
-						<Network className="h-4 w-4" /> Tunnel
+						<Network className="h-4 w-4" /> Connections
 					</button>
 					<button
 						type="button"

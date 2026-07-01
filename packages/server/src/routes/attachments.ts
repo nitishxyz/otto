@@ -12,6 +12,7 @@ import {
 } from 'node:path';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import { resolveRequestProjectRoot } from './project-context.ts';
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const ATTACHMENTS_DIR = 'attachments';
@@ -271,7 +272,7 @@ export function registerAttachmentRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const form = await c.req.formData();
 				const value = form.get('file');
@@ -348,7 +349,7 @@ export function registerAttachmentRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const metadata = await readMetadata(cfg, c.req.param('id'));
 				return c.json(metadataResponse(metadata));
@@ -393,7 +394,7 @@ export function registerAttachmentRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = c.req.query('project') || process.cwd();
+				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const metadata = await readMetadata(cfg, c.req.param('id'));
 				const originalFile = resolveOriginalFile(cfg, metadata);

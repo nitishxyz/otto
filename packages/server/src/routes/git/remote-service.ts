@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import type { Context } from 'hono';
 import { gitRemoteAddSchema, gitRemoteRemoveSchema } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,8 +26,7 @@ function parseRemoteOutput(output: string): GitRemote[] {
 
 export async function handleGetGitRemotes(c: Context) {
 	try {
-		const project = c.req.query('project');
-		const requestedPath = project || process.cwd();
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {
@@ -59,8 +59,8 @@ export async function handleGetGitRemotes(c: Context) {
 export async function handleAddGitRemote(c: Context) {
 	try {
 		const body = await c.req.json().catch(() => ({}));
-		const { project, name, url } = gitRemoteAddSchema.parse(body);
-		const requestedPath = project || process.cwd();
+		const { name, url } = gitRemoteAddSchema.parse(body);
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {
@@ -89,8 +89,8 @@ export async function handleAddGitRemote(c: Context) {
 export async function handleRemoveGitRemote(c: Context) {
 	try {
 		const body = await c.req.json().catch(() => ({}));
-		const { project, name } = gitRemoteRemoveSchema.parse(body);
-		const requestedPath = project || process.cwd();
+		const { name } = gitRemoteRemoveSchema.parse(body);
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {

@@ -66,7 +66,11 @@ export const WorkspaceTitleBar = memo(function WorkspaceTitleBar() {
 		<TitleBar
 			className="hidden md:flex"
 			leading={<RoutedOttoTabs />}
-			trailing={<TitleBarRightRailToggle />}
+			trailing={
+				<div className="flex items-center gap-2">
+					<TitleBarRightRailToggle />
+				</div>
+			}
 		/>
 	);
 });

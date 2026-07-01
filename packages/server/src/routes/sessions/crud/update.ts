@@ -4,12 +4,12 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { serializeError } from '../../../runtime/errors/api-error.ts';
+import { resolveRequestProject } from '../../project-context.ts';
 import {
 	attachSessionCostSummary,
 	buildSessionPreferenceUpdates,
 	findSessionById,
 	getSessionCostSummaries,
-	loadProjectDb,
 	normalizeSessionRow,
 } from '../service.ts';
 import {
@@ -57,8 +57,7 @@ export function registerUpdateSessionRoute(app: Hono) {
 		async (c) => {
 			try {
 				const sessionId = c.req.param('sessionId');
-				const projectRoot = c.req.query('project') || process.cwd();
-				const { cfg, db } = await loadProjectDb(projectRoot);
+				const { cfg, db } = await resolveRequestProject(c);
 
 				const body = (await c.req.json().catch(() => ({}))) as Record<
 					string,

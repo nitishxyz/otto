@@ -1,4 +1,7 @@
 import { z } from '@hono/zod-openapi';
+import { projectQuerySchema } from '../../project-context.ts';
+
+export { projectQuerySchema };
 
 export const sessionSchema = z
 	.object({
@@ -41,17 +44,6 @@ export const sessionSchema = z
 			.optional(),
 	})
 	.passthrough();
-
-export const projectQuerySchema = z.object({
-	project: z
-		.string()
-		.optional()
-		.openapi({
-			param: { name: 'project', in: 'query' },
-			description:
-				'Project root override (defaults to current working directory).',
-		}),
-});
 
 export const listSessionsQuerySchema = projectQuerySchema.extend({
 	limit: z.coerce

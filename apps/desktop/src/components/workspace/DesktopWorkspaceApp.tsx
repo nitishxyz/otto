@@ -3,12 +3,13 @@ import {
 	OttoRouterTopupModal,
 } from '@ottocode/web-sdk/components';
 import type { ReactNode } from 'react';
-import type { Project } from '../../lib/tauri-bridge';
+import type { Project, ServerInfo } from '../../lib/tauri-bridge';
 import { DesktopSessionsLayout } from './DesktopSessionsLayout';
 import { DesktopWorkspaceProvider } from './DesktopWorkspaceProvider';
 
 interface DesktopWorkspaceAppProps {
 	apiUrl: string;
+	server?: ServerInfo | null;
 	project: Project;
 	sessionId?: string;
 	view?: 'agents' | 'otto';
@@ -19,6 +20,7 @@ interface DesktopWorkspaceAppProps {
 
 export function DesktopWorkspaceApp({
 	apiUrl,
+	server,
 	project,
 	sessionId,
 	view,
@@ -27,7 +29,7 @@ export function DesktopWorkspaceApp({
 	titleBar,
 }: DesktopWorkspaceAppProps) {
 	return (
-		<DesktopWorkspaceProvider apiUrl={apiUrl}>
+		<DesktopWorkspaceProvider apiUrl={apiUrl} server={server}>
 			<div className="h-full min-h-0" data-project-path={project.path}>
 				<DesktopSessionsLayout
 					project={project}

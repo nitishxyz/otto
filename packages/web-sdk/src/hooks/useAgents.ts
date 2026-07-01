@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import type { AgentDetail, UpdateAgentInput } from '../lib/api-client/config';
+import { configQueryKey } from './useConfig';
+import { projectScopedKey } from '../lib/api-client/utils';
 import { useAgentsStore } from '../stores/agentsStore';
 
 export type {
@@ -14,6 +16,13 @@ interface UseAgentsOptions {
 	enabled?: boolean;
 }
 
+export const agentDetailsQueryKey = () =>
+	projectScopedKey(['config', 'agents'] as const);
+export const agentQueryKey = (agentName: string | null) =>
+	projectScopedKey(['config', 'agents', agentName] as const);
+export const configToolsQueryKey = () =>
+	projectScopedKey(['config', 'tools'] as const);
+
 export function useAgentDetails(options: UseAgentsOptions = {}) {
 	const managerOpen = useAgentsStore((s) => s.isManagerOpen);
 	const createOpen = useAgentsStore((s) => s.isCreateModalOpen);
@@ -23,7 +32,7 @@ export function useAgentDetails(options: UseAgentsOptions = {}) {
 	const selectAgent = useAgentsStore((s) => s.selectAgent);
 
 	const query = useQuery({
-		queryKey: ['config', 'agents'],
+		queryKey: agentDetailsQueryKey(),
 		queryFn: () => apiClient.getAgentDetails(),
 		enabled,
 		staleTime: 15_000,
@@ -45,7 +54,7 @@ export function useAgentDetails(options: UseAgentsOptions = {}) {
 
 export function useAgent(agentName: string | null) {
 	return useQuery({
-		queryKey: ['config', 'agents', agentName],
+		queryKey: agentQueryKey(agentName),
 		queryFn: async () => {
 			if (!agentName) return null;
 			return apiClient.getAgent(agentName);
@@ -61,7 +70,7 @@ export function useAgent(agentName: string | null) {
  */
 export function useMentionAgents(options: UseAgentsOptions = {}) {
 	return useQuery({
-		queryKey: ['config', 'agents'],
+		queryKey: agentDetailsQueryKey(),
 		queryFn: () => apiClient.getAgentDetails(),
 		enabled: options.enabled ?? true,
 		staleTime: 60_000,
@@ -73,7 +82,7 @@ export function useConfigTools(options: UseAgentsOptions = {}) {
 	const createOpen = useAgentsStore((s) => s.isCreateModalOpen);
 	const enabled = options.enabled ?? (managerOpen || createOpen);
 	return useQuery({
-		queryKey: ['config', 'tools'],
+		queryKey: configToolsQueryKey(),
 		queryFn: () => apiClient.getConfigTools(),
 		enabled,
 		staleTime: 30_000,
@@ -86,9 +95,9 @@ export function useUpdateAgent() {
 		mutationFn: ({ name, input }: { name: string; input: UpdateAgentInput }) =>
 			apiClient.updateAgent(name, input),
 		onSuccess: (data, variables) => {
-			queryClient.setQueryData(['config', 'agents', variables.name], data);
-			void queryClient.invalidateQueries({ queryKey: ['config', 'agents'] });
-			void queryClient.invalidateQueries({ queryKey: ['config'] });
+			queryClient.setQueryData(agentQueryKey(variables.name), data);
+			void queryClient.invalidateQueries({ queryKey: agentDetailsQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: configQueryKey() });
 		},
 	});
 }
@@ -106,9 +115,9 @@ export function useDeleteAgent() {
 			scope?: 'local' | 'global';
 		}) => apiClient.deleteAgent(name, scope),
 		onSuccess: async (_data, variables) => {
-			await queryClient.invalidateQueries({ queryKey: ['config', 'agents'] });
+			await queryClient.invalidateQueries({ queryKey: agentDetailsQueryKey() });
 			const refreshed = await queryClient.fetchQuery({
-				queryKey: ['config', 'agents'],
+				queryKey: agentDetailsQueryKey(),
 				queryFn: () => apiClient.getAgentDetails(),
 			});
 			setAgents(refreshed.agents, refreshed.default);
@@ -119,7 +128,7 @@ export function useDeleteAgent() {
 					null;
 				selectAgent(next);
 			}
-			void queryClient.invalidateQueries({ queryKey: ['config'] });
+			void queryClient.invalidateQueries({ queryKey: configQueryKey() });
 		},
 	});
 }
@@ -130,8 +139,8 @@ export function useSetDefaultAgent() {
 		mutationFn: (name: string) =>
 			apiClient.updateDefaults({ agent: name, scope: 'global' }),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: ['config', 'agents'] });
-			void queryClient.invalidateQueries({ queryKey: ['config'] });
+			void queryClient.invalidateQueries({ queryKey: agentDetailsQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: configQueryKey() });
 		},
 	});
 }

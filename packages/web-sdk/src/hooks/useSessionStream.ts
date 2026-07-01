@@ -7,10 +7,13 @@ import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useSecureInputStore } from '../stores/secureInputStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import {
+	getQueueStateQueryKey,
 	normalizeQueueState,
 	optimisticallyQueueMessage,
 } from './useQueueState';
-import { sessionsQueryKey } from './useSessions';
+import { getSessionQueryKey, getSessionsQueryKey } from './useSessions';
+import { getMessagesQueryKey } from './useMessages';
+import { getAuthHeaders, projectScopedKey } from '../lib/api-client/utils';
 import { extractStreamingMultiEditPreviewEdits } from './tool-preview-helpers';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
@@ -91,7 +94,7 @@ export function useSessionStream(
 
 		const url = apiClient.getStreamUrl(sessionId);
 		console.log('[useSessionStream] Connecting to stream:', url);
-		client.connect(url);
+		client.connect(url, getAuthHeaders());
 
 		const resolveAssistantTargetIndex = (messages: Message[]): number => {
 			if (assistantMessageIdRef.current) {
@@ -547,12 +550,15 @@ export function useSessionStream(
 			path.split('.').pop()?.toLowerCase() ?? '';
 
 		const updateFileContentCache = (path: string, content: string) => {
-			queryClient.setQueryData<FileContentCache>(['files', 'read', path], {
-				content,
-				path,
-				extension: getExtension(path),
-				lineCount: content.split('\n').length,
-			});
+			queryClient.setQueryData<FileContentCache>(
+				projectScopedKey(['files', 'read', path] as const),
+				{
+					content,
+					path,
+					extension: getExtension(path),
+					lineCount: content.split('\n').length,
+				},
+			);
 		};
 
 		const mergeReadResultIntoFileCache = (
@@ -569,7 +575,7 @@ export function useSessionStream(
 			}
 
 			queryClient.setQueryData<FileContentCache | undefined>(
-				['files', 'read', path],
+				projectScopedKey(['files', 'read', path] as const),
 				(current) => {
 					if (!current?.content) return current;
 					const lines = current.content.split('\n');
@@ -590,7 +596,9 @@ export function useSessionStream(
 		};
 
 		const invalidateFileContentCache = (path: string) => {
-			void queryClient.invalidateQueries({ queryKey: ['files', 'read', path] });
+			void queryClient.invalidateQueries({
+				queryKey: projectScopedKey(['files', 'read', path] as const),
+			});
 		};
 
 		const getChangedLinesForPath = (
@@ -1113,7 +1121,7 @@ export function useSessionStream(
 			const batch = [...pendingDeltas.values()];
 			pendingDeltas.clear();
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					let nextMessages: Message[] | null = null;
@@ -1257,7 +1265,7 @@ export function useSessionStream(
 					: `error-${messageId}`;
 
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const nextMessages = [...oldMessages];
@@ -1331,7 +1339,7 @@ export function useSessionStream(
 			}
 
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const nextMessages = [...oldMessages];
@@ -1420,7 +1428,7 @@ export function useSessionStream(
 			const name = getToolEventName(payload);
 			if (!name) return;
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const nextMessages = [...oldMessages];
@@ -1511,7 +1519,7 @@ export function useSessionStream(
 			const name = getToolEventName(payload);
 			if (!name) return;
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const nextMessages = [...oldMessages];
@@ -1607,7 +1615,7 @@ export function useSessionStream(
 			const payloadArtifact = payload?.artifact;
 			const payloadArgs = getToolEventArgs(payload);
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					let changed = false;
@@ -1667,7 +1675,7 @@ export function useSessionStream(
 			const callId = getToolEventCallId(payload);
 			if (!callId) return;
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					let changed = false;
@@ -1688,7 +1696,7 @@ export function useSessionStream(
 		const clearEphemeralForMessage = (messageId: string | null) => {
 			if (!messageId) return;
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const targetIndex = oldMessages.findIndex(
@@ -1721,7 +1729,7 @@ export function useSessionStream(
 			const id = typeof payload?.id === 'string' ? payload.id : null;
 			if (!id) return;
 			queryClient.setQueryData<Message[]>(
-				['messages', sessionId],
+				getMessagesQueryKey(sessionId),
 				(oldMessages) => {
 					if (!oldMessages) return oldMessages;
 					const nextMessages = [...oldMessages];
@@ -1794,7 +1802,7 @@ export function useSessionStream(
 									]
 								: [];
 						queryClient.setQueryData<Message[]>(
-							['messages', sessionId],
+							getMessagesQueryKey(sessionId),
 							(oldMessages) => {
 								if (!oldMessages) return oldMessages;
 								if (oldMessages.some((m) => m.id === id)) return oldMessages;
@@ -1840,7 +1848,7 @@ export function useSessionStream(
 					clearEphemeralForMessage(id);
 					if (id) {
 						queryClient.setQueryData<ReturnType<typeof normalizeQueueState>>(
-							['queueState', sessionId],
+							getQueueStateQueryKey(sessionId),
 							(current) => {
 								if (!current || current.currentMessageId !== id) return current;
 								return normalizeQueueState({
@@ -1851,12 +1859,22 @@ export function useSessionStream(
 							},
 						);
 					}
-					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
-					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
-					queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
-					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
-					queryClient.invalidateQueries({ queryKey: ['goals', 'project'] });
-					queryClient.invalidateQueries({ queryKey: ['subagents', sessionId] });
+					queryClient.invalidateQueries({
+						queryKey: getMessagesQueryKey(sessionId),
+					});
+					queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
+					queryClient.invalidateQueries({
+						queryKey: getSessionQueryKey(sessionId),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['goal', sessionId] as const),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['goals', 'project'] as const),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['subagents', sessionId] as const),
+					});
 					break;
 				}
 				case 'tool.delta': {
@@ -1970,7 +1988,9 @@ export function useSessionStream(
 						clearEphemeralForMessage(messageId);
 						upsertErrorPart(payload);
 					}
-					queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+					queryClient.invalidateQueries({
+						queryKey: getMessagesQueryKey(sessionId),
+					});
 					break;
 				}
 				case 'message.updated': {
@@ -1987,7 +2007,7 @@ export function useSessionStream(
 						const error =
 							typeof payload?.error === 'string' ? payload.error : undefined;
 						queryClient.setQueryData<Message[]>(
-							['messages', sessionId],
+							getMessagesQueryKey(sessionId),
 							(oldMessages) => {
 								if (!oldMessages) return oldMessages;
 								const idx = oldMessages.findIndex((m) => m.id === id);
@@ -2009,10 +2029,14 @@ export function useSessionStream(
 					break;
 				}
 				case 'goal.updated': {
-					queryClient.invalidateQueries({ queryKey: ['goal', sessionId] });
-					queryClient.invalidateQueries({ queryKey: ['goals', 'project'] });
 					queryClient.invalidateQueries({
-						queryKey: ['subagents', sessionId],
+						queryKey: projectScopedKey(['goal', sessionId] as const),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['goals', 'project'] as const),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['subagents', sessionId] as const),
 					});
 					break;
 				}
@@ -2028,7 +2052,10 @@ export function useSessionStream(
 								? payload.isRunning
 								: undefined,
 					});
-					queryClient.setQueryData(['queueState', sessionId], queueState);
+					queryClient.setQueryData(
+						getQueueStateQueryKey(sessionId),
+						queueState,
+					);
 					break;
 				}
 				default:
@@ -2039,8 +2066,10 @@ export function useSessionStream(
 				const now = Date.now();
 				if (now - lastSessionInvalidation >= 2000) {
 					lastSessionInvalidation = now;
-					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
-					queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+					queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
+					queryClient.invalidateQueries({
+						queryKey: getSessionQueryKey(sessionId),
+					});
 				}
 			}
 		});

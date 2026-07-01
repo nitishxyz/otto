@@ -1,9 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { projectScopedKey } from '../lib/api-client/utils';
+
+export const filesQueryKey = (query = '') =>
+	projectScopedKey(['files', query] as const);
 
 export function useFiles(options: { enabled?: boolean; query?: string } = {}) {
 	return useQuery({
-		queryKey: ['files', options.query ?? ''],
+		queryKey: filesQueryKey(options.query ?? ''),
 		queryFn: async () => {
 			const result = await apiClient.searchFiles(options.query ?? '');
 			return result;

@@ -19,14 +19,15 @@ import {
 import { resolveModel } from '../../runtime/provider/index.ts';
 import { gitCommitSchema, gitGenerateCommitMessageSchema } from './schemas.ts';
 import { parseGitStatus, validateAndGetGitRoot } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const execFileAsync = promisify(execFile);
 
 export async function handleCommitChanges(c: Context) {
 	try {
 		const body = await c.req.json();
-		const { message, project } = gitCommitSchema.parse(body);
-		const requestedPath = project || process.cwd();
+		const { message } = gitCommitSchema.parse(body);
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {
@@ -66,9 +67,12 @@ export async function handleCommitChanges(c: Context) {
 	}
 }
 
-async function getSessionProviderModel(sessionId?: string) {
+async function getSessionProviderModel(
+	projectRoot: string,
+	sessionId?: string,
+) {
 	if (!sessionId) return {};
-	const db = await getDb();
+	const db = await getDb(projectRoot);
 	const [session] = await db
 		.select({ provider: sessions.provider, model: sessions.model })
 		.from(sessions)
@@ -112,8 +116,8 @@ Commit message:`;
 export async function handleGenerateCommitMessage(c: Context) {
 	try {
 		const body = await c.req.json();
-		const { project, sessionId } = gitGenerateCommitMessageSchema.parse(body);
-		const requestedPath = project || process.cwd();
+		const { sessionId } = gitGenerateCommitMessageSchema.parse(body);
+		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
 		if ('error' in validation) {
@@ -144,8 +148,11 @@ export async function handleGenerateCommitMessage(c: Context) {
 		);
 		const { staged } = parseGitStatus(statusOutput, validation.gitRoot);
 		const fileList = staged.map((f) => `${f.status}: ${f.path}`).join('\n');
-		const config = await loadConfig();
-		const session = await getSessionProviderModel(sessionId);
+		const config = await loadConfig(requestedPath);
+		const session = await getSessionProviderModel(
+			config.projectRoot,
+			sessionId,
+		);
 		const provider =
 			session.provider ??
 			((config.defaults?.provider || 'anthropic') as ProviderId);

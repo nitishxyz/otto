@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitPushSchema } from './schemas.ts';
 import { getCurrentBranch, validateAndGetGitRoot } from './utils.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -77,9 +78,9 @@ export function registerPushRoute(app: Hono) {
 					);
 				}
 
-				const { project } = gitPushSchema.parse(body);
+				gitPushSchema.parse(body);
 
-				const requestedPath = project || process.cwd();
+				const requestedPath = await resolveRequestProjectRoot(c);
 
 				const validation = await validateAndGetGitRoot(requestedPath);
 				if ('error' in validation) {

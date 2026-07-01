@@ -1,18 +1,16 @@
 import type { Command } from 'commander';
-import {
-	loadConfig,
-	getTerminalManager,
-	openAuthUrl,
-	logger,
-	printQRCode,
-} from '@ottocode/sdk';
+import { loadConfig, openAuthUrl, logger, printQRCode } from '@ottocode/sdk';
 import {
 	createApp as createServer,
+	setDaemonId,
 	setServerPort,
+	setServerVersion,
+	shutdownProjectManager,
 	bunWebSocket,
 } from '@ottocode/server';
 import { getDb } from '@ottocode/database';
 import { startTunnel, stopTunnel } from '@ottocode/api';
+import { DEFAULT_DAEMON_PORT, parseDaemonPort } from '../daemon.ts';
 import { createWebServer } from '../web-server.ts';
 import { colors } from '../ui.ts';
 
@@ -21,6 +19,9 @@ export interface StartServerResult {
 	webUrl?: string;
 	stop: () => Promise<void>;
 }
+
+type ApiFetch = NonNullable<Parameters<typeof Bun.serve>[0]['fetch']>;
+type ApiWebSocket = NonNullable<Parameters<typeof Bun.serve>[0]['websocket']>;
 
 function createProjectStorageError(
 	projectRoot: string,
@@ -55,8 +56,23 @@ async function ensureProjectStorage(projectRoot: string) {
 }
 
 async function activateProject(projectRoot: string): Promise<void> {
-	process.chdir(projectRoot);
-	await ensureProjectStorage(process.cwd());
+	await ensureProjectStorage(projectRoot);
+}
+
+export function serveApi(options: {
+	port: number;
+	hostname: string;
+	fetch: ApiFetch;
+	serve?: typeof Bun.serve;
+}) {
+	const serve = options.serve ?? Bun.serve;
+	return serve({
+		port: options.port,
+		hostname: options.hostname,
+		fetch: options.fetch,
+		idleTimeout: 240,
+		websocket: bunWebSocket as ApiWebSocket,
+	});
 }
 
 export async function startApiServer(opts: {
@@ -69,12 +85,10 @@ export async function startApiServer(opts: {
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
 	const requestedPort = opts.port ?? portEnv ?? 0;
 
-	const agiServer = Bun.serve({
+	const agiServer = serveApi({
 		port: requestedPort,
 		hostname: '127.0.0.1',
 		fetch: app.fetch,
-		idleTimeout: 240,
-		websocket: bunWebSocket,
 	});
 
 	const serverPort = agiServer.port ?? requestedPort;
@@ -97,8 +111,7 @@ export async function startApiServer(opts: {
 
 	const stop = async () => {
 		try {
-			const terminalManager = getTerminalManager();
-			if (terminalManager) await terminalManager.killAll();
+			await shutdownProjectManager();
 		} catch {}
 		try {
 			webServer?.stop(true);
@@ -133,22 +146,26 @@ export interface ServeOptions {
 	noOpen: boolean;
 	tunnel: boolean;
 	apiOnly: boolean;
+	daemonRegister?: boolean;
 }
 
 export async function handleServe(opts: ServeOptions, version: string) {
 	await activateProject(opts.project);
+	setServerVersion(version);
+	setDaemonId(process.env.OTTO_DAEMON_ID || null);
 
 	const app = createServer();
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
-	const requestedPort = opts.port ?? portEnv ?? 0;
+	const daemonPort = parseDaemonPort(process.env.OTTO_DAEMON_PORT);
+	const requestedPort = opts.daemonRegister
+		? (opts.port ?? daemonPort ?? DEFAULT_DAEMON_PORT)
+		: (opts.port ?? portEnv ?? 0);
 	const hostname = opts.network ? '0.0.0.0' : '127.0.0.1';
 
-	const agiServer = Bun.serve({
+	const agiServer = serveApi({
 		port: requestedPort,
 		hostname,
 		fetch: app.fetch,
-		idleTimeout: 240,
-		websocket: bunWebSocket,
 	});
 
 	const displayHost = opts.network ? getLocalIP() : '127.0.0.1';
@@ -157,6 +174,17 @@ export async function handleServe(opts: ServeOptions, version: string) {
 
 	// Register server port so tunnel routes can use it
 	setServerPort(serverPort);
+
+	if (opts.daemonRegister) {
+		const { writeDaemonRegistrationFromServer } = await import('../daemon.ts');
+		await writeDaemonRegistrationFromServer({
+			id: process.env.OTTO_DAEMON_ID || crypto.randomUUID(),
+			version,
+			url: `http://127.0.0.1:${serverPort}`,
+			pid: process.pid,
+			startedAt: Date.now(),
+		});
+	}
 
 	let webServer: ReturnType<typeof createWebServer>['server'] | null = null;
 	let webUrl: string | null = null;
@@ -262,12 +290,9 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		}
 
 		try {
-			const terminalManager = getTerminalManager();
-			if (terminalManager) {
-				await terminalManager.killAll();
-			}
+			await shutdownProjectManager();
 		} catch (error) {
-			logger.error('Error cleaning up terminals', error);
+			logger.error('Error cleaning up project resources', error);
 		}
 
 		try {
@@ -294,13 +319,18 @@ export async function handleServe(opts: ServeOptions, version: string) {
 export function registerServeCommand(program: Command, version: string) {
 	program
 		.command('serve')
-		.description('Start API server + Web UI')
+		.description('Advanced: run a standalone foreground API/Web server')
 		.option('-p, --port <port>', 'Port to listen on', (v) =>
 			Number.parseInt(v, 10),
 		)
 		.option('--network', 'Bind to 0.0.0.0 for network access', false)
 		.option('--tunnel', 'Enable Cloudflare tunnel for remote access', false)
 		.option('--api-only', 'Start only the API server without Web UI', false)
+		.option(
+			'--daemon-register',
+			'Register this server as the local daemon',
+			false,
+		)
 		.option('--no-open', 'Do not open browser automatically')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
@@ -312,6 +342,7 @@ export function registerServeCommand(program: Command, version: string) {
 					tunnel: opts.tunnel,
 					noOpen: !opts.open,
 					apiOnly: opts.apiOnly,
+					daemonRegister: opts.daemonRegister,
 				},
 				version,
 			);

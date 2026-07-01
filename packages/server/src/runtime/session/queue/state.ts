@@ -1,4 +1,5 @@
 import { publish } from '../../../events/bus.ts';
+import { scopedMessageKey } from '../../projects/scope.ts';
 import type { QueuedMessage, RunnerState } from './types.ts';
 
 // Global state for session queues.
@@ -17,6 +18,8 @@ export function getOrCreateRunnerState(sessionId: string): RunnerState {
 	const existing = runners.get(sessionId);
 	if (existing) return existing;
 	const state: RunnerState = {
+		projectId: undefined,
+		projectRoot: undefined,
 		queue: [],
 		running: false,
 		currentMessageId: null,
@@ -32,28 +35,38 @@ export function deleteRunnerState(sessionId: string): void {
 export function setMessageAbortController(
 	messageId: string,
 	controller: AbortController,
+	projectKey?: string,
 ): void {
-	messageAbortControllers.set(messageId, controller);
+	messageAbortControllers.set(
+		scopedMessageKey(projectKey, messageId),
+		controller,
+	);
 }
 
 export function getMessageAbortController(
 	messageId: string,
+	projectKey?: string,
 ): AbortController | undefined {
-	return messageAbortControllers.get(messageId);
+	return messageAbortControllers.get(scopedMessageKey(projectKey, messageId));
 }
 
-export function deleteMessageAbortController(messageId: string): void {
-	messageAbortControllers.delete(messageId);
+export function deleteMessageAbortController(
+	messageId: string,
+	projectKey?: string,
+): void {
+	messageAbortControllers.delete(scopedMessageKey(projectKey, messageId));
 }
 
 export function abortAndDeleteMessageController(
 	messageId: string,
 	reason?: unknown,
+	projectKey?: string,
 ): boolean {
-	const controller = messageAbortControllers.get(messageId);
+	const key = scopedMessageKey(projectKey, messageId);
+	const controller = messageAbortControllers.get(key);
 	if (!controller) return false;
 	controller.abort(reason);
-	messageAbortControllers.delete(messageId);
+	messageAbortControllers.delete(key);
 	return true;
 }
 
@@ -69,6 +82,8 @@ export function publishQueueState(sessionId: string): void {
 	publish({
 		type: 'queue.updated',
 		sessionId,
+		projectId: state?.projectId,
+		projectRoot: state?.projectRoot,
 		payload: {
 			currentMessageId: state?.currentMessageId ?? null,
 			queuedMessages,

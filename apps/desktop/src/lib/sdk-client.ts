@@ -3,10 +3,15 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { configureApiClient } from '@ottocode/web-sdk/lib';
 import { registerNativeBrowserBridge } from './native-browser';
-import { tauriBridge } from './tauri-bridge';
+import { tauriBridge, type ServerInfo } from './tauri-bridge';
 
 interface OttoWindow extends Window {
 	OTTO_SERVER_URL?: string;
+	OTTO_RUNTIME_CONTEXT?: {
+		projectId?: string;
+		projectRoot?: string;
+		serverToken?: string;
+	};
 	OTTO_OPEN_URL?: (url: string) => void | Promise<void>;
 	OTTO_SHOW_NOTIFICATION?: (
 		notification: OttoPlatformNotification,
@@ -107,9 +112,19 @@ function registerDesktopPlatformAdapters() {
 	}
 }
 
-export function configureDesktopSdk(apiUrl: string) {
+export function configureDesktopSdk(
+	apiUrl: string,
+	server?: ServerInfo | null,
+) {
 	const win = window as OttoWindow;
 	win.OTTO_SERVER_URL = apiUrl;
+	if (server) {
+		win.OTTO_RUNTIME_CONTEXT = {
+			projectId: server.projectId,
+			projectRoot: server.projectPath,
+			serverToken: server.token ?? undefined,
+		};
+	}
 	registerDesktopPlatformAdapters();
 	configureApiClient();
 }
