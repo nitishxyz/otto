@@ -9,8 +9,8 @@ import {
 	useMemo,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSendMessage } from '../../hooks/useMessages';
-import { useDeleteSession } from '../../hooks/useSessions';
+import { getMessagesQueryKey, useSendMessage } from '../../hooks/useMessages';
+import { getSessionsQueryKey, useDeleteSession } from '../../hooks/useSessions';
 import { useChatComposer } from '../../hooks/useChatComposer';
 import { useConfigModalControls } from '../../hooks/useConfigModalControls';
 import { useStageFiles } from '../../hooks/useGit';
@@ -345,12 +345,14 @@ export const ChatInputContainer = memo(
 						const toastId = toast.loading('Creating handoff...');
 						try {
 							const result = await apiClient.createHandoff(sessionId);
-							queryClient.invalidateQueries({ queryKey: ['sessions'] });
 							queryClient.invalidateQueries({
-								queryKey: ['messages', sessionId],
+								queryKey: getSessionsQueryKey(),
 							});
 							queryClient.invalidateQueries({
-								queryKey: ['messages', result.sessionId],
+								queryKey: getMessagesQueryKey(sessionId),
+							});
+							queryClient.invalidateQueries({
+								queryKey: getMessagesQueryKey(result.sessionId),
 							});
 							openPlatformSession(result.sessionId);
 							toast.success('Handoff created');

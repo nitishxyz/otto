@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useGitStore } from '../../stores/gitStore';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
 import {
+	gitStatusQueryKey,
 	useGitStatus,
 	usePullChanges,
 	usePushCommits,
@@ -81,7 +82,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 	);
 
 	useEffect(() => {
-		queryClient.invalidateQueries({ queryKey: ['git', 'status'] });
+		queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 	}, [queryClient]);
 
 	const handleRefresh = () => {

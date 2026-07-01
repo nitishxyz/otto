@@ -10,7 +10,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useConfig } from '../../hooks/useConfig';
-import { sessionsQueryKey, useSessions } from '../../hooks/useSessions';
+import { getSessionsQueryKey, useSessions } from '../../hooks/useSessions';
+import { getMessagesQueryKey } from '../../hooks/useMessages';
 import { apiClient } from '../../lib/api-client';
 import { formatFileSelectionForMessage } from '../../lib/fileSelectionContext';
 import { toast } from '../../stores/toastStore';
@@ -60,7 +61,7 @@ export const BtwFloatingChat = memo(function BtwFloatingChat() {
 					});
 					activeSessionId = session.id;
 					setSessionId(session.id);
-					queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+					queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 				}
 
 				const contextPrefix = formatFileSelectionForMessage(selection);
@@ -74,7 +75,7 @@ export const BtwFloatingChat = memo(function BtwFloatingChat() {
 					reasoningLevel: config?.defaults.reasoningLevel ?? 'high',
 				});
 				queryClient.invalidateQueries({
-					queryKey: ['messages', activeSessionId],
+					queryKey: getMessagesQueryKey(activeSessionId),
 				});
 			} catch (error) {
 				toast.error(

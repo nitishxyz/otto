@@ -1,6 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { apiClient } from '@ottocode/web-sdk/lib';
 import { configureDesktopSdk } from '../../lib/sdk-client';
 import type { ServerInfo } from '../../lib/tauri-bridge';
 
@@ -20,7 +19,7 @@ export function DesktopWorkspaceProvider({
 	const queryClient = useMemo(() => {
 		configureDesktopSdk(apiUrl, server);
 
-		const client = new QueryClient({
+		return new QueryClient({
 			defaultOptions: {
 				queries: {
 					refetchOnWindowFocus: false,
@@ -29,17 +28,6 @@ export function DesktopWorkspaceProvider({
 				},
 			},
 		});
-
-		client.prefetchQuery({
-			queryKey: ['sessions'],
-			queryFn: () => apiClient.getSessions(),
-		});
-		client.prefetchQuery({
-			queryKey: ['config'],
-			queryFn: () => apiClient.getConfig(),
-		});
-
-		return client;
 	}, [apiUrl, server]);
 
 	useEffect(() => {

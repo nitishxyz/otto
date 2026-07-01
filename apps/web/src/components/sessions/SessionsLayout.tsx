@@ -19,7 +19,7 @@ import {
 	useWorkingDirectory,
 	useKeyboardShortcuts,
 	useClientEvents,
-	sessionsQueryKey,
+	getSessionsQueryKey,
 } from '@ottocode/web-sdk/hooks';
 import {
 	useGitStore,
@@ -318,8 +318,9 @@ function SessionKeyboardShortcuts({
 	);
 
 	const getSessionIds = useCallback(() => {
-		const cached =
-			queryClient.getQueryData<SessionsCacheData>(sessionsQueryKey);
+		const cached = queryClient.getQueryData<SessionsCacheData>(
+			getSessionsQueryKey(),
+		);
 		return (
 			cached?.pages?.flatMap((page) => page.items?.map((s) => s.id) ?? []) ?? []
 		);

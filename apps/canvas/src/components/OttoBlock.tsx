@@ -6,6 +6,8 @@ import {
 	ChatInputContainer,
 	MessageThreadContainer,
 	NewSessionLanding,
+	getMessagesQueryKey,
+	getSessionsQueryKey,
 	useMessages,
 	type ChatInputContainerRef,
 	type NewSessionLandingRef,
@@ -83,8 +85,10 @@ export function OttoBlock({ block, isFocused, workspaceId }: OttoBlockProps) {
 
 	useEffect(() => {
 		if (!sessionId || runtime?.status !== 'ready') return;
-		void queryClient.invalidateQueries({ queryKey: ['sessions'] });
-		void queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+		void queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
+		void queryClient.invalidateQueries({
+			queryKey: getMessagesQueryKey(sessionId),
+		});
 	}, [queryClient, runtime?.status, sessionId, workspaceId]);
 
 	useEffect(() => {

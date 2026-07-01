@@ -1,0 +1,2 @@
+CREATE INDEX `sessions_project_type_activity_idx` ON `sessions` (`project_path`,`session_type`,`last_active_at`,`created_at`);--> statement-breakpoint
+CREATE INDEX `sessions_parent_type_idx` ON `sessions` (`parent_session_id`,`session_type`);

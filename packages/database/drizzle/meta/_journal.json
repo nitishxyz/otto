@@ -57,6 +57,20 @@
 			"when": 1781174319689,
 			"tag": "0007_drop_done_pending_status",
 			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "6",
+			"when": 1782935251995,
+			"tag": "0008_quick_screwball",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "6",
+			"when": 1782935501553,
+			"tag": "0009_tearful_roland_deschain",
+			"breakpoints": true
 		}
 	]
 }

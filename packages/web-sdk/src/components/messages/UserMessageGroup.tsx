@@ -15,6 +15,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message } from '../../types/api';
 import { useMessageQueuePosition } from '../../hooks/useQueueState';
+import { getMessagesQueryKey } from '../../hooks/useMessages';
 import { useQueueStore } from '../../stores/queueStore';
 import { apiClient } from '../../lib/api-client';
 import { parseResearchContext } from '../../lib/parseResearchContext';
@@ -251,7 +252,9 @@ export const UserMessageGroup = memo(
 			try {
 				await apiClient.removeFromQueue(sessionId, nextAssistantMessageId);
 				// Invalidate messages to refresh UI
-				queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+				queryClient.invalidateQueries({
+					queryKey: getMessagesQueryKey(sessionId),
+				});
 			} catch (err) {
 				console.error('Failed to cancel queued message:', err);
 			}
@@ -271,7 +274,9 @@ export const UserMessageGroup = memo(
 			try {
 				await apiClient.removeFromQueue(sessionId, nextAssistantMessageId);
 				// Invalidate messages to refresh UI
-				queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+				queryClient.invalidateQueries({
+					queryKey: getMessagesQueryKey(sessionId),
+				});
 			} catch (err) {
 				console.error('Failed to delete queued message:', err);
 			}

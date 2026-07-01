@@ -21,10 +21,11 @@ import {
 } from '../../hooks/useResearch';
 import { useSession, useUpdateSession } from '../../hooks/useSessions';
 import { useAllModels } from '../../hooks/useConfig';
-import { useMessages } from '../../hooks/useMessages';
+import { getMessagesQueryKey, useMessages } from '../../hooks/useMessages';
 import { useSessionStream } from '../../hooks/useSessionStream';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
+import { projectScopedKey } from '../../lib/api-client/utils';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
@@ -117,7 +118,9 @@ const ResearchSidebarContent = memo(function ResearchSidebarContent({
 			content: string;
 		}) => apiClient.sendMessage(sessionId, { content }),
 		onSuccess: (_, { sessionId }) => {
-			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
+			queryClient.invalidateQueries({
+				queryKey: getMessagesQueryKey(sessionId),
+			});
 		},
 	});
 
@@ -216,7 +219,7 @@ const ResearchSidebarContent = memo(function ResearchSidebarContent({
 			setTimeout(() => setInjectionStatus('idle'), 5000);
 			// Invalidate parent messages to update the UI
 			queryClient.invalidateQueries({
-				queryKey: ['messages', parentSessionId],
+				queryKey: getMessagesQueryKey(parentSessionId),
 			});
 		} catch (err) {
 			console.error('Failed to inject context:', err);
@@ -322,7 +325,11 @@ const ResearchSidebarContent = memo(function ResearchSidebarContent({
 					model: newModel,
 				});
 				await queryClient.invalidateQueries({
-					queryKey: ['research', 'sessions', parentSessionId],
+					queryKey: projectScopedKey([
+						'research',
+						'sessions',
+						parentSessionId,
+					] as const),
 				});
 				setShowModelSelector(false);
 			} catch (err) {

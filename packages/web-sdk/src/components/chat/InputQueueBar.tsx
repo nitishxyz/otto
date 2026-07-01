@@ -9,8 +9,11 @@ import {
 	Trash2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMessages } from '../../hooks/useMessages';
-import { useQueueState } from '../../hooks/useQueueState';
+import { getMessagesQueryKey, useMessages } from '../../hooks/useMessages';
+import {
+	getQueueStateQueryKey,
+	useQueueState,
+} from '../../hooks/useQueueState';
 import { apiClient } from '../../lib/api-client';
 import { useQueueStore } from '../../stores/queueStore';
 import type { Message } from '../../types/api';
@@ -144,8 +147,12 @@ export const InputQueueBar = memo(function InputQueueBar({
 		}
 		try {
 			await apiClient.removeFromQueue(sessionId, item.assistantMessageId);
-			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
-			queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
+			queryClient.invalidateQueries({
+				queryKey: getMessagesQueryKey(sessionId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: getQueueStateQueryKey(sessionId),
+			});
 		} catch (error) {
 			console.error('Failed to remove queued message:', error);
 		}
@@ -154,8 +161,12 @@ export const InputQueueBar = memo(function InputQueueBar({
 	const sendQueuedItemNow = async (item: QueuedMessagePreview) => {
 		try {
 			await apiClient.sendQueuedMessageNow(sessionId, item.assistantMessageId);
-			queryClient.invalidateQueries({ queryKey: ['messages', sessionId] });
-			queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
+			queryClient.invalidateQueries({
+				queryKey: getMessagesQueryKey(sessionId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: getQueueStateQueryKey(sessionId),
+			});
 		} catch (error) {
 			console.error('Failed to send queued message now:', error);
 		}

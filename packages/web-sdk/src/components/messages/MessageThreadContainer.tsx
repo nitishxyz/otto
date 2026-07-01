@@ -2,7 +2,8 @@ import { memo, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMessages } from '../../hooks/useMessages';
 import { useSessionStream } from '../../hooks/useSessionStream';
-import { sessionsQueryKey, useSession } from '../../hooks/useSessions';
+import { getSessionsQueryKey, useSession } from '../../hooks/useSessions';
+import { getQueueStateQueryKey } from '../../hooks/useQueueState';
 import { usePreferences } from '../../hooks/usePreferences';
 import { MessageThread } from './MessageThread';
 import { useToolApprovalShortcuts } from '../../hooks/useToolApprovalShortcuts';
@@ -47,8 +48,10 @@ function SessionStreamController({ sessionId }: { sessionId: string }) {
 	useSessionStream(sessionId);
 
 	useEffect(() => {
-		queryClient.invalidateQueries({ queryKey: ['queueState', sessionId] });
-		queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+		queryClient.invalidateQueries({
+			queryKey: getQueueStateQueryKey(sessionId),
+		});
+		queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 	}, [queryClient, sessionId]);
 
 	return null;

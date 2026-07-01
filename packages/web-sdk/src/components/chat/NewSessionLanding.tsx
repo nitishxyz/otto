@@ -21,7 +21,7 @@ import { ChatInput } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
 import { apiClient } from '../../lib/api-client';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
-import { sessionsQueryKey } from '../../hooks/useSessions';
+import { getSessionsQueryKey } from '../../hooks/useSessions';
 import type { Session } from '../../types/api';
 
 interface NewSessionLandingProps {
@@ -176,7 +176,7 @@ export const NewSessionLanding = memo(
 							sessionType: sessionType === 'otto' ? 'otto' : undefined,
 						});
 
-						queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+						queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 
 						const fileData =
 							allAttachments.length > 0

@@ -20,6 +20,7 @@ import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useQueueState } from '../../hooks/useQueueState';
+import { getMessagesQueryKey } from '../../hooks/useMessages';
 import { useTopupApprovalStore } from '../../stores/topupApprovalStore';
 import {
 	useTodoStore,
@@ -898,7 +899,7 @@ export const MessageThread = memo(function MessageThread({
 				if (!messageId) return;
 
 				queryClient.setQueryData<Message[]>(
-					['messages', sessionId],
+					getMessagesQueryKey(sessionId),
 					(oldMessages) => {
 						if (!oldMessages) return oldMessages;
 						return oldMessages.map((msg) => {

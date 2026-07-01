@@ -15,6 +15,10 @@ import {
 	type ChatInputContainerRef,
 } from '@ottocode/web-sdk/components';
 import {
+	getMessagesQueryKey,
+	getQueueStateQueryKey,
+	getSessionQueryKey,
+	getSessionsQueryKey,
 	useClientEvents,
 	useConfig,
 	useCreateSession,
@@ -128,13 +132,13 @@ export function DesktopSessionsLayout({
 		async (id: string) => {
 			await Promise.allSettled([
 				queryClient.fetchQuery({
-					queryKey: ['messages', id],
+					queryKey: getMessagesQueryKey(id),
 					queryFn: () => apiClient.getMessages(id),
 					staleTime: 0,
 				}),
-				queryClient.invalidateQueries({ queryKey: ['queueState', id] }),
-				queryClient.invalidateQueries({ queryKey: ['session', id] }),
-				queryClient.invalidateQueries({ queryKey: ['sessions', 'list'] }),
+				queryClient.invalidateQueries({ queryKey: getQueueStateQueryKey(id) }),
+				queryClient.invalidateQueries({ queryKey: getSessionQueryKey(id) }),
+				queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
 			]);
 		},
 		[queryClient],
