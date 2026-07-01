@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
 	DEFAULT_DAEMON_PORT,
+	ensureDaemon,
 	ensureDaemonToken,
 	ensureDaemonProject,
 	fetchDaemonHealth,
@@ -293,6 +294,57 @@ describe('daemon service', () => {
 		expect(stopped).toBe(true);
 		expect(signaled).toEqual([[reg.pid, 'SIGTERM']]);
 		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('restarts authenticated daemon when ensuring with a newer version', async () => {
+		const paths = await createDaemonPaths();
+		const oldReg = registration({ version: '1.2.2' });
+		const signaled: Array<[number, NodeJS.Signals | number | undefined]> = [];
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(oldReg, { paths });
+
+		const ensured = await ensureDaemon({
+			version: '1.2.3',
+			paths,
+			projectRoot: '/tmp/project',
+			port: 49_124,
+			fetch: async (url) => {
+				const registered = await readDaemonRegistration({ paths });
+				return jsonResponse({
+					port: Number(new URL(String(url)).port),
+					version: registered?.version ?? oldReg.version,
+					pid: registered?.pid ?? oldReg.pid,
+					daemonId: registered?.id ?? oldReg.id,
+					startedAt: registered?.startedAt ?? oldReg.startedAt,
+				});
+			},
+			signal: (pid, signal) => {
+				signaled.push([pid, signal]);
+				return true;
+			},
+			spawn: ((options) => {
+				const id = options.env?.OTTO_DAEMON_ID;
+				expect(typeof id).toBe('string');
+				void writeDaemonRegistration(
+					registration({
+						id: String(id),
+						version: '1.2.3',
+						url: 'http://127.0.0.1:49124',
+						pid: 49_124,
+						startedAt: 3000,
+					}),
+					{ paths },
+				);
+				return {
+					unref: () => {},
+					exited: new Promise(() => {}),
+				} as ReturnType<typeof Bun.spawn>;
+			}) as typeof Bun.spawn,
+		});
+
+		expect(signaled).toEqual([[oldReg.pid, 'SIGTERM']]);
+		expect(ensured.version).toBe('1.2.3');
+		expect(ensured.url).toBe('http://127.0.0.1:49124');
 	});
 
 	it('opens a project on an existing daemon with auth headers', async () => {

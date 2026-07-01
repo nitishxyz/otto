@@ -281,8 +281,12 @@ export async function ensureDaemon(
 ): Promise<DaemonRegistration> {
 	const current = await getDaemonStatus(options);
 	if (current.state === 'running') return current.registration;
-	if (current.state === 'stale' && current.reason !== 'version mismatch') {
-		await removeDaemonRegistration(options);
+	if (current.state === 'stale') {
+		if (current.reason === 'version mismatch') {
+			await stopDaemon(options);
+		} else {
+			await removeDaemonRegistration(options);
+		}
 	}
 	return startDaemon(options);
 }
