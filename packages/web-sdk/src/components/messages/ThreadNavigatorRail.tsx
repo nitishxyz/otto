@@ -7,11 +7,7 @@ import {
 	type MotionValue,
 } from 'motion/react';
 import type { Message } from '../../types/api';
-import {
-	getMessagePartText,
-	getUserMessageText,
-	isCompactSlashCommand,
-} from './compactionSummary';
+import { getMessagePartText, isCompactSlashCommand } from './compactionSummary';
 import {
 	getThreadNavigatorLayout,
 	getThreadNavigatorRowHeight,
@@ -52,24 +48,54 @@ const FAR_POINTER_Y = -10000;
 const BAR_MIN_HEIGHT = 2;
 const BAR_MAX_HEIGHT = 3.5;
 const MAX_TURNS = 90;
+const NAVIGATOR_TEXT_SCAN_LIMIT = 6000;
 const SPRING = { stiffness: 420, damping: 30, mass: 0.35 };
 const RAIL_VERTICAL_MARGIN_PX = 28;
 const RAIL_SHELL_CLASS_NAME =
 	'absolute left-0 flex items-center justify-start z-20 pointer-events-none select-none';
 
+function limitNavigatorSource(text: string): string {
+	return text.length > NAVIGATOR_TEXT_SCAN_LIMIT
+		? text.slice(0, NAVIGATOR_TEXT_SCAN_LIMIT)
+		: text;
+}
+
+function getNavigatorPartText(part: NonNullable<Message['parts']>[number]) {
+	if (
+		part.contentJson &&
+		typeof part.contentJson === 'object' &&
+		'text' in part.contentJson
+	) {
+		return limitNavigatorSource(String(part.contentJson.text));
+	}
+
+	if (typeof part.content !== 'string') return '';
+	if (part.content.length > NAVIGATOR_TEXT_SCAN_LIMIT) {
+		return limitNavigatorSource(part.content);
+	}
+
+	return limitNavigatorSource(getMessagePartText(part));
+}
+
 function getAssistantText(message: Message): string {
 	const parts = message.parts ?? [];
 	for (const part of parts) {
 		if (part.type !== 'text') continue;
-		const text = getMessagePartText(part).trim();
+		const text = getNavigatorPartText(part).trim();
 		if (text) return text;
 	}
 	for (const part of parts) {
 		if (part.type !== 'reasoning') continue;
-		const text = getMessagePartText(part).trim();
+		const text = getNavigatorPartText(part).trim();
 		if (text) return text;
 	}
 	return '';
+}
+
+function getUserText(message: Message): string {
+	if (message.role !== 'user') return '';
+	const textPart = message.parts?.find((part) => part.type === 'text');
+	return textPart ? getNavigatorPartText(textPart) : '';
 }
 
 function firstLine(text: string, max = 60): string {
@@ -117,7 +143,7 @@ function parseXmlAttrs(raw: string): Record<string, string> {
 }
 
 function cleanNavigatorPreviewText(text: string): string {
-	const trimmed = text.trim();
+	const trimmed = limitNavigatorSource(text).trim();
 	if (!trimmed) return '';
 
 	try {
@@ -184,7 +210,7 @@ function summarizeSubagentResults(content: string): NavTurn | null {
 function summarizeTaggedUserMessage(
 	content: string,
 ): Omit<NavTurn, 'index'> | null {
-	const trimmed = content.trimStart();
+	const trimmed = limitNavigatorSource(content).trimStart();
 	if (trimmed.startsWith('<subagent_results>')) {
 		const summary = summarizeSubagentResults(trimmed);
 		return summary ? { title: summary.title, preview: summary.preview } : null;
@@ -245,10 +271,10 @@ function getProximity(pointerY: number, centerY: number, rowHeight: number) {
 
 function buildTurns(messages: Message[]): NavTurn[] {
 	const turns: NavTurn[] = [];
-	for (let i = 0; i < messages.length; i++) {
+	for (let i = messages.length - 1; i >= 0 && turns.length < MAX_TURNS; i--) {
 		const message = messages[i];
 		if (message.role === 'user') {
-			const userText = getUserMessageText(message).trim();
+			const userText = getUserText(message).trim();
 			if (!userText || isCompactSlashCommand(userText)) continue;
 			const next = messages[i + 1];
 			const assistantText =
@@ -266,9 +292,7 @@ function buildTurns(messages: Message[]): NavTurn[] {
 			});
 		}
 	}
-	if (turns.length <= MAX_TURNS) return turns;
-	// Keep the most recent turns when a thread gets very long.
-	return turns.slice(turns.length - MAX_TURNS);
+	return turns.reverse();
 }
 
 const ThreadNavigatorBar = memo(function ThreadNavigatorBar({
