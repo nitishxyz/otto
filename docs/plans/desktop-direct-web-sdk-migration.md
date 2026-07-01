@@ -26,7 +26,7 @@ Key files:
   - Bridges native behavior with `postMessage`.
 - `apps/desktop/src-tauri/src/commands/server.rs`
   - Local projects run `otto serve --port <port> --no-open`.
-  - Remote projects run `otto web --api <remoteApi> --port <port> --no-open`.
+  - Remote projects run `otto web --url <remoteApi> --port <port> --no-open`.
 - `apps/web/src/components/sessions/SessionsLayout.tsx`
   - Composes the main workspace using `@ottocode/web-sdk` components and hooks.
 - `packages/web-sdk`

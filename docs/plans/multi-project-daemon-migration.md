@@ -578,7 +578,7 @@ Deliverables:
   - `otto projects close <id>`
   - `otto projects forget <id-or-path>`
 - Add recent projects from the existing registry.
-- Make `otto --web` open the daemon web UI with the current project selected.
+- Make `otto web` open the daemon web UI with the current project selected.
 
 Acceptance criteria:
 

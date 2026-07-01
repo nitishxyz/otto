@@ -59,23 +59,23 @@ otto --version            # Show version
 otto --help               # Show help with discovered commands
 ```
 
-## Server Mode
-
-```bash
-otto serve                  # Start HTTP server on random port
-otto serve --no-open        # Start server + web UI without opening browser
-otto serve --port 3000      # Start on specific port
-otto serve --network        # Start with network access (0.0.0.0)
-otto serve --port 3000 --network  # Combine port and network flags
-otto serve --tunnel         # Enable Cloudflare tunnel for remote access
-```
-
 ## Web UI Modes
 
 ```bash
-otto --web                  # Start local API server + open Web UI
-otto web --api <url>        # Start Web UI only, connected to an existing API server
-otto web --api <url> --no-open  # Start Web UI only without opening browser
+otto web                    # Open this project in the Web UI via the local daemon
+otto web --url <api-url>    # Open Web UI connected to an existing API server
+otto web --url <api-url> --no-open  # Start Web UI shell without opening browser
+```
+
+## Advanced Server Mode
+
+```bash
+otto serve                  # Run standalone foreground API + Web UI servers
+otto serve --no-open        # Run without opening browser
+otto serve --port 3000      # Start API on a specific port
+otto serve --network        # Bind to 0.0.0.0 for network access
+otto serve --port 3000 --network  # Combine port and network flags
+otto serve --tunnel         # Enable Cloudflare tunnel for remote access
 ```
 
 ### Remote Access with Tunnels

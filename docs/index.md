@@ -47,11 +47,11 @@ bun install -g @ottocode/install
 
 ```bash
 otto
-otto --web
+otto web
 otto "fix this bug"
 otto "plan this refactor" --agent plan
 otto "research this subsystem" --agent research
-otto serve
+otto serve  # advanced standalone server
 otto setup
 otto doctor
 ```

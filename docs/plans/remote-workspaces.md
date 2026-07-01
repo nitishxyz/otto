@@ -128,10 +128,10 @@ All fall back to `http://localhost:9100` if not set.
 A new CLI command that starts **only** the web UI server, pointed at an arbitrary API URL:
 
 ```bash
-otto web --api http://localhost:9100          # local API server
-otto web --api http://192.168.1.50:9100       # remote machine
-otto web --api http://localhost:29000         # Docker container
-otto web --api https://team.otto.dev:9100     # remote team server
+otto web --url http://localhost:9100          # local API server
+otto web --url http://192.168.1.50:9100       # remote machine
+otto web --url http://localhost:29000         # Docker container
+otto web --url https://team.otto.dev:9100     # remote team server
 ```
 
 ### Why
@@ -219,7 +219,7 @@ export function registerWebCommand(program: Command, version: string) {
   program
     .command('web')
     .description('Start Web UI only, connected to a remote API server')
-    .requiredOption('--api <url>', 'API server URL to connect to')
+    .option('--url <api-url>', 'Use an existing API server URL')
     .option('-p, --port <port>', 'Web UI port', (v) => parseInt(v, 10))
     .option('--network', 'Bind to 0.0.0.0 for network access', false)
     .option('--no-open', 'Do not open browser automatically')
@@ -487,7 +487,7 @@ When remote servers need authentication:
 
 ```bash
 otto serve --auth-token <token>     # Require token for API access
-otto web --api https://... --token <token>  # Pass token to web UI
+otto web --url https://... --token <token>  # Pass token to web UI
 ```
 
 The web server can inject the token into `window.OTTO_AUTH_TOKEN`, and the web-sdk reads it alongside `OTTO_SERVER_URL` to add `Authorization` headers to API requests.
@@ -500,7 +500,7 @@ Not blocking for Phases 1-3.
 
 | Phase | Effort | Depends On | Deliverable |
 |-------|--------|-----------|-------------|
-| **1a**: `otto web --api <url>` | Small (1 new file, 1 modified file) | Nothing | CLI can connect to any remote API |
+| **1a**: `otto web --url <api-url>` | Small (1 new file, 1 modified file) | Nothing | CLI can connect to any remote API |
 | **1b**: `otto serve --api-only` | Tiny (3-line change) | Nothing | API server without web UI |
 | **2**: Desktop "Connect to URL" | Small (extend Project type, modify Workspace) | Phase 1a (conceptually) | Desktop connects to remote servers |
 | **3**: Merge launcher into desktop | Large (move Rust + React code) | Phase 2 | Single app for everything |

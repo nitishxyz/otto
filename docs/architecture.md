@@ -19,7 +19,7 @@ The compiled CLI bundles the server, database, daemon service, and web UI assets
 
 ## Daemon and project model
 
-otto's default local process model is one daemon per user. The daemon listens on `127.0.0.1`, stores its registration in the global otto state directory, and serves many projects in one process.
+otto's default local process model is one daemon per user. The daemon listens on `127.0.0.1`, stores its registration in the global otto state directory, and serves many projects in one process. Daemon startup binds the documented default port `47477`; if that port is unavailable, startup fails and no new registration is written. `OTTO_DAEMON_PORT` or `otto service start --port <port>` can change the required port, but clients should still read `server.json`/status instead of assuming a port.
 
 Daemon files:
 

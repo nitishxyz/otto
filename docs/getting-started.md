@@ -79,7 +79,7 @@ otto auth list
 
 ```bash
 otto
-otto --web
+otto web
 otto "explain this error"
 otto "write tests for this module" --agent build
 otto "plan the refactor" --agent plan
@@ -89,12 +89,13 @@ otto "research auth handling" --agent research
 Behavior notes:
 
 - `otto` starts the local API server and launches the TUI
-- `otto --web` starts the API and browser UI together
+- `otto web` reuses the local daemon and opens this project in the browser UI
+- `otto web --url <api-url>` opens the browser UI for an existing API URL without starting a local API server
 - one-shot prompts stream through the same local server runtime
 
 ---
 
-## Server mode
+## Advanced server mode
 
 ```bash
 otto serve
@@ -107,6 +108,8 @@ When you run `otto serve --port 3000`:
 
 - API listens on `http://localhost:3000`
 - Web UI is served on `http://localhost:3001`
+
+Use `otto serve` for standalone foreground API/Web serving. For normal browser use, prefer `otto web`.
 
 The API is versioned under `/v1/*`, and `/openapi.json` exposes the generated spec.
 
