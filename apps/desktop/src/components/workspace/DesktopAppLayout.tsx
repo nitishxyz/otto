@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { usePreferences } from '@ottocode/web-sdk/hooks';
+import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
 import {
 	BrowserPanelToggle,
 	BtwFloatingChat,
@@ -52,8 +52,6 @@ const VIEWER_MIN_WIDTH = 320;
 const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const RIGHT_RAIL_HOVER_RATIO = 0.05;
-const HOVER_SHOW_DELAY_MS = 260;
-const HOVER_HIDE_DELAY_MS = 120;
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
 const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 
@@ -110,7 +108,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
 	const { preferences } = usePreferences();
-	const smartEdges = preferences.smartEdges;
 	const anyRightPanelOpen =
 		gitExpanded ||
 		sessionFilesExpanded ||
@@ -139,11 +136,18 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		: `clamp(${VIEWER_MIN_WIDTH}px, ${
 				viewerPanelWidth ? `${viewerPanelWidth}px` : '50%'
 			}, calc(100% - ${CHAT_MIN_WIDTH}px))`;
+	const {
+		isVisible: isRightRailVisible,
+		isHoverPending: isRightRailHoverPending,
+	} = useEdgeHover({
+		side: 'right',
+		enabled: preferences.smartEdges,
+		hoverRatio: RIGHT_RAIL_HOVER_RATIO,
+		activeWidth: activeRightPanelWidth,
+		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,
+	});
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousRightPanelOpenRef = useRef(anyRightPanelOpen);
-	const isRightRailVisibleRef = useRef(false);
-	const rightRailShowTimeoutRef = useRef<number | null>(null);
-	const rightRailHideTimeoutRef = useRef<number | null>(null);
 	const [isRightPanelMounted, setIsRightPanelMounted] =
 		useState(anyRightPanelOpen);
 	const [rightPanelWidth, setRightPanelWidth] = useState(
@@ -151,8 +155,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	);
 	const [isRightPanelTransitioning, setIsRightPanelTransitioning] =
 		useState(false);
-	const [isRightRailVisible, setIsRightRailVisible] = useState(false);
-	const [isRightRailHoverPending, setIsRightRailHoverPending] = useState(false);
 	const previousSidePanelOpenRef = useRef(anySidePanelOpen);
 	const shouldAnimateViewer =
 		previousViewerOpenRef.current !== anyViewerOpen ||
@@ -234,101 +236,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	useEffect(() => {
 		previousSidePanelOpenRef.current = anySidePanelOpen;
 	}, [anySidePanelOpen]);
-
-	useEffect(() => {
-		const setRailVisible = (visible: boolean) => {
-			isRightRailVisibleRef.current = visible;
-			setIsRightRailVisible(visible);
-		};
-
-		const clearHoverTimeouts = () => {
-			if (rightRailShowTimeoutRef.current !== null) {
-				window.clearTimeout(rightRailShowTimeoutRef.current);
-				rightRailShowTimeoutRef.current = null;
-			}
-			if (rightRailHideTimeoutRef.current !== null) {
-				window.clearTimeout(rightRailHideTimeoutRef.current);
-				rightRailHideTimeoutRef.current = null;
-			}
-		};
-
-		const scheduleRailVisible = (visible: boolean) => {
-			if (isRightRailVisibleRef.current === visible) {
-				setIsRightRailHoverPending(false);
-				return;
-			}
-
-			setIsRightRailHoverPending(visible);
-			const delay = visible ? HOVER_SHOW_DELAY_MS : HOVER_HIDE_DELAY_MS;
-			const targetRef = visible
-				? rightRailShowTimeoutRef
-				: rightRailHideTimeoutRef;
-			const oppositeRef = visible
-				? rightRailHideTimeoutRef
-				: rightRailShowTimeoutRef;
-
-			if (oppositeRef.current !== null) {
-				window.clearTimeout(oppositeRef.current);
-				oppositeRef.current = null;
-			}
-
-			if (targetRef.current !== null) return;
-
-			targetRef.current = window.setTimeout(() => {
-				setRailVisible(visible);
-				setIsRightRailHoverPending(false);
-				targetRef.current = null;
-			}, delay);
-		};
-
-		const handleMouseMove = (event: MouseEvent) => {
-			const target = event.target;
-			if (
-				target instanceof Element &&
-				target.closest(SMART_EDGE_IGNORE_SELECTOR)
-			) {
-				clearHoverTimeouts();
-				setIsRightRailHoverPending(false);
-				setRailVisible(false);
-				return;
-			}
-
-			const hoverWidth = window.innerWidth * RIGHT_RAIL_HOVER_RATIO;
-			scheduleRailVisible(window.innerWidth - event.clientX <= hoverWidth);
-		};
-		const handleMouseLeave = () => {
-			clearHoverTimeouts();
-			setIsRightRailHoverPending(false);
-			setRailVisible(false);
-		};
-		const handleMouseOut = (event: MouseEvent) => {
-			if (!event.relatedTarget) {
-				handleMouseLeave();
-			}
-		};
-
-		if (!smartEdges) {
-			clearHoverTimeouts();
-			setIsRightRailHoverPending(false);
-			setRailVisible(false);
-			return;
-		}
-
-		window.addEventListener('mousemove', handleMouseMove);
-		window.addEventListener('mouseout', handleMouseOut);
-		window.addEventListener('blur', handleMouseLeave);
-		document.documentElement.addEventListener('mouseleave', handleMouseLeave);
-		return () => {
-			clearHoverTimeouts();
-			window.removeEventListener('mousemove', handleMouseMove);
-			window.removeEventListener('mouseout', handleMouseOut);
-			window.removeEventListener('blur', handleMouseLeave);
-			document.documentElement.removeEventListener(
-				'mouseleave',
-				handleMouseLeave,
-			);
-		};
-	}, [smartEdges]);
 
 	return (
 		<div className="h-full flex flex-col bg-background touch-manipulation">

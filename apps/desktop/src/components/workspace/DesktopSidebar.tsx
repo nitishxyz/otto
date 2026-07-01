@@ -1,17 +1,16 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePanelWidthStore, useSidebarStore } from '@ottocode/web-sdk/stores';
 import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
-import { usePreferences } from '@ottocode/web-sdk/hooks';
+import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
 
 const PANEL_KEY = 'desktop-left-sidebar';
 const DEFAULT_WIDTH = 272;
 const MIN_WIDTH = 256;
 const MAX_WIDTH = 480;
 const LEFT_SIDEBAR_HOVER_RATIO = 0.02;
-const HOVER_SHOW_DELAY_MS = 260;
-const HOVER_HIDE_DELAY_MS = 120;
+const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 
 interface DesktopSidebarProps {
 	children: ReactNode;
@@ -32,12 +31,13 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
 	);
 	const { preferences } = usePreferences();
-	const smartEdges = preferences.smartEdges;
-	const [isAutoVisible, setIsAutoVisible] = useState(false);
-	const [isHoverPending, setIsHoverPending] = useState(false);
-	const isAutoVisibleRef = useRef(false);
-	const autoShowTimeoutRef = useRef<number | null>(null);
-	const autoHideTimeoutRef = useRef<number | null>(null);
+	const { isVisible: isAutoVisible, isHoverPending } = useEdgeHover({
+		side: 'left',
+		enabled: isCollapsed && preferences.smartEdges,
+		hoverRatio: LEFT_SIDEBAR_HOVER_RATIO,
+		activeWidth: panelWidth,
+		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,
+	});
 	const shouldShowSidebar = !isCollapsed || isAutoVisible;
 	const shouldShowEdgeHint = isCollapsed && isHoverPending && !isAutoVisible;
 	const sidebarStyle = {
@@ -55,89 +55,6 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 			document.body.style.overflow = '';
 		};
 	}, [isCollapsed]);
-
-	useEffect(() => {
-		const setAutoVisible = (visible: boolean) => {
-			isAutoVisibleRef.current = visible;
-			setIsAutoVisible(visible);
-		};
-
-		const clearHoverTimeouts = () => {
-			if (autoShowTimeoutRef.current !== null) {
-				window.clearTimeout(autoShowTimeoutRef.current);
-				autoShowTimeoutRef.current = null;
-			}
-			if (autoHideTimeoutRef.current !== null) {
-				window.clearTimeout(autoHideTimeoutRef.current);
-				autoHideTimeoutRef.current = null;
-			}
-		};
-
-		const scheduleAutoVisible = (visible: boolean) => {
-			if (isAutoVisibleRef.current === visible) {
-				setIsHoverPending(false);
-				return;
-			}
-
-			setIsHoverPending(visible);
-			const delay = visible ? HOVER_SHOW_DELAY_MS : HOVER_HIDE_DELAY_MS;
-			const targetRef = visible ? autoShowTimeoutRef : autoHideTimeoutRef;
-			const oppositeRef = visible ? autoHideTimeoutRef : autoShowTimeoutRef;
-
-			if (oppositeRef.current !== null) {
-				window.clearTimeout(oppositeRef.current);
-				oppositeRef.current = null;
-			}
-
-			if (targetRef.current !== null) return;
-
-			targetRef.current = window.setTimeout(() => {
-				setAutoVisible(visible);
-				setIsHoverPending(false);
-				targetRef.current = null;
-			}, delay);
-		};
-
-		if (!isCollapsed || !smartEdges) {
-			clearHoverTimeouts();
-			setIsHoverPending(false);
-			setAutoVisible(false);
-			return;
-		}
-
-		const handleMouseMove = (event: MouseEvent) => {
-			const triggerWidth = window.innerWidth * LEFT_SIDEBAR_HOVER_RATIO;
-			const activeWidth = isAutoVisibleRef.current
-				? Math.max(triggerWidth, panelWidth)
-				: triggerWidth;
-			scheduleAutoVisible(event.clientX <= activeWidth);
-		};
-		const handleMouseLeave = () => {
-			clearHoverTimeouts();
-			setIsHoverPending(false);
-			setAutoVisible(false);
-		};
-		const handleMouseOut = (event: MouseEvent) => {
-			if (!event.relatedTarget) {
-				handleMouseLeave();
-			}
-		};
-
-		window.addEventListener('mousemove', handleMouseMove);
-		window.addEventListener('mouseout', handleMouseOut);
-		window.addEventListener('blur', handleMouseLeave);
-		document.documentElement.addEventListener('mouseleave', handleMouseLeave);
-		return () => {
-			clearHoverTimeouts();
-			window.removeEventListener('mousemove', handleMouseMove);
-			window.removeEventListener('mouseout', handleMouseOut);
-			window.removeEventListener('blur', handleMouseLeave);
-			document.documentElement.removeEventListener(
-				'mouseleave',
-				handleMouseLeave,
-			);
-		};
-	}, [isCollapsed, panelWidth, smartEdges]);
 
 	return (
 		<>
