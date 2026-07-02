@@ -3,6 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "moduleResolution": "Bundler",
+    "ignoreDeprecations": "6.0",
+    "types": ["bun"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
@@ -26,7 +28,8 @@
       "@/constants/*": ["./src/constants/*"],
       "@/data/*": ["./src/data/*"],
       "@/db/*": ["./src/db/*"],
-      "@/drizzle/*": ["./src/drizzle/*"]
+      "@/drizzle/*": ["./src/drizzle/*"],
+      "@/ai/*": ["./src/ai/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

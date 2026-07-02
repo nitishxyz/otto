@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Animated, Easing } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import { Button } from "@/components/ui/primitives/button";
@@ -20,24 +20,19 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
   onCopy,
 }) => {
   const [copied, setCopied] = useState(false);
-  const rotateAnim = new Animated.Value(0);
-  const scaleAnim = new Animated.Value(1);
+  const rotateAnim = useMemo(() => new Animated.Value(0), []);
+  const scaleAnim = useMemo(() => new Animated.Value(1), []);
 
-  // Reset copied state after delay
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    if (copied) {
-      timeout = setTimeout(() => {
-        animateBack();
-      }, 1500);
-    }
+  const animateBack = useCallback(() => {
+    Animated.timing(rotateAnim, {
+      toValue: 0,
+      duration: 300,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+      useNativeDriver: true,
+    }).start(() => setCopied(false));
+  }, [rotateAnim]);
 
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [copied]);
-
-  const animateToCopied = () => {
+  const animateToCopied = useCallback(() => {
     Animated.parallel([
       Animated.timing(rotateAnim, {
         toValue: 1,
@@ -60,16 +55,21 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
         }),
       ]),
     ]).start();
-  };
+  }, [rotateAnim, scaleAnim]);
 
-  const animateBack = () => {
-    Animated.timing(rotateAnim, {
-      toValue: 0,
-      duration: 300,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-      useNativeDriver: true,
-    }).start(() => setCopied(false));
-  };
+  // Reset copied state after delay
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    if (copied) {
+      timeout = setTimeout(() => {
+        animateBack();
+      }, 1500);
+    }
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [copied, animateBack]);
 
   const copyToClipboard = async () => {
     try {

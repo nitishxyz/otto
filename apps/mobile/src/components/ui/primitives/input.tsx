@@ -199,6 +199,8 @@ const InputComponent = forwardRef<TextInput, InputProps>(({
   );
 });
 
+InputComponent.displayName = "Input";
+
 const Input = InputComponent as typeof InputComponent & {
   Accessory: typeof Accessory;
 };

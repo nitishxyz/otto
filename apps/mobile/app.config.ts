@@ -72,9 +72,7 @@ const config = {
       "expo-web-browser",
       "expo-build-properties",
       "expo-sqlite",
-      "react-native-cloud-storage",
       "react-native-edge-to-edge",
-      ["react-native-cloud-storage"],
       [
         "expo-build-properties",
         {
@@ -91,13 +89,11 @@ const config = {
         "react-native-vision-camera",
         {
           cameraPermissionText:
-            "$(PRODUCT_NAME) needs access to your Camera. To Scan QR Codes.",
-
+            "$(PRODUCT_NAME) needs access to your camera to scan QR codes.",
           enableMicrophonePermission: false,
           enableCodeScanner: true,
         },
       ],
-      "@react-native-community/datetimepicker",
     ],
     experiments: {
       typedRoutes: true,

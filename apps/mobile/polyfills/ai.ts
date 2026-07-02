@@ -1,12 +1,23 @@
 import "fast-text-encoding";
-import "@ungap/structured-clone";
-import { ReadableStream } from "web-streams-polyfill";
+import { Platform } from "react-native";
 
-// Polyfill ReadableStream for streaming responses
-// The AI SDK relies on the Web Streams API (ReadableStream) to handle streaming responses.
-if (typeof global.ReadableStream === "undefined") {
-  global.ReadableStream = ReadableStream as any;
+if (Platform.OS !== "web") {
+  const setupPolyfills = async () => {
+    try {
+      const rn = require("react-native/Libraries/Utilities/PolyfillFunctions");
+      const { TextEncoderStream, TextDecoderStream } = await import(
+        "@stardazed/streams-text-encoding"
+      );
+
+      if (!("TextEncoderStream" in globalThis)) {
+        rn.polyfillGlobal("TextEncoderStream", () => TextEncoderStream);
+      }
+
+      if (!("TextDecoderStream" in globalThis)) {
+        rn.polyfillGlobal("TextDecoderStream", () => TextDecoderStream);
+      }
+    } catch {}
+  };
+
+  setupPolyfills();
 }
-
-// Note: fast-text-encoding automatically polyfills TextEncoder and TextDecoder on the global object.
-// No further action is needed for them.

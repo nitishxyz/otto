@@ -1,15 +1,10 @@
-import { drizzle as expodrizzle } from "drizzle-orm/expo-sqlite";
+import { drizzle } from "drizzle-orm/expo-sqlite";
 import { openDatabaseSync } from "expo-sqlite";
 
-const ENV = process.env.EXPO_PUBLIC_ENV || "prod";
+import * as schema from "./schema";
 
-console.log("env:", ENV)
+export const sqlite = openDatabaseSync("ottocode.db");
 
-const opsqliteDb = openDatabaseSync(ENV === "dev" ? "newdb.db" : "database.db");
-const db = expodrizzle(opsqliteDb);
+const db = drizzle(sqlite, { schema });
 
-// Export the single instance
 export default db;
-
-// Export types
-export * from "./types";

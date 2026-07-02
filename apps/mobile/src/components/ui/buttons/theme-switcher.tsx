@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutated via `.value`. */
 import { Feather } from "@expo/vector-icons";
 import { Button, Icon } from "@/primitives";
 import { StyleSheet, UnistylesRuntime } from "react-native-unistyles";

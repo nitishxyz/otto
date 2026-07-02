@@ -61,29 +61,6 @@ export const useSonner = () => {
     });
   };
 
-  // Helper for transaction flows
-  const transaction = {
-    start: (title: string = "Processing transaction") => {
-      return loading(title, { updatable: true });
-    },
-    success: (id: string, title: string = "Transaction successful") => {
-      updateSonner(id, {
-        type: "success",
-        title,
-        persistent: false,
-        duration: 2000,
-      });
-    },
-    error: (id: string, title: string = "Transaction failed") => {
-      updateSonner(id, {
-        type: "error",
-        title,
-        persistent: false,
-        duration: 5000,
-      });
-    },
-  };
-
   return {
     // Core methods
     show: showSonner,
@@ -98,9 +75,5 @@ export const useSonner = () => {
     info,
     warning,
     loading,
-
-    // Transaction helper
-    transaction,
   };
 };
-

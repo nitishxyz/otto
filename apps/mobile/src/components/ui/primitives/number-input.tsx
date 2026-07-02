@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- React Native Animated values are stored in refs for stable native animations. */
 import React, { useRef, useState } from "react";
 import {
   Animated,

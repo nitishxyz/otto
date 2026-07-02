@@ -21,59 +21,10 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, "node_modules"),
 ];
 
-// Custom resolver for handling package exports compatibility
-const resolveRequestWithPackageExports = (context, moduleName, platform) => {
-  // Package exports in `isows` (a `viem`) dependency are incompatible, so they need to be disabled
-  if (moduleName === "isows") {
-    const ctx = {
-      ...context,
-      unstable_enablePackageExports: false,
-    };
-    return ctx.resolveRequest(ctx, moduleName, platform);
-  }
-
-  // Package exports in `zustand@4` are incompatible, so they need to be disabled
-  if (moduleName.startsWith("zustand")) {
-    const ctx = {
-      ...context,
-      unstable_enablePackageExports: false,
-    };
-    return ctx.resolveRequest(ctx, moduleName, platform);
-  }
-
-  // Package exports in `uuid` cause issues - force browser condition
-  if (moduleName === "uuid" || moduleName.startsWith("uuid/")) {
-    const ctx = {
-      ...context,
-      unstable_enablePackageExports: false,
-    };
-    return ctx.resolveRequest(ctx, moduleName, platform);
-  }
-
-  // Package exports in `jose` are incompatible, so the browser version is used
-  if (moduleName === "jose") {
-    const ctx = {
-      ...context,
-      unstable_conditionNames: ["browser"],
-    };
-    return ctx.resolveRequest(ctx, moduleName, platform);
-  }
-
-  // RN 0.79+ enables package exports by default, so no extra auth package handling is needed here
-
-  return context.resolveRequest(context, moduleName, platform);
-};
-
 // Add custom configuration for ESM packages
 config.resolver = {
   ...config.resolver,
   sourceExts: [...config.resolver.sourceExts, "mjs", "cjs", "sql"],
-  // Alias Node.js built-in modules to polyfills for React Native
-  extraNodeModules: {
-    ...config.resolver.extraNodeModules,
-    crypto: path.resolve(projectRoot, "polyfills/crypto.js"),
-  },
-  resolveRequest: resolveRequestWithPackageExports,
 };
 
 

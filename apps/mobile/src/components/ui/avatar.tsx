@@ -62,7 +62,7 @@ const styles = StyleSheet.create((theme) => ({
   imageContainer: {
     overflow: "hidden",
   },
-  // Scale image slightly larger to crop out any internal padding in token images
+  // Scale image slightly larger to crop out any internal padding in source images
   image: {
     width: "115%",
     height: "115%",

@@ -1,29 +1,13 @@
 import React, {
   useCallback,
-  useMemo,
   useRef,
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Pressable } from "react-native";
-import { FullWindowOverlay } from "react-native-screens";
-import {
-  StyleSheet,
-  StyleSheet as UnistyleStyleSheet,
-} from "react-native-unistyles";
-import { useTheme } from "@/providers/theme-context";
-import { BlurView } from "expo-blur";
-import Animated, {
-  useAnimatedStyle,
-  interpolate,
-  Extrapolation,
-} from "react-native-reanimated";
-import {
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackdropProps,
-  useBottomSheetSpringConfigs,
-} from "@gorhom/bottom-sheet";
+import { StyleSheet as UnistyleStyleSheet } from "react-native-unistyles";
+import MeasuredBottomSheet, {
+  type MeasuredBottomSheetRef,
+} from "./measured-bottom-sheet";
 import { Box } from "./primitives/box";
 import { Button } from "./primitives/button";
 import { Icon } from "./primitives/icon";
@@ -34,6 +18,8 @@ type GorhomPopupSheetProps = {
   children?: React.ReactNode;
   title?: string;
   disableCloseButton?: boolean;
+  /** Pinned at the bottom of the sheet; never scrolls off screen. */
+  footer?: React.ReactNode;
   onDismiss?: () => void;
 };
 
@@ -55,43 +41,6 @@ type GorhomPopupSheetSectionProps = {
 export type GorhomPopupSheetRef = {
   present: () => void;
   dismiss: () => void;
-};
-
-// Custom Blur Backdrop Component
-const CustomBackdrop = ({
-  animatedIndex,
-  style,
-  onPress,
-}: BottomSheetBackdropProps & { onPress?: () => void }) => {
-  const { currentTheme } = useTheme();
-  const colorScheme = currentTheme;
-
-  // Animated style for backdrop opacity
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      animatedIndex.value,
-      [-1, 0],
-      [0, 1],
-      Extrapolation.CLAMP
-    ),
-  }));
-
-  const containerStyle = useMemo(
-    () => [style, containerAnimatedStyle],
-    [style, containerAnimatedStyle]
-  );
-
-  return (
-    <Animated.View style={containerStyle}>
-      <Pressable onPress={onPress} style={StyleSheet.absoluteFillObject}>
-        <BlurView
-          intensity={50}
-          tint={colorScheme === "dark" ? "dark" : "light"}
-          style={{ flex: 1 }}
-        />
-      </Pressable>
-    </Animated.View>
-  );
 };
 
 // Close Button Component
@@ -151,24 +100,22 @@ const GorhomPopupSheetItem = ({
       <Box
         direction="row"
         alignItems="center"
-        rounded="xl"
+        rounded="lg"
         style={styles.itemContent}
       >
-        {/* Left Icon Section */}
         {icon && iconName && (
           <Box
-            rounded="lg"
+            rounded="full"
             style={styles.iconContainer}
             center
-            background="base"
+            background="dim"
           >
-            <Icon icon={icon} name={iconName} size={22} />
+            <Icon icon={icon} name={iconName} size={18} />
           </Box>
         )}
 
-        {/* Center Content Section */}
-        <Box flex style={styles.textContent}>
-          <Button.Text size="lg" weight="semibold">
+        <Box flex>
+          <Button.Text size="md" weight="semibold">
             {title}
           </Button.Text>
           {description && (
@@ -178,9 +125,8 @@ const GorhomPopupSheetItem = ({
           )}
         </Box>
 
-        {/* Right Content Section */}
         {rightContent && (
-          <Box alignItems="flex-end" style={styles.rightContent}>
+          <Box alignItems="flex-end">
             {rightContent}
           </Box>
         )}
@@ -210,16 +156,8 @@ const GorhomPopupSheetSection = ({
 
 // Main Sheet Component
 const GorhomPopupSheet = forwardRef<GorhomPopupSheetRef, GorhomPopupSheetProps>(
-  ({ children, title, disableCloseButton, onDismiss }, ref) => {
-    const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-
-    // Spring animation configs - More bouncy like your original
-    const animationConfigs = useBottomSheetSpringConfigs({
-      damping: 30,
-      overshootClamping: false,
-      stiffness: 400,
-      mass: 1,
-    });
+  ({ children, title, footer, onDismiss }, ref) => {
+    const bottomSheetModalRef = useRef<MeasuredBottomSheetRef>(null);
 
     // Present modal
     const present = useCallback(() => {
@@ -241,68 +179,32 @@ const GorhomPopupSheet = forwardRef<GorhomPopupSheetRef, GorhomPopupSheetProps>(
       [present, dismiss]
     );
 
-    // Handle sheet changes
-    const handleSheetChanges = useCallback((index: number) => {
-      console.log("handleSheetChanges", index);
-    }, []);
-
-    const renderContainerComponent = useCallback(
-      ({ children }: { children: React.ReactNode }) => (
-        <FullWindowOverlay style={{ flex: 1 }}>
-          {children}
-        </FullWindowOverlay>
-      ),
-      []
-    );
-
     return (
-      <BottomSheetModal
+      <MeasuredBottomSheet
         ref={bottomSheetModalRef}
-        onChange={handleSheetChanges}
-        enableDynamicSizing={true}
-        backdropComponent={(props) => (
-          <CustomBackdrop {...props} onPress={dismiss} />
-        )}
-        backgroundStyle={styles.backgroundStyle}
-        style={styles.sheetStyle}
-        handleStyle={styles.handleStyle}
-        handleIndicatorStyle={styles.handleIndicatorStyle}
-        enablePanDownToClose={true}
         onDismiss={onDismiss}
-        animationConfigs={animationConfigs}
-        animateOnMount={true}
-        containerComponent={renderContainerComponent}
-        keyboardBehavior="interactive"
-        keyboardBlurBehavior="restore"
-        android_keyboardInputMode="adjustResize"
-      >
-        <BottomSheetView
-          style={[styles.contentContainer, { backgroundColor: "transparent" }]}
-        >
-          <Box m="md" p="lg" shadow="lg" background="base" style={styles.container} border="thin">
-            {/* Header */}
+        header={
+          <Box style={styles.headerContainer}>
             <Box direction="row" alignItems="center" style={styles.header}>
               <Box center flex>
                 {title && (
-                  <Text size="xl" mode="subtle" weight="bold">
+                  <Text size="lg" mode="subtle" weight="bold">
                     {title}
                   </Text>
                 )}
               </Box>
             </Box>
-            <CloseButton
-              onPress={dismiss}
-              disabled={disableCloseButton}
-              hidden={disableCloseButton}
-            />
-
-            {/* Content */}
-            <Box gap="sm" mt="md">
-              {children}
-            </Box>
+            <CloseButton hidden disabled />
           </Box>
-        </BottomSheetView>
-      </BottomSheetModal>
+        }
+        footer={
+          footer ? <Box style={styles.footer}>{footer}</Box> : undefined
+        }
+      >
+        <Box style={styles.content}>
+          {children}
+        </Box>
+      </MeasuredBottomSheet>
     );
   }
 );
@@ -318,81 +220,48 @@ const GorhomPopupSheetWithComponents = Object.assign(GorhomPopupSheet, {
 export default GorhomPopupSheetWithComponents;
 
 const styles = UnistyleStyleSheet.create((theme, rt) => ({
-  // Bottom Sheet Modal Styles - Make completely transparent
-  sheetStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    shadowColor: "transparent",
-    shadowOpacity: 0,
-    elevation: 0,
+  headerContainer: {
+    paddingTop: theme.spacing.md,
   },
-  backgroundStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
+  content: {
+    paddingTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
   },
-  handleStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    height: 0, // Hide handle completely
-    opacity: 0,
+  footer: {
+    paddingTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
   },
-  handleIndicatorStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    width: 0,
-    height: 0, // Hide handle indicator completely
-    opacity: 0,
-  },
-
-  // Content Container
-  contentContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    paddingTop: theme.spacing.lg,
-    paddingBottom: rt.insets.bottom,
-  },
-
-  // Popup Container (our actual popup)
-  container: {
-    alignSelf: "stretch",
-    borderRadius: theme.radius.tera,
-    paddingTop: theme.spacing.lg,
-    marginBottom: 0,
-  },
-
-  // Header
   header: {
-    minHeight: 35,
+    minHeight: 28,
+    paddingHorizontal: theme.spacing.lg,
   },
   closeButtonContainer: {
     position: "absolute",
-    top: theme.spacing.md,
-    right: theme.spacing.md,
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
     zIndex: 1000,
   },
   closeButton: {
-    height: 35,
-    width: 35,
+    height: 32,
+    width: 32,
   },
-
-  // Item Styles
   itemButton: {
-    borderRadius: theme.radius.xxl,
+    borderRadius: theme.radius.lg,
     paddingVertical: 0,
     paddingHorizontal: 0,
   },
   itemContent: {
-    minHeight: 48,
-    padding: theme.spacing.sm + 4,
-    backgroundColor: theme.colors.background.lightest,
+    minHeight: 52,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
   },
   iconContainer: {
-    width: 45,
-    height: 45,
+    width: 36,
+    height: 36,
     marginRight: 12,
   },
-  textContent: {},
   description: {
     opacity: 0.7,
-  },
-  rightContent: {
-    minWidth: 60,
   },
   sectionTitle: {
     textTransform: "uppercase",

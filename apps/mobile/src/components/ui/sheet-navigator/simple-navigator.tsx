@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutated via `.value`. */
 import { StyleSheet } from "react-native-unistyles";
 import { Box } from "../primitives/box";
 import { Button } from "../primitives/button";
@@ -250,7 +251,7 @@ const SimpleSheetNavigator: React.FC<SheetNavigatorProps> = ({
           >
             {/* Header */}
             <Box direction="row" alignItems="center" style={styles.header}>
-              <CloseButton onPress={handleClose} hidden={true} />
+              <CloseButton hidden disabled />
               <Box center flex>
                 {currentStepTitle && (
                   <Text size="xl" mode="subtle" weight="bold">
@@ -258,10 +259,7 @@ const SimpleSheetNavigator: React.FC<SheetNavigatorProps> = ({
                   </Text>
                 )}
               </Box>
-              <CloseButton
-                onPress={handleClose}
-                disabled={navigation.isLoading}
-              />
+              <CloseButton hidden disabled />
             </Box>
 
             {/* Progress Indicator */}

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutated via `.value`. */
 import React, { useEffect } from "react";
 import { Pressable, ActivityIndicator } from "react-native";
 import Animated, {

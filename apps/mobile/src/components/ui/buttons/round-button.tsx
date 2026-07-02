@@ -3,7 +3,6 @@ import { Box, Button, Icon } from "@/primitives";
 import { StyleProp, ViewStyle } from "react-native";
 import { IconProps } from "@expo/vector-icons/build/createIconSet";
 import React from "react";
-import { varbinary } from "drizzle-orm/mysql-core";
 
 type RoundButtonProps = {
   title: string;

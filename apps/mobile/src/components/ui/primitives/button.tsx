@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- React Native Animated values are stored in refs for stable native animations. */
 import {
   triggerHaptic,
   type HapticConfig,
@@ -6,10 +7,11 @@ import {
 import { getContrastColor, getIconSize } from "@/utils/theme";
 import { createContext, useContext, useMemo, useRef } from "react";
 import type { PressableProps, StyleProp, ViewStyle } from "react-native";
-import { ActivityIndicator, Animated, Pressable, View } from "react-native";
+import { Animated, Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useTheme } from "@/providers/theme-context";
 import { ButtonText, type ButtonTextProps } from "./button-text";
+import { Spinner } from "@/components/ui/primitives/spinner";
 
 type ButtonContextType = {
   size: "sm" | "md" | "lg" | "auto";
@@ -140,35 +142,35 @@ const Button: React.FC<ButtonProps> & {
     [size, variant, mode, m, isDisabled]
   );
 
-  // Use variants to get styled container
-  stylesheet.useVariants({
-    size,
-    variant,
-    mode,
-    m,
-    mt,
-    mb,
-    gap,
-    disabled: disabled || mode === "disabled",
-    rounded,
-    shadow: shadowNow,
-    border: borderNow,
-  });
+ // Use variants to get styled container
+ stylesheet.useVariants({
+   size,
+   variant,
+   mode,
+   m,
+   mt,
+   mb,
+   gap,
+   rounded,
+   shadow: shadowNow,
+   border: borderNow,
+ });
 
   return (
     <ButtonContext.Provider value={contextValue}>
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Pressable
-          disabled={contextValue.disabled}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          style={[stylesheet.container, style]}
-          {...props}
-        >
-          <View style={[stylesheet.content, contentStyle]}>
-            {loading ? (
-              <ActivityIndicator
-                size="small"
+       <Pressable
+         disabled={contextValue.disabled}
+         onPressIn={onPressIn}
+         onPressOut={onPressOut}
+         style={[stylesheet.container, style]}
+         {...props}
+       >
+          {isDisabled && <View style={stylesheet.disabledOverlay} />}
+         <View style={[stylesheet.content, contentStyle]}>
+           {loading ? (
+              <Spinner
+                size="sm"
                 color={
                   mode === "subtle" || variant === "outline" || variant === "ghost"
                     ? theme.colors.text.default
@@ -186,39 +188,39 @@ const Button: React.FC<ButtonProps> & {
 };
 
 const InternalButtonText = ({
-  style,
-  color,
-  weight,
-  ...props
+ style,
+ color,
+ weight,
+ ...props
 }: ButtonTextProps) => {
   const { size, variant, mode } = useContext(ButtonContext);
-  const { theme } = useUnistyles();
+ const { theme } = useUnistyles();
 
-  const textColor = useMemo(() => {
-    if (color) return color;
+ const textColor = useMemo(() => {
+   if (color) return color;
 
-    // Handle outline and ghost variants
-    if (variant === "outline" || variant === "ghost") {
-      if (mode === "subtle") {
-        return theme.colors.text.default;
-      }
-      return theme.colors[mode || "primary"][500];
-    }
+   // Handle outline and ghost variants
+   if (variant === "outline" || variant === "ghost") {
+     if (mode === "subtle") {
+       return theme.colors.text.default;
+     }
+     return theme.colors[mode || "primary"][500];
+   }
 
-    // Handle filled variant (default behavior)
-    if (mode === "subtle") {
-      return theme.colors.text.default;
-    }
+   // Handle filled variant (default behavior)
+   if (mode === "subtle") {
+     return theme.colors.text.default;
+   }
 
-    const buttonColor =
-      mode !== "disabled"
-        ? theme.colors[mode || "primary"][500]
-        : theme.colors.primary[500];
+   const buttonColor =
+     mode !== "disabled"
+       ? theme.colors[mode || "primary"][500]
+       : theme.colors.primary[500];
 
-    return getContrastColor(buttonColor);
+   return getContrastColor(buttonColor);
   }, [color, variant, mode, theme]);
 
-  return (
+ return (
     <ButtonText
       size={size}
       weight={weight}
@@ -231,12 +233,12 @@ const InternalButtonText = ({
 
 const ButtonIcon = ({ children, style }: ButtonIconProps) => {
   const { size, variant, mode } = useContext(ButtonContext);
-  const { theme } = useUnistyles();
+ const { theme } = useUnistyles();
 
-  const iconProps = useMemo(() => {
-    const iconColor =
-      variant === "outline" || variant === "ghost"
-        ? (() => {
+ const iconProps = useMemo(() => {
+   const iconColor =
+     variant === "outline" || variant === "ghost"
+       ? (() => {
             if (mode === "subtle") {
               return theme.colors.text.default;
             }
@@ -253,13 +255,13 @@ const ButtonIcon = ({ children, style }: ButtonIconProps) => {
             return getContrastColor(buttonColor);
           })();
 
-    return {
-      size: getIconSize(size),
-      color: iconColor,
-    };
+   return {
+     size: getIconSize(size),
+     color: iconColor,
+   };
   }, [size, variant, mode, theme]);
 
-  return (
+ return (
     <View style={[stylesheet.icon, style]}>
       {typeof children === "function" ? children(iconProps) : children}
     </View>
@@ -272,12 +274,13 @@ Button.Icon = ButtonIcon;
 export { Button };
 
 const stylesheet = StyleSheet.create((theme) => ({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderCurve: "continuous",
+ container: {
+   flexDirection: "row",
+   alignItems: "center",
+   justifyContent: "center",
+    overflow: "hidden",
+   borderWidth: 1,
+   borderCurve: "continuous",
     backgroundColor: theme.colors.primary[500],
     borderColor: theme.colors.primary[500],
     borderRadius: theme.radius.md,
@@ -381,15 +384,10 @@ const stylesheet = StyleSheet.create((theme) => ({
         none: { gap: 0 },
         sm: { gap: theme.spacing.sm },
         md: { gap: theme.spacing.md },
-        lg: { gap: theme.spacing.lg },
-      },
-      disabled: {
-        true: {
-          opacity: 0.5,
-        },
-      },
-      border: {
-        default: {
+       lg: { gap: theme.spacing.lg },
+     },
+     border: {
+       default: {
           borderWidth: 1,
           borderColor: "transparent",
         },
@@ -442,7 +440,18 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   icon: {
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+   alignItems: "center",
+   justifyContent: "center",
+ },
+disabledOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: theme.colors.background.default,
+  opacity: 0.5,
+   borderRadius: theme.radius.full,
+   borderCurve: "continuous",
+},
 }));

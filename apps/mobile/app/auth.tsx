@@ -1,1 +1,5 @@
-export { AuthPage as default } from "@/components/pages/auth";
+import { Redirect } from "expo-router";
+
+export default function AuthRoute() {
+  return <Redirect href="/(app)/tabs/home" />;
+}

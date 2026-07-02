@@ -1,7 +1,7 @@
 import haptics from "@/components/utils/haptics";
 import { Box, Icon } from "@/primitives";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable } from "react-native";

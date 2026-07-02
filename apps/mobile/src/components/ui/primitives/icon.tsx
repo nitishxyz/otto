@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { View } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
-import { Theme } from "@/src/utils/unistyles";
+import type { Theme } from "@/utils/unistyles";
 
 export type IconProps = {
   icon: React.ComponentType<any>;
@@ -119,7 +119,9 @@ const IconBase: React.FC<IconProps> = ({
 };
 
 const Icon = withUnistyles(IconBase, (theme, rt) => ({
-  isDark: rt.themeName === "dark",
+  // Anything that's not the explicit light theme should pick the dark
+  // icon palette so icons stay legible on dark surfaces.
+  isDark: rt.themeName !== "light",
   theme,
 }));
 

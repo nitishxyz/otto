@@ -2,7 +2,7 @@ import BlurView from "@/components/ui/primitives/blur-view";
 import haptics from "@/components/utils/haptics";
 import { Icon, Text } from "@/primitives";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable } from "react-native";

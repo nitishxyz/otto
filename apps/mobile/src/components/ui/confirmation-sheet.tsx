@@ -1,29 +1,14 @@
 import React, {
   useCallback,
-  useMemo,
   useRef,
+  useState,
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Pressable } from "react-native";
-import { FullWindowOverlay } from "react-native-screens";
-import {
-  StyleSheet,
-  StyleSheet as UnistyleStyleSheet,
-} from "react-native-unistyles";
-import { useTheme } from "@/providers/theme-context";
-import { BlurView } from "expo-blur";
-import Animated, {
-  useAnimatedStyle,
-  interpolate,
-  Extrapolation,
-} from "react-native-reanimated";
-import {
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackdropProps,
-  useBottomSheetSpringConfigs,
-} from "@gorhom/bottom-sheet";
+import { StyleSheet as UnistyleStyleSheet } from "react-native-unistyles";
+import MeasuredBottomSheet, {
+  type MeasuredBottomSheetRef,
+} from "./measured-bottom-sheet";
 import { Box, Text, Button, Icon } from "@/primitives";
 import { Feather } from "@expo/vector-icons";
 
@@ -48,42 +33,6 @@ export type ConfirmationSheetRef = {
   dismiss: () => void;
 };
 
-// Custom Blur Backdrop Component
-const CustomBackdrop = ({
-  animatedIndex,
-  style,
-  onPress,
-}: BottomSheetBackdropProps & { onPress?: () => void }) => {
-  const { currentTheme } = useTheme();
-  const colorScheme = currentTheme;
-
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      animatedIndex.value,
-      [-1, 0],
-      [0, 1],
-      Extrapolation.CLAMP
-    ),
-  }));
-
-  const containerStyle = useMemo(
-    () => [style, containerAnimatedStyle],
-    [style, containerAnimatedStyle]
-  );
-
-  return (
-    <Animated.View style={containerStyle}>
-      <Pressable onPress={onPress} style={StyleSheet.absoluteFillObject}>
-        <BlurView
-          intensity={50}
-          tint={colorScheme === "dark" ? "dark" : "light"}
-          style={{ flex: 1 }}
-        />
-      </Pressable>
-    </Animated.View>
-  );
-};
-
 const iconColors = {
   default: "#9CA3AF",
   warning: "#F59E0B",
@@ -93,14 +42,7 @@ const iconColors = {
 
 const ConfirmationSheet = forwardRef<ConfirmationSheetRef, ConfirmationSheetProps>(
   ({ title, message, icon, iconColor = "default", actions = [], onDismiss }, ref) => {
-    const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-
-    const animationConfigs = useBottomSheetSpringConfigs({
-      damping: 30,
-      overshootClamping: false,
-      stiffness: 400,
-      mass: 1,
-    });
+    const bottomSheetModalRef = useRef<MeasuredBottomSheetRef>(null);
 
     const present = useCallback(() => {
       bottomSheetModalRef.current?.present();
@@ -119,24 +61,20 @@ const ConfirmationSheet = forwardRef<ConfirmationSheetRef, ConfirmationSheetProp
       [present, dismiss]
     );
 
-    const handleSheetChanges = useCallback((_index: number) => {
-      // Sheet state changed
-    }, []);
-
-    const renderContainerComponent = useCallback(
-      (props: { children?: React.ReactNode }) => (
-        <FullWindowOverlay>
-          {props.children}
-        </FullWindowOverlay>
-      ),
-      []
-    );
+    const [pendingIndex, setPendingIndex] = useState<number | null>(null);
 
     const handleActionPress = useCallback(
-      async (action: ConfirmationAction) => {
-        dismiss();
-        if (action.onPress) {
+      async (action: ConfirmationAction, index: number) => {
+        if (!action.onPress) {
+          dismiss();
+          return;
+        }
+        setPendingIndex(index);
+        try {
           await action.onPress();
+          dismiss();
+        } finally {
+          setPendingIndex(null);
         }
       },
       [dismiss]
@@ -176,104 +114,91 @@ const ConfirmationSheet = forwardRef<ConfirmationSheetRef, ConfirmationSheetProp
     };
 
     return (
-      <BottomSheetModal
+      <MeasuredBottomSheet
         ref={bottomSheetModalRef}
-        onChange={handleSheetChanges}
-        enableDynamicSizing={true}
-        backdropComponent={(props) => (
-          <CustomBackdrop {...props} onPress={dismiss} />
-        )}
-        backgroundStyle={styles.backgroundStyle}
-        style={styles.sheetStyle}
-        handleStyle={styles.handleStyle}
-        handleIndicatorStyle={styles.handleIndicatorStyle}
-        enablePanDownToClose={true}
         onDismiss={onDismiss}
-        animationConfigs={animationConfigs}
-        animateOnMount={true}
-        containerComponent={renderContainerComponent}
-      >
-        <BottomSheetView
-          style={[styles.contentContainer, { backgroundColor: "transparent" }]}
-        >
-          <Box m="md" p="lg" shadow="lg" background="base" style={styles.container} border="thin">
-            {/* Icon */}
-            {icon && (
-              <Box center mb="md">
-                <Box
-                  center
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: `${iconColors[iconColor]}20` },
-                  ]}
-                >
-                  <Icon
-                    icon={Feather}
-                    name={icon}
-                    size={28}
-                    color={iconColors[iconColor]}
-                  />
-                </Box>
+        footer={
+          <Box gap="sm" style={styles.footer}>
+            {sortedActions.length === 2 ? (
+              // Two buttons side by side
+              <Box direction="row" gap="sm">
+                {sortedActions.map((action, index) => (
+                  <Box key={index} flex>
+                    <Button
+                      size="lg"
+                      rounded="full"
+                      variant={getButtonVariant(action.style)}
+                      mode={getButtonMode(action.style)}
+                      onPress={() => handleActionPress(action, index)}
+                      loading={action.loading || pendingIndex === index}
+                      disabled={pendingIndex !== null}
+                      style={styles.rowButton}
+                    >
+                      <Button.Text weight="semibold" numberOfLines={1}>
+                        {action.label}
+                      </Button.Text>
+                    </Button>
+                  </Box>
+                ))}
               </Box>
+            ) : (
+              // Stack buttons vertically
+              sortedActions.map((action, index) => (
+                <Button
+                  key={index}
+                  size="lg"
+                  rounded="full"
+                  variant={getButtonVariant(action.style)}
+                  mode={getButtonMode(action.style)}
+                  onPress={() => handleActionPress(action, index)}
+                  loading={action.loading || pendingIndex === index}
+                  disabled={pendingIndex !== null}
+                >
+                  <Button.Text weight="semibold">{action.label}</Button.Text>
+                </Button>
+              ))
             )}
+          </Box>
+        }
+      >
+        <Box style={styles.content}>
+          {/* Icon */}
+          {icon && (
+            <Box center mb="md">
+              <Box
+                center
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: `${iconColors[iconColor]}20` },
+                ]}
+              >
+                <Icon
+                  icon={Feather}
+                  name={icon}
+                  size={28}
+                  color={iconColors[iconColor]}
+                />
+              </Box>
+            </Box>
+          )}
 
-            {/* Title */}
-            <Box center mb="sm">
-              <Text size="xl" weight="bold" style={styles.title}>
-                {title}
+          {/* Title */}
+          <Box center mb="sm">
+            <Text size="xl" weight="bold" style={styles.title}>
+              {title}
+            </Text>
+          </Box>
+
+          {/* Message */}
+          {message && (
+            <Box center mb="lg" px="sm">
+              <Text size="md" mode="subtle" style={styles.message}>
+                {message}
               </Text>
             </Box>
-
-            {/* Message */}
-            {message && (
-              <Box center mb="lg" px="sm">
-                <Text size="md" mode="subtle" style={styles.message}>
-                  {message}
-                </Text>
-              </Box>
-            )}
-
-            {/* Actions */}
-            <Box gap="sm" mt="md">
-              {sortedActions.length === 2 ? (
-                // Two buttons side by side
-                <Box direction="row" gap="sm">
-                  {sortedActions.map((action, index) => (
-                    <Box key={index} flex center>
-                      <Button
-                        size="lg"
-                        rounded="full"
-                        variant={getButtonVariant(action.style)}
-                        mode={getButtonMode(action.style)}
-                        onPress={() => handleActionPress(action)}
-                        loading={action.loading}
-                        style={{ paddingHorizontal: 44}}
-                      >
-                        <Button.Text weight="semibold">{action.label}</Button.Text>
-                      </Button>
-                    </Box>
-                  ))}
-                </Box>
-              ) : (
-                // Stack buttons vertically
-                sortedActions.map((action, index) => (
-                  <Button
-                    key={index}
-                    size="lg"
-                    rounded="full"
-                    variant={getButtonVariant(action.style)}
-                    mode={getButtonMode(action.style)}
-                    onPress={() => handleActionPress(action)}
-                    loading={action.loading}
-                  >
-                    <Button.Text weight="semibold">{action.label}</Button.Text>
-                  </Button>
-                ))
-              )}
-            </Box>
-          </Box>
-        </BottomSheetView>
-      </BottomSheetModal>
+          )}
+        </Box>
+      </MeasuredBottomSheet>
     );
   }
 );
@@ -282,39 +207,18 @@ ConfirmationSheet.displayName = "ConfirmationSheet";
 
 export default ConfirmationSheet;
 
-const styles = UnistyleStyleSheet.create((theme, rt) => ({
-  sheetStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    shadowColor: "transparent",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  backgroundStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-  },
-  handleStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    height: 0,
-    opacity: 0,
-  },
-  handleIndicatorStyle: {
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    width: 0,
-    height: 0,
-    opacity: 0,
-  },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0)",
-    paddingTop: theme.spacing.lg,
-    paddingBottom: rt.insets.bottom,
-  },
-  container: {
-    alignSelf: "stretch",
-    borderRadius: theme.radius.tera,
+const styles = UnistyleStyleSheet.create((theme) => ({
+  content: {
     paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.lg,
-    marginBottom: 0,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  footer: {
+    paddingTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  rowButton: {
+    width: "100%",
+    paddingHorizontal: theme.spacing.sm,
   },
   iconContainer: {
     width: 64,

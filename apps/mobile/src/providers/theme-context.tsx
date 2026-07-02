@@ -50,7 +50,7 @@ export const ThemeContextProvider = ({
 
       if (!hasManualPreference) {
         // User hasn't manually set a theme, so follow system changes
-        const systemTheme = systemColorScheme || "dark";
+        const systemTheme = systemColorScheme === "light" ? "light" : "dark";
         setCurrentTheme(systemTheme);
         UnistylesRuntime.setTheme(systemTheme as keyof UnistylesThemes);
       }

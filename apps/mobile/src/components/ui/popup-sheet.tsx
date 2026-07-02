@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutated via `.value`. */
 import { StyleSheet } from "react-native-unistyles";
 import { Box } from "./primitives/box";
 import { Button } from "./primitives/button";
@@ -188,7 +189,6 @@ const PopupSheet: React.FC<PopupSheetProps> & {
   visible,
   onClose,
   disableBackdrop,
-  disableCloseButton,
 }) => {
   const translateY = useSharedValue(1000);
   const scale = useSharedValue(0.98);
@@ -281,9 +281,7 @@ const PopupSheet: React.FC<PopupSheetProps> & {
             >
               {/* Header */}
               <Box direction="row" alignItems="center" style={styles.header}>
-                {!disableCloseButton && (
-                  <CloseButton onPress={handleClose} hidden={true} />
-                )}
+                <CloseButton hidden disabled />
                 <Box center flex>
                   {title && (
                     <Text size="xl" mode="subtle" weight="bold">
@@ -291,11 +289,7 @@ const PopupSheet: React.FC<PopupSheetProps> & {
                     </Text>
                   )}
                 </Box>
-                <CloseButton
-                  onPress={handleClose}
-                  disabled={disableCloseButton}
-                  hidden={disableCloseButton}
-                />
+                <CloseButton hidden disabled />
               </Box>
 
               {/* Content */}

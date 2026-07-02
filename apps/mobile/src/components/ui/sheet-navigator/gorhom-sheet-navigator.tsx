@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Sheet step state intentionally resets after navigation changes. */
 import React, {
   useCallback,
   useMemo,
@@ -280,7 +281,7 @@ const GorhomSheetNavigator = forwardRef<
             <Box style={styles.header}>
               {/* Title Row with Close Button */}
               <Box direction="row" alignItems="center" pl="md" pr="md">
-                <CloseButton onPress={dismiss} hidden={true} />
+                <CloseButton hidden disabled />
                 <Box flex center>
                   {currentStepTitle && (
                     <Text size="xl" weight="bold">
@@ -288,10 +289,7 @@ const GorhomSheetNavigator = forwardRef<
                     </Text>
                   )}
                 </Box>
-                <CloseButton
-                  onPress={dismiss}
-                  disabled={navigation.isLoading}
-                />
+                <CloseButton hidden disabled />
               </Box>
 
               {/* Progress Row - Centered Below Title */}
