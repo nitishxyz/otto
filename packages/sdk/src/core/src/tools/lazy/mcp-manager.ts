@@ -38,11 +38,15 @@ type ServerSummary = {
 	connected: boolean;
 	tools: string[];
 	error?: string;
+	authRequired?: boolean;
+	authenticated?: boolean;
+	authUrl?: string;
 };
 
 function summarizeServer(
 	server: MCPServerConfig,
 	status?: MCPServerStatus,
+	authUrl?: string | null,
 ): ServerSummary {
 	return {
 		name: server.name,
@@ -55,7 +59,16 @@ function summarizeServer(
 		connected: status?.connected ?? false,
 		tools: status?.tools ?? [],
 		...(status?.error ? { error: status.error } : {}),
+		...(status?.authRequired ? { authRequired: true } : {}),
+		...(status?.authRequired || authUrl
+			? { authenticated: status?.authenticated ?? false }
+			: {}),
+		...(authUrl ? { authUrl } : {}),
 	};
+}
+
+function getPendingAuthUrl(projectRoot: string, name: string): string | null {
+	return getMCPManager(projectRoot)?.getAuthUrl(name) ?? null;
 }
 
 async function getStatuses(projectRoot: string): Promise<MCPServerStatus[]> {
@@ -208,7 +221,9 @@ Transports:
 - stdio requires "command" (plus optional "args"/"env")
 - http/sse require "url" (plus optional "headers")
 
-Set "start": true on add/update to start the server immediately. Newly started servers expose their tools via load_mcp_tools on the next session turn.`,
+Set "start": true on add/update to start the server immediately. Tools from servers started via start/enable become available to you directly on your next step in the current turn; other configured servers expose their tools via load_mcp_tools.
+
+Authentication: some http/sse servers require OAuth. When a started server needs auth, the result includes "authRequired": true and (when available) an "authUrl". Share the authUrl with the user as a clickable link and ask them to open it in their browser to authorize; the server reconnects automatically once auth completes. Use action "list" afterwards to confirm it is connected.`,
 			inputSchema: z.object({
 				action: z.enum(mcpActions).describe('Operation to perform.'),
 				name: z
@@ -263,6 +278,7 @@ Set "start": true on add/update to start the server immediately. Newly started s
 							summarizeServer(
 								server,
 								statuses.find((status) => status.name === server.name),
+								getPendingAuthUrl(projectRoot, server.name),
 							),
 						),
 					};
@@ -303,7 +319,11 @@ Set "start": true on add/update to start the server immediately. Newly started s
 							return {
 								ok: true,
 								action,
-								server: summarizeServer(server, status),
+								server: summarizeServer(
+									server,
+									status,
+									getPendingAuthUrl(projectRoot, server.name),
+								),
 							};
 						} catch (err) {
 							const msg = err instanceof Error ? err.message : String(err);
@@ -353,7 +373,11 @@ Set "start": true on add/update to start the server immediately. Newly started s
 						return {
 							ok: true,
 							action,
-							server: summarizeServer(server, status),
+							server: summarizeServer(
+								server,
+								status,
+								getPendingAuthUrl(projectRoot, server.name),
+							),
 						};
 					} catch (err) {
 						const msg = err instanceof Error ? err.message : String(err);

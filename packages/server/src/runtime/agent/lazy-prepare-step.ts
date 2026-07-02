@@ -13,6 +13,7 @@ export interface LazyToolLoaderState {
 export interface LazyPrepareStepState {
 	baseToolNames: string[];
 	loaders: LazyToolLoaderState[];
+	refresh?: (args: { steps: unknown[] }) => void | Promise<void>;
 }
 
 export function createLazyToolLoaderState(
@@ -137,10 +138,12 @@ export function collectLoadedToolsFromHistory(
 export function createLazyPrepareStepState(
 	baseToolNames: string[],
 	loaders: LazyToolLoaderState[],
+	refresh?: (args: { steps: unknown[] }) => void | Promise<void>,
 ): LazyPrepareStepState {
 	return {
 		baseToolNames,
 		loaders,
+		...(refresh ? { refresh } : {}),
 	};
 }
 
@@ -156,6 +159,12 @@ export function buildLazyPrepareStep(state: LazyPrepareStepState) {
 			toolCalls?: Array<{ toolName: string; input: unknown }>;
 			toolResults?: Array<{ toolName: string; output: unknown }>;
 		}>;
+
+		if (state.refresh) {
+			try {
+				await state.refresh({ steps });
+			} catch {}
+		}
 
 		for (const step of previousSteps) {
 			if (!step.toolCalls) continue;
