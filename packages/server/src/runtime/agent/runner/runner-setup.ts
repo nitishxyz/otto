@@ -14,7 +14,7 @@ import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import { buildDatabaseTools } from '../../../tools/database/index.ts';
 import { buildSubagentTools } from '../../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../../tools/goals/index.ts';
-import { buildEnqueueSessionMessageTool } from '../../../tools/otto/index.ts';
+import { buildEnqueueSessionMessageTool } from '../../../tools/looper/index.ts';
 import { buildRunPluginCommandTool } from '../../../tools/plugins/run-plugin-command.ts';
 import { time } from '../../debug/index.ts';
 import { buildHistoryMessages } from '../../message/history-builder.ts';
@@ -48,7 +48,7 @@ const DATABASE_TOOL_NAMES = new Set([
 	'present_action',
 ]);
 
-// Otto sessions get delegation: otto dispatches goal tasks to worker agents.
+// Looper sessions get delegation: looper dispatches goal tasks to worker agents.
 // Subagents stay excluded (depth-1 delegation cap).
 const NO_DELEGATION_SESSION_TYPES = new Set(['subagent']);
 
@@ -153,7 +153,6 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 
 	const currentSessionType = sessionRows[0]?.sessionType ?? 'main';
 	const currentParentSessionId = sessionRows[0]?.parentSessionId ?? null;
-	const ottoEnabled = cfg.defaults.ottoEnabled !== false;
 	const injectedToolNames: string[] = [];
 
 	// Delegation tools are built-in for every agent in eligible sessions; no
@@ -170,7 +169,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 			const { listAgentDescriptions } = await import('../registry.ts');
 			const agentList = await listAgentDescriptions(cfg.projectRoot);
 			const delegatable = agentList.filter(
-				(a) => a.name !== opts.agent && a.name !== 'otto',
+				(a) => a.name !== opts.agent && a.name !== 'looper',
 			);
 			const lines = delegatable.map((a) =>
 				a.description ? `- ${a.name}: ${a.description}` : `- ${a.name}`,
@@ -194,20 +193,20 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		} catch {}
 	}
 
-	// Goals are single-writer: only otto carries goal tools. Workers stay
+	// Goals are single-writer: only looper carries goal tools. Workers stay
 	// goal-unaware and receive work via delegate_task / enqueued messages.
-	const needsGoalTools = ottoEnabled && opts.agent === 'otto';
+	const needsGoalTools = opts.agent === 'looper';
 	if (needsGoalTools) {
-		// Legacy otto sessions are children of the session they supervise and
-		// bind goals via goals.sessionId = parent. Phase 3 re-keys otto sessions
-		// per goal (goals.ottoSessionId), at which point this fallback goes away.
-		const ottoSessionId =
-			currentSessionType === 'otto' && currentParentSessionId
+		// Legacy looper sessions are children of the session they supervise and
+		// bind goals via goals.sessionId = parent. Phase 3 re-keys looper sessions
+		// per goal (goals.looperSessionId), at which point this fallback goes away.
+		const looperSessionId =
+			currentSessionType === 'looper' && currentParentSessionId
 				? currentParentSessionId
 				: opts.sessionId;
 		const goalTools = buildGoalTools({
 			projectRoot: cfg.projectRoot,
-			ottoSessionId,
+			looperSessionId,
 		});
 		for (const item of goalTools) {
 			discovered.tools.push(item);
@@ -215,10 +214,10 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		}
 	}
 
-	if (opts.agent === 'otto') {
+	if (opts.agent === 'looper') {
 		const enqueueTool = buildEnqueueSessionMessageTool(
 			cfg.projectRoot,
-			currentSessionType === 'otto' && currentParentSessionId
+			currentSessionType === 'looper' && currentParentSessionId
 				? currentParentSessionId
 				: undefined,
 		);

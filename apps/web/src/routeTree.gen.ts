@@ -12,9 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
-import { Route as OttoIndexRouteImport } from './routes/otto.index'
+import { Route as LooperIndexRouteImport } from './routes/looper.index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as OttoSessionIdRouteImport } from './routes/otto.$sessionId'
+import { Route as LooperSessionIdRouteImport } from './routes/looper.$sessionId'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -31,9 +31,9 @@ const SessionsIndexRoute = SessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OttoIndexRoute = OttoIndexRouteImport.update({
-  id: '/otto/',
-  path: '/otto/',
+const LooperIndexRoute = LooperIndexRouteImport.update({
+  id: '/looper/',
+  path: '/looper/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
@@ -41,35 +41,35 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   path: '/sessions/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OttoSessionIdRoute = OttoSessionIdRouteImport.update({
-  id: '/otto/$sessionId',
-  path: '/otto/$sessionId',
+const LooperSessionIdRoute = LooperSessionIdRouteImport.update({
+  id: '/looper/$sessionId',
+  path: '/looper/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/otto/$sessionId': typeof OttoSessionIdRoute
+  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/otto/': typeof OttoIndexRoute
+  '/looper/': typeof LooperIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/otto/$sessionId': typeof OttoSessionIdRoute
+  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/otto': typeof OttoIndexRoute
+  '/looper': typeof LooperIndexRoute
   '/sessions': typeof SessionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/otto/$sessionId': typeof OttoSessionIdRoute
+  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/otto/': typeof OttoIndexRoute
+  '/looper/': typeof LooperIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRouteTypes {
@@ -77,34 +77,34 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
-    | '/otto/$sessionId'
+    | '/looper/$sessionId'
     | '/sessions/$sessionId'
-    | '/otto/'
+    | '/looper/'
     | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
-    | '/otto/$sessionId'
+    | '/looper/$sessionId'
     | '/sessions/$sessionId'
-    | '/otto'
+    | '/looper'
     | '/sessions'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
-    | '/otto/$sessionId'
+    | '/looper/$sessionId'
     | '/sessions/$sessionId'
-    | '/otto/'
+    | '/looper/'
     | '/sessions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  OttoSessionIdRoute: typeof OttoSessionIdRoute
+  LooperSessionIdRoute: typeof LooperSessionIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
-  OttoIndexRoute: typeof OttoIndexRoute
+  LooperIndexRoute: typeof LooperIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
 }
 
@@ -131,11 +131,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/otto/': {
-      id: '/otto/'
-      path: '/otto'
-      fullPath: '/otto/'
-      preLoaderRoute: typeof OttoIndexRouteImport
+    '/looper/': {
+      id: '/looper/'
+      path: '/looper'
+      fullPath: '/looper/'
+      preLoaderRoute: typeof LooperIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessions/$sessionId': {
@@ -145,11 +145,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/otto/$sessionId': {
-      id: '/otto/$sessionId'
-      path: '/otto/$sessionId'
-      fullPath: '/otto/$sessionId'
-      preLoaderRoute: typeof OttoSessionIdRouteImport
+    '/looper/$sessionId': {
+      id: '/looper/$sessionId'
+      path: '/looper/$sessionId'
+      fullPath: '/looper/$sessionId'
+      preLoaderRoute: typeof LooperSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -158,9 +158,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  OttoSessionIdRoute: OttoSessionIdRoute,
+  LooperSessionIdRoute: LooperSessionIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
-  OttoIndexRoute: OttoIndexRoute,
+  LooperIndexRoute: LooperIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
 }
 export const routeTree = rootRouteImport

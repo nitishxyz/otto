@@ -237,7 +237,7 @@ export function registerToolsRoute(app: Hono) {
 					...buildSubagentTools(cfg.projectRoot, ''),
 					...buildGoalTools({
 						projectRoot: cfg.projectRoot,
-						ottoSessionId: '',
+						looperSessionId: '',
 					}),
 				]) {
 					details.set(

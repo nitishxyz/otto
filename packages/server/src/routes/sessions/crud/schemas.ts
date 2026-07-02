@@ -30,7 +30,7 @@ export const sessionSchema = z
 		parentSessionId: z.string().nullable().optional(),
 		branchPointMessageId: z.string().nullable().optional(),
 		sessionType: z
-			.enum(['main', 'branch', 'handoff', 'btw', 'otto', 'subagent'])
+			.enum(['main', 'branch', 'handoff', 'btw', 'looper', 'subagent'])
 			.optional(),
 		toolCounts: z.record(z.string(), z.number()).optional(),
 		isRunning: z.boolean().optional(),
@@ -68,12 +68,12 @@ export const listSessionsQuerySchema = projectQuerySchema.extend({
 			description: 'Offset for pagination',
 		}),
 	sessionType: z
-		.enum(['otto'])
+		.enum(['looper'])
 		.optional()
 		.openapi({
 			param: { name: 'sessionType', in: 'query' },
 			description:
-				'Filter to a specific session type. Currently only "otto" is supported; omit for the default listing (which excludes otto sessions).',
+				'Filter to a specific session type. Currently only "looper" is supported; omit for the default listing (which excludes looper sessions).',
 		}),
 });
 
@@ -104,7 +104,7 @@ export const createSessionBodySchema = z.object({
 			'Allow a model override that is not present in the configured model catalog.',
 	}),
 	parentSessionId: z.string().nullable().optional(),
-	sessionType: z.enum(['main', 'btw', 'otto']).optional(),
+	sessionType: z.enum(['main', 'btw', 'looper']).optional(),
 });
 
 export const updateSessionBodySchema = z.object({

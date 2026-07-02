@@ -45,7 +45,7 @@ export const sessionsMixin = {
 	},
 
 	async getSessionsPage(
-		params: { limit?: number; offset?: number; sessionType?: 'otto' } = {},
+		params: { limit?: number; offset?: number; sessionType?: 'looper' } = {},
 	): Promise<SessionsPage> {
 		const { limit = 50, offset = 0, sessionType } = params;
 		const response = await apiListSessions({

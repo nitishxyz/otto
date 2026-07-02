@@ -12,12 +12,12 @@ import {
 } from '../packages/server/src/tools/goals/index.ts';
 import {
 	buildGoalKickoffMessage,
-	ensureOttoSessionForGoal,
-	maybeWakeOtto,
-} from '../packages/server/src/runtime/otto/service.ts';
+	ensureLooperSessionForGoal,
+	maybeWakeLooper,
+} from '../packages/server/src/runtime/looper/service.ts';
 
 let projectRoot = '';
-const OTTO_SESSION_ID = 'otto-session-1';
+const LOOPER_SESSION_ID = 'looper-session-1';
 
 type ToolExecute = (input: Record<string, unknown>) => Promise<{
 	ok: boolean;
@@ -50,7 +50,7 @@ describe('single-writer goal tools', () => {
 	test('goal_list returns null when no goal exists', async () => {
 		const listTool = buildGoalListTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const result = await getExecute(listTool)({});
 		expect(result.ok).toBe(true);
@@ -61,17 +61,17 @@ describe('single-writer goal tools', () => {
 	test('goal_update requires createGoal when no goal exists', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const result = await getExecute(updateTool)({ addTasks: ['orphan task'] });
 		expect(result.ok).toBe(false);
 		expect(result.error).toContain('createGoal');
 	});
 
-	test('createGoal binds goal to the otto session', async () => {
+	test('createGoal binds goal to the looper session', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const result = await getExecute(updateTool)({
 			createGoal: { title: 'Test goal' },
@@ -86,7 +86,7 @@ describe('single-writer goal tools', () => {
 		const rows = await db
 			.select()
 			.from(goals)
-			.where(eq(goals.ottoSessionId, OTTO_SESSION_ID));
+			.where(eq(goals.looperSessionId, LOOPER_SESSION_ID));
 		expect(rows).toHaveLength(1);
 		expect(rows[0].projectPath).toBe(
 			(await loadConfig(projectRoot)).projectRoot,
@@ -96,7 +96,7 @@ describe('single-writer goal tools', () => {
 	test('updateTasks records worker sessionId and status transitions', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const execute = getExecute(updateTool);
 		const list = await execute({});
@@ -123,7 +123,7 @@ describe('single-writer goal tools', () => {
 	test('done_pending is not an accepted task status', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const inputSchema = (
 			updateTool.tool as unknown as {
@@ -143,7 +143,7 @@ describe('single-writer goal tools', () => {
 	test('goal_update preserves older task history and ordering', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: 'otto-preserve-history',
+			looperSessionId: 'looper-preserve-history',
 		});
 		const execute = getExecute(updateTool);
 		const created = await execute({
@@ -184,7 +184,7 @@ describe('single-writer goal tools', () => {
 	test('completeGoal closes the goal', async () => {
 		const updateTool = buildGoalUpdateTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const execute = getExecute(updateTool);
 		const list = await execute({});
@@ -200,31 +200,31 @@ describe('single-writer goal tools', () => {
 
 		const listTool = buildGoalListTool({
 			projectRoot,
-			ottoSessionId: OTTO_SESSION_ID,
+			looperSessionId: LOOPER_SESSION_ID,
 		});
 		const after = await getExecute(listTool)({});
 		expect(after.goal).toBeNull();
 	});
 });
 
-describe('per-goal otto session binding', () => {
-	test('ensureOttoSessionForGoal returns the bound otto session', async () => {
+describe('per-goal looper session binding', () => {
+	test('ensureLooperSessionForGoal returns the bound looper session', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
 		const now = Date.now();
 		await db.insert(sessions).values({
-			id: 'otto-bound-1',
-			agent: 'otto',
+			id: 'looper-bound-1',
+			agent: 'looper',
 			provider: 'anthropic',
 			model: 'test',
 			projectPath: cfg.projectRoot,
 			createdAt: now,
-			sessionType: 'otto',
+			sessionType: 'looper',
 		});
 		await db.insert(goals).values({
 			id: 'goal-bound-1',
 			projectPath: cfg.projectRoot,
-			ottoSessionId: 'otto-bound-1',
+			looperSessionId: 'looper-bound-1',
 			title: 'Bound goal',
 			status: 'active',
 			createdAt: now,
@@ -233,11 +233,11 @@ describe('per-goal otto session binding', () => {
 		const goalRow = (
 			await db.select().from(goals).where(eq(goals.id, 'goal-bound-1'))
 		)[0];
-		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
-		expect(session?.id).toBe('otto-bound-1');
+		const session = await ensureLooperSessionForGoal(db, cfg, goalRow);
+		expect(session?.id).toBe('looper-bound-1');
 	});
 
-	test('non-otto goal binding is ignored and rebound to an otto session', async () => {
+	test('non-looper goal binding is ignored and rebound to a looper session', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
 		const now = Date.now();
@@ -253,7 +253,7 @@ describe('per-goal otto session binding', () => {
 		await db.insert(goals).values({
 			id: 'goal-bad-bound-1',
 			projectPath: cfg.projectRoot,
-			ottoSessionId: 'bad-main-bound-1',
+			looperSessionId: 'bad-main-bound-1',
 			title: 'Bad bound goal',
 			status: 'active',
 			createdAt: now,
@@ -262,17 +262,17 @@ describe('per-goal otto session binding', () => {
 		const goalRow = (
 			await db.select().from(goals).where(eq(goals.id, 'goal-bad-bound-1'))
 		)[0];
-		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
+		const session = await ensureLooperSessionForGoal(db, cfg, goalRow);
 		expect(session?.id).not.toBe('bad-main-bound-1');
-		expect(session?.sessionType).toBe('otto');
+		expect(session?.sessionType).toBe('looper');
 
 		const rebound = (
 			await db.select().from(goals).where(eq(goals.id, 'goal-bad-bound-1'))
 		)[0];
-		expect(rebound.ottoSessionId).toBe(session?.id);
+		expect(rebound.looperSessionId).toBe(session?.id);
 	});
 
-	test('legacy parent-child otto session is adopted and backfilled', async () => {
+	test('legacy parent-child looper session is adopted and backfilled', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
 		const now = Date.now();
@@ -286,14 +286,14 @@ describe('per-goal otto session binding', () => {
 			sessionType: 'main',
 		});
 		await db.insert(sessions).values({
-			id: 'legacy-otto-1',
-			agent: 'otto',
+			id: 'legacy-looper-1',
+			agent: 'looper',
 			provider: 'anthropic',
 			model: 'test',
 			projectPath: cfg.projectRoot,
 			createdAt: now,
 			parentSessionId: 'legacy-main-1',
-			sessionType: 'otto',
+			sessionType: 'looper',
 		});
 		await db.insert(goals).values({
 			id: 'goal-legacy-1',
@@ -307,18 +307,18 @@ describe('per-goal otto session binding', () => {
 		const goalRow = (
 			await db.select().from(goals).where(eq(goals.id, 'goal-legacy-1'))
 		)[0];
-		const session = await ensureOttoSessionForGoal(db, cfg, goalRow);
-		expect(session?.id).toBe('legacy-otto-1');
+		const session = await ensureLooperSessionForGoal(db, cfg, goalRow);
+		expect(session?.id).toBe('legacy-looper-1');
 
 		const backfilled = (
 			await db.select().from(goals).where(eq(goals.id, 'goal-legacy-1'))
 		)[0];
-		expect(backfilled.ottoSessionId).toBe('legacy-otto-1');
+		expect(backfilled.looperSessionId).toBe('legacy-looper-1');
 	});
 });
 
-describe('otto wakeup routing', () => {
-	test('errored normal sessions without an active goal do not create legacy otto wakeups', async () => {
+describe('looper wakeup routing', () => {
+	test('errored normal sessions without an active goal do not create legacy looper wakeups', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
 		const now = Date.now();
@@ -349,13 +349,13 @@ describe('otto wakeup routing', () => {
 				.from(sessions)
 				.where(eq(sessions.id, 'error-main-no-goal-1'))
 		)[0];
-		await maybeWakeOtto({ db, cfg, session });
+		await maybeWakeLooper({ db, cfg, session });
 
-		const legacyOttoSessions = await db
+		const legacyLooperSessions = await db
 			.select()
 			.from(sessions)
 			.where(eq(sessions.parentSessionId, 'error-main-no-goal-1'));
-		expect(legacyOttoSessions).toEqual([]);
+		expect(legacyLooperSessions).toEqual([]);
 	});
 });
 
@@ -366,7 +366,7 @@ describe('goal kickoff message', () => {
 			id: 'g1',
 			projectPath: '/p',
 			sessionId: null,
-			ottoSessionId: 'o1',
+			looperSessionId: 'o1',
 			title: 'Ship feature',
 			status: 'active',
 			startedAt: null,
@@ -387,8 +387,8 @@ describe('goal kickoff message', () => {
 			},
 		];
 		const message = buildGoalKickoffMessage(goal, tasks);
-		expect(message.startsWith('<otto_kickoff goal-id="g1">')).toBe(true);
-		expect(message).toContain('</otto_kickoff>');
+		expect(message.startsWith('<looper_kickoff goal-id="g1">')).toBe(true);
+		expect(message).toContain('</looper_kickoff>');
 		expect(message).toContain('<task id="t1" status="pending" position="0">');
 		expect(message).toContain('<instructions>');
 		expect(message).toContain('Ship feature');

@@ -6,7 +6,6 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
-	DISABLED_ERROR,
 	listTasksForGoal,
 	loadGoalsContext,
 	serializeGoal,
@@ -26,9 +25,9 @@ export function registerStartGoalRoute(app: Hono) {
 			path: '/v1/goals/{goalId}/start',
 			tags: ['goals'],
 			operationId: 'startGoal',
-			summary: 'Start working on a goal via its otto orchestrator',
+			summary: 'Start working on a goal via its looper orchestrator',
 			description:
-				"Dispatches a kickoff message into the goal's otto session (creating one if missing). Otto orchestrates: it marks tasks in_progress, delegates work to agents, verifies results, and completes tasks.",
+				"Dispatches a kickoff message into the goal's looper session (creating one if missing). Looper orchestrates: it marks tasks in_progress, delegates work to agents, verifies results, and completes tasks.",
 			request: {
 				params: goalIdParamsSchema,
 				query: projectQuerySchema,
@@ -39,10 +38,6 @@ export function registerStartGoalRoute(app: Hono) {
 					content: {
 						'application/json': { schema: goalResponseSchema },
 					},
-				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
 				},
 				'404': {
 					description: 'Not Found',
@@ -56,10 +51,9 @@ export function registerStartGoalRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { cfg, db, enabled } = await loadGoalsContext(
+				const { cfg, db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const rows = await db
 					.select()
@@ -80,14 +74,14 @@ export function registerStartGoalRoute(app: Hono) {
 				}
 
 				const {
-					ensureOttoSessionForGoal,
+					ensureLooperSessionForGoal,
 					buildGoalKickoffMessage,
-					resetOttoStallState,
-				} = await import('../../runtime/otto/service.ts');
-				const ottoSession = await ensureOttoSessionForGoal(db, cfg, goal);
-				if (!ottoSession) {
+					resetLooperStallState,
+				} = await import('../../runtime/looper/service.ts');
+				const looperSession = await ensureLooperSessionForGoal(db, cfg, goal);
+				if (!looperSession) {
 					return c.json(
-						{ error: 'Failed to create otto session for goal.' },
+						{ error: 'Failed to create looper session for goal.' },
 						409,
 					);
 				}
@@ -99,16 +93,16 @@ export function registerStartGoalRoute(app: Hono) {
 				await dispatchAssistantMessage({
 					cfg,
 					db,
-					session: ottoSession,
-					agent: 'otto',
-					provider: ottoSession.provider as Parameters<
+					session: looperSession,
+					agent: 'looper',
+					provider: looperSession.provider as Parameters<
 						typeof dispatchAssistantMessage
 					>[0]['provider'],
-					model: ottoSession.model,
+					model: looperSession.model,
 					content,
 				});
 
-				resetOttoStallState(goal.id);
+				resetLooperStallState(goal.id);
 				const now = Date.now();
 				await db
 					.update(goals)

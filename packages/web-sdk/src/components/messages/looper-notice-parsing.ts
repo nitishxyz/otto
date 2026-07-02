@@ -1,17 +1,29 @@
-export const OTTO_KICKOFF_TAG = '<otto_kickoff';
-export const OTTO_WAKEUP_TAG = '<otto_wakeup';
+export const LOOPER_KICKOFF_TAG = '<looper_kickoff';
+export const LOOPER_WAKEUP_TAG = '<looper_wakeup';
+// Legacy tags from before the otto -> looper agent rename; old transcripts
+// still contain them.
+const LEGACY_KICKOFF_TAG = '<otto_kickoff';
+const LEGACY_WAKEUP_TAG = '<otto_wakeup';
 
-/** True when a message is the automated otto goal-kickoff payload. */
-export function isOttoKickoffMessage(content: string): boolean {
-	return content.trimStart().startsWith(OTTO_KICKOFF_TAG);
+/** True when a message is the automated looper goal-kickoff payload. */
+export function isLooperKickoffMessage(content: string): boolean {
+	const trimmed = content.trimStart();
+	return (
+		trimmed.startsWith(LOOPER_KICKOFF_TAG) ||
+		trimmed.startsWith(LEGACY_KICKOFF_TAG)
+	);
 }
 
-/** True when a message is the automated otto wakeup/check-in payload. */
-export function isOttoWakeupMessage(content: string): boolean {
-	return content.trimStart().startsWith(OTTO_WAKEUP_TAG);
+/** True when a message is the automated looper wakeup/check-in payload. */
+export function isLooperWakeupMessage(content: string): boolean {
+	const trimmed = content.trimStart();
+	return (
+		trimmed.startsWith(LOOPER_WAKEUP_TAG) ||
+		trimmed.startsWith(LEGACY_WAKEUP_TAG)
+	);
 }
 
-export interface OttoNoticeTask {
+export interface LooperNoticeTask {
 	id: string;
 	status: string;
 	position: number;
@@ -20,30 +32,30 @@ export interface OttoNoticeTask {
 	workerSessionId?: string;
 }
 
-export interface OttoKickoffData {
+export interface LooperKickoffData {
 	goalId: string;
 	title: string;
-	tasks: OttoNoticeTask[];
+	tasks: LooperNoticeTask[];
 	instructions: string;
 }
 
-export interface OttoWakeupSubagent {
+export interface LooperWakeupSubagent {
 	agent: string;
 	status: string;
 	delivered?: boolean;
 	note?: string;
 }
 
-export interface OttoWakeupData {
+export interface LooperWakeupData {
 	workerSessionId: string;
 	workerAgent: string;
 	errored: boolean;
 	errorReason?: string;
 	goalId?: string;
 	goalTitle?: string;
-	tasks: OttoNoticeTask[];
+	tasks: LooperNoticeTask[];
 	transcript: string[];
-	subagents: OttoWakeupSubagent[];
+	subagents: LooperWakeupSubagent[];
 	instructions: string;
 }
 
@@ -59,8 +71,8 @@ function parseAttrs(raw: string): Record<string, string> {
 	return attrs;
 }
 
-function parseTasks(block: string): OttoNoticeTask[] {
-	const tasks: OttoNoticeTask[] = [];
+function parseTasks(block: string): LooperNoticeTask[] {
+	const tasks: LooperNoticeTask[] = [];
 	for (const match of block.matchAll(TASK_RE)) {
 		const attrs = parseAttrs(match[1] ?? '');
 		const body = match[2] ?? '';
@@ -85,19 +97,20 @@ function extractBlock(content: string, tag: string): string {
 	);
 }
 
-/** Parses the `<otto_kickoff>` payload into structured data. */
-export function parseOttoKickoff(content: string): OttoKickoffData {
-	const goalId = /<otto_kickoff\s+goal-id="([^"]*)"/.exec(content)?.[1] ?? '';
+/** Parses the `<looper_kickoff>` (or legacy `<otto_kickoff>`) payload. */
+export function parseLooperKickoff(content: string): LooperKickoffData {
+	const goalId =
+		/<(?:looper|otto)_kickoff\s+goal-id="([^"]*)"/.exec(content)?.[1] ?? '';
 	const title = /<title>([\s\S]*?)<\/title>/.exec(content)?.[1]?.trim() ?? '';
 	const tasks = parseTasks(extractBlock(content, 'tasks'));
 	const instructions = extractBlock(content, 'instructions').trim();
 	return { goalId, title, tasks, instructions };
 }
 
-/** Parses the `<otto_wakeup>` payload into structured data. */
-export function parseOttoWakeup(content: string): OttoWakeupData {
+/** Parses the `<looper_wakeup>` (or legacy `<otto_wakeup>`) payload. */
+export function parseLooperWakeup(content: string): LooperWakeupData {
 	const headAttrs = parseAttrs(
-		/<otto_wakeup\b([^>]*)>/.exec(content)?.[1] ?? '',
+		/<(?:looper|otto)_wakeup\b([^>]*)>/.exec(content)?.[1] ?? '',
 	);
 	const lastRun = headAttrs['last-run'] ?? 'completed';
 	const errored = lastRun.startsWith('errored');
@@ -117,7 +130,7 @@ export function parseOttoWakeup(content: string): OttoWakeupData {
 		.filter(Boolean);
 
 	const subagentsBlock = extractBlock(content, 'subagents');
-	const subagents: OttoWakeupSubagent[] = [];
+	const subagents: LooperWakeupSubagent[] = [];
 	for (const match of subagentsBlock.matchAll(SUBAGENT_RE)) {
 		const attrs = parseAttrs(match[1] ?? '');
 		subagents.push({

@@ -97,7 +97,6 @@ export async function writeDefaults(
 		notificationsEnabled: boolean;
 		autoCompactThresholdTokens: number | null;
 		coAuthorCommits: boolean;
-		ottoEnabled: boolean;
 	}>,
 	projectRoot?: string,
 ) {

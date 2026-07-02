@@ -158,7 +158,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 		],
 		loadable: ['read_image', 'copy_attachment_to_project', 'browser'],
 	},
-	otto: {
+	looper: {
 		firstClass: [
 			'read',
 			'ls',

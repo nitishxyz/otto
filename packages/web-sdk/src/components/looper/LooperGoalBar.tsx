@@ -72,7 +72,7 @@ function pickVisibleTask(tasks: GoalTask[]): GoalTask | undefined {
 
 /**
  * Resolves the goal shown for a session. Multiple goals can point at the
- * same otto session; prefer active goals, then the most recently created,
+ * same looper session; prefer active goals, then the most recently created,
  * so the choice is deterministic instead of array-order dependent.
  */
 function pickSessionGoal(
@@ -80,7 +80,7 @@ function pickSessionGoal(
 	sessionId: string,
 ): Goal | null {
 	if (!goals) return null;
-	const matches = goals.filter((g) => g.ottoSessionId === sessionId);
+	const matches = goals.filter((g) => g.looperSessionId === sessionId);
 	if (matches.length === 0) return null;
 	const active = matches.filter((g) => g.status === 'active');
 	const pool = active.length > 0 ? active : matches;
@@ -123,7 +123,7 @@ const TaskRow = memo(function TaskRow({
 	deleteDisabled,
 }: TaskRowProps) {
 	// In-progress tasks cannot be deleted (server returns 409); hide the
-	// affordance and let users cancel via otto instead.
+	// affordance and let users cancel via looper instead.
 	const canDelete = task.status !== 'in_progress';
 	const isCurrent = task.status === 'in_progress';
 	return (
@@ -246,17 +246,17 @@ const AddTaskComposer = memo(function AddTaskComposer({
 	);
 });
 
-interface OttoGoalBarContentProps {
+interface LooperGoalBarContentProps {
 	goal: Goal;
 }
 
-const OttoGoalBarContent = memo(function OttoGoalBarContent({
+const LooperGoalBarContent = memo(function LooperGoalBarContent({
 	goal,
-}: OttoGoalBarContentProps) {
+}: LooperGoalBarContentProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const openWorker = useSubagentViewerStore((state) => state.open);
 	const deleteTask = useDeleteProjectGoalTask();
-	const startGoal = useStartGoal(goal.ottoSessionId ?? undefined);
+	const startGoal = useStartGoal(goal.looperSessionId ?? undefined);
 
 	const handleOpenWorker = useCallback(
 		(task: GoalTask) => {
@@ -280,7 +280,7 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 							error instanceof Error ? error.message : 'Failed to delete task';
 						toast.error(
 							/in[_ ]progress/i.test(message)
-								? 'Task is in progress and cannot be deleted — ask otto to cancel it instead.'
+								? 'Task is in progress and cannot be deleted — ask looper to cancel it instead.'
 								: message,
 						);
 					},
@@ -389,7 +389,7 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 								}
 								disabled={startGoal.isPending}
 								className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-								title="Dispatch otto to work this goal"
+								title="Dispatch looper to work this goal"
 							>
 								{startGoal.isPending ? (
 									<StableSpinner size="sm" title="Starting goal" />
@@ -404,7 +404,7 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 						{tasks.length === 0 ? (
 							<p className="px-3 py-2 text-xs text-muted-foreground">
 								{isActive
-									? 'No tasks yet. Ask otto to plan this goal, or add tasks below.'
+									? 'No tasks yet. Ask looper to plan this goal, or add tasks below.'
 									: 'No tasks were added to this goal.'}
 							</p>
 						) : (
@@ -428,25 +428,25 @@ const OttoGoalBarContent = memo(function OttoGoalBarContent({
 	);
 });
 
-interface OttoGoalBarProps {
+interface LooperGoalBarProps {
 	sessionId: string;
 }
 
 /**
- * Collapsible goals bar attached above the chat input of otto sessions, in
+ * Collapsible goals bar attached above the chat input of looper sessions, in
  * the exact InputTodosBar interaction pattern. Collapsed: compact summary
  * ("Goal | <current task> — n/m done"). Expanded: full task queue with
  * add/remove affordances and worker transcript links. Resolves the goal
- * attached to this session (goal.ottoSessionId === sessionId; when several
+ * attached to this session (goal.looperSessionId === sessionId; when several
  * match, the most recently created active goal wins) and hides itself with
  * the grid-rows animation when no goal exists yet or while goals are still
  * loading. A failed goals fetch shows a subtle inline notice instead of
- * silently hiding. Only mount this for otto sessions — it owns the project
+ * silently hiding. Only mount this for looper sessions — it owns the project
  * goals query.
  */
-export const OttoGoalBar = memo(function OttoGoalBar({
+export const LooperGoalBar = memo(function LooperGoalBar({
 	sessionId,
-}: OttoGoalBarProps) {
+}: LooperGoalBarProps) {
 	const { data, isError } = useProjectGoals();
 	const goal = pickSessionGoal(data?.goals, sessionId);
 	const showError = isError && !goal;
@@ -463,7 +463,7 @@ export const OttoGoalBar = memo(function OttoGoalBar({
 		>
 			<div className="overflow-hidden">
 				{goal ? (
-					<OttoGoalBarContent goal={goal} />
+					<LooperGoalBarContent goal={goal} />
 				) : showError ? (
 					<div
 						className={`border border-border bg-card overflow-hidden ${INPUT_BAR_ATTACHED_CARD_CLASS}`}

@@ -83,8 +83,8 @@ export function registerCreateSessionRoute(app: Hono) {
 					sessionType:
 						body.sessionType === 'btw'
 							? 'btw'
-							: body.sessionType === 'otto'
-								? 'otto'
+							: body.sessionType === 'looper'
+								? 'looper'
 								: 'main',
 				});
 				return c.json(

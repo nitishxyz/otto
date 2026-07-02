@@ -56,7 +56,7 @@ export function ConfigModal({
 			(agentDetails?.agents.length
 				? agentDetails.agents.map((agentDetail) => agentDetail.name)
 				: (config?.agents ?? [])
-			).filter((name) => name !== 'otto'),
+			).filter((name) => name !== 'looper'),
 		[agentDetails?.agents, config?.agents],
 	);
 	const agentSelectorRef = useRef<UnifiedAgentSelectorRef>(null);

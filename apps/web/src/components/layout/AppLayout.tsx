@@ -51,7 +51,7 @@ import {
 	useRightRailStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
-import { RoutedOttoTabs, WorkspaceTitleBar } from './WorkspaceTitleBar';
+import { RoutedLooperTabs, WorkspaceTitleBar } from './WorkspaceTitleBar';
 import {
 	Bot,
 	FileCode2,
@@ -379,7 +379,7 @@ const MobileTopBar = memo(function MobileTopBar({
 							Viewer
 						</span>
 					) : (
-						<RoutedOttoTabs />
+						<RoutedLooperTabs />
 					)}
 				</div>
 				{anyViewerOpen && (

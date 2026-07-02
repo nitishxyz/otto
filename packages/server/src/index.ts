@@ -27,6 +27,7 @@ import { registerTunnelRoutes } from './routes/tunnel.ts';
 import { registerMCPRoutes } from './routes/mcp.ts';
 import { registerProviderUsageRoutes } from './routes/provider-usage.ts';
 import { registerDoctorRoutes } from './routes/doctor.ts';
+import { registerDebugRuntimeRoute } from './routes/debug-runtime.ts';
 import { registerSkillsRoutes } from './routes/skills.ts';
 import { registerRecipesRoutes } from './routes/recipes.ts';
 import { registerUsageRoutes } from './routes/usage.ts';
@@ -116,6 +117,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerMCPRoutes(app);
 	registerProviderUsageRoutes(app);
 	registerDoctorRoutes(app);
+	registerDebugRuntimeRoute(app);
 	registerSkillsRoutes(app);
 	registerRecipesRoutes(app);
 	registerPluginsRoutes(app);
@@ -200,7 +202,6 @@ export type EmbeddedAppConfig = {
 		notificationsEnabled?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
-		ottoEnabled?: boolean;
 	};
 	/** Additional CORS origins for proxies/Tailscale (e.g., ['https://myapp.ts.net', 'https://example.com']) */
 	corsOrigins?: string[];

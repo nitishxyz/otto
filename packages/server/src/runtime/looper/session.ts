@@ -9,24 +9,24 @@ import { createSession } from '../session/manager.ts';
 import type { GoalRow, SessionRow } from './types.ts';
 
 /**
- * Returns the otto session that owns a goal, creating and binding one
- * (goals.ottoSessionId) when missing. Migrates legacy goals whose otto
+ * Returns the looper session that owns a goal, creating and binding one
+ * (goals.looperSessionId) when missing. Migrates legacy goals whose looper
  * session was a child of the supervised session.
  */
-export async function ensureOttoSessionForGoal(
+export async function ensureLooperSessionForGoal(
 	db: DB,
 	cfg: OttoConfig,
 	goal: GoalRow,
 ): Promise<SessionRow | undefined> {
-	if (goal.ottoSessionId) {
+	if (goal.looperSessionId) {
 		const rows = await db
 			.select()
 			.from(sessions)
-			.where(eq(sessions.id, goal.ottoSessionId))
+			.where(eq(sessions.id, goal.looperSessionId))
 			.limit(1);
-		if (rows[0]?.sessionType === 'otto') return rows[0];
+		if (rows[0]?.sessionType === 'looper') return rows[0];
 		if (rows[0]) {
-			logger.warn('[otto] goal bound to non-otto session; rebinding', {
+			logger.warn('[looper] goal bound to non-looper session; rebinding', {
 				goalId: goal.id,
 				boundSessionId: rows[0].id,
 				sessionType: rows[0].sessionType,
@@ -34,7 +34,7 @@ export async function ensureOttoSessionForGoal(
 		}
 	}
 
-	// Legacy binding: otto session created as a child of the supervised session.
+	// Legacy binding: looper session created as a child of the supervised session.
 	if (goal.sessionId) {
 		const legacy = await db
 			.select()
@@ -42,37 +42,37 @@ export async function ensureOttoSessionForGoal(
 			.where(
 				and(
 					eq(sessions.parentSessionId, goal.sessionId),
-					eq(sessions.sessionType, 'otto'),
+					eq(sessions.sessionType, 'looper'),
 				),
 			)
 			.limit(1);
 		if (legacy[0]) {
 			await db
 				.update(goals)
-				.set({ ottoSessionId: legacy[0].id, updatedAt: Date.now() })
+				.set({ looperSessionId: legacy[0].id, updatedAt: Date.now() })
 				.where(eq(goals.id, goal.id));
 			return legacy[0];
 		}
 	}
 
-	const created = await createOttoSession(db, cfg, {
+	const created = await createLooperSession(db, cfg, {
 		title: goal.title,
 	});
 	if (!created) return undefined;
 	await db
 		.update(goals)
-		.set({ ottoSessionId: created.id, updatedAt: Date.now() })
+		.set({ looperSessionId: created.id, updatedAt: Date.now() })
 		.where(eq(goals.id, goal.id));
 	return created;
 }
 
-async function createOttoSession(
+async function createLooperSession(
 	db: DB,
 	cfg: OttoConfig,
 	opts: { title: string | null; parentSessionId?: string },
 ): Promise<SessionRow | undefined> {
 	try {
-		const agentCfg = await resolveAgentConfig(cfg.projectRoot, 'otto');
+		const agentCfg = await resolveAgentConfig(cfg.projectRoot, 'looper');
 		const agentProviderDefault = hasConfiguredProvider(cfg, agentCfg.provider)
 			? agentCfg.provider
 			: cfg.defaults.provider;
@@ -85,15 +85,15 @@ async function createOttoSession(
 		return await createSession({
 			db,
 			cfg,
-			agent: 'otto',
+			agent: 'looper',
 			provider: selection.provider,
 			model: selection.model,
 			title: opts.title,
 			parentSessionId: opts.parentSessionId,
-			sessionType: 'otto',
+			sessionType: 'looper',
 		});
 	} catch (error) {
-		logger.warn('[otto] failed to create otto session', {
+		logger.warn('[looper] failed to create looper session', {
 			error: toErrorMessage(error),
 		});
 		return undefined;

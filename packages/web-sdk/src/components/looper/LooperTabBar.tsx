@@ -1,16 +1,14 @@
 import { memo } from 'react';
-import { SquareTerminal } from 'lucide-react';
-import { useOttoEnabled } from '../../hooks/useGoals';
-import { OttoOIcon } from '../common/OttoOIcon';
+import { Repeat2, ShipWheel } from 'lucide-react';
 
-export type WorkspaceTab = 'agents' | 'otto';
+export type WorkspaceTab = 'agents' | 'looper';
 
 const TABS: Array<{ id: WorkspaceTab; label: string }> = [
 	{ id: 'agents', label: 'agents' },
-	{ id: 'otto', label: 'otto' },
+	{ id: 'looper', label: 'looper' },
 ];
 
-interface OttoTabBarProps {
+interface LooperTabBarProps {
 	activeTab: WorkspaceTab;
 	onTabChange: (tab: WorkspaceTab) => void;
 	/**
@@ -21,19 +19,15 @@ interface OttoTabBarProps {
 }
 
 /**
- * Top-level workspace tab switcher: Chats (direct sessions) vs Otto (goal
+ * Top-level workspace tab switcher: Chats (direct sessions) vs Looper (goal
  * orchestrator). Controlled by the host app — typically backed by routes
- * (/sessions vs /otto) so refreshes land on the same tab. Renders nothing
- * when otto is disabled on the server (`useOttoEnabled()`); hosts should
- * treat the active tab as 'agents' in that case.
+ * (/sessions vs /looper) so refreshes land on the same tab.
  */
-export const OttoTabBar = memo(function OttoTabBar({
+export const LooperTabBar = memo(function LooperTabBar({
 	activeTab,
 	onTabChange,
 	variant = 'sidebar',
-}: OttoTabBarProps) {
-	const ottoEnabled = useOttoEnabled();
-	if (!ottoEnabled) return null;
+}: LooperTabBarProps) {
 	if (variant === 'titlebar') {
 		return (
 			<div className="flex h-8 items-center gap-0.5 rounded-lg bg-muted/60 p-0.5">
@@ -52,9 +46,9 @@ export const OttoTabBar = memo(function OttoTabBar({
 							aria-pressed={isActive}
 						>
 							{tab.id === 'agents' ? (
-								<SquareTerminal className="h-3.5 w-3.5" />
+								<ShipWheel className="h-3.5 w-3.5" />
 							) : (
-								<OttoOIcon className="h-3 w-3" />
+								<Repeat2 className="h-3.5 w-3.5" />
 							)}
 							{tab.label}
 						</button>
@@ -80,9 +74,9 @@ export const OttoTabBar = memo(function OttoTabBar({
 						aria-pressed={isActive}
 					>
 						{tab.id === 'agents' ? (
-							<SquareTerminal className="h-3.5 w-3.5" />
+							<ShipWheel className="h-3.5 w-3.5" />
 						) : (
-							<OttoOIcon className="h-3 w-3" />
+							<Repeat2 className="h-3.5 w-3.5" />
 						)}
 						{tab.label}
 					</button>

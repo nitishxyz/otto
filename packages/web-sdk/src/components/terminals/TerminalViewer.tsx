@@ -9,6 +9,7 @@ import {
 } from 'ghostty-web';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
 import { openUrl } from '../../lib/open-url';
+import { getProjectQuery } from '../../lib/api-client/utils';
 import { client } from '@ottocode/api';
 import { StableSpinner } from '../ui/StableSpinner';
 
@@ -187,7 +188,9 @@ export const TerminalViewer = memo(function TerminalViewer({
 			}
 
 			const wsBaseUrl = httpToWs(baseUrl);
-			const wsUrl = `${wsBaseUrl}/v1/terminals/${terminalId}/ws`;
+			const params = new URLSearchParams(getProjectQuery());
+			const query = params.toString();
+			const wsUrl = `${wsBaseUrl}/v1/terminals/${terminalId}/ws${query ? `?${query}` : ''}`;
 			const ws = new WebSocket(wsUrl);
 			wsRef.current = ws;
 

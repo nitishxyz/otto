@@ -7,10 +7,10 @@ import {
 	ChevronRight,
 	RadioTower,
 } from 'lucide-react';
-import { parseOttoWakeup } from './otto-notice-parsing';
-import { OttoTaskRow } from './OttoKickoffNotice';
+import { parseLooperWakeup } from './looper-notice-parsing';
+import { LooperTaskRow } from './LooperKickoffNotice';
 
-export { isOttoWakeupMessage } from './otto-notice-parsing';
+export { isLooperWakeupMessage } from './looper-notice-parsing';
 
 function subagentStatusClass(status: string): string {
 	if (status === 'completed') return 'text-green-600 dark:text-green-400';
@@ -18,20 +18,21 @@ function subagentStatusClass(status: string): string {
 	return 'text-muted-foreground';
 }
 
-interface OttoWakeupNoticeProps {
+interface LooperWakeupNoticeProps {
 	content: string;
 }
 
 /**
- * Compact rendering for the automated `<otto_wakeup>` check-in message
- * dispatched into otto when a worker run finishes, instead of the raw tagged
- * payload. Header summarizes the worker run + goal progress; transcript and
- * sub-agent details are expandable. Errored runs get error styling.
+ * Compact rendering for the automated `<looper_wakeup>` check-in message
+ * dispatched into looper when a worker run finishes, instead of the raw
+ * tagged payload. Header summarizes the worker run + goal progress;
+ * transcript and sub-agent details are expandable. Errored runs get error
+ * styling.
  */
-export const OttoWakeupNotice = memo(function OttoWakeupNotice({
+export const LooperWakeupNotice = memo(function LooperWakeupNotice({
 	content,
-}: OttoWakeupNoticeProps) {
-	const data = useMemo(() => parseOttoWakeup(content), [content]);
+}: LooperWakeupNoticeProps) {
+	const data = useMemo(() => parseLooperWakeup(content), [content]);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const taskCount = data.tasks.length;
 	const completed = data.tasks.filter(
@@ -72,7 +73,7 @@ export const OttoWakeupNotice = memo(function OttoWakeupNotice({
 					</div>
 					<div className="min-w-0 flex-1">
 						<div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-							Otto check-in
+							Looper check-in
 						</div>
 						<div className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
 							<span className="truncate">
@@ -120,7 +121,7 @@ export const OttoWakeupNotice = memo(function OttoWakeupNotice({
 						{taskCount > 0 ? (
 							<div className="divide-y divide-border/40 py-0.5">
 								{data.tasks.map((task) => (
-									<OttoTaskRow key={task.id || task.content} task={task} />
+									<LooperTaskRow key={task.id || task.content} task={task} />
 								))}
 							</div>
 						) : null}

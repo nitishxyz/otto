@@ -172,8 +172,8 @@ Key responsibilities:
 - agent resolution and prompt composition
 - tool execution and approvals
 - OpenAPI generation
-- otto orchestration: project-scoped goals with per-goal otto sessions
-  (`goals.ottoSessionId`); otto is the sole writer of goal state and
+- looper orchestration: project-scoped goals with per-goal looper sessions
+  (`goals.looperSessionId`); looper is the sole writer of goal state and
   dispatches tasks to worker agents via async delegation
 
 Exports include:

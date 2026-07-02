@@ -27,8 +27,14 @@ import {
 	isSubagentResultsMessage,
 } from './SubagentResultsNotice';
 import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
-import { OttoKickoffNotice, isOttoKickoffMessage } from './OttoKickoffNotice';
-import { OttoWakeupNotice, isOttoWakeupMessage } from './OttoWakeupNotice';
+import {
+	LooperKickoffNotice,
+	isLooperKickoffMessage,
+} from './LooperKickoffNotice';
+import {
+	LooperWakeupNotice,
+	isLooperWakeupMessage,
+} from './LooperWakeupNotice';
 import { useSkills } from '../../hooks/useSkills';
 import { useRecipes } from '../../hooks/useRecipes';
 import { useMentionAgents } from '../../hooks/useAgents';
@@ -164,11 +170,11 @@ export const UserMessageGroup = memo(
 		if (isSubagentResultsMessage(rawContent)) {
 			return <SubagentResultsNotice content={rawContent} />;
 		}
-		if (isOttoKickoffMessage(rawContent)) {
-			return <OttoKickoffNotice content={rawContent} />;
+		if (isLooperKickoffMessage(rawContent)) {
+			return <LooperKickoffNotice content={rawContent} />;
 		}
-		if (isOttoWakeupMessage(rawContent)) {
-			return <OttoWakeupNotice content={rawContent} />;
+		if (isLooperWakeupMessage(rawContent)) {
+			return <LooperWakeupNotice content={rawContent} />;
 		}
 		if (isGoalStartMessage(rawContent)) {
 			return <GoalStartNotice content={rawContent} />;

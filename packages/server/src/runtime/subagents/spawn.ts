@@ -153,8 +153,8 @@ async function validateSpawnTarget(args: {
 			error: 'Cannot delegate to the same agent that is delegating.',
 		};
 	}
-	if (args.targetAgent === 'otto') {
-		return { ok: false, error: 'Cannot delegate to the otto agent.' };
+	if (args.targetAgent === 'looper') {
+		return { ok: false, error: 'Cannot delegate to the looper agent.' };
 	}
 
 	const knownAgents = await discoverAllAgents(args.cfg.projectRoot);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type WorkspaceTabId = 'agents' | 'otto';
+type WorkspaceTabId = 'agents' | 'looper';
 
 interface WorkspaceTabState {
 	/** Last active session id per workspace tab (in-memory only). */
@@ -10,7 +10,7 @@ interface WorkspaceTabState {
 }
 
 /**
- * Remembers the last visited session per workspace tab (agents | otto) so
+ * Remembers the last visited session per workspace tab (agents | looper) so
  * switching tabs returns to where you were instead of the new-session view.
  */
 export const useWorkspaceTabStore = create<WorkspaceTabState>((set) => ({

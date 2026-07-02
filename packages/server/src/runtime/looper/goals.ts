@@ -47,7 +47,7 @@ export async function completeGoal(db: DB, goal: GoalRow): Promise<void> {
 		.update(goals)
 		.set({ status: 'completed', updatedAt: Date.now() })
 		.where(eq(goals.id, goal.id));
-	const eventSessionId = goal.ottoSessionId ?? goal.sessionId;
+	const eventSessionId = goal.looperSessionId ?? goal.sessionId;
 	if (eventSessionId) {
 		publish({
 			type: 'goal.updated',
@@ -55,5 +55,5 @@ export async function completeGoal(db: DB, goal: GoalRow): Promise<void> {
 			payload: { goalId: goal.id, changes: ['goal completed'] },
 		});
 	}
-	logger.info('[otto] goal completed', { goalId: goal.id });
+	logger.info('[looper] goal completed', { goalId: goal.id });
 }

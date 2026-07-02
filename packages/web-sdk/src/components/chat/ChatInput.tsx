@@ -272,7 +272,7 @@ export const ChatInput = memo(
 		const mentionAgents = useMemo(
 			() =>
 				(mentionAgentsData?.agents ?? [])
-					.filter((a) => a.name !== 'otto' && a.name !== agent)
+					.filter((a) => a.name !== 'looper' && a.name !== agent)
 					.map((a) => ({ name: a.name, description: a.description })),
 			[mentionAgentsData, agent],
 		);

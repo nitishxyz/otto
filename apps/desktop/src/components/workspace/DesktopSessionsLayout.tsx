@@ -8,8 +8,8 @@ import {
 	ChatInputContainer,
 	MessageThreadContainer,
 	NewSessionLanding,
-	OttoSessionRail,
-	OttoWorkspace,
+	LooperSessionRail,
+	LooperWorkspace,
 	SessionListContainer,
 	Toaster,
 	type ChatInputContainerRef,
@@ -46,8 +46,8 @@ import { DesktopAppLayout } from './DesktopAppLayout';
 interface DesktopSessionsLayoutProps {
 	project: Project;
 	sessionId?: string;
-	/** Workspace view: 'agents' (default, /sessions) or 'otto' (/otto). */
-	view?: 'agents' | 'otto';
+	/** Workspace view: 'agents' (default, /sessions) or 'looper' (/looper). */
+	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 	titleBar?: ReactNode;
@@ -80,7 +80,7 @@ export function DesktopSessionsLayout({
 	);
 	const defaultAgent =
 		project.kind === 'general' ? 'general' : config?.defaults.agent;
-	const isOttoTab = view === 'otto';
+	const isLooperTab = view === 'looper';
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
@@ -94,9 +94,9 @@ export function DesktopSessionsLayout({
 	}, []);
 
 	const handleNewSession = useCallback(() => {
-		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
+		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
 		focusInput();
-	}, [navigate, focusInput, isOttoTab]);
+	}, [navigate, focusInput, isLooperTab]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
@@ -113,9 +113,9 @@ export function DesktopSessionsLayout({
 	const handleDeleteSession = useCallback(() => {
 		useWorkspaceTabStore
 			.getState()
-			.clearLastSession(isOttoTab ? 'otto' : 'agents');
-		navigate({ to: isOttoTab ? '/otto' : '/sessions' });
-	}, [navigate, isOttoTab]);
+			.clearLastSession(isLooperTab ? 'looper' : 'agents');
+		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
+	}, [navigate, isLooperTab]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
@@ -144,10 +144,10 @@ export function DesktopSessionsLayout({
 		[queryClient],
 	);
 
-	const handleSelectOttoSession = useCallback(
+	const handleSelectLooperSession = useCallback(
 		(id: string) => {
 			navigate({
-				to: '/otto/$sessionId',
+				to: '/looper/$sessionId',
 				params: { sessionId: id },
 			});
 			focusInput();
@@ -155,10 +155,10 @@ export function DesktopSessionsLayout({
 		[navigate, focusInput],
 	);
 
-	const handleOttoSessionCreated = useCallback(
+	const handleLooperSessionCreated = useCallback(
 		(newSessionId: string) => {
 			navigate({
-				to: '/otto/$sessionId',
+				to: '/looper/$sessionId',
 				params: { sessionId: newSessionId },
 				replace: false,
 			});
@@ -345,10 +345,10 @@ export function DesktopSessionsLayout({
 				onCloseDashboard={onCloseDashboard}
 				titleBar={titleBar}
 				sidebar={
-					isOttoTab ? (
-						<OttoSessionRail
+					isLooperTab ? (
+						<LooperSessionRail
 							activeSessionId={sessionId}
-							onSelectSession={handleSelectOttoSession}
+							onSelectSession={handleSelectLooperSession}
 							hasOverlayHeader
 						/>
 					) : (
@@ -360,11 +360,11 @@ export function DesktopSessionsLayout({
 					)
 				}
 			>
-				{isOttoTab ? (
-					<OttoWorkspace
+				{isLooperTab ? (
+					<LooperWorkspace
 						ref={chatInputRef}
 						sessionId={sessionId}
-						onSessionCreated={handleOttoSessionCreated}
+						onSessionCreated={handleLooperSessionCreated}
 						onNewSession={handleNewSession}
 						onDeleteSession={handleDeleteSession}
 					/>

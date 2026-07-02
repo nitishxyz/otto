@@ -35,31 +35,4 @@ export function registerStorageCommand(program: Command) {
 			);
 			await dispatchRegisteredCommand(register, argv);
 		});
-
-	storage
-		.command('migrate')
-		.description('Copy legacy SQLite files into project state storage')
-		.option('--project <path>', 'Use project at <path>')
-		.option(
-			'--dry-run',
-			'Show the migration plan without touching files',
-			false,
-		)
-		.option(
-			'--delete-legacy',
-			'Delete legacy SQLite files after successful copy',
-			false,
-		)
-		.option('--force', 'Overwrite existing target SQLite files', false)
-		.action(async (opts) => {
-			const argv = ['storage', 'migrate'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--dry-run', opts.dryRun);
-			pushFlag(argv, '--delete-legacy', opts.deleteLegacy);
-			pushFlag(argv, '--force', opts.force);
-			const { registerStorageCommand: register } = await import(
-				'../storage.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
-		});
 }

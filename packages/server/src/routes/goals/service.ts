@@ -7,15 +7,12 @@ export type GoalRow = typeof goals.$inferSelect;
 export type GoalTaskRow = typeof goalTasks.$inferSelect;
 export type GoalsDb = Awaited<ReturnType<typeof getDb>>;
 
-export const DISABLED_ERROR =
-	'Goals are disabled because otto is disabled (defaults.ottoEnabled).';
-
 export function serializeGoal(goal: GoalRow, tasks: GoalTaskRow[]) {
 	return {
 		id: goal.id,
 		projectPath: goal.projectPath,
 		sessionId: goal.sessionId,
-		ottoSessionId: goal.ottoSessionId,
+		looperSessionId: goal.looperSessionId,
 		title: goal.title,
 		status: goal.status,
 		startedAt: goal.startedAt,
@@ -42,8 +39,7 @@ export function serializeGoalTask(task: GoalTaskRow) {
 export async function loadGoalsContext(projectRoot: string) {
 	const cfg = await loadConfig(projectRoot);
 	const db = await getDb(cfg.projectRoot);
-	const enabled = cfg.defaults.ottoEnabled !== false;
-	return { cfg, db, enabled };
+	return { cfg, db };
 }
 
 export async function listTasksForGoal(

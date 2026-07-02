@@ -1,23 +1,23 @@
 import { forwardRef, memo } from 'react';
 import { MessageThreadContainer } from '../messages/MessageThreadContainer';
 import { ChatInputContainer } from '../chat/ChatInputContainer';
-import { OttoGoalBar } from './OttoGoalBar';
+import { LooperGoalBar } from './LooperGoalBar';
 
-interface OttoSessionViewProps {
+interface LooperSessionViewProps {
 	sessionId: string;
 	onNewSession?: () => void;
 	onDeleteSession?: () => void;
 }
 
 /**
- * An otto session rendered with the standard session experience: the normal
+ * A looper session rendered with the standard session experience: the normal
  * message thread (SessionHeader/LeanHeader included) and the full chat input
- * (provider/model editable; agent locked to otto). The goals bar attaches to
- * the chat input alongside InputTodosBar — the session header stays clean.
+ * (provider/model editable; agent locked to looper). The goals bar attaches
+ * to the chat input alongside InputTodosBar — the session header stays clean.
  */
-export const OttoSessionView = memo(
-	forwardRef<{ focus: () => void }, OttoSessionViewProps>(
-		function OttoSessionView(
+export const LooperSessionView = memo(
+	forwardRef<{ focus: () => void }, LooperSessionViewProps>(
+		function LooperSessionView(
 			{ sessionId, onNewSession, onDeleteSession },
 			ref,
 		) {
@@ -31,7 +31,7 @@ export const OttoSessionView = memo(
 						lockedAgent
 						onNewSession={onNewSession}
 						onDeleteSession={onDeleteSession}
-						topBars={<OttoGoalBar sessionId={sessionId} />}
+						topBars={<LooperGoalBar sessionId={sessionId} />}
 					/>
 				</div>
 			);

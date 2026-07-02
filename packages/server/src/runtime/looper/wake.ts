@@ -4,24 +4,26 @@ import {
 	findGoalForIdleSession,
 	listGoalTasks,
 } from './goals.ts';
-import { buildOttoWakeMessage } from './prompts.ts';
-import { ensureOttoSessionForGoal } from './session.ts';
+import { buildLooperWakeMessage } from './prompts.ts';
+import { ensureLooperSessionForGoal } from './session.ts';
 import {
 	buildStateHash,
 	getLastAssistantRun,
 	getLastManualUserMessageId,
 } from './transcript.ts';
-import { clearOttoStallState, shouldStopForOttoStall } from './stall.ts';
-import type { MaybeWakeOttoInput } from './types.ts';
+import { clearLooperStallState, shouldStopForLooperStall } from './stall.ts';
+import type { MaybeWakeLooperInput } from './types.ts';
 
 /**
- * Wakes the otto agent when a worker session's run finishes and there is an
+ * Wakes the looper agent when a worker session's run finishes and there is an
  * active goal with open tasks. The goal is resolved via goal_tasks.sessionId
  * (task dispatch) or legacy goals.sessionId. Guarded by a per-goal stall cap:
  * wakeups without task progress stop after MAX_STALLED_WAKEUPS until the user
  * intervenes.
  */
-export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
+export async function maybeWakeLooper(
+	input: MaybeWakeLooperInput,
+): Promise<void> {
 	const { db, cfg, session } = input;
 
 	const goal = await findGoalForIdleSession(db, session.id);
@@ -39,13 +41,13 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 			lastRun?.finishReason === 'error');
 	const stallKey = goal?.id ?? session.id;
 	if (aborted) {
-		clearOttoStallState(stallKey, session.id);
+		clearLooperStallState(stallKey, session.id);
 		return;
 	}
 
 	const shouldWake = Boolean(goal && openTasks.length > 0);
 	if (!shouldWake) {
-		clearOttoStallState(stallKey);
+		clearLooperStallState(stallKey);
 		if (goal && tasks.length > 0 && openTasks.length === 0) {
 			await completeGoal(db, goal);
 		}
@@ -54,9 +56,9 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 
 	const lastUserMessageId = await getLastManualUserMessageId(db, session.id);
 	const hash = buildStateHash(tasks, lastUserMessageId, errored);
-	const stall = shouldStopForOttoStall({ stallKey, hash });
+	const stall = shouldStopForLooperStall({ stallKey, hash });
 	if (stall.stop) {
-		logger.warn('[otto] stall cap reached; waiting for user input', {
+		logger.warn('[looper] stall cap reached; waiting for user input', {
 			goalId: goal?.id ?? null,
 			sessionId: session.id,
 			stalls: stall.stalls,
@@ -64,12 +66,12 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 		return;
 	}
 
-	const ottoSession = goal
-		? await ensureOttoSessionForGoal(db, cfg, goal)
+	const looperSession = goal
+		? await ensureLooperSessionForGoal(db, cfg, goal)
 		: undefined;
-	if (!ottoSession) return;
+	if (!looperSession) return;
 
-	const content = await buildOttoWakeMessage({
+	const content = await buildLooperWakeMessage({
 		db,
 		workerSession: session,
 		goal,
@@ -82,18 +84,18 @@ export async function maybeWakeOtto(input: MaybeWakeOttoInput): Promise<void> {
 	await dispatchAssistantMessage({
 		cfg,
 		db,
-		session: ottoSession,
-		agent: 'otto',
-		provider: ottoSession.provider as Parameters<
+		session: looperSession,
+		agent: 'looper',
+		provider: looperSession.provider as Parameters<
 			typeof dispatchAssistantMessage
 		>[0]['provider'],
-		model: ottoSession.model,
+		model: looperSession.model,
 		content,
 	});
 
-	logger.info('[otto] woke up', {
+	logger.info('[looper] woke up', {
 		sessionId: session.id,
-		ottoSessionId: ottoSession.id,
+		looperSessionId: looperSession.id,
 		goalId: goal?.id ?? null,
 		errored,
 	});

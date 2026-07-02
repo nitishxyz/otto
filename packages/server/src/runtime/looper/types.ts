@@ -6,7 +6,7 @@ export type SessionRow = typeof sessions.$inferSelect;
 export type GoalRow = typeof goals.$inferSelect;
 export type GoalTaskRow = typeof goalTasks.$inferSelect;
 
-export type MaybeWakeOttoInput = {
+export type MaybeWakeLooperInput = {
 	db: DB;
 	cfg: OttoConfig;
 	session: SessionRow;

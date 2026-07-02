@@ -64,7 +64,6 @@ const configDefaultsSchema = z.object({
 	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
-	ottoEnabled: z.boolean().optional(),
 });
 
 const configResponseSchema = z.object({
@@ -221,12 +220,6 @@ export function registerMainConfigRoute(app: Hono) {
 							embeddedConfig?.defaults?.coAuthorCommits,
 							cfg.defaults.coAuthorCommits,
 						) ?? false,
-					ottoEnabled:
-						getDefault(
-							undefined,
-							embeddedConfig?.defaults?.ottoEnabled,
-							cfg.defaults.ottoEnabled,
-						) ?? true,
 				};
 
 				return c.json({

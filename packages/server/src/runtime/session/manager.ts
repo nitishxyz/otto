@@ -30,7 +30,7 @@ type CreateSessionInput = {
 		| 'research'
 		| 'btw'
 		| 'subagent'
-		| 'otto';
+		| 'looper';
 };
 
 export async function createSession({
@@ -141,13 +141,13 @@ export async function listSessions({
 						ne(sessions.sessionType, 'research'),
 						ne(sessions.sessionType, 'btw'),
 						ne(sessions.sessionType, 'subagent'),
-						ne(sessions.sessionType, 'otto'),
+						ne(sessions.sessionType, 'looper'),
 					)
 				: and(
 						ne(sessions.sessionType, 'research'),
 						ne(sessions.sessionType, 'btw'),
 						ne(sessions.sessionType, 'subagent'),
-						ne(sessions.sessionType, 'otto'),
+						ne(sessions.sessionType, 'looper'),
 					),
 		)
 		.orderBy(

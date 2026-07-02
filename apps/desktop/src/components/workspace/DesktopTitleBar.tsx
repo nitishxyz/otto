@@ -3,7 +3,7 @@ import { ArrowDownToLine, RotateCw } from 'lucide-react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useWorkspaceTabStore } from '@ottocode/web-sdk/stores';
 import {
-	OttoTabBar,
+	LooperTabBar,
 	TitleBar,
 	TitleBarButton,
 	TitleBarRightRailToggle,
@@ -18,25 +18,25 @@ import { tauriBridge } from '../../lib/tauri-bridge';
 import { WindowControls } from '../WindowControls';
 
 /**
- * Agents | Otto tabs backed by the desktop router (/sessions vs /otto).
- * Must render inside the workspace QueryClientProvider (OttoTabBar queries
- * the server for otto availability). Remembers the last visited session per
- * tab so switching tabs returns to that session instead of the landing.
+ * Agents | Looper tabs backed by the desktop router (/sessions vs /looper).
+ * Must render inside the workspace QueryClientProvider. Remembers the last
+ * visited session per tab so switching tabs returns to that session instead
+ * of the landing.
  */
-const DesktopRoutedOttoTabs = memo(function DesktopRoutedOttoTabs() {
+const DesktopRoutedLooperTabs = memo(function DesktopRoutedLooperTabs() {
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
-	const activeTab: WorkspaceTab = pathname.startsWith('/otto')
-		? 'otto'
+	const activeTab: WorkspaceTab = pathname.startsWith('/looper')
+		? 'looper'
 		: 'agents';
 	const setLastSession = useWorkspaceTabStore((s) => s.setLastSession);
 
 	useEffect(() => {
-		const match = pathname.match(/^\/(otto|sessions)\/([^/]+)/);
+		const match = pathname.match(/^\/(looper|sessions)\/([^/]+)/);
 		if (match?.[2]) {
-			setLastSession(match[1] === 'otto' ? 'otto' : 'agents', match[2]);
+			setLastSession(match[1] === 'looper' ? 'looper' : 'agents', match[2]);
 		}
 	}, [pathname, setLastSession]);
 
@@ -46,18 +46,18 @@ const DesktopRoutedOttoTabs = memo(function DesktopRoutedOttoTabs() {
 				useWorkspaceTabStore.getState().lastSessionByTab[tab];
 			if (lastSessionId) {
 				navigate({
-					to: tab === 'otto' ? '/otto/$sessionId' : '/sessions/$sessionId',
+					to: tab === 'looper' ? '/looper/$sessionId' : '/sessions/$sessionId',
 					params: { sessionId: lastSessionId },
 				});
 				return;
 			}
-			navigate({ to: tab === 'otto' ? '/otto' : '/sessions' });
+			navigate({ to: tab === 'looper' ? '/looper' : '/sessions' });
 		},
 		[navigate],
 	);
 
 	return (
-		<OttoTabBar
+		<LooperTabBar
 			variant="titlebar"
 			activeTab={activeTab}
 			onTabChange={handleTabChange}
@@ -76,7 +76,7 @@ interface DesktopTitleBarProps {
 
 /**
  * Desktop app title bar: shared TitleBar composition (sidebar toggle,
- * Agents | Otto tabs and right-rail toggle) plus desktop-specific content —
+ * Agents | Looper tabs and right-rail toggle) plus desktop-specific content —
  * back button, update controls, API port + app version, and a
  * new-window button. Acts as the native drag region.
  */
@@ -107,7 +107,7 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 			leadingInset={platform === 'macos' && !isFullscreen}
 			onBack={onBack}
 			title={projectName}
-			leading={showTabs ? <DesktopRoutedOttoTabs /> : undefined}
+			leading={showTabs ? <DesktopRoutedLooperTabs /> : undefined}
 			trailing={
 				<>
 					{available &&

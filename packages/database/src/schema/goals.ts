@@ -4,7 +4,7 @@ export const goals = sqliteTable('goals', {
 	id: text('id').primaryKey(),
 	projectPath: text('project_path').notNull(),
 	sessionId: text('session_id'),
-	ottoSessionId: text('otto_session_id'),
+	looperSessionId: text('otto_session_id'),
 	title: text('title').notNull(),
 	status: text('status').notNull().default('active'), // 'active' | 'completed' | 'abandoned'
 	startedAt: integer('started_at', { mode: 'number' }),

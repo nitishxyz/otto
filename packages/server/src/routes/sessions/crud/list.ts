@@ -52,17 +52,17 @@ export function registerListSessionsRoute(app: Hono) {
 				.select()
 				.from(sessions)
 				.where(
-					sessionTypeFilter === 'otto'
+					sessionTypeFilter === 'looper'
 						? and(
 								eq(sessions.projectPath, cfg.projectRoot),
-								eq(sessions.sessionType, 'otto'),
+								eq(sessions.sessionType, 'looper'),
 							)
 						: and(
 								eq(sessions.projectPath, cfg.projectRoot),
 								ne(sessions.sessionType, 'research'),
 								ne(sessions.sessionType, 'btw'),
 								ne(sessions.sessionType, 'subagent'),
-								ne(sessions.sessionType, 'otto'),
+								ne(sessions.sessionType, 'looper'),
 							),
 				)
 				.orderBy(

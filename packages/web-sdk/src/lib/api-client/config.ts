@@ -95,7 +95,6 @@ export const configMixin = {
 			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
-			ottoEnabled?: boolean;
 		};
 	}> {
 		const response = await apiGetConfig({ query: getProjectQuery() } as never);
@@ -272,7 +271,6 @@ export const configMixin = {
 		notificationsEnabled?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
-		ottoEnabled?: boolean;
 		scope?: 'global' | 'local';
 	}): Promise<{
 		success: boolean;
@@ -296,7 +294,6 @@ export const configMixin = {
 			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
-			ottoEnabled?: boolean;
 		};
 	}> {
 		const response = await apiUpdateDefaults({

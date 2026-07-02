@@ -20,6 +20,7 @@ import {
 	registerMCPCommand,
 	registerWebCommand,
 	registerStorageCommand,
+	registerMigrateCommand,
 	registerServiceCommand,
 	registerProjectsCommand,
 } from './commands/index.ts';
@@ -41,6 +42,7 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'sessions',
 	'share',
 	'storage',
+	'migrate',
 	'plugins',
 	'service',
 	'projects',
@@ -55,6 +57,7 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'debug',
 	'web',
 	'storage',
+	'migrate',
 	'plugins',
 	'service',
 	'projects',
@@ -109,6 +112,7 @@ export function createCli(version: string): Command {
 	registerMCPCommand(program);
 	registerWebCommand(program, version);
 	registerStorageCommand(program);
+	registerMigrateCommand(program);
 	registerServiceCommand(program, version);
 	registerProjectsCommand(program, version);
 

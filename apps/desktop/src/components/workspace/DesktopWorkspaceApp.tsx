@@ -12,7 +12,7 @@ interface DesktopWorkspaceAppProps {
 	server?: ServerInfo | null;
 	project: Project;
 	sessionId?: string;
-	view?: 'agents' | 'otto';
+	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 	titleBar?: ReactNode;

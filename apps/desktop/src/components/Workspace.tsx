@@ -25,7 +25,7 @@ export function Workspace({
 	project: Project;
 	onBack: () => void | Promise<void>;
 	sessionId?: string;
-	view?: 'agents' | 'otto';
+	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 }) {

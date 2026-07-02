@@ -16,13 +16,14 @@ const TASK_STATUSES = [
 type BuildGoalToolsArgs = {
 	projectRoot: string;
 	/**
-	 * Otto session that owns this goal thread. Goals are bound to their otto
-	 * session via goals.ottoSessionId (legacy goals via goals.sessionId).
+	 * Looper session that owns this goal thread. Goals are bound to their
+	 * looper session via goals.looperSessionId (legacy goals via
+	 * goals.sessionId).
 	 */
-	ottoSessionId: string;
+	looperSessionId: string;
 };
 
-async function loadGoalWithTasks(projectRoot: string, ottoSessionId: string) {
+async function loadGoalWithTasks(projectRoot: string, looperSessionId: string) {
 	const db = await getDb(projectRoot);
 	const goalRows = await db
 		.select()
@@ -31,8 +32,8 @@ async function loadGoalWithTasks(projectRoot: string, ottoSessionId: string) {
 			and(
 				eq(goals.status, 'active'),
 				or(
-					eq(goals.ottoSessionId, ottoSessionId),
-					eq(goals.sessionId, ottoSessionId),
+					eq(goals.looperSessionId, looperSessionId),
+					eq(goals.sessionId, looperSessionId),
 				),
 			),
 		)
@@ -64,12 +65,12 @@ export function buildGoalListTool(args: BuildGoalToolsArgs) {
 		name: 'goal_list',
 		tool: tool({
 			description:
-				'List the goal this otto session supervises and its task queue. Tasks persist across runs; use goal_update to change them.',
+				'List the goal this looper session supervises and its task queue. Tasks persist across runs; use goal_update to change them.',
 			inputSchema: z.object({}),
 			async execute() {
 				const { goal, tasks } = await loadGoalWithTasks(
 					args.projectRoot,
-					args.ottoSessionId,
+					args.looperSessionId,
 				);
 				if (!goal) {
 					return { ok: true, goal: null, tasks: [] };
@@ -89,7 +90,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 		createGoal: z
 			.object({ title: z.string().min(1) })
 			.optional()
-			.describe('Create a new active goal owned by this otto session'),
+			.describe('Create a new active goal owned by this looper session'),
 		completeGoal: z
 			.boolean()
 			.optional()
@@ -131,7 +132,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 				const db = await getDb(args.projectRoot);
 				let { goal, tasks } = await loadGoalWithTasks(
 					args.projectRoot,
-					args.ottoSessionId,
+					args.looperSessionId,
 				);
 				const now = Date.now();
 
@@ -140,7 +141,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 					await db.insert(goals).values({
 						id,
 						projectPath: args.projectRoot,
-						ottoSessionId: args.ottoSessionId,
+						looperSessionId: args.looperSessionId,
 						title: input.createGoal.title,
 						status: 'active',
 						createdAt: now,
@@ -158,7 +159,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 					return {
 						ok: false,
 						error:
-							'No active goal for this otto session. Pass createGoal to start one.',
+							'No active goal for this looper session. Pass createGoal to start one.',
 					};
 				}
 
@@ -224,12 +225,12 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 
 				const refreshed = await loadGoalWithTasks(
 					args.projectRoot,
-					args.ottoSessionId,
+					args.looperSessionId,
 				);
 				if (results.length) {
 					publish({
 						type: 'goal.updated',
-						sessionId: args.ottoSessionId,
+						sessionId: args.looperSessionId,
 						payload: { goalId: goal.id, changes: results },
 					});
 				}

@@ -2,13 +2,16 @@ const MAX_STALLED_WAKEUPS = 3;
 
 export const AUTOMATED_PREFIXES = [
 	'[automated]',
+	'[looper]',
 	'[otto]',
 	'<subagent_results>',
-	// Legacy worker-goal kickoff marker; retained so old automated messages do
-	// not count as manual user input when calculating otto stall state.
+	// Legacy markers; retained so old automated messages do not count as
+	// manual user input when calculating looper stall state.
 	'<goal_start',
 	'<otto_kickoff',
 	'<otto_wakeup',
+	'<looper_kickoff',
+	'<looper_wakeup',
 ];
 
 type StallState = {
@@ -23,15 +26,15 @@ const stallStates = new Map<string, StallState>();
  * Clears the stall counter for a goal (or legacy session key), e.g. when the
  * user explicitly (re)starts a goal.
  */
-export function resetOttoStallState(key: string): void {
+export function resetLooperStallState(key: string): void {
 	stallStates.delete(key);
 }
 
-export function clearOttoStallState(...keys: string[]): void {
+export function clearLooperStallState(...keys: string[]): void {
 	for (const key of keys) stallStates.delete(key);
 }
 
-export function shouldStopForOttoStall(args: {
+export function shouldStopForLooperStall(args: {
 	stallKey: string;
 	hash: string;
 }): { stop: boolean; stalls: number } {

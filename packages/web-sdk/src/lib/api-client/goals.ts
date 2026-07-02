@@ -36,7 +36,7 @@ export type Goal = {
 	id: string;
 	projectPath: string;
 	sessionId: string | null;
-	ottoSessionId: string | null;
+	looperSessionId: string | null;
 	title: string;
 	status: GoalStatus;
 	startedAt: number | null;

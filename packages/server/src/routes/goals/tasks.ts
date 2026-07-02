@@ -7,7 +7,6 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
-	DISABLED_ERROR,
 	listTasksForGoal,
 	loadGoalsContext,
 	serializeGoal,
@@ -56,10 +55,6 @@ function registerAddGoalTasksRoute(app: Hono) {
 						'application/json': { schema: goalResponseSchema },
 					},
 				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
-				},
 				'404': {
 					description: 'Not Found',
 					content: { 'application/json': { schema: goalErrorSchema } },
@@ -68,10 +63,9 @@ function registerAddGoalTasksRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(
+				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const body = addTasksBodySchema.parse(await c.req.json());
 				const rows = await db
@@ -145,10 +139,6 @@ function registerUpdateGoalTaskRoute(app: Hono) {
 						'application/json': { schema: taskResponseSchema },
 					},
 				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
-				},
 				'404': {
 					description: 'Not Found',
 					content: { 'application/json': { schema: goalErrorSchema } },
@@ -157,10 +147,9 @@ function registerUpdateGoalTaskRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(
+				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const taskId = c.req.param('taskId');
 				const body = updateTaskBodySchema.parse(await c.req.json());
@@ -205,7 +194,7 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 			operationId: 'deleteGoalTask',
 			summary: 'Delete a goal task',
 			description:
-				'Removes a task from the goal queue. Tasks currently in_progress cannot be deleted; cancel them instead so otto and the worker stay consistent.',
+				'Removes a task from the goal queue. Tasks currently in_progress cannot be deleted; cancel them instead so looper and the worker stay consistent.',
 			request: {
 				params: goalTaskParamsSchema,
 				query: projectQuerySchema,
@@ -216,10 +205,6 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 					content: {
 						'application/json': { schema: goalResponseSchema },
 					},
-				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
 				},
 				'404': {
 					description: 'Not Found',
@@ -233,10 +218,9 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(
+				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const taskId = c.req.param('taskId');
 				const goalRows = await db
@@ -257,7 +241,7 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 					return c.json(
 						{
 							error:
-								'Task is in progress. Cancel it instead of deleting so otto and the worker stay consistent.',
+								'Task is in progress. Cancel it instead of deleting so looper and the worker stay consistent.',
 						},
 						409,
 					);
@@ -270,7 +254,7 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 					.where(eq(goals.id, goalId));
 				publish({
 					type: 'goal.updated',
-					sessionId: goalRows[0].ottoSessionId ?? goalRows[0].sessionId ?? '',
+					sessionId: goalRows[0].looperSessionId ?? goalRows[0].sessionId ?? '',
 					payload: { goalId, changes: [`task ${taskId} deleted`] },
 				});
 				const tasks = await listTasksForGoal(db, goalId);

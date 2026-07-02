@@ -1,8 +1,11 @@
 import { memo, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Play, Target } from 'lucide-react';
-import { parseOttoKickoff, type OttoNoticeTask } from './otto-notice-parsing';
+import {
+	parseLooperKickoff,
+	type LooperNoticeTask,
+} from './looper-notice-parsing';
 
-export { isOttoKickoffMessage } from './otto-notice-parsing';
+export { isLooperKickoffMessage } from './looper-notice-parsing';
 
 function taskChipClass(status: string): string {
 	switch (status) {
@@ -19,10 +22,10 @@ function taskChipClass(status: string): string {
 	}
 }
 
-export const OttoTaskRow = memo(function OttoTaskRow({
+export const LooperTaskRow = memo(function LooperTaskRow({
 	task,
 }: {
-	task: OttoNoticeTask;
+	task: LooperNoticeTask;
 }) {
 	return (
 		<div className="flex items-start gap-2 px-3 py-1.5 min-w-0">
@@ -51,19 +54,19 @@ export const OttoTaskRow = memo(function OttoTaskRow({
 	);
 });
 
-interface OttoKickoffNoticeProps {
+interface LooperKickoffNoticeProps {
 	content: string;
 }
 
 /**
- * Compact rendering for the automated `<otto_kickoff>` message dispatched
+ * Compact rendering for the automated `<looper_kickoff>` message dispatched
  * when a goal is started, instead of the raw tagged payload. Collapsible
  * task list; model-facing instructions stay hidden.
  */
-export const OttoKickoffNotice = memo(function OttoKickoffNotice({
+export const LooperKickoffNotice = memo(function LooperKickoffNotice({
 	content,
-}: OttoKickoffNoticeProps) {
-	const data = useMemo(() => parseOttoKickoff(content), [content]);
+}: LooperKickoffNoticeProps) {
+	const data = useMemo(() => parseLooperKickoff(content), [content]);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const taskCount = data.tasks.length;
 	const completed = data.tasks.filter(
@@ -115,7 +118,7 @@ export const OttoKickoffNotice = memo(function OttoKickoffNotice({
 				{isExpanded && taskCount > 0 ? (
 					<div className="border-t border-border/60 divide-y divide-border/40 py-0.5">
 						{data.tasks.map((task) => (
-							<OttoTaskRow key={task.id || task.content} task={task} />
+							<LooperTaskRow key={task.id || task.content} task={task} />
 						))}
 					</div>
 				) : null}

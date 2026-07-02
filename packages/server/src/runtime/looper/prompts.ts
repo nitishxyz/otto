@@ -5,16 +5,16 @@ import { buildRecentTranscript } from './transcript.ts';
 import type { GoalRow, GoalTaskRow, SessionRow } from './types.ts';
 
 /**
- * Builds the kickoff message dispatched into a goal's otto session when the
- * user starts the goal. Otto plans dispatch from here. Wrapped in
- * <otto_kickoff> so clients render it as structured UI instead of raw text.
+ * Builds the kickoff message dispatched into a goal's looper session when the
+ * user starts the goal. Looper plans dispatch from here. Wrapped in
+ * <looper_kickoff> so clients render it as structured UI instead of raw text.
  */
 export function buildGoalKickoffMessage(
 	goal: GoalRow,
 	tasks: GoalTaskRow[],
 ): string {
 	const lines: string[] = [
-		`<otto_kickoff goal-id="${goal.id}">`,
+		`<looper_kickoff goal-id="${goal.id}">`,
 		`<title>${goal.title}</title>`,
 	];
 	if (tasks.length) {
@@ -40,16 +40,16 @@ export function buildGoalKickoffMessage(
 			? 'Dispatch the first open task(s): mark them in_progress via goal_update (recording the worker sessionId), then delegate with delegate_task or enqueue into a worker session. Independent tasks may run in parallel.'
 			: 'The goal has no tasks yet. Create them with goal_update.',
 		'</instructions>',
-		'</otto_kickoff>',
+		'</looper_kickoff>',
 	);
 	return lines.join('\n');
 }
 
 /**
- * Builds the wakeup message dispatched into otto when a worker session run
- * finishes. Wrapped in <otto_wakeup> for structured client rendering.
+ * Builds the wakeup message dispatched into looper when a worker session run
+ * finishes. Wrapped in <looper_wakeup> for structured client rendering.
  */
-export async function buildOttoWakeMessage(args: {
+export async function buildLooperWakeMessage(args: {
 	db: DB;
 	workerSession: SessionRow;
 	goal: GoalRow | undefined;
@@ -61,7 +61,7 @@ export async function buildOttoWakeMessage(args: {
 		? `errored:${args.lastRunFinishReason ?? 'unknown'}`
 		: 'completed';
 	const lines: string[] = [
-		`<otto_wakeup worker-session-id="${args.workerSession.id}" worker-agent="${args.workerSession.agent}" last-run="${lastRun}">`,
+		`<looper_wakeup worker-session-id="${args.workerSession.id}" worker-agent="${args.workerSession.agent}" last-run="${lastRun}">`,
 	];
 
 	if (args.goal) {
@@ -91,7 +91,7 @@ export async function buildOttoWakeMessage(args: {
 	);
 	if (transcript.length) {
 		lines.push(
-			'<transcript note="oldest first; [auto] = automated message, including your own previous [otto] continuations">',
+			'<transcript note="oldest first; [auto] = automated message, including your own previous [looper] continuations">',
 			...transcript,
 			'</transcript>',
 		);
@@ -132,10 +132,10 @@ export async function buildOttoWakeMessage(args: {
 		'<instructions>',
 		'A worker session run finished. Check up on it.',
 		'Follow your instructions: verify finished work, update task statuses, and dispatch or enqueue a continuation only if work remains or the error needs a retry.',
-		'If a previous [otto] message of yours was already answered in the conversation above, act on that answer (complete or keep tasks with a note) — never re-ask the same thing.',
+		'If a previous [looper] message of yours was already answered in the conversation above, act on that answer (complete or keep tasks with a note) — never re-ask the same thing.',
 		'Sub-agent results are delivered to the dispatching session automatically — never repeat, summarize, or re-send them. Keep any enqueued continuation to one short line: which task to do next.',
 		'</instructions>',
-		'</otto_wakeup>',
+		'</looper_wakeup>',
 	);
 	return lines.join('\n');
 }

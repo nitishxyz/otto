@@ -58,7 +58,6 @@ export function useUpdateDefaults() {
 			notificationsEnabled?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
-			ottoEnabled?: boolean;
 			scope?: 'global' | 'local';
 		}) => apiClient.updateDefaults(data),
 		onMutate: async (data) => {

@@ -68,8 +68,8 @@ export function buildStateHash(
 
 /**
  * Builds a compact tail of the worker session conversation (text parts only)
- * so otto can see how the agent answered previous [otto] messages and what
- * the user actually asked for, instead of judging from task state alone.
+ * so looper can see how the agent answered previous [looper] messages and
+ * what the user actually asked for, instead of judging from task state alone.
  */
 export async function buildRecentTranscript(
 	db: DB,

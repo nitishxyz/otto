@@ -225,24 +225,30 @@ function summarizeTaggedUserMessage(
 		};
 	}
 
-	if (trimmed.startsWith('<otto_kickoff')) {
+	if (
+		trimmed.startsWith('<looper_kickoff') ||
+		trimmed.startsWith('<otto_kickoff')
+	) {
 		const title = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'title'));
 		const tasks = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'tasks'));
 		return {
-			title: title ? `Otto kickoff: ${title}` : 'Otto kickoff',
+			title: title ? `Looper kickoff: ${title}` : 'Looper kickoff',
 			preview:
 				tasks ||
 				cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'instructions')),
 		};
 	}
 
-	if (trimmed.startsWith('<otto_wakeup')) {
+	if (
+		trimmed.startsWith('<looper_wakeup') ||
+		trimmed.startsWith('<otto_wakeup')
+	) {
 		const goal = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'goal'));
 		const transcript = cleanNavigatorPreviewText(
 			extractXmlBlock(trimmed, 'transcript'),
 		);
 		return {
-			title: goal ? `Otto update: ${firstLine(goal)}` : 'Otto update',
+			title: goal ? `Looper update: ${firstLine(goal)}` : 'Looper update',
 			preview:
 				transcript ||
 				cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'instructions')),

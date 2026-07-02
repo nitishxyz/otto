@@ -6,7 +6,6 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
-	DISABLED_ERROR,
 	listTasksForGoal,
 	loadGoalsContext,
 	serializeGoal,
@@ -45,10 +44,6 @@ export function registerUpdateGoalRoute(app: Hono) {
 						'application/json': { schema: goalResponseSchema },
 					},
 				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
-				},
 				'404': {
 					description: 'Not Found',
 					content: { 'application/json': { schema: goalErrorSchema } },
@@ -57,10 +52,9 @@ export function registerUpdateGoalRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(
+				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const goalId = c.req.param('goalId');
 				const body = updateGoalBodySchema.parse(await c.req.json());
 				const rows = await db

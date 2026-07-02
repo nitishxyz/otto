@@ -76,9 +76,9 @@ const MessageThreadData = memo(function MessageThreadData({
 	const session = useSession(sessionId);
 	const { preferences } = usePreferences();
 
-	// Otto orchestrator threads always use the compact renderer so otto's
+	// Looper orchestrator threads always use the compact renderer so looper's
 	// verify/complete/dispatch tool activity collapses into activity events.
-	const isOttoThread = forceCompact || session?.sessionType === 'otto';
+	const isLooperThread = forceCompact || session?.sessionType === 'looper';
 
 	const isGenerating = useMemo(
 		() =>
@@ -100,7 +100,7 @@ const MessageThreadData = memo(function MessageThreadData({
 			sessionId={sessionId}
 			session={session}
 			isGenerating={isGenerating}
-			compact={isOttoThread || preferences.compactThread}
+			compact={isLooperThread || preferences.compactThread}
 			responsiveCompact={preferences.compactThread}
 			onSelectSession={onSelectSession}
 			footerBottomPaddingClass={footerBottomPaddingClass}

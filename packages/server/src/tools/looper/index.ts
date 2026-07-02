@@ -7,8 +7,8 @@ import { loadConfig } from '@ottocode/sdk';
 import { getRunnerState } from '../../runtime/session/queue.ts';
 
 /**
- * Otto-only tool: enqueues a continuation run into a worker session.
- * When `defaultTargetSessionId` is provided (legacy otto-supervises-parent
+ * Looper-only tool: enqueues a continuation run into a worker session.
+ * When `defaultTargetSessionId` is provided (legacy looper-supervises-parent
  * sessions), the sessionId input may be omitted.
  */
 export function buildEnqueueSessionMessageTool(
@@ -63,9 +63,9 @@ export function buildEnqueueSessionMessageTool(
 							'Target session is currently running; it will pick up state on its own. Do not enqueue now.',
 					};
 				}
-				const content = input.message.trimStart().startsWith('[otto]')
+				const content = input.message.trimStart().startsWith('[looper]')
 					? input.message
-					: `[otto] ${input.message}`;
+					: `[looper] ${input.message}`;
 				const { dispatchAssistantMessage } = await import(
 					'../../runtime/message/service.ts'
 				);

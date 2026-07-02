@@ -6,7 +6,6 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
-	DISABLED_ERROR,
 	listTasksForGoal,
 	loadGoalsContext,
 	serializeGoal,
@@ -48,18 +47,13 @@ function registerGetSessionGoalRoute(app: Hono) {
 						'application/json': { schema: nullableGoalResponseSchema },
 					},
 				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
-				},
 			},
 		},
 		async (c) => {
 			try {
-				const { db, enabled } = await loadGoalsContext(
+				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const sessionId = c.req.param('sessionId');
 				const activeRows = await db
 					.select()
@@ -118,10 +112,6 @@ function registerCreateSessionGoalRoute(app: Hono) {
 						'application/json': { schema: goalResponseSchema },
 					},
 				},
-				'403': {
-					description: 'Goals disabled',
-					content: { 'application/json': { schema: goalErrorSchema } },
-				},
 				'409': {
 					description: 'Active goal already exists',
 					content: { 'application/json': { schema: goalErrorSchema } },
@@ -130,10 +120,9 @@ function registerCreateSessionGoalRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { cfg, db, enabled } = await loadGoalsContext(
+				const { cfg, db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				if (!enabled) return c.json({ error: DISABLED_ERROR }, 403);
 				const sessionId = c.req.param('sessionId');
 				const body = createGoalBodySchema.parse(await c.req.json());
 

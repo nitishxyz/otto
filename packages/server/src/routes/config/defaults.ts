@@ -57,7 +57,6 @@ const defaultsUpdateBodySchema = z.object({
 	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
-	ottoEnabled: z.boolean().optional(),
 	scope: z.enum(['global', 'local']).optional().default('global'),
 });
 
@@ -81,7 +80,6 @@ const defaultsSchema = z.object({
 	notificationsEnabled: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
-	ottoEnabled: z.boolean().optional(),
 });
 
 const updateDefaultsResponseSchema = z.object({
@@ -141,7 +139,6 @@ export function registerDefaultsRoute(app: Hono) {
 					notificationsEnabled?: boolean;
 					autoCompactThresholdTokens?: number | null;
 					coAuthorCommits?: boolean;
-					ottoEnabled?: boolean;
 					scope?: 'global' | 'local';
 				}>();
 
@@ -166,7 +163,6 @@ export function registerDefaultsRoute(app: Hono) {
 					notificationsEnabled: boolean;
 					autoCompactThresholdTokens: number | null;
 					coAuthorCommits: boolean;
-					ottoEnabled: boolean;
 				}> = {};
 
 				if (body.agent) updates.agent = body.agent;
@@ -215,8 +211,6 @@ export function registerDefaultsRoute(app: Hono) {
 				}
 				if (body.coAuthorCommits !== undefined)
 					updates.coAuthorCommits = body.coAuthorCommits;
-				if (body.ottoEnabled !== undefined)
-					updates.ottoEnabled = body.ottoEnabled;
 
 				await setConfig(scope, updates, projectRoot);
 

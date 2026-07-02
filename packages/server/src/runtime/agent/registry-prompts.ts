@@ -19,7 +19,7 @@ import AGENT_INIT from '@ottocode/sdk/prompts/agents/init.txt' with {
 import AGENT_RESEARCH from '@ottocode/sdk/prompts/agents/research.txt' with {
 	type: 'text',
 };
-import AGENT_OTTO from '@ottocode/sdk/prompts/agents/otto.txt' with {
+import AGENT_LOOPER from '@ottocode/sdk/prompts/agents/looper.txt' with {
 	type: 'text',
 };
 
@@ -34,7 +34,7 @@ const EMBEDDED_AGENT_PROMPTS: Record<string, string> = {
 	general: AGENT_GENERAL,
 	init: AGENT_INIT,
 	research: AGENT_RESEARCH,
-	otto: AGENT_OTTO,
+	looper: AGENT_LOOPER,
 };
 
 function normalizePath(path: string): string {

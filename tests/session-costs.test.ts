@@ -37,12 +37,12 @@ describe('session cost summaries', () => {
 		await db.insert(sessions).values([
 			{
 				id: 'parent',
-				agent: 'otto',
+				agent: 'looper',
 				provider: 'openai',
 				model: 'gpt-4o-mini',
 				projectPath: cfg.projectRoot,
 				createdAt: now,
-				sessionType: 'otto',
+				sessionType: 'looper',
 			},
 			{
 				id: 'child',
@@ -61,7 +61,7 @@ describe('session cost summaries', () => {
 				sessionId: 'parent',
 				role: 'assistant',
 				status: 'complete',
-				agent: 'otto',
+				agent: 'looper',
 				provider: 'openai',
 				model: 'gpt-4o-mini',
 				createdAt: now,

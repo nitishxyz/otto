@@ -85,3 +85,26 @@ export function subscribeClientEvents(handler: ClientSubscriber) {
 		clientSubscribers.delete(handler);
 	};
 }
+
+export interface BusStats {
+	sessionKeys: number;
+	sessionSubscribers: number;
+	clientSubscribers: number;
+	topSessionKeys: Array<{ key: string; subscribers: number }>;
+}
+
+export function getBusStats(): BusStats {
+	let total = 0;
+	const perKey: Array<{ key: string; subscribers: number }> = [];
+	for (const [key, set] of subscribers) {
+		total += set.size;
+		perKey.push({ key, subscribers: set.size });
+	}
+	perKey.sort((a, b) => b.subscribers - a.subscribers);
+	return {
+		sessionKeys: subscribers.size,
+		sessionSubscribers: total,
+		clientSubscribers: clientSubscribers.size,
+		topSessionKeys: perKey.slice(0, 10),
+	};
+}

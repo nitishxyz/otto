@@ -32,6 +32,28 @@ export function deleteRunnerState(sessionId: string): void {
 	runners.delete(sessionId);
 }
 
+export interface QueueStats {
+	runnerStates: number;
+	runningRunners: number;
+	queuedMessages: number;
+	messageAbortControllers: number;
+}
+
+export function getQueueStats(): QueueStats {
+	let running = 0;
+	let queued = 0;
+	for (const state of runners.values()) {
+		if (state.running) running += 1;
+		queued += state.queue.length;
+	}
+	return {
+		runnerStates: runners.size,
+		runningRunners: running,
+		queuedMessages: queued,
+		messageAbortControllers: messageAbortControllers.size,
+	};
+}
+
 export function setMessageAbortController(
 	messageId: string,
 	controller: AbortController,

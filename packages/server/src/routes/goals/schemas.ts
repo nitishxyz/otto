@@ -57,7 +57,7 @@ export const goalSchema = z.object({
 	id: z.string(),
 	projectPath: z.string(),
 	sessionId: z.string().nullable(),
-	ottoSessionId: z.string().nullable(),
+	looperSessionId: z.string().nullable(),
 	title: z.string(),
 	status: goalStatusSchema,
 	startedAt: z.number().nullable(),

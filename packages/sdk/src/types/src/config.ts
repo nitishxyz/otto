@@ -43,8 +43,6 @@ export type DefaultConfig = {
 	autoCompactThresholdTokens?: number | null;
 	/** Adds the ottocode bot as a co-author on commits made through Otto. */
 	coAuthorCommits?: boolean;
-	/** Enables the otto supervisor agent and persistent goals (disabled together). */
-	ottoEnabled?: boolean;
 };
 
 export type ProviderSettingsEntry = {

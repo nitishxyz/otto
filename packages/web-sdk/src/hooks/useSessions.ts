@@ -28,7 +28,7 @@ export function getSessionQueryKey(sessionId: string) {
 	return projectScopedKey(['session', sessionId] as const);
 }
 
-export type SessionListFilter = 'otto' | undefined;
+export type SessionListFilter = 'looper' | undefined;
 
 export function useSessionsInfinite(sessionType?: SessionListFilter) {
 	return useInfiniteQuery({

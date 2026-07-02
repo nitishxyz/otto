@@ -64,15 +64,15 @@ const sessionDetailRoute = createRoute({
 	component: EmptyRouteComponent,
 });
 
-const ottoRoute = createRoute({
+const looperRoute = createRoute({
 	getParentRoute: () => workspaceRoute,
-	path: 'otto',
+	path: 'looper',
 	component: EmptyRouteComponent,
 });
 
-const ottoSessionDetailRoute = createRoute({
+const looperSessionDetailRoute = createRoute({
 	getParentRoute: () => workspaceRoute,
-	path: 'otto/$sessionId',
+	path: 'looper/$sessionId',
 	component: EmptyRouteComponent,
 });
 
@@ -89,8 +89,8 @@ const routeTree = rootRoute.addChildren([
 	workspaceRoute.addChildren([
 		sessionsRoute,
 		sessionDetailRoute,
-		ottoRoute,
-		ottoSessionDetailRoute,
+		looperRoute,
+		looperSessionDetailRoute,
 		dashboardRoute,
 	]),
 ]);
@@ -166,10 +166,10 @@ function WorkspaceRouteComponent() {
 	const dashboardOpen = matches.some(
 		(match) => match.routeId === dashboardRoute.id,
 	);
-	const isOttoView = matches.some(
+	const isLooperView = matches.some(
 		(match) =>
-			match.routeId === ottoRoute.id ||
-			match.routeId === ottoSessionDetailRoute.id,
+			match.routeId === looperRoute.id ||
+			match.routeId === looperSessionDetailRoute.id,
 	);
 	const sessionId = dashboardOpen
 		? (matchedSessionId ?? lastSessionIdRef.current)
@@ -207,7 +207,7 @@ function WorkspaceRouteComponent() {
 			project={selectedProject}
 			onBack={onBackToProjects}
 			sessionId={sessionId}
-			view={isOttoView ? 'otto' : 'agents'}
+			view={isLooperView ? 'looper' : 'agents'}
 			dashboardOpen={dashboardOpen}
 			onCloseDashboard={handleCloseDashboard}
 		/>

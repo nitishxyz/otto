@@ -90,7 +90,7 @@ export function ConfigSelector({
 						className="text-xs bg-background border border-border rounded px-2 py-1 outline-none"
 					>
 						{config.agents
-							.filter((a) => a !== 'otto')
+							.filter((a) => a !== 'looper')
 							.map((a) => (
 								<option key={a} value={a}>
 									{a}

@@ -1,18 +1,12 @@
 import type { Command } from 'commander';
 import {
-	formatProjectStateMigrationReport,
 	formatStorageDoctor,
 	formatStoragePlan,
-	migrateProjectStateStorage,
 	planStorageMigration,
 } from '../storage.ts';
 
 type StorageCommandOptions = {
 	project?: string;
-};
-
-type StorageMigrateOptions = StorageCommandOptions & {
-	dryRun?: boolean;
 };
 
 type StoragePlanOptions = StorageCommandOptions & {
@@ -46,22 +40,5 @@ export function registerStorageCommand(program: Command) {
 				force: opts.force,
 			});
 			console.log(formatStoragePlan(plan));
-		});
-
-	storage
-		.command('migrate')
-		.description('Migrate all project state directories to path-based IDs')
-		.option('--project <path>', 'Only migrate state for one project path')
-		.option(
-			'--dry-run',
-			'Show the migration plan without touching files',
-			false,
-		)
-		.action(async (opts: StorageMigrateOptions) => {
-			const result = await migrateProjectStateStorage({
-				projectRoot: opts.project,
-				dryRun: opts.dryRun,
-			});
-			console.log(formatProjectStateMigrationReport(result));
 		});
 }

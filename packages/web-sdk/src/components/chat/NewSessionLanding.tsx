@@ -30,8 +30,8 @@ interface NewSessionLandingProps {
 	wordmark?: React.ReactNode;
 	compact?: boolean;
 	modalPosition?: 'fixed' | 'absolute';
-	/** Session type for the created session (e.g. 'otto' for the Otto tab). */
-	sessionType?: 'main' | 'otto';
+	/** Session type for the created session (e.g. 'looper' for the Looper tab). */
+	sessionType?: 'main' | 'looper';
 	/** Fixes the agent (no picker); provider/model stay user-editable. */
 	lockAgent?: boolean;
 }
@@ -173,7 +173,7 @@ export const NewSessionLanding = memo(
 							agent: agent || 'general',
 							provider: provider || undefined,
 							model: model || undefined,
-							sessionType: sessionType === 'otto' ? 'otto' : undefined,
+							sessionType: sessionType === 'looper' ? 'looper' : undefined,
 						});
 
 						queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });

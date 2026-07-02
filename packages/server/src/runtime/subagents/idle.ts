@@ -36,7 +36,7 @@ async function wasLastRunAbortedByUser(
 
 /**
  * Runs whenever a session's run queue drains. Drives sub-agent result
- * reporting and otto wake-ups.
+ * reporting and looper wake-ups.
  */
 export async function handleSessionIdle(
 	sessionId: string,
@@ -58,12 +58,12 @@ export async function handleSessionIdle(
 			return;
 		}
 
-		// A user hard-stop means stop: no result reporting, no otto wake-up.
+		// A user hard-stop means stop: no result reporting, no looper wake-up.
 		// Anything pending is delivered after the next user-initiated run.
 		if (await wasLastRunAbortedByUser(db, sessionId)) {
-			const { resetOttoStallState } = await import('../otto/service.ts');
-			resetOttoStallState(sessionId);
-			logger.info('[idle] last run aborted by user; skipping otto/report', {
+			const { resetLooperStallState } = await import('../looper/service.ts');
+			resetLooperStallState(sessionId);
+			logger.info('[idle] last run aborted by user; skipping looper/report', {
 				sessionId,
 			});
 			return;
@@ -72,13 +72,12 @@ export async function handleSessionIdle(
 		const reported = await reportFinishedSubagents(db, cfg, sessionId);
 		if (reported) return;
 
-		// Otto sessions receive sub-agent results like any parent, but never
-		// wake another otto for themselves (no self-supervision loop).
-		if (sessionType === 'otto') return;
+		// Looper sessions receive sub-agent results like any parent, but never
+		// wake another looper for themselves (no self-supervision loop).
+		if (sessionType === 'looper') return;
 
-		if (cfg.defaults.ottoEnabled === false) return;
-		const { maybeWakeOtto } = await import('../otto/service.ts');
-		await maybeWakeOtto({ db, cfg, session });
+		const { maybeWakeLooper } = await import('../looper/service.ts');
+		await maybeWakeLooper({ db, cfg, session });
 	} catch (error) {
 		logger.warn('[idle] session idle hook failed', {
 			sessionId,

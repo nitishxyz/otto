@@ -6,7 +6,6 @@ import type {
 	GoalTaskStatus,
 	SubagentStatus,
 } from '../lib/api-client';
-import { useConfig } from './useConfig';
 import { getMessagesQueryKey } from './useMessages';
 import { getSessionsQueryKey } from './useSessions';
 import { projectScopedKey } from '../lib/api-client/utils';
@@ -18,21 +17,14 @@ export const projectGoalsQueryKey = () =>
 export const subagentsQueryKey = (sessionId: string | undefined) =>
 	projectScopedKey(['subagents', sessionId] as const);
 
-export function useOttoEnabled(): boolean {
-	const { data: config } = useConfig();
-	return config?.defaults?.ottoEnabled ?? true;
-}
-
 /**
  * Lists every goal for the current project (active, completed, abandoned),
- * each with its full task queue. Powers the Otto tab overview and goal view.
+ * each with its full task queue. Powers the Looper tab overview and goal view.
  */
 export function useProjectGoals() {
-	const ottoEnabled = useOttoEnabled();
 	return useQuery({
 		queryKey: projectGoalsQueryKey(),
 		queryFn: () => apiClient.listGoals(),
-		enabled: ottoEnabled,
 		refetchInterval: 10000,
 	});
 }
@@ -48,8 +40,8 @@ function applyGoalToProjectCache(
 }
 
 /**
- * Appends tasks to a goal from the Otto tab. Updates the project goals cache
- * with the returned goal so the queue refreshes immediately.
+ * Appends tasks to a goal from the Looper tab. Updates the project goals
+ * cache with the returned goal so the queue refreshes immediately.
  */
 export function useAddProjectGoalTasks() {
 	const queryClient = useQueryClient();
@@ -61,7 +53,7 @@ export function useAddProjectGoalTasks() {
 }
 
 /**
- * Deletes a goal task from the Otto tab. The server rejects in_progress
+ * Deletes a goal task from the Looper tab. The server rejects in_progress
  * tasks with a 409 — surface the error to the caller via onError.
  */
 export function useDeleteProjectGoalTask() {
@@ -74,14 +66,13 @@ export function useDeleteProjectGoalTask() {
 }
 
 export function useSessionGoal(sessionId: string | undefined) {
-	const ottoEnabled = useOttoEnabled();
 	return useQuery({
 		queryKey: goalQueryKey(sessionId),
 		queryFn: () => {
 			if (!sessionId) throw new Error('No session ID');
 			return apiClient.getSessionGoal(sessionId);
 		},
-		enabled: Boolean(sessionId) && ottoEnabled,
+		enabled: Boolean(sessionId),
 		refetchInterval: 15000,
 	});
 }
