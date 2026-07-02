@@ -1,4 +1,19 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it, mock } from 'bun:test';
+import * as customCommandsActual from '@ottocode/cli/src/custom-commands.ts';
+import * as gitignoreActual from '@ottocode/cli/src/gitignore.ts';
+import * as daemonActual from '@ottocode/cli/src/daemon.ts';
+import * as withAuthActual from '@ottocode/cli/src/middleware/with-auth.ts';
+import * as askServerActual from '@ottocode/cli/src/ask/server.ts';
+import * as serveActual from '@ottocode/cli/src/commands/serve.ts';
+import * as commandsIndexActual from '@ottocode/cli/src/commands/index.ts';
+
+const realCustomCommands = { ...customCommandsActual };
+const realGitignore = { ...gitignoreActual };
+const realDaemon = { ...daemonActual };
+const realWithAuth = { ...withAuthActual };
+const realAskServer = { ...askServerActual };
+const realServe = { ...serveActual };
+const realCommandsIndex = { ...commandsIndexActual };
 
 const ensureAuthMock = mock(async () => true);
 const startApiServerMock = mock(async () => ({
@@ -29,6 +44,7 @@ mock.module('@ottocode/cli/src/cli-deps.ts', () => ({
 }));
 
 mock.module('@ottocode/cli/src/commands/index.ts', () => ({
+	...realCommandsIndex,
 	registerServeCommand: () => {},
 	registerAskCommand: () => {},
 	registerSessionsCommand: () => {},
@@ -50,35 +66,52 @@ mock.module('@ottocode/cli/src/commands/index.ts', () => ({
 	registerStorageCommand: () => {},
 	registerServiceCommand: () => {},
 	registerProjectsCommand: () => {},
+	registerMigrateCommand: () => {},
 }));
 
 mock.module('@ottocode/cli/src/custom-commands.ts', () => ({
+	...realCustomCommands,
 	runDiscoveredCommand: runDiscoveredCommandMock,
 }));
 
 mock.module('@ottocode/cli/src/gitignore.ts', () => ({
+	...realGitignore,
 	ensureProjectOttoIgnored: ensureProjectOttoIgnoredMock,
 }));
 
 mock.module('@ottocode/cli/src/commands/serve.ts', () => ({
+	...realServe,
 	startApiServer: startApiServerMock,
 	handleServe: handleServeMock,
 }));
 
 mock.module('@ottocode/cli/src/daemon.ts', () => ({
+	...realDaemon,
 	ensureDaemonProject: ensureDaemonProjectMock,
 }));
 
 mock.module('@ottocode/tui', () => ({ startTui: startTuiMock }));
 
 mock.module('@ottocode/cli/src/middleware/with-auth.ts', () => ({
+	...realWithAuth,
 	ensureAuth: ensureAuthMock,
 }));
 
 mock.module('@ottocode/cli/src/ask/server.ts', () => ({
+	...realAskServer,
 	ensureServer: ensureServerMock,
 	stopEphemeralServer: stopEphemeralServerMock,
 }));
+
+afterAll(() => {
+	mock.module('@ottocode/cli/src/custom-commands.ts', () => realCustomCommands);
+	mock.module('@ottocode/cli/src/gitignore.ts', () => realGitignore);
+	mock.module('@ottocode/cli/src/daemon.ts', () => realDaemon);
+	mock.module('@ottocode/cli/src/middleware/with-auth.ts', () => realWithAuth);
+	mock.module('@ottocode/cli/src/ask/server.ts', () => realAskServer);
+	mock.module('@ottocode/cli/src/commands/serve.ts', () => realServe);
+	mock.module('@ottocode/cli/src/commands/index.ts', () => realCommandsIndex);
+});
 
 const cliModulePromise = import('@ottocode/cli/src/cli.ts');
 

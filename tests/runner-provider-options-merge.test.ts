@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
 	applyModelFamilyEditToolPolicy,
 	mergeProviderOptions,
-} from '../packages/server/src/runtime/agent/runner-setup.ts';
+} from '../packages/server/src/runtime/agent/runner/runner-setup.ts';
 import { buildCodexProviderOptions } from '../packages/server/src/runtime/provider/oauth-adapter.ts';
 import type { OttoConfig } from '../packages/sdk/src/types/src/config.ts';
 

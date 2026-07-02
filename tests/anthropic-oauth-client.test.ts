@@ -1,5 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	mock,
+} from 'bun:test';
 import type { OAuth } from '../packages/sdk/src/types/src/index.ts';
+import * as authActual from '../packages/sdk/src/auth/src/index.ts';
+
+const realAuth = { ...authActual };
 
 const EXPIRED_OAUTH: OAuth = {
 	type: 'oauth',
@@ -12,9 +23,14 @@ const getAuthMock = mock(async () => EXPIRED_OAUTH);
 const setAuthMock = mock(async () => {});
 
 mock.module('../packages/sdk/src/auth/src/index.ts', () => ({
+	...realAuth,
 	getAuth: getAuthMock,
 	setAuth: setAuthMock,
 }));
+
+afterAll(() => {
+	mock.module('../packages/sdk/src/auth/src/index.ts', () => realAuth);
+});
 
 const { createAnthropicOAuthFetch } = await import(
 	'../packages/sdk/src/providers/src/anthropic-oauth-client.ts'

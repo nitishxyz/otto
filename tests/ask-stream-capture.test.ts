@@ -42,6 +42,12 @@ describe('runAskStreamCapture', () => {
 						: input instanceof URL
 							? input.toString()
 							: input.url;
+				if (url.includes('/v1/projects/open')) {
+					return new Response(
+						JSON.stringify({ id: 'project-id', path: '/tmp/project' }),
+						{ headers: { 'Content-Type': 'application/json' } },
+					);
+				}
 				if (url.includes('/v1/ask')) {
 					requestBody =
 						input instanceof Request

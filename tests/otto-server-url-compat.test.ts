@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it, mock } from 'bun:test';
+import * as serverActual from '@ottocode/server';
+import * as apiActual from '@ottocode/api';
+import * as daemonActual from '@ottocode/cli/src/daemon.ts';
+
+const realServer = { ...serverActual };
+const realApi = { ...apiActual };
+const realDaemon = { ...daemonActual };
 
 const setConfigMock = mock(() => {});
 const openProjectOnServerMock = mock(async () => ({
@@ -18,15 +25,24 @@ const ensureDaemonProjectMock = mock(async () => ({
 const readDaemonTokenMock = mock(async () => 'server-token');
 
 mock.module('@ottocode/server', () => ({
+	...realServer,
 	createApp: () => ({ fetch: () => new Response('ok') }),
 	bunWebSocket: {},
 }));
 
 mock.module('@ottocode/api', () => ({
+	...realApi,
 	client: { setConfig: setConfigMock },
 }));
 
+afterAll(() => {
+	mock.module('@ottocode/server', () => realServer);
+	mock.module('@ottocode/api', () => realApi);
+	mock.module('@ottocode/cli/src/daemon.ts', () => realDaemon);
+});
+
 mock.module('@ottocode/cli/src/daemon.ts', () => ({
+	...realDaemon,
 	openProjectOnServer: openProjectOnServerMock,
 	ensureDaemonProject: ensureDaemonProjectMock,
 	readDaemonToken: readDaemonTokenMock,

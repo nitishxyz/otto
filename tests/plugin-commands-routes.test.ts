@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import {
-	getProjectPluginsDir,
-	TerminalManager,
-	writePluginsConfig,
-} from '@ottocode/sdk';
+import { getProjectPluginsDir, writePluginsConfig } from '@ottocode/sdk';
 import { registerPluginsRoutes } from '../packages/server/src/routes/plugins/index.ts';
+import {
+	createServerTerminalBridge,
+	runPluginCommand,
+} from '../packages/server/src/runtime/plugins/commands/index.ts';
 
 describe('plugin command routes', () => {
 	let projectRoot: string;
@@ -123,20 +123,19 @@ describe('plugin command routes', () => {
 			},
 		});
 
-		const app = createPluginsApp(undefined);
-		const response = await app.request(
-			'/v1/plugins/serve-sim/commands/doctor/run',
-			{
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ project: projectRoot }),
-			},
-		);
-		const body = await response.json();
-
-		expect(response.status).toBe(503);
-		expect(body.error.code).toBe('plugin_command_terminal_unavailable');
-		expect(body.error.details?.command).toBe('echo ok');
+		expect(
+			runPluginCommand(
+				{
+					projectRoot,
+					plugin: 'serve-sim',
+					command: 'doctor',
+				},
+				createServerTerminalBridge(undefined),
+			),
+		).rejects.toMatchObject({
+			status: 503,
+			code: 'plugin_command_terminal_unavailable',
+		});
 	});
 
 	test('runs plugin commands through the server terminal bridge', async () => {
@@ -152,7 +151,7 @@ describe('plugin command routes', () => {
 			},
 		});
 
-		const app = createPluginsApp(new TerminalManager());
+		const app = createPluginsApp();
 		const response = await app.request(
 			'/v1/plugins/serve-sim/commands/doctor/run',
 			{
@@ -177,11 +176,9 @@ describe('plugin command routes', () => {
 	});
 });
 
-function createPluginsApp(
-	terminalManager?: import('@ottocode/sdk').TerminalManager,
-) {
+function createPluginsApp() {
 	const app = new OpenAPIHono();
-	registerPluginsRoutes(app, terminalManager);
+	registerPluginsRoutes(app);
 	return app;
 }
 

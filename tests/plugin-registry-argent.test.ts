@@ -106,15 +106,34 @@ describe('argent official plugin registry', () => {
 				scope: 'project',
 				projectRoot,
 				registries: [registryPath],
-				fetch: async (input) => {
+				fetch: (async (input: RequestInfo | URL) => {
 					const url = String(input);
 					if (url.includes('api.github.com/repos/nitishxyz/otto')) {
 						throw new Error(
 							'Unexpected GitHub fetch for otto registry payload',
 						);
 					}
-					return fetch(input);
-				},
+					const contentsMatch = url.match(
+						/^https:\/\/api\.github\.com\/repos\/software-mansion\/argent\/contents\/([^?]+)/,
+					);
+					if (contentsMatch) {
+						const path = decodeURIComponent(contentsMatch[1] ?? '');
+						return Response.json([
+							{
+								name: 'SKILL.md',
+								path: `${path}/SKILL.md`,
+								type: 'file',
+								download_url: `https://stub.local/${path}/SKILL.md`,
+							},
+						]);
+					}
+					if (url.startsWith('https://stub.local/')) {
+						return new Response(
+							'---\nname: stub\ndescription: stub skill\n---\n\nStub skill content.\n',
+						);
+					}
+					throw new Error(`Unexpected network fetch in test: ${url}`);
+				}) as typeof fetch,
 			});
 
 			expect(installed.name).toBe('argent');

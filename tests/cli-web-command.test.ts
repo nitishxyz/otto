@@ -1,5 +1,22 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it, mock } from 'bun:test';
 import { Command } from 'commander';
+import * as sdkActual from '@ottocode/sdk';
+import * as serverActual from '@ottocode/server';
+import * as databaseActual from '@ottocode/database';
+import * as apiActual from '@ottocode/api';
+import * as withAuthActual from '@ottocode/cli/src/middleware/with-auth.ts';
+import * as daemonActual from '@ottocode/cli/src/daemon.ts';
+import * as customCommandsActual from '@ottocode/cli/src/custom-commands.ts';
+import * as gitignoreActual from '@ottocode/cli/src/gitignore.ts';
+
+const realSdk = { ...sdkActual };
+const realServer = { ...serverActual };
+const realDatabase = { ...databaseActual };
+const realApi = { ...apiActual };
+const realWithAuth = { ...withAuthActual };
+const realDaemon = { ...daemonActual };
+const realCustomCommands = { ...customCommandsActual };
+const realGitignore = { ...gitignoreActual };
 
 const openAuthUrlMock = mock(async () => true);
 const createWebServerMock = mock(() => ({
@@ -17,6 +34,7 @@ const ensureDaemonProjectMock = mock(async () => ({
 const fetchMock = mock(async () => new Response('ok'));
 
 mock.module('@ottocode/sdk', () => ({
+	...realSdk,
 	openAuthUrl: openAuthUrlMock,
 	logger: { error: mock(() => {}) },
 	loadConfig: mock(async () => ({ projectRoot: '/tmp/project' })),
@@ -34,22 +52,27 @@ mock.module('@ottocode/cli/src/web-server.ts', () => ({
 }));
 
 mock.module('@ottocode/cli/src/middleware/with-auth.ts', () => ({
+	...realWithAuth,
 	ensureAuth: ensureAuthMock,
 }));
 
 mock.module('@ottocode/cli/src/daemon.ts', () => ({
+	...realDaemon,
 	ensureDaemonProject: ensureDaemonProjectMock,
 }));
 
 mock.module('@ottocode/cli/src/custom-commands.ts', () => ({
+	...realCustomCommands,
 	runDiscoveredCommand: mock(async () => false),
 }));
 
 mock.module('@ottocode/cli/src/gitignore.ts', () => ({
+	...realGitignore,
 	ensureProjectOttoIgnored: mock(async () => false),
 }));
 
 mock.module('@ottocode/server', () => ({
+	...realServer,
 	createApp: mock(() => ({ fetch: mock(() => new Response('ok')) })),
 	setDaemonId: mock(() => {}),
 	setServerPort: mock(() => {}),
@@ -59,15 +82,28 @@ mock.module('@ottocode/server', () => ({
 }));
 
 mock.module('@ottocode/database', () => ({
+	...realDatabase,
 	getDb: mock(async () => ({})),
 }));
 
 mock.module('@ottocode/api', () => ({
+	...realApi,
 	startTunnel: mock(async () => ({
 		data: { ok: true, url: 'https://tunnel.test' },
 	})),
 	stopTunnel: mock(async () => ({})),
 }));
+
+afterAll(() => {
+	mock.module('@ottocode/sdk', () => realSdk);
+	mock.module('@ottocode/server', () => realServer);
+	mock.module('@ottocode/database', () => realDatabase);
+	mock.module('@ottocode/api', () => realApi);
+	mock.module('@ottocode/cli/src/middleware/with-auth.ts', () => realWithAuth);
+	mock.module('@ottocode/cli/src/daemon.ts', () => realDaemon);
+	mock.module('@ottocode/cli/src/custom-commands.ts', () => realCustomCommands);
+	mock.module('@ottocode/cli/src/gitignore.ts', () => realGitignore);
+});
 
 const webModulePromise = import('@ottocode/cli/src/commands/web.ts');
 const serveModulePromise = import('@ottocode/cli/src/commands/lazy/serve.ts');

@@ -23,11 +23,14 @@ describe('git routes', () => {
 		const app = createApp();
 		const expectedPath = await realpath(projectDir);
 
-		const response = await app.request('/v1/git/init', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ project: projectDir }),
-		});
+		const response = await app.request(
+			`/v1/git/init?project=${encodeURIComponent(projectDir)}`,
+			{
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({}),
+			},
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
@@ -42,11 +45,14 @@ describe('git routes', () => {
 		const app = createApp();
 		const expectedPath = await realpath(projectDir);
 
-		const response = await app.request('/v1/git/init', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ project: projectDir }),
-		});
+		const response = await app.request(
+			`/v1/git/init?project=${encodeURIComponent(projectDir)}`,
+			{
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({}),
+			},
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(200);
@@ -60,11 +66,14 @@ describe('git routes', () => {
 		await execFileAsync('git', ['init'], { cwd: projectDir });
 		const app = createApp();
 
-		const response = await app.request('/v1/git/rebase', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ project: projectDir, action: 'continue' }),
-		});
+		const response = await app.request(
+			`/v1/git/rebase?project=${encodeURIComponent(projectDir)}`,
+			{
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ action: 'continue' }),
+			},
+		);
 		const body = await response.json();
 
 		expect(response.status).toBe(409);

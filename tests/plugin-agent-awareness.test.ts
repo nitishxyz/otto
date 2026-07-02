@@ -6,6 +6,7 @@ import {
 	TerminalManager,
 	getProjectPluginsDir,
 	setTerminalManager,
+	unsetTerminalManager,
 	writePluginsConfig,
 } from '@ottocode/sdk';
 import {
@@ -132,7 +133,7 @@ describe('plugin command agent awareness', () => {
 	it('runs enabled plugin commands through the shared terminal bridge', async () => {
 		const { projectRoot, cleanup } = await setupProject();
 		const manager = new TerminalManager();
-		setTerminalManager(manager);
+		setTerminalManager(manager, projectRoot);
 		try {
 			await installPlugin(projectRoot, 'serve-sim', {
 				doctor: {
@@ -157,6 +158,7 @@ describe('plugin command agent awareness', () => {
 			});
 			expect(manager.list()).toHaveLength(1);
 		} finally {
+			unsetTerminalManager(projectRoot);
 			await cleanup();
 		}
 	});

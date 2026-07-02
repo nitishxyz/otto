@@ -1,7 +1,18 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	mock,
+	test,
+} from 'bun:test';
 import { EventEmitter } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import * as sdkActual from '@ottocode/sdk';
+
+const realSdk = { ...sdkActual };
 
 class MockTunnel extends EventEmitter {
 	static starts: number[] = [];
@@ -23,6 +34,7 @@ class MockTunnel extends EventEmitter {
 }
 
 mock.module('@ottocode/sdk', () => ({
+	...realSdk,
 	generateQRCode: async (url: string) => `qr:${url}`,
 	isTunnelBinaryInstalled: async () => true,
 	killStaleTunnels: async () => {},
@@ -32,6 +44,10 @@ mock.module('@ottocode/sdk', () => ({
 	OttoTunnel: MockTunnel,
 	printQRCode: async () => {},
 }));
+
+afterAll(() => {
+	mock.module('@ottocode/sdk', () => realSdk);
+});
 
 type TunnelService =
 	typeof import('../packages/server/src/routes/tunnel/service.ts');

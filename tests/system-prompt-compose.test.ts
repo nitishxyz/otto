@@ -70,10 +70,8 @@ describe('system prompt composition', () => {
 			includeEnvironment: false,
 		});
 
-		expect(prompt).toContain('Skills:');
-		expect(prompt).toContain(
-			'- ea: Enterprise architecture planning guidance.',
-		);
+		expect(prompt).toContain('Available skills:');
+		expect(prompt).toContain('- ea: Enterprise architecture planning guidance');
 		expect(components).toContain('capabilities:skills');
 	});
 
@@ -93,7 +91,7 @@ describe('system prompt composition', () => {
 		});
 
 		expect(prompt).toContain(
-			'- global-ea: Global enterprise architecture guidance.',
+			'- global-ea: Global enterprise architecture guidance',
 		);
 	});
 
@@ -112,7 +110,7 @@ describe('system prompt composition', () => {
 			},
 		});
 
-		expect(prompt).toContain('- enabled-skill: Enabled skill guidance.');
+		expect(prompt).toContain('- enabled-skill: Enabled skill guidance');
 		expect(prompt).not.toContain('disabled-skill');
 	});
 
@@ -131,9 +129,7 @@ describe('system prompt composition', () => {
 			skillSettings: { items: { ea: { enabled: true } } },
 		});
 
-		expect(prompt).toContain(
-			'- ea: Enterprise architecture planning guidance.',
-		);
+		expect(prompt).toContain('- ea: Enterprise architecture planning guidance');
 	});
 
 	async function writeSkill(

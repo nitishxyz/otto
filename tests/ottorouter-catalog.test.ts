@@ -36,7 +36,7 @@ describe('ottorouter catalog entry', () => {
 
 	it('maps Moonshot-owned OttoRouter models to Kimi', () => {
 		const entry = catalog.ottorouter;
-		const model = entry?.models['kimi-k2-thinking'];
+		const model = entry?.models['kimi-k2.5'];
 		expect(model?.ownedBy).toBe('kimi');
 		expect(
 			modelMapToList(entry.models).some(
