@@ -1,6 +1,9 @@
 import type { DB } from '@ottocode/database';
 import { getDb } from '@ottocode/database';
 import {
+	getGlobalConfigPath,
+	getGlobalSkillsConfigPath,
+	getProjectConfigPath,
 	getProjectId,
 	loadConfig,
 	shutdownMCP,
@@ -9,7 +12,7 @@ import {
 	unsetTerminalManager,
 	type OttoConfig,
 } from '@ottocode/sdk';
-import { realpath } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { forgetProject, listProjects, touchProject } from './registry.ts';
 
@@ -41,9 +44,17 @@ export interface ProjectRuntimeSummary {
 	open: boolean;
 }
 
+const CONFIG_STALENESS_CHECK_INTERVAL_MS = 2000;
+
+interface ConfigCacheState {
+	fingerprint: string;
+	checkedAt: number;
+}
+
 export class ProjectManager {
 	private readonly runtimesById = new Map<string, ProjectRuntime>();
 	private readonly idsByRoot = new Map<string, string>();
+	private readonly cfgCacheById = new Map<string, ConfigCacheState>();
 
 	async openProject(input: { path: string }): Promise<ProjectRuntime> {
 		const root = await canonicalizeProjectRoot(input.path);
@@ -80,6 +91,10 @@ export class ProjectManager {
 		setTerminalManager(terminalManager, cfg.projectRoot);
 		this.runtimesById.set(runtime.id, runtime);
 		this.idsByRoot.set(runtime.root, runtime.id);
+		this.cfgCacheById.set(runtime.id, {
+			fingerprint: await configFingerprint(runtime.root),
+			checkedAt: Date.now(),
+		});
 		return runtime;
 	}
 
@@ -91,6 +106,7 @@ export class ProjectManager {
 			const runtime = this.runtimesById.get(input.id);
 			if (runtime) {
 				this.touchProject(input.id);
+				await this.maybeRefreshConfig(runtime);
 				return runtime;
 			}
 
@@ -139,6 +155,7 @@ export class ProjectManager {
 		await runtime.stopIdleResources();
 		this.runtimesById.delete(id);
 		this.idsByRoot.delete(runtime.root);
+		this.cfgCacheById.delete(id);
 	}
 
 	async closeAllProjects(): Promise<void> {
@@ -165,6 +182,32 @@ export class ProjectManager {
 		if (!runtime) return;
 		runtime.lastUsedAt = Date.now();
 	}
+
+	async refreshProjectConfig(root: string): Promise<OttoConfig | null> {
+		const id = this.idsByRoot.get(root);
+		if (!id) return null;
+		const runtime = this.runtimesById.get(id);
+		if (!runtime) return null;
+		runtime.cfg = await loadConfig(runtime.root);
+		this.cfgCacheById.set(id, {
+			fingerprint: await configFingerprint(runtime.root),
+			checkedAt: Date.now(),
+		});
+		return runtime.cfg;
+	}
+
+	private async maybeRefreshConfig(runtime: ProjectRuntime): Promise<void> {
+		const state = this.cfgCacheById.get(runtime.id);
+		const now = Date.now();
+		if (state && now - state.checkedAt < CONFIG_STALENESS_CHECK_INTERVAL_MS) {
+			return;
+		}
+		const fingerprint = await configFingerprint(runtime.root);
+		if (!state || state.fingerprint !== fingerprint) {
+			runtime.cfg = await loadConfig(runtime.root);
+		}
+		this.cfgCacheById.set(runtime.id, { fingerprint, checkedAt: now });
+	}
 }
 
 const defaultProjectManager = new ProjectManager();
@@ -188,6 +231,24 @@ async function canonicalizeProjectRoot(projectRoot: string): Promise<string> {
 
 function projectName(projectRoot: string): string {
 	return basename(projectRoot) || projectRoot;
+}
+
+async function configFingerprint(projectRoot: string): Promise<string> {
+	const paths = [
+		getProjectConfigPath(projectRoot),
+		getGlobalConfigPath(),
+		getGlobalSkillsConfigPath(),
+	];
+	const mtimes = await Promise.all(
+		paths.map(async (path) => {
+			try {
+				return String((await stat(path)).mtimeMs);
+			} catch {
+				return 'missing';
+			}
+		}),
+	);
+	return mtimes.join('|');
 }
 
 function toProjectRuntimeSummary(

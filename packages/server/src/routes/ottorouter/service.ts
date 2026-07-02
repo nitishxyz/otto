@@ -22,7 +22,6 @@ export async function getOttoRouterPrivateKey(
 	if (process.env.OTTOROUTER_PRIVATE_KEY) {
 		return process.env.OTTOROUTER_PRIVATE_KEY;
 	}
-	if (!projectRoot) return null;
 
 	try {
 		const auth = await getAuth('ottorouter', projectRoot);

@@ -41,8 +41,26 @@ async function handleSessionStream(c: Context) {
 
 	const encoder = new TextEncoder();
 
+	let cleanedUp = false;
+	let cleanup = () => {};
+
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
+			let unsubscribeProject = () => {};
+			let unsubscribeLegacy = () => {};
+			let hb: ReturnType<typeof setInterval> | null = null;
+
+			cleanup = () => {
+				if (cleanedUp) return;
+				cleanedUp = true;
+				if (hb !== null) clearInterval(hb);
+				unsubscribeProject();
+				unsubscribeLegacy();
+				try {
+					controller.close();
+				} catch {}
+			};
+
 			const write = (evt: OttoEvent) => {
 				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
 				let line: string;
@@ -53,32 +71,28 @@ async function handleSessionStream(c: Context) {
 				} catch {
 					line = `event: ${evt.type}\ndata: {}\n\n`;
 				}
-				controller.enqueue(encoder.encode(line));
+				try {
+					controller.enqueue(encoder.encode(line));
+				} catch {
+					cleanup();
+				}
 			};
-			const unsubscribeProject = subscribe(
-				sessionId,
-				write,
-				project.runtime.root,
-			);
-			const unsubscribeLegacy = subscribe(sessionId, write);
+			unsubscribeProject = subscribe(sessionId, write, project.runtime.root);
+			unsubscribeLegacy = subscribe(sessionId, write);
 			controller.enqueue(encoder.encode(`: connected ${sessionId}\n\n`));
-			const hb = setInterval(() => {
+			hb = setInterval(() => {
 				try {
 					controller.enqueue(encoder.encode(`: hb ${Date.now()}\n\n`));
 				} catch {
-					clearInterval(hb);
+					cleanup();
 				}
 			}, 5000);
 
 			const signal = c.req.raw?.signal as AbortSignal | undefined;
-			signal?.addEventListener('abort', () => {
-				clearInterval(hb);
-				unsubscribeProject();
-				unsubscribeLegacy();
-				try {
-					controller.close();
-				} catch {}
-			});
+			signal?.addEventListener('abort', cleanup, { once: true });
+		},
+		cancel() {
+			cleanup();
 		},
 	});
 

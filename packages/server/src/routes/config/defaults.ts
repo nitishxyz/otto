@@ -11,6 +11,7 @@ import type { Hono } from 'hono';
 import { normalizeThemeId, themeIds, type ThemeId } from '@ottocode/themes';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { getProjectManager } from '../../runtime/projects/manager.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const projectQuerySchema = z.object({
@@ -219,7 +220,9 @@ export function registerDefaultsRoute(app: Hono) {
 
 				await setConfig(scope, updates, projectRoot);
 
-				const nextCfg = await loadConfig(projectRoot);
+				const nextCfg =
+					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
+					(await loadConfig(projectRoot));
 
 				return c.json({
 					success: true,

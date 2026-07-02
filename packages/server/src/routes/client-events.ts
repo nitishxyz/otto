@@ -38,8 +38,24 @@ function handleClientEventsStream(c: Context) {
 
 	const encoder = new TextEncoder();
 
+	let cleanedUp = false;
+	let cleanup = () => {};
+
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
+			let unsubscribe = () => {};
+			let hb: ReturnType<typeof setInterval> | null = null;
+
+			cleanup = () => {
+				if (cleanedUp) return;
+				cleanedUp = true;
+				if (hb !== null) clearInterval(hb);
+				unsubscribe();
+				try {
+					controller.close();
+				} catch {}
+			};
+
 			const write = (evt: ClientEvent) => {
 				let line: string;
 				try {
@@ -49,30 +65,27 @@ function handleClientEventsStream(c: Context) {
 				} catch {
 					line = `event: ${evt.type}\ndata: {}\n\n`;
 				}
-				controller.enqueue(encoder.encode(line));
+				try {
+					controller.enqueue(encoder.encode(line));
+				} catch {
+					cleanup();
+				}
 			};
 
-			const unsubscribe = subscribeClientEvents(write);
+			unsubscribe = subscribeClientEvents(write);
 			controller.enqueue(encoder.encode(': connected client-events\n\n'));
-			const hb = setInterval(() => {
-				try {
-					write({
-						type: 'heartbeat',
-						payload: { createdAt: new Date().toISOString() },
-					});
-				} catch {
-					clearInterval(hb);
-				}
+			hb = setInterval(() => {
+				write({
+					type: 'heartbeat',
+					payload: { createdAt: new Date().toISOString() },
+				});
 			}, 5000);
 
 			const signal = c.req.raw?.signal as AbortSignal | undefined;
-			signal?.addEventListener('abort', () => {
-				clearInterval(hb);
-				unsubscribe();
-				try {
-					controller.close();
-				} catch {}
-			});
+			signal?.addEventListener('abort', cleanup, { once: true });
+		},
+		cancel() {
+			cleanup();
 		},
 	});
 

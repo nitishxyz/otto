@@ -16,6 +16,7 @@ import {
 import type { Context } from 'hono';
 import type { EmbeddedAppConfig } from '../../index.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { getProjectManager } from '../../runtime/projects/manager.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
 	getAuthorizedProviders,
@@ -204,7 +205,9 @@ export async function handleUpdateProviderSettings(c: Context) {
 		}
 
 		await writeProviderSettings('global', provider, updates, projectRoot);
-		const cfg = await loadConfig(projectRoot);
+		const cfg =
+			(await getProjectManager().refreshProjectConfig(projectRoot)) ??
+			(await loadConfig(projectRoot));
 		const details = await getProviderDetails(undefined, cfg);
 		return c.json({
 			success: true,
@@ -229,7 +232,9 @@ export async function handleDeleteProviderSettings(c: Context) {
 		if (!provider) return c.json({ error: 'Provider is required' }, 400);
 
 		await removeProviderSettings('global', provider, projectRoot);
-		const cfg = await loadConfig(projectRoot);
+		const cfg =
+			(await getProjectManager().refreshProjectConfig(projectRoot)) ??
+			(await loadConfig(projectRoot));
 		const details = await getProviderDetails(undefined, cfg);
 		return c.json({ success: true, provider, details });
 	} catch (error) {
