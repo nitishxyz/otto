@@ -1,7 +1,11 @@
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './patch.txt' with { type: 'text' };
-import { createToolError, type ToolResponse } from '../error.ts';
+import {
+	createToolAbortError,
+	createToolError,
+	type ToolResponse,
+} from '../error.ts';
 import { applyPatchOperations } from './patch/apply.ts';
 import { parsePatchInput } from './patch/parse.ts';
 import { repairPatchContent } from './patch/repair.ts';
@@ -69,15 +73,18 @@ export function buildApplyPatchTool(projectRoot: string): {
 					'Enable fuzzy matching with whitespace normalization (converts tabs to spaces for matching)',
 				),
 		}),
-		async execute({
-			patch,
-			allowRejects = false,
-			fuzzyMatch = true,
-		}: {
-			patch: string;
-			allowRejects?: boolean;
-			fuzzyMatch?: boolean;
-		}): Promise<
+		async execute(
+			{
+				patch,
+				allowRejects = false,
+				fuzzyMatch = true,
+			}: {
+				patch: string;
+				allowRejects?: boolean;
+				fuzzyMatch?: boolean;
+			},
+			options?: { abortSignal?: AbortSignal },
+		): Promise<
 			ToolResponse<{
 				operation: 'apply_patch';
 				output: string;
@@ -129,6 +136,9 @@ export function buildApplyPatchTool(projectRoot: string): {
 			}
 
 			try {
+				if (options?.abortSignal?.aborted) {
+					return createToolAbortError('Patch');
+				}
 				const result = await applyPatchOperations(projectRoot, operations, {
 					useFuzzy: fuzzyMatch,
 					allowRejects,

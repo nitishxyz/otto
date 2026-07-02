@@ -10,7 +10,11 @@ import {
 } from './util.ts';
 import { applyStringEdit } from './edit-shared.ts';
 import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
-import { createToolError, type ToolResponse } from '../../error.ts';
+import {
+	createToolAbortError,
+	createToolError,
+	type ToolResponse,
+} from '../../error.ts';
 
 const multiEditSchema = z.object({
 	path: z
@@ -45,7 +49,10 @@ export function buildMultiEditTool(projectRoot: string): {
 	const multiedit = tool({
 		description: DESCRIPTION,
 		inputSchema: multiEditSchema,
-		async execute({ path, edits }: z.infer<typeof multiEditSchema>): Promise<
+		async execute(
+			{ path, edits }: z.infer<typeof multiEditSchema>,
+			options?: { abortSignal?: AbortSignal },
+		): Promise<
 			ToolResponse<{
 				path: string;
 				operation: 'multiedit';
@@ -109,6 +116,9 @@ export function buildMultiEditTool(projectRoot: string): {
 					});
 				}
 
+				if (options?.abortSignal?.aborted) {
+					return createToolAbortError('Multiedit');
+				}
 				await writeFile(abs, nextContent, 'utf-8');
 				await rememberFileWrite(projectRoot, abs);
 				const metadata = buildMutationMetadata(original, nextContent);

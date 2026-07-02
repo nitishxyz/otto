@@ -10,7 +10,11 @@ import {
 } from './util.ts';
 import { applyStringEdit } from './edit-shared.ts';
 import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
-import { createToolError, type ToolResponse } from '../../error.ts';
+import {
+	createToolAbortError,
+	createToolError,
+	type ToolResponse,
+} from '../../error.ts';
 
 export function buildEditTool(projectRoot: string): {
 	name: string;
@@ -38,17 +42,20 @@ export function buildEditTool(projectRoot: string): {
 					'Replace every matching occurrence instead of requiring a unique match',
 				),
 		}),
-		async execute({
-			path,
-			oldString,
-			newString,
-			replaceAll = false,
-		}: {
-			path: string;
-			oldString: string;
-			newString: string;
-			replaceAll?: boolean;
-		}): Promise<
+		async execute(
+			{
+				path,
+				oldString,
+				newString,
+				replaceAll = false,
+			}: {
+				path: string;
+				oldString: string;
+				newString: string;
+				replaceAll?: boolean;
+			},
+			options?: { abortSignal?: AbortSignal },
+		): Promise<
 			ToolResponse<{
 				path: string;
 				operation: 'edit';
@@ -101,6 +108,9 @@ export function buildEditTool(projectRoot: string): {
 					});
 				}
 
+				if (options?.abortSignal?.aborted) {
+					return createToolAbortError('Edit');
+				}
 				await writeFile(abs, updated.content, 'utf-8');
 				await rememberFileWrite(projectRoot, abs);
 				const metadata = buildMutationMetadata(original, updated.content);

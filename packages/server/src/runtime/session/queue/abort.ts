@@ -2,6 +2,7 @@ import {
 	abortActiveShellsForMessage,
 	abortActiveShellsForSession,
 } from '../../tools/active-shells.ts';
+import { clearPendingApprovalsForSession } from '../../tools/approval.ts';
 import type {
 	RunAbortReason,
 	SendNowPreemptReason,
@@ -25,6 +26,7 @@ export function abortSession(
 	const state = getRunnerStateInternal(sessionId);
 	if (!state) {
 		abortActiveShellsForSession(sessionId);
+		clearPendingApprovalsForSession(sessionId);
 		return;
 	}
 
@@ -41,6 +43,7 @@ export function abortSession(
 			state.projectRoot,
 		);
 	}
+	clearPendingApprovalsForSession(sessionId, state.projectRoot);
 
 	// Optionally clear the queue and abort all queued messages.
 	if (clearQueue && state.queue.length > 0) {
@@ -75,6 +78,7 @@ export function abortMessage(
 	if (state.currentMessageId === messageId) {
 		abortActiveShellsForMessage(sessionId, messageId, state.projectRoot);
 		abortAndDeleteMessageController(messageId, undefined, state.projectRoot);
+		clearPendingApprovalsForSession(sessionId, state.projectRoot);
 		return { removed: true, wasRunning: true };
 	}
 
@@ -162,6 +166,7 @@ export function sendQueuedMessageNow(
 			} satisfies SendNowPreemptReason,
 			state.projectRoot,
 		);
+		clearPendingApprovalsForSession(sessionId, state.projectRoot);
 	}
 
 	publishQueueState(sessionId);

@@ -24,6 +24,7 @@ import {
 } from './pending.ts';
 import {
 	buildToolResultContent,
+	createAbortedToolResult,
 	createBlockedToolResult,
 	createRejectedToolResult,
 	createToolExceptionResult,
@@ -58,6 +59,9 @@ export async function handleAdaptedToolExecute(args: {
 }): Promise<ToolExecuteReturn> {
 	const input = unwrapDoubleWrappedArgs(args.input, args.name);
 	const sdkCallId = extractToolCallId(args.options);
+	const abortSignal = (
+		args.options as { abortSignal?: AbortSignal } | undefined
+	)?.abortSignal;
 	const meta = shiftPendingCall(args.pendingCalls, args.name);
 	const callIdFromQueue = sdkCallId || meta?.callId;
 	const startTsFromQueue = meta?.startTs;
@@ -79,6 +83,19 @@ export async function handleAdaptedToolExecute(args: {
 
 	const executeWithGuards = async (): Promise<ToolExecuteReturn> => {
 		try {
+			if (abortSignal?.aborted) {
+				const abortedResult = createAbortedToolResult();
+				await persistToolErrorResult(args.ctx, {
+					name: args.name,
+					errorResult: abortedResult,
+					callId: callIdFromQueue,
+					startTs: startTsFromQueue,
+					stepIndexForEvent,
+					input: meta?.args,
+				});
+				return abortedResult as ToolExecuteReturn;
+			}
+
 			if (meta?.blocked) {
 				const blockedResult = createBlockedToolResult(meta.blockReason);
 				await persistToolErrorResult(args.ctx, {
@@ -94,6 +111,18 @@ export async function handleAdaptedToolExecute(args: {
 
 			if (meta?.approvalPromise) {
 				const approved = await meta.approvalPromise;
+				if (abortSignal?.aborted) {
+					const abortedResult = createAbortedToolResult();
+					await persistToolErrorResult(args.ctx, {
+						name: args.name,
+						errorResult: abortedResult,
+						callId: callIdFromQueue,
+						startTs: startTsFromQueue,
+						stepIndexForEvent,
+						input: meta?.args,
+					});
+					return abortedResult as ToolExecuteReturn;
+				}
 				if (!approved) {
 					const rejectedResult = createRejectedToolResult();
 					await persistToolErrorResult(args.ctx, {

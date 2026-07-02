@@ -16,7 +16,11 @@ import {
 	normalizeLineEndings,
 } from './edit-shared.ts';
 import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
-import { createToolError, type ToolResponse } from '../../error.ts';
+import {
+	createToolAbortError,
+	createToolError,
+	type ToolResponse,
+} from '../../error.ts';
 
 const lineEndpointSchema = z.union([
 	z.number().int().min(1),
@@ -221,7 +225,10 @@ export function buildCopyIntoTool(projectRoot: string): {
 	const copyInto = tool({
 		description: DESCRIPTION,
 		inputSchema: copyIntoSchema,
-		async execute(input: CopyIntoInput): Promise<
+		async execute(
+			input: CopyIntoInput,
+			options?: { abortSignal?: AbortSignal },
+		): Promise<
 			ToolResponse<{
 				operation: 'copy_into';
 				sourcePath: string;
@@ -306,6 +313,9 @@ export function buildCopyIntoTool(projectRoot: string): {
 					});
 				}
 
+				if (options?.abortSignal?.aborted) {
+					return createToolAbortError('Copy');
+				}
 				await writeFile(targetAbs, nextContent, 'utf-8');
 				await rememberFileWrite(projectRoot, targetAbs);
 				const metadata = buildMutationMetadata(targetContent, nextContent);

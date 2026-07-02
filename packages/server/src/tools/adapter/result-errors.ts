@@ -35,6 +35,18 @@ export function createRejectedToolResult(): {
 	};
 }
 
+export function createAbortedToolResult(): {
+	ok: false;
+	error: string;
+	details: { reason: 'aborted' };
+} {
+	return {
+		ok: false,
+		error: 'Tool execution aborted by user',
+		details: { reason: 'aborted' },
+	};
+}
+
 export function createToolExceptionResult(error: unknown): unknown {
 	if (error && typeof error === 'object' && 'ok' in error) return error;
 	const errorMessage = stringifyUnknownError(error);

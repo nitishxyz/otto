@@ -62,7 +62,6 @@ export function Workspace({
 				<DesktopTitleBar
 					projectName={project.name}
 					onBack={handleBack}
-					serverPort={server?.port}
 					isRemote={isRemote}
 					showTabs={false}
 				/>
@@ -107,7 +106,6 @@ export function Workspace({
 							<DesktopTitleBar
 								projectName={project.name}
 								onBack={handleBack}
-								serverPort={server?.port}
 								isRemote={isRemote}
 							/>
 						}

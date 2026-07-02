@@ -12,7 +12,7 @@ import {
 import { useUpdate } from '../../hooks/useUpdate';
 import { usePlatform } from '../../hooks/usePlatform';
 import { useFullscreen } from '../../hooks/useFullscreen';
-import { useVersion } from '../../hooks/useVersion';
+
 import { handleTitleBarDrag } from '../../utils/title-bar';
 import { tauriBridge } from '../../lib/tauri-bridge';
 import { WindowControls } from '../WindowControls';
@@ -68,7 +68,6 @@ const DesktopRoutedLooperTabs = memo(function DesktopRoutedLooperTabs() {
 interface DesktopTitleBarProps {
 	projectName: string;
 	onBack: () => void | Promise<void>;
-	serverPort?: number;
 	isRemote: boolean;
 	/** Hide the workspace tabs (e.g. while the server is still starting). */
 	showTabs?: boolean;
@@ -77,19 +76,17 @@ interface DesktopTitleBarProps {
 /**
  * Desktop app title bar: shared TitleBar composition (sidebar toggle,
  * Agents | Looper tabs and right-rail toggle) plus desktop-specific content —
- * back button, update controls, API port + app version, and a
- * new-window button. Acts as the native drag region.
+ * back button, update controls, and new-window button. Acts as the native
+ * drag region.
  */
 export const DesktopTitleBar = memo(function DesktopTitleBar({
 	projectName,
 	onBack,
-	serverPort,
 	isRemote,
 	showTabs = true,
 }: DesktopTitleBarProps) {
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
-	const appVersion = useVersion();
 	const {
 		available,
 		version,
@@ -133,17 +130,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 								{downloading ? `${progress}%` : 'Update'}
 							</button>
 						))}
-					{serverPort != null && !isRemote && (
-						<div className="flex items-center gap-1.5 text-sm">
-							<span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-							<span className="text-muted-foreground">API {serverPort}</span>
-							{appVersion && (
-								<span className="text-muted-foreground/50">
-									· v{appVersion}
-								</span>
-							)}
-						</div>
-					)}
 					{isRemote && (
 						<div className="flex items-center gap-1.5 text-sm">
 							<span className="w-2.5 h-2.5 rounded-full bg-blue-500" />

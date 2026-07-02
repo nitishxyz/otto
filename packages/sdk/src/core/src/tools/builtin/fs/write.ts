@@ -11,7 +11,11 @@ import {
 } from './util.ts';
 import { rememberFileWrite } from './read-tracker.ts';
 import DESCRIPTION from './write.txt' with { type: 'text' };
-import { createToolError, type ToolResponse } from '../../error.ts';
+import {
+	createToolAbortError,
+	createToolError,
+	type ToolResponse,
+} from '../../error.ts';
 
 export function buildWriteTool(projectRoot: string): {
 	name: string;
@@ -28,15 +32,18 @@ export function buildWriteTool(projectRoot: string): {
 			content: z.string().describe('Text content to write'),
 			createDirs: z.boolean().optional().default(true),
 		}),
-		async execute({
-			path,
-			content,
-			createDirs,
-		}: {
-			path: string;
-			content: string;
-			createDirs?: boolean;
-		}): Promise<
+		async execute(
+			{
+				path,
+				content,
+				createDirs,
+			}: {
+				path: string;
+				content: string;
+				createDirs?: boolean;
+			},
+			options?: { abortSignal?: AbortSignal },
+		): Promise<
 			ToolResponse<{
 				path: string;
 				operation: 'write';
@@ -86,6 +93,9 @@ export function buildWriteTool(projectRoot: string): {
 					oldText = await readFile(abs, 'utf-8');
 					existed = true;
 				} catch {}
+				if (options?.abortSignal?.aborted) {
+					return createToolAbortError('Write');
+				}
 				await writeFile(abs, content);
 				await rememberFileWrite(projectRoot, abs);
 				const metadata = buildMutationMetadata(oldText, content);

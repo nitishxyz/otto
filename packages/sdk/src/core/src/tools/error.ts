@@ -66,3 +66,9 @@ export function createToolError(
 		details,
 	};
 }
+
+export function createToolAbortError(operation: string): ToolErrorResponse {
+	return createToolError(`${operation} aborted by user`, 'abort', {
+		reason: 'aborted',
+	});
+}
