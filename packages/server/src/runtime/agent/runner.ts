@@ -27,6 +27,8 @@ import {
 import type { RunnerTextState } from './runner/runner-text.ts';
 import { observeRunnerToolEvents } from './runner/runner-tool-observer.ts';
 import {
+	autoCompactSessionAfterTurn,
+	createAutoCompactStopCondition,
 	handleRunnerError,
 	shouldPreemptivelyAutoCompact,
 } from './runner/runner-errors.ts';
@@ -192,9 +194,19 @@ async function runAssistant(opts: RunOpts) {
 
 	const isCopilotResponsesApi =
 		opts.provider === 'copilot' && !opts.model.startsWith('gpt-5-mini');
+	let turnStoppedForAutoCompact = false;
+	const autoCompactStop = createAutoCompactStopCondition(
+		opts,
+		cfg.defaults.autoCompactThresholdTokens,
+		() => {
+			turnStoppedForAutoCompact = true;
+		},
+	);
 	const stopWhenCondition = isCopilotResponsesApi
 		? undefined
-		: stepCountIs(MAX_TURN_STEPS);
+		: autoCompactStop
+			? [stepCountIs(MAX_TURN_STEPS), autoCompactStop]
+			: stepCountIs(MAX_TURN_STEPS);
 	logStreamRequestReady({
 		opts,
 		setup,
@@ -278,6 +290,14 @@ async function runAssistant(opts: RunOpts) {
 			finishReason,
 			rawFinishReason,
 			toolObserver: toolObserver.state,
+		});
+
+		await autoCompactSessionAfterTurn({
+			db,
+			opts,
+			threshold: cfg.defaults.autoCompactThresholdTokens,
+			turnStoppedForCompaction: turnStoppedForAutoCompact,
+			runSessionLoop,
 		});
 	} catch (err) {
 		unsubscribeFinish();

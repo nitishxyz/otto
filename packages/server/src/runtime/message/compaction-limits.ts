@@ -46,6 +46,41 @@ export function shouldAutoCompactBeforeOverflow(args: {
 	return currentContextTokens + estimatedInputTokens >= threshold;
 }
 
+export function shouldStopTurnForAutoCompact(args: {
+	autoCompactThresholdTokens?: number | null;
+	isCompactCommand?: boolean;
+	compactionRetries?: number;
+	lastStepUsage?: {
+		inputTokens?: number | null;
+		outputTokens?: number | null;
+	} | null;
+}): boolean {
+	const threshold = Number(args.autoCompactThresholdTokens ?? 0);
+	if (!Number.isFinite(threshold) || threshold <= 0) {
+		return false;
+	}
+	if (args.isCompactCommand) {
+		return false;
+	}
+	if ((args.compactionRetries ?? 0) > 0) {
+		return false;
+	}
+
+	const inputTokens = Math.max(
+		0,
+		Math.floor(Number(args.lastStepUsage?.inputTokens ?? 0)),
+	);
+	if (inputTokens <= 0) {
+		return false;
+	}
+	const outputTokens = Math.max(
+		0,
+		Math.floor(Number(args.lastStepUsage?.outputTokens ?? 0)),
+	);
+
+	return inputTokens + outputTokens >= threshold;
+}
+
 export function getModelLimits(
 	provider: string,
 	model: string,

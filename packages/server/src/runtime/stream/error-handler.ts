@@ -6,7 +6,7 @@ import { publish, publishClientEvent } from '../../events/bus.ts';
 import { toErrorPayload } from '../errors/handling.ts';
 import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
-import { pruneSession, performAutoCompaction } from '../message/compaction.ts';
+import { runAutoCompactionFlow } from '../message/compaction.ts';
 import { enqueueAssistantRun } from '../session/queue.ts';
 import { clearPendingTopup } from '../topup/manager.ts';
 
@@ -196,70 +196,10 @@ export function createErrorHandler(
 					},
 				});
 
-				const compactMessageId = crypto.randomUUID();
-				const compactMessageTime = Date.now();
-				await db.insert(messages).values({
-					id: compactMessageId,
-					sessionId: opts.sessionId,
-					role: 'assistant',
-					status: 'pending',
-					agent: opts.agent,
-					provider: opts.provider,
-					model: opts.model,
-					createdAt: compactMessageTime,
-				});
-
-				publish({
-					type: 'message.created',
-					sessionId: opts.sessionId,
-					payload: {
-						id: compactMessageId,
-						role: 'assistant',
-						agent: opts.agent,
-						provider: opts.provider,
-						model: opts.model,
-					},
-				});
-
-				let compactionSucceeded = false;
-				try {
-					const publishWrapper = (event: {
-						type: string;
-						sessionId: string;
-						payload: Record<string, unknown>;
-					}) => {
-						publish(event as Parameters<typeof publish>[0]);
-					};
-					const compactResult = await performAutoCompaction(
-						db,
-						opts.sessionId,
-						compactMessageId,
-						publishWrapper,
-						opts.provider,
-						opts.model,
-						opts.projectRoot,
-						opts.assistantMessageId,
-					);
-					if (compactResult.success) {
-						compactionSucceeded = true;
-					} else {
-						const pruneResult = await pruneSession(db, opts.sessionId);
-						compactionSucceeded = pruneResult.pruned > 0;
-					}
-				} catch {}
-
-				await db
-					.update(messages)
-					.set({
-						status: compactionSucceeded ? 'complete' : 'error',
-						completedAt: Date.now(),
-					})
-					.where(eq(messages.id, compactMessageId));
-
-				publish({
-					type: 'message.completed',
-					sessionId: opts.sessionId,
-					payload: { id: compactMessageId, autoCompacted: true },
+				const { succeeded: compactionSucceeded } = await runAutoCompactionFlow({
+					db,
+					opts,
+					throughMessageId: opts.assistantMessageId,
 				});
 
 				if (compactionSucceeded && retryCallback) {

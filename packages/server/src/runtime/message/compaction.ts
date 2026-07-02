@@ -4,6 +4,7 @@ export {
 	type ModelLimits,
 	getModelLimits,
 	shouldAutoCompactBeforeOverflow,
+	shouldStopTurnForAutoCompact,
 	isCompacted,
 	COMPACTED_PLACEHOLDER,
 } from './compaction-limits.ts';
@@ -20,3 +21,5 @@ export { markSessionCompacted } from './compaction-mark.ts';
 export { pruneSession } from './compaction-prune.ts';
 
 export { performAutoCompaction } from './compaction-auto.ts';
+
+export { runAutoCompactionFlow } from './compaction-flow.ts';
