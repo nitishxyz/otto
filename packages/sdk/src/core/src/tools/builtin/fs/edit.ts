@@ -9,7 +9,7 @@ import {
 	resolveSafePath,
 } from './util.ts';
 import { applyStringEdit } from './edit-shared.ts';
-import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
+import { getStaleReadHint, rememberFileWrite } from './read-tracker.ts';
 import {
 	createToolAbortError,
 	createToolError,
@@ -93,7 +93,6 @@ export function buildEditTool(projectRoot: string): {
 
 			const abs = resolveSafePath(projectRoot, path);
 			try {
-				await assertFreshRead(projectRoot, abs, path);
 				const original = await readFile(abs, 'utf-8');
 				const updated = applyStringEdit(
 					original,
@@ -138,17 +137,21 @@ export function buildEditTool(projectRoot: string): {
 					typeof error === 'object' &&
 					'code' in error &&
 					error.code === 'ENOENT';
+				const staleHint = isEnoent
+					? undefined
+					: await getStaleReadHint(projectRoot, abs, path);
+				const message = error instanceof Error ? error.message : String(error);
 				return createToolError(
 					isEnoent
 						? `File not found: ${path}`
-						: `Failed to edit file: ${error instanceof Error ? error.message : String(error)}`,
+						: `Failed to edit file: ${message}${staleHint ? ` ${staleHint}` : ''}`,
 					isEnoent ? 'not_found' : 'execution',
 					{
 						parameter: 'path',
 						value: path,
 						suggestion: isEnoent
 							? 'Use read or ls to confirm the file path first'
-							: undefined,
+							: staleHint,
 					},
 				);
 			}

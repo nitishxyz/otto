@@ -5,7 +5,7 @@ Use this when duplicating large existing content such as SVGs, licenses, generat
 Rules:
 - Source paths may be relative to the project, absolute, or `~/...` so content can be copied from another project.
 - Target paths must resolve within the current project. Absolute target paths are accepted only when they are inside the project root.
-- You must read the target file first in the current session before modifying it.
+- Read the target file first when possible so line numbers match the current content.
 - Line numbers are 1-indexed and inclusive.
 - `endLine` may be a line number, `"end"`, or `"eof"`. Prefer `"end"` over guessed sentinel values like `999`.
 - `insertAtLine` inserts before that line. Use `"append"` to add to the end.

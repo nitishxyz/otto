@@ -15,7 +15,7 @@ import {
 	detectLineEnding,
 	normalizeLineEndings,
 } from './edit-shared.ts';
-import { assertFreshRead, rememberFileWrite } from './read-tracker.ts';
+import { getStaleReadHint, rememberFileWrite } from './read-tracker.ts';
 import {
 	createToolAbortError,
 	createToolError,
@@ -280,7 +280,6 @@ export function buildCopyIntoTool(projectRoot: string): {
 			const targetDisplayPath = toProjectRelativePath(projectRoot, targetAbs);
 
 			try {
-				await assertFreshRead(projectRoot, targetAbs, targetDisplayPath);
 				const [sourceContent, targetContent] = await Promise.all([
 					readFile(sourceAbs, 'utf-8'),
 					readFile(targetAbs, 'utf-8'),
@@ -347,15 +346,19 @@ export function buildCopyIntoTool(projectRoot: string): {
 					typeof error === 'object' &&
 					'code' in error &&
 					error.code === 'ENOENT';
+				const staleHint = isEnoent
+					? undefined
+					: await getStaleReadHint(projectRoot, targetAbs, targetDisplayPath);
+				const message = error instanceof Error ? error.message : String(error);
 				return createToolError(
 					isEnoent
 						? 'Source or target file not found.'
-						: `Failed to copy into file: ${error instanceof Error ? error.message : String(error)}`,
+						: `Failed to copy into file: ${message}${staleHint ? ` ${staleHint}` : ''}`,
 					isEnoent ? 'not_found' : 'execution',
 					{
 						suggestion: isEnoent
 							? 'Use read, ls, or tree to confirm both file paths first'
-							: undefined,
+							: staleHint,
 					},
 				);
 			}

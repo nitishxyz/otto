@@ -37,19 +37,44 @@ afterAll(async () => {
 const interpolatedReturnLine = '\treturn `' + '$' + '{label}!' + '`;';
 
 describe('edit and multiedit tools', () => {
-	it('requires read before edit', async () => {
+	it('allows edit without prior read', async () => {
+		await writeFile(
+			join(projectRoot, 'unread.ts'),
+			'export const value = 1;\n',
+		);
 		const { tools } = await discoverProjectTools(projectRoot);
 		const editTool = tools.find((tool) => tool.name === 'edit');
 		expect(editTool).toBeDefined();
 
 		const result = await editTool?.tool.execute({
-			path: 'sample.ts',
-			oldString: 'const label = "hello";',
-			newString: 'const label = "hi";',
+			path: 'unread.ts',
+			oldString: 'export const value = 1;',
+			newString: 'export const value = 2;',
+		});
+
+		expect(result).toMatchObject({ ok: true, occurrences: 1 });
+		const updated = await Bun.file(join(projectRoot, 'unread.ts')).text();
+		expect(updated).toContain('export const value = 2;');
+	});
+
+	it('adds a read hint when an unread edit fails to match', async () => {
+		await writeFile(
+			join(projectRoot, 'unread-miss.ts'),
+			'export const value = 1;\n',
+		);
+		const { tools } = await discoverProjectTools(projectRoot);
+		const editTool = tools.find((tool) => tool.name === 'edit');
+
+		const result = await editTool?.tool.execute({
+			path: 'unread-miss.ts',
+			oldString: 'export const value = 42;',
+			newString: 'export const value = 2;',
 		});
 
 		expect(result).toMatchObject({ ok: false });
-		expect((result as { error: string }).error).toContain('read tool first');
+		expect((result as { error: string }).error).toContain(
+			'was not read in this session',
+		);
 	});
 
 	it('applies exact replacement after read', async () => {

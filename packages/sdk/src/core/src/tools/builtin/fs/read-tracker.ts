@@ -46,27 +46,28 @@ export async function rememberFileWrite(
 	state.set(absPath, await captureFileStamp(absPath));
 }
 
-export async function assertFreshRead(
+export async function getStaleReadHint(
 	projectRoot: string,
 	absPath: string,
 	displayPath: string,
-): Promise<void> {
+): Promise<string | undefined> {
 	const state = getProjectState(projectRoot);
 	const previous = state.get(absPath);
 	if (!previous) {
-		throw new Error(
-			`You must read file ${displayPath} before editing it. Use the read tool first.`,
-		);
+		return `File ${displayPath} was not read in this session. Read it and copy the exact text before retrying.`;
 	}
 
-	const current = await captureFileStamp(absPath);
+	let current: FileStamp;
+	try {
+		current = await captureFileStamp(absPath);
+	} catch {
+		return undefined;
+	}
 	const changed =
 		current.mtimeMs !== previous.mtimeMs ||
 		current.ctimeMs !== previous.ctimeMs ||
 		current.size !== previous.size;
-	if (!changed) return;
+	if (!changed) return undefined;
 
-	throw new Error(
-		`File ${displayPath} has changed since it was last read. Read it again before editing.`,
-	);
+	return `File ${displayPath} has changed since it was last read. Read it again before retrying.`;
 }

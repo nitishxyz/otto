@@ -3,7 +3,7 @@ Replace an exact text block in an existing file.
 Use this tool for one precise old/new text replacement in one existing file.
 
 Rules:
-- You must read the file first in the current session before editing it.
+- Read the file first when possible so `oldString` matches the current content.
 - Prefer exact `oldString` text copied from the latest read output.
 - If there is no exact match, the tool may apply a unique whole-line match after whitespace normalization (tabs/spaces, leading/trailing whitespace, and repeated internal whitespace). It will not guess through non-whitespace text differences.
 - If `oldString` appears multiple times, provide more context or set `replaceAll: true`.
