@@ -11,8 +11,17 @@ const subscribers = new Map<string, Set<Subscriber>>(); // project/session -> su
 const projectSubscribers = new Map<string, Set<Subscriber>>(); // project -> subs
 const clientSubscribers = new Set<ClientSubscriber>();
 
-function eventProjectKey(event: OttoEvent): string | undefined {
-	return event.projectId ?? event.projectRoot;
+/**
+ * Events may carry projectId, projectRoot, or both, while subscribers key by
+ * whichever value they had at hand (routes use the resolved project root).
+ * Route on every distinct key so publisher and subscriber never have to agree
+ * on which identifier to use.
+ */
+function eventProjectKeys(event: OttoEvent): string[] {
+	const keys = new Set<string>();
+	keys.add(projectScopeKey(event.projectId));
+	keys.add(projectScopeKey(event.projectRoot));
+	return [...keys];
 }
 
 function sanitizeBigInt<T>(obj: T): T {
@@ -31,34 +40,25 @@ function sanitizeBigInt<T>(obj: T): T {
 
 export function publish(event: OttoEvent) {
 	const sanitizedEvent = sanitizeBigInt(event);
-	const projectSubs = projectSubscribers.get(
-		projectScopeKey(eventProjectKey(event)),
-	);
-	if (projectSubs) {
-		for (const sub of projectSubs) {
+	const notified = new Set<Subscriber>();
+	const dispatch = (subs: Set<Subscriber> | undefined, label: string) => {
+		if (!subs) return;
+		for (const sub of subs) {
+			if (notified.has(sub)) continue;
+			notified.add(sub);
 			try {
 				sub(sanitizedEvent);
 			} catch (err) {
 				console.error(
-					`[bus] Project subscriber threw on event ${event.type}:`,
+					`[bus] ${label} threw on event ${event.type}:`,
 					err instanceof Error ? err.message : String(err),
 				);
 			}
 		}
-	}
-	const subs = subscribers.get(
-		scopedSessionKey(eventProjectKey(event), event.sessionId),
-	);
-	if (!subs) return;
-	for (const sub of subs) {
-		try {
-			sub(sanitizedEvent);
-		} catch (err) {
-			console.error(
-				`[bus] Subscriber threw on event ${event.type}:`,
-				err instanceof Error ? err.message : String(err),
-			);
-		}
+	};
+	for (const projectKey of eventProjectKeys(event)) {
+		dispatch(projectSubscribers.get(projectKey), 'Project subscriber');
+		dispatch(subscribers.get(`${projectKey}:${event.sessionId}`), 'Subscriber');
 	}
 }
 

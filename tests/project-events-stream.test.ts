@@ -17,8 +17,8 @@ interface ParsedEvent {
 	data: Record<string, unknown>;
 }
 
-async function openStream(url: string) {
-	const response = await fetch(url);
+async function openStream(url: string, method: 'GET' | 'POST' = 'GET') {
+	const response = await fetch(url, { method });
 	expect(response.ok).toBe(true);
 	const reader = response.body?.getReader();
 	if (!reader) throw new Error('No response body');
@@ -128,6 +128,73 @@ describe('multiplexed project events stream', () => {
 		const received = await stream.next((evt) => evt.event === 'notification');
 		expect(received.data.sessionId).toBeUndefined();
 		expect((received.data.payload as Record<string, unknown>).id).toBe('n-1');
+
+		await stream.close();
+	});
+
+	it('serves the POST alias for tunnels', async () => {
+		const stream = await openStream(
+			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			'POST',
+		);
+
+		publish({
+			type: 'message.created',
+			sessionId: 'proj-events-session-post',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-post' },
+		});
+
+		const received = await stream.next(
+			(evt) => evt.event === 'message.created',
+		);
+		expect(received.data.sessionId).toBe('proj-events-session-post');
+
+		await stream.close();
+	});
+
+	it('delivers events published with only a projectId', async () => {
+		const stream = await openStream(
+			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+
+		publish({
+			type: 'queue.updated',
+			sessionId: 'proj-events-session-id-only',
+			projectId: 'some-project-id-not-root',
+			payload: { queueLength: 0 },
+		});
+
+		const received = await stream.next((evt) => evt.event === 'queue.updated');
+		expect(received.data.sessionId).toBe('proj-events-session-id-only');
+
+		await stream.close();
+	});
+
+	it('does not double-deliver when a subscriber matches multiple keys', async () => {
+		const stream = await openStream(
+			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+
+		publish({
+			type: 'message.created',
+			sessionId: 'proj-events-session-dedupe',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-dedupe' },
+		});
+		publish({
+			type: 'message.completed',
+			sessionId: 'proj-events-session-dedupe',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-dedupe' },
+		});
+
+		let createdCount = 0;
+		await stream.next((evt) => {
+			if (evt.event === 'message.created') createdCount += 1;
+			return evt.event === 'message.completed';
+		});
+		expect(createdCount).toBe(1);
 
 		await stream.close();
 	});

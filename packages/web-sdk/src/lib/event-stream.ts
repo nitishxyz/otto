@@ -49,13 +49,15 @@ interface SubscriptionEntry {
  */
 class EventStreamMultiplexer {
 	private readonly baseUrl: string;
+	private readonly onEmpty: () => void;
 	private client: SSEClient | null = null;
 	private clientOff: Release | null = null;
 	private fallback = false;
 	private readonly entries = new Map<string, SubscriptionEntry>();
 
-	constructor(baseUrl: string) {
+	constructor(baseUrl: string, onEmpty: () => void) {
 		this.baseUrl = baseUrl;
+		this.onEmpty = onEmpty;
 	}
 
 	acquire(key: string): StreamHandle {
@@ -89,6 +91,7 @@ class EventStreamMultiplexer {
 					this.entries.delete(key);
 					if (this.entries.size === 0) {
 						this.teardownConnection();
+						this.onEmpty();
 					}
 				}
 			},
@@ -187,8 +190,13 @@ function getMultiplexer(): EventStreamMultiplexer {
 	const cacheKey = `${getBaseUrl()}::${projectKey}`;
 	let mux = multiplexers.get(cacheKey);
 	if (!mux) {
-		mux = new EventStreamMultiplexer(getBaseUrl());
-		multiplexers.set(cacheKey, mux);
+		const created = new EventStreamMultiplexer(getBaseUrl(), () => {
+			if (multiplexers.get(cacheKey) === created) {
+				multiplexers.delete(cacheKey);
+			}
+		});
+		multiplexers.set(cacheKey, created);
+		mux = created;
 	}
 	return mux;
 }
