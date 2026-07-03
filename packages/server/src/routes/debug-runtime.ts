@@ -20,6 +20,7 @@ const debugRuntimeResponseSchema = z.object({
 	bus: z.object({
 		sessionKeys: z.number().int(),
 		sessionSubscribers: z.number().int(),
+		projectSubscribers: z.number().int(),
 		clientSubscribers: z.number().int(),
 		topSessionKeys: z.array(
 			z.object({ key: z.string(), subscribers: z.number().int() }),

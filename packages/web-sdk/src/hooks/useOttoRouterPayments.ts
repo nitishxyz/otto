@@ -1,12 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { SSEClient } from '../lib/sse-client';
-import { apiClient } from '../lib/api-client';
+import { acquireSessionEventStream } from '../lib/event-stream';
 import { toast, useToastStore } from '../stores/toastStore';
 import { useOttoRouterStore } from '../stores/ottorouterStore';
 import { useTopupApprovalStore } from '../stores/topupApprovalStore';
 
 export function useOttoRouterPayments(sessionId: string | undefined) {
-	const clientRef = useRef<SSEClient | null>(null);
 	const loadingToastIdRef = useRef<string | null>(null);
 	const setBalance = useOttoRouterStore((s) => s.setBalance);
 	const setPaymentPending = useOttoRouterStore((s) => s.setPaymentPending);
@@ -18,13 +16,9 @@ export function useOttoRouterPayments(sessionId: string | undefined) {
 	useEffect(() => {
 		if (!sessionId) return;
 
-		const client = new SSEClient();
-		clientRef.current = client;
+		const stream = acquireSessionEventStream(sessionId);
 
-		const url = apiClient.getStreamUrl(sessionId);
-		client.connect(url);
-
-		const unsubscribe = client.on('*', (event) => {
+		const unsubscribe = stream.on((event) => {
 			const payload = event.payload as Record<string, unknown> | undefined;
 
 			switch (event.type) {
@@ -188,7 +182,7 @@ export function useOttoRouterPayments(sessionId: string | undefined) {
 
 		return () => {
 			unsubscribe();
-			client.disconnect();
+			stream.release();
 		};
 	}, [
 		sessionId,

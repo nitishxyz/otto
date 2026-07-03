@@ -1,0 +1,211 @@
+import {
+	buildClientEventsStreamUrl,
+	buildProjectEventsStreamUrl,
+	buildSessionStreamUrl,
+} from '@ottocode/api';
+import type { SSEEvent } from '../types/api';
+import {
+	getAuthHeaders,
+	getBaseUrl,
+	getProjectId,
+	getProjectRoot,
+} from './api-client/utils';
+import { acquireSharedSSEStream, SSEClient } from './sse-client';
+
+export type StreamEventHandler = (event: SSEEvent) => void;
+export type Release = () => void;
+
+export interface StreamHandle {
+	on: (handler: StreamEventHandler) => Release;
+	release: Release;
+}
+
+const CLIENT_EVENTS_KEY = '__client_events__';
+
+interface SubscriptionEntry {
+	refs: number;
+	handlers: Set<StreamEventHandler>;
+	/** Active when the multiplexer has fallen back to per-stream SSE. */
+	sseRelease: Release | null;
+	sseOff: Release | null;
+}
+
+/**
+ * Multiplexes all session event streams plus the global client-event stream
+ * over ONE shared SSE connection per window (`/v1/events/project`).
+ *
+ * Why: webviews (Tauri/WKWebView, Safari) cap HTTP/1.1 at ~6 connections per
+ * host:port origin shared across ALL windows. Before the daemon migration
+ * each window talked to its own server port (own pool); with one shared
+ * daemon port, per-session SSE connections exhaust the pool after a couple
+ * of windows and every regular fetch hangs ("stuck on loading"). One
+ * multiplexed SSE connection per window keeps the budget flat regardless of
+ * how many sessions are open.
+ *
+ * The transport stays plain SSE (GET, or POST over tunnels), so tunnels and
+ * proxies that already carry the existing streams work unchanged. If the
+ * endpoint is unavailable (older daemon), the multiplexer transparently
+ * falls back to shared per-stream SSE.
+ */
+class EventStreamMultiplexer {
+	private readonly baseUrl: string;
+	private client: SSEClient | null = null;
+	private clientOff: Release | null = null;
+	private fallback = false;
+	private readonly entries = new Map<string, SubscriptionEntry>();
+
+	constructor(baseUrl: string) {
+		this.baseUrl = baseUrl;
+	}
+
+	acquire(key: string): StreamHandle {
+		let entry = this.entries.get(key);
+		if (!entry) {
+			entry = { refs: 0, handlers: new Set(), sseRelease: null, sseOff: null };
+			this.entries.set(key, entry);
+			if (this.fallback) {
+				this.startFallbackEntry(key, entry);
+			} else {
+				this.ensureConnection();
+			}
+		}
+		entry.refs += 1;
+
+		let released = false;
+		return {
+			on: (handler: StreamEventHandler) => {
+				entry.handlers.add(handler);
+				return () => entry.handlers.delete(handler);
+			},
+			release: () => {
+				if (released) return;
+				released = true;
+				entry.refs -= 1;
+				if (entry.refs <= 0) {
+					entry.sseOff?.();
+					entry.sseRelease?.();
+					entry.sseOff = null;
+					entry.sseRelease = null;
+					this.entries.delete(key);
+					if (this.entries.size === 0) {
+						this.teardownConnection();
+					}
+				}
+			},
+		};
+	}
+
+	private emit(key: string, event: SSEEvent) {
+		const entry = this.entries.get(key);
+		if (!entry) return;
+		for (const handler of entry.handlers) {
+			try {
+				handler(event);
+			} catch (error) {
+				console.error('[event-stream] Handler threw:', error);
+			}
+		}
+	}
+
+	private ensureConnection() {
+		if (this.client || this.fallback) return;
+		const url = buildProjectEventsStreamUrl({
+			baseUrl: this.baseUrl,
+			projectId: getProjectId(),
+			projectPath: getProjectRoot(),
+		});
+		const client = new SSEClient();
+		this.client = client;
+		this.clientOff = client.on('*', (event) => {
+			const data = event.payload as
+				| { sessionId?: string; payload?: unknown }
+				| undefined;
+			const payload = (data?.payload ?? {}) as Record<string, unknown>;
+			if (data && typeof data.sessionId === 'string') {
+				this.emit(data.sessionId, { type: event.type, payload });
+			} else {
+				this.emit(CLIENT_EVENTS_KEY, { type: event.type, payload });
+			}
+		});
+		void client.connect(url, getAuthHeaders(), {
+			onHttpError: (status) => {
+				if (status === 404 || status === 405) {
+					// Older daemon without /v1/events/project: use per-stream SSE.
+					this.enterFallback();
+					return false;
+				}
+				return true;
+			},
+		});
+	}
+
+	private teardownConnection() {
+		this.clientOff?.();
+		this.clientOff = null;
+		this.client?.disconnect();
+		this.client = null;
+	}
+
+	private enterFallback() {
+		if (this.fallback) return;
+		this.fallback = true;
+		console.warn(
+			'[event-stream] Project event stream unavailable, falling back to per-stream SSE',
+		);
+		this.teardownConnection();
+		this.emit(CLIENT_EVENTS_KEY, { type: 'stream.fallback', payload: {} });
+		for (const [key, entry] of this.entries) {
+			this.startFallbackEntry(key, entry);
+		}
+	}
+
+	private startFallbackEntry(key: string, entry: SubscriptionEntry) {
+		if (entry.sseRelease) return;
+		const url =
+			key === CLIENT_EVENTS_KEY
+				? buildClientEventsStreamUrl({
+						baseUrl: this.baseUrl,
+						projectId: getProjectId(),
+						projectPath: getProjectRoot(),
+					})
+				: buildSessionStreamUrl({
+						baseUrl: this.baseUrl,
+						sessionId: key,
+						projectId: getProjectId(),
+						projectPath: getProjectRoot(),
+					});
+		const { client, release } = acquireSharedSSEStream(url, getAuthHeaders());
+		entry.sseRelease = release;
+		entry.sseOff = client.on('*', (event) => this.emit(key, event));
+	}
+}
+
+const multiplexers = new Map<string, EventStreamMultiplexer>();
+
+function getMultiplexer(): EventStreamMultiplexer {
+	const projectKey = getProjectId() ?? getProjectRoot() ?? '';
+	const cacheKey = `${getBaseUrl()}::${projectKey}`;
+	let mux = multiplexers.get(cacheKey);
+	if (!mux) {
+		mux = new EventStreamMultiplexer(getBaseUrl());
+		multiplexers.set(cacheKey, mux);
+	}
+	return mux;
+}
+
+/**
+ * Subscribe to a session's event stream over the shared multiplexed
+ * connection. Multiple subscribers for the same session share one
+ * subscription; all sessions share one SSE connection per window.
+ */
+export function acquireSessionEventStream(sessionId: string): StreamHandle {
+	return getMultiplexer().acquire(sessionId);
+}
+
+/**
+ * Subscribe to global client events (notifications, session status) over the
+ * shared multiplexed connection.
+ */
+export function acquireClientEventStream(): StreamHandle {
+	return getMultiplexer().acquire(CLIENT_EVENTS_KEY);
+}

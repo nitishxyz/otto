@@ -1,10 +1,14 @@
 import type { ClientEvent, NotificationEvent, OttoEvent } from './types.ts';
-import { scopedSessionKey } from '../runtime/projects/scope.ts';
+import {
+	projectScopeKey,
+	scopedSessionKey,
+} from '../runtime/projects/scope.ts';
 
 type Subscriber = (evt: OttoEvent) => void;
 type ClientSubscriber = (evt: ClientEvent) => void;
 
 const subscribers = new Map<string, Set<Subscriber>>(); // project/session -> subs
+const projectSubscribers = new Map<string, Set<Subscriber>>(); // project -> subs
 const clientSubscribers = new Set<ClientSubscriber>();
 
 function eventProjectKey(event: OttoEvent): string | undefined {
@@ -27,6 +31,21 @@ function sanitizeBigInt<T>(obj: T): T {
 
 export function publish(event: OttoEvent) {
 	const sanitizedEvent = sanitizeBigInt(event);
+	const projectSubs = projectSubscribers.get(
+		projectScopeKey(eventProjectKey(event)),
+	);
+	if (projectSubs) {
+		for (const sub of projectSubs) {
+			try {
+				sub(sanitizedEvent);
+			} catch (err) {
+				console.error(
+					`[bus] Project subscriber threw on event ${event.type}:`,
+					err instanceof Error ? err.message : String(err),
+				);
+			}
+		}
+	}
 	const subs = subscribers.get(
 		scopedSessionKey(eventProjectKey(event), event.sessionId),
 	);
@@ -86,9 +105,32 @@ export function subscribeClientEvents(handler: ClientSubscriber) {
 	};
 }
 
+/**
+ * Subscribe to every session event published for a project scope. Used by the
+ * multiplexed project event stream so one SSE connection can carry all
+ * sessions of a project.
+ */
+export function subscribeProjectEvents(
+	projectKey: string | undefined,
+	handler: Subscriber,
+) {
+	const key = projectScopeKey(projectKey);
+	let set = projectSubscribers.get(key);
+	if (!set) {
+		set = new Set();
+		projectSubscribers.set(key, set);
+	}
+	set.add(handler);
+	return () => {
+		set?.delete(handler);
+		if (set && set.size === 0) projectSubscribers.delete(key);
+	};
+}
+
 export interface BusStats {
 	sessionKeys: number;
 	sessionSubscribers: number;
+	projectSubscribers: number;
 	clientSubscribers: number;
 	topSessionKeys: Array<{ key: string; subscribers: number }>;
 }
@@ -101,9 +143,12 @@ export function getBusStats(): BusStats {
 		perKey.push({ key, subscribers: set.size });
 	}
 	perKey.sort((a, b) => b.subscribers - a.subscribers);
+	let projectSubs = 0;
+	for (const set of projectSubscribers.values()) projectSubs += set.size;
 	return {
 		sessionKeys: subscribers.size,
 		sessionSubscribers: total,
+		projectSubscribers: projectSubs,
 		clientSubscribers: clientSubscribers.size,
 		topSessionKeys: perKey.slice(0, 10),
 	};

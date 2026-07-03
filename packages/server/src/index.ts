@@ -9,6 +9,7 @@ import { registerSessionsRoutes } from './routes/sessions.ts';
 import { registerSessionMessagesRoutes } from './routes/session-messages.ts';
 import { registerSessionStreamRoute } from './routes/session-stream.ts';
 import { registerClientEventsRoute } from './routes/client-events.ts';
+import { registerProjectEventsRoute } from './routes/project-events.ts';
 import { registerAskRoutes } from './routes/ask.ts';
 import { registerConfigRoutes } from './routes/config/index.ts';
 import { registerFilesRoutes } from './routes/files.ts';
@@ -102,6 +103,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerSessionMessagesRoutes(app);
 	registerSessionStreamRoute(app);
 	registerClientEventsRoute(app);
+	registerProjectEventsRoute(app);
 	registerAskRoutes(app);
 	registerConfigRoutes(app);
 	registerFilesRoutes(app);

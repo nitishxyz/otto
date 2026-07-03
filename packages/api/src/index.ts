@@ -28,6 +28,7 @@ export * from './generated/schemas.gen';
 // Export SSE utilities
 export {
 	buildClientEventsStreamUrl,
+	buildProjectEventsStreamUrl,
 	buildSessionStreamUrl,
 	createClientEventsStream,
 	createSSEStream,

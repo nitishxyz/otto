@@ -2,6 +2,15 @@ import type { SSEEvent } from '../types/api';
 
 export type SSEEventHandler = (event: SSEEvent) => void;
 
+export interface SSEConnectOptions {
+	/**
+	 * Called when the server answers with a non-OK HTTP status. Return false
+	 * to stop reconnecting (e.g. 404 from an older daemon that lacks the
+	 * endpoint); return true (default) to keep retrying.
+	 */
+	onHttpError?: (status: number) => boolean;
+}
+
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
 // Server sends `: hb` comments every 5s; if nothing arrives for this long the
@@ -14,7 +23,7 @@ export class SSEClient {
 	private handlers: Map<string, Set<SSEEventHandler>> = new Map();
 	private running = false;
 
-	async connect(url: string, headers?: HeadersInit) {
+	async connect(url: string, headers?: HeadersInit, opts?: SSEConnectOptions) {
 		if (this.abortController) {
 			this.abortController.abort();
 		}
@@ -25,7 +34,7 @@ export class SSEClient {
 		let attempt = 0;
 
 		while (this.running && !signal.aborted) {
-			const receivedData = await this.streamOnce(url, headers, signal);
+			const receivedData = await this.streamOnce(url, headers, signal, opts);
 			if (!this.running || signal.aborted) break;
 
 			attempt = receivedData ? 0 : attempt + 1;
@@ -42,6 +51,7 @@ export class SSEClient {
 		url: string,
 		headers: HeadersInit | undefined,
 		signal: AbortSignal,
+		opts?: SSEConnectOptions,
 	): Promise<boolean> {
 		const isTunnel = !url.includes('localhost') && !url.includes('127.0.0.1');
 		let receivedData = false;
@@ -65,6 +75,9 @@ export class SSEClient {
 
 			if (!response.ok) {
 				console.error('[SSE] Connection failed:', response.status);
+				if (opts?.onHttpError && opts.onHttpError(response.status) === false) {
+					this.running = false;
+				}
 				return receivedData;
 			}
 
@@ -175,4 +188,52 @@ export class SSEClient {
 			}
 		}
 	}
+}
+
+interface SharedStreamEntry {
+	client: SSEClient;
+	refs: number;
+}
+
+const sharedStreams = new Map<string, SharedStreamEntry>();
+
+/**
+ * Acquire a shared SSE connection for a stream URL.
+ *
+ * Multiple subscribers (message thread, floating viewers, looper panes) for
+ * the same session reuse ONE underlying connection instead of opening their
+ * own. This matters in webviews (Tauri/WKWebView) where HTTP/1.1 allows only
+ * ~6 connections per host across all windows: unbounded SSE connections
+ * starve regular fetches and the UI appears stuck loading.
+ *
+ * Returns the client plus a release function. The connection closes when the
+ * last subscriber releases it.
+ */
+export function acquireSharedSSEStream(
+	url: string,
+	headers?: HeadersInit,
+): { client: SSEClient; release: () => void } {
+	let entry = sharedStreams.get(url);
+	if (!entry) {
+		const client = new SSEClient();
+		void client.connect(url, headers);
+		entry = { client, refs: 0 };
+		sharedStreams.set(url, entry);
+	}
+	entry.refs += 1;
+
+	let released = false;
+	const release = () => {
+		if (released) return;
+		released = true;
+		const current = sharedStreams.get(url);
+		if (!current) return;
+		current.refs -= 1;
+		if (current.refs <= 0) {
+			sharedStreams.delete(url);
+			current.client.disconnect();
+		}
+	};
+
+	return { client: entry.client, release };
 }

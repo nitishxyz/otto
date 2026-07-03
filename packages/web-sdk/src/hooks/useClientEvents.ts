@@ -2,18 +2,17 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
 	buildClientEventsStreamUrl,
-	createClientEventsStream,
 	type NotificationEvent,
 	type SessionStatusEvent,
 } from '@ottocode/api';
 import { toast, useToastStore } from '../stores/toastStore';
 import type { SessionsPage } from '../types/api';
 import {
-	getAuthHeaders,
 	getBaseUrl,
 	getProjectId,
 	getProjectKey,
 } from '../lib/api-client/utils';
+import { acquireClientEventStream } from '../lib/event-stream';
 import { openUrl } from '../lib/open-url';
 import {
 	getPlatformWindowFocused,
@@ -291,109 +290,53 @@ export function useClientEvents(activeSessionId?: string) {
 
 	useEffect(() => {
 		void projectKey;
-		const controller = new AbortController();
 		const baseUrl = getBaseUrl();
-		const projectId = getProjectId();
 
-		const STALL_TIMEOUT_MS = 20000;
-		const RECONNECT_DELAY_MS = 2000;
+		const stream = acquireClientEventStream();
+		const off = stream.on((event) => {
+			if (event.type === 'heartbeat') return;
 
-		const runStream = async () => {
-			while (!controller.signal.aborted) {
-				const attempt = new AbortController();
-				const onOuterAbort = () => attempt.abort();
-				controller.signal.addEventListener('abort', onOuterAbort, {
-					once: true,
-				});
-				let lastEventAt = Date.now();
-				const watchdog = setInterval(() => {
-					if (Date.now() - lastEventAt > STALL_TIMEOUT_MS) {
-						console.warn(
-							'[client-events] No events received, dropping stalled connection',
-						);
-						attempt.abort();
-					}
-				}, 5000);
+			if (event.type === 'stream.fallback') {
+				void maybeShowLocalAccessToast(baseUrl);
+				return;
+			}
 
-				try {
-					await createClientEventsStream(
-						{
-							baseUrl,
-							projectId,
-							headers: getAuthHeaders(),
-							onEvent: (event) => {
-								lastEventAt = Date.now();
-								if (event.event === 'heartbeat') return;
+			if (event.type === 'session.status') {
+				const status = event.payload as unknown as SessionStatusEvent;
+				updateSessionStatusInCache(queryClient, status);
+				if (status.status !== 'running') {
+					void queryClient.invalidateQueries({
+						queryKey: getSessionsQueryKey(),
+					});
+				}
+				return;
+			}
 
-								let payload: unknown;
-								try {
-									payload = JSON.parse(event.data);
-								} catch (error) {
-									console.error(
-										'[client-events] Failed to parse event:',
-										error,
-									);
-									return;
-								}
-
-								if (event.event === 'session.status') {
-									const status = payload as SessionStatusEvent;
-									updateSessionStatusInCache(queryClient, status);
-									if (status.status !== 'running') {
-										void queryClient.invalidateQueries({
-											queryKey: getSessionsQueryKey(),
-										});
-									}
-									return;
-								}
-
-								if (event.event === 'notification') {
-									const notification = payload as NotificationEvent;
-									const isActiveVisibleSession =
-										notification.sessionId === activeSessionIdRef.current &&
-										isAppForeground();
-									const isSessionNotification =
-										notification.source === 'session' ||
-										!!notification.sessionId;
-									let sentSystemNotification = false;
-									if (
-										notificationsEnabledRef.current &&
-										!isActiveVisibleSession
-									) {
-										sentSystemNotification =
-											sendBrowserNotification(notification);
-									}
-
-									if (
-										!isSessionNotification ||
-										(!sentSystemNotification && !isActiveVisibleSession)
-									) {
-										showInAppNotification(notification);
-									}
-								}
-							},
-							onError: (error) => {
-								if (!controller.signal.aborted && !attempt.signal.aborted) {
-									console.error('[client-events] Stream error:', error);
-									void maybeShowLocalAccessToast(baseUrl);
-								}
-							},
-						},
-						attempt.signal,
-					);
-				} finally {
-					clearInterval(watchdog);
-					controller.signal.removeEventListener('abort', onOuterAbort);
+			if (event.type === 'notification') {
+				const notification = event.payload as unknown as NotificationEvent;
+				const isActiveVisibleSession =
+					notification.sessionId === activeSessionIdRef.current &&
+					isAppForeground();
+				const isSessionNotification =
+					notification.source === 'session' || !!notification.sessionId;
+				let sentSystemNotification = false;
+				if (notificationsEnabledRef.current && !isActiveVisibleSession) {
+					sentSystemNotification = sendBrowserNotification(notification);
 				}
 
-				if (controller.signal.aborted) break;
-				await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+				if (
+					!isSessionNotification ||
+					(!sentSystemNotification && !isActiveVisibleSession)
+				) {
+					showInAppNotification(notification);
+				}
 			}
+		});
+
+		return () => {
+			off();
+			stream.release();
 		};
-
-		void runStream();
-
-		return () => controller.abort();
 	}, [queryClient, projectKey]);
 
 	return buildClientEventsStreamUrl({

@@ -130,6 +130,22 @@ export function buildClientEventsStreamUrl(options: {
 	return url.toString();
 }
 
+/**
+ * Build the URL for the multiplexed project event stream. One SSE connection
+ * carries every session event for the project plus global client events.
+ */
+export function buildProjectEventsStreamUrl(options: {
+	baseUrl: string;
+	projectPath?: string;
+	projectId?: string;
+}) {
+	const url = new URL('/v1/events/project', options.baseUrl);
+	if (options.projectId) url.searchParams.set('projectId', options.projectId);
+	else if (options.projectPath)
+		url.searchParams.set('project', options.projectPath);
+	return url.toString();
+}
+
 async function createStreamToUrl(
 	options: {
 		baseUrl: string;

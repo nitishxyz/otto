@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { SSEClient } from '../lib/sse-client';
+import { acquireSessionEventStream } from '../lib/event-stream';
 import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
@@ -13,7 +13,7 @@ import {
 } from './useQueueState';
 import { getSessionQueryKey, getSessionsQueryKey } from './useSessions';
 import { getMessagesQueryKey } from './useMessages';
-import { getAuthHeaders, projectScopedKey } from '../lib/api-client/utils';
+import { projectScopedKey } from '../lib/api-client/utils';
 import { extractStreamingMultiEditPreviewEdits } from './tool-preview-helpers';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
@@ -31,7 +31,6 @@ export function useSessionStream(
 	enabled = true,
 ) {
 	const queryClient = useQueryClient();
-	const clientRef = useRef<SSEClient | null>(null);
 	const assistantMessageIdRef = useRef<string | null>(null);
 	const toolInputBuffersRef = useRef<Map<string, string>>(new Map());
 	const toolPreviewEmitRef = useRef<
@@ -89,12 +88,7 @@ export function useSessionStream(
 				setPendingInputs([]);
 			});
 
-		const client = new SSEClient();
-		clientRef.current = client;
-
-		const url = apiClient.getStreamUrl(sessionId);
-		console.log('[useSessionStream] Connecting to stream:', url);
-		client.connect(url, getAuthHeaders());
+		const stream = acquireSessionEventStream(sessionId);
 
 		const resolveAssistantTargetIndex = (messages: Message[]): number => {
 			if (assistantMessageIdRef.current) {
@@ -1748,7 +1742,7 @@ export function useSessionStream(
 			);
 		};
 
-		const unsubscribe = client.on('*', (event) => {
+		const unsubscribe = stream.on((event) => {
 			// console.log('[useSessionStream] Event received:', event);
 			const payload = event.payload as Record<string, unknown> | undefined;
 
@@ -2081,7 +2075,7 @@ export function useSessionStream(
 			}
 			pendingDeltas.clear();
 			unsubscribe();
-			client.disconnect();
+			stream.release();
 		};
 	}, [
 		sessionId,
