@@ -27,7 +27,13 @@ interface Registration {
 interface RuntimeStats {
 	pid: number;
 	uptimeSeconds: number;
-	memory: { rssMb: number; heapUsedMb: number; heapTotalMb: number };
+	memory: {
+		rssMb: number;
+		heapUsedMb: number;
+		heapTotalMb: number;
+		externalMb?: number;
+		arrayBuffersMb?: number;
+	};
 	bus: {
 		sessionKeys: number;
 		sessionSubscribers: number;
@@ -214,7 +220,7 @@ async function main() {
 		`  uptime: ${Math.floor(runtime.uptimeSeconds / 3600)}h ${Math.floor((runtime.uptimeSeconds % 3600) / 60)}m`,
 	);
 	console.log(
-		`  memory: rss ${runtime.memory.rssMb}MB, heap ${runtime.memory.heapUsedMb}/${runtime.memory.heapTotalMb}MB`,
+		`  memory: rss ${runtime.memory.rssMb}MB, heap ${runtime.memory.heapUsedMb}/${runtime.memory.heapTotalMb}MB, external ${runtime.memory.externalMb ?? 'n/a'}MB, arrayBuffers ${runtime.memory.arrayBuffersMb ?? 'n/a'}MB`,
 	);
 	console.log(
 		`  bus: ${runtime.bus.sessionSubscribers} session subs across ${runtime.bus.sessionKeys} keys, ${runtime.bus.clientSubscribers} client subs`,

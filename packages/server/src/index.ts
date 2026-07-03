@@ -41,6 +41,7 @@ import type {
 	AgentToolConfig,
 } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
+import { createErrorResponse } from './runtime/errors/api-error.ts';
 
 // Suppress noisy AI SDK provider warnings unless debug mode is enabled.
 installAiSdkWarningHandler();
@@ -127,10 +128,18 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerDictationRoutes(app);
 }
 
+function applyErrorHandler(app: OpenAPIHono<BlankEnv>) {
+	app.onError((err, c) => {
+		const [body, status] = createErrorResponse(err);
+		return c.json(body, status);
+	});
+}
+
 function initApp() {
 	const app = new OpenAPIHono<BlankEnv>();
 	applyPrivateNetworkAccessHeaders(app);
 	app.use('*', cors(buildCorsOptions()));
+	applyErrorHandler(app);
 	registerRoutes(app);
 	return app;
 }
@@ -156,6 +165,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	const honoApp = new OpenAPIHono<BlankEnv>();
 	applyPrivateNetworkAccessHeaders(honoApp);
 	honoApp.use('*', cors(buildCorsOptions()));
+	applyErrorHandler(honoApp);
 	registerRoutes(honoApp);
 	return honoApp;
 }

@@ -8,6 +8,8 @@ import { zodOpenApiRoute } from '../openapi/route.ts';
 const STREAM_DESCRIPTION =
 	'SSE event stream. Events include notification, session.status, and heartbeat.';
 
+const MAX_BACKPRESSURE_DEFICIT = -256;
+
 const clientEventsQuerySchema = z.object({
 	project: z
 		.string()
@@ -67,6 +69,9 @@ function handleClientEventsStream(c: Context) {
 				}
 				try {
 					controller.enqueue(encoder.encode(line));
+					if ((controller.desiredSize ?? 0) < MAX_BACKPRESSURE_DEFICIT) {
+						cleanup();
+					}
 				} catch {
 					cleanup();
 				}

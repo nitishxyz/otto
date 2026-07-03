@@ -2,10 +2,12 @@ import type { DB } from '@ottocode/database';
 import type { OttoConfig } from '@ottocode/sdk';
 import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
+import { APIError } from '../runtime/errors/api-error.ts';
 import {
 	getProjectManager,
 	type ProjectRuntime,
 } from '../runtime/projects/manager.ts';
+import { getServerInfo } from '../state.ts';
 
 export const projectQuerySchema = z.object({
 	project: z
@@ -38,6 +40,16 @@ export async function resolveRequestProject(
 	const projectId =
 		c.req.query('projectId') || c.req.header('X-Otto-Project-Id');
 	const projectPath = c.req.query('project') || c.req.header('X-Otto-Project');
+
+	if (!projectId && !projectPath && getServerInfo().daemonId) {
+		// Daemon serves many projects; guessing via cwd would silently route
+		// requests to whichever project the daemon was spawned from.
+		throw new APIError(
+			'Project context required: pass projectId (X-Otto-Project-Id) or project path (X-Otto-Project).',
+			{ status: 400, code: 'project_context_required' },
+		);
+	}
+
 	const runtime = await getProjectManager().getProject({
 		id: projectId,
 		// Compatibility-only fallback for legacy single-project server callers.

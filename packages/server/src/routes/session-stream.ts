@@ -12,6 +12,11 @@ import {
 const STREAM_DESCRIPTION =
 	'SSE event stream. Events include session.created, message.created, message.part.delta, tool.call, tool.delta, tool.result, message.completed, error.';
 
+// desiredSize = highWaterMark - queued chunks; a large negative value means
+// the consumer stopped reading. Treat the connection as stalled and drop it
+// instead of buffering event data unboundedly (native memory growth).
+const MAX_BACKPRESSURE_DEFICIT = -256;
+
 const sessionStreamParamsSchema = z.object({
 	id: z.string().openapi({
 		param: { name: 'id', in: 'path' },
@@ -71,8 +76,14 @@ async function handleSessionStream(c: Context) {
 				} catch {
 					line = `event: ${evt.type}\ndata: {}\n\n`;
 				}
+				send(line);
+			};
+			const send = (chunk: string) => {
 				try {
-					controller.enqueue(encoder.encode(line));
+					controller.enqueue(encoder.encode(chunk));
+					if ((controller.desiredSize ?? 0) < MAX_BACKPRESSURE_DEFICIT) {
+						cleanup();
+					}
 				} catch {
 					cleanup();
 				}
@@ -81,11 +92,7 @@ async function handleSessionStream(c: Context) {
 			unsubscribeLegacy = subscribe(sessionId, write);
 			controller.enqueue(encoder.encode(`: connected ${sessionId}\n\n`));
 			hb = setInterval(() => {
-				try {
-					controller.enqueue(encoder.encode(`: hb ${Date.now()}\n\n`));
-				} catch {
-					cleanup();
-				}
+				send(`: hb ${Date.now()}\n\n`);
 			}, 5000);
 
 			const signal = c.req.raw?.signal as AbortSignal | undefined;

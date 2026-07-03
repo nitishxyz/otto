@@ -14,6 +14,8 @@ const debugRuntimeResponseSchema = z.object({
 		rssMb: z.number(),
 		heapUsedMb: z.number(),
 		heapTotalMb: z.number(),
+		externalMb: z.number(),
+		arrayBuffersMb: z.number(),
 	}),
 	bus: z.object({
 		sessionKeys: z.number().int(),
@@ -75,6 +77,8 @@ export function registerDebugRuntimeRoute(app: Hono) {
 					rssMb: toMb(memory.rss),
 					heapUsedMb: toMb(memory.heapUsed),
 					heapTotalMb: toMb(memory.heapTotal),
+					externalMb: toMb(memory.external ?? 0),
+					arrayBuffersMb: toMb(memory.arrayBuffers ?? 0),
 				},
 				bus: getBusStats(),
 				queue: getQueueStats(),

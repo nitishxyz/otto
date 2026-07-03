@@ -156,8 +156,7 @@ export function createWebServer(
 						try {
 							let html = await file.text();
 							const serverUrl = getServerUrl(url.host);
-							const scriptTag = `<script>window.OTTO_SERVER_URL = '${serverUrl}';</script>`;
-							html = html.replace('</head>', `${scriptTag}</head>`);
+							html = injectRuntimeContext(html, serverUrl, context);
 
 							return new Response(html, {
 								headers: {
@@ -183,8 +182,7 @@ export function createWebServer(
 					if (pathname.endsWith('.html')) {
 						let html = decoder.decode(embeddedData);
 						const serverUrl = getServerUrl(url.host);
-						const scriptTag = `<script>window.OTTO_SERVER_URL = '${serverUrl}';</script>`;
-						html = html.replace('</head>', `${scriptTag}</head>`);
+						html = injectRuntimeContext(html, serverUrl, context);
 
 						return new Response(html, {
 							headers: {

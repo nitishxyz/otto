@@ -64,6 +64,7 @@ export async function startWebUi(
 	let apiUrl = explicitApiUrl;
 	let webPort = opts.port ?? 0;
 	let context = opts.context;
+	let allowPortFallback = false;
 
 	if (apiUrl) {
 		validateApiUrl(apiUrl);
@@ -81,6 +82,10 @@ export async function startWebUi(
 		const serverUrl = new URL(serverContext.baseUrl);
 		const serverPort = Number(serverUrl.port);
 		webPort = opts.port ?? serverPort + 1;
+		// The daemon serves many projects; another `otto web` may already own
+		// the preferred port. Fall back to a random port unless the user asked
+		// for a specific one.
+		allowPortFallback = opts.port === undefined;
 		context = {
 			projectId: serverContext.projectId,
 			projectRoot: serverContext.projectRoot,
@@ -88,12 +93,14 @@ export async function startWebUi(
 		};
 	}
 
-	const { port: actualWebPort, server } = createWebServer(
-		webPort,
-		apiUrl,
-		opts.network,
-		context,
-	);
+	let webServer: ReturnType<typeof createWebServer>;
+	try {
+		webServer = createWebServer(webPort, apiUrl, opts.network, context);
+	} catch (error) {
+		if (!allowPortFallback) throw error;
+		webServer = createWebServer(0, apiUrl, opts.network, context);
+	}
+	const { port: actualWebPort, server } = webServer;
 
 	const displayHost = opts.network ? getLocalIP() : 'localhost';
 	const webUrl = `http://${displayHost}:${actualWebPort}`;

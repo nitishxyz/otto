@@ -4,7 +4,12 @@ import { eq, sql } from 'drizzle-orm';
 import { createDb } from '../db/client';
 import { sharedSessions } from '../db/schema';
 import { generateShareId, generateSecret } from '../lib/nanoid';
-import type { CreateShareRequest, UpdateShareRequest } from '../types';
+import { sessionToMarkdown } from '../lib/markdown';
+import type {
+	CreateShareRequest,
+	SharedSessionData,
+	UpdateShareRequest,
+} from '../types';
 
 export const shareRoutes = new Hono();
 
@@ -56,16 +61,20 @@ shareRoutes.post('/', async (c) => {
 shareRoutes.get('/:shareId', async (c) => {
 	const db = createDb();
 	const { shareId } = c.req.param();
+	const format = c.req.query('format');
+	const wantsMarkdown = format === 'md' || format === 'markdown';
 
 	const session = await db.query.sharedSessions.findFirst({
 		where: eq(sharedSessions.shareId, shareId),
 	});
 
 	if (!session) {
+		if (wantsMarkdown) return c.text('Share not found', 404);
 		return c.json({ error: 'Share not found' }, 404);
 	}
 
 	if (session.expiresAt && session.expiresAt < Date.now()) {
+		if (wantsMarkdown) return c.text('Share has expired', 410);
 		return c.json({ error: 'Share has expired' }, 410);
 	}
 
@@ -75,6 +84,26 @@ shareRoutes.get('/:shareId', async (c) => {
 		.where(eq(sharedSessions.shareId, shareId));
 
 	const viewCount = (session.viewCount ?? 0) + 1;
+
+	if (wantsMarkdown) {
+		let sessionData: SharedSessionData;
+		if (session.sessionData === 'r2') {
+			const obj = await Resource.ShareStorage.get(sessionKey(shareId));
+			if (!obj) {
+				return c.text('Session data not found', 404);
+			}
+			sessionData = JSON.parse(await obj.text()) as SharedSessionData;
+		} else {
+			sessionData = JSON.parse(session.sessionData) as SharedSessionData;
+		}
+		const markdown = sessionToMarkdown(sessionData, {
+			shareId: session.shareId,
+			description: session.description,
+		});
+		return c.text(markdown, 200, {
+			'Content-Type': 'text/markdown; charset=utf-8',
+		});
+	}
 
 	if (session.sessionData === 'r2') {
 		const obj = await Resource.ShareStorage.get(sessionKey(shareId));

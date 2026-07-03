@@ -295,62 +295,103 @@ export function useClientEvents(activeSessionId?: string) {
 		const baseUrl = getBaseUrl();
 		const projectId = getProjectId();
 
-		void createClientEventsStream(
-			{
-				baseUrl,
-				projectId,
-				headers: getAuthHeaders(),
-				onEvent: (event) => {
-					if (event.event === 'heartbeat') return;
+		const STALL_TIMEOUT_MS = 20000;
+		const RECONNECT_DELAY_MS = 2000;
 
-					let payload: unknown;
-					try {
-						payload = JSON.parse(event.data);
-					} catch (error) {
-						console.error('[client-events] Failed to parse event:', error);
-						return;
+		const runStream = async () => {
+			while (!controller.signal.aborted) {
+				const attempt = new AbortController();
+				const onOuterAbort = () => attempt.abort();
+				controller.signal.addEventListener('abort', onOuterAbort, {
+					once: true,
+				});
+				let lastEventAt = Date.now();
+				const watchdog = setInterval(() => {
+					if (Date.now() - lastEventAt > STALL_TIMEOUT_MS) {
+						console.warn(
+							'[client-events] No events received, dropping stalled connection',
+						);
+						attempt.abort();
 					}
+				}, 5000);
 
-					if (event.event === 'session.status') {
-						const status = payload as SessionStatusEvent;
-						updateSessionStatusInCache(queryClient, status);
-						if (status.status !== 'running') {
-							void queryClient.invalidateQueries({
-								queryKey: getSessionsQueryKey(),
-							});
-						}
-						return;
-					}
+				try {
+					await createClientEventsStream(
+						{
+							baseUrl,
+							projectId,
+							headers: getAuthHeaders(),
+							onEvent: (event) => {
+								lastEventAt = Date.now();
+								if (event.event === 'heartbeat') return;
 
-					if (event.event === 'notification') {
-						const notification = payload as NotificationEvent;
-						const isActiveVisibleSession =
-							notification.sessionId === activeSessionIdRef.current &&
-							isAppForeground();
-						const isSessionNotification =
-							notification.source === 'session' || !!notification.sessionId;
-						let sentSystemNotification = false;
-						if (notificationsEnabledRef.current && !isActiveVisibleSession) {
-							sentSystemNotification = sendBrowserNotification(notification);
-						}
+								let payload: unknown;
+								try {
+									payload = JSON.parse(event.data);
+								} catch (error) {
+									console.error(
+										'[client-events] Failed to parse event:',
+										error,
+									);
+									return;
+								}
 
-						if (
-							!isSessionNotification ||
-							(!sentSystemNotification && !isActiveVisibleSession)
-						) {
-							showInAppNotification(notification);
-						}
-					}
-				},
-				onError: (error) => {
-					if (!controller.signal.aborted) {
-						console.error('[client-events] Stream error:', error);
-						void maybeShowLocalAccessToast(baseUrl);
-					}
-				},
-			},
-			controller.signal,
-		);
+								if (event.event === 'session.status') {
+									const status = payload as SessionStatusEvent;
+									updateSessionStatusInCache(queryClient, status);
+									if (status.status !== 'running') {
+										void queryClient.invalidateQueries({
+											queryKey: getSessionsQueryKey(),
+										});
+									}
+									return;
+								}
+
+								if (event.event === 'notification') {
+									const notification = payload as NotificationEvent;
+									const isActiveVisibleSession =
+										notification.sessionId === activeSessionIdRef.current &&
+										isAppForeground();
+									const isSessionNotification =
+										notification.source === 'session' ||
+										!!notification.sessionId;
+									let sentSystemNotification = false;
+									if (
+										notificationsEnabledRef.current &&
+										!isActiveVisibleSession
+									) {
+										sentSystemNotification =
+											sendBrowserNotification(notification);
+									}
+
+									if (
+										!isSessionNotification ||
+										(!sentSystemNotification && !isActiveVisibleSession)
+									) {
+										showInAppNotification(notification);
+									}
+								}
+							},
+							onError: (error) => {
+								if (!controller.signal.aborted && !attempt.signal.aborted) {
+									console.error('[client-events] Stream error:', error);
+									void maybeShowLocalAccessToast(baseUrl);
+								}
+							},
+						},
+						attempt.signal,
+					);
+				} finally {
+					clearInterval(watchdog);
+					controller.signal.removeEventListener('abort', onOuterAbort);
+				}
+
+				if (controller.signal.aborted) break;
+				await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+			}
+		};
+
+		void runStream();
 
 		return () => controller.abort();
 	}, [queryClient, projectKey]);

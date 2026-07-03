@@ -4,6 +4,10 @@ export type SSEEventHandler = (event: SSEEvent) => void;
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
+// Server sends `: hb` comments every 5s; if nothing arrives for this long the
+// connection is stalled (half-dead socket, paused webview) and must be dropped.
+const STALL_TIMEOUT_MS = 20000;
+const STALL_CHECK_INTERVAL_MS = 5000;
 
 export class SSEClient {
 	private abortController: AbortController | null = null;
@@ -41,12 +45,22 @@ export class SSEClient {
 	): Promise<boolean> {
 		const isTunnel = !url.includes('localhost') && !url.includes('127.0.0.1');
 		let receivedData = false;
+		const attempt = new AbortController();
+		const onOuterAbort = () => attempt.abort();
+		signal.addEventListener('abort', onOuterAbort, { once: true });
+		let lastByteAt = Date.now();
+		const watchdog = setInterval(() => {
+			if (Date.now() - lastByteAt > STALL_TIMEOUT_MS) {
+				console.warn('[SSE] No data received, dropping stalled connection');
+				attempt.abort();
+			}
+		}, STALL_CHECK_INTERVAL_MS);
 
 		try {
 			const response = await fetch(url, {
 				method: isTunnel ? 'POST' : 'GET',
 				headers: { ...headers, Accept: 'text/event-stream' },
-				signal,
+				signal: attempt.signal,
 			});
 
 			if (!response.ok) {
@@ -67,6 +81,7 @@ export class SSEClient {
 				const { done, value } = await reader.read();
 				if (done) break;
 				receivedData = true;
+				lastByteAt = Date.now();
 
 				buffer += decoder.decode(value, { stream: true });
 				let idx = buffer.indexOf('\n\n');
@@ -109,6 +124,9 @@ export class SSEClient {
 			} else {
 				console.error('[SSE] Connection error:', error);
 			}
+		} finally {
+			clearInterval(watchdog);
+			signal.removeEventListener('abort', onOuterAbort);
 		}
 		return receivedData;
 	}
