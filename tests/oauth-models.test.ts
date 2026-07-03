@@ -118,6 +118,10 @@ describe('oauth model filtering', () => {
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-opus-4-8-20260529'),
 		).toBe(true);
+		expect(isModelAllowedForOAuth('anthropic', 'claude-sonnet-5')).toBe(true);
+		expect(
+			isModelAllowedForOAuth('anthropic', 'claude-sonnet-5-20260701'),
+		).toBe(true);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-3-5-sonnet-latest'),
 		).toBe(false);
