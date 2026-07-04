@@ -6,6 +6,7 @@ import {
 	runPluginsRemove,
 	runPluginsSearch,
 	runPluginsSetEnabled,
+	runPluginsSync,
 	runPluginsUpdate,
 	type PluginCommandOptions,
 } from '../plugins.ts';
@@ -101,5 +102,15 @@ export function registerPluginsCommand(program: Command) {
 		.option('--json', 'Output as JSON', false)
 		.action(async (name, opts) => {
 			await runPluginsUpdate(name, normalizeOptions(opts));
+		});
+
+	plugins
+		.command('sync')
+		.description(
+			'Re-sync plugin skills into .agents/skills and remove orphaned entries',
+		)
+		.option('--project <path>', 'Use project at <path>', process.cwd())
+		.action(async (opts) => {
+			await runPluginsSync({ ...opts, scope: undefined });
 		});
 }

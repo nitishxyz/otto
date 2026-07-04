@@ -32,6 +32,7 @@ serve-sim plugin
 - Plugin recipes are now loaded and invokable from enabled installed plugins.
 - Plugin agents are now loaded into the agent registry from enabled installed plugins.
 - Plugin manifests can include `mcpServers`, `commands`, and `browser` metadata.
+- Plugin manifests can declare `dependencies` (other plugin names). Installing a plugin recursively installs its dependencies from the configured registries, with a cycle guard. Already-installed dependencies are left as-is. Dependencies whose registry entry targets other platforms are skipped. Each dependency's config entry records provenance in `installedBy`; removing a parent plugin clears its `installedBy` references but does not cascade-remove dependencies.
 
 ### Not working yet
 

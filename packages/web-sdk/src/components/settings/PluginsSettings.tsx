@@ -71,6 +71,7 @@ function pluralize(count: number, noun: string) {
 interface CapabilitySource {
 	skills?: unknown[];
 	recipes?: unknown[];
+	dependencies?: unknown[];
 	mcpServers?: Record<string, unknown>;
 	commands?: Record<string, unknown>;
 }
@@ -78,11 +79,13 @@ interface CapabilitySource {
 function capabilityCounts(source?: CapabilitySource): string[] {
 	const skills = source?.skills?.length ?? 0;
 	const recipes = source?.recipes?.length ?? 0;
+	const dependencies = source?.dependencies?.length ?? 0;
 	const mcp = Object.keys(source?.mcpServers ?? {}).length;
 	const commands = Object.keys(source?.commands ?? {}).length;
 	return [
 		skills ? pluralize(skills, 'skill') : null,
 		recipes ? pluralize(recipes, 'recipe') : null,
+		dependencies ? pluralize(dependencies, 'dep') : null,
 		mcp ? `${mcp} MCP` : null,
 		commands ? pluralize(commands, 'command') : null,
 	].filter((value): value is string => Boolean(value));
@@ -232,6 +235,7 @@ const CapabilityGroups = memo(function CapabilityGroups({
 	const manifest = plugin.manifest;
 	const skills = manifest?.skills ?? [];
 	const recipes = manifest?.recipes ?? [];
+	const dependencies = manifest?.dependencies ?? [];
 	const mcpServers = Object.keys(manifest?.mcpServers ?? {});
 	const commands = Object.entries(manifest?.commands ?? {});
 	const requirements = manifest?.requirements ?? [];
@@ -239,6 +243,7 @@ const CapabilityGroups = memo(function CapabilityGroups({
 	if (
 		!skills.length &&
 		!recipes.length &&
+		!dependencies.length &&
 		!mcpServers.length &&
 		!commands.length &&
 		!requirements.length
@@ -248,6 +253,9 @@ const CapabilityGroups = memo(function CapabilityGroups({
 
 	return (
 		<div className="space-y-2 text-xs">
+			{dependencies.length ? (
+				<CapabilityGroup label="Depends on" items={dependencies} />
+			) : null}
 			{skills.length ? (
 				<CapabilityGroup
 					label="Skills"
@@ -348,6 +356,7 @@ const InstalledPluginCard = memo(function InstalledPluginCard({
 	const official =
 		registry?.official || plugin.configEntry?.source?.startsWith('official:');
 	const counts = capabilityCounts(plugin.manifest);
+	const installedBy = plugin.configEntry?.installedBy ?? [];
 
 	return (
 		<details className="group rounded-lg border border-border bg-background/70 open:bg-background/90 open:shadow-sm">
@@ -398,6 +407,15 @@ const InstalledPluginCard = memo(function InstalledPluginCard({
 						</Badge>
 					) : null}
 					{plugin.overriddenByProject ? <Badge>Project override</Badge> : null}
+					{installedBy.length ? (
+						<Badge>
+							<span
+								title={`Installed as a dependency of ${installedBy.join(', ')}`}
+							>
+								Dependency of {installedBy.join(', ')}
+							</span>
+						</Badge>
+					) : null}
 				</div>
 
 				<CapabilityGroups plugin={plugin} />
@@ -479,6 +497,17 @@ const AvailablePluginCard = memo(function AvailablePluginCard({
 					{plugin.publisher ? <Badge>{plugin.publisher}</Badge> : null}
 					<TagOverflow tags={plugin.tags} max={4} />
 				</div>
+
+				{plugin.dependencies?.length ? (
+					<div className="text-xs">
+						<span className="font-medium text-muted-foreground">
+							Installs with:{' '}
+						</span>
+						<span className="font-mono text-[11px] text-foreground/90">
+							{plugin.dependencies.join(', ')}
+						</span>
+					</div>
+				) : null}
 
 				<SourceLink source={plugin.source} />
 
@@ -567,7 +596,11 @@ export function PluginsSettings() {
 				scope,
 				enabled: true,
 			});
-			toast.success(`Installed ${plugin.name} in ${scope} scope.`);
+			const depCount = plugin.dependencies?.length ?? 0;
+			const withDeps = depCount
+				? ` with ${depCount} ${depCount === 1 ? 'dependency' : 'dependencies'}`
+				: '';
+			toast.success(`Installed ${plugin.name}${withDeps} in ${scope} scope.`);
 		} catch (err) {
 			toast.error(
 				err instanceof Error ? err.message : 'Failed to install plugin.',

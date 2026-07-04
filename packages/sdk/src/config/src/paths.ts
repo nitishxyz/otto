@@ -35,6 +35,11 @@ export function getGlobalSkillsConfigPath(): string {
 	return joinPath(getGlobalConfigDir(), 'skills.json');
 }
 
+/** Resolve the user-level cross-harness skills directory (~/.agents/skills). */
+export function getGlobalAgentsSkillsDir(): string {
+	return joinPath(getHomeDir(), '.agents', 'skills');
+}
+
 export function getGlobalPluginsConfigPath(): string {
 	return joinPath(getGlobalConfigDir(), 'plugins.json');
 }
@@ -179,6 +184,11 @@ export function getProjectPluginsConfigPath(projectRoot: string): string {
 /** Resolve the repository-local Otto project plugins directory. */
 export function getProjectPluginsDir(projectRoot: string): string {
 	return joinPath(getProjectConfigDir(projectRoot), 'plugins');
+}
+
+/** Resolve the repository-local cross-harness skills directory (.agents/skills). */
+export function getProjectAgentsSkillsDir(projectRoot: string): string {
+	return joinPath(projectRoot, '.agents', 'skills');
 }
 
 /** Resolve the user-level state directory for a project. */

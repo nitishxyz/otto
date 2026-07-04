@@ -11,6 +11,7 @@ import {
 	rebuildSkillDescription,
 	clearSkillCache,
 } from '../packages/sdk/src/skills/index.ts';
+import { installPlugin, setPluginEnabled } from '@ottocode/sdk';
 
 describe('Skills', () => {
 	let tempDir: string;
@@ -507,14 +508,14 @@ Content.
 
 		test('discovers enabled plugin skills and loads content through the skill tool', async () => {
 			const projectRoot = join(tempDir, 'project');
-			const pluginDir = join(projectRoot, '.otto/plugins/demo-plugin');
-			const skillDir = join(pluginDir, 'skills/plugin-skill');
+			const sourceDir = join(tempDir, 'demo-plugin-src');
+			const skillDir = join(sourceDir, 'skills/plugin-skill');
 			process.env.XDG_CONFIG_HOME = join(tempDir, 'xdg-config');
 			process.env.HOME = join(tempDir, 'home');
 
 			await fs.mkdir(skillDir, { recursive: true });
 			await fs.writeFile(
-				join(pluginDir, 'otto.plugin.json'),
+				join(sourceDir, 'otto.plugin.json'),
 				`${JSON.stringify(
 					{
 						name: 'demo-plugin',
@@ -543,12 +544,15 @@ FULL_PLUGIN_SKILL_CONTENT
 `,
 			);
 
+			await fs.mkdir(projectRoot, { recursive: true });
+			await installPlugin(sourceDir, { scope: 'project', projectRoot });
+
 			const skills = await initializeSkills(projectRoot, projectRoot);
 			const pluginSkill = skills.find((s) => s.name === 'plugin-skill');
 			const description = rebuildSkillDescription();
 
 			expect(pluginSkill).toBeDefined();
-			expect(pluginSkill?.scope).toBe('repo');
+			expect(pluginSkill?.scope).toBe('cwd');
 			expect(description).toContain(
 				'- plugin-skill: Compact plugin capability.',
 			);
@@ -566,7 +570,9 @@ FULL_PLUGIN_SKILL_CONTENT
 			expect(result.ok).toBe(true);
 			if (result.ok) {
 				expect(result.content).toContain('FULL_PLUGIN_SKILL_CONTENT');
-				expect(result.baseDirectory).toBe(skillDir);
+				expect(result.baseDirectory).toBe(
+					join(projectRoot, '.agents/skills/plugin-skill'),
+				);
 				expect(result.resourceInstructions).toContain(
 					'Supporting file paths are relative to this baseDirectory',
 				);
@@ -575,28 +581,14 @@ FULL_PLUGIN_SKILL_CONTENT
 
 		test('excludes disabled plugin skills', async () => {
 			const projectRoot = join(tempDir, 'project');
-			const pluginDir = join(projectRoot, '.otto/plugins/disabled-plugin');
-			const skillDir = join(pluginDir, 'skills/disabled-skill');
+			const sourceDir = join(tempDir, 'disabled-plugin-src');
+			const skillDir = join(sourceDir, 'skills/disabled-skill');
 			process.env.XDG_CONFIG_HOME = join(tempDir, 'xdg-config');
 			process.env.HOME = join(tempDir, 'home');
 
 			await fs.mkdir(skillDir, { recursive: true });
 			await fs.writeFile(
-				join(projectRoot, '.otto/plugins.json'),
-				`${JSON.stringify(
-					{
-						version: 1,
-						registries: [],
-						plugins: {
-							'disabled-plugin': { enabled: false },
-						},
-					},
-					null,
-					2,
-				)}\n`,
-			);
-			await fs.writeFile(
-				join(pluginDir, 'otto.plugin.json'),
+				join(sourceDir, 'otto.plugin.json'),
 				`${JSON.stringify(
 					{
 						name: 'disabled-plugin',
@@ -622,6 +614,13 @@ description: Disabled plugin skill
 Disabled content.
 `,
 			);
+
+			await fs.mkdir(projectRoot, { recursive: true });
+			await installPlugin(sourceDir, { scope: 'project', projectRoot });
+			await setPluginEnabled('disabled-plugin', false, {
+				scope: 'project',
+				projectRoot,
+			});
 
 			const skills = await discoverSkills(projectRoot, projectRoot);
 

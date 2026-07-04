@@ -6,6 +6,7 @@ import {
 	resolveEffectivePlugins,
 	resolveRegistryPlugin,
 	setPluginEnabled,
+	syncPluginSkills,
 	updatePlugin,
 	type PluginRegistryEntry,
 	type PluginScope,
@@ -178,6 +179,13 @@ export async function runPluginsUpdate(
 		return;
 	}
 	console.log(colors.green(`Updated ${plugin.name} (${plugin.scope})`));
+}
+
+export async function runPluginsSync(
+	opts: PluginCommandOptions,
+): Promise<void> {
+	await syncPluginSkills(opts.project);
+	console.log(colors.green('Synced plugin skills to .agents/skills'));
 }
 
 function printRegistryEntry(plugin: PluginRegistryEntry): void {

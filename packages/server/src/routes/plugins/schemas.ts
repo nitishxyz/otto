@@ -120,6 +120,7 @@ export const pluginManifestSchema = z.object({
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
 	agents: z.array(pluginAgentSchema).optional(),
+	dependencies: z.array(z.string()).optional(),
 	mcpServers: z.record(z.string(), z.unknown()).optional(),
 	commands: z.record(z.string(), pluginCommandSchema).optional(),
 	browser: z.object({ previewUrl: z.string().optional() }).optional(),
@@ -133,6 +134,7 @@ export const pluginConfigEntrySchema = z.object({
 	installedAt: z.string().optional(),
 	updatedAt: z.string().optional(),
 	pinned: z.boolean().optional(),
+	installedBy: z.array(z.string()).optional(),
 });
 
 export const pluginsConfigSchema = z.object({
@@ -199,6 +201,7 @@ export const pluginRegistryEntrySchema = z.object({
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
 	agents: z.array(pluginAgentSchema).optional(),
+	dependencies: z.array(z.string()).optional(),
 	mcpServers: z.record(z.string(), z.unknown()).optional(),
 	commands: z.record(z.string(), pluginCommandSchema).optional(),
 	browser: z.object({ previewUrl: z.string().optional() }).optional(),

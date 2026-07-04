@@ -14,6 +14,7 @@ import {
 	resolveEffectivePlugins,
 	resolveRegistryPlugin,
 	setPluginEnabled,
+	syncPluginSkills,
 	updatePlugin,
 	writePluginsConfig,
 } from '@ottocode/sdk';
@@ -412,6 +413,219 @@ describe('plugins', () => {
 		}
 	});
 
+	it('installs declared plugin dependencies recursively with provenance', async () => {
+		const { projectRoot, cleanup } =
+			await createPluginTestRoot('otto-plugins-deps-');
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'dep-a', '1.0.0', {
+				dependencies: ['dep-b'],
+			});
+			await writePluginPayload(payloadDir, 'dep-b', '1.0.0');
+			await writePluginPayload(payloadDir, 'meta', '1.0.0', {
+				dependencies: ['dep-a', 'dep-b'],
+			});
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'meta', dependencies: ['dep-a', 'dep-b'] },
+				{ name: 'dep-a', dependencies: ['dep-b'] },
+				{ name: 'dep-b' },
+			]);
+
+			const installed = await installPlugin('meta', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			expect(installed.name).toBe('meta');
+			expect(installed.installed).toBe(true);
+
+			const config = await loadPluginsConfig('project', projectRoot);
+			expect(config.plugins['dep-a']?.enabled).toBe(true);
+			expect(config.plugins['dep-b']?.enabled).toBe(true);
+			expect(config.plugins['dep-a']?.installedBy).toEqual(['meta']);
+			expect(config.plugins['dep-b']?.installedBy).toEqual(['dep-a']);
+			expect(config.plugins.meta?.installedBy).toBeUndefined();
+
+			const effective = await resolveEffectivePlugins(projectRoot);
+			for (const name of ['meta', 'dep-a', 'dep-b']) {
+				const plugin = effective.plugins.find((item) => item.name === name);
+				expect(plugin?.status).toBe('installed');
+			}
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('records provenance on already-installed dependencies without reinstalling', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-deps-existing-',
+		);
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'dep-b', '1.0.0');
+			await writePluginPayload(payloadDir, 'meta', '1.0.0', {
+				dependencies: ['dep-b'],
+			});
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'meta', dependencies: ['dep-b'] },
+				{ name: 'dep-b' },
+			]);
+
+			await installPlugin('dep-b', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			let config = await loadPluginsConfig('project', projectRoot);
+			const installedAt = config.plugins['dep-b']?.installedAt;
+			expect(config.plugins['dep-b']?.installedBy).toBeUndefined();
+
+			await installPlugin('meta', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			config = await loadPluginsConfig('project', projectRoot);
+			expect(config.plugins['dep-b']?.installedBy).toEqual(['meta']);
+			expect(config.plugins['dep-b']?.installedAt).toBe(installedAt);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('guards against circular plugin dependencies', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-deps-cycle-',
+		);
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'cycle-a', '1.0.0', {
+				dependencies: ['cycle-b'],
+			});
+			await writePluginPayload(payloadDir, 'cycle-b', '1.0.0', {
+				dependencies: ['cycle-a'],
+			});
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'cycle-a', dependencies: ['cycle-b'] },
+				{ name: 'cycle-b', dependencies: ['cycle-a'] },
+			]);
+
+			const installed = await installPlugin('cycle-a', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			expect(installed.installed).toBe(true);
+
+			const config = await loadPluginsConfig('project', projectRoot);
+			expect(config.plugins['cycle-a']?.enabled).toBe(true);
+			expect(config.plugins['cycle-b']?.enabled).toBe(true);
+			expect(config.plugins['cycle-b']?.installedBy).toEqual(['cycle-a']);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('skips dependencies targeting other platforms', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-deps-platform-',
+		);
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'other-os', '1.0.0');
+			await writePluginPayload(payloadDir, 'meta', '1.0.0', {
+				dependencies: ['other-os'],
+			});
+			const otherPlatform = process.platform === 'win32' ? 'darwin' : 'win32';
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'meta', dependencies: ['other-os'] },
+				{ name: 'other-os', platforms: [otherPlatform] },
+			]);
+
+			const installed = await installPlugin('meta', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			expect(installed.installed).toBe(true);
+
+			const config = await loadPluginsConfig('project', projectRoot);
+			expect(config.plugins['other-os']).toBeUndefined();
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('fails with a clear error when a dependency cannot be resolved', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-deps-missing-',
+		);
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'meta', '1.0.0', {
+				dependencies: ['ghost'],
+			});
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'meta', dependencies: ['ghost'] },
+			]);
+
+			await expect(
+				installPlugin('meta', {
+					scope: 'project',
+					projectRoot,
+					registries: [registryPath],
+				}),
+			).rejects.toThrow(
+				'Failed to install dependency "ghost" of plugin "meta"',
+			);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('clears installedBy references when a parent plugin is removed', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-deps-remove-',
+		);
+
+		try {
+			const payloadDir = join(projectRoot, 'registry-payload');
+			await writePluginPayload(payloadDir, 'dep-b', '1.0.0');
+			await writePluginPayload(payloadDir, 'meta', '1.0.0', {
+				dependencies: ['dep-b'],
+			});
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeRegistryWithPlugins(registryPath, payloadDir, [
+				{ name: 'meta', dependencies: ['dep-b'] },
+				{ name: 'dep-b' },
+			]);
+
+			await installPlugin('meta', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+			await removePlugin('meta', { scope: 'project', projectRoot });
+
+			const config = await loadPluginsConfig('project', projectRoot);
+			expect(config.plugins.meta).toBeUndefined();
+			expect(config.plugins['dep-b']?.enabled).toBe(true);
+			expect(config.plugins['dep-b']?.installedBy).toBeUndefined();
+		} finally {
+			await cleanup();
+		}
+	});
+
 	it('materializes source-backed registry skills into the plugin directory', async () => {
 		const { projectRoot, cleanup } = await createPluginTestRoot(
 			'otto-plugins-skill-source-',
@@ -493,6 +707,131 @@ describe('plugins', () => {
 			await cleanup();
 		}
 	});
+
+	it('syncs plugin skills into .agents/skills for cross-harness use', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-agents-skills-',
+		);
+
+		try {
+			const skillSourceDir = join(projectRoot, 'skill-source');
+			await writeSkillBundle(skillSourceDir, 'remote-skill');
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeInlineRegistryWithSkillSource(registryPath, skillSourceDir);
+
+			await installPlugin('source-plugin', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+
+			const syncedSkillDir = join(
+				projectRoot,
+				'.agents',
+				'skills',
+				'remote-skill',
+			);
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				true,
+			);
+			const syncedSkill = await readFile(
+				join(syncedSkillDir, 'SKILL.md'),
+				'utf-8',
+			);
+			expect(syncedSkill).toContain('name: remote-skill');
+			expect(syncedSkill).toContain(
+				'description: "Test skill from an external source."',
+			);
+			expect(
+				await Bun.file(
+					join(syncedSkillDir, 'references', 'details.md'),
+				).exists(),
+			).toBe(true);
+			expect(
+				(await readFile(join(syncedSkillDir, '.otto-plugin'), 'utf-8')).trim(),
+			).toBe('source-plugin');
+
+			await setPluginEnabled('source-plugin', false, {
+				scope: 'project',
+				projectRoot,
+			});
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				false,
+			);
+
+			await setPluginEnabled('source-plugin', true, {
+				scope: 'project',
+				projectRoot,
+			});
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				true,
+			);
+
+			await removePlugin('source-plugin', { scope: 'project', projectRoot });
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				false,
+			);
+		} finally {
+			await cleanup();
+		}
+	});
+
+	it('backfills and removes orphaned synced skills via syncPluginSkills', async () => {
+		const { projectRoot, cleanup } = await createPluginTestRoot(
+			'otto-plugins-sync-sweep-',
+		);
+
+		try {
+			const skillSourceDir = join(projectRoot, 'skill-source');
+			await writeSkillBundle(skillSourceDir, 'remote-skill');
+			const registryPath = join(projectRoot, 'registry.json');
+			await writeInlineRegistryWithSkillSource(registryPath, skillSourceDir);
+
+			await installPlugin('source-plugin', {
+				scope: 'project',
+				projectRoot,
+				registries: [registryPath],
+			});
+
+			const agentsSkillsDir = join(projectRoot, '.agents', 'skills');
+			const syncedSkillDir = join(agentsSkillsDir, 'remote-skill');
+
+			// Simulate a pre-sync install: delete the synced copy, then backfill.
+			await rm(syncedSkillDir, { recursive: true, force: true });
+			await syncPluginSkills(projectRoot);
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				true,
+			);
+
+			// Simulate manual plugin deletion: sweep removes the orphaned skill.
+			await rm(join(getProjectPluginsDir(projectRoot), 'source-plugin'), {
+				recursive: true,
+				force: true,
+			});
+			const orphanConfig = await loadPluginsConfig('project', projectRoot);
+			delete orphanConfig.plugins['source-plugin'];
+			await writePluginsConfig('project', orphanConfig, projectRoot);
+
+			await syncPluginSkills(projectRoot);
+			expect(await Bun.file(join(syncedSkillDir, 'SKILL.md')).exists()).toBe(
+				false,
+			);
+
+			// User-authored skills without a marker are never touched.
+			const userSkillDir = join(agentsSkillsDir, 'user-skill');
+			await mkdir(userSkillDir, { recursive: true });
+			await writeFile(
+				join(userSkillDir, 'SKILL.md'),
+				'---\nname: user-skill\ndescription: Mine\n---\n\nBody.\n',
+			);
+			await syncPluginSkills(projectRoot);
+			expect(await Bun.file(join(userSkillDir, 'SKILL.md')).exists()).toBe(
+				true,
+			);
+		} finally {
+			await cleanup();
+		}
+	});
 });
 
 async function createPluginTestRoot(prefix: string): Promise<{
@@ -520,6 +859,7 @@ async function writePluginPayload(
 	pluginsDir: string,
 	name: string,
 	version: string,
+	extra: Record<string, unknown> = {},
 ): Promise<void> {
 	const pluginDir = join(pluginsDir, name);
 	await mkdir(pluginDir, { recursive: true });
@@ -531,6 +871,7 @@ async function writePluginPayload(
 				name,
 				version,
 				description: `${name} plugin`,
+				...extra,
 			},
 			null,
 			2,
@@ -558,6 +899,36 @@ async function writeRegistry(
 						source: { type: 'local', path: payloadDir },
 					},
 				],
+			},
+			null,
+			2,
+		)}\n`,
+	);
+}
+
+async function writeRegistryWithPlugins(
+	registryPath: string,
+	payloadDir: string,
+	plugins: Array<{
+		name: string;
+		dependencies?: string[];
+		platforms?: string[];
+	}>,
+): Promise<void> {
+	await writeFile(
+		registryPath,
+		`${JSON.stringify(
+			{
+				$schema: 'https://ottocode.ai/schemas/plugin-registry.json',
+				version: 1,
+				plugins: plugins.map((plugin) => ({
+					name: plugin.name,
+					version: '1.0.0',
+					description: `${plugin.name} plugin`,
+					...(plugin.dependencies ? { dependencies: plugin.dependencies } : {}),
+					...(plugin.platforms ? { platforms: plugin.platforms } : {}),
+					source: { type: 'local', path: join(payloadDir, plugin.name) },
+				})),
 			},
 			null,
 			2,

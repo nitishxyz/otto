@@ -272,6 +272,7 @@ export {
 	getProjectId,
 	getProjectConfigDir,
 	getProjectConfigPath,
+	getProjectAgentsSkillsDir,
 	getProjectPluginsConfigPath,
 	getProjectPluginsDir,
 	getProjectStateDir,
@@ -285,6 +286,7 @@ export {
 	getGlobalConfigDir,
 	getGlobalConfigPath,
 	getGlobalSkillsConfigPath,
+	getGlobalAgentsSkillsDir,
 	getGlobalPluginsConfigPath,
 	getGlobalPluginsDir,
 	getGlobalAgentsJsonPath,
@@ -321,6 +323,7 @@ export {
 	resolveRegistryPlugin,
 	resolveEffectivePlugins,
 	setPluginEnabled,
+	syncPluginSkills,
 	updatePlugin,
 	writePluginsConfig,
 } from './plugins/index.ts';

@@ -1,10 +1,12 @@
-import { cp, readdir, rm } from 'node:fs/promises';
+import { cp, readdir, rm, rmdir } from 'node:fs/promises';
 import { z } from 'zod/v3';
 import {
 	ensureDir,
 	fileExists,
+	getGlobalAgentsSkillsDir,
 	getGlobalPluginsConfigPath,
 	getGlobalPluginsDir,
+	getProjectAgentsSkillsDir,
 	getProjectPluginsConfigPath,
 	getProjectPluginsDir,
 	joinPath,
@@ -122,6 +124,7 @@ export const pluginManifestSchema = z.object({
 	skills: z.array(pluginSkillSchema).optional(),
 	recipes: z.array(pluginRecipeSchema).optional(),
 	agents: z.array(pluginAgentSchema).optional(),
+	dependencies: z.array(pluginNameSchema).optional(),
 	mcpServers: z.record(z.unknown()).optional(),
 	commands: z.record(pluginCommandSchema).optional(),
 	browser: z
@@ -139,6 +142,7 @@ export const pluginConfigEntrySchema = z.object({
 	installedAt: z.string().optional(),
 	updatedAt: z.string().optional(),
 	pinned: z.boolean().optional(),
+	installedBy: z.array(z.string()).optional(),
 });
 
 export const pluginsConfigSchema = z.object({
@@ -175,6 +179,7 @@ export const pluginRegistryEntrySchema = pluginManifestSchema
 		skills: true,
 		recipes: true,
 		agents: true,
+		dependencies: true,
 		mcpServers: true,
 		commands: true,
 		browser: true,
@@ -395,6 +400,19 @@ export async function installPlugin(
 	source: string,
 	options: PluginInstallOptions = {},
 ): Promise<DiscoveredPlugin> {
+	return installPluginWithContext(source, options, { visited: new Set() });
+}
+
+type PluginInstallContext = {
+	visited: Set<string>;
+	installedBy?: string;
+};
+
+async function installPluginWithContext(
+	source: string,
+	options: PluginInstallOptions,
+	context: PluginInstallContext,
+): Promise<DiscoveredPlugin> {
 	const scope = options.scope ?? (isLocalSource(source) ? 'project' : 'global');
 	const pluginsDir = getPluginsDir(scope, options.projectRoot);
 	let manifest: PluginManifest;
@@ -431,18 +449,114 @@ export async function installPlugin(
 			: `registry:${entry.name}`;
 	}
 
+	context.visited.add(manifest.name);
+
 	const now = new Date().toISOString();
 	const config = await loadPluginsConfig(scope, options.projectRoot);
+	const previousEntry = config.plugins[manifest.name];
+	const installedBy = new Set(previousEntry?.installedBy ?? []);
+	if (context.installedBy) installedBy.add(context.installedBy);
 	config.plugins[manifest.name] = {
 		enabled: options.enabled ?? true,
 		source: sourceLabel,
 		version: manifest.version,
-		installedAt: config.plugins[manifest.name]?.installedAt ?? now,
+		installedAt: previousEntry?.installedAt ?? now,
 		updatedAt: now,
+		...(installedBy.size
+			? { installedBy: Array.from(installedBy).sort() }
+			: {}),
 	};
 	await writePluginsConfig(scope, config, options.projectRoot);
 
+	if (options.enabled ?? true) {
+		await syncPluginSkillsToAgentsDir(
+			joinPath(pluginsDir, manifest.name),
+			manifest,
+			scope,
+			options.projectRoot,
+		);
+	} else {
+		await removeSyncedPluginSkills(manifest.name, scope, options.projectRoot);
+	}
+
+	await installPluginDependencies(manifest, scope, options, context);
+
 	return readDiscoveredPlugin(scope, pluginsDir, manifest.name, config);
+}
+
+/**
+ * Install a plugin's declared dependencies from configured registries.
+ * Dependencies already visited in this install run are skipped (cycle
+ * guard), already-installed dependencies only gain provenance, and
+ * dependencies whose registry entry targets other platforms are skipped.
+ */
+async function installPluginDependencies(
+	manifest: PluginManifest,
+	scope: PluginScope,
+	options: PluginInstallOptions,
+	context: PluginInstallContext,
+): Promise<void> {
+	for (const dependency of manifest.dependencies ?? []) {
+		if (context.visited.has(dependency)) continue;
+		context.visited.add(dependency);
+
+		const config = await loadPluginsConfig(scope, options.projectRoot);
+		const existing = await readDiscoveredPlugin(
+			scope,
+			getPluginsDir(scope, options.projectRoot),
+			dependency,
+			config,
+		);
+		if (existing.status === 'installed') {
+			await recordPluginInstalledBy(
+				dependency,
+				manifest.name,
+				scope,
+				options.projectRoot,
+			);
+			continue;
+		}
+
+		try {
+			const { entry } = await resolveRegistryPlugin(dependency, options);
+			if (
+				entry.platforms &&
+				!(entry.platforms as string[]).includes(process.platform)
+			) {
+				continue;
+			}
+			await installPluginWithContext(
+				dependency,
+				{ ...options, scope },
+				{ visited: context.visited, installedBy: manifest.name },
+			);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(
+				`Failed to install dependency "${dependency}" of plugin "${manifest.name}": ${message}`,
+			);
+		}
+	}
+}
+
+/** Record that a plugin was requested as a dependency of another plugin. */
+async function recordPluginInstalledBy(
+	name: string,
+	parent: string,
+	scope: PluginScope,
+	projectRoot?: string,
+): Promise<void> {
+	const config = await loadPluginsConfig(scope, projectRoot);
+	const entry = config.plugins[name];
+	if (!entry) return;
+	const installedBy = new Set(entry.installedBy ?? []);
+	if (installedBy.has(parent)) return;
+	installedBy.add(parent);
+	config.plugins[name] = {
+		...entry,
+		installedBy: Array.from(installedBy).sort(),
+	};
+	await writePluginsConfig(scope, config, projectRoot);
 }
 
 /** Remove an installed plugin payload and config entry. */
@@ -453,11 +567,20 @@ export async function removePlugin(
 	const scope = options.scope ?? 'global';
 	const config = await loadPluginsConfig(scope, options.projectRoot);
 	delete config.plugins[name];
+	for (const [pluginName, entry] of Object.entries(config.plugins)) {
+		if (!entry.installedBy?.includes(name)) continue;
+		const installedBy = entry.installedBy.filter((parent) => parent !== name);
+		config.plugins[pluginName] = {
+			...entry,
+			...(installedBy.length ? { installedBy } : { installedBy: undefined }),
+		};
+	}
 	await writePluginsConfig(scope, config, options.projectRoot);
 	await rm(joinPath(getPluginsDir(scope, options.projectRoot), name), {
 		recursive: true,
 		force: true,
 	});
+	await removeSyncedPluginSkills(name, scope, options.projectRoot);
 }
 
 /** Enable or disable a plugin in the selected scope. */
@@ -473,6 +596,25 @@ export async function setPluginEnabled(
 		enabled,
 	};
 	await writePluginsConfig(scope, config, options.projectRoot);
+
+	if (enabled) {
+		const plugin = await readDiscoveredPlugin(
+			scope,
+			getPluginsDir(scope, options.projectRoot),
+			name,
+			config,
+		);
+		if (plugin.status === 'installed' && plugin.manifest) {
+			await syncPluginSkillsToAgentsDir(
+				plugin.dir,
+				plugin.manifest,
+				scope,
+				options.projectRoot,
+			);
+		}
+	} else {
+		await removeSyncedPluginSkills(name, scope, options.projectRoot);
+	}
 	return config;
 }
 
@@ -600,6 +742,228 @@ function getPluginsDir(scope: PluginScope, projectRoot?: string): string {
 	if (!projectRoot)
 		throw new Error('projectRoot is required for project plugins');
 	return getProjectPluginsDir(projectRoot);
+}
+
+const PLUGIN_SKILL_MARKER_FILE = '.otto-plugin';
+
+function getAgentsSkillsDir(scope: PluginScope, projectRoot?: string): string {
+	if (scope === 'global') return getGlobalAgentsSkillsDir();
+	if (!projectRoot)
+		throw new Error('projectRoot is required for project plugins');
+	return getProjectAgentsSkillsDir(projectRoot);
+}
+
+function parentPath(path: string): string {
+	const index = path.lastIndexOf('/');
+	return index > 0 ? path.slice(0, index) : path;
+}
+
+/** Remove skills previously synced into .agents/skills for a plugin. */
+async function removeSyncedPluginSkills(
+	pluginName: string,
+	scope: PluginScope,
+	projectRoot?: string,
+): Promise<void> {
+	const skillsDir = getAgentsSkillsDir(scope, projectRoot);
+	let entries: Awaited<ReturnType<typeof readdir>>;
+	try {
+		entries = await readdir(skillsDir, { withFileTypes: true });
+	} catch {
+		return;
+	}
+
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		const dir = joinPath(skillsDir, entry.name);
+		const marker = Bun.file(joinPath(dir, PLUGIN_SKILL_MARKER_FILE));
+		try {
+			if (!(await marker.exists())) continue;
+			if ((await marker.text()).trim() !== pluginName) continue;
+		} catch {
+			continue;
+		}
+		await rm(dir, { recursive: true, force: true });
+	}
+	await removeDirIfEmpty(skillsDir);
+}
+
+async function removeDirIfEmpty(dir: string): Promise<void> {
+	try {
+		await rmdir(dir);
+	} catch {}
+}
+
+/**
+ * Re-sync all plugin skills into .agents/skills and remove synced skills
+ * whose owning plugin is no longer installed and enabled. Use this to
+ * backfill existing installs or clean up after manual plugin removal.
+ */
+export async function syncPluginSkills(projectRoot: string): Promise<void> {
+	const discovered = await discoverPlugins(projectRoot);
+	const activeByScope: Record<PluginScope, Map<string, DiscoveredPlugin>> = {
+		global: new Map(),
+		project: new Map(),
+	};
+	for (const scope of ['global', 'project'] as const) {
+		for (const plugin of discovered[scope].plugins) {
+			if (!plugin.enabled || plugin.status !== 'installed' || !plugin.manifest)
+				continue;
+			activeByScope[scope].set(plugin.name, plugin);
+		}
+	}
+
+	for (const scope of ['global', 'project'] as const) {
+		const scopeProjectRoot = scope === 'project' ? projectRoot : undefined;
+		await removeOrphanedPluginSkills(
+			activeByScope[scope],
+			scope,
+			scopeProjectRoot,
+		);
+		for (const plugin of activeByScope[scope].values()) {
+			if (!plugin.manifest) continue;
+			await syncPluginSkillsToAgentsDir(
+				plugin.dir,
+				plugin.manifest,
+				scope,
+				scopeProjectRoot,
+			);
+		}
+	}
+}
+
+async function removeOrphanedPluginSkills(
+	activePlugins: Map<string, DiscoveredPlugin>,
+	scope: PluginScope,
+	projectRoot?: string,
+): Promise<void> {
+	const skillsDir = getAgentsSkillsDir(scope, projectRoot);
+	let entries: Awaited<ReturnType<typeof readdir>>;
+	try {
+		entries = await readdir(skillsDir, { withFileTypes: true });
+	} catch {
+		return;
+	}
+
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		const dir = joinPath(skillsDir, entry.name);
+		const marker = Bun.file(joinPath(dir, PLUGIN_SKILL_MARKER_FILE));
+		let owner: string;
+		try {
+			if (!(await marker.exists())) continue;
+			owner = (await marker.text()).trim();
+		} catch {
+			continue;
+		}
+		if (activePlugins.has(owner)) continue;
+		await rm(dir, { recursive: true, force: true });
+	}
+	await removeDirIfEmpty(skillsDir);
+}
+
+/** Materialize plugin skills into .agents/skills so any harness can use them. */
+async function syncPluginSkillsToAgentsDir(
+	pluginDir: string,
+	manifest: PluginManifest,
+	scope: PluginScope,
+	projectRoot?: string,
+): Promise<void> {
+	await removeSyncedPluginSkills(manifest.name, scope, projectRoot);
+	if (!manifest.skills?.length) return;
+
+	const skillsDir = getAgentsSkillsDir(scope, projectRoot);
+	const normalizedPluginDir = normalizeSourcePattern(pluginDir);
+	for (const skill of manifest.skills) {
+		if (!skill.path) continue;
+		const normalizedSkillPath = normalizeSourcePattern(skill.path);
+		if (normalizedSkillPath.split('/').includes('..')) continue;
+
+		const skillFile = joinPath(pluginDir, normalizedSkillPath);
+		if (!(await fileExists(skillFile))) continue;
+
+		const sourceDir = parentPath(skillFile);
+		const targetDir = joinPath(skillsDir, skill.name);
+		await rm(targetDir, { recursive: true, force: true });
+		await ensureDir(targetDir);
+		const skillFileName = skillFile.slice(skillFile.lastIndexOf('/') + 1);
+		const targetSkillFile = joinPath(targetDir, 'SKILL.md');
+		if (normalizeSourcePattern(sourceDir) === normalizedPluginDir) {
+			await cp(skillFile, targetSkillFile, { force: true });
+		} else {
+			await cp(sourceDir, targetDir, { recursive: true, force: true });
+			if (skillFileName !== 'SKILL.md') {
+				await cp(joinPath(targetDir, skillFileName), targetSkillFile, {
+					force: true,
+				});
+				await rm(joinPath(targetDir, skillFileName), { force: true });
+			}
+		}
+		try {
+			const content = await Bun.file(targetSkillFile).text();
+			await Bun.write(
+				targetSkillFile,
+				normalizeSkillFrontmatter(content, skill.name, skill.description),
+			);
+		} catch {}
+		await Bun.write(
+			joinPath(targetDir, PLUGIN_SKILL_MARKER_FILE),
+			`${manifest.name}\n`,
+		);
+	}
+}
+
+/**
+ * Rewrite SKILL.md frontmatter so `name`/`description` match the plugin
+ * manifest. Other harnesses read skill metadata from the frontmatter only,
+ * so the synced copy must carry the effective values.
+ */
+function normalizeSkillFrontmatter(
+	content: string,
+	name: string,
+	description?: string,
+): string {
+	const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+	if (!match) {
+		const head = [`name: ${name}`];
+		if (description) head.push(`description: ${JSON.stringify(description)}`);
+		return `---\n${head.join('\n')}\n---\n\n${content}`;
+	}
+
+	const lines = (match[1] ?? '').split(/\r?\n/);
+	const kept: string[] = [];
+	let hasName = false;
+	let hasDescription = false;
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index] ?? '';
+		if (!/^\S/.test(line)) {
+			kept.push(line);
+			continue;
+		}
+		const colonIdx = line.indexOf(':');
+		const key = colonIdx === -1 ? '' : line.slice(0, colonIdx).trim();
+		const replaceName = key === 'name';
+		const replaceDescription =
+			key === 'description' && description !== undefined;
+		if (key === 'name') hasName = true;
+		if (key === 'description') hasDescription = true;
+		if (!replaceName && !replaceDescription) {
+			kept.push(line);
+			continue;
+		}
+		while (index + 1 < lines.length && !/^\S/.test(lines[index + 1] ?? '')) {
+			index += 1;
+		}
+		kept.push(
+			replaceName
+				? `name: ${name}`
+				: `description: ${JSON.stringify(description)}`,
+		);
+	}
+	if (!hasName) kept.unshift(`name: ${name}`);
+	if (description !== undefined && !hasDescription) {
+		kept.push(`description: ${JSON.stringify(description)}`);
+	}
+	return `---\n${kept.join('\n')}\n---\n${match[2] ?? ''}`;
 }
 
 function isLocalSource(source: string): boolean {
