@@ -353,7 +353,9 @@ const LooperGoalBarContent = memo(function LooperGoalBarContent({
 				}}
 			>
 				<div className="overflow-hidden">
-					<div className="flex items-center gap-2 border-b border-border pr-2">
+					<div
+						className={`flex items-center border-b border-border ${showStart ? 'gap-2 pr-2' : ''}`}
+					>
 						<button
 							type="button"
 							aria-expanded={isExpanded}

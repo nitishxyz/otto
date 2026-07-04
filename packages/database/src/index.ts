@@ -6,6 +6,18 @@ import { bundledMigrations } from './runtime/migrations-bundled.ts';
 
 const dbCache: Map<string, BunSQLiteDatabase<typeof schema>> = new Map();
 const migratedPaths = new Set<string>();
+const dbPathByInstance = new WeakMap<object, string>();
+
+/**
+ * Resolve the SQLite file path backing a database instance returned by
+ * getDb/getDbByPath. Used by write-behind persistence to open its own
+ * connection to the same file from a worker thread.
+ */
+export function getDbFilePath(db: unknown): string | undefined {
+	return typeof db === 'object' && db !== null
+		? dbPathByInstance.get(db)
+		: undefined;
+}
 
 export async function getDb(projectRootInput?: string) {
 	const cfg = await loadConfig(projectRootInput);
@@ -79,6 +91,7 @@ export async function getDbByPath(dbPath: string) {
 		}
 	}
 	dbCache.set(key, db);
+	dbPathByInstance.set(db as object, dbPath);
 	return db;
 }
 

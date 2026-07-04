@@ -56,6 +56,24 @@ export function createOauthCodexTextGuardState(): OauthCodexTextGuardState {
 }
 
 /**
+ * Resets the guard window at structured tool boundaries.
+ *
+ * The guard accumulates raw text for the WHOLE run; once a pseudo tool-call
+ * leak (e.g. "assistant to=functions...") is detected, everything after the
+ * leak index is dropped from every later delta - including legitimate prose
+ * streamed after the real tool call executed. Since a leak marker only
+ * poisons text up to the next structured tool part, reset the window when a
+ * tool call/result arrives so post-tool text flows again.
+ */
+export function resetOauthCodexTextGuard(
+	state: OauthCodexTextGuardState,
+): void {
+	state.raw = '';
+	state.sanitized = '';
+	state.dropped = false;
+}
+
+/**
  * Consumes a raw delta and returns only safe delta text.
  */
 export function consumeOauthCodexTextDelta(

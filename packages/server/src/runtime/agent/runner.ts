@@ -1,6 +1,7 @@
 import { stepCountIs } from 'ai';
 import { logger } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
+import { flushPartContentWrites } from '../persistence/part-content-writer.ts';
 import {
 	type RunOpts,
 	setRunning,
@@ -254,6 +255,7 @@ async function runAssistant(opts: RunOpts) {
 		});
 
 		unsubscribeFinish();
+		await flushPartContentWrites();
 		await cleanupEmptyTextParts(opts, db);
 		firstToolTimer.end({ seen: firstToolSeen() });
 		const { finishReason, rawFinishReason } =

@@ -14,6 +14,7 @@ import {
 } from '@ottocode/sdk';
 import { realpath, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
+import { shutdownPartContentWriter } from '../persistence/part-content-writer.ts';
 import { forgetProject, listProjects, touchProject } from './registry.ts';
 
 export interface ProjectRef {
@@ -217,6 +218,9 @@ export function getProjectManager(): ProjectManager {
 }
 
 export async function shutdownProjectManager(): Promise<void> {
+	try {
+		await shutdownPartContentWriter();
+	} catch {}
 	await defaultProjectManager.closeAllProjects();
 }
 

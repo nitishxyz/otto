@@ -2,6 +2,7 @@ import type { getDb } from '@ottocode/database';
 import { messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish } from '../../../events/bus.ts';
+import { queuePartContentWrite } from '../../persistence/part-content-writer.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 
@@ -128,12 +129,7 @@ export async function handleReasoningDelta(
 			delta: text,
 		},
 	});
-	try {
-		await db
-			.update(messageParts)
-			.set({ content: serializeReasoningContent(state) })
-			.where(eq(messageParts.id, state.partId));
-	} catch {}
+	queuePartContentWrite(db, state.partId, serializeReasoningContent(state));
 }
 
 function hasAnthropicRedactedReasoning(providerMetadata: unknown): boolean {

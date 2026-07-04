@@ -3,6 +3,7 @@ import type { DB } from '@ottocode/database';
 import { messageParts } from '@ottocode/database/schema';
 import type { ToolApprovalMode } from './approval.ts';
 import { publish } from '../../events/bus.ts';
+import { flushPartContentWrites } from '../persistence/part-content-writer.ts';
 
 export type StepExecutionState = {
 	chain: Promise<void>;
@@ -46,6 +47,9 @@ export async function appendAssistantText(
 	text: string,
 ): Promise<void> {
 	try {
+		// Read-modify-write below: make sure queued streaming writes for this
+		// part have landed before reading its previous content.
+		await flushPartContentWrites();
 		const rows = await ctx.db
 			.select()
 			.from(messageParts)

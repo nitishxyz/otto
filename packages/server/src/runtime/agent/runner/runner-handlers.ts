@@ -18,7 +18,7 @@ import {
 	createStepFinishHandler,
 } from '../../stream/handlers.ts';
 import type { ToolAdapterContext } from '../../../tools/adapter.ts';
-import type { RunnerTextState } from './runner-text.ts';
+import { flushRunnerTextPart, type RunnerTextState } from './runner-text.ts';
 
 type RunSessionLoop = (sessionId: string) => Promise<void>;
 
@@ -47,6 +47,13 @@ export function createRunnerStreamHandlers(args: {
 	const updateAccumulated = (text: string) => {
 		args.textState.accumulated = text;
 	};
+	// Text delta persistence is throttled; flush pending content before any
+	// handler that completes, errors, or aborts the current text part.
+	const flushTextPart = async () => {
+		try {
+			await flushRunnerTextPart(args.textState, args.db);
+		} catch {}
+	};
 	const triggerTitleGenerationWhenReady = () => {
 		if (state.titleGenerationTriggered) return;
 
@@ -60,7 +67,7 @@ export function createRunnerStreamHandlers(args: {
 		});
 	};
 
-	const onStepFinish = createStepFinishHandler(
+	const baseOnStepFinish = createStepFinishHandler(
 		args.opts,
 		args.db,
 		args.getStepIndex,
@@ -73,14 +80,24 @@ export function createRunnerStreamHandlers(args: {
 		updateSessionTokensIncremental,
 		updateMessageTokensIncremental,
 	);
+	const onStepFinish = async (
+		event: Parameters<typeof baseOnStepFinish>[0],
+	) => {
+		await flushTextPart();
+		await baseOnStepFinish(event);
+	};
 
-	const onError = createErrorHandler(
+	const baseOnError = createErrorHandler(
 		args.opts,
 		args.db,
 		args.getStepIndex,
 		args.sharedCtx,
 		args.runSessionLoop,
 	);
+	const onError = async (event: Parameters<typeof baseOnError>[0]) => {
+		await flushTextPart();
+		await baseOnError(event);
+	};
 
 	const baseOnAbort = createAbortHandler(
 		args.opts,
@@ -98,6 +115,7 @@ export function createRunnerStreamHandlers(args: {
 		state.abortedByUser =
 			!isSendNowPreempt && !isSystemAbortReason(abortReason);
 		state.sendNowPreemptHandled = isSendNowPreempt;
+		await flushTextPart();
 		await baseOnAbort(event);
 	};
 

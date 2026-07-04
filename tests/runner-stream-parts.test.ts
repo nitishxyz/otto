@@ -3,6 +3,7 @@ import { messageParts } from '@ottocode/database/schema';
 import { subscribe } from '../packages/server/src/events/bus.ts';
 import type { OttoEvent } from '../packages/server/src/events/types.ts';
 import { consumeRunnerStreamParts } from '../packages/server/src/runtime/agent/runner/runner-stream-parts.ts';
+import { createOauthCodexTextGuardState } from '../packages/server/src/runtime/stream/text-guard.ts';
 import type { RunOpts } from '../packages/server/src/runtime/session/queue.ts';
 import type { RunnerTextState } from '../packages/server/src/runtime/agent/runner/runner-text.ts';
 import type { ToolAdapterContext } from '../packages/server/src/tools/adapter.ts';
@@ -157,5 +158,37 @@ describe('consumeRunnerStreamParts', () => {
 
 		await expect(promise).rejects.toThrow('stop now');
 		expect(returned).toBe(true);
+	});
+
+	test('oauth text guard recovers after tool boundary (post-tool prose is published)', async () => {
+		const args = createConsumeArgs([
+			{
+				type: 'text-delta',
+				id: 'text-1',
+				delta:
+					'Checking now. assistant to=functions.shell commentary {"cmd":"ls"}',
+			},
+			{ type: 'tool-call', toolCallId: 'call-1', toolName: 'shell' },
+			{ type: 'tool-result', toolCallId: 'call-1', toolName: 'shell' },
+			{ type: 'text-delta', id: 'text-2', delta: 'The tests all pass.' },
+		]);
+		args.oauthTextGuard = createOauthCodexTextGuardState() as never;
+		const events: OttoEvent[] = [];
+		const unsubscribe = subscribe(args.opts.sessionId, (event) => {
+			events.push(event);
+		});
+
+		try {
+			await consumeRunnerStreamParts(args);
+		} finally {
+			unsubscribe();
+		}
+
+		const deltas = events
+			.filter((event) => event.type === 'message.part.delta')
+			.map((event) => (event.payload as { delta?: string }).delta);
+		expect(deltas).toContain('Checking now.');
+		expect(deltas).toContain('The tests all pass.');
+		expect(deltas.join('')).not.toContain('assistant to=');
 	});
 });

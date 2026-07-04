@@ -5,7 +5,10 @@ import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import type { createTurnDumpCollector } from '../../debug/turn-dump.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import type { createOauthCodexTextGuardState } from '../../stream/text-guard.ts';
-import { consumeOauthCodexTextDelta } from '../../stream/text-guard.ts';
+import {
+	consumeOauthCodexTextDelta,
+	resetOauthCodexTextGuard,
+} from '../../stream/text-guard.ts';
 import {
 	handleReasoningDelta,
 	handleReasoningEnd,
@@ -130,6 +133,10 @@ export async function consumeRunnerStreamParts(args: {
 			case 'tool-input-end':
 			case 'tool-call':
 			case 'tool-result':
+				// A structured tool part ends any pseudo tool-call text leak; reset
+				// the guard window so post-tool prose is not dropped for the rest
+				// of the run.
+				if (args.oauthTextGuard) resetOauthCodexTextGuard(args.oauthTextGuard);
 				break;
 			case 'text-delta': {
 				const rawDelta = deltaTextField(part);

@@ -1,11 +1,14 @@
 import { messageParts } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
 import { logger } from '@ottocode/sdk';
 import { publish } from '../../../events/bus.ts';
 import type { getDb } from '@ottocode/database';
 import type { RunOpts } from '../../session/queue.ts';
 import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import type { createTurnDumpCollector } from '../../debug/turn-dump.ts';
+import {
+	flushPartContentWrites,
+	queuePartContentWrite,
+} from '../../persistence/part-content-writer.ts';
 import type { RunnerToolObserverState } from './runner-tool-observer.ts';
 import { nowMs } from './runner-telemetry.ts';
 
@@ -20,6 +23,25 @@ export type RunnerTextState = {
 	lastTextDeltaStepIndex: number | null;
 	firstPublishedDeltaSeen: boolean;
 };
+
+/**
+ * Durability barrier for streamed part content. Queues the latest accumulated
+ * text (if any) and waits until every queued part-content write - text and
+ * reasoning - is on disk. Call at step finish, abort, and error.
+ */
+export async function flushRunnerTextPart(
+	state: RunnerTextState,
+	db: Awaited<ReturnType<typeof getDb>>,
+): Promise<void> {
+	if (state.currentPartId) {
+		queuePartContentWrite(
+			db,
+			state.currentPartId,
+			JSON.stringify({ text: state.accumulated }),
+		);
+	}
+	await flushPartContentWrites();
+}
 
 export async function handleRunnerTextDelta(args: {
 	delta: string;
@@ -100,9 +122,10 @@ export async function handleRunnerTextDelta(args: {
 			deltaPreview: delta.length > 80 ? `${delta.slice(0, 80)}…` : delta,
 		});
 	}
-	await db
-		.update(messageParts)
-		.set({ content: JSON.stringify({ text: state.accumulated }) })
-		.where(eq(messageParts.id, state.currentPartId));
+	queuePartContentWrite(
+		db,
+		state.currentPartId,
+		JSON.stringify({ text: state.accumulated }),
+	);
 	return true;
 }

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import {
 	consumeOauthCodexTextDelta,
 	createOauthCodexTextGuardState,
+	resetOauthCodexTextGuard,
 	stripCodexPseudoToolText,
 } from '../packages/server/src/runtime/stream/text-guard.ts';
 import { markSessionCompacted } from '../packages/server/src/runtime/message/compaction-mark.ts';
@@ -65,6 +66,31 @@ describe('oauth codex text guard', () => {
 
 		expect(emitted).toBe('I found the right file. ');
 		expect(state.dropped).toBe(true);
+	});
+
+	test('reset after tool boundary lets post-tool prose flow again', () => {
+		const state = createOauthCodexTextGuardState();
+
+		// Pre-tool text ends with a pseudo tool-call leak.
+		const before = consumeOauthCodexTextDelta(
+			state,
+			'Let me check. assistant to=functions.shell commentary {"cmd":"ls"}',
+		);
+		expect(before).toBe('Let me check.');
+		expect(state.dropped).toBe(true);
+
+		// Without a reset, EVERYTHING after the leak stays dropped.
+		expect(consumeOauthCodexTextDelta(state, ' The tests pass.')).toBe('');
+
+		// Structured tool part arrives -> runner resets the window.
+		resetOauthCodexTextGuard(state);
+
+		const after = consumeOauthCodexTextDelta(
+			state,
+			'All 4 tests pass, moving on.',
+		);
+		expect(after).toBe('All 4 tests pass, moving on.');
+		expect(state.dropped).toBe(false);
 	});
 
 	test('treats legacy assistant status "completed" as complete', async () => {

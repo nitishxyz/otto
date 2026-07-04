@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { createApp } from '@ottocode/server';
 import {
 	publish,
@@ -6,19 +6,21 @@ import {
 } from '../packages/server/src/events/bus.ts';
 
 const app = createApp();
-const server = Bun.serve({ port: 0, fetch: app.fetch });
-
-afterAll(() => {
-	server.stop(true);
-});
 
 interface ParsedEvent {
 	event: string;
 	data: Record<string, unknown>;
 }
 
-async function openStream(url: string, method: 'GET' | 'POST' = 'GET') {
-	const response = await fetch(url, { method });
+// Invoke the Hono app directly instead of going through a real socket and
+// global fetch: several suites stub globalThis.fetch (oauth clients) and
+// bun's pattern-discovery mode interleaves module loading, which poisoned
+// network-based reads when the whole tests/ directory ran together.
+async function openStream(path: string, method: 'GET' | 'POST' = 'GET') {
+	const abort = new AbortController();
+	const response = await app.fetch(
+		new Request(`http://localhost${path}`, { method, signal: abort.signal }),
+	);
 	expect(response.ok).toBe(true);
 	const reader = response.body?.getReader();
 	if (!reader) throw new Error('No response body');
@@ -59,13 +61,19 @@ async function openStream(url: string, method: 'GET' | 'POST' = 'GET') {
 		throw new Error('Timed out waiting for event');
 	};
 
-	return { next, close: () => reader.cancel() };
+	return {
+		next,
+		close: async () => {
+			abort.abort();
+			await reader.cancel().catch(() => {});
+		},
+	};
 }
 
 describe('multiplexed project events stream', () => {
 	it('carries session events with a sessionId envelope', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
 
 		publish({
@@ -86,7 +94,7 @@ describe('multiplexed project events stream', () => {
 
 	it('filters out events from other projects', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
 
 		publish({
@@ -112,7 +120,7 @@ describe('multiplexed project events stream', () => {
 
 	it('carries client events on the same connection', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
 
 		publishClientEvent({
@@ -134,7 +142,7 @@ describe('multiplexed project events stream', () => {
 
 	it('serves the POST alias for tunnels', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 			'POST',
 		);
 
@@ -155,7 +163,7 @@ describe('multiplexed project events stream', () => {
 
 	it('delivers events published with only a projectId', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
 
 		publish({
@@ -173,7 +181,7 @@ describe('multiplexed project events stream', () => {
 
 	it('does not double-deliver when a subscriber matches multiple keys', async () => {
 		const stream = await openStream(
-			`http://127.0.0.1:${server.port}/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
 
 		publish({
