@@ -61,7 +61,20 @@ export const updateTodosTool: Tool = tool({
 			.describe('Optional note or context for the update'),
 	}),
 	async execute({ todos }: { todos: TodoItemInput[]; note?: string }) {
-		normalizeItems(todos);
-		return { ok: true };
+		const items = normalizeItems(todos);
+		const remaining = items.filter(
+			(item) => item.status === 'pending' || item.status === 'in_progress',
+		).length;
+		return {
+			ok: true,
+			todos: items,
+			remaining,
+			...(remaining > 0
+				? {
+						reminder:
+							'Keep this list current: mark each item in_progress when you start it and completed immediately when done.',
+					}
+				: {}),
+		};
 	},
 });

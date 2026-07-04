@@ -39,7 +39,7 @@ function toAnthropicEffort(
 		case 'max':
 			return 'max';
 		case 'xhigh':
-			return isClaudeOpus47(model) ? 'xhigh' : 'max';
+			return supportsAnthropicXhighEffort(model) ? 'xhigh' : 'max';
 		default:
 			return 'high';
 	}
@@ -136,20 +136,36 @@ function buildSharedProviderOptions(
 	return Object.fromEntries(keys.map((key) => [key, options]));
 }
 
-export function isClaudeOpus47(model: string): boolean {
-	const lower = model.toLowerCase();
-	return lower.includes('claude-opus-4-7') || lower.includes('claude-opus-4.7');
+function matchesAnyClaudeModel(model: string, names: string[]): boolean {
+	const lower = model.toLowerCase().replace(/\./g, '-');
+	return names.some((name) => lower.includes(name));
 }
 
+// Models where thinking { type: 'enabled', budget_tokens } is rejected (400)
+// or deprecated; adaptive thinking with `effort` is required/recommended.
+// See https://platform.claude.com/docs/en/build-with-claude/extended-thinking
 function usesAdaptiveAnthropicThinking(model: string): boolean {
-	const lower = model.toLowerCase();
-	return (
-		isClaudeOpus47(model) ||
-		lower.includes('claude-opus-4-6') ||
-		lower.includes('claude-opus-4.6') ||
-		lower.includes('claude-sonnet-4-6') ||
-		lower.includes('claude-sonnet-4.6')
-	);
+	return matchesAnyClaudeModel(model, [
+		'claude-opus-4-6',
+		'claude-opus-4-7',
+		'claude-opus-4-8',
+		'claude-sonnet-4-6',
+		'claude-sonnet-5',
+		'claude-fable-5',
+		'claude-mythos',
+	]);
+}
+
+// xhigh effort is only accepted on these models; others reject it with 400.
+// See https://platform.claude.com/docs/en/build-with-claude/effort
+function supportsAnthropicXhighEffort(model: string): boolean {
+	return matchesAnyClaudeModel(model, [
+		'claude-opus-4-7',
+		'claude-opus-4-8',
+		'claude-sonnet-5',
+		'claude-fable-5',
+		'claude-mythos-5',
+	]);
 }
 
 export function buildAnthropicReasoningOptions({
@@ -158,14 +174,13 @@ export function buildAnthropicReasoningOptions({
 	maxOutputTokens,
 }: ReasoningBuilderArgs): ReasoningConfigResult {
 	if (usesAdaptiveAnthropicThinking(model)) {
-		const thinking = isClaudeOpus47(model)
-			? { type: 'adaptive', display: 'summarized' }
-			: { type: 'adaptive' };
-
 		return {
 			providerOptions: {
 				anthropic: {
-					thinking,
+					// Explicit display is required to receive thinking text on
+					// models where display defaults to 'omitted' (Opus 4.7/4.8,
+					// Sonnet 5, Fable 5, Mythos); it is a no-op on 4.6 models.
+					thinking: { type: 'adaptive', display: 'summarized' },
 					effort: toAnthropicEffort(model, reasoningLevel),
 				},
 			},

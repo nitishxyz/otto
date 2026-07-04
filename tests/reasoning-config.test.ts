@@ -28,7 +28,7 @@ describe('buildReasoningConfig', () => {
 		expect(result.enabled).toBe(true);
 		expect(result.providerOptions).toEqual({
 			anthropic: {
-				thinking: { type: 'adaptive' },
+				thinking: { type: 'adaptive', display: 'summarized' },
 				effort: 'max',
 			},
 		});
@@ -52,6 +52,45 @@ describe('buildReasoningConfig', () => {
 			},
 		});
 		expect(result.effectiveMaxOutputTokens).toBe(4000);
+	});
+
+	test('uses adaptive thinking with summarized display for newer Claude models', () => {
+		for (const model of ['claude-opus-4-8', 'claude-sonnet-5']) {
+			const result = buildReasoningConfig({
+				provider: 'anthropic',
+				model,
+				reasoningText: true,
+				reasoningLevel: 'xhigh',
+				maxOutputTokens: 4000,
+			});
+
+			expect(result.enabled).toBe(true);
+			expect(result.providerOptions).toEqual({
+				anthropic: {
+					thinking: { type: 'adaptive', display: 'summarized' },
+					effort: 'xhigh',
+				},
+			});
+			expect(result.effectiveMaxOutputTokens).toBe(4000);
+		}
+	});
+
+	test('downgrades xhigh to max on models without xhigh effort support', () => {
+		const result = buildReasoningConfig({
+			provider: 'anthropic',
+			model: 'claude-sonnet-4-6',
+			reasoningText: true,
+			reasoningLevel: 'xhigh',
+			maxOutputTokens: 4000,
+		});
+
+		expect(result.enabled).toBe(true);
+		expect(result.providerOptions).toEqual({
+			anthropic: {
+				thinking: { type: 'adaptive', display: 'summarized' },
+				effort: 'max',
+			},
+		});
 	});
 
 	test('uses OpenRouter request-level reasoning options', () => {
