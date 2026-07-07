@@ -267,12 +267,13 @@
 			"displayName": "Expo",
 			"publisher": "Expo",
 			"official": true,
-			"version": "1.0.0",
-			"description": "Official Expo AI agent skills, EAS setup recipes, dev commands, and the remote Expo MCP server.",
+			"version": "1.1.0",
+			"description": "Expo / React Native harness: specialist agent, official Expo skills, EAS recipes, dev commands, and device control via Argent and serve-sim.",
 			"homepage": "https://docs.expo.dev/skills/",
 			"repository": "https://github.com/expo/skills",
 			"platforms": ["darwin", "linux", "win32"],
 			"tags": ["expo", "react-native", "eas", "mcp", "mobile"],
+			"dependencies": ["argent", "serve-sim"],
 			"source": {
 				"type": "github",
 				"repo": "nitishxyz/otto",
@@ -421,6 +422,40 @@
 						"ref": "main",
 						"path": "plugins/expo/skills/use-dom",
 						"include": ["SKILL.md", "references/**"]
+					}
+				}
+			],
+			"agents": [
+				{
+					"name": "expo",
+					"path": "agents/expo.md",
+					"description": "Expo / React Native specialist: build features, run and verify on simulators/emulators, debug, profile, and ship via EAS.",
+					"tools": {
+						"firstClass": [
+							"skill",
+							"read",
+							"apply_patch",
+							"edit",
+							"multiedit",
+							"write",
+							"copy_into",
+							"ls",
+							"tree",
+							"shell",
+							"update_todos",
+							"glob",
+							"search",
+							"git_status",
+							"terminal",
+							"websearch"
+						],
+						"loadable": [
+							"read_image",
+							"simulator",
+							"browser",
+							"mcp_manager",
+							"run_plugin_command"
+						]
 					}
 				}
 			],
