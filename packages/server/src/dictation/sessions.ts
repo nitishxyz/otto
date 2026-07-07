@@ -40,6 +40,8 @@ export class DictationSessionError extends Error {
 export type CreateDictationSessionInput = {
 	model?: string;
 	language?: string;
+	prompt?: string;
+	projectRoot?: string;
 	format?: Partial<AudioFormat>;
 };
 
@@ -62,6 +64,8 @@ export class DictationSessionManager {
 			status: 'created',
 			model: input.model || DEFAULT_DICTATION_MODEL,
 			language: input.language || 'en',
+			prompt: input.prompt?.trim() || undefined,
+			projectRoot: input.projectRoot || undefined,
 			format,
 			createdAt: now,
 			updatedAt: now,
@@ -123,6 +127,7 @@ export class DictationSessionManager {
 		session.status = 'recording';
 		session.model = input.model || session.model;
 		session.language = input.language || session.language;
+		session.prompt = input.prompt?.trim() || session.prompt;
 		session.format = format;
 		touch(session);
 		this.transcriptionRunner

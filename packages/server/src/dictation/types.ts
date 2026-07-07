@@ -36,6 +36,8 @@ export type DictationSession = {
 	status: DictationSessionStatus;
 	model: string;
 	language: string;
+	prompt?: string;
+	projectRoot?: string;
 	format: AudioFormat;
 	createdAt: string;
 	updatedAt: string;
@@ -61,6 +63,7 @@ export type DictationStartMessage = {
 	type: 'start';
 	model?: string;
 	language?: string;
+	prompt?: string;
 	format?: Partial<AudioFormat>;
 	partialResults?: boolean;
 };

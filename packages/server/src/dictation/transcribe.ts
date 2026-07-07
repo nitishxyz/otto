@@ -2,6 +2,7 @@ import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
 import { getGlobalConfigDir } from '@ottocode/sdk';
 import { getDictationModelPath, getDictationTempDir } from './paths.ts';
+import { resolveDictationPrompt } from './prompt.ts';
 import type { DictationErrorCode, DictationSession } from './types.ts';
 
 export type DictationTranscriptionInput = {
@@ -56,6 +57,10 @@ export function createWhisperCppTranscriptionRunner(): DictationTranscriptionRun
 			const { binaryPath, modelPath } = await resolveWhisperRuntime(
 				input.session.model,
 			);
+			const prompt = await resolveDictationPrompt({
+				prompt: input.session.prompt,
+				projectRoot: input.session.projectRoot,
+			});
 
 			const { stdout } = await runWhisperCli([
 				binaryPath,
@@ -67,6 +72,7 @@ export function createWhisperCppTranscriptionRunner(): DictationTranscriptionRun
 				input.session.language || 'en',
 				'-nt',
 				'-np',
+				...(prompt ? ['--prompt', prompt] : []),
 			]);
 
 			return { text: extractTranscript(stdout) };

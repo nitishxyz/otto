@@ -71,6 +71,7 @@ export interface DictationModelInstallEvent {
 export interface CreateDictationSessionInput {
 	model?: string;
 	language?: string;
+	prompt?: string;
 }
 
 export interface CreateDictationSessionResponse {

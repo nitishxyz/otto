@@ -5,6 +5,7 @@ import {
 } from '../../dictation/models.ts';
 import { DEFAULT_DICTATION_MODEL } from '../../dictation/types.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { sessionResponse } from './helpers.ts';
 import {
 	createDictationSessionResponseSchema,
@@ -63,9 +64,14 @@ function registerCreateDictationSessionRoute(app: Hono) {
 			} catch {
 				modelInstalled = false;
 			}
+			const projectRoot = await resolveRequestProjectRoot(c).catch(
+				() => undefined,
+			);
 			const session = dictationSessions.create({
 				model: requestedModel,
 				language: typeof body.language === 'string' ? body.language : undefined,
+				prompt: typeof body.prompt === 'string' ? body.prompt : undefined,
+				projectRoot,
 			});
 			return c.json(
 				{

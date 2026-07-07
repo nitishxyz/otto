@@ -77,6 +77,7 @@ export const installModelBodySchema = z.object({
 export const createSessionBodySchema = z.object({
 	model: z.string().optional(),
 	language: z.string().optional(),
+	prompt: z.string().optional(),
 });
 
 export const dictationStatusResponseSchema = z.object({
