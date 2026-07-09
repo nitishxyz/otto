@@ -58,10 +58,7 @@ async function probe(
 		try {
 			body = JSON.parse(text);
 		} catch {}
-		log(
-			`${label} -> HTTP ${res.status} (${Date.now() - started}ms)`,
-			body,
-		);
+		log(`${label} -> HTTP ${res.status} (${Date.now() - started}ms)`, body);
 		if (res.status === 401) {
 			log(`${label} WWW-Authenticate`, res.headers.get('www-authenticate'));
 		}
@@ -93,9 +90,8 @@ async function main() {
 	// 2. Poll
 	const intervalMs = Math.max(device.interval, 1) * 1000;
 	const deadline = Date.now() + (device.expiresIn ?? 900) * 1000;
-	let tokens: Awaited<
-		ReturnType<typeof pollOttoRouterDeviceCodeOnce>
-	> | null = null;
+	let tokens: Awaited<ReturnType<typeof pollOttoRouterDeviceCodeOnce>> | null =
+		null;
 	let pollCount = 0;
 	while (Date.now() < deadline) {
 		pollCount += 1;
@@ -136,9 +132,13 @@ async function main() {
 	const bearer = { Authorization: `Bearer ${access}` };
 
 	// 4-6. Probes
-	await probe('GET /api/auth/oauth2/userinfo', `${BASE_URL}/api/auth/oauth2/userinfo`, {
-		headers: bearer,
-	});
+	await probe(
+		'GET /api/auth/oauth2/userinfo',
+		`${BASE_URL}/api/auth/oauth2/userinfo`,
+		{
+			headers: bearer,
+		},
+	);
 	await probe('GET /v1/balance', `${BASE_URL}/v1/balance`, { headers: bearer });
 	await probe('GET /v1/account', `${BASE_URL}/v1/account`, { headers: bearer });
 	await probe('POST /v1/chat/completions', `${BASE_URL}/v1/chat/completions`, {
@@ -162,11 +162,9 @@ async function main() {
 		});
 		const refreshedPayload = decodeJwtPayload(refreshed.access);
 		log('refreshed JWT payload', refreshedPayload ?? 'decode failed');
-		await probe(
-			'GET /v1/balance (refreshed token)',
-			`${BASE_URL}/v1/balance`,
-			{ headers: { Authorization: `Bearer ${refreshed.access}` } },
-		);
+		await probe('GET /v1/balance (refreshed token)', `${BASE_URL}/v1/balance`, {
+			headers: { Authorization: `Bearer ${refreshed.access}` },
+		});
 	} catch (err) {
 		log('refresh FAILED', err instanceof Error ? err.message : String(err));
 	}
