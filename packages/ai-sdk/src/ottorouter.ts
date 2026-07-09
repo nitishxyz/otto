@@ -7,12 +7,10 @@ import type {
 	WalletUsdcBalance,
 	OttoRouterAuth,
 } from './types.ts';
-import { createWalletContext } from './auth.ts';
-import type { WalletContext } from './auth.ts';
 import { createOttoRouterFetch } from './fetch.ts';
 import { ProviderRegistry } from './providers/registry.ts';
 import { createModel } from './providers/factory.ts';
-import { fetchBalance, fetchWalletUsdcBalance } from './balance.ts';
+import { fetchBalance } from './balance.ts';
 
 const DEFAULT_BASE_URL = 'https://api.ottorouter.org';
 
@@ -39,34 +37,23 @@ export interface OttoRouterInstance {
 	registry: ProviderRegistry;
 }
 
-function resolveAuth(auth: OttoRouterAuth): {
-	auth: OttoRouterAuth;
-	wallet: WalletContext;
-} {
-	if (auth.signer) {
-		return { auth, wallet: createWalletContext(auth) };
+function resolveAuth(auth: OttoRouterAuth): OttoRouterAuth {
+	if (auth.accessToken || auth.refreshToken) {
+		return auth;
 	}
 
-	const privateKey = auth.privateKey || process.env.OTTOROUTER_PRIVATE_KEY;
-	if (!privateKey) {
-		throw new Error(
-			'OttoRouter: either privateKey (or OTTOROUTER_PRIVATE_KEY env) or signer is required.',
-		);
-	}
-	const resolvedAuth = { ...auth, privateKey };
-	return { auth: resolvedAuth, wallet: createWalletContext(resolvedAuth) };
+	throw new Error('OttoRouter: OAuth token is required.');
 }
 
 export function createOttoRouter(config: OttoRouterConfig): OttoRouterInstance {
 	const baseURL = trimTrailingSlash(config.baseURL ?? DEFAULT_BASE_URL);
-	const { auth: resolvedAuth, wallet } = resolveAuth(config.auth);
+	const resolvedAuth = resolveAuth(config.auth);
 	const registry = new ProviderRegistry(config.providers, config.modelMap);
 
 	const ottorouterFetch = createOttoRouterFetch({
-		wallet,
+		auth: resolvedAuth,
 		baseURL,
 		fetch: config.fetch,
-		rpcURL: config.rpcURL,
 		callbacks: config.callbacks,
 		cache: config.cache,
 		payment: config.payment,
@@ -117,24 +104,15 @@ export function createOttoRouter(config: OttoRouterConfig): OttoRouterInstance {
 		},
 
 		async balance() {
-			return fetchBalance(wallet, baseURL);
+			return fetchBalance(resolvedAuth, baseURL);
 		},
 
 		async walletBalance(network?: 'mainnet' | 'devnet') {
-			const walletAddr = wallet.walletAddress;
-			if (!resolvedAuth.privateKey && !walletAddr) {
-				return null;
-			}
-			if (resolvedAuth.privateKey) {
-				return fetchWalletUsdcBalance(
-					resolvedAuth as Required<Pick<OttoRouterAuth, 'privateKey'>>,
-					network,
-				);
-			}
-			return fetchWalletUsdcBalance({ walletAddress: walletAddr }, network);
+			void network;
+			return null;
 		},
 
-		walletAddress: wallet.walletAddress,
+		walletAddress: null,
 
 		registry,
 	};

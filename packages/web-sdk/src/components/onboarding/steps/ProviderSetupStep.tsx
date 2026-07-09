@@ -6,6 +6,7 @@ import {
 	X,
 	Key,
 	ExternalLink,
+	LogOut,
 	ArrowRight,
 	RefreshCw,
 	Plus,
@@ -13,7 +14,6 @@ import {
 	Laptop,
 	Globe,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { ProviderLogo } from '../../common/ProviderLogo';
 import { StableSpinner } from '../../ui/StableSpinner';
 import type { AuthStatus } from '../../../stores/onboardingStore';
@@ -99,8 +99,6 @@ function buildCustomProviderModelMap(
 
 interface ProviderSetupStepProps {
 	authStatus: AuthStatus;
-	onSetupWallet: () => Promise<unknown>;
-	onImportWallet: (privateKey: string) => Promise<unknown>;
 	onAddProvider: (provider: string, apiKey: string) => Promise<unknown>;
 	onAddCustomProvider: (data: {
 		id: string;
@@ -154,6 +152,15 @@ interface ProviderSetupStepProps {
 	onPollKimiDeviceFlow?: (
 		sessionId: string,
 	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
+	onStartOttoRouterDeviceFlow?: () => Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}>;
+	onPollOttoRouterDeviceFlow?: (
+		sessionId: string,
+	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
 	onGetCopilotAuthMethods?: () => Promise<{
 		oauth: boolean;
 		token: boolean;
@@ -195,8 +202,6 @@ interface ProviderSetupStepProps {
 
 export const ProviderSetupStep = memo(function ProviderSetupStep({
 	authStatus,
-	onSetupWallet,
-	onImportWallet,
 	onAddProvider,
 	onAddCustomProvider,
 	onRemoveProvider,
@@ -214,19 +219,14 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	onPollCopilotDeviceFlow,
 	onStartKimiDeviceFlow,
 	onPollKimiDeviceFlow,
+	onStartOttoRouterDeviceFlow,
+	onPollOttoRouterDeviceFlow,
 	onGetCopilotAuthMethods,
 	onSaveCopilotToken,
 	onImportCopilotTokenFromGh,
 	onGetCopilotDiagnostics,
 }: ProviderSetupStepProps) {
-	const [copied, setCopied] = useState(false);
 	const [isSettingUp, setIsSettingUp] = useState(false);
-	const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-	const [importPrivateKey, setImportPrivateKey] = useState('');
-	const [isImportingWallet, setIsImportingWallet] = useState(false);
-	const [importWalletError, setImportWalletError] = useState<string | null>(
-		null,
-	);
 	const [addingProvider, setAddingProvider] = useState<string | null>(null);
 	const [apiKeyInput, setApiKeyInput] = useState('');
 	const [isCustomProviderModalOpen, setIsCustomProviderModalOpen] =
@@ -335,13 +335,18 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const kimiPollFnRef = useRef(onPollKimiDeviceFlow);
 	kimiPollFnRef.current = onPollKimiDeviceFlow;
 	const balance = useOttoRouterStore((s) => s.balance);
-	const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 	const payg = useOttoRouterStore((s) => s.payg);
 	const subscription = useOttoRouterStore((s) => s.subscription);
 	const isBalanceLoading = useOttoRouterStore((s) => s.isLoading);
+	const setOttoRouterBalance = useOttoRouterStore((s) => s.setBalance);
+	const setOttoRouterScope = useOttoRouterStore((s) => s.setScope);
+	const setOttoRouterPayg = useOttoRouterStore((s) => s.setPayg);
+	const setOttoRouterSubscription = useOttoRouterStore(
+		(s) => s.setSubscription,
+	);
+	const setOttoRouterLimits = useOttoRouterStore((s) => s.setLimits);
 	const apiKeyInputRef = useRef<HTMLInputElement>(null);
 	const oauthCodeInputRef = useRef<HTMLInputElement>(null);
-	const importPrivateKeyRef = useRef<HTMLTextAreaElement>(null);
 	const isTopupModalOpen = useOttoRouterStore((s) => s.isTopupModalOpen);
 	const prevTopupModalOpen = useRef(false);
 	const { fetchBalance } = useOttoRouterBalance('ottorouter');
@@ -358,13 +363,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		}
 		prevTopupModalOpen.current = isTopupModalOpen;
 	}, [isTopupModalOpen, fetchBalance]);
-
-	useEffect(() => {
-		if (!authStatus.ottorouter.configured && !isSettingUp) {
-			setIsSettingUp(true);
-			onSetupWallet().finally(() => setIsSettingUp(false));
-		}
-	}, [authStatus.ottorouter.configured, onSetupWallet, isSettingUp]);
 
 	useEffect(() => {
 		if (addingProvider && apiKeyInputRef.current) {
@@ -385,12 +383,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			setOauthCodeInput('');
 		}
 	}, [authStatus.providers, oauthSession]);
-
-	useEffect(() => {
-		if (isImportModalOpen && importPrivateKeyRef.current) {
-			importPrivateKeyRef.current.focus();
-		}
-	}, [isImportModalOpen]);
 
 	useEffect(() => {
 		if (!copilotPolling || !copilotDevice || !copilotPollFnRef.current) return;
@@ -527,16 +519,31 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		};
 	}, [kimiPolling, kimiDevice]);
 
-	const handleCopy = async () => {
-		if (authStatus.ottorouter.publicKey) {
-			await navigator.clipboard.writeText(authStatus.ottorouter.publicKey);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
+	const handleStartOttoRouterOAuth = async () => {
+		if (!onStartOttoRouterDeviceFlow || !onPollOttoRouterDeviceFlow) return;
+		setIsSettingUp(true);
+		try {
+			const device = await onStartOttoRouterDeviceFlow();
+			openUrl(device.verificationUri);
+			const timeoutAt = Date.now() + 15 * 60 * 1000;
+			while (Date.now() < timeoutAt) {
+				const result = await onPollOttoRouterDeviceFlow(device.sessionId);
+				if (result.status === 'complete') {
+					await fetchBalance();
+					return;
+				}
+				if (result.status === 'error') {
+					throw new Error(result.error ?? 'OttoRouter OAuth failed');
+				}
+				await new Promise((resolve) =>
+					setTimeout(resolve, Math.max(1, device.interval) * 1000),
+				);
+			}
+			throw new Error('OttoRouter OAuth timed out');
+		} finally {
+			setIsSettingUp(false);
 		}
 	};
-
-	const truncateAddress = (addr: string) =>
-		`${addr.slice(0, 8)}...${addr.slice(-6)}`;
 
 	const handleAddProvider = async (providerId: string) => {
 		if (!apiKeyInput.trim()) return;
@@ -679,6 +686,13 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			setRemovingProvider(providerId);
 			try {
 				await onRemoveProvider(providerId);
+				if (providerId === 'ottorouter') {
+					setOttoRouterBalance(null);
+					setOttoRouterScope(null);
+					setOttoRouterPayg(null);
+					setOttoRouterSubscription(null);
+					setOttoRouterLimits(null);
+				}
 			} finally {
 				setRemovingProvider(null);
 				setConfirmingDelete(null);
@@ -965,19 +979,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		}
 	};
 
-	const handleOpenImportWallet = () => {
-		setImportWalletError(null);
-		setImportPrivateKey('');
-		setIsImportModalOpen(true);
-	};
-
-	const handleCloseImportWallet = () => {
-		if (isImportingWallet) return;
-		setIsImportModalOpen(false);
-		setImportWalletError(null);
-		setImportPrivateKey('');
-	};
-
 	useEffect(() => {
 		const handleNativeBack = (event: Event) => {
 			const customEvent = event as CustomEvent<{ handled?: boolean }>;
@@ -1003,16 +1004,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					setCustomProviderError(null);
 					setDiscoveredCustomModels([]);
 					setCustomProviderDiscoveryMessage(null);
-				}
-				return;
-			}
-
-			if (isImportModalOpen) {
-				markHandled();
-				if (!isImportingWallet) {
-					setIsImportModalOpen(false);
-					setImportWalletError(null);
-					setImportPrivateKey('');
 				}
 				return;
 			}
@@ -1092,31 +1083,11 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		isAddingCustomProvider,
 		isCustomProviderModalOpen,
 		isExchangingCode,
-		isImportingWallet,
-		isImportModalOpen,
 		isOpeningPopup,
 		kimiLoading,
 		kimiModalOpen,
 		oauthSession,
 	]);
-
-	const handleImportWallet = async () => {
-		if (!importPrivateKey.trim() || isImportingWallet) return;
-		setIsImportingWallet(true);
-		setImportWalletError(null);
-		try {
-			await onImportWallet(importPrivateKey.trim());
-			setIsImportModalOpen(false);
-			setImportPrivateKey('');
-			fetchBalance();
-		} catch (err) {
-			setImportWalletError(
-				err instanceof Error ? err.message : 'Failed to import wallet',
-			);
-		} finally {
-			setIsImportingWallet(false);
-		}
-	};
 
 	const configuredProviders = Object.entries(authStatus.providers).filter(
 		([id, info]) => info.configured && id !== 'ottorouter',
@@ -1160,54 +1131,39 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					</div>
 
 					<div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-						{/* Left Column - Wallet */}
+						{/* Left Column - OttoRouter */}
 						<div>
 							<div className="bg-card rounded-2xl border border-border p-5">
-								{authStatus.ottorouter.configured &&
-								authStatus.ottorouter.publicKey ? (
-									<div className="flex flex-col h-full">
-										{/* OttoRouter Default Provider Badge */}
-										<div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-											<ProviderLogo provider="ottorouter" size={16} />
-											<span className="text-sm font-medium text-green-600 dark:text-green-400">
-												OttoRouter
-											</span>
-											<span className="text-xs text-green-600/60 dark:text-green-500/60 ml-auto">
-												Default Provider
-											</span>
-										</div>
+								<div className="flex flex-col h-full gap-4">
+									<div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+										<ProviderLogo provider="ottorouter" size={16} />
+										<span className="text-sm font-medium text-green-600 dark:text-green-400">
+											OttoRouter
+										</span>
+										<span className="text-xs text-green-600/60 dark:text-green-500/60 ml-auto">
+											Default Provider
+										</span>
+									</div>
 
-										<div className="flex justify-center py-4 mt-4">
-											<div className="bg-white p-2 rounded-lg">
-												<QRCodeSVG
-													value={authStatus.ottorouter.publicKey}
-													size={140}
-													level="M"
-												/>
-											</div>
-										</div>
+									<div className="space-y-2">
+										<h2 className="text-lg font-semibold text-foreground">
+											{authStatus.ottorouter.configured
+												? 'OAuth connected'
+												: 'Connect OttoRouter'}
+										</h2>
+										<p className="text-sm text-muted-foreground">
+											Authenticate once with OttoRouter OAuth, then use credits
+											and card top-ups from this account.
+										</p>
+									</div>
 
-										<div className="space-y-2 mt-4">
-											<button
-												type="button"
-												onClick={handleCopy}
-												className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-mono text-muted-foreground transition-colors"
-											>
-												{truncateAddress(authStatus.ottorouter.publicKey)}
-												{copied ? (
-													<Check className="w-3.5 h-3.5 text-green-500" />
-												) : (
-													<Copy className="w-3.5 h-3.5 text-muted-foreground" />
-												)}
-											</button>
-
+									{authStatus.ottorouter.configured ? (
+										<>
 											<div className="space-y-1.5 px-3 py-2 bg-muted/50 rounded-lg">
 												<div className="flex items-center justify-between gap-2">
-													<div className="flex items-center gap-1.5 min-w-0">
-														<span className="font-mono text-xs sm:text-sm text-foreground truncate">
-															{ottorouterStatusLabel}
-														</span>
-													</div>
+													<span className="font-mono text-xs sm:text-sm text-foreground truncate">
+														{ottorouterStatusLabel}
+													</span>
 													<button
 														type="button"
 														onClick={fetchBalance}
@@ -1225,48 +1181,74 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 													</button>
 												</div>
 												<span className="text-[10px] text-muted-foreground font-mono">
-													Balance ${(balance ?? 0).toFixed(2)} • On-chain{' '}
-													{(usdcBalance ?? 0).toFixed(2)} USDC
+													Account balance ${(balance ?? 0).toFixed(2)}
 												</span>
 											</div>
-										</div>
-
-										{/* OR Divider */}
-										<div className="flex items-center gap-4 py-4">
-											<div className="flex-1 h-px bg-border" />
-											<span className="text-xs text-muted-foreground font-medium">
-												OR
-											</span>
-											<div className="flex-1 h-px bg-border" />
-										</div>
-
+											<button
+												type="button"
+												onClick={onOpenTopup}
+												className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+											>
+												<CreditCard className="w-4 h-4" />
+												Top Up with Card
+											</button>
+											{confirmingDelete === 'ottorouter' ? (
+												<div className="flex gap-2">
+													<button
+														type="button"
+														onClick={() => handleRemoveProvider('ottorouter')}
+														disabled={removingProvider === 'ottorouter'}
+														className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
+													>
+														{removingProvider === 'ottorouter' ? (
+															<StableSpinner size="sm" title="Signing out" />
+														) : (
+															<LogOut className="w-4 h-4" />
+														)}
+														Confirm
+													</button>
+													<button
+														type="button"
+														onClick={handleCancelDelete}
+														className="px-4 py-2.5 bg-muted text-muted-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
+													>
+														Cancel
+													</button>
+												</div>
+											) : (
+												<button
+													type="button"
+													onClick={() => handleRemoveProvider('ottorouter')}
+													className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-red-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
+												>
+													<LogOut className="w-4 h-4" />
+													Sign Out
+												</button>
+											)}
+										</>
+									) : (
 										<button
 											type="button"
-											onClick={onOpenTopup}
-											className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+											onClick={handleStartOttoRouterOAuth}
+											disabled={
+												isSettingUp ||
+												!onStartOttoRouterDeviceFlow ||
+												!onPollOttoRouterDeviceFlow
+											}
+											className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
 										>
-											<CreditCard className="w-4 h-4" />
-											Top Up with Card
+											{isSettingUp ? (
+												<StableSpinner
+													size="sm"
+													title="Connecting OttoRouter"
+												/>
+											) : (
+												<ExternalLink className="w-4 h-4" />
+											)}
+											Authenticate with OAuth
 										</button>
-
-										<button
-											type="button"
-											onClick={handleOpenImportWallet}
-											className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 border border-border text-foreground rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors"
-										>
-											<Key className="w-4 h-4" />
-											Import Wallet
-										</button>
-									</div>
-								) : (
-									<div className="flex items-center justify-center py-16">
-										<StableSpinner
-											size="xl"
-											className="text-muted-foreground"
-											title="Loading OttoRouter wallet"
-										/>
-									</div>
-								)}
+									)}
+								</div>
 							</div>
 						</div>
 
@@ -1791,67 +1773,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										<StableSpinner title="Adding provider" />
 									) : (
 										'Add Provider'
-									)}
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{isImportModalOpen && (
-				<div
-					data-otto-nested-modal="true"
-					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-				>
-					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
-						<div className="flex items-center gap-3 p-6 border-b border-border">
-							<ProviderLogo provider="ottorouter" size={24} />
-							<h3 className="text-lg font-semibold">
-								Import OttoRouter Wallet
-							</h3>
-						</div>
-						<div className="p-6">
-							<p className="text-sm text-muted-foreground mb-4">
-								Paste your base58 private key to replace the current wallet used
-								for OttoRouter.
-							</p>
-							<textarea
-								ref={importPrivateKeyRef}
-								value={importPrivateKey}
-								onChange={(e) => setImportPrivateKey(e.target.value)}
-								placeholder="Enter private key"
-								className="w-full min-h-[110px] px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-xs resize-y"
-								onKeyDown={(e) => {
-									if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-										e.preventDefault();
-										handleImportWallet();
-									}
-									if (e.key === 'Escape') handleCloseImportWallet();
-								}}
-							/>
-							{importWalletError && (
-								<p className="text-sm text-red-500 mt-3">{importWalletError}</p>
-							)}
-							<div className="flex gap-3 mt-5">
-								<button
-									type="button"
-									onClick={handleCloseImportWallet}
-									disabled={isImportingWallet}
-									className="flex-1 h-11 px-4 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors disabled:opacity-50"
-								>
-									Cancel
-								</button>
-								<button
-									type="button"
-									onClick={handleImportWallet}
-									disabled={!importPrivateKey.trim() || isImportingWallet}
-									className="flex-1 h-11 px-4 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-								>
-									{isImportingWallet ? (
-										<StableSpinner title="Importing wallet" />
-									) : (
-										'Import Wallet'
 									)}
 								</button>
 							</div>

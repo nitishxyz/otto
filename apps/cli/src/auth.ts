@@ -35,8 +35,8 @@ import {
 	exchangeXai,
 	openXaiAuthUrl,
 	readGrokCliAuth,
-	generateWallet,
-	importWallet,
+	pollOttoRouterDeviceCodeOnce,
+	requestOttoRouterDeviceCode,
 	authorizeCopilot,
 	pollForCopilotToken,
 	openCopilotAuthUrl,
@@ -99,7 +99,7 @@ const PROVIDER_LINKS: Record<
 	ottorouter: {
 		name: 'OttoRouter',
 		url: 'https://dash.ottorouter.org',
-		env: 'OTTOROUTER_PRIVATE_KEY',
+		env: 'OAuth',
 	},
 	xai: {
 		name: 'xAI',
@@ -236,6 +236,8 @@ async function maybeImportEnvCredential(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
 ): Promise<'imported' | 'continue' | 'cancelled'> {
+	if (provider === 'ottorouter') return 'continue';
+
 	const envValue = readEnvKey(provider);
 	if (!envValue) return 'continue';
 
@@ -255,14 +257,7 @@ async function maybeImportEnvCredential(
 
 	if (choice !== 'import') return 'continue';
 
-	if (provider === 'ottorouter') {
-		await setAuth(
-			provider,
-			{ type: 'wallet', secret: envValue },
-			cfg.projectRoot,
-			'global',
-		);
-	} else if (provider === 'copilot') {
+	if (provider === 'copilot') {
 		await setAuth(
 			provider,
 			{ type: 'oauth', refresh: envValue, access: envValue, expires: 0 },
@@ -1248,71 +1243,78 @@ async function runAuthLoginOttoRouter(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
 ): Promise<boolean> {
-	log.info('OttoRouter uses a Solana wallet for authentication.');
+	try {
+		log.info('Starting OttoRouter OAuth device flow...');
+		const deviceData = await requestOttoRouterDeviceCode();
+		const verificationUri =
+			deviceData.verificationUriComplete ?? deviceData.verificationUri;
 
-	const authMethod = (await select({
-		message: 'Select wallet option',
-		options: [
-			{ value: 'create', label: 'Create new wallet' },
-			{ value: 'import', label: 'Import existing wallet' },
-		],
-	})) as 'create' | 'import' | symbol;
+		log.info(`Opening browser: ${verificationUri}`);
+		log.info(`Enter code: ${colors.cyan(deviceData.userCode)}\n`);
 
-	if (isCancel(authMethod)) {
-		cancel('Cancelled');
+		const opened = await openAuthUrl(verificationUri);
+		if (!opened) {
+			log.warn(
+				'Could not open browser automatically. Please visit the URL above manually.\n',
+			);
+		}
+
+		log.info('Waiting for OttoRouter authorization...');
+		const startedAt = Date.now();
+		const expiresAt = startedAt + (deviceData.expiresIn ?? 900) * 1000;
+		let tokens: Awaited<
+			ReturnType<typeof pollOttoRouterDeviceCodeOnce>
+		> | null = null;
+		while (Date.now() < expiresAt) {
+			await new Promise((resolve) =>
+				setTimeout(resolve, Math.max(1, deviceData.interval) * 1000),
+			);
+			const result = await pollOttoRouterDeviceCodeOnce(deviceData.deviceCode);
+			if (result.status === 'pending') continue;
+			tokens = result;
+			break;
+		}
+
+		if (!tokens || tokens.status !== 'complete') {
+			log.error(
+				tokens?.status === 'error'
+					? tokens.error
+					: 'OttoRouter OAuth authorization timed out.',
+			);
+			outro('Failed');
+			return false;
+		}
+
+		await setAuth(
+			'ottorouter',
+			{
+				type: 'oauth',
+				refresh: tokens.tokens.refresh,
+				access: tokens.tokens.access,
+				expires: tokens.tokens.expires,
+				idToken: tokens.tokens.idToken,
+				scopes: tokens.tokens.scopes,
+			},
+			cfg.projectRoot,
+			'global',
+		);
+		if (wantLocal)
+			log.warn(
+				'Local credential storage is disabled; saved to secure global location.',
+			);
+		await finalizeSuccessfulLogin('ottorouter');
+		log.success('OttoRouter OAuth authorized!');
+		log.info(
+			`Token expires: ${new Date(tokens.tokens.expires).toLocaleString()}`,
+		);
+		outro('Done');
+		return true;
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		log.error(`Authentication failed: ${message}`);
+		outro('Failed');
 		return false;
 	}
-
-	let privateKeyBase58: string;
-	let publicKey: string;
-
-	if (authMethod === 'create') {
-		const wallet = generateWallet();
-		privateKeyBase58 = wallet.privateKey;
-		publicKey = wallet.publicKey;
-		log.info('Generated new Solana wallet');
-	} else {
-		const key = await password({
-			message: `Paste ${PROVIDER_LINKS.ottorouter.env} (base58 private key)`,
-			validate: (v) =>
-				v && String(v).trim().length > 0
-					? undefined
-					: 'Private key is required',
-		});
-		if (isCancel(key)) {
-			cancel('Cancelled');
-			return false;
-		}
-		try {
-			const wallet = importWallet(String(key));
-			privateKeyBase58 = wallet.privateKey;
-			publicKey = wallet.publicKey;
-		} catch {
-			log.error(
-				'Invalid private key format. Please provide a valid base58 encoded private key.',
-			);
-			return false;
-		}
-	}
-
-	await setAuth(
-		'ottorouter',
-		{ type: 'wallet', secret: privateKeyBase58 },
-		cfg.projectRoot,
-		'global',
-	);
-	if (wantLocal)
-		log.warn(
-			'Local credential storage is disabled; saved to secure global location.',
-		);
-	await finalizeSuccessfulLogin('ottorouter');
-	log.success('Saved');
-	console.log(`  Wallet Public Key: ${colors.cyan(publicKey)}`);
-	console.log(
-		`  Tip: you can also set ${PROVIDER_LINKS.ottorouter.env} in your environment.`,
-	);
-	outro('Done');
-	return true;
 }
 
 async function runAuthLoginCopilot(
@@ -1482,7 +1484,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 		? modelMapToList(catalog[provider]?.models ?? {})
 		: [];
 	const defaultModel =
-		(provider === 'xai' ? 'grok-4.3' : undefined) ||
+		(provider === 'xai' ? 'grok-4.5' : undefined) ||
 		models[0]?.id ||
 		(provider === 'anthropic'
 			? 'claude-3-haiku'

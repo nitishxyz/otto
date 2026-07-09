@@ -5,8 +5,6 @@ import { useUsageStore } from '../stores/usageStore';
 
 export function useOttoRouterBalance(providerName: string | undefined) {
 	const setBalance = useOttoRouterStore((s) => s.setBalance);
-	const setUsdcBalance = useOttoRouterStore((s) => s.setUsdcBalance);
-	const setWalletAddress = useOttoRouterStore((s) => s.setWalletAddress);
 	const setLoading = useOttoRouterStore((s) => s.setLoading);
 	const setScope = useOttoRouterStore((s) => s.setScope);
 	const setPayg = useOttoRouterStore((s) => s.setPayg);
@@ -14,9 +12,7 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 	const setLimits = useOttoRouterStore((s) => s.setLimits);
 	const setUsage = useUsageStore((s) => s.setUsage);
 	const balance = useOttoRouterStore((s) => s.balance);
-	const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 	const subscription = useOttoRouterStore((s) => s.subscription);
-	const network = useOttoRouterStore((s) => s.network);
 
 	const fetchBalance = useCallback(async () => {
 		if (providerName !== 'ottorouter') {
@@ -25,15 +21,10 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 
 		setLoading(true);
 		try {
-			const [ottorouterData, usdcData, walletData] = await Promise.all([
-				apiClient.getOttoRouterBalance(),
-				apiClient.getOttoRouterUsdcBalance(network),
-				apiClient.getOttoRouterWallet(),
-			]);
+			const ottorouterData = await apiClient.getOttoRouterBalance();
 
 			if (ottorouterData) {
 				setBalance(ottorouterData.balance);
-				setWalletAddress(ottorouterData.walletAddress);
 				setScope(ottorouterData.scope ?? null);
 				setPayg(ottorouterData.payg ?? null);
 				setSubscription(ottorouterData.subscription ?? null);
@@ -57,15 +48,6 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 						planType: sub.tierName ?? 'GO',
 					});
 				}
-			} else if (walletData?.configured && walletData.publicKey) {
-				setWalletAddress(walletData.publicKey);
-			}
-
-			if (usdcData) {
-				setUsdcBalance(usdcData.usdcBalance);
-				if (!ottorouterData && usdcData.walletAddress) {
-					setWalletAddress(usdcData.walletAddress);
-				}
 			}
 		} catch {
 		} finally {
@@ -73,10 +55,7 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 		}
 	}, [
 		providerName,
-		network,
 		setBalance,
-		setUsdcBalance,
-		setWalletAddress,
 		setLoading,
 		setScope,
 		setPayg,
@@ -90,11 +69,11 @@ export function useOttoRouterBalance(providerName: string | undefined) {
 	useEffect(() => {
 		if (
 			providerName === 'ottorouter' &&
-			(balance === null || usdcBalance === null || needsUsageWindows)
+			(balance === null || needsUsageWindows)
 		) {
 			fetchBalance();
 		}
-	}, [providerName, balance, usdcBalance, needsUsageWindows, fetchBalance]);
+	}, [providerName, balance, needsUsageWindows, fetchBalance]);
 
 	return {
 		fetchBalance,

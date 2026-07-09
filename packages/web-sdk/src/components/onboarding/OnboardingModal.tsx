@@ -27,8 +27,6 @@ export const OnboardingModal = memo(function OnboardingModal({
 	const openTopupModal = useOttoRouterStore((s) => s.openTopupModal);
 
 	const {
-		setupWallet,
-		importWallet,
 		addProvider,
 		addCustomProvider,
 		removeProvider,
@@ -42,6 +40,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 		pollCopilotDeviceFlow,
 		startKimiDeviceFlow,
 		pollKimiDeviceFlow,
+		startOttoRouterDeviceFlow,
+		pollOttoRouterDeviceFlow,
 		getCopilotAuthMethods,
 		saveCopilotToken,
 		importCopilotTokenFromGh,
@@ -91,8 +91,6 @@ export const OnboardingModal = memo(function OnboardingModal({
 			) : currentStep === 'wallet' ? (
 				<ProviderSetupStep
 					authStatus={authStatus}
-					onSetupWallet={setupWallet}
-					onImportWallet={importWallet}
 					onAddProvider={addProvider}
 					onAddCustomProvider={addCustomProvider}
 					onRemoveProvider={removeProvider}
@@ -110,6 +108,8 @@ export const OnboardingModal = memo(function OnboardingModal({
 					onPollCopilotDeviceFlow={pollCopilotDeviceFlow}
 					onStartKimiDeviceFlow={startKimiDeviceFlow}
 					onPollKimiDeviceFlow={pollKimiDeviceFlow}
+					onStartOttoRouterDeviceFlow={startOttoRouterDeviceFlow}
+					onPollOttoRouterDeviceFlow={pollOttoRouterDeviceFlow}
 					onGetCopilotAuthMethods={getCopilotAuthMethods}
 					onSaveCopilotToken={saveCopilotToken}
 					onImportCopilotTokenFromGh={importCopilotTokenFromGh}

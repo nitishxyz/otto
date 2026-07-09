@@ -5,17 +5,16 @@ import { normalizeThemeId, themeList, type ThemeId } from '@ottocode/themes';
 import {
 	Settings,
 	ChevronRight,
-	Wallet,
+	CreditCard,
 	Cpu,
 	Zap,
 	User,
 	ChevronDown,
 	RefreshCw,
+	LogOut,
 	Plus,
 	Pencil,
-	Copy,
 	Check,
-	Key,
 	Type,
 	Brain,
 	BarChart3,
@@ -24,7 +23,6 @@ import {
 	ChefHat,
 	Puzzle,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { SidebarHeader } from '../ui/SidebarHeader';
@@ -47,7 +45,6 @@ import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
 import { ResizeHandle } from '../ui/ResizeHandle';
-import { apiClient } from '../../lib/api-client';
 import {
 	hasPlatformSystemFonts,
 	listPlatformSystemFonts,
@@ -1045,11 +1042,17 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 	const { data: config } = useConfig();
 	const { data: allModels } = useAllModels();
 	const updateDefaults = useUpdateDefaults();
+	const [isSigningOutOttoRouter, setIsSigningOutOttoRouter] = useState(false);
 	const ottorouterBalance = useOttoRouterStore((s) => s.balance);
-	const ottorouterWallet = useOttoRouterStore((s) => s.walletAddress);
-	const ottorouterUsdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 	const ottorouterLoading = useOttoRouterStore((s) => s.isLoading);
 	const openTopupModal = useOttoRouterStore((s) => s.openTopupModal);
+	const setOttoRouterBalance = useOttoRouterStore((s) => s.setBalance);
+	const setOttoRouterScope = useOttoRouterStore((s) => s.setScope);
+	const setOttoRouterPayg = useOttoRouterStore((s) => s.setPayg);
+	const setOttoRouterSubscription = useOttoRouterStore(
+		(s) => s.setSubscription,
+	);
+	const setOttoRouterLimits = useOttoRouterStore((s) => s.setLimits);
 
 	// Handle topup success callback from Polar checkout redirect
 	useTopupCallback();
@@ -1062,11 +1065,28 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 	const setOnboardingOpen = useOnboardingStore((s) => s.setOpen);
 	const setStep = useOnboardingStore((s) => s.setStep);
 	const setManageMode = useOnboardingStore((s) => s.setManageMode);
-	const { fetchAuthStatus } = useAuthStatus();
+	const { fetchAuthStatus, removeProvider } = useAuthStatus();
 
-	const exportOttoRouterPrivateKey = useCallback(async () => {
-		return await apiClient.exportOttoRouterWallet();
-	}, []);
+	const handleSignOutOttoRouter = useCallback(async () => {
+		setIsSigningOutOttoRouter(true);
+		try {
+			await removeProvider('ottorouter');
+			setOttoRouterBalance(null);
+			setOttoRouterScope(null);
+			setOttoRouterPayg(null);
+			setOttoRouterSubscription(null);
+			setOttoRouterLimits(null);
+		} finally {
+			setIsSigningOutOttoRouter(false);
+		}
+	}, [
+		removeProvider,
+		setOttoRouterBalance,
+		setOttoRouterScope,
+		setOttoRouterPayg,
+		setOttoRouterSubscription,
+		setOttoRouterLimits,
+	]);
 
 	const providerOptions = useMemo(() => {
 		if (!config?.providers || !allModels) return [];
@@ -1223,13 +1243,12 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 
 					{config?.providers?.includes('ottorouter') && (
 						<OttoRouterWalletSection
-							ottorouterWallet={ottorouterWallet}
 							ottorouterBalance={ottorouterBalance}
-							ottorouterUsdcBalance={ottorouterUsdcBalance}
 							ottorouterLoading={ottorouterLoading}
 							refreshOttoRouterBalance={refreshOttoRouterBalance}
 							openTopupModal={openTopupModal}
-							onExportPrivateKey={exportOttoRouterPrivateKey}
+							onSignOut={handleSignOutOttoRouter}
+							isSigningOut={isSigningOutOttoRouter}
 						/>
 					)}
 
@@ -1326,114 +1345,48 @@ function OttoRouterSubscriptionInfo() {
 }
 
 interface OttoRouterWalletSectionProps {
-	ottorouterWallet: string | null;
 	ottorouterBalance: number | null;
-	ottorouterUsdcBalance: number | null;
 	ottorouterLoading: boolean;
 	refreshOttoRouterBalance: () => void;
 	openTopupModal: () => void;
-	onExportPrivateKey: () => Promise<{
-		success: boolean;
-		publicKey: string;
-		privateKey: string;
-	}>;
+	onSignOut: () => Promise<void>;
+	isSigningOut: boolean;
 }
 
 const OttoRouterWalletSection = memo(function OttoRouterWalletSection({
-	ottorouterWallet,
 	ottorouterBalance,
-	ottorouterUsdcBalance,
 	ottorouterLoading,
 	refreshOttoRouterBalance,
 	openTopupModal,
-	onExportPrivateKey,
+	onSignOut,
+	isSigningOut,
 }: OttoRouterWalletSectionProps) {
 	const hasActiveSubscription = useOttoRouterStore(
 		(s) => !!s.subscription?.active,
 	);
-	const [copied, setCopied] = useState(false);
-	const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-	const [exportPrivateKey, setExportPrivateKey] = useState<string | null>(null);
-	const [isExportingPrivateKey, setIsExportingPrivateKey] = useState(false);
-	const [exportPrivateKeyError, setExportPrivateKeyError] = useState<
-		string | null
-	>(null);
-	const [privateKeyCopied, setPrivateKeyCopied] = useState(false);
-
-	const handleCopy = useCallback(async () => {
-		if (!ottorouterWallet) return;
-		await navigator.clipboard.writeText(ottorouterWallet);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	}, [ottorouterWallet]);
-
-	const handleOpenExportPrivateKey = async () => {
-		setIsExportModalOpen(true);
-		setPrivateKeyCopied(false);
-		setExportPrivateKey(null);
-		setExportPrivateKeyError(null);
-		setIsExportingPrivateKey(true);
-		try {
-			const result = await onExportPrivateKey();
-			setExportPrivateKey(result.privateKey);
-		} catch (err) {
-			setExportPrivateKeyError(
-				err instanceof Error ? err.message : 'Failed to export private key',
-			);
-		} finally {
-			setIsExportingPrivateKey(false);
-		}
-	};
-
-	const handleCloseExportPrivateKey = () => {
-		if (isExportingPrivateKey) return;
-		setIsExportModalOpen(false);
-		setPrivateKeyCopied(false);
-		setExportPrivateKey(null);
-		setExportPrivateKeyError(null);
-	};
-
-	const handleCopyPrivateKey = async () => {
-		if (!exportPrivateKey) return;
-		await navigator.clipboard.writeText(exportPrivateKey);
-		setPrivateKeyCopied(true);
-		setTimeout(() => setPrivateKeyCopied(false), 2000);
-	};
-
-	const truncateWallet = (address: string | null) => {
-		if (!address) return 'Not configured';
-		return `${address.slice(0, 4)}...${address.slice(-4)}`;
-	};
 
 	const formatBalance = (balance: number | null) => {
 		if (balance === null) return '—';
 		return `$${balance.toFixed(4)}`;
 	};
 
-	const formatUsdcBalance = (balance: number | null) => {
-		if (balance === null) return '—';
-		return `${balance.toFixed(2)} USDC`;
-	};
-
-	const isLoaded = ottorouterWallet !== null;
-
 	return (
 		<SettingsSection
 			title="OttoRouter Credits"
-			icon={<Wallet className="w-4 h-4 text-muted-foreground" />}
+			icon={<CreditCard className="w-4 h-4 text-muted-foreground" />}
 			action={
 				<button
 					type="button"
 					onClick={refreshOttoRouterBalance}
 					disabled={ottorouterLoading}
 					className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
-					title="Refresh balances"
+					title="Refresh balance"
 				>
 					{ottorouterLoading ? (
 						<StableSpinner
 							size="sm"
 							className="text-muted-foreground"
-							title="Refreshing balances"
+							title="Refreshing balance"
 						/>
 					) : (
 						<RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1441,150 +1394,46 @@ const OttoRouterWalletSection = memo(function OttoRouterWalletSection({
 				</button>
 			}
 		>
-			{isLoaded ? (
-				<>
-					<div className="flex justify-center pb-3">
-						<div className="p-2 bg-white rounded-lg">
-							<QRCodeSVG
-								value={ottorouterWallet}
-								size={120}
-								level="M"
-								includeMargin={false}
-							/>
-						</div>
+			<div className="space-y-3">
+				<div className="rounded-lg border border-border bg-muted/30 p-3">
+					<div className="text-sm font-medium text-foreground">
+						OAuth account connected
 					</div>
-					<div className="flex items-center justify-between text-sm">
-						<span className="text-muted-foreground">Address</span>
-						<button
-							type="button"
-							onClick={handleCopy}
-							className="flex items-center gap-1.5 font-mono text-foreground hover:text-muted-foreground transition-colors"
-							title="Copy address"
-						>
-							{truncateWallet(ottorouterWallet)}
-							{copied ? (
-								<Check className="w-3 h-3 text-green-500" />
-							) : (
-								<Copy className="w-3 h-3 text-muted-foreground" />
-							)}
-						</button>
-					</div>
-					<OttoRouterSubscriptionInfo />
-					{!hasActiveSubscription && (
-						<>
-							<SettingRow
-								label="Balance"
-								value={formatBalance(ottorouterBalance)}
-							/>
-							<SettingRow
-								label="USDC"
-								value={formatUsdcBalance(ottorouterUsdcBalance)}
-							/>
-						</>
-					)}
-				</>
-			) : (
-				<>
-					<div className="flex justify-center pb-3">
-						<div className="w-[136px] h-[136px] bg-muted rounded-lg animate-pulse" />
-					</div>
-					<div className="flex items-center justify-between text-sm">
-						<span className="text-muted-foreground">Address</span>
-						<div className="w-24 h-4 bg-muted rounded animate-pulse" />
-					</div>
-					<div className="flex items-center justify-between text-sm">
-						<span className="text-muted-foreground">Balance</span>
-						<div className="w-16 h-4 bg-muted rounded animate-pulse" />
-					</div>
-					<div className="flex items-center justify-between text-sm">
-						<span className="text-muted-foreground">USDC</span>
-						<div className="w-20 h-4 bg-muted rounded animate-pulse" />
-					</div>
-				</>
-			)}
-			<Button
-				variant="secondary"
-				size="sm"
-				onClick={openTopupModal}
-				className="w-full mt-2 gap-2"
-			>
-				<Plus className="w-4 h-4" />
-				Top Up Balance
-			</Button>
-			<Button
-				variant="ghost"
-				size="sm"
-				onClick={handleOpenExportPrivateKey}
-				className="w-full gap-2"
-			>
-				<Key className="w-4 h-4" />
-				Export Private Key
-			</Button>
-
-			{isExportModalOpen && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
-						<div className="flex items-center gap-3 p-6 border-b border-border">
-							<Key className="w-5 h-5 text-muted-foreground" />
-							<h3 className="text-lg font-semibold">
-								Export OttoRouter Private Key
-							</h3>
-						</div>
-						<div className="p-6">
-							<p className="text-sm text-muted-foreground mb-4">
-								Keep this private key secret. Anyone with this key can spend
-								funds from your OttoRouter wallet.
-							</p>
-
-							{isExportingPrivateKey && (
-								<div className="flex items-center gap-2 text-sm text-muted-foreground">
-									<StableSpinner title="Exporting private key" />
-									Exporting private key...
-								</div>
-							)}
-
-							{!isExportingPrivateKey && exportPrivateKey && (
-								<div className="space-y-3">
-									<textarea
-										readOnly
-										value={exportPrivateKey}
-										className="w-full min-h-[110px] px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground outline-none font-mono text-xs resize-y"
-									/>
-									<Button
-										variant="secondary"
-										size="sm"
-										onClick={handleCopyPrivateKey}
-										className="w-full gap-2"
-									>
-										{privateKeyCopied ? (
-											<Check className="w-4 h-4 text-green-500" />
-										) : (
-											<Copy className="w-4 h-4" />
-										)}
-										{privateKeyCopied ? 'Copied' : 'Copy Private Key'}
-									</Button>
-								</div>
-							)}
-
-							{!isExportingPrivateKey && exportPrivateKeyError && (
-								<p className="text-sm text-red-500 mt-3">
-									{exportPrivateKeyError}
-								</p>
-							)}
-							<div className="flex gap-3 mt-5">
-								<button
-									type="button"
-									onClick={handleCloseExportPrivateKey}
-									disabled={isExportingPrivateKey}
-									className="flex-1 h-11 px-4 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors disabled:opacity-50"
-								>
-									Close
-								</button>
-							</div>
-						</div>
+					<div className="mt-1 text-xs text-muted-foreground">
+						Credits and top-ups apply to your OttoRouter account.
 					</div>
 				</div>
-			)}
+				<OttoRouterSubscriptionInfo />
+				{!hasActiveSubscription && (
+					<SettingRow
+						label="Balance"
+						value={formatBalance(ottorouterBalance)}
+					/>
+				)}
+				<Button
+					variant="secondary"
+					size="sm"
+					onClick={openTopupModal}
+					className="w-full mt-2 gap-2"
+				>
+					<Plus className="w-4 h-4" />
+					Top Up Balance
+				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={onSignOut}
+					disabled={isSigningOut}
+					className="w-full gap-2 text-red-500 hover:text-red-500 hover:bg-red-500/10"
+				>
+					{isSigningOut ? (
+						<StableSpinner size="sm" title="Signing out" />
+					) : (
+						<LogOut className="w-4 h-4" />
+					)}
+					{isSigningOut ? 'Signing out...' : 'Sign Out'}
+				</Button>
+			</div>
 		</SettingsSection>
 	);
 });

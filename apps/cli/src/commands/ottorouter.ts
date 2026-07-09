@@ -1,18 +1,13 @@
 import type { Command } from 'commander';
 import { log } from '@clack/prompts';
-import qrcode from 'qrcode-terminal';
 import { box, colors } from '../ui.ts';
-import {
-	getOttoRouterBalance,
-	getOttoRouterWallet,
-	getOttoRouterUsdcBalance,
-} from '@ottocode/api';
+import { getOttoRouterBalance } from '@ottocode/api';
 
 export function registerOttoRouterCommand(program: Command) {
 	program
 		.command('ottorouter')
-		.description('Manage OttoRouter wallet and view balance')
-		.option('--login', 'Login/setup OttoRouter wallet')
+		.description('Manage OttoRouter OAuth and view balance')
+		.option('--login', 'Login to OttoRouter with OAuth')
 		.action(async (options) => {
 			const { runAuth } = await import('../auth.ts');
 
@@ -22,84 +17,19 @@ export function registerOttoRouterCommand(program: Command) {
 			}
 
 			console.log('');
-			console.log(colors.bold('  OttoRouter Wallet'));
+			console.log(colors.bold('  OttoRouter'));
 			console.log('');
-
-			const { data: walletData, error: walletError } =
-				await getOttoRouterWallet();
-
-			if (walletError || !walletData) {
-				log.warn('No OttoRouter wallet configured.');
-				console.log(
-					`  Run ${colors.cyan('otto ottorouter --login')} to setup your wallet.`,
-				);
-				console.log(
-					`  Or set ${colors.cyan('OTTOROUTER_PRIVATE_KEY')} environment variable.`,
-				);
-				console.log('');
-				return;
-			}
-
-			const wallet = walletData as {
-				configured: boolean;
-				publicKey?: string;
-				network?: string;
-				rpcUrl?: string;
-				ottorouterUrl?: string;
-			};
-
-			if (!wallet.configured || !wallet.publicKey) {
-				log.warn('No OttoRouter wallet configured.');
-				console.log(
-					`  Run ${colors.cyan('otto ottorouter --login')} to setup your wallet.`,
-				);
-				console.log('');
-				return;
-			}
-
-			const publicKey = wallet.publicKey;
-			const network = wallet.network ?? 'unknown';
-			const rpcUrl = wallet.rpcUrl ?? '';
-			const ottorouterUrl = wallet.ottorouterUrl ?? '';
-
-			const networkLabel =
-				network === 'mainnet'
-					? colors.green('mainnet')
-					: network === 'devnet'
-						? colors.yellow('devnet')
-						: colors.dim('unknown');
-
-			const walletLines = [
-				`Public Key: ${colors.cyan(publicKey)}`,
-				`Network:    ${networkLabel}`,
-				`RPC:        ${colors.dim(rpcUrl)}`,
-				`OttoRouter: ${colors.dim(ottorouterUrl)}`,
-			];
-
-			box('Wallet', walletLines);
-
-			console.log(colors.bold('  Wallet QR Code'));
-			console.log('');
-			qrcode.generate(publicKey, { small: true }, (qr: string) => {
-				console.log(qr);
-			});
 
 			console.log(colors.dim('  Fetching balances...'));
-			const [balanceResult, usdcResult] = await Promise.all([
-				getOttoRouterBalance(),
-				getOttoRouterUsdcBalance(),
-			]);
+			const balanceResult = await getOttoRouterBalance();
 
-			const usdcData = usdcResult.data as {
-				usdcBalance: number;
-			} | null;
-
-			if (usdcData?.usdcBalance !== undefined) {
+			if (balanceResult.error) {
+				log.warn('No OttoRouter OAuth session configured.');
 				console.log(
-					`  USDC:     ${colors.green(`${usdcData.usdcBalance.toFixed(2)} USDC`)}`,
+					`  Run ${colors.cyan('otto ottorouter --login')} to authenticate with OAuth.`,
 				);
-			} else {
-				console.log(`  USDC:     ${colors.dim('Could not fetch')}`);
+				console.log('');
+				return;
 			}
 
 			const balanceData = balanceResult.data as {
@@ -109,7 +39,7 @@ export function registerOttoRouterCommand(program: Command) {
 				requestCount: number;
 				scope?: string;
 				payg?: {
-					walletBalanceUsd: number;
+					walletBalanceUsd?: number;
 					accountBalanceUsd: number;
 					rawPoolUsd: number;
 					effectiveSpendableUsd: number;
@@ -151,7 +81,6 @@ export function registerOttoRouterCommand(program: Command) {
 				if (balanceData.payg) {
 					const p = balanceData.payg;
 					accountLines.push(
-						`Wallet Bal:   ${colors.dim(`$${p.walletBalanceUsd.toFixed(4)}`)}`,
 						`Account Bal:  ${colors.dim(`$${p.accountBalanceUsd.toFixed(4)}`)}`,
 						`Spendable:    ${colors.green(`$${p.effectiveSpendableUsd.toFixed(4)}`)}`,
 					);

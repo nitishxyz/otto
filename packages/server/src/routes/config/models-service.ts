@@ -49,7 +49,7 @@ type UiModel = {
 
 type UiProviderModels = {
 	label: string;
-	authType?: 'api' | 'oauth' | 'wallet';
+	authType?: 'api' | 'oauth';
 	allowAnyModel?: boolean;
 	dynamicModels?: boolean;
 	models: UiModel[];
@@ -228,7 +228,7 @@ function shouldLazyLoadProviderModels(
 function getProviderModelsForUi(args: {
 	catalogModels: ModelInfoMap | undefined;
 	provider: ProviderId;
-	authType: 'api' | 'oauth' | 'wallet' | undefined;
+	authType: 'api' | 'oauth' | undefined;
 }): ModelInfo[] {
 	const catalogModels = args.catalogModels ?? {};
 	return modelMapToList(
@@ -332,6 +332,8 @@ export async function handleGetProviderModels(c: Context) {
 			provider,
 			projectRoot,
 		);
+		const uiAuthType =
+			authType === 'api' || authType === 'oauth' ? authType : undefined;
 		if (
 			providerDefinition &&
 			shouldLazyLoadProviderModels(providerDefinition)
@@ -345,7 +347,7 @@ export async function handleGetProviderModels(c: Context) {
 		const filteredModels = getProviderModelsForUi({
 			catalogModels: providerCatalog?.models ?? providerDefinition?.models,
 			provider,
-			authType,
+			authType: uiAuthType,
 		});
 		const copilotAllowedModels =
 			provider === 'copilot'
@@ -403,6 +405,8 @@ export async function handleGetAllModels(c: Context) {
 				provider,
 				projectRoot,
 			);
+			const uiAuthType =
+				authType === 'api' || authType === 'oauth' ? authType : undefined;
 			if (dynamicModels && providerDefinition) {
 				void refreshProviderModelsInBackground({
 					provider,
@@ -413,13 +417,13 @@ export async function handleGetAllModels(c: Context) {
 			const filteredModels = getProviderModelsForUi({
 				catalogModels: providerCatalog?.models ?? providerDefinition?.models,
 				provider,
-				authType,
+				authType: uiAuthType,
 			});
 			modelsMap[provider] = {
 				label: providerDefinition
 					? getUiProviderLabel(providerDefinition)
 					: (providerCatalog?.label ?? provider),
-				authType,
+				authType: uiAuthType,
 				allowAnyModel: providerDefinition?.allowAnyModel,
 				dynamicModels,
 				models: filteredModels.map(toUiModel),

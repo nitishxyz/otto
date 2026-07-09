@@ -3,11 +3,7 @@ import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import {
-	buildWalletHeaders,
-	getOttoRouterBaseUrl,
-	getOttoRouterPrivateKey,
-} from './service.ts';
+import { getOttoRouterAuthHeaders, getOttoRouterBaseUrl } from './service.ts';
 
 const errorResponseSchema = z.object({ error: z.string() });
 const passthroughResponseSchema = z.record(z.string(), z.unknown());
@@ -150,16 +146,16 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					},
 				},
 				'401': {
-					description: 'Wallet not configured',
+					description: 'OAuth not configured',
 					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const privateKey = await getOttoRouterPrivateKey();
-				if (!privateKey) {
-					return c.json({ error: 'OttoRouter wallet not configured' }, 401);
+				const authHeaders = await getOttoRouterAuthHeaders();
+				if (!authHeaders) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
 				}
 
 				const body = await c.req.json();
@@ -176,14 +172,13 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					return c.json({ error: 'Missing successUrl' }, 400);
 				}
 
-				const walletHeaders = buildWalletHeaders(privateKey);
 				const baseUrl = getOttoRouterBaseUrl();
 
 				const response = await fetch(`${baseUrl}/v1/topup/polar`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						...walletHeaders,
+						...authHeaders,
 					},
 					body: JSON.stringify({ amount, successUrl }),
 				});
@@ -316,16 +311,16 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					},
 				},
 				'401': {
-					description: 'Wallet not configured',
+					description: 'OAuth not configured',
 					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const privateKey = await getOttoRouterPrivateKey();
-				if (!privateKey) {
-					return c.json({ error: 'OttoRouter wallet not configured' }, 401);
+				const authHeaders = await getOttoRouterAuthHeaders();
+				if (!authHeaders) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
 				}
 
 				const body = await c.req.json();
@@ -335,14 +330,13 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					return c.json({ error: 'Invalid amount' }, 400);
 				}
 
-				const walletHeaders = buildWalletHeaders(privateKey);
 				const baseUrl = getOttoRouterBaseUrl();
 
 				const response = await fetch(`${baseUrl}/v1/topup/razorpay`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						...walletHeaders,
+						...authHeaders,
 					},
 					body: JSON.stringify({ amount }),
 				});
@@ -383,16 +377,16 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					},
 				},
 				'401': {
-					description: 'Wallet not configured',
+					description: 'OAuth not configured',
 					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const privateKey = await getOttoRouterPrivateKey();
-				if (!privateKey) {
-					return c.json({ error: 'OttoRouter wallet not configured' }, 401);
+				const authHeaders = await getOttoRouterAuthHeaders();
+				if (!authHeaders) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
 				}
 
 				const body = await c.req.json();
@@ -407,14 +401,13 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 					return c.json({ error: 'Missing payment details' }, 400);
 				}
 
-				const walletHeaders = buildWalletHeaders(privateKey);
 				const baseUrl = getOttoRouterBaseUrl();
 
 				const response = await fetch(`${baseUrl}/v1/topup/razorpay/verify`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						...walletHeaders,
+						...authHeaders,
 					},
 					body: JSON.stringify({
 						razorpay_order_id,

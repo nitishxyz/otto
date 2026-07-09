@@ -6,8 +6,7 @@ import type {
 	WalletUsdcBalance,
 } from './types.ts';
 import type { WalletContext } from './auth.ts';
-import { createWalletContext } from './auth.ts';
-import { createAccessTokenManager } from './token.ts';
+import { createOAuthAccessTokenManager } from './token.ts';
 
 const DEFAULT_BASE_URL = 'https://api.ottorouter.org';
 const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
@@ -34,11 +33,17 @@ export async function fetchBalance(
 	baseURL?: string,
 ): Promise<BalanceResponse | null> {
 	try {
-		const wallet = isWalletContext(walletOrAuth)
-			? walletOrAuth
-			: createWalletContext(walletOrAuth);
 		const url = trimTrailingSlash(baseURL ?? DEFAULT_BASE_URL);
-		const tokenManager = createAccessTokenManager({ wallet, baseURL: url });
+		if (
+			isWalletContext(walletOrAuth) ||
+			(!walletOrAuth.accessToken && !walletOrAuth.refreshToken)
+		) {
+			throw new Error('OttoRouter: OAuth token is required.');
+		}
+		const tokenManager = createOAuthAccessTokenManager({
+			auth: walletOrAuth,
+			baseURL: url,
+		});
 		const requestBalance = async (forceRefresh = false) => {
 			const accessToken = await tokenManager.getToken(forceRefresh);
 			return fetch(`${url}/v1/balance`, {
@@ -56,6 +61,7 @@ export async function fetchBalance(
 
 		const data = (await response.json()) as {
 			wallet_address: string;
+			account_id?: string;
 			balance_usd: number;
 			total_spent: number;
 			total_topups: number;
@@ -108,7 +114,7 @@ export async function fetchBalance(
 		};
 
 		const result: BalanceResponse = {
-			walletAddress: data.wallet_address,
+			walletAddress: data.wallet_address ?? data.account_id ?? '',
 			balance: data.balance_usd,
 			totalSpent: data.total_spent,
 			totalTopups: data.total_topups,

@@ -3,7 +3,6 @@ import {
 	catalog,
 	getAllAuth,
 	getOnboardingComplete,
-	getOttoRouterWallet,
 	isProviderAuthorized,
 	loadConfig,
 	logger,
@@ -18,7 +17,7 @@ import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const authStatusProviderSchema = z.object({
 	configured: z.boolean(),
-	type: z.enum(['api', 'oauth', 'wallet']).optional(),
+	type: z.enum(['api', 'oauth']).optional(),
 	label: z.string(),
 	supportsOAuth: z.boolean(),
 	supportsToken: z.boolean().optional(),
@@ -37,7 +36,7 @@ const authStatusResponseSchema = z.object({
 	onboardingComplete: z.boolean(),
 	ottorouter: z.object({
 		configured: z.boolean(),
-		publicKey: z.string().optional(),
+		expiresAt: z.number().optional(),
 	}),
 	providers: z.record(z.string(), authStatusProviderSchema),
 	defaults: z.record(z.string(), z.unknown()).optional(),
@@ -67,14 +66,14 @@ export function registerAuthStatusRoutes(app: Hono) {
 				const auth = await getAllAuth(projectRoot);
 				const cfg = await loadConfig(projectRoot);
 				const onboardingComplete = await getOnboardingComplete(projectRoot);
-				const ottorouterWallet = await getOttoRouterWallet(projectRoot);
+				const ottorouterAuth = auth.ottorouter;
 				const ghImportCapability = getGhImportCapability();
 
 				const providers: Record<
 					string,
 					{
 						configured: boolean;
-						type?: 'api' | 'oauth' | 'wallet';
+						type?: 'api' | 'oauth';
 						label: string;
 						supportsOAuth: boolean;
 						supportsToken?: boolean;
@@ -91,8 +90,13 @@ export function registerAuthStatusRoutes(app: Hono) {
 						!!providerAuth ||
 						(await isProviderAuthorized(cfg, id as ProviderId));
 					const authType =
-						providerAuth?.type ??
-						(configured ? (id === 'copilot' ? 'oauth' : 'api') : undefined);
+						providerAuth?.type === 'oauth' || providerAuth?.type === 'api'
+							? providerAuth.type
+							: configured
+								? id === 'copilot' || id === 'ottorouter'
+									? 'oauth'
+									: 'api'
+								: undefined;
 					const models = Object.values(entry.models);
 					const costs = models
 						.map((m) => m.cost?.input)
@@ -107,7 +111,8 @@ export function registerAuthStatusRoutes(app: Hono) {
 							id === 'openai' ||
 							id === 'xai' ||
 							id === 'copilot' ||
-							id === 'kimi',
+							id === 'kimi' ||
+							id === 'ottorouter',
 						supportsToken: id === 'copilot',
 						supportsGhImport:
 							id === 'copilot' ? ghImportCapability.available : false,
@@ -127,7 +132,10 @@ export function registerAuthStatusRoutes(app: Hono) {
 					if (!detail.custom || providers[detail.id]) continue;
 					providers[detail.id] = {
 						configured: detail.authorized,
-						type: detail.authType,
+						type:
+							detail.authType === 'oauth' || detail.authType === 'api'
+								? detail.authType
+								: undefined,
 						label: detail.label,
 						supportsOAuth: false,
 						custom: true,
@@ -137,14 +145,15 @@ export function registerAuthStatusRoutes(app: Hono) {
 
 				return c.json({
 					onboardingComplete,
-					ottorouter: ottorouterWallet
-						? {
-								configured: true,
-								publicKey: ottorouterWallet.publicKey,
-							}
-						: {
-								configured: false,
-							},
+					ottorouter:
+						ottorouterAuth?.type === 'oauth'
+							? {
+									configured: true,
+									expiresAt: ottorouterAuth.expires,
+								}
+							: {
+									configured: false,
+								},
 					providers,
 					defaults: cfg.defaults,
 				});

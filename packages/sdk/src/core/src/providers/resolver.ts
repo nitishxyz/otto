@@ -206,21 +206,21 @@ export async function resolveModel(
 	}
 
 	if (provider === 'ottorouter') {
-		const privateKey =
-			config.apiKey || process.env.OTTOROUTER_PRIVATE_KEY || '';
-		if (!privateKey) {
+		if (!config.oauth?.access) {
 			throw new Error(
-				'OttoRouter provider requires OTTOROUTER_PRIVATE_KEY (base58 Solana secret).',
+				'OttoRouter provider requires OAuth. Run `otto auth login ottorouter`.',
 			);
 		}
 		const baseURL = config.baseURL || process.env.OTTOROUTER_BASE_URL;
-		const rpcURL = process.env.OTTOROUTER_SOLANA_RPC_URL;
 		return createOttoRouterModel(
 			model,
-			{ privateKey },
+			{
+				accessToken: config.oauth.access,
+				refreshToken: config.oauth.refresh,
+				expiresAt: config.oauth.expires,
+			},
 			{
 				baseURL,
-				rpcURL,
 			},
 		);
 	}

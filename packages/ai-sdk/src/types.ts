@@ -36,7 +36,18 @@ export interface ExternalSigner {
 	signTransaction?: (transaction: Uint8Array) => Promise<Uint8Array>;
 }
 
+export interface OAuthTokenRefreshResult {
+	accessToken: string;
+	refreshToken?: string;
+	expiresAt?: number;
+}
+
 export interface OttoRouterAuth {
+	accessToken?: string;
+	refreshToken?: string;
+	expiresAt?: number;
+	clientId?: string;
+	onTokenRefresh?: (tokens: OAuthTokenRefreshResult) => void | Promise<void>;
 	privateKey?: string;
 	signer?: ExternalSigner;
 }

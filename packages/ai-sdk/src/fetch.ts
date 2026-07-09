@@ -5,46 +5,13 @@ import type {
 	CacheOptions,
 	BalanceUpdate,
 	FetchFunction,
+	OttoRouterAuth,
 } from './types.ts';
-import { isTopupRequired, pickTopupAmount, handleTopup } from './payment.ts';
+import { isTopupRequired, pickTopupAmount } from './payment.ts';
 import { addAnthropicCacheControl } from './cache.ts';
-import { createAccessTokenManager } from './token.ts';
+import { createOAuthAccessTokenManager } from './token.ts';
 
-const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
 const DEFAULT_MAX_ATTEMPTS = 3;
-
-interface PaymentQueueEntry {
-	promise: Promise<void>;
-	resolve: () => void;
-}
-
-const paymentQueues = new Map<string, PaymentQueueEntry>();
-
-async function acquirePaymentLock(walletAddress: string): Promise<() => void> {
-	const existing = paymentQueues.get(walletAddress);
-
-	let resolveFunc: () => void = () => {};
-	const newPromise = new Promise<void>((resolve) => {
-		resolveFunc = resolve;
-	});
-
-	const entry: PaymentQueueEntry = {
-		promise: newPromise,
-		resolve: resolveFunc,
-	};
-	paymentQueues.set(walletAddress, entry);
-
-	if (existing) {
-		await existing.promise;
-	}
-
-	return () => {
-		if (paymentQueues.get(walletAddress) === entry) {
-			paymentQueues.delete(walletAddress);
-		}
-		resolveFunc();
-	};
-}
 
 function tryParseOttoRouterComment(
 	line: string,
@@ -188,7 +155,8 @@ async function rewriteOttoRouterOpenRouterChatRequest(
 }
 
 export interface CreateOttoRouterFetchOptions {
-	wallet: WalletContext;
+	wallet?: WalletContext;
+	auth?: OttoRouterAuth;
 	baseURL: string;
 	fetch?: FetchFunction;
 	rpcURL?: string;
@@ -211,10 +179,9 @@ export function createOttoRouterOpenRouterFetch(
 
 export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 	const {
-		wallet,
+		auth,
 		baseURL,
 		fetch: customFetch,
-		rpcURL = DEFAULT_RPC_URL,
 		callbacks = {},
 		cache,
 		payment,
@@ -222,11 +189,17 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 
 	const maxAttempts = payment?.maxRequestAttempts ?? DEFAULT_MAX_ATTEMPTS;
 	const baseFetch = customFetch ?? globalThis.fetch.bind(globalThis);
-	const tokenManager = createAccessTokenManager({
-		wallet,
-		baseURL,
-		fetch: baseFetch,
-	});
+	const tokenManager =
+		auth?.accessToken || auth?.refreshToken
+			? createOAuthAccessTokenManager({
+					auth,
+					baseURL,
+					fetch: baseFetch,
+				})
+			: null;
+	if (!tokenManager) {
+		throw new Error('OttoRouter: OAuth token is required.');
+	}
 
 	return async (
 		input: Parameters<typeof fetch>[0],
@@ -287,89 +260,24 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 			}
 
 			const topupAmount = pickTopupAmount(payload);
-
-			const releaseLock = await acquirePaymentLock(wallet.walletAddress);
-
-			try {
-				let walletUsdcBalance = 0;
-				try {
-					const resp = await baseFetch(
-						`${baseURL}/v1/wallet/${wallet.walletAddress}/balances`,
-					);
-					if (resp.ok) {
-						const data = (await resp.json()) as {
-							balances?: Array<{
-								mint?: string;
-								balance?: number;
-								symbol?: string;
-							}>;
-						};
-						const USDC_MINTS = [
-							'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-							'4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-						];
-						for (const token of data.balances ?? []) {
-							if (token.mint && USDC_MINTS.includes(token.mint)) {
-								walletUsdcBalance += token.balance ?? 0;
-							}
-						}
-					}
-				} catch {}
-
-				const hasEnoughUsdc = walletUsdcBalance >= topupAmount;
-
-				const requestApproval = async () => {
-					if (!callbacks.onPaymentApproval) return;
-					const approval = await callbacks.onPaymentApproval({
-						amountUsd: topupAmount,
-						currentBalance: walletUsdcBalance,
-					});
-					if (approval === 'cancel') {
-						callbacks.onPaymentError?.('Payment cancelled by user');
-						throw new Error('OttoRouter: payment cancelled by user');
-					}
-					if (approval === 'fiat') {
-						const err = new Error(
-							'OttoRouter: fiat payment selected',
-						) as Error & {
-							code: string;
-						};
-						err.code = 'OTTOROUTER_FIAT_SELECTED';
-						throw err;
-					}
-				};
-
-				if (!hasEnoughUsdc) {
-					await requestApproval();
-				}
-
-				callbacks.onPaymentRequired?.(topupAmount, walletUsdcBalance);
-
-				const doTopup = async () => {
-					await handleTopup({
-						baseURL,
-						amount: topupAmount,
-						wallet,
-						rpcURL,
-						baseFetch,
-						tokenManager,
-						callbacks,
-					});
-				};
-
-				try {
-					await doTopup();
-				} catch {
-					if (hasEnoughUsdc) {
-						await requestApproval();
-						await doTopup();
-					} else {
-						throw new Error('OttoRouter: topup failed');
-					}
-				}
-			} finally {
-				releaseLock();
+			callbacks.onPaymentRequired?.(topupAmount, 0);
+			const approval = await callbacks.onPaymentApproval?.({
+				amountUsd: topupAmount,
+				currentBalance: 0,
+			});
+			if (approval === 'cancel') {
+				callbacks.onPaymentError?.('Payment cancelled by user');
+				throw new Error('OttoRouter: payment cancelled by user');
 			}
+			if (approval === 'fiat') {
+				const err = new Error('OttoRouter: fiat payment selected') as Error & {
+					code: string;
+				};
+				err.code = 'OTTOROUTER_FIAT_SELECTED';
+				throw err;
+			}
+			callbacks.onPaymentError?.('Top up required before retrying');
+			throw new Error('OttoRouter: top up required');
 		}
 
 		throw new Error('OttoRouter: max attempts exceeded');

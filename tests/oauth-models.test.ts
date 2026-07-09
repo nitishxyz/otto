@@ -64,12 +64,14 @@ describe('oauth model filtering', () => {
 		const oauthModelIds = Object.keys(oauthModels);
 		const apiModelIds = Object.keys(apiModels);
 
-		expect(oauthModelIds).toContain('grok-build');
 		expect(oauthModelIds).toContain('grok-composer-2.5-fast');
-		expect(oauthModelIds).toContain('grok-4.3');
+		expect(oauthModelIds).toContain('grok-4.5');
+		expect(oauthModelIds).not.toContain('grok-build');
+		expect(oauthModelIds).not.toContain('grok-4.3');
 		expect(apiModelIds).not.toContain('grok-build');
 		expect(apiModelIds).not.toContain('grok-composer-2.5-fast');
 		expect(isModelAllowedForOAuth('xai', 'grok-composer-2.5-fast')).toBe(true);
+		expect(isModelAllowedForOAuth('xai', 'grok-4.3')).toBe(false);
 
 		const composer = catalog.xai.models['grok-composer-2.5-fast'];
 		const build = catalog.xai.models['grok-build'];
@@ -84,6 +86,7 @@ describe('oauth model filtering', () => {
 			xai: {
 				id: 'xai',
 				models: {
+					'grok-4.5': { id: 'grok-4.5', label: 'Grok 4.5' },
 					'grok-4.3': { id: 'grok-4.3', label: 'Grok 4.3' },
 					'grok-composer-2.5-fast': {
 						id: 'grok-composer-2.5-fast',
@@ -97,6 +100,7 @@ describe('oauth model filtering', () => {
 		const modelIds = Object.keys(providers.xai.models);
 		const composer = providers.xai.models['grok-composer-2.5-fast'];
 
+		expect(modelIds).toContain('grok-4.5');
 		expect(modelIds).toContain('grok-4.3');
 		expect(modelIds).toContain('grok-build');
 		expect(modelIds).toContain('grok-composer-2.5-fast');

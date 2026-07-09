@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
-import { CreditCard, Wallet, ExternalLink, RefreshCw } from 'lucide-react';
+import { CreditCard, ExternalLink, RefreshCw } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { StableSpinner } from '../ui/StableSpinner';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
@@ -115,7 +115,6 @@ const OttoRouterTopupModalContent = memo(
 		const closeModal = useOttoRouterStore((s) => s.closeTopupModal);
 		const balance = useOttoRouterStore((s) => s.balance);
 		const setBalance = useOttoRouterStore((s) => s.setBalance);
-		const usdcBalance = useOttoRouterStore((s) => s.usdcBalance);
 		const subscription = useOttoRouterStore((s) => s.subscription);
 
 		const [view, setView] = useState<ModalView>('amount');
@@ -666,30 +665,6 @@ const OttoRouterTopupModalContent = memo(
 								)}
 								{gateway === 'polar' ? 'Pay with Card' : 'Pay with Razorpay'}
 							</button>
-
-							<div className="relative pt-6">
-								<div className="absolute inset-x-0 top-0 flex items-center">
-									<div className="flex-1 h-px bg-border" />
-									<span className="px-3 text-xs text-muted-foreground">OR</span>
-									<div className="flex-1 h-px bg-border" />
-								</div>
-								<div className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg">
-									<Wallet className="w-5 h-5 text-muted-foreground mt-0.5" />
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center justify-between">
-											<span className="font-medium text-sm">Pay with USDC</span>
-											{usdcBalance !== null && (
-												<span className="text-xs font-mono text-muted-foreground">
-													{usdcBalance.toFixed(2)} USDC
-												</span>
-											)}
-										</div>
-										<p className="text-xs text-muted-foreground mt-1">
-											Send USDC to your OttoRouter wallet to increase balance.
-										</p>
-									</div>
-								</div>
-							</div>
 						</>
 					)}
 				</div>

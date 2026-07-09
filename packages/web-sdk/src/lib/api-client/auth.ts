@@ -1,8 +1,5 @@
 import {
 	getAuthStatus as apiGetAuthStatus,
-	setupOttoRouterWallet as apiSetupOttoRouterWallet,
-	importOttoRouterWallet as apiImportOttoRouterWallet,
-	exportOttoRouterWallet as apiExportOttoRouterWallet,
 	addProviderApiKey as apiAddProviderApiKey,
 	removeProvider as apiRemoveProvider,
 	completeOnboarding as apiCompleteOnboarding,
@@ -26,12 +23,12 @@ import { extractErrorMessage, getBaseUrl } from './utils';
 export const authMixin = {
 	async getAuthStatus(): Promise<{
 		onboardingComplete: boolean;
-		ottorouter: { configured: boolean; publicKey?: string };
+		ottorouter: { configured: boolean; expiresAt?: number };
 		providers: Record<
 			string,
 			{
 				configured: boolean;
-				type?: 'api' | 'oauth' | 'wallet';
+				type?: 'api' | 'oauth';
 				label: string;
 				supportsOAuth: boolean;
 				supportsToken?: boolean;
@@ -49,40 +46,6 @@ export const authMixin = {
 		};
 	}> {
 		const response = await apiGetAuthStatus();
-		if (response.error) throw new Error(extractErrorMessage(response.error));
-		// biome-ignore lint/suspicious/noExplicitAny: API response structure
-		return response.data as any;
-	},
-
-	async setupOttoRouterWallet(): Promise<{
-		success: boolean;
-		publicKey: string;
-		isNew: boolean;
-	}> {
-		const response = await apiSetupOttoRouterWallet();
-		if (response.error) throw new Error(extractErrorMessage(response.error));
-		// biome-ignore lint/suspicious/noExplicitAny: API response structure
-		return response.data as any;
-	},
-
-	async importOttoRouterWallet(privateKey: string): Promise<{
-		success: boolean;
-		publicKey: string;
-	}> {
-		const response = await apiImportOttoRouterWallet({
-			body: { privateKey },
-		});
-		if (response.error) throw new Error(extractErrorMessage(response.error));
-		// biome-ignore lint/suspicious/noExplicitAny: API response structure
-		return response.data as any;
-	},
-
-	async exportOttoRouterWallet(): Promise<{
-		success: boolean;
-		publicKey: string;
-		privateKey: string;
-	}> {
-		const response = await apiExportOttoRouterWallet();
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
@@ -218,6 +181,45 @@ export const authMixin = {
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return response.data as any;
+	},
+
+	async startOttoRouterDeviceFlow(): Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}> {
+		const response = await fetch(
+			`${getBaseUrl()}/v1/auth/ottorouter/device/start`,
+			{
+				method: 'POST',
+			},
+		);
+		if (!response.ok) throw new Error(await response.text());
+		return (await response.json()) as {
+			sessionId: string;
+			userCode: string;
+			verificationUri: string;
+			interval: number;
+		};
+	},
+
+	async pollOttoRouterDeviceFlow(
+		sessionId: string,
+	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
+		const response = await fetch(
+			`${getBaseUrl()}/v1/auth/ottorouter/device/poll`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ sessionId }),
+			},
+		);
+		if (!response.ok) throw new Error(await response.text());
+		return (await response.json()) as {
+			status: 'complete' | 'pending' | 'error';
+			error?: string;
+		};
 	},
 
 	async getCopilotAuthMethods(): Promise<{

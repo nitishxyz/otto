@@ -20,8 +20,11 @@ function App() {
 
 			try {
 				const status = await tauriOnboarding.getStatus();
+				const hasAnyProvider = Object.values(status.providers).some(
+					(provider) => provider.configured,
+				);
 
-				if (!status.onboardingComplete) {
+				if (!hasAnyProvider) {
 					nextRoute = '/onboarding';
 				}
 			} catch {

@@ -54,7 +54,6 @@ export async function isAuthorized(
 	const info = auth[provider];
 	if (info?.type === 'api' && info.key) return true;
 	if (info?.type === 'oauth' && info.refresh && info.access) return true;
-	if (info?.type === 'wallet' && info.secret) return true;
 	return false;
 }
 
@@ -66,12 +65,7 @@ export async function ensureEnv(
 	if (readEnvKey(provider)) return;
 	const { auth } = await read(projectRoot);
 	const stored = auth[provider];
-	const value =
-		stored?.type === 'api'
-			? stored.key
-			: stored?.type === 'wallet'
-				? stored.secret
-				: undefined;
+	const value = stored?.type === 'api' ? stored.key : undefined;
 	if (value) setEnvKey(provider, value);
 }
 

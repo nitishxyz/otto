@@ -242,6 +242,16 @@ export type {
 	KimiDevicePollResult,
 } from './auth/src/index.ts';
 export {
+	refreshOttoRouterToken,
+	requestOttoRouterDeviceCode,
+	pollOttoRouterDeviceCodeOnce,
+} from './auth/src/index.ts';
+export type {
+	OttoRouterOAuthTokens,
+	OttoRouterDeviceCodeResponse,
+	OttoRouterDevicePollResult,
+} from './auth/src/index.ts';
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

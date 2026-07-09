@@ -1,14 +1,9 @@
 import { z } from '@hono/zod-openapi';
-import { getPublicKeyFromPrivate, logger } from '@ottocode/sdk';
+import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import {
-	getOttoRouterBalance,
-	getOttoRouterBaseUrl,
-	getOttoRouterPrivateKey,
-	getOttoRouterWalletInfo,
-} from './service.ts';
+import { getOttoRouterAuthInfo, getOttoRouterBalance } from './service.ts';
 
 const errorResponseSchema = z.object({ error: z.string() });
 
@@ -57,27 +52,10 @@ const ottoRouterBalanceSchema = z.object({
 		.optional(),
 });
 
-const ottoRouterWalletSchema = z.object({
+const ottoRouterAuthSchema = z.object({
 	configured: z.boolean(),
-	publicKey: z.string().optional(),
+	expiresAt: z.number().optional(),
 	error: z.string().optional(),
-});
-
-const usdcBalanceQuerySchema = z.object({
-	network: z
-		.enum(['mainnet', 'devnet'])
-		.optional()
-		.default('mainnet')
-		.openapi({
-			param: { name: 'network', in: 'query' },
-			description: 'Solana network to query',
-		}),
-});
-
-const usdcBalanceResponseSchema = z.object({
-	walletAddress: z.string(),
-	usdcBalance: z.number(),
-	network: z.enum(['mainnet', 'devnet']),
 });
 
 export function registerOttoRouterWalletRoutes(app: Hono) {
@@ -90,7 +68,7 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 			operationId: 'getOttoRouterBalance',
 			summary: 'Get OttoRouter account balance',
 			description:
-				'Returns wallet balance, subscription, account info, limits, and usage data',
+				'Returns account balance, subscription, limits, and usage data for the OAuth account',
 			responses: {
 				'200': {
 					description: 'OK',
@@ -99,7 +77,7 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 					},
 				},
 				'401': {
-					description: 'Wallet not configured',
+					description: 'OAuth not configured',
 					content: { 'application/json': { schema: errorResponseSchema } },
 				},
 				'502': {
@@ -128,105 +106,24 @@ export function registerOttoRouterWalletRoutes(app: Hono) {
 			method: 'get',
 			path: '/v1/ottorouter/wallet',
 			tags: ['ottorouter'],
-			operationId: 'getOttoRouterWallet',
-			summary: 'Get OttoRouter wallet info',
+			operationId: 'getOttoRouterAuth',
+			summary: 'Get OttoRouter OAuth status',
 			description:
-				'Returns whether the wallet is configured and its public key',
+				'Returns whether OttoRouter OAuth is configured for this otto instance',
 			responses: {
 				'200': {
 					description: 'OK',
 					content: {
-						'application/json': { schema: ottoRouterWalletSchema },
+						'application/json': { schema: ottoRouterAuthSchema },
 					},
 				},
 			},
 		},
 		async (c) => {
 			try {
-				return c.json(await getOttoRouterWalletInfo());
+				return c.json(await getOttoRouterAuthInfo());
 			} catch (error) {
-				logger.error('Failed to get OttoRouter wallet info', error);
-				const errorResponse = serializeError(error);
-				return c.json(errorResponse, errorResponse.error.status || 500);
-			}
-		},
-	);
-
-	zodOpenApiRoute(
-		app,
-		{
-			method: 'get',
-			path: '/v1/ottorouter/usdc-balance',
-			tags: ['ottorouter'],
-			operationId: 'getOttoRouterUsdcBalance',
-			summary: 'Get USDC token balance',
-			description:
-				'Fetches USDC balance from Solana blockchain for the configured wallet',
-			request: { query: usdcBalanceQuerySchema },
-			responses: {
-				'200': {
-					description: 'OK',
-					content: {
-						'application/json': { schema: usdcBalanceResponseSchema },
-					},
-				},
-				'401': {
-					description: 'Wallet not configured',
-					content: { 'application/json': { schema: errorResponseSchema } },
-				},
-				'502': {
-					description: 'Failed to fetch USDC balance from Solana',
-					content: { 'application/json': { schema: errorResponseSchema } },
-				},
-			},
-		},
-		async (c) => {
-			try {
-				const privateKey = await getOttoRouterPrivateKey();
-				if (!privateKey) {
-					return c.json({ error: 'OttoRouter wallet not configured' }, 401);
-				}
-
-				const publicKey = getPublicKeyFromPrivate(privateKey);
-				if (!publicKey) {
-					return c.json({ error: 'Invalid private key' }, 400);
-				}
-
-				const baseUrl = getOttoRouterBaseUrl();
-				const response = await fetch(
-					`${baseUrl}/v1/wallet/${publicKey}/balances?limit=100&showNative=false&showNfts=false&showZeroBalance=false`,
-					{
-						method: 'GET',
-						headers: { 'Content-Type': 'application/json' },
-					},
-				);
-
-				if (!response.ok) {
-					return c.json({ error: 'Failed to fetch wallet balances' }, 502);
-				}
-
-				const data = (await response.json()) as {
-					balances: Array<{
-						mint: string;
-						symbol: string;
-						name: string;
-						balance: number;
-						decimals: number;
-						pricePerToken: number | null;
-						usdValue: number | null;
-					}>;
-					totalUsdValue: number;
-				};
-
-				const usdcEntry = data.balances.find((b) => b.symbol === 'USDC');
-
-				return c.json({
-					walletAddress: publicKey,
-					usdcBalance: usdcEntry?.balance ?? 0,
-					network: 'mainnet' as const,
-				});
-			} catch (error) {
-				logger.error('Failed to fetch USDC balance', error);
+				logger.error('Failed to get OttoRouter OAuth status', error);
 				const errorResponse = serializeError(error);
 				return c.json(errorResponse, errorResponse.error.status || 500);
 			}

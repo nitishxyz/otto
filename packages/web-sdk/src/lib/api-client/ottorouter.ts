@@ -1,7 +1,5 @@
 import {
 	getOttoRouterBalance as apiGetOttoRouterBalance,
-	getOttoRouterWallet as apiGetOttoRouterWallet,
-	getOttoRouterUsdcBalance as apiGetOttoRouterUsdcBalance,
 	createPolarCheckout as apiCreatePolarCheckout,
 	getPolarTopupEstimate as apiGetPolarTopupEstimate,
 	getPolarTopupStatus as apiGetPolarTopupStatus,
@@ -75,40 +73,6 @@ export const ottorouterMixin = {
 		}
 	},
 
-	async getOttoRouterWallet(): Promise<{
-		configured: boolean;
-		publicKey?: string;
-		error?: string;
-	}> {
-		try {
-			const response = await apiGetOttoRouterWallet();
-			if (response.error) return { configured: false };
-			// biome-ignore lint/suspicious/noExplicitAny: API response structure
-			return response.data as any;
-		} catch {
-			return { configured: false };
-		}
-	},
-
-	async getOttoRouterUsdcBalance(
-		network: 'mainnet' | 'devnet' = 'mainnet',
-	): Promise<{
-		walletAddress: string;
-		usdcBalance: number;
-		network: 'mainnet' | 'devnet';
-	} | null> {
-		try {
-			const response = await apiGetOttoRouterUsdcBalance({
-				query: { network },
-			});
-			if (response.error) return null;
-			// biome-ignore lint/suspicious/noExplicitAny: API response structure
-			return response.data as any;
-		} catch {
-			return null;
-		}
-	},
-
 	async getPolarTopupEstimate(amount: number): Promise<{
 		creditAmount: number;
 		chargeAmount: number;
@@ -152,7 +116,7 @@ export const ottorouterMixin = {
 
 	async selectTopupMethod(
 		sessionId: string,
-		method: 'crypto' | 'fiat',
+		method: 'fiat',
 	): Promise<{ success: boolean; method: string }> {
 		const response = await apiSelectTopupMethod({
 			body: { sessionId, method },

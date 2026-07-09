@@ -1,11 +1,9 @@
-import { Keypair } from '@solana/web3.js';
 import {
 	fetchOttoRouterBalance,
 	getAuth,
-	getPublicKeyFromPrivate,
+	refreshOttoRouterToken,
+	setAuth,
 } from '@ottocode/sdk';
-import bs58 from 'bs58';
-import nacl from 'tweetnacl';
 
 const OTTOROUTER_BASE_URL =
 	process.env.OTTOROUTER_BASE_URL || 'https://api.ottorouter.org';
@@ -16,53 +14,80 @@ export function getOttoRouterBaseUrl(): string {
 		: OTTOROUTER_BASE_URL;
 }
 
-export async function getOttoRouterPrivateKey(
-	projectRoot?: string,
-): Promise<string | null> {
-	if (process.env.OTTOROUTER_PRIVATE_KEY) {
-		return process.env.OTTOROUTER_PRIVATE_KEY;
+export async function getOttoRouterOAuthAuth(projectRoot?: string) {
+	const auth = await getAuth('ottorouter', projectRoot);
+	if (auth?.type !== 'oauth' || !auth.access) {
+		return null;
 	}
 
-	try {
-		const auth = await getAuth('ottorouter', projectRoot);
-		if (auth?.type === 'wallet' && auth.secret) {
-			return auth.secret;
-		}
-	} catch {}
+	let access = auth.access;
+	let refresh = auth.refresh;
+	let expires = auth.expires;
+	if (refresh && expires && expires < Date.now() + 60_000) {
+		const tokens = await refreshOttoRouterToken(refresh);
+		access = tokens.access;
+		refresh = tokens.refresh;
+		expires = tokens.expires;
+		await setAuth(
+			'ottorouter',
+			{
+				type: 'oauth',
+				access,
+				refresh,
+				expires,
+				idToken: tokens.idToken ?? auth.idToken,
+				scopes: tokens.scopes ?? auth.scopes,
+			},
+			projectRoot,
+			'global',
+		);
+	}
 
-	return null;
-}
-
-function signNonce(nonce: string, privateKeyBytes: Uint8Array): string {
-	const data = new TextEncoder().encode(nonce);
-	const signature = nacl.sign.detached(data, privateKeyBytes);
-	return bs58.encode(signature);
-}
-
-export function buildWalletHeaders(privateKey: string): Record<string, string> {
-	const privateKeyBytes = bs58.decode(privateKey);
-	const keypair = Keypair.fromSecretKey(privateKeyBytes);
-	const walletAddress = keypair.publicKey.toBase58();
-	const nonce = Date.now().toString();
-	const signature = signNonce(nonce, privateKeyBytes);
 	return {
-		'x-wallet-address': walletAddress,
-		'x-wallet-nonce': nonce,
-		'x-wallet-signature': signature,
+		accessToken: access,
+		refreshToken: refresh,
+		expiresAt: expires,
+		onTokenRefresh: async (tokens: {
+			accessToken: string;
+			refreshToken?: string;
+			expiresAt?: number;
+		}) => {
+			await setAuth(
+				'ottorouter',
+				{
+					type: 'oauth',
+					access: tokens.accessToken,
+					refresh: tokens.refreshToken ?? refresh,
+					expires: tokens.expiresAt ?? Date.now() + 60 * 60 * 1000,
+					idToken: auth.idToken,
+					scopes: auth.scopes,
+				},
+				projectRoot,
+				'global',
+			);
+		},
 	};
 }
 
-export async function getOttoRouterBalance() {
-	const privateKey = await getOttoRouterPrivateKey();
-	if (!privateKey) {
+export async function getOttoRouterAuthHeaders(
+	projectRoot?: string,
+): Promise<Record<string, string> | null> {
+	const auth = await getOttoRouterOAuthAuth(projectRoot);
+	if (!auth) return null;
+	return { Authorization: `Bearer ${auth.accessToken}` };
+}
+
+export async function getOttoRouterBalance(projectRoot?: string) {
+	const auth = await getOttoRouterOAuthAuth(projectRoot);
+	if (!auth) {
 		return {
 			ok: false as const,
-			body: { error: 'OttoRouter wallet not configured' },
+			body: { error: 'OttoRouter OAuth not configured' },
 			status: 401 as const,
 		};
 	}
 
-	const balance = await fetchOttoRouterBalance({ privateKey });
+	const balance = await fetchOttoRouterBalance(auth);
 	if (!balance) {
 		return {
 			ok: false as const,
@@ -74,19 +99,17 @@ export async function getOttoRouterBalance() {
 	return { ok: true as const, body: balance };
 }
 
-export async function getOttoRouterWalletInfo() {
-	const privateKey = await getOttoRouterPrivateKey();
-	if (!privateKey) {
+export async function getOttoRouterAuthInfo(projectRoot?: string) {
+	const auth = await getOttoRouterOAuthAuth(projectRoot);
+	if (!auth) {
 		return {
 			configured: false,
-			error: 'OttoRouter wallet not configured',
+			error: 'OttoRouter OAuth not configured',
 		};
 	}
 
-	const publicKey = getPublicKeyFromPrivate(privateKey);
-	if (!publicKey) {
-		return { configured: false, error: 'Invalid private key' };
-	}
-
-	return { configured: true, publicKey };
+	return {
+		configured: true,
+		expiresAt: auth.expiresAt,
+	};
 }

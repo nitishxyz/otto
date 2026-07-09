@@ -49,17 +49,6 @@ export function useOttoRouterPayments(sessionId: string | undefined) {
 					break;
 				}
 
-				case 'ottorouter.topup.method_selected': {
-					const method = payload?.method;
-					if (method === 'crypto') {
-						setPaymentPending(true);
-						loadingToastIdRef.current = toast.loading(
-							'💳 Processing crypto payment...',
-						);
-					}
-					break;
-				}
-
 				case 'ottorouter.topup.cancelled': {
 					clearPendingTopup();
 					const reason =

@@ -1,8 +1,9 @@
 import type { WalletContext } from './auth.ts';
-import type { FetchFunction } from './types.ts';
+import type { FetchFunction, OttoRouterAuth } from './types.ts';
 
 const DEFAULT_TOKEN_REFRESH_SKEW_MS = 60_000;
 const DEFAULT_TOKEN_TTL_MS = 5 * 60_000;
+const DEFAULT_OAUTH_CLIENT_ID = 'ottocode-cli';
 
 interface AccessTokenState {
 	token: string;
@@ -21,6 +22,13 @@ interface CreateAccessTokenManagerOptions {
 	tokenRefreshSkewMs?: number;
 }
 
+interface CreateOAuthAccessTokenManagerOptions {
+	auth: OttoRouterAuth;
+	baseURL: string;
+	fetch?: FetchFunction;
+	tokenRefreshSkewMs?: number;
+}
+
 interface WalletTokenResponse {
 	accessToken?: string;
 	access_token?: string;
@@ -31,8 +39,19 @@ interface WalletTokenResponse {
 	expires_in?: number | string;
 }
 
+interface OAuthTokenResponse {
+	access_token?: string;
+	refresh_token?: string;
+	expires_in?: number | string;
+	expires_at?: number | string;
+}
+
 function trimTrailingSlash(url: string) {
 	return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+function oauthResource(baseURL: string) {
+	return `${trimTrailingSlash(baseURL)}/api/auth`;
 }
 
 function parseNumber(value: unknown): number | null {
@@ -137,6 +156,121 @@ export function createAccessTokenManager(
 	return {
 		async getToken(forceRefresh = false) {
 			if (!forceRefresh && hasValidToken() && state) {
+				return state.token;
+			}
+
+			if (!inFlight) {
+				inFlight = refresh().finally(() => {
+					inFlight = null;
+				});
+			}
+
+			return inFlight;
+		},
+		invalidate() {
+			state = null;
+		},
+	};
+}
+
+async function refreshOAuthToken(
+	auth: OttoRouterAuth,
+	baseURL: string,
+	baseFetch: FetchFunction,
+): Promise<AccessTokenState> {
+	if (!auth.refreshToken) {
+		throw new Error('OttoRouter: OAuth refresh token is not configured.');
+	}
+
+	const response = await baseFetch(
+		`${trimTrailingSlash(baseURL)}/api/auth/oauth2/token`,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Accept: 'application/json',
+			},
+			body: new URLSearchParams({
+				client_id: auth.clientId ?? DEFAULT_OAUTH_CLIENT_ID,
+				grant_type: 'refresh_token',
+				refresh_token: auth.refreshToken,
+				resource: oauthResource(baseURL),
+			}).toString(),
+		},
+	);
+
+	const payload = (await response
+		.json()
+		.catch(() => ({}))) as OAuthTokenResponse & {
+		error?: string;
+		error_description?: string;
+	};
+	if (!response.ok || !payload.access_token) {
+		const message =
+			payload.error_description ?? payload.error ?? response.statusText;
+		throw new Error(`OttoRouter: OAuth token refresh failed (${message})`);
+	}
+
+	const refreshToken = payload.refresh_token ?? auth.refreshToken;
+	const expiresAt = resolveExpiresAt(
+		{
+			expires_at: payload.expires_at,
+			expires_in: payload.expires_in,
+		},
+		payload.access_token,
+	);
+	auth.accessToken = payload.access_token;
+	auth.refreshToken = refreshToken;
+	auth.expiresAt = expiresAt;
+	await auth.onTokenRefresh?.({
+		accessToken: payload.access_token,
+		refreshToken,
+		expiresAt,
+	});
+
+	return {
+		token: payload.access_token,
+		expiresAt,
+	};
+}
+
+export function createOAuthAccessTokenManager(
+	options: CreateOAuthAccessTokenManagerOptions,
+): AccessTokenManager {
+	const {
+		auth,
+		baseURL,
+		fetch: customFetch,
+		tokenRefreshSkewMs = DEFAULT_TOKEN_REFRESH_SKEW_MS,
+	} = options;
+	const baseFetch = customFetch ?? globalThis.fetch.bind(globalThis);
+	let state: AccessTokenState | null = auth.accessToken
+		? {
+				token: auth.accessToken,
+				expiresAt:
+					auth.expiresAt ??
+					parseJwtExpiry(auth.accessToken) ??
+					Date.now() + DEFAULT_TOKEN_TTL_MS,
+			}
+		: null;
+	let inFlight: Promise<string> | null = null;
+
+	const hasValidToken = () =>
+		state != null && Date.now() + tokenRefreshSkewMs < state.expiresAt;
+
+	const refresh = async () => {
+		const next = await refreshOAuthToken(auth, baseURL, baseFetch);
+		state = next;
+		return next.token;
+	};
+
+	return {
+		async getToken(forceRefresh = false) {
+			if (!forceRefresh && hasValidToken() && state) {
+				return state.token;
+			}
+
+			if (!forceRefresh && state && !auth.refreshToken) {
 				return state.token;
 			}
 

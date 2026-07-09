@@ -117,7 +117,7 @@ interface ChatInputProps {
 	modelName?: string;
 	providerName?: string;
 	isCustomProvider?: boolean;
-	authType?: 'api' | 'oauth' | 'wallet';
+	authType?: 'api' | 'oauth';
 	isFreeModel?: boolean;
 	researchContexts?: Array<{ id: string; label: string }>;
 	onResearchContextRemove?: (id: string) => void;

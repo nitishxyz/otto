@@ -44,8 +44,8 @@ export const DefaultsStep = memo(function DefaultsStep({
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 
-	const [selectedProvider, setSelectedProvider] = useState('ottorouter');
-	const [selectedModel, setSelectedModel] = useState('kimi-k2.5');
+	const [selectedProvider, setSelectedProvider] = useState('');
+	const [selectedModel, setSelectedModel] = useState('');
 	const [selectedAgent, setSelectedAgent] = useState(
 		authStatus.defaults.agent || 'build',
 	);
@@ -69,17 +69,24 @@ export const DefaultsStep = memo(function DefaultsStep({
 				]);
 				setConfig(configData);
 				setAllModels(modelsData);
-				const cfgProvider = configData?.defaults?.provider || 'ottorouter';
-				const cfgModel = configData?.defaults?.model || 'kimi-k2.5';
-				const providerHasModels = modelsData?.[cfgProvider]?.models?.length > 0;
-				const resolvedProvider = providerHasModels ? cfgProvider : 'ottorouter';
-				const resolvedModel =
-					providerHasModels &&
-					modelsData[cfgProvider].models.some(
-						(m: { id: string }) => m.id === cfgModel,
-					)
-						? cfgModel
-						: modelsData?.[resolvedProvider]?.models?.[0]?.id || 'kimi-k2.5';
+				const availableProviderIds = configData.providers.filter(
+					(p) =>
+						authStatus.providers[p]?.configured &&
+						modelsData?.[p]?.models?.length > 0,
+				);
+				const cfgProvider = configData.defaults.provider;
+				const cfgModel = configData.defaults.model;
+				const resolvedProvider = availableProviderIds.includes(cfgProvider)
+					? cfgProvider
+					: (availableProviderIds[0] ?? '');
+				const providerModels = resolvedProvider
+					? (modelsData?.[resolvedProvider]?.models ?? [])
+					: [];
+				const resolvedModel = providerModels.some(
+					(m: { id: string }) => m.id === cfgModel,
+				)
+					? cfgModel
+					: (providerModels[0]?.id ?? '');
 				setSelectedProvider(resolvedProvider);
 				setSelectedModel(resolvedModel);
 				if (configData?.defaults?.agent) {
@@ -97,7 +104,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 			}
 		};
 		loadConfig();
-	}, []);
+	}, [authStatus.providers]);
 
 	useEffect(() => {
 		if (config?.agents?.length) {
@@ -118,6 +125,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 	}, [selectedProvider, allModels, selectedModel]);
 
 	const handleFinish = async () => {
+		if (!selectedProvider || !selectedModel) return;
 		setIsSaving(true);
 		try {
 			await apiClient.updateDefaults({
@@ -148,11 +156,12 @@ export const DefaultsStep = memo(function DefaultsStep({
 		);
 	}
 
-	const availableProviders = config?.providers.filter(
-		(p) =>
-			(authStatus.providers[p]?.configured || p === 'ottorouter') &&
-			allModels?.[p]?.models?.length > 0,
-	) || ['ottorouter'];
+	const availableProviders =
+		config?.providers.filter(
+			(p) =>
+				authStatus.providers[p]?.configured &&
+				allModels?.[p]?.models?.length > 0,
+		) ?? [];
 
 	const currentProviderModels = allModels?.[selectedProvider]?.models || [];
 

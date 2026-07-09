@@ -3,6 +3,7 @@ import {
 	type OttoRouterPaymentCallbacks,
 	getAuth,
 	loadConfig,
+	setAuth,
 } from '@ottocode/sdk';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
 import { isDevtoolsEnabled } from '../debug/state.ts';
@@ -21,18 +22,36 @@ export interface ResolveOttoRouterModelOptions {
 	autoPayThresholdUsd?: number;
 }
 
-async function getOttoRouterPrivateKey(projectRoot?: string): Promise<string> {
-	if (process.env.OTTOROUTER_PRIVATE_KEY) {
-		return process.env.OTTOROUTER_PRIVATE_KEY;
+async function getOttoRouterOAuth(projectRoot?: string) {
+	const cfg = await loadConfig(projectRoot);
+	const auth = await getAuth('ottorouter', cfg.projectRoot);
+	if (auth?.type === 'oauth' && auth.access) {
+		return {
+			accessToken: auth.access,
+			refreshToken: auth.refresh,
+			expiresAt: auth.expires,
+			onTokenRefresh: async (tokens: {
+				accessToken: string;
+				refreshToken?: string;
+				expiresAt?: number;
+			}) => {
+				await setAuth(
+					'ottorouter',
+					{
+						type: 'oauth',
+						access: tokens.accessToken,
+						refresh: tokens.refreshToken ?? auth.refresh,
+						expires: tokens.expiresAt ?? Date.now() + 60 * 60 * 1000,
+						idToken: auth.idToken,
+						scopes: auth.scopes,
+					},
+					cfg.projectRoot,
+					'global',
+				);
+			},
+		};
 	}
-	try {
-		const cfg = await loadConfig(projectRoot);
-		const auth = await getAuth('ottorouter', cfg.projectRoot);
-		if (auth?.type === 'wallet' && auth.secret) {
-			return auth.secret;
-		}
-	} catch {}
-	return '';
+	return null;
 }
 
 export async function resolveOttoRouterModel(
@@ -40,14 +59,13 @@ export async function resolveOttoRouterModel(
 	sessionId?: string,
 	options: ResolveOttoRouterModelOptions = {},
 ) {
-	const privateKey = await getOttoRouterPrivateKey(options.projectRoot);
-	if (!privateKey) {
+	const auth = await getOttoRouterOAuth(options.projectRoot);
+	if (!auth) {
 		throw new Error(
-			'OttoRouter provider requires OTTOROUTER_PRIVATE_KEY (base58 Solana secret).',
+			'OttoRouter provider requires OAuth. Run `otto auth login ottorouter` first.',
 		);
 	}
 	const baseURL = process.env.OTTOROUTER_BASE_URL;
-	const rpcURL = process.env.OTTOROUTER_SOLANA_RPC_URL;
 	const {
 		messageId,
 		topupApprovalMode = 'approval',
@@ -120,9 +138,8 @@ export async function resolveOttoRouterModel(
 		: {};
 
 	const ottorouter = createOttoRouter({
-		auth: { privateKey },
+		auth,
 		baseURL,
-		rpcURL,
 		callbacks,
 		middleware: isDevtoolsEnabled() ? devToolsMiddleware() : undefined,
 		payment: {

@@ -107,6 +107,15 @@ export {
 } from './kimi-oauth.ts';
 
 export {
+	refreshOttoRouterToken,
+	requestOttoRouterDeviceCode,
+	pollOttoRouterDeviceCodeOnce,
+	type OttoRouterOAuthTokens,
+	type OttoRouterDeviceCodeResponse,
+	type OttoRouterDevicePollResult,
+} from './ottorouter-oauth.ts';
+
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

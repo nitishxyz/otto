@@ -26,6 +26,7 @@ const OAUTH_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
 		'gpt-5.4-mini',
 		'gpt-5.5',
 	],
+	xai: ['grok-4.5', 'grok-composer-2.5-fast'],
 };
 
 const OAUTH_ONLY_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
@@ -55,13 +56,14 @@ function applyOAuthContextOverride(
 }
 
 function matchesOAuthModel(provider: ProviderId, modelId: string): boolean {
-	if (isOAuthOnlyModel(provider, modelId)) return true;
-
 	const exactIds = OAUTH_MODEL_IDS[provider];
 	if (exactIds?.includes(modelId)) return true;
 
 	const prefixes = OAUTH_MODEL_PREFIXES[provider];
 	if (prefixes?.some((prefix) => modelId.startsWith(prefix))) return true;
+
+	if (!exactIds && !prefixes && isOAuthOnlyModel(provider, modelId))
+		return true;
 
 	return !exactIds && !prefixes;
 }

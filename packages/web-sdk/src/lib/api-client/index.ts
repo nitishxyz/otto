@@ -140,8 +140,6 @@ class ApiClient {
 	getPendingSecureInputs = secureInputMixin.getPendingSecureInputs;
 
 	getOttoRouterBalance = ottorouterMixin.getOttoRouterBalance;
-	getOttoRouterWallet = ottorouterMixin.getOttoRouterWallet;
-	getOttoRouterUsdcBalance = ottorouterMixin.getOttoRouterUsdcBalance;
 	getPolarTopupEstimate = ottorouterMixin.getPolarTopupEstimate;
 	createPolarCheckout = ottorouterMixin.createPolarCheckout;
 	selectTopupMethod = ottorouterMixin.selectTopupMethod;
@@ -153,9 +151,6 @@ class ApiClient {
 	verifyRazorpayPayment = ottorouterMixin.verifyRazorpayPayment;
 
 	getAuthStatus = authMixin.getAuthStatus;
-	setupOttoRouterWallet = authMixin.setupOttoRouterWallet;
-	importOttoRouterWallet = authMixin.importOttoRouterWallet;
-	exportOttoRouterWallet = authMixin.exportOttoRouterWallet;
 	addProvider = authMixin.addProvider;
 	removeProvider = authMixin.removeProvider;
 	completeOnboarding = authMixin.completeOnboarding;
@@ -168,6 +163,8 @@ class ApiClient {
 	pollCopilotDeviceFlow = authMixin.pollCopilotDeviceFlow;
 	startKimiDeviceFlow = authMixin.startKimiDeviceFlow;
 	pollKimiDeviceFlow = authMixin.pollKimiDeviceFlow;
+	startOttoRouterDeviceFlow = authMixin.startOttoRouterDeviceFlow;
+	pollOttoRouterDeviceFlow = authMixin.pollOttoRouterDeviceFlow;
 	getCopilotAuthMethods = authMixin.getCopilotAuthMethods;
 	saveCopilotToken = authMixin.saveCopilotToken;
 	importCopilotTokenFromGh = authMixin.importCopilotTokenFromGh;

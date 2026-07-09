@@ -4,7 +4,7 @@ export type OnboardingStep = 'wallet' | 'defaults';
 
 export interface ProviderInfo {
 	configured: boolean;
-	type?: 'api' | 'oauth' | 'wallet';
+	type?: 'api' | 'oauth';
 	label: string;
 	supportsOAuth: boolean;
 	supportsToken?: boolean;
@@ -16,7 +16,7 @@ export interface ProviderInfo {
 
 export interface AuthStatus {
 	onboardingComplete: boolean;
-	ottorouter: { configured: boolean; publicKey?: string };
+	ottorouter: { configured: boolean; expiresAt?: number };
 	providers: Record<string, ProviderInfo>;
 	defaults: {
 		agent: string;

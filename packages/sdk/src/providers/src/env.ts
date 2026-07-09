@@ -12,7 +12,7 @@ const ENV_VARS: Record<BuiltInProviderId, string> = {
 	openrouter: 'OPENROUTER_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
 	copilot: 'GITHUB_TOKEN',
-	ottorouter: 'OTTOROUTER_PRIVATE_KEY',
+	ottorouter: 'OTTOROUTER_OAUTH',
 	xai: 'XAI_API_KEY',
 	zai: 'ZAI_API_KEY',
 	'zai-coding': 'ZAI_CODING_API_KEY',
@@ -26,6 +26,9 @@ export function providerEnvVar(provider: ProviderId): string | undefined {
 }
 
 export function readEnvKey(provider: ProviderId): string | undefined {
+	if (provider === 'ottorouter') {
+		return undefined;
+	}
 	if (provider === 'kimi') {
 		const value = readKimiApiKeyFromEnv();
 		return value.length ? value : undefined;

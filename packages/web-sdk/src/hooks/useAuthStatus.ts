@@ -46,51 +46,13 @@ export function useAuthStatus() {
 			const hasAnyProvider = Object.values(status.providers).some(
 				(p) => p.configured,
 			);
-			const needsOnboarding =
-				!status.onboardingComplete ||
-				!hasAnyProvider ||
-				!status.ottorouter.configured;
+			const needsOnboarding = !hasAnyProvider;
 			if (needsOnboarding) {
 				setOpen(true);
 			}
 		}
 		setInitialized(true);
 	}, [fetchAuthStatus, setOpen]);
-
-	const setupWallet = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		try {
-			const result = await apiClient.setupOttoRouterWallet();
-			await fetchAuthStatus();
-			return result;
-		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Setup failed';
-			setError(message);
-			throw err;
-		} finally {
-			setLoading(false);
-		}
-	}, [fetchAuthStatus, setLoading, setError]);
-
-	const importWallet = useCallback(
-		async (privateKey: string) => {
-			setLoading(true);
-			setError(null);
-			try {
-				const result = await apiClient.importOttoRouterWallet(privateKey);
-				await fetchAuthStatus();
-				return result;
-			} catch (err) {
-				const message = err instanceof Error ? err.message : 'Import failed';
-				setError(message);
-				throw err;
-			} finally {
-				setLoading(false);
-			}
-		},
-		[fetchAuthStatus, setLoading, setError],
-	);
 
 	const addProvider = useCallback(
 		async (provider: string, apiKey: string) => {
@@ -359,6 +321,17 @@ export function useAuthStatus() {
 		[fetchAuthStatus],
 	);
 
+	const pollOttoRouterDeviceFlow = useCallback(
+		async (sessionId: string) => {
+			const result = await apiClient.pollOttoRouterDeviceFlow(sessionId);
+			if (result.status === 'complete') {
+				await fetchAuthStatus();
+			}
+			return result;
+		},
+		[fetchAuthStatus],
+	);
+
 	const saveCopilotToken = useCallback(
 		async (token: string) => {
 			setLoading(true);
@@ -404,8 +377,6 @@ export function useAuthStatus() {
 		initialized,
 		fetchAuthStatus,
 		checkOnboarding,
-		setupWallet,
-		importWallet,
 		addProvider,
 		addCustomProvider,
 		removeProvider,
@@ -419,6 +390,9 @@ export function useAuthStatus() {
 		pollCopilotDeviceFlow,
 		startKimiDeviceFlow: apiClient.startKimiDeviceFlow.bind(apiClient),
 		pollKimiDeviceFlow,
+		startOttoRouterDeviceFlow:
+			apiClient.startOttoRouterDeviceFlow.bind(apiClient),
+		pollOttoRouterDeviceFlow,
 		getCopilotAuthMethods: apiClient.getCopilotAuthMethods.bind(apiClient),
 		saveCopilotToken,
 		importCopilotTokenFromGh,

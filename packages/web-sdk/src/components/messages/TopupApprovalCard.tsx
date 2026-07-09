@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Wallet, CreditCard, AlertCircle, X } from 'lucide-react';
+import { CreditCard, AlertCircle, X } from 'lucide-react';
 import type { PendingTopupApproval } from '../../stores/topupApprovalStore';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
@@ -8,7 +8,7 @@ import { StableSpinner } from '../ui/StableSpinner';
 
 interface TopupApprovalCardProps {
 	pendingTopup: PendingTopupApproval;
-	onMethodSelected: (method: 'crypto' | 'fiat') => void;
+	onMethodSelected: (method: 'fiat') => void;
 	onCancel: () => void;
 }
 
@@ -18,26 +18,9 @@ export const TopupApprovalCard = memo(function TopupApprovalCard({
 	onCancel,
 }: TopupApprovalCardProps) {
 	const [isProcessing, setIsProcessing] = useState(false);
-	const [selectedMethod, setSelectedMethod] = useState<
-		'crypto' | 'fiat' | null
-	>(null);
+	const [selectedMethod, setSelectedMethod] = useState<'fiat' | null>(null);
 	const openTopupModal = useOttoRouterStore((s) => s.openTopupModal);
 	const hasGoPlan = useOttoRouterStore((s) => !!s.subscription?.active);
-
-	const handleSelectCrypto = async () => {
-		setSelectedMethod('crypto');
-		setIsProcessing(true);
-		try {
-			await apiClient.selectTopupMethod(pendingTopup.sessionId, 'crypto');
-			onMethodSelected('crypto');
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : 'Failed to process payment',
-			);
-			setIsProcessing(false);
-			setSelectedMethod(null);
-		}
-	};
 
 	const handleSelectFiat = async () => {
 		setSelectedMethod('fiat');
@@ -108,21 +91,6 @@ export const TopupApprovalCard = memo(function TopupApprovalCard({
 
 				<button
 					type="button"
-					onClick={handleSelectCrypto}
-					disabled={isProcessing}
-					title="Pay with USDC from your wallet"
-					className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
-				>
-					{selectedMethod === 'crypto' && isProcessing ? (
-						<StableSpinner size="xs" title="Processing payment" />
-					) : (
-						<Wallet className="w-3 h-3" />
-					)}
-					Pay with USDC
-				</button>
-
-				<button
-					type="button"
 					onClick={handleSelectFiat}
 					disabled={isProcessing}
 					title="Top up with card (min $5)"
@@ -139,11 +107,9 @@ export const TopupApprovalCard = memo(function TopupApprovalCard({
 			</div>
 
 			<p className="ml-6 text-xs text-muted-foreground">
-				{selectedMethod === 'crypto'
-					? 'Processing USDC payment from your wallet...'
-					: selectedMethod === 'fiat'
-						? 'Opening checkout...'
-						: 'Select a payment method to continue your request.'}
+				{selectedMethod === 'fiat'
+					? 'Opening checkout...'
+					: 'Top up with card to continue your request.'}
 			</p>
 		</div>
 	);

@@ -12,10 +12,10 @@ export interface PendingTopupApproval {
 interface TopupApprovalState {
 	pendingTopup: PendingTopupApproval | null;
 	isProcessing: boolean;
-	selectedMethod: 'crypto' | 'fiat' | null;
+	selectedMethod: 'fiat' | null;
 	setPendingTopup: (topup: PendingTopupApproval | null) => void;
 	setProcessing: (processing: boolean) => void;
-	setSelectedMethod: (method: 'crypto' | 'fiat' | null) => void;
+	setSelectedMethod: (method: 'fiat' | null) => void;
 	clearPendingTopup: () => void;
 }
 
