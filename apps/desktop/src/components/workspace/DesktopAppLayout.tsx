@@ -131,11 +131,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 					: RIGHT_PANEL_DEFAULT_WIDTH;
 	const viewerPanelWidth = panelWidths[VIEWER_PANEL_KEY];
 	const anySidePanelOpen = !sessionsCollapsed || anyRightPanelOpen;
-	const viewerSideBySideWidth = anySidePanelOpen
-		? `calc(100% - ${CHAT_MIN_WIDTH}px)`
-		: `clamp(${VIEWER_MIN_WIDTH}px, ${
-				viewerPanelWidth ? `${viewerPanelWidth}px` : '50%'
-			}, calc(100% - ${CHAT_MIN_WIDTH}px))`;
+	const viewerPreferredWidth = viewerPanelWidth
+		? `${viewerPanelWidth}px`
+		: '50%';
+	const viewerSideBySideWidth = `min(max(${VIEWER_MIN_WIDTH}px, ${viewerPreferredWidth}), max(0px, calc(100% - ${CHAT_MIN_WIDTH}px)))`;
 	const {
 		isVisible: isRightRailVisible,
 		isHoverPending: isRightRailHoverPending,
@@ -283,7 +282,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								style={viewerPaneStyle}
 								aria-hidden={!anyViewerOpen}
 							>
-								{anyViewerOpen && viewerSideBySide && !anySidePanelOpen && (
+								{anyViewerOpen && viewerSideBySide && (
 									<ResizeHandle
 										panelKey={VIEWER_PANEL_KEY}
 										side="right"
