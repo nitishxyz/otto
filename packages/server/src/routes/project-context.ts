@@ -7,7 +7,7 @@ import {
 	getProjectManager,
 	type ProjectRuntime,
 } from '../runtime/projects/manager.ts';
-import { getServerInfo } from '../state.ts';
+import { getDefaultProjectRoot } from '../state.ts';
 
 export const projectQuerySchema = z.object({
 	project: z
@@ -40,21 +40,23 @@ export async function resolveRequestProject(
 	const projectId =
 		c.req.query('projectId') || c.req.header('X-Otto-Project-Id');
 	const projectPath = c.req.query('project') || c.req.header('X-Otto-Project');
+	const defaultProjectRoot = getDefaultProjectRoot();
 
-	if (!projectId && !projectPath && getServerInfo().daemonId) {
-		// Daemon serves many projects; guessing via cwd would silently route
-		// requests to whichever project the daemon was spawned from.
+	if (!projectId && !projectPath && !defaultProjectRoot) {
 		throw new APIError(
 			'Project context required: pass projectId (X-Otto-Project-Id) or project path (X-Otto-Project).',
 			{ status: 400, code: 'project_context_required' },
 		);
 	}
 
-	const runtime = await getProjectManager().getProject({
-		id: projectId,
-		// Compatibility-only fallback for legacy single-project server callers.
-		path: projectPath || process.cwd(),
-	});
+	const runtime = projectId
+		? await getProjectManager().getProject({
+				id: projectId,
+				path: projectPath || undefined,
+			})
+		: await getProjectManager().getProject({
+				path: projectPath || defaultProjectRoot || undefined,
+			});
 
 	return {
 		projectId: runtime.id,

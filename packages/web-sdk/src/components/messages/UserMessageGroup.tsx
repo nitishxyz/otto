@@ -18,6 +18,7 @@ import { useMessageQueuePosition } from '../../hooks/useQueueState';
 import { getMessagesQueryKey } from '../../hooks/useMessages';
 import { useQueueStore } from '../../stores/queueStore';
 import { apiClient } from '../../lib/api-client';
+import { getBaseUrl, getProjectQuery } from '../../lib/api-client/utils';
 import { parseResearchContext } from '../../lib/parseResearchContext';
 import { parseFileSelections } from '../../lib/fileSelectionContext';
 import { mentionHighlightClasses } from '../../lib/mentionHighlightStyles';
@@ -68,6 +69,12 @@ interface FileData {
 	mediaType: string;
 	textContent?: string;
 	attachmentId?: string;
+}
+
+function getAttachmentSrc(attachmentId: string): string {
+	const params = new URLSearchParams(getProjectQuery());
+	const query = params.size ? `?${params.toString()}` : '';
+	return `${getBaseUrl().replace(/\/$/, '')}/v1/attachments/${encodeURIComponent(attachmentId)}${query}`;
 }
 
 function linkifySlashCommand(content: string, recipeNames: string[]) {
@@ -196,10 +203,14 @@ export const UserMessageGroup = memo(
 		for (const part of imageParts) {
 			try {
 				const data = part.contentJson || JSON.parse(part.content || '{}');
-				if (data && typeof data === 'object' && 'data' in data) {
+				if (data && typeof data === 'object') {
 					const imgData = data as ImageData;
-					if (imgData.data) {
-						const src = `data:${imgData.mediaType};base64,${imgData.data}`;
+					const src = imgData.data
+						? `data:${imgData.mediaType};base64,${imgData.data}`
+						: imgData.attachmentId
+							? getAttachmentSrc(imgData.attachmentId)
+							: null;
+					if (src) {
 						images.push({ id: part.id, src });
 					}
 				}
@@ -212,8 +223,13 @@ export const UserMessageGroup = memo(
 				const data = part.contentJson || JSON.parse(part.content || '{}');
 				if (data && typeof data === 'object' && 'type' in data) {
 					const fileData = data as FileData;
-					if (fileData.type === 'image' && fileData.data) {
-						const src = `data:${fileData.mediaType};base64,${fileData.data}`;
+					if (
+						fileData.type === 'image' &&
+						(fileData.data || fileData.attachmentId)
+					) {
+						const src = fileData.data
+							? `data:${fileData.mediaType};base64,${fileData.data}`
+							: getAttachmentSrc(fileData.attachmentId as string);
 						images.push({ id: part.id, src });
 					} else {
 						files.push({

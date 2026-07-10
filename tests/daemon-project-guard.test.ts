@@ -1,10 +1,20 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { createApp, setDaemonId } from '@ottocode/server';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import {
+	createApp,
+	setDaemonId,
+	setDefaultProjectRoot,
+} from '@ottocode/server';
 
 const app = createApp();
 
-afterAll(() => {
+beforeEach(() => {
 	setDaemonId(null);
+	setDefaultProjectRoot(null);
+});
+
+afterEach(() => {
+	setDaemonId(null);
+	setDefaultProjectRoot(null);
 });
 
 describe('daemon project context guard', () => {
@@ -26,9 +36,31 @@ describe('daemon project context guard', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('falls back to cwd for non-daemon single-project servers', async () => {
-		setDaemonId(null);
+	it('rejects contextless requests without an explicit default root', async () => {
+		const res = await app.request('/v1/config');
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as {
+			error?: { code?: string };
+		};
+		expect(body.error?.code).toBe('project_context_required');
+	});
+
+	it('uses a registered default root for single-project servers', async () => {
+		setDefaultProjectRoot(process.cwd());
 		const res = await app.request('/v1/config');
 		expect(res.status).toBe(200);
+	});
+
+	it('returns 404 for an unknown project id instead of using a fallback', async () => {
+		setDefaultProjectRoot(process.cwd());
+		const res = await app.request(
+			'/v1/config?projectId=unknown-project-id-for-routing-test',
+		);
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as {
+			error?: { message?: string; status?: number };
+		};
+		expect(body.error?.message).toContain('Project not found');
+		expect(body.error?.status).toBe(404);
 	});
 });

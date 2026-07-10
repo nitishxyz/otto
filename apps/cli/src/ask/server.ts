@@ -1,4 +1,8 @@
-import { createApp, bunWebSocket } from '@ottocode/server';
+import {
+	createApp,
+	bunWebSocket,
+	setDefaultProjectRoot,
+} from '@ottocode/server';
 import { client } from '@ottocode/api';
 import PKG from '../../package.json' with { type: 'json' };
 import {
@@ -12,6 +16,7 @@ let currentServer: ReturnType<typeof Bun.serve> | null = null;
 
 export async function startEphemeralServer(): Promise<string> {
 	if (currentServer) return `http://localhost:${currentServer.port}`;
+	setDefaultProjectRoot(process.cwd());
 	const app = createApp();
 	currentServer = Bun.serve({
 		port: 0,

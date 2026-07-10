@@ -6,6 +6,7 @@
 let serverPort: number | null = null;
 let serverVersion: string | null = null;
 let daemonId: string | null = process.env.OTTO_DAEMON_ID || null;
+let defaultProjectRoot: string | null = null;
 
 export function setServerPort(port: number): void {
 	serverPort = port;
@@ -21,6 +22,14 @@ export function setServerVersion(version: string): void {
 
 export function setDaemonId(id: string | null): void {
 	daemonId = id;
+}
+
+export function setDefaultProjectRoot(root: string | null): void {
+	defaultProjectRoot = root;
+}
+
+export function getDefaultProjectRoot(): string | null {
+	return defaultProjectRoot;
 }
 
 export function getServerInfo(): {

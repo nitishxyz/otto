@@ -136,7 +136,9 @@ describe('Z.AI Coding Plan provider', () => {
 	test('auth status reports API-key auth and no OAuth support', async () => {
 		process.env.ZAI_CODING_API_KEY = 'zai-env-key';
 		const app = createEmbeddedApp();
-		const response = await app.request('http://localhost/v1/auth/status');
+		const response = await app.request(
+			`http://localhost/v1/auth/status?project=${encodeURIComponent(process.cwd())}`,
+		);
 		const payload = (await response.json()) as {
 			providers: Record<
 				string,

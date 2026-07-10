@@ -3,6 +3,7 @@ import { loadConfig, openAuthUrl, logger, printQRCode } from '@ottocode/sdk';
 import {
 	createApp as createServer,
 	setDaemonId,
+	setDefaultProjectRoot,
 	setServerPort,
 	setServerVersion,
 	shutdownProjectManager,
@@ -80,6 +81,7 @@ export async function startApiServer(opts: {
 	port?: number;
 }): Promise<StartServerResult> {
 	await activateProject(opts.project);
+	setDefaultProjectRoot(opts.project);
 
 	const app = createServer();
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
@@ -153,6 +155,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	await activateProject(opts.project);
 	setServerVersion(version);
 	setDaemonId(process.env.OTTO_DAEMON_ID || null);
+	setDefaultProjectRoot(opts.daemonRegister ? null : opts.project);
 
 	const app = createServer();
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;

@@ -30,9 +30,9 @@ export type ShareSessionResult = {
 /** Shares an otto session and returns the public share URL. */
 export async function shareSession(args: {
 	sessionId: string;
-	projectRoot?: string;
+	projectRoot: string;
 }): Promise<ShareSessionResult> {
-	const cfg = await loadConfig(args.projectRoot || process.cwd());
+	const cfg = await loadConfig(args.projectRoot);
 	const db = await getDb(cfg.projectRoot);
 
 	const session = await db

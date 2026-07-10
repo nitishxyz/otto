@@ -108,7 +108,10 @@ export async function handleAskRequest(
 async function processAskRequest(
 	request: AskServerRequest,
 ): Promise<AskServerResponse> {
-	const projectRoot = request.projectRoot || process.cwd();
+	if (!request.projectRoot) {
+		throw new AskServiceError('projectRoot is required for ask requests', 400);
+	}
+	const projectRoot = request.projectRoot;
 	const configTimer = time('ask:loadConfig+db');
 
 	let cfg: import('@ottocode/sdk').OttoConfig;

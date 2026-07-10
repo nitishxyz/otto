@@ -25,6 +25,86 @@ import {
 type MessagePartRow = typeof messageParts.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 
+const MAX_MESSAGE_ATTACHMENTS = 10;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+const MAX_MESSAGE_REQUEST_BYTES = 64 * 1024 * 1024;
+
+function attachmentPayloadBytes(attachment: unknown): number {
+	if (!attachment || typeof attachment !== 'object') return 0;
+	const payload = attachment as Record<string, unknown>;
+	const dataBytes =
+		typeof payload.data === 'string'
+			? Math.ceil(payload.data.length * 0.75)
+			: 0;
+	const textBytes =
+		typeof payload.textContent === 'string'
+			? Buffer.byteLength(payload.textContent, 'utf8')
+			: 0;
+	return dataBytes + textBytes;
+}
+
+function attachmentName(attachment: unknown, index: number): string {
+	if (attachment && typeof attachment === 'object') {
+		const name = (attachment as Record<string, unknown>).name;
+		if (typeof name === 'string' && name.trim()) return name;
+	}
+	return `attachment ${index + 1}`;
+}
+
+function validateMessageAttachments(body: unknown): string | null {
+	if (!body || typeof body !== 'object') return null;
+	const payload = body as Record<string, unknown>;
+	const attachments = [
+		...(Array.isArray(payload.images) ? payload.images : []),
+		...(Array.isArray(payload.files) ? payload.files : []),
+	];
+	if (attachments.length > MAX_MESSAGE_ATTACHMENTS) {
+		return `A message can include at most ${MAX_MESSAGE_ATTACHMENTS} attachments.`;
+	}
+
+	let totalBytes = 0;
+	for (const [index, attachment] of attachments.entries()) {
+		const bytes = attachmentPayloadBytes(attachment);
+		if (bytes > MAX_ATTACHMENT_BYTES) {
+			return `${attachmentName(attachment, index)} exceeds the 5 MB attachment limit.`;
+		}
+		totalBytes += bytes;
+		if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+			return 'Attachments exceed the 20 MB total limit.';
+		}
+	}
+
+	return null;
+}
+
+function stripHeavyAttachmentFields(
+	partType: string,
+	content: Record<string, unknown> | string,
+): Record<string, unknown> | string {
+	if (
+		typeof content === 'string' ||
+		(partType !== 'image' && partType !== 'file') ||
+		typeof content.attachmentId !== 'string' ||
+		!content.attachmentId
+	) {
+		return content;
+	}
+
+	const hasInlinePayload =
+		typeof content.data === 'string' ||
+		(partType === 'file' && typeof content.textContent === 'string');
+	if (!hasInlinePayload) return content;
+
+	const stripped: Record<string, unknown> = {
+		...content,
+		dataOmitted: true,
+	};
+	delete stripped.data;
+	delete stripped.textContent;
+	return stripped;
+}
+
 const messagePartSchema = z
 	.object({
 		id: z.string(),
@@ -152,6 +232,21 @@ const messageErrorSchema = z.object({
 });
 
 export function registerSessionMessagesRoutes(app: Hono) {
+	app.use('/v1/sessions/:id/messages', async (c, next) => {
+		const contentLength = Number.parseInt(
+			c.req.header('content-length') || '',
+			10,
+		);
+		if (
+			c.req.method === 'POST' &&
+			Number.isFinite(contentLength) &&
+			contentLength > MAX_MESSAGE_REQUEST_BYTES
+		) {
+			return c.json({ error: 'Message request exceeds the 64 MB limit.' }, 413);
+		}
+		await next();
+	});
+
 	zodOpenApiRoute(
 		app,
 		{
@@ -215,9 +310,12 @@ export function registerSessionMessagesRoutes(app: Hono) {
 						);
 						const mapped = parts.map((p) => {
 							const parsed = parseContent(p.content);
+							const stripped = stripHeavyAttachmentFields(p.type, parsed);
+							const content =
+								stripped === parsed ? p.content : JSON.stringify(stripped);
 							return wantParsed
-								? { ...p, content: parsed }
-								: { ...p, contentJson: parsed };
+								? { ...p, content: stripped }
+								: { ...p, content, contentJson: stripped };
 						});
 						return { ...m, parts: mapped };
 					});
@@ -269,6 +367,12 @@ export function registerSessionMessagesRoutes(app: Hono) {
 						'application/json': { schema: messageErrorSchema },
 					},
 				},
+				'413': {
+					description: 'Message or attachments exceed size limits',
+					content: {
+						'application/json': { schema: messageErrorSchema },
+					},
+				},
 			},
 		},
 		async (c) => {
@@ -276,6 +380,10 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				const { cfg, db, runtime } = await resolveRequestProject(c);
 				const sessionId = c.req.param('id');
 				const body = await c.req.json().catch(() => ({}));
+				const attachmentError = validateMessageAttachments(body);
+				if (attachmentError) {
+					return c.json({ error: attachmentError }, 413);
+				}
 
 				logger.info('[API] Received message request', {
 					sessionId,

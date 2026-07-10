@@ -134,7 +134,9 @@ describe('Baseten provider', () => {
 	test('auth status reports API-key auth and no OAuth support', async () => {
 		process.env.BASETEN_API_KEY = 'baseten-env-key';
 		const app = createEmbeddedApp();
-		const response = await app.request('http://localhost/v1/auth/status');
+		const response = await app.request(
+			`http://localhost/v1/auth/status?project=${encodeURIComponent(process.cwd())}`,
+		);
 		const payload = (await response.json()) as {
 			providers: Record<
 				string,

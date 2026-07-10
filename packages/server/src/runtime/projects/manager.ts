@@ -118,6 +118,11 @@ export class ProjectManager {
 		}
 
 		if (input.path) return this.openProject({ path: input.path });
+		if (input.id) {
+			const error = new Error(`Project not found: ${input.id}`);
+			(error as Error & { status?: number }).status = 404;
+			throw error;
+		}
 
 		throw new Error('Project id or path is required');
 	}

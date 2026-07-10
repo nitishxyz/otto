@@ -96,6 +96,41 @@ const TEXT_EXTENSIONS = [
 	'.vue',
 ];
 
+export const DEFAULT_MAX_FILE_SIZE_MB = 5;
+export const DEFAULT_MAX_TOTAL_SIZE_MB = 20;
+
+export type StagedFileValidation =
+	| { ok: true }
+	| { ok: false; reason: 'file' | 'total'; message: string };
+
+export function validateStagedFile(
+	file: File,
+	stagedBytes: number,
+	options: { maxSizeMB: number; maxTotalSizeMB: number },
+): StagedFileValidation {
+	const { maxSizeMB, maxTotalSizeMB } = options;
+	const maxSizeBytes = maxSizeMB * 1024 * 1024;
+	const maxTotalBytes = maxTotalSizeMB * 1024 * 1024;
+
+	if (file.size > maxSizeBytes) {
+		return {
+			ok: false,
+			reason: 'file',
+			message: `${file.name} is too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Max per file: ${maxSizeMB}MB`,
+		};
+	}
+
+	if (stagedBytes + file.size > maxTotalBytes) {
+		return {
+			ok: false,
+			reason: 'total',
+			message: `${file.name} exceeds the ${maxTotalSizeMB}MB total attachment limit`,
+		};
+	}
+
+	return { ok: true };
+}
+
 function generateId(): string {
 	return `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -163,6 +198,7 @@ async function uploadOriginalFile(
 interface UseFileUploadOptions {
 	maxFiles?: number;
 	maxSizeMB?: number;
+	maxTotalSizeMB?: number;
 	pageWide?: boolean;
 	supportsImages?: boolean;
 	supportsFileAttachments?: boolean;
@@ -173,7 +209,8 @@ interface UseFileUploadOptions {
 export function useFileUpload(options: UseFileUploadOptions = {}) {
 	const {
 		maxFiles = 10,
-		maxSizeMB = 100,
+		maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB,
+		maxTotalSizeMB = DEFAULT_MAX_TOTAL_SIZE_MB,
 		pageWide = true,
 		supportsImages = true,
 		supportsFileAttachments = true,
@@ -184,18 +221,6 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 	const [files, setFiles] = useState<FileAttachment[]>([]);
 	const [isDragging, setIsDragging] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-
-	const maxSizeBytes = maxSizeMB * 1024 * 1024;
-
-	const validateFile = useCallback(
-		(file: File): string | null => {
-			if (file.size > maxSizeBytes) {
-				return `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Max: ${maxSizeMB}MB`;
-			}
-			return null;
-		},
-		[maxSizeBytes, maxSizeMB],
-	);
 
 	const addFiles = useCallback(
 		async (inputFiles: FileList | File[]) => {
@@ -212,12 +237,16 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
 			const filesToAdd = fileArray.slice(0, remaining);
 			const newFiles: FileAttachment[] = [];
+			let stagedBytes = files.reduce((sum, f) => sum + f.file.size, 0);
 
 			for (const file of filesToAdd) {
-				const validationError = validateFile(file);
-				if (validationError) {
-					setError(validationError);
-					onError?.(validationError);
+				const validation = validateStagedFile(file, stagedBytes, {
+					maxSizeMB,
+					maxTotalSizeMB,
+				});
+				if ('message' in validation) {
+					setError(validation.message);
+					onError?.(validation.message);
 					continue;
 				}
 
@@ -256,6 +285,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 					}
 
 					const id = generateId();
+					stagedBytes += file.size;
 					newFiles.push({
 						id,
 						file,
@@ -314,9 +344,10 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 			}
 		},
 		[
-			files.length,
+			files,
 			maxFiles,
-			validateFile,
+			maxSizeMB,
+			maxTotalSizeMB,
 			onError,
 			sessionId,
 			supportsImages,

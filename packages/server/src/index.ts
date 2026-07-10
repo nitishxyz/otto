@@ -238,6 +238,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	});
 
 	honoApp.use('*', cors(buildCorsOptions(config.corsOrigins)));
+	applyErrorHandler(honoApp);
 	registerRoutes(honoApp);
 	return honoApp;
 }
@@ -297,8 +298,10 @@ export { logger } from '@ottocode/sdk';
 // Export server state management
 export {
 	setDaemonId,
+	setDefaultProjectRoot,
 	setServerPort,
 	setServerVersion,
+	getDefaultProjectRoot,
 	getServerPort,
 	getServerInfo,
 } from './state.ts';
