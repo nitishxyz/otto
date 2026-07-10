@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-07-10T12:31:42.882Z",
+	"updatedAt": "2026-07-10T12:38:52.258Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -16956,6 +16956,34 @@
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
+				"muse-spark-1.1": {
+					"id": "muse-spark-1.1",
+					"ownedBy": "meta",
+					"label": "Muse Spark 1.1",
+					"modalities": {
+						"input": ["text", "image", "pdf", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-08",
+					"lastUpdated": "2026-07-09",
+					"openWeights": false,
+					"cost": {
+						"input": 1.2562499999999999,
+						"output": 4.271249999999999,
+						"cacheRead": 0.15074999999999997
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 32000
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai"
 					}
 				},
 				"MiniMax-M2.1": {
