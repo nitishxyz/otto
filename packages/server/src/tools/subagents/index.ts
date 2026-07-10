@@ -37,7 +37,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 		name: 'delegate_task',
 		tool: tool({
 			description:
-				'Delegate a bounded task to another configured agent. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. You will receive the result automatically when it finishes, or you can poll with list_subagents.',
+				'Delegate a bounded task to another configured agent. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically after the current parent turn ends. Do not poll for completion: if no unrelated work remains, end the current turn so delivery can occur.',
 			inputSchema: delegateInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -67,7 +67,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 					childSessionId: result.childSessionId,
 					agent: result.agent,
 					status: 'running',
-					note: 'Task ownership transferred to the sub-agent. Do not perform the delegated task yourself unless it fails or the user explicitly requested independent verification. Continue unrelated work, or wait/check list_subagents.',
+					note: 'Task ownership transferred to the sub-agent. Continue only unrelated work. Do not call list_subagents to poll: automatic result delivery requires this parent turn to end, so end it now if no unrelated work remains.',
 				};
 			},
 		}),
@@ -86,7 +86,7 @@ export function buildListSubagentsTool(projectRoot: string, sessionId: string) {
 		name: 'list_subagents',
 		tool: tool({
 			description:
-				'List sub-agents spawned from this session with their status and result summaries. Use this instead of remembering what you delegated.',
+				'List sub-agents spawned from this session with their status and result summaries. Use for an explicit status review or after automatic delivery, not to poll a running sub-agent. If a listed sub-agent is still running, do not check again in this turn; end the turn so its result can be delivered automatically.',
 			inputSchema: listInputSchema,
 			async execute(input) {
 				const db = await getDb(projectRoot);
