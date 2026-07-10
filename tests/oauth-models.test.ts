@@ -21,6 +21,10 @@ describe('oauth model filtering', () => {
 		expect(filteredIds).toContain('gpt-5.3-codex');
 		expect(filteredIds).toContain('gpt-5.4');
 		expect(filteredIds).toContain('gpt-5.5');
+		expect(filteredIds).toContain('gpt-5.6');
+		expect(filteredIds).toContain('gpt-5.6-luna');
+		expect(filteredIds).toContain('gpt-5.6-sol');
+		expect(filteredIds).toContain('gpt-5.6-terra');
 		expect(filteredIds).not.toContain('gpt-5.2-chat-latest');
 		expect(filteredIds).not.toContain('gpt-5.2-pro');
 		expect(filteredIds).not.toContain('gpt-5.3-codex-spark');
@@ -134,7 +138,9 @@ describe('oauth model filtering', () => {
 	test('rejects OpenAI lookalike models that only share a prefix', () => {
 		expect(isModelAllowedForOAuth('openai', 'gpt-5.2')).toBe(true);
 		expect(isModelAllowedForOAuth('openai', 'gpt-5.5')).toBe(true);
+		expect(isModelAllowedForOAuth('openai', 'gpt-5.6-terra')).toBe(true);
 		expect(isModelAllowedForOAuth('openai', 'gpt-5.2-chat-latest')).toBe(false);
 		expect(isModelAllowedForOAuth('openai', 'gpt-5.4-pro')).toBe(false);
+		expect(isModelAllowedForOAuth('openai', 'gpt-5.6-pro')).toBe(false);
 	});
 });

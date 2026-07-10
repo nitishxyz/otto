@@ -25,6 +25,10 @@ const OAUTH_MODEL_IDS: Partial<Record<ProviderId, string[]>> = {
 		'gpt-5.4',
 		'gpt-5.4-mini',
 		'gpt-5.5',
+		'gpt-5.6',
+		'gpt-5.6-luna',
+		'gpt-5.6-sol',
+		'gpt-5.6-terra',
 	],
 	xai: ['grok-4.5', 'grok-composer-2.5-fast'],
 };
