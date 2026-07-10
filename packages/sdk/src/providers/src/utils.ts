@@ -42,6 +42,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-4.1-mini'],
 	anthropic: ['claude-3-5-haiku-latest'],
 	google: ['gemini-2.0-flash-lite'],
+	meta: ['muse-spark-1.1'],
 	baseten: ['nvidia/Nemotron-120B-A12B'],
 	huggingface: ['deepseek-ai/DeepSeek-V4-Flash:deepinfra'],
 	wafer: ['deepseek-v4-flash'],
@@ -174,6 +175,7 @@ const OWNER_TO_FAMILY: Record<ModelOwner, UnderlyingProviderKey> = {
 	openai: 'openai',
 	anthropic: 'anthropic',
 	google: 'google',
+	meta: 'openai',
 	openrouter: 'openai-compatible',
 	xai: 'openai',
 	kimi: 'kimi',
@@ -189,6 +191,7 @@ const DIRECT_PROVIDER_FAMILY: Partial<
 	openai: 'openai',
 	anthropic: 'anthropic',
 	google: 'google',
+	meta: 'openai',
 	'ollama-cloud': 'openai-compatible',
 	baseten: 'openai-compatible',
 	huggingface: 'openai-compatible',
@@ -223,6 +226,13 @@ function inferFromModelId(model: string): UnderlyingProviderKey {
 	)
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
+	if (
+		lower.includes('muse-spark') ||
+		lower.startsWith('meta/') ||
+		lower.startsWith('meta-llama/') ||
+		lower.startsWith('llama')
+	)
+		return 'openai';
 	if (lower.includes('grok') || lower.startsWith('xai/')) return 'openai';
 	if (lower.includes('qwen') || lower.startsWith('qwen/'))
 		return 'openai-compatible';

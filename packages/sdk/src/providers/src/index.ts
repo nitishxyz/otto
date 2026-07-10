@@ -136,6 +136,8 @@ export { createHuggingFaceModel } from './huggingface-client.ts';
 export type { HuggingFaceProviderConfig } from './huggingface-client.ts';
 export { createWaferModel } from './wafer-client.ts';
 export type { WaferProviderConfig } from './wafer-client.ts';
+export { createMetaModel } from './meta-client.ts';
+export type { MetaProviderConfig } from './meta-client.ts';
 export {
 	getOpenRouterInstance,
 	createOpenRouterModel,

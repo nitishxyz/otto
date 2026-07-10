@@ -118,6 +118,7 @@ const OWNER_NPM: Record<ModelOwner, string> = {
 	openai: '@ai-sdk/openai',
 	anthropic: '@ai-sdk/anthropic',
 	google: '@ai-sdk/google',
+	meta: '@ai-sdk/openai',
 	openrouter: '@openrouter/ai-sdk-provider',
 	xai: '@ai-sdk/xai',
 	kimi: '@ai-sdk/openai-compatible',

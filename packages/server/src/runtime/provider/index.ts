@@ -3,6 +3,7 @@ import {
 	createBasetenModel,
 	createHuggingFaceModel,
 	createWaferModel,
+	createMetaModel,
 	getConfiguredProviderApiKey,
 	getProviderDefinition,
 	isBuiltInProviderId,
@@ -48,6 +49,16 @@ export async function resolveModel(
 	}
 	if (provider === 'google') {
 		return resolveGoogleModel(model, cfg);
+	}
+	if (provider === 'meta') {
+		const definition = getProviderDefinition(cfg, provider);
+		if (!definition) {
+			throw new Error(`Unsupported provider: ${provider}`);
+		}
+		return createMetaModel(model, {
+			apiKey: getConfiguredProviderApiKey(cfg, provider),
+			baseURL: definition.baseURL,
+		});
 	}
 	if (provider === 'ollama-cloud') {
 		const definition = getProviderDefinition(cfg, provider);

@@ -17,6 +17,7 @@ import {
 	basetenLogo,
 	huggingfaceLogo,
 	waferLogo,
+	metaLogo,
 	copilotLogo,
 } from '../../assets/provider-logos';
 
@@ -39,6 +40,7 @@ const providerLogos: Record<string, string> = {
 	baseten: basetenLogo,
 	huggingface: huggingfaceLogo,
 	wafer: waferLogo,
+	meta: metaLogo,
 	copilot: copilotLogo,
 };
 

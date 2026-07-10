@@ -1979,6 +1979,41 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 			npm: '@ai-sdk/google',
 			doc: 'https://ai.google.dev/gemini-api/docs/models',
 		},
+		meta: {
+			id: 'meta',
+			models: {
+				'muse-spark-1.1': {
+					id: 'muse-spark-1.1',
+					ownedBy: 'meta',
+					label: 'Muse Spark 1.1',
+					modalities: {
+						input: ['text', 'image', 'pdf', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-04-08',
+					lastUpdated: '2026-07-09',
+					openWeights: false,
+					cost: {
+						input: 1.25,
+						output: 4.25,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1000000,
+						output: 32000,
+					},
+				},
+			},
+			label: 'Meta',
+			env: ['META_MODEL_API_KEY'],
+			npm: '@ai-sdk/openai',
+			api: 'https://api.meta.ai/v1',
+			doc: 'https://dev.meta.ai/docs',
+		},
 		baseten: {
 			id: 'baseten',
 			models: {
@@ -2497,6 +2532,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/Llama-3.3-70B-Instruct': {
 					id: 'meta-llama/Llama-3.3-70B-Instruct',
+					ownedBy: 'meta',
 					label: 'Llama-3.3-70B-Instruct',
 					modalities: {
 						input: ['text'],
@@ -5552,6 +5588,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-3.1-70b-instruct': {
 					id: 'meta-llama/llama-3.1-70b-instruct',
+					ownedBy: 'meta',
 					label: 'Llama 3.1 70B Instruct',
 					modalities: {
 						input: ['text'],
@@ -5576,6 +5613,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-3.1-8b-instruct': {
 					id: 'meta-llama/llama-3.1-8b-instruct',
+					ownedBy: 'meta',
 					label: 'Llama 3.1 8B Instruct',
 					modalities: {
 						input: ['text'],
@@ -5600,6 +5638,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-3.3-70b-instruct': {
 					id: 'meta-llama/llama-3.3-70b-instruct',
+					ownedBy: 'meta',
 					label: 'Llama-3.3-70B-Instruct',
 					modalities: {
 						input: ['text'],
@@ -5624,6 +5663,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-3.3-70b-instruct:free': {
 					id: 'meta-llama/llama-3.3-70b-instruct:free',
+					ownedBy: 'meta',
 					label: 'Llama 3.3 70B Instruct (free)',
 					modalities: {
 						input: ['text'],
@@ -5648,6 +5688,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-4-maverick': {
 					id: 'meta-llama/llama-4-maverick',
+					ownedBy: 'meta',
 					label: 'Llama 4 Maverick',
 					modalities: {
 						input: ['text', 'image'],
@@ -5672,6 +5713,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'meta-llama/llama-4-scout': {
 					id: 'meta-llama/llama-4-scout',
+					ownedBy: 'meta',
 					label: 'Llama 4 Scout',
 					modalities: {
 						input: ['text', 'image'],
@@ -9619,6 +9661,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'sao10k/l3.1-euryale-70b': {
 					id: 'sao10k/l3.1-euryale-70b',
+					ownedBy: 'meta',
 					label: 'Llama 3.1 Euryale 70B v2.2',
 					modalities: {
 						input: ['text'],

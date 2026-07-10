@@ -170,6 +170,8 @@ export { createHuggingFaceModel } from './providers/src/index.ts';
 export type { HuggingFaceProviderConfig } from './providers/src/index.ts';
 export { createWaferModel } from './providers/src/index.ts';
 export type { WaferProviderConfig } from './providers/src/index.ts';
+export { createMetaModel } from './providers/src/index.ts';
+export type { MetaProviderConfig } from './providers/src/index.ts';
 export {
 	getOpenRouterInstance,
 	createOpenRouterModel,

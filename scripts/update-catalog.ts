@@ -34,6 +34,7 @@ const SINGLE_PROVIDER_OWNER: Record<string, ModelOwner> = {
 	openai: 'openai',
 	anthropic: 'anthropic',
 	google: 'google',
+	meta: 'meta',
 	moonshotai: 'kimi',
 	kimi: 'kimi',
 	xai: 'xai',
@@ -63,6 +64,8 @@ const FAMILY_TO_OWNER: Record<string, ModelOwner> = {
 	'gemini-flash': 'google',
 	'gemini-flash-lite': 'google',
 	'gemini-pro': 'google',
+	muse: 'meta',
+	llama: 'meta',
 	kimi: 'kimi',
 	'kimi-k2': 'kimi',
 	'kimi-thinking': 'kimi',
@@ -86,6 +89,7 @@ const OWNER_NPM: Partial<Record<ModelOwner, string>> = {
 	openai: '@ai-sdk/openai',
 	anthropic: '@ai-sdk/anthropic',
 	google: '@ai-sdk/google',
+	meta: '@ai-sdk/openai',
 	openrouter: '@openrouter/ai-sdk-provider',
 	xai: '@ai-sdk/xai',
 	kimi: '@ai-sdk/openai-compatible',
@@ -113,6 +117,13 @@ function resolveOwnedByFromModelId(modelId: string): ModelOwner | undefined {
 	)
 		return 'openai';
 	if (lower.includes('gemini') || lower.startsWith('google/')) return 'google';
+	if (
+		lower.includes('muse-spark') ||
+		lower.startsWith('meta/') ||
+		lower.startsWith('meta-llama/') ||
+		lower.startsWith('llama')
+	)
+		return 'meta';
 	if (lower.includes('kimi') || lower.startsWith('moonshotai/')) return 'kimi';
 	if (lower.includes('qwen')) return 'qwen';
 	if (
@@ -167,6 +178,7 @@ function pickProviders(
 		openai: createEmptyEntry('openai'),
 		anthropic: createEmptyEntry('anthropic'),
 		google: createEmptyEntry('google'),
+		meta: createEmptyEntry('meta'),
 		baseten: createEmptyEntry('baseten'),
 		huggingface: createEmptyEntry('huggingface'),
 		openrouter: createEmptyEntry('openrouter'),
@@ -188,6 +200,7 @@ function pickProviders(
 				'openai',
 				'anthropic',
 				'google',
+				'meta',
 				'baseten',
 				'huggingface',
 				'openrouter',

@@ -66,6 +66,11 @@ const PROVIDER_LINKS: Record<
 		url: 'https://aistudio.google.com/app/apikey',
 		env: 'GOOGLE_GENERATIVE_AI_API_KEY',
 	},
+	meta: {
+		name: 'Meta',
+		url: 'https://dev.meta.ai/docs',
+		env: 'META_MODEL_API_KEY',
+	},
 	'ollama-cloud': {
 		name: 'Ollama Cloud',
 		url: 'https://ollama.com/settings/keys',
@@ -402,6 +407,7 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				{ value: 'openai', label: PROVIDER_LINKS.openai.name },
 				{ value: 'anthropic', label: PROVIDER_LINKS.anthropic.name },
 				{ value: 'google', label: PROVIDER_LINKS.google.name },
+				{ value: 'meta', label: PROVIDER_LINKS.meta.name },
 				{
 					value: 'ollama-cloud',
 					label: PROVIDER_LINKS['ollama-cloud'].name,
@@ -1501,6 +1507,7 @@ async function ensureGlobalConfigDefaults(provider: ProviderId) {
 			openai: { enabled: provider === 'openai' },
 			anthropic: { enabled: provider === 'anthropic' },
 			google: { enabled: provider === 'google' },
+			meta: { enabled: provider === 'meta' },
 			baseten: { enabled: provider === 'baseten' },
 			huggingface: { enabled: provider === 'huggingface' },
 			wafer: { enabled: provider === 'wafer' },

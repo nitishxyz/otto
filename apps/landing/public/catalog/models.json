@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-07-10T01:05:46.729Z",
+	"updatedAt": "2026-07-10T12:31:42.882Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -1978,6 +1978,41 @@
 			"npm": "@ai-sdk/google",
 			"doc": "https://ai.google.dev/gemini-api/docs/models"
 		},
+		"meta": {
+			"id": "meta",
+			"models": {
+				"muse-spark-1.1": {
+					"id": "muse-spark-1.1",
+					"ownedBy": "meta",
+					"label": "Muse Spark 1.1",
+					"modalities": {
+						"input": ["text", "image", "pdf", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-08",
+					"lastUpdated": "2026-07-09",
+					"openWeights": false,
+					"cost": {
+						"input": 1.25,
+						"output": 4.25,
+						"cacheRead": 0.15
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 32000
+					}
+				}
+			},
+			"label": "Meta",
+			"env": ["META_MODEL_API_KEY"],
+			"npm": "@ai-sdk/openai",
+			"api": "https://api.meta.ai/v1",
+			"doc": "https://dev.meta.ai/docs"
+		},
 		"baseten": {
 			"id": "baseten",
 			"models": {
@@ -2666,6 +2701,7 @@
 				},
 				"meta-llama/Llama-3.3-70B-Instruct": {
 					"id": "meta-llama/Llama-3.3-70B-Instruct",
+					"ownedBy": "meta",
 					"label": "Llama-3.3-70B-Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -5721,6 +5757,7 @@
 				},
 				"meta-llama/llama-3.1-70b-instruct": {
 					"id": "meta-llama/llama-3.1-70b-instruct",
+					"ownedBy": "meta",
 					"label": "Llama 3.1 70B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -5745,6 +5782,7 @@
 				},
 				"meta-llama/llama-3.1-8b-instruct": {
 					"id": "meta-llama/llama-3.1-8b-instruct",
+					"ownedBy": "meta",
 					"label": "Llama 3.1 8B Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -5769,6 +5807,7 @@
 				},
 				"meta-llama/llama-3.3-70b-instruct": {
 					"id": "meta-llama/llama-3.3-70b-instruct",
+					"ownedBy": "meta",
 					"label": "Llama-3.3-70B-Instruct",
 					"modalities": {
 						"input": ["text"],
@@ -5793,6 +5832,7 @@
 				},
 				"meta-llama/llama-3.3-70b-instruct:free": {
 					"id": "meta-llama/llama-3.3-70b-instruct:free",
+					"ownedBy": "meta",
 					"label": "Llama 3.3 70B Instruct (free)",
 					"modalities": {
 						"input": ["text"],
@@ -5817,6 +5857,7 @@
 				},
 				"meta-llama/llama-4-maverick": {
 					"id": "meta-llama/llama-4-maverick",
+					"ownedBy": "meta",
 					"label": "Llama 4 Maverick",
 					"modalities": {
 						"input": ["text", "image"],
@@ -5841,6 +5882,7 @@
 				},
 				"meta-llama/llama-4-scout": {
 					"id": "meta-llama/llama-4-scout",
+					"ownedBy": "meta",
 					"label": "Llama 4 Scout",
 					"modalities": {
 						"input": ["text", "image"],
@@ -9788,6 +9830,7 @@
 				},
 				"sao10k/l3.1-euryale-70b": {
 					"id": "sao10k/l3.1-euryale-70b",
+					"ownedBy": "meta",
 					"label": "Llama 3.1 Euryale 70B v2.2",
 					"modalities": {
 						"input": ["text"],
@@ -16031,124 +16074,124 @@
 						"npm": "@ai-sdk/openai"
 					}
 				},
-				"claude-3-5-haiku-20241022": {
-					"id": "claude-3-5-haiku-20241022",
-					"ownedBy": "anthropic",
-					"label": "Claude Haiku 3.5",
+				"gpt-5.6": {
+					"id": "gpt-5.6",
+					"ownedBy": "openai",
+					"label": "GPT-5.6",
 					"modalities": {
 						"input": ["text", "image", "pdf"],
 						"output": ["text"]
 					},
 					"toolCall": true,
-					"reasoningText": false,
+					"reasoningText": true,
 					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-07-31",
-					"releaseDate": "2024-10-22",
-					"lastUpdated": "2024-10-22",
+					"temperature": false,
+					"knowledge": "2026-02-16",
+					"releaseDate": "2026-07-09",
+					"lastUpdated": "2026-07-09",
 					"openWeights": false,
 					"cost": {
-						"input": 0.8039999999999999,
-						"output": 4.02,
-						"cacheRead": 0.0804,
-						"cacheWrite": 1.005
+						"input": 5.0249999999999995,
+						"output": 30.15,
+						"cacheRead": 0.5025,
+						"cacheWrite": 6.281249999999999
 					},
 					"limit": {
-						"context": 200000,
-						"output": 8192
+						"context": 1050000,
+						"output": 128000
 					},
 					"provider": {
-						"npm": "@ai-sdk/anthropic"
+						"npm": "@ai-sdk/openai"
 					}
 				},
-				"claude-3-5-haiku-latest": {
-					"id": "claude-3-5-haiku-latest",
-					"ownedBy": "anthropic",
-					"label": "Claude Haiku 3.5 (latest)",
+				"gpt-5.6-luna": {
+					"id": "gpt-5.6-luna",
+					"ownedBy": "openai",
+					"label": "GPT-5.6 Luna",
 					"modalities": {
 						"input": ["text", "image", "pdf"],
 						"output": ["text"]
 					},
 					"toolCall": true,
-					"reasoningText": false,
+					"reasoningText": true,
 					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-07-31",
-					"releaseDate": "2024-10-22",
-					"lastUpdated": "2024-10-22",
+					"temperature": false,
+					"knowledge": "2026-02-16",
+					"releaseDate": "2026-07-09",
+					"lastUpdated": "2026-07-09",
 					"openWeights": false,
 					"cost": {
-						"input": 0.8039999999999999,
-						"output": 4.02,
-						"cacheRead": 0.0804,
-						"cacheWrite": 1.005
+						"input": 1.005,
+						"output": 6.029999999999999,
+						"cacheRead": 0.10049999999999999,
+						"cacheWrite": 1.2562499999999999
 					},
 					"limit": {
-						"context": 200000,
-						"output": 8192
+						"context": 1050000,
+						"output": 128000
 					},
 					"provider": {
-						"npm": "@ai-sdk/anthropic"
+						"npm": "@ai-sdk/openai"
 					}
 				},
-				"claude-3-5-sonnet-20240620": {
-					"id": "claude-3-5-sonnet-20240620",
-					"ownedBy": "anthropic",
-					"label": "Claude Sonnet 3.5",
+				"gpt-5.6-sol": {
+					"id": "gpt-5.6-sol",
+					"ownedBy": "openai",
+					"label": "GPT-5.6 Sol",
 					"modalities": {
 						"input": ["text", "image", "pdf"],
 						"output": ["text"]
 					},
 					"toolCall": true,
-					"reasoningText": false,
+					"reasoningText": true,
 					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-04-30",
-					"releaseDate": "2024-06-20",
-					"lastUpdated": "2024-06-20",
+					"temperature": false,
+					"knowledge": "2026-02-16",
+					"releaseDate": "2026-07-09",
+					"lastUpdated": "2026-07-09",
 					"openWeights": false,
 					"cost": {
-						"input": 3.0149999999999997,
+						"input": 5.0249999999999995,
+						"output": 30.15,
+						"cacheRead": 0.5025,
+						"cacheWrite": 6.281249999999999
+					},
+					"limit": {
+						"context": 1050000,
+						"output": 128000
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai"
+					}
+				},
+				"gpt-5.6-terra": {
+					"id": "gpt-5.6-terra",
+					"ownedBy": "openai",
+					"label": "GPT-5.6 Terra",
+					"modalities": {
+						"input": ["text", "image", "pdf"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"knowledge": "2026-02-16",
+					"releaseDate": "2026-07-09",
+					"lastUpdated": "2026-07-09",
+					"openWeights": false,
+					"cost": {
+						"input": 2.5124999999999997,
 						"output": 15.075,
-						"cacheRead": 0.30149999999999993,
-						"cacheWrite": 3.76875
+						"cacheRead": 0.25125,
+						"cacheWrite": 3.1406249999999996
 					},
 					"limit": {
-						"context": 200000,
-						"output": 8192
+						"context": 1050000,
+						"output": 128000
 					},
 					"provider": {
-						"npm": "@ai-sdk/anthropic"
-					}
-				},
-				"claude-3-5-sonnet-20241022": {
-					"id": "claude-3-5-sonnet-20241022",
-					"ownedBy": "anthropic",
-					"label": "Claude Sonnet 3.5 v2",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": false,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2024-04-30",
-					"releaseDate": "2024-10-22",
-					"lastUpdated": "2024-10-22",
-					"openWeights": false,
-					"cost": {
-						"input": 3.0149999999999997,
-						"output": 15.075,
-						"cacheRead": 0.30149999999999993,
-						"cacheWrite": 3.76875
-					},
-					"limit": {
-						"context": 200000,
-						"output": 8192
-					},
-					"provider": {
-						"npm": "@ai-sdk/anthropic"
+						"npm": "@ai-sdk/openai"
 					}
 				},
 				"claude-fable-5": {
@@ -16163,7 +16206,7 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": false,
-					"releaseDate": "2026-06-09",
+					"releaseDate": "2026-06-07",
 					"lastUpdated": "2026-06-09",
 					"openWeights": false,
 					"cost": {
@@ -16240,36 +16283,6 @@
 						"npm": "@ai-sdk/anthropic"
 					}
 				},
-				"claude-opus-4-0": {
-					"id": "claude-opus-4-0",
-					"ownedBy": "anthropic",
-					"label": "Claude Opus 4 (latest)",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-03-31",
-					"releaseDate": "2025-05-22",
-					"lastUpdated": "2025-05-22",
-					"openWeights": false,
-					"cost": {
-						"input": 15.075,
-						"output": 75.37499999999999,
-						"cacheRead": 1.5074999999999998,
-						"cacheWrite": 18.843749999999996
-					},
-					"limit": {
-						"context": 200000,
-						"output": 32000
-					},
-					"provider": {
-						"npm": "@ai-sdk/anthropic"
-					}
-				},
 				"claude-opus-4-1": {
 					"id": "claude-opus-4-1",
 					"ownedBy": "anthropic",
@@ -16330,36 +16343,6 @@
 						"npm": "@ai-sdk/anthropic"
 					}
 				},
-				"claude-opus-4-20250514": {
-					"id": "claude-opus-4-20250514",
-					"ownedBy": "anthropic",
-					"label": "Claude Opus 4",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-03-31",
-					"releaseDate": "2025-05-22",
-					"lastUpdated": "2025-05-22",
-					"openWeights": false,
-					"cost": {
-						"input": 15.075,
-						"output": 75.37499999999999,
-						"cacheRead": 1.5074999999999998,
-						"cacheWrite": 18.843749999999996
-					},
-					"limit": {
-						"context": 200000,
-						"output": 32000
-					},
-					"provider": {
-						"npm": "@ai-sdk/anthropic"
-					}
-				},
 				"claude-opus-4-5": {
 					"id": "claude-opus-4-5",
 					"ownedBy": "anthropic",
@@ -16372,7 +16355,7 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": true,
-					"knowledge": "2025-03-31",
+					"knowledge": "2025-05",
 					"releaseDate": "2025-11-24",
 					"lastUpdated": "2025-11-24",
 					"openWeights": false,
@@ -16402,8 +16385,8 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": true,
-					"knowledge": "2025-03-31",
-					"releaseDate": "2025-11-01",
+					"knowledge": "2025-05",
+					"releaseDate": "2025-11-24",
 					"lastUpdated": "2025-11-01",
 					"openWeights": false,
 					"cost": {
@@ -16433,7 +16416,7 @@
 					"attachment": true,
 					"temperature": true,
 					"knowledge": "2025-05-31",
-					"releaseDate": "2026-02-05",
+					"releaseDate": "2026-02-04",
 					"lastUpdated": "2026-03-13",
 					"openWeights": false,
 					"cost": {
@@ -16463,7 +16446,7 @@
 					"attachment": true,
 					"temperature": false,
 					"knowledge": "2026-01-31",
-					"releaseDate": "2026-04-16",
+					"releaseDate": "2026-04-14",
 					"lastUpdated": "2026-04-16",
 					"openWeights": false,
 					"cost": {
@@ -16492,6 +16475,7 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": false,
+					"knowledge": "2026-01",
 					"releaseDate": "2026-05-28",
 					"lastUpdated": "2026-05-28",
 					"openWeights": false,
@@ -16504,66 +16488,6 @@
 					"limit": {
 						"context": 1000000,
 						"output": 128000
-					},
-					"provider": {
-						"npm": "@ai-sdk/anthropic"
-					}
-				},
-				"claude-sonnet-4-0": {
-					"id": "claude-sonnet-4-0",
-					"ownedBy": "anthropic",
-					"label": "Claude Sonnet 4 (latest)",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-03-31",
-					"releaseDate": "2025-05-22",
-					"lastUpdated": "2025-05-22",
-					"openWeights": false,
-					"cost": {
-						"input": 3.0149999999999997,
-						"output": 15.075,
-						"cacheRead": 0.30149999999999993,
-						"cacheWrite": 3.76875
-					},
-					"limit": {
-						"context": 200000,
-						"output": 64000
-					},
-					"provider": {
-						"npm": "@ai-sdk/anthropic"
-					}
-				},
-				"claude-sonnet-4-20250514": {
-					"id": "claude-sonnet-4-20250514",
-					"ownedBy": "anthropic",
-					"label": "Claude Sonnet 4",
-					"modalities": {
-						"input": ["text", "image", "pdf"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": true,
-					"temperature": true,
-					"knowledge": "2025-03-31",
-					"releaseDate": "2025-05-22",
-					"lastUpdated": "2025-05-22",
-					"openWeights": false,
-					"cost": {
-						"input": 3.0149999999999997,
-						"output": 15.075,
-						"cacheRead": 0.30149999999999993,
-						"cacheWrite": 3.76875
-					},
-					"limit": {
-						"context": 200000,
-						"output": 64000
 					},
 					"provider": {
 						"npm": "@ai-sdk/anthropic"
@@ -16592,7 +16516,7 @@
 						"cacheWrite": 3.76875
 					},
 					"limit": {
-						"context": 200000,
+						"context": 1000000,
 						"output": 64000
 					},
 					"provider": {
@@ -16622,7 +16546,7 @@
 						"cacheWrite": 3.76875
 					},
 					"limit": {
-						"context": 200000,
+						"context": 1000000,
 						"output": 64000
 					},
 					"provider": {
@@ -16653,7 +16577,7 @@
 					},
 					"limit": {
 						"context": 1000000,
-						"output": 64000
+						"output": 128000
 					},
 					"provider": {
 						"npm": "@ai-sdk/anthropic"
@@ -16708,8 +16632,8 @@
 						"cacheRead": 0.14572499999999997
 					},
 					"limit": {
-						"context": 131000,
-						"output": 131000
+						"context": 262144,
+						"output": 262144
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"
@@ -17005,6 +16929,35 @@
 						"npm": "@ai-sdk/openai-compatible"
 					}
 				},
+				"kimi-k2.7-code-highspeed": {
+					"id": "kimi-k2.7-code-highspeed",
+					"ownedBy": "kimi",
+					"label": "Kimi K2.7 Code HighSpeed",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"knowledge": "2025-01",
+					"releaseDate": "2026-06-12",
+					"lastUpdated": "2026-06-12",
+					"openWeights": true,
+					"cost": {
+						"input": 1.9094999999999998,
+						"output": 8.04,
+						"cacheRead": 0.38189999999999996
+					},
+					"limit": {
+						"context": 262144,
+						"output": 262144
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
 				"MiniMax-M2.1": {
 					"id": "MiniMax-M2.1",
 					"ownedBy": "minimax",
@@ -17276,13 +17229,13 @@
 					"lastUpdated": "2026-06-13",
 					"openWeights": true,
 					"cost": {
-						"input": 1.5074999999999998,
-						"output": 4.522499999999999,
+						"input": 1.4069999999999998,
+						"output": 4.422,
 						"cacheRead": 0.30149999999999993
 					},
 					"limit": {
-						"context": 131072,
-						"output": 131072
+						"context": 202720,
+						"output": 202720
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"

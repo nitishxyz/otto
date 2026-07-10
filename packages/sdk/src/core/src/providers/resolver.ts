@@ -10,6 +10,7 @@ import {
 	createDeepSeekModel,
 	createHuggingFaceModel,
 	createWaferModel,
+	createMetaModel,
 	createMinimaxModel,
 	createKimiModel,
 	createOttoRouterModel,
@@ -29,6 +30,7 @@ export type ProviderName =
 	| 'openai'
 	| 'anthropic'
 	| 'google'
+	| 'meta'
 	| 'ollama-cloud'
 	| 'baseten'
 	| 'huggingface'
@@ -100,6 +102,14 @@ export async function resolveModel(
 			return instance(model);
 		}
 		return google(model);
+	}
+
+	if (provider === 'meta') {
+		return createMetaModel(model, {
+			apiKey: config.apiKey,
+			baseURL: config.baseURL,
+			fetch: config.customFetch,
+		});
 	}
 
 	if (provider === 'ollama-cloud') {
