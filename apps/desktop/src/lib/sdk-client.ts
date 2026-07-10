@@ -38,12 +38,10 @@ let ownsVoiceShortcutPress = false;
 async function showNativeNotification(notification: OttoPlatformNotification) {
 	if (!notification.title) return;
 
-	const appWindow = getCurrentWindow();
 	await tauriBridge.showNativeNotification({
 		title: notification.title,
 		body: notification.body,
 		sessionId: notification.sessionId,
-		windowLabel: appWindow.label,
 	});
 }
 

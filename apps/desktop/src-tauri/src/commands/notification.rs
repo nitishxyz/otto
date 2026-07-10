@@ -7,9 +7,9 @@ use std::net::{TcpListener, TcpStream};
 use std::process::Command;
 #[cfg(target_os = "macos")]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::AppHandle;
+use tauri::{AppHandle, WebviewWindow};
 #[cfg(target_os = "macos")]
-use tauri::{Emitter, EventTarget, Manager};
+use tauri::{Emitter, Manager};
 #[cfg(not(target_os = "macos"))]
 use tauri_plugin_notification::NotificationExt;
 
@@ -19,13 +19,26 @@ pub struct NativeNotificationPayload {
     title: String,
     body: Option<String>,
     session_id: Option<String>,
-    window_label: Option<String>,
 }
 
 #[cfg(target_os = "macos")]
-fn open_session_window(app: &AppHandle, window_label: Option<String>, session_id: Option<String>) {
-    let label = window_label.unwrap_or_else(|| "main".to_string());
-    let Some(window) = app.get_webview_window(&label) else {
+#[derive(Debug, PartialEq, Eq)]
+struct NotificationTarget {
+    window_label: String,
+    session_id: Option<String>,
+}
+
+#[cfg(target_os = "macos")]
+fn notification_target(window_label: &str, session_id: Option<String>) -> NotificationTarget {
+    NotificationTarget {
+        window_label: window_label.to_string(),
+        session_id,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn open_session_window(app: &AppHandle, window_label: &str, session_id: Option<String>) {
+    let Some(window) = app.get_webview_window(window_label) else {
         return;
     };
 
@@ -34,7 +47,7 @@ fn open_session_window(app: &AppHandle, window_label: Option<String>, session_id
     let _ = window.set_focus();
 
     if let Some(session_id) = session_id {
-        let _ = app.emit_to(EventTarget::labeled(label), "otto-open-session", session_id);
+        let _ = window.emit("otto-open-session", session_id);
     }
 }
 
@@ -97,6 +110,7 @@ fn spawn_click_helper(identifier: String, title: String, body: String, callback_
 #[tauri::command]
 pub fn show_native_notification(
     app: AppHandle,
+    window: WebviewWindow,
     notification: NativeNotificationPayload,
 ) -> Result<(), String> {
     let identifier = if tauri::is_dev() {
@@ -132,8 +146,7 @@ pub fn show_native_notification(
     let callback_url = format!("http://127.0.0.1:{port}/notification-click/{token}");
     let expected_path = format!("/notification-click/{token}");
     let app_for_click = app.clone();
-    let window_label = notification.window_label.clone();
-    let session_id = notification.session_id.clone();
+    let target = notification_target(window.label(), notification.session_id.clone());
 
     std::thread::spawn(move || {
         let _ = listener.set_nonblocking(true);
@@ -150,7 +163,11 @@ pub fn show_native_notification(
                         let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\n\r\n");
                         let app_for_main = app_for_click.clone();
                         let _ = app_for_click.run_on_main_thread(move || {
-                            open_session_window(&app_for_main, window_label, session_id);
+                            open_session_window(
+                                &app_for_main,
+                                &target.window_label,
+                                target.session_id,
+                            );
                         });
                     }
                     return;
@@ -180,10 +197,10 @@ pub fn show_native_notification(
 #[tauri::command]
 pub fn show_native_notification(
     app: AppHandle,
+    _window: WebviewWindow,
     notification: NativeNotificationPayload,
 ) -> Result<(), String> {
     let _ = notification.session_id;
-    let _ = notification.window_label;
 
     app.notification()
         .builder()
@@ -191,4 +208,20 @@ pub fn show_native_notification(
         .body(notification.body.unwrap_or_default())
         .show()
         .map_err(|error| error.to_string())
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::{notification_target, NotificationTarget};
+
+    #[test]
+    fn notification_target_preserves_the_invoking_window() {
+        assert_eq!(
+            notification_target("main-7", Some("session-123".to_string())),
+            NotificationTarget {
+                window_label: "main-7".to_string(),
+                session_id: Some("session-123".to_string()),
+            }
+        );
+    }
 }

@@ -72,7 +72,6 @@ export interface NativeNotificationPayload {
 	title: string;
 	body?: string;
 	sessionId?: string;
-	windowLabel?: string;
 }
 
 export const isDesktopApp = (): boolean => {
