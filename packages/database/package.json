@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/database",
-	"version": "0.1.343",
+	"version": "0.1.344",
 	"description": "Database and persistence layer for ottocode",
 	"type": "module",
 	"main": "./src/index.ts",
