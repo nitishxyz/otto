@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { StableSpinner } from '../ui/StableSpinner';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
 import { apiClient } from '../../lib/api-client';
+import { openUrl } from '../../lib/open-url';
 import { toast } from '../../stores/toastStore';
 import { StatusIndicator } from '../common/StatusIndicator';
 
@@ -228,14 +229,6 @@ const OttoRouterTopupModalContent = memo(
 			setIsCustom(true);
 		};
 
-		const openCheckoutUrl = useCallback((url: string) => {
-			if (window.self !== window.top) {
-				window.parent.postMessage({ type: 'otto-open-url', url }, '*');
-			} else {
-				window.open(url, '_blank');
-			}
-		}, []);
-
 		const handlePolarCheckout = async () => {
 			if (effectiveAmount < MIN_AMOUNT || effectiveAmount > MAX_AMOUNT) {
 				toast.error(`Amount must be between $${MIN_AMOUNT} and $${MAX_AMOUNT}`);
@@ -259,7 +252,7 @@ const OttoRouterTopupModalContent = memo(
 					setCheckoutInfo(info);
 					localStorage.setItem('pendingPolarCheckout', result.checkoutId);
 					setView('checkout');
-					openCheckoutUrl(result.checkoutUrl);
+					openUrl(result.checkoutUrl);
 					startPolling(result.checkoutId);
 				}
 			} catch (error) {
@@ -468,7 +461,7 @@ const OttoRouterTopupModalContent = memo(
 								</button>
 								<button
 									type="button"
-									onClick={() => openCheckoutUrl(checkoutInfo.url)}
+									onClick={() => openUrl(checkoutInfo.url)}
 									className="w-full h-11 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
 								>
 									<ExternalLink className="w-4 h-4" />
