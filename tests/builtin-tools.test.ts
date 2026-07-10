@@ -804,7 +804,16 @@ describe('Built-in Tools', () => {
 					{ step: 'Task 2', status: 'in_progress' },
 				],
 			});
-			expect(result).toEqual({ ok: true });
+			expect(result).toEqual({
+				ok: true,
+				todos: [
+					{ step: 'Task 1', status: 'completed' },
+					{ step: 'Task 2', status: 'in_progress' },
+				],
+				remaining: 1,
+				reminder:
+					'Keep this list current: mark each item in_progress when you start it and completed immediately when done.',
+			});
 		});
 	});
 

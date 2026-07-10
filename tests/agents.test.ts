@@ -95,13 +95,13 @@ describe('agent config merging', () => {
 				join(projectRoot, '.otto', 'agents.json'),
 				JSON.stringify({
 					coder: {
-						model: 'claude-3-5-sonnet-20241022',
+						model: 'claude-sonnet-4-5',
 					},
 				}),
 			);
 			const cfg = await resolveAgentConfig(projectRoot, 'coder');
 			expect(cfg.provider).toBe('anthropic');
-			expect(cfg.model).toBe('claude-3-5-sonnet-20241022');
+			expect(cfg.model).toBe('claude-sonnet-4-5');
 		} finally {
 			if (prevHome === undefined) delete process.env.HOME;
 			else process.env.HOME = prevHome;
@@ -411,7 +411,7 @@ describe('agent config merging', () => {
 				reviewer: {
 					prompt: 'Review carefully.',
 					provider: 'anthropic',
-					model: 'claude-3-5-sonnet-20241022',
+					model: 'claude-sonnet-4-5',
 				},
 			}),
 		);
@@ -431,7 +431,7 @@ describe('agent config merging', () => {
 			const session = await response.json();
 			expect(session.agent).toBe('reviewer');
 			expect(session.provider).toBe('anthropic');
-			expect(session.model).toBe('claude-3-5-sonnet-20241022');
+			expect(session.model).toBe('claude-sonnet-4-5');
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
@@ -447,7 +447,7 @@ describe('agent config merging', () => {
 				reviewer: {
 					prompt: 'Review carefully.',
 					provider: 'anthropic',
-					model: 'claude-3-5-sonnet-20241022',
+					model: 'claude-sonnet-4-5',
 				},
 			}),
 		);
@@ -495,7 +495,7 @@ describe('agent config merging', () => {
 			const rows = await messagesResponse.json();
 			expect(rows.at(-1).agent).toBe('reviewer');
 			expect(rows.at(-1).provider).toBe('anthropic');
-			expect(rows.at(-1).model).toBe('claude-3-5-sonnet-20241022');
+			expect(rows.at(-1).model).toBe('claude-sonnet-4-5');
 		} finally {
 			if (sessionId) {
 				abortSession(sessionId, true);

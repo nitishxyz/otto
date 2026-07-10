@@ -1,27 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Keypair } from '@solana/web3.js';
-import bs58 from 'bs58';
-import nacl from 'tweetnacl';
-import { createWalletContext } from '../src/auth.ts';
 import { fetchBalance } from '../src/balance.ts';
 import { createOttoRouterFetch } from '../src/fetch.ts';
-
-function createSignerWallet() {
-	const keypair = Keypair.generate();
-	const walletAddress = keypair.publicKey.toBase58();
-	const wallet = createWalletContext({
-		signer: {
-			walletAddress,
-			signNonce: (nonce: string) => {
-				const data = new TextEncoder().encode(nonce);
-				const signature = nacl.sign.detached(data, keypair.secretKey);
-				return bs58.encode(signature);
-			},
-		},
-	});
-
-	return { wallet, walletAddress };
-}
+import type { OttoRouterAuth } from '../src/types.ts';
 
 const originalFetch = globalThis.fetch;
 
@@ -31,21 +11,21 @@ afterEach(() => {
 
 describe('bearer auth request flow', () => {
 	test('createOttoRouterFetch attaches bearer auth and shares one token exchange', async () => {
-		const { wallet } = createSignerWallet();
+		const auth: OttoRouterAuth = { refreshToken: 'refresh-1' };
 		const requests: Array<{ url: string; headers: Headers }> = [];
 		let tokenExchangeCount = 0;
 		const ottorouterFetch = createOttoRouterFetch({
-			wallet,
+			auth,
 			baseURL: 'https://ottorouter.test',
 			fetch: async (input, init) => {
 				const url = String(input);
 				const headers = new Headers(init?.headers);
 				requests.push({ url, headers });
-				if (url.endsWith('/v1/auth/wallet-token')) {
+				if (url.endsWith('/api/auth/oauth2/token')) {
 					tokenExchangeCount++;
 					return Response.json({
-						accessToken: 'shared-token',
-						expiresIn: 3600,
+						access_token: 'shared-token',
+						expires_in: 3600,
 					});
 				}
 				return Response.json({ ok: true });
@@ -66,7 +46,7 @@ describe('bearer auth request flow', () => {
 
 		expect(tokenExchangeCount).toBe(1);
 		const apiRequests = requests.filter(
-			(request) => !request.url.endsWith('/v1/auth/wallet-token'),
+			(request) => !request.url.endsWith('/api/auth/oauth2/token'),
 		);
 		expect(apiRequests).toHaveLength(3);
 		for (const request of apiRequests) {
@@ -78,20 +58,20 @@ describe('bearer auth request flow', () => {
 	});
 
 	test('createOttoRouterFetch refreshes and retries once on 401', async () => {
-		const { wallet } = createSignerWallet();
+		const auth: OttoRouterAuth = { refreshToken: 'refresh-1' };
 		let tokenExchangeCount = 0;
 		let apiCount = 0;
 		const ottorouterFetch = createOttoRouterFetch({
-			wallet,
+			auth,
 			baseURL: 'https://ottorouter.test',
 			fetch: async (input, init) => {
 				const url = String(input);
 				const headers = new Headers(init?.headers);
-				if (url.endsWith('/v1/auth/wallet-token')) {
+				if (url.endsWith('/api/auth/oauth2/token')) {
 					tokenExchangeCount++;
 					return Response.json({
-						accessToken: `token-${tokenExchangeCount}`,
-						expiresIn: 3600,
+						access_token: `token-${tokenExchangeCount}`,
+						expires_in: 3600,
 					});
 				}
 				apiCount++;
@@ -115,17 +95,14 @@ describe('bearer auth request flow', () => {
 	});
 
 	test('fetchBalance uses bearer auth instead of wallet headers', async () => {
-		const { wallet, walletAddress } = createSignerWallet();
+		const auth: OttoRouterAuth = { accessToken: 'balance-token' };
 		const requests: Array<{ url: string; headers: Headers }> = [];
 		globalThis.fetch = (async (input, init) => {
 			const url = String(input);
 			const headers = new Headers(init?.headers);
 			requests.push({ url, headers });
-			if (url.endsWith('/v1/auth/wallet-token')) {
-				return Response.json({ accessToken: 'balance-token', expiresIn: 3600 });
-			}
 			return Response.json({
-				wallet_address: walletAddress,
+				wallet_address: 'wallet-address-1',
 				balance_usd: 12.5,
 				total_spent: 3,
 				total_topups: 2,
@@ -133,8 +110,8 @@ describe('bearer auth request flow', () => {
 			});
 		}) as typeof fetch;
 
-		const balance = await fetchBalance(wallet, 'https://ottorouter.test');
-		expect(balance?.walletAddress).toBe(walletAddress);
+		const balance = await fetchBalance(auth, 'https://ottorouter.test');
+		expect(balance?.walletAddress).toBe('wallet-address-1');
 		expect(balance?.balance).toBe(12.5);
 
 		const balanceRequest = requests.find((request) =>

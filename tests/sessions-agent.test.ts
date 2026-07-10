@@ -36,7 +36,7 @@ describe('session creation respects agent provider/model', () => {
 				JSON.stringify({
 					coder: {
 						provider: 'anthropic',
-						model: 'claude-3-5-sonnet-20241022',
+						model: 'claude-sonnet-4-5',
 					},
 				}),
 			);
@@ -51,7 +51,7 @@ describe('session creation respects agent provider/model', () => {
 			const data = (await res.json()) as Record<string, unknown>;
 			expect(data.agent).toBe('coder');
 			expect(data.provider).toBe('anthropic');
-			expect(data.model).toBe('claude-3-5-sonnet-20241022');
+			expect(data.model).toBe('claude-sonnet-4-5');
 		} finally {
 			if (prevHome === undefined) delete process.env.HOME;
 			else process.env.HOME = prevHome;

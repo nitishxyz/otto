@@ -75,7 +75,7 @@ describe('User Context Feature', () => {
 			body: JSON.stringify({
 				agent: 'general',
 				provider: 'anthropic',
-				model: 'claude-3-5-sonnet-20241022',
+				model: 'claude-sonnet-4-5',
 			}),
 		});
 
@@ -233,7 +233,7 @@ describe('User Context Feature', () => {
 						content: 'Test',
 						userContext: 'Context',
 						provider: 'anthropic',
-						model: 'claude-3-5-sonnet-20241022',
+						model: 'claude-sonnet-4-5',
 					}),
 				},
 			);
@@ -269,7 +269,7 @@ describe('User Context Feature', () => {
 						userContext: 'Context',
 						agent: 'general',
 						provider: 'anthropic',
-						model: 'claude-3-5-sonnet-20241022',
+						model: 'claude-sonnet-4-5',
 						oneShot: false,
 					}),
 				},

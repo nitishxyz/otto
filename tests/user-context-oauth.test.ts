@@ -5,7 +5,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 	it('should include userContext when spoofPrompt is NOT passed', async () => {
 		const { prompt, components } = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a test agent.',
 			userContext: 'Important user context here',
@@ -20,7 +20,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 	it('should NOT include userContext when spoofPrompt IS passed (early return)', async () => {
 		const { prompt, components } = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a test agent.',
 			userContext: 'Important user context here',
@@ -45,7 +45,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 		// Second: Get the full prompt for messages array (without passing spoofPrompt)
 		const fullPrompt = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a helpful assistant.',
 			userContext: 'User is working on project X',
@@ -68,7 +68,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 	it('should handle empty userContext gracefully with spoof', async () => {
 		const { prompt } = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a test agent.',
 			userContext: '',
@@ -81,7 +81,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 	it('should handle undefined userContext with spoof', async () => {
 		const { prompt } = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a test agent.',
 			userContext: undefined,
@@ -94,7 +94,7 @@ describe('userContext with OAuth/spoof prompt handling', () => {
 	it('should handle whitespace-only userContext with spoof', async () => {
 		const { prompt } = await composeSystemPrompt({
 			provider: 'anthropic',
-			model: 'claude-3-5-sonnet-20241022',
+			model: 'claude-sonnet-4-5',
 			projectRoot: process.cwd(),
 			agentPrompt: 'You are a test agent.',
 			userContext: '   ',

@@ -10,7 +10,7 @@ const baseSession = {
 	title: 'Existing session',
 	agent: 'build',
 	provider: 'anthropic',
-	model: 'claude-3-5-sonnet-20241022',
+	model: 'claude-sonnet-4-5',
 	projectPath: '/tmp/otto-test',
 	createdAt: 1000,
 	lastActiveAt: 2000,
