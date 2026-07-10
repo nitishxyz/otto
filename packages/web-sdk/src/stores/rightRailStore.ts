@@ -10,7 +10,7 @@ interface RightRailState {
 export const useRightRailStore = create<RightRailState>()(
 	persist(
 		(set) => ({
-			isPinned: false,
+			isPinned: true,
 			togglePinned: () => set((state) => ({ isPinned: !state.isPinned })),
 			setPinned: (pinned) => set({ isPinned: pinned }),
 		}),
