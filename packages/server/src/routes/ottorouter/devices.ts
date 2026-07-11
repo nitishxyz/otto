@@ -4,7 +4,7 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { getProtocolInfo } from '../../protocol.ts';
 import { getServerInfo } from '../../state.ts';
-import { getOttoRouterAuthHeaders, getOttoRouterBaseUrl } from './service.ts';
+import { fetchWithOttoRouterAuth, getOttoRouterBaseUrl } from './service.ts';
 
 const tunnelDeviceSchema = z.object({
 	deviceId: z.string(),
@@ -131,19 +131,11 @@ async function loadAuthorizedMachineProjects(
 				message: 'Tunnel device identity mismatch.',
 			};
 		}
-		const authHeaders = await getOttoRouterAuthHeaders();
-		if (!authHeaders) {
-			return {
-				status: 'unavailable' as const,
-				message: 'Connect OttoRouter and retry.',
-			};
-		}
-		const assertionResponse = await fetch(
+		const assertionResponse = await fetchWithOttoRouterAuth(
 			`${getOttoRouterBaseUrl()}/v1/tunnels/device/authorize`,
 			{
 				method: 'POST',
 				headers: {
-					...authHeaders,
 					'Content-Type': 'application/json',
 					Accept: 'application/json',
 				},
@@ -153,6 +145,12 @@ async function loadAuthorizedMachineProjects(
 				}),
 			},
 		);
+		if (!assertionResponse) {
+			return {
+				status: 'unavailable' as const,
+				message: 'Connect OttoRouter and retry.',
+			};
+		}
 		if (!assertionResponse.ok) {
 			return {
 				status: 'unavailable' as const,
@@ -294,20 +292,19 @@ export function remoteDevicesOnly(
 export async function listRemoteOttoRouterDevices(
 	fetcher: typeof globalThis.fetch = globalThis.fetch,
 ) {
-	const authHeaders = await getOttoRouterAuthHeaders();
-	if (!authHeaders) return { configured: false, devices: [] };
-	const response = await fetcher(
+	const response = await fetchWithOttoRouterAuth(
 		`${getOttoRouterBaseUrl()}/v1/tunnels/devices`,
 		{
 			headers: {
-				...authHeaders,
 				Accept: 'application/json',
 				'Cache-Control': 'no-cache, no-store, max-age=0',
 				Pragma: 'no-cache',
 			},
 			cache: 'no-store',
 		},
+		fetcher,
 	);
+	if (!response) return { configured: false, devices: [] };
 	if (response.status === 401 || response.status === 403) {
 		return {
 			configured: false,
@@ -409,22 +406,20 @@ export function registerOttoRouterDeviceRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const authHeaders = await getOttoRouterAuthHeaders();
-			if (!authHeaders)
-				return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
 			const body = authorizeBodySchema.parse(await c.req.json());
-			const response = await fetch(
+			const response = await fetchWithOttoRouterAuth(
 				`${getOttoRouterBaseUrl()}/v1/tunnels/device/authorize`,
 				{
 					method: 'POST',
 					headers: {
-						...authHeaders,
 						Accept: 'application/json',
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify(body),
 				},
 			);
+			if (!response)
+				return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
 			const payload = (await response.json()) as Record<string, unknown>;
 			return c.json(payload, response.status as 200);
 		},

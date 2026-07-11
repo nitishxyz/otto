@@ -24,6 +24,7 @@
 		"@tauri-apps/plugin-shell": "2.3.5",
 		"@tauri-apps/plugin-updater": "2.10.0",
 		"lucide-react": "0.563.0",
+		"motion": "12.40.0",
 		"qrcode.react": "4.2.0",
 		"react": "19.2.0",
 		"react-dom": "19.2.0",

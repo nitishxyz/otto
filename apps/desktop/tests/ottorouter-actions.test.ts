@@ -58,12 +58,15 @@ describe('landing Connect button de-duplication (static)', () => {
 
 	test('local tunnel card carries no auth button, only the requirement notice', async () => {
 		const panel = await readFile('src/components/LocalTunnelPanel.tsx', 'utf8');
+		const picker = await readFile('src/components/ProjectPicker.tsx', 'utf8');
 		// No Connect button label (the notice text may reference it in prose).
 		expect(panel).not.toContain("'Connect OttoRouter'");
 		expect(panel).not.toContain('onConnect');
 		expect(panel).toContain('Requires an OttoRouter connection');
 		expect(panel).toContain("'Disable'");
 		expect(panel).toContain("'Enable'");
+		expect(picker).toContain('{machineState?.configured && (');
+		expect(picker).toContain('<LocalTunnelPanel ottorouterConfigured />');
 	});
 
 	test('exactly one Connect OttoRouter button exists across landing components', async () => {
@@ -87,6 +90,10 @@ describe('landing Connect button de-duplication (static)', () => {
 			'utf8',
 		);
 		expect(launcher).toContain('onConnect');
+		expect(launcher).toContain('Sign in to view your machines');
+		expect(launcher).not.toContain(
+			"state?.error ? state.error : 'Sign in to view your machines'",
+		);
 		// Connect failures surface next to the single Connect button (no dead-end).
 		expect(launcher).toContain('connectError');
 	});

@@ -15,13 +15,19 @@ import { ProjectPicker } from './components/ProjectPicker';
 import { DesktopSettings } from './components/DesktopSettings';
 import { Workspace } from './components/Workspace';
 import { OttoRouterLoader } from './components/OttoRouterLoader';
-import type { MachineBootstrap, Project, ServerInfo } from './lib/tauri-bridge';
+import type {
+	CliSelectionInfo,
+	MachineBootstrap,
+	Project,
+	ServerInfo,
+} from './lib/tauri-bridge';
 import { DesktopThemeContext, type DesktopThemeContextValue } from './theme';
 
 export interface DesktopRouterContext extends DesktopThemeContextValue {
 	initialized: boolean;
 	machine: MachineBootstrap | null;
 	daemon: ServerInfo | null;
+	cliSelection: CliSelectionInfo | null;
 	selectedProject: Project | null;
 	onSelectProject: (project: Project) => void;
 	onBackToProjects: () => void | Promise<void>;
@@ -29,6 +35,7 @@ export interface DesktopRouterContext extends DesktopThemeContextValue {
 	onStartDaemon: () => Promise<void>;
 	onStopDaemon: () => Promise<void>;
 	onRestartDaemon: () => Promise<void>;
+	onUpdateInstalledCli: () => Promise<void>;
 }
 
 const rootRoute = createRootRouteWithContext<DesktopRouterContext>()({
@@ -113,6 +120,7 @@ const defaultRouterContext: DesktopRouterContext = {
 	initialized: false,
 	machine: null,
 	daemon: null,
+	cliSelection: null,
 	selectedProject: null,
 	theme: 'otto-dark',
 	setTheme: () => {},
@@ -123,6 +131,7 @@ const defaultRouterContext: DesktopRouterContext = {
 	onStartDaemon: async () => {},
 	onStopDaemon: async () => {},
 	onRestartDaemon: async () => {},
+	onUpdateInstalledCli: async () => {},
 };
 
 export const router = createRouter({
@@ -178,14 +187,22 @@ function ProjectsRouteComponent() {
 }
 
 function SettingsRouteComponent() {
-	const { daemon, onStartDaemon, onStopDaemon, onRestartDaemon } =
-		rootRoute.useRouteContext();
+	const {
+		daemon,
+		cliSelection,
+		onStartDaemon,
+		onStopDaemon,
+		onRestartDaemon,
+		onUpdateInstalledCli,
+	} = rootRoute.useRouteContext();
 	return (
 		<DesktopSettings
 			daemon={daemon}
+			cliSelection={cliSelection}
 			onStartDaemon={onStartDaemon}
 			onStopDaemon={onStopDaemon}
 			onRestartDaemon={onRestartDaemon}
+			onUpdateInstalledCli={onUpdateInstalledCli}
 		/>
 	);
 }

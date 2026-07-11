@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { RouterProvider } from '@tanstack/react-router';
 import {
 	tauriBridge,
+	type CliSelectionInfo,
 	type MachineBootstrap,
 	type Project,
 	type ServerInfo,
@@ -24,6 +25,9 @@ function App() {
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 	const [machine, setMachine] = useState<MachineBootstrap | null>(null);
 	const [daemon, setDaemon] = useState<ServerInfo | null>(null);
+	const [cliSelection, setCliSelection] = useState<CliSelectionInfo | null>(
+		null,
+	);
 	const [daemonError, setDaemonError] = useState<string | null>(null);
 	const [startupAttempt, setStartupAttempt] = useState(0);
 	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme();
@@ -47,6 +51,9 @@ function App() {
 				return;
 			}
 			const machineBootstrap = await tauriBridge.getMachineBootstrap();
+			const nextCliSelection = await tauriBridge
+				.getCliSelection()
+				.catch(() => null);
 			const initialPath = await tauriBridge.getInitialProject();
 			const initialRemote = await tauriBridge.getInitialRemote();
 			let nextRoute: '/onboarding' | '/projects' | '/sessions' = '/projects';
@@ -93,6 +100,7 @@ function App() {
 
 			flushSync(() => {
 				setMachine(machineBootstrap);
+				setCliSelection(nextCliSelection);
 				setSelectedProject(nextProject);
 				setInitialized(true);
 			});
@@ -232,6 +240,11 @@ function App() {
 		await handleStartDaemon();
 	};
 
+	const handleUpdateInstalledCli = async () => {
+		const selection = await tauriBridge.updateInstalledCli();
+		setCliSelection(selection);
+	};
+
 	const handleOnboardingComplete = () => {
 		flushSync(() => {
 			setInitialized(true);
@@ -264,6 +277,7 @@ function App() {
 				initialized,
 				machine,
 				daemon,
+				cliSelection,
 				selectedProject,
 				theme,
 				setTheme,
@@ -274,6 +288,7 @@ function App() {
 				onStartDaemon: handleStartDaemon,
 				onStopDaemon: handleStopDaemon,
 				onRestartDaemon: handleRestartDaemon,
+				onUpdateInstalledCli: handleUpdateInstalledCli,
 			}}
 		/>
 	);

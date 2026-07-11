@@ -665,9 +665,9 @@ export function ProjectPicker({
 							>
 								{activeTab === 'machines' && (
 									<>
-										<LocalTunnelPanel
-											ottorouterConfigured={machineState?.configured ?? false}
-										/>
+										{machineState?.configured && (
+											<LocalTunnelPanel ottorouterConfigured />
+										)}
 										<MachineLauncher
 											state={machineState}
 											loading={machinesLoading}

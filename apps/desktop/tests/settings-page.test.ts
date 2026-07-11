@@ -32,6 +32,62 @@ describe('desktop settings page', () => {
 		expect(settings).toContain('onRestartDaemon');
 	});
 
+	test('uses the shared TitleBar with macOS inset and a back action', async () => {
+		const settings = await readFile(
+			'src/components/DesktopSettings.tsx',
+			'utf8',
+		);
+
+		expect(settings).toContain('<TitleBar');
+		expect(settings).toContain(
+			"leadingInset={platform === 'macos' && !isFullscreen}",
+		);
+		expect(settings).toContain('showSidebarToggle={false}');
+		expect(settings).toContain('onBack={() => void handleBackToProjects()}');
+		expect(settings).toContain('<OttoWordmark');
+	});
+
+	test('appearance is a collapsed-by-default expandable card with optimistic theme state', async () => {
+		const settings = await readFile(
+			'src/components/DesktopSettings.tsx',
+			'utf8',
+		);
+
+		expect(settings).toContain('useState(false)');
+		expect(settings).toContain('aria-expanded={appearanceOpen}');
+		expect(settings).toContain('{selectedThemeName}');
+		expect(settings).toContain('setSelectedTheme(themeId)');
+		expect(settings).toContain('setTheme(themeId)');
+		expect(settings).toContain('setSelectedTheme(theme)');
+		expect(settings).toContain('<AnimatePresence initial={false}>');
+		expect(settings).toContain("animate={{ height: 'auto', opacity: 1 }}");
+		expect(settings).toContain(
+			'animate={{ rotate: appearanceOpen ? 180 : 0 }}',
+		);
+	});
+
+	test('checks the installed CLI on startup and offers a bundled update', async () => {
+		const app = await readFile('src/App.tsx', 'utf8');
+		const settings = await readFile(
+			'src/components/DesktopSettings.tsx',
+			'utf8',
+		);
+		const bridge = await readFile('src/lib/tauri-bridge.ts', 'utf8');
+		const native = await readFile('src-tauri/src/commands/server.rs', 'utf8');
+
+		expect(app).toContain('.getCliSelection()');
+		expect(settings).toContain('cliSelection?.updateAvailable');
+		expect(settings).toContain('Update CLI');
+		expect(bridge).toContain(
+			"invoke<CliSelectionInfo>('update_installed_cli')",
+		);
+		expect(native).toContain('pub async fn update_installed_cli');
+		expect(native).toContain('replace_cli_binary(');
+		expect(native).toContain('Copied CLI version mismatch');
+		expect(native).toContain('installed PATH CLI');
+		expect(native).toContain('.join(".local").join("bin")');
+	});
+
 	test('native stop command terminates the registered daemon safely', async () => {
 		const bridge = await readFile('src/lib/tauri-bridge.ts', 'utf8');
 		const native = await readFile('src-tauri/src/commands/server.rs', 'utf8');

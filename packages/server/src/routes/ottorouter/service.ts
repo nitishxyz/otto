@@ -1,25 +1,7 @@
-import {
-	fetchOttoRouterBalance,
-	getAuth,
-	refreshOttoRouterToken,
-	setAuth,
-} from '@ottocode/sdk';
+import { fetchOttoRouterBalance, getFreshOttoRouterOAuth } from '@ottocode/sdk';
 
 const OTTOROUTER_BASE_URL =
 	process.env.OTTOROUTER_BASE_URL || 'https://api.ottorouter.org';
-const TOKEN_REFRESH_WINDOW_MS = 5 * 60_000;
-const refreshes = new Map<string, ReturnType<typeof refreshOttoRouterToken>>();
-
-function refreshTokenOnce(refreshToken: string) {
-	let pending = refreshes.get(refreshToken);
-	if (!pending) {
-		pending = refreshOttoRouterToken(refreshToken).finally(() => {
-			refreshes.delete(refreshToken);
-		});
-		refreshes.set(refreshToken, pending);
-	}
-	return pending;
-}
 
 export function getOttoRouterBaseUrl(): string {
 	return OTTOROUTER_BASE_URL.endsWith('/')
@@ -28,56 +10,26 @@ export function getOttoRouterBaseUrl(): string {
 }
 
 export async function getOttoRouterOAuthAuth(projectRoot?: string) {
-	const auth = await getAuth('ottorouter', projectRoot);
-	if (auth?.type !== 'oauth' || !auth.access) {
-		return null;
-	}
-
-	let access = auth.access;
-	let refresh = auth.refresh;
-	let expires = auth.expires;
-	if (refresh && expires && expires < Date.now() + TOKEN_REFRESH_WINDOW_MS) {
-		const tokens = await refreshTokenOnce(refresh);
-		access = tokens.access;
-		refresh = tokens.refresh;
-		expires = tokens.expires;
-		await setAuth(
-			'ottorouter',
-			{
-				type: 'oauth',
-				access,
-				refresh,
-				expires,
-				idToken: tokens.idToken ?? auth.idToken,
-				scopes: tokens.scopes ?? auth.scopes,
-			},
-			projectRoot,
-			'global',
-		);
-	}
+	const auth = await getFreshOttoRouterOAuth({ projectRoot });
+	if (!auth) return null;
 
 	return {
-		accessToken: access,
-		refreshToken: refresh,
-		expiresAt: expires,
-		onTokenRefresh: async (tokens: {
-			accessToken: string;
-			refreshToken?: string;
-			expiresAt?: number;
-		}) => {
-			await setAuth(
-				'ottorouter',
-				{
-					type: 'oauth',
-					access: tokens.accessToken,
-					refresh: tokens.refreshToken ?? refresh,
-					expires: tokens.expiresAt ?? Date.now() + 60 * 60 * 1000,
-					idToken: auth.idToken,
-					scopes: auth.scopes,
-				},
+		accessToken: auth.access,
+		refreshToken: auth.refresh,
+		expiresAt: auth.expires,
+		refreshAccessToken: async (options?: { staleAccessToken?: string }) => {
+			const next = await getFreshOttoRouterOAuth({
 				projectRoot,
-				'global',
-			);
+				staleAccess: options?.staleAccessToken,
+			});
+			if (!next) {
+				throw new Error('OttoRouter OAuth is no longer configured.');
+			}
+			return {
+				accessToken: next.access,
+				refreshToken: next.refresh,
+				expiresAt: next.expires,
+			};
 		},
 	};
 }
@@ -88,6 +40,36 @@ export async function getOttoRouterAuthHeaders(
 	const auth = await getOttoRouterOAuthAuth(projectRoot);
 	if (!auth) return null;
 	return { Authorization: `Bearer ${auth.accessToken}` };
+}
+
+/**
+ * Performs an authenticated OttoRouter API request. When the backend rejects
+ * the bearer token with 401, forces one coordinated token refresh and retries
+ * the request once. Returns null when OttoRouter OAuth is not configured.
+ */
+export async function fetchWithOttoRouterAuth(
+	input: string,
+	init: RequestInit = {},
+	fetcher: typeof globalThis.fetch = globalThis.fetch,
+	projectRoot?: string,
+): Promise<Response | null> {
+	const auth = await getOttoRouterOAuthAuth(projectRoot);
+	if (!auth) return null;
+	const request = (token: string) => {
+		const headers = new Headers(init.headers);
+		headers.set('Authorization', `Bearer ${token}`);
+		return fetcher(input, { ...init, headers });
+	};
+	const response = await request(auth.accessToken);
+	if (response.status !== 401) return response;
+	try {
+		const next = await auth.refreshAccessToken({
+			staleAccessToken: auth.accessToken,
+		});
+		return await request(next.accessToken);
+	} catch {
+		return response;
+	}
 }
 
 export async function getOttoRouterBalance(projectRoot?: string) {

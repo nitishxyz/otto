@@ -31,6 +31,7 @@ export interface CliSelectionInfo {
 	embeddedVersion: string;
 	localPath?: string | null;
 	localVersion?: string | null;
+	updateAvailable: boolean;
 	reason: string;
 }
 
@@ -149,6 +150,7 @@ export const tauriBridge = {
 	stopAllServers: () => invoke('stop_all_servers'),
 	listServers: () => invoke<ServerInfo[]>('list_servers'),
 	getCliSelection: () => invoke<CliSelectionInfo>('get_cli_selection'),
+	updateInstalledCli: () => invoke<CliSelectionInfo>('update_installed_cli'),
 	listSystemFonts: () => invoke<string[]>('list_system_fonts'),
 	showNativeNotification: (notification: NativeNotificationPayload) =>
 		invoke('show_native_notification', { notification }),

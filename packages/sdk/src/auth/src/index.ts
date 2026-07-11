@@ -129,6 +129,11 @@ export {
 } from './ottorouter-oauth.ts';
 
 export {
+	getFreshOttoRouterOAuth,
+	type FreshOttoRouterOAuthOptions,
+} from './ottorouter-refresh.ts';
+
+export {
 	generateWallet,
 	importWallet,
 	isValidPrivateKey,

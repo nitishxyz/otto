@@ -48,6 +48,14 @@ export interface OttoRouterAuth {
 	expiresAt?: number;
 	clientId?: string;
 	onTokenRefresh?: (tokens: OAuthTokenRefreshResult) => void | Promise<void>;
+	/**
+	 * Optional external refresh coordinator. When provided it replaces the
+	 * built-in refresh_token HTTP exchange and owns persistence, so hosts can
+	 * serialize rotating-token refreshes across processes.
+	 */
+	refreshAccessToken?: (options?: {
+		staleAccessToken?: string;
+	}) => Promise<OAuthTokenRefreshResult>;
 	privateKey?: string;
 	signer?: ExternalSigner;
 }

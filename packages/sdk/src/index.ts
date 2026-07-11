@@ -268,11 +268,13 @@ export {
 	requestOttoRouterDeviceCode,
 	pollOttoRouterDeviceCodeOnce,
 } from './auth/src/index.ts';
+export { getFreshOttoRouterOAuth } from './auth/src/index.ts';
 export type {
 	OttoRouterOAuthTokens,
 	OttoRouterDeviceCodeResponse,
 	OttoRouterDevicePollResult,
 } from './auth/src/index.ts';
+export type { FreshOttoRouterOAuthOptions } from './auth/src/index.ts';
 export {
 	generateWallet,
 	importWallet,

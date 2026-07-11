@@ -31,6 +31,7 @@ pub struct CliSelectionInfo {
     pub embedded_version: String,
     pub local_path: Option<String>,
     pub local_version: Option<String>,
+    pub update_available: bool,
     pub reason: String,
 }
 
@@ -213,7 +214,27 @@ fn get_embedded_binary_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     ))
 }
 
-fn installed_cli_candidates() -> Vec<PathBuf> {
+fn path_cli_candidates() -> Vec<PathBuf> {
+    let exe_name = if cfg!(windows) { "otto.exe" } else { "otto" };
+    let mut candidates = Vec::new();
+
+    if let Ok(path) = std::env::var("PATH") {
+        for entry in std::env::split_paths(&path) {
+            candidates.push(entry.join(exe_name));
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        let user_cli = home.join(".local").join("bin").join(exe_name);
+        if !candidates.contains(&user_cli) {
+            candidates.push(user_cli);
+        }
+    }
+
+    candidates
+}
+
+fn daemon_cli_candidates() -> Vec<PathBuf> {
     let exe_name = if cfg!(windows) { "otto.exe" } else { "otto" };
     let mut candidates = Vec::new();
 
@@ -222,12 +243,7 @@ fn installed_cli_candidates() -> Vec<PathBuf> {
     }
 
     candidates.push(otto_home_dir().join("bin").join(exe_name));
-
-    if let Ok(path) = std::env::var("PATH") {
-        for entry in std::env::split_paths(&path) {
-            candidates.push(entry.join(exe_name));
-        }
-    }
+    candidates.extend(path_cli_candidates());
 
     candidates
 }
@@ -294,6 +310,13 @@ fn daemon_reuse_decision(
     }
 }
 
+fn cli_update_available(embedded_version: &str, local_version: Option<&str>) -> bool {
+    matches!(
+        local_version.and_then(|version| semver_cmp(embedded_version, version)),
+        Some(std::cmp::Ordering::Greater)
+    )
+}
+
 fn prefer_embedded_cli(embedded_version: &str, local_version: Option<&str>) -> bool {
     match local_version.and_then(|version| semver_cmp(embedded_version, version)) {
         Some(std::cmp::Ordering::Greater) => true,
@@ -329,9 +352,9 @@ fn select_cli_candidate(
     }
 }
 
-fn get_local_cli_candidate(embedded_path: &Path) -> Option<CliCandidate> {
+fn get_cli_candidate(paths: Vec<PathBuf>, embedded_path: &Path) -> Option<CliCandidate> {
     let canonical_embedded = embedded_path.canonicalize().ok();
-    for path in installed_cli_candidates() {
+    for path in paths {
         if !path.exists() {
             continue;
         }
@@ -341,14 +364,6 @@ fn get_local_cli_candidate(embedded_path: &Path) -> Option<CliCandidate> {
             }
         }
         if let Some(version) = read_cli_version(&path) {
-            if !cli_supports_daemon_register(&path) {
-                eprintln!(
-                    "[otto] Skipping local CLI without daemon support: {} ({})",
-                    path.display(),
-                    version
-                );
-                continue;
-            }
             return Some(CliCandidate {
                 path,
                 version,
@@ -378,6 +393,13 @@ fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo)
         version: embedded_version.clone(),
         source: "embedded",
     };
+    let installed = get_cli_candidate(path_cli_candidates(), &embedded_path);
+    let local_path = installed
+        .as_ref()
+        .map(|candidate| candidate.path.display().to_string());
+    let local_version = installed
+        .as_ref()
+        .map(|candidate| candidate.version.clone());
     if tauri::is_dev() {
         let info = CliSelectionInfo {
             path: embedded.path.display().to_string(),
@@ -385,17 +407,25 @@ fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo)
             source: embedded.source.to_string(),
             embedded_path: embedded_path.display().to_string(),
             embedded_version,
-            local_path: None,
-            local_version: None,
-            reason: "dev mode uses the freshly built embedded CLI".to_string(),
+            local_path,
+            local_version,
+            update_available: false,
+            reason: "dev mode uses the freshly built embedded CLI while reporting the installed PATH CLI".to_string(),
         };
         return Ok((embedded, info));
     }
-    let local = get_local_cli_candidate(&embedded_path);
-    let local_path = local
-        .as_ref()
-        .map(|candidate| candidate.path.display().to_string());
-    let local_version = local.as_ref().map(|candidate| candidate.version.clone());
+    let update_available = cli_update_available(&embedded_version, local_version.as_deref());
+    let local = get_cli_candidate(daemon_cli_candidates(), &embedded_path).filter(|candidate| {
+        let supported = cli_supports_daemon_register(&candidate.path);
+        if !supported {
+            eprintln!(
+                "[otto] Local CLI does not support daemon registration: {} ({})",
+                candidate.path.display(),
+                candidate.version
+            );
+        }
+        supported
+    });
     let (selected, reason) = select_cli_candidate(embedded, local);
     let info = CliSelectionInfo {
         path: selected.path.display().to_string(),
@@ -405,6 +435,7 @@ fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo)
         embedded_version,
         local_path,
         local_version,
+        update_available,
         reason,
     };
     Ok((selected, info))
@@ -772,11 +803,114 @@ pub async fn get_cli_selection(app: tauri::AppHandle) -> Result<CliSelectionInfo
     Ok(info)
 }
 
+fn replace_cli_binary(source: &Path, target: &Path, expected_version: &str) -> Result<(), String> {
+    if target
+        .symlink_metadata()
+        .map(|metadata| metadata.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        return Err(format!(
+            "Refusing to replace the symlink at {}. Update that package-managed CLI with its installer instead.",
+            target.display()
+        ));
+    }
+    let destination = target.to_path_buf();
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "Installed CLI path has no parent directory".to_string())?;
+    let temp = parent.join(format!(".otto-update-{}", std::process::id()));
+    let _ = fs::remove_file(&temp);
+    fs::copy(source, &temp).map_err(|error| {
+        format!(
+            "Failed to copy the bundled CLI to {}: {}",
+            destination.display(),
+            error
+        )
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&temp, fs::Permissions::from_mode(0o755))
+            .map_err(|error| format!("Failed to make the updated CLI executable: {}", error))?;
+    }
+    let copied_version = read_cli_version(&temp).ok_or_else(|| {
+        let _ = fs::remove_file(&temp);
+        "Failed to verify the copied CLI version".to_string()
+    })?;
+    if copied_version != expected_version {
+        let _ = fs::remove_file(&temp);
+        return Err(format!(
+            "Copied CLI version mismatch: expected {}, found {}",
+            expected_version, copied_version
+        ));
+    }
+    OpenOptions::new()
+        .write(true)
+        .open(&temp)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            format!("Failed to flush the updated CLI to disk: {}", error)
+        })?;
+
+    let backup = parent.join(format!(".otto-backup-{}", std::process::id()));
+    let _ = fs::remove_file(&backup);
+    fs::rename(&destination, &backup).map_err(|error| {
+        let _ = fs::remove_file(&temp);
+        format!(
+            "Failed to prepare the installed CLI at {} for replacement: {}",
+            destination.display(),
+            error
+        )
+    })?;
+    if let Err(error) = fs::rename(&temp, &destination) {
+        let _ = fs::rename(&backup, &destination);
+        let _ = fs::remove_file(&temp);
+        return Err(format!(
+            "Failed to replace the installed CLI at {}: {}",
+            destination.display(),
+            error
+        ));
+    }
+    let installed_version = read_cli_version(&destination);
+    if installed_version.as_deref() != Some(expected_version) {
+        let _ = fs::remove_file(&destination);
+        let _ = fs::rename(&backup, &destination);
+        return Err(format!(
+            "Installed CLI verification failed: expected {}, found {}",
+            expected_version,
+            installed_version.as_deref().unwrap_or("unknown")
+        ));
+    }
+    let _ = fs::remove_file(&backup);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_installed_cli(app: tauri::AppHandle) -> Result<CliSelectionInfo, String> {
+    let (_, selection) = select_cli(&app)?;
+    if !selection.update_available {
+        return Err("The installed CLI is already the same version or newer.".to_string());
+    }
+    let local_path = selection
+        .local_path
+        .as_deref()
+        .map(Path::new)
+        .ok_or_else(|| "No installed Otto CLI was found on PATH.".to_string())?;
+    replace_cli_binary(
+        Path::new(&selection.embedded_path),
+        local_path,
+        &selection.embedded_version,
+    )?;
+    let (_, updated) = select_cli(&app)?;
+    Ok(updated)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        daemon_reuse_decision, parse_cli_version, prefer_embedded_cli, select_cli_candidate,
-        CliCandidate, DaemonHealth, DaemonRegistration, DaemonReuseDecision,
+        cli_update_available, daemon_reuse_decision, parse_cli_version, prefer_embedded_cli,
+        select_cli_candidate, CliCandidate, DaemonHealth, DaemonRegistration, DaemonReuseDecision,
     };
     use std::path::PathBuf;
 
@@ -824,6 +958,15 @@ mod tests {
         assert!(prefer_embedded_cli("dev", Some("1.1.9")));
         assert!(!prefer_embedded_cli("1.2.0", Some("1.2.0")));
         assert!(!prefer_embedded_cli("1.2.0", Some("1.3.0")));
+    }
+
+    #[test]
+    fn offers_cli_update_only_for_an_older_installed_release() {
+        assert!(cli_update_available("1.2.0", Some("1.1.9")));
+        assert!(!cli_update_available("1.2.0", Some("1.2.0")));
+        assert!(!cli_update_available("1.2.0", Some("1.3.0")));
+        assert!(!cli_update_available("1.2.0", None));
+        assert!(!cli_update_available("dev", Some("1.1.9")));
     }
 
     #[test]

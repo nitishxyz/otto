@@ -91,6 +91,21 @@ async function handleProjectEventsStream(c: Context) {
 			};
 
 			const writeClient = (evt: ClientEvent) => {
+				const payload = evt.payload;
+				if (
+					'projectId' in payload &&
+					payload.projectId &&
+					payload.projectId !== project.projectId
+				) {
+					return;
+				}
+				if (
+					'projectRoot' in payload &&
+					payload.projectRoot &&
+					payload.projectRoot !== project.projectRoot
+				) {
+					return;
+				}
 				let line: string;
 				try {
 					line =

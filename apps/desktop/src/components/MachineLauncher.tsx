@@ -90,24 +90,26 @@ export function MachineLauncher({
 
 	return (
 		<div>
-			<div className="mb-3 flex items-center justify-between">
-				<p className="text-xs text-muted-foreground/60">
-					Other machines on your OttoRouter account
-				</p>
-				<button
-					type="button"
-					onClick={onRefresh}
-					disabled={loading || !configured}
-					className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-				>
-					{loading ? (
-						<StableSpinner size="sm" title="Refreshing machines" />
-					) : (
-						<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-					)}
-					Refresh
-				</button>
-			</div>
+			{configured && (
+				<div className="mb-3 flex items-center justify-between">
+					<p className="text-xs text-muted-foreground/60">
+						Other machines on your OttoRouter account
+					</p>
+					<button
+						type="button"
+						onClick={onRefresh}
+						disabled={loading}
+						className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+					>
+						{loading ? (
+							<StableSpinner size="sm" title="Refreshing machines" />
+						) : (
+							<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+						)}
+						Refresh
+					</button>
+				</div>
+			)}
 
 			<div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
 				{initialLoading && (
@@ -145,7 +147,7 @@ export function MachineLauncher({
 							<Radio className="h-5 w-5 text-muted-foreground" />
 						</div>
 						<p className="text-sm text-foreground">
-							{state?.error ? state.error : 'Sign in to view your machines'}
+							Sign in to view your machines
 						</p>
 						<p className="mt-1 text-xs text-muted-foreground/60">
 							Connect your OttoRouter account to launch projects on your other

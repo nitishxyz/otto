@@ -51,6 +51,10 @@ interface OAuthTokenState extends AccessTokenState {
 }
 
 const oauthRefreshes = new Map<string, Promise<OAuthTokenState>>();
+const externalOAuthRefreshes = new WeakMap<
+	OttoRouterAuth,
+	Promise<AccessTokenState>
+>();
 
 function trimTrailingSlash(url: string) {
 	return url.endsWith('/') ? url.slice(0, -1) : url;
@@ -184,6 +188,16 @@ async function refreshOAuthToken(
 	baseURL: string,
 	baseFetch: FetchFunction,
 ): Promise<AccessTokenState> {
+	if (auth.refreshAccessToken) {
+		let pending = externalOAuthRefreshes.get(auth);
+		if (!pending) {
+			pending = runExternalOAuthRefresh(auth).finally(() => {
+				externalOAuthRefreshes.delete(auth);
+			});
+			externalOAuthRefreshes.set(auth, pending);
+		}
+		return pending;
+	}
 	if (!auth.refreshToken) {
 		throw new Error('OttoRouter: OAuth refresh token is not configured.');
 	}
@@ -212,6 +226,28 @@ async function refreshOAuthToken(
 	});
 
 	return next;
+}
+
+async function runExternalOAuthRefresh(
+	auth: OttoRouterAuth,
+): Promise<AccessTokenState> {
+	const refreshAccessToken = auth.refreshAccessToken;
+	if (!refreshAccessToken) {
+		throw new Error('OttoRouter: OAuth refresh is not configured.');
+	}
+	const next = await refreshAccessToken({
+		staleAccessToken: auth.accessToken,
+	});
+	auth.accessToken = next.accessToken;
+	if (next.refreshToken) auth.refreshToken = next.refreshToken;
+	auth.expiresAt = next.expiresAt;
+	return {
+		token: next.accessToken,
+		expiresAt:
+			next.expiresAt ??
+			parseJwtExpiry(next.accessToken) ??
+			Date.now() + DEFAULT_TOKEN_TTL_MS,
+	};
 }
 
 async function exchangeOAuthToken(
@@ -300,7 +336,12 @@ export function createOAuthAccessTokenManager(
 				return state.token;
 			}
 
-			if (!forceRefresh && state && !auth.refreshToken) {
+			if (
+				!forceRefresh &&
+				state &&
+				!auth.refreshToken &&
+				!auth.refreshAccessToken
+			) {
 				return state.token;
 			}
 

@@ -111,6 +111,8 @@ export async function publishAssistantMessageError(args: {
 		type: 'session.status',
 		payload: {
 			sessionId: args.opts.sessionId,
+			projectId: args.opts.projectId,
+			projectRoot: args.opts.projectRoot,
 			status,
 			messageId: args.opts.assistantMessageId,
 			createdAt,
@@ -127,6 +129,8 @@ export async function publishAssistantMessageError(args: {
 				body: args.notificationBody ?? args.error.message,
 				source: 'session',
 				sessionId: args.opts.sessionId,
+				projectId: args.opts.projectId,
+				projectRoot: args.opts.projectRoot,
 				createdAt,
 			},
 		});

@@ -3,7 +3,7 @@ import { logger } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
-import { getOttoRouterAuthHeaders, getOttoRouterBaseUrl } from './service.ts';
+import { fetchWithOttoRouterAuth, getOttoRouterBaseUrl } from './service.ts';
 
 const errorResponseSchema = z.object({ error: z.string() });
 const passthroughResponseSchema = z.record(z.string(), z.unknown());
@@ -153,11 +153,6 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const authHeaders = await getOttoRouterAuthHeaders();
-				if (!authHeaders) {
-					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
-				}
-
 				const body = await c.req.json();
 				const { amount, successUrl } = body as {
 					amount: number;
@@ -174,14 +169,19 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 
 				const baseUrl = getOttoRouterBaseUrl();
 
-				const response = await fetch(`${baseUrl}/v1/topup/polar`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						...authHeaders,
+				const response = await fetchWithOttoRouterAuth(
+					`${baseUrl}/v1/topup/polar`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ amount, successUrl }),
 					},
-					body: JSON.stringify({ amount, successUrl }),
-				});
+				);
+				if (!response) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
+				}
 
 				const data = await response.json();
 				if (!response.ok) {
@@ -318,11 +318,6 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const authHeaders = await getOttoRouterAuthHeaders();
-				if (!authHeaders) {
-					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
-				}
-
 				const body = await c.req.json();
 				const { amount } = body as { amount: number };
 
@@ -332,14 +327,19 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 
 				const baseUrl = getOttoRouterBaseUrl();
 
-				const response = await fetch(`${baseUrl}/v1/topup/razorpay`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						...authHeaders,
+				const response = await fetchWithOttoRouterAuth(
+					`${baseUrl}/v1/topup/razorpay`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ amount }),
 					},
-					body: JSON.stringify({ amount }),
-				});
+				);
+				if (!response) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
+				}
 
 				const data = await response.json();
 				if (!response.ok) {
@@ -384,11 +384,6 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const authHeaders = await getOttoRouterAuthHeaders();
-				if (!authHeaders) {
-					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
-				}
-
 				const body = await c.req.json();
 				const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
 					body as {
@@ -403,18 +398,23 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 
 				const baseUrl = getOttoRouterBaseUrl();
 
-				const response = await fetch(`${baseUrl}/v1/topup/razorpay/verify`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						...authHeaders,
+				const response = await fetchWithOttoRouterAuth(
+					`${baseUrl}/v1/topup/razorpay/verify`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							razorpay_order_id,
+							razorpay_payment_id,
+							razorpay_signature,
+						}),
 					},
-					body: JSON.stringify({
-						razorpay_order_id,
-						razorpay_payment_id,
-						razorpay_signature,
-					}),
-				});
+				);
+				if (!response) {
+					return c.json({ error: 'OttoRouter OAuth not configured' }, 401);
+				}
 
 				const data = await response.json();
 				if (!response.ok) {

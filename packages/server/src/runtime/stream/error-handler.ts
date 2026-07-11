@@ -312,6 +312,8 @@ export function createErrorHandler(
 			type: 'session.status',
 			payload: {
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				status,
 				messageId: opts.assistantMessageId,
 				createdAt,
@@ -326,6 +328,8 @@ export function createErrorHandler(
 				body: displayMessage,
 				source: 'session',
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				createdAt,
 			},
 		});

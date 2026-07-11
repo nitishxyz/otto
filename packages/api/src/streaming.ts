@@ -401,10 +401,14 @@ export interface NotificationEvent {
 	expiresAt?: string;
 	source?: 'agent' | 'system' | 'session' | 'auth' | 'billing';
 	sessionId?: string;
+	projectId?: string;
+	projectRoot?: string;
 }
 
 export interface SessionStatusEvent {
 	sessionId: string;
+	projectId?: string;
+	projectRoot?: string;
 	status: 'running' | 'completed' | 'failed' | 'needs_attention';
 	messageId?: string;
 	createdAt: string;

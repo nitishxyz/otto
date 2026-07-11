@@ -126,6 +126,8 @@ export function createFinishHandler(
 			type: 'session.status',
 			payload: {
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				status,
 				messageId: opts.assistantMessageId,
 				createdAt,
@@ -143,6 +145,8 @@ export function createFinishHandler(
 						: 'An assistant run finished successfully.',
 				source: 'session',
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				createdAt,
 			},
 		});

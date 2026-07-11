@@ -57,6 +57,8 @@ export interface NotificationEvent {
 	expiresAt?: string;
 	source?: 'agent' | 'system' | 'session' | 'auth' | 'billing';
 	sessionId?: string;
+	projectId?: string;
+	projectRoot?: string;
 }
 
 export interface SessionStatusEvent {

@@ -185,6 +185,7 @@ pub fn run() {
             commands::server::stop_all_servers,
             commands::server::list_servers,
             commands::server::get_cli_selection,
+            commands::server::update_installed_cli,
             commands::github::github_save_token,
             commands::github::github_get_token,
             commands::github::github_logout,

@@ -24,6 +24,7 @@ import {
 	shouldUseOpenAIResponsesApi,
 } from '../../../providers/src/index.ts';
 import { createCopilotModel } from '../../../providers/src/copilot-client.ts';
+import { getFreshOttoRouterOAuth } from '../../../auth/src/ottorouter-refresh.ts';
 import type { OAuth } from '../../../types/src/index.ts';
 
 export type ProviderName =
@@ -228,6 +229,20 @@ export async function resolveModel(
 				accessToken: config.oauth.access,
 				refreshToken: config.oauth.refresh,
 				expiresAt: config.oauth.expires,
+				refreshAccessToken: async (options?: { staleAccessToken?: string }) => {
+					const next = await getFreshOttoRouterOAuth({
+						projectRoot: config.projectRoot,
+						staleAccess: options?.staleAccessToken,
+					});
+					if (!next) {
+						throw new Error('OttoRouter OAuth is no longer configured.');
+					}
+					return {
+						accessToken: next.access,
+						refreshToken: next.refresh,
+						expiresAt: next.expires,
+					};
+				},
 			},
 			{
 				baseURL,

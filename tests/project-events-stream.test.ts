@@ -141,6 +141,67 @@ describe('multiplexed project events stream', () => {
 		await stream.close();
 	});
 
+	it('filters client events from other projects', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+		const createdAt = new Date().toISOString();
+
+		publishClientEvent({
+			type: 'notification',
+			payload: {
+				id: 'notification-other-project',
+				title: 'other project',
+				level: 'info',
+				projectRoot: '/tmp/otto-some-other-project',
+				createdAt,
+			},
+		});
+		publishClientEvent({
+			type: 'notification',
+			payload: {
+				id: 'notification-current-project',
+				title: 'current project',
+				level: 'info',
+				projectRoot: process.cwd(),
+				createdAt,
+			},
+		});
+
+		const notification = await stream.next(
+			(evt) => evt.event === 'notification',
+		);
+		expect((notification.data.payload as Record<string, unknown>).id).toBe(
+			'notification-current-project',
+		);
+
+		publishClientEvent({
+			type: 'session.status',
+			payload: {
+				sessionId: 'status-other-project',
+				projectRoot: '/tmp/otto-some-other-project',
+				status: 'completed',
+				createdAt,
+			},
+		});
+		publishClientEvent({
+			type: 'session.status',
+			payload: {
+				sessionId: 'status-current-project',
+				projectRoot: process.cwd(),
+				status: 'completed',
+				createdAt,
+			},
+		});
+
+		const status = await stream.next((evt) => evt.event === 'session.status');
+		expect((status.data.payload as Record<string, unknown>).sessionId).toBe(
+			'status-current-project',
+		);
+
+		await stream.close();
+	});
+
 	it('serves the POST alias for tunnels', async () => {
 		const stream = await openStream(
 			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
