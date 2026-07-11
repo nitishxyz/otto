@@ -1,4 +1,4 @@
-import { logger } from '@ottocode/sdk';
+import { isProviderStreamIdleTimeoutError, logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
 import { messages } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
@@ -8,7 +8,7 @@ import { enqueueAssistantRun } from '../../session/queue.ts';
 import { cleanupEmptyTextParts } from '../../session/db-operations.ts';
 import { toErrorMessage } from '../../errors/handling.ts';
 
-const OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX = 2;
+const PROVIDER_STREAM_IDLE_RETRY_MAX = 2;
 const MAX_OUTPUT_CONTINUATION_RETRY_MAX = 2;
 
 type RunSessionLoop = (sessionId: string) => Promise<void>;
@@ -20,10 +20,13 @@ function parsePositiveIntegerEnv(name: string, fallback: number) {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function getOpenAIOAuthCodexStreamIdleRetryMax() {
+function getProviderStreamIdleRetryMax() {
 	return parsePositiveIntegerEnv(
-		'OTTO_OPENAI_OAUTH_STREAM_IDLE_RETRY_MAX',
-		OPENAI_OAUTH_CODEX_STREAM_IDLE_RETRY_MAX,
+		'OTTO_PROVIDER_STREAM_IDLE_RETRY_MAX',
+		parsePositiveIntegerEnv(
+			'OTTO_OPENAI_OAUTH_STREAM_IDLE_RETRY_MAX',
+			PROVIDER_STREAM_IDLE_RETRY_MAX,
+		),
 	);
 }
 
@@ -49,26 +52,25 @@ function isMaxOutputTokensFinish(
 	);
 }
 
-function isOpenAIOAuthCodexStreamIdleTimeout(error: unknown): boolean {
+function isProviderOrLegacyCodexStreamIdleTimeout(error: unknown): boolean {
+	if (isProviderStreamIdleTimeoutError(error)) return true;
 	const message = toErrorMessage(error);
 	return message.includes('OpenAI OAuth Codex stream idle timeout');
 }
 
-export async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
+export async function retryAfterProviderStreamIdleTimeout(args: {
 	err: unknown;
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
-	isOpenAIOAuth: boolean;
 	runSessionLoop: RunSessionLoop;
 }): Promise<boolean> {
-	const { err, opts, db, isOpenAIOAuth, runSessionLoop } = args;
-	if (opts.provider !== 'openai' || !isOpenAIOAuth) return false;
-	if (!isOpenAIOAuthCodexStreamIdleTimeout(err)) return false;
+	const { err, opts, db, runSessionLoop } = args;
+	if (!isProviderOrLegacyCodexStreamIdleTimeout(err)) return false;
 	if (opts.abortSignal?.aborted) return false;
 
-	const continuationCount = opts.continuationCount ?? 0;
-	const maxRetries = getOpenAIOAuthCodexStreamIdleRetryMax();
-	if (continuationCount >= maxRetries) return false;
+	const streamIdleRetryCount = opts.streamIdleRetryCount ?? 0;
+	const maxRetries = getProviderStreamIdleRetryMax();
+	if (streamIdleRetryCount >= maxRetries) return false;
 
 	const retryMessageId = crypto.randomUUID();
 	await cleanupEmptyTextParts(opts, db);
@@ -86,7 +88,7 @@ export async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 		payload: {
 			id: opts.assistantMessageId,
 			finishReason: 'stream-idle-retry',
-			codexStreamRetry: true,
+			providerStreamRetry: true,
 		},
 	});
 
@@ -109,7 +111,7 @@ export async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 			agent: opts.agent,
 			provider: opts.provider,
 			model: opts.model,
-			codexStreamRetry: true,
+			providerStreamRetry: true,
 		},
 	});
 
@@ -118,23 +120,21 @@ export async function retryOpenAIOAuthCodexAfterStreamIdleTimeout(args: {
 		{
 			...retryOpts,
 			assistantMessageId: retryMessageId,
-			continuationCount: continuationCount + 1,
+			streamIdleRetryCount: streamIdleRetryCount + 1,
 		},
 		runSessionLoop,
 	);
-	logger.warn(
-		'[agent] retrying OpenAI OAuth Codex run after stream idle timeout',
-		{
-			sessionId: opts.sessionId,
-			messageId: opts.assistantMessageId,
-			retryMessageId,
-			agent: opts.agent,
-			model: opts.model,
-			attempt: continuationCount + 1,
-			maxRetries,
-			error: toErrorMessage(err),
-		},
-	);
+	logger.warn('[agent] retrying provider run after stream idle timeout', {
+		sessionId: opts.sessionId,
+		messageId: opts.assistantMessageId,
+		retryMessageId,
+		agent: opts.agent,
+		provider: opts.provider,
+		model: opts.model,
+		attempt: streamIdleRetryCount + 1,
+		maxRetries,
+		error: toErrorMessage(err),
+	});
 	return true;
 }
 

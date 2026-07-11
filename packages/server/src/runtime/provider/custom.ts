@@ -11,6 +11,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOllama } from 'ai-sdk-ollama';
+import { providerFetch } from './fetch.ts';
 
 export function resolveCustomConfiguredModel(
 	definition: NonNullable<ReturnType<typeof getProviderDefinition>>,
@@ -32,22 +33,30 @@ export function resolveCustomConfiguredModel(
 	}
 
 	if (definition.compatibility === 'openai') {
-		const instance = createOpenAI({ apiKey, baseURL });
+		const instance = createOpenAI({ apiKey, baseURL, fetch: providerFetch });
 		return resolveOpenAIResponsesModel(instance, model);
 	}
 
 	if (definition.compatibility === 'anthropic') {
-		const instance = createAnthropic({ apiKey, baseURL });
+		const instance = createAnthropic({ apiKey, baseURL, fetch: providerFetch });
 		return instance(model);
 	}
 
 	if (definition.compatibility === 'google') {
-		const instance = createGoogleGenerativeAI({ apiKey, baseURL });
+		const instance = createGoogleGenerativeAI({
+			apiKey,
+			baseURL,
+			fetch: providerFetch,
+		});
 		return instance(model);
 	}
 
 	if (definition.compatibility === 'openrouter') {
-		const instance = createOpenRouter({ apiKey, baseURL });
+		const instance = createOpenRouter({
+			apiKey,
+			baseURL,
+			fetch: providerFetch,
+		});
 		return instance.chat(model);
 	}
 
@@ -57,6 +66,7 @@ export function resolveCustomConfiguredModel(
 		const instance = createOllama({
 			baseURL: ollamaBaseURL,
 			headers,
+			fetch: providerFetch,
 		});
 		return instance(model, {
 			...(options?.reasoningText ? { think: true } : {}),
@@ -68,6 +78,7 @@ export function resolveCustomConfiguredModel(
 		name: definition.label,
 		baseURL,
 		headers,
+		fetch: providerFetch,
 	});
 	return instance(model);
 }

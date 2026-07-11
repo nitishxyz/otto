@@ -151,3 +151,23 @@ export { createMinimaxModel } from './minimax-client.ts';
 export type { MinimaxProviderConfig } from './minimax-client.ts';
 export { createCopilotFetch, createCopilotModel } from './copilot-client.ts';
 export type { CopilotOAuthConfig } from './copilot-client.ts';
+export {
+	DEFAULT_PROVIDER_REQUEST_MAX_RETRIES,
+	DEFAULT_PROVIDER_REQUEST_RETRY_DELAY_MS,
+	DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
+	DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS,
+	ProviderStreamIdleTimeoutError,
+	createResilientFetch,
+	getProviderRequestMaxRetries,
+	getProviderRequestRetryDelayMs,
+	getProviderRequestTimeoutMs,
+	getProviderStreamIdleTimeoutMs,
+	isNonReplayableRequestBody,
+	isProviderStreamIdleTimeoutError,
+	resilientFetch,
+	withStreamIdleTimeout,
+} from './resilient-fetch.ts';
+export type {
+	FetchLike,
+	ResilientFetchOptions,
+} from './resilient-fetch.ts';

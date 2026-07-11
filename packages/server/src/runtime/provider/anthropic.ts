@@ -6,6 +6,7 @@ import {
 } from '@ottocode/sdk';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { toClaudeCodeName } from '../tools/mapping.ts';
+import { providerFetch } from './fetch.ts';
 
 export async function getAnthropicInstance(cfg: OttoConfig) {
 	const auth = await getAuth('anthropic', cfg.projectRoot);
@@ -23,7 +24,7 @@ export async function getAnthropicInstance(cfg: OttoConfig) {
 			});
 	}
 
-	const cachingFetch = createAnthropicCachingFetch();
+	const cachingFetch = createAnthropicCachingFetch(providerFetch);
 	return createAnthropic({
 		fetch: cachingFetch as typeof fetch,
 	});

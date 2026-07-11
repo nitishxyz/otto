@@ -4,6 +4,7 @@ import { catalog } from './catalog-merged.ts';
 export type MinimaxProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
+	fetch?: typeof fetch;
 };
 
 export function createMinimaxModel(
@@ -18,6 +19,7 @@ export function createMinimaxModel(
 	const instance = createAnthropic({
 		apiKey,
 		baseURL,
+		fetch: config?.fetch,
 	});
 
 	return instance(model);

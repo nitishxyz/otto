@@ -1,5 +1,6 @@
 import { getAuth, createCopilotModel, readEnvKey } from '@ottocode/sdk';
 import type { OttoConfig, OAuth } from '@ottocode/sdk';
+import { providerFetch } from './fetch.ts';
 
 const COPILOT_MODELS_URL = 'https://api.githubcopilot.com/models';
 const COPILOT_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -55,7 +56,7 @@ async function getCopilotAvailableModels(
 	}
 
 	try {
-		const response = await fetch(COPILOT_MODELS_URL, {
+		const response = await providerFetch(COPILOT_MODELS_URL, {
 			headers: {
 				Authorization: `Bearer ${token}`,
 				'Openai-Intent': 'conversation-edits',
@@ -110,7 +111,10 @@ export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
 	}
 
 	if (selected) {
-		return createCopilotModel(model, { oauth: selected.oauth });
+		return createCopilotModel(model, {
+			oauth: selected.oauth,
+			fetch: providerFetch,
+		});
 	}
 
 	if (unionAvailableModels.size > 0) {
@@ -119,5 +123,8 @@ export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
 		);
 	}
 
-	return createCopilotModel(model, { oauth: candidates[0].oauth });
+	return createCopilotModel(model, {
+		oauth: candidates[0].oauth,
+		fetch: providerFetch,
+	});
 }

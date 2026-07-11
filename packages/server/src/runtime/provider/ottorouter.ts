@@ -10,6 +10,7 @@ import {
 	waitForTopupMethodSelection,
 	type TopupMethod,
 } from '../topup/manager.ts';
+import { providerFetch } from './fetch.ts';
 
 const MIN_TOPUP_USD = 5;
 
@@ -106,6 +107,7 @@ export async function resolveOttoRouterModel(
 	const ottorouter = createOttoRouter({
 		auth,
 		baseURL,
+		fetch: providerFetch,
 		callbacks,
 		middleware: isDevtoolsEnabled() ? devToolsMiddleware() : undefined,
 		payment: {

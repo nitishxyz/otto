@@ -5,6 +5,7 @@ import { getModelNpmBinding } from './utils.ts';
 export type OpenRouterProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
+	fetch?: typeof fetch;
 };
 
 function isAnthropicModel(model: string): boolean {
@@ -18,8 +19,8 @@ export function getOpenRouterInstance(
 ) {
 	const apiKey = config?.apiKey ?? process.env.OPENROUTER_API_KEY ?? '';
 	const customFetch = model
-		? createConditionalCachingFetch(isAnthropicModel, model)
-		: undefined;
+		? createConditionalCachingFetch(isAnthropicModel, model, config?.fetch)
+		: config?.fetch;
 	return createOpenRouter({
 		apiKey,
 		fetch: customFetch as typeof fetch | undefined,

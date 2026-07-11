@@ -37,7 +37,7 @@ import {
 import { markUnhandledAssistantRunFailure } from './runner/runner-failures.ts';
 import {
 	retryAfterMaxOutputTokensFinish,
-	retryOpenAIOAuthCodexAfterStreamIdleTimeout,
+	retryAfterProviderStreamIdleTimeout,
 } from './runner/runner-retries.ts';
 import { consumeRunnerStreamParts } from './runner/runner-stream-parts.ts';
 import { persistRunnerStreamFinishDetails } from './runner/runner-finish-details.ts';
@@ -330,11 +330,10 @@ async function runAssistant(opts: RunOpts) {
 			return;
 		}
 		if (
-			await retryOpenAIOAuthCodexAfterStreamIdleTimeout({
+			await retryAfterProviderStreamIdleTimeout({
 				err,
 				opts,
 				db,
-				isOpenAIOAuth,
 				runSessionLoop,
 			})
 		) {

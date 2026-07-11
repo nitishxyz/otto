@@ -32,6 +32,7 @@ export type RunOpts = {
 	toolApprovalMode?: ToolApprovalMode;
 	compactionRetries?: number;
 	continuationCount?: number;
+	streamIdleRetryCount?: number;
 };
 
 export type QueuedMessage = {

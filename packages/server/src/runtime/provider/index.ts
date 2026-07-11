@@ -24,6 +24,7 @@ import { getKimiInstance } from './kimi.ts';
 import { getMinimaxInstance } from './minimax.ts';
 import { resolveCopilotModel } from './copilot.ts';
 import { resolveCustomConfiguredModel } from './custom.ts';
+import { providerFetch } from './fetch.ts';
 
 export type ProviderName = ProviderId;
 
@@ -58,6 +59,7 @@ export async function resolveModel(
 		return createMetaModel(model, {
 			apiKey: getConfiguredProviderApiKey(cfg, provider),
 			baseURL: definition.baseURL,
+			fetch: providerFetch,
 		});
 	}
 	if (provider === 'ollama-cloud') {
@@ -75,6 +77,7 @@ export async function resolveModel(
 		return createBasetenModel(model, {
 			apiKey: getConfiguredProviderApiKey(cfg, provider),
 			baseURL: definition.baseURL,
+			fetch: providerFetch,
 		});
 	}
 	if (provider === 'huggingface') {
@@ -85,6 +88,7 @@ export async function resolveModel(
 		return createHuggingFaceModel(model, {
 			apiKey: getConfiguredProviderApiKey(cfg, provider),
 			baseURL: definition.baseURL,
+			fetch: providerFetch,
 		});
 	}
 	if (provider === 'wafer') {
@@ -95,6 +99,7 @@ export async function resolveModel(
 		return createWaferModel(model, {
 			apiKey: getConfiguredProviderApiKey(cfg, provider),
 			baseURL: definition.baseURL,
+			fetch: providerFetch,
 		});
 	}
 	if (provider === 'openrouter') {

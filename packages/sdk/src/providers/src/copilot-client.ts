@@ -5,6 +5,7 @@ const COPILOT_BASE_URL = 'https://api.githubcopilot.com';
 
 export type CopilotOAuthConfig = {
 	oauth: OAuth;
+	fetch?: typeof fetch;
 };
 
 const COPILOT_REASONING_DROP_TYPES = new Set([
@@ -178,7 +179,7 @@ export function createCopilotFetch(
 			init = { ...init, body: sanitizeCopilotRequestBody(init.body) };
 		}
 
-		const response = await fetch(input, {
+		const response = await (config.fetch ?? fetch)(input, {
 			...init,
 			headers,
 		});

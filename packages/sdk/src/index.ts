@@ -191,6 +191,26 @@ export {
 	createCopilotModel,
 } from './providers/src/index.ts';
 export type { CopilotOAuthConfig } from './providers/src/index.ts';
+export {
+	DEFAULT_PROVIDER_REQUEST_MAX_RETRIES,
+	DEFAULT_PROVIDER_REQUEST_RETRY_DELAY_MS,
+	DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
+	DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS,
+	ProviderStreamIdleTimeoutError,
+	createResilientFetch,
+	getProviderRequestMaxRetries,
+	getProviderRequestRetryDelayMs,
+	getProviderRequestTimeoutMs,
+	getProviderStreamIdleTimeoutMs,
+	isNonReplayableRequestBody,
+	isProviderStreamIdleTimeoutError,
+	resilientFetch,
+	withStreamIdleTimeout,
+} from './providers/src/index.ts';
+export type {
+	FetchLike,
+	ResilientFetchOptions,
+} from './providers/src/index.ts';
 
 // =======================
 // Authentication (from internal auth module)

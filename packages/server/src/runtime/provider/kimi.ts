@@ -5,6 +5,7 @@ import {
 	refreshKimiToken,
 	createKimiModel,
 } from '@ottocode/sdk';
+import { providerFetch } from './fetch.ts';
 
 const KIMI_REFRESH_SKEW_MS = 5 * 60 * 1000;
 
@@ -41,5 +42,5 @@ export async function getKimiInstance(cfg: OttoConfig, model: string) {
 	if (oauth) {
 		oauth = await ensureFreshKimiOAuth(oauth, providerKey, cfg.projectRoot);
 	}
-	return createKimiModel(model, { apiKey, oauth });
+	return createKimiModel(model, { apiKey, oauth, fetch: providerFetch });
 }

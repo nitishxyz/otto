@@ -89,7 +89,9 @@ export function addAnthropicCacheControl(parsed: ParsedBody): ParsedBody {
 	return parsed;
 }
 
-export function createAnthropicCachingFetch(): FetchLike {
+export function createAnthropicCachingFetch(
+	baseFetch: typeof fetch = fetch,
+): FetchLike {
 	return async (input, init) => {
 		let body = init?.body;
 		if (body && typeof body === 'string') {
@@ -101,17 +103,18 @@ export function createAnthropicCachingFetch(): FetchLike {
 				// If parsing fails, send as-is
 			}
 		}
-		return fetch(input, { ...init, body });
+		return baseFetch(input, { ...init, body });
 	};
 }
 
 export function createConditionalCachingFetch(
 	shouldCache: (model: string) => boolean,
 	model: string,
+	baseFetch: typeof fetch = fetch,
 ): FetchLike {
 	return async (input, init) => {
 		if (!shouldCache(model)) {
-			return fetch(input, init);
+			return baseFetch(input, init);
 		}
 
 		let body = init?.body;
@@ -202,6 +205,6 @@ export function createConditionalCachingFetch(
 			}
 		}
 
-		return fetch(input, { ...init, body });
+		return baseFetch(input, { ...init, body });
 	};
 }

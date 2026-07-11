@@ -6,6 +6,7 @@ export type KimiProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
 	oauth?: OAuth;
+	fetch?: typeof fetch;
 };
 
 const KIMI_CODE_CLI_VERSION = '0.16.0';
@@ -346,7 +347,7 @@ export function createKimiModel(model: string, config?: KimiProviderConfig) {
 		name: 'Kimi',
 		baseURL,
 		headers,
-		fetch: createKimiUsageFetch(undefined, isKimiCodeBaseURL(baseURL)),
+		fetch: createKimiUsageFetch(config?.fetch, isKimiCodeBaseURL(baseURL)),
 	});
 
 	return instance(model);

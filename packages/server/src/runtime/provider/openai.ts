@@ -1,6 +1,7 @@
 import type { OttoConfig } from '@ottocode/sdk';
 import { getAuth, createOpenAIOAuthModel } from '@ottocode/sdk';
-import { openai, createOpenAI } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { providerFetch } from './fetch.ts';
 
 export async function resolveOpenAIModel(
 	model: string,
@@ -16,8 +17,8 @@ export async function resolveOpenAIModel(
 		});
 	}
 	if (auth?.type === 'api' && auth.key) {
-		const instance = createOpenAI({ apiKey: auth.key });
+		const instance = createOpenAI({ apiKey: auth.key, fetch: providerFetch });
 		return instance(model);
 	}
-	return openai(model);
+	return createOpenAI({ fetch: providerFetch })(model);
 }

@@ -7,6 +7,7 @@ import type { ProviderId } from '../../types/src/index.ts';
 
 export type OpencodeProviderConfig = {
 	apiKey?: string;
+	fetch?: typeof fetch;
 };
 
 function normalizeModelIdentifier(provider: ProviderId, model: string): string {
@@ -32,11 +33,11 @@ export function createOpencodeModel(
 	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
 
 	if (binding === '@ai-sdk/openai') {
-		const instance = createOpenAI({ apiKey, baseURL });
+		const instance = createOpenAI({ apiKey, baseURL, fetch: config?.fetch });
 		return instance(resolvedModelId);
 	}
 	if (binding === '@ai-sdk/anthropic') {
-		const cachingFetch = createAnthropicCachingFetch();
+		const cachingFetch = createAnthropicCachingFetch(config?.fetch);
 		const instance = createAnthropic({
 			apiKey,
 			baseURL,
@@ -49,6 +50,7 @@ export function createOpencodeModel(
 			name: entry?.label ?? 'opencode',
 			baseURL,
 			headers,
+			fetch: config?.fetch,
 		});
 		return instance(resolvedModelId);
 	}
