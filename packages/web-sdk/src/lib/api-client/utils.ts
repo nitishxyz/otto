@@ -1,4 +1,5 @@
 import { client } from '@ottocode/api';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import {
 	getConfiguredRuntimeApiBaseUrl,
 	getRuntimeApiBaseUrl,
@@ -14,6 +15,8 @@ import {
 } from '../share-mode';
 import { getOwnerSessionHeaders, onOwnerSessionChange } from '../owner-auth';
 import type { Session, Message } from '../../types/api';
+import { invalidateAuthenticatedAssets } from '../authenticated-asset';
+import { renewOwnerSession } from '../owner-renewal';
 
 type ApiSession = Record<string, unknown> & {
 	title?: string | null;
@@ -22,6 +25,55 @@ type ApiSession = Record<string, unknown> & {
 	lastViewedAt?: string | number | null;
 	pinnedAt?: string | number | null;
 };
+
+type RetryableOwnerRequest = InternalAxiosRequestConfig & {
+	_ottoOwnerRetried?: boolean;
+};
+
+export function shouldRenewOwnerRequest(input: {
+	status?: number;
+	retried?: boolean;
+	shareMode: boolean;
+	hasOwnerSession: boolean;
+	runtimeBase?: string;
+	requestBase?: string;
+}): boolean {
+	return Boolean(
+		input.status === 401 &&
+			!input.retried &&
+			!input.shareMode &&
+			input.hasOwnerSession &&
+			input.runtimeBase &&
+			input.requestBase?.startsWith(input.runtimeBase),
+	);
+}
+
+const axiosClient = axios.create();
+axiosClient.interceptors.response.use(undefined, async (error: AxiosError) => {
+	const request = error.config as RetryableOwnerRequest | undefined;
+	const runtimeBase = getConfiguredRuntimeApiBaseUrl();
+	const requestUrl = request?.baseURL ?? '';
+	if (
+		!request ||
+		!shouldRenewOwnerRequest({
+			status: error.response?.status,
+			retried: request._ottoOwnerRetried,
+			shareMode: isShareMode(),
+			hasOwnerSession: Boolean(getRuntimeProjectContext()?.ownerSession),
+			runtimeBase,
+			requestBase: requestUrl,
+		})
+	) {
+		throw error;
+	}
+	request._ottoOwnerRetried = true;
+	await renewOwnerSession();
+	request.headers.set(
+		'X-Otto-Owner-Session',
+		getRuntimeProjectContext()?.ownerSession?.token,
+	);
+	return axiosClient.request(request);
+});
 
 type ApiMessage = Record<string, unknown> & {
 	createdAt?: string | number;
@@ -65,6 +117,7 @@ export function configureApiClient() {
 	const baseURL = configuredBaseUrl ?? getRuntimeApiBaseUrl();
 	client.setConfig({
 		baseURL,
+		axios: axiosClient,
 		adapter: getClientAdapter(),
 		headers: getAuthHeaders(),
 	});
@@ -75,6 +128,7 @@ configureApiClient();
 // Re-apply auth headers whenever the owner session changes so a freshly
 // exchanged owner bearer is attached to subsequent API calls (retry/bootstrap).
 onOwnerSessionChange(() => {
+	invalidateAuthenticatedAssets();
 	configureApiClient();
 });
 

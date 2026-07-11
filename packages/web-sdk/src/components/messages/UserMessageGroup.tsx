@@ -47,6 +47,7 @@ import {
 	parseSlashCommandName,
 	type CommandKind,
 } from '../../lib/commands';
+import { AuthenticatedImage } from '../AuthenticatedImage';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -123,6 +124,9 @@ export const UserMessageGroup = memo(
 		nextAssistantMessageId,
 	}: UserMessageGroupProps) {
 		const [expandedImage, setExpandedImage] = useState<string | null>(null);
+		const [resolvedImages, setResolvedImages] = useState<
+			Record<string, string>
+		>({});
 		const parts = message.parts || [];
 		const textParts = parts.filter((p) => p.type === 'text');
 		const imageParts = parts.filter((p) => p.type === 'image');
@@ -346,12 +350,21 @@ export const UserMessageGroup = memo(
 											<button
 												key={img.id}
 												type="button"
-												onClick={() => setExpandedImage(img.src)}
+												onClick={() =>
+													setExpandedImage(resolvedImages[img.id] ?? img.src)
+												}
 												className="w-16 h-16 rounded-lg overflow-hidden bg-muted hover:ring-2 hover:ring-primary/50 transition-all"
 											>
-												<img
+												<AuthenticatedImage
 													src={img.src}
 													alt="Attachment"
+													onResolvedSrc={(src) => {
+														setResolvedImages((current) =>
+															current[img.id] === src
+																? current
+																: { ...current, [img.id]: src },
+														);
+													}}
 													className="w-full h-full object-cover"
 												/>
 											</button>
@@ -554,7 +567,7 @@ export const UserMessageGroup = memo(
 						>
 							<X className="w-6 h-6 text-white" />
 						</button>
-						<img
+						<AuthenticatedImage
 							src={expandedImage}
 							alt="Expanded attachment"
 							className="max-w-full max-h-full object-contain rounded-lg"

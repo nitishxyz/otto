@@ -21,6 +21,7 @@ import {
 	writeManagedTunnelDesiredState,
 } from './managed-state.ts';
 import { clearOwnerAuthorizationState } from './owner-auth.ts';
+import { clearTerminalWebSocketTickets } from '../terminals/ws-ticket.ts';
 import {
 	clearTunnelShares,
 	createTunnelShare,
@@ -729,6 +730,7 @@ export function stopActiveTunnel() {
 	managedShareIds.clear();
 	clearTunnelShares();
 	clearOwnerAuthorizationState();
+	clearTerminalWebSocketTickets();
 	for (const slot of tunnelSlots.values()) {
 		if (slot.activeTunnel) {
 			slot.activeTunnel.stop();

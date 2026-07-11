@@ -11,46 +11,54 @@ export type TunnelScope = 'remote-control' | 'project-share';
 export type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
 export type TunnelMode = 'managed' | 'quick';
 
-export interface TunnelScopeState {
+/**
+ * Each (scope, mode) pair has its own slot so status polls for one mode can
+ * never overwrite another. The managed remote-control slot is the single
+ * source of truth for whole-machine remote access; quick tunnels and quick
+ * project shares live in their own slots.
+ */
+export type TunnelSlotKey = 'remoteManaged' | 'remoteQuick' | 'projectShare';
+
+export interface TunnelSlotState {
 	status: TunnelStatus;
 	url: string | null;
 	error: string | null;
 	progress: string | null;
-	mode: TunnelMode;
 	hostname: string | null;
 }
 
-function createScopeState(): TunnelScopeState {
+/** Maps a tunnel scope + mode onto its dedicated store slot. */
+export function tunnelSlotKey(
+	scope: TunnelScope,
+	mode?: TunnelMode,
+): TunnelSlotKey {
+	if (scope === 'project-share') return 'projectShare';
+	return mode === 'managed' ? 'remoteManaged' : 'remoteQuick';
+}
+
+function createSlotState(): TunnelSlotState {
 	return {
 		status: 'idle',
 		url: null,
 		error: null,
 		progress: null,
-		mode: 'quick',
 		hostname: null,
 	};
 }
 
 interface TunnelState {
 	isExpanded: boolean;
-	remoteControl: TunnelScopeState;
-	projectShare: TunnelScopeState;
+	remoteManaged: TunnelSlotState;
+	remoteQuick: TunnelSlotState;
+	projectShare: TunnelSlotState;
 	ottorouterConnected: boolean;
 
 	toggleSidebar: () => void;
 	expandSidebar: () => void;
 	collapseSidebar: () => void;
-	setScopeStatus: (scope: TunnelScope, status: TunnelStatus) => void;
-	setScopeUrl: (scope: TunnelScope, url: string | null) => void;
-	setScopeError: (scope: TunnelScope, error: string | null) => void;
-	setScopeProgress: (scope: TunnelScope, progress: string | null) => void;
-	patchScope: (scope: TunnelScope, patch: Partial<TunnelScopeState>) => void;
-	resetScope: (scope: TunnelScope) => void;
+	patchSlot: (key: TunnelSlotKey, patch: Partial<TunnelSlotState>) => void;
+	resetSlot: (key: TunnelSlotKey) => void;
 	setOttorouterConnected: (connected: boolean) => void;
-}
-
-function scopeKey(scope: TunnelScope): 'remoteControl' | 'projectShare' {
-	return scope === 'project-share' ? 'projectShare' : 'remoteControl';
 }
 
 function collapseOtherSidebars() {
@@ -65,8 +73,9 @@ function collapseOtherSidebars() {
 
 export const useTunnelStore = create<TunnelState>((set) => ({
 	isExpanded: false,
-	remoteControl: createScopeState(),
-	projectShare: createScopeState(),
+	remoteManaged: createSlotState(),
+	remoteQuick: createSlotState(),
+	projectShare: createSlotState(),
 	ottorouterConnected: false,
 
 	toggleSidebar: () => {
@@ -84,40 +93,10 @@ export const useTunnelStore = create<TunnelState>((set) => ({
 
 	collapseSidebar: () => set({ isExpanded: false }),
 
-	setScopeStatus: (scope, status) =>
-		set((state) => {
-			const key = scopeKey(scope);
-			return { [key]: { ...state[key], status } } as Partial<TunnelState>;
-		}),
+	patchSlot: (key, patch) =>
+		set((state) => ({ [key]: { ...state[key], ...patch } })),
 
-	setScopeUrl: (scope, url) =>
-		set((state) => {
-			const key = scopeKey(scope);
-			return { [key]: { ...state[key], url } } as Partial<TunnelState>;
-		}),
-
-	setScopeError: (scope, error) =>
-		set((state) => {
-			const key = scopeKey(scope);
-			return { [key]: { ...state[key], error } } as Partial<TunnelState>;
-		}),
-
-	setScopeProgress: (scope, progress) =>
-		set((state) => {
-			const key = scopeKey(scope);
-			return { [key]: { ...state[key], progress } } as Partial<TunnelState>;
-		}),
-
-	patchScope: (scope, patch) =>
-		set((state) => {
-			const key = scopeKey(scope);
-			return { [key]: { ...state[key], ...patch } } as Partial<TunnelState>;
-		}),
-
-	resetScope: (scope) =>
-		set(
-			() => ({ [scopeKey(scope)]: createScopeState() }) as Partial<TunnelState>,
-		),
+	resetSlot: (key) => set(() => ({ [key]: createSlotState() })),
 
 	setOttorouterConnected: (connected) =>
 		set({ ottorouterConnected: connected }),

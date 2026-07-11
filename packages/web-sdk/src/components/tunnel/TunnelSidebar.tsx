@@ -16,9 +16,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { SidebarHeader } from '../ui/SidebarHeader';
 import { StableSpinner } from '../ui/StableSpinner';
 import {
+	tunnelSlotKey,
 	useTunnelStore,
-	type TunnelMode,
-	type TunnelScope,
+	type TunnelSlotState,
 } from '../../stores/tunnelStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import {
@@ -32,7 +32,21 @@ import { useProjects } from '../../hooks/useProjects';
 import { getProjectId, getProjectRoot } from '../../lib/api-client/utils';
 import { isShareMode } from '../../lib/share-mode';
 import { openUrl } from '../../lib/open-url';
+import {
+	resolveProjectShareView,
+	resolveRemoteControlView,
+} from '../../lib/tunnel-views';
 import { ProjectShareManager } from './ProjectShareManager';
+
+const MANAGED_REMOTE_ARGS: TunnelScopeArgs = {
+	scope: 'remote-control',
+	mode: 'managed',
+};
+
+const QUICK_REMOTE_ARGS: TunnelScopeArgs = {
+	scope: 'remote-control',
+	mode: 'quick',
+};
 
 function truncateUrl(url: string): string {
 	try {
@@ -84,11 +98,8 @@ const TunnelSidebarContent = memo(function TunnelSidebarContent() {
 			/>
 
 			<div className="flex-1 overflow-y-auto">
-				<RemoteControlSection />
-
-				<div className="border-t border-sidebar-border" />
-
-				<ProjectShareSection
+				<RemoteControlCard />
+				<ProjectShareCard
 					projectId={projectId ?? null}
 					projectName={projectName}
 				/>
@@ -97,54 +108,59 @@ const TunnelSidebarContent = memo(function TunnelSidebarContent() {
 	);
 });
 
-const REMOTE_ARGS: Record<TunnelMode, TunnelScopeArgs> = {
-	managed: { scope: 'remote-control', mode: 'managed' },
-	quick: { scope: 'remote-control', mode: 'quick' },
-};
+interface SidebarSectionProps {
+	icon: React.ReactNode;
+	title: string;
+	badge?: React.ReactNode;
+	children: React.ReactNode;
+}
 
-const RemoteControlSection = memo(function RemoteControlSection() {
+/** Flat stacked sidebar section with a compact header and a divider below. */
+const SidebarSection = memo(function SidebarSection({
+	icon,
+	title,
+	badge,
+	children,
+}: SidebarSectionProps) {
+	return (
+		<section className="border-b border-border/60">
+			<div className="px-3 py-2 flex items-center gap-2 bg-muted/30">
+				<span className="text-muted-foreground shrink-0">{icon}</span>
+				<span className="text-sm font-medium text-foreground">{title}</span>
+				{badge}
+			</div>
+			<div className="px-3 py-2">{children}</div>
+		</section>
+	);
+});
+
+const RemoteControlCard = memo(function RemoteControlCard() {
 	const ottorouterConnected = useTunnelStore((s) => s.ottorouterConnected);
-	const managed = useTunnelStore((s) => s.remoteControl);
+	const managed = useTunnelStore((s) => s.remoteManaged);
+	const quickStatus = useTunnelStore((s) => s.remoteQuick.status);
 	const expandSettings = useSettingsStore((s) => s.expandSidebar);
 
-	// Poll status for both modes so ottorouterConnected + managed hostname stay
-	// current regardless of which mode the owner is using.
-	useTunnelStatus(REMOTE_ARGS.managed);
-	useTunnelStatus(REMOTE_ARGS.quick);
-	useTunnelStream(
-		managed.mode === 'managed' ? REMOTE_ARGS.managed : REMOTE_ARGS.quick,
-	);
+	// The managed remote-control slot is the authoritative whole-machine
+	// state; poll + stream it whenever the sidebar is open so enable/disable
+	// from any surface (desktop Machines tab, CLI) shows up here.
+	useTunnelStatus(MANAGED_REMOTE_ARGS);
+	useTunnelStream(MANAGED_REMOTE_ARGS);
 
-	const [showQuick, setShowQuick] = useState(false);
+	const view = resolveRemoteControlView({
+		managedStatus: managed.status,
+		ottorouterConnected,
+	});
 
-	const managedActive =
-		managed.mode === 'managed' &&
-		(managed.status === 'connected' ||
-			managed.status === 'starting' ||
-			managed.status === 'error');
+	const pillStatus =
+		view === 'ottorouter-disconnected' ? quickStatus : managed.status;
 
 	return (
-		<div className="p-4">
-			<div className="flex items-center gap-2 mb-1">
-				<span className="text-muted-foreground shrink-0">
-					<Globe className="size-[15px]" />
-				</span>
-				<span className="text-sm font-medium text-foreground">
-					Remote Control
-				</span>
-				<StatusPill status={managedActive ? managed.status : 'idle'} />
-			</div>
-			<p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-				Full access to every project on this machine. Stays on after you close
-				otto.
-			</p>
-
-			{ottorouterConnected || managedActive ? (
-				<ManagedTunnelPanel
-					state={managed}
-					warning="Anyone with this link can use every project on this machine."
-				/>
-			) : (
+		<SidebarSection
+			icon={<Globe className="size-[15px]" />}
+			title="Remote Control"
+			badge={<StatusPill status={pillStatus} />}
+		>
+			{view === 'ottorouter-disconnected' ? (
 				<div className="flex flex-col gap-3">
 					<div className="flex items-start gap-1.5 text-xs text-muted-foreground">
 						<ShieldCheck className="w-3.5 h-3.5 shrink-0 text-primary mt-0.5" />
@@ -160,206 +176,56 @@ const RemoteControlSection = memo(function RemoteControlSection() {
 						<ShieldCheck className="w-3.5 h-3.5" />
 						Connect OttoRouter
 					</button>
-
-					{showQuick ? (
-						<QuickTunnelPanel
-							args={REMOTE_ARGS.quick}
-							startLabel="Start quick tunnel"
-							stopLabel="Turn off"
-							warning="Anyone with this link can use every project on this machine."
-						/>
-					) : (
-						<button
-							type="button"
-							onClick={() => setShowQuick(true)}
-							className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-						>
-							<Zap className="w-3.5 h-3.5" />
-							Use a quick tunnel instead
-						</button>
-					)}
-				</div>
-			)}
-		</div>
-	);
-});
-
-interface ProjectShareSectionProps {
-	projectId: string | null;
-	projectName: string | null;
-}
-
-const ProjectShareSection = memo(function ProjectShareSection({
-	projectId,
-	projectName,
-}: ProjectShareSectionProps) {
-	const ottorouterConnected = useTunnelStore((s) => s.ottorouterConnected);
-	const remoteConnected = useTunnelStore(
-		(s) =>
-			s.remoteControl.mode === 'managed' &&
-			s.remoteControl.status === 'connected',
-	);
-
-	const quickArgs: TunnelScopeArgs = useMemo(
-		() => ({
-			scope: 'project-share',
-			mode: 'quick',
-			projectId: projectId ?? undefined,
-		}),
-		[projectId],
-	);
-
-	// Keep quick project-share status/stream live so the QR + URL stay current
-	// when the owner uses the quick fallback path.
-	useTunnelStatus(quickArgs);
-	useTunnelStream(quickArgs);
-
-	const [useQuick, setUseQuick] = useState(false);
-	const managedSharesAvailable = ottorouterConnected;
-
-	return (
-		<div className="p-4">
-			<div className="flex items-center gap-2 mb-1">
-				<span className="text-muted-foreground shrink-0">
-					<FolderGit2 className="size-[15px]" />
-				</span>
-				<span className="text-sm font-medium text-foreground">
-					Project Share
-				</span>
-			</div>
-			<p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-				{projectName
-					? `Share only "${projectName}".`
-					: 'Share only the current project.'}
-			</p>
-
-			{managedSharesAvailable && !useQuick ? (
-				<div className="flex flex-col gap-3">
-					<ProjectShareManager
-						projectId={projectId}
-						projectName={projectName}
-						ready={remoteConnected}
+					<QuickFallback
+						args={QUICK_REMOTE_ARGS}
+						toggleLabel="Use a temporary quick tunnel"
+						startLabel="Start quick tunnel"
+						stopLabel="Turn off"
+						warning="Anyone with this link can use every project on this machine. The link changes on every restart."
 					/>
-					<button
-						type="button"
-						onClick={() => setUseQuick(true)}
-						className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-					>
-						<Zap className="w-3.5 h-3.5" />
-						Use a quick share instead
-					</button>
 				</div>
 			) : (
-				<QuickTunnelPanel
-					args={quickArgs}
-					scope="project-share"
-					disabled={!projectId}
-					disabledHint="Open a project to share it."
-					startLabel="Share this project"
-					stopLabel="Stop sharing"
-				/>
+				<ManagedRemotePanel state={managed} view={view} />
 			)}
-		</div>
+		</SidebarSection>
 	);
 });
 
-interface ManagedTunnelPanelProps {
-	state: {
-		status: string;
-		url: string | null;
-		error: string | null;
-		progress: string | null;
-		hostname: string | null;
-	};
-	warning?: string;
+interface ManagedRemotePanelProps {
+	state: TunnelSlotState;
+	view: 'managed-live' | 'managed-starting' | 'managed-error' | 'managed-off';
 }
 
-const ManagedTunnelPanel = memo(function ManagedTunnelPanel({
+const ManagedRemotePanel = memo(function ManagedRemotePanel({
 	state,
-	warning,
-}: ManagedTunnelPanelProps) {
-	const startTunnel = useStartTunnel(REMOTE_ARGS.managed);
-	const stopTunnel = useStopTunnel(REMOTE_ARGS.managed);
-	const [copied, setCopied] = useState(false);
+	view,
+}: ManagedRemotePanelProps) {
+	const startTunnel = useStartTunnel(MANAGED_REMOTE_ARGS);
+	const stopTunnel = useStopTunnel(MANAGED_REMOTE_ARGS);
 
-	const handleCopyUrl = async () => {
-		if (state.url) {
-			await navigator.clipboard.writeText(state.url);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		}
-	};
-
-	if (state.status === 'connected' && state.url) {
+	if (view === 'managed-live' && state.url) {
 		return (
-			<div className="flex flex-col">
-				<div className="flex justify-center pb-3">
-					<div className="p-3 bg-white rounded-lg">
-						<QRCodeSVG
-							value={state.url}
-							size={148}
-							level="M"
-							includeMargin={false}
-						/>
-					</div>
-				</div>
-
-				{state.hostname && (
-					<div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-						<ShieldCheck className="w-3.5 h-3.5 shrink-0 text-primary" />
-						<span className="font-mono truncate">{state.hostname}</span>
-						<span className="ml-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-							Stable
-						</span>
-					</div>
-				)}
-
-				<div className="flex items-center justify-between text-sm mb-3">
-					<span className="text-muted-foreground">URL</span>
-					<button
-						type="button"
-						onClick={handleCopyUrl}
-						className="flex items-center gap-1.5 font-mono text-foreground hover:text-muted-foreground transition-colors"
-						title="Copy URL"
-					>
-						{truncateUrl(state.url)}
-						{copied ? (
-							<Check className="w-3 h-3 text-green-500" />
-						) : (
-							<Copy className="w-3 h-3 text-muted-foreground" />
-						)}
-					</button>
-				</div>
-
-				<button
-					type="button"
-					onClick={() => state.url && openUrl(state.url)}
-					className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm hover:bg-muted transition-colors mb-2"
-				>
-					<ExternalLink className="w-3.5 h-3.5" />
-					Open in browser
-				</button>
-
-				{warning && (
-					<div className="flex items-start gap-1.5 text-xs text-muted-foreground mb-2">
-						<AlertTriangle className="w-3.5 h-3.5 shrink-0 text-yellow-500 mt-0.5" />
-						<span>{warning}</span>
-					</div>
-				)}
-
+			<div className="flex flex-col gap-1">
+				<ManagedRemoteLink
+					url={state.url}
+					hostname={state.hostname ?? truncateUrl(state.url)}
+				/>
 				<button
 					type="button"
 					onClick={() => stopTunnel.mutate()}
 					disabled={stopTunnel.isPending}
-					className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+					className="w-full flex items-center gap-2 rounded px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
 				>
-					{stopTunnel.isPending ? 'Stopping...' : 'Turn off'}
+					{stopTunnel.isPending && (
+						<StableSpinner size="sm" title="Turning off" />
+					)}
+					{stopTunnel.isPending ? 'Turning off...' : 'Turn off'}
 				</button>
 			</div>
 		);
 	}
 
-	if (state.status === 'starting') {
+	if (view === 'managed-starting' || (view === 'managed-live' && !state.url)) {
 		return (
 			<div className="flex items-center gap-2 py-2">
 				<StableSpinner size="sm" className="text-primary" title="Starting" />
@@ -370,7 +236,7 @@ const ManagedTunnelPanel = memo(function ManagedTunnelPanel({
 		);
 	}
 
-	if (state.status === 'error') {
+	if (view === 'managed-error') {
 		return (
 			<div className="flex flex-col gap-2">
 				<div className="flex items-start gap-1.5 text-xs">
@@ -396,16 +262,136 @@ const ManagedTunnelPanel = memo(function ManagedTunnelPanel({
 			type="button"
 			onClick={() => startTunnel.mutate()}
 			disabled={startTunnel.isPending}
-			className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+			className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
 		>
+			{startTunnel.isPending && <StableSpinner size="sm" title="Starting" />}
 			{startTunnel.isPending ? 'Starting...' : 'Turn on remote access'}
 		</button>
 	);
 });
 
-interface QuickTunnelPanelProps {
+interface ManagedRemoteLinkProps {
+	url: string;
+	hostname: string;
+}
+
+/**
+ * Compact copyable hostname row for the live managed remote-control link.
+ * Owner-only semantics live in the title/aria description, not visible copy.
+ */
+const ManagedRemoteLink = memo(function ManagedRemoteLink({
+	url,
+	hostname,
+}: ManagedRemoteLinkProps) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = async () => {
+		try {
+			await navigator.clipboard.writeText(url);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch {
+			// Clipboard may be unavailable; ignore.
+		}
+	};
+
+	return (
+		<button
+			type="button"
+			onClick={handleCopy}
+			className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-muted/50 transition-colors"
+			title="Copy link — access limited to the OttoRouter account owner via the OttoCode app"
+			aria-label="Copy remote control link. Access limited to the OttoRouter account owner via the OttoCode app."
+		>
+			<ShieldCheck className="w-3.5 h-3.5 shrink-0 text-primary" />
+			<span className="flex-1 truncate font-mono text-xs text-foreground">
+				{hostname}
+			</span>
+			{copied ? (
+				<Check className="w-3.5 h-3.5 shrink-0 text-green-500" />
+			) : (
+				<Copy className="w-3 h-3 shrink-0 text-muted-foreground" />
+			)}
+		</button>
+	);
+});
+
+interface ProjectShareCardProps {
+	projectId: string | null;
+	projectName: string | null;
+}
+
+const ProjectShareCard = memo(function ProjectShareCard({
+	projectId,
+	projectName,
+}: ProjectShareCardProps) {
+	const ottorouterConnected = useTunnelStore((s) => s.ottorouterConnected);
+	const managedStatus = useTunnelStore((s) => s.remoteManaged.status);
+
+	const view = resolveProjectShareView({
+		managedStatus,
+		ottorouterConnected,
+	});
+
+	const quickArgs: TunnelScopeArgs = useMemo(
+		() => ({
+			scope: 'project-share',
+			mode: 'quick',
+			projectId: projectId ?? undefined,
+		}),
+		[projectId],
+	);
+
+	return (
+		<SidebarSection
+			icon={<FolderGit2 className="size-[15px]" />}
+			title="Project Share"
+			badge={
+				<span
+					className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+					title={
+						projectName
+							? `Share links grant access to only "${projectName}"`
+							: 'Share links grant access to only the current project'
+					}
+				>
+					Current project
+				</span>
+			}
+		>
+			{view === 'managed-shares' ? (
+				<ProjectShareManager projectId={projectId} ready />
+			) : view === 'managed-shares-waiting' ? (
+				<div className="flex flex-col gap-3">
+					<p className="text-xs text-muted-foreground/80 leading-relaxed">
+						Stable managed share links become available once Remote Control is
+						on.
+					</p>
+					<QuickFallback
+						args={quickArgs}
+						disabled={!projectId}
+						disabledHint="Open a project to share it."
+						toggleLabel="Use a temporary quick share"
+						startLabel="Share this project"
+						stopLabel="Stop sharing"
+					/>
+				</div>
+			) : (
+				<QuickSharePanel
+					args={quickArgs}
+					disabled={!projectId}
+					disabledHint="Open a project to share it."
+					startLabel="Share this project"
+					stopLabel="Stop sharing"
+				/>
+			)}
+		</SidebarSection>
+	);
+});
+
+interface QuickFallbackProps {
 	args: TunnelScopeArgs;
-	scope?: TunnelScope;
+	toggleLabel: string;
 	startLabel: string;
 	stopLabel: string;
 	warning?: string;
@@ -413,29 +399,79 @@ interface QuickTunnelPanelProps {
 	disabledHint?: string;
 }
 
-const QuickTunnelPanel = memo(function QuickTunnelPanel({
+/**
+ * Collapsed entry point for the temporary quick tunnel. The quick panel (and
+ * its status polling/stream) mounts only after the owner opts in, or when the
+ * quick slot already has activity from this session.
+ */
+const QuickFallback = memo(function QuickFallback({
 	args,
-	scope = 'remote-control',
+	toggleLabel,
+	startLabel,
+	stopLabel,
+	warning,
+	disabled,
+	disabledHint,
+}: QuickFallbackProps) {
+	const slot = tunnelSlotKey(args.scope, args.mode);
+	const slotStatus = useTunnelStore((s) => s[slot].status);
+	const [opened, setOpened] = useState(false);
+	const show = opened || slotStatus !== 'idle';
+
+	if (!show) {
+		return (
+			<button
+				type="button"
+				onClick={() => setOpened(true)}
+				className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+			>
+				<Zap className="w-3.5 h-3.5" />
+				{toggleLabel}
+			</button>
+		);
+	}
+
+	return (
+		<QuickSharePanel
+			args={args}
+			startLabel={startLabel}
+			stopLabel={stopLabel}
+			warning={warning}
+			disabled={disabled}
+			disabledHint={disabledHint}
+		/>
+	);
+});
+
+interface QuickSharePanelProps {
+	args: TunnelScopeArgs;
+	startLabel: string;
+	stopLabel: string;
+	warning?: string;
+	disabled?: boolean;
+	disabledHint?: string;
+}
+
+/**
+ * Temporary quick tunnel panel. Owns its own status polling and SSE stream so
+ * the requests only run while the panel is actually visible; state lives in
+ * the quick slot for its scope and never touches managed state.
+ */
+const QuickSharePanel = memo(function QuickSharePanel({
+	args,
 	startLabel,
 	stopLabel,
 	warning,
 	disabled = false,
 	disabledHint,
-}: QuickTunnelPanelProps) {
-	const state = useTunnelStore((s) =>
-		scope === 'project-share' ? s.projectShare : s.remoteControl,
-	);
+}: QuickSharePanelProps) {
+	const slot = tunnelSlotKey(args.scope, args.mode);
+	const state = useTunnelStore((s) => s[slot]);
 	const startTunnel = useStartTunnel(args);
 	const stopTunnel = useStopTunnel(args);
-	const [copied, setCopied] = useState(false);
 
-	const handleCopyUrl = async () => {
-		if (state.url) {
-			await navigator.clipboard.writeText(state.url);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		}
-	};
+	useTunnelStatus(args);
+	useTunnelStream(args);
 
 	const isRateLimited = state.error?.includes('Rate limited');
 
@@ -448,56 +484,18 @@ const QuickTunnelPanel = memo(function QuickTunnelPanel({
 	if (state.status === 'connected' && state.url) {
 		return (
 			<div className="flex flex-col">
-				<div className="flex justify-center pb-3">
-					<div className="p-3 bg-white rounded-lg">
-						<QRCodeSVG
-							value={state.url}
-							size={148}
-							level="M"
-							includeMargin={false}
-						/>
-					</div>
+				<div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+					<Zap className="w-3.5 h-3.5 shrink-0 text-yellow-500" />
+					<span>Temporary link — it changes on every restart.</span>
 				</div>
-
-				<div className="flex items-center justify-between text-sm mb-3">
-					<span className="text-muted-foreground">URL</span>
-					<button
-						type="button"
-						onClick={handleCopyUrl}
-						className="flex items-center gap-1.5 font-mono text-foreground hover:text-muted-foreground transition-colors"
-						title="Copy URL"
-					>
-						{truncateUrl(state.url)}
-						{copied ? (
-							<Check className="w-3 h-3 text-green-500" />
-						) : (
-							<Copy className="w-3 h-3 text-muted-foreground" />
-						)}
-					</button>
-				</div>
-
-				<button
-					type="button"
-					onClick={() => state.url && openUrl(state.url)}
-					className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm hover:bg-muted transition-colors mb-2"
-				>
-					<ExternalLink className="w-3.5 h-3.5" />
-					Open in browser
-				</button>
-
-				{warning && (
-					<div className="flex items-start gap-1.5 text-xs text-muted-foreground mb-2">
-						<AlertTriangle className="w-3.5 h-3.5 shrink-0 text-yellow-500 mt-0.5" />
-						<span>{warning}</span>
-					</div>
-				)}
-
+				<TunnelLinkDetails url={state.url} warning={warning} />
 				<button
 					type="button"
 					onClick={() => stopTunnel.mutate()}
 					disabled={stopTunnel.isPending}
-					className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+					className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
 				>
+					{stopTunnel.isPending && <StableSpinner size="sm" title="Stopping" />}
 					{stopTunnel.isPending ? 'Stopping...' : stopLabel}
 				</button>
 			</div>
@@ -548,10 +546,77 @@ const QuickTunnelPanel = memo(function QuickTunnelPanel({
 			type="button"
 			onClick={() => startTunnel.mutate()}
 			disabled={startTunnel.isPending}
-			className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+			className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
 		>
+			{startTunnel.isPending ? (
+				<StableSpinner size="sm" title="Starting" />
+			) : (
+				<Zap className="w-3.5 h-3.5" />
+			)}
 			{startTunnel.isPending ? 'Starting...' : startLabel}
 		</button>
+	);
+});
+
+interface TunnelLinkDetailsProps {
+	url: string;
+	warning?: string;
+}
+
+/** QR code, copy, and open-in-browser for a live quick tunnel. */
+const TunnelLinkDetails = memo(function TunnelLinkDetails({
+	url,
+	warning,
+}: TunnelLinkDetailsProps) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopyUrl = async () => {
+		await navigator.clipboard.writeText(url);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
+
+	return (
+		<>
+			<div className="flex justify-center pb-3">
+				<div className="p-3 bg-white rounded-lg">
+					<QRCodeSVG value={url} size={148} level="M" includeMargin={false} />
+				</div>
+			</div>
+
+			<div className="flex items-center justify-between text-sm mb-3">
+				<span className="text-muted-foreground">URL</span>
+				<button
+					type="button"
+					onClick={handleCopyUrl}
+					className="flex items-center gap-1.5 font-mono text-foreground hover:text-muted-foreground transition-colors"
+					title="Copy URL"
+				>
+					{truncateUrl(url)}
+					{copied ? (
+						<Check className="w-3 h-3 text-green-500" />
+					) : (
+						<Copy className="w-3 h-3 text-muted-foreground" />
+					)}
+				</button>
+			</div>
+
+			<button
+				type="button"
+				onClick={() => openUrl(url)}
+				className="flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md text-sm hover:bg-muted transition-colors mb-2"
+			>
+				<ExternalLink className="w-3.5 h-3.5" />
+				Open in browser
+			</button>
+
+			{warning && (
+				<div className="flex items-start gap-1.5 text-xs text-muted-foreground mb-2">
+					<AlertTriangle className="w-3.5 h-3.5 shrink-0 text-yellow-500 mt-0.5" />
+					<span>{warning}</span>
+				</div>
+			)}
+		</>
 	);
 });
 

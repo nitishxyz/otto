@@ -11,6 +11,7 @@ import {
 	stopTunnel as apiStopTunnel,
 } from '@ottocode/api';
 import {
+	tunnelSlotKey,
 	useTunnelStore,
 	type TunnelMode,
 	type TunnelScope,
@@ -18,7 +19,10 @@ import {
 } from '../stores/tunnelStore';
 import { getProjectId } from '../lib/api-client/utils';
 import { API_BASE_URL } from '../lib/config';
-import { normalizeTunnelStatus } from '../lib/tunnel-shared';
+import {
+	describeTunnelActionError,
+	normalizeTunnelStatus,
+} from '../lib/tunnel-shared';
 
 interface TunnelStatusResponse {
 	mode: TunnelMode;
@@ -106,7 +110,7 @@ async function startTunnel(
 	if (response.error) {
 		const data = response.data as TunnelStartResponse | undefined;
 		if (data && data.ok === false) return data;
-		throw new Error(JSON.stringify(response.error));
+		throw new Error(describeTunnelActionError(response.error));
 	}
 	return response.data as TunnelStartResponse;
 }
@@ -119,7 +123,8 @@ async function stopTunnel(args: TunnelScopeArgs): Promise<{
 	const response = await apiStopTunnel({
 		query: scopeQuery({ ...args, projectId: resolveProjectId(args) }),
 	});
-	if (response.error) throw new Error(JSON.stringify(response.error));
+	if (response.error)
+		throw new Error(describeTunnelActionError(response.error));
 	return response.data as { ok: boolean; message?: string; error?: string };
 }
 
@@ -131,8 +136,16 @@ async function fetchTunnelQr(args: TunnelScopeArgs): Promise<TunnelQrResponse> {
 	return response.data as TunnelQrResponse;
 }
 
+/**
+ * Polls daemon tunnel status for one (scope, mode) pair and mirrors it into
+ * that pair's dedicated store slot, so e.g. a quick-mode poll can never
+ * overwrite live managed remote-control state. Refetches on window focus and
+ * every 3s while mounted, keeping the sidebar in sync with changes made from
+ * other surfaces (desktop Machines tab, CLI).
+ */
 export function useTunnelStatus(args: TunnelScopeArgs) {
-	const patchScope = useTunnelStore((s) => s.patchScope);
+	const slot = tunnelSlotKey(args.scope, args.mode);
+	const patchSlot = useTunnelStore((s) => s.patchSlot);
 
 	const setOttorouterConnected = useTunnelStore(
 		(s) => s.setOttorouterConnected,
@@ -149,33 +162,34 @@ export function useTunnelStatus(args: TunnelScopeArgs) {
 		queryFn: () => fetchTunnelStatus(args),
 		refetchInterval: 3000,
 		refetchOnMount: 'always',
+		refetchOnWindowFocus: 'always',
 		enabled: isProjectShareReady(args),
 	});
 
 	useEffect(() => {
 		if (query.data) {
-			patchScope(args.scope, {
+			patchSlot(slot, {
 				status: normalizeTunnelStatus(query.data),
 				url: query.data.url,
 				error: query.data.error,
-				mode: query.data.mode,
 				hostname: query.data.hostname,
 			});
 			setOttorouterConnected(query.data.ottorouterConnected);
 		}
-	}, [query.data, patchScope, setOttorouterConnected, args.scope]);
+	}, [query.data, patchSlot, setOttorouterConnected, slot]);
 
 	return query;
 }
 
 export function useStartTunnel(args: TunnelScopeArgs) {
+	const slot = tunnelSlotKey(args.scope, args.mode);
 	const queryClient = useQueryClient();
-	const patchScope = useTunnelStore((s) => s.patchScope);
+	const patchSlot = useTunnelStore((s) => s.patchSlot);
 
 	return useMutation<TunnelStartResponse, Error, void>({
 		mutationFn: () => startTunnel(args),
 		onMutate: () => {
-			patchScope(args.scope, {
+			patchSlot(slot, {
 				status: 'starting',
 				progress: 'Connecting...',
 				error: null,
@@ -184,25 +198,25 @@ export function useStartTunnel(args: TunnelScopeArgs) {
 		onSuccess: (data) => {
 			if (data.ok) {
 				if (data.url) {
-					patchScope(args.scope, {
+					patchSlot(slot, {
 						status: 'connected',
 						url: data.url,
 						progress: null,
 					});
 				} else {
-					patchScope(args.scope, { progress: null });
+					patchSlot(slot, { progress: null });
 				}
 			} else {
-				patchScope(args.scope, {
+				patchSlot(slot, {
 					status: 'error',
-					error: data.error || 'Failed to start tunnel',
+					error: describeTunnelActionError(data),
 					progress: null,
 				});
 			}
 			queryClient.invalidateQueries({ queryKey: ['tunnel'] });
 		},
 		onError: (error) => {
-			patchScope(args.scope, {
+			patchSlot(slot, {
 				status: 'error',
 				error: error.message,
 				progress: null,
@@ -212,22 +226,22 @@ export function useStartTunnel(args: TunnelScopeArgs) {
 }
 
 export function useStopTunnel(args: TunnelScopeArgs) {
+	const slot = tunnelSlotKey(args.scope, args.mode);
 	const queryClient = useQueryClient();
-	const resetScope = useTunnelStore((s) => s.resetScope);
+	const resetSlot = useTunnelStore((s) => s.resetSlot);
 
 	return useMutation({
 		mutationFn: () => stopTunnel(args),
 		onSuccess: () => {
-			resetScope(args.scope);
+			resetSlot(slot);
 			queryClient.invalidateQueries({ queryKey: ['tunnel'] });
 		},
 	});
 }
 
 export function useTunnelQr(args: TunnelScopeArgs) {
-	const url = useTunnelStore((s) =>
-		args.scope === 'project-share' ? s.projectShare.url : s.remoteControl.url,
-	);
+	const slot = tunnelSlotKey(args.scope, args.mode);
+	const url = useTunnelStore((s) => s[slot].url);
 
 	return useQuery<TunnelQrResponse>({
 		queryKey: [
@@ -243,8 +257,13 @@ export function useTunnelQr(args: TunnelScopeArgs) {
 	});
 }
 
+/**
+ * Subscribes to the daemon SSE tunnel stream for one (scope, mode) pair and
+ * mirrors events into that pair's store slot while the sidebar is expanded.
+ */
 export function useTunnelStream(args: TunnelScopeArgs) {
-	const patchScope = useTunnelStore((s) => s.patchScope);
+	const slot = tunnelSlotKey(args.scope, args.mode);
+	const patchSlot = useTunnelStore((s) => s.patchSlot);
 	const isExpanded = useTunnelStore((s) => s.isExpanded);
 	const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -275,12 +294,11 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 			try {
 				const data = JSON.parse(event.data);
 				if (data.type === 'status') {
-					patchScope(args.scope, {
+					patchSlot(slot, {
 						status: normalizeTunnelStatus(data),
 						url: data.url,
 						error: data.error,
 						progress: data.progress,
-						...(data.mode ? { mode: data.mode } : {}),
 						...(typeof data.hostname !== 'undefined'
 							? { hostname: data.hostname }
 							: {}),
@@ -300,7 +318,7 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 			es.close();
 			eventSourceRef.current = null;
 		};
-	}, [patchScope, args.scope, args.mode, projectId]);
+	}, [patchSlot, slot, args.scope, args.mode, projectId]);
 
 	useEffect(() => {
 		if (isExpanded && ready) {

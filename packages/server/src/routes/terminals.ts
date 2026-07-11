@@ -12,6 +12,7 @@ import {
 	resizeTerminal,
 	sendTerminalInput,
 } from './terminals/service.ts';
+import { createTerminalWebSocketTicket } from './terminals/ws-ticket.ts';
 
 const terminalSchema = z.object({
 	id: z.string(),
@@ -55,11 +56,45 @@ const terminalResizeBodySchema = z.object({
 	rows: z.number().int().min(1),
 });
 
+const terminalTicketResponseSchema = z.object({
+	ticket: z.string(),
+	expiresIn: z.number(),
+});
+
 const successResponseSchema = z.object({
 	success: z.boolean(),
 });
 
 export function registerTerminalsRoutes(app: Hono) {
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/terminals/{id}/ws-ticket',
+			operationId: 'createTerminalWebSocketTicket',
+			summary: 'Create a one-time terminal WebSocket ticket',
+			request: { params: terminalIdParamsSchema },
+			responses: {
+				'200': {
+					description: 'One-time WebSocket ticket',
+					content: {
+						'application/json': { schema: terminalTicketResponseSchema },
+					},
+				},
+			},
+		},
+		(c) => {
+			const shareToken = c.req.header('X-Otto-Share-Token');
+			return c.json(
+				createTerminalWebSocketTicket({
+					terminalId: c.req.param('id'),
+					projectId: c.req.header('X-Otto-Project-Id'),
+					shareToken,
+				}),
+			);
+		},
+	);
+
 	zodOpenApiRoute(
 		app,
 		{

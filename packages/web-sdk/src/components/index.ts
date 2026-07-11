@@ -9,6 +9,7 @@ export * from './ui/ToolApprovalDialog';
 export * from './ui/ResizeHandle';
 export * from './ui/SidebarHeader';
 export * from './ui/StableSpinner';
+export * from './AuthenticatedImage';
 
 // Chat Components
 export * from './chat/ChatInput';

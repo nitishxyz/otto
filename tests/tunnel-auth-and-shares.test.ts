@@ -11,6 +11,7 @@ import {
 import {
 	clearTunnelShares,
 	createTunnelShare,
+	revokeTunnelShare,
 } from '../packages/server/src/routes/tunnel/shares.ts';
 import {
 	DAEMON_TOKEN_COOKIE,
@@ -39,6 +40,9 @@ function createAuthTestApp() {
 		}),
 	);
 	app.get('/assets/app.js', (c) => c.text('static asset'));
+	app.get('/v1/attachments/:id', (c) =>
+		c.json({ projectId: c.req.header('x-otto-project-id') ?? null }),
+	);
 	return app;
 }
 
@@ -62,6 +66,17 @@ describe('tunnel auth middleware', () => {
 			'http://localhost/v1/data',
 		);
 		expect(response.status).toBe(200);
+	});
+
+	it('requires tunnel auth for attachment bytes', async () => {
+		await useTempOttoHome();
+		const app = new OpenAPIHono();
+		app.use('*', tunnelAuthMiddleware);
+		app.get('/v1/attachments/:id', (c) => c.body('image'));
+		const denied = await app.request(
+			'https://device.example/v1/attachments/att_1',
+		);
+		expect(denied.status).toBe(401);
 	});
 
 	it('rejects unauthenticated tunnel APIs while allowing static UI assets', async () => {
@@ -108,6 +123,38 @@ describe('tunnel auth middleware', () => {
 		});
 		expect(headerResponse.status).toBe(200);
 		expect(cookieResponse.status).toBe(200);
+	});
+
+	it('allows attachment bytes only for valid owner/share credentials and pins shares', async () => {
+		const root = await useTempOttoHome();
+		const ownerToken = await ensureDaemonToken(join(root, 'server-token'));
+		const share = createTunnelShare('project-pinned', 'https://device.example');
+		const app = createAuthTestApp();
+
+		const owner = await app.request(
+			'https://device.example/v1/attachments/att_1',
+			{ headers: { Authorization: `Bearer ${ownerToken}` } },
+		);
+		expect(owner.status).toBe(200);
+
+		const shared = await app.request(
+			'https://device.example/v1/attachments/att_1?projectId=attacker',
+			{ headers: { 'X-Otto-Share-Token': share.token } },
+		);
+		expect(shared.status).toBe(200);
+		expect(await shared.json()).toEqual({ projectId: 'project-pinned' });
+
+		const wrong = await app.request(
+			'https://device.example/v1/attachments/att_1',
+			{ headers: { 'X-Otto-Share-Token': 'wrong' } },
+		);
+		expect(wrong.status).toBe(401);
+		revokeTunnelShare(share.id);
+		const revoked = await app.request(
+			'https://device.example/v1/attachments/att_1',
+			{ headers: { 'X-Otto-Share-Token': share.token } },
+		);
+		expect(revoked.status).toBe(401);
 	});
 
 	it('pins share requests and blocks daemon-global routes', async () => {

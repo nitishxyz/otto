@@ -261,6 +261,7 @@ describe('owner authorization routes and middleware', () => {
 		app.use('*', tunnelAuthMiddleware);
 		registerTunnelRoutes(app);
 		app.get('/v1/owner-only', (c) => c.json({ ok: true }));
+		app.get('/v1/attachments/att-owner', (c) => c.body('image'));
 
 		const challengeResponse = await app.request(
 			'https://device.ottorouter.org/v1/tunnel/owner/challenge',
@@ -306,6 +307,16 @@ describe('owner authorization routes and middleware', () => {
 			{ headers: { 'X-Otto-Owner-Session': sessionBody.access_token } },
 		);
 		expect(headerAuthorized.status).toBe(200);
+		const ownerHeaderAttachment = await app.request(
+			'https://device.ottorouter.org/v1/attachments/att-owner',
+			{ headers: { 'X-Otto-Owner-Session': sessionBody.access_token } },
+		);
+		expect(ownerHeaderAttachment.status).toBe(200);
+		const ownerCookieAttachment = await app.request(
+			'https://device.ottorouter.org/v1/attachments/att-owner',
+			{ headers: { Cookie: cookie.split(';')[0] ?? '' } },
+		);
+		expect(ownerCookieAttachment.status).toBe(200);
 		const bearerAuthorized = await app.request(
 			'https://device.ottorouter.org/v1/owner-only',
 			{ headers: { Authorization: `Bearer ${sessionBody.access_token}` } },

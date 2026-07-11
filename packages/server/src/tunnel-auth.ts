@@ -8,6 +8,7 @@ import {
 	OWNER_SESSION_HEADER,
 } from './routes/tunnel/owner-auth.ts';
 import { getShareByToken } from './routes/tunnel/shares.ts';
+import { consumeTerminalWebSocketTicket } from './routes/terminals/ws-ticket.ts';
 
 export const DAEMON_TOKEN_COOKIE = 'otto_server_token';
 export const SHARE_TOKEN_HEADER = 'x-otto-share-token';
@@ -121,6 +122,22 @@ export const tunnelAuthMiddleware: MiddlewareHandler = async (c, next) => {
 	}
 
 	const pathname = new URL(c.req.url).pathname;
+	const terminalWsMatch = pathname.match(/^\/v1\/terminals\/([^/]+)\/ws$/);
+	if (c.req.method === 'GET' && terminalWsMatch) {
+		const ticketToken = c.req.query('ticket');
+		const terminalId = decodeURIComponent(terminalWsMatch[1] ?? '');
+		const ticket = ticketToken
+			? consumeTerminalWebSocketTicket(ticketToken, terminalId)
+			: undefined;
+		if (!ticket) return c.json({ error: 'Unauthorized' }, 401);
+		if (ticket.projectId) {
+			c.req.raw.headers.set('x-otto-project-id', ticket.projectId);
+			c.req.raw.headers.set(PINNED_PROJECT_HEADER, ticket.projectId);
+			c.req.raw.headers.delete('x-otto-project');
+		}
+		await next();
+		return;
+	}
 	if (c.req.method === 'GET' && pathname === '/v1/tunnel/ping') {
 		await next();
 		return;

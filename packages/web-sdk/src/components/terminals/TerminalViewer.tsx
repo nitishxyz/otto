@@ -9,7 +9,7 @@ import {
 } from 'ghostty-web';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
 import { openUrl } from '../../lib/open-url';
-import { getProjectQuery } from '../../lib/api-client/utils';
+import { getAuthHeaders, getProjectQuery } from '../../lib/api-client/utils';
 import { client } from '@ottocode/api';
 import { StableSpinner } from '../ui/StableSpinner';
 
@@ -99,8 +99,43 @@ function resolveApiBaseUrl(): string {
 	return getRuntimeApiBaseUrl();
 }
 
-function httpToWs(url: string): string {
-	return url.replace(/^http/, 'ws');
+export function terminalWebSocketUrl(
+	baseUrl: string,
+	terminalId: string,
+	ticket: string,
+): string {
+	const url = new URL(
+		`/v1/terminals/${encodeURIComponent(terminalId)}/ws`,
+		baseUrl,
+	);
+	url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+	url.searchParams.set('ticket', ticket);
+	return url.toString();
+}
+
+async function requestTerminalWebSocketTicket(
+	baseUrl: string,
+	terminalId: string,
+): Promise<string> {
+	const url = new URL(
+		`/v1/terminals/${encodeURIComponent(terminalId)}/ws-ticket`,
+		baseUrl,
+	);
+	const params = new URLSearchParams(getProjectQuery());
+	url.search = params.toString();
+	const response = await fetch(url, {
+		method: 'POST',
+		headers: getAuthHeaders(),
+		credentials: 'include',
+		cache: 'no-store',
+	});
+	if (!response.ok)
+		throw new Error(`Terminal authorization failed (${response.status})`);
+	const body = (await response.json()) as { ticket?: unknown };
+	if (typeof body.ticket !== 'string' || !body.ticket) {
+		throw new Error('Terminal authorization returned an invalid ticket');
+	}
+	return body.ticket;
 }
 
 function shouldOpenTerminalLink(event: MouseEvent): boolean {
@@ -181,16 +216,21 @@ export const TerminalViewer = memo(function TerminalViewer({
 	}, []);
 
 	const connectWebSocket = useCallback(
-		(term: Terminal, baseUrl: string) => {
+		async (term: Terminal, baseUrl: string) => {
 			if (wsRef.current) {
 				wsRef.current.close();
 				wsRef.current = null;
 			}
 
-			const wsBaseUrl = httpToWs(baseUrl);
-			const params = new URLSearchParams(getProjectQuery());
-			const query = params.toString();
-			const wsUrl = `${wsBaseUrl}/v1/terminals/${terminalId}/ws${query ? `?${query}` : ''}`;
+			let ticket: string;
+			try {
+				ticket = await requestTerminalWebSocketTicket(baseUrl, terminalId);
+			} catch {
+				setReady(false);
+				return;
+			}
+			if (disposedRef.current) return;
+			const wsUrl = terminalWebSocketUrl(baseUrl, terminalId, ticket);
 			const ws = new WebSocket(wsUrl);
 			wsRef.current = ws;
 

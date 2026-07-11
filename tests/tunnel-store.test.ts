@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { useTunnelStore } from '../packages/web-sdk/src/stores/tunnelStore';
+import {
+	tunnelSlotKey,
+	useTunnelStore,
+} from '../packages/web-sdk/src/stores/tunnelStore';
 
-function idleScope() {
+function idleSlot() {
 	return {
 		status: 'idle' as const,
 		url: null,
 		error: null,
 		progress: null,
-		mode: 'quick' as const,
 		hostname: null,
 	};
 }
@@ -15,8 +17,9 @@ function idleScope() {
 function resetStore() {
 	useTunnelStore.setState({
 		isExpanded: false,
-		remoteControl: idleScope(),
-		projectShare: idleScope(),
+		remoteManaged: idleSlot(),
+		remoteQuick: idleSlot(),
+		projectShare: idleSlot(),
 		ottorouterConnected: false,
 	});
 }
@@ -25,82 +28,95 @@ afterEach(() => {
 	resetStore();
 });
 
-describe('tunnelStore scope isolation', () => {
-	test('patchScope updates only the targeted scope', () => {
-		const { patchScope } = useTunnelStore.getState();
-		patchScope('remote-control', {
+describe('tunnelSlotKey', () => {
+	test('maps scope + mode onto dedicated slots', () => {
+		expect(tunnelSlotKey('remote-control', 'managed')).toBe('remoteManaged');
+		expect(tunnelSlotKey('remote-control', 'quick')).toBe('remoteQuick');
+		expect(tunnelSlotKey('remote-control')).toBe('remoteQuick');
+		expect(tunnelSlotKey('project-share', 'quick')).toBe('projectShare');
+		expect(tunnelSlotKey('project-share', 'managed')).toBe('projectShare');
+	});
+});
+
+describe('tunnelStore slot isolation', () => {
+	test('patchSlot updates only the targeted slot', () => {
+		const { patchSlot } = useTunnelStore.getState();
+		patchSlot('remoteManaged', {
 			status: 'connected',
 			url: 'https://remote.example.com',
+			hostname: 'remote.example.com',
 		});
 
 		const state = useTunnelStore.getState();
-		expect(state.remoteControl.status).toBe('connected');
-		expect(state.remoteControl.url).toBe('https://remote.example.com');
+		expect(state.remoteManaged.status).toBe('connected');
+		expect(state.remoteManaged.url).toBe('https://remote.example.com');
+		expect(state.remoteQuick.status).toBe('idle');
 		expect(state.projectShare.status).toBe('idle');
-		expect(state.projectShare.url).toBeNull();
 	});
 
-	test('project-share scope is independent of remote-control', () => {
-		const { patchScope } = useTunnelStore.getState();
-		patchScope('remote-control', { status: 'connected' });
-		patchScope('project-share', {
+	test('quick remote-control status can never clobber live managed state', () => {
+		// Regression: a mode=quick status poll used to overwrite the shared
+		// remote-control scope, flipping a live managed tunnel back to "Off".
+		const { patchSlot } = useTunnelStore.getState();
+		patchSlot('remoteManaged', {
+			status: 'connected',
+			url: 'https://abc.ottorouter.org',
+			hostname: 'abc.ottorouter.org',
+		});
+		patchSlot('remoteQuick', { status: 'idle', url: null });
+
+		const state = useTunnelStore.getState();
+		expect(state.remoteManaged.status).toBe('connected');
+		expect(state.remoteManaged.url).toBe('https://abc.ottorouter.org');
+		expect(state.remoteManaged.hostname).toBe('abc.ottorouter.org');
+	});
+
+	test('project-share slot is independent of remote-control slots', () => {
+		const { patchSlot } = useTunnelStore.getState();
+		patchSlot('remoteManaged', { status: 'connected' });
+		patchSlot('projectShare', {
 			status: 'connected',
 			url: 'https://share.example.com',
 		});
 
 		const state = useTunnelStore.getState();
-		expect(state.remoteControl.status).toBe('connected');
+		expect(state.remoteManaged.status).toBe('connected');
 		expect(state.projectShare.status).toBe('connected');
 		expect(state.projectShare.url).toBe('https://share.example.com');
 	});
 
-	test('resetScope clears only the targeted scope', () => {
-		const { patchScope, resetScope } = useTunnelStore.getState();
-		patchScope('remote-control', {
+	test('resetSlot clears only the targeted slot', () => {
+		const { patchSlot, resetSlot } = useTunnelStore.getState();
+		patchSlot('remoteManaged', {
 			status: 'connected',
 			url: 'https://remote.example.com',
+			hostname: 'remote.example.com',
 		});
-		patchScope('project-share', {
+		patchSlot('projectShare', {
 			status: 'connected',
 			url: 'https://share.example.com',
 		});
 
-		resetScope('project-share');
+		resetSlot('projectShare');
 
 		const state = useTunnelStore.getState();
-		expect(state.remoteControl.status).toBe('connected');
-		expect(state.remoteControl.url).toBe('https://remote.example.com');
+		expect(state.remoteManaged.status).toBe('connected');
+		expect(state.remoteManaged.hostname).toBe('remote.example.com');
 		expect(state.projectShare.status).toBe('idle');
 		expect(state.projectShare.url).toBeNull();
 	});
 
-	test('scope setters mutate the matching slice', () => {
-		const { setScopeStatus, setScopeError, setScopeProgress } =
-			useTunnelStore.getState();
-		setScopeStatus('project-share', 'error');
-		setScopeError('project-share', 'boom');
-		setScopeProgress('remote-control', 'Connecting...');
-
-		const state = useTunnelStore.getState();
-		expect(state.projectShare.status).toBe('error');
-		expect(state.projectShare.error).toBe('boom');
-		expect(state.remoteControl.progress).toBe('Connecting...');
-		expect(state.remoteControl.status).toBe('idle');
-	});
-
-	test('patchScope updates mode and hostname independently', () => {
-		const { patchScope } = useTunnelStore.getState();
-		patchScope('remote-control', {
-			mode: 'managed',
-			hostname: 'device.ottorouter.org',
+	test('resetSlot restores defaults including hostname', () => {
+		const { patchSlot, resetSlot } = useTunnelStore.getState();
+		patchSlot('remoteManaged', {
 			status: 'connected',
+			hostname: 'device.ottorouter.org',
 		});
+		resetSlot('remoteManaged');
 
 		const state = useTunnelStore.getState();
-		expect(state.remoteControl.mode).toBe('managed');
-		expect(state.remoteControl.hostname).toBe('device.ottorouter.org');
-		expect(state.projectShare.mode).toBe('quick');
-		expect(state.projectShare.hostname).toBeNull();
+		expect(state.remoteManaged.status).toBe('idle');
+		expect(state.remoteManaged.hostname).toBeNull();
 	});
 
 	test('setOttorouterConnected toggles the shared flag', () => {
@@ -108,20 +124,5 @@ describe('tunnelStore scope isolation', () => {
 		expect(useTunnelStore.getState().ottorouterConnected).toBe(false);
 		setOttorouterConnected(true);
 		expect(useTunnelStore.getState().ottorouterConnected).toBe(true);
-	});
-
-	test('resetScope restores default mode and hostname', () => {
-		const { patchScope, resetScope } = useTunnelStore.getState();
-		patchScope('remote-control', {
-			mode: 'managed',
-			hostname: 'device.ottorouter.org',
-			status: 'connected',
-		});
-		resetScope('remote-control');
-
-		const state = useTunnelStore.getState();
-		expect(state.remoteControl.mode).toBe('quick');
-		expect(state.remoteControl.hostname).toBeNull();
-		expect(state.remoteControl.status).toBe('idle');
 	});
 });

@@ -11,6 +11,10 @@ import { loadAuthorizedMachineProjects } from './lib/machine-api';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
 import { router } from './router';
 import { useNativeDesktopTheme } from './theme';
+import {
+	ownerRenewalDelay,
+	setOwnerRenewalHandler,
+} from '@ottocode/web-sdk/lib';
 import './index.css';
 
 function App() {
@@ -94,37 +98,61 @@ function App() {
 
 	useEffect(() => {
 		if (!machine || !selectedProject?.projectId) return;
-		const renewOnFocus = async () => {
-			try {
-				const access = await loadAuthorizedMachineProjects(machine);
-				if (access.status !== 'ready') return;
-				const project = access.projects.find(
-					(candidate) => candidate.id === selectedProject.projectId,
-				);
-				if (!project) return;
-				configureMachineSdk(
-					access.apiUrl,
-					project.id,
-					project.path,
-					access.ownerSession,
-					access.ownerSessionExpiresAt,
-				);
-				setSelectedProject((current) =>
-					current
-						? {
-								...current,
-								machineOwnerSession: access.ownerSession,
-								machineOwnerSessionExpiresAt: access.ownerSessionExpiresAt,
-							}
-						: current,
-				);
-			} catch {
-				// Existing session remains usable; projects retry surfaces renewal errors.
-			}
+		let timer: number | undefined;
+		const renew = async () => {
+			const access = await loadAuthorizedMachineProjects(machine);
+			if (access.status !== 'ready') throw new Error(access.message);
+			const project = access.projects.find(
+				(candidate) => candidate.id === selectedProject.projectId,
+			);
+			if (!project) throw new Error('Remote project is no longer available.');
+			configureMachineSdk(
+				access.apiUrl,
+				project.id,
+				project.path,
+				access.ownerSession,
+				access.ownerSessionExpiresAt,
+			);
+			setSelectedProject((current) =>
+				current
+					? {
+							...current,
+							machineOwnerSession: access.ownerSession,
+							machineOwnerSessionExpiresAt: access.ownerSessionExpiresAt,
+						}
+					: current,
+			);
+			timer = window.setTimeout(
+				() => void renew(),
+				ownerRenewalDelay(access.ownerSessionExpiresAt),
+			);
+			return {
+				token: access.ownerSession,
+				expiresAt: access.ownerSessionExpiresAt,
+			};
+		};
+		setOwnerRenewalHandler(renew);
+		const expiresAt = selectedProject.machineOwnerSessionExpiresAt;
+		if (expiresAt) {
+			timer = window.setTimeout(
+				() => void renew(),
+				ownerRenewalDelay(expiresAt),
+			);
+		}
+		const renewOnFocus = () => {
+			if (expiresAt && ownerRenewalDelay(expiresAt) === 0) void renew();
 		};
 		window.addEventListener('focus', renewOnFocus);
-		return () => window.removeEventListener('focus', renewOnFocus);
-	}, [machine, selectedProject?.projectId]);
+		return () => {
+			window.removeEventListener('focus', renewOnFocus);
+			if (timer !== undefined) window.clearTimeout(timer);
+			setOwnerRenewalHandler(null);
+		};
+	}, [
+		machine,
+		selectedProject?.projectId,
+		selectedProject?.machineOwnerSessionExpiresAt,
+	]);
 
 	const handleSelectProject = (project: Project) => {
 		const updatedProject = {

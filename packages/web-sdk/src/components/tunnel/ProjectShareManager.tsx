@@ -10,7 +10,6 @@ import {
 
 interface ProjectShareManagerProps {
 	projectId: string | null;
-	projectName: string | null;
 	/** Whether the managed remote tunnel is connected and can mint shares. */
 	ready: boolean;
 }
@@ -21,7 +20,6 @@ interface ProjectShareManagerProps {
  */
 export const ProjectShareManager = memo(function ProjectShareManager({
 	projectId,
-	projectName,
 	ready,
 }: ProjectShareManagerProps) {
 	const { data: shares, isLoading } = useTunnelShares(ready);
@@ -35,8 +33,8 @@ export const ProjectShareManager = memo(function ProjectShareManager({
 	if (!ready) {
 		return (
 			<p className="text-xs text-muted-foreground/70 leading-relaxed">
-				Managed project shares need a connected managed tunnel. Turn on remote
-				access first.
+				Managed share links need Remote Control to be on. Turn it on above to
+				create stable, revocable links.
 			</p>
 		);
 	}
@@ -50,17 +48,18 @@ export const ProjectShareManager = memo(function ProjectShareManager({
 	}
 
 	return (
-		<div className="flex flex-col gap-3">
+		<div className="flex flex-col gap-1">
 			<button
 				type="button"
 				onClick={() => createShare.mutate(projectId)}
 				disabled={createShare.isPending}
-				className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+				className="w-full flex items-center gap-2 rounded px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+				title="Create a share link scoped to this project"
 			>
 				{createShare.isPending ? (
 					<StableSpinner size="sm" title="Creating share" />
 				) : (
-					<Plus className="w-3.5 h-3.5" />
+					<Plus className="w-3 h-3" />
 				)}
 				Create share link
 			</button>
@@ -74,14 +73,8 @@ export const ProjectShareManager = memo(function ProjectShareManager({
 					<StableSpinner size="sm" title="Loading shares" />
 					<span className="text-xs text-muted-foreground">Loading shares…</span>
 				</div>
-			) : projectShares.length === 0 ? (
-				<p className="text-xs text-muted-foreground/70 leading-relaxed">
-					No active shares for
-					{projectName ? ` "${projectName}"` : ' this project'}. Each link
-					grants access to only this project.
-				</p>
-			) : (
-				<ul className="flex flex-col gap-2">
+			) : projectShares.length > 0 ? (
+				<ul className="flex flex-col gap-0.5">
 					{projectShares.map((share) => (
 						<ShareRow
 							key={share.id}
@@ -93,7 +86,7 @@ export const ProjectShareManager = memo(function ProjectShareManager({
 						/>
 					))}
 				</ul>
-			)}
+			) : null}
 		</div>
 	);
 });
@@ -122,7 +115,7 @@ const ShareRow = memo(function ShareRow({
 	};
 
 	return (
-		<li className="flex items-center gap-2 rounded-md border border-border px-2.5 py-2">
+		<li className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted/50 transition-colors">
 			<Link2 className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
 			<span className="flex-1 truncate font-mono text-xs text-foreground">
 				{shareLabel(share.url)}
