@@ -28,7 +28,7 @@ export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
 		'Full coding agent: edits files, runs commands, builds, tests, and delegates.',
 	plan: 'Read-only planner: explores the codebase and produces plans, no edits.',
 	general:
-		'General-purpose assistant for questions and light repo exploration.',
+		'General-purpose assistant for broad questions, including topics unrelated to the current project.',
 	init: 'Sets up AGENTS.md and project conventions for a repository.',
 	research:
 		'Searches session history and past conversations to answer questions.',

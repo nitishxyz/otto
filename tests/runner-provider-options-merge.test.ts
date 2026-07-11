@@ -147,23 +147,15 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		]);
 	});
 
-	test('keeps all editing tools for OpenAI-family general models', () => {
+	test('does not add editing tools for OpenAI-family general models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'general',
-			editPolicyTools,
+			['read', 'shell'],
 			'openrouter',
 			'openai/gpt-4.1',
 		);
 
-		expect(result).toEqual([
-			'read',
-			'shell',
-			'apply_patch',
-			'write',
-			'edit',
-			'multiedit',
-			'copy_into',
-		]);
+		expect(result).toEqual(['read', 'shell']);
 	});
 
 	test('keeps apply_patch for non-Anthropic/OpenAI init models', () => {
@@ -224,23 +216,15 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		]);
 	});
 
-	test('uses structured edit tools for OpenAI mini models', () => {
+	test('does not add structured edit tools for OpenAI mini general models', () => {
 		const result = applyModelFamilyEditToolPolicy(
 			'general',
-			editPolicyTools,
+			['read', 'shell'],
 			'openai',
 			'gpt-5-mini',
 		);
 
-		expect(result).toEqual([
-			'read',
-			'shell',
-			'apply_patch',
-			'write',
-			'edit',
-			'multiedit',
-			'copy_into',
-		]);
+		expect(result).toEqual(['read', 'shell']);
 	});
 
 	test('uses structured edit tools for catalog low-cost models', () => {
