@@ -88,7 +88,10 @@ export function registerTerminalsRoutes(app: Hono) {
 			return c.json(
 				createTerminalWebSocketTicket({
 					terminalId: c.req.param('id'),
-					projectId: c.req.header('X-Otto-Project-Id'),
+					projectId:
+						c.req.header('X-Otto-Share-Project-Id') ??
+						c.req.header('X-Otto-Project-Id') ??
+						c.req.query('projectId'),
 					shareToken,
 				}),
 			);

@@ -116,15 +116,20 @@ function isApiPath(pathname: string): boolean {
 
 /** Authenticates tunneled API requests and pins project-scoped shares. */
 export const tunnelAuthMiddleware: MiddlewareHandler = async (c, next) => {
-	if (c.req.method === 'OPTIONS' || !isTunnelRequest(c)) {
+	if (c.req.method === 'OPTIONS') {
 		await next();
 		return;
 	}
 
 	const pathname = new URL(c.req.url).pathname;
+	const tunneled = isTunnelRequest(c);
 	const terminalWsMatch = pathname.match(/^\/v1\/terminals\/([^/]+)\/ws$/);
 	if (c.req.method === 'GET' && terminalWsMatch) {
 		const ticketToken = c.req.query('ticket');
+		if (!tunneled && !ticketToken) {
+			await next();
+			return;
+		}
 		const terminalId = decodeURIComponent(terminalWsMatch[1] ?? '');
 		const ticket = ticketToken
 			? consumeTerminalWebSocketTicket(ticketToken, terminalId)
@@ -135,6 +140,10 @@ export const tunnelAuthMiddleware: MiddlewareHandler = async (c, next) => {
 			c.req.raw.headers.set(PINNED_PROJECT_HEADER, ticket.projectId);
 			c.req.raw.headers.delete('x-otto-project');
 		}
+		await next();
+		return;
+	}
+	if (!tunneled) {
 		await next();
 		return;
 	}

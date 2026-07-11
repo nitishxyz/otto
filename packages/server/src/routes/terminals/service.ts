@@ -74,7 +74,10 @@ export async function getTerminal(c: Context) {
 }
 
 export function createTerminalWebSocketHandler(c: Context) {
-	const terminalManagerPromise = getRequestTerminalManager(c);
+	const terminalManagerPromise = getRequestTerminalManager(c).catch((error) => {
+		logger.error('Terminal WebSocket project resolution failed', error);
+		return null;
+	});
 	const id = c.req.param('id');
 	let onData: ((data: string) => void) | null = null;
 	let onExit: ((exitCode: number) => void) | null = null;
@@ -88,15 +91,23 @@ export function createTerminalWebSocketHandler(c: Context) {
 			},
 		) {
 			const terminalManager = await terminalManagerPromise;
+			if (!terminalManager) {
+				ws.close(1011, 'Terminal project unavailable');
+				return;
+			}
 			const terminal = terminalManager.get(id);
 			if (!terminal) {
 				ws.close(4004, 'Terminal not found');
 				return;
 			}
 
-			const history = terminal.read();
-			for (const chunk of history) {
-				ws.send(chunk);
+			try {
+				const history = terminal.read();
+				for (const chunk of history) ws.send(chunk);
+			} catch (error) {
+				logger.error('Terminal WebSocket history failed', error, { id });
+				ws.close(1011, 'Terminal unavailable');
+				return;
 			}
 
 			onData = (data: string) => {
@@ -116,8 +127,14 @@ export function createTerminalWebSocketHandler(c: Context) {
 				}
 			};
 
-			terminal.onData(onData);
-			terminal.onExit(onExit);
+			try {
+				terminal.onData(onData);
+				terminal.onExit(onExit);
+			} catch (error) {
+				logger.error('Terminal WebSocket listener setup failed', error, { id });
+				ws.close(1011, 'Terminal unavailable');
+				return;
+			}
 
 			if (terminal.status === 'exited') {
 				onExit(terminal.exitCode ?? 0);
@@ -125,6 +142,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 		},
 		async onMessage(event: { data: unknown }, _ws: unknown) {
 			const terminalManager = await terminalManagerPromise;
+			if (!terminalManager) return;
 			const terminal = terminalManager.get(id);
 			if (!terminal) return;
 
@@ -140,7 +158,11 @@ export function createTerminalWebSocketHandler(c: Context) {
 				try {
 					const msg = JSON.parse(message);
 					if (msg.type === 'resize' && msg.cols > 0 && msg.rows > 0) {
-						terminal.resize(msg.cols, msg.rows);
+						try {
+							terminal.resize(msg.cols, msg.rows);
+						} catch (error) {
+							logger.error('Terminal WebSocket resize failed', error, { id });
+						}
 						return;
 					}
 				} catch {
@@ -148,10 +170,15 @@ export function createTerminalWebSocketHandler(c: Context) {
 				}
 			}
 
-			terminal.write(message);
+			try {
+				terminal.write(message);
+			} catch (error) {
+				logger.error('Terminal WebSocket input failed', error, { id });
+			}
 		},
 		async onClose() {
 			const terminalManager = await terminalManagerPromise;
+			if (!terminalManager) return;
 			const terminal = terminalManager.get(id);
 			if (terminal) {
 				if (onData) terminal.removeDataListener(onData);
@@ -162,6 +189,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 		},
 		async onError() {
 			const terminalManager = await terminalManagerPromise;
+			if (!terminalManager) return;
 			const terminal = terminalManager.get(id);
 			if (terminal) {
 				if (onData) terminal.removeDataListener(onData);
