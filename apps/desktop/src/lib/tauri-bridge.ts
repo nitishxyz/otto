@@ -99,6 +99,16 @@ export interface MachineProject {
 	lastUsedAt: number;
 }
 
+export interface MachineServerInfo {
+	version: string | null;
+	protocol?: {
+		version: number;
+		minVersion: number;
+		maxVersion: number;
+		capabilities: string[];
+	};
+}
+
 export type MachineProjectAccess =
 	| {
 			status: 'ready';
@@ -106,6 +116,7 @@ export type MachineProjectAccess =
 			ownerSession: string;
 			ownerSessionExpiresAt: number;
 			projects: MachineProject[];
+			serverInfo?: MachineServerInfo | null;
 	  }
 	| { status: 'offline'; message: string }
 	| { status: 'unavailable'; message: string };

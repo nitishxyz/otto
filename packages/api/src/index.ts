@@ -52,6 +52,21 @@ export type {
 export { isApiError, handleApiError } from './utils';
 export type { ApiError } from './utils';
 
+export {
+	clientIdentityHeaders,
+	evaluateCompatibility,
+	OTTO_CLIENT_CAPABILITIES,
+	OTTO_PROTOCOL_MAX_VERSION,
+	OTTO_PROTOCOL_MIN_VERSION,
+	OTTO_PROTOCOL_VERSION,
+} from './compatibility';
+export type {
+	ClientIdentity,
+	CompatibilityResult,
+	CompatibilityStatus,
+	ProtocolDescriptor,
+} from './compatibility';
+
 /**
  * Quick Start Example:
  *

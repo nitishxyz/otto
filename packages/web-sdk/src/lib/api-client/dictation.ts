@@ -99,6 +99,17 @@ function buildInstallEventsUrl(model: string): string {
 	return `${baseUrl}/v1/dictation/models/${encodeURIComponent(model)}/install/events`;
 }
 
+/** Resolves a dictation socket through the API origin selected by the client. */
+export function resolveDictationWebSocketUrl(
+	wsUrl: string,
+	apiBaseUrl = getBaseUrl(),
+): string {
+	const sessionUrl = new URL(wsUrl);
+	const url = new URL(`${sessionUrl.pathname}${sessionUrl.search}`, apiBaseUrl);
+	url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+	return url.toString();
+}
+
 export const dictationMixin = {
 	async getDictationStatus(): Promise<DictationStatusResponse> {
 		const response = await apiGetDictationStatus();

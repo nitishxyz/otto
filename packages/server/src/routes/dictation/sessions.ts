@@ -17,6 +17,7 @@ import {
 } from './schemas.ts';
 import { dictationSessions } from './state.ts';
 import { registerDictationWebSocketRoute } from './websocket.ts';
+import { createDictationWebSocketTicket } from './ws-ticket.ts';
 
 export function registerDictationSessionRoutes(app: Hono) {
 	registerCreateDictationSessionRoute(app);
@@ -73,10 +74,18 @@ function registerCreateDictationSessionRoute(app: Hono) {
 				prompt: typeof body.prompt === 'string' ? body.prompt : undefined,
 				projectRoot,
 			});
+			const { ticket } = createDictationWebSocketTicket({
+				sessionId: session.id,
+				projectId:
+					c.req.header('X-Otto-Share-Project-Id') ??
+					c.req.header('X-Otto-Project-Id') ??
+					c.req.query('projectId'),
+				shareToken: c.req.header('X-Otto-Share-Token'),
+			});
 			return c.json(
 				{
 					id: session.id,
-					wsUrl: sessionResponse(session.id, c),
+					wsUrl: sessionResponse(session.id, ticket, c),
 					model: session.model,
 					modelInstalled,
 					format: session.format,

@@ -53,4 +53,25 @@ describe('server root auth', () => {
 			expect(authorized.status).toBe(200);
 		});
 	});
+
+	it('rejects remote upgrade without an owner session', async () => {
+		await withDaemonAuthEnv(async () => {
+			const app = new OpenAPIHono();
+			registerRootRoutes(app);
+
+			const response = await app.request('/v1/server/upgrade', {
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer daemon-token-is-not-owner-authorization',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ targetVersion: '999.0.0' }),
+			});
+
+			expect(response.status).toBe(403);
+			expect(await response.json()).toEqual({
+				error: 'Owner authorization required',
+			});
+		});
+	});
 });

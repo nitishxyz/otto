@@ -8,6 +8,7 @@ import {
 	OWNER_SESSION_HEADER,
 } from './routes/tunnel/owner-auth.ts';
 import { getShareByToken } from './routes/tunnel/shares.ts';
+import { consumeDictationWebSocketTicket } from './routes/dictation/ws-ticket.ts';
 import { consumeTerminalWebSocketTicket } from './routes/terminals/ws-ticket.ts';
 
 export const DAEMON_TOKEN_COOKIE = 'otto_server_token';
@@ -123,6 +124,28 @@ export const tunnelAuthMiddleware: MiddlewareHandler = async (c, next) => {
 
 	const pathname = new URL(c.req.url).pathname;
 	const tunneled = isTunnelRequest(c);
+	const dictationWsMatch = pathname.match(
+		/^\/v1\/dictation\/sessions\/([^/]+)\/ws$/,
+	);
+	if (c.req.method === 'GET' && dictationWsMatch) {
+		const ticketToken = c.req.query('ticket');
+		if (!tunneled && !ticketToken) {
+			await next();
+			return;
+		}
+		const sessionId = decodeURIComponent(dictationWsMatch[1] ?? '');
+		const ticket = ticketToken
+			? consumeDictationWebSocketTicket(ticketToken, sessionId)
+			: undefined;
+		if (!ticket) return c.json({ error: 'Unauthorized' }, 401);
+		if (ticket.projectId) {
+			c.req.raw.headers.set('x-otto-project-id', ticket.projectId);
+			c.req.raw.headers.set(PINNED_PROJECT_HEADER, ticket.projectId);
+			c.req.raw.headers.delete('x-otto-project');
+		}
+		await next();
+		return;
+	}
 	const terminalWsMatch = pathname.match(/^\/v1\/terminals\/([^/]+)\/ws$/);
 	if (c.req.method === 'GET' && terminalWsMatch) {
 		const ticketToken = c.req.query('ticket');

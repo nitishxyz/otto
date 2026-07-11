@@ -3,6 +3,7 @@ import {
 	listOttoRouterDevices,
 	pollOttoRouterDeviceFlow,
 	removeProvider,
+	stageServerUpgrade,
 	startOttoRouterDeviceFlow,
 } from '@ottocode/api';
 import type { MachineBootstrap, MachineProjectAccess } from './tauri-bridge';
@@ -39,6 +40,35 @@ export async function loadAuthorizedMachineProjects(
 	});
 	if (response.error) throw new Error('Machine projects unavailable.');
 	return response.data as MachineProjectAccess;
+}
+
+/**
+ * Stages a strictly newer official daemon release on the remote host via the
+ * generated operation, authorized with the machine owner session. The remote
+ * daemon is never replaced or restarted by this call: the host owner must
+ * activate the staged binary by restarting the daemon.
+ */
+export async function stageRemoteHostUpgrade(
+	apiUrl: string,
+	ownerSession: string,
+	targetVersion: string,
+): Promise<{ stagedPath: string }> {
+	const response = await stageServerUpgrade({
+		baseURL: apiUrl,
+		headers: { 'X-Otto-Owner-Session': ownerSession },
+		body: { targetVersion },
+	});
+	if (response.error || !response.data) {
+		const detail =
+			response.error &&
+			typeof response.error === 'object' &&
+			'error' in response.error &&
+			typeof (response.error as { error?: unknown }).error === 'string'
+				? (response.error as { error: string }).error
+				: 'The machine rejected the upgrade request.';
+		throw new Error(detail);
+	}
+	return { stagedPath: response.data.stagedPath };
 }
 
 export async function loadMachineDevices(): Promise<MachineDeviceState> {

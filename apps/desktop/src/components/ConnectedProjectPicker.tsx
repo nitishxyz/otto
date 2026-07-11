@@ -8,16 +8,29 @@ import {
 import { StableSpinner } from '@ottocode/web-sdk/components';
 import { useCallback, useEffect, useState } from 'react';
 import { usePlatform } from '../hooks/usePlatform';
-import { loadAuthorizedMachineProjects } from '../lib/machine-api';
+import {
+	loadAuthorizedMachineProjects,
+	stageRemoteHostUpgrade,
+} from '../lib/machine-api';
 import { toConnectedProject } from '../lib/machine-project';
+import { assessRemoteCompatibility } from '../lib/remote-compatibility';
 import type {
 	MachineBootstrap,
 	MachineProjectAccess,
 	Project,
 } from '../lib/tauri-bridge';
+import { tauriBridge } from '../lib/tauri-bridge';
 import { DesktopDragRegion } from './DesktopDragRegion';
 import { OttoWordmark } from './Icons';
+import {
+	RemoteClientTooOldPanel,
+	RemoteHostTooOldPanel,
+	RemoteLimitedNotice,
+	type RemoteUpgradePhase,
+} from './RemoteCompatibilityPanel';
 import { WindowControls } from './WindowControls';
+
+const STAGED_RECHECK_INTERVAL_MS = 7000;
 
 export function ConnectedProjectPicker({
 	machine,
@@ -29,23 +42,98 @@ export function ConnectedProjectPicker({
 	const [access, setAccess] = useState<MachineProjectAccess | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [clientRelease, setClientRelease] = useState<string | null>(null);
+	const [upgrade, setUpgrade] = useState<RemoteUpgradePhase>({
+		phase: 'idle',
+	});
+	const [rechecking, setRechecking] = useState(false);
 	const platform = usePlatform();
 	const machineName = machine.name || machine.hostname || 'Otto machine';
 
-	const loadProjects = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		try {
-			setAccess(await loadAuthorizedMachineProjects(machine));
-		} catch (cause) {
-			setError(String(cause));
-		} finally {
-			setLoading(false);
-		}
-	}, [machine]);
+	const loadProjects = useCallback(
+		async (options?: { background?: boolean }) => {
+			const background = options?.background === true;
+			if (!background) {
+				setLoading(true);
+				setError(null);
+			}
+			try {
+				setAccess(await loadAuthorizedMachineProjects(machine));
+				if (background) setError(null);
+			} catch (cause) {
+				if (!background) setError(String(cause));
+			} finally {
+				if (!background) setLoading(false);
+			}
+		},
+		[machine],
+	);
 
 	useEffect(() => {
-		loadProjects();
+		void loadProjects();
+	}, [loadProjects]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void tauriBridge
+			.getCliSelection()
+			.then((selection) => {
+				if (!cancelled) setClientRelease(selection.version || null);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const ready = access?.status === 'ready' ? access : null;
+	const gate = ready
+		? assessRemoteCompatibility(ready.serverInfo, machineName, clientRelease)
+		: null;
+
+	// After a staged upgrade, watch for the owner-managed host restart and
+	// re-evaluate compatibility on each reconnect until the gate clears.
+	useEffect(() => {
+		if (upgrade.phase !== 'staged') return;
+		if (gate && gate.kind !== 'host-too-old') {
+			setUpgrade({ phase: 'idle' });
+			return;
+		}
+		const interval = window.setInterval(() => {
+			void loadProjects({ background: true });
+		}, STAGED_RECHECK_INTERVAL_MS);
+		return () => window.clearInterval(interval);
+	}, [upgrade.phase, gate, loadProjects]);
+
+	const stageUpgrade = useCallback(
+		async (targetVersion: string) => {
+			if (!ready) return;
+			setUpgrade({ phase: 'staging', targetVersion });
+			try {
+				await stageRemoteHostUpgrade(
+					ready.apiUrl,
+					ready.ownerSession,
+					targetVersion,
+				);
+				setUpgrade({ phase: 'staged', targetVersion });
+			} catch (cause) {
+				setUpgrade({
+					phase: 'error',
+					targetVersion,
+					message: cause instanceof Error ? cause.message : String(cause),
+				});
+			}
+		},
+		[ready],
+	);
+
+	const recheckCompatibility = useCallback(async () => {
+		setRechecking(true);
+		try {
+			await loadProjects({ background: true });
+		} finally {
+			setRechecking(false);
+		}
 	}, [loadProjects]);
 
 	const selectProject = (
@@ -97,7 +185,7 @@ export function ConnectedProjectPicker({
 						</div>
 						<button
 							type="button"
-							onClick={loadProjects}
+							onClick={() => void loadProjects()}
 							disabled={loading}
 							className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
 						>
@@ -109,6 +197,10 @@ export function ConnectedProjectPicker({
 							Retry
 						</button>
 					</div>
+
+					{!loading && gate?.kind === 'limited' && (
+						<RemoteLimitedNotice reason={gate.reason} />
+					)}
 
 					<div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
 						{loading && (
@@ -152,8 +244,30 @@ export function ConnectedProjectPicker({
 								</p>
 							</div>
 						)}
+						{!loading && gate?.kind === 'host-too-old' && (
+							<RemoteHostTooOldPanel
+								machineName={machineName}
+								hostVersion={gate.hostVersion}
+								upgradeTarget={gate.upgradeTarget}
+								guidance={gate.guidance}
+								upgrade={upgrade}
+								onStageUpgrade={(targetVersion) =>
+									void stageUpgrade(targetVersion)
+								}
+								onRecheck={() => void recheckCompatibility()}
+								rechecking={rechecking}
+							/>
+						)}
+						{!loading && gate?.kind === 'client-too-old' && (
+							<RemoteClientTooOldPanel
+								machineName={machineName}
+								hostVersion={gate.hostVersion}
+							/>
+						)}
 						{!loading &&
 							access?.status === 'ready' &&
+							gate?.kind !== 'host-too-old' &&
+							gate?.kind !== 'client-too-old' &&
 							access.projects.length === 0 && (
 								<div className="px-5 py-12 text-center text-sm text-muted-foreground">
 									No projects are known on this machine.
@@ -161,6 +275,8 @@ export function ConnectedProjectPicker({
 							)}
 						{!loading &&
 							access?.status === 'ready' &&
+							gate?.kind !== 'host-too-old' &&
+							gate?.kind !== 'client-too-old' &&
 							access.projects.map((project, index) => (
 								<button
 									type="button"

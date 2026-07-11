@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/api-client';
+import { resolveDictationWebSocketUrl } from '../lib/api-client/dictation';
 
 const TARGET_SAMPLE_RATE = 16000;
 const PCM_FRAME_BYTES = 3200; // 100ms of 16 kHz mono pcm_s16le
@@ -30,7 +31,7 @@ type DictationServerEvent =
 	  };
 
 interface UseVoiceInputOptions {
-	/** Called when local dictation returns transcript text. */
+	/** Called when daemon dictation returns transcript text. */
 	onTranscript?: (transcript: string, isFinal: boolean) => void;
 	onError?: (message: string) => void;
 	onNeedsInstall?: () => void;
@@ -115,8 +116,8 @@ function appendBuffer(
 }
 
 /**
- * Owns local streaming dictation: getUserMedia + AudioContext for waveform and
- * PCM frame capture, plus a WebSocket session to the local otto server.
+ * Owns streaming dictation: getUserMedia + AudioContext for waveform and PCM
+ * frame capture, plus a WebSocket session to the configured otto daemon.
  *
  * The returned `analyser` is intended to be passed to <LiveWaveform>.
  */
@@ -346,14 +347,14 @@ export function useVoiceInput({
 				return;
 			}
 
-			const socket = new WebSocket(session.wsUrl);
+			const socket = new WebSocket(resolveDictationWebSocketUrl(session.wsUrl));
 			socket.binaryType = 'arraybuffer';
 			socketRef.current = socket;
 			sessionIdRef.current = session.id;
 
 			await new Promise<void>((resolve, reject) => {
 				const timeout = window.setTimeout(() => {
-					reject(new Error('Timed out connecting to local dictation'));
+					reject(new Error('Timed out connecting to dictation server'));
 				}, 5000);
 
 				socket.onopen = () => {
@@ -390,7 +391,7 @@ export function useVoiceInput({
 
 				socket.onerror = () => {
 					window.clearTimeout(timeout);
-					reject(new Error('Could not connect to local dictation'));
+					reject(new Error('Could not connect to dictation server'));
 				};
 			});
 

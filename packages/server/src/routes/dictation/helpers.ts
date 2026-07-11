@@ -17,11 +17,12 @@ export type WebSocketLike = {
 	close: (code?: number, reason?: string) => void;
 };
 
-export function sessionResponse(sessionId: string, c: Context) {
+export function sessionResponse(sessionId: string, ticket: string, c: Context) {
 	const url = new URL(c.req.url);
 	url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 	url.pathname = `/v1/dictation/sessions/${encodeURIComponent(sessionId)}/ws`;
 	url.search = '';
+	url.searchParams.set('ticket', ticket);
 	return url.toString();
 }
 

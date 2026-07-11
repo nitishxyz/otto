@@ -2,6 +2,8 @@ import { z } from '@hono/zod-openapi';
 import { getManagedTunnelDeviceId } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { getProtocolInfo } from '../../protocol.ts';
+import { getServerInfo } from '../../state.ts';
 import { getOttoRouterAuthHeaders, getOttoRouterBaseUrl } from './service.ts';
 
 const tunnelDeviceSchema = z.object({
@@ -26,12 +28,24 @@ const machineProjectSchema = z.object({
 	open: z.boolean(),
 	lastUsedAt: z.number(),
 });
+const remoteServerInfoSchema = z.object({
+	version: z.string().nullable(),
+	protocol: z
+		.object({
+			version: z.number().int(),
+			minVersion: z.number().int(),
+			maxVersion: z.number().int(),
+			capabilities: z.array(z.string()),
+		})
+		.optional(),
+});
 const machineProjectsResponseSchema = z.object({
 	status: z.enum(['ready', 'unavailable']),
 	apiUrl: z.string().optional(),
 	ownerSession: z.string().optional(),
 	ownerSessionExpiresAt: z.number().optional(),
 	projects: z.array(machineProjectSchema).optional(),
+	serverInfo: remoteServerInfoSchema.nullable().optional(),
 	message: z.string().optional(),
 });
 const authorizeResponseSchema = z.object({
@@ -61,6 +75,20 @@ function machineUrl(hostname: string): string {
 	return hostname.startsWith('http://') || hostname.startsWith('https://')
 		? hostname.replace(/\/$/, '')
 		: `https://${hostname.replace(/\/$/, '')}`;
+}
+
+function machineRequestHeaders(ownerSession?: string): Record<string, string> {
+	const protocol = getProtocolInfo();
+	const clientVersion = getServerInfo().version;
+	return {
+		Accept: 'application/json',
+		'X-Otto-Client': 'server-machine-access',
+		...(clientVersion ? { 'X-Otto-Client-Version': clientVersion } : {}),
+		'X-Otto-Protocol-Version': String(protocol.version),
+		'X-Otto-Protocol-Min': String(protocol.minVersion),
+		'X-Otto-Protocol-Max': String(protocol.maxVersion),
+		...(ownerSession ? { 'X-Otto-Owner-Session': ownerSession } : {}),
+	};
 }
 
 async function loadAuthorizedMachineProjects(
@@ -157,10 +185,17 @@ async function loadAuthorizedMachineProjects(
 		};
 		machineSessions.set(deviceId, session);
 	}
-	const projectsResponse = await fetch(`${apiUrl}/v1/projects`, {
-		headers: { 'X-Otto-Owner-Session': session.token },
-		signal: AbortSignal.timeout(5_000),
-	});
+	const headers = machineRequestHeaders(session.token);
+	const [projectsResponse, infoResponse] = await Promise.all([
+		fetch(`${apiUrl}/v1/projects`, {
+			headers,
+			signal: AbortSignal.timeout(5_000),
+		}),
+		fetch(`${apiUrl}/v1/server/info`, {
+			headers,
+			signal: AbortSignal.timeout(5_000),
+		}).catch(() => null),
+	]);
 	if (!projectsResponse.ok)
 		throw new Error(
 			`Machine projects failed (HTTP ${projectsResponse.status})`,
@@ -168,12 +203,17 @@ async function loadAuthorizedMachineProjects(
 	const { projects } = (await projectsResponse.json()) as {
 		projects: unknown[];
 	};
+	const serverInfo =
+		infoResponse?.ok === true
+			? ((await infoResponse.json()) as z.infer<typeof remoteServerInfoSchema>)
+			: null;
 	return {
 		status: 'ready' as const,
 		apiUrl,
 		ownerSession: session.token,
 		ownerSessionExpiresAt: session.expiresAt,
 		projects,
+		serverInfo,
 	};
 }
 
