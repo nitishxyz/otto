@@ -88,6 +88,22 @@ export function setSharePinnedProjectId(projectId: string): void {
 	writeSessionStorage(SHARE_PROJECT_ID_STORAGE_KEY, projectId);
 }
 
+/** Activates share mode with an explicitly supplied project-share token. */
+export function activateShareMode(token: string): void {
+	const normalized = token.trim();
+	if (!normalized) {
+		clearShareMode();
+		return;
+	}
+	const win = shareWindow();
+	if (win) {
+		win.__OTTO_SHARE_TOKEN__ = normalized;
+		delete win.__OTTO_SHARE_PROJECT_ID__;
+	}
+	writeSessionStorage(SHARE_TOKEN_STORAGE_KEY, normalized);
+	removeSessionStorage(SHARE_PROJECT_ID_STORAGE_KEY);
+}
+
 /** Clears all share credentials for the current tab. */
 export function clearShareMode(): void {
 	const win = shareWindow();
@@ -120,11 +136,7 @@ export function consumeShareBoot(): string | undefined {
 		const param = url.searchParams.get(SHARE_QUERY_PARAM);
 		if (param) {
 			token = param.trim() || undefined;
-			if (token) {
-				writeSessionStorage(SHARE_TOKEN_STORAGE_KEY, token);
-				const win = shareWindow();
-				if (win) win.__OTTO_SHARE_TOKEN__ = token;
-			}
+			if (token) activateShareMode(token);
 			url.searchParams.delete(SHARE_QUERY_PARAM);
 			const search = url.searchParams.toString();
 			const stripped = `${url.pathname}${search ? `?${search}` : ''}${url.hash}`;

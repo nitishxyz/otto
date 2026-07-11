@@ -88,6 +88,20 @@ describe('share-mode boot', () => {
 		});
 	});
 
+	it('activates an explicit token and clears stale pinned project state', () => {
+		installWindow('tauri://localhost/');
+		shareMode.activateShareMode(' first-token ');
+		shareMode.setSharePinnedProjectId('stale-project');
+
+		shareMode.activateShareMode('second-token');
+
+		expect(shareMode.getShareToken()).toBe('second-token');
+		expect(shareMode.getSharePinnedProjectId()).toBeUndefined();
+		expect(shareMode.getShareAuthHeaders()).toEqual({
+			'X-Otto-Share-Token': 'second-token',
+		});
+	});
+
 	it('is inert when no ?share= param is present', () => {
 		installWindow('https://device.example/');
 		const token = shareMode.consumeShareBoot();

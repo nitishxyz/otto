@@ -1,8 +1,13 @@
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { configureApiClient } from '@ottocode/web-sdk/lib';
+import {
+	activateShareMode,
+	clearShareMode,
+	configureApiClient,
+} from '@ottocode/web-sdk/lib';
 import { registerNativeBrowserBridge } from './native-browser';
+import { normalizeDesktopRemoteUrl } from './remote-url';
 import { tauriBridge, type ServerInfo } from './tauri-bridge';
 
 interface OttoWindow extends Window {
@@ -116,13 +121,20 @@ export function configureDesktopSdk(
 	server?: ServerInfo | null,
 ) {
 	const win = window as OttoWindow;
-	win.OTTO_SERVER_URL = apiUrl;
 	if (server) {
+		clearShareMode();
+		win.OTTO_SERVER_URL = apiUrl;
 		win.OTTO_RUNTIME_CONTEXT = {
 			projectId: server.projectId,
 			projectRoot: server.projectPath,
 			serverToken: server.token ?? undefined,
 		};
+	} else {
+		const remote = normalizeDesktopRemoteUrl(apiUrl);
+		win.OTTO_SERVER_URL = remote.apiUrl;
+		delete win.OTTO_RUNTIME_CONTEXT;
+		if (remote.shareToken) activateShareMode(remote.shareToken);
+		else clearShareMode();
 	}
 	registerDesktopPlatformAdapters();
 	configureApiClient();
@@ -136,6 +148,7 @@ export function configureMachineSdk(
 	ownerSessionExpiresAt: number,
 ) {
 	const win = window as OttoWindow;
+	clearShareMode();
 	win.OTTO_SERVER_URL = apiUrl;
 	win.OTTO_RUNTIME_CONTEXT = {
 		projectId,

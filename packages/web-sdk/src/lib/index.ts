@@ -18,6 +18,7 @@ export {
 	SHARE_TOKEN_STORAGE_KEY,
 	SHARE_PROJECT_ID_STORAGE_KEY,
 	SHARE_QUERY_PARAM,
+	activateShareMode,
 	clearShareMode,
 	consumeShareBoot,
 	getShareAuthHeaders,
