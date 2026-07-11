@@ -10,6 +10,7 @@ import {
 	messageSubagent,
 	retrySubagent,
 	spawnSubagent,
+	stopSubagent,
 } from '../../runtime/subagents/service.ts';
 
 const delegateInputSchema = z.object({
@@ -28,7 +29,7 @@ const delegateInputSchema = z.object({
 		.string()
 		.optional()
 		.describe(
-			'Child session id of a previous delegation to the SAME agent. The new task is dispatched into that session so prior context (explored files, changes) carries over. Use for related/continuation tasks; omit for unrelated work.',
+			'Child session id of a previous delegation to the SAME agent type. The new task is dispatched into that session so prior context (explored files, changes) carries over. Use for related/continuation tasks; omit for unrelated work or parallel work, which starts a fresh instance even when another instance of this agent type is running.',
 		),
 });
 
@@ -37,7 +38,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 		name: 'delegate_task',
 		tool: tool({
 			description:
-				'Delegate a bounded task to another configured agent. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically after the current parent turn ends. Do not poll for completion: if no unrelated work remains, end the current turn so delivery can occur.',
+				'Delegate a bounded task to another configured agent type. Each call without reuseSessionId starts a fresh sub-agent instance, so independent tasks may run concurrently in multiple instances of the same agent type (for example, two separate plan delegations). Use reuseSessionId or message_subagent only for related continuation work that should retain an existing instance context; do not use them merely because that agent type is already running. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically after the current parent turn ends. Do not poll for completion: if no unrelated work remains, end the current turn so delivery can occur.',
 			inputSchema: delegateInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -132,6 +133,13 @@ const messageInputSchema = z.object({
 		.string()
 		.min(1)
 		.describe('Follow-up question or task for the sub-agent'),
+	delivery: z
+		.enum(['queue', 'interrupt'])
+		.optional()
+		.default('queue')
+		.describe(
+			'queue waits behind the current turn; interrupt silently stops the current turn and delivers this message next',
+		),
 });
 
 export function buildMessageSubagentTool(
@@ -142,7 +150,7 @@ export function buildMessageSubagentTool(
 		name: 'message_subagent',
 		tool: tool({
 			description:
-				'Send a follow-up message to a sub-agent session. If it is running, the message queues behind the current run; otherwise it resumes with full prior context. Use this for clarifications or incremental follow-up work instead of re-delegating from scratch.',
+				'Send a follow-up message to a sub-agent session with full prior context. delivery="queue" (default) waits behind a running turn. delivery="interrupt" silently stops the current turn and delivers the follow-up next; use it only when the current work must change immediately. Use this tool for clarifications or incremental follow-up work instead of re-delegating from scratch.',
 			inputSchema: messageInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -153,6 +161,7 @@ export function buildMessageSubagentTool(
 					parentSessionId: sessionId,
 					subagentId: input.subagentId,
 					message: input.message,
+					delivery: input.delivery,
 				});
 				if (!result.ok) {
 					return { ok: false, error: result.error };
@@ -162,8 +171,46 @@ export function buildMessageSubagentTool(
 					subagentId: result.subagentId,
 					childSessionId: result.childSessionId,
 					agent: result.agent,
+					messageId: result.messageId,
+					delivery: result.delivery,
+					preemptedMessageId: result.preemptedMessageId,
 					status: 'running',
-					note: 'Follow-up queued/sent. The sub-agent result arrives automatically when it finishes.',
+					note:
+						result.delivery === 'interrupt'
+							? 'The current turn was preempted and the follow-up will run next. The result arrives automatically when it finishes.'
+							: 'Follow-up queued. The sub-agent result arrives automatically when it finishes.',
+				};
+			},
+		}),
+	};
+}
+
+const stopInputSchema = z.object({
+	subagentId: z
+		.string()
+		.min(1)
+		.describe('Id of the running sub-agent to stop (from list_subagents)'),
+});
+
+export function buildStopSubagentTool(projectRoot: string, sessionId: string) {
+	return {
+		name: 'stop_subagent',
+		tool: tool({
+			description:
+				'Stop one running sub-agent owned by this session. This aborts its current turn, clears queued follow-ups, and marks it cancelled. Use delegate_task to start fresh if work is needed later.',
+			inputSchema: stopInputSchema,
+			async execute(input) {
+				const db = await getDb(projectRoot);
+				const result = await stopSubagent({
+					db,
+					parentSessionId: sessionId,
+					subagentId: input.subagentId,
+				});
+				if (!result.ok) return { ok: false, error: result.error };
+				return {
+					...result,
+					status: 'cancelled',
+					note: 'Sub-agent stopped. Its queued follow-ups were cleared.',
 				};
 			},
 		}),
@@ -215,6 +262,7 @@ export function buildSubagentTools(projectRoot: string, sessionId: string) {
 		buildDelegateTaskTool(projectRoot, sessionId),
 		buildListSubagentsTool(projectRoot, sessionId),
 		buildMessageSubagentTool(projectRoot, sessionId),
+		buildStopSubagentTool(projectRoot, sessionId),
 		buildRetrySubagentTool(projectRoot, sessionId),
 	];
 }

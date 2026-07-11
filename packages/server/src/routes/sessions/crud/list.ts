@@ -3,6 +3,7 @@ import { sessions } from '@ottocode/database/schema';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { getRunningSessionTreeIds } from '../../../runtime/session/working.ts';
 import { resolveRequestProject } from '../../project-context.ts';
 import {
 	attachSessionCostSummary,
@@ -74,19 +75,23 @@ export function registerListSessionsRoute(app: Hono) {
 				.offset(offset);
 			const hasMore = rows.length > limit;
 			const page = hasMore ? rows.slice(0, limit) : rows;
-			const [fileStats, costSummaries] = await Promise.all([
+			const [fileStats, costSummaries, runningTreeIds] = await Promise.all([
 				getSessionFileStats(db, page),
 				getSessionCostSummaries(db, page),
+				getRunningSessionTreeIds(db, cfg.projectRoot),
 			]);
 			const normalized = page.map((row) => {
 				const normalizedSession = normalizeSessionRow(row, {
 					includeRunning: true,
 				});
+				const sessionWithRunningDescendants = runningTreeIds.has(row.id)
+					? { ...normalizedSession, isRunning: true }
+					: normalizedSession;
 				const stats = fileStats.get(row.id);
 				const sessionWithStats =
 					stats && stats.changedFiles > 0
-						? { ...normalizedSession, fileStats: stats }
-						: normalizedSession;
+						? { ...sessionWithRunningDescendants, fileStats: stats }
+						: sessionWithRunningDescendants;
 				return attachSessionCostSummary(
 					sessionWithStats,
 					costSummaries.get(row.id),

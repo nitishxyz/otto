@@ -8,6 +8,7 @@ export { messageSubagent } from './message.ts';
 export { reportFinishedSubagents } from './report.ts';
 export { retrySubagent } from './retry.ts';
 export { spawnSubagent } from './spawn.ts';
+export { stopSubagent } from './stop.ts';
 export type {
 	MessageSubagentInput,
 	MessageSubagentResult,
@@ -15,5 +16,7 @@ export type {
 	RetrySubagentResult,
 	SpawnSubagentInput,
 	SpawnSubagentResult,
+	StopSubagentInput,
+	StopSubagentResult,
 	SubagentRecord,
 } from './types.ts';

@@ -19,6 +19,7 @@ const EXPLORATION_TOOL_NAMES = new Set([
 	'delegate_task',
 	'list_subagents',
 	'message_subagent',
+	'stop_subagent',
 ]);
 
 interface CompactActivityEntry {
@@ -430,12 +431,25 @@ export function getCompactActivityEntry(
 
 	if (part.toolName === 'message_subagent') {
 		const message = getStringField(args, 'message');
+		const delivery = getStringField(args, 'delivery');
 		return {
 			id: part.id,
 			toolName: part.toolName,
 			label: message
-				? `Following up with sub-agent: ${truncate(message, 42)}`
-				: 'Following up with sub-agent',
+				? `${delivery === 'interrupt' ? 'Interrupting' : 'Following up with'} sub-agent: ${truncate(message, 42)}`
+				: delivery === 'interrupt'
+					? 'Interrupting sub-agent'
+					: 'Following up with sub-agent',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
+	if (part.toolName === 'stop_subagent') {
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: 'Stopping sub-agent',
 			startedAt: part.startedAt,
 			completedAt: part.completedAt,
 		};

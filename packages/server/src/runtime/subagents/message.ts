@@ -2,19 +2,21 @@ import { and, eq } from 'drizzle-orm';
 import { logger } from '@ottocode/sdk';
 import { subagents } from '@ottocode/database/schema';
 import { getSessionById } from '../session/manager.ts';
+import { sendQueuedMessageNow } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
 import { buildFollowUpPrompt } from './prompt.ts';
 import type { MessageSubagentInput, MessageSubagentResult } from './types.ts';
 
 /**
  * Sends a follow-up message to an existing sub-agent's child session,
- * resuming it with full prior context. If the child session is already
- * running, the message queues behind the current run like normal chat input.
+ * resuming it with full prior context. Queue delivery waits behind an active
+ * run; interrupt delivery silently preempts the active run and executes next.
  */
 export async function messageSubagent(
 	input: MessageSubagentInput,
 ): Promise<MessageSubagentResult> {
 	const { db, cfg, parentSessionId, subagentId, message } = input;
+	const delivery = input.delivery ?? 'queue';
 
 	const rows = await db
 		.select()
@@ -55,19 +57,33 @@ export async function messageSubagent(
 		.set({ status: 'running', reported: false, updatedAt: now })
 		.where(eq(subagents.id, record.id));
 
-	await dispatchSubagentMessage({
+	const { assistantMessageId } = await dispatchSubagentMessage({
 		cfg,
 		db,
 		session: childSession,
 		agent: childSession.agent,
 		content: buildFollowUpPrompt(message),
 	});
+	let sendNowResult: ReturnType<typeof sendQueuedMessageNow> | undefined;
+	if (delivery === 'interrupt') {
+		const { runSessionLoop } = await import('../agent/runner.ts');
+		sendNowResult = sendQueuedMessageNow(
+			record.childSessionId,
+			assistantMessageId,
+			runSessionLoop,
+		);
+	}
 
 	logger.info('[subagent] follow-up sent', {
 		subagentId: record.id,
 		parentSessionId,
 		childSessionId: record.childSessionId,
 		wasRunning: record.status === 'running',
+		delivery,
+		preemptedMessageId:
+			sendNowResult?.success === true
+				? sendNowResult.preemptedMessageId
+				: undefined,
 	});
 
 	return {
@@ -75,5 +91,9 @@ export async function messageSubagent(
 		subagentId: record.id,
 		childSessionId: record.childSessionId,
 		agent: record.agent,
+		messageId: assistantMessageId,
+		delivery,
+		preemptedMessageId:
+			sendNowResult?.success === true ? sendNowResult.preemptedMessageId : null,
 	};
 }

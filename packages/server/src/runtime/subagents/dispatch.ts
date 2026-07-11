@@ -12,7 +12,7 @@ export async function dispatchSubagentMessage(args: {
 	content: string;
 }) {
 	const { dispatchAssistantMessage } = await import('../message/service.ts');
-	await dispatchAssistantMessage({
+	return dispatchAssistantMessage({
 		cfg: args.cfg,
 		db: args.db,
 		session: args.session,

@@ -500,6 +500,26 @@ describe('Built-in Tools', () => {
 			expect((result as { stdout: string }).stdout).toContain('test');
 		});
 
+		it('should fall back to a shell on PATH when SHELL is missing', async () => {
+			if (process.platform === 'win32') return;
+
+			const originalShell = process.env.SHELL;
+			try {
+				process.env.SHELL = '/missing/bin/zsh';
+				const { tools } = await discoverProjectTools(projectRoot);
+				const shellTool = tools.find((t) => t.name === 'shell');
+				const result = await resolveStreamedResult(
+					await shellTool?.tool.execute({ cmd: 'printf path-shell-ok' }),
+				);
+
+				expect(result).toMatchObject({ ok: true });
+				expect((result as { stdout: string }).stdout).toBe('path-shell-ok');
+			} finally {
+				if (originalShell === undefined) delete process.env.SHELL;
+				else process.env.SHELL = originalShell;
+			}
+		});
+
 		it('should tail shell output when requested', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');

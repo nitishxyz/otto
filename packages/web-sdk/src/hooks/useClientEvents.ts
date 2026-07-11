@@ -124,26 +124,28 @@ function updateSessionStatusInCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	status: SessionStatusEvent,
 ) {
-	queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-		getSessionsQueryKey(),
-		(old) => {
-			if (!old) return old;
-			return {
-				...old,
-				pages: old.pages.map((page) => ({
-					...page,
-					items: page.items.map((session) =>
-						session.id === status.sessionId
-							? {
-									...session,
-									isRunning: status.status === 'running',
-								}
-							: session,
-					),
-				})),
-			};
-		},
-	);
+	for (const sessionType of [undefined, 'looper'] as const) {
+		queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
+			getSessionsQueryKey(sessionType),
+			(old) => {
+				if (!old) return old;
+				return {
+					...old,
+					pages: old.pages.map((page) => ({
+						...page,
+						items: page.items.map((session) =>
+							session.id === status.sessionId
+								? {
+										...session,
+										isRunning: status.status === 'running',
+									}
+								: session,
+						),
+					})),
+				};
+			},
+		);
+	}
 }
 
 function isLocalApiUrl(baseUrl: string) {

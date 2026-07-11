@@ -17,8 +17,11 @@ function getAbortClassification(reason: unknown): {
 	isAborted: boolean;
 } {
 	if (isSystemAbortReason(reason)) {
+		const stoppedByParent = reason.type === 'subagent-stopped-by-parent';
 		return {
-			message: 'Cancelled because the parent session was aborted',
+			message: stoppedByParent
+				? 'Stopped by the parent agent'
+				: 'Cancelled because the parent session was aborted',
 			type: 'cancelled',
 			finishReason: 'cancelled',
 			isAborted: false,

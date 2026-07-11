@@ -3,6 +3,7 @@ import { messageParts, messages } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish, publishClientEvent } from '../../events/bus.ts';
 import type { RunOpts } from '../session/queue.ts';
+import { hasRunningSubagentDescendant } from '../session/working.ts';
 
 export type AssistantMessageErrorInput = {
 	message: string;
@@ -100,11 +101,17 @@ export async function publishAssistantMessageError(args: {
 	});
 
 	const createdAt = new Date().toISOString();
+	const status = (await hasRunningSubagentDescendant(
+		args.db,
+		args.opts.sessionId,
+	))
+		? 'running'
+		: 'failed';
 	publishClientEvent({
 		type: 'session.status',
 		payload: {
 			sessionId: args.opts.sessionId,
-			status: 'failed',
+			status,
 			messageId: args.opts.assistantMessageId,
 			createdAt,
 		},

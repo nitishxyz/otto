@@ -8,6 +8,7 @@ import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import { runAutoCompactionFlow } from '../message/compaction.ts';
 import { enqueueAssistantRun } from '../session/queue.ts';
+import { hasRunningSubagentDescendant } from '../session/working.ts';
 import { clearPendingTopup } from '../topup/manager.ts';
 
 export function createErrorHandler(
@@ -304,11 +305,14 @@ export function createErrorHandler(
 		});
 
 		const createdAt = new Date().toISOString();
+		const status = (await hasRunningSubagentDescendant(db, opts.sessionId))
+			? 'running'
+			: 'failed';
 		publishClientEvent({
 			type: 'session.status',
 			payload: {
 				sessionId: opts.sessionId,
-				status: 'failed',
+				status,
 				messageId: opts.assistantMessageId,
 				createdAt,
 			},

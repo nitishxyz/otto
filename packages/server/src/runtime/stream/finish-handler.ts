@@ -11,6 +11,7 @@ import {
 	normalizeUsage,
 	resolveUsageProvider,
 } from '../session/db-operations.ts';
+import { hasRunningSubagentDescendant } from '../session/working.ts';
 
 export async function markEmptyAssistantResponseAsError(args: {
 	opts: RunOpts;
@@ -117,7 +118,10 @@ export function createFinishHandler(
 		});
 
 		const createdAt = new Date().toISOString();
-		const status = fin.finishReason === 'error' ? 'failed' : 'completed';
+		const runStatus = fin.finishReason === 'error' ? 'failed' : 'completed';
+		const status = (await hasRunningSubagentDescendant(db, opts.sessionId))
+			? 'running'
+			: runStatus;
 		publishClientEvent({
 			type: 'session.status',
 			payload: {
@@ -131,10 +135,10 @@ export function createFinishHandler(
 			type: 'notification',
 			payload: {
 				id: crypto.randomUUID(),
-				level: status === 'failed' ? 'error' : 'success',
-				title: status === 'failed' ? 'Session failed' : 'Session completed',
+				level: runStatus === 'failed' ? 'error' : 'success',
+				title: runStatus === 'failed' ? 'Session failed' : 'Session completed',
 				body:
-					status === 'failed'
+					runStatus === 'failed'
 						? 'An assistant run ended with an error.'
 						: 'An assistant run finished successfully.',
 				source: 'session',

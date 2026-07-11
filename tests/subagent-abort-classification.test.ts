@@ -98,6 +98,21 @@ describe('subagent abort classification', () => {
 		);
 	});
 
+	test('persists parent-requested sub-agent stops as cancellations', async () => {
+		const { message, partContent } = await runAbortHandler({
+			sessionId: 'parent-stop-session',
+			messageId: 'parent-stop-message',
+			reason: { type: 'subagent-stopped-by-parent' },
+		});
+
+		expect(message.error).toBe('Stopped by the parent agent');
+		expect(message.errorType).toBe('cancelled');
+		expect(message.finishReason).toBe('cancelled');
+		expect(message.isAborted).toBe(false);
+		expect(partContent.isAborted).toBe(false);
+		expect(partContent.message).toBe('Stopped by the parent agent');
+	});
+
 	test('keeps unreasoned aborts classified as user aborts', async () => {
 		const { message, partContent } = await runAbortHandler({
 			sessionId: 'user-abort-session',

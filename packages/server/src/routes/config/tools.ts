@@ -62,6 +62,7 @@ const ORCHESTRATION_TOOLS = new Set([
 	'delegate_task',
 	'list_subagents',
 	'message_subagent',
+	'stop_subagent',
 	'retry_subagent',
 	'goal_list',
 	'goal_update',

@@ -33,10 +33,36 @@ export type MessageSubagentInput = {
 	parentSessionId: string;
 	subagentId: string;
 	message: string;
+	delivery?: 'queue' | 'interrupt';
 };
 
 export type MessageSubagentResult =
-	| { ok: true; subagentId: string; childSessionId: string; agent: string }
+	| {
+			ok: true;
+			subagentId: string;
+			childSessionId: string;
+			agent: string;
+			messageId: string;
+			delivery: 'queue' | 'interrupt';
+			preemptedMessageId: string | null;
+	  }
+	| { ok: false; error: string };
+
+export type StopSubagentInput = {
+	db: DB;
+	parentSessionId: string;
+	subagentId: string;
+};
+
+export type StopSubagentResult =
+	| {
+			ok: true;
+			subagentId: string;
+			childSessionId: string;
+			agent: string;
+			wasRunning: boolean;
+			clearedQueuedMessages: number;
+	  }
 	| { ok: false; error: string };
 
 export type RetrySubagentInput = {

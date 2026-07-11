@@ -45,9 +45,9 @@ export type SendNowPreemptReason = {
 	nextMessageId: string;
 };
 
-export type SystemAbortReason = {
-	type: 'parent-session-aborted';
-};
+export type SystemAbortReason =
+	| { type: 'parent-session-aborted' }
+	| { type: 'subagent-stopped-by-parent' };
 
 export type RunAbortReason = SendNowPreemptReason | SystemAbortReason;
 

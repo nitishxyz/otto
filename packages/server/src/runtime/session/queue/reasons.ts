@@ -15,9 +15,11 @@ export function isSendNowPreemptReason(
 export function isSystemAbortReason(
 	value: unknown,
 ): value is SystemAbortReason {
+	const type =
+		Boolean(value) && typeof value === 'object'
+			? (value as { type?: unknown }).type
+			: undefined;
 	return (
-		Boolean(value) &&
-		typeof value === 'object' &&
-		(value as { type?: unknown }).type === 'parent-session-aborted'
+		type === 'parent-session-aborted' || type === 'subagent-stopped-by-parent'
 	);
 }

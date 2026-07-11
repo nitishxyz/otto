@@ -1,6 +1,7 @@
-import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
+import { accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
+import { basename, delimiter, join } from 'node:path';
 import {
 	clearCachedBinaries,
 	getCachedBinary,
@@ -78,9 +79,33 @@ export function clearBinaryCache(): void {
 	clearCachedBinaries();
 }
 
+function resolveShellExecutable(candidate: string): string | null {
+	const paths = candidate.includes('/') ? [candidate] : [];
+	const name = basename(candidate);
+	for (const directory of (process.env.PATH || '').split(delimiter)) {
+		if (directory) paths.push(join(directory, name));
+	}
+
+	for (const path of paths) {
+		try {
+			accessSync(path, constants.X_OK);
+			return path;
+		} catch {}
+	}
+	return null;
+}
+
 export function getUserShell(): string {
 	if (process.platform === 'win32') return process.env.COMSPEC || 'cmd.exe';
-	return process.env.SHELL || '/bin/bash';
+
+	const candidates = [process.env.SHELL, 'zsh', 'bash', 'sh'].filter(
+		(candidate): candidate is string => Boolean(candidate),
+	);
+	for (const candidate of candidates) {
+		const shell = resolveShellExecutable(candidate);
+		if (shell) return shell;
+	}
+	return 'sh';
 }
 
 export function getShellExecutionConfig(
