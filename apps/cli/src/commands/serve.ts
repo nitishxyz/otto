@@ -6,13 +6,15 @@ import {
 	setDefaultProjectRoot,
 	setServerPort,
 	setServerVersion,
+	restoreManagedTunnel,
+	shutdownActiveTunnels,
 	shutdownProjectManager,
 	bunWebSocket,
 } from '@ottocode/server';
 import { getDb } from '@ottocode/database';
-import { startTunnel, stopTunnel } from '@ottocode/api';
+import { startTunnel } from '@ottocode/api';
 import { DEFAULT_DAEMON_PORT, parseDaemonPort } from '../daemon.ts';
-import { createWebServer } from '../web-server.ts';
+import { createWebServer, createWebUIFetch } from '../web-server.ts';
 import { colors } from '../ui.ts';
 
 export interface StartServerResult {
@@ -23,6 +25,30 @@ export interface StartServerResult {
 
 type ApiFetch = NonNullable<Parameters<typeof Bun.serve>[0]['fetch']>;
 type ApiWebSocket = NonNullable<Parameters<typeof Bun.serve>[0]['websocket']>;
+
+function isApiRequest(request: Request): boolean {
+	const pathname = new URL(request.url).pathname;
+	return (
+		pathname === '/v1' ||
+		pathname.startsWith('/v1/') ||
+		pathname === '/openapi.json'
+	);
+}
+
+/** Routes API requests to Hono and browser requests to the embedded web UI. */
+export function createSameOriginFetch(
+	apiFetch: ApiFetch,
+	webFetch: (request: Request) => Response | Promise<Response>,
+): ApiFetch {
+	const fetchApi = apiFetch as (
+		request: Request,
+		server: Bun.Server<undefined>,
+	) => Response | Promise<Response>;
+	return ((request: Request, server: Bun.Server<undefined>) =>
+		isApiRequest(request)
+			? fetchApi(request, server)
+			: webFetch(request)) as ApiFetch;
+}
 
 function createProjectStorageError(
 	projectRoot: string,
@@ -164,11 +190,14 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		? (opts.port ?? daemonPort ?? DEFAULT_DAEMON_PORT)
 		: (opts.port ?? portEnv ?? 0);
 	const hostname = opts.network ? '0.0.0.0' : '127.0.0.1';
+	const fetch = opts.daemonRegister
+		? createSameOriginFetch(app.fetch, createWebUIFetch(null))
+		: app.fetch;
 
 	const agiServer = serveApi({
 		port: requestedPort,
 		hostname,
-		fetch: app.fetch,
+		fetch,
 	});
 
 	const displayHost = opts.network ? getLocalIP() : '127.0.0.1';
@@ -186,6 +215,9 @@ export async function handleServe(opts: ServeOptions, version: string) {
 			url: `http://127.0.0.1:${serverPort}`,
 			pid: process.pid,
 			startedAt: Date.now(),
+		});
+		void restoreManagedTunnel().catch((error) => {
+			logger.error('Managed tunnel restore failed', error);
 		});
 	}
 
@@ -283,13 +315,10 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		shuttingDown = true;
 		console.log(`\nReceived ${signal}, shutting down...`);
 
-		// Stop tunnel via server endpoint
 		try {
-			await stopTunnel({
-				baseURL: apiUrl,
-			});
-		} catch {
-			// Ignore - server may already be stopping
+			shutdownActiveTunnels();
+		} catch (error) {
+			logger.error('Error stopping tunnel processes', error);
 		}
 
 		try {

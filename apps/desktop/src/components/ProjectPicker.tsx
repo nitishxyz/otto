@@ -1,13 +1,27 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import {
+	useState,
+	useCallback,
+	useId,
+	useRef,
+	useEffect,
+	useMemo,
+} from 'react';
 import { useProjects } from '../hooks/useProjects';
 import { useGitHub } from '../hooks/useGitHub';
 import { usePlatform } from '../hooks/usePlatform';
-import { handleTitleBarDrag } from '../utils/title-bar';
+import { DesktopDragRegion } from './DesktopDragRegion';
 import { tauriBridge, type Project } from '../lib/tauri-bridge';
 import { OttoWordmark } from './Icons';
 import { ProjectCard } from './ProjectCard';
 import { DeviceCodeModal } from './DeviceCodeModal';
 import { CloneModal } from './CloneModal';
+import { MachineLauncher } from './MachineLauncher';
+import { LocalTunnelPanel } from './LocalTunnelPanel';
+import {
+	OttoRouterAccountControl,
+	useOttoRouterAccount,
+} from './OttoRouterAccountControl';
+import { useMachineDevices } from '../hooks/useMachineDevices';
 import {
 	ArrowDownToLine,
 	FolderOpen,
@@ -24,6 +38,93 @@ import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';
 
 const PROJECTS_PER_PAGE = 10;
+
+type PickerTab = 'projects' | 'machines';
+
+const PICKER_TABS: Array<{ id: PickerTab; label: string }> = [
+	{ id: 'projects', label: 'Projects' },
+	{ id: 'machines', label: 'Machines' },
+];
+
+/** Compact, keyboard-accessible Projects | Machines tab strip. */
+function PickerTabList({
+	idBase,
+	active,
+	onChange,
+	machineCount,
+}: {
+	idBase: string;
+	active: PickerTab;
+	onChange: (tab: PickerTab) => void;
+	machineCount: number | null;
+}) {
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+		const index = PICKER_TABS.findIndex((tab) => tab.id === active);
+		let nextIndex: number | null = null;
+		if (event.key === 'ArrowRight') {
+			nextIndex = (index + 1) % PICKER_TABS.length;
+		} else if (event.key === 'ArrowLeft') {
+			nextIndex = (index - 1 + PICKER_TABS.length) % PICKER_TABS.length;
+		} else if (event.key === 'Home') {
+			nextIndex = 0;
+		} else if (event.key === 'End') {
+			nextIndex = PICKER_TABS.length - 1;
+		}
+		if (nextIndex === null) return;
+		event.preventDefault();
+		const next = PICKER_TABS[nextIndex];
+		onChange(next.id);
+		document.getElementById(`${idBase}-tab-${next.id}`)?.focus();
+	};
+
+	return (
+		<div
+			role="tablist"
+			aria-label="Open a project from"
+			onKeyDown={handleKeyDown}
+			className="mb-4 flex w-fit items-center gap-1 rounded-lg border border-border/50 bg-muted/30 p-1"
+		>
+			{PICKER_TABS.map((tab) => {
+				const selected = tab.id === active;
+				return (
+					<button
+						key={tab.id}
+						type="button"
+						role="tab"
+						id={`${idBase}-tab-${tab.id}`}
+						aria-selected={selected}
+						aria-controls={`${idBase}-panel-${tab.id}`}
+						tabIndex={selected ? 0 : -1}
+						onClick={() => onChange(tab.id)}
+						className={`flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+							selected
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'
+						}`}
+					>
+						{tab.label}
+						{tab.id === 'machines' &&
+							machineCount !== null &&
+							machineCount > 0 && (
+								<span
+									className={`rounded-full px-1.5 text-[11px] leading-4 ${
+										selected
+											? 'bg-muted text-muted-foreground'
+											: 'bg-muted/60 text-muted-foreground/70'
+									}`}
+								>
+									{machineCount}
+									<span className="sr-only">
+										{machineCount === 1 ? ' machine' : ' machines'}
+									</span>
+								</span>
+							)}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
 
 export function ProjectPicker({
 	onSelectProject,
@@ -53,10 +154,17 @@ export function ProjectPicker({
 	const [cloning, setCloning] = useState(false);
 	const [cloningRepo, setCloningRepo] = useState<string | null>(null);
 	const [projectSearch, setProjectSearch] = useState('');
+	const {
+		state: machineState,
+		loading: machinesLoading,
+		refresh: refreshMachines,
+	} = useMachineDevices();
+	const [activeTab, setActiveTab] = useState<PickerTab>('projects');
 	const [projectVisibleCount, setProjectVisibleCount] =
 		useState(PROJECTS_PER_PAGE);
 	const platform = usePlatform();
 	const pageRef = useRef(1);
+	const tabsIdBase = useId();
 	const projectLoadMoreRef = useRef<HTMLDivElement | null>(null);
 	const {
 		available: updateAvailable,
@@ -68,6 +176,17 @@ export function ProjectPicker({
 		applyUpdate,
 	} = useUpdate();
 	const appVersion = useVersion();
+
+	useEffect(() => {
+		if (activeTab !== 'machines') return;
+		void refreshMachines();
+		const interval = window.setInterval(() => {
+			void refreshMachines();
+		}, 30_000);
+		return () => window.clearInterval(interval);
+	}, [activeTab, refreshMachines]);
+
+	const machineAccount = useOttoRouterAccount(refreshMachines);
 
 	const handleOpenFolder = async () => {
 		const project = await openProjectDialog();
@@ -89,19 +208,8 @@ export function ProjectPicker({
 	};
 
 	const handleGeneral = async () => {
-		try {
-			const path = await tauriBridge.getGeneralWorkspacePath();
-			const project: Project = {
-				path,
-				name: 'General',
-				lastOpened: new Date().toISOString(),
-				pinned: false,
-				kind: 'general',
-			};
-			onSelectProject(project);
-		} catch (err) {
-			alert(`Failed to open General workspace: ${err}`);
-		}
+		const general = projects.find((project) => project.kind === 'general');
+		if (general) onSelectProject(general);
 	};
 
 	const handleConnect = () => {
@@ -117,7 +225,6 @@ export function ProjectPicker({
 				kind: 'remote',
 				remoteUrl: connectUrl.trim(),
 			};
-			tauriBridge.saveRecentProject(project).catch(() => {});
 			setShowConnectModal(false);
 			setConnectUrl('');
 			setConnectName('');
@@ -231,16 +338,16 @@ export function ProjectPicker({
 
 	return (
 		<div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
-			<div
-				className="shrink-0 flex items-center px-4 h-12 border-b border-border/50 cursor-default select-none relative"
-				onMouseDown={handleTitleBarDrag}
-				data-tauri-drag-region
-				role="toolbar"
-			>
+			<DesktopDragRegion className="shrink-0 flex items-center px-4 h-12 border-b border-border/50 cursor-default select-none relative">
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 					<OttoWordmark height={16} className="text-foreground" />
 				</div>
 				<div className="flex items-center gap-2 ml-auto">
+					<OttoRouterAccountControl
+						configured={machineState?.configured ?? false}
+						initializing={machineState === null}
+						account={machineAccount}
+					/>
 					{isAuthenticated && (
 						<div className="flex items-center gap-1.5 mr-2">
 							{user?.avatar_url && (
@@ -309,7 +416,7 @@ export function ProjectPicker({
 					</button>
 					{platform === 'linux' && <WindowControls />}
 				</div>
-			</div>
+			</DesktopDragRegion>
 
 			<div className="flex-1 overflow-y-auto">
 				<div className="relative min-h-full flex flex-col">
@@ -414,110 +521,152 @@ export function ProjectPicker({
 								</button>
 							</div>
 
-							{projects.length > 0 && (
-								<div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
-									{showProjectSearch && (
-										<div className="p-3 border-b border-border/30">
-											<label className="relative block">
-												<span className="sr-only">Search projects</span>
-												<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-												<input
-													type="search"
-													value={projectSearch}
-													onChange={(e) => {
-														setProjectSearch(e.target.value);
-														setProjectVisibleCount(PROJECTS_PER_PAGE);
-													}}
-													placeholder="Search projects..."
-													className="w-full h-9 pl-9 pr-3 bg-muted/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring/50 transition-colors"
-												/>
-											</label>
-										</div>
-									)}
-									{pinnedProjects.length > 0 && (
-										<div>
-											<div className="px-4 pt-3 pb-1">
-												<h2 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5">
-													<Star className="w-3.5 h-3.5 text-yellow-500/70" />
-													Pinned
-												</h2>
-											</div>
-											<div className="px-1">
-												{pinnedProjects.map((project) => (
-													<ProjectCard
-														key={project.path}
-														project={project}
-														pinned={true}
-														onSelect={() => onSelectProject(project)}
-														onTogglePin={() => togglePinned(project.path)}
-														onRemove={() => removeProject(project.path)}
+							<PickerTabList
+								idBase={tabsIdBase}
+								active={activeTab}
+								onChange={setActiveTab}
+								machineCount={
+									machineState?.configured && !machineState.error
+										? machineState.devices.length
+										: null
+								}
+							/>
+
+							<div
+								role="tabpanel"
+								id={`${tabsIdBase}-panel-projects`}
+								aria-labelledby={`${tabsIdBase}-tab-projects`}
+								hidden={activeTab !== 'projects'}
+							>
+								{projects.length > 0 && (
+									<div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
+										{showProjectSearch && (
+											<div className="p-3 border-b border-border/30">
+												<label className="relative block">
+													<span className="sr-only">Search projects</span>
+													<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+													<input
+														type="search"
+														value={projectSearch}
+														onChange={(e) => {
+															setProjectSearch(e.target.value);
+															setProjectVisibleCount(PROJECTS_PER_PAGE);
+														}}
+														placeholder="Search projects..."
+														className="w-full h-9 pl-9 pr-3 bg-muted/30 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring/50 transition-colors"
 													/>
-												))}
+												</label>
 											</div>
-										</div>
-									)}
-
-									{pinnedProjects.length > 0 && recentProjects.length > 0 && (
-										<div className="mx-4 border-t border-border/30" />
-									)}
-
-									{recentProjects.length > 0 && (
-										<div>
-											<div className="px-4 pt-3 pb-1">
-												<h2 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
-													Recent
-												</h2>
+										)}
+										{pinnedProjects.length > 0 && (
+											<div>
+												<div className="px-4 pt-3 pb-1">
+													<h2 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5">
+														<Star className="w-3.5 h-3.5 text-yellow-500/70" />
+														Pinned
+													</h2>
+												</div>
+												<div className="px-1">
+													{pinnedProjects.map((project) => (
+														<ProjectCard
+															key={project.path}
+															project={project}
+															pinned={true}
+															onSelect={() => onSelectProject(project)}
+															onTogglePin={() => togglePinned(project.path)}
+															onRemove={() => removeProject(project.path)}
+														/>
+													))}
+												</div>
 											</div>
-											<div className="px-1 pb-1">
-												{recentProjects.map((project) => (
-													<ProjectCard
-														key={project.path}
-														project={project}
-														pinned={false}
-														onSelect={() => onSelectProject(project)}
-														onTogglePin={() => togglePinned(project.path)}
-														onRemove={() => removeProject(project.path)}
-													/>
-												))}
+										)}
+
+										{pinnedProjects.length > 0 && recentProjects.length > 0 && (
+											<div className="mx-4 border-t border-border/30" />
+										)}
+
+										{recentProjects.length > 0 && (
+											<div>
+												<div className="px-4 pt-3 pb-1">
+													<h2 className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+														Recent
+													</h2>
+												</div>
+												<div className="px-1 pb-1">
+													{recentProjects.map((project) => (
+														<ProjectCard
+															key={project.path}
+															project={project}
+															pinned={false}
+															onSelect={() => onSelectProject(project)}
+															onTogglePin={() => togglePinned(project.path)}
+															onRemove={() => removeProject(project.path)}
+														/>
+													))}
+												</div>
 											</div>
-										</div>
-									)}
+										)}
 
-									{!hasProjectResults && (
-										<div className="text-center py-10 text-sm text-muted-foreground/60">
-											No matching projects
-										</div>
-									)}
+										{!hasProjectResults && (
+											<div className="text-center py-10 text-sm text-muted-foreground/60">
+												No matching projects
+											</div>
+										)}
 
-									{hasMoreProjects && (
-										<div
-											ref={projectLoadMoreRef}
-											className="h-8 border-t border-border/30"
-											aria-hidden="true"
-										/>
-									)}
-								</div>
-							)}
-
-							{loading && projects.length === 0 && (
-								<div className="text-center py-16 text-sm text-muted-foreground/60">
-									Loading...
-								</div>
-							)}
-
-							{!loading && projects.length === 0 && (
-								<div className="text-center py-16">
-									<div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
-										<FolderOpen className="w-5 h-5 text-muted-foreground/40" />
+										{hasMoreProjects && (
+											<div
+												ref={projectLoadMoreRef}
+												className="h-8 border-t border-border/30"
+												aria-hidden="true"
+											/>
+										)}
 									</div>
-									<p className="text-sm text-muted-foreground/60">
-										No recent projects
-									</p>
-									<p className="text-xs text-muted-foreground/40 mt-1">
-										Open a folder to get started
-									</p>
-								</div>
-							)}
+								)}
+
+								{loading && projects.length === 0 && (
+									<div className="text-center py-16 text-sm text-muted-foreground/60">
+										Loading...
+									</div>
+								)}
+
+								{!loading && projects.length === 0 && (
+									<div className="text-center py-16">
+										<div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+											<FolderOpen className="w-5 h-5 text-muted-foreground/40" />
+										</div>
+										<p className="text-sm text-muted-foreground/60">
+											No recent projects
+										</p>
+										<p className="text-xs text-muted-foreground/40 mt-1">
+											Open a folder to get started
+										</p>
+									</div>
+								)}
+							</div>
+
+							<div
+								role="tabpanel"
+								id={`${tabsIdBase}-panel-machines`}
+								aria-labelledby={`${tabsIdBase}-tab-machines`}
+								hidden={activeTab !== 'machines'}
+							>
+								{activeTab === 'machines' && (
+									<>
+										<LocalTunnelPanel
+											ottorouterConfigured={machineState?.configured ?? false}
+											onConnect={machineAccount.connect}
+											connectBusy={machineAccount.busy}
+										/>
+										<MachineLauncher
+											state={machineState}
+											loading={machinesLoading}
+											onRefresh={refreshMachines}
+											onConnect={machineAccount.connect}
+											connectBusy={machineAccount.busy}
+										/>
+									</>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>

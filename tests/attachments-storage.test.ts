@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'bun:test';
@@ -13,8 +13,10 @@ async function withProject(
 ) {
 	const projectRoot = await mkdtemp(join(tmpdir(), prefix));
 	const previousOttoHome = process.env.OTTO_HOME;
+	const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
 	const ottoHome = join(projectRoot, 'otto-home');
 	process.env.OTTO_HOME = ottoHome;
+	process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
 	try {
 		await fn(projectRoot, ottoHome);
 	} finally {
@@ -23,11 +25,53 @@ async function withProject(
 		} else {
 			process.env.OTTO_HOME = previousOttoHome;
 		}
+		if (previousXdgConfigHome === undefined) {
+			delete process.env.XDG_CONFIG_HOME;
+		} else {
+			process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+		}
 		await rm(projectRoot, { recursive: true, force: true });
 	}
 }
 
 describe('attachment project state storage', () => {
+	it('does not mutate the configured project registry', async () => {
+		const configuredHome = await mkdtemp(
+			join(tmpdir(), 'otto-configured-store-'),
+		);
+		const configuredOttoDir = join(configuredHome, 'otto');
+		const registryPath = join(configuredOttoDir, 'projects.json');
+		const sentinel = '{"version":1,"projects":[]}\n';
+		const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		try {
+			await mkdir(configuredOttoDir, { recursive: true });
+			await writeFile(registryPath, sentinel);
+			process.env.XDG_CONFIG_HOME = configuredHome;
+
+			await withProject('otto-attachments-isolation-', async (projectRoot) => {
+				const metadata = await storeAttachmentBytes({
+					projectRoot,
+					bytes: Buffer.from('isolated'),
+					filename: 'isolated.txt',
+					mimeType: 'text/plain',
+				});
+				const response = await createEmbeddedApp().request(
+					`http://localhost/v1/attachments/${metadata.id}?project=${encodeURIComponent(projectRoot)}`,
+				);
+				expect(response.status).toBe(200);
+			});
+
+			expect(await readFile(registryPath, 'utf8')).toBe(sentinel);
+		} finally {
+			if (previousXdgConfigHome === undefined) {
+				delete process.env.XDG_CONFIG_HOME;
+			} else {
+				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+			}
+			await rm(configuredHome, { recursive: true, force: true });
+		}
+	});
+
 	it('stores new attachments under project state with project-state metadata', async () => {
 		await withProject('otto-attachments-state-', async (projectRoot) => {
 			const metadata = await storeAttachmentBytes({
@@ -68,7 +112,7 @@ describe('attachment project state storage', () => {
 			const metadata = await storeAttachmentBytes({
 				projectRoot,
 				bytes: Buffer.from('state route bytes'),
-				filename: 'route.txt',
+				filename: 'Screenshot 2026-07-11 at 4.10.06 AM.txt',
 				mimeType: 'text/plain',
 			});
 			const app = createEmbeddedApp();
@@ -78,6 +122,9 @@ describe('attachment project state storage', () => {
 			);
 
 			expect(response.status).toBe(200);
+			expect(response.headers.get('Content-Disposition')).toContain(
+				"filename*=UTF-8''Screenshot%202026-07-11%20at%204.10.06%E2%80%AFAM.txt",
+			);
 			expect(await response.text()).toBe('state route bytes');
 		});
 	});

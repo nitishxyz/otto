@@ -8,6 +8,7 @@ import * as withAuthActual from '@ottocode/cli/src/middleware/with-auth.ts';
 import * as daemonActual from '@ottocode/cli/src/daemon.ts';
 import * as customCommandsActual from '@ottocode/cli/src/custom-commands.ts';
 import * as gitignoreActual from '@ottocode/cli/src/gitignore.ts';
+import * as webServerActual from '@ottocode/cli/src/web-server.ts';
 
 const realSdk = { ...sdkActual };
 const realServer = { ...serverActual };
@@ -17,6 +18,7 @@ const realWithAuth = { ...withAuthActual };
 const realDaemon = { ...daemonActual };
 const realCustomCommands = { ...customCommandsActual };
 const realGitignore = { ...gitignoreActual };
+const realWebServer = { ...webServerActual };
 
 const openAuthUrlMock = mock(async () => true);
 const createWebServerMock = mock(() => ({
@@ -103,6 +105,7 @@ afterAll(() => {
 	mock.module('@ottocode/cli/src/daemon.ts', () => realDaemon);
 	mock.module('@ottocode/cli/src/custom-commands.ts', () => realCustomCommands);
 	mock.module('@ottocode/cli/src/gitignore.ts', () => realGitignore);
+	mock.module('@ottocode/cli/src/web-server.ts', () => realWebServer);
 });
 
 const webModulePromise = import('@ottocode/cli/src/commands/web.ts');

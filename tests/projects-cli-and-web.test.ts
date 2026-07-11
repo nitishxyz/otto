@@ -24,6 +24,7 @@ describe('CLI projects helpers', () => {
 				dbPath: '/tmp/alpha/.otto/otto.sqlite',
 				lastUsedAt: 1_700_000_000_000,
 				open: true,
+				pinned: true,
 			},
 			{
 				id: 'project-b',
@@ -33,6 +34,7 @@ describe('CLI projects helpers', () => {
 				dbPath: '/tmp/beta/.otto/otto.sqlite',
 				lastUsedAt: 1_600_000_000_000,
 				open: false,
+				pinned: false,
 			},
 		]);
 

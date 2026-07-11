@@ -18,8 +18,14 @@ export interface TunnelEvents {
 	stderr: (data: string) => void;
 }
 
+/** Injectable process dependencies used to test tunnel lifecycle behavior. */
+export interface OttoTunnelDependencies {
+	ensureBinary: typeof ensureTunnelBinary;
+	spawn: typeof spawn;
+}
+
 const URL_REGEX = /https:\/\/([a-z0-9-]+)\.trycloudflare\.com/;
-const CONN_REGEX = /Connection ([a-f0-9-]+)/;
+const CONN_REGEX = /[Cc]onnection(?:=| )([a-f0-9-]+)/;
 const IP_REGEX = /(\d+\.\d+\.\d+\.\d+)/;
 const LOCATION_REGEX = /location=([a-z0-9]+)/i;
 const INDEX_REGEX = /connIndex=(\d+)/;
@@ -28,10 +34,19 @@ const RATE_LIMIT_REGEX = /429 Too Many Requests|error code: 1015/i;
 const FAILED_UNMARSHAL_REGEX = /failed to unmarshal quick Tunnel/i;
 
 export class OttoTunnel extends EventEmitter {
+	private readonly dependencies: OttoTunnelDependencies;
 	private process: ChildProcess | null = null;
 	private connections: (TunnelConnection | undefined)[] = [];
 	private _url: string | null = null;
 	private _stopped = false;
+
+	constructor(dependencies: Partial<OttoTunnelDependencies> = {}) {
+		super();
+		this.dependencies = {
+			ensureBinary: dependencies.ensureBinary ?? ensureTunnelBinary,
+			spawn: dependencies.spawn ?? spawn,
+		};
+	}
 
 	get url(): string | null {
 		return this._url;
@@ -86,32 +101,59 @@ export class OttoTunnel extends EventEmitter {
 		return false;
 	}
 
-	async start(
-		port: number,
+	private async startProcess(
+		args: string[],
+		readiness: 'url' | 'connected',
+		knownUrl: string | null,
 		onProgress?: (message: string) => void,
 	): Promise<string> {
 		if (this.process) {
 			throw new Error('Tunnel is already running');
 		}
 
-		const binPath = await ensureTunnelBinary(onProgress);
+		const binPath = await this.dependencies.ensureBinary(onProgress);
+		this._stopped = false;
+		this._url = knownUrl;
+		this.connections = [];
 
 		return new Promise((resolve, reject) => {
-			const args = ['tunnel', '--url', `http://localhost:${port}`];
+			let settled = false;
+			const finish = (error?: Error) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timeout);
+				this.off('url', handleUrl);
+				this.off('connected', handleConnected);
+				this.off('error', handleError);
+				if (error) reject(error);
+				else if (this._url) resolve(this._url);
+				else reject(new Error('Tunnel URL was not available'));
+			};
+			const handleUrl = () => finish();
+			const handleConnected = () => finish();
+			const handleError = (error: Error) => finish(error);
+			const timeout = setTimeout(() => {
+				this.stop();
+				finish(new Error('Tunnel startup timed out'));
+			}, 30000);
 
-			this.process = spawn(binPath, args, {
+			if (readiness === 'url') this.once('url', handleUrl);
+			else this.once('connected', handleConnected);
+			this.once('error', handleError);
+
+			this.process = this.dependencies.spawn(binPath, args, {
 				stdio: ['ignore', 'pipe', 'pipe'],
 			});
 
 			this.process.on('error', (error) => {
 				this.emit('error', error);
-				reject(error);
 			});
 
 			this.process.on('exit', (code, signal) => {
 				this._stopped = true;
 				this.process = null;
 				this.emit('exit', code, signal);
+				finish(new Error('Tunnel process exited before it was ready'));
 			});
 
 			this.process.stdout?.on('data', (data: Buffer) => {
@@ -119,11 +161,6 @@ export class OttoTunnel extends EventEmitter {
 				this.emit('stdout', output);
 				if (this.checkForRateLimit(output)) {
 					this.stop();
-					reject(
-						new Error(
-							'Rate limited by Cloudflare. Please wait 5-10 minutes before trying again.',
-						),
-					);
 					return;
 				}
 				this.handleOutput(output);
@@ -134,33 +171,38 @@ export class OttoTunnel extends EventEmitter {
 				this.emit('stderr', output);
 				if (this.checkForRateLimit(output)) {
 					this.stop();
-					reject(
-						new Error(
-							'Rate limited by Cloudflare. Please wait 5-10 minutes before trying again.',
-						),
-					);
 					return;
 				}
 				this.handleOutput(output);
 			});
-
-			const timeout = setTimeout(() => {
-				if (!this._url) {
-					this.stop();
-					reject(new Error('Tunnel startup timed out'));
-				}
-			}, 30000);
-
-			this.once('url', (url) => {
-				clearTimeout(timeout);
-				resolve(url);
-			});
-
-			this.once('error', (error) => {
-				clearTimeout(timeout);
-				reject(error);
-			});
 		});
+	}
+
+	async start(
+		port: number,
+		onProgress?: (message: string) => void,
+	): Promise<string> {
+		return this.startProcess(
+			['tunnel', '--url', `http://localhost:${port}`],
+			'url',
+			null,
+			onProgress,
+		);
+	}
+
+	/** Start a named tunnel and wait for its first registered connection. */
+	async startManaged(
+		token: string,
+		url: string,
+		onProgress?: (message: string) => void,
+	): Promise<string> {
+		if (!token) throw new Error('Managed tunnel token is required');
+		return this.startProcess(
+			['tunnel', 'run', '--token', token],
+			'connected',
+			url,
+			onProgress,
+		);
 	}
 
 	stop(): boolean {
@@ -213,7 +255,7 @@ export async function killStaleTunnels(): Promise<void> {
 		const killCmd =
 			process.platform === 'win32'
 				? 'taskkill /F /IM tunnel.exe 2>NUL || exit /b 0'
-				: 'pkill -f "tunnel tunnel --url" 2>/dev/null || true';
+				: 'pkill -f "tunnel tunnel (--url|run --token)" 2>/dev/null || true';
 		await execAsync(killCmd);
 		// Give processes time to die
 		await new Promise((resolve) => setTimeout(resolve, 500));

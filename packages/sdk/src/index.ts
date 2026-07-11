@@ -550,11 +550,21 @@ export {
 	OttoTunnel,
 	createTunnel,
 	killStaleTunnels,
+	getManagedTunnelDeviceId,
+	isManagedTunnelDeviceId,
+	provisionManagedTunnel,
 	generateQRCode,
 	printQRCode,
 } from './tunnel/index.ts';
 
-export type { TunnelConnection, TunnelEvents } from './tunnel/index.ts';
+export type {
+	ManagedTunnelAuth,
+	ManagedTunnelProvision,
+	ManagedTunnelProvisionOptions,
+	OttoTunnelDependencies,
+	TunnelConnection,
+	TunnelEvents,
+} from './tunnel/index.ts';
 
 // =======================
 // MCP (Model Context Protocol)

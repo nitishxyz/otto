@@ -26,11 +26,13 @@ export interface RegisteredProject {
 	dbPath: string;
 	firstSeenAt: number;
 	lastSeenAt: number;
+	pinned: boolean;
 }
 
 interface RegistryFile {
 	version: 1;
 	projects: RegisteredProject[];
+	forgottenRoots: string[];
 }
 
 interface ProjectMetadataFile {
@@ -69,8 +71,10 @@ function parseTime(value: unknown, fallback: number): number {
 
 async function discoverStateProjects(
 	registered: RegisteredProject[],
+	forgottenRoots: string[],
 ): Promise<RegisteredProject[]> {
 	const existingRoots = new Set(registered.map((project) => project.path));
+	const forgotten = new Set(forgottenRoots);
 	const discovered: RegisteredProject[] = [];
 	const projectsRoot = getProjectsStateRoot();
 
@@ -95,6 +99,7 @@ async function discoverStateProjects(
 			).json()) as ProjectMetadataFile;
 			if (!metadata || typeof metadata.root !== 'string') continue;
 			if (existingRoots.has(metadata.root)) continue;
+			if (forgotten.has(metadata.root)) continue;
 
 			const now = Date.now();
 			const root = metadata.root;
@@ -108,6 +113,7 @@ async function discoverStateProjects(
 				dbPath: await getProjectDbPath(root),
 				firstSeenAt: parseTime(metadata.createdAt, now),
 				lastSeenAt: parseTime(metadata.lastSeenAt, now),
+				pinned: false,
 			});
 		} catch (error) {
 			logger.warn('Failed to load project metadata from state directory', {
@@ -123,7 +129,8 @@ async function discoverStateProjects(
 async function loadRegistry(): Promise<RegistryFile> {
 	try {
 		const file = Bun.file(registryPath());
-		if (!(await file.exists())) return { version: 1, projects: [] };
+		if (!(await file.exists()))
+			return { version: 1, projects: [], forgottenRoots: [] };
 		const text = await file.text();
 		const parsed = JSON.parse(text);
 		if (
@@ -144,11 +151,19 @@ async function loadRegistry(): Promise<RegistryFile> {
 						typeof p.firstSeenAt === 'number' ? p.firstSeenAt : Date.now(),
 					lastSeenAt:
 						typeof p.lastSeenAt === 'number' ? p.lastSeenAt : Date.now(),
+					pinned: p.pinned === true,
 				});
 			}
 			return {
 				version: 1,
 				projects,
+				forgottenRoots: Array.isArray(
+					(parsed as Partial<RegistryFile>).forgottenRoots,
+				)
+					? (parsed as RegistryFile).forgottenRoots.filter(
+							(root): root is string => typeof root === 'string',
+						)
+					: [],
 			};
 		}
 	} catch (error) {
@@ -156,7 +171,7 @@ async function loadRegistry(): Promise<RegistryFile> {
 			error: toErrorLogPayload(error),
 		});
 	}
-	return { version: 1, projects: [] };
+	return { version: 1, projects: [], forgottenRoots: [] };
 }
 
 async function saveRegistry(reg: RegistryFile): Promise<void> {
@@ -186,6 +201,9 @@ export async function touchProject(
 		touchedThisSession.set(projectRoot, now);
 
 		const reg = await loadRegistry();
+		reg.forgottenRoots = reg.forgottenRoots.filter(
+			(root) => root !== projectRoot,
+		);
 		const projectId = await getProjectId(projectRoot);
 		const stateDir = await getProjectStateDir(projectRoot);
 		const projectDbPath = await getProjectDbPath(projectRoot);
@@ -205,6 +223,7 @@ export async function touchProject(
 				dbPath: projectDbPath,
 				firstSeenAt: now,
 				lastSeenAt: now,
+				pinned: false,
 			});
 		}
 		await saveRegistry(reg);
@@ -220,10 +239,26 @@ export async function touchProject(
  */
 export async function listProjects(): Promise<RegisteredProject[]> {
 	const reg = await loadRegistry();
-	const discovered = await discoverStateProjects(reg.projects);
+	const discovered = await discoverStateProjects(
+		reg.projects,
+		reg.forgottenRoots,
+	);
 	return [...reg.projects, ...discovered].sort(
 		(a, b) => b.lastSeenAt - a.lastSeenAt,
 	);
+}
+
+/** Persist whether a known project is pinned in recent-project lists. */
+export async function setProjectPinned(
+	projectRoot: string,
+	pinned: boolean,
+): Promise<boolean> {
+	const reg = await loadRegistry();
+	const project = reg.projects.find((item) => item.path === projectRoot);
+	if (!project) return false;
+	project.pinned = pinned;
+	await saveRegistry(reg);
+	return true;
 }
 
 /**
@@ -242,8 +277,8 @@ export async function forgetProjects(projectRoots: string[]): Promise<void> {
 
 	const reg = await loadRegistry();
 	const next = reg.projects.filter((p) => !roots.has(p.path));
-	if (next.length === reg.projects.length) return;
 	reg.projects = next;
+	reg.forgottenRoots = [...new Set([...reg.forgottenRoots, ...roots])];
 	for (const root of roots) touchedThisSession.delete(root);
 	await saveRegistry(reg);
 }

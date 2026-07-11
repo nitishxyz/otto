@@ -10,14 +10,16 @@ import {
 	useNavigate,
 } from '@tanstack/react-router';
 import { NativeOnboarding } from './components/onboarding/NativeOnboarding';
+import { ConnectedProjectPicker } from './components/ConnectedProjectPicker';
 import { ProjectPicker } from './components/ProjectPicker';
 import { Workspace } from './components/Workspace';
 import { OttoRouterLoader } from './components/OttoRouterLoader';
-import type { Project } from './lib/tauri-bridge';
+import type { MachineBootstrap, Project } from './lib/tauri-bridge';
 import { DesktopThemeContext, type DesktopThemeContextValue } from './theme';
 
 export interface DesktopRouterContext extends DesktopThemeContextValue {
 	initialized: boolean;
+	machine: MachineBootstrap | null;
 	selectedProject: Project | null;
 	onSelectProject: (project: Project) => void;
 	onBackToProjects: () => void | Promise<void>;
@@ -97,6 +99,7 @@ const routeTree = rootRoute.addChildren([
 
 const defaultRouterContext: DesktopRouterContext = {
 	initialized: false,
+	machine: null,
 	selectedProject: null,
 	theme: 'otto-dark',
 	setTheme: () => {},
@@ -124,7 +127,10 @@ function RootRouteComponent() {
 
 	if (!initialized) {
 		return (
-			<div className="min-h-screen flex items-center justify-center">
+			<div
+				className="min-h-screen flex items-center justify-center cursor-default select-none"
+				data-tauri-drag-region
+			>
 				<OttoRouterLoader />
 			</div>
 		);
@@ -143,7 +149,15 @@ function OnboardingRouteComponent() {
 }
 
 function ProjectsRouteComponent() {
-	const { onSelectProject } = rootRoute.useRouteContext();
+	const { machine, onSelectProject } = rootRoute.useRouteContext();
+	if (machine) {
+		return (
+			<ConnectedProjectPicker
+				machine={machine}
+				onSelectProject={onSelectProject}
+			/>
+		);
+	}
 	return <ProjectPicker onSelectProject={onSelectProject} />;
 }
 

@@ -11,6 +11,7 @@ interface OttoWindow extends Window {
 		projectId?: string;
 		projectRoot?: string;
 		serverToken?: string;
+		ownerSession?: { token: string; expiresAt?: number };
 	};
 	OTTO_OPEN_URL?: (url: string) => void | Promise<void>;
 	OTTO_SHOW_NOTIFICATION?: (
@@ -123,6 +124,24 @@ export function configureDesktopSdk(
 			serverToken: server.token ?? undefined,
 		};
 	}
+	registerDesktopPlatformAdapters();
+	configureApiClient();
+}
+
+export function configureMachineSdk(
+	apiUrl: string,
+	projectId: string,
+	projectRoot: string,
+	ownerSession: string,
+	ownerSessionExpiresAt: number,
+) {
+	const win = window as OttoWindow;
+	win.OTTO_SERVER_URL = apiUrl;
+	win.OTTO_RUNTIME_CONTEXT = {
+		projectId,
+		projectRoot,
+		ownerSession: { token: ownerSession, expiresAt: ownerSessionExpiresAt },
+	};
 	registerDesktopPlatformAdapters();
 	configureApiClient();
 }

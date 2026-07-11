@@ -1,9 +1,18 @@
 import { client } from '@ottocode/api';
 import {
+	getConfiguredRuntimeApiBaseUrl,
 	getRuntimeApiBaseUrl,
 	getRuntimeProjectContext,
 	setRuntimeApiBaseUrl as persistRuntimeApiBaseUrl,
 } from '../config';
+import { isPlatformDesktop } from '../platform';
+import {
+	consumeShareBoot,
+	getShareAuthHeaders,
+	getSharePinnedProjectId,
+	isShareMode,
+} from '../share-mode';
+import { getOwnerSessionHeaders, onOwnerSessionChange } from '../owner-auth';
 import type { Session, Message } from '../../types/api';
 
 type ApiSession = Record<string, unknown> & {
@@ -47,35 +56,38 @@ export function extractErrorMessage(error: unknown): string {
 }
 
 export function configureApiClient() {
-	const baseURL = getRuntimeApiBaseUrl();
-	const projectContext = getRuntimeProjectContext();
+	// Consume any `?share=` boot token before wiring auth headers so the client
+	// attaches the distinct share credential from the very first request.
+	consumeShareBoot();
+
+	const configuredBaseUrl = getConfiguredRuntimeApiBaseUrl();
+	if (isPlatformDesktop() && !configuredBaseUrl) return;
+	const baseURL = configuredBaseUrl ?? getRuntimeApiBaseUrl();
 	client.setConfig({
 		baseURL,
 		adapter: getClientAdapter(),
-		headers: {
-			...(projectContext?.serverToken
-				? {
-						Authorization: `Bearer ${projectContext.serverToken}`,
-						'X-Otto-Server-Token': projectContext.serverToken,
-					}
-				: {}),
-			...(projectContext?.projectId
-				? { 'X-Otto-Project-Id': projectContext.projectId }
-				: {}),
-			...(projectContext?.projectRoot
-				? { 'X-Otto-Project': projectContext.projectRoot }
-				: {}),
-		},
+		headers: getAuthHeaders(),
 	});
 }
 
 configureApiClient();
+
+// Re-apply auth headers whenever the owner session changes so a freshly
+// exchanged owner bearer is attached to subsequent API calls (retry/bootstrap).
+onOwnerSessionChange(() => {
+	configureApiClient();
+});
 
 export function getBaseUrl(): string {
 	return getRuntimeApiBaseUrl();
 }
 
 export function getProjectId(): string | undefined {
+	// In share mode the project is pinned server-side by the share token; prefer
+	// the resolved pinned project id once it is known.
+	if (isShareMode()) {
+		return getSharePinnedProjectId() ?? getRuntimeProjectContext()?.projectId;
+	}
 	return getRuntimeProjectContext()?.projectId;
 }
 
@@ -84,6 +96,13 @@ export function getProjectRoot(): string | undefined {
 }
 
 export function getAuthHeaders(): Record<string, string> {
+	// Share viewers authenticate with the distinct share token only. The server
+	// pins their project context from the token, so we never send owner-level
+	// daemon credentials or client-supplied project headers in share mode.
+	if (isShareMode()) {
+		return getShareAuthHeaders();
+	}
+
 	const context = getRuntimeProjectContext();
 	return {
 		...(context?.serverToken
@@ -92,6 +111,10 @@ export function getAuthHeaders(): Record<string, string> {
 					'X-Otto-Server-Token': context.serverToken,
 				}
 			: {}),
+		// Memory-only owner session (desktop-supplied or established via the setu
+		// assertion exchange). Attached over tunnels where no local server token
+		// exists; the daemon also honors its Secure HttpOnly cookie same-origin.
+		...getOwnerSessionHeaders(),
 		...(context?.projectId ? { 'X-Otto-Project-Id': context.projectId } : {}),
 		...(context?.projectRoot ? { 'X-Otto-Project': context.projectRoot } : {}),
 	};

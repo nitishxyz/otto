@@ -8,6 +8,13 @@ interface OttoWindow extends Window {
 		projectId?: string;
 		projectRoot?: string;
 		serverToken?: string;
+		// Memory-only owner session bearer supplied by the desktop shell for a
+		// machine window. Never persisted to disk, URL, or web storage.
+		ownerSession?: {
+			token: string;
+			// Absolute epoch milliseconds when the session expires.
+			expiresAt?: number;
+		};
 	};
 }
 
@@ -117,6 +124,9 @@ function computeApiBaseUrl(): string {
 
 	const envUrl = import.meta.env?.VITE_API_BASE_URL;
 	if (envUrl) return normalizeApiBaseUrl(envUrl);
+	if (isPlatformDesktop()) {
+		return '';
+	}
 
 	// Fallback for standalone dev
 	return 'http://localhost:9100';

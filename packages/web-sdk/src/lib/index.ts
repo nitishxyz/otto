@@ -12,4 +12,32 @@ export {
 	normalizeApiBaseUrl,
 	setRuntimeApiBaseUrl,
 } from './config';
+export {
+	SHARE_TOKEN_HEADER,
+	SHARE_TOKEN_STORAGE_KEY,
+	SHARE_PROJECT_ID_STORAGE_KEY,
+	SHARE_QUERY_PARAM,
+	clearShareMode,
+	consumeShareBoot,
+	getShareAuthHeaders,
+	getShareToken,
+	getSharePinnedProjectId,
+	isShareMode,
+	setSharePinnedProjectId,
+} from './share-mode';
+export {
+	OWNER_SESSION_HEADER,
+	OwnerAuthError,
+	authorizeOwnerWithAssertion,
+	beginOwnerAuthorization,
+	clearOwnerSession,
+	getOwnerAuthState,
+	getOwnerSessionHeaders,
+	getOwnerSessionToken,
+	isOwnerAuthenticated,
+	onOwnerSessionChange,
+	requestOwnerChallenge,
+	type OwnerAuthState,
+	type OwnerAuthorizationResult,
+} from './owner-auth';
 export * from './platform';

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Star, X, Link, MessageCircle } from 'lucide-react';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import type { Project } from '../lib/tauri-bridge';
+import { runRemoveProjectFlow } from '../lib/remove-project-flow';
 import { formatTimeAgo } from '../utils/format-time';
 
 export function ProjectCard({
@@ -14,9 +16,34 @@ export function ProjectCard({
 	pinned: boolean;
 	onSelect: () => void;
 	onTogglePin: () => void;
-	onRemove: () => void;
+	onRemove: () => Promise<void> | void;
 }) {
 	const [hovered, setHovered] = useState(false);
+	const [removing, setRemoving] = useState(false);
+	const [removeError, setRemoveError] = useState<string | null>(null);
+
+	const handleRemoveClick = async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		e.preventDefault();
+		if (removing) return;
+		setRemoving(true);
+		setRemoveError(null);
+		try {
+			const result = await runRemoveProjectFlow(
+				() =>
+					confirm(
+						`Remove ${project.name} from the project list? Project files will not be deleted.`,
+						{ title: 'Remove from list', kind: 'warning' },
+					),
+				onRemove,
+			);
+			if (result.status === 'error') {
+				setRemoveError(result.message);
+			}
+		} finally {
+			setRemoving(false);
+		}
+	};
 
 	return (
 		<button
@@ -76,12 +103,11 @@ export function ProjectCard({
 						</button>
 						<button
 							type="button"
-							onClick={(e) => {
-								e.stopPropagation();
-								onRemove();
-							}}
-							className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors"
-							title="Remove"
+							onClick={handleRemoveClick}
+							disabled={removing}
+							className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors disabled:opacity-50"
+							title="Remove from list"
+							aria-label={`Remove ${project.name} from list`}
 						>
 							<X className="w-3.5 h-3.5" />
 						</button>
@@ -92,6 +118,14 @@ export function ProjectCard({
 					</span>
 				)}
 			</div>
+			{removeError && (
+				<span
+					role="alert"
+					className="absolute right-3 -bottom-1 z-10 rounded bg-background px-1.5 text-[11px] text-destructive"
+				>
+					{removeError}
+				</span>
+			)}
 		</button>
 	);
 }

@@ -93,6 +93,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .manage(ServerState::default())
+        .manage(commands::machine::MachineWindowState::default())
         .manage(commands::updater::PendingUpdate(Mutex::new(None)))
         .manage(commands::updater::ReadyUpdate(Mutex::new(None)))
         .manage(InitialProjectState {
@@ -178,6 +179,7 @@ pub fn run() {
             commands::project::toggle_project_pinned,
             commands::project::get_general_workspace_path,
             commands::server::start_server,
+            commands::server::ensure_desktop_daemon,
             commands::server::stop_server,
             commands::server::stop_all_servers,
             commands::server::list_servers,
@@ -200,6 +202,8 @@ pub fn run() {
             commands::git::git_is_repo,
             commands::fonts::list_system_fonts,
             commands::window::create_new_window,
+            commands::window::open_machine_window,
+            commands::machine::get_machine_bootstrap,
             commands::notification::show_native_notification,
             get_initial_project,
             get_initial_remote,

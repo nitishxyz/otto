@@ -43,6 +43,7 @@ import type {
 } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
 import { createErrorResponse } from './runtime/errors/api-error.ts';
+import { tunnelAuthMiddleware } from './tunnel-auth.ts';
 
 // Suppress noisy AI SDK provider warnings unless debug mode is enabled.
 installAiSdkWarningHandler();
@@ -54,6 +55,8 @@ const corsAllowHeaders = [
 	'X-Otto-Project',
 	'X-Otto-Project-Id',
 	'X-Otto-Server-Token',
+	'X-Otto-Share-Token',
+	'X-Otto-Owner-Session',
 	'Access-Control-Request-Private-Network',
 ];
 
@@ -141,6 +144,7 @@ function initApp() {
 	const app = new OpenAPIHono<BlankEnv>();
 	applyPrivateNetworkAccessHeaders(app);
 	app.use('*', cors(buildCorsOptions()));
+	app.use('*', tunnelAuthMiddleware);
 	applyErrorHandler(app);
 	registerRoutes(app);
 	return app;
@@ -167,6 +171,7 @@ export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	const honoApp = new OpenAPIHono<BlankEnv>();
 	applyPrivateNetworkAccessHeaders(honoApp);
 	honoApp.use('*', cors(buildCorsOptions()));
+	honoApp.use('*', tunnelAuthMiddleware);
 	applyErrorHandler(honoApp);
 	registerRoutes(honoApp);
 	return honoApp;
@@ -238,6 +243,7 @@ export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	});
 
 	honoApp.use('*', cors(buildCorsOptions(config.corsOrigins)));
+	honoApp.use('*', tunnelAuthMiddleware);
 	applyErrorHandler(honoApp);
 	registerRoutes(honoApp);
 	return honoApp;
@@ -306,6 +312,10 @@ export {
 	getServerInfo,
 } from './state.ts';
 export { shutdownProjectManager } from './runtime/projects/manager.ts';
+export {
+	restoreManagedTunnel,
+	shutdownActiveTunnels,
+} from './routes/tunnel/service.ts';
 
 // Export WebSocket handler for Bun.serve()
 export { websocket as bunWebSocket } from './ws.ts';

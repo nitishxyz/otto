@@ -9,22 +9,33 @@ import { useSkillsStore } from './skillsStore';
 
 export type TunnelScope = 'remote-control' | 'project-share';
 export type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
+export type TunnelMode = 'managed' | 'quick';
 
 export interface TunnelScopeState {
 	status: TunnelStatus;
 	url: string | null;
 	error: string | null;
 	progress: string | null;
+	mode: TunnelMode;
+	hostname: string | null;
 }
 
 function createScopeState(): TunnelScopeState {
-	return { status: 'idle', url: null, error: null, progress: null };
+	return {
+		status: 'idle',
+		url: null,
+		error: null,
+		progress: null,
+		mode: 'quick',
+		hostname: null,
+	};
 }
 
 interface TunnelState {
 	isExpanded: boolean;
 	remoteControl: TunnelScopeState;
 	projectShare: TunnelScopeState;
+	ottorouterConnected: boolean;
 
 	toggleSidebar: () => void;
 	expandSidebar: () => void;
@@ -35,6 +46,7 @@ interface TunnelState {
 	setScopeProgress: (scope: TunnelScope, progress: string | null) => void;
 	patchScope: (scope: TunnelScope, patch: Partial<TunnelScopeState>) => void;
 	resetScope: (scope: TunnelScope) => void;
+	setOttorouterConnected: (connected: boolean) => void;
 }
 
 function scopeKey(scope: TunnelScope): 'remoteControl' | 'projectShare' {
@@ -55,6 +67,7 @@ export const useTunnelStore = create<TunnelState>((set) => ({
 	isExpanded: false,
 	remoteControl: createScopeState(),
 	projectShare: createScopeState(),
+	ottorouterConnected: false,
 
 	toggleSidebar: () => {
 		set((state) => {
@@ -105,4 +118,7 @@ export const useTunnelStore = create<TunnelState>((set) => ({
 		set(
 			() => ({ [scopeKey(scope)]: createScopeState() }) as Partial<TunnelState>,
 		),
+
+	setOttorouterConnected: (connected) =>
+		set({ ottorouterConnected: connected }),
 }));

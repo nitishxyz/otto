@@ -7,6 +7,9 @@ export interface Project {
 	pinned: boolean;
 	kind?: 'local' | 'remote' | 'general';
 	remoteUrl?: string;
+	projectId?: string;
+	machineOwnerSession?: string;
+	machineOwnerSessionExpiresAt?: number;
 }
 
 export interface ServerInfo {
@@ -74,6 +77,48 @@ export interface NativeNotificationPayload {
 	sessionId?: string;
 }
 
+export interface TunnelDevice {
+	deviceId: string;
+	hostname?: string | null;
+	name?: string | null;
+	lastSeenAt?: string | null;
+	status?: string | null;
+}
+
+export interface MachineBootstrap {
+	deviceId: string;
+	hostname?: string | null;
+	name?: string | null;
+}
+
+export interface MachineProject {
+	id: string;
+	name: string;
+	path: string;
+	open: boolean;
+	lastUsedAt: number;
+}
+
+export type MachineProjectAccess =
+	| {
+			status: 'ready';
+			apiUrl: string;
+			ownerSession: string;
+			ownerSessionExpiresAt: number;
+			projects: MachineProject[];
+	  }
+	| { status: 'offline'; message: string }
+	| { status: 'unavailable'; message: string };
+
+export interface MachineOwnerAuthorizationExchange {
+	loadProjects: () => Promise<MachineProjectAccess>;
+}
+
+export const machineOwnerAuthorizationExchange: MachineOwnerAuthorizationExchange =
+	{
+		loadProjects: () => invoke<MachineProjectAccess>('get_machine_projects'),
+	};
+
 export const isDesktopApp = (): boolean => {
 	try {
 		return '__TAURI__' in window;
@@ -84,15 +129,8 @@ export const isDesktopApp = (): boolean => {
 
 export const tauriBridge = {
 	openProjectDialog: () => invoke<string | null>('open_project_dialog'),
-	getRecentProjects: () => invoke<Project[]>('get_recent_projects'),
-	saveRecentProject: (project: Project) =>
-		invoke('save_recent_project', { project }),
-	removeRecentProject: (path: string) =>
-		invoke('remove_recent_project', { path }),
-	toggleProjectPinned: (path: string) =>
-		invoke('toggle_project_pinned', { path }),
-	getGeneralWorkspacePath: () => invoke<string>('get_general_workspace_path'),
 
+	ensureDesktopDaemon: () => invoke<ServerInfo>('ensure_desktop_daemon'),
 	startServer: (projectPath: string, port?: number) =>
 		invoke<ServerInfo>('start_server', { projectPath, port }),
 	stopServer: (pid: number) => invoke('stop_server', { pid }),
@@ -104,7 +142,10 @@ export const tauriBridge = {
 		invoke('show_native_notification', { notification }),
 
 	createNewWindow: () => invoke('create_new_window'),
-
+	openMachineWindow: (device: TunnelDevice) =>
+		invoke('open_machine_window', { device }),
+	getMachineBootstrap: () =>
+		invoke<MachineBootstrap | null>('get_machine_bootstrap'),
 	getInitialProject: () => invoke<string | null>('get_initial_project'),
 	getInitialRemote: () => invoke<[string, string] | null>('get_initial_remote'),
 

@@ -105,6 +105,16 @@ function sanitizeFilename(filename: string): string {
 	return cleaned.trim() || 'attachment';
 }
 
+function getContentDisposition(filename: string): string {
+	const fallback =
+		filename.replace(/[^\x20-\x7e]|["\\]/g, '_').trim() || 'attachment';
+	const encoded = encodeURIComponent(filename).replace(
+		/[!'()*]/g,
+		(char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+	return `inline; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
 function getAttachmentKind(mimeType: string): StoredAttachmentMetadata['kind'] {
 	const normalized = mimeType.toLowerCase().split(';', 1)[0].trim();
 	if (normalized.startsWith('image/')) return 'image';
@@ -404,7 +414,7 @@ export function registerAttachmentRoutes(app: Hono) {
 					headers: {
 						'Content-Type': metadata.mimeType,
 						'Content-Length': String(metadata.size),
-						'Content-Disposition': `inline; filename="${metadata.filename.replace(/"/g, '')}"`,
+						'Content-Disposition': getContentDisposition(metadata.filename),
 					},
 				});
 			} catch {

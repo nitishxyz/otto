@@ -2,7 +2,7 @@
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
 	"description": "Default capabilities for otto desktop",
-	"windows": ["main", "main-*"],
+	"windows": ["main", "main-*", "machine-*"],
 	"permissions": [
 		"core:default",
 		"core:window:default",

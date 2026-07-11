@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'bun:test';
@@ -8,7 +8,9 @@ import {
 	getProjectStateDir,
 } from '@ottocode/sdk';
 import {
+	forgetProject,
 	listProjects,
+	setProjectPinned,
 	touchProject,
 } from '../packages/server/src/runtime/projects/registry.ts';
 
@@ -61,6 +63,53 @@ describe('project registry', () => {
 			expect(project?.dbPath).not.toBe(
 				join(projectRoot, '.otto', 'otto.sqlite'),
 			);
+		});
+	});
+
+	it('forgets only the recent-list record and preserves project files', async () => {
+		await withProject(
+			'otto-registry-forget-',
+			async (projectRoot, ottoHome) => {
+				const sentinel = join(projectRoot, 'keep.txt');
+				const stateDir = await getProjectStateDir(projectRoot);
+				await writeFile(sentinel, 'keep');
+				await touchProject(projectRoot, 'ignored');
+				await mkdir(stateDir, { recursive: true });
+				await writeFile(join(stateDir, 'otto.sqlite'), '');
+				await writeFile(
+					join(stateDir, 'project.json'),
+					JSON.stringify({ root: projectRoot }),
+				);
+
+				await forgetProject(projectRoot);
+
+				expect(
+					(await listProjects()).some((item) => item.path === projectRoot),
+				).toBe(false);
+				expect(await Bun.file(sentinel).text()).toBe('keep');
+				expect(stateDir.startsWith(ottoHome)).toBe(true);
+				expect(await Bun.file(join(stateDir, 'project.json')).exists()).toBe(
+					true,
+				);
+			},
+		);
+	});
+
+	it('persists pin and unpin state without touching project files', async () => {
+		await withProject('otto-registry-pinned-', async (projectRoot) => {
+			await touchProject(projectRoot, 'ignored');
+			expect(await setProjectPinned(projectRoot, true)).toBe(true);
+			expect(
+				(await listProjects()).find((item) => item.path === projectRoot)
+					?.pinned,
+			).toBe(true);
+
+			expect(await setProjectPinned(projectRoot, false)).toBe(true);
+			expect(
+				(await listProjects()).find((item) => item.path === projectRoot)
+					?.pinned,
+			).toBe(false);
+			expect((await stat(projectRoot)).isDirectory()).toBe(true);
 		});
 	});
 

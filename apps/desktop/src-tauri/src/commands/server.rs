@@ -681,6 +681,16 @@ fn registration_port(registration: &DaemonRegistration) -> Result<u16, String> {
 }
 
 #[tauri::command]
+pub async fn ensure_desktop_daemon(
+    state: State<'_, ServerState>,
+    app: tauri::AppHandle,
+) -> Result<ServerInfo, String> {
+    let workspace = super::project::get_general_workspace_dir()?;
+    std::fs::create_dir_all(&workspace).map_err(|error| error.to_string())?;
+    start_server(workspace.to_string_lossy().to_string(), None, state, app).await
+}
+
+#[tauri::command]
 pub async fn start_server(
     project_path: String,
     port: Option<u16>,

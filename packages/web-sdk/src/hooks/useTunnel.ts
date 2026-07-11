@@ -2,13 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback, useRef } from 'react';
 import {
 	client,
+	createTunnelShare as apiCreateTunnelShare,
 	getTunnelQr,
 	getTunnelStatus,
+	listTunnelShares as apiListTunnelShares,
+	revokeTunnelShare as apiRevokeTunnelShare,
 	startTunnel as apiStartTunnel,
 	stopTunnel as apiStopTunnel,
 } from '@ottocode/api';
 import {
 	useTunnelStore,
+	type TunnelMode,
 	type TunnelScope,
 	type TunnelStatus,
 } from '../stores/tunnelStore';
@@ -16,6 +20,7 @@ import { getProjectId } from '../lib/api-client/utils';
 import { API_BASE_URL } from '../lib/config';
 
 interface TunnelStatusResponse {
+	mode: TunnelMode;
 	scope: TunnelScope;
 	projectId: string | null;
 	status: TunnelStatus;
@@ -23,12 +28,15 @@ interface TunnelStatusResponse {
 	error: string | null;
 	binaryInstalled: boolean;
 	isRunning: boolean;
+	hostname: string | null;
+	ottorouterConnected: boolean;
 }
 
 interface TunnelStartResponse {
 	ok: boolean;
 	url?: string | null;
 	message?: string;
+	code?: string;
 	error?: string;
 }
 
@@ -39,15 +47,25 @@ interface TunnelQrResponse {
 	error?: string;
 }
 
+export interface TunnelShare {
+	id: string;
+	projectId: string;
+	token: string;
+	url: string;
+	createdAt: number;
+}
+
 export interface TunnelScopeArgs {
 	scope: TunnelScope;
+	mode?: TunnelMode;
 	projectId?: string | null;
 }
 
 function scopeQuery(args: TunnelScopeArgs) {
-	const query: { scope: TunnelScope; projectId?: string } = {
+	const query: { scope: TunnelScope; mode?: TunnelMode; projectId?: string } = {
 		scope: args.scope,
 	};
+	if (args.mode) query.mode = args.mode;
 	if (args.scope === 'project-share' && args.projectId) {
 		query.projectId = args.projectId;
 	}
@@ -91,10 +109,15 @@ async function startTunnel(
 	const response = await apiStartTunnel({
 		body: {
 			scope: args.scope,
+			...(args.mode ? { mode: args.mode } : {}),
 			...(projectId ? { projectId } : {}),
 		},
 	});
-	if (response.error) throw new Error(JSON.stringify(response.error));
+	if (response.error) {
+		const data = response.data as TunnelStartResponse | undefined;
+		if (data && data.ok === false) return data;
+		throw new Error(JSON.stringify(response.error));
+	}
 	return response.data as TunnelStartResponse;
 }
 
@@ -121,8 +144,18 @@ async function fetchTunnelQr(args: TunnelScopeArgs): Promise<TunnelQrResponse> {
 export function useTunnelStatus(args: TunnelScopeArgs) {
 	const patchScope = useTunnelStore((s) => s.patchScope);
 
+	const setOttorouterConnected = useTunnelStore(
+		(s) => s.setOttorouterConnected,
+	);
+
 	const query = useQuery<TunnelStatusResponse>({
-		queryKey: ['tunnel', 'status', args.scope, resolveProjectId(args) ?? null],
+		queryKey: [
+			'tunnel',
+			'status',
+			args.scope,
+			args.mode ?? 'quick',
+			resolveProjectId(args) ?? null,
+		],
 		queryFn: () => fetchTunnelStatus(args),
 		refetchInterval: 3000,
 		refetchOnMount: 'always',
@@ -135,9 +168,12 @@ export function useTunnelStatus(args: TunnelScopeArgs) {
 				status: normalizeTunnelStatus(query.data),
 				url: query.data.url,
 				error: query.data.error,
+				mode: query.data.mode,
+				hostname: query.data.hostname,
 			});
+			setOttorouterConnected(query.data.ottorouterConnected);
 		}
-	}, [query.data, patchScope, args.scope]);
+	}, [query.data, patchScope, setOttorouterConnected, args.scope]);
 
 	return query;
 }
@@ -204,7 +240,14 @@ export function useTunnelQr(args: TunnelScopeArgs) {
 	);
 
 	return useQuery<TunnelQrResponse>({
-		queryKey: ['tunnel', 'qr', args.scope, resolveProjectId(args) ?? null, url],
+		queryKey: [
+			'tunnel',
+			'qr',
+			args.scope,
+			args.mode ?? 'quick',
+			resolveProjectId(args) ?? null,
+			url,
+		],
 		queryFn: () => fetchTunnelQr(args),
 		enabled: !!url && isProjectShareReady(args),
 	});
@@ -224,6 +267,7 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 		}
 
 		const query: Record<string, string> = { scope: args.scope };
+		if (args.mode) query.mode = args.mode;
 		if (args.scope === 'project-share' && projectId) {
 			query.projectId = projectId;
 		}
@@ -246,6 +290,10 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 						url: data.url,
 						error: data.error,
 						progress: data.progress,
+						...(data.mode ? { mode: data.mode } : {}),
+						...(typeof data.hostname !== 'undefined'
+							? { hostname: data.hostname }
+							: {}),
 					});
 				}
 			} catch {
@@ -262,7 +310,7 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 			es.close();
 			eventSourceRef.current = null;
 		};
-	}, [patchScope, args.scope, projectId]);
+	}, [patchScope, args.scope, args.mode, projectId]);
 
 	useEffect(() => {
 		if (isExpanded && ready) {
@@ -278,4 +326,57 @@ export function useTunnelStream(args: TunnelScopeArgs) {
 	}, [isExpanded, ready, connect]);
 
 	return { connect };
+}
+
+const TUNNEL_SHARES_KEY = ['tunnel', 'shares'] as const;
+
+/** Lists active managed project shares. */
+export function useTunnelShares(enabled = true) {
+	return useQuery<TunnelShare[]>({
+		queryKey: TUNNEL_SHARES_KEY,
+		queryFn: async () => {
+			const response = await apiListTunnelShares();
+			if (response.error) throw new Error(JSON.stringify(response.error));
+			return (response.data?.shares ?? []) as TunnelShare[];
+		},
+		enabled,
+		refetchInterval: 5000,
+	});
+}
+
+/** Creates a managed project share for the given project. */
+export function useCreateTunnelShare() {
+	const queryClient = useQueryClient();
+	return useMutation<TunnelShare, Error, string>({
+		mutationFn: async (projectId: string) => {
+			const response = await apiCreateTunnelShare({ body: { projectId } });
+			if (response.error) throw new Error(extractShareError(response.error));
+			return response.data as TunnelShare;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: TUNNEL_SHARES_KEY });
+		},
+	});
+}
+
+/** Revokes a managed project share by id. */
+export function useRevokeTunnelShare() {
+	const queryClient = useQueryClient();
+	return useMutation<void, Error, string>({
+		mutationFn: async (id: string) => {
+			const response = await apiRevokeTunnelShare({ path: { id } });
+			if (response.error) throw new Error(extractShareError(response.error));
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: TUNNEL_SHARES_KEY });
+		},
+	});
+}
+
+function extractShareError(error: unknown): string {
+	if (error && typeof error === 'object' && 'error' in error) {
+		const message = (error as { error?: unknown }).error;
+		if (typeof message === 'string') return message;
+	}
+	return JSON.stringify(error);
 }

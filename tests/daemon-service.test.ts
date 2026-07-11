@@ -22,7 +22,12 @@ import {
 	type DaemonPaths,
 	type DaemonRegistration,
 } from '../apps/cli/src/daemon.ts';
-import { serveApi } from '../apps/cli/src/commands/serve.ts';
+import {
+	createSameOriginFetch,
+	serveApi,
+} from '../apps/cli/src/commands/serve.ts';
+import { assetPaths } from '../apps/cli/src/web-assets.ts';
+import { createWebUIFetch } from '../apps/cli/src/web-server.ts';
 
 const tempRoots: string[] = [];
 
@@ -114,6 +119,37 @@ describe('daemon service', () => {
 		expect(getPreferredDaemonPort(49_002, { OTTO_DAEMON_PORT: '49001' })).toBe(
 			49_002,
 		);
+	});
+
+	it('routes daemon APIs and browser navigation on the same origin', async () => {
+		const apiFetch = (async (request: Request) =>
+			new Response(`api:${new URL(request.url).pathname}`)) as NonNullable<
+			Parameters<typeof Bun.serve>[0]['fetch']
+		>;
+		const routedFetch = createSameOriginFetch(
+			apiFetch,
+			createWebUIFetch(null),
+		) as unknown as (request: Request) => Promise<Response>;
+
+		for (const pathname of ['/v1/server/info', '/openapi.json']) {
+			const response = await routedFetch(
+				new Request(`https://device.example${pathname}`),
+			);
+			expect(await response.text()).toBe(`api:${pathname}`);
+		}
+
+		const navigation = await routedFetch(
+			new Request('https://device.example/sessions/example'),
+		);
+		const html = await navigation.text();
+		expect(navigation.headers.get('content-type')).toContain('text/html');
+		expect(html).toContain('window.OTTO_SERVER_URL = "https://device.example"');
+
+		const asset = await routedFetch(
+			new Request(`https://device.example${assetPaths.assets.js[0]}`),
+		);
+		expect(asset.status).toBe(200);
+		expect(asset.headers.get('content-type')).toContain('javascript');
 	});
 
 	it('fails without fallback when the daemon port is unavailable', () => {

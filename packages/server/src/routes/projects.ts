@@ -13,6 +13,7 @@ const projectSummarySchema = z.object({
 	openedAt: z.number().optional(),
 	lastUsedAt: z.number(),
 	open: z.boolean(),
+	pinned: z.boolean(),
 });
 
 const projectListResponseSchema = z.object({
@@ -31,6 +32,7 @@ const projectIdParamsSchema = z.object({
 });
 
 const projectActionResponseSchema = z.object({ ok: z.boolean() });
+const projectPinnedBodySchema = z.object({ pinned: z.boolean() });
 const projectErrorSchema = z.object({ error: z.string() });
 
 export function registerProjectsRoutes(app: Hono) {
@@ -125,6 +127,50 @@ export function registerProjectsRoutes(app: Hono) {
 			);
 			return project
 				? c.json(project)
+				: c.json({ error: 'Project not found' }, 404);
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'patch',
+			path: '/v1/projects/{projectId}/pinned',
+			tags: ['projects'],
+			operationId: 'setProjectPinned',
+			summary: 'Pin or unpin a known project',
+			request: {
+				params: projectIdParamsSchema,
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: projectPinnedBodySchema },
+					},
+				},
+			},
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': { schema: projectActionResponseSchema },
+					},
+				},
+				'404': {
+					description: 'Not Found',
+					content: {
+						'application/json': { schema: projectErrorSchema },
+					},
+				},
+			},
+		},
+		async (c) => {
+			const body = projectPinnedBodySchema.parse(await c.req.json());
+			const updated = await getProjectManager().setProjectPinned(
+				c.req.param('projectId'),
+				body.pinned,
+			);
+			return updated
+				? c.json({ ok: true })
 				: c.json({ error: 'Project not found' }, 404);
 		},
 	);

@@ -15,7 +15,12 @@ import {
 import { realpath, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { shutdownPartContentWriter } from '../persistence/part-content-writer.ts';
-import { forgetProject, listProjects, touchProject } from './registry.ts';
+import {
+	forgetProject,
+	listProjects,
+	setProjectPinned,
+	touchProject,
+} from './registry.ts';
 
 export interface ProjectRef {
 	id: string;
@@ -43,6 +48,7 @@ export interface ProjectRuntimeSummary {
 	openedAt?: number;
 	lastUsedAt: number;
 	open: boolean;
+	pinned: boolean;
 }
 
 const CONFIG_STALENESS_CHECK_INTERVAL_MS = 2000;
@@ -134,10 +140,17 @@ export class ProjectManager {
 	}
 
 	async listProjects(): Promise<ProjectRuntimeSummary[]> {
+		const registeredProjects = await listProjects();
+		const pinnedById = new Map(
+			registeredProjects.map((project) => [project.id, project.pinned]),
+		);
 		const openProjects = this.listOpenProjects();
+		for (const project of openProjects) {
+			project.pinned = pinnedById.get(project.id) ?? false;
+		}
 		const byId = new Map(openProjects.map((project) => [project.id, project]));
 
-		for (const project of await listProjects()) {
+		for (const project of registeredProjects) {
 			if (byId.has(project.id)) continue;
 			byId.set(project.id, {
 				id: project.id,
@@ -147,6 +160,7 @@ export class ProjectManager {
 				dbPath: project.dbPath,
 				lastUsedAt: project.lastSeenAt,
 				open: false,
+				pinned: project.pinned,
 			});
 		}
 
@@ -181,6 +195,13 @@ export class ProjectManager {
 		await this.closeProject(project.id);
 		await forgetProject(project.path);
 		return project;
+	}
+
+	async setProjectPinned(id: string, pinned: boolean): Promise<boolean> {
+		const project = (await this.listProjects()).find((item) => item.id === id);
+		if (!project) return false;
+		await touchProject(project.path, project.dbPath);
+		return setProjectPinned(project.path, pinned);
 	}
 
 	touchProject(id: string): void {
@@ -272,5 +293,6 @@ function toProjectRuntimeSummary(
 		openedAt: runtime.openedAt,
 		lastUsedAt: runtime.lastUsedAt,
 		open: true,
+		pinned: false,
 	};
 }

@@ -8,13 +8,38 @@ import {
 	killStaleTunnels,
 	logger,
 	OttoTunnel,
+	provisionManagedTunnel,
+	type ManagedTunnelAuth,
+	type ManagedTunnelProvision,
+	type ManagedTunnelProvisionOptions,
 } from '@ottocode/sdk';
-import { getServerPort } from '../../state.ts';
+import { getServerInfo, getServerPort } from '../../state.ts';
+import { isBlockedProjectSharePath } from '../../tunnel-auth.ts';
+import { getOttoRouterOAuthAuth } from '../ottorouter/service.ts';
+import {
+	readManagedTunnelDesiredState,
+	writeManagedTunnelDesiredState,
+} from './managed-state.ts';
+import { clearOwnerAuthorizationState } from './owner-auth.ts';
+import {
+	clearTunnelShares,
+	createTunnelShare,
+	listTunnelShares,
+	revokeTunnelShare,
+} from './shares.ts';
 
 export type TunnelScope = 'remote-control' | 'project-share';
+export type TunnelMode = 'managed' | 'quick';
 type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
 
 type TunnelFactory = () => OttoTunnel;
+type ManagedAuthProvider = () => Promise<{ accessToken: string } | null>;
+type ManagedProvisioner = (
+	auth: ManagedTunnelAuth,
+	options: ManagedTunnelProvisionOptions,
+) => Promise<ManagedTunnelProvision>;
+type ManagedStateReader = typeof readManagedTunnelDesiredState;
+type ManagedStateWriter = typeof writeManagedTunnelDesiredState;
 
 interface TunnelSlot {
 	scope: TunnelScope;
@@ -31,10 +56,28 @@ interface TunnelSlot {
 export interface TunnelScopeOptions {
 	scope?: TunnelScope;
 	projectId?: string;
+	mode?: TunnelMode;
 }
 
 const tunnelSlots = new Map<string, TunnelSlot>();
+const managedShareIds = new Map<string, string>();
 let tunnelFactory: TunnelFactory = () => new OttoTunnel();
+let managedAuthProvider: ManagedAuthProvider = getOttoRouterOAuthAuth;
+let managedProvisioner: ManagedProvisioner = provisionManagedTunnel;
+let managedStateReader: ManagedStateReader = readManagedTunnelDesiredState;
+let managedStateWriter: ManagedStateWriter = writeManagedTunnelDesiredState;
+let managedStartPromise: Promise<void> | null = null;
+const managedTunnel: TunnelSlot & { hostname: string | null } = {
+	scope: 'remote-control',
+	projectId: null,
+	activeTunnel: null,
+	proxyServer: null,
+	url: null,
+	status: 'idle',
+	error: null,
+	progress: null,
+	hostname: null,
+};
 
 function getTunnelKey(options: TunnelScopeOptions = {}) {
 	const scope = options.scope ?? 'remote-control';
@@ -83,6 +126,30 @@ function validateScope(options: TunnelScopeOptions = {}) {
 }
 
 function getCurrentTunnelState(options: TunnelScopeOptions = {}) {
+	if (options.mode === 'managed') {
+		const projectId =
+			options.scope === 'project-share' ? options.projectId : null;
+		const shareId = projectId ? managedShareIds.get(projectId) : undefined;
+		const share = shareId
+			? listTunnelShares().find((item) => item.id === shareId)
+			: undefined;
+		const daemonRunning = managedTunnel.activeTunnel?.isRunning ?? false;
+		const isRunning = projectId
+			? Boolean(share) && daemonRunning
+			: daemonRunning;
+		return {
+			scope: options.scope ?? 'remote-control',
+			projectId: projectId ?? null,
+			status: projectId && !share ? 'idle' : managedTunnel.status,
+			url: projectId ? (share?.url ?? null) : managedTunnel.url,
+			error: managedTunnel.error,
+			isRunning,
+			progress: managedTunnel.progress,
+			mode: 'managed' as const,
+			hostname: managedTunnel.hostname,
+		};
+	}
+
 	const slot = getExistingTunnelSlot(options);
 	const isRunning = slot.activeTunnel?.isRunning ?? false;
 	const status = isRunning
@@ -99,16 +166,9 @@ function getCurrentTunnelState(options: TunnelScopeOptions = {}) {
 		error: slot.error,
 		isRunning,
 		progress: slot.progress,
+		mode: 'quick' as const,
+		hostname: null,
 	};
-}
-
-function isBlockedProjectSharePath(pathname: string) {
-	return (
-		pathname === '/v1/projects' ||
-		pathname.startsWith('/v1/projects/') ||
-		pathname === '/v1/tunnel' ||
-		pathname.startsWith('/v1/tunnel/')
-	);
 }
 
 function startProjectScopeProxy(
@@ -206,6 +266,10 @@ function stopProxyServer(slot: TunnelSlot) {
 export async function getTunnelStatus(options: TunnelScopeOptions = {}) {
 	const binaryInstalled = await isTunnelBinaryInstalled();
 	const state = getCurrentTunnelState(options);
+	let ottorouterConnected = false;
+	try {
+		ottorouterConnected = Boolean(await managedAuthProvider());
+	} catch {}
 
 	return {
 		scope: state.scope,
@@ -215,7 +279,171 @@ export async function getTunnelStatus(options: TunnelScopeOptions = {}) {
 		error: state.error,
 		binaryInstalled,
 		isRunning: state.isRunning,
+		mode: state.mode,
+		hostname: state.hostname,
+		ottorouterConnected,
 	};
+}
+
+async function startManagedTunnelUnlocked(
+	options: TunnelScopeOptions,
+	persistDesiredState = true,
+) {
+	const scope = options.scope ?? 'remote-control';
+	if (scope === 'project-share' && options.projectId) {
+		const existingId = managedShareIds.get(options.projectId);
+		const existing = existingId
+			? listTunnelShares().find((item) => item.id === existingId)
+			: undefined;
+		if (existing) {
+			return {
+				ok: true,
+				mode: 'managed' as const,
+				scope,
+				projectId: options.projectId,
+				url: existing.url,
+				message: 'Project share already active',
+			};
+		}
+		if (existingId) managedShareIds.delete(options.projectId);
+	}
+
+	try {
+		if (!managedTunnel.activeTunnel?.isRunning) {
+			const auth = await managedAuthProvider();
+			if (!auth) {
+				return {
+					ok: false as const,
+					mode: 'managed' as const,
+					scope,
+					projectId: scope === 'project-share' ? options.projectId : null,
+					code: 'ottorouter_not_connected',
+					error: 'Connect OttoRouter before starting a managed tunnel',
+				};
+			}
+
+			const localPort = getServerPort();
+			if (!localPort) {
+				throw new Error('Daemon server port is not available');
+			}
+
+			await killStaleTunnels();
+			managedTunnel.status = 'starting';
+			managedTunnel.error = null;
+			managedTunnel.progress = 'Provisioning managed tunnel...';
+			const provision = await managedProvisioner(
+				{ accessToken: auth.accessToken },
+				{
+					localPort,
+					daemonVersion: getServerInfo().version ?? 'unknown',
+				},
+			);
+
+			const tunnel = tunnelFactory();
+			managedTunnel.activeTunnel = tunnel;
+			managedTunnel.hostname = provision.hostname;
+			managedTunnel.url = provision.url;
+			await tunnel.startManaged(
+				provision.tunnel_token,
+				provision.url,
+				(message) => {
+					managedTunnel.progress = message;
+				},
+			);
+			managedTunnel.status = 'connected';
+			managedTunnel.progress = null;
+
+			tunnel.on('error', (error) => {
+				logger.error('Managed tunnel error:', error);
+				managedTunnel.error = error.message;
+				managedTunnel.status = 'error';
+			});
+			tunnel.on('exit', () => {
+				managedTunnel.status = 'idle';
+				managedTunnel.url = null;
+				managedTunnel.hostname = null;
+				managedTunnel.activeTunnel = null;
+			});
+		}
+
+		if (scope === 'project-share' && options.projectId) {
+			const share = createTunnelShare(
+				options.projectId,
+				managedTunnel.url ?? '',
+			);
+			managedShareIds.set(options.projectId, share.id);
+			if (persistDesiredState) await managedStateWriter(true);
+			return {
+				ok: true,
+				mode: 'managed' as const,
+				scope,
+				projectId: options.projectId,
+				url: share.url,
+				message: 'Project share started',
+			};
+		}
+		if (persistDesiredState) await managedStateWriter(true);
+
+		return {
+			ok: true,
+			mode: 'managed' as const,
+			scope,
+			projectId: null,
+			url: managedTunnel.url,
+			message: 'Managed tunnel started',
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		managedTunnel.status = 'error';
+		managedTunnel.error = message;
+		managedTunnel.progress = null;
+		managedTunnel.activeTunnel?.stop();
+		managedTunnel.activeTunnel = null;
+		managedTunnel.url = null;
+		managedTunnel.hostname = null;
+		logger.error('Failed to start managed tunnel:', error);
+		return {
+			ok: false as const,
+			mode: 'managed' as const,
+			scope,
+			projectId: scope === 'project-share' ? options.projectId : null,
+			error: message,
+		};
+	}
+}
+
+async function startManagedTunnel(
+	options: TunnelScopeOptions,
+	persistDesiredState = true,
+) {
+	if (managedStartPromise) {
+		await managedStartPromise;
+		return startManagedTunnelUnlocked(options, persistDesiredState);
+	}
+
+	const operation = startManagedTunnelUnlocked(options, persistDesiredState);
+	const pending = operation.then(() => {});
+	managedStartPromise = pending;
+	try {
+		return await operation;
+	} finally {
+		if (managedStartPromise === pending) managedStartPromise = null;
+	}
+}
+
+/** Restores the desired managed daemon tunnel without blocking daemon startup. */
+export async function restoreManagedTunnel(): Promise<void> {
+	const desired = await managedStateReader();
+	if (!desired.enabled) return;
+	managedTunnel.status = 'starting';
+	managedTunnel.error = null;
+	managedTunnel.progress = 'Restoring managed tunnel...';
+	const result = await startManagedTunnel({ mode: 'managed' }, false);
+	if (!result.ok) {
+		managedTunnel.status = 'error';
+		managedTunnel.error = result.error ?? 'Managed tunnel restore failed';
+		managedTunnel.progress = null;
+	}
 }
 
 export async function startTunnel(
@@ -224,11 +452,13 @@ export async function startTunnel(
 ) {
 	const validation = validateScope(options);
 	if (!validation.ok) return validation;
+	if (options.mode === 'managed') return startManagedTunnel(options);
 
 	const slot = getTunnelSlot(options);
 	if (slot.activeTunnel?.isRunning) {
 		return {
 			ok: true,
+			mode: 'quick' as const,
 			scope: slot.scope,
 			projectId: slot.projectId,
 			url: slot.url,
@@ -285,6 +515,7 @@ export async function startTunnel(
 
 		return {
 			ok: true,
+			mode: 'quick' as const,
 			scope: slot.scope,
 			projectId: slot.projectId,
 			url: slot.url,
@@ -300,6 +531,7 @@ export async function startTunnel(
 		logger.error('Failed to start tunnel:', error);
 		return {
 			ok: false,
+			mode: 'quick' as const,
 			scope: slot.scope,
 			projectId: slot.projectId,
 			error: message,
@@ -326,6 +558,7 @@ export function registerExternalTunnel(
 
 	return {
 		ok: true,
+		mode: 'quick' as const,
 		scope: slot.scope,
 		projectId: slot.projectId,
 		url: slot.url,
@@ -333,14 +566,45 @@ export function registerExternalTunnel(
 	};
 }
 
-export function stopTunnel(options: TunnelScopeOptions = {}) {
+export async function stopTunnel(options: TunnelScopeOptions = {}) {
 	const validation = validateScope(options);
 	if (!validation.ok) return validation;
+	if (options.mode === 'managed') {
+		const scope = options.scope ?? 'remote-control';
+		if (scope === 'project-share' && options.projectId) {
+			const shareId = managedShareIds.get(options.projectId);
+			if (shareId) revokeTunnelShare(shareId);
+			managedShareIds.delete(options.projectId);
+			return {
+				ok: true,
+				mode: 'managed' as const,
+				scope,
+				projectId: options.projectId,
+				message: shareId ? 'Project share stopped' : 'No project share active',
+			};
+		}
+
+		await managedStateWriter(false);
+		managedTunnel.activeTunnel?.stop();
+		managedTunnel.activeTunnel = null;
+		managedTunnel.url = null;
+		managedTunnel.hostname = null;
+		managedTunnel.status = 'idle';
+		managedTunnel.error = null;
+		return {
+			ok: true,
+			mode: 'managed' as const,
+			scope,
+			projectId: null,
+			message: 'Managed tunnel stopped',
+		};
+	}
 
 	const slot = getTunnelSlot(options);
 	if (!slot.activeTunnel) {
 		return {
 			ok: true,
+			mode: 'quick' as const,
 			scope: slot.scope,
 			projectId: slot.projectId,
 			message: 'No tunnel running',
@@ -365,6 +629,7 @@ export function stopTunnel(options: TunnelScopeOptions = {}) {
 		const message = error instanceof Error ? error.message : String(error);
 		return {
 			ok: false,
+			mode: 'quick' as const,
 			scope: slot.scope,
 			projectId: slot.projectId,
 			error: message,
@@ -373,31 +638,34 @@ export function stopTunnel(options: TunnelScopeOptions = {}) {
 }
 
 export async function getTunnelQRCode(options: TunnelScopeOptions = {}) {
-	const slot = getExistingTunnelSlot(options);
-	if (!slot.url) {
+	const state = getCurrentTunnelState(options);
+	if (!state.url) {
 		return {
 			ok: false,
-			scope: slot.scope,
-			projectId: slot.projectId,
+			mode: state.mode,
+			scope: state.scope,
+			projectId: state.projectId,
 			error: 'No tunnel URL available',
 		};
 	}
 
 	try {
-		const qrCode = await generateQRCode(slot.url);
+		const qrCode = await generateQRCode(state.url);
 		return {
 			ok: true,
-			scope: slot.scope,
-			projectId: slot.projectId,
-			url: slot.url,
+			mode: state.mode,
+			scope: state.scope,
+			projectId: state.projectId,
+			url: state.url,
 			qrCode,
 		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		return {
 			ok: false,
-			scope: slot.scope,
-			projectId: slot.projectId,
+			mode: state.mode,
+			scope: state.scope,
+			projectId: state.projectId,
 			error: message,
 		};
 	}
@@ -437,7 +705,22 @@ export async function handleTunnelStream(c: Context) {
 	});
 }
 
+/** Stops runtime tunnel processes without changing persisted desired state. */
+export function shutdownActiveTunnels(): void {
+	stopActiveTunnel();
+}
+
 export function stopActiveTunnel() {
+	managedTunnel.activeTunnel?.stop();
+	managedTunnel.activeTunnel = null;
+	managedTunnel.url = null;
+	managedTunnel.hostname = null;
+	managedTunnel.status = 'idle';
+	managedTunnel.error = null;
+	managedTunnel.progress = null;
+	managedShareIds.clear();
+	clearTunnelShares();
+	clearOwnerAuthorizationState();
 	for (const slot of tunnelSlots.values()) {
 		if (slot.activeTunnel) {
 			slot.activeTunnel.stop();
@@ -474,7 +757,9 @@ export function setExternalTunnel(tunnel: OttoTunnel, url: string) {
 }
 
 export function getActiveTunnelUrl(): string | null {
-	return getExistingTunnelSlot({ scope: 'remote-control' }).url;
+	return (
+		managedTunnel.url ?? getExistingTunnelSlot({ scope: 'remote-control' }).url
+	);
 }
 
 export function getTunnelScopeOptionsFromContext(
@@ -485,9 +770,11 @@ export function getTunnelScopeOptionsFromContext(
 		| undefined;
 	const projectId =
 		c.req.query('projectId') || c.req.header('X-Otto-Project-Id') || undefined;
+	const mode = c.req.query('mode') === 'managed' ? 'managed' : 'quick';
 	return {
 		scope: scope === 'project-share' ? scope : 'remote-control',
 		projectId,
+		mode,
 	};
 }
 
@@ -495,9 +782,26 @@ export const tunnelTesting = {
 	setTunnelFactory(factory: TunnelFactory) {
 		tunnelFactory = factory;
 	},
+	setManagedAuthProvider(provider: ManagedAuthProvider) {
+		managedAuthProvider = provider;
+	},
+	setManagedProvisioner(provisioner: ManagedProvisioner) {
+		managedProvisioner = provisioner;
+	},
+	setManagedStateReader(reader: ManagedStateReader) {
+		managedStateReader = reader;
+	},
+	setManagedStateWriter(writer: ManagedStateWriter) {
+		managedStateWriter = writer;
+	},
 	reset() {
 		stopActiveTunnel();
 		tunnelSlots.clear();
 		tunnelFactory = () => new OttoTunnel();
+		managedAuthProvider = getOttoRouterOAuthAuth;
+		managedProvisioner = provisionManagedTunnel;
+		managedStateReader = readManagedTunnelDesiredState;
+		managedStateWriter = writeManagedTunnelDesiredState;
+		managedStartPromise = null;
 	},
 };

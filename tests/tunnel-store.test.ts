@@ -1,11 +1,23 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { useTunnelStore } from '../packages/web-sdk/src/stores/tunnelStore';
 
+function idleScope() {
+	return {
+		status: 'idle' as const,
+		url: null,
+		error: null,
+		progress: null,
+		mode: 'quick' as const,
+		hostname: null,
+	};
+}
+
 function resetStore() {
 	useTunnelStore.setState({
 		isExpanded: false,
-		remoteControl: { status: 'idle', url: null, error: null, progress: null },
-		projectShare: { status: 'idle', url: null, error: null, progress: null },
+		remoteControl: idleScope(),
+		projectShare: idleScope(),
+		ottorouterConnected: false,
 	});
 }
 
@@ -73,6 +85,43 @@ describe('tunnelStore scope isolation', () => {
 		expect(state.projectShare.status).toBe('error');
 		expect(state.projectShare.error).toBe('boom');
 		expect(state.remoteControl.progress).toBe('Connecting...');
+		expect(state.remoteControl.status).toBe('idle');
+	});
+
+	test('patchScope updates mode and hostname independently', () => {
+		const { patchScope } = useTunnelStore.getState();
+		patchScope('remote-control', {
+			mode: 'managed',
+			hostname: 'device.ottorouter.org',
+			status: 'connected',
+		});
+
+		const state = useTunnelStore.getState();
+		expect(state.remoteControl.mode).toBe('managed');
+		expect(state.remoteControl.hostname).toBe('device.ottorouter.org');
+		expect(state.projectShare.mode).toBe('quick');
+		expect(state.projectShare.hostname).toBeNull();
+	});
+
+	test('setOttorouterConnected toggles the shared flag', () => {
+		const { setOttorouterConnected } = useTunnelStore.getState();
+		expect(useTunnelStore.getState().ottorouterConnected).toBe(false);
+		setOttorouterConnected(true);
+		expect(useTunnelStore.getState().ottorouterConnected).toBe(true);
+	});
+
+	test('resetScope restores default mode and hostname', () => {
+		const { patchScope, resetScope } = useTunnelStore.getState();
+		patchScope('remote-control', {
+			mode: 'managed',
+			hostname: 'device.ottorouter.org',
+			status: 'connected',
+		});
+		resetScope('remote-control');
+
+		const state = useTunnelStore.getState();
+		expect(state.remoteControl.mode).toBe('quick');
+		expect(state.remoteControl.hostname).toBeNull();
 		expect(state.remoteControl.status).toBe('idle');
 	});
 });

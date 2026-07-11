@@ -5,21 +5,36 @@ import {
 	beforeEach,
 	afterEach,
 	beforeAll,
+	afterAll,
 } from 'bun:test';
 import {
 	createApp,
 	createStandaloneApp,
 	createEmbeddedApp,
+	shutdownProjectManager,
 } from '@ottocode/server';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const tempProjectBase = join(tmpdir(), 'otto-server-standalone-tests');
+const originalOttoHome = process.env.OTTO_HOME;
+const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 beforeAll(async () => {
 	await rm(tempProjectBase, { recursive: true, force: true });
 	await mkdir(tempProjectBase, { recursive: true });
+	process.env.OTTO_HOME = join(tempProjectBase, 'otto-home');
+	process.env.XDG_CONFIG_HOME = join(tempProjectBase, 'xdg-config');
+});
+
+afterAll(async () => {
+	await shutdownProjectManager();
+	if (originalOttoHome === undefined) delete process.env.OTTO_HOME;
+	else process.env.OTTO_HOME = originalOttoHome;
+	if (originalXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+	else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+	await rm(tempProjectBase, { recursive: true, force: true });
 });
 
 function createTempProjectRoot() {
@@ -122,7 +137,7 @@ describe('AskService with Config Injection', () => {
 		};
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
 		for (const [key, value] of Object.entries(originalEnv)) {
 			if (value !== undefined) {
 				process.env[key] = value;
@@ -130,6 +145,8 @@ describe('AskService with Config Injection', () => {
 				delete process.env[key];
 			}
 		}
+		await shutdownProjectManager();
+		await rm(tempProjectRoot, { recursive: true, force: true });
 	});
 
 	test('accepts skipFileConfig flag', async () => {
@@ -271,6 +288,11 @@ describe('API Route Integration', () => {
 
 	beforeEach(async () => {
 		tempProjectRoot = await createTempProjectRoot();
+	});
+
+	afterEach(async () => {
+		await shutdownProjectManager();
+		await rm(tempProjectRoot, { recursive: true, force: true });
 	});
 
 	test('POST /v1/ask accepts skipFileConfig in body', async () => {

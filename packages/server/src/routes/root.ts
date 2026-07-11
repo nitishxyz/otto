@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { getOttoHomeDir } from '@ottocode/sdk';
 import { getServerInfo } from '../state.ts';
+import { isDaemonTokenAuthorized } from '../tunnel-auth.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const rootResponseSchema = z.string();
@@ -14,27 +14,11 @@ const serverInfoSchema = z.object({
 	startedAt: z.number(),
 });
 
-function serverTokenPath(): string {
-	return `${getOttoHomeDir().replace(/\/$/, '')}/server-token`;
-}
-
 async function isDaemonHealthAuthorized(
 	c: Parameters<Parameters<typeof zodOpenApiRoute>[2]>[0],
 ) {
 	if (!process.env.OTTO_DAEMON_ID) return true;
-	const auth = c.req.header('authorization') || '';
-	const headerToken = c.req.header('x-otto-server-token');
-	const bearerToken = auth.toLowerCase().startsWith('bearer ')
-		? auth.slice(7).trim()
-		: undefined;
-	const provided = headerToken || bearerToken;
-	if (!provided) return false;
-	try {
-		const token = (await Bun.file(serverTokenPath()).text()).trim();
-		return token.length > 0 && token === provided;
-	} catch {
-		return false;
-	}
+	return isDaemonTokenAuthorized(c);
 }
 
 export function registerRootRoutes(app: Hono) {

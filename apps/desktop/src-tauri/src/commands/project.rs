@@ -22,7 +22,7 @@ fn get_projects_config_path() -> Result<PathBuf, String> {
         .map(|p| p.join(".otto").join("desktop-projects.json"))
 }
 
-fn get_general_workspace_dir() -> Result<PathBuf, String> {
+pub(crate) fn get_general_workspace_dir() -> Result<PathBuf, String> {
     let base_dir = dirs::data_dir()
         .or_else(dirs::home_dir)
         .ok_or_else(|| "No data directory".to_string())?;

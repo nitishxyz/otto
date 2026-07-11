@@ -48,15 +48,12 @@ function injectRuntimeContext(
 	);
 }
 
-/**
- * Create the web UI server
- */
-export function createWebServer(
-	port: number,
-	agiServerPortOrUrl: number | string,
+/** Creates a request handler for the embedded web UI assets. */
+export function createWebUIFetch(
+	agiServerPortOrUrl: number | string | null,
 	network = false,
 	context?: WebServerContext,
-): { port: number; server: ReturnType<typeof Bun.serve> } {
+) {
 	// Build asset map - maps URL paths to file paths
 	const assetMap = new Map<string, string>();
 
@@ -80,108 +77,81 @@ export function createWebServer(
 	});
 
 	// Get the appropriate server URL for network mode
-	const getServerUrl = (requestHost?: string) => {
+	const getServerUrl = (requestUrl: URL) => {
 		if (typeof agiServerPortOrUrl === 'string') {
 			return agiServerPortOrUrl;
 		}
-		if (network && requestHost) {
-			const hostname = requestHost.split(':')[0];
+		if (agiServerPortOrUrl === null) {
+			return requestUrl.origin;
+		}
+		if (network) {
+			const hostname = requestUrl.hostname;
 			return `http://${hostname}:${agiServerPortOrUrl}`;
 		}
 		return `http://127.0.0.1:${agiServerPortOrUrl}`;
 	};
 
-	const server = Bun.serve({
-		port,
-		hostname: network ? '0.0.0.0' : '127.0.0.1',
+	return async function fetchWebUI(req: Request): Promise<Response> {
+		const url = new URL(req.url);
+		let pathname = url.pathname;
 
-		async fetch(req) {
-			const url = new URL(req.url);
-			let pathname = url.pathname;
+		const respondWithIndex = async () => {
+			const indexPath = assetMap.get('/index.html');
+			const serverUrl = getServerUrl(url);
 
-			const respondWithIndex = async () => {
-				const indexPath = assetMap.get('/index.html');
-				const serverUrl = getServerUrl(url.host);
-
-				if (indexPath) {
-					const indexFile = Bun.file(indexPath);
-					if (await indexFile.exists()) {
-						try {
-							let html = await indexFile.text();
-							html = injectRuntimeContext(html, serverUrl, context);
-							return new Response(html, {
-								headers: {
-									'Content-Type': 'text/html; charset=utf-8',
-									'Cache-Control': 'no-cache',
-								},
-							});
-						} catch (error) {
-							logger.error('Error reading HTML file for fallback', error);
-						}
+			if (indexPath) {
+				const indexFile = Bun.file(indexPath);
+				if (await indexFile.exists()) {
+					try {
+						let html = await indexFile.text();
+						html = injectRuntimeContext(html, serverUrl, context);
+						return new Response(html, {
+							headers: {
+								'Content-Type': 'text/html; charset=utf-8',
+								'Cache-Control': 'no-cache',
+							},
+						});
+					} catch (error) {
+						logger.error('Error reading HTML file for fallback', error);
 					}
 				}
-
-				const embeddedIndex = await getEmbeddedAsset('/index.html');
-				if (embeddedIndex) {
-					let html = decoder.decode(embeddedIndex);
-					html = injectRuntimeContext(html, serverUrl, context);
-					return new Response(html, {
-						headers: {
-							'Content-Type': 'text/html; charset=utf-8',
-							'Cache-Control': 'no-cache',
-						},
-					});
-				}
-
-				return null;
-			};
-
-			// Normalize path
-			if (pathname === '/') {
-				pathname = '/index.html';
 			}
 
-			// Check if we have this asset
-			if (assetMap.has(pathname)) {
-				const filePath = assetMap.get(pathname);
-				if (!filePath) {
-					return new Response('Not Found', { status: 404 });
-				}
+			const embeddedIndex = await getEmbeddedAsset('/index.html');
+			if (embeddedIndex) {
+				let html = decoder.decode(embeddedIndex);
+				html = injectRuntimeContext(html, serverUrl, context);
+				return new Response(html, {
+					headers: {
+						'Content-Type': 'text/html; charset=utf-8',
+						'Cache-Control': 'no-cache',
+					},
+				});
+			}
 
-				const file = Bun.file(filePath);
-				const fileExists = await file.exists();
+			return null;
+		};
 
-				if (fileExists) {
-					if (pathname.endsWith('.html')) {
-						try {
-							let html = await file.text();
-							const serverUrl = getServerUrl(url.host);
-							html = injectRuntimeContext(html, serverUrl, context);
+		// Normalize path
+		if (pathname === '/') {
+			pathname = '/index.html';
+		}
 
-							return new Response(html, {
-								headers: {
-									'Content-Type': 'text/html; charset=utf-8',
-									'Cache-Control': 'no-cache',
-								},
-							});
-						} catch (error) {
-							logger.error('Error reading HTML file', error);
-						}
-					}
+		// Check if we have this asset
+		if (assetMap.has(pathname)) {
+			const filePath = assetMap.get(pathname);
+			if (!filePath) {
+				return new Response('Not Found', { status: 404 });
+			}
 
-					return new Response(file, {
-						headers: {
-							'Content-Type': getMimeType(pathname),
-							'Cache-Control': 'public, max-age=31536000',
-						},
-					});
-				}
+			const file = Bun.file(filePath);
+			const fileExists = await file.exists();
 
-				const embeddedData = await getEmbeddedAsset(pathname);
-				if (embeddedData) {
-					if (pathname.endsWith('.html')) {
-						let html = decoder.decode(embeddedData);
-						const serverUrl = getServerUrl(url.host);
+			if (fileExists) {
+				if (pathname.endsWith('.html')) {
+					try {
+						let html = await file.text();
+						const serverUrl = getServerUrl(url);
 						html = injectRuntimeContext(html, serverUrl, context);
 
 						return new Response(html, {
@@ -190,27 +160,68 @@ export function createWebServer(
 								'Cache-Control': 'no-cache',
 							},
 						});
+					} catch (error) {
+						logger.error('Error reading HTML file', error);
 					}
+				}
 
-					return new Response(embeddedData, {
+				return new Response(file, {
+					headers: {
+						'Content-Type': getMimeType(pathname),
+						'Cache-Control': 'public, max-age=31536000',
+					},
+				});
+			}
+
+			const embeddedData = await getEmbeddedAsset(pathname);
+			if (embeddedData) {
+				if (pathname.endsWith('.html')) {
+					let html = decoder.decode(embeddedData);
+					const serverUrl = getServerUrl(url);
+					html = injectRuntimeContext(html, serverUrl, context);
+
+					return new Response(html, {
 						headers: {
-							'Content-Type': getMimeType(pathname),
-							'Cache-Control': 'public, max-age=31536000',
+							'Content-Type': 'text/html; charset=utf-8',
+							'Cache-Control': 'no-cache',
 						},
 					});
 				}
-			}
 
-			if (!pathname.includes('.')) {
-				const fallback = await respondWithIndex();
-				if (fallback) {
-					return fallback;
-				}
+				return new Response(embeddedData, {
+					headers: {
+						'Content-Type': getMimeType(pathname),
+						'Cache-Control': 'public, max-age=31536000',
+					},
+				});
 			}
+		}
 
-			console.warn(`File not found: ${pathname}`);
-			return new Response('Not Found', { status: 404 });
-		},
+		if (!pathname.includes('.')) {
+			const fallback = await respondWithIndex();
+			if (fallback) {
+				return fallback;
+			}
+		}
+
+		console.warn(`File not found: ${pathname}`);
+		return new Response('Not Found', { status: 404 });
+	};
+}
+
+/**
+ * Create the web UI server
+ */
+export function createWebServer(
+	port: number,
+	agiServerPortOrUrl: number | string,
+	network = false,
+	context?: WebServerContext,
+): { port: number; server: ReturnType<typeof Bun.serve> } {
+	const server = Bun.serve({
+		port,
+		hostname: network ? '0.0.0.0' : '127.0.0.1',
+		fetch: createWebUIFetch(agiServerPortOrUrl, network, context),
 	});
 
 	return { port: Number(server.port ?? port), server };

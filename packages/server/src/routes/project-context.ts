@@ -37,9 +37,14 @@ export interface RequestProjectContext {
 export async function resolveRequestProject(
 	c: Context,
 ): Promise<RequestProjectContext> {
+	const pinnedProjectId = c.req.header('X-Otto-Share-Project-Id');
 	const projectId =
-		c.req.query('projectId') || c.req.header('X-Otto-Project-Id');
-	const projectPath = c.req.query('project') || c.req.header('X-Otto-Project');
+		pinnedProjectId ??
+		c.req.query('projectId') ??
+		c.req.header('X-Otto-Project-Id');
+	const projectPath = pinnedProjectId
+		? undefined
+		: c.req.query('project') || c.req.header('X-Otto-Project');
 	const defaultProjectRoot = getDefaultProjectRoot();
 
 	if (!projectId && !projectPath && !defaultProjectRoot) {

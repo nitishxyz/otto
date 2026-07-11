@@ -1,7 +1,7 @@
 const DEFAULT_OTTOROUTER_BASE_URL = 'https://api.ottorouter.org';
 const OTTOROUTER_OAUTH_CLIENT_ID = 'ottocode-cli';
 const OTTOROUTER_OAUTH_SCOPE =
-	'openid profile email offline_access inference account:read account:topup';
+	'openid profile email offline_access inference account:read account:topup tunnel:authorize';
 
 function ottorouterBaseUrl(): string {
 	return (

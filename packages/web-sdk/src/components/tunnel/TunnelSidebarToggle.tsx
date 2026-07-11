@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Network } from 'lucide-react';
 import { useTunnelStore } from '../../stores/tunnelStore';
+import { isShareMode } from '../../lib/share-mode';
 import { SidebarShortcutBadge } from '../sidebar/SidebarShortcutBadge';
 
 export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
@@ -8,6 +9,9 @@ export const TunnelSidebarToggle = memo(function TunnelSidebarToggle() {
 	const toggleSidebar = useTunnelStore((state) => state.toggleSidebar);
 	const remoteStatus = useTunnelStore((state) => state.remoteControl.status);
 	const shareStatus = useTunnelStore((state) => state.projectShare.status);
+
+	// Connections are owner-only; share viewers never see the toggle.
+	if (isShareMode()) return null;
 
 	const isConnected =
 		remoteStatus === 'connected' || shareStatus === 'connected';

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useServer } from '../../hooks/useServer';
 import { usePlatform } from '../../hooks/usePlatform';
-import { handleTitleBarDrag } from '../../utils/title-bar';
+import { DesktopDragRegion } from '../DesktopDragRegion';
 import { tauriOnboarding } from '../../lib/tauri-onboarding';
 import { OttoRouterLoader } from '../OttoRouterLoader';
 import { WindowControls } from '../WindowControls';
@@ -186,12 +186,7 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 
 	return (
 		<>
-			<div
-				className="shrink-0 flex items-center px-4 h-12 border-b border-border cursor-default select-none fixed top-0 left-0 right-0 z-[10000] bg-background relative"
-				onMouseDown={handleTitleBarDrag}
-				data-tauri-drag-region
-				role="toolbar"
-			>
+			<DesktopDragRegion className="shrink-0 flex items-center px-4 h-12 border-b border-border cursor-default select-none fixed top-0 left-0 right-0 z-[10000] bg-background relative">
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 					<span className="font-semibold text-base text-foreground">otto</span>
 				</div>
@@ -202,7 +197,7 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 					{currentStep === 'wallet' ? 'Step 1 of 2' : 'Step 2 of 2'}
 					{platform === 'linux' && <WindowControls />}
 				</div>
-			</div>
+			</DesktopDragRegion>
 			<div className="pt-12">
 				<OnboardingModal hideHeader />
 				{!isOpen && !onboardingLoading && onboardingError && (
