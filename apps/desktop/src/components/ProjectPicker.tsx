@@ -30,10 +30,12 @@ import {
 	MessageCircle,
 	RotateCw,
 	Search,
+	Settings,
 	Star,
 	X,
 } from 'lucide-react';
 import { StableSpinner } from '@ottocode/web-sdk/components';
+import { useNavigate } from '@tanstack/react-router';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';
@@ -177,6 +179,7 @@ export function ProjectPicker({
 		applyUpdate,
 	} = useUpdate();
 	const appVersion = useVersion();
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		if (activeTab !== 'machines') return;
@@ -393,6 +396,14 @@ export function ProjectPicker({
 								{downloading ? `${updateProgress}%` : 'Update'}
 							</button>
 						))}
+					<button
+						type="button"
+						onClick={() => navigate({ to: '/settings' })}
+						className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+						title="Settings"
+					>
+						<Settings className="w-4 h-4" aria-hidden="true" />
+					</button>
 
 					<button
 						type="button"

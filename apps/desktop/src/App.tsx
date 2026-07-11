@@ -5,6 +5,7 @@ import {
 	tauriBridge,
 	type MachineBootstrap,
 	type Project,
+	type ServerInfo,
 } from './lib/tauri-bridge';
 import { tauriOnboarding } from './lib/tauri-onboarding';
 import { loadAuthorizedMachineProjects } from './lib/machine-api';
@@ -22,6 +23,7 @@ function App() {
 	const [initialized, setInitialized] = useState(false);
 	const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 	const [machine, setMachine] = useState<MachineBootstrap | null>(null);
+	const [daemon, setDaemon] = useState<ServerInfo | null>(null);
 	const [daemonError, setDaemonError] = useState<string | null>(null);
 	const [startupAttempt, setStartupAttempt] = useState(0);
 	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme();
@@ -33,8 +35,9 @@ function App() {
 		const init = async () => {
 			setDaemonError(null);
 			try {
-				const daemon = await tauriBridge.ensureDesktopDaemon();
-				configureDesktopSdk(daemon.url, daemon);
+				const daemonInfo = await tauriBridge.ensureDesktopDaemon();
+				configureDesktopSdk(daemonInfo.url, daemonInfo);
+				setDaemon(daemonInfo);
 			} catch (cause) {
 				setDaemonError(
 					cause instanceof Error
@@ -212,6 +215,23 @@ function App() {
 		await router.navigate({ to: '/projects' });
 	};
 
+	const handleStartDaemon = async () => {
+		const daemonInfo = await tauriBridge.ensureDesktopDaemon();
+		configureDesktopSdk(daemonInfo.url, daemonInfo);
+		setDaemon(daemonInfo);
+	};
+
+	const handleStopDaemon = async () => {
+		await tauriBridge.stopDesktopDaemon();
+		setDaemon(null);
+	};
+
+	const handleRestartDaemon = async () => {
+		await tauriBridge.stopDesktopDaemon();
+		setDaemon(null);
+		await handleStartDaemon();
+	};
+
 	const handleOnboardingComplete = () => {
 		flushSync(() => {
 			setInitialized(true);
@@ -243,6 +263,7 @@ function App() {
 			context={{
 				initialized,
 				machine,
+				daemon,
 				selectedProject,
 				theme,
 				setTheme,
@@ -250,6 +271,9 @@ function App() {
 				onSelectProject: handleSelectProject,
 				onBackToProjects: handleBack,
 				onOnboardingComplete: handleOnboardingComplete,
+				onStartDaemon: handleStartDaemon,
+				onStopDaemon: handleStopDaemon,
+				onRestartDaemon: handleRestartDaemon,
 			}}
 		/>
 	);

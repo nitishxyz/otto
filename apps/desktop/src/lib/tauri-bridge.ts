@@ -142,6 +142,7 @@ export const tauriBridge = {
 	openProjectDialog: () => invoke<string | null>('open_project_dialog'),
 
 	ensureDesktopDaemon: () => invoke<ServerInfo>('ensure_desktop_daemon'),
+	stopDesktopDaemon: () => invoke('stop_desktop_daemon'),
 	startServer: (projectPath: string, port?: number) =>
 		invoke<ServerInfo>('start_server', { projectPath, port }),
 	stopServer: (pid: number) => invoke('stop_server', { pid }),

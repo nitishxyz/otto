@@ -12,18 +12,23 @@ import {
 import { NativeOnboarding } from './components/onboarding/NativeOnboarding';
 import { ConnectedProjectPicker } from './components/ConnectedProjectPicker';
 import { ProjectPicker } from './components/ProjectPicker';
+import { DesktopSettings } from './components/DesktopSettings';
 import { Workspace } from './components/Workspace';
 import { OttoRouterLoader } from './components/OttoRouterLoader';
-import type { MachineBootstrap, Project } from './lib/tauri-bridge';
+import type { MachineBootstrap, Project, ServerInfo } from './lib/tauri-bridge';
 import { DesktopThemeContext, type DesktopThemeContextValue } from './theme';
 
 export interface DesktopRouterContext extends DesktopThemeContextValue {
 	initialized: boolean;
 	machine: MachineBootstrap | null;
+	daemon: ServerInfo | null;
 	selectedProject: Project | null;
 	onSelectProject: (project: Project) => void;
 	onBackToProjects: () => void | Promise<void>;
 	onOnboardingComplete: () => void;
+	onStartDaemon: () => Promise<void>;
+	onStopDaemon: () => Promise<void>;
+	onRestartDaemon: () => Promise<void>;
 }
 
 const rootRoute = createRootRouteWithContext<DesktopRouterContext>()({
@@ -46,6 +51,12 @@ const projectsRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: 'projects',
 	component: ProjectsRouteComponent,
+});
+
+const settingsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: 'settings',
+	component: SettingsRouteComponent,
 });
 
 const workspaceRoute = createRoute({
@@ -88,6 +99,7 @@ const routeTree = rootRoute.addChildren([
 	indexRoute,
 	onboardingRoute,
 	projectsRoute,
+	settingsRoute,
 	workspaceRoute.addChildren([
 		sessionsRoute,
 		sessionDetailRoute,
@@ -100,6 +112,7 @@ const routeTree = rootRoute.addChildren([
 const defaultRouterContext: DesktopRouterContext = {
 	initialized: false,
 	machine: null,
+	daemon: null,
 	selectedProject: null,
 	theme: 'otto-dark',
 	setTheme: () => {},
@@ -107,6 +120,9 @@ const defaultRouterContext: DesktopRouterContext = {
 	onSelectProject: () => {},
 	onBackToProjects: () => {},
 	onOnboardingComplete: () => {},
+	onStartDaemon: async () => {},
+	onStopDaemon: async () => {},
+	onRestartDaemon: async () => {},
 };
 
 export const router = createRouter({
@@ -159,6 +175,19 @@ function ProjectsRouteComponent() {
 		);
 	}
 	return <ProjectPicker onSelectProject={onSelectProject} />;
+}
+
+function SettingsRouteComponent() {
+	const { daemon, onStartDaemon, onStopDaemon, onRestartDaemon } =
+		rootRoute.useRouteContext();
+	return (
+		<DesktopSettings
+			daemon={daemon}
+			onStartDaemon={onStartDaemon}
+			onStopDaemon={onStopDaemon}
+			onRestartDaemon={onRestartDaemon}
+		/>
+	);
 }
 
 function WorkspaceRouteComponent() {

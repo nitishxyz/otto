@@ -691,6 +691,16 @@ pub async fn ensure_desktop_daemon(
 }
 
 #[tauri::command]
+pub async fn stop_desktop_daemon(state: State<'_, ServerState>) -> Result<(), String> {
+    if let Some(registration) = read_daemon_registration() {
+        let token = ensure_daemon_token()?;
+        stop_registered_daemon(&registration, &token).await;
+    }
+    state.servers.lock().unwrap().clear();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn start_server(
     project_path: String,
     port: Option<u16>,

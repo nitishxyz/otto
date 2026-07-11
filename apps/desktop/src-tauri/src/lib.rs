@@ -180,6 +180,7 @@ pub fn run() {
             commands::project::get_general_workspace_path,
             commands::server::start_server,
             commands::server::ensure_desktop_daemon,
+            commands::server::stop_desktop_daemon,
             commands::server::stop_server,
             commands::server::stop_all_servers,
             commands::server::list_servers,
