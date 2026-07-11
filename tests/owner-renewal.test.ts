@@ -45,13 +45,40 @@ describe('owner session renewal', () => {
 		});
 	});
 
+	test('does not let completion from a replaced handler clear its pending call', async () => {
+		let resolveFirst!: (value: { token: string; expiresAt: number }) => void;
+		setOwnerRenewalHandler(
+			() =>
+				new Promise((resolve) => {
+					resolveFirst = resolve;
+				}),
+		);
+		const first = renewOwnerSession();
+		let secondCalls = 0;
+		let resolveSecond!: (value: { token: string; expiresAt: number }) => void;
+		setOwnerRenewalHandler(
+			() =>
+				new Promise((resolve) => {
+					secondCalls += 1;
+					resolveSecond = resolve;
+				}),
+		);
+		const second = renewOwnerSession();
+		resolveFirst({ token: 'first', expiresAt: 1000 });
+		await first;
+		expect(renewOwnerSession()).toBe(second);
+		resolveSecond({ token: 'second', expiresAt: 2000 });
+		await second;
+		expect(secondCalls).toBe(1);
+	});
+
 	test('renews one remote owner 401 but not its retry or share/local requests', () => {
 		const remote = {
 			status: 401,
 			shareMode: false,
 			hasOwnerSession: true,
-			runtimeBase: 'https://machine.example',
-			requestBase: 'https://machine.example',
+			runtimeBase: 'https://machine.example/api',
+			requestUrl: 'https://machine.example/api/v1/projects',
 		};
 		expect(shouldRenewOwnerRequest(remote)).toBe(true);
 		expect(shouldRenewOwnerRequest({ ...remote, retried: true })).toBe(false);
@@ -59,7 +86,13 @@ describe('owner session renewal', () => {
 		expect(
 			shouldRenewOwnerRequest({
 				...remote,
-				requestBase: 'http://127.0.0.1:47477',
+				requestUrl: 'http://127.0.0.1:47477/v1/projects',
+			}),
+		).toBe(false);
+		expect(
+			shouldRenewOwnerRequest({
+				...remote,
+				requestUrl: 'https://machine.example.evil/api/v1/projects',
 			}),
 		).toBe(false);
 	});

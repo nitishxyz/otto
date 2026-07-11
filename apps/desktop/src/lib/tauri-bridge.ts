@@ -146,6 +146,8 @@ export const tauriBridge = {
 		invoke('open_machine_window', { device }),
 	getMachineBootstrap: () =>
 		invoke<MachineBootstrap | null>('get_machine_bootstrap'),
+	setMachineWindowProject: (projectId: string | null) =>
+		invoke('set_machine_window_project', { projectId }),
 	getInitialProject: () => invoke<string | null>('get_initial_project'),
 	getInitialRemote: () => invoke<[string, string] | null>('get_initial_remote'),
 

@@ -10,7 +10,12 @@ import {
 	getProjectId,
 	getProjectRoot,
 } from './api-client/utils';
-import { acquireSharedSSEStream, SSEClient } from './sse-client';
+import { hasOwnerRenewalHandler, renewOwnerSession } from './owner-renewal';
+import {
+	acquireSharedSSEStream,
+	SSEClient,
+	type SSEConnectionState,
+} from './sse-client';
 
 export type StreamEventHandler = (event: SSEEvent) => void;
 export type Release = () => void;
@@ -19,6 +24,24 @@ export interface StreamHandle {
 	on: (handler: StreamEventHandler) => Release;
 	release: Release;
 }
+
+/**
+ * Connection state of the active project's multiplexed SSE stream. Extends
+ * the raw client states with `fallback` for older daemons that serve
+ * per-stream SSE (each fallback stream manages its own reconnects).
+ */
+export type ProjectConnectionState =
+	| SSEConnectionState
+	| { status: 'fallback' };
+
+const IDLE_CONNECTION_STATE: ProjectConnectionState = { status: 'idle' };
+const FALLBACK_CONNECTION_STATE: ProjectConnectionState = {
+	status: 'fallback',
+};
+
+const connectionStateHandlers = new Set<
+	(state: ProjectConnectionState) => void
+>();
 
 const CLIENT_EVENTS_KEY = '__client_events__';
 
@@ -52,6 +75,8 @@ class EventStreamMultiplexer {
 	private readonly onEmpty: () => void;
 	private client: SSEClient | null = null;
 	private clientOff: Release | null = null;
+	private clientStateOff: Release | null = null;
+	private connectionState: ProjectConnectionState = IDLE_CONNECTION_STATE;
 	private fallback = false;
 	private readonly entries = new Map<string, SubscriptionEntry>();
 
@@ -98,6 +123,24 @@ class EventStreamMultiplexer {
 		};
 	}
 
+	/** Returns the current state of the multiplexed connection. */
+	getConnectionState(): ProjectConnectionState {
+		return this.connectionState;
+	}
+
+	/** Tears down and re-establishes the multiplexed SSE connection. */
+	reconnect(): void {
+		if (this.fallback || this.entries.size === 0) return;
+		this.teardownConnection();
+		this.ensureConnection();
+	}
+
+	private setConnectionState(state: ProjectConnectionState) {
+		if (this.connectionState === state) return;
+		this.connectionState = state;
+		for (const handler of connectionStateHandlers) handler(state);
+	}
+
 	private emit(key: string, event: SSEEvent) {
 		const entry = this.entries.get(key);
 		if (!entry) return;
@@ -119,6 +162,9 @@ class EventStreamMultiplexer {
 		});
 		const client = new SSEClient();
 		this.client = client;
+		this.clientStateOff = client.onConnectionState((state) =>
+			this.setConnectionState(state),
+		);
 		this.clientOff = client.on('*', (event) => {
 			const data = event.payload as
 				| { sessionId?: string; payload?: unknown }
@@ -130,7 +176,11 @@ class EventStreamMultiplexer {
 				this.emit(CLIENT_EVENTS_KEY, { type: event.type, payload });
 			}
 		});
-		void client.connect(url, getAuthHeaders(), {
+		void client.connect(url, undefined, {
+			getHeaders: getAuthHeaders,
+			onUnauthorized: async () => {
+				await renewOwnerSession();
+			},
 			onHttpError: (status) => {
 				if (status === 404 || status === 405) {
 					// Older daemon without /v1/events/project: use per-stream SSE.
@@ -145,8 +195,11 @@ class EventStreamMultiplexer {
 	private teardownConnection() {
 		this.clientOff?.();
 		this.clientOff = null;
+		this.clientStateOff?.();
+		this.clientStateOff = null;
 		this.client?.disconnect();
 		this.client = null;
+		this.setConnectionState(IDLE_CONNECTION_STATE);
 	}
 
 	private enterFallback() {
@@ -156,6 +209,7 @@ class EventStreamMultiplexer {
 			'[event-stream] Project event stream unavailable, falling back to per-stream SSE',
 		);
 		this.teardownConnection();
+		this.setConnectionState(FALLBACK_CONNECTION_STATE);
 		this.emit(CLIENT_EVENTS_KEY, { type: 'stream.fallback', payload: {} });
 		for (const [key, entry] of this.entries) {
 			this.startFallbackEntry(key, entry);
@@ -177,7 +231,12 @@ class EventStreamMultiplexer {
 						projectId: getProjectId(),
 						projectPath: getProjectRoot(),
 					});
-		const { client, release } = acquireSharedSSEStream(url, getAuthHeaders());
+		const { client, release } = acquireSharedSSEStream(url, undefined, {
+			getHeaders: getAuthHeaders,
+			onUnauthorized: async () => {
+				await renewOwnerSession();
+			},
+		});
 		entry.sseRelease = release;
 		entry.sseOff = client.on('*', (event) => this.emit(key, event));
 	}
@@ -185,9 +244,13 @@ class EventStreamMultiplexer {
 
 const multiplexers = new Map<string, EventStreamMultiplexer>();
 
-function getMultiplexer(): EventStreamMultiplexer {
+function getMultiplexerKey(): string {
 	const projectKey = getProjectId() ?? getProjectRoot() ?? '';
-	const cacheKey = `${getBaseUrl()}::${projectKey}`;
+	return `${getBaseUrl()}::${projectKey}`;
+}
+
+function getMultiplexer(): EventStreamMultiplexer {
+	const cacheKey = getMultiplexerKey();
 	let mux = multiplexers.get(cacheKey);
 	if (!mux) {
 		const created = new EventStreamMultiplexer(getBaseUrl(), () => {
@@ -216,4 +279,37 @@ export function acquireSessionEventStream(sessionId: string): StreamHandle {
  */
 export function acquireClientEventStream(): StreamHandle {
 	return getMultiplexer().acquire(CLIENT_EVENTS_KEY);
+}
+
+/** Returns the active project's multiplexed SSE connection state. */
+export function getProjectConnectionState(): ProjectConnectionState {
+	return (
+		multiplexers.get(getMultiplexerKey())?.getConnectionState() ??
+		IDLE_CONNECTION_STATE
+	);
+}
+
+/**
+ * Subscribes to connection state changes of any project multiplexer. Pair
+ * with {@link getProjectConnectionState} to read the active project's state.
+ */
+export function onProjectConnectionState(
+	handler: (state: ProjectConnectionState) => void,
+): Release {
+	connectionStateHandlers.add(handler);
+	return () => {
+		connectionStateHandlers.delete(handler);
+	};
+}
+
+/**
+ * Runs the full recovery path for the active project's event connection:
+ * renews the remote owner session when a renewal broker is installed, then
+ * re-establishes the multiplexed SSE connection.
+ */
+export async function retryProjectConnection(): Promise<void> {
+	if (hasOwnerRenewalHandler()) {
+		await renewOwnerSession();
+	}
+	multiplexers.get(getMultiplexerKey())?.reconnect();
 }

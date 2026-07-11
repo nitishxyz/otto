@@ -3,6 +3,12 @@ export * from './api-client';
 export * from './sse-client';
 export * from './owner-renewal';
 export {
+	getProjectConnectionState,
+	onProjectConnectionState,
+	retryProjectConnection,
+	type ProjectConnectionState,
+} from './event-stream';
+export {
 	API_BASE_URL,
 	RUNTIME_API_BASE_URL_STORAGE_KEY,
 	clearRuntimeApiBaseUrl,

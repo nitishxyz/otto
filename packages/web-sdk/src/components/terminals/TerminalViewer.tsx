@@ -9,7 +9,10 @@ import {
 } from 'ghostty-web';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
 import { openUrl } from '../../lib/open-url';
-import { getAuthHeaders, getProjectQuery } from '../../lib/api-client/utils';
+import {
+	authenticatedFetch,
+	getProjectQuery,
+} from '../../lib/api-client/utils';
 import { client } from '@ottocode/api';
 import { StableSpinner } from '../ui/StableSpinner';
 
@@ -123,9 +126,8 @@ async function requestTerminalWebSocketTicket(
 	);
 	const params = new URLSearchParams(getProjectQuery());
 	url.search = params.toString();
-	const response = await fetch(url, {
+	const response = await authenticatedFetch(url, {
 		method: 'POST',
-		headers: getAuthHeaders(),
 		credentials: 'include',
 		cache: 'no-store',
 	});

@@ -1,4 +1,4 @@
-import { getAuthHeaders, getBaseUrl } from './utils';
+import { authenticatedFetch, getBaseUrl } from './utils';
 
 export interface ProjectSummary {
 	id: string;
@@ -12,10 +12,9 @@ export interface ProjectSummary {
 }
 
 async function projectRequest<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(`${getBaseUrl()}${path}`, {
+	const response = await authenticatedFetch(`${getBaseUrl()}${path}`, {
 		...init,
 		headers: {
-			...getAuthHeaders(),
 			...(init?.body ? { 'content-type': 'application/json' } : {}),
 			...init?.headers,
 		},

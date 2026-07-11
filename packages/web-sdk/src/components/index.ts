@@ -131,6 +131,7 @@ export * from './titlebar/TitleBar';
 export * from './common/FileTypeIcon';
 export * from './common/OttoOIcon';
 export * from './common/ProviderLogo';
+export * from './common/ProjectConnectionBanner';
 export * from './common/StatusIndicator';
 export * from './common/UsageRing';
 export * from './common/UsageModal';

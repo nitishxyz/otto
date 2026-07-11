@@ -37,4 +37,5 @@ export * from './useVoiceInput';
 export * from './useDictationModels';
 export * from './usePlugins';
 export * from './usePluginCommands';
+export * from './useProjectConnection';
 export * from './useProjects';

@@ -22,6 +22,7 @@ export interface MachineDeviceState {
 
 export async function loadAuthorizedMachineProjects(
 	machine: MachineBootstrap,
+	forceOwnerSession = false,
 ): Promise<MachineProjectAccess> {
 	if (!machine.hostname) {
 		return {
@@ -30,7 +31,11 @@ export async function loadAuthorizedMachineProjects(
 		};
 	}
 	const response = await listAuthorizedMachineProjects({
-		body: { deviceId: machine.deviceId, hostname: machine.hostname },
+		body: {
+			deviceId: machine.deviceId,
+			hostname: machine.hostname,
+			forceOwnerSession,
+		} as { deviceId: string; hostname: string; forceOwnerSession?: boolean },
 	});
 	if (response.error) throw new Error('Machine projects unavailable.');
 	return response.data as MachineProjectAccess;

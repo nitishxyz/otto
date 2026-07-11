@@ -36,23 +36,58 @@ export function shouldRenewOwnerRequest(input: {
 	shareMode: boolean;
 	hasOwnerSession: boolean;
 	runtimeBase?: string;
-	requestBase?: string;
+	requestUrl?: string;
 }): boolean {
+	let isRuntimeRequest = false;
+	try {
+		const runtime = input.runtimeBase ? new URL(input.runtimeBase) : null;
+		const request = input.requestUrl ? new URL(input.requestUrl) : null;
+		isRuntimeRequest = Boolean(
+			runtime &&
+				request &&
+				runtime.origin === request.origin &&
+				(request.pathname === runtime.pathname ||
+					request.pathname.startsWith(
+						`${runtime.pathname.replace(/\/$/, '')}/`,
+					)),
+		);
+	} catch {
+		isRuntimeRequest = false;
+	}
 	return Boolean(
 		input.status === 401 &&
 			!input.retried &&
 			!input.shareMode &&
 			input.hasOwnerSession &&
-			input.runtimeBase &&
-			input.requestBase?.startsWith(input.runtimeBase),
+			isRuntimeRequest,
 	);
 }
 
 const axiosClient = axios.create();
+axiosClient.interceptors.request.use((request) => {
+	const runtimeBase = getConfiguredRuntimeApiBaseUrl();
+	const requestUrl = resolveRequestUrl(request, runtimeBase);
+	if (
+		shouldRenewOwnerRequest({
+			status: 401,
+			shareMode: isShareMode(),
+			hasOwnerSession: Boolean(getRuntimeProjectContext()?.ownerSession),
+			runtimeBase,
+			requestUrl,
+		})
+	) {
+		for (const [name, value] of Object.entries(getOwnerSessionHeaders())) {
+			request.headers.set(name, value);
+		}
+	}
+	return request;
+});
 axiosClient.interceptors.response.use(undefined, async (error: AxiosError) => {
 	const request = error.config as RetryableOwnerRequest | undefined;
 	const runtimeBase = getConfiguredRuntimeApiBaseUrl();
-	const requestUrl = request?.baseURL ?? '';
+	const requestUrl = request
+		? resolveRequestUrl(request, runtimeBase)
+		: undefined;
 	if (
 		!request ||
 		!shouldRenewOwnerRequest({
@@ -61,19 +96,29 @@ axiosClient.interceptors.response.use(undefined, async (error: AxiosError) => {
 			shareMode: isShareMode(),
 			hasOwnerSession: Boolean(getRuntimeProjectContext()?.ownerSession),
 			runtimeBase,
-			requestBase: requestUrl,
+			requestUrl,
 		})
 	) {
 		throw error;
 	}
 	request._ottoOwnerRetried = true;
 	await renewOwnerSession();
-	request.headers.set(
-		'X-Otto-Owner-Session',
-		getRuntimeProjectContext()?.ownerSession?.token,
-	);
 	return axiosClient.request(request);
 });
+
+function resolveRequestUrl(
+	request: Pick<InternalAxiosRequestConfig, 'baseURL' | 'url'>,
+	runtimeBase?: string,
+): string | undefined {
+	try {
+		return new URL(
+			request.url ?? '',
+			request.baseURL || runtimeBase,
+		).toString();
+	} catch {
+		return undefined;
+	}
+}
 
 type ApiMessage = Record<string, unknown> & {
 	createdAt?: string | number;
@@ -172,6 +217,38 @@ export function getAuthHeaders(): Record<string, string> {
 		...(context?.projectId ? { 'X-Otto-Project-Id': context.projectId } : {}),
 		...(context?.projectRoot ? { 'X-Otto-Project': context.projectRoot } : {}),
 	};
+}
+
+/** Fetches with current runtime auth and renews a remote owner session once. */
+export async function authenticatedFetch(
+	input: string | URL | Request,
+	init?: RequestInit,
+): Promise<Response> {
+	const requestUrl =
+		typeof input === 'string'
+			? new URL(input, getRuntimeApiBaseUrl()).toString()
+			: input instanceof URL
+				? input.toString()
+				: input.url;
+	const dispatch = () =>
+		fetch(input, {
+			...init,
+			headers: { ...getAuthHeaders(), ...init?.headers },
+		});
+	let response = await dispatch();
+	if (
+		shouldRenewOwnerRequest({
+			status: response.status,
+			shareMode: isShareMode(),
+			hasOwnerSession: Boolean(getRuntimeProjectContext()?.ownerSession),
+			runtimeBase: getConfiguredRuntimeApiBaseUrl(),
+			requestUrl,
+		})
+	) {
+		await renewOwnerSession();
+		response = await dispatch();
+	}
+	return response;
 }
 
 export function getProjectQuery() {

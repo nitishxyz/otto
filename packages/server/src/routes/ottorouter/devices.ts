@@ -17,6 +17,7 @@ const authorizeBodySchema = z.object({
 const machineProjectsBodySchema = z.object({
 	deviceId: z.string().uuid(),
 	hostname: z.string().min(1),
+	forceOwnerSession: z.boolean().optional(),
 });
 const machineProjectSchema = z.object({
 	id: z.string(),
@@ -65,10 +66,15 @@ function machineUrl(hostname: string): string {
 async function loadAuthorizedMachineProjects(
 	deviceId: string,
 	hostname: string,
+	forceOwnerSession = false,
 ) {
 	const apiUrl = machineUrl(hostname);
 	let session = machineSessions.get(deviceId);
-	if (!session || session.expiresAt <= Date.now() + 60_000) {
+	if (
+		forceOwnerSession ||
+		!session ||
+		session.expiresAt <= Date.now() + 60_000
+	) {
 		const challengeResponse = await fetch(
 			`${apiUrl}/v1/tunnel/owner/challenge`,
 			{
@@ -314,7 +320,11 @@ export function registerOttoRouterDeviceRoutes(app: Hono) {
 		async (c) => {
 			const body = machineProjectsBodySchema.parse(await c.req.json());
 			return c.json(
-				await loadAuthorizedMachineProjects(body.deviceId, body.hostname),
+				await loadAuthorizedMachineProjects(
+					body.deviceId,
+					body.hostname,
+					body.forceOwnerSession,
+				),
 			);
 		},
 	);

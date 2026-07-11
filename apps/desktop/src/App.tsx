@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { RouterProvider } from '@tanstack/react-router';
 import {
@@ -13,6 +13,7 @@ import { router } from './router';
 import { useNativeDesktopTheme } from './theme';
 import {
 	ownerRenewalDelay,
+	renewOwnerSession,
 	setOwnerRenewalHandler,
 } from '@ottocode/web-sdk/lib';
 import './index.css';
@@ -24,6 +25,8 @@ function App() {
 	const [daemonError, setDaemonError] = useState<string | null>(null);
 	const [startupAttempt, setStartupAttempt] = useState(0);
 	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme();
+	const ownerExpiryRef = useRef<number | undefined>(undefined);
+	ownerExpiryRef.current = selectedProject?.machineOwnerSessionExpiresAt;
 
 	useEffect(() => {
 		void startupAttempt;
@@ -96,63 +99,87 @@ function App() {
 		init();
 	}, [startupAttempt]);
 
+	// Report the open project (or picker state) to the Rust window registry so
+	// repeated machine-open requests reuse idle pickers instead of focusing a
+	// window that is busy with another project.
+	useEffect(() => {
+		if (!machine) return;
+		void tauriBridge
+			.setMachineWindowProject(selectedProject?.projectId ?? null)
+			.catch(() => {});
+	}, [machine, selectedProject?.projectId]);
+
 	useEffect(() => {
 		if (!machine || !selectedProject?.projectId) return;
 		let timer: number | undefined;
+		let cancelled = false;
+		let expiresAt = ownerExpiryRef.current;
+		let failureCount = 0;
+		const schedule = (delay: number) => {
+			if (cancelled) return;
+			if (timer !== undefined) window.clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				void renewOwnerSession().catch(() => {});
+			}, delay);
+		};
 		const renew = async () => {
-			const access = await loadAuthorizedMachineProjects(machine);
-			if (access.status !== 'ready') throw new Error(access.message);
-			const project = access.projects.find(
-				(candidate) => candidate.id === selectedProject.projectId,
-			);
-			if (!project) throw new Error('Remote project is no longer available.');
-			configureMachineSdk(
-				access.apiUrl,
-				project.id,
-				project.path,
-				access.ownerSession,
-				access.ownerSessionExpiresAt,
-			);
-			setSelectedProject((current) =>
-				current
-					? {
-							...current,
-							machineOwnerSession: access.ownerSession,
-							machineOwnerSessionExpiresAt: access.ownerSessionExpiresAt,
-						}
-					: current,
-			);
-			timer = window.setTimeout(
-				() => void renew(),
-				ownerRenewalDelay(access.ownerSessionExpiresAt),
-			);
-			return {
-				token: access.ownerSession,
-				expiresAt: access.ownerSessionExpiresAt,
-			};
+			try {
+				const access = await loadAuthorizedMachineProjects(machine, true);
+				if (access.status !== 'ready') throw new Error(access.message);
+				const project = access.projects.find(
+					(candidate) => candidate.id === selectedProject.projectId,
+				);
+				if (!project) throw new Error('Remote project is no longer available.');
+				if (cancelled) throw new Error('Owner reconnect was cancelled.');
+				configureMachineSdk(
+					access.apiUrl,
+					project.id,
+					project.path,
+					access.ownerSession,
+					access.ownerSessionExpiresAt,
+				);
+				expiresAt = access.ownerSessionExpiresAt;
+				failureCount = 0;
+				setSelectedProject((current) =>
+					current?.projectId === project.id
+						? {
+								...current,
+								machineOwnerSession: access.ownerSession,
+								machineOwnerSessionExpiresAt: access.ownerSessionExpiresAt,
+							}
+						: current,
+				);
+				schedule(ownerRenewalDelay(expiresAt));
+				return { token: access.ownerSession, expiresAt };
+			} catch (error) {
+				if (!cancelled) {
+					failureCount += 1;
+					schedule(Math.min(5_000 * 2 ** (failureCount - 1), 60_000));
+				}
+				throw error;
+			}
 		};
 		setOwnerRenewalHandler(renew);
-		const expiresAt = selectedProject.machineOwnerSessionExpiresAt;
 		if (expiresAt) {
-			timer = window.setTimeout(
-				() => void renew(),
-				ownerRenewalDelay(expiresAt),
-			);
+			schedule(ownerRenewalDelay(expiresAt));
 		}
-		const renewOnFocus = () => {
-			if (expiresAt && ownerRenewalDelay(expiresAt) === 0) void renew();
+		const renewOnWake = () => {
+			if (expiresAt && ownerRenewalDelay(expiresAt) === 0) {
+				void renewOwnerSession().catch(() => {});
+			}
 		};
-		window.addEventListener('focus', renewOnFocus);
+		window.addEventListener('focus', renewOnWake);
+		window.addEventListener('online', renewOnWake);
+		document.addEventListener('visibilitychange', renewOnWake);
 		return () => {
-			window.removeEventListener('focus', renewOnFocus);
+			cancelled = true;
+			window.removeEventListener('focus', renewOnWake);
+			window.removeEventListener('online', renewOnWake);
+			document.removeEventListener('visibilitychange', renewOnWake);
 			if (timer !== undefined) window.clearTimeout(timer);
 			setOwnerRenewalHandler(null);
 		};
-	}, [
-		machine,
-		selectedProject?.projectId,
-		selectedProject?.machineOwnerSessionExpiresAt,
-	]);
+	}, [machine, selectedProject?.projectId]);
 
 	const handleSelectProject = (project: Project) => {
 		const updatedProject = {

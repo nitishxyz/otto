@@ -28,6 +28,8 @@ pub struct MachineBootstrap {
 #[derive(Clone, Debug)]
 pub struct MachineWindowContext {
     pub bootstrap: MachineBootstrap,
+    /// Project currently open in the window; `None` while it shows the picker.
+    pub project_id: Option<String>,
 }
 
 #[derive(Default)]
@@ -42,6 +44,22 @@ pub fn get_machine_bootstrap(
     Ok(windows
         .get(window.label())
         .map(|context| context.bootstrap.clone()))
+}
+
+/// Renderer reports which project its machine window has open (or `None`
+/// when it returns to the project picker) so duplicate open requests can
+/// reuse idle picker windows instead of focusing busy project windows.
+#[tauri::command]
+pub fn set_machine_window_project(
+    window: WebviewWindow,
+    state: tauri::State<'_, MachineWindowState>,
+    project_id: Option<String>,
+) -> Result<(), String> {
+    let mut windows = state.0.lock().map_err(|error| error.to_string())?;
+    if let Some(context) = windows.get_mut(window.label()) {
+        context.project_id = project_id;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

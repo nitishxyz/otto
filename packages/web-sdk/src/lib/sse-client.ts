@@ -1,6 +1,11 @@
 import type { SSEEvent } from '../types/api';
 
 export type SSEEventHandler = (event: SSEEvent) => void;
+export type SSEConnectionState =
+	| { status: 'idle' }
+	| { status: 'connecting'; attempt: number }
+	| { status: 'connected' }
+	| { status: 'retrying'; attempt: number; delay: number; httpStatus?: number };
 
 export interface SSEConnectOptions {
 	/**
@@ -9,6 +14,10 @@ export interface SSEConnectOptions {
 	 * endpoint); return true (default) to keep retrying.
 	 */
 	onHttpError?: (status: number) => boolean;
+	/** Supplies credentials immediately before every connection attempt. */
+	getHeaders?: () => HeadersInit;
+	/** Renews credentials after a 401. Concurrent renewal should be deduplicated. */
+	onUnauthorized?: () => Promise<void>;
 }
 
 const RECONNECT_BASE_DELAY_MS = 1000;
@@ -21,7 +30,9 @@ const STALL_CHECK_INTERVAL_MS = 5000;
 export class SSEClient {
 	private abortController: AbortController | null = null;
 	private handlers: Map<string, Set<SSEEventHandler>> = new Map();
+	private stateHandlers = new Set<(state: SSEConnectionState) => void>();
 	private running = false;
+	private state: SSEConnectionState = { status: 'idle' };
 
 	async connect(url: string, headers?: HeadersInit, opts?: SSEConnectOptions) {
 		if (this.abortController) {
@@ -34,6 +45,7 @@ export class SSEClient {
 		let attempt = 0;
 
 		while (this.running && !signal.aborted) {
+			this.setState({ status: 'connecting', attempt });
 			const receivedData = await this.streamOnce(url, headers, signal, opts);
 			if (!this.running || signal.aborted) break;
 
@@ -42,6 +54,7 @@ export class SSEClient {
 				RECONNECT_BASE_DELAY_MS * 2 ** attempt,
 				RECONNECT_MAX_DELAY_MS,
 			);
+			this.setState({ status: 'retrying', attempt, delay });
 			console.warn(`[SSE] Stream ended, reconnecting in ${delay}ms`);
 			await new Promise((resolve) => setTimeout(resolve, delay));
 		}
@@ -69,12 +82,19 @@ export class SSEClient {
 		try {
 			const response = await fetch(url, {
 				method: isTunnel ? 'POST' : 'GET',
-				headers: { ...headers, Accept: 'text/event-stream' },
+				headers: {
+					...headers,
+					...opts?.getHeaders?.(),
+					Accept: 'text/event-stream',
+				},
 				signal: attempt.signal,
 			});
 
 			if (!response.ok) {
 				console.error('[SSE] Connection failed:', response.status);
+				if (response.status === 401 && opts?.onUnauthorized) {
+					await opts.onUnauthorized();
+				}
 				if (opts?.onHttpError && opts.onHttpError(response.status) === false) {
 					this.running = false;
 				}
@@ -86,6 +106,7 @@ export class SSEClient {
 				console.error('[SSE] No response body');
 				return receivedData;
 			}
+			this.setState({ status: 'connected' });
 
 			const decoder = new TextDecoder();
 			let buffer = '';
@@ -146,10 +167,27 @@ export class SSEClient {
 
 	disconnect() {
 		this.running = false;
+		this.setState({ status: 'idle' });
 		if (this.abortController) {
 			this.abortController.abort();
 			this.abortController = null;
 		}
+	}
+
+	/** Returns the current connection state for external-store consumers. */
+	getConnectionState(): SSEConnectionState {
+		return this.state;
+	}
+
+	/** Subscribes to connection/retry state changes. */
+	onConnectionState(handler: (state: SSEConnectionState) => void): () => void {
+		this.stateHandlers.add(handler);
+		return () => this.stateHandlers.delete(handler);
+	}
+
+	private setState(state: SSEConnectionState): void {
+		this.state = state;
+		for (const handler of this.stateHandlers) handler(state);
 	}
 
 	on(eventType: string, handler: SSEEventHandler) {
@@ -212,11 +250,12 @@ const sharedStreams = new Map<string, SharedStreamEntry>();
 export function acquireSharedSSEStream(
 	url: string,
 	headers?: HeadersInit,
+	opts?: SSEConnectOptions,
 ): { client: SSEClient; release: () => void } {
 	let entry = sharedStreams.get(url);
 	if (!entry) {
 		const client = new SSEClient();
-		void client.connect(url, headers);
+		void client.connect(url, headers, opts);
 		entry = { client, refs: 0 };
 		sharedStreams.set(url, entry);
 	}
