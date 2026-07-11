@@ -182,15 +182,15 @@ export function getBaseUrl(): string {
 }
 
 export function getProjectId(): string | undefined {
-	// In share mode the project is pinned server-side by the share token; prefer
-	// the resolved pinned project id once it is known.
+	// Never fall back to an injected owner project while using a share token.
 	if (isShareMode()) {
-		return getSharePinnedProjectId() ?? getRuntimeProjectContext()?.projectId;
+		return getSharePinnedProjectId();
 	}
 	return getRuntimeProjectContext()?.projectId;
 }
 
 export function getProjectRoot(): string | undefined {
+	if (isShareMode()) return undefined;
 	return getRuntimeProjectContext()?.projectRoot;
 }
 

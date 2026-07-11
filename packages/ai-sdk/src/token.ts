@@ -46,6 +46,12 @@ interface OAuthTokenResponse {
 	expires_at?: number | string;
 }
 
+interface OAuthTokenState extends AccessTokenState {
+	refreshToken: string;
+}
+
+const oauthRefreshes = new Map<string, Promise<OAuthTokenState>>();
+
 function trimTrailingSlash(url: string) {
 	return url.endsWith('/') ? url.slice(0, -1) : url;
 }
@@ -181,7 +187,39 @@ async function refreshOAuthToken(
 	if (!auth.refreshToken) {
 		throw new Error('OttoRouter: OAuth refresh token is not configured.');
 	}
+	const currentRefreshToken = auth.refreshToken;
+	const refreshKey = `${trimTrailingSlash(baseURL)}::${auth.clientId ?? DEFAULT_OAUTH_CLIENT_ID}::${currentRefreshToken}`;
+	let pending = oauthRefreshes.get(refreshKey);
+	if (!pending) {
+		pending = exchangeOAuthToken(
+			auth.clientId ?? DEFAULT_OAUTH_CLIENT_ID,
+			currentRefreshToken,
+			baseURL,
+			baseFetch,
+		).finally(() => {
+			oauthRefreshes.delete(refreshKey);
+		});
+		oauthRefreshes.set(refreshKey, pending);
+	}
+	const next = await pending;
+	auth.accessToken = next.token;
+	auth.refreshToken = next.refreshToken;
+	auth.expiresAt = next.expiresAt;
+	await auth.onTokenRefresh?.({
+		accessToken: next.token,
+		refreshToken: next.refreshToken,
+		expiresAt: next.expiresAt,
+	});
 
+	return next;
+}
+
+async function exchangeOAuthToken(
+	clientId: string,
+	refreshToken: string,
+	baseURL: string,
+	baseFetch: FetchFunction,
+): Promise<OAuthTokenState> {
 	const response = await baseFetch(
 		`${trimTrailingSlash(baseURL)}/api/auth/oauth2/token`,
 		{
@@ -191,9 +229,9 @@ async function refreshOAuthToken(
 				Accept: 'application/json',
 			},
 			body: new URLSearchParams({
-				client_id: auth.clientId ?? DEFAULT_OAUTH_CLIENT_ID,
+				client_id: clientId,
 				grant_type: 'refresh_token',
-				refresh_token: auth.refreshToken,
+				refresh_token: refreshToken,
 				resource: oauthResource(baseURL),
 			}).toString(),
 		},
@@ -211,7 +249,6 @@ async function refreshOAuthToken(
 		throw new Error(`OttoRouter: OAuth token refresh failed (${message})`);
 	}
 
-	const refreshToken = payload.refresh_token ?? auth.refreshToken;
 	const expiresAt = resolveExpiresAt(
 		{
 			expires_at: payload.expires_at,
@@ -219,18 +256,11 @@ async function refreshOAuthToken(
 		},
 		payload.access_token,
 	);
-	auth.accessToken = payload.access_token;
-	auth.refreshToken = refreshToken;
-	auth.expiresAt = expiresAt;
-	await auth.onTokenRefresh?.({
-		accessToken: payload.access_token,
-		refreshToken,
-		expiresAt,
-	});
 
 	return {
 		token: payload.access_token,
 		expiresAt,
+		refreshToken: payload.refresh_token ?? refreshToken,
 	};
 }
 

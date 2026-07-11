@@ -12,6 +12,33 @@ function globalAuthPath(): string {
 	return getSecureAuthPath();
 }
 
+let authMutation = Promise.resolve();
+
+function mutateAuthFile(mutator: (auth: AuthFile) => void): Promise<void> {
+	const mutation = authMutation.then(async () => {
+		const path = globalAuthPath();
+		const existing = ((await Bun.file(path)
+			.json()
+			.catch(() => ({}))) || {}) as AuthFile;
+		mutator(existing);
+		const base = path.slice(0, path.lastIndexOf('/')) || '.';
+		await ensureDir(base);
+		const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+		const { promises: fs } = await import('node:fs');
+		try {
+			await fs.writeFile(tempPath, JSON.stringify(existing, null, 2), {
+				mode: 0o600,
+			});
+			await fs.rename(tempPath, path);
+			await fs.chmod(path, 0o600).catch(() => {});
+		} finally {
+			await fs.rm(tempPath, { force: true }).catch(() => {});
+		}
+	});
+	authMutation = mutation.catch(() => {});
+	return mutation;
+}
+
 export async function getAllAuth(_projectRoot?: string): Promise<AuthFile> {
 	const globalFile = Bun.file(globalAuthPath());
 	const globalData = (await globalFile.json().catch(() => ({}))) as AuthFile;
@@ -32,17 +59,9 @@ export async function setAuth(
 	_projectRoot?: string,
 	_scope: 'global' | 'local' = 'global',
 ) {
-	const path = globalAuthPath();
-	const f = Bun.file(path);
-	const existing = ((await f.json().catch(() => ({}))) || {}) as AuthFile;
-	const next: AuthFile = { ...existing, [provider]: info };
-	const base = path.slice(0, path.lastIndexOf('/')) || '.';
-	await ensureDir(base);
-	await Bun.write(path, JSON.stringify(next, null, 2));
-	try {
-		const { promises: fs } = await import('node:fs');
-		await fs.chmod(path, 0o600).catch(() => {});
-	} catch {}
+	await mutateAuthFile((auth) => {
+		auth[provider] = info;
+	});
 }
 
 export async function removeAuth(
@@ -50,15 +69,9 @@ export async function removeAuth(
 	_projectRoot?: string,
 	_scope: 'global' | 'local' = 'global',
 ) {
-	const path = globalAuthPath();
-	const f = Bun.file(path);
-	const existing = ((await f.json().catch(() => ({}))) || {}) as AuthFile;
-	delete existing[provider];
-	await Bun.write(path, JSON.stringify(existing, null, 2));
-	try {
-		const { promises: fs } = await import('node:fs');
-		await fs.chmod(path, 0o600).catch(() => {});
-	} catch {}
+	await mutateAuthFile((auth) => {
+		delete auth[provider];
+	});
 }
 
 export {

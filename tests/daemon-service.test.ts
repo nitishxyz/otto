@@ -145,6 +145,15 @@ describe('daemon service', () => {
 		expect(navigation.headers.get('content-type')).toContain('text/html');
 		expect(html).toContain('window.OTTO_SERVER_URL = "https://device.example"');
 
+		const proxiedNavigation = await routedFetch(
+			new Request('http://device.example/sessions/example', {
+				headers: { 'X-Forwarded-Proto': 'https' },
+			}),
+		);
+		expect(await proxiedNavigation.text()).toContain(
+			'window.OTTO_SERVER_URL = "https://device.example"',
+		);
+
 		const asset = await routedFetch(
 			new Request(`https://device.example${assetPaths.assets.js[0]}`),
 		);

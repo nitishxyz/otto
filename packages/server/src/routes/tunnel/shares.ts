@@ -22,7 +22,7 @@ export function createTunnelShare(
 ): TunnelShare {
 	const token = createShareToken();
 	const url = new URL(tunnelUrl);
-	url.pathname = '/';
+	url.pathname = '/sessions';
 	url.search = '';
 	url.hash = '';
 	url.searchParams.set('share', token);

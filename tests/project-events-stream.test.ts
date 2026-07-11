@@ -62,6 +62,7 @@ async function openStream(path: string, method: 'GET' | 'POST' = 'GET') {
 	};
 
 	return {
+		headers: response.headers,
 		next,
 		close: async () => {
 			abort.abort();
@@ -145,6 +146,8 @@ describe('multiplexed project events stream', () => {
 			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 			'POST',
 		);
+		expect(stream.headers.get('cache-control')).toBe('no-cache, no-transform');
+		expect(stream.headers.get('x-accel-buffering')).toBe('no');
 
 		publish({
 			type: 'message.created',

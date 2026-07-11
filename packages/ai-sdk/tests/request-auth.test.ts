@@ -57,6 +57,44 @@ describe('bearer auth request flow', () => {
 		}
 	});
 
+	test('shares a rotating refresh token exchange across client instances', async () => {
+		const firstAuth: OttoRouterAuth = { refreshToken: 'rotating-refresh' };
+		const secondAuth: OttoRouterAuth = { refreshToken: 'rotating-refresh' };
+		let tokenExchangeCount = 0;
+		const baseFetch = async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (url.endsWith('/api/auth/oauth2/token')) {
+				tokenExchangeCount++;
+				await Bun.sleep(10);
+				return Response.json({
+					access_token: 'shared-rotated-access',
+					refresh_token: 'next-refresh',
+					expires_in: 3600,
+				});
+			}
+			return Response.json({ ok: true });
+		};
+		const firstFetch = createOttoRouterFetch({
+			auth: firstAuth,
+			baseURL: 'https://rotating.ottorouter.test',
+			fetch: baseFetch,
+		});
+		const secondFetch = createOttoRouterFetch({
+			auth: secondAuth,
+			baseURL: 'https://rotating.ottorouter.test',
+			fetch: baseFetch,
+		});
+
+		await Promise.all([
+			firstFetch('https://rotating.ottorouter.test/v1/messages'),
+			secondFetch('https://rotating.ottorouter.test/v1/messages'),
+		]);
+
+		expect(tokenExchangeCount).toBe(1);
+		expect(firstAuth.refreshToken).toBe('next-refresh');
+		expect(secondAuth.refreshToken).toBe('next-refresh');
+	});
+
 	test('createOttoRouterFetch refreshes and retries once on 401', async () => {
 		const auth: OttoRouterAuth = { refreshToken: 'refresh-1' };
 		let tokenExchangeCount = 0;

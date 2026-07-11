@@ -1,11 +1,9 @@
 import {
 	createOttoRouter,
 	type OttoRouterPaymentCallbacks,
-	getAuth,
-	loadConfig,
-	setAuth,
 } from '@ottocode/sdk';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
+import { getOttoRouterOAuthAuth } from '../../routes/ottorouter/service.ts';
 import { isDevtoolsEnabled } from '../debug/state.ts';
 import { publish } from '../../events/bus.ts';
 import {
@@ -22,44 +20,12 @@ export interface ResolveOttoRouterModelOptions {
 	autoPayThresholdUsd?: number;
 }
 
-async function getOttoRouterOAuth(projectRoot?: string) {
-	const cfg = await loadConfig(projectRoot);
-	const auth = await getAuth('ottorouter', cfg.projectRoot);
-	if (auth?.type === 'oauth' && auth.access) {
-		return {
-			accessToken: auth.access,
-			refreshToken: auth.refresh,
-			expiresAt: auth.expires,
-			onTokenRefresh: async (tokens: {
-				accessToken: string;
-				refreshToken?: string;
-				expiresAt?: number;
-			}) => {
-				await setAuth(
-					'ottorouter',
-					{
-						type: 'oauth',
-						access: tokens.accessToken,
-						refresh: tokens.refreshToken ?? auth.refresh,
-						expires: tokens.expiresAt ?? Date.now() + 60 * 60 * 1000,
-						idToken: auth.idToken,
-						scopes: auth.scopes,
-					},
-					cfg.projectRoot,
-					'global',
-				);
-			},
-		};
-	}
-	return null;
-}
-
 export async function resolveOttoRouterModel(
 	model: string,
 	sessionId?: string,
 	options: ResolveOttoRouterModelOptions = {},
 ) {
-	const auth = await getOttoRouterOAuth(options.projectRoot);
+	const auth = await getOttoRouterOAuthAuth(options.projectRoot);
 	if (!auth) {
 		throw new Error(
 			'OttoRouter provider requires OAuth. Run `otto auth login ottorouter` first.',

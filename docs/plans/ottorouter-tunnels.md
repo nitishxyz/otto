@@ -106,7 +106,7 @@ New middleware in `packages/server/src/` applied before all routes:
 Share token routes (new, under `/v1/tunnel/shares`):
 
 - `POST /v1/tunnel/shares` `{ projectId }` → `{ token, url }` where
-  `url = https://<hostname>/?share=<token>`
+  `url = https://<hostname>/sessions?share=<token>`
 - `GET /v1/tunnel/shares` → active shares
 - `DELETE /v1/tunnel/shares/:id` → revoke
 
@@ -143,7 +143,7 @@ New module `packages/sdk/src/tunnel/managed.ts`:
     "connect OttoRouter or use quick tunnel".
   - Project share start/stop = share token create/revoke (workstream 1). The
     `project-share` scope in the API keeps working but returns
-    `https://<hostname>/?share=<token>` as its URL, and starts the managed
+    `https://<hostname>/sessions?share=<token>` as its URL, and starts the managed
     tunnel if not already running.
   - Remove per-share proxy servers in managed mode.
 - **Quick mode**: existing per-slot process + proxy behavior preserved as-is.

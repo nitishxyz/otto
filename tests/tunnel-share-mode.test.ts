@@ -120,4 +120,25 @@ describe('share-mode boot', () => {
 		expect(shareMode.isShareMode()).toBe(false);
 		expect(shareMode.getSharePinnedProjectId()).toBeUndefined();
 	});
+
+	it('never falls back to an injected owner project in share mode', async () => {
+		installWindow('https://device.example/sessions?share=share-token-pin', {
+			projectId: 'owner-project',
+			projectRoot: '/tmp/owner-project',
+		});
+		shareMode.consumeShareBoot();
+		const { getProjectQuery, projectScopedKey } = await import(
+			'../packages/web-sdk/src/lib/api-client/utils.ts'
+		);
+
+		expect(getProjectQuery()).toEqual({});
+		expect(projectScopedKey(['sessions'] as const)).toEqual([
+			'project',
+			'default',
+			'sessions',
+		]);
+
+		shareMode.setSharePinnedProjectId('shared-project');
+		expect(getProjectQuery()).toEqual({ projectId: 'shared-project' });
+	});
 });

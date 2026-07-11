@@ -77,11 +77,19 @@ export function createWebUIFetch(
 	});
 
 	// Get the appropriate server URL for network mode
-	const getServerUrl = (requestUrl: URL) => {
+	const getServerUrl = (request: Request) => {
+		const requestUrl = new URL(request.url);
 		if (typeof agiServerPortOrUrl === 'string') {
 			return agiServerPortOrUrl;
 		}
 		if (agiServerPortOrUrl === null) {
+			const forwardedProtocol = request.headers
+				.get('x-forwarded-proto')
+				?.split(',')[0]
+				?.trim();
+			if (forwardedProtocol === 'http' || forwardedProtocol === 'https') {
+				return `${forwardedProtocol}://${requestUrl.host}`;
+			}
 			return requestUrl.origin;
 		}
 		if (network) {
@@ -97,7 +105,7 @@ export function createWebUIFetch(
 
 		const respondWithIndex = async () => {
 			const indexPath = assetMap.get('/index.html');
-			const serverUrl = getServerUrl(url);
+			const serverUrl = getServerUrl(req);
 
 			if (indexPath) {
 				const indexFile = Bun.file(indexPath);
@@ -151,7 +159,7 @@ export function createWebUIFetch(
 				if (pathname.endsWith('.html')) {
 					try {
 						let html = await file.text();
-						const serverUrl = getServerUrl(url);
+						const serverUrl = getServerUrl(req);
 						html = injectRuntimeContext(html, serverUrl, context);
 
 						return new Response(html, {
@@ -177,7 +185,7 @@ export function createWebUIFetch(
 			if (embeddedData) {
 				if (pathname.endsWith('.html')) {
 					let html = decoder.decode(embeddedData);
-					const serverUrl = getServerUrl(url);
+					const serverUrl = getServerUrl(req);
 					html = injectRuntimeContext(html, serverUrl, context);
 
 					return new Response(html, {

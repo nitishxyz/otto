@@ -7,6 +7,19 @@ import {
 
 const OTTOROUTER_BASE_URL =
 	process.env.OTTOROUTER_BASE_URL || 'https://api.ottorouter.org';
+const TOKEN_REFRESH_WINDOW_MS = 5 * 60_000;
+const refreshes = new Map<string, ReturnType<typeof refreshOttoRouterToken>>();
+
+function refreshTokenOnce(refreshToken: string) {
+	let pending = refreshes.get(refreshToken);
+	if (!pending) {
+		pending = refreshOttoRouterToken(refreshToken).finally(() => {
+			refreshes.delete(refreshToken);
+		});
+		refreshes.set(refreshToken, pending);
+	}
+	return pending;
+}
 
 export function getOttoRouterBaseUrl(): string {
 	return OTTOROUTER_BASE_URL.endsWith('/')
@@ -23,8 +36,8 @@ export async function getOttoRouterOAuthAuth(projectRoot?: string) {
 	let access = auth.access;
 	let refresh = auth.refresh;
 	let expires = auth.expires;
-	if (refresh && expires && expires < Date.now() + 60_000) {
-		const tokens = await refreshOttoRouterToken(refresh);
+	if (refresh && expires && expires < Date.now() + TOKEN_REFRESH_WINDOW_MS) {
+		const tokens = await refreshTokenOnce(refresh);
 		access = tokens.access;
 		refresh = tokens.refresh;
 		expires = tokens.expires;

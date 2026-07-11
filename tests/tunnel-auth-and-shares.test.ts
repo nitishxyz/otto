@@ -211,7 +211,9 @@ describe('tunnel share routes', () => {
 		};
 		expect(created.projectId).toBe('project-1');
 		expect(created.token.length).toBeGreaterThanOrEqual(43);
-		expect(new URL(created.url).searchParams.get('share')).toBe(created.token);
+		const shareUrl = new URL(created.url);
+		expect(shareUrl.pathname).toBe('/sessions');
+		expect(shareUrl.searchParams.get('share')).toBe(created.token);
 
 		const listResponse = await app.request('/v1/tunnel/shares');
 		expect(listResponse.status).toBe(200);
