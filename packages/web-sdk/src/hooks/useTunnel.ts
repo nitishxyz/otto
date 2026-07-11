@@ -18,6 +18,7 @@ import {
 } from '../stores/tunnelStore';
 import { getProjectId } from '../lib/api-client/utils';
 import { API_BASE_URL } from '../lib/config';
+import { normalizeTunnelStatus } from '../lib/tunnel-shared';
 
 interface TunnelStatusResponse {
 	mode: TunnelMode;
@@ -79,17 +80,6 @@ function resolveProjectId(args: TunnelScopeArgs): string | undefined {
 
 function isProjectShareReady(args: TunnelScopeArgs): boolean {
 	return args.scope !== 'project-share' || Boolean(resolveProjectId(args));
-}
-
-function normalizeTunnelStatus(data: {
-	status: TunnelStatus;
-	url: string | null;
-	isRunning?: boolean;
-}): TunnelStatus {
-	if (data.isRunning && data.url) return 'connected';
-	if (data.isRunning && data.status === 'idle') return 'starting';
-	if (data.status === 'connected' && !data.url) return 'starting';
-	return data.status;
 }
 
 async function fetchTunnelStatus(

@@ -214,7 +214,11 @@ export function registerTunnelRoutes(app: Hono) {
 				},
 			},
 		},
-		(c) => c.json({ status: 'ok' as const }),
+		(c) => {
+			c.header('Cache-Control', 'no-store, max-age=0');
+			c.header('Pragma', 'no-cache');
+			return c.json({ status: 'ok' as const });
+		},
 	);
 
 	zodOpenApiRoute(

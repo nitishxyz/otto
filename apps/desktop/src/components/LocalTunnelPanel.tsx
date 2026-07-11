@@ -1,6 +1,7 @@
-import { Check, Copy, ExternalLink, Laptop, Radio } from 'lucide-react';
+import { Check, Copy, ExternalLink, Laptop } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 import { useManagedTunnel } from '../hooks/useManagedTunnel';
 import { usePlatform } from '../hooks/usePlatform';
 import type { ManagedTunnelState } from '../lib/managed-tunnel-store';
@@ -45,16 +46,19 @@ function TunnelStateBadge({
 				badge: 'border-border/50 text-muted-foreground',
 			}
 		: STATE_STYLES[state];
+	const busyBadge = checking || state === 'starting';
 	return (
 		<output
 			className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
 		>
-			<span
-				className={`h-1.5 w-1.5 rounded-full ${style.dot} ${
-					checking || state === 'starting' ? 'animate-pulse' : ''
-				}`}
-				aria-hidden="true"
-			/>
+			{busyBadge ? (
+				<StableSpinner size="xs" title={style.label} />
+			) : (
+				<span
+					className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+					aria-hidden="true"
+				/>
+			)}
 			{style.label}
 		</output>
 	);
@@ -63,17 +67,14 @@ function TunnelStateBadge({
 /**
  * Local machine panel above the remote machine list: daemon identity,
  * managed remote-control tunnel state, hostname copy/open affordances, and
- * a theme-consistent Enable/Disable control. Requires an OttoRouter
- * connection before enabling (shared Connect flow); no quick-mode fallback.
+ * a theme-consistent Enable/Disable control. Signed out it only states that
+ * an OttoRouter connection is required — the single Connect action lives in
+ * the remote machines panel below; no quick-mode fallback.
  */
 export function LocalTunnelPanel({
 	ottorouterConfigured,
-	onConnect,
-	connectBusy,
 }: {
 	ottorouterConfigured: boolean;
-	onConnect: () => void;
-	connectBusy: boolean;
 }) {
 	const tunnel = useManagedTunnel();
 	const platform = usePlatform();
@@ -160,7 +161,7 @@ export function LocalTunnelPanel({
 						)}
 					</div>
 				</div>
-				{ottorouterConfigured ? (
+				{ottorouterConfigured && (
 					<button
 						type="button"
 						onClick={() => void (enabled ? tunnel.disable() : tunnel.enable())}
@@ -172,31 +173,27 @@ export function LocalTunnelPanel({
 								: 'bg-primary text-primary-foreground hover:bg-primary/90'
 						}`}
 					>
-						{busy
-							? tunnel.pending === 'disable'
-								? 'Disabling...'
-								: 'Enabling...'
-							: enabled
-								? 'Disable'
-								: 'Enable'}
-					</button>
-				) : (
-					<button
-						type="button"
-						onClick={onConnect}
-						disabled={connectBusy}
-						className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-						title="OttoRouter connection is required for remote access"
-					>
-						<Radio className="h-3.5 w-3.5" aria-hidden="true" />
-						{connectBusy ? 'Connecting...' : 'Connect OttoRouter'}
+						{busy ? (
+							<span className="flex items-center gap-1.5">
+								<StableSpinner
+									size="sm"
+									title={
+										tunnel.pending === 'disable' ? 'Disabling' : 'Enabling'
+									}
+								/>
+								{tunnel.pending === 'disable' ? 'Disabling...' : 'Enabling...'}
+							</span>
+						) : enabled ? (
+							'Disable'
+						) : (
+							'Enable'
+						)}
 					</button>
 				)}
 			</div>
 			{!ottorouterConfigured && (
 				<p className="border-t border-border/30 px-4 py-2 text-xs text-muted-foreground/60">
-					Remote access needs your OttoRouter account before this machine can be
-					reached from other devices.
+					Requires an OttoRouter connection — use Connect OttoRouter below.
 				</p>
 			)}
 			{(tunnel.actionError || (state === 'error' && status?.error)) && (

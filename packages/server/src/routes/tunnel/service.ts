@@ -584,7 +584,12 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 			};
 		}
 
-		await managedStateWriter(false);
+		let persistenceError: string | undefined;
+		try {
+			await managedStateWriter(false);
+		} catch (error) {
+			persistenceError = error instanceof Error ? error.message : String(error);
+		}
 		managedTunnel.activeTunnel?.stop();
 		managedTunnel.activeTunnel = null;
 		managedTunnel.url = null;
@@ -592,11 +597,14 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 		managedTunnel.status = 'idle';
 		managedTunnel.error = null;
 		return {
-			ok: true,
+			ok: !persistenceError,
 			mode: 'managed' as const,
 			scope,
 			projectId: null,
 			message: 'Managed tunnel stopped',
+			...(persistenceError
+				? { error: `Failed to persist disabled state: ${persistenceError}` }
+				: {}),
 		};
 	}
 

@@ -104,6 +104,8 @@ describe('landing header account lifecycle wiring', () => {
 		expect(hook).toContain('useSyncExternalStore');
 		expect(hook).toContain('machineAccountStore.refresh()');
 		expect(hook).toContain("addEventListener('focus'");
+		expect(hook).toContain("addEventListener('visibilitychange'");
+		expect(hook).toContain('setInterval');
 		expect(hook).toContain('MACHINE_AUTH_CHANGED_EVENT');
 
 		const picker = await readFile('src/components/ProjectPicker.tsx', 'utf8');

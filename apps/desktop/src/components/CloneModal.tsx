@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, X, GitBranch, Lock, Package, Download } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 
 interface CloneProgress {
 	receivedObjects: number;
@@ -137,7 +138,10 @@ export function CloneModal({
 					<div className="px-5 pb-3">
 						<div className="p-3 bg-muted/30 border border-border/50 rounded-lg space-y-2.5">
 							<div className="flex items-center gap-2.5">
-								<div className="w-4 h-4 border-2 border-muted-foreground/20 border-t-foreground rounded-full animate-spin shrink-0" />
+								<StableSpinner
+									className="shrink-0"
+									title="Cloning repository"
+								/>
 								<div className="flex-1 min-w-0">
 									<div className="text-xs font-medium text-foreground">
 										Cloning {cloningRepo}
@@ -245,7 +249,7 @@ export function CloneModal({
 										</div>
 										<div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
 											{isThisCloning ? (
-												<div className="w-3.5 h-3.5 border-2 border-muted-foreground/20 border-t-foreground rounded-full animate-spin" />
+												<StableSpinner size="sm" title="Cloning" />
 											) : (
 												<Download className="w-3.5 h-3.5 text-muted-foreground/50" />
 											)}

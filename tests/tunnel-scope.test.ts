@@ -248,6 +248,24 @@ describe('managed tunnel service', () => {
 		expect(desired).toEqual([true, false]);
 	});
 
+	test('stops managed process even when disabled state cannot be persisted', async () => {
+		configureManagedTunnel();
+		await service.startTunnel(undefined, { mode: 'managed' });
+		service.tunnelTesting.setManagedStateWriter(async () => {
+			throw new Error('disk unavailable');
+		});
+
+		expect(await service.stopTunnel({ mode: 'managed' })).toMatchObject({
+			ok: false,
+			error: 'Failed to persist disabled state: disk unavailable',
+		});
+		expect(MockTunnel.stops).toBe(1);
+		expect(await service.getTunnelStatus({ mode: 'managed' })).toMatchObject({
+			status: 'idle',
+			isRunning: false,
+		});
+	});
+
 	test('restores enabled managed tunnel and preserves stable provisioned hostname', async () => {
 		const provisions = configureManagedTunnel();
 		const desiredWrites: boolean[] = [];

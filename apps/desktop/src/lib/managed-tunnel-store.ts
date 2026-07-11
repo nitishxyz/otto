@@ -1,4 +1,10 @@
 import { getTunnelStatus, startTunnel, stopTunnel } from '@ottocode/api';
+import {
+	MANAGED_REMOTE_CONTROL,
+	describeTunnelActionError,
+	normalizeTunnelStatus,
+	type RawTunnelStatus,
+} from '@ottocode/web-sdk/lib';
 
 export type ManagedTunnelState = 'off' | 'starting' | 'online' | 'error';
 
@@ -36,24 +42,35 @@ export interface ManagedTunnelStore {
 	disable: () => Promise<void>;
 }
 
-const MANAGED_QUERY = { mode: 'managed', scope: 'remote-control' } as const;
+const RAW_STATUSES: readonly RawTunnelStatus[] = [
+	'idle',
+	'starting',
+	'connected',
+	'error',
+];
 
 /** Maps daemon tunnel status payloads onto the four landing badge states. */
 export function toManagedTunnelStatus(payload: unknown): ManagedTunnelStatus {
 	const record = (payload ?? {}) as Record<string, unknown>;
-	const raw = typeof record.status === 'string' ? record.status : 'idle';
+	const url = typeof record.url === 'string' ? record.url : null;
+	const raw = RAW_STATUSES.includes(record.status as RawTunnelStatus)
+		? (record.status as RawTunnelStatus)
+		: 'idle';
+	const normalized = normalizeTunnelStatus({
+		status: raw,
+		url,
+		isRunning: record.isRunning === true,
+	});
 	const state: ManagedTunnelState =
-		raw === 'connected'
+		normalized === 'connected'
 			? 'online'
-			: raw === 'starting'
-				? 'starting'
-				: raw === 'error'
-					? 'error'
-					: 'off';
+			: normalized === 'idle'
+				? 'off'
+				: normalized;
 	return {
 		state,
 		hostname: typeof record.hostname === 'string' ? record.hostname : null,
-		url: typeof record.url === 'string' ? record.url : null,
+		url,
 		error: typeof record.error === 'string' ? record.error : null,
 		ottorouterConnected: record.ottorouterConnected === true,
 	};
@@ -61,14 +78,7 @@ export function toManagedTunnelStatus(payload: unknown): ManagedTunnelStatus {
 
 /** Converts start/stop response bodies into readable messages, never a raw TypeError. */
 export function toManagedTunnelActionError(payload: unknown): string {
-	const record = (payload ?? {}) as Record<string, unknown>;
-	if (record.code === 'ottorouter_not_connected') {
-		return 'Connect OttoRouter before enabling remote access.';
-	}
-	if (typeof record.error === 'string' && record.error) return record.error;
-	if (typeof record.message === 'string' && record.message)
-		return record.message;
-	return 'The managed tunnel request failed. Retry once the daemon is reachable.';
+	return describeTunnelActionError(payload);
 }
 
 /**
@@ -166,7 +176,7 @@ export function createManagedTunnelStore(api: TunnelApi): ManagedTunnelStore {
 }
 
 export const managedTunnelStore = createManagedTunnelStore({
-	status: () => getTunnelStatus({ query: MANAGED_QUERY }),
-	start: () => startTunnel({ body: MANAGED_QUERY }),
-	stop: () => stopTunnel({ query: MANAGED_QUERY }),
+	status: () => getTunnelStatus({ query: MANAGED_REMOTE_CONTROL }),
+	start: () => startTunnel({ body: MANAGED_REMOTE_CONTROL }),
+	stop: () => stopTunnel({ query: MANAGED_REMOTE_CONTROL }),
 });

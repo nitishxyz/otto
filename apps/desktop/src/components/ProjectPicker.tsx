@@ -33,6 +33,7 @@ import {
 	Star,
 	X,
 } from 'lucide-react';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
 import { useVersion } from '../hooks/useVersion';
@@ -624,9 +625,10 @@ export function ProjectPicker({
 								)}
 
 								{loading && projects.length === 0 && (
-									<div className="text-center py-16 text-sm text-muted-foreground/60">
+									<output className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground/60">
+										<StableSpinner size="sm" title="Loading projects" />
 										Loading...
-									</div>
+									</output>
 								)}
 
 								{!loading && projects.length === 0 && (
@@ -654,15 +656,15 @@ export function ProjectPicker({
 									<>
 										<LocalTunnelPanel
 											ottorouterConfigured={machineState?.configured ?? false}
-											onConnect={machineAccount.connect}
-											connectBusy={machineAccount.busy}
 										/>
 										<MachineLauncher
 											state={machineState}
 											loading={machinesLoading}
 											onRefresh={refreshMachines}
 											onConnect={machineAccount.connect}
-											connectBusy={machineAccount.busy}
+											onCancelConnect={machineAccount.cancel}
+											authPhase={machineAccount.phase}
+											connectError={machineAccount.error}
 										/>
 									</>
 								)}

@@ -1,6 +1,12 @@
-import { LogOut, Radio, RefreshCw } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { LogOut } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { StableSpinner } from '@ottocode/web-sdk/components';
+import {
+	planOttoRouterActions,
+	type OttoRouterAuthPhase,
+} from '../lib/ottorouter-actions';
+import { runOttoRouterDeviceFlow } from '../lib/ottorouter-device-flow';
 import {
 	pollOttoRouterSignIn,
 	signOutOttoRouter,
@@ -10,19 +16,28 @@ import { MACHINE_AUTH_CHANGED_EVENT } from '../lib/machine-account-store';
 
 export interface OttoRouterAccount {
 	busy: boolean;
+	/** Connect device-flow phase; 'pending' persists until poll resolves. */
+	phase: OttoRouterAuthPhase;
 	error: string | null;
 	connect: () => Promise<void>;
 	disconnect: () => Promise<void>;
+	/** Cancels an in-flight connect flow and returns to the idle view. */
+	cancel: () => void;
 }
 
 /**
  * Daemon-owned OttoRouter provider auth flow (device start/poll + sign-out).
  * Shared by the header control and the Machines tab sign-in state so both
  * trigger the same flow and refresh the machine list after auth changes.
+ * While a device flow is pending the phase stays 'pending' regardless of
+ * account-store refreshes, so the UI keeps its waiting state between polls.
  */
 export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
-	const [busy, setBusy] = useState(false);
+	const [disconnectBusy, setDisconnectBusy] = useState(false);
+	const [phase, setPhase] = useState<OttoRouterAuthPhase>('idle');
 	const [error, setError] = useState<string | null>(null);
+	const flowGenerationRef = useRef(0);
+	const activeGenerationRef = useRef<number | null>(null);
 
 	const notifyChanged = useCallback(() => {
 		onChanged();
@@ -30,57 +45,71 @@ export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
 	}, [onChanged]);
 
 	const connect = useCallback(async () => {
-		setBusy(true);
+		if (activeGenerationRef.current !== null) return;
+		const generation = ++flowGenerationRef.current;
+		activeGenerationRef.current = generation;
+		setPhase('pending');
 		setError(null);
-		try {
-			const flow = await startOttoRouterSignIn();
-			await openUrl(flow.verificationUri);
-			const deadline = Date.now() + 10 * 60_000;
-			while (Date.now() < deadline) {
-				await new Promise((resolve) =>
-					setTimeout(resolve, Math.max(flow.interval, 2) * 1000),
-				);
-				const result = await pollOttoRouterSignIn(flow.sessionId);
-				if (result.status === 'complete') {
-					notifyChanged();
-					return;
-				}
-				if (result.status === 'error') {
-					throw new Error(result.error || 'OttoRouter sign-in failed.');
-				}
-			}
-			throw new Error('OttoRouter sign-in timed out.');
-		} catch (cause) {
-			setError(String(cause));
-		} finally {
-			setBusy(false);
+		const result = await runOttoRouterDeviceFlow({
+			start: startOttoRouterSignIn,
+			openVerification: (url) => openUrl(url),
+			poll: pollOttoRouterSignIn,
+			isCancelled: () => flowGenerationRef.current !== generation,
+		});
+		if (flowGenerationRef.current !== generation) return;
+		activeGenerationRef.current = null;
+		if (result.status === 'connected') {
+			setPhase('idle');
+			notifyChanged();
+			return;
 		}
+		if (result.status === 'cancelled') {
+			setPhase('idle');
+			return;
+		}
+		setPhase('error');
+		setError(result.error);
 	}, [notifyChanged]);
 
+	const cancel = useCallback(() => {
+		if (activeGenerationRef.current === null) return;
+		flowGenerationRef.current += 1;
+		activeGenerationRef.current = null;
+		setPhase('idle');
+		setError(null);
+	}, []);
+
 	const disconnect = useCallback(async () => {
-		setBusy(true);
+		setDisconnectBusy(true);
 		setError(null);
 		try {
 			await signOutOttoRouter();
-			notifyChanged();
 		} catch (cause) {
 			setError(String(cause));
 		} finally {
-			setBusy(false);
+			notifyChanged();
+			setDisconnectBusy(false);
 		}
 	}, [notifyChanged]);
 
-	return { busy, error, connect, disconnect };
+	return {
+		busy: disconnectBusy || phase === 'pending',
+		phase,
+		error,
+		connect,
+		disconnect,
+		cancel,
+	};
 }
 
 /**
- * Compact header control matching the Update button (h-7, rounded-full,
- * theme primary). Shows a neutral checking pill until the daemon answers the
- * first account-status query (no signed-out flash), `Connect OttoRouter`
- * when signed out, and — when signed in — a single pill (status dot +
- * OttoRouter) whose content swaps to a disconnect affordance on
- * hover/keyboard focus without changing size; clicking (or tapping) the
- * pill disconnects.
+ * Compact header control matching the Update button (h-7, rounded-full).
+ * Renders nothing when signed out (the single Connect action lives in the
+ * Machines tab), a neutral checking pill until the daemon answers the first
+ * account-status query (no Connect flash), and — when signed in — a single
+ * status pill (dot + OttoRouter) whose content swaps to a disconnect
+ * affordance on hover/keyboard focus without changing size; clicking (or
+ * tapping) the pill disconnects.
  */
 export function OttoRouterAccountControl({
 	configured,
@@ -92,9 +121,12 @@ export function OttoRouterAccountControl({
 	initializing?: boolean;
 	account: OttoRouterAccount;
 }) {
-	const { busy, error, connect, disconnect } = account;
+	const { busy, error, disconnect } = account;
+	const plan = planOttoRouterActions({ configured, initializing });
 
-	if (initializing) {
+	if (plan.headerControl === 'none') return null;
+
+	if (plan.headerControl === 'checking') {
 		return (
 			<output
 				data-no-drag
@@ -102,10 +134,7 @@ export function OttoRouterAccountControl({
 				title="Checking OttoRouter connection"
 				className="h-7 px-3 flex items-center gap-1.5 text-sm text-muted-foreground/70 border border-border/50 rounded-full select-none"
 			>
-				<span
-					className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-pulse"
-					aria-hidden="true"
-				/>
+				<StableSpinner size="xs" title="Checking OttoRouter connection" />
 				OttoRouter
 			</output>
 		);
@@ -113,66 +142,48 @@ export function OttoRouterAccountControl({
 
 	return (
 		<div className="relative flex items-center gap-1.5">
-			{configured ? (
-				<button
-					type="button"
-					onClick={disconnect}
-					disabled={busy}
-					data-no-drag
-					aria-label="Disconnect OttoRouter"
-					aria-busy={busy}
-					title="Disconnect OttoRouter"
-					className="group h-7 px-3 grid items-center text-sm text-muted-foreground border border-border/50 rounded-full transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive disabled:opacity-60"
+			<button
+				type="button"
+				onClick={disconnect}
+				disabled={busy}
+				data-no-drag
+				aria-label="Disconnect OttoRouter"
+				aria-busy={busy}
+				title="Disconnect OttoRouter"
+				className="group h-7 px-3 grid items-center text-sm text-muted-foreground border border-border/50 rounded-full transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive disabled:opacity-60"
+			>
+				<span
+					aria-hidden="true"
+					className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 transition-opacity duration-150 ${
+						busy
+							? 'opacity-0'
+							: 'group-hover:opacity-0 group-focus-visible:opacity-0'
+					}`}
 				>
-					<span
-						aria-hidden="true"
-						className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 transition-opacity duration-150 ${
-							busy
-								? 'opacity-0'
-								: 'group-hover:opacity-0 group-focus-visible:opacity-0'
-						}`}
-					>
-						<span className="w-2 h-2 rounded-full bg-primary" />
-						OttoRouter
-					</span>
-					<span
-						aria-hidden="true"
-						className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 opacity-0 transition-opacity duration-150 ${
-							busy
-								? ''
-								: 'group-hover:opacity-100 group-focus-visible:opacity-100'
-						}`}
-					>
-						<LogOut className="w-3.5 h-3.5" />
-						Disconnect
-					</span>
-					<span
-						aria-hidden={!busy}
-						className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 transition-opacity duration-150 ${
-							busy ? 'opacity-100' : 'opacity-0'
-						}`}
-					>
-						<RefreshCw className="w-3.5 h-3.5 animate-spin" />
-						Disconnect
-					</span>
-				</button>
-			) : (
-				<button
-					type="button"
-					onClick={connect}
-					disabled={busy}
-					data-no-drag
-					className="h-7 px-3 flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors disabled:opacity-60"
-					title="Connect your OttoRouter account"
+					<span className="w-2 h-2 rounded-full bg-primary" />
+					OttoRouter
+				</span>
+				<span
+					aria-hidden="true"
+					className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 opacity-0 transition-opacity duration-150 ${
+						busy
+							? ''
+							: 'group-hover:opacity-100 group-focus-visible:opacity-100'
+					}`}
 				>
-					{busy ? (
-						<RefreshCw className="w-4 h-4 animate-spin" aria-hidden="true" />
-					) : (
-						<Radio className="w-4 h-4" aria-hidden="true" />
-					)}
-					{busy ? 'Connecting...' : 'Connect OttoRouter'}
-				</button>
-			)}
+					<LogOut className="w-3.5 h-3.5" />
+					Disconnect
+				</span>
+				<span
+					aria-hidden={!busy}
+					className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5 transition-opacity duration-150 ${
+						busy ? 'opacity-100' : 'opacity-0'
+					}`}
+				>
+					<StableSpinner size="sm" title="Disconnecting" />
+					Disconnect
+				</span>
+			</button>
 			{error && (
 				<div
 					role="alert"

@@ -41,3 +41,9 @@ export {
 	type OwnerAuthorizationResult,
 } from './owner-auth';
 export * from './platform';
+export {
+	MANAGED_REMOTE_CONTROL,
+	describeTunnelActionError,
+	normalizeTunnelStatus,
+	type RawTunnelStatus,
+} from './tunnel-shared';

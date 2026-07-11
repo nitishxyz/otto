@@ -624,6 +624,17 @@ export const ChatInput = memo(
 			textareaRef.current?.focus();
 		}, []);
 
+		const wasDisabledRef = useRef(false);
+		useEffect(() => {
+			const wasDisabled = wasDisabledRef.current;
+			wasDisabledRef.current = Boolean(disabled);
+			if (!wasDisabled || disabled) return;
+			const active = document.activeElement;
+			if (active === document.body || active === null) {
+				textareaRef.current?.focus({ preventScroll: true });
+			}
+		}, [disabled]);
+
 		useEffect(() => {
 			if (externalIsPlanMode !== undefined) {
 				setIsPlanMode(externalIsPlanMode);

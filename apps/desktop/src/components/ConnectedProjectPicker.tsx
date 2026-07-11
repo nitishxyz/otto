@@ -5,6 +5,7 @@ import {
 	ShieldAlert,
 	WifiOff,
 } from 'lucide-react';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 import { useCallback, useEffect, useState } from 'react';
 import { usePlatform } from '../hooks/usePlatform';
 import { loadAuthorizedMachineProjects } from '../lib/machine-api';
@@ -100,18 +101,24 @@ export function ConnectedProjectPicker({
 							disabled={loading}
 							className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
 						>
-							<RefreshCw
-								className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
-							/>
+							{loading ? (
+								<StableSpinner size="sm" title="Loading projects" />
+							) : (
+								<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+							)}
 							Retry
 						</button>
 					</div>
 
 					<div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
 						{loading && (
-							<div className="px-5 py-12 text-center text-sm text-muted-foreground">
+							<output className="flex items-center justify-center gap-2 px-5 py-12 text-sm text-muted-foreground">
+								<StableSpinner
+									size="sm"
+									title="Authorizing and loading projects"
+								/>
 								Authorizing and loading projects...
-							</div>
+							</output>
 						)}
 						{!loading && error && (
 							<div className="px-6 py-10 text-center">

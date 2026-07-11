@@ -1,6 +1,8 @@
 import { Monitor, Radio, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 import type { MachineDeviceState } from '../lib/machine-api';
+import type { OttoRouterAuthPhase } from '../lib/ottorouter-actions';
 import { machinePresence, type MachinePresence } from '../lib/machine-status';
 import { tauriBridge } from '../lib/tauri-bridge';
 
@@ -31,10 +33,14 @@ function PresenceBadge({ presence }: { presence: MachinePresence }) {
 		<span
 			className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.badge}`}
 		>
-			<span
-				className={`h-1.5 w-1.5 rounded-full ${style.dot} ${presence === 'checking' ? 'animate-pulse' : ''}`}
-				aria-hidden="true"
-			/>
+			{presence === 'checking' ? (
+				<StableSpinner size="xs" title="Checking machine status" />
+			) : (
+				<span
+					className={`h-1.5 w-1.5 rounded-full ${style.dot}`}
+					aria-hidden="true"
+				/>
+			)}
 			{style.label}
 		</span>
 	);
@@ -49,13 +55,18 @@ export function MachineLauncher({
 	loading,
 	onRefresh,
 	onConnect,
-	connectBusy,
+	onCancelConnect,
+	authPhase = 'idle',
+	connectError,
 }: {
 	state: MachineDeviceState | null;
 	loading: boolean;
 	onRefresh: () => void;
 	onConnect: () => void;
-	connectBusy: boolean;
+	onCancelConnect?: () => void;
+	/** Device-flow phase; 'pending' keeps the waiting view across refreshes. */
+	authPhase?: OttoRouterAuthPhase;
+	connectError?: string | null;
 }) {
 	const [opening, setOpening] = useState<string | null>(null);
 	const [openError, setOpenError] = useState<string | null>(null);
@@ -89,21 +100,46 @@ export function MachineLauncher({
 					disabled={loading || !configured}
 					className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
 				>
-					<RefreshCw
-						className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
-						aria-hidden="true"
-					/>
+					{loading ? (
+						<StableSpinner size="sm" title="Refreshing machines" />
+					) : (
+						<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+					)}
 					Refresh
 				</button>
 			</div>
 
 			<div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
 				{initialLoading && (
-					<output className="block px-4 py-10 text-center text-sm text-muted-foreground/60">
+					<output className="flex items-center justify-center gap-2 px-4 py-10 text-sm text-muted-foreground/60">
+						<StableSpinner size="sm" title="Loading machines" />
 						Loading machines...
 					</output>
 				)}
-				{!initialLoading && !configured && (
+				{!initialLoading && authPhase === 'pending' && (
+					<div className="px-5 py-10 text-center" aria-busy="true">
+						<div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/60">
+							<StableSpinner title="Waiting for authorization" />
+						</div>
+						<output className="block text-sm text-foreground">
+							Waiting for authorization...
+						</output>
+						<p className="mt-1 text-xs text-muted-foreground/60">
+							Approve the sign-in in your browser. This screen updates
+							automatically.
+						</p>
+						{onCancelConnect && (
+							<button
+								type="button"
+								onClick={onCancelConnect}
+								className="mt-4 h-8 px-3.5 inline-flex items-center rounded-full border border-border/50 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								Cancel
+							</button>
+						)}
+					</div>
+				)}
+				{!initialLoading && authPhase !== 'pending' && !configured && (
 					<div className="px-5 py-10 text-center">
 						<div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/60">
 							<Radio className="h-5 w-5 text-muted-foreground" />
@@ -118,19 +154,21 @@ export function MachineLauncher({
 						<button
 							type="button"
 							onClick={onConnect}
-							disabled={connectBusy}
-							className="mt-4 h-8 px-3.5 inline-flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors disabled:opacity-60"
+							className="mt-4 h-8 px-3.5 inline-flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
 						>
-							{connectBusy ? (
-								<RefreshCw
-									className="w-3.5 h-3.5 animate-spin"
-									aria-hidden="true"
-								/>
-							) : (
-								<Radio className="w-3.5 h-3.5" aria-hidden="true" />
-							)}
-							{connectBusy ? 'Connecting...' : 'Connect OttoRouter'}
+							<Radio className="w-3.5 h-3.5" aria-hidden="true" />
+							{authPhase === 'error'
+								? 'Retry Connect OttoRouter'
+								: 'Connect OttoRouter'}
 						</button>
+						{connectError && (
+							<p
+								role="alert"
+								className="mx-auto mt-3 max-w-md text-xs text-destructive"
+							>
+								{connectError}
+							</p>
+						)}
 					</div>
 				)}
 				{!initialLoading && configured && state?.error && (

@@ -10,6 +10,7 @@ import {
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import { disconnectOttoRouter } from './ottorouter-disconnect.ts';
 
 const providerParamSchema = z.object({
 	provider: z.string().openapi({
@@ -24,6 +25,9 @@ const addProviderApiKeyBodySchema = z.object({
 const providerAuthResponseSchema = z.object({
 	success: z.boolean(),
 	provider: z.string(),
+	tunnelDisabled: z.boolean().optional(),
+	authRemoved: z.boolean().optional(),
+	error: z.string().optional(),
 });
 
 const providerAuthErrorSchema = z.object({
@@ -126,6 +130,10 @@ export function registerAuthProviderRoutes(app: Hono) {
 
 				if (!isBuiltInProviderId(provider) || !catalog[provider]) {
 					return c.json({ error: 'Unknown provider' }, 400);
+				}
+
+				if (provider === 'ottorouter') {
+					return c.json(await disconnectOttoRouter());
 				}
 
 				await removeAuth(provider, undefined, 'global');

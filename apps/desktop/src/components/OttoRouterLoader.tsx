@@ -2,7 +2,10 @@ import { OttoLogo } from './Icons';
 
 export function OttoRouterLoader({ label }: { label?: string }) {
 	return (
-		<div className="flex flex-col items-center justify-center gap-5">
+		<output
+			aria-busy="true"
+			className="flex flex-col items-center justify-center gap-5"
+		>
 			<div className="ottorouter-loader-ring">
 				<OttoLogo size={32} />
 			</div>
@@ -11,6 +14,6 @@ export function OttoRouterLoader({ label }: { label?: string }) {
 					{label}
 				</span>
 			)}
-		</div>
+		</output>
 	);
 }

@@ -3,6 +3,7 @@ import {
 	managedTunnelStore,
 	type ManagedTunnelSnapshot,
 } from '../lib/managed-tunnel-store';
+import { MACHINE_AUTH_CHANGED_EVENT } from '../lib/machine-account-store';
 
 const STARTING_POLL_MS = 2_500;
 
@@ -29,7 +30,11 @@ export function useManagedTunnel(): ManagedTunnel {
 		void managedTunnelStore.refresh();
 		const refresh = () => void managedTunnelStore.refresh();
 		window.addEventListener('focus', refresh);
-		return () => window.removeEventListener('focus', refresh);
+		window.addEventListener(MACHINE_AUTH_CHANGED_EVENT, refresh);
+		return () => {
+			window.removeEventListener('focus', refresh);
+			window.removeEventListener(MACHINE_AUTH_CHANGED_EVENT, refresh);
+		};
 	}, []);
 
 	const settling = snapshot.status?.state === 'starting' || snapshot.pending;

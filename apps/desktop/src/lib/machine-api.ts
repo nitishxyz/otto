@@ -72,4 +72,15 @@ export async function pollOttoRouterSignIn(sessionId: string): Promise<{
 export async function signOutOttoRouter(): Promise<void> {
 	const response = await removeProvider({ path: { provider: 'ottorouter' } });
 	if (response.error) throw new Error('Could not disconnect OttoRouter.');
+	const result = response.data as {
+		success: boolean;
+		tunnelDisabled?: boolean;
+		authRemoved?: boolean;
+		error?: string;
+	};
+	if (!result.success) {
+		throw new Error(
+			result.error ?? 'OttoRouter disconnected with cleanup errors.',
+		);
+	}
 }

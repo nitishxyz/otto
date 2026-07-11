@@ -181,16 +181,26 @@ export function classifyProbeStatus(
 	return 'checking';
 }
 
-async function probeDevice(
+/** Probes the public daemon ping endpoint without reusing edge caches. */
+export async function probeDevice(
 	hostname: string | null,
 	fetcher: typeof globalThis.fetch,
 ): Promise<'online' | 'offline' | 'checking'> {
 	if (!hostname) return 'checking';
 	try {
-		const response = await fetcher(
-			`https://${hostname.replace(/^https?:\/\//, '').replace(/\/$/, '')}/v1/tunnel/ping`,
-			{ signal: AbortSignal.timeout(3_000), cache: 'no-store' },
-		);
+		const url = new URL('/v1/tunnel/ping', machineUrl(hostname));
+		url.searchParams.set('_', String(Date.now()));
+		const response = await fetcher(url, {
+			method: 'GET',
+			headers: {
+				Accept: 'application/json',
+				'Cache-Control': 'no-cache, no-store, max-age=0',
+				Pragma: 'no-cache',
+			},
+			redirect: 'follow',
+			signal: AbortSignal.timeout(5_000),
+			cache: 'no-store',
+		});
 		return classifyProbeStatus(response.status);
 	} catch {
 		return 'offline';
@@ -243,7 +253,13 @@ export async function listRemoteOttoRouterDevices(
 	const response = await fetcher(
 		`${getOttoRouterBaseUrl()}/v1/tunnels/devices`,
 		{
-			headers: { ...authHeaders, Accept: 'application/json' },
+			headers: {
+				...authHeaders,
+				Accept: 'application/json',
+				'Cache-Control': 'no-cache, no-store, max-age=0',
+				Pragma: 'no-cache',
+			},
+			cache: 'no-store',
 		},
 	);
 	if (response.status === 401 || response.status === 403) {

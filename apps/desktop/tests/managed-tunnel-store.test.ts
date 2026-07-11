@@ -50,9 +50,20 @@ describe('managed tunnel status mapping', () => {
 		expect(toManagedTunnelStatus({ status: 'starting' }).state).toBe(
 			'starting',
 		);
-		expect(toManagedTunnelStatus({ status: 'connected' }).state).toBe('online');
+		expect(toManagedTunnelStatus(CONNECTED_STATUS).state).toBe('online');
 		expect(toManagedTunnelStatus({ status: 'error' }).state).toBe('error');
 		expect(toManagedTunnelStatus(undefined).state).toBe('off');
+	});
+
+	test('smooths startup race windows via the shared normalizer', () => {
+		// connected reported before the URL is published -> still starting
+		expect(toManagedTunnelStatus({ status: 'connected' }).state).toBe(
+			'starting',
+		);
+		// process running while status lags at idle -> starting, not off
+		expect(
+			toManagedTunnelStatus({ status: 'idle', isRunning: true }).state,
+		).toBe('starting');
 	});
 
 	test('keeps hostname and ottorouter prerequisite from the payload', () => {
@@ -117,7 +128,13 @@ describe('managed tunnel store flows', () => {
 		const { api, calls } = makeApi({
 			status: () =>
 				Promise.resolve({
-					data: { ...CONNECTED_STATUS, status: 'idle', hostname: null },
+					data: {
+						...CONNECTED_STATUS,
+						status: 'idle',
+						hostname: null,
+						url: null,
+						isRunning: false,
+					},
 				}),
 		});
 		const store = createManagedTunnelStore(api);
@@ -178,12 +195,31 @@ describe('local tunnel panel wiring', () => {
 
 		const store = await readFile('src/lib/managed-tunnel-store.ts', 'utf8');
 		expect(store).toContain("from '@ottocode/api'");
-		expect(store).toContain("mode: 'managed'");
-		expect(store).toContain("scope: 'remote-control'");
+		expect(store).toContain('MANAGED_REMOTE_CONTROL');
 		expect(store).not.toContain('fetch(');
 
 		const panel = await readFile('src/components/LocalTunnelPanel.tsx', 'utf8');
 		expect(panel).toContain('Connect OttoRouter');
 		expect(panel).not.toContain("mode: 'quick'");
+	});
+
+	test('desktop consumes shared web-sdk tunnel helpers instead of duplicating them', async () => {
+		const store = await readFile('src/lib/managed-tunnel-store.ts', 'utf8');
+		expect(store).toContain("from '@ottocode/web-sdk/lib'");
+		expect(store).toContain('describeTunnelActionError');
+		expect(store).toContain('normalizeTunnelStatus');
+
+		const shared = await readFile(
+			'../../packages/web-sdk/src/lib/tunnel-shared.ts',
+			'utf8',
+		);
+		expect(shared).toContain('ottorouter_not_connected');
+		expect(shared).toContain('MANAGED_REMOTE_CONTROL');
+
+		const webHook = await readFile(
+			'../../packages/web-sdk/src/hooks/useTunnel.ts',
+			'utf8',
+		);
+		expect(webHook).toContain("from '../lib/tunnel-shared'");
 	});
 });

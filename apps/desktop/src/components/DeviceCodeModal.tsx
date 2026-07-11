@@ -1,4 +1,5 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { StableSpinner } from '@ottocode/web-sdk/components';
 import type { OAuthState } from '../hooks/useGitHub';
 import type { DeviceCodeResponse } from '../lib/tauri-bridge';
 
@@ -44,7 +45,7 @@ export function DeviceCodeModal({
 				<div className="p-6">
 					{oauthState.step === 'requesting' && (
 						<div className="flex items-center justify-center py-8">
-							<div className="w-6 h-6 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
+							<StableSpinner size="lg" title="Connecting to GitHub" />
 							<span className="ml-3 text-muted-foreground">
 								Connecting to GitHub...
 							</span>
@@ -77,7 +78,7 @@ export function DeviceCodeModal({
 
 					{oauthState.step === 'polling' && (
 						<div className="flex flex-col items-center py-8 gap-4">
-							<div className="w-6 h-6 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
+							<StableSpinner size="lg" title="Waiting for authorization" />
 							<p className="text-muted-foreground text-sm">
 								Waiting for authorization...
 							</p>
