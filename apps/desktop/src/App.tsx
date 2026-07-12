@@ -18,6 +18,7 @@ import {
 	renewOwnerSession,
 	setOwnerRenewalHandler,
 } from '@ottocode/web-sdk/lib';
+import { useViewerTabsStore } from '@ottocode/web-sdk/stores';
 import './index.css';
 
 function App() {
@@ -50,12 +51,13 @@ function App() {
 				);
 				return;
 			}
-			const machineBootstrap = await tauriBridge.getMachineBootstrap();
-			const nextCliSelection = await tauriBridge
-				.getCliSelection()
-				.catch(() => null);
-			const initialPath = await tauriBridge.getInitialProject();
-			const initialRemote = await tauriBridge.getInitialRemote();
+			const [machineBootstrap, nextCliSelection, initialPath, initialRemote] =
+				await Promise.all([
+					tauriBridge.getMachineBootstrap(),
+					tauriBridge.getCliSelection().catch(() => null),
+					tauriBridge.getInitialProject(),
+					tauriBridge.getInitialRemote(),
+				]);
 			let nextRoute: '/onboarding' | '/projects' | '/sessions' = '/projects';
 
 			if (!machineBootstrap) {
@@ -219,6 +221,7 @@ function App() {
 	};
 
 	const handleBack = async () => {
+		useViewerTabsStore.getState().closeAllTabs();
 		setSelectedProject(null);
 		await router.navigate({ to: '/projects' });
 	};
@@ -242,7 +245,8 @@ function App() {
 
 	const handleUpdateInstalledCli = async () => {
 		const selection = await tauriBridge.updateInstalledCli();
-		setCliSelection(selection);
+		flushSync(() => setCliSelection(selection));
+		await router.invalidate();
 	};
 
 	const handleOnboardingComplete = () => {

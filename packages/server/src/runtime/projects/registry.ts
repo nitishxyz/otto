@@ -1,8 +1,6 @@
 import {
 	getGlobalConfigDir,
-	getProjectDbPath,
 	getProjectId,
-	getProjectStateDir,
 	getProjectsStateRoot,
 	logger,
 } from '@ottocode/sdk';
@@ -43,6 +41,12 @@ interface ProjectMetadataFile {
 	lastSeenAt?: unknown;
 }
 
+interface RegistryStorage {
+	configDir: string;
+	projectsRoot: string;
+	registryPath: string;
+}
+
 const TOUCH_DEBOUNCE_MS = 60_000;
 const touchedThisSession = new Map<string, number>();
 
@@ -54,8 +58,21 @@ function joinPath(...parts: string[]): string {
 		.replace(/\/+/g, '/');
 }
 
-function registryPath(): string {
-	return joinPath(getGlobalConfigDir(), 'projects.json');
+function resolveRegistryStorage(): RegistryStorage {
+	const configDir = getGlobalConfigDir();
+	return {
+		configDir,
+		projectsRoot: getProjectsStateRoot(),
+		registryPath: joinPath(configDir, 'projects.json'),
+	};
+}
+
+function getStoredProjectPaths(
+	storage: RegistryStorage,
+	projectId: string,
+): { stateDir: string; dbPath: string } {
+	const stateDir = joinPath(storage.projectsRoot, projectId);
+	return { stateDir, dbPath: joinPath(stateDir, 'otto.sqlite') };
 }
 
 function projectName(projectRoot: string): string {
@@ -70,24 +87,24 @@ function parseTime(value: unknown, fallback: number): number {
 }
 
 async function discoverStateProjects(
+	storage: RegistryStorage,
 	registered: RegisteredProject[],
 	forgottenRoots: string[],
 ): Promise<RegisteredProject[]> {
 	const existingRoots = new Set(registered.map((project) => project.path));
 	const forgotten = new Set(forgottenRoots);
 	const discovered: RegisteredProject[] = [];
-	const projectsRoot = getProjectsStateRoot();
 
 	let entries: Array<{ isDirectory(): boolean; name: string }>;
 	try {
-		entries = await readdir(projectsRoot, { withFileTypes: true });
+		entries = await readdir(storage.projectsRoot, { withFileTypes: true });
 	} catch {
 		return discovered;
 	}
 
 	for (const entry of entries) {
 		if (!entry.isDirectory()) continue;
-		const stateDir = joinPath(projectsRoot, entry.name);
+		const stateDir = joinPath(storage.projectsRoot, entry.name);
 		try {
 			const dbPathOnDisk = joinPath(stateDir, 'otto.sqlite');
 			if (!(await Bun.file(dbPathOnDisk).exists())) continue;
@@ -103,14 +120,16 @@ async function discoverStateProjects(
 
 			const now = Date.now();
 			const root = metadata.root;
+			const id = await getProjectId(root);
+			const paths = getStoredProjectPaths(storage, id);
 			existingRoots.add(root);
 			discovered.push({
-				id: await getProjectId(root),
+				id,
 				name:
 					typeof metadata.name === 'string' ? metadata.name : projectName(root),
 				path: root,
-				stateDir: await getProjectStateDir(root),
-				dbPath: await getProjectDbPath(root),
+				stateDir: paths.stateDir,
+				dbPath: paths.dbPath,
 				firstSeenAt: parseTime(metadata.createdAt, now),
 				lastSeenAt: parseTime(metadata.lastSeenAt, now),
 				pinned: false,
@@ -126,9 +145,9 @@ async function discoverStateProjects(
 	return discovered;
 }
 
-async function loadRegistry(): Promise<RegistryFile> {
+async function loadRegistry(storage: RegistryStorage): Promise<RegistryFile> {
 	try {
-		const file = Bun.file(registryPath());
+		const file = Bun.file(storage.registryPath);
 		if (!(await file.exists()))
 			return { version: 1, projects: [], forgottenRoots: [] };
 		const text = await file.text();
@@ -141,12 +160,14 @@ async function loadRegistry(): Promise<RegistryFile> {
 			const projects: RegisteredProject[] = [];
 			for (const p of (parsed as RegistryFile).projects) {
 				if (!p || typeof p.path !== 'string') continue;
+				const id = await getProjectId(p.path);
+				const paths = getStoredProjectPaths(storage, id);
 				projects.push({
-					id: await getProjectId(p.path),
+					id,
 					name: typeof p.name === 'string' ? p.name : projectName(p.path),
 					path: p.path,
-					stateDir: await getProjectStateDir(p.path),
-					dbPath: await getProjectDbPath(p.path),
+					stateDir: paths.stateDir,
+					dbPath: paths.dbPath,
 					firstSeenAt:
 						typeof p.firstSeenAt === 'number' ? p.firstSeenAt : Date.now(),
 					lastSeenAt:
@@ -174,10 +195,13 @@ async function loadRegistry(): Promise<RegistryFile> {
 	return { version: 1, projects: [], forgottenRoots: [] };
 }
 
-async function saveRegistry(reg: RegistryFile): Promise<void> {
+async function saveRegistry(
+	storage: RegistryStorage,
+	reg: RegistryFile,
+): Promise<void> {
 	try {
-		await mkdir(getGlobalConfigDir(), { recursive: true });
-		await Bun.write(registryPath(), `${JSON.stringify(reg, null, 2)}\n`);
+		await mkdir(storage.configDir, { recursive: true });
+		await Bun.write(storage.registryPath, `${JSON.stringify(reg, null, 2)}\n`);
 	} catch (error) {
 		logger.warn('Failed to write projects registry', {
 			error: toErrorLogPayload(error),
@@ -193,6 +217,7 @@ export async function touchProject(
 	projectRoot: string,
 	dbPath: string,
 ): Promise<void> {
+	const storage = resolveRegistryStorage();
 	try {
 		void dbPath;
 		const now = Date.now();
@@ -200,13 +225,15 @@ export async function touchProject(
 		if (last && now - last < TOUCH_DEBOUNCE_MS) return;
 		touchedThisSession.set(projectRoot, now);
 
-		const reg = await loadRegistry();
+		const reg = await loadRegistry(storage);
 		reg.forgottenRoots = reg.forgottenRoots.filter(
 			(root) => root !== projectRoot,
 		);
 		const projectId = await getProjectId(projectRoot);
-		const stateDir = await getProjectStateDir(projectRoot);
-		const projectDbPath = await getProjectDbPath(projectRoot);
+		const { stateDir, dbPath: projectDbPath } = getStoredProjectPaths(
+			storage,
+			projectId,
+		);
 		const existing = reg.projects.find((p) => p.path === projectRoot);
 		if (existing) {
 			existing.id = projectId;
@@ -226,7 +253,7 @@ export async function touchProject(
 				pinned: false,
 			});
 		}
-		await saveRegistry(reg);
+		await saveRegistry(storage, reg);
 	} catch (error) {
 		logger.warn('Failed to touch project registry', {
 			error: toErrorLogPayload(error),
@@ -238,8 +265,10 @@ export async function touchProject(
  * Return all known projects, most-recently-seen first.
  */
 export async function listProjects(): Promise<RegisteredProject[]> {
-	const reg = await loadRegistry();
+	const storage = resolveRegistryStorage();
+	const reg = await loadRegistry(storage);
 	const discovered = await discoverStateProjects(
+		storage,
 		reg.projects,
 		reg.forgottenRoots,
 	);
@@ -253,11 +282,12 @@ export async function setProjectPinned(
 	projectRoot: string,
 	pinned: boolean,
 ): Promise<boolean> {
-	const reg = await loadRegistry();
+	const storage = resolveRegistryStorage();
+	const reg = await loadRegistry(storage);
 	const project = reg.projects.find((item) => item.path === projectRoot);
 	if (!project) return false;
 	project.pinned = pinned;
-	await saveRegistry(reg);
+	await saveRegistry(storage, reg);
 	return true;
 }
 
@@ -275,10 +305,11 @@ export async function forgetProjects(projectRoots: string[]): Promise<void> {
 	const roots = new Set(projectRoots);
 	if (roots.size === 0) return;
 
-	const reg = await loadRegistry();
+	const storage = resolveRegistryStorage();
+	const reg = await loadRegistry(storage);
 	const next = reg.projects.filter((p) => !roots.has(p.path));
 	reg.projects = next;
 	reg.forgottenRoots = [...new Set([...reg.forgottenRoots, ...roots])];
 	for (const root of roots) touchedThisSession.delete(root);
-	await saveRegistry(reg);
+	await saveRegistry(storage, reg);
 }

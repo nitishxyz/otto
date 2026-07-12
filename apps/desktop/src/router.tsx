@@ -15,6 +15,7 @@ import { ProjectPicker } from './components/ProjectPicker';
 import { DesktopSettings } from './components/DesktopSettings';
 import { Workspace } from './components/Workspace';
 import { OttoRouterLoader } from './components/OttoRouterLoader';
+import { useStartupMessage } from './hooks/useStartupMessage';
 import type {
 	CliSelectionInfo,
 	MachineBootstrap,
@@ -151,20 +152,31 @@ function RootRouteComponent() {
 		rootRoute.useRouteContext();
 
 	if (!initialized) {
-		return (
-			<div
-				className="min-h-screen flex items-center justify-center cursor-default select-none"
-				data-tauri-drag-region
-			>
-				<OttoRouterLoader />
-			</div>
-		);
+		return <StartupGate />;
 	}
 
 	return (
 		<DesktopThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
 			<Outlet />
 		</DesktopThemeContext.Provider>
+	);
+}
+
+function StartupGate() {
+	const message = useStartupMessage();
+	return (
+		<div
+			className="min-h-screen flex flex-col items-center justify-center gap-5 cursor-default select-none"
+			data-tauri-drag-region
+		>
+			<OttoRouterLoader />
+			<span
+				aria-hidden="true"
+				className="text-xs text-muted-foreground tracking-wide"
+			>
+				{message}
+			</span>
+		</div>
 	);
 }
 

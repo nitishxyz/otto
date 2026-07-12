@@ -66,6 +66,32 @@ describe('project registry', () => {
 		});
 	});
 
+	it('keeps an in-flight write bound to its original registry paths', async () => {
+		await withProject('otto-registry-race-', async (projectRoot, ottoHome) => {
+			const originalXdgConfigHome = process.env.XDG_CONFIG_HOME ?? '';
+			const otherHome = join(projectRoot, 'other-otto-home');
+			const otherXdgConfigHome = join(projectRoot, 'other-xdg-config');
+
+			const touch = touchProject(projectRoot, 'ignored');
+			process.env.OTTO_HOME = otherHome;
+			process.env.XDG_CONFIG_HOME = otherXdgConfigHome;
+			await touch;
+
+			const registryPath = join(originalXdgConfigHome, 'otto', 'projects.json');
+			const registry = (await Bun.file(registryPath).json()) as {
+				projects: Array<{ path: string; stateDir: string }>;
+			};
+			expect(registry.projects).toHaveLength(1);
+			expect(registry.projects[0]?.path).toBe(projectRoot);
+			expect(registry.projects[0]?.stateDir.startsWith(ottoHome)).toBe(true);
+			expect(
+				await Bun.file(
+					join(otherXdgConfigHome, 'otto', 'projects.json'),
+				).exists(),
+			).toBe(false);
+		});
+	});
+
 	it('forgets only the recent-list record and preserves project files', async () => {
 		await withProject(
 			'otto-registry-forget-',

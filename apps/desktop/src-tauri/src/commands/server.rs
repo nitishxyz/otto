@@ -37,12 +37,14 @@ pub struct CliSelectionInfo {
 
 pub struct ServerState {
     pub servers: Mutex<HashMap<u32, ServerInfo>>,
+    daemon_start: tokio::sync::Mutex<()>,
 }
 
 impl Default for ServerState {
     fn default() -> Self {
         Self {
             servers: Mutex::new(HashMap::new()),
+            daemon_start: tokio::sync::Mutex::new(()),
         }
     }
 }
@@ -510,6 +512,43 @@ async fn fetch_daemon_health(
     response.json::<DaemonHealth>().await.ok()
 }
 
+fn running_daemon_satisfies_embedded(running_version: &str, embedded_version: &str) -> bool {
+    running_version == embedded_version
+        || matches!(
+            semver_cmp(running_version, embedded_version),
+            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+        )
+}
+
+async fn reusable_running_daemon(
+    app: &tauri::AppHandle,
+) -> Option<(CliCandidate, DaemonRegistration)> {
+    let registration = read_daemon_registration()?;
+    let token = read_daemon_token()?;
+    let health = fetch_daemon_health(&registration, &token).await?;
+    if daemon_reuse_decision(&registration, &health, &registration.version)
+        != DaemonReuseDecision::Reuse
+    {
+        return None;
+    }
+
+    let embedded_path = get_embedded_binary_path(app).ok()?;
+    let embedded_version = read_cli_version(&embedded_path)?;
+    let running_version = health.version.as_deref().unwrap_or(&registration.version);
+    if !running_daemon_satisfies_embedded(running_version, &embedded_version) {
+        return None;
+    }
+
+    Some((
+        CliCandidate {
+            path: embedded_path,
+            version: running_version.to_string(),
+            source: "running-daemon",
+        },
+        registration,
+    ))
+}
+
 fn stop_process(pid: u32) -> bool {
     #[cfg(windows)]
     {
@@ -744,10 +783,43 @@ pub async fn start_server(
         );
     }
 
-    let (cli, selection) = select_cli(&app)?;
-    eprintln!("[otto] CLI selection: {}", selection.reason);
-    let registration = ensure_daemon(&cli, &project_path).await?;
+    // StrictMode and multiple desktop windows can request startup concurrently.
+    // Keep discovery, spawn, and registration validation atomic so two daemons
+    // cannot overwrite the shared registration file while becoming healthy.
+    let _startup_guard = state.daemon_start.lock().await;
     let token = ensure_daemon_token()?;
+    let cached = {
+        let servers = state.servers.lock().unwrap();
+        servers.values().next().cloned()
+    };
+    if let Some(cached) = cached {
+        let registration = DaemonRegistration {
+            id: String::new(),
+            version: cached.cli_version.clone(),
+            url: cached.url.clone(),
+            pid: cached.pid,
+            _started_at: 0,
+        };
+        if let Ok(opened) = open_project_on_daemon(&registration, &project_path, &token).await {
+            let info = ServerInfo {
+                project_path: opened.path,
+                project_id: opened.id,
+                ..cached
+            };
+            state.servers.lock().unwrap().insert(info.pid, info.clone());
+            return Ok(info);
+        }
+    }
+
+    let (cli, registration) = if let Some(running) = reusable_running_daemon(&app).await {
+        eprintln!("[otto] Reusing healthy registered daemon without probing local CLIs");
+        running
+    } else {
+        let (cli, selection) = select_cli(&app)?;
+        eprintln!("[otto] CLI selection: {}", selection.reason);
+        let registration = ensure_daemon(&cli, &project_path).await?;
+        (cli, registration)
+    };
     let opened = open_project_on_daemon(&registration, &project_path, &token).await?;
     let port = registration_port(&registration)?;
 
@@ -910,9 +982,12 @@ pub async fn update_installed_cli(app: tauri::AppHandle) -> Result<CliSelectionI
 mod tests {
     use super::{
         cli_update_available, daemon_reuse_decision, parse_cli_version, prefer_embedded_cli,
-        select_cli_candidate, CliCandidate, DaemonHealth, DaemonRegistration, DaemonReuseDecision,
+        running_daemon_satisfies_embedded, select_cli_candidate, CliCandidate, DaemonHealth,
+        DaemonRegistration, DaemonReuseDecision,
     };
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     fn candidate(source: &'static str, version: &str) -> CliCandidate {
         CliCandidate {
@@ -967,6 +1042,33 @@ mod tests {
         assert!(!cli_update_available("1.2.0", Some("1.3.0")));
         assert!(!cli_update_available("1.2.0", None));
         assert!(!cli_update_available("dev", Some("1.1.9")));
+    }
+
+    #[test]
+    fn warm_start_reuses_same_or_newer_daemon_but_not_an_older_one() {
+        assert!(running_daemon_satisfies_embedded("1.2.0", "1.2.0"));
+        assert!(running_daemon_satisfies_embedded("1.3.0", "1.2.0"));
+        assert!(!running_daemon_satisfies_embedded("1.1.9", "1.2.0"));
+        assert!(running_daemon_satisfies_embedded("dev", "dev"));
+        assert!(!running_daemon_satisfies_embedded("dev", "1.2.0"));
+    }
+
+    #[tokio::test]
+    async fn serializes_concurrent_daemon_start_attempts() {
+        let state = Arc::new(super::ServerState::default());
+        let guard = state.daemon_start.lock().await;
+        let waiting_state = Arc::clone(&state);
+        let mut waiter = tokio::spawn(async move {
+            let _guard = waiting_state.daemon_start.lock().await;
+        });
+
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut waiter)
+            .await
+            .is_err());
+        drop(guard);
+        assert!(tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .is_ok());
     }
 
     #[test]

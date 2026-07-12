@@ -88,6 +88,22 @@ describe('desktop settings page', () => {
 		expect(native).toContain('.join(".local").join("bin")');
 	});
 
+	test('refreshes router settings context immediately after a CLI update', async () => {
+		const app = await readFile('src/App.tsx', 'utf8');
+
+		expect(app).toContain('flushSync(() => setCliSelection(selection))');
+		expect(app).toContain('await router.invalidate()');
+	});
+
+	test('parallelizes post-daemon bootstrap work', async () => {
+		const app = await readFile('src/App.tsx', 'utf8');
+
+		expect(app).toContain('await Promise.all([');
+		expect(app).toContain('tauriBridge.getMachineBootstrap()');
+		expect(app).toContain('tauriBridge.getInitialProject()');
+		expect(app).toContain('tauriBridge.getInitialRemote()');
+	});
+
 	test('native stop command terminates the registered daemon safely', async () => {
 		const bridge = await readFile('src/lib/tauri-bridge.ts', 'utf8');
 		const native = await readFile('src-tauri/src/commands/server.rs', 'utf8');
