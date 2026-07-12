@@ -12,7 +12,10 @@ type Theme = ThemeId;
 export function useTheme() {
 	const { data: config } = useConfig();
 	const updateDefaults = useUpdateDefaults();
-	const configTheme = normalizeThemeId(config?.defaults?.theme);
+	// null until the config query resolves; applying a fallback theme before
+	// then clobbers the theme already on the document (set by the desktop
+	// shell or a previous page) and causes a visible flicker on mount.
+	const configTheme = config ? normalizeThemeId(config.defaults?.theme) : null;
 	const [optimisticTheme, setOptimisticTheme] = useState<Theme | null>(null);
 	const theme = optimisticTheme ?? configTheme;
 
@@ -23,7 +26,7 @@ export function useTheme() {
 	}, [configTheme, optimisticTheme]);
 
 	useEffect(() => {
-		if (typeof document === 'undefined') return;
+		if (theme === null || typeof document === 'undefined') return;
 
 		applyCssTheme(theme);
 
@@ -50,6 +53,7 @@ export function useTheme() {
 	);
 
 	const toggleTheme = useCallback(() => {
+		if (theme === null) return;
 		setTheme(getOppositeThemeId(theme));
 	}, [setTheme, theme]);
 
