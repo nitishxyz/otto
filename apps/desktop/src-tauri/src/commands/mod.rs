@@ -1,11 +1,8 @@
 pub mod clipboard;
 pub mod fonts;
-pub mod git;
-pub mod github;
 pub mod machine;
 pub mod native_browser;
 pub mod notification;
-pub mod onboarding;
 pub mod project;
 pub mod server;
 pub mod updater;

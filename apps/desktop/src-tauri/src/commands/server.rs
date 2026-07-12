@@ -72,12 +72,6 @@ struct DaemonHealth {
     _started_at: u64,
 }
 
-#[derive(Deserialize)]
-struct OpenProjectResponse {
-    id: String,
-    path: String,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CliCandidate {
     path: PathBuf,
@@ -236,20 +230,6 @@ fn path_cli_candidates() -> Vec<PathBuf> {
     candidates
 }
 
-fn daemon_cli_candidates() -> Vec<PathBuf> {
-    let exe_name = if cfg!(windows) { "otto.exe" } else { "otto" };
-    let mut candidates = Vec::new();
-
-    if let Ok(path) = std::env::var("OTTO_CLI_PATH") {
-        candidates.push(PathBuf::from(path));
-    }
-
-    candidates.push(otto_home_dir().join("bin").join(exe_name));
-    candidates.extend(path_cli_candidates());
-
-    candidates
-}
-
 fn parse_cli_version(output: &str) -> Option<String> {
     output
         .split_whitespace()
@@ -268,20 +248,6 @@ fn read_cli_version(binary: &Path) -> Option<String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     parse_cli_version(&stdout).or_else(|| parse_cli_version(&stderr))
-}
-
-fn cli_supports_daemon_register(binary: &Path) -> bool {
-    let output = Command::new(binary)
-        .args(["serve", "--help"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output();
-    let Ok(output) = output else {
-        return false;
-    };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    stdout.contains("--daemon-register") || stderr.contains("--daemon-register")
 }
 
 fn semver_cmp(a: &str, b: &str) -> Option<std::cmp::Ordering> {
@@ -319,41 +285,6 @@ fn cli_update_available(embedded_version: &str, local_version: Option<&str>) -> 
     )
 }
 
-fn prefer_embedded_cli(embedded_version: &str, local_version: Option<&str>) -> bool {
-    match local_version.and_then(|version| semver_cmp(embedded_version, version)) {
-        Some(std::cmp::Ordering::Greater) => true,
-        Some(_) => false,
-        None => true,
-    }
-}
-
-fn select_cli_candidate(
-    embedded: CliCandidate,
-    local: Option<CliCandidate>,
-) -> (CliCandidate, String) {
-    match local {
-        Some(local_candidate)
-            if !prefer_embedded_cli(&embedded.version, Some(&local_candidate.version)) =>
-        {
-            (
-                local_candidate,
-                "local CLI is the same version or newer than the embedded CLI".to_string(),
-            )
-        }
-        Some(local_candidate) => {
-            let reason = format!(
-                "embedded CLI {} is newer than local CLI {}; preferring embedded without replacing local files",
-                embedded.version, local_candidate.version
-            );
-            (embedded, reason)
-        }
-        None => (
-            embedded,
-            "no usable local CLI found; using embedded CLI".to_string(),
-        ),
-    }
-}
-
 fn get_cli_candidate(paths: Vec<PathBuf>, embedded_path: &Path) -> Option<CliCandidate> {
     let canonical_embedded = embedded_path.canonicalize().ok();
     for path in paths {
@@ -376,7 +307,7 @@ fn get_cli_candidate(paths: Vec<PathBuf>, embedded_path: &Path) -> Option<CliCan
     None
 }
 
-fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo), String> {
+fn embedded_cli(app: &tauri::AppHandle) -> Result<CliCandidate, String> {
     let embedded_path = get_embedded_binary_path(app)?;
     let embedded_version = read_cli_version(&embedded_path).ok_or_else(|| {
         format!(
@@ -384,17 +315,17 @@ fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo)
             embedded_path.display()
         )
     })?;
-    if !cli_supports_daemon_register(&embedded_path) {
-        return Err(format!(
-            "Embedded CLI does not support daemon registration: {}",
-            embedded_path.display()
-        ));
-    }
-    let embedded = CliCandidate {
+    Ok(CliCandidate {
         path: embedded_path.clone(),
-        version: embedded_version.clone(),
+        version: embedded_version,
         source: "embedded",
-    };
+    })
+}
+
+fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo), String> {
+    let embedded = embedded_cli(app)?;
+    let embedded_path = embedded.path.clone();
+    let embedded_version = embedded.version.clone();
     let installed = get_cli_candidate(path_cli_candidates(), &embedded_path);
     let local_path = installed
         .as_ref()
@@ -402,45 +333,20 @@ fn select_cli(app: &tauri::AppHandle) -> Result<(CliCandidate, CliSelectionInfo)
     let local_version = installed
         .as_ref()
         .map(|candidate| candidate.version.clone());
-    if tauri::is_dev() {
-        let info = CliSelectionInfo {
-            path: embedded.path.display().to_string(),
-            version: embedded.version.clone(),
-            source: embedded.source.to_string(),
-            embedded_path: embedded_path.display().to_string(),
-            embedded_version,
-            local_path,
-            local_version,
-            update_available: false,
-            reason: "dev mode uses the freshly built embedded CLI while reporting the installed PATH CLI".to_string(),
-        };
-        return Ok((embedded, info));
-    }
-    let update_available = cli_update_available(&embedded_version, local_version.as_deref());
-    let local = get_cli_candidate(daemon_cli_candidates(), &embedded_path).filter(|candidate| {
-        let supported = cli_supports_daemon_register(&candidate.path);
-        if !supported {
-            eprintln!(
-                "[otto] Local CLI does not support daemon registration: {} ({})",
-                candidate.path.display(),
-                candidate.version
-            );
-        }
-        supported
-    });
-    let (selected, reason) = select_cli_candidate(embedded, local);
+    let update_available =
+        !tauri::is_dev() && cli_update_available(&embedded_version, local_version.as_deref());
     let info = CliSelectionInfo {
-        path: selected.path.display().to_string(),
-        version: selected.version.clone(),
-        source: selected.source.to_string(),
+        path: embedded.path.display().to_string(),
+        version: embedded.version.clone(),
+        source: embedded.source.to_string(),
         embedded_path: embedded_path.display().to_string(),
         embedded_version,
         local_path,
         local_version,
         update_available,
-        reason,
+        reason: "the desktop app always runs its embedded CLI; the installed PATH CLI is only reported for updates".to_string(),
     };
-    Ok((selected, info))
+    Ok((embedded, info))
 }
 
 fn read_daemon_registration() -> Option<DaemonRegistration> {
@@ -716,33 +622,6 @@ fn augmented_path() -> String {
     )
 }
 
-async fn open_project_on_daemon(
-    registration: &DaemonRegistration,
-    project_path: &str,
-    token: &str,
-) -> Result<OpenProjectResponse, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{}/v1/projects/open", registration.url))
-        .headers(auth_headers(token))
-        .json(&serde_json::json!({ "path": project_path }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to open project on daemon: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Failed to open project on daemon: {}",
-            response.status()
-        ));
-    }
-
-    response
-        .json::<OpenProjectResponse>()
-        .await
-        .map_err(|e| format!("Invalid project open response from daemon: {}", e))
-}
-
 fn registration_port(registration: &DaemonRegistration) -> Result<u16, String> {
     let url =
         url::Url::parse(&registration.url).map_err(|e| format!("Invalid daemon URL: {}", e))?;
@@ -757,35 +636,6 @@ pub async fn ensure_desktop_daemon(
 ) -> Result<ServerInfo, String> {
     let workspace = super::project::get_general_workspace_dir()?;
     std::fs::create_dir_all(&workspace).map_err(|error| error.to_string())?;
-    start_server(workspace.to_string_lossy().to_string(), None, state, app).await
-}
-
-#[tauri::command]
-pub async fn stop_desktop_daemon(state: State<'_, ServerState>) -> Result<(), String> {
-    if let Some(registration) = read_daemon_registration() {
-        let token = ensure_daemon_token()?;
-        stop_registered_daemon(&registration, &token).await;
-    }
-    state.servers.lock().unwrap().clear();
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn start_server(
-    project_path: String,
-    port: Option<u16>,
-    state: State<'_, ServerState>,
-    app: tauri::AppHandle,
-) -> Result<ServerInfo, String> {
-    if port.is_some() {
-        eprintln!(
-            "[otto] Ignoring requested desktop server port; using shared daemon registration"
-        );
-    }
-
-    // StrictMode and multiple desktop windows can request startup concurrently.
-    // Keep discovery, spawn, and registration validation atomic so two daemons
-    // cannot overwrite the shared registration file while becoming healthy.
     let _startup_guard = state.daemon_start.lock().await;
     let token = ensure_daemon_token()?;
     let cached = {
@@ -793,41 +643,25 @@ pub async fn start_server(
         servers.values().next().cloned()
     };
     if let Some(cached) = cached {
-        let registration = DaemonRegistration {
-            id: String::new(),
-            version: cached.cli_version.clone(),
-            url: cached.url.clone(),
-            pid: cached.pid,
-            _started_at: 0,
-        };
-        if let Ok(opened) = open_project_on_daemon(&registration, &project_path, &token).await {
-            let info = ServerInfo {
-                project_path: opened.path,
-                project_id: opened.id,
-                ..cached
-            };
-            state.servers.lock().unwrap().insert(info.pid, info.clone());
-            return Ok(info);
-        }
+        return Ok(cached);
     }
 
     let (cli, registration) = if let Some(running) = reusable_running_daemon(&app).await {
         eprintln!("[otto] Reusing healthy registered daemon without probing local CLIs");
         running
     } else {
-        let (cli, selection) = select_cli(&app)?;
-        eprintln!("[otto] CLI selection: {}", selection.reason);
-        let registration = ensure_daemon(&cli, &project_path).await?;
+        let cli = embedded_cli(&app)?;
+        eprintln!("[otto] Starting from the embedded desktop CLI");
+        let registration = ensure_daemon(&cli, &workspace.to_string_lossy()).await?;
         (cli, registration)
     };
-    let opened = open_project_on_daemon(&registration, &project_path, &token).await?;
     let port = registration_port(&registration)?;
 
     let info = ServerInfo {
         pid: registration.pid,
         port,
-        project_path: opened.path,
-        project_id: opened.id,
+        project_path: workspace.to_string_lossy().to_string(),
+        project_id: String::new(),
         url: registration.url,
         token: Some(token),
         cli_path: cli.path.display().to_string(),
@@ -844,29 +678,13 @@ pub async fn start_server(
 }
 
 #[tauri::command]
-pub async fn stop_server(pid: u32, state: State<'_, ServerState>) -> Result<(), String> {
-    let mut servers = state.servers.lock().unwrap();
-    if servers.remove(&pid).is_some() {
-        eprintln!(
-            "[otto] Released desktop project handle for daemon pid={}",
-            pid
-        );
+pub async fn stop_desktop_daemon(state: State<'_, ServerState>) -> Result<(), String> {
+    if let Some(registration) = read_daemon_registration() {
+        let token = ensure_daemon_token()?;
+        stop_registered_daemon(&registration, &token).await;
     }
+    state.servers.lock().unwrap().clear();
     Ok(())
-}
-
-#[tauri::command]
-pub async fn stop_all_servers(state: State<'_, ServerState>) -> Result<(), String> {
-    let mut servers = state.servers.lock().unwrap();
-    eprintln!("[otto] Releasing {} desktop project handles", servers.len());
-    servers.clear();
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn list_servers(state: State<'_, ServerState>) -> Result<Vec<ServerInfo>, String> {
-    let servers = state.servers.lock().unwrap();
-    Ok(servers.values().cloned().collect())
 }
 
 #[tauri::command]
@@ -981,21 +799,11 @@ pub async fn update_installed_cli(app: tauri::AppHandle) -> Result<CliSelectionI
 #[cfg(test)]
 mod tests {
     use super::{
-        cli_update_available, daemon_reuse_decision, parse_cli_version, prefer_embedded_cli,
-        running_daemon_satisfies_embedded, select_cli_candidate, CliCandidate, DaemonHealth,
-        DaemonRegistration, DaemonReuseDecision,
+        cli_update_available, daemon_reuse_decision, parse_cli_version,
+        running_daemon_satisfies_embedded, DaemonHealth, DaemonRegistration, DaemonReuseDecision,
     };
-    use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
-
-    fn candidate(source: &'static str, version: &str) -> CliCandidate {
-        CliCandidate {
-            path: PathBuf::from(format!("/tmp/otto-{}", source)),
-            version: version.to_string(),
-            source,
-        }
-    }
 
     fn registration(version: &str) -> DaemonRegistration {
         DaemonRegistration {
@@ -1025,14 +833,6 @@ mod tests {
             parse_cli_version("otto v1.2.3\n"),
             Some("1.2.3".to_string())
         );
-    }
-
-    #[test]
-    fn prefers_embedded_when_newer_or_unparseable() {
-        assert!(prefer_embedded_cli("1.2.0", Some("1.1.9")));
-        assert!(prefer_embedded_cli("dev", Some("1.1.9")));
-        assert!(!prefer_embedded_cli("1.2.0", Some("1.2.0")));
-        assert!(!prefer_embedded_cli("1.2.0", Some("1.3.0")));
     }
 
     #[test]
@@ -1069,23 +869,6 @@ mod tests {
         assert!(tokio::time::timeout(Duration::from_secs(1), waiter)
             .await
             .is_ok());
-    }
-
-    #[test]
-    fn selects_local_only_when_same_or_newer() {
-        let (selected, reason) = select_cli_candidate(
-            candidate("embedded", "1.2.0"),
-            Some(candidate("local", "1.3.0")),
-        );
-        assert_eq!(selected.source, "local");
-        assert!(reason.contains("same version or newer"));
-
-        let (selected, reason) = select_cli_candidate(
-            candidate("embedded", "1.2.0"),
-            Some(candidate("local", "1.1.0")),
-        );
-        assert_eq!(selected.source, "embedded");
-        assert!(reason.contains("preferring embedded without replacing local files"));
     }
 
     #[test]

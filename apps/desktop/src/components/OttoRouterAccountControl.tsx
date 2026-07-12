@@ -12,7 +12,10 @@ import {
 	signOutOttoRouter,
 	startOttoRouterSignIn,
 } from '../lib/machine-api';
-import { MACHINE_AUTH_CHANGED_EVENT } from '../lib/machine-account-store';
+import {
+	MACHINE_AUTH_CHANGED_EVENT,
+	machineAccountStore,
+} from '../lib/machine-account-store';
 
 export interface OttoRouterAccount {
 	busy: boolean;
@@ -39,7 +42,10 @@ export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
 	const flowGenerationRef = useRef(0);
 	const activeGenerationRef = useRef<number | null>(null);
 
-	const notifyChanged = useCallback(() => {
+	const notifyChanged = useCallback(async () => {
+		// Fetch strictly after the auth change so a pre-auth in-flight poll can
+		// never satisfy this refresh with stale signed-out data.
+		await machineAccountStore.refreshFresh();
 		onChanged();
 		window.dispatchEvent(new Event(MACHINE_AUTH_CHANGED_EVENT));
 	}, [onChanged]);
@@ -57,12 +63,17 @@ export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
 			isCancelled: () => flowGenerationRef.current !== generation,
 		});
 		if (flowGenerationRef.current !== generation) return;
-		activeGenerationRef.current = null;
 		if (result.status === 'connected') {
+			// Stay 'pending' until the store reflects the connected account, so
+			// the Machines panel never flashes the Connect button between the
+			// poll completing and the account state landing.
+			await notifyChanged();
+			if (flowGenerationRef.current !== generation) return;
+			activeGenerationRef.current = null;
 			setPhase('idle');
-			notifyChanged();
 			return;
 		}
+		activeGenerationRef.current = null;
 		if (result.status === 'cancelled') {
 			setPhase('idle');
 			return;
@@ -87,7 +98,7 @@ export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
 		} catch (cause) {
 			setError(String(cause));
 		} finally {
-			notifyChanged();
+			await notifyChanged();
 			setDisconnectBusy(false);
 		}
 	}, [notifyChanged]);

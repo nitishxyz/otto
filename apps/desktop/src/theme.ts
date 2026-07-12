@@ -11,7 +11,7 @@ import {
 	normalizeThemeId,
 	type ThemeId,
 } from '@ottocode/themes';
-import { tauriOnboarding } from './lib/tauri-onboarding';
+import { apiClient } from '@ottocode/web-sdk/lib';
 
 type Theme = ThemeId;
 
@@ -29,24 +29,27 @@ export const DesktopThemeContext = createContext<DesktopThemeContextValue>({
 
 export const useDesktopTheme = () => useContext(DesktopThemeContext);
 
-export function useNativeDesktopTheme(): DesktopThemeContextValue {
+export function useNativeDesktopTheme(
+	serverReady: boolean,
+): DesktopThemeContextValue {
 	const [theme, setThemeState] = useState<Theme>('otto-dark');
 
 	useEffect(() => {
+		if (!serverReady) return;
 		let cancelled = false;
 
-		tauriOnboarding
-			.getStatus()
-			.then((status) => {
+		apiClient
+			.getConfig()
+			.then((config) => {
 				if (cancelled) return;
-				setThemeState(normalizeThemeId(status.defaults.theme));
+				setThemeState(normalizeThemeId(config.defaults.theme));
 			})
 			.catch(() => {});
 
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [serverReady]);
 
 	useEffect(() => {
 		applyCssTheme(theme);
@@ -58,7 +61,7 @@ export function useNativeDesktopTheme(): DesktopThemeContextValue {
 			previousTheme = currentTheme;
 			return nextTheme;
 		});
-		tauriOnboarding.setDefaults({ theme: nextTheme }).catch(() => {
+		apiClient.updateDefaults({ theme: nextTheme }).catch(() => {
 			setThemeState((currentTheme) => {
 				if (currentTheme === nextTheme && previousTheme) {
 					return previousTheme;
@@ -71,7 +74,7 @@ export function useNativeDesktopTheme(): DesktopThemeContextValue {
 	const toggleTheme = useCallback(() => {
 		setThemeState((currentTheme) => {
 			const nextTheme = getOppositeThemeId(currentTheme);
-			tauriOnboarding.setDefaults({ theme: nextTheme }).catch(() => {
+			apiClient.updateDefaults({ theme: nextTheme }).catch(() => {
 				setThemeState((latestTheme) =>
 					latestTheme === nextTheme ? currentTheme : latestTheme,
 				);

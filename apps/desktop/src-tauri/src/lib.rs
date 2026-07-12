@@ -88,8 +88,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .manage(ServerState::default())
@@ -173,35 +171,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::clipboard::copy_to_clipboard,
             commands::project::open_project_dialog,
-            commands::project::get_recent_projects,
-            commands::project::save_recent_project,
-            commands::project::remove_recent_project,
-            commands::project::toggle_project_pinned,
-            commands::project::get_general_workspace_path,
-            commands::server::start_server,
             commands::server::ensure_desktop_daemon,
             commands::server::stop_desktop_daemon,
-            commands::server::stop_server,
-            commands::server::stop_all_servers,
-            commands::server::list_servers,
             commands::server::get_cli_selection,
             commands::server::update_installed_cli,
-            commands::github::github_save_token,
-            commands::github::github_get_token,
-            commands::github::github_logout,
-            commands::github::github_get_user,
-            commands::github::github_list_repos,
-            commands::github::github_device_code_request,
-            commands::github::github_device_code_poll,
             commands::native_browser::native_browser_mount,
             commands::native_browser::native_browser_set_visible,
             commands::native_browser::native_browser_unmount,
-            commands::git::git_clone,
-            commands::git::git_status,
-            commands::git::git_commit,
-            commands::git::git_push,
-            commands::git::git_pull,
-            commands::git::git_is_repo,
             commands::fonts::list_system_fonts,
             commands::window::create_new_window,
             commands::window::open_machine_window,
@@ -211,13 +187,6 @@ pub fn run() {
             get_initial_project,
             get_initial_remote,
             get_platform,
-            commands::onboarding::get_onboarding_status,
-            commands::onboarding::generate_wallet,
-            commands::onboarding::add_provider,
-            commands::onboarding::remove_provider,
-            commands::onboarding::set_defaults,
-            commands::onboarding::complete_onboarding,
-            commands::onboarding::get_home_directory,
             commands::updater::check_for_update,
             commands::updater::download_update,
             commands::updater::apply_update,

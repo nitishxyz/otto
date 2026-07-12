@@ -21,6 +21,7 @@ export function registerOpenApiRoute(app: OpenAPIHono) {
 			{ name: 'terminals' },
 			{ name: 'ottorouter' },
 			{ name: 'auth' },
+			{ name: 'github' },
 			{ name: 'mcp' },
 			{ name: 'tunnel' },
 			{ name: 'plugins' },

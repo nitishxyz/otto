@@ -1,7 +1,6 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { StableSpinner } from '@ottocode/web-sdk/components';
-import type { OAuthState } from '../hooks/useGitHub';
-import type { DeviceCodeResponse } from '../lib/tauri-bridge';
+import type { DeviceCodeResponse, OAuthState } from '../hooks/useGitHub';
 
 export function DeviceCodeModal({
 	oauthState,

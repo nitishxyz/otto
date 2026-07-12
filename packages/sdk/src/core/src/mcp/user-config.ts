@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { getGlobalConfigDir } from '../../../config/src/paths.ts';
 import type { MCPServerConfig } from './types.ts';
 
 export async function readMcpServersFromFile(
@@ -26,15 +27,13 @@ export async function readMcpServersFromFile(
 
 export async function readUserMcpServersFromConfigFiles(
 	projectRoot: string,
-	globalConfigDir?: string,
+	globalConfigDir = getGlobalConfigDir(),
 ): Promise<{ global: MCPServerConfig[]; project: MCPServerConfig[] }> {
-	const globalPath = globalConfigDir
-		? join(globalConfigDir, 'config.json')
-		: null;
+	const globalPath = join(globalConfigDir, 'config.json');
 	const projectPath = join(projectRoot, '.otto', 'config.json');
 
 	return {
-		global: globalPath ? await readMcpServersFromFile(globalPath) : [],
+		global: await readMcpServersFromFile(globalPath),
 		project: await readMcpServersFromFile(projectPath),
 	};
 }

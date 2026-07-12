@@ -8,12 +8,12 @@ import {
 	type Project,
 	type ServerInfo,
 } from './lib/tauri-bridge';
-import { tauriOnboarding } from './lib/tauri-onboarding';
 import { loadAuthorizedMachineProjects } from './lib/machine-api';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
 import { router } from './router';
 import { useNativeDesktopTheme } from './theme';
 import {
+	apiClient,
 	ownerRenewalDelay,
 	renewOwnerSession,
 	setOwnerRenewalHandler,
@@ -31,7 +31,9 @@ function App() {
 	);
 	const [daemonError, setDaemonError] = useState<string | null>(null);
 	const [startupAttempt, setStartupAttempt] = useState(0);
-	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme();
+	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme(
+		daemon !== null,
+	);
 	const ownerExpiryRef = useRef<number | undefined>(undefined);
 	ownerExpiryRef.current = selectedProject?.machineOwnerSessionExpiresAt;
 
@@ -51,18 +53,20 @@ function App() {
 				);
 				return;
 			}
-			const [machineBootstrap, nextCliSelection, initialPath, initialRemote] =
-				await Promise.all([
-					tauriBridge.getMachineBootstrap(),
-					tauriBridge.getCliSelection().catch(() => null),
-					tauriBridge.getInitialProject(),
-					tauriBridge.getInitialRemote(),
-				]);
+			void tauriBridge
+				.getCliSelection()
+				.then(setCliSelection)
+				.catch(() => {});
+			const [machineBootstrap, initialPath, initialRemote] = await Promise.all([
+				tauriBridge.getMachineBootstrap(),
+				tauriBridge.getInitialProject(),
+				tauriBridge.getInitialRemote(),
+			]);
 			let nextRoute: '/onboarding' | '/projects' | '/sessions' = '/projects';
 
 			if (!machineBootstrap) {
 				try {
-					const status = await tauriOnboarding.getStatus();
+					const status = await apiClient.getAuthStatus();
 					const hasAnyProvider = Object.values(status.providers).some(
 						(provider) => provider.configured,
 					);
@@ -102,7 +106,6 @@ function App() {
 
 			flushSync(() => {
 				setMachine(machineBootstrap);
-				setCliSelection(nextCliSelection);
 				setSelectedProject(nextProject);
 				setInitialized(true);
 			});

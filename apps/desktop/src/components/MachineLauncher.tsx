@@ -227,13 +227,11 @@ export function MachineLauncher({
 									</div>
 								</div>
 								<PresenceBadge presence={presence} />
-								<span className="text-xs text-muted-foreground/50">
-									{offline
-										? 'Start otto to connect'
-										: opening === device.deviceId
-											? 'Opening...'
-											: 'Open'}
-								</span>
+								{!offline && (
+									<span className="text-xs text-muted-foreground/50">
+										{opening === device.deviceId ? 'Opening...' : 'Open'}
+									</span>
+								)}
 							</button>
 						);
 					})}

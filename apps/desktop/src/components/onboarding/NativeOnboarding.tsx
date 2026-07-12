@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { useServer } from '../../hooks/useServer';
 import { usePlatform } from '../../hooks/usePlatform';
 import { DesktopDragRegion } from '../DesktopDragRegion';
-import { tauriOnboarding } from '../../lib/tauri-onboarding';
 import { OttoRouterLoader } from '../OttoRouterLoader';
 import { WindowControls } from '../WindowControls';
 import {
@@ -13,25 +11,14 @@ import {
 } from '@ottocode/web-sdk';
 import { useOnboardingStore } from '@ottocode/web-sdk/stores';
 import { useAuthStatus } from '@ottocode/web-sdk/hooks';
-import { configureDesktopSdk } from '../../lib/sdk-client';
 
 interface NativeOnboardingProps {
 	onComplete: () => void;
 }
 
 export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
-	const [serverReady, setServerReady] = useState(false);
-	const [homePath, setHomePath] = useState<string | null>(null);
 	const platform = usePlatform();
 	const currentStep = useOnboardingStore((s) => s.currentStep);
-	const {
-		server,
-		loading: serverLoading,
-		error: serverError,
-		startServer,
-		stopServer,
-	} = useServer();
-	const startedRef = useRef(false);
 	const isOpen = useOnboardingStore((s) => s.isOpen);
 	const { checkOnboarding, fetchAuthStatus } = useAuthStatus();
 	const onboardingError = useOnboardingStore((s) => s.error);
@@ -109,37 +96,16 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 	}, [startOAuthPolling]);
 
 	useEffect(() => {
-		tauriOnboarding
-			.getHomeDirectory()
-			.then(setHomePath)
-			.catch(() => setHomePath('/tmp'));
-	}, []);
-
-	useEffect(() => {
-		if (!homePath || startedRef.current) return;
-		startedRef.current = true;
-		startServer(homePath);
-	}, [homePath, startServer]);
-
-	useEffect(() => {
-		if (!server) return;
-		configureDesktopSdk(server.url, server);
-		setServerReady(true);
-	}, [server]);
-
-	useEffect(() => {
-		if (serverReady) {
-			checkOnboarding();
-		}
-	}, [serverReady, checkOnboarding]);
+		checkOnboarding();
+	}, [checkOnboarding]);
 
 	useEffect(() => {
 		if (isOpen) {
 			hasBeenOpened.current = true;
-		} else if (hasBeenOpened.current && serverReady) {
-			stopServer().then(() => onComplete());
+		} else if (hasBeenOpened.current) {
+			onComplete();
 		}
-	}, [isOpen, serverReady, stopServer, onComplete]);
+	}, [isOpen, onComplete]);
 
 	useEffect(() => {
 		const handler = (e: MessageEvent) => {
@@ -155,34 +121,6 @@ export function NativeOnboarding({ onComplete }: NativeOnboardingProps) {
 		window.addEventListener('message', handler);
 		return () => window.removeEventListener('message', handler);
 	}, [startOAuthPolling]);
-
-	if (!serverReady) {
-		return (
-			<div className="min-h-screen flex flex-col items-center justify-center gap-4">
-				<OttoRouterLoader
-					label={
-						serverError
-							? serverError
-							: serverLoading
-								? 'Starting server...'
-								: 'Preparing...'
-					}
-				/>
-				{serverError && (
-					<button
-						type="button"
-						onClick={() => {
-							startedRef.current = false;
-							if (homePath) startServer(homePath);
-						}}
-						className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-					>
-						Retry
-					</button>
-				)}
-			</div>
-		);
-	}
 
 	return (
 		<>

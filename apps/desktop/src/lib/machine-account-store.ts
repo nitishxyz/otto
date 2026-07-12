@@ -14,6 +14,13 @@ export interface MachineAccountStore {
 	subscribe: (listener: () => void) => () => void;
 	/** Deduped refresh: concurrent callers share one in-flight request. */
 	refresh: () => Promise<void>;
+	/**
+	 * Refresh that guarantees a fetch STARTED AFTER this call. If a deduped
+	 * request is already in flight (e.g. an interval poll that began before an
+	 * auth change), waits for it and then fetches again, so the resolved
+	 * snapshot can never be stale relative to the caller's trigger.
+	 */
+	refreshFresh: () => Promise<void>;
 }
 
 const DAEMON_UNAVAILABLE_STATE: MachineDeviceState = {
@@ -57,6 +64,11 @@ export function createMachineAccountStore(
 		return inflight;
 	};
 
+	const refreshFresh = (): Promise<void> => {
+		if (!inflight) return refresh();
+		return inflight.then(() => refresh());
+	};
+
 	return {
 		getSnapshot: () => snapshot,
 		subscribe: (listener) => {
@@ -66,6 +78,7 @@ export function createMachineAccountStore(
 			};
 		},
 		refresh,
+		refreshFresh,
 	};
 }
 

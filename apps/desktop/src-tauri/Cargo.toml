@@ -16,17 +16,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-notification = "2"
-
-# Git operations
-git2 = "0.19"
-
-# Secure token storage
-keyring = "3"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -44,12 +36,8 @@ dirs = "5"
 chrono = { version = "0.4", features = ["serde"] }
 url = "2"
 semver = "1"
-urlencoding = "2"
 fontdb = "0.23"
 
-# Onboarding / wallet generation
-ed25519-dalek = { version = "2", features = ["rand_core"] }
-bs58 = "0.5"
 rand = "0.8"
 
 # macOS/Linux: vendored OpenSSL for TLS

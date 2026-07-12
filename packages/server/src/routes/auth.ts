@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { registerAuthCopilotRoutes } from './auth/copilot.ts';
+import { registerAuthGitHubRoutes } from './auth/github.ts';
 import { registerAuthKimiRoutes } from './auth/kimi.ts';
 import { registerAuthOAuthRoutes } from './auth/oauth.ts';
 import { registerAuthOnboardingRoutes } from './auth/onboarding.ts';
@@ -11,6 +12,7 @@ export function registerAuthRoutes(app: Hono) {
 	registerAuthProviderRoutes(app);
 	registerAuthOAuthRoutes(app);
 	registerAuthCopilotRoutes(app);
+	registerAuthGitHubRoutes(app);
 	registerAuthKimiRoutes(app);
 	registerAuthOnboardingRoutes(app);
 }

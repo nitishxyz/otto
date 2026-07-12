@@ -23,8 +23,6 @@
 		"core:webview:allow-webview-close",
 		"opener:default",
 		"dialog:default",
-		"fs:default",
-		"shell:default",
 		"process:default",
 		"updater:default",
 		"notification:default"

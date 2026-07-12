@@ -30,18 +30,23 @@ export function useMachineDevices(): MachineDevices {
 	useEffect(() => {
 		void machineAccountStore.refresh();
 		const refresh = () => void machineAccountStore.refresh();
+		const refreshAfterAuthChange = () =>
+			void machineAccountStore.refreshFresh();
 		const refreshVisible = () => {
 			if (document.visibilityState === 'visible') refresh();
 		};
 		const interval = window.setInterval(refreshVisible, PRESENCE_REFRESH_MS);
 		window.addEventListener('focus', refresh);
 		document.addEventListener('visibilitychange', refreshVisible);
-		window.addEventListener(MACHINE_AUTH_CHANGED_EVENT, refresh);
+		window.addEventListener(MACHINE_AUTH_CHANGED_EVENT, refreshAfterAuthChange);
 		return () => {
 			window.clearInterval(interval);
 			window.removeEventListener('focus', refresh);
 			document.removeEventListener('visibilitychange', refreshVisible);
-			window.removeEventListener(MACHINE_AUTH_CHANGED_EVENT, refresh);
+			window.removeEventListener(
+				MACHINE_AUTH_CHANGED_EVENT,
+				refreshAfterAuthChange,
+			);
 		};
 	}, []);
 

@@ -59,6 +59,38 @@ describe('shared machine account store', () => {
 		expect(calls).toBe(2);
 	});
 
+	test('refreshFresh after auth change never resolves with pre-auth in-flight data', async () => {
+		const first = deferred<MachineDeviceState>();
+		let calls = 0;
+		const store = createMachineAccountStore(() => {
+			calls += 1;
+			return calls === 1 ? first.promise : Promise.resolve(CONNECTED);
+		});
+
+		// Interval poll starts before the user approves the device flow.
+		const stalePoll = store.refresh();
+		// Auth completes; a plain refresh would dedupe into the stale poll.
+		const fresh = store.refreshFresh();
+
+		first.resolve({ configured: false, devices: [] });
+		await stalePoll;
+		await fresh;
+
+		expect(calls).toBe(2);
+		expect(store.getSnapshot().state).toEqual(CONNECTED);
+	});
+
+	test('refreshFresh without an in-flight request performs a single fetch', async () => {
+		let calls = 0;
+		const store = createMachineAccountStore(() => {
+			calls += 1;
+			return Promise.resolve(CONNECTED);
+		});
+		await store.refreshFresh();
+		expect(calls).toBe(1);
+		expect(store.getSnapshot().state).toEqual(CONNECTED);
+	});
+
 	test('all subscribers observe the same snapshot (header and Machines stay in sync)', async () => {
 		let next: MachineDeviceState = CONNECTED;
 		const store = createMachineAccountStore(() => Promise.resolve(next));

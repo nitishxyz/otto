@@ -1,6 +1,7 @@
 import { MCPServerManager } from './server-manager.ts';
 import { loadEffectiveMCPConfig } from './effective-config.ts';
 import type { MCPConfig, MCPServerConfig, MCPScope } from './types.ts';
+import { getGlobalConfigDir } from '../../../config/src/paths.ts';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
@@ -51,17 +52,17 @@ export async function shutdownMCP(projectRoot?: string): Promise<void> {
 
 export async function loadMCPConfig(
 	projectRoot: string,
-	globalConfigDir?: string,
+	globalConfigDir = getGlobalConfigDir(),
 ): Promise<MCPConfig> {
 	return loadEffectiveMCPConfig(projectRoot, globalConfigDir);
 }
 
 function resolveConfigPath(
 	projectRoot: string,
-	globalConfigDir: string | undefined,
+	globalConfigDir: string,
 	scope: MCPScope,
 ): string {
-	if (scope === 'global' && globalConfigDir) {
+	if (scope === 'global') {
 		return join(globalConfigDir, 'config.json');
 	}
 	return join(projectRoot, '.otto', 'config.json');
@@ -75,7 +76,7 @@ async function ensureConfigDir(configPath: string): Promise<void> {
 export async function addMCPServerToConfig(
 	projectRoot: string,
 	server: MCPServerConfig,
-	globalConfigDir?: string,
+	globalConfigDir = getGlobalConfigDir(),
 ): Promise<void> {
 	const scope: MCPScope = server.scope ?? 'global';
 	const configPath = resolveConfigPath(projectRoot, globalConfigDir, scope);
@@ -84,7 +85,9 @@ export async function addMCPServerToConfig(
 	try {
 		const text = await fs.readFile(configPath, 'utf-8');
 		json = JSON.parse(text);
-	} catch {}
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+	}
 
 	if (!json.mcp) json.mcp = {};
 	const mcp = json.mcp as Record<string, unknown>;
@@ -107,10 +110,10 @@ export async function addMCPServerToConfig(
 export async function removeMCPServerFromConfig(
 	projectRoot: string,
 	name: string,
-	globalConfigDir?: string,
+	globalConfigDir = getGlobalConfigDir(),
 ): Promise<boolean> {
 	const paths = [
-		...(globalConfigDir ? [join(globalConfigDir, 'config.json')] : []),
+		join(globalConfigDir, 'config.json'),
 		join(projectRoot, '.otto', 'config.json'),
 	];
 

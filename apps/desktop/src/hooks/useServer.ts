@@ -1,5 +1,7 @@
+import { openProject } from '@ottocode/api';
 import { useState, useCallback, useRef } from 'react';
 import { tauriBridge, type ServerInfo } from '../lib/tauri-bridge';
+import { configureDesktopSdk } from '../lib/sdk-client';
 
 async function waitForServer(
 	server: ServerInfo,
@@ -36,47 +38,46 @@ export function useServer() {
 	const startingRef = useRef(false);
 	const serverRef = useRef<ServerInfo | null>(null);
 
-	const startServer = useCallback(
-		async (projectPath: string, port?: number) => {
-			if (startingRef.current) return null;
-			startingRef.current = true;
+	const startServer = useCallback(async (projectPath: string) => {
+		if (startingRef.current) return null;
+		startingRef.current = true;
 
-			try {
-				setLoading(true);
-				setError(null);
+		try {
+			setLoading(true);
+			setError(null);
 
-				// Ensure/reuse the shared daemon and open this project on it.
-				const info = await tauriBridge.startServer(projectPath, port);
+			const daemon = await tauriBridge.ensureDesktopDaemon();
 
-				const ready = await waitForServer(info);
-				if (ready) {
-					setServer(info);
-					serverRef.current = info;
-					return info;
-				} else {
-					throw new Error('Server started but not responding after 15s');
+			const ready = await waitForServer(daemon);
+			if (ready) {
+				configureDesktopSdk(daemon.url, daemon);
+				const response = await openProject({ body: { path: projectPath } });
+				if (response.error || !response.data) {
+					throw new Error('Could not open project.');
 				}
-			} catch (err) {
-				const message =
-					err instanceof Error ? err.message : 'Failed to start server';
-				setError(message);
-				return null;
-			} finally {
-				setLoading(false);
-				startingRef.current = false;
+				const info: ServerInfo = {
+					...daemon,
+					projectId: response.data.id,
+					projectPath: response.data.path,
+				};
+				setServer(info);
+				serverRef.current = info;
+				return info;
+			} else {
+				throw new Error('Server started but not responding after 15s');
 			}
-		},
-		[],
-	);
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : 'Failed to start server';
+			setError(message);
+			return null;
+		} finally {
+			setLoading(false);
+			startingRef.current = false;
+		}
+	}, []);
 
 	const stopServer = useCallback(async () => {
-		const currentServer = serverRef.current;
-		if (!currentServer) return;
-		try {
-			await tauriBridge.stopServer(currentServer.pid);
-		} catch (err) {
-			console.error('Failed to stop server:', err);
-		}
 		setServer(null);
 		serverRef.current = null;
 	}, []);

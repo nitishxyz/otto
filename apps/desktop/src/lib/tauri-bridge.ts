@@ -35,43 +35,6 @@ export interface CliSelectionInfo {
 	reason: string;
 }
 
-export interface GitHubRepo {
-	id: number;
-	name: string;
-	full_name: string;
-	clone_url: string;
-	private: boolean;
-	description: string | null;
-}
-
-export interface GitHubUser {
-	login: string;
-	name: string | null;
-	avatar_url: string;
-}
-
-export interface GitStatus {
-	branch: string;
-	ahead: number;
-	behind: number;
-	changedFiles: Array<{ path: string; status: string }>;
-	hasChanges: boolean;
-}
-
-export interface DeviceCodeResponse {
-	deviceCode: string;
-	userCode: string;
-	verificationUri: string;
-	interval: number;
-	expiresIn: number;
-}
-
-export interface DevicePollResult {
-	status: 'complete' | 'pending' | 'error';
-	accessToken: string | null;
-	error: string | null;
-}
-
 export interface NativeNotificationPayload {
 	title: string;
 	body?: string;
@@ -122,15 +85,6 @@ export type MachineProjectAccess =
 	| { status: 'offline'; message: string }
 	| { status: 'unavailable'; message: string };
 
-export interface MachineOwnerAuthorizationExchange {
-	loadProjects: () => Promise<MachineProjectAccess>;
-}
-
-export const machineOwnerAuthorizationExchange: MachineOwnerAuthorizationExchange =
-	{
-		loadProjects: () => invoke<MachineProjectAccess>('get_machine_projects'),
-	};
-
 export const isDesktopApp = (): boolean => {
 	try {
 		return '__TAURI__' in window;
@@ -144,11 +98,6 @@ export const tauriBridge = {
 
 	ensureDesktopDaemon: () => invoke<ServerInfo>('ensure_desktop_daemon'),
 	stopDesktopDaemon: () => invoke('stop_desktop_daemon'),
-	startServer: (projectPath: string, port?: number) =>
-		invoke<ServerInfo>('start_server', { projectPath, port }),
-	stopServer: (pid: number) => invoke('stop_server', { pid }),
-	stopAllServers: () => invoke('stop_all_servers'),
-	listServers: () => invoke<ServerInfo[]>('list_servers'),
 	getCliSelection: () => invoke<CliSelectionInfo>('get_cli_selection'),
 	updateInstalledCli: () => invoke<CliSelectionInfo>('update_installed_cli'),
 	listSystemFonts: () => invoke<string[]>('list_system_fonts'),
@@ -164,25 +113,4 @@ export const tauriBridge = {
 		invoke('set_machine_window_project', { projectId }),
 	getInitialProject: () => invoke<string | null>('get_initial_project'),
 	getInitialRemote: () => invoke<[string, string] | null>('get_initial_remote'),
-
-	githubDeviceCodeRequest: () =>
-		invoke<DeviceCodeResponse>('github_device_code_request'),
-	githubDeviceCodePoll: (deviceCode: string) =>
-		invoke<DevicePollResult>('github_device_code_poll', { deviceCode }),
-	githubSaveToken: (token: string) => invoke('github_save_token', { token }),
-	githubGetToken: () => invoke<string | null>('github_get_token'),
-	githubLogout: () => invoke('github_logout'),
-	githubGetUser: (token: string) =>
-		invoke<GitHubUser>('github_get_user', { token }),
-	githubListRepos: (token: string, page?: number, search?: string) =>
-		invoke<GitHubRepo[]>('github_list_repos', { token, page, search }),
-
-	gitClone: (url: string, path: string, token: string) =>
-		invoke<string>('git_clone', { url, path, token }),
-	gitStatus: (path: string) => invoke<GitStatus>('git_status', { path }),
-	gitCommit: (path: string, message: string) =>
-		invoke<string>('git_commit', { path, message }),
-	gitPush: (path: string, token: string) => invoke('git_push', { path, token }),
-	gitPull: (path: string, token: string) => invoke('git_pull', { path, token }),
-	gitIsRepo: (path: string) => invoke<boolean>('git_is_repo', { path }),
 };
