@@ -1,5 +1,5 @@
 import { stepCountIs } from 'ai';
-import { logger } from '@ottocode/sdk';
+import { isAnthropicBasedModel, logger } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
 import { flushPartContentWrites } from '../persistence/part-content-writer.ts';
 import {
@@ -49,6 +49,7 @@ import {
 import { createRunnerStreamHandlers } from './runner/runner-handlers.ts';
 import { invokeRunnerStreamText } from './runner/runner-invoke.ts';
 import { markEmptyResponseAfterFinalAttempt } from './runner/runner-empty-response.ts';
+import { ensureUserTurnBeforeAssistantRun } from './runner/runner-messages.ts';
 
 export {
 	enqueueAssistantRun,
@@ -119,10 +120,13 @@ async function runAssistant(opts: RunOpts) {
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');
 
-	const messagesWithSystemInstructions = [
-		...additionalSystemMessages,
-		...history,
-	];
+	const runnerMessages = [...additionalSystemMessages, ...history];
+	const messagesWithSystemInstructions = isAnthropicBasedModel(
+		opts.provider,
+		opts.model,
+	)
+		? ensureUserTurnBeforeAssistantRun(runnerMessages)
+		: runnerMessages;
 
 	const dump = createRunnerTurnDump({
 		opts,

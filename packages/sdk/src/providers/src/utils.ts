@@ -48,7 +48,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	wafer: ['deepseek-v4-flash'],
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],
-	ottorouter: ['glm-5-turbo'],
+	ottorouter: ['gemini-3.5-flash'],
 	xai: ['grok-code-fast-1', 'grok-4-fast'],
 	zai: ['glm-4.5-flash'],
 	deepseek: ['deepseek-v4-flash'],
@@ -61,6 +61,7 @@ const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-5.4-mini'],
 	anthropic: ['claude-haiku-4-5'],
 	kimi: ['kimi-k2.7-code'],
+	ottorouter: ['gemini-3.5-flash'],
 };
 
 function preferredFastModelKey(provider: ProviderId): ProviderId {

@@ -81,7 +81,7 @@ async function shouldExcludeRecipeInvocationFromHistory(args: {
 export async function buildHistoryMessages(
 	db: Awaited<ReturnType<typeof getDb>>,
 	sessionId: string,
-	_currentMessageId?: string,
+	currentMessageId?: string,
 	options?: { projectRoot?: string },
 ): Promise<ModelMessage[]> {
 	const rows = await db
@@ -121,6 +121,7 @@ export async function buildHistoryMessages(
 
 	for (const message of rows) {
 		if (
+			message.id === currentMessageId ||
 			queuedAssistantMessageIds.has(message.id) ||
 			queuedUserMessageIds.has(message.id)
 		) {
