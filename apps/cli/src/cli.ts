@@ -23,6 +23,7 @@ import {
 	registerMigrateCommand,
 	registerServiceCommand,
 	registerProjectsCommand,
+	registerTunnelCommand,
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
 import { ensureProjectOttoIgnored } from './gitignore.ts';
@@ -46,6 +47,7 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'plugins',
 	'service',
 	'projects',
+	'tunnel',
 ]);
 
 const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
@@ -61,6 +63,7 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'plugins',
 	'service',
 	'projects',
+	'tunnel',
 ]);
 
 export function createCli(version: string): Command {
@@ -115,6 +118,7 @@ export function createCli(version: string): Command {
 	registerMigrateCommand(program);
 	registerServiceCommand(program, version);
 	registerProjectsCommand(program, version);
+	registerTunnelCommand(program, version);
 
 	return program;
 }

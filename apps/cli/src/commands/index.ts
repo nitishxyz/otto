@@ -22,3 +22,4 @@ export { registerStorageCommand } from './lazy/storage.ts';
 export { registerMigrateCommand } from './lazy/migrate.ts';
 export { registerServiceCommand } from './lazy/service.ts';
 export { registerProjectsCommand } from './lazy/projects.ts';
+export { registerTunnelCommand } from './lazy/tunnel.ts';
