@@ -1,4 +1,5 @@
 import { getTunnelStatus, startTunnel, stopTunnel } from '@ottocode/api';
+import { confirm, isCancel } from '@clack/prompts';
 import type { Command } from 'commander';
 import { daemonAuthHeaders, ensureDaemon, readDaemonToken } from '../daemon.ts';
 
@@ -24,6 +25,7 @@ interface TunnelActionResult {
 	ok: boolean;
 	url?: string | null;
 	message?: string;
+	code?: string;
 	error?: string;
 }
 
@@ -55,7 +57,39 @@ export function formatMachineTunnelStatus(status: MachineTunnelStatus): string {
 	return lines.join('\n');
 }
 
-async function enableTunnel(version: string, projectRoot?: string) {
+/** Returns whether a managed tunnel failure requires OttoRouter login. */
+export function requiresOttoRouterLogin(
+	result: TunnelActionResult | undefined,
+): boolean {
+	return (
+		result?.code === 'ottorouter_not_connected' ||
+		result?.error?.includes('Connect OttoRouter') === true
+	);
+}
+
+async function offerOttoRouterLogin(): Promise<boolean> {
+	if (process.env.OTTO_CI_MODE === '1' || process.env.CI) {
+		throw new Error(
+			'OttoRouter login required. Run `otto ottorouter --login`, then retry `otto tunnel enable`.',
+		);
+	}
+	const shouldLogin = await confirm({
+		message: 'OttoRouter is not linked. Log in now?',
+		initialValue: true,
+	});
+	if (isCancel(shouldLogin) || !shouldLogin) {
+		console.log('Run `otto ottorouter --login` when you are ready.');
+		return false;
+	}
+	const { runAuth } = await import('../auth.ts');
+	return Boolean(await runAuth(['login', 'ottorouter']));
+}
+
+async function enableTunnel(
+	version: string,
+	projectRoot?: string,
+	loginOffered = false,
+) {
 	const connection = await daemonConnection(version, projectRoot);
 	const response = await startTunnel({
 		...connection,
@@ -63,6 +97,11 @@ async function enableTunnel(version: string, projectRoot?: string) {
 	});
 	const result = response.data as TunnelActionResult | undefined;
 	if (response.error || !result?.ok) {
+		if (!loginOffered && requiresOttoRouterLogin(result)) {
+			const loggedIn = await offerOttoRouterLogin();
+			if (loggedIn) await enableTunnel(version, projectRoot, true);
+			return;
+		}
 		throw new Error(
 			result?.error ??
 				`Failed to enable machine tunnel: ${errorMessage(response.error)}`,

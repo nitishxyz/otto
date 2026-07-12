@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import {
 	formatMachineTunnelStatus,
 	registerTunnelCommand,
+	requiresOttoRouterLogin,
 } from '../apps/cli/src/commands/tunnel.ts';
 
 describe('CLI tunnel command', () => {
@@ -49,5 +50,18 @@ describe('CLI tunnel command', () => {
 
 		expect(output).toContain('OttoRouter: not connected');
 		expect(output).toContain('error: cloudflared exited');
+	});
+
+	it('detects when tunnel enable should offer OttoRouter login', () => {
+		expect(
+			requiresOttoRouterLogin({
+				ok: false,
+				code: 'ottorouter_not_connected',
+				error: 'Connect OttoRouter before starting a managed tunnel',
+			}),
+		).toBe(true);
+		expect(
+			requiresOttoRouterLogin({ ok: false, error: 'cloudflared exited' }),
+		).toBe(false);
 	});
 });
