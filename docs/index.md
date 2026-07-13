@@ -32,6 +32,10 @@
 - [Keyboard Shortcuts](keyboard-shortcuts.md)
 - [License](license.md)
 
+## Brand
+
+- [Brand assets (ShipWheel mark, lockups, usage)](../assets/brand/README.md)
+
 ---
 
 ## Quick reference

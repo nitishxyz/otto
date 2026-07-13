@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Repeat2, ShipWheel } from 'lucide-react';
+import { Repeat2 } from 'lucide-react';
+import { OttoMark } from '../common/OttoOIcon';
 
 export type WorkspaceTab = 'agents' | 'looper';
 export type LooperTabBarVariant = 'sidebar' | 'titlebar' | 'mobile';
@@ -53,7 +54,7 @@ export const LooperTabBar = memo(function LooperTabBar({
 							}`}
 						>
 							{tab.id === 'agents' ? (
-								<ShipWheel className="h-3.5 w-3.5 shrink-0" />
+								<OttoMark className="h-3.5 w-3.5 shrink-0" />
 							) : (
 								<Repeat2 className="h-3.5 w-3.5 shrink-0" />
 							)}
@@ -83,7 +84,7 @@ export const LooperTabBar = memo(function LooperTabBar({
 							aria-pressed={isActive}
 						>
 							{tab.id === 'agents' ? (
-								<ShipWheel className="h-3.5 w-3.5" />
+								<OttoMark className="h-3.5 w-3.5" />
 							) : (
 								<Repeat2 className="h-3.5 w-3.5" />
 							)}
@@ -111,7 +112,7 @@ export const LooperTabBar = memo(function LooperTabBar({
 						aria-pressed={isActive}
 					>
 						{tab.id === 'agents' ? (
-							<ShipWheel className="h-3.5 w-3.5" />
+							<OttoMark className="h-3.5 w-3.5" />
 						) : (
 							<Repeat2 className="h-3.5 w-3.5" />
 						)}

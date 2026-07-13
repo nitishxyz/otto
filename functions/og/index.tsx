@@ -16,7 +16,7 @@ interface OGRequest {
 }
 
 interface PageOGRequest {
-	type: 'landing' | 'docs' | 'blog';
+	type: 'landing' | 'docs' | 'blog' | 'ottorouter';
 	title?: string;
 	description?: string;
 	section?: string;
@@ -75,9 +75,6 @@ async function loadFont(): Promise<ArrayBuffer> {
 	return response.arrayBuffer();
 }
 
-const OTTO_WORDMARK_PATH =
-	'M192.877 257.682C192.877 263.287 191.783 268.551 189.596 273.473C187.545 278.395 184.674 282.701 180.982 286.393C177.428 289.947 173.189 292.818 168.268 295.006C163.482 297.057 158.287 298.082 152.682 298.082H44.1953C38.7266 298.082 33.5312 297.057 28.6094 295.006C23.6875 292.818 19.3809 289.947 15.6895 286.393C12.1348 282.701 9.26367 278.395 7.07617 273.473C5.02539 268.551 4 263.287 4 257.682V120.074C4 114.469 5.02539 109.205 7.07617 104.283C9.26367 99.3613 12.1348 95.123 15.6895 91.5684C19.3809 87.877 23.6875 85.0059 28.6094 82.9551C33.5312 80.7676 38.7266 79.6738 44.1953 79.6738H152.682C158.287 79.6738 163.482 80.7676 168.268 82.9551C173.189 85.0059 177.428 87.877 180.982 91.5684C184.674 95.123 187.545 99.3613 189.596 104.283C191.783 109.205 192.877 114.469 192.877 120.074V257.682ZM44.1953 120.074V257.682H152.682V120.074H44.1953ZM331.715 4V298.082H289.674V46.041H239.225V4H331.715ZM478.961 4V298.082H436.92V46.041H386.471V4H478.961ZM743.717 257.682C743.717 263.287 742.623 268.551 740.436 273.473C738.385 278.395 735.514 282.701 731.822 286.393C728.268 289.947 724.029 292.818 719.107 295.006C714.322 297.057 709.127 298.082 703.521 298.082H595.035C589.566 298.082 584.371 297.057 579.449 295.006C574.527 292.818 570.221 289.947 566.529 286.393C562.975 282.701 560.104 278.395 557.916 273.473C555.865 268.551 554.84 263.287 554.84 257.682V120.074C554.84 114.469 555.865 109.205 557.916 104.283C560.104 99.3613 562.975 95.123 566.529 91.5684C570.221 87.877 574.527 85.0059 579.449 82.9551C584.371 80.7676 589.566 79.6738 595.035 79.6738H703.521C709.127 79.6738 714.322 80.7676 719.107 82.9551C724.029 85.0059 728.268 87.877 731.822 91.5684C735.514 95.123 738.385 99.3613 740.436 104.283C742.623 109.205 743.717 114.469 743.717 120.074V257.682ZM595.035 120.074V257.682H703.521V120.074H595.035Z';
-
 const bgColor = '#09090b';
 const fgColor = '#ffffff';
 const mutedColor = '#a1a1aa';
@@ -85,31 +82,107 @@ const dimColor = '#71717a';
 const cardColor = '#1c1c22';
 const borderColor = '#3f3f46';
 const accentColor = '#3b82f6';
+const purpleColor = '#9333ea';
 
-function OttoLogo({ size = 32 }: { size?: number }) {
-	const w = Math.round(size * (748 / 303));
+const OTTO_WORDMARK_PATH =
+	'M192.877 257.682C192.877 263.287 191.783 268.551 189.596 273.473C187.545 278.395 184.674 282.701 180.982 286.393C177.428 289.947 173.189 292.818 168.268 295.006C163.482 297.057 158.287 298.082 152.682 298.082H44.1953C38.7266 298.082 33.5312 297.057 28.6094 295.006C23.6875 292.818 19.3809 289.947 15.6895 286.393C12.1348 282.701 9.26367 278.395 7.07617 273.473C5.02539 268.551 4 263.287 4 257.682V120.074C4 114.469 5.02539 109.205 7.07617 104.283C9.26367 99.3613 12.1348 95.123 15.6895 91.5684C19.3809 87.877 23.6875 85.0059 28.6094 82.9551C33.5312 80.7676 38.7266 79.6738 44.1953 79.6738H152.682C158.287 79.6738 163.482 80.7676 168.268 82.9551C173.189 85.0059 177.428 87.877 180.982 91.5684C184.674 95.123 187.545 99.3613 189.596 104.283C191.783 109.205 192.877 114.469 192.877 120.074V257.682ZM44.1953 120.074V257.682H152.682V120.074H44.1953ZM331.715 4V298.082H289.674V46.041H239.225V4H331.715ZM478.961 4V298.082H436.92V46.041H386.471V4H478.961ZM743.717 257.682C743.717 263.287 742.623 268.551 740.436 273.473C738.385 278.395 735.514 282.701 731.822 286.393C728.268 289.947 724.029 292.818 719.107 295.006C714.322 297.057 709.127 298.082 703.521 298.082H595.035C589.566 298.082 584.371 297.057 579.449 295.006C574.527 292.818 570.221 289.947 566.529 286.393C562.975 282.701 560.104 278.395 557.916 273.473C555.865 268.551 554.84 263.287 554.84 257.682V120.074C554.84 114.469 555.865 109.205 557.916 104.283C560.104 99.3613 562.975 95.123 566.529 91.5684C570.221 87.877 574.527 85.0059 579.449 82.9551C584.371 80.7676 589.566 79.6738 595.035 79.6738H703.521C709.127 79.6738 714.322 80.7676 719.107 82.9551C724.029 85.0059 728.268 87.877 731.822 91.5684C735.514 95.123 738.385 99.3613 740.436 104.283C742.623 109.205 743.717 114.469 743.717 120.074V257.682ZM595.035 120.074V257.682H703.521V120.074H595.035Z';
+
+function ShipWheelMark({
+	size = 32,
+	color = fgColor,
+}: {
+	size?: number;
+	color?: string;
+}) {
 	return (
-		<svg width={w} height={size} viewBox="0 0 748 303" fill={fgColor}>
-			<path d={OTTO_WORDMARK_PATH} />
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color}
+			strokeWidth={2}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			role="img"
+			aria-label="otto mark"
+		>
+			<circle cx={12} cy={12} r={8} />
+			<path d="M12 2v7.5" />
+			<path d="m19 5-5.23 5.23" />
+			<path d="M22 12h-7.5" />
+			<path d="m19 19-5.23-5.23" />
+			<path d="M12 14.5V22" />
+			<path d="M10.23 13.77 5 19" />
+			<path d="M9.5 12H2" />
+			<path d="M10.23 10.23 5 5" />
+			<circle cx={12} cy={12} r={2.5} />
 		</svg>
 	);
 }
 
-function GridPattern() {
+function OttoLogo({
+	size = 32,
+	color = fgColor,
+}: {
+	size?: number;
+	color?: string;
+}) {
+	const width = Math.round(size * (1061 / 303));
+	return (
+		<svg
+			width={width}
+			height={size}
+			viewBox="0 0 1061 303"
+			role="img"
+			aria-label="otto"
+		>
+			<g
+				transform="translate(0 79.68) scale(9.1)"
+				fill="none"
+				stroke={color}
+				strokeWidth={2}
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
+				<circle cx={12} cy={12} r={8} />
+				<path d="M12 2v7.5" />
+				<path d="m19 5-5.23 5.23" />
+				<path d="M22 12h-7.5" />
+				<path d="m19 19-5.23-5.23" />
+				<path d="M12 14.5V22" />
+				<path d="M10.23 13.77 5 19" />
+				<path d="M9.5 12H2" />
+				<path d="M10.23 10.23 5 5" />
+				<circle cx={12} cy={12} r={2.5} />
+			</g>
+			<path transform="translate(313 0)" fill={color} d={OTTO_WORDMARK_PATH} />
+		</svg>
+	);
+}
+
+function OttoRouterLogo({ size = 32 }: { size?: number }) {
 	return (
 		<div
 			style={{
-				position: 'absolute',
-				top: 0,
-				left: 0,
-				right: 0,
-				bottom: 0,
 				display: 'flex',
-				opacity: 0.04,
-				backgroundImage: `linear-gradient(${borderColor} 1px, transparent 1px), linear-gradient(90deg, ${borderColor} 1px, transparent 1px)`,
-				backgroundSize: '60px 60px',
+				alignItems: 'center',
+				gap: `${Math.round(size * 0.28)}px`,
 			}}
-		/>
+		>
+			<ShipWheelMark size={size} color={purpleColor} />
+			<div
+				style={{
+					display: 'flex',
+					fontSize: `${Math.round(size * 0.85)}px`,
+					fontWeight: 600,
+					color: fgColor,
+					letterSpacing: '-0.02em',
+				}}
+			>
+				OttoRouter
+			</div>
+		</div>
 	);
 }
 
@@ -226,6 +299,100 @@ function renderLandingOG() {
 					}}
 				>
 					open source
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function renderOttoRouterOG(data: PageOGRequest) {
+	const description =
+		data.description || 'One key. Every model. Pay as you go.';
+
+	return (
+		<div
+			style={{
+				width: '100%',
+				height: '100%',
+				display: 'flex',
+				flexDirection: 'column',
+				background: bgColor,
+				fontFamily: 'IBM Plex Mono',
+				color: fgColor,
+				position: 'relative',
+				overflow: 'hidden',
+			}}
+		>
+			<div
+				style={{
+					position: 'absolute',
+					top: '-120px',
+					right: '-120px',
+					width: '500px',
+					height: '500px',
+					borderRadius: '50%',
+					background:
+						'radial-gradient(circle, rgba(147,51,234,0.16), transparent 70%)',
+					display: 'flex',
+				}}
+			/>
+
+			<div
+				style={{
+					display: 'flex',
+					flexDirection: 'column',
+					justifyContent: 'center',
+					alignItems: 'center',
+					flex: 1,
+					padding: '60px',
+					position: 'relative',
+				}}
+			>
+				<OttoRouterLogo size={80} />
+
+				<div
+					style={{
+						fontSize: '36px',
+						color: '#d4d4d8',
+						marginTop: '36px',
+						textAlign: 'center',
+						lineHeight: 1.4,
+						letterSpacing: '-0.01em',
+						maxWidth: '800px',
+						display: 'flex',
+					}}
+				>
+					{description}
+				</div>
+			</div>
+
+			<div
+				style={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					padding: '0 60px 40px',
+				}}
+			>
+				<div
+					style={{
+						fontSize: '18px',
+						color: mutedColor,
+						display: 'flex',
+						letterSpacing: '0.04em',
+					}}
+				>
+					ottorouter.org
+				</div>
+				<div
+					style={{
+						fontSize: '18px',
+						color: purpleColor,
+						display: 'flex',
+						letterSpacing: '0.04em',
+					}}
+				>
+					an otto service
 				</div>
 			</div>
 		</div>
@@ -661,7 +828,12 @@ export const handler = async (event: {
 
 	let element: JSX.Element;
 
-	if (type === 'landing' || type === 'docs' || type === 'blog') {
+	if (
+		type === 'landing' ||
+		type === 'docs' ||
+		type === 'blog' ||
+		type === 'ottorouter'
+	) {
 		const pageData: PageOGRequest = {
 			type,
 			title: params.title,
@@ -673,6 +845,8 @@ export const handler = async (event: {
 
 		if (type === 'landing') {
 			element = renderLandingOG();
+		} else if (type === 'ottorouter') {
+			element = renderOttoRouterOG(pageData);
 		} else if (type === 'docs') {
 			element = renderDocsOG(pageData);
 		} else {

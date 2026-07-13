@@ -34,18 +34,21 @@ When the CLI detects the desktop app is installed, running `otto` with no argume
 
 ### Main App Icon
 
-1. Place your new icon as `icon.png` in this directory (`apps/desktop/`)
-   - Recommended size: **1024x1024px** or larger
-   - Format: PNG with transparency
+Canonical icon sources live under `assets/brand/`. Update the appropriate SVG there, then regenerate repository-managed raster and web assets from the monorepo root:
 
-2. Run the icon generator:
+```bash
+bun run brand:generate
+```
 
-   ```bash
-   bun run icon
-   ```
+To troubleshoot Tauri output generation for an individual app, run:
 
-3. This generates all platform-specific icons in `src-tauri/icons/`
-4. Commit the generated icons
+```bash
+bun run --cwd apps/desktop icon
+bun run --cwd apps/launcher icon
+bun run --cwd apps/canvas icon
+```
+
+Do not hand-edit generated files under `src-tauri/icons/`, and do not use `src-tauri/icons/icon.png` as generation input. It is generated from the canonical SVG and reusing it would cause cumulative quality loss. Commit canonical SVG changes and generated icon sets together according to repository convention.
 
 ### Tray Icon (macOS Template Mode)
 
@@ -72,8 +75,6 @@ const tray = await TrayIcon.getById("main");
 await tray?.setIcon("icons/tray-dark.png"); // or tray-light.png
 await tray?.setIconAsTemplate(true); // Enable template mode
 ```
-
-> **Note:** The source `icon.png` is gitignored. Only the generated icons in `src-tauri/icons/` should be committed.
 
 ## Build Targets
 

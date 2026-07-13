@@ -1,6 +1,6 @@
 import { Monitor, Radio, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { StableSpinner } from '@ottocode/web-sdk/components';
+import { OttoMark, StableSpinner } from '@ottocode/web-sdk/components';
 import type { MachineDeviceState } from '../lib/machine-api';
 import type { OttoRouterAuthPhase } from '../lib/ottorouter-actions';
 import { machinePresence, type MachinePresence } from '../lib/machine-status';
@@ -144,7 +144,7 @@ export function MachineLauncher({
 				{!initialLoading && authPhase !== 'pending' && !configured && (
 					<div className="px-5 py-10 text-center">
 						<div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/60">
-							<Radio className="h-5 w-5 text-muted-foreground" />
+							<OttoMark className="h-5 w-5 text-muted-foreground" />
 						</div>
 						<p className="text-sm text-foreground">
 							Sign in to view your machines

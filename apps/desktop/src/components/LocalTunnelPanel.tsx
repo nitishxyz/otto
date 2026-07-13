@@ -1,7 +1,7 @@
 import { Check, Copy, ExternalLink, Laptop } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { StableSpinner } from '@ottocode/web-sdk/components';
+import { OttoMark, StableSpinner } from '@ottocode/web-sdk/components';
 import { useManagedTunnel } from '../hooks/useManagedTunnel';
 import { usePlatform } from '../hooks/usePlatform';
 import type { ManagedTunnelState } from '../lib/managed-tunnel-store';
@@ -192,7 +192,8 @@ export function LocalTunnelPanel({
 				)}
 			</div>
 			{!ottorouterConfigured && (
-				<p className="border-t border-border/30 px-4 py-2 text-xs text-muted-foreground/60">
+				<p className="flex items-center gap-1.5 border-t border-border/30 px-4 py-2 text-xs text-muted-foreground/60">
+					<OttoMark className="h-3.5 w-3.5 shrink-0" />
 					Requires an OttoRouter connection — use Connect OttoRouter below.
 				</p>
 			)}

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/brand/otto-lockup.svg" alt="otto" width="180" />
+
 # otto
 
 **A local-first AI coding platform.**

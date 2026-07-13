@@ -1,3 +1,29 @@
+function ShipWheelIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="w-3 h-3 shrink-0"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<circle cx="12" cy="12" r="8" />
+			<path d="M12 2v7.5" />
+			<path d="m19 5-5.23 5.23" />
+			<path d="M22 12h-7.5" />
+			<path d="m19 19-5.23-5.23" />
+			<path d="M12 14.5V22" />
+			<path d="M10.23 13.77 5 19" />
+			<path d="M9.5 12H2" />
+			<path d="M10.23 10.23 5 5" />
+			<circle cx="12" cy="12" r="2.5" />
+		</svg>
+	);
+}
+
 const NAV_ITEMS = [
 	{ href: '/docs', label: 'Installation & Setup', end: true },
 	{ href: '/docs/usage', label: 'Usage Guide' },
@@ -12,7 +38,7 @@ const NAV_ITEMS = [
 	{ href: '/docs/ai-sdk', label: 'Overview', end: true },
 	{ href: '/docs/ai-sdk/configuration', label: 'Configuration' },
 	{ href: '/docs/ai-sdk/caching', label: 'Caching' },
-	{ href: '/docs/ottorouter', label: 'Overview', end: true },
+	{ href: '/docs/ottorouter', label: 'OttoRouter', end: true, mark: true },
 	{ href: '/docs/ottorouter/payments', label: 'Payments' },
 	{ href: '/docs/ottorouter/integration', label: 'Integration Guide' },
 	{ href: '/docs/ottorouter/openclaw', label: 'OpenClaw Plugin' },
@@ -35,12 +61,13 @@ export function DocsMobileNav({ pathname }: { pathname: string }) {
 						<a
 							key={item.href}
 							href={item.href}
-							className={`px-3 py-1.5 text-xs rounded-sm whitespace-nowrap transition-colors ${
+							className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-sm whitespace-nowrap transition-colors ${
 								active
 									? 'bg-otto-card text-otto-text border border-otto-border'
 									: 'text-otto-muted hover:text-otto-text'
 							}`}
 						>
+							{'mark' in item && item.mark && <ShipWheelIcon />}
 							{item.label}
 						</a>
 					);

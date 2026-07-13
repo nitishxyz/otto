@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
+import { OttoMark } from '../common/OttoOIcon';
 import { SidebarHeader } from '../ui/SidebarHeader';
 import { StableSpinner } from '../ui/StableSpinner';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -1300,7 +1301,7 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 
 					<SettingsSection
 						title="Providers"
-						icon={<Zap className="w-4 h-4 text-muted-foreground" />}
+						icon={<OttoMark className="w-4 h-4 text-muted-foreground" />}
 						action={
 							<button
 								type="button"

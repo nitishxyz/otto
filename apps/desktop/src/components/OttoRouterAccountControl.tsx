@@ -1,7 +1,7 @@
 import { LogOut } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { StableSpinner } from '@ottocode/web-sdk/components';
+import { OttoMark, StableSpinner } from '@ottocode/web-sdk/components';
 import {
 	planOttoRouterActions,
 	type OttoRouterAuthPhase,
@@ -146,6 +146,7 @@ export function OttoRouterAccountControl({
 				className="h-7 px-3 flex items-center gap-1.5 text-sm text-muted-foreground/70 border border-border/50 rounded-full select-none"
 			>
 				<StableSpinner size="xs" title="Checking OttoRouter connection" />
+				<OttoMark className="w-3.5 h-3.5" />
 				OttoRouter
 			</output>
 		);
@@ -172,6 +173,7 @@ export function OttoRouterAccountControl({
 					}`}
 				>
 					<span className="w-2 h-2 rounded-full bg-primary" />
+					<OttoMark className="w-3.5 h-3.5" />
 					OttoRouter
 				</span>
 				<span

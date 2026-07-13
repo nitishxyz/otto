@@ -459,13 +459,16 @@ export const UserMessageGroup = memo(
 														: href?.startsWith('otto-file:')
 															? href.slice('otto-file:'.length)
 															: null;
-													const referenceHref = href?.startsWith('#otto-reference:')
+													const referenceHref = href?.startsWith(
+														'#otto-reference:',
+													)
 														? href.slice('#otto-reference:'.length)
 														: href?.startsWith('otto-reference:')
 															? href.slice('otto-reference:'.length)
 															: null;
 													if (referenceHref) {
-														const referenceName = decodeURIComponent(referenceHref);
+														const referenceName =
+															decodeURIComponent(referenceHref);
 														return (
 															<span
 																className={`${mentionHighlightClasses.reference} text-[0.92em] leading-normal`}

@@ -7,7 +7,8 @@
 		"dev": "vite",
 		"build": "tsc && vite build",
 		"preview": "vite preview",
-		"tauri": "tauri"
+		"tauri": "tauri",
+		"icon": "tauri icon ../../assets/brand/otto-app-icon.svg --output src-tauri/icons"
 	},
 	"dependencies": {
 		"@ottocode/web-sdk": "workspace:*",

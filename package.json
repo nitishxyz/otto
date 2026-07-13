@@ -34,6 +34,8 @@
 		"lint": "biome check package.json biome.json apps/cli apps/desktop apps/intro-video apps/landing apps/launcher apps/preview-api apps/tui apps/web examples packages scripts tests",
 		"typecheck": "bun run --filter './apps/*' --filter './packages/*' typecheck",
 		"check": "bun run lint && bun run typecheck",
+		"brand:generate": "bun run scripts/generate-brand-assets.ts",
+		"brand:check": "bun run scripts/generate-brand-assets.ts --check",
 		"cli": "bun run apps/cli/index.ts",
 		"test": "bun test tests packages/*/tests --path-ignore-patterns 'tmp/**'",
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",

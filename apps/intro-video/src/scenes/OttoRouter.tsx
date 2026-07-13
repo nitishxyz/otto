@@ -8,12 +8,31 @@ import {
 } from 'remotion';
 import { colors, font } from '../theme';
 
-const OttoRouterBolt: React.FC<{ size: number; color: string }> = ({
+const OttoRouterMark: React.FC<{ size: number; color: string }> = ({
 	size,
 	color,
 }) => (
-	<svg width={size} height={size} viewBox="0 0 100 100" fill={color}>
-		<path d="M55.0151 11H45.7732C42.9871 11 41.594 11 40.5458 11.7564C39.4977 12.5128 39.0587 13.8349 38.1807 16.479L28.4934 45.6545C26.899 50.4561 26.1019 52.8569 27.2993 54.5162C28.4967 56.1754 31.0264 56.1754 36.0858 56.1754H38.1307C41.9554 56.1754 43.8677 56.1754 45.0206 57.2527C45.2855 57.5002 45.5155 57.7825 45.7043 58.092C46.5262 59.4389 46.1395 61.3117 45.3662 65.0574C42.291 79.9519 40.7534 87.3991 43.0079 88.8933C43.4871 89.2109 44.0292 89.4215 44.5971 89.5107C47.2691 89.9303 51.1621 83.398 58.9481 70.3336L70.7118 50.5949C72.8831 46.9517 73.9687 45.13 73.6853 43.639C73.5201 42.7697 73.0712 41.9797 72.4091 41.3927C71.2734 40.386 69.1528 40.386 64.9115 40.386C61.2258 40.386 59.3829 40.386 58.2863 39.5068C57.6438 38.9916 57.176 38.2907 56.9467 37.4998C56.5553 36.1498 57.2621 34.4479 58.6757 31.044L62.4033 22.0683C64.4825 17.0618 65.5221 14.5585 64.3345 12.7793C63.1468 11 60.4362 11 55.0151 11Z" />
+	<svg
+		width={size}
+		height={size}
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke={color}
+		strokeWidth={2}
+		strokeLinecap="round"
+		strokeLinejoin="round"
+		style={{ overflow: 'visible' }}
+	>
+		<circle cx="12" cy="12" r="8" />
+		<path d="M12 2v7.5" />
+		<path d="m19 5-5.23 5.23" />
+		<path d="M22 12h-7.5" />
+		<path d="m19 19-5.23-5.23" />
+		<path d="M12 14.5V22" />
+		<path d="M10.23 13.77 5 19" />
+		<path d="M9.5 12H2" />
+		<path d="M10.23 10.23 5 5" />
+		<circle cx="12" cy="12" r="2.5" />
 	</svg>
 );
 
@@ -27,12 +46,12 @@ export const OttoRouter: React.FC = () => {
 		extrapolateRight: 'extend',
 	});
 
-	const boltProgress = spring({
+	const markProgress = spring({
 		frame: frame - 5,
 		fps,
 		config: { damping: 12, mass: 1.2, stiffness: 80 },
 	});
-	const boltScale = interpolate(boltProgress, [0, 1], [0, 1]);
+	const markScale = interpolate(markProgress, [0, 1], [0, 1]);
 
 	const ringProgress = interpolate(frame, [15, 50], [0, 1], {
 		extrapolateLeft: 'clamp',
@@ -89,7 +108,7 @@ export const OttoRouter: React.FC = () => {
 					borderRadius: '50%',
 					background: `radial-gradient(circle, ${colors.accent}10, transparent 60%)`,
 					filter: 'blur(100px)',
-					opacity: boltProgress * 0.6,
+					opacity: markProgress * 0.6,
 				}}
 			/>
 
@@ -187,12 +206,13 @@ export const OttoRouter: React.FC = () => {
 					/>
 					<div
 						style={{
-							transform: `scale(${boltScale})`,
-							opacity: boltProgress,
+							transform: `scale(${markScale})`,
+							opacity: markProgress,
 							position: 'relative',
+							padding: 8,
 						}}
 					>
-						<OttoRouterBolt size={130} color={colors.accent} />
+						<OttoRouterMark size={120} color={colors.accent} />
 					</div>
 				</div>
 

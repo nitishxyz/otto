@@ -4,6 +4,33 @@ import { Reveal } from '../components/Reveal';
 import { TerminalBlock } from '../components/TerminalBlock';
 import { ProviderLogo } from '../components/ProviderLogo';
 
+function OttoRouterMark({ className = 'w-6 h-6' }: { className?: string }) {
+	return (
+		<svg
+			aria-hidden="true"
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			xmlns="http://www.w3.org/2000/svg"
+		>
+			<circle cx="12" cy="12" r="8" />
+			<path d="M12 2v7.5" />
+			<path d="m19 5-5.23 5.23" />
+			<path d="M22 12h-7.5" />
+			<path d="m19 19-5.23-5.23" />
+			<path d="M12 14.5V22" />
+			<path d="M10.23 13.77 5 19" />
+			<path d="M9.5 12H2" />
+			<path d="M10.23 10.23 5 5" />
+			<circle cx="12" cy="12" r="2.5" />
+		</svg>
+	);
+}
+
 const MODELS = [
 	{
 		provider: 'openai',
@@ -602,19 +629,7 @@ function HeroMockup() {
 		<div className="bg-otto-surface border border-otto-border rounded-lg overflow-hidden shadow-2xl shadow-black/10 dark:shadow-black/50">
 			<div className="h-12 border-b border-otto-border bg-otto-surface/95 flex items-center justify-between px-5">
 				<div className="flex items-center gap-2 text-sm text-otto-muted min-w-0 flex-1 mr-4">
-					<svg
-						className="w-4 h-4 flex-shrink-0 text-purple-600 dark:text-purple-400"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<circle cx="12" cy="12" r="10" />
-						<line x1="12" y1="8" x2="12" y2="16" />
-						<line x1="8" y1="12" x2="16" y2="12" />
-					</svg>
+					<OttoRouterMark className="w-4 h-4 flex-shrink-0 text-purple-600 dark:text-purple-400" />
 					<span className="text-otto-text font-medium truncate text-xs">
 						api.ottorouter.org
 					</span>
@@ -794,8 +809,11 @@ export function OttoRouter() {
 							<p className="text-otto-dim text-xs uppercase tracking-[0.2em] mb-6">
 								by ottocode
 							</p>
+							<div className="mb-6 flex items-center justify-center">
+								<OttoRouterMark className="w-12 h-12 sm:w-16 sm:h-16 text-[#9333ea]" />
+							</div>
 							<h1 className="text-5xl sm:text-7xl font-bold mb-6 tracking-tight">
-								ottorouter
+								OttoRouter
 							</h1>
 							<p className="text-otto-text text-lg sm:text-xl font-medium mb-3">
 								Your wallet is your API key.
@@ -1497,6 +1515,9 @@ const { text } = await generateText({
 			<section className="py-28 sm:py-36 px-6 border-t border-otto-border">
 				<div className="max-w-[600px] mx-auto text-center">
 					<Reveal>
+						<div className="mb-5 flex items-center justify-center">
+							<OttoRouterMark className="w-8 h-8 text-[#9333ea]" />
+						</div>
 						<h2 className="text-2xl sm:text-3xl font-bold mb-4">
 							Start building with OttoRouter
 						</h2>

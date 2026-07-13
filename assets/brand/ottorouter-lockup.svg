@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="32" viewBox="0 0 172 32" role="img" aria-label="OttoRouter">
+  <g transform="scale(1.3333)" fill="none" stroke="#9333ea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8"/>
+    <path d="M12 2v7.5"/>
+    <path d="m19 5-5.23 5.23"/>
+    <path d="M22 12h-7.5"/>
+    <path d="m19 19-5.23-5.23"/>
+    <path d="M12 14.5V22"/>
+    <path d="M10.23 13.77 5 19"/>
+    <path d="M9.5 12H2"/>
+    <path d="M10.23 10.23 5 5"/>
+    <circle cx="12" cy="12" r="2.5"/>
+  </g>
+  <text x="38" y="24" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" letter-spacing="-0.5" fill="currentColor">Otto<tspan fill="#9333ea">Router</tspan></text>
+</svg>
