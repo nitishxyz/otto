@@ -226,8 +226,16 @@ const ChatPreview: FC<ChatPreviewProps> = ({ data }) => {
 							<span className="opacity-50">·</span>
 							<span>{sessionData.provider}</span>
 						</div>
-						<div className="flex items-center gap-3">
+						<div className="flex flex-wrap items-center justify-end gap-3">
 							<span>{viewCount} views</span>
+							<a
+								href={`/s/${shareId}?format=md`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+							>
+								View Markdown
+							</a>
 							<fieldset className="inline-flex rounded-full border border-border bg-muted/40 p-0.5 text-xs">
 								<legend className="sr-only">Thread density</legend>
 								<button
