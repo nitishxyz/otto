@@ -132,6 +132,36 @@ describe('system prompt composition', () => {
 		expect(prompt).toContain('- ea: Enterprise architecture planning guidance');
 	});
 
+	it('marks an @mentioned reference as directly relevant for the turn', async () => {
+		const { prompt, components } = await composeSystemPrompt({
+			provider: 'openrouter',
+			model: 'gpt-4o-mini',
+			projectRoot: tempDir,
+			agentPrompt: 'AGENT',
+			includeEnvironment: false,
+			userContent: 'Compare @docs with the file @api/client.ts.',
+			references: [
+				{
+					name: 'api',
+					description: 'API implementation',
+					path: '/tmp/api',
+					status: 'available',
+				},
+				{
+					name: 'docs',
+					description: 'Documentation source',
+					path: '/tmp/docs',
+					status: 'available',
+				},
+			],
+		});
+
+		expect(components).toContain('references');
+		expect(prompt).toContain('Mentioned this turn: yes');
+		expect(prompt.match(/Mentioned this turn: yes/g)).toHaveLength(1);
+		expect(prompt.indexOf('- docs')).toBeLessThan(prompt.indexOf('- api'));
+	});
+
 	async function writeSkill(
 		name: string,
 		description: string,

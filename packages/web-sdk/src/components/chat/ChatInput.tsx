@@ -42,6 +42,7 @@ import { useVimMode } from '../../hooks/useVimMode';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
 import { useSkillMention } from '../../hooks/useSkillMention';
+import { useReferences } from '../../hooks/useReferences';
 import { useCommandSuggestions } from '../../hooks/useCommandSuggestions';
 import { createChatInputKeyHandler } from './ChatInputKeyHandler';
 import {
@@ -279,6 +280,23 @@ export const ChatInput = memo(
 		const mentionAgentNames = useMemo(
 			() => mentionAgents.map((a) => a.name),
 			[mentionAgents],
+		);
+		const { data: referencesData } = useReferences('effective', {
+			enabled: showFileMention || message.includes('@'),
+		});
+		const mentionReferences = useMemo(
+			() =>
+				Object.entries(referencesData?.references ?? {})
+					.filter(([, reference]) => reference.enabled !== false)
+					.map(([name, reference]) => ({
+						name,
+						description: reference.description,
+					})),
+			[referencesData],
+		);
+		const mentionReferenceNames = useMemo(
+			() => mentionReferences.map((reference) => reference.name),
+			[mentionReferences],
 		);
 		const mentionSkillNames = useMemo(
 			() =>
@@ -968,6 +986,7 @@ export const ChatInput = memo(
 									{showFileMention && (
 										<MentionPopup
 											agents={mentionAgents}
+											references={mentionReferences}
 											skills={mentionSkills}
 											files={files}
 											changedFiles={changedFiles}
@@ -1009,6 +1028,7 @@ export const ChatInput = memo(
 											<InputHighlightOverlay
 												value={message}
 												agentNames={mentionAgentNames}
+												referenceNames={mentionReferenceNames}
 												skillNames={mentionSkillNames}
 												scrollTop={highlightScrollTop}
 												className="pl-1 pr-2 py-2 text-base leading-normal"

@@ -62,10 +62,12 @@ async function getSortedFileResult(args: {
 		getGitIgnoredFiles(args.projectRoot, result.files),
 	]);
 
+	const queryActive = Boolean(args.query?.trim());
 	result.files.sort((a, b) => {
 		const aIgnored = ignoredFiles.has(a);
 		const bIgnored = ignoredFiles.has(b);
 		if (aIgnored !== bIgnored) return aIgnored ? 1 : -1;
+		if (queryActive) return 0;
 		const aChanged = changedFiles.has(a);
 		const bChanged = changedFiles.has(b);
 		if (aChanged && !bChanged) return -1;

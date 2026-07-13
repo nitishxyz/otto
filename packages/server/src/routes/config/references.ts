@@ -25,6 +25,12 @@ const projectQuerySchema = z.object({
 			description: 'Project root override.',
 		}),
 });
+const listScopeQuerySchema = projectQuerySchema.extend({
+	scope: z
+		.enum(['effective', 'global', 'local'])
+		.optional()
+		.default('effective'),
+});
 const scopeQuerySchema = projectQuerySchema.extend({
 	scope: z.enum(['global', 'local']).optional().default('global'),
 });
@@ -72,7 +78,7 @@ export function registerReferencesRoutes(app: Hono) {
 			tags: ['config'],
 			operationId: 'listReferences',
 			summary: 'List configured references',
-			request: { query: scopeQuerySchema },
+			request: { query: listScopeQuerySchema },
 			responses: {
 				'200': {
 					description: 'Configured references',
@@ -82,8 +88,11 @@ export function registerReferencesRoutes(app: Hono) {
 		},
 		async (c) => {
 			const projectRoot = await resolveRequestProjectRoot(c);
-			const scope = c.req.query('scope') === 'local' ? 'local' : 'global';
-			const references = await readReferenceSettings(scope, projectRoot);
+			const scope = c.req.query('scope') ?? 'effective';
+			const references =
+				scope === 'effective'
+					? ((await loadConfig(projectRoot)).references ?? {})
+					: await readReferenceSettings(scope, projectRoot);
 			return c.json({ references });
 		},
 	);

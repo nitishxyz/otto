@@ -4,12 +4,13 @@ import { mentionHighlightClasses } from '../../lib/mentionHighlightStyles';
 interface InputHighlightOverlayProps {
 	value: string;
 	agentNames: string[];
+	referenceNames: string[];
 	skillNames: string[];
 	scrollTop?: number;
 	className?: string;
 }
 
-type SegmentKind = 'text' | 'agent' | 'file' | 'skill';
+type SegmentKind = 'text' | 'agent' | 'reference' | 'file' | 'skill';
 
 interface Segment {
 	text: string;
@@ -23,6 +24,7 @@ const BOUNDARY_CHARS = new Set([' ', '\t', '\n', '(', '[', '{']);
 function classifyToken(
 	token: string,
 	agentNames: Set<string>,
+	referenceNames: Set<string>,
 	skillNames: Set<string>,
 ): SegmentKind {
 	if (token.startsWith('$')) {
@@ -32,6 +34,7 @@ function classifyToken(
 	const name = token.slice(1).replace(TRAILING_PUNCTUATION_REGEX, '');
 	if (!name) return 'text';
 	if (agentNames.has(name)) return 'agent';
+	if (referenceNames.has(name)) return 'reference';
 	if (skillNames.has(name)) return 'skill';
 	if (name.includes('/') || name.includes('.')) return 'file';
 	return 'text';
@@ -40,6 +43,7 @@ function classifyToken(
 function tokenize(
 	value: string,
 	agentNames: Set<string>,
+	referenceNames: Set<string>,
 	skillNames: Set<string>,
 ): Segment[] {
 	const segments: Segment[] = [];
@@ -51,7 +55,7 @@ function tokenize(
 		const prevChar = index > 0 ? value[index - 1] : '';
 		const hasBoundary = index === 0 || BOUNDARY_CHARS.has(prevChar);
 		const kind = hasBoundary
-			? classifyToken(token, agentNames, skillNames)
+			? classifyToken(token, agentNames, referenceNames, skillNames)
 			: 'text';
 
 		if (kind === 'text') continue;
@@ -86,18 +90,20 @@ function tokenize(
 export const InputHighlightOverlay = memo(function InputHighlightOverlay({
 	value,
 	agentNames,
+	referenceNames,
 	skillNames,
 	scrollTop = 0,
 	className = '',
 }: InputHighlightOverlayProps) {
 	const agentSet = useMemo(() => new Set(agentNames), [agentNames]);
+	const referenceSet = useMemo(() => new Set(referenceNames), [referenceNames]);
 	const skillSet = useMemo(() => new Set(skillNames), [skillNames]);
 
 	const segments = useMemo(() => {
 		if (!value || (!value.includes('@') && !value.includes('$'))) return null;
-		const result = tokenize(value, agentSet, skillSet);
+		const result = tokenize(value, agentSet, referenceSet, skillSet);
 		return result.some((segment) => segment.kind !== 'text') ? result : null;
-	}, [value, agentSet, skillSet]);
+	}, [value, agentSet, referenceSet, skillSet]);
 
 	if (!segments) return null;
 

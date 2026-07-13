@@ -39,6 +39,7 @@ import {
 import { useSkills } from '../../hooks/useSkills';
 import { useRecipes } from '../../hooks/useRecipes';
 import { useMentionAgents } from '../../hooks/useAgents';
+import { useReferences } from '../../hooks/useReferences';
 import { useSkillsStore } from '../../stores/skillsStore';
 import { useFileBrowserStore } from '../../stores/fileBrowserStore';
 import {
@@ -163,6 +164,9 @@ export const UserMessageGroup = memo(
 		const { data: mentionAgentsData } = useMentionAgents({
 			enabled: hasAtMention,
 		});
+		const { data: referencesData } = useReferences('effective', {
+			enabled: hasAtMention,
+		});
 		const expandSkillsSidebar = useSkillsStore((state) => state.expandSidebar);
 		const selectSkill = useSkillsStore((state) => state.selectSkill);
 		const openFile = useFileBrowserStore((state) => state.openFile);
@@ -199,6 +203,9 @@ export const UserMessageGroup = memo(
 				contentAfterFileSelections,
 				skillsConfig?.items ?? [],
 				mentionAgentsData?.agents ?? [],
+				Object.entries(referencesData?.references ?? {}).map(
+					([name, reference]) => ({ name, description: reference.description }),
+				),
 			),
 			recipesData?.recipes.map((recipe) => recipe.name) ?? [],
 		);
@@ -452,6 +459,22 @@ export const UserMessageGroup = memo(
 														: href?.startsWith('otto-file:')
 															? href.slice('otto-file:'.length)
 															: null;
+													const referenceHref = href?.startsWith('#otto-reference:')
+														? href.slice('#otto-reference:'.length)
+														: href?.startsWith('otto-reference:')
+															? href.slice('otto-reference:'.length)
+															: null;
+													if (referenceHref) {
+														const referenceName = decodeURIComponent(referenceHref);
+														return (
+															<span
+																className={`${mentionHighlightClasses.reference} text-[0.92em] leading-normal`}
+																title={`Reference: ${referenceName}`}
+															>
+																{children}
+															</span>
+														);
+													}
 													const agentHref = href?.startsWith('#otto-agent:')
 														? href.slice('#otto-agent:'.length)
 														: href?.startsWith('otto-agent:')

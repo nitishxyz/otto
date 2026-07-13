@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import Fuse from 'fuse.js';
 import { motion } from 'motion/react';
 import {
 	File,
@@ -12,6 +11,7 @@ import {
 	Plus,
 	Pencil,
 	Sparkles,
+	BookOpen,
 	type LucideIcon,
 } from 'lucide-react';
 
@@ -25,14 +25,20 @@ export interface MentionSkill {
 	description?: string;
 }
 
+export interface MentionReference {
+	name: string;
+	description?: string;
+}
+
 export interface MentionItem {
-	type: 'agent' | 'skill' | 'file';
+	type: 'agent' | 'reference' | 'skill' | 'file';
 	value: string;
 	description?: string;
 }
 
 interface MentionPopupProps {
 	agents: MentionAgent[];
+	references?: MentionReference[];
 	skills?: MentionSkill[];
 	files: string[];
 	changedFiles?: Array<{
@@ -47,6 +53,7 @@ interface MentionPopupProps {
 }
 
 const MAX_AGENT_RESULTS = 5;
+const MAX_REFERENCE_RESULTS = 5;
 const MAX_SKILL_RESULTS = 5;
 const MAX_FILE_RESULTS = 20;
 const POPUP_TRANSITION = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
@@ -163,8 +170,34 @@ function matchByName<T extends { name: string }>(
 	return ranked.slice(0, limit).map((r) => r.item);
 }
 
+function isSubsequence(needle: string, haystack: string): boolean {
+	let i = 0;
+	for (let j = 0; j < haystack.length && i < needle.length; j++) {
+		if (haystack[j] === needle[i]) i++;
+	}
+	return i === needle.length;
+}
+
+/**
+ * Filename-first tiering for file results. The server (FFF) already ranks by
+ * relevance, so this only buckets matches — order within a tier preserves the
+ * server order. Tiers exist mainly to keep stale placeholder data sensible
+ * while a fresh search is in flight.
+ */
+function rankFileMatch(path: string, q: string): number | null {
+	const lower = path.toLowerCase();
+	const filename = lower.split('/').pop() ?? lower;
+	if (filename.startsWith(q)) return 0;
+	if (filename.includes(q)) return 1;
+	if (lower.includes(q)) return 2;
+	if (isSubsequence(q, filename)) return 3;
+	if (isSubsequence(q, lower)) return 4;
+	return null;
+}
+
 export function MentionPopup({
 	agents,
+	references = [],
 	skills = [],
 	files,
 	changedFiles = [],
@@ -184,56 +217,36 @@ export function MentionPopup({
 		[agents, query],
 	);
 
+	const referenceResults = useMemo(
+		() => matchByName(references, query, MAX_REFERENCE_RESULTS),
+		[references, query],
+	);
+
 	const skillResults = useMemo(
 		() => matchByName(skills, query, MAX_SKILL_RESULTS),
 		[skills, query],
-	);
-
-	const fileFuse = useMemo(
-		() =>
-			new Fuse(
-				files.map((f) => ({
-					path: f,
-					filename: f.split('/').pop() || f,
-					normalized: f.replace(/[.\-_/]/g, ''),
-				})),
-				{
-					keys: [
-						{ name: 'filename', weight: 2 },
-						{ name: 'normalized', weight: 1.5 },
-						{ name: 'path', weight: 1 },
-					],
-					threshold: 0.3,
-					distance: 200,
-					ignoreLocation: true,
-					includeScore: true,
-				},
-			),
-		[files],
 	);
 
 	const fileResults = useMemo(() => {
 		if (!query) {
 			return files.slice(0, MAX_FILE_RESULTS);
 		}
-		const normalizedQuery = query.replace(/[.\-_/]/g, '');
-		const searchResults = fileFuse.search(normalizedQuery);
-
-		searchResults.sort((a, b) => {
-			const scoreA = a.score ?? 1;
-			const scoreB = b.score ?? 1;
-			const scoreDiff = Math.abs(scoreA - scoreB);
-			if (scoreDiff < 0.05) {
-				const aChanged = changedFilesMap.has(a.item.path);
-				const bChanged = changedFilesMap.has(b.item.path);
-				if (aChanged && !bChanged) return -1;
-				if (!aChanged && bChanged) return 1;
-			}
-			return scoreA - scoreB;
+		const q = query.toLowerCase();
+		const tiers: Array<{ path: string; tier: number; index: number }> = [];
+		files.forEach((path, index) => {
+			const tier = rankFileMatch(path, q);
+			if (tier === null) return;
+			tiers.push({ path, tier, index });
 		});
-
-		return searchResults.slice(0, MAX_FILE_RESULTS).map((r) => r.item.path);
-	}, [fileFuse, query, files, changedFilesMap]);
+		tiers.sort((a, b) => {
+			if (a.tier !== b.tier) return a.tier - b.tier;
+			const aChanged = changedFilesMap.has(a.path);
+			const bChanged = changedFilesMap.has(b.path);
+			if (aChanged !== bChanged) return aChanged ? -1 : 1;
+			return a.index - b.index;
+		});
+		return tiers.slice(0, MAX_FILE_RESULTS).map((t) => t.path);
+	}, [query, files, changedFilesMap]);
 
 	const items = useMemo<MentionItem[]>(
 		() => [
@@ -241,6 +254,11 @@ export function MentionPopup({
 				type: 'agent',
 				value: agent.name,
 				description: agent.description,
+			})),
+			...referenceResults.map<MentionItem>((reference) => ({
+				type: 'reference',
+				value: reference.name,
+				description: reference.description,
 			})),
 			...skillResults.map<MentionItem>((skill) => ({
 				type: 'skill',
@@ -252,7 +270,7 @@ export function MentionPopup({
 				value: path,
 			})),
 		],
-		[agentResults, skillResults, fileResults],
+		[agentResults, referenceResults, skillResults, fileResults],
 	);
 
 	const effectiveIndex = items.length > 0 ? selectedIndex % items.length : 0;
@@ -292,8 +310,10 @@ export function MentionPopup({
 		);
 	}
 
-	const skillSectionOffset = agentResults.length;
-	const fileSectionOffset = agentResults.length + skillResults.length;
+	const referenceSectionOffset = agentResults.length;
+	const skillSectionOffset = agentResults.length + referenceResults.length;
+	const fileSectionOffset =
+		agentResults.length + referenceResults.length + skillResults.length;
 
 	return (
 		<motion.div
@@ -307,29 +327,66 @@ export function MentionPopup({
 			{agentResults.length > 0 && (
 				<>
 					<SectionLabel>Agents</SectionLabel>
-					{agentResults.map((agent, index) => (
-						<button
-							type="button"
-							key={`agent-${agent.name}`}
-							id={`mention-item-${index}`}
-							onMouseDown={(e) => {
-								e.preventDefault();
-								onSelect(agent.name);
-							}}
-							className={`w-full text-left px-3 py-2 hover:bg-accent ${
-								index === effectiveIndex ? 'bg-accent' : ''
-							}`}
-						>
-							<div className="min-w-0 flex-1">
-								<span className="font-mono text-sm">@{agent.name}</span>
-								{agent.description && (
-									<div className="text-xs text-muted-foreground truncate">
-										{agent.description}
+					{agentResults.map((agent, index) => {
+						return (
+							<button
+								type="button"
+								key={`agent-${agent.name}`}
+								id={`mention-item-${index}`}
+								onMouseDown={(e) => {
+									e.preventDefault();
+									onSelect(agent.name);
+								}}
+								className={`w-full text-left px-3 py-2 hover:bg-accent ${
+									index === effectiveIndex ? 'bg-accent' : ''
+								}`}
+							>
+								<div className="min-w-0 flex-1">
+									<span className="font-mono text-sm">@{agent.name}</span>
+									{agent.description && (
+										<div className="text-xs text-muted-foreground truncate">
+											{agent.description}
+										</div>
+									)}
+								</div>
+							</button>
+						);
+					})}
+				</>
+			)}
+
+			{referenceResults.length > 0 && (
+				<>
+					<SectionLabel>References</SectionLabel>
+					{referenceResults.map((reference, index) => {
+						const itemIndex = referenceSectionOffset + index;
+						return (
+							<button
+								type="button"
+								key={`reference-${reference.name}`}
+								id={`mention-item-${itemIndex}`}
+								onMouseDown={(event) => {
+									event.preventDefault();
+									onSelect(reference.name);
+								}}
+								className={`w-full px-3 py-2 text-left hover:bg-accent ${
+									itemIndex === effectiveIndex ? 'bg-accent' : ''
+								}`}
+							>
+								<div className="flex w-full items-start gap-2">
+									<BookOpen className="mt-1 h-3.5 w-3.5 shrink-0 text-violet-500" />
+									<div className="min-w-0 flex-1">
+										<span className="font-mono text-sm">@{reference.name}</span>
+										{reference.description ? (
+											<div className="truncate text-xs text-muted-foreground">
+												{reference.description}
+											</div>
+										) : null}
 									</div>
-								)}
-							</div>
-						</button>
-					))}
+								</div>
+							</button>
+						);
+					})}
 				</>
 			)}
 
@@ -370,13 +427,18 @@ export function MentionPopup({
 
 			{fileResults.length > 0 && (
 				<>
-					{(agentResults.length > 0 || skillResults.length > 0) && (
-						<SectionLabel>Files</SectionLabel>
-					)}
+					{(agentResults.length > 0 ||
+						referenceResults.length > 0 ||
+						skillResults.length > 0) && <SectionLabel>Files</SectionLabel>}
 					{fileResults.map((filePath, index) => {
 						const itemIndex = fileSectionOffset + index;
 						const Icon = getFileIcon(filePath);
 						const status = getGitStatusInfo(filePath, changedFilesMap);
+						const slashIndex = filePath.lastIndexOf('/');
+						const dir =
+							slashIndex >= 0 ? filePath.slice(0, slashIndex + 1) : '';
+						const base =
+							slashIndex >= 0 ? filePath.slice(slashIndex + 1) : filePath;
 						return (
 							<button
 								type="button"
@@ -393,7 +455,12 @@ export function MentionPopup({
 								<div className="flex items-center gap-2 w-full">
 									<Icon className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
 									<span className="font-mono text-sm flex-1 truncate">
-										{filePath}
+										{base}
+										{dir && (
+											<span className="ml-2 text-xs text-muted-foreground">
+												{dir}
+											</span>
+										)}
 									</span>
 									{status && (
 										<span title={status.label}>

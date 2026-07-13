@@ -40,6 +40,7 @@ export type { Recipe } from './recipes';
 export type {
 	Reference,
 	ReferenceDirectoryListing,
+	ListReferenceScope,
 	ReferenceScope,
 } from './references';
 export type {

@@ -4,6 +4,11 @@ export interface SkillMentionSkill {
 	enabled?: boolean;
 }
 
+export interface UserMessageMentionReference {
+	name: string;
+	description?: string;
+}
+
 export interface UserMessageMentionAgent {
 	name: string;
 	description?: string;
@@ -59,10 +64,14 @@ export function linkifyUserMessageMentions(
 	content: string,
 	skills: SkillMentionSkill[],
 	agents: UserMessageMentionAgent[] = [],
+	references: UserMessageMentionReference[] = [],
 ): string {
 	if (!content.includes('$') && !content.includes('@')) return content;
 
 	const availableAgents = new Set(agents.map((agent) => agent.name));
+	const availableReferences = new Set(
+		references.map((reference) => reference.name),
+	);
 	const availableSkills = new Set(
 		skills
 			.filter((skill) => skill.enabled !== false)
@@ -88,6 +97,10 @@ export function linkifyUserMessageMentions(
 
 		if (availableSkills.has(name)) {
 			return `${prefix}[${mentionToken}](#otto-skill:${encodeURIComponent(name)})${trailing}`;
+		}
+
+		if (availableReferences.has(name)) {
+			return `${prefix}[${mentionToken}](#otto-reference:${encodeURIComponent(name)})${trailing}`;
 		}
 
 		if (!name.includes('/') && !name.includes('.')) return match;

@@ -1,11 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
-import type { Reference, ReferenceScope } from '../lib/api-client/references';
+import type {
+	ListReferenceScope,
+	Reference,
+	ReferenceScope,
+} from '../lib/api-client/references';
 
-export function useReferences(scope: ReferenceScope) {
+export function useReferences(
+	scope: ListReferenceScope,
+	options: { enabled?: boolean } = {},
+) {
 	return useQuery({
 		queryKey: ['references', scope],
 		queryFn: () => apiClient.listReferences(scope),
+		enabled: options.enabled ?? true,
 	});
 }
 

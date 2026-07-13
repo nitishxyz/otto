@@ -7,6 +7,7 @@ import {
 import { extractErrorMessage } from './utils';
 
 export type ReferenceScope = 'global' | 'local';
+export type ListReferenceScope = 'effective' | ReferenceScope;
 export type Reference = {
 	description: string;
 	enabled?: boolean;
@@ -22,7 +23,7 @@ export type ReferenceDirectoryListing = {
 
 export const referencesMixin = {
 	async listReferences(
-		scope: ReferenceScope,
+		scope: ListReferenceScope,
 	): Promise<{ references: Record<string, Reference> }> {
 		const response = await apiListReferences({ query: { scope } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
