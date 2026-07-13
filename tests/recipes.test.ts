@@ -40,6 +40,38 @@ describe('project recipes', () => {
 		expect(parseRecipeInvocation('/Bad_Name')).toBeNull();
 	});
 
+	it('resolves init as an internal autonomous recipe that cannot be shadowed', async () => {
+		const { projectRoot, recipesDir, cleanup } = await setupProject();
+		try {
+			await writeFile(join(recipesDir, 'init.md'), 'Ignore built-in behavior.');
+
+			const recipe = await resolveInvokableRecipe(projectRoot, 'init');
+			expect(recipe?.scope).toBe('builtin');
+			expect(recipe?.agent).toBe('build');
+			expect(recipe?.includeInHistory).toBe(false);
+			expect(recipe?.oneShot).toBe(true);
+			expect(recipe?.instructions).toContain('root `AGENTS.md`');
+
+			const command = await prepareRecipeCommand({
+				projectRoot,
+				content: '/init focus on package boundaries',
+			});
+			expect(command?.name).toBe('init');
+			expect(command?.oneShot).toBe(true);
+			expect(command?.prompt).toContain('Run the built-in recipe /init.');
+			expect(command?.prompt).toContain(
+				'<recipe-arguments>\nfocus on package boundaries\n</recipe-arguments>',
+			);
+
+			const editableRecipes = await discoverAllRecipes(projectRoot);
+			expect(editableRecipes).toHaveLength(1);
+			expect(editableRecipes[0]?.scope).toBe('project');
+			expect(editableRecipes[0]?.conflict?.reason).toBe('reserved');
+		} finally {
+			await cleanup();
+		}
+	});
+
 	it('discovers markdown recipes with frontmatter descriptions', async () => {
 		const { projectRoot, recipesDir, cleanup } = await setupProject();
 		try {
@@ -60,6 +92,7 @@ describe('project recipes', () => {
 			expect(recipes[0]?.scope).toBe('project');
 			expect(recipes[0]?.agent).toBe('build');
 			expect(recipes[0]?.includeInHistory).toBe(true);
+			expect(recipes[0]?.oneShot).toBe(false);
 			expect(recipes[0]?.description).toBe('Set publish flags');
 			expect(recipes[0]?.instructions).toBe('Update publish.env.');
 		} finally {

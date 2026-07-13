@@ -5,12 +5,6 @@ import {
 	getModelLimits,
 	isCompactCommand,
 } from '../message/compaction.ts';
-import {
-	buildInitCommandUserPrompt,
-	buildInitProjectSnapshot,
-	getInitCommandSystemPrompt,
-	isInitCommand,
-} from './init.ts';
 import { prepareRecipeCommand } from './recipes.ts';
 
 export type BuiltinCommandPromptMessage = {
@@ -19,7 +13,7 @@ export type BuiltinCommandPromptMessage = {
 };
 
 export type BuiltinCommandSpec = {
-	id: 'compact' | 'init' | `recipe:${string}`;
+	id: 'compact' | `recipe:${string}`;
 	agent?: string;
 	provider?: string;
 	model?: string;
@@ -66,23 +60,6 @@ export async function prepareBuiltinCommand(args: {
 		};
 	}
 
-	if (isInitCommand(args.content)) {
-		const snapshot = await buildInitProjectSnapshot(args.cfg.projectRoot);
-		return {
-			id: 'init',
-			agent: 'init',
-			oneShot: true,
-			omitHistory: true,
-			additionalPromptMessages: [
-				{ role: 'system', content: getInitCommandSystemPrompt() },
-				{
-					role: 'user',
-					content: buildInitCommandUserPrompt(args.cfg.projectRoot, snapshot),
-				},
-			],
-		};
-	}
-
 	const recipeCommand = await prepareRecipeCommand({
 		projectRoot: args.cfg.projectRoot,
 		content: args.content,
@@ -93,6 +70,7 @@ export async function prepareBuiltinCommand(args: {
 			agent: recipeCommand.agent,
 			provider: recipeCommand.provider,
 			model: recipeCommand.model,
+			oneShot: recipeCommand.oneShot,
 			omitHistory: !recipeCommand.includeInHistory,
 			additionalPromptMessages: [
 				{ role: 'user', content: recipeCommand.prompt },

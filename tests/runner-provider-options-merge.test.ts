@@ -158,9 +158,9 @@ describe('applyModelFamilyEditToolPolicy', () => {
 		expect(result).toEqual(['read', 'shell']);
 	});
 
-	test('keeps apply_patch for non-Anthropic/OpenAI init models', () => {
+	test('keeps apply_patch for non-Anthropic/OpenAI build models', () => {
 		const result = applyModelFamilyEditToolPolicy(
-			'init',
+			'build',
 			editPolicyTools,
 			'google',
 			'gemini-2.5-flash',

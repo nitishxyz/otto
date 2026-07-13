@@ -37,7 +37,9 @@ Usage:
 /publish-ready web cli
 ```
 
-Arguments after the recipe name are passed to Otto as recipe arguments. Recipes run through the normal agent flow and keep the usual tool approval, editing, and safety rules. The optional `agent` frontmatter chooses which agent runs the recipe; it defaults to `build`, and unavailable agents fall back to `build`. By default, recipes are included in session history, so they can use prior context and remain in future context. Set `includeInHistory: false` when a recipe should run isolated from session history. You can also ask Otto to create or edit a recipe; it should write markdown files under `.otto/recipes/`.
+Arguments after the recipe name are passed to Otto as recipe arguments. Recipes run through the normal agent flow and keep the usual tool approval, editing, and safety rules. The optional `agent` frontmatter chooses which agent runs the recipe; it defaults to `build`, and unavailable agents fall back to `build`. By default, recipes are included in session history, so they can use prior context and remain in future context. Set `includeInHistory: false` when a recipe should run isolated from session history. Set `oneShot: true` when it should execute autonomously without conversational questions or confirmation; configured tool approval controls still apply. You can also ask Otto to create or edit a recipe; it should write markdown files under `.otto/recipes/`.
+
+Otto also ships immutable built-in recipes. `/init` is a built-in recipe that uses the `build` agent to generate repository agent documentation autonomously. Built-in recipes are reserved, cannot be overridden by project, global, or plugin recipes, and are not shown in editable recipe settings or CRUD APIs.
 
 ## Custom commands
 

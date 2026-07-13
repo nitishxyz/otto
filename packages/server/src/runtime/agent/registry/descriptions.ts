@@ -2,18 +2,12 @@ export const BUILTIN_AGENT_NAMES = [
 	'build',
 	'plan',
 	'general',
-	'init',
 	'research',
 	'looper',
 ];
 
-/**
- * Built-in agents that are internal-only and must not be exposed in agent
- * listings (UI pickers, ACP modes, delegation lists). They remain resolvable
- * when explicitly requested (e.g. the /init command). Looper is intentionally
- * NOT hidden: it is listed and editable so users can set its provider/model.
- */
-export const HIDDEN_BUILTIN_AGENT_NAMES = ['init'];
+/** Built-in agents that are internal-only and hidden from agent listings. */
+export const HIDDEN_BUILTIN_AGENT_NAMES: string[] = [];
 
 const hiddenAgentSet = new Set(HIDDEN_BUILTIN_AGENT_NAMES);
 
@@ -29,7 +23,6 @@ export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
 	plan: 'Read-only planner: explores the codebase and produces plans, no edits.',
 	general:
 		'General-purpose assistant for broad questions, including topics unrelated to the current project.',
-	init: 'Sets up AGENTS.md and project conventions for a repository.',
 	research:
 		'Searches session history and past conversations to answer questions.',
 	looper:

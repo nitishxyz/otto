@@ -1,5 +1,4 @@
 import type { TerminalManager } from '@ottocode/sdk';
-import { isInitCommand } from './init.ts';
 import { isCompactCommand } from '../message/compaction.ts';
 import { prepareRecipeCommand } from './recipes.ts';
 import { parsePluginCommandInvocation } from '../plugins/commands/parse.ts';
@@ -23,7 +22,7 @@ export async function tryExecutePluginSlashMessage(args: {
 	const bridge =
 		args.bridge ?? createServerTerminalBridge(args.terminalManager);
 
-	if (isCompactCommand(args.content) || isInitCommand(args.content)) {
+	if (isCompactCommand(args.content)) {
 		return null;
 	}
 

@@ -9,7 +9,7 @@ const EDITING_TOOL_NAMES = [
 	'copy_into',
 	'apply_patch',
 ];
-const MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS = new Set(['build', 'init']);
+const MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS = new Set(['build']);
 
 const LOWER_TIER_MODEL_PATTERNS = [
 	/(^|[-_/])fast($|[-_/])/,

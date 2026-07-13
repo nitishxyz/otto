@@ -4,12 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DB } from '@ottocode/database';
 import { COMMANDS as TUI_COMMANDS } from '../apps/tui/src/commands.ts';
+import { BUILTIN_AGENTS } from '../packages/server/src/presets.ts';
 import { prepareBuiltinCommand } from '../packages/server/src/runtime/commands/builtins.ts';
-import {
-	buildInitProjectSnapshot,
-	buildInitCommandUserPrompt,
-	isInitCommand,
-} from '../packages/server/src/runtime/commands/init.ts';
 import {
 	COMMANDS as WEB_COMMANDS,
 	findExactCommand,
@@ -95,25 +91,7 @@ afterAll(async () => {
 });
 
 describe('/init command', () => {
-	test('detects the built-in slash command', () => {
-		expect(isInitCommand('/init')).toBe(true);
-		expect(isInitCommand('  /INIT  ')).toBe(true);
-		expect(isInitCommand('/init now')).toBe(false);
-		expect(isInitCommand('/compact')).toBe(false);
-	});
-
-	test('builds a filesystem-grounded project snapshot', async () => {
-		const snapshot = await buildInitProjectSnapshot(projectRoot);
-		expect(snapshot).toContain('Repo shape: monorepo/workspace');
-		expect(snapshot).toContain('Workspace globs: apps/*, packages/*');
-		expect(snapshot).toContain('apps/: mobile/, web/');
-		expect(snapshot).toContain('packages/: database/, server/');
-		expect(snapshot).toContain('packages/server/src/routes: sessions.ts');
-		expect(snapshot).toContain('packages/database/src/schema: sessions.ts');
-		expect(snapshot).toContain('Existing agent docs: AGENTS.md, mobile.md');
-	});
-
-	test('prepares an isolated /init built-in command spec', async () => {
+	test('prepares /init through the autonomous built-in recipe', async () => {
 		const stateDir = join(
 			tmpdir(),
 			'otto-home',
@@ -167,15 +145,20 @@ describe('/init command', () => {
 			content: '/init',
 		});
 
-		expect(command?.id).toBe('init');
-		expect(command?.agent).toBe('init');
+		expect(command?.id).toBe('recipe:init');
+		expect(command?.agent).toBe('build');
+		expect('init' in BUILTIN_AGENTS).toBe(false);
 		expect(command?.oneShot).toBe(true);
 		expect(command?.omitHistory).toBe(true);
-		expect(command?.additionalPromptMessages?.length).toBe(2);
-		const prompt = buildInitCommandUserPrompt(projectRoot, 'snapshot');
-		expect(prompt).toContain('Root AGENTS.md');
-		expect(command?.additionalPromptMessages?.[1]?.content).toContain(
-			'Repository snapshot',
+		expect(command?.additionalPromptMessages).toHaveLength(1);
+		expect(command?.additionalPromptMessages?.[0]?.content).toContain(
+			'Run the built-in recipe /init.',
+		);
+		expect(command?.additionalPromptMessages?.[0]?.content).toContain(
+			'root `AGENTS.md`',
+		);
+		expect(command?.additionalPromptMessages?.[0]?.content).toContain(
+			'configured for autonomous execution',
 		);
 	});
 

@@ -3,6 +3,9 @@ import {
 	getGlobalRecipesDir,
 	resolveEffectivePlugins,
 } from '@ottocode/sdk';
+import INIT_RECIPE from '@ottocode/sdk/prompts/recipes/init.md' with {
+	type: 'text',
+};
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
 import { discoverAllAgents, resolveAgentConfig } from '../agent/registry.ts';
@@ -29,10 +32,21 @@ export type Recipe = {
 	description?: string;
 	agent: string;
 	includeInHistory: boolean;
+	oneShot: boolean;
 	path: string;
 	content: string;
 	instructions: string;
 	conflict?: RecipeConflict;
+};
+
+type BuiltinRecipe = Omit<Recipe, 'scope' | 'conflict'> & {
+	scope: 'builtin';
+};
+
+type InvokableRecipe = Recipe | BuiltinRecipe;
+
+const BUILTIN_RECIPE_SOURCES: Readonly<Record<string, string>> = {
+	init: INIT_RECIPE,
 };
 
 /** @deprecated Use {@link Recipe} with scope `project`. */
@@ -175,7 +189,7 @@ async function discoverPluginRecipes(projectRoot: string): Promise<Recipe[]> {
 				continue;
 			}
 
-			const { agent, description, includeInHistory, instructions } =
+			const { agent, description, includeInHistory, oneShot, instructions } =
 				parseRecipeContent(content);
 			if (!instructions.trim()) continue;
 
@@ -185,6 +199,7 @@ async function discoverPluginRecipes(projectRoot: string): Promise<Recipe[]> {
 				agent,
 				description: pluginRecipe.description ?? description,
 				includeInHistory,
+				oneShot,
 				path: recipePath,
 				content,
 				instructions,
@@ -216,7 +231,7 @@ export async function loadRecipe(args: {
 		return null;
 	}
 
-	const { agent, description, includeInHistory, instructions } =
+	const { agent, description, includeInHistory, oneShot, instructions } =
 		parseRecipeContent(content);
 	if (!instructions.trim()) return null;
 
@@ -226,6 +241,7 @@ export async function loadRecipe(args: {
 		agent,
 		description,
 		includeInHistory,
+		oneShot,
 		path: recipePath,
 		content,
 		instructions,
@@ -296,9 +312,11 @@ export async function discoverAllRecipes(
 export async function resolveInvokableRecipe(
 	projectRoot: string,
 	name: string,
-): Promise<Recipe | null> {
+): Promise<InvokableRecipe | null> {
 	const normalized = name.toLowerCase();
 	if (!isValidRecipeName(normalized)) return null;
+	const builtin = loadBuiltinRecipe(normalized);
+	if (builtin) return builtin;
 	if (isReservedRecipeSlashCommandName(normalized)) return null;
 
 	const matches = (await discoverAllRecipes(projectRoot)).filter(
@@ -306,6 +324,26 @@ export async function resolveInvokableRecipe(
 	);
 	if (matches.length !== 1) return null;
 	return matches[0] ?? null;
+}
+
+function loadBuiltinRecipe(name: string): BuiltinRecipe | null {
+	const content = BUILTIN_RECIPE_SOURCES[name];
+	if (!content) return null;
+	const { agent, description, includeInHistory, oneShot, instructions } =
+		parseRecipeContent(content);
+	if (!instructions.trim()) return null;
+
+	return {
+		name,
+		scope: 'builtin',
+		agent,
+		description,
+		includeInHistory,
+		oneShot,
+		path: `@ottocode/sdk/prompts/recipes/${name}.md`,
+		content,
+		instructions,
+	};
 }
 
 export async function loadProjectRecipe(
@@ -329,6 +367,7 @@ export async function prepareRecipeCommand(args: {
 	description?: string;
 	agent: string;
 	includeInHistory: boolean;
+	oneShot: boolean;
 	provider?: string;
 	model?: string;
 	prompt: string;
@@ -350,6 +389,7 @@ export async function prepareRecipeCommand(args: {
 		description: recipe.description,
 		agent,
 		includeInHistory: recipe.includeInHistory,
+		oneShot: recipe.oneShot,
 		provider: agentConfig.provider,
 		model: agentConfig.model,
 		prompt: buildRecipePrompt(args.projectRoot, recipe, invocation.args),
@@ -360,6 +400,7 @@ export function parseRecipeContent(content: string): {
 	agent: string;
 	description?: string;
 	includeInHistory: boolean;
+	oneShot: boolean;
 	instructions: string;
 } {
 	const parsed = extractFrontmatter(content);
@@ -367,6 +408,7 @@ export function parseRecipeContent(content: string): {
 		return {
 			agent: DEFAULT_RECIPE_AGENT,
 			includeInHistory: true,
+			oneShot: false,
 			instructions: content.trim(),
 		};
 	}
@@ -378,6 +420,7 @@ export function parseRecipeContent(content: string): {
 		description: readFrontmatterString(parsed.frontmatter, 'description'),
 		includeInHistory:
 			readFrontmatterBoolean(parsed.frontmatter, 'includeInHistory') ?? true,
+		oneShot: readFrontmatterBoolean(parsed.frontmatter, 'oneShot') ?? false,
 		instructions: parsed.body.trim(),
 	};
 }
@@ -421,11 +464,19 @@ function readFrontmatterBoolean(
 
 function buildRecipePrompt(
 	projectRoot: string,
-	recipe: Recipe,
+	recipe: InvokableRecipe,
 	args: string,
 ): string {
-	const displayPath = relative(projectRoot, recipe.path) || recipe.path;
-	const scopeLabel = recipe.scope === 'global' ? 'global' : 'project';
+	const displayPath =
+		recipe.scope === 'builtin'
+			? recipe.path
+			: relative(projectRoot, recipe.path) || recipe.path;
+	const scopeLabel =
+		recipe.scope === 'builtin'
+			? 'built-in'
+			: recipe.scope === 'global'
+				? 'global'
+				: 'project';
 	const parts = [
 		`Run the ${scopeLabel} recipe /${recipe.name}.`,
 		recipe.description ? `Description: ${recipe.description}` : undefined,
@@ -438,7 +489,9 @@ function buildRecipePrompt(
 		args
 			? ['<recipe-arguments>', args, '</recipe-arguments>'].join('\n')
 			: undefined,
-		`This recipe is a reusable ${scopeLabel} instruction. Execute it through the normal agent flow and respect all normal tool approval, editing, and safety rules.`,
+		recipe.oneShot
+			? `This recipe is a reusable ${scopeLabel} instruction configured for autonomous execution. Complete it without asking questions or requesting confirmation, while respecting editing and safety rules.`
+			: `This recipe is a reusable ${scopeLabel} instruction. Execute it through the normal agent flow and respect all normal tool approval, editing, and safety rules.`,
 	];
 
 	return parts.filter(Boolean).join('\n\n');
