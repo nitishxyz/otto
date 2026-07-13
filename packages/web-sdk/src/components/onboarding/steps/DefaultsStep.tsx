@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useId, useRef } from 'react';
+import { memo, useCallback, useState, useEffect, useId, useRef } from 'react';
 import { ArrowLeft, Sparkles, ChevronDown } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import type { AuthStatus } from '../../../stores/onboardingStore';
@@ -43,6 +43,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 	const [allModels, setAllModels] = useState<AllModels | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
+	const [loadError, setLoadError] = useState<string | null>(null);
 
 	const [selectedProvider, setSelectedProvider] = useState('');
 	const [selectedModel, setSelectedModel] = useState('');
@@ -60,51 +61,72 @@ export const DefaultsStep = memo(function DefaultsStep({
 	const agentId = useId();
 	const approvalId = useId();
 
-	useEffect(() => {
-		const loadConfig = async () => {
-			try {
-				const [configData, modelsData] = await Promise.all([
-					apiClient.getConfig(),
-					apiClient.getAllModels(),
-				]);
-				setConfig(configData);
-				setAllModels(modelsData);
-				const availableProviderIds = configData.providers.filter(
-					(p) =>
-						authStatus.providers[p]?.configured &&
-						modelsData?.[p]?.models?.length > 0,
+	const loadConfig = useCallback(async () => {
+		setIsLoading(true);
+		setLoadError(null);
+		try {
+			const [configResult, modelsResult] = await Promise.allSettled([
+				apiClient.getConfig(),
+				apiClient.getAllModels(),
+			]);
+			const configData =
+				configResult.status === 'fulfilled' ? configResult.value : null;
+			setConfig(configData);
+			if (modelsResult.status === 'rejected') throw modelsResult.reason;
+			const modelsData = modelsResult.value;
+			setAllModels(modelsData);
+			const availableProviderIds = Object.keys(modelsData).filter(
+				(provider) =>
+					authStatus.providers[provider]?.configured &&
+					modelsData[provider]?.models?.length > 0,
+			);
+			if (availableProviderIds.length === 0) {
+				throw new Error(
+					'No models are available for your connected providers.',
 				);
-				const cfgProvider = configData.defaults.provider;
-				const cfgModel = configData.defaults.model;
-				const resolvedProvider = availableProviderIds.includes(cfgProvider)
-					? cfgProvider
-					: (availableProviderIds[0] ?? '');
-				const providerModels = resolvedProvider
-					? (modelsData?.[resolvedProvider]?.models ?? [])
-					: [];
-				const resolvedModel = providerModels.some(
-					(m: { id: string }) => m.id === cfgModel,
-				)
-					? cfgModel
-					: (providerModels[0]?.id ?? '');
-				setSelectedProvider(resolvedProvider);
-				setSelectedModel(resolvedModel);
-				if (configData?.defaults?.agent) {
-					setSelectedAgent(configData.defaults.agent);
-				}
-				if (configData?.defaults?.toolApproval) {
-					setSelectedApproval(configData.defaults.toolApproval);
-				}
-				if (configData?.defaults?.guidedMode) {
-					setGuidedMode(configData.defaults.guidedMode);
-				}
-			} catch {
-			} finally {
-				setIsLoading(false);
 			}
-		};
+			const cfgProvider =
+				authStatus.defaults.provider || configData?.defaults.provider;
+			const cfgModel = authStatus.defaults.model || configData?.defaults.model;
+			const resolvedProvider = availableProviderIds.includes(cfgProvider)
+				? cfgProvider
+				: availableProviderIds[0];
+			const providerModels = modelsData[resolvedProvider]?.models ?? [];
+			const resolvedModel = providerModels.some(
+				(model: { id: string }) => model.id === cfgModel,
+			)
+				? cfgModel
+				: (providerModels[0]?.id ?? '');
+			setSelectedProvider(resolvedProvider);
+			setSelectedModel(resolvedModel);
+			setSelectedAgent(
+				authStatus.defaults.agent || configData?.defaults.agent || 'build',
+			);
+			setSelectedApproval(
+				authStatus.defaults.toolApproval ||
+					configData?.defaults.toolApproval ||
+					'dangerous',
+			);
+			setGuidedMode(
+				authStatus.defaults.guidedMode ??
+					configData?.defaults.guidedMode ??
+					false,
+			);
+		} catch (error) {
+			setAllModels(null);
+			setSelectedProvider('');
+			setSelectedModel('');
+			setLoadError(
+				error instanceof Error ? error.message : 'Failed to load models.',
+			);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [authStatus.defaults, authStatus.providers]);
+
+	useEffect(() => {
 		loadConfig();
-	}, [authStatus.providers]);
+	}, [loadConfig]);
 
 	useEffect(() => {
 		if (config?.agents?.length) {
@@ -127,6 +149,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 	const handleFinish = async () => {
 		if (!selectedProvider || !selectedModel) return;
 		setIsSaving(true);
+		setLoadError(null);
 		try {
 			await apiClient.updateDefaults({
 				provider: selectedProvider,
@@ -134,11 +157,17 @@ export const DefaultsStep = memo(function DefaultsStep({
 				agent: selectedAgent,
 				toolApproval: selectedApproval,
 				guidedMode,
-				fullWidthContent: config?.defaults?.fullWidthContent ?? true,
+				fullWidthContent:
+					authStatus.defaults.fullWidthContent ??
+					config?.defaults?.fullWidthContent ??
+					true,
 				scope: 'global',
 			});
 			await onComplete();
-		} catch {
+		} catch (error) {
+			setLoadError(
+				error instanceof Error ? error.message : 'Failed to save defaults.',
+			);
 		} finally {
 			setIsSaving(false);
 		}
@@ -156,12 +185,11 @@ export const DefaultsStep = memo(function DefaultsStep({
 		);
 	}
 
-	const availableProviders =
-		config?.providers.filter(
-			(p) =>
-				authStatus.providers[p]?.configured &&
-				allModels?.[p]?.models?.length > 0,
-		) ?? [];
+	const availableProviders = Object.keys(allModels ?? {}).filter(
+		(provider) =>
+			authStatus.providers[provider]?.configured &&
+			(allModels?.[provider]?.models?.length ?? 0) > 0,
+	);
 
 	const currentProviderModels = allModels?.[selectedProvider]?.models || [];
 
@@ -194,6 +222,19 @@ export const DefaultsStep = memo(function DefaultsStep({
 							Set your preferences. You can change these anytime in settings.
 						</p>
 					</div>
+
+					{loadError && (
+						<div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+							<span>{loadError}</span>
+							<button
+								type="button"
+								onClick={loadConfig}
+								className="shrink-0 rounded-lg border border-destructive/30 px-3 py-1.5 font-medium hover:bg-destructive/10"
+							>
+								Retry
+							</button>
+						</div>
+					)}
 
 					{/* Form */}
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -265,7 +306,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 									onChange={(e) => setSelectedAgent(e.target.value)}
 									className="w-full px-4 py-3 bg-card border border-border rounded-xl text-foreground appearance-none cursor-pointer focus:outline-none focus:border-ring transition-colors"
 								>
-									{(config?.agents || ['build']).map((a) => (
+									{(config?.agents || [selectedAgent || 'build']).map((a) => (
 										<option key={a} value={a}>
 											{a}
 										</option>
@@ -358,7 +399,7 @@ export const DefaultsStep = memo(function DefaultsStep({
 					<button
 						type="button"
 						onClick={handleFinish}
-						disabled={isSaving}
+						disabled={isSaving || !selectedProvider || !selectedModel}
 						className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
 					>
 						{isSaving ? (

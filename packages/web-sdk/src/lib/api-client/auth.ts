@@ -43,6 +43,8 @@ export const authMixin = {
 			provider: string;
 			model: string;
 			toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
+			guidedMode?: boolean;
+			fullWidthContent?: boolean;
 		};
 	}> {
 		const response = await apiGetAuthStatus();

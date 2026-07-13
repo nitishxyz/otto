@@ -7,6 +7,7 @@ import {
 	getProviderDefinition,
 	resolveBuiltInProviderCatalogId,
 	loadConfig,
+	loadGlobalConfig,
 	logger,
 	modelListToMap,
 	modelMapToList,
@@ -383,8 +384,7 @@ export async function handleGetProviderModels(c: Context) {
 export async function handleGetAllModels(c: Context) {
 	try {
 		const embeddedConfig = getEmbeddedConfig(c);
-		const projectRoot = await resolveRequestProjectRoot(c);
-		const cfg = await loadConfig(projectRoot);
+		const cfg = await loadGlobalConfig();
 		const authorizedProviders = await getAuthorizedProviders(
 			embeddedConfig,
 			cfg,
@@ -403,7 +403,7 @@ export async function handleGetAllModels(c: Context) {
 			const authType = await getAuthTypeForProvider(
 				embeddedConfig,
 				provider,
-				projectRoot,
+				cfg.projectRoot,
 			);
 			const uiAuthType =
 				authType === 'api' || authType === 'oauth' ? authType : undefined;
@@ -411,7 +411,7 @@ export async function handleGetAllModels(c: Context) {
 				void refreshProviderModelsInBackground({
 					provider,
 					providerDefinition,
-					projectRoot,
+					projectRoot: cfg.projectRoot,
 				});
 			}
 			const filteredModels = getProviderModelsForUi({

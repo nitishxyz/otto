@@ -70,6 +70,18 @@ const LOCAL_DEFAULT_OVERRIDE_KEYS = [
 export async function loadConfig(
 	projectRootInput?: string,
 ): Promise<OttoConfig> {
+	return loadResolvedConfig(projectRootInput, true);
+}
+
+/** Loads machine-global configuration without applying project overrides. */
+export async function loadGlobalConfig(): Promise<OttoConfig> {
+	return loadResolvedConfig(undefined, false);
+}
+
+async function loadResolvedConfig(
+	projectRootInput: string | undefined,
+	includeProjectConfig: boolean,
+): Promise<OttoConfig> {
 	const projectRoot = projectRootInput
 		? String(projectRootInput)
 		: process.cwd();
@@ -92,7 +104,9 @@ export async function loadConfig(
 	const globalConfigPath = getGlobalConfigPath();
 	const globalSkillsConfigPath = getGlobalSkillsConfigPath();
 
-	const projectCfg = await readJsonOptional(projectConfigPath);
+	const projectCfg = includeProjectConfig
+		? await readJsonOptional(projectConfigPath)
+		: undefined;
 	const globalCfg = await readJsonOptional(globalConfigPath);
 	const globalSkillsCfg = await readJsonOptional(globalSkillsConfigPath);
 

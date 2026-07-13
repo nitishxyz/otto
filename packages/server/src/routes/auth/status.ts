@@ -4,7 +4,7 @@ import {
 	getAllAuth,
 	getOnboardingComplete,
 	isProviderAuthorized,
-	loadConfig,
+	loadGlobalConfig,
 	logger,
 	type ProviderId,
 } from '@ottocode/sdk';
@@ -13,7 +13,6 @@ import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { getProviderDetails } from '../config/utils.ts';
 import { getGhImportCapability } from './service.ts';
-import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const authStatusProviderSchema = z.object({
 	configured: z.boolean(),
@@ -62,10 +61,9 @@ export function registerAuthStatusRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = await resolveRequestProjectRoot(c);
-				const auth = await getAllAuth(projectRoot);
-				const cfg = await loadConfig(projectRoot);
-				const onboardingComplete = await getOnboardingComplete(projectRoot);
+				const auth = await getAllAuth();
+				const cfg = await loadGlobalConfig();
+				const onboardingComplete = await getOnboardingComplete();
 				const ottorouterAuth = auth.ottorouter;
 				const ghImportCapability = getGhImportCapability();
 

@@ -23,6 +23,8 @@ export interface AuthStatus {
 		provider: string;
 		model: string;
 		toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
+		guidedMode?: boolean;
+		fullWidthContent?: boolean;
 	};
 }
 

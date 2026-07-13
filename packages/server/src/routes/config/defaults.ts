@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi';
 import {
 	hasConfiguredProvider,
 	loadConfig,
+	loadGlobalConfig,
 	logger,
 	setConfig,
 	type ProviderId,
@@ -12,7 +13,10 @@ import { normalizeThemeId, themeIds, type ThemeId } from '@ottocode/themes';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { getProjectManager } from '../../runtime/projects/manager.ts';
-import { resolveRequestProjectRoot } from '../project-context.ts';
+import {
+	hasRequestProjectContext,
+	resolveRequestProjectRoot,
+} from '../project-context.ts';
 
 const projectQuerySchema = z.object({
 	project: z
@@ -117,8 +121,6 @@ export function registerDefaultsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const projectRoot = await resolveRequestProjectRoot(c);
-				const cfg = await loadConfig(projectRoot);
 				const body = await c.req.json<{
 					agent?: string;
 					provider?: string;
@@ -143,6 +145,18 @@ export function registerDefaultsRoute(app: Hono) {
 				}>();
 
 				const scope = body.scope || 'global';
+				const hasProjectContext = hasRequestProjectContext(c);
+				if (scope === 'local' && !hasProjectContext) {
+					return c.json(
+						{ error: 'Local defaults require an explicit project context.' },
+						400,
+					);
+				}
+				const projectRoot =
+					scope === 'local' ? await resolveRequestProjectRoot(c) : undefined;
+				const cfg = projectRoot
+					? await loadConfig(projectRoot)
+					: await loadGlobalConfig();
 				const updates: Partial<{
 					agent: string;
 					provider: ProviderId;
@@ -214,9 +228,10 @@ export function registerDefaultsRoute(app: Hono) {
 
 				await setConfig(scope, updates, projectRoot);
 
-				const nextCfg =
-					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
-					(await loadConfig(projectRoot));
+				const nextCfg = projectRoot
+					? ((await getProjectManager().refreshProjectConfig(projectRoot)) ??
+						(await loadConfig(projectRoot)))
+					: await loadGlobalConfig();
 
 				return c.json({
 					success: true,

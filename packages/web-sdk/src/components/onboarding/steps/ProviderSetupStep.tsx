@@ -1095,6 +1095,9 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const unconfiguredProviders = Object.entries(authStatus.providers).filter(
 		([id, info]) => !info.configured && id !== 'ottorouter',
 	);
+	const canContinue =
+		authStatus.ottorouter.configured ||
+		Object.values(authStatus.providers).some((provider) => provider.configured);
 
 	return (
 		<div className="min-h-screen flex flex-col">
@@ -1472,7 +1475,9 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 				<div className="max-w-7xl mx-auto flex items-center justify-between">
 					{!manageMode && (
 						<div className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-							You can add more providers later in settings
+							{canContinue
+								? 'You can add more providers later in settings'
+								: 'Connect at least one provider to continue'}
 						</div>
 					)}
 					{manageMode ? (
@@ -1487,7 +1492,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 						<button
 							type="button"
 							onClick={onNext}
-							className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+							disabled={!canContinue}
+							className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							Continue
 							<ArrowRight className="w-4 h-4" />

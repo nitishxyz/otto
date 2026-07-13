@@ -29,6 +29,7 @@ import {
 	getProjectStateDir,
 	getProjectTmpDir,
 	loadConfig,
+	loadGlobalConfig,
 	removeReferenceSettings,
 	setConfig,
 	writeReferenceSettings,
@@ -96,7 +97,9 @@ describe('config loader', () => {
 			);
 
 			const cfg = await loadConfig(projectRoot);
+			const globalCfg = await loadGlobalConfig();
 			expect(cfg.defaults.model).toBe('project-model');
+			expect(globalCfg.defaults.model).not.toBe('project-model');
 			expect(cfg.paths.projectConfigPath).toBe(
 				join(projectRoot, '.otto', 'config.json'),
 			);

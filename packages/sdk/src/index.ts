@@ -300,7 +300,11 @@ export type {
 // =======================
 // Configuration (from internal config module)
 // =======================
-export { loadConfig, read as readConfig } from './config/src/index.ts';
+export {
+	loadConfig,
+	loadGlobalConfig,
+	read as readConfig,
+} from './config/src/index.ts';
 export {
 	getLocalDataDir,
 	getLegacyProjectDataDir,

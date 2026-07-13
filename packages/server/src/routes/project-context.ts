@@ -34,6 +34,18 @@ export interface RequestProjectContext {
 	runtime: ProjectRuntime;
 }
 
+/** Returns whether a request can resolve a project without prompting the user. */
+export function hasRequestProjectContext(c: Context): boolean {
+	return Boolean(
+		c.req.header('X-Otto-Share-Project-Id') ||
+			c.req.query('projectId') ||
+			c.req.header('X-Otto-Project-Id') ||
+			c.req.query('project') ||
+			c.req.header('X-Otto-Project') ||
+			getDefaultProjectRoot(),
+	);
+}
+
 export async function resolveRequestProject(
 	c: Context,
 ): Promise<RequestProjectContext> {

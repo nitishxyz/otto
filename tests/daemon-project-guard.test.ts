@@ -28,6 +28,17 @@ describe('daemon project context guard', () => {
 		expect(body.error?.code).toBe('project_context_required');
 	});
 
+	it('allows project-less onboarding status and model requests', async () => {
+		setDaemonId('daemon-test');
+
+		const statusResponse = await app.request('/v1/auth/status');
+		expect(statusResponse.status).toBe(200);
+
+		const modelsResponse = await app.request('/v1/config/models');
+		expect(modelsResponse.status).toBe(200);
+		expect(await modelsResponse.json()).toBeTypeOf('object');
+	});
+
 	it('accepts requests with an explicit project path when running as daemon', async () => {
 		setDaemonId('daemon-test');
 		const res = await app.request(
