@@ -104,6 +104,12 @@ export const AddMCPServerModal = memo(function AddMCPServerModal({
 					return;
 				}
 				const { command, args } = parseCommandString(trimmedCmd);
+				if (args.some((arg) => /^[\u2010-\u2015\u2212]/.test(arg))) {
+					setError(
+						'Use regular hyphens in arguments, for example "--yes" instead of "—yes".',
+					);
+					return;
+				}
 				await addServer.mutateAsync({
 					name: trimmedName,
 					transport: 'stdio',

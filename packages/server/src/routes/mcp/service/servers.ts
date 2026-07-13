@@ -28,6 +28,7 @@ export async function listMCPServers(projectRoot: string) {
 			disabled: server.disabled ?? false,
 			connected: status?.connected ?? false,
 			tools: status?.tools ?? [],
+			error: status?.error,
 			authRequired: status?.authRequired ?? false,
 			authenticated: status?.authenticated ?? false,
 			scope: server.scope ?? 'global',
@@ -70,6 +71,18 @@ export function buildMCPServerConfig(body: Record<string, unknown>) {
 			ok: false as const,
 			error:
 				'stdio transport requires a local command, not a URL. Use http or sse transport for remote servers.',
+			status: 400 as const,
+		};
+	}
+	if (
+		selectedTransport === 'stdio' &&
+		Array.isArray(args) &&
+		args.some((arg) => /^[\u2010-\u2015\u2212]/.test(String(arg)))
+	) {
+		return {
+			ok: false as const,
+			error:
+				'Command arguments contain a Unicode dash. Use regular hyphens, for example "--yes" instead of "—yes".',
 			status: 400 as const,
 		};
 	}

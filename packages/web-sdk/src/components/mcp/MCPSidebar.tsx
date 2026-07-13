@@ -253,6 +253,17 @@ const MCPServerCard = memo(function MCPServerCard({
 				</div>
 			)}
 
+			{server.error && !server.connected && !isAwaitingAuth && (
+				<div className="px-3 pb-2.5 pt-0">
+					<div
+						className="max-h-16 overflow-auto whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-400"
+						title={server.error}
+					>
+						{server.error}
+					</div>
+				</div>
+			)}
+
 			{hasTools && showTools && (
 				<div className="px-3 pb-2.5 pt-0">
 					<div className="flex flex-wrap gap-1">

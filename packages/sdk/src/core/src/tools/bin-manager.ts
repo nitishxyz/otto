@@ -124,19 +124,7 @@ export function getShellExecutionConfig(
 	args: string[];
 	env: NodeJS.ProcessEnv;
 } {
-	const envMode = normalizeShellEnvMode(options.envMode);
-	const loginEnv =
-		envMode === 'minimal' ? null : getLoginShellEnv(envMode === 'login-fresh');
-	const env = {
-		...process.env,
-		...(loginEnv ?? {}),
-		PATH: mergePaths([
-			getAgiBinDir(),
-			loginEnv?.PATH,
-			getLoginShellPath(),
-			process.env.PATH,
-		]),
-	};
+	const env = getShellEnvironment(options);
 	if (process.platform === 'win32') {
 		return {
 			command: getUserShell(),
@@ -151,6 +139,30 @@ export function getShellExecutionConfig(
 		args: ['-c', 'eval "$OTTO_SHELL_COMMAND"'],
 		env: { ...env, OTTO_SHELL_COMMAND: cmd },
 	};
+}
+
+/** Return the user's cached login-shell environment with a portable PATH. */
+export function getShellEnvironment(
+	options: { envMode?: ShellEnvModeInput } = {},
+): Record<string, string> {
+	const envMode = normalizeShellEnvMode(options.envMode);
+	const loginEnv =
+		envMode === 'minimal' ? null : getLoginShellEnv(envMode === 'login-fresh');
+	const values: NodeJS.ProcessEnv = {
+		...process.env,
+		...(loginEnv ?? {}),
+		PATH: mergePaths([
+			getAgiBinDir(),
+			loginEnv?.PATH,
+			getLoginShellPath(),
+			process.env.PATH,
+		]),
+	};
+	return Object.fromEntries(
+		Object.entries(values).filter(
+			(entry): entry is [string, string] => entry[1] !== undefined,
+		),
+	);
 }
 
 function normalizeShellEnvMode(envMode?: ShellEnvModeInput): ShellEnvMode {

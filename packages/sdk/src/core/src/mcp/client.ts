@@ -5,6 +5,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import { getShellEnvironment } from '../tools/bin-manager.ts';
 import type { MCPServerConfig } from './types.ts';
 
 export type MCPToolInfo = {
@@ -77,17 +78,29 @@ export class MCPClientWrapper {
 			throw new Error('command is required for stdio transport');
 		}
 
-		const env = this.resolveEnv(this.config.env ?? {});
-		this.transport = new StdioClientTransport({
+		const customEnv = this.resolveEnv(this.config.env ?? {});
+		const transport = new StdioClientTransport({
 			command: this.config.command,
 			args: this.config.args,
-			env: { ...process.env, ...env } as Record<string, string>,
+			env: { ...getShellEnvironment(), ...customEnv },
 			cwd: this.config.cwd,
 			stderr: 'pipe',
 		});
+		this.transport = transport;
 
-		await this.client.connect(this.transport);
-		this._connected = true;
+		let stderr = '';
+		transport.stderr?.on('data', (chunk: Buffer | string) => {
+			if (stderr.length < 8192) stderr += chunk.toString();
+		});
+
+		try {
+			await this.client.connect(transport);
+			this._connected = true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const detail = stderr.trim();
+			throw new Error(detail ? `${message}\n${detail}` : message);
+		}
 	}
 
 	private async connectHTTP(): Promise<void> {

@@ -20,6 +20,7 @@ export interface MCPServerInfo {
 	disabled: boolean;
 	connected: boolean;
 	tools: string[];
+	error?: string;
 	authRequired: boolean;
 	authenticated: boolean;
 	scope: MCPScope;

@@ -21,6 +21,7 @@ export class MCPServerManager {
 	private pendingAuth = new Map<string, string>();
 	private oauthStore = new OAuthCredentialStore();
 	private serverScopes = new Map<string, 'global' | 'project'>();
+	private startupErrors = new Map<string, string>();
 	private _started = false;
 	private projectRoot: string | null = null;
 
@@ -130,6 +131,7 @@ export class MCPServerManager {
 		try {
 			await client.connect();
 			this.clients.set(config.name, client);
+			this.startupErrors.delete(config.name);
 
 			const tools = await client.listTools();
 			for (const tool of tools) {
@@ -149,6 +151,7 @@ export class MCPServerManager {
 			}
 
 			const msg = err instanceof Error ? err.message : String(err);
+			this.startupErrors.set(config.name, msg);
 			console.error(`[mcp] Failed to start server "${config.name}": ${msg}`);
 		}
 	}
@@ -184,6 +187,7 @@ export class MCPServerManager {
 		this.authProviders.clear();
 		this.pendingAuth.clear();
 		this.serverScopes.clear();
+		this.startupErrors.clear();
 		this._started = false;
 	}
 
@@ -230,6 +234,7 @@ export class MCPServerManager {
 				url: config.url,
 				authRequired: client.authRequired,
 				authenticated: false,
+				error: this.startupErrors.get(name),
 			});
 		}
 		return statuses;
@@ -265,6 +270,7 @@ export class MCPServerManager {
 				url: config.url,
 				authRequired: client.authRequired,
 				authenticated,
+				error: this.startupErrors.get(name),
 			});
 		}
 		return statuses;
@@ -474,5 +480,6 @@ export class MCPServerManager {
 			}
 		}
 		this.pendingAuth.delete(name);
+		this.startupErrors.delete(name);
 	}
 }

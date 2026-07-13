@@ -14,6 +14,7 @@ const mcpServerSchema = z
 		disabled: z.boolean(),
 		connected: z.boolean(),
 		tools: z.array(z.string()),
+		error: z.string().optional(),
 		authRequired: z.boolean(),
 		authenticated: z.boolean(),
 		scope: z.enum(['global', 'project']),
