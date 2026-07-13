@@ -144,54 +144,90 @@ export const DictationSettings = memo(function DictationSettings({
 
 	const isBusy = installMutation.isPending || removeMutation.isPending;
 
-	return (
-		<div className={embedded ? 'space-y-3' : 'border-b border-border'}>
-			{embedded ? null : (
-				<div className="px-4 py-3 flex items-center gap-2 bg-muted/30">
-					<Mic className="w-4 h-4 text-muted-foreground" />
-					<span className="text-sm font-medium flex-1">Dictation</span>
+	if (embedded) {
+		return (
+			<section className="pt-4">
+				<div className="flex items-center justify-between gap-2 pb-1">
+					<h3
+						className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60"
+						title="Download a local model for on-device voice input."
+					>
+						Local Speech Models
+					</h3>
 					<button
 						type="button"
 						onClick={() => statusQuery.refetch()}
 						disabled={statusQuery.isFetching}
-						className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
+						className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
 						title="Refresh dictation status"
 					>
 						<RefreshCw
-							className={`w-3.5 h-3.5 text-muted-foreground ${statusQuery.isFetching ? 'animate-spin' : ''}`}
+							className={`h-3 w-3 ${statusQuery.isFetching ? 'animate-spin' : ''}`}
 						/>
 					</button>
 				</div>
-			)}
-
-			<div className={embedded ? 'space-y-3' : 'px-4 py-3 space-y-3'}>
-				{embedded ? (
-					<div className="flex items-start justify-between gap-3">
-						<div className="min-w-0">
-							<div className="text-sm font-medium text-foreground">
-								Speech Models
-							</div>
-							<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-								Download a local model for on-device voice input.
-							</p>
-						</div>
-						<button
-							type="button"
-							onClick={() => statusQuery.refetch()}
-							disabled={statusQuery.isFetching}
-							className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-							title="Refresh dictation status"
-						>
-							<RefreshCw
-								className={`h-3.5 w-3.5 ${statusQuery.isFetching ? 'animate-spin' : ''}`}
-							/>
-						</button>
+				{statusQuery.isLoading ? (
+					<div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+						<StableSpinner className="h-4 w-4" />
+						Loading dictation models…
 					</div>
-				) : (
-					<p className="text-xs text-muted-foreground">
-						Download a local speech model for voice input.
+				) : statusQuery.error ? (
+					<div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+						{statusQuery.error instanceof Error
+							? statusQuery.error.message
+							: 'Failed to load dictation settings'}
+					</div>
+				) : !isAvailable ? (
+					<p className="py-2 text-xs leading-relaxed text-muted-foreground">
+						Local dictation is not available on this platform yet.
 					</p>
+				) : (
+					<div>
+						{installStreamError ? (
+							<div className="mb-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+								{installStreamError}
+							</div>
+						) : null}
+						<div className="divide-y divide-border/60">
+							{models.map((model) => (
+								<DictationModelRow
+									key={model.id}
+									model={model}
+									isBusy={isBusy}
+									isDefault={model.id === defaultModel}
+									onInstall={(modelId) => void installModel(modelId)}
+									onRemove={(modelId) => void removeModel(modelId)}
+								/>
+							))}
+						</div>
+					</div>
 				)}
+			</section>
+		);
+	}
+
+	return (
+		<div className="border-b border-border">
+			<div className="px-4 py-3 flex items-center gap-2 bg-muted/30">
+				<Mic className="w-4 h-4 text-muted-foreground" />
+				<span className="text-sm font-medium flex-1">Dictation</span>
+				<button
+					type="button"
+					onClick={() => statusQuery.refetch()}
+					disabled={statusQuery.isFetching}
+					className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
+					title="Refresh dictation status"
+				>
+					<RefreshCw
+						className={`w-3.5 h-3.5 text-muted-foreground ${statusQuery.isFetching ? 'animate-spin' : ''}`}
+					/>
+				</button>
+			</div>
+
+			<div className="px-4 py-3 space-y-3">
+				<p className="text-xs text-muted-foreground">
+					Download a local speech model for voice input.
+				</p>
 
 				{statusQuery.isLoading ? (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">

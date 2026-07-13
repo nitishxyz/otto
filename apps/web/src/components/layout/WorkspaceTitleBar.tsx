@@ -5,6 +5,7 @@ import {
 	LooperTabBar,
 	TitleBar,
 	TitleBarRightRailToggle,
+	type LooperTabBarVariant,
 	type WorkspaceTab,
 } from '@ottocode/web-sdk/components';
 
@@ -14,7 +15,13 @@ import {
  * workspace. Remembers the last visited session per tab so switching tabs
  * returns to that session instead of the new-session view.
  */
-export const RoutedLooperTabs = memo(function RoutedLooperTabs() {
+interface RoutedLooperTabsProps {
+	variant?: LooperTabBarVariant;
+}
+
+export const RoutedLooperTabs = memo(function RoutedLooperTabs({
+	variant = 'titlebar',
+}: RoutedLooperTabsProps) {
 	const navigate = useNavigate();
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
@@ -49,7 +56,7 @@ export const RoutedLooperTabs = memo(function RoutedLooperTabs() {
 
 	return (
 		<LooperTabBar
-			variant="titlebar"
+			variant={variant}
 			activeTab={activeTab}
 			onTabChange={handleTabChange}
 		/>

@@ -3,6 +3,8 @@ export interface OttoPlatformNotification {
 	title: string;
 	body?: string;
 	sessionId?: string;
+	projectId?: string;
+	activeSessionId?: string;
 }
 
 interface OttoPlatformWindow extends Window {
@@ -14,6 +16,7 @@ interface OttoPlatformWindow extends Window {
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
 	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
+	OTTO_PICK_DIRECTORY?: () => Promise<string | null>;
 }
 
 function getPlatformWindow(): OttoPlatformWindow | null {
@@ -43,6 +46,12 @@ export function listPlatformSystemFonts(): Promise<string[]> | null {
 	return win.OTTO_LIST_SYSTEM_FONTS();
 }
 
+export function pickPlatformDirectory(): Promise<string | null> | null {
+	const win = getPlatformWindow();
+	if (!win?.OTTO_PICK_DIRECTORY) return null;
+	return win.OTTO_PICK_DIRECTORY();
+}
+
 export function notifyPlatformFontFamilyChanged(fontFamily: string): boolean {
 	const win = getPlatformWindow();
 	if (!win?.OTTO_SET_DESKTOP_FONT) return false;
@@ -69,6 +78,10 @@ export function hasPlatformOpenUrl(): boolean {
 
 export function hasPlatformSystemFonts(): boolean {
 	return !!getPlatformWindow()?.OTTO_LIST_SYSTEM_FONTS;
+}
+
+export function hasPlatformDirectoryPicker(): boolean {
+	return !!getPlatformWindow()?.OTTO_PICK_DIRECTORY;
 }
 
 export function isPlatformDesktop(): boolean {

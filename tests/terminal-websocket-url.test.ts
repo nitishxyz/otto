@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { getActiveTerminal } from '../packages/web-sdk/src/components/terminals/TerminalsPanel.tsx';
 import { terminalWebSocketUrl } from '../packages/web-sdk/src/components/terminals/TerminalViewer.tsx';
 
 describe('terminal WebSocket URL', () => {
@@ -23,5 +24,15 @@ describe('terminal WebSocket URL', () => {
 				terminalWebSocketUrl('http://127.0.0.1:47477', 'term-1', 'ticket'),
 			).protocol,
 		).toBe('ws:');
+	});
+
+	test('keeps only the active terminal connected in each window', () => {
+		const terminals = [
+			{ id: 'term-1', title: 'One' },
+			{ id: 'term-2', title: 'Two' },
+		];
+
+		expect(getActiveTerminal(terminals, 'term-2')).toBe(terminals[1]);
+		expect(getActiveTerminal(terminals, null)).toBeUndefined();
 	});
 });

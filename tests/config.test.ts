@@ -29,7 +29,9 @@ import {
 	getProjectStateDir,
 	getProjectTmpDir,
 	loadConfig,
+	removeReferenceSettings,
 	setConfig,
+	writeReferenceSettings,
 	writeSkillSettings,
 } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
@@ -228,6 +230,128 @@ describe('config loader', () => {
 			} else {
 				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
 			}
+			if (previousOttoHome === undefined) {
+				delete process.env.OTTO_HOME;
+			} else {
+				process.env.OTTO_HOME = previousOttoHome;
+			}
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('merges global and project references by name', async () => {
+		const projectRoot = await mkdtemp(
+			join(tmpdir(), 'otto-config-references-'),
+		);
+		const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		const previousOttoHome = process.env.OTTO_HOME;
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		process.env.OTTO_HOME = join(projectRoot, 'otto-home');
+		const app = createEmbeddedApp();
+
+		try {
+			await writeReferenceSettings(
+				'global',
+				'hono',
+				{
+					description: 'Global Hono reference',
+					source: { type: 'git', url: 'https://github.com/honojs/hono.git' },
+				},
+				projectRoot,
+			);
+			await writeReferenceSettings(
+				'local',
+				'hono',
+				{
+					description: 'Project Hono reference',
+					source: { type: 'local', path: './vendor/hono' },
+				},
+				projectRoot,
+			);
+			await writeReferenceSettings(
+				'local',
+				'design-system',
+				{
+					description: 'Project components',
+					enabled: false,
+					source: { type: 'local', path: '../design-system' },
+				},
+				projectRoot,
+			);
+
+			const cfg = await loadConfig(projectRoot);
+			expect(cfg.references?.hono.description).toBe('Project Hono reference');
+			expect(cfg.references?.hono.source.type).toBe('local');
+			expect(cfg.references?.['design-system'].enabled).toBe(false);
+
+			const globalResponse = await app.request(
+				`http://localhost/v1/config/references?project=${encodeURIComponent(projectRoot)}&scope=global`,
+			);
+			const globalPayload = await globalResponse.json();
+			expect(globalPayload.references.hono.description).toBe(
+				'Global Hono reference',
+			);
+			expect(globalPayload.references['design-system']).toBeUndefined();
+
+			const localResponse = await app.request(
+				`http://localhost/v1/config/references?project=${encodeURIComponent(projectRoot)}&scope=local`,
+			);
+			const localPayload = await localResponse.json();
+			expect(localPayload.references.hono.description).toBe(
+				'Project Hono reference',
+			);
+			expect(localPayload.references['design-system'].enabled).toBe(false);
+
+			await removeReferenceSettings('local', 'hono', projectRoot);
+			const fallbackCfg = await loadConfig(projectRoot);
+			expect(fallbackCfg.references?.hono.description).toBe(
+				'Global Hono reference',
+			);
+		} finally {
+			if (previousXdgConfigHome === undefined) {
+				delete process.env.XDG_CONFIG_HOME;
+			} else {
+				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+			}
+			if (previousOttoHome === undefined) {
+				delete process.env.OTTO_HOME;
+			} else {
+				process.env.OTTO_HOME = previousOttoHome;
+			}
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('browses server directories for local references', async () => {
+		const projectRoot = await mkdtemp(
+			join(tmpdir(), 'otto-reference-browser-'),
+		);
+		const childPath = join(projectRoot, 'reference-child');
+		const previousOttoHome = process.env.OTTO_HOME;
+		process.env.OTTO_HOME = join(projectRoot, 'otto-home');
+		const app = createEmbeddedApp();
+
+		try {
+			await mkdir(childPath);
+			await writeFile(join(projectRoot, 'not-a-directory.txt'), 'ignored');
+			const response = await app.request(
+				`http://localhost/v1/config/reference-directories?project=${encodeURIComponent(projectRoot)}`,
+			);
+
+			expect(response.status).toBe(200);
+			const payload = await response.json();
+			const canonicalProjectRoot = await realpath(projectRoot);
+			expect(payload.path).toBe(canonicalProjectRoot);
+			expect(payload.directories).toContainEqual({
+				name: 'reference-child',
+				path: join(canonicalProjectRoot, 'reference-child'),
+			});
+			expect(
+				payload.directories.some(
+					(entry: { name: string }) => entry.name === 'not-a-directory.txt',
+				),
+			).toBe(false);
+		} finally {
 			if (previousOttoHome === undefined) {
 				delete process.env.OTTO_HOME;
 			} else {

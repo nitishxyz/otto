@@ -219,6 +219,20 @@ export const TerminalViewer = memo(function TerminalViewer({
 
 	const connectWebSocket = useCallback(
 		async (term: Terminal, baseUrl: string) => {
+			const scheduleReconnect = () => {
+				if (disposedRef.current || retryCountRef.current >= WS_MAX_RETRIES) {
+					return;
+				}
+				retryCountRef.current++;
+				if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+				retryTimerRef.current = setTimeout(() => {
+					retryTimerRef.current = null;
+					if (termRef.current && !disposedRef.current) {
+						connectWebSocket(termRef.current, baseUrl);
+					}
+				}, WS_RECONNECT_DELAY);
+			};
+
 			if (wsRef.current) {
 				wsRef.current.close();
 				wsRef.current = null;
@@ -227,8 +241,10 @@ export const TerminalViewer = memo(function TerminalViewer({
 			let ticket: string;
 			try {
 				ticket = await requestTerminalWebSocketTicket(baseUrl, terminalId);
-			} catch {
+			} catch (error) {
+				console.warn('[TerminalViewer] Failed to authorize WebSocket:', error);
 				setReady(false);
+				scheduleReconnect();
 				return;
 			}
 			if (disposedRef.current) return;
@@ -236,10 +252,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 			const ws = new WebSocket(wsUrl);
 			wsRef.current = ws;
 
-			let gotFirstData = false;
-
 			ws.onopen = () => {
-				retryCountRef.current = 0;
 				if (term.cols && term.rows) {
 					ws.send(
 						JSON.stringify({
@@ -249,9 +262,21 @@ export const TerminalViewer = memo(function TerminalViewer({
 						}),
 					);
 				}
+				setTimeout(() => {
+					if (
+						wsRef.current === ws &&
+						ws.readyState === WebSocket.OPEN &&
+						!disposedRef.current
+					) {
+						retryCountRef.current = 0;
+						setReady(true);
+					}
+				}, 200);
 			};
 
 			ws.onmessage = (event) => {
+				retryCountRef.current = 0;
+				setReady(true);
 				const message = typeof event.data === 'string' ? event.data : '';
 
 				if (message.startsWith('{')) {
@@ -276,11 +301,6 @@ export const TerminalViewer = memo(function TerminalViewer({
 				if (userScrolledRef.current && savedY > 0) {
 					term.scrollToLine(savedY);
 				}
-
-				if (!gotFirstData) {
-					gotFirstData = true;
-					setTimeout(() => setReady(true), 200);
-				}
 			};
 
 			ws.onerror = () => {
@@ -291,14 +311,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 				if (wsRef.current === ws) {
 					wsRef.current = null;
 				}
-				if (!disposedRef.current && retryCountRef.current < WS_MAX_RETRIES) {
-					retryCountRef.current++;
-					retryTimerRef.current = setTimeout(() => {
-						if (termRef.current && !disposedRef.current) {
-							connectWebSocket(termRef.current, baseUrl);
-						}
-					}, WS_RECONNECT_DELAY);
-				}
+				scheduleReconnect();
 			};
 		},
 		[terminalId],
@@ -460,10 +473,6 @@ export const TerminalViewer = memo(function TerminalViewer({
 				});
 			});
 			resizeObserver.observe(containerRef.current);
-
-			setTimeout(() => {
-				if (!disposed) setReady(true);
-			}, 2000);
 		};
 
 		setup().catch((error) => {

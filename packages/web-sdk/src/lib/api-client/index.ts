@@ -13,6 +13,7 @@ import { usageMixin } from './usage';
 import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
 import { pluginsMixin } from './plugins';
+import { referencesMixin } from './references';
 
 export { configureApiClient } from './utils';
 export type {
@@ -36,6 +37,11 @@ export type {
 	RemoveDictationModelResponse,
 } from './dictation';
 export type { Recipe } from './recipes';
+export type {
+	Reference,
+	ReferenceDirectoryListing,
+	ReferenceScope,
+} from './references';
 export type {
 	DiscoveredPlugin,
 	EffectivePlugin,
@@ -181,6 +187,10 @@ class ApiClient {
 	listRecipes = recipesMixin.listRecipes;
 	saveRecipe = recipesMixin.saveRecipe;
 	deleteRecipe = recipesMixin.deleteRecipe;
+	listReferences = referencesMixin.listReferences;
+	listReferenceDirectories = referencesMixin.listReferenceDirectories;
+	saveReference = referencesMixin.saveReference;
+	deleteReference = referencesMixin.deleteReference;
 
 	listPlugins = pluginsMixin.listPlugins;
 	listPluginRegistry = pluginsMixin.listPluginRegistry;

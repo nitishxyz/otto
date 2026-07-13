@@ -7,6 +7,7 @@ import { registerModelsRoutes } from './models.ts';
 import { registerDefaultsRoute } from './defaults.ts';
 import { registerDebugConfigRoute } from './debug.ts';
 import { registerToolsRoute } from './tools.ts';
+import { registerReferencesRoutes } from './references.ts';
 
 export function registerConfigRoutes(app: Hono) {
 	registerCwdRoute(app);
@@ -17,4 +18,5 @@ export function registerConfigRoutes(app: Hono) {
 	registerModelsRoutes(app);
 	registerDefaultsRoute(app);
 	registerDebugConfigRoute(app);
+	registerReferencesRoutes(app);
 }

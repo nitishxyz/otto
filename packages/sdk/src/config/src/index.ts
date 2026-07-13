@@ -115,6 +115,7 @@ export async function loadConfig(
 		defaults: merged.defaults as OttoConfig['defaults'],
 		providers: merged.providers as OttoConfig['providers'],
 		skills: merged.skills as OttoConfig['skills'],
+		references: merged.references as OttoConfig['references'],
 		paths: {
 			projectConfigDir,
 			projectConfigPath: (await fileExists(projectConfigPath))
@@ -217,6 +218,9 @@ export {
 	writeProviderSettings,
 	removeProviderSettings,
 	writeSkillSettings,
+	readReferenceSettings,
+	writeReferenceSettings,
+	removeReferenceSettings,
 	writeAuth,
 	removeAuth,
 } from './manager.ts';

@@ -22,6 +22,8 @@ import {
 	Bell,
 	ChefHat,
 	Puzzle,
+	BookOpen,
+	X,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -41,6 +43,7 @@ import { OttoRouterTopupModal } from './OttoRouterTopupModal';
 import { DictationSettings } from './DictationSettings';
 import { RecipesSettings } from './RecipesSettings';
 import { PluginsSettings } from './PluginsSettings';
+import { ReferencesSettings } from './ReferencesSettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -175,6 +178,25 @@ const SettingRow = memo(function SettingRow({ label, value }: SettingRowProps) {
 			<span className="text-muted-foreground">{label}</span>
 			<span className="font-mono text-foreground">{value}</span>
 		</div>
+	);
+});
+
+interface PrefSectionProps {
+	title: string;
+	children: React.ReactNode;
+}
+
+const PrefSection = memo(function PrefSection({
+	title,
+	children,
+}: PrefSectionProps) {
+	return (
+		<section className="pt-4 first:pt-1">
+			<h3 className="pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+				{title}
+			</h3>
+			<div className="divide-y divide-border/60">{children}</div>
+		</section>
 	);
 });
 
@@ -592,55 +614,77 @@ type PreferencesTab =
 	| 'reasoning'
 	| 'dictation'
 	| 'recipes'
+	| 'references'
 	| 'plugins';
 
-const PREFERENCE_TABS: Array<{
+interface PreferenceTabConfig {
 	id: PreferencesTab;
 	label: string;
 	description: string;
 	icon: React.ReactNode;
+}
+
+const PREFERENCE_GROUPS: Array<{
+	label: string;
+	tabs: PreferenceTabConfig[];
 }> = [
 	{
-		id: 'editor',
-		label: 'Editor',
-		description: 'Input, layout, and appearance',
-		icon: <Type className="h-4 w-4" />,
+		label: 'General',
+		tabs: [
+			{
+				id: 'editor',
+				label: 'Editor',
+				description: 'Input, layout, and appearance',
+				icon: <Type className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'notifications',
+				label: 'Notifications',
+				description: 'Background update alerts',
+				icon: <Bell className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'automation',
+				label: 'Automation',
+				description: 'Tool approvals and auto-compaction',
+				icon: <Zap className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'reasoning',
+				label: 'Reasoning',
+				description: 'Model thinking and effort level',
+				icon: <Brain className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'dictation',
+				label: 'Dictation',
+				description: 'Voice input and local models',
+				icon: <Mic className="h-3.5 w-3.5" />,
+			},
+		],
 	},
 	{
-		id: 'notifications',
-		label: 'Notifications',
-		description: 'Background update alerts',
-		icon: <Bell className="h-4 w-4" />,
-	},
-	{
-		id: 'automation',
-		label: 'Automation',
-		description: 'Tool approvals and auto-compaction',
-		icon: <Zap className="h-4 w-4" />,
-	},
-	{
-		id: 'reasoning',
-		label: 'Reasoning',
-		description: 'Model thinking and effort level',
-		icon: <Brain className="h-4 w-4" />,
-	},
-	{
-		id: 'dictation',
-		label: 'Dictation',
-		description: 'Voice input and local models',
-		icon: <Mic className="h-4 w-4" />,
-	},
-	{
-		id: 'recipes',
-		label: 'Recipes',
-		description: 'Reusable project slash commands',
-		icon: <ChefHat className="h-4 w-4" />,
-	},
-	{
-		id: 'plugins',
-		label: 'Plugins',
-		description: 'Installed capability packs and registry plugins',
-		icon: <Puzzle className="h-4 w-4" />,
+		label: 'Library',
+		tabs: [
+			{
+				id: 'recipes',
+				label: 'Recipes',
+				description: 'Reusable project slash commands',
+				icon: <ChefHat className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'references',
+				label: 'References',
+				description: 'Repositories and directories Otto can consult',
+				icon: <BookOpen className="h-3.5 w-3.5" />,
+			},
+			{
+				id: 'plugins',
+				label: 'Plugins',
+				description: 'Installed capability packs and registry plugins',
+				icon: <Puzzle className="h-3.5 w-3.5" />,
+			},
+		],
 	},
 ];
 
@@ -650,10 +694,13 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 	const updateDefaults = useUpdateDefaults();
 	const isDesktop = isPlatformDesktop();
 	const [activeTab, setActiveTab] = useState<PreferencesTab>('editor');
+	const isFullBleedTab =
+		activeTab === 'recipes' ||
+		activeTab === 'references' ||
+		activeTab === 'plugins';
 	const [notificationPermission, setNotificationPermission] = useState(() =>
 		getBrowserNotificationPermission(),
 	);
-	const activeTabConfig = PREFERENCE_TABS.find((tab) => tab.id === activeTab);
 	const notificationDescription = useMemo(() => {
 		if (isDesktop) {
 			return 'Show native desktop notifications when sessions update in the background.';
@@ -740,258 +787,293 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 		switch (activeTab) {
 			case 'editor':
 				return (
-					<div className="divide-y divide-border/60">
-						<ToggleRow
-							label="Vim Mode"
-							description="Use modal keybindings in the chat input."
-							checked={preferences.vimMode}
-							onChange={(checked) => updatePreferences({ vimMode: checked })}
-						/>
-						<ToggleRow
-							label="Compact Thread"
-							description="Reduce spacing between messages for a denser view."
-							checked={preferences.compactThread}
-							onChange={(checked) =>
-								updatePreferences({ compactThread: checked })
-							}
-						/>
-						<ToggleRow
-							label="Full Width Content"
-							description="Let messages span the full width of the window."
-							checked={preferences.fullWidthContent}
-							onChange={(checked) =>
-								updatePreferences({ fullWidthContent: checked })
-							}
-						/>
-						<ToggleRow
-							label="Thread Navigator Rail"
-							description="Show the quick-jump rail beside message threads."
-							checked={preferences.threadNavigatorRail}
-							onChange={(checked) =>
-								updatePreferences({ threadNavigatorRail: checked })
-							}
-						/>
-						{isDesktop ? (
+					<div className="pb-2">
+						<PrefSection title="Input">
 							<ToggleRow
-								label="Smart Sidebar Edges"
-								description="Snap sidebars to window edges automatically."
-								checked={preferences.smartEdges}
+								label="Vim Mode"
+								description="Use modal keybindings in the chat input."
+								checked={preferences.vimMode}
+								onChange={(checked) => updatePreferences({ vimMode: checked })}
+							/>
+						</PrefSection>
+						<PrefSection title="Layout">
+							<ToggleRow
+								label="Compact Thread"
+								description="Reduce spacing between messages for a denser view."
+								checked={preferences.compactThread}
 								onChange={(checked) =>
-									updatePreferences({ smartEdges: checked })
+									updatePreferences({ compactThread: checked })
 								}
 							/>
-						) : null}
-						<div className="py-2">
-							<SelectRow
-								label="Theme"
-								value={normalizeThemeId(config?.defaults?.theme)}
-								options={themeOptions}
-								onChange={handleThemeChange}
-								disabled={updateDefaults.isPending}
-								description="Choose the color theme for web and desktop."
+							<ToggleRow
+								label="Full Width Content"
+								description="Let messages span the full width of the window."
+								checked={preferences.fullWidthContent}
+								onChange={(checked) =>
+									updatePreferences({ fullWidthContent: checked })
+								}
 							/>
-						</div>
-						<div className="py-2">
-							<FontPickerRow
-								value={preferences.fontFamily}
-								onChange={(fontFamily) => updatePreferences({ fontFamily })}
+							<ToggleRow
+								label="Thread Navigator Rail"
+								description="Show the quick-jump rail beside message threads."
+								checked={preferences.threadNavigatorRail}
+								onChange={(checked) =>
+									updatePreferences({ threadNavigatorRail: checked })
+								}
 							/>
-						</div>
+							{isDesktop ? (
+								<ToggleRow
+									label="Smart Sidebar Edges"
+									description="Snap sidebars to window edges automatically."
+									checked={preferences.smartEdges}
+									onChange={(checked) =>
+										updatePreferences({ smartEdges: checked })
+									}
+								/>
+							) : null}
+						</PrefSection>
+						<PrefSection title="Appearance">
+							<div className="py-2.5">
+								<SelectRow
+									label="Theme"
+									value={normalizeThemeId(config?.defaults?.theme)}
+									options={themeOptions}
+									onChange={handleThemeChange}
+									disabled={updateDefaults.isPending}
+									description="Choose the color theme for web and desktop."
+								/>
+							</div>
+							<div className="py-2.5">
+								<FontPickerRow
+									value={preferences.fontFamily}
+									onChange={(fontFamily) => updatePreferences({ fontFamily })}
+								/>
+							</div>
+						</PrefSection>
 					</div>
 				);
 			case 'notifications':
 				return (
-					<div className="divide-y divide-border/60">
-						<ToggleRow
-							label="System Notifications"
-							description={notificationDescription}
-							checked={preferences.notificationsEnabled}
-							onChange={handleNotificationsEnabledChange}
-						/>
-						{!isDesktop ? (
-							<div className="py-2">
-								<SettingRow
-									label="Browser permission"
-									value={notificationPermission}
-								/>
-							</div>
-						) : null}
+					<div className="pb-2">
+						<PrefSection title="Alerts">
+							<ToggleRow
+								label="System Notifications"
+								description={notificationDescription}
+								checked={preferences.notificationsEnabled}
+								onChange={handleNotificationsEnabledChange}
+							/>
+							{!isDesktop ? (
+								<div className="py-2.5">
+									<SettingRow
+										label="Browser permission"
+										value={notificationPermission}
+									/>
+								</div>
+							) : null}
+						</PrefSection>
 					</div>
 				);
 			case 'automation':
 				return (
-					<div className="divide-y divide-border/60">
-						<div className="py-2">
-							<NumberInputRow
-								label="Auto Compact"
-								value={config?.defaults?.autoCompactThresholdTokens}
-								onCommit={(value) =>
+					<div className="pb-2">
+						<PrefSection title="Tool Approvals">
+							<div className="py-2.5">
+								<SelectRow
+									label="Tool Approval"
+									description="Choose which tool calls require manual confirmation."
+									value={config?.defaults?.toolApproval ?? 'dangerous'}
+									options={[
+										{ id: 'auto', label: 'Auto' },
+										{ id: 'dangerous', label: 'Dangerous only' },
+										{ id: 'yolo', label: 'YOLO' },
+										{ id: 'all', label: 'All tools' },
+									]}
+									onChange={(value) =>
+										updateDefaults.mutate({
+											toolApproval: value as
+												| 'auto'
+												| 'dangerous'
+												| 'all'
+												| 'yolo',
+											scope: 'global',
+										})
+									}
+									disabled={updateDefaults.isPending}
+								/>
+							</div>
+							<ToggleRow
+								label="Guided Mode"
+								description="Walk through steps with extra prompts and checkpoints."
+								checked={config?.defaults?.guidedMode ?? false}
+								onChange={(checked) =>
 									updateDefaults.mutate({
-										autoCompactThresholdTokens: value,
+										guidedMode: checked,
 										scope: 'global',
 									})
 								}
-								placeholder="Tokens"
-								hint="Summarize the thread once it grows past this many tokens."
-								disabled={updateDefaults.isPending}
 							/>
-						</div>
-						<div className="py-2">
-							<SelectRow
-								label="Tool Approval"
-								description="Choose which tool calls require manual confirmation."
-								value={config?.defaults?.toolApproval ?? 'dangerous'}
-								options={[
-									{ id: 'auto', label: 'Auto' },
-									{ id: 'dangerous', label: 'Dangerous only' },
-									{ id: 'yolo', label: 'YOLO' },
-									{ id: 'all', label: 'All tools' },
-								]}
-								onChange={(value) =>
+						</PrefSection>
+						<PrefSection title="Sessions">
+							<div className="py-2.5">
+								<NumberInputRow
+									label="Auto Compact"
+									value={config?.defaults?.autoCompactThresholdTokens}
+									onCommit={(value) =>
+										updateDefaults.mutate({
+											autoCompactThresholdTokens: value,
+											scope: 'global',
+										})
+									}
+									placeholder="Tokens"
+									hint="Summarize the thread once it grows past this many tokens."
+									disabled={updateDefaults.isPending}
+								/>
+							</div>
+							<ToggleRow
+								label="Otto Commit Co-author"
+								description="Add the ottocode bot as a co-author on commits made through Otto."
+								checked={config?.defaults?.coAuthorCommits ?? false}
+								onChange={(checked) =>
 									updateDefaults.mutate({
-										toolApproval: value as
-											| 'auto'
-											| 'dangerous'
-											| 'all'
-											| 'yolo',
+										coAuthorCommits: checked,
 										scope: 'global',
 									})
 								}
-								disabled={updateDefaults.isPending}
 							/>
-						</div>
-						<ToggleRow
-							label="Guided Mode"
-							description="Walk through steps with extra prompts and checkpoints."
-							checked={config?.defaults?.guidedMode ?? false}
-							onChange={(checked) =>
-								updateDefaults.mutate({
-									guidedMode: checked,
-									scope: 'global',
-								})
-							}
-						/>
-						<ToggleRow
-							label="Otto Commit Co-author"
-							description="Add the ottocode bot as a co-author on commits made through Otto."
-							checked={config?.defaults?.coAuthorCommits ?? false}
-							onChange={(checked) =>
-								updateDefaults.mutate({
-									coAuthorCommits: checked,
-									scope: 'global',
-								})
-							}
-						/>
+						</PrefSection>
 					</div>
 				);
 			case 'reasoning':
 				return (
-					<div className="divide-y divide-border/60">
-						<ToggleRow
-							label="Show Reasoning"
-							description="Display the model's thinking alongside responses."
-							checked={config?.defaults?.reasoningText ?? true}
-							onChange={(checked) =>
-								updateDefaults.mutate({
-									reasoningText: checked,
-									scope: 'global',
-								})
-							}
-						/>
-						<div className="space-y-2.5 py-3">
-							<div>
-								<div className="text-sm font-medium text-foreground">
-									Reasoning Level
-								</div>
-								<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-									Higher levels think longer but cost more tokens.
-								</p>
-							</div>
-							<ReasoningTabs
-								value={
-									(config?.defaults?.reasoningLevel ?? 'high') as ReasoningLevel
-								}
-								onChange={(level) =>
+					<div className="pb-2">
+						<PrefSection title="Model Thinking">
+							<ToggleRow
+								label="Show Reasoning"
+								description="Display the model's thinking alongside responses."
+								checked={config?.defaults?.reasoningText ?? true}
+								onChange={(checked) =>
 									updateDefaults.mutate({
-										reasoningLevel: level,
+										reasoningText: checked,
 										scope: 'global',
 									})
 								}
-								disabled={updateDefaults.isPending}
 							/>
-						</div>
+							<div className="space-y-2.5 py-3">
+								<div>
+									<div className="text-sm font-medium text-foreground">
+										Reasoning Level
+									</div>
+									<p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+										Higher levels think longer but cost more tokens.
+									</p>
+								</div>
+								<ReasoningTabs
+									value={
+										(config?.defaults?.reasoningLevel ??
+											'high') as ReasoningLevel
+									}
+									onChange={(level) =>
+										updateDefaults.mutate({
+											reasoningLevel: level,
+											scope: 'global',
+										})
+									}
+									disabled={updateDefaults.isPending}
+								/>
+							</div>
+						</PrefSection>
 					</div>
 				);
 			case 'dictation':
 				return (
-					<div className="divide-y divide-border/60">
-						<ToggleRow
-							label="Release to Send"
-							description="Send the message automatically when dictation ends."
-							checked={preferences.releaseToSend}
-							onChange={(checked) =>
-								updatePreferences({ releaseToSend: checked })
-							}
-						/>
-						<div className="pt-3">
-							<DictationSettings embedded />
-						</div>
+					<div className="pb-2">
+						<PrefSection title="Voice Input">
+							<ToggleRow
+								label="Release to Send"
+								description="Send the message automatically when dictation ends."
+								checked={preferences.releaseToSend}
+								onChange={(checked) =>
+									updatePreferences({ releaseToSend: checked })
+								}
+							/>
+						</PrefSection>
+						<DictationSettings embedded />
 					</div>
 				);
 			case 'recipes':
 				return <RecipesSettings />;
+			case 'references':
+				return <ReferencesSettings />;
 			case 'plugins':
 				return <PluginsSettings />;
 		}
 	};
 
 	return (
-		<Modal isOpen={isOpen} onClose={onClose} title="Preferences" maxWidth="5xl">
-			<div className="-m-6 flex h-[clamp(480px,82vh,760px)] overflow-hidden">
-				<nav className="flex w-48 shrink-0 flex-col border-r border-border bg-muted/20 py-1">
-					{PREFERENCE_TABS.map((tab) => {
-						const isActive = activeTab === tab.id;
-						return (
-							<button
-								key={tab.id}
-								type="button"
-								onClick={() => setActiveTab(tab.id)}
-								className={`relative flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-									isActive
-										? 'bg-background text-foreground'
-										: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-								}`}
-							>
-								{isActive ? (
-									<motion.span
-										layoutId="preferences-tab-indicator"
-										className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary"
-										transition={{ duration: 0.2, ease: 'easeOut' }}
-									/>
-								) : null}
-								<span
-									className={
-										isActive ? 'text-foreground' : 'text-muted-foreground'
-									}
-								>
-									{tab.icon}
-								</span>
-								<span className="text-sm font-medium">{tab.label}</span>
-							</button>
-						);
-					})}
+		<Modal
+			isOpen={isOpen}
+			onClose={onClose}
+			maxWidth="5xl"
+			showCloseButton={false}
+		>
+			<div className="relative -m-6 flex h-[clamp(460px,72vh,600px)] flex-col overflow-hidden sm:flex-row">
+				<button
+					type="button"
+					onClick={onClose}
+					aria-label="Close preferences"
+					className="absolute right-2 top-2 z-20 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				>
+					<X className="h-4 w-4" />
+				</button>
+				<nav className="flex w-full shrink-0 items-center gap-0.5 overflow-x-auto border-b border-sidebar-border bg-sidebar py-1.5 pl-2 pr-11 sm:w-52 sm:flex-col sm:items-stretch sm:gap-0 sm:overflow-y-auto sm:border-b-0 sm:border-r sm:px-0 sm:py-1.5">
+					{PREFERENCE_GROUPS.map((group) => (
+						<div
+							key={group.label}
+							className="flex shrink-0 items-center gap-0.5 sm:block sm:shrink"
+						>
+							<div className="hidden px-4 pb-1 pt-4 text-[10px] font-medium uppercase tracking-wider text-sidebar-muted-foreground/70 first:pt-2 sm:block">
+								{group.label}
+							</div>
+							{group.tabs.map((tab) => {
+								const isActive = activeTab === tab.id;
+								return (
+									<button
+										key={tab.id}
+										type="button"
+										onClick={() => setActiveTab(tab.id)}
+										title={tab.description}
+										className={`relative flex w-auto shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors duration-150 sm:w-full sm:rounded-none sm:px-4 sm:py-2 ${
+											isActive
+												? 'bg-black/[0.08] font-medium text-sidebar-foreground dark:bg-white/[0.08]'
+												: 'font-normal text-sidebar-muted-foreground hover:bg-black/[0.05] hover:text-sidebar-foreground dark:hover:bg-white/[0.055]'
+										}`}
+									>
+										{isActive ? (
+											<motion.span
+												layoutId="preferences-nav-indicator"
+												className="absolute inset-y-0 left-0 hidden w-0.5 bg-primary sm:block"
+												transition={{ duration: 0.15, ease: 'easeOut' }}
+											/>
+										) : null}
+										<span
+											className={
+												isActive
+													? 'text-sidebar-foreground'
+													: 'text-sidebar-muted-foreground'
+											}
+										>
+											{tab.icon}
+										</span>
+										{tab.label}
+									</button>
+								);
+							})}
+						</div>
+					))}
 				</nav>
 
-				<section className="flex min-w-0 flex-1 flex-col">
-					<div className="shrink-0 border-b border-border px-6 py-4">
-						<h2 className="text-base font-semibold text-foreground">
-							{activeTabConfig?.label}
-						</h2>
-						<p className="mt-0.5 text-xs text-muted-foreground">
-							{activeTabConfig?.description}
-						</p>
-					</div>
-					<div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
+				<section className="flex min-h-0 min-w-0 flex-1 flex-col">
+					<div className="min-h-0 flex-1 overflow-hidden">
 						<AnimatePresence mode="wait">
 							<motion.div
 								key={activeTab}
@@ -1001,7 +1083,13 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 								exit={{ opacity: 0, y: -6 }}
 								transition={{ duration: 0.15, ease: 'easeOut' }}
 							>
-								{renderActiveTab()}
+								{isFullBleedTab ? (
+									renderActiveTab()
+								) : (
+									<div className="h-full min-h-0 overflow-y-auto px-4 py-3 sm:px-5">
+										{renderActiveTab()}
+									</div>
+								)}
 							</motion.div>
 						</AnimatePresence>
 					</div>

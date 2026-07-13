@@ -320,21 +320,31 @@ interface TerminalPanelBodyProps {
 	onKillTerminal: (id: string) => void;
 }
 
+/** Returns the one terminal viewer that should hold a live WebSocket. */
+export function getActiveTerminal<T extends { id: string }>(
+	terminals: T[],
+	activeTabId: string | null,
+): T | undefined {
+	return terminals.find((terminal) => terminal.id === activeTabId);
+}
+
 const TerminalPanelBody = memo(function TerminalPanelBody({
 	terminalsList,
 	activeTabId,
 	onKillTerminal,
 }: TerminalPanelBodyProps) {
+	const activeTerminal = getActiveTerminal(terminalsList, activeTabId);
+
 	return (
 		<div className="flex-1 min-h-0 overflow-hidden relative">
-			{terminalsList.map((t) => (
+			{activeTerminal ? (
 				<TerminalViewer
-					key={t.id}
-					terminalId={t.id}
-					isActive={t.id === activeTabId}
+					key={activeTerminal.id}
+					terminalId={activeTerminal.id}
+					isActive
 					onExit={onKillTerminal}
 				/>
-			))}
+			) : null}
 			{terminalsList.length === 0 && <EmptyTerminalPanel />}
 		</div>
 	);

@@ -372,13 +372,15 @@ const MobileTopBar = memo(function MobileTopBar({
 				>
 					<Menu className="h-5 w-5" />
 				</Button>
-				<div className="min-w-0 flex-1 px-1">
+				<div className="flex min-w-0 flex-1 items-center justify-center px-1">
 					{anyViewerOpen ? (
 						<span className="truncate text-sm font-medium text-foreground/80">
 							Viewer
 						</span>
 					) : (
-						<RoutedLooperTabs />
+						<div className="w-full min-w-[9.5rem] max-w-[13.5rem]">
+							<RoutedLooperTabs variant="mobile" />
+						</div>
 					)}
 				</div>
 				{anyViewerOpen && (

@@ -8,6 +8,8 @@ import {
 } from '../../auth/src/index.ts';
 import type {
 	ProviderSettingsEntry,
+	ReferenceConfig,
+	ReferenceSettings,
 	SkillSettings,
 } from '../../types/src/index.ts';
 import {
@@ -183,6 +185,49 @@ export async function writeSkillSettings(
 		},
 	};
 	await writeConfigFile(filePath, next);
+}
+
+/** Read references authored directly in one configuration scope. */
+export async function readReferenceSettings(
+	scope: Scope,
+	projectRoot?: string,
+): Promise<ReferenceSettings> {
+	const config = await readJsonFile(getConfigFilePath(scope, projectRoot));
+	if (!config || typeof config.references !== 'object') return {};
+	return config.references as ReferenceSettings;
+}
+
+/** Persist a named reference in global or project configuration. */
+export async function writeReferenceSettings(
+	scope: Scope,
+	name: string,
+	reference: ReferenceConfig,
+	projectRoot?: string,
+) {
+	const filePath = getConfigFilePath(scope, projectRoot);
+	const existing = await readJsonFile(filePath);
+	const references =
+		existing && typeof existing.references === 'object'
+			? (existing.references as Record<string, unknown>)
+			: {};
+	await writeConfigFile(filePath, {
+		...existing,
+		references: { ...references, [name]: reference },
+	});
+}
+
+/** Remove a named reference from global or project configuration. */
+export async function removeReferenceSettings(
+	scope: Scope,
+	name: string,
+	projectRoot?: string,
+) {
+	const filePath = getConfigFilePath(scope, projectRoot);
+	const existing = await readJsonFile(filePath);
+	if (!existing || typeof existing.references !== 'object') return;
+	const references = { ...(existing.references as Record<string, unknown>) };
+	delete references[name];
+	await writeConfigFile(filePath, { ...existing, references });
 }
 
 export async function readDebugConfig(

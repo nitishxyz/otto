@@ -7,6 +7,7 @@ import {
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { composeSystemPrompt } from '../../prompt/builder.ts';
+import { resolveReferences } from '../../context/references.ts';
 import { isDebugEnabled } from '../../debug/state.ts';
 import { getMaxOutputTokens } from '../../utils/token.ts';
 import { getCompactionSystemPrompt } from '../../message/compaction.ts';
@@ -40,12 +41,14 @@ export async function buildRunnerPrompt(args: {
 	const { getAuth } = await import('@ottocode/sdk');
 	const auth = await getAuth(opts.provider, cfg.projectRoot);
 	const oauth = detectOAuth(opts.provider, auth);
+	const references = await resolveReferences(cfg);
 
 	const composed = await composeSystemPrompt({
 		provider: opts.provider,
 		model: opts.model,
 		promptFamily: getConfiguredProviderFamily(cfg, opts.provider, opts.model),
 		skillSettings: cfg.skills,
+		references,
 		projectRoot: cfg.projectRoot,
 		agentPrompt,
 		oneShot: opts.oneShot,

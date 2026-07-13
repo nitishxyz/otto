@@ -36,6 +36,7 @@ export * from './useEdgeHover';
 export * from './useVoiceInput';
 export * from './useDictationModels';
 export * from './usePlugins';
+export * from './useReferences';
 export * from './usePluginCommands';
 export * from './useProjectConnection';
 export * from './useProjects';

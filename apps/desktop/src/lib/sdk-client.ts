@@ -25,6 +25,7 @@ interface OttoWindow extends Window {
 	OTTO_LIST_SYSTEM_FONTS?: () => Promise<string[]>;
 	OTTO_SET_DESKTOP_FONT?: (fontFamily: string) => void | Promise<void>;
 	OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
+	OTTO_PICK_DIRECTORY?: () => Promise<string | null>;
 	OTTO_VOICE_SHORTCUT_LISTENER?: boolean;
 	OTTO_WINDOW_FOCUS_LISTENER?: boolean;
 	OTTO_IS_WINDOW_FOCUSED?: () => boolean;
@@ -35,6 +36,8 @@ interface OttoPlatformNotification {
 	title: string;
 	body?: string;
 	sessionId?: string;
+	projectId?: string;
+	activeSessionId?: string;
 }
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
@@ -43,11 +46,23 @@ let ownsVoiceShortcutPress = false;
 
 async function showNativeNotification(notification: OttoPlatformNotification) {
 	if (!notification.title) return;
+	const currentProjectId = (window as OttoWindow).OTTO_RUNTIME_CONTEXT
+		?.projectId;
+	if (
+		notification.projectId &&
+		currentProjectId &&
+		notification.projectId !== currentProjectId
+	) {
+		return;
+	}
 
 	await tauriBridge.showNativeNotification({
+		id: notification.id,
 		title: notification.title,
 		body: notification.body,
 		sessionId: notification.sessionId,
+		activeSessionId: notification.activeSessionId,
+		windowFocused: isCurrentWindowFocused(),
 	});
 }
 
@@ -73,6 +88,7 @@ function registerDesktopPlatformAdapters() {
 		showNativeNotification(notification);
 	win.OTTO_IS_WINDOW_FOCUSED = () => isDesktopWindowFocused;
 	win.OTTO_LIST_SYSTEM_FONTS = () => tauriBridge.listSystemFonts();
+	win.OTTO_PICK_DIRECTORY = () => tauriBridge.openProjectDialog();
 	win.OTTO_SET_DESKTOP_FONT = (fontFamily) => {
 		document.documentElement.style.setProperty(
 			'--otto-font-family',

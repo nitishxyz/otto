@@ -23,13 +23,13 @@ export type ProjectConnectionStatus =
 	| 'disconnected';
 
 /**
- * Derives the user-facing connection status from the raw multiplexer state.
- * `wasInterrupted` keeps a reconnect visible through the `connecting` phase
- * that follows a drop or a manual retry without flashing on initial connect.
+ * Derives the user-facing connection status purely from the raw multiplexer
+ * state. `attempt` counts consecutive failed connection attempts, so a fresh
+ * connect (`connecting` with attempt 0) is healthy and shows nothing, while
+ * accumulated failures escalate reconnecting -> disconnected.
  */
 export function deriveProjectConnectionStatus(
 	state: ProjectConnectionState,
-	wasInterrupted: boolean,
 ): ProjectConnectionStatus {
 	switch (state.status) {
 		case 'connected':
@@ -37,8 +37,10 @@ export function deriveProjectConnectionStatus(
 		case 'fallback':
 			return 'connected';
 		case 'connecting':
-			if (state.attempt >= DISCONNECTED_AFTER_ATTEMPTS) return 'disconnected';
-			return state.attempt > 0 || wasInterrupted ? 'reconnecting' : 'connected';
+			if (state.attempt === 0) return 'connected';
+			return state.attempt >= DISCONNECTED_AFTER_ATTEMPTS
+				? 'disconnected'
+				: 'reconnecting';
 		case 'retrying':
 			return state.attempt >= DISCONNECTED_AFTER_ATTEMPTS
 				? 'disconnected'
@@ -85,7 +87,7 @@ export function useProjectConnection() {
 
 	return {
 		state,
-		status: deriveProjectConnectionStatus(state, interruptedRef.current),
+		status: deriveProjectConnectionStatus(state),
 		retry,
 		retryPending,
 	};

@@ -87,9 +87,13 @@ function showInAppNotification(notification: NotificationEvent) {
 	toast(message, toastTypeForLevel(notification.level), 5000);
 }
 
-function sendBrowserNotification(notification: NotificationEvent) {
+function sendBrowserNotification(
+	notification: NotificationEvent,
+	activeSessionId?: string,
+) {
 	if (typeof window === 'undefined') return false;
-	if (showPlatformNotification(notification)) return true;
+	if (showPlatformNotification({ ...notification, activeSessionId }))
+		return true;
 
 	if (window.parent && window.parent !== window) {
 		const message: DesktopNotificationMessage = {
@@ -323,7 +327,10 @@ export function useClientEvents(activeSessionId?: string) {
 					notification.source === 'session' || !!notification.sessionId;
 				let sentSystemNotification = false;
 				if (notificationsEnabledRef.current && !isActiveVisibleSession) {
-					sentSystemNotification = sendBrowserNotification(notification);
+					sentSystemNotification = sendBrowserNotification(
+						notification,
+						activeSessionIdRef.current,
+					);
 				}
 
 				if (

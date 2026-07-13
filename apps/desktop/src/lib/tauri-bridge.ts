@@ -36,9 +36,12 @@ export interface CliSelectionInfo {
 }
 
 export interface NativeNotificationPayload {
+	id: string;
 	title: string;
 	body?: string;
 	sessionId?: string;
+	activeSessionId?: string;
+	windowFocused: boolean;
 }
 
 export interface TunnelDevice {

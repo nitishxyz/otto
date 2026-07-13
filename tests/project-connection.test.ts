@@ -14,56 +14,51 @@ describe('project connection state', () => {
 	});
 
 	test('hides the banner for healthy or fallback transports', () => {
-		expect(deriveProjectConnectionStatus({ status: 'connected' }, false)).toBe(
+		expect(deriveProjectConnectionStatus({ status: 'connected' })).toBe(
 			'connected',
 		);
-		expect(deriveProjectConnectionStatus({ status: 'idle' }, false)).toBe(
-			'connected',
-		);
-		expect(deriveProjectConnectionStatus({ status: 'fallback' }, false)).toBe(
+		expect(deriveProjectConnectionStatus({ status: 'idle' })).toBe('connected');
+		expect(deriveProjectConnectionStatus({ status: 'fallback' })).toBe(
 			'connected',
 		);
 	});
 
-	test('does not flash on initial connect but stays visible mid-reconnect', () => {
+	test('treats fresh connects as healthy and failed attempts as reconnecting', () => {
 		expect(
-			deriveProjectConnectionStatus(
-				{ status: 'connecting', attempt: 0 },
-				false,
-			),
+			deriveProjectConnectionStatus({ status: 'connecting', attempt: 0 }),
 		).toBe('connected');
 		expect(
-			deriveProjectConnectionStatus({ status: 'connecting', attempt: 0 }, true),
+			deriveProjectConnectionStatus({ status: 'connecting', attempt: 1 }),
 		).toBe('reconnecting');
 		expect(
-			deriveProjectConnectionStatus(
-				{ status: 'connecting', attempt: 1 },
-				false,
-			),
+			deriveProjectConnectionStatus({ status: 'connecting', attempt: 2 }),
 		).toBe('reconnecting');
 	});
 
 	test('reports reconnecting then disconnected as retries accumulate', () => {
 		expect(
-			deriveProjectConnectionStatus(
-				{ status: 'retrying', attempt: 0, delay: 1000 },
-				false,
-			),
+			deriveProjectConnectionStatus({
+				status: 'retrying',
+				attempt: 0,
+				delay: 1000,
+			}),
 		).toBe('reconnecting');
 		expect(
-			deriveProjectConnectionStatus(
-				{ status: 'retrying', attempt: 2, delay: 4000 },
-				false,
-			),
+			deriveProjectConnectionStatus({
+				status: 'retrying',
+				attempt: 2,
+				delay: 4000,
+			}),
 		).toBe('reconnecting');
 		expect(
-			deriveProjectConnectionStatus(
-				{ status: 'retrying', attempt: 3, delay: 8000 },
-				false,
-			),
+			deriveProjectConnectionStatus({
+				status: 'retrying',
+				attempt: 3,
+				delay: 8000,
+			}),
 		).toBe('disconnected');
 		expect(
-			deriveProjectConnectionStatus({ status: 'connecting', attempt: 3 }, true),
+			deriveProjectConnectionStatus({ status: 'connecting', attempt: 3 }),
 		).toBe('disconnected');
 	});
 });

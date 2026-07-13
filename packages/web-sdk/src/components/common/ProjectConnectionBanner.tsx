@@ -2,11 +2,13 @@ import { Loader2, WifiOff } from 'lucide-react';
 import { useProjectConnection } from '../../hooks/useProjectConnection';
 
 /**
- * Slim status banner for the active project's event connection. Hidden while
- * connected; shows a spinner while reconnecting and a clear message with a
- * manual Retry once reconnect attempts keep failing. Also hosts the
- * once-mounted controller that reconciles event-maintained queries after a
- * successful reconnect.
+ * Floating status pill for the active project's event connection. Rendered
+ * inside the chat pane (needs a relative-positioned parent) so it overlays
+ * the thread under the session/lean header instead of pushing layout down.
+ * Hidden while connected; shows a spinner while reconnecting and a clear
+ * message with a manual Retry once reconnect attempts keep failing. Also
+ * hosts the once-mounted controller that reconciles event-maintained
+ * queries after a successful reconnect.
  */
 export function ProjectConnectionBanner() {
 	const { status, retry, retryPending } = useProjectConnection();
@@ -16,7 +18,7 @@ export function ProjectConnectionBanner() {
 	return (
 		<output
 			aria-live="polite"
-			className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-border bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground"
+			className="pointer-events-auto absolute left-1/2 top-14 z-20 flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/75"
 		>
 			{status === 'reconnecting' ? (
 				<>

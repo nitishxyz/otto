@@ -1,0 +1,12 @@
+{
+  "references": {
+    "setu": {
+      "description": "when otto needs to understand, check, or suggest anything related to ottorouter provider.",
+      "enabled": true,
+      "source": {
+        "type": "local",
+        "path": "/Users/bat/dev/nitishxyz/setu"
+      }
+    }
+  }
+}

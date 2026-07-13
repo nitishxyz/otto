@@ -1,12 +1,15 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 #[cfg(target_os = "macos")]
 use std::io::{Read, Write};
 #[cfg(target_os = "macos")]
 use std::net::{TcpListener, TcpStream};
 #[cfg(target_os = "macos")]
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 #[cfg(target_os = "macos")]
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, WebviewWindow};
 #[cfg(target_os = "macos")]
 use tauri::{Emitter, Manager};
@@ -16,24 +19,97 @@ use tauri_plugin_notification::NotificationExt;
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeNotificationPayload {
+    id: String,
     title: String,
     body: Option<String>,
     session_id: Option<String>,
+    active_session_id: Option<String>,
+    window_focused: bool,
 }
 
-#[cfg(target_os = "macos")]
-#[derive(Debug, PartialEq, Eq)]
+const NOTIFICATION_DEDUP_TTL: Duration = Duration::from_secs(600);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct NotificationTarget {
     window_label: String,
     session_id: Option<String>,
 }
 
-#[cfg(target_os = "macos")]
-fn notification_target(window_label: &str, session_id: Option<String>) -> NotificationTarget {
-    NotificationTarget {
-        window_label: window_label.to_string(),
-        session_id,
+struct PendingNotification {
+    target: NotificationTarget,
+    priority: u8,
+    created_at: Instant,
+}
+
+static PENDING_NOTIFICATIONS: OnceLock<Mutex<HashMap<String, PendingNotification>>> =
+    OnceLock::new();
+
+fn pending_notifications() -> &'static Mutex<HashMap<String, PendingNotification>> {
+    PENDING_NOTIFICATIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn notification_target(
+    window_label: &str,
+    session_id: Option<String>,
+    active_session_id: Option<&str>,
+    window_focused: bool,
+) -> (NotificationTarget, u8) {
+    let owns_session = session_id
+        .as_deref()
+        .zip(active_session_id)
+        .map(|(notification_session, active_session)| notification_session == active_session)
+        .unwrap_or(false);
+    (
+        NotificationTarget {
+            window_label: window_label.to_string(),
+            session_id,
+        },
+        if owns_session {
+            2
+        } else if window_focused {
+            1
+        } else {
+            0
+        },
+    )
+}
+
+fn register_notification(
+    notifications: &mut HashMap<String, PendingNotification>,
+    id: &str,
+    target: NotificationTarget,
+    priority: u8,
+    now: Instant,
+) -> bool {
+    notifications.retain(|_, pending| {
+        now.saturating_duration_since(pending.created_at) <= NOTIFICATION_DEDUP_TTL
+    });
+
+    if let Some(pending) = notifications.get_mut(id) {
+        if priority > pending.priority {
+            pending.target = target;
+            pending.priority = priority;
+        }
+        return false;
     }
+
+    notifications.insert(
+        id.to_string(),
+        PendingNotification {
+            target,
+            priority,
+            created_at: now,
+        },
+    );
+    true
+}
+
+fn take_notification_target(id: &str) -> Option<NotificationTarget> {
+    pending_notifications()
+        .lock()
+        .ok()?
+        .remove(id)
+        .map(|pending| pending.target)
 }
 
 #[cfg(target_os = "macos")]
@@ -113,6 +189,37 @@ pub fn show_native_notification(
     window: WebviewWindow,
     notification: NativeNotificationPayload,
 ) -> Result<(), String> {
+    let listener = if notification.session_id.is_some() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|error| error.to_string())?;
+        listener
+            .set_nonblocking(false)
+            .map_err(|error| error.to_string())?;
+        Some(listener)
+    } else {
+        None
+    };
+    let (target, priority) = notification_target(
+        window.label(),
+        notification.session_id.clone(),
+        notification.active_session_id.as_deref(),
+        notification.window_focused,
+    );
+    let is_new = {
+        let mut notifications = pending_notifications()
+            .lock()
+            .map_err(|error| error.to_string())?;
+        register_notification(
+            &mut notifications,
+            &notification.id,
+            target,
+            priority,
+            Instant::now(),
+        )
+    };
+    if !is_new {
+        return Ok(());
+    }
+
     let identifier = if tauri::is_dev() {
         "com.apple.Terminal".to_string()
     } else {
@@ -130,10 +237,7 @@ pub fn show_native_notification(
         return Ok(());
     }
 
-    let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|error| error.to_string())?;
-    listener
-        .set_nonblocking(false)
-        .map_err(|error| error.to_string())?;
+    let listener = listener.expect("session notifications create a click listener");
     let port = listener
         .local_addr()
         .map_err(|error| error.to_string())?
@@ -146,7 +250,7 @@ pub fn show_native_notification(
     let callback_url = format!("http://127.0.0.1:{port}/notification-click/{token}");
     let expected_path = format!("/notification-click/{token}");
     let app_for_click = app.clone();
-    let target = notification_target(window.label(), notification.session_id.clone());
+    let notification_id = notification.id.clone();
 
     std::thread::spawn(move || {
         let _ = listener.set_nonblocking(true);
@@ -161,19 +265,22 @@ pub fn show_native_notification(
                     let request = String::from_utf8_lossy(&buffer[..read]);
                     if request.starts_with(&format!("GET {expected_path} ")) {
                         let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\n\r\n");
-                        let app_for_main = app_for_click.clone();
-                        let _ = app_for_click.run_on_main_thread(move || {
-                            open_session_window(
-                                &app_for_main,
-                                &target.window_label,
-                                target.session_id,
-                            );
-                        });
+                        if let Some(target) = take_notification_target(&notification_id) {
+                            let app_for_main = app_for_click.clone();
+                            let _ = app_for_click.run_on_main_thread(move || {
+                                open_session_window(
+                                    &app_for_main,
+                                    &target.window_label,
+                                    target.session_id,
+                                );
+                            });
+                        }
                     }
                     return;
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    if started.elapsed().unwrap_or_default() > Duration::from_secs(600) {
+                    if started.elapsed().unwrap_or_default() > NOTIFICATION_DEDUP_TTL {
+                        let _ = take_notification_target(&notification_id);
                         return;
                     }
                     std::thread::sleep(Duration::from_millis(250));
@@ -197,10 +304,30 @@ pub fn show_native_notification(
 #[tauri::command]
 pub fn show_native_notification(
     app: AppHandle,
-    _window: WebviewWindow,
+    window: WebviewWindow,
     notification: NativeNotificationPayload,
 ) -> Result<(), String> {
-    let _ = notification.session_id;
+    let (target, priority) = notification_target(
+        window.label(),
+        notification.session_id.clone(),
+        notification.active_session_id.as_deref(),
+        notification.window_focused,
+    );
+    let is_new = {
+        let mut notifications = pending_notifications()
+            .lock()
+            .map_err(|error| error.to_string())?;
+        register_notification(
+            &mut notifications,
+            &notification.id,
+            target,
+            priority,
+            Instant::now(),
+        )
+    };
+    if !is_new {
+        return Ok(());
+    }
 
     app.notification()
         .builder()
@@ -210,18 +337,70 @@ pub fn show_native_notification(
         .map_err(|error| error.to_string())
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod tests {
-    use super::{notification_target, NotificationTarget};
+    use super::{
+        notification_target, register_notification, NotificationTarget, PendingNotification,
+    };
+    use std::collections::HashMap;
+    use std::time::{Duration, Instant};
 
     #[test]
-    fn notification_target_preserves_the_invoking_window() {
+    fn notification_target_prefers_the_window_showing_the_session() {
+        let (target, priority) = notification_target(
+            "main-7",
+            Some("session-123".to_string()),
+            Some("session-123"),
+            false,
+        );
         assert_eq!(
-            notification_target("main-7", Some("session-123".to_string())),
+            target,
             NotificationTarget {
                 window_label: "main-7".to_string(),
                 session_id: Some("session-123".to_string()),
             }
+        );
+        assert_eq!(priority, 2);
+    }
+
+    #[test]
+    fn duplicate_notification_updates_target_without_spawning_again() {
+        let now = Instant::now();
+        let mut notifications: HashMap<String, PendingNotification> = HashMap::new();
+        let (fallback, fallback_priority) = notification_target(
+            "main-1",
+            Some("session-123".to_string()),
+            Some("session-other"),
+            true,
+        );
+        let (owner, owner_priority) = notification_target(
+            "main-2",
+            Some("session-123".to_string()),
+            Some("session-123"),
+            false,
+        );
+
+        assert!(register_notification(
+            &mut notifications,
+            "notification-1",
+            fallback,
+            fallback_priority,
+            now,
+        ));
+        assert!(!register_notification(
+            &mut notifications,
+            "notification-1",
+            owner,
+            owner_priority,
+            now + Duration::from_millis(10),
+        ));
+        assert_eq!(
+            notifications
+                .get("notification-1")
+                .unwrap()
+                .target
+                .window_label,
+            "main-2"
         );
     }
 }

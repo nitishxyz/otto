@@ -81,6 +81,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 	const id = c.req.param('id');
 	let onData: ((data: string) => void) | null = null;
 	let onExit: ((exitCode: number) => void) | null = null;
+	let closed = false;
 
 	return {
 		async onOpen(
@@ -91,6 +92,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 			},
 		) {
 			const terminalManager = await terminalManagerPromise;
+			if (closed) return;
 			if (!terminalManager) {
 				ws.close(1011, 'Terminal project unavailable');
 				return;
@@ -142,7 +144,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 		},
 		async onMessage(event: { data: unknown }, _ws: unknown) {
 			const terminalManager = await terminalManagerPromise;
-			if (!terminalManager) return;
+			if (closed || !terminalManager) return;
 			const terminal = terminalManager.get(id);
 			if (!terminal) return;
 
@@ -177,6 +179,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 			}
 		},
 		async onClose() {
+			closed = true;
 			const terminalManager = await terminalManagerPromise;
 			if (!terminalManager) return;
 			const terminal = terminalManager.get(id);
@@ -188,6 +191,7 @@ export function createTerminalWebSocketHandler(c: Context) {
 			onExit = null;
 		},
 		async onError() {
+			closed = true;
 			const terminalManager = await terminalManagerPromise;
 			if (!terminalManager) return;
 			const terminal = terminalManager.get(id);

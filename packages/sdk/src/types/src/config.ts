@@ -75,6 +75,25 @@ export type SkillSettings = {
 	>;
 };
 
+export type ReferenceSource =
+	| {
+			type: 'git';
+			url: string;
+			ref?: string;
+	  }
+	| {
+			type: 'local';
+			path: string;
+	  };
+
+export type ReferenceConfig = {
+	description: string;
+	enabled?: boolean;
+	source: ReferenceSource;
+};
+
+export type ReferenceSettings = Record<string, ReferenceConfig>;
+
 /**
  * Path configuration
  */
@@ -101,6 +120,7 @@ export type OttoConfig = {
 	defaults: DefaultConfig;
 	providers: ProviderSettings;
 	skills?: SkillSettings;
+	references?: ReferenceSettings;
 	paths: PathConfig;
 	debugEnabled?: boolean;
 	debugScopes?: string[];

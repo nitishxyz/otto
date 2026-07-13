@@ -221,7 +221,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	return (
 		<div className="h-full flex flex-col bg-background touch-manipulation">
 			{titleBar}
-			<ProjectConnectionBanner />
 
 			<div className="flex-1 flex min-h-0 overflow-hidden">
 				<DesktopSidebar onNewSession={onNewSession}>{sidebar}</DesktopSidebar>
@@ -248,6 +247,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 											: 'hidden'
 								}`}
 							>
+								<ProjectConnectionBanner />
 								{children}
 							</main>
 							<section
