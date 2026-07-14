@@ -19,6 +19,7 @@ import { toErrorMessage, toErrorPayload } from '../errors/handling.ts';
 import { setupRunner } from './runner/runner-setup.ts';
 import { setupLazyToolLoading } from './runner/runner-lazy-tools.ts';
 import { withTodoReminderPrepareStep } from './runner/runner-todo-reminder.ts';
+import { withSubagentResultsPrepareStep } from './runner/runner-subagent-results.ts';
 import type { ReasoningState } from './runner/runner-reasoning.ts';
 import { createOauthCodexTextGuardState } from '../stream/text-guard.ts';
 import {
@@ -117,6 +118,10 @@ async function runAssistant(opts: RunOpts) {
 	} = setup;
 	const { toolset, prepareStep } = await setupLazyToolLoading(opts, setup);
 	const prepareStepWithTodoReminder = withTodoReminderPrepareStep(prepareStep);
+	const prepareStepWithSubagentResults = withSubagentResultsPrepareStep(
+		prepareStepWithTodoReminder,
+		{ db, ctx: sharedCtx },
+	);
 
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');
 
@@ -220,7 +225,7 @@ async function runAssistant(opts: RunOpts) {
 		queueWaitMs,
 		messages: messagesWithSystemInstructions,
 		toolset: toolset as Record<string, unknown>,
-		hasPrepareStep: Boolean(prepareStepWithTodoReminder),
+		hasPrepareStep: Boolean(prepareStepWithSubagentResults),
 	});
 
 	try {
@@ -234,7 +239,7 @@ async function runAssistant(opts: RunOpts) {
 			providerOptions,
 			abortSignal: opts.abortSignal,
 			stopWhen: stopWhenCondition,
-			prepareStep: prepareStepWithTodoReminder,
+			prepareStep: prepareStepWithSubagentResults,
 			onStepFinish: runnerHandlers.onStepFinish,
 			onError: runnerHandlers.onError,
 			onAbort: runnerHandlers.onAbort,

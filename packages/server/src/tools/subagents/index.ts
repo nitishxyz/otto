@@ -38,7 +38,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 		name: 'delegate_task',
 		tool: tool({
 			description:
-				'Delegate a bounded task to another configured agent type. Each call without reuseSessionId starts a fresh sub-agent instance, so independent tasks may run concurrently in multiple instances of the same agent type (for example, two separate plan delegations). Use reuseSessionId or message_subagent only for related continuation work that should retain an existing instance context; do not use them merely because that agent type is already running. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically after the current parent turn ends. Do not poll for completion: if no unrelated work remains, end the current turn so delivery can occur.',
+				'Delegate a bounded task to another configured agent type. Each call without reuseSessionId starts a fresh sub-agent instance, so independent tasks may run concurrently in multiple instances of the same agent type (for example, two separate plan delegations). Use reuseSessionId or message_subagent only for related continuation work that should retain an existing instance context; do not use them merely because that agent type is already running. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically at the next parent model step when possible, or in a continuation after the current turn ends. Do not poll for completion: continue unrelated work, and end the current turn if none remains.',
 			inputSchema: delegateInputSchema,
 			async execute(input) {
 				const cfg = await loadConfig(projectRoot);
@@ -68,7 +68,7 @@ export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
 					childSessionId: result.childSessionId,
 					agent: result.agent,
 					status: 'running',
-					note: 'Task ownership transferred to the sub-agent. Continue only unrelated work. Do not call list_subagents to poll: automatic result delivery requires this parent turn to end, so end it now if no unrelated work remains.',
+					note: 'Task ownership transferred to the sub-agent. Continue only unrelated work. Do not call list_subagents to poll: the result will be injected at the next parent model step when possible, or delivered in a continuation after this turn ends.',
 				};
 			},
 		}),
@@ -87,7 +87,7 @@ export function buildListSubagentsTool(projectRoot: string, sessionId: string) {
 		name: 'list_subagents',
 		tool: tool({
 			description:
-				'List sub-agents spawned from this session with their status and result summaries. Use for an explicit status review or after automatic delivery, not to poll a running sub-agent. If a listed sub-agent is still running, do not check again in this turn; end the turn so its result can be delivered automatically.',
+				'List sub-agents spawned from this session with their status and result summaries. Use for an explicit status review or after automatic delivery, not to poll a running sub-agent. If a listed sub-agent is still running, do not check again in this turn; continue unrelated work or end the turn and let its result be delivered automatically.',
 			inputSchema: listInputSchema,
 			async execute(input) {
 				const db = await getDb(projectRoot);
