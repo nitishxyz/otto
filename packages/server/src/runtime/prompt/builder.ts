@@ -245,8 +245,12 @@ function buildReferencesPrompt(
 	userContent: string | undefined,
 ): string {
 	if (!references?.length) return '';
+	const availableReferences = references.filter(
+		(reference) => reference.status === 'available' && reference.path,
+	);
+	if (availableReferences.length === 0) return '';
 	const mentionedNames = extractMentionedReferenceNames(userContent);
-	const sortedReferences = [...references].sort(
+	const sortedReferences = [...availableReferences].sort(
 		(a, b) =>
 			Number(mentionedNames.has(b.name.toLowerCase())) -
 			Number(mentionedNames.has(a.name.toLowerCase())),
@@ -265,12 +269,7 @@ function buildReferencesPrompt(
 				'  Mentioned this turn: yes. Treat this reference as directly relevant and consult it before answering when available.',
 			);
 		}
-		if (reference.path) lines.push(`  Path: ${reference.path}`);
-		if (reference.status === 'unavailable') {
-			lines.push(
-				`  Status: unavailable (${reference.error ?? 'unknown error'})`,
-			);
-		}
+		lines.push(`  Available locally at: ${reference.path}`);
 		lines.push('');
 	}
 	lines.push('</references>');

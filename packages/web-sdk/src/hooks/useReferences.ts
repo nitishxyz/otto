@@ -14,6 +14,12 @@ export function useReferences(
 		queryKey: ['references', scope],
 		queryFn: () => apiClient.listReferences(scope),
 		enabled: options.enabled ?? true,
+		refetchInterval: (query) =>
+			Object.values(query.state.data?.statuses ?? {}).some(
+				(status) => status.status === 'cloning',
+			)
+				? 1000
+				: false,
 	});
 }
 
@@ -25,6 +31,16 @@ export function useSaveReference() {
 			reference: Reference;
 			scope: ReferenceScope;
 		}) => apiClient.saveReference(input.name, input.reference, input.scope),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ['references'] });
+		},
+	});
+}
+
+export function useRetryReference() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (name: string) => apiClient.retryReference(name),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ['references'] });
 		},

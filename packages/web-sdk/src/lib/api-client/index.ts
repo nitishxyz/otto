@@ -191,6 +191,7 @@ class ApiClient {
 	listReferences = referencesMixin.listReferences;
 	listReferenceDirectories = referencesMixin.listReferenceDirectories;
 	saveReference = referencesMixin.saveReference;
+	retryReference = referencesMixin.retryReference;
 	deleteReference = referencesMixin.deleteReference;
 
 	listPlugins = pluginsMixin.listPlugins;

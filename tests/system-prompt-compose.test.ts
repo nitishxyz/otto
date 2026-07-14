@@ -160,6 +160,30 @@ describe('system prompt composition', () => {
 		expect(prompt).toContain('Mentioned this turn: yes');
 		expect(prompt.match(/Mentioned this turn: yes/g)).toHaveLength(1);
 		expect(prompt.indexOf('- docs')).toBeLessThan(prompt.indexOf('- api'));
+		expect(prompt).toContain('Available locally at: /tmp/docs');
+		expect(prompt).not.toContain('git@');
+	});
+
+	it('omits unavailable references from the system prompt', async () => {
+		const { prompt, components } = await composeSystemPrompt({
+			provider: 'openrouter',
+			model: 'gpt-4o-mini',
+			projectRoot: tempDir,
+			agentPrompt: 'AGENT',
+			includeEnvironment: false,
+			references: [
+				{
+					name: 'docs',
+					description: 'Documentation source',
+					status: 'unavailable',
+					error: 'Clone failed',
+				},
+			],
+		});
+
+		expect(components).not.toContain('references');
+		expect(prompt).not.toContain('Documentation source');
+		expect(prompt).not.toContain('Clone failed');
 	});
 
 	async function writeSkill(

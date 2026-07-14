@@ -1,11 +1,12 @@
 import type { OttoConfig, ReferenceConfig } from '@ottocode/sdk';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const GIT_TIMEOUT_MS = 15_000;
-const inFlight = new Map<string, Promise<ResolvedReference>>();
+const preparations = new Map<string, Promise<void>>();
+const preparationStates = new Map<string, ReferencePreparationStatus>();
 
 export type ResolvedReference = {
 	name: string;
@@ -15,33 +16,22 @@ export type ResolvedReference = {
 	error?: string;
 };
 
-/** Resolve enabled local and Git references into agent-readable directories. */
+export type ReferencePreparationStatus = {
+	status: 'cloning' | 'available' | 'error';
+	error?: string;
+};
+
+/** Resolve enabled references from local state without performing network I/O. */
 export async function resolveReferences(
 	cfg: OttoConfig,
 ): Promise<ResolvedReference[]> {
 	const entries = Object.entries(cfg.references ?? {}).filter(
 		([, reference]) => reference.enabled !== false,
 	);
-	return Promise.all(
-		entries.map(([name, reference]) =>
-			resolveReferenceOnce(name, reference, cfg),
-		),
+	const resolved = await Promise.all(
+		entries.map(([name, reference]) => resolveReference(name, reference, cfg)),
 	);
-}
-
-function resolveReferenceOnce(
-	name: string,
-	reference: ReferenceConfig,
-	cfg: OttoConfig,
-): Promise<ResolvedReference> {
-	const key = `${cfg.projectRoot}\0${name}\0${JSON.stringify(reference)}`;
-	const existing = inFlight.get(key);
-	if (existing) return existing;
-	const pending = resolveReference(name, reference, cfg).finally(() => {
-		inFlight.delete(key);
-	});
-	inFlight.set(key, pending);
-	return pending;
+	return resolved.filter((reference) => reference.status === 'available');
 }
 
 async function resolveReference(
@@ -56,7 +46,7 @@ async function resolveReference(
 		const path =
 			reference.source.type === 'local'
 				? await resolveLocalReference(reference.source.path, cfg.projectRoot)
-				: await resolveGitReference(name, reference, cfg.paths.cacheDir);
+				: await resolveCachedGitReference(name, reference, cfg.paths.cacheDir);
 		return {
 			name,
 			description: reference.description.trim(),
@@ -71,6 +61,57 @@ async function resolveReference(
 			error: error instanceof Error ? error.message : String(error),
 		};
 	}
+}
+
+/** Start preparing enabled Git references without blocking the caller. */
+export function prepareReferences(cfg: OttoConfig): void {
+	for (const [name, reference] of Object.entries(cfg.references ?? {})) {
+		if (reference.enabled === false || reference.source.type !== 'git')
+			continue;
+		void prepareGitReference(name, reference, cfg.paths.cacheDir);
+	}
+}
+
+/** Retry preparation for one Git reference after an explicit user action. */
+export function retryReferencePreparation(
+	name: string,
+	reference: ReferenceConfig,
+	cfg: OttoConfig,
+): void {
+	if (reference.enabled === false || reference.source.type !== 'git') return;
+	void prepareGitReference(name, reference, cfg.paths.cacheDir, true);
+}
+
+/** Read preparation state for configured references without waiting for clones. */
+export async function getReferenceStatuses(
+	cfg: OttoConfig,
+): Promise<Record<string, ReferencePreparationStatus>> {
+	const statuses: Record<string, ReferencePreparationStatus> = {};
+	for (const [name, reference] of Object.entries(cfg.references ?? {})) {
+		if (reference.source.type === 'local') {
+			try {
+				await resolveLocalReference(reference.source.path, cfg.projectRoot);
+				statuses[name] = { status: 'available' };
+			} catch (error) {
+				statuses[name] = { status: 'error', error: toErrorMessage(error) };
+			}
+			continue;
+		}
+		const { key, path } = getGitReferencePaths(
+			name,
+			reference,
+			cfg.paths.cacheDir,
+		);
+		if (await isDirectory(join(path, '.git'))) {
+			statuses[name] = { status: 'available' };
+		} else {
+			statuses[name] = preparationStates.get(key) ?? {
+				status: 'error',
+				error: 'Repository has not been cloned yet',
+			};
+		}
+	}
+	return statuses;
 }
 
 async function resolveLocalReference(
@@ -89,11 +130,23 @@ async function resolveLocalReference(
 	return path;
 }
 
-async function resolveGitReference(
+async function resolveCachedGitReference(
 	name: string,
 	reference: ReferenceConfig,
 	cacheDir: string,
 ): Promise<string> {
+	const { path } = getGitReferencePaths(name, reference, cacheDir);
+	if (!(await isDirectory(join(path, '.git')))) {
+		throw new Error('Repository is still being prepared');
+	}
+	return path;
+}
+
+function getGitReferencePaths(
+	name: string,
+	reference: ReferenceConfig,
+	cacheDir: string,
+): { key: string; path: string; metadataPath: string; url: string } {
 	if (reference.source.type !== 'git') throw new Error('Invalid Git reference');
 	const url = reference.source.url.trim();
 	if (!url) throw new Error('Git URL is required');
@@ -105,32 +158,80 @@ async function resolveGitReference(
 		name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(0, 48) || 'reference';
 	const root = join(cacheDir, 'references');
 	const path = join(root, `${safeName}-${hash}`);
-	const metadataPath = join(path, '.otto-reference.json');
+	return {
+		key: `${path}\0${url}\0${reference.source.ref ?? ''}`,
+		path,
+		metadataPath: join(path, '.otto-reference.json'),
+		url,
+	};
+}
+
+function prepareGitReference(
+	name: string,
+	reference: ReferenceConfig,
+	cacheDir: string,
+	force = false,
+): Promise<void> {
+	const paths = getGitReferencePaths(name, reference, cacheDir);
+	const existing = preparations.get(paths.key);
+	if (existing) return existing;
+	if (!force && preparationStates.get(paths.key)?.status === 'error') {
+		return Promise.resolve();
+	}
+	preparationStates.set(paths.key, { status: 'cloning' });
+	const pending = runGitPreparation(reference, paths)
+		.then(() => {
+			preparationStates.set(paths.key, { status: 'available' });
+		})
+		.catch((error) => {
+			preparationStates.set(paths.key, {
+				status: 'error',
+				error: toErrorMessage(error),
+			});
+		})
+		.finally(() => {
+			preparations.delete(paths.key);
+		});
+	preparations.set(paths.key, pending);
+	return pending;
+}
+
+async function runGitPreparation(
+	reference: ReferenceConfig,
+	paths: { path: string; metadataPath: string; url: string },
+): Promise<void> {
+	if (reference.source.type !== 'git') throw new Error('Invalid Git reference');
+	const root = join(paths.path, '..');
 	await mkdir(root, { recursive: true });
 
-	if (!(await isDirectory(join(path, '.git')))) {
+	if (!(await isDirectory(join(paths.path, '.git')))) {
+		await rm(paths.path, { recursive: true, force: true });
 		const args = ['clone', '--depth', '1'];
 		if (reference.source.ref) {
 			args.push('--branch', reference.source.ref, '--single-branch');
 		}
-		args.push('--', url, path);
-		await runGit(args);
-		await writeMetadata(metadataPath);
-		return path;
+		args.push('--', paths.url, paths.path);
+		try {
+			await runGit(args);
+		} catch (error) {
+			await rm(paths.path, { recursive: true, force: true });
+			throw error;
+		}
+		await writeMetadata(paths.metadataPath);
+		return;
 	}
 
-	if (await shouldRefresh(metadataPath)) {
+	if (await shouldRefresh(paths.metadataPath)) {
 		try {
-			const args = ['-C', path, 'fetch', '--depth', '1', 'origin'];
+			const args = ['-C', paths.path, 'fetch', '--depth', '1', 'origin'];
 			if (reference.source.ref) args.push(reference.source.ref);
 			await runGit(args);
-			await runGit(['-C', path, 'reset', '--hard', 'FETCH_HEAD']);
+			await runGit(['-C', paths.path, 'reset', '--hard', 'FETCH_HEAD']);
 		} catch {
-			// Keep a usable stale clone and avoid retrying a failed network fetch per turn.
+			// Keep a usable stale clone when a background refresh fails.
 		}
-		await writeMetadata(metadataPath);
+		await writeMetadata(paths.metadataPath);
 	}
-	return path;
 }
 
 async function isDirectory(path: string): Promise<boolean> {
@@ -158,13 +259,23 @@ async function writeMetadata(metadataPath: string): Promise<void> {
 
 async function runGit(args: string[]): Promise<void> {
 	const process = Bun.spawn(['git', ...args], {
+		stdin: 'ignore',
 		stdout: 'ignore',
 		stderr: 'pipe',
-		env: { ...Bun.env, GIT_TERMINAL_PROMPT: '0' },
+		env: {
+			...Bun.env,
+			GIT_TERMINAL_PROMPT: '0',
+			GIT_SSH_COMMAND: 'ssh -oBatchMode=yes -oConnectTimeout=10',
+		},
 	});
-	const timeout = setTimeout(() => process.kill(), GIT_TIMEOUT_MS);
+	let timedOut = false;
+	const timeout = setTimeout(() => {
+		timedOut = true;
+		process.kill();
+	}, GIT_TIMEOUT_MS);
 	try {
 		const exitCode = await process.exited;
+		if (timedOut) throw new Error('Git operation timed out');
 		if (exitCode !== 0) {
 			const stderr = await new Response(process.stderr).text();
 			throw new Error(stderr.trim() || `git exited with code ${exitCode}`);
@@ -172,4 +283,8 @@ async function runGit(args: string[]): Promise<void> {
 	} finally {
 		clearTimeout(timeout);
 	}
+}
+
+function toErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

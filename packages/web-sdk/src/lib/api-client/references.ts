@@ -2,6 +2,7 @@ import {
 	deleteReference as apiDeleteReference,
 	listReferenceDirectories as apiListReferenceDirectories,
 	listReferences as apiListReferences,
+	retryReference as apiRetryReference,
 	upsertReference as apiUpsertReference,
 } from '@ottocode/api';
 import { extractErrorMessage } from './utils';
@@ -15,6 +16,14 @@ export type Reference = {
 		| { type: 'git'; url: string; ref?: string }
 		| { type: 'local'; path: string };
 };
+export type ReferenceStatus = {
+	status: 'cloning' | 'available' | 'error';
+	error?: string;
+};
+export type ReferencesResponse = {
+	references: Record<string, Reference>;
+	statuses: Record<string, ReferenceStatus>;
+};
 export type ReferenceDirectoryListing = {
 	path: string;
 	parent: string | null;
@@ -22,12 +31,10 @@ export type ReferenceDirectoryListing = {
 };
 
 export const referencesMixin = {
-	async listReferences(
-		scope: ListReferenceScope,
-	): Promise<{ references: Record<string, Reference> }> {
+	async listReferences(scope: ListReferenceScope): Promise<ReferencesResponse> {
 		const response = await apiListReferences({ query: { scope } });
 		if (response.error) throw new Error(extractErrorMessage(response.error));
-		return response.data as { references: Record<string, Reference> };
+		return response.data as ReferencesResponse;
 	},
 
 	async listReferenceDirectories(
@@ -44,14 +51,20 @@ export const referencesMixin = {
 		name: string,
 		reference: Reference,
 		scope: ReferenceScope,
-	): Promise<{ references: Record<string, Reference> }> {
+	): Promise<ReferencesResponse> {
 		const response = await apiUpsertReference({
 			path: { name },
 			query: { scope },
 			body: reference,
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
-		return response.data as { references: Record<string, Reference> };
+		return response.data as ReferencesResponse;
+	},
+
+	async retryReference(name: string): Promise<ReferencesResponse> {
+		const response = await apiRetryReference({ path: { name } });
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return response.data as ReferencesResponse;
 	},
 
 	async deleteReference(name: string, scope: ReferenceScope): Promise<void> {

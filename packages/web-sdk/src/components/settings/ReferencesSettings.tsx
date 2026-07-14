@@ -1,8 +1,15 @@
-import { BookOpen, ChevronDown, FolderOpen, Trash2 } from 'lucide-react';
+import {
+	BookOpen,
+	ChevronDown,
+	FolderOpen,
+	RefreshCw,
+	Trash2,
+} from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import {
 	useDeleteReference,
 	useReferences,
+	useRetryReference,
 	useSaveReference,
 } from '../../hooks/useReferences';
 import type {
@@ -71,17 +78,20 @@ export function ReferencesSettings() {
 	const [scope, setScope] = useState<ReferenceScope>('local');
 	const referencesQuery = useReferences(scope);
 	const saveReference = useSaveReference();
+	const retryReference = useRetryReference();
 	const deleteReference = useDeleteReference();
 	const [selectedName, setSelectedName] = useState('');
 	const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 	const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 	const references = referencesQuery.data?.references ?? {};
+	const statuses = referencesQuery.data?.statuses ?? {};
 	const entries = useMemo(
 		() => Object.entries(references).sort(([a], [b]) => a.localeCompare(b)),
 		[references],
 	);
 	const normalizedName = draft.name.trim().toLowerCase();
 	const isEditing = selectedName !== '' && selectedName === normalizedName;
+	const selectedStatus = selectedName ? statuses[selectedName] : undefined;
 	const isValid =
 		NAME_PATTERN.test(normalizedName) &&
 		draft.description.trim() !== '' &&
@@ -151,11 +161,27 @@ export function ReferencesSettings() {
 					source,
 				},
 			});
-			toast.success(`Saved ${normalizedName}`);
+			toast.success(
+				draft.type === 'git'
+					? `Saved ${normalizedName}; cloning repository in the background`
+					: `Saved ${normalizedName}`,
+			);
 			clearDraft();
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : 'Failed to save reference',
+			);
+		}
+	}
+
+	async function handleRetry() {
+		if (!selectedName) return;
+		try {
+			await retryReference.mutateAsync(selectedName);
+			toast.success(`Retrying ${selectedName}`);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : 'Failed to retry reference',
 			);
 		}
 	}
@@ -182,15 +208,29 @@ export function ReferencesSettings() {
 				subtitle={`Saves to the ${scope === 'local' ? 'project' : 'global'} config`}
 				footerStart={
 					isEditing ? (
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={handleDelete}
-							disabled={deleteReference.isPending}
-							className="h-7 gap-1 px-2 text-xs text-red-500 hover:text-red-400"
-						>
-							<Trash2 className="h-3.5 w-3.5" /> Delete
-						</Button>
+						<>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={handleDelete}
+								disabled={deleteReference.isPending}
+								className="h-7 gap-1 px-2 text-xs text-red-500 hover:text-red-400"
+							>
+								<Trash2 className="h-3.5 w-3.5" /> Delete
+							</Button>
+							{draft.type === 'git' && selectedStatus?.status === 'error' ? (
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={handleRetry}
+									disabled={retryReference.isPending}
+									className="h-7 gap-1 px-2 text-xs"
+								>
+									<RefreshCw className="h-3.5 w-3.5" />
+									{retryReference.isPending ? 'Retrying…' : 'Retry clone'}
+								</Button>
+							) : null}
+						</>
 					) : null
 				}
 				footerEnd={
@@ -214,6 +254,14 @@ export function ReferencesSettings() {
 					</>
 				}
 			>
+				{isEditing && selectedStatus?.status === 'error' ? (
+					<div className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+						<p className="font-medium">Repository clone failed</p>
+						<p className="mt-1 break-words font-mono text-[11px] text-red-400/80">
+							{selectedStatus.error ?? 'Unknown Git error'}
+						</p>
+					</div>
+				) : null}
 				<div className="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_160px]">
 					<EntityField id={nameId} label="Name">
 						<input
@@ -359,20 +407,36 @@ export function ReferencesSettings() {
 				/>
 			) : (
 				<EntityListGroup>
-					{entries.map(([name, reference]) => (
-						<EntityRow
-							key={name}
-							onClick={() => selectReference(name, reference)}
-							title={name}
-							badge={reference.source.type === 'git' ? 'Git' : 'Local'}
-							description={reference.description}
-							meta={
-								reference.source.type === 'git'
-									? reference.source.url
-									: reference.source.path
-							}
-						/>
-					))}
+					{entries.map(([name, reference]) => {
+						const status = statuses[name];
+						const badge =
+							reference.source.type === 'local'
+								? 'Local'
+								: status?.status === 'cloning'
+									? 'Cloning…'
+									: status?.status === 'error'
+										? 'Clone failed'
+										: 'Git';
+						const location =
+							reference.source.type === 'git'
+								? reference.source.url
+								: reference.source.path;
+						return (
+							<EntityRow
+								key={name}
+								onClick={() => selectReference(name, reference)}
+								title={name}
+								badge={badge}
+								warning={
+									status?.status === 'error'
+										? status.error || 'Repository clone failed'
+										: undefined
+								}
+								description={reference.description}
+								meta={location}
+							/>
+						);
+					})}
 				</EntityListGroup>
 			)}
 		</EntityListPage>

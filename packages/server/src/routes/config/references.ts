@@ -13,6 +13,11 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
+import {
+	getReferenceStatuses,
+	prepareReferences,
+	retryReferencePreparation,
+} from '../../runtime/context/references.ts';
 import { getProjectManager } from '../../runtime/projects/manager.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -56,12 +61,18 @@ const referenceSchema = z.object({
 	enabled: z.boolean().optional(),
 	source: sourceSchema,
 });
+const referenceStatusSchema = z.object({
+	status: z.enum(['cloning', 'available', 'error']),
+	error: z.string().optional(),
+});
 const referencesResponseSchema = z.object({
 	references: z.record(z.string(), referenceSchema),
+	statuses: z.record(z.string(), referenceStatusSchema),
 });
 const mutationResponseSchema = z.object({
 	success: z.boolean(),
 	references: z.record(z.string(), referenceSchema),
+	statuses: z.record(z.string(), referenceStatusSchema),
 });
 const directoryListResponseSchema = z.object({
 	path: z.string(),
@@ -88,12 +99,22 @@ export function registerReferencesRoutes(app: Hono) {
 		},
 		async (c) => {
 			const projectRoot = await resolveRequestProjectRoot(c);
-			const scope = c.req.query('scope') ?? 'effective';
+			const requestedScope = c.req.query('scope');
+			const scope =
+				requestedScope === 'global' || requestedScope === 'local'
+					? requestedScope
+					: 'effective';
+			const cfg = await loadConfig(projectRoot);
 			const references =
 				scope === 'effective'
-					? ((await loadConfig(projectRoot)).references ?? {})
+					? (cfg.references ?? {})
 					: await readReferenceSettings(scope, projectRoot);
-			return c.json({ references });
+			const scopedConfig = { ...cfg, references };
+			prepareReferences(scopedConfig);
+			return c.json({
+				references,
+				statuses: await getReferenceStatuses(scopedConfig),
+			});
 		},
 	);
 
@@ -181,9 +202,54 @@ export function registerReferencesRoutes(app: Hono) {
 				const cfg =
 					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
 					(await loadConfig(projectRoot));
-				return c.json({ success: true, references: cfg.references ?? {} });
+				prepareReferences({ ...cfg, references: { [name]: reference } });
+				return c.json({
+					success: true,
+					references: cfg.references ?? {},
+					statuses: await getReferenceStatuses(cfg),
+				});
 			} catch (error) {
 				logger.error('Failed to update reference', error);
+				const response = serializeError(error);
+				return c.json(response, response.error.status || 500);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/config/references/{name}/retry',
+			tags: ['config'],
+			operationId: 'retryReference',
+			summary: 'Retry cloning a Git reference',
+			request: { params: nameParamSchema, query: projectQuerySchema },
+			responses: {
+				'200': {
+					description: 'Reference clone retry started',
+					content: { 'application/json': { schema: mutationResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const projectRoot = await resolveRequestProjectRoot(c);
+				const { name } = c.req.param();
+				const cfg = await loadConfig(projectRoot);
+				const reference = cfg.references?.[name];
+				if (!reference) return c.json({ error: 'Reference not found' }, 404);
+				if (reference.source.type !== 'git') {
+					return c.json({ error: 'Only Git references can be retried' }, 400);
+				}
+				retryReferencePreparation(name, reference, cfg);
+				return c.json({
+					success: true,
+					references: cfg.references ?? {},
+					statuses: await getReferenceStatuses(cfg),
+				});
+			} catch (error) {
+				logger.error('Failed to retry reference', error);
 				const response = serializeError(error);
 				return c.json(response, response.error.status || 500);
 			}
@@ -215,7 +281,11 @@ export function registerReferencesRoutes(app: Hono) {
 				const cfg =
 					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
 					(await loadConfig(projectRoot));
-				return c.json({ success: true, references: cfg.references ?? {} });
+				return c.json({
+					success: true,
+					references: cfg.references ?? {},
+					statuses: await getReferenceStatuses(cfg),
+				});
 			} catch (error) {
 				logger.error('Failed to delete reference', error);
 				const response = serializeError(error);
