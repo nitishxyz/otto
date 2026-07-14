@@ -64,6 +64,7 @@ export function SubagentResultRenderer({
 	const timeStr = formatDuration(toolDurationMs);
 	const { headline, failedCount } = summarizeSubagentResults(results);
 	const canExpand = results.length > 0 || Boolean(raw.trim());
+	const singleResult = results.length === 1 ? results[0] : undefined;
 
 	return (
 		<div className="text-[12px]">
@@ -74,13 +75,21 @@ export function SubagentResultRenderer({
 				colorVariant="purple"
 				canExpand={canExpand}
 			>
-				{!compact && results.length > 0 && (
+				{results.length > 0 && (
 					<>
 						<ToolHeaderSeparator />
-						<Bot className="h-3 w-3 shrink-0 text-purple-400" />
-						<span className="max-w-[300px] truncate font-mono text-[11px] text-foreground/60">
-							{headline}
+						{!compact && <Bot className="h-3 w-3 shrink-0 text-purple-400" />}
+						<span className="flex-shrink-0 font-mono text-[11px] text-foreground/60">
+							{singleResult?.agent ?? headline}
 						</span>
+						{singleResult?.task && (
+							<>
+								<ToolHeaderSeparator />
+								<span className="min-w-0 max-w-[360px] truncate font-mono text-[11px] text-foreground/60">
+									{singleResult.task}
+								</span>
+							</>
+						)}
 					</>
 				)}
 				{!compact && results.length > 0 && (
