@@ -208,6 +208,8 @@ export async function consumeRunnerStreamParts(args: {
 		publish({
 			type: 'finish-step',
 			sessionId: args.opts.sessionId,
+			projectId: args.opts.projectId,
+			projectRoot: args.opts.projectRoot,
 			payload: { reason: 'no-tool-calls' },
 		});
 	}

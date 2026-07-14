@@ -229,16 +229,50 @@ describe('multiplexed project events stream', () => {
 		const stream = await openStream(
 			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
 		);
+		const projectsResponse = await app.fetch(
+			new Request('http://localhost/v1/projects'),
+		);
+		const projectsBody = (await projectsResponse.json()) as {
+			projects: Array<{ id: string; path: string }>;
+		};
+		const project = projectsBody.projects.find(
+			(candidate) => candidate.path === process.cwd(),
+		);
+		if (!project) throw new Error('Current project was not registered');
 
 		publish({
 			type: 'queue.updated',
 			sessionId: 'proj-events-session-id-only',
-			projectId: 'some-project-id-not-root',
+			projectId: project.id,
 			payload: { queueLength: 0 },
 		});
 
 		const received = await stream.next((evt) => evt.event === 'queue.updated');
 		expect(received.data.sessionId).toBe('proj-events-session-id-only');
+
+		await stream.close();
+	});
+
+	it('filters out events published with another projectId', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+
+		publish({
+			type: 'queue.updated',
+			sessionId: 'other-project-id-only',
+			projectId: 'some-other-project-id',
+			payload: { queueLength: 1 },
+		});
+		publish({
+			type: 'queue.updated',
+			sessionId: 'current-project-root',
+			projectRoot: process.cwd(),
+			payload: { queueLength: 0 },
+		});
+
+		const received = await stream.next((evt) => evt.event === 'queue.updated');
+		expect(received.data.sessionId).toBe('current-project-root');
 
 		await stream.close();
 	});

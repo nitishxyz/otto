@@ -19,8 +19,9 @@ const clientSubscribers = new Set<ClientSubscriber>();
  */
 function eventProjectKeys(event: OttoEvent): string[] {
 	const keys = new Set<string>();
-	keys.add(projectScopeKey(event.projectId));
-	keys.add(projectScopeKey(event.projectRoot));
+	if (event.projectId) keys.add(projectScopeKey(event.projectId));
+	if (event.projectRoot) keys.add(projectScopeKey(event.projectRoot));
+	if (keys.size === 0) keys.add(projectScopeKey(undefined));
 	return [...keys];
 }
 

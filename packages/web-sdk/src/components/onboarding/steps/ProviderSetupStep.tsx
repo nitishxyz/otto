@@ -14,8 +14,6 @@ import {
 	Laptop,
 	Globe,
 	Search,
-	ShieldCheck,
-	Zap,
 } from 'lucide-react';
 import { ProviderLogo } from '../../common/ProviderLogo';
 import { StableSpinner } from '../../ui/StableSpinner';
@@ -356,7 +354,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const { fetchBalance } = useOttoRouterBalance('ottorouter');
 	const effectivePayg = payg?.effectiveSpendableUsd ?? balance ?? 0;
 	const ottorouterStatusLabel = subscription?.active
-		? `GO ${(subscription.creditsRemaining ?? 0).toFixed(1)} credits`
+		? `Starter ${(subscription.creditsRemaining ?? 0).toFixed(1)} credits`
 		: `$${effectivePayg.toFixed(2)}`;
 
 	// Refetch balance when topup modal closes
@@ -1129,7 +1127,6 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					)}
 				</div>
 			)}
-
 			{/* Main Content */}
 			<div
 				className={`flex-1 px-4 sm:px-6 lg:px-12 pb-32 ${hideHeader ? 'pt-8 sm:pt-10 lg:pt-14' : 'pt-6 sm:pt-8 lg:pt-12'}`}
@@ -1140,129 +1137,133 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 						<h1 className="text-2xl sm:text-3xl font-semibold text-foreground mb-2">
 							{manageMode ? 'Manage Providers' : 'Welcome to otto'}
 						</h1>
-						<p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
+						<p className="text-base text-muted-foreground max-w-2xl">
 							{manageMode
-								? 'Add or remove AI providers. Your changes are saved automatically.'
-								: 'Connect OttoRouter for instant access to every model, or bring your own API keys.'}
+								? 'Changes are saved automatically.'
+								: 'Connect OttoRouter or bring your own API keys.'}
 						</p>
 					</div>
 
 					{/* OttoRouter Hero */}
-					<div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-card mb-10">
-						<div
-							className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent"
-							aria-hidden="true"
-						/>
-						<div className="relative p-5 sm:p-7 flex flex-col lg:flex-row lg:items-center gap-6 lg:gap-10">
-							<div className="flex-1 min-w-0">
-								<div className="flex flex-wrap items-center gap-2.5 mb-3">
-									<ProviderLogo provider="ottorouter" size={22} />
-									<span className="text-base font-semibold text-foreground">
-										OttoRouter
-									</span>
-									{authStatus.ottorouter.configured ? (
-										<span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-medium text-green-600 dark:text-green-400">
-											<span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-											Connected
-										</span>
-									) : (
-										<span className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
-											Recommended
-										</span>
-									)}
-								</div>
-								<p className="text-sm text-muted-foreground mb-4 max-w-xl">
-									One account for every top model. Authenticate once with OAuth,
-									no API keys to copy around.
-								</p>
-								<ul className="space-y-2">
-									<li className="flex items-center gap-2.5 text-sm text-foreground/90">
-										<Zap className="w-4 h-4 text-primary shrink-0" />
-										Instant access to all supported models
-									</li>
-									<li className="flex items-center gap-2.5 text-sm text-foreground/90">
-										<ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-										GO plan credits applied automatically
-									</li>
-									<li className="flex items-center gap-2.5 text-sm text-foreground/90">
-										<CreditCard className="w-4 h-4 text-primary shrink-0" />
-										Pay-as-you-go with card top-ups
-									</li>
-								</ul>
-							</div>
-
-							<div className="lg:w-72 shrink-0">
-								{authStatus.ottorouter.configured ? (
-									<div className="space-y-3">
-										<div className="px-4 py-3 bg-muted/50 border border-border rounded-xl">
-											<div className="flex items-center justify-between gap-2">
-												<span className="font-mono text-lg font-semibold text-foreground truncate">
-													{ottorouterStatusLabel}
-												</span>
-												<button
-													type="button"
-													onClick={fetchBalance}
-													disabled={isBalanceLoading}
-													className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-													aria-label="Refresh balance"
-												>
-													{isBalanceLoading ? (
-														<StableSpinner
-															size="xs"
-															title="Refreshing balance"
-														/>
-													) : (
-														<RefreshCw className="w-3.5 h-3.5" />
-													)}
-												</button>
-											</div>
-											<span className="text-[11px] text-muted-foreground font-mono">
-												Account balance ${(balance ?? 0).toFixed(2)}
+					{authStatus.ottorouter.configured ? (
+						<div className="rounded-2xl border border-border bg-card mb-10">
+							<div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+								<div className="flex items-center gap-3 flex-1 min-w-0">
+									<div className="flex items-center justify-center w-10 h-10 rounded-xl bg-muted shrink-0">
+										<ProviderLogo provider="ottorouter" size={22} />
+									</div>
+									<div className="min-w-0">
+										<div className="flex items-center gap-2">
+											<span className="text-base font-semibold text-foreground">
+												OttoRouter
+											</span>
+											<span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-xs font-medium text-green-600 dark:text-green-400">
+												<span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+												Connected
 											</span>
 										</div>
 										<button
 											type="button"
-											onClick={onOpenTopup}
-											className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+											onClick={() => openUrl('https://ottorouter.org')}
+											className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
 										>
-											<CreditCard className="w-4 h-4" />
-											Top Up with Card
+											ottorouter.org
+											<ExternalLink className="w-3 h-3" />
 										</button>
-										{confirmingDelete === 'ottorouter' ? (
-											<div className="flex gap-2">
-												<button
-													type="button"
-													onClick={() => handleRemoveProvider('ottorouter')}
-													disabled={removingProvider === 'ottorouter'}
-													className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
-												>
-													{removingProvider === 'ottorouter' ? (
-														<StableSpinner size="sm" title="Signing out" />
-													) : (
-														<LogOut className="w-4 h-4" />
-													)}
-													Confirm
-												</button>
-												<button
-													type="button"
-													onClick={handleCancelDelete}
-													className="px-4 py-2 bg-muted text-muted-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
-												>
-													Cancel
-												</button>
-											</div>
-										) : (
+									</div>
+								</div>
+
+								<div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+									<div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-lg">
+										<span className="font-mono text-sm font-semibold text-foreground">
+											{ottorouterStatusLabel}
+										</span>
+										<button
+											type="button"
+											onClick={fetchBalance}
+											disabled={isBalanceLoading}
+											className="p-0.5 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+											aria-label="Refresh balance"
+										>
+											{isBalanceLoading ? (
+												<StableSpinner size="xs" title="Refreshing balance" />
+											) : (
+												<RefreshCw className="w-3.5 h-3.5" />
+											)}
+										</button>
+									</div>
+									<button
+										type="button"
+										onClick={onOpenTopup}
+										className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+									>
+										<CreditCard className="w-4 h-4" />
+										Top Up
+									</button>
+									{confirmingDelete === 'ottorouter' ? (
+										<div className="flex items-center gap-1.5">
 											<button
 												type="button"
 												onClick={() => handleRemoveProvider('ottorouter')}
-												className="w-full flex items-center justify-center gap-2 px-4 py-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
+												disabled={removingProvider === 'ottorouter'}
+												className="flex items-center gap-1.5 px-3 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
 											>
-												<LogOut className="w-4 h-4" />
-												Sign Out
+												{removingProvider === 'ottorouter' ? (
+													<StableSpinner size="sm" title="Signing out" />
+												) : (
+													<LogOut className="w-3.5 h-3.5" />
+												)}
+												Confirm
 											</button>
-										)}
+											<button
+												type="button"
+												onClick={handleCancelDelete}
+												className="px-3 py-2 bg-muted text-muted-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
+											>
+												Cancel
+											</button>
+										</div>
+									) : (
+										<button
+											type="button"
+											onClick={() => handleRemoveProvider('ottorouter')}
+											className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+											aria-label="Sign out of OttoRouter"
+											title="Sign out"
+										>
+											<LogOut className="w-4 h-4" />
+										</button>
+									)}
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="rounded-2xl border border-primary/25 bg-card mb-10">
+							<div className="p-5 sm:p-7 flex flex-col lg:flex-row lg:items-center gap-6 lg:gap-10">
+								<div className="flex-1 min-w-0">
+									<div className="flex flex-wrap items-center gap-2.5 mb-3">
+										<ProviderLogo provider="ottorouter" size={22} />
+										<span className="text-base font-semibold text-foreground">
+											OttoRouter
+										</span>
+										<span className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+											Recommended
+										</span>
 									</div>
-								) : (
+									<p className="text-sm text-muted-foreground mb-3 max-w-xl">
+										One account for every top model. No API keys needed.
+									</p>
+									<button
+										type="button"
+										onClick={() => openUrl('https://ottorouter.org')}
+										className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+									>
+										Open dashboard
+										<ExternalLink className="w-3.5 h-3.5" />
+									</button>
+								</div>
+
+								<div className="lg:w-72 shrink-0">
 									<div className="space-y-2">
 										<button
 											type="button"
@@ -1288,10 +1289,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 											Opens your browser to authorize
 										</p>
 									</div>
-								)}
+								</div>
 							</div>
 						</div>
-					</div>
+					)}
 
 					{/* Connected Providers */}
 					{configuredProviders.length > 0 && (
@@ -1377,14 +1378,9 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					{/* Add Providers */}
 					<div>
 						<div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
-							<div>
-								<h2 className="font-semibold text-foreground">
-									Bring Your Own Keys
-								</h2>
-								<p className="text-sm text-muted-foreground">
-									Connect providers directly with an API key or OAuth
-								</p>
-							</div>
+							<h2 className="font-semibold text-foreground">
+								Bring Your Own Keys
+							</h2>
 							<div className="relative sm:w-64">
 								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
 								<input
@@ -1522,9 +1518,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					</div>
 				</div>
 			</div>
-
-			{/* Bottom Bar */}
-			<div className="fixed bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-border bg-background">
+			<div className="fixed bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-border bg-background/70 backdrop-blur-md">
 				<div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
 					{!manageMode && (
 						<div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">

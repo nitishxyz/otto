@@ -52,6 +52,8 @@ export async function handleReasoningStart(
 		publish({
 			type: 'reasoning.delta',
 			sessionId: opts.sessionId,
+			projectId: opts.projectId,
+			projectRoot: opts.projectRoot,
 			payload: {
 				messageId: opts.assistantMessageId,
 				partId: state.partId,
@@ -122,6 +124,8 @@ export async function handleReasoningDelta(
 	publish({
 		type: 'reasoning.delta',
 		sessionId: opts.sessionId,
+		projectId: opts.projectId,
+		projectRoot: opts.projectRoot,
 		payload: {
 			messageId: opts.assistantMessageId,
 			partId: state.partId,

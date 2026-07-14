@@ -74,6 +74,7 @@ export async function appendAssistantText(
 			publish({
 				type: 'message.part.delta',
 				sessionId: ctx.sessionId,
+				projectRoot: ctx.projectRoot,
 				payload,
 			});
 		}

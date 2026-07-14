@@ -70,6 +70,8 @@ export function createStepFinishHandler(
 			publish({
 				type: 'finish-step',
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				payload: {
 					stepIndex,
 					usage: step.usage,
@@ -81,6 +83,8 @@ export function createStepFinishHandler(
 				publish({
 					type: 'usage',
 					sessionId: opts.sessionId,
+					projectId: opts.projectId,
+					projectRoot: opts.projectRoot,
 					payload: { stepIndex, ...step.usage },
 				});
 			}

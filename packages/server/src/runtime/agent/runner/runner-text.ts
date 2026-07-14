@@ -101,6 +101,8 @@ export async function handleRunnerTextDelta(args: {
 	publish({
 		type: 'message.part.delta',
 		sessionId: opts.sessionId,
+		projectId: opts.projectId,
+		projectRoot: opts.projectRoot,
 		payload: {
 			messageId: opts.assistantMessageId,
 			partId: state.currentPartId,

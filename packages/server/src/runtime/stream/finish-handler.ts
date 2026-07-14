@@ -108,6 +108,8 @@ export function createFinishHandler(
 		publish({
 			type: 'message.completed',
 			sessionId: opts.sessionId,
+			projectId: opts.projectId,
+			projectRoot: opts.projectRoot,
 			payload: {
 				id: opts.assistantMessageId,
 				usage,

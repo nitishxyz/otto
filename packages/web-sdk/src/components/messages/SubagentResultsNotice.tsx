@@ -9,7 +9,7 @@ export function isSubagentResultsMessage(content: string): boolean {
 	return content.trimStart().startsWith(SUBAGENT_RESULTS_TAG);
 }
 
-interface ParsedSubagentResult {
+export interface ParsedSubagentResult {
 	id: string;
 	agent: string;
 	status: string;

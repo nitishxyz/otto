@@ -46,7 +46,8 @@ async function handleProjectEventsStream(c: Context) {
 
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
-			let unsubscribeProject = () => {};
+			let unsubscribeProjectRoot = () => {};
+			let unsubscribeProjectId = () => {};
 			let unsubscribeLegacy = () => {};
 			let unsubscribeClient = () => {};
 			let hb: ReturnType<typeof setInterval> | null = null;
@@ -55,7 +56,8 @@ async function handleProjectEventsStream(c: Context) {
 				if (cleanedUp) return;
 				cleanedUp = true;
 				if (hb !== null) clearInterval(hb);
-				unsubscribeProject();
+				unsubscribeProjectRoot();
+				unsubscribeProjectId();
 				unsubscribeLegacy();
 				unsubscribeClient();
 				try {
@@ -75,6 +77,7 @@ async function handleProjectEventsStream(c: Context) {
 			};
 
 			const writeSession = (evt: OttoEvent) => {
+				if (evt.projectId && evt.projectId !== project.projectId) return;
 				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
 				let line: string;
 				try {
@@ -117,8 +120,12 @@ async function handleProjectEventsStream(c: Context) {
 				send(line);
 			};
 
-			unsubscribeProject = subscribeProjectEvents(
+			unsubscribeProjectRoot = subscribeProjectEvents(
 				project.runtime.root,
+				writeSession,
+			);
+			unsubscribeProjectId = subscribeProjectEvents(
+				project.projectId,
 				writeSession,
 			);
 			unsubscribeLegacy = subscribeProjectEvents(undefined, writeSession);

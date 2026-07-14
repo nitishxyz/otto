@@ -29,6 +29,7 @@ import { SimulatorRenderer } from './SimulatorRenderer';
 import { SkillRenderer } from './SkillRenderer';
 import { GoalToolRenderer } from './GoalToolRenderer';
 import { SubagentToolRenderer } from './SubagentToolRenderer';
+import { SubagentResultRenderer } from './SubagentResultRenderer';
 
 interface ToolResultRendererProps {
 	toolName: string;
@@ -194,6 +195,8 @@ export function ToolResultRenderer({
 		case 'list_subagents':
 		case 'message_subagent':
 			return <SubagentToolRenderer {...props} toolName={normalizedName} />;
+		case 'subagent_result':
+			return <SubagentResultRenderer {...props} />;
 		case 'error':
 			return (
 				<ErrorRenderer

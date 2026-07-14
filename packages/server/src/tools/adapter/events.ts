@@ -22,6 +22,7 @@ export function publishToolCall(
 	publish({
 		type: 'tool.call',
 		sessionId: ctx.sessionId,
+		projectRoot: ctx.projectRoot,
 		payload: {
 			name: args.name,
 			args: args.input,
@@ -58,6 +59,7 @@ export function publishToolDelta(
 	publish({
 		type: 'tool.delta',
 		sessionId: ctx.sessionId,
+		projectRoot: ctx.projectRoot,
 		payload: {
 			name: args.name,
 			channel: args.channel,
@@ -77,6 +79,7 @@ export function publishToolResult(
 	publish({
 		type: 'tool.result',
 		sessionId: ctx.sessionId,
+		projectRoot: ctx.projectRoot,
 		payload: { ...content, stepIndex, messageId: ctx.messageId },
 	});
 }
@@ -164,6 +167,7 @@ export function publishPlanUpdated(
 			publish({
 				type: 'plan.updated',
 				sessionId: ctx.sessionId,
+				projectRoot: ctx.projectRoot,
 				payload,
 			});
 		}
