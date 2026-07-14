@@ -20,6 +20,7 @@ export type ToolAdapterContext = {
 	provider: string;
 	model: string;
 	projectRoot: string;
+	readOnlyRoots?: string[];
 	nextIndex: () => number | Promise<number>;
 	stepIndex?: number;
 	onFirstToolCall?: () => void;

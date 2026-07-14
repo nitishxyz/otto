@@ -7,6 +7,7 @@ export type GuardAction =
 
 export type GuardContext = {
 	projectRoot?: string;
+	readOnlyRoots?: string[];
 };
 
 export function guardToolCall(
@@ -19,23 +20,48 @@ export function guardToolCall(
 	switch (toolName) {
 		case 'shell':
 		case 'bash':
-			return guardShellCommand(String(a.cmd ?? ''));
+			return guardShellCommand(
+				String(a.cmd ?? ''),
+				context,
+				String(a.cwd ?? ''),
+			);
 		case 'terminal':
-			return guardTerminal(a);
+			return guardTerminal(a, context);
 		case 'read':
-			return guardReadPath(String(a.path ?? ''), context.projectRoot);
+		case 'ls':
+		case 'tree':
+		case 'search':
+		case 'glob':
+			return guardReadPath(
+				String(a.path ?? ''),
+				context.projectRoot,
+				context.readOnlyRoots,
+			);
 		case 'write':
-			return guardWritePath(toolName, a);
+		case 'edit':
+		case 'multiedit':
+			return guardWritePath(a, context.readOnlyRoots);
 		case 'copy_into':
-			return guardCopyIntoPath(a, context.projectRoot);
+			return guardCopyIntoPath(a, context.projectRoot, context.readOnlyRoots);
 		default:
 			return { type: 'allow' };
 	}
 }
 
-function guardShellCommand(cmd: string): GuardAction {
+function guardShellCommand(
+	cmd: string,
+	context: GuardContext = {},
+	cwd = '',
+): GuardAction {
 	const n = cmd.trim();
 	if (!n) return { type: 'allow' };
+	if (
+		(referencesReadOnlyRoot(n, context.readOnlyRoots) ||
+			isPathInAnyRoot(cwd, context.readOnlyRoots)) &&
+		!isReadOnlyProbe(n)
+	) {
+		return { type: 'block', reason: 'Reference directories are read-only' };
+	}
 
 	const blocked = checkBlockedCommand(n);
 	if (blocked) return { type: 'block', reason: blocked };
@@ -104,10 +130,69 @@ function checkApprovalCommand(cmd: string): string | null {
 	return null;
 }
 
-function guardTerminal(args: Record<string, unknown>): GuardAction {
+function referencesReadOnlyRoot(
+	command: string,
+	readOnlyRoots: string[] | undefined,
+): boolean {
+	const normalizedCommand = normalizeForComparison(command);
+	return (readOnlyRoots ?? []).some((root) => {
+		const normalizedRoot = normalizeForComparison(resolvePath(root)).replace(
+			/[\\/]+$/,
+			'',
+		);
+		const index = normalizedCommand.indexOf(normalizedRoot);
+		if (index === -1) return false;
+		const next = normalizedCommand[index + normalizedRoot.length];
+		return next === undefined || /[\s/'"\\]/.test(next);
+	});
+}
+
+function isReadOnlyProbe(command: string): boolean {
+	if (/(^|[^<])>(?!>)|>>|\btee\b/.test(command)) return false;
+	const segments = command
+		.split(/&&|\|\||(?<!\|)\|(?!\|)|;|\n/)
+		.map((segment) => segment.trim())
+		.filter(Boolean);
+	return segments.every((segment) => {
+		const executable = segment.match(
+			/^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(\S+)/,
+		)?.[1];
+		if (!executable) return false;
+		const name = executable.split('/').pop();
+		if (name === 'git') {
+			return /\bgit\b(?:\s+-C\s+\S+)?\s+(status|log|show|diff|branch|rev-parse|ls-files)\b/.test(
+				segment,
+			);
+		}
+		return new Set([
+			'ls',
+			'pwd',
+			'cat',
+			'head',
+			'tail',
+			'grep',
+			'rg',
+			'tree',
+			'file',
+			'stat',
+			'wc',
+			'du',
+			'jq',
+		]).has(name ?? '');
+	});
+}
+
+function guardTerminal(
+	args: Record<string, unknown>,
+	context: GuardContext,
+): GuardAction {
 	const op = String(args.operation ?? '');
 	if (op === 'start' && typeof args.command === 'string') {
-		return guardShellCommand(args.command);
+		return guardShellCommand(
+			args.command,
+			context,
+			typeof args.cwd === 'string' ? args.cwd : '',
+		);
 	}
 	return { type: 'allow' };
 }
@@ -150,9 +235,9 @@ function isAbsoluteLike(path: string): boolean {
 	);
 }
 
-function isPathInProject(path: string, projectRoot?: string): boolean {
-	if (!projectRoot || !isAbsoluteLike(path)) return false;
-	const root = resolvePath(projectRoot);
+function isPathInRoot(path: string, rootPath?: string): boolean {
+	if (!rootPath || !isAbsoluteLike(path)) return false;
+	const root = resolvePath(rootPath);
 	const target = resolvePath(expandTilde(path));
 	const rootNorm = (() => {
 		const normalized = normalizeForComparison(root);
@@ -164,7 +249,17 @@ function isPathInProject(path: string, projectRoot?: string): boolean {
 	return targetNorm === rootNorm || targetNorm.startsWith(rootWithSlash);
 }
 
-function guardReadPath(path: string, projectRoot?: string): GuardAction {
+function isPathInAnyRoot(path: string, roots: string[] | undefined): boolean {
+	return (
+		Boolean(path) && (roots ?? []).some((root) => isPathInRoot(path, root))
+	);
+}
+
+function guardReadPath(
+	path: string,
+	projectRoot?: string,
+	readOnlyRoots?: string[],
+): GuardAction {
 	if (!path) return { type: 'allow' };
 	const p = path.trim();
 
@@ -174,7 +269,7 @@ function guardReadPath(path: string, projectRoot?: string): GuardAction {
 	for (const { pattern, reason } of SENSITIVE_READ_PATHS) {
 		if (pattern.test(p)) return { type: 'approve', reason };
 	}
-	if (isPathInProject(p, projectRoot)) {
+	if (isPathInRoot(p, projectRoot) || isPathInAnyRoot(p, readOnlyRoots)) {
 		return { type: 'allow' };
 	}
 	if (isAbsoluteLike(p)) {
@@ -189,8 +284,8 @@ const SENSITIVE_WRITE_PATHS: Array<{ pattern: RegExp; reason: string }> = [
 ];
 
 function guardWritePath(
-	_toolName: string,
 	args: Record<string, unknown>,
+	readOnlyRoots?: string[],
 ): GuardAction {
 	const path =
 		typeof args.path === 'string'
@@ -202,6 +297,9 @@ function guardWritePath(
 					: '';
 	if (!path) return { type: 'allow' };
 	const p = path.trim();
+	if (isPathInAnyRoot(p, readOnlyRoots)) {
+		return { type: 'block', reason: 'Reference directories are read-only' };
+	}
 
 	for (const { pattern, reason } of SENSITIVE_WRITE_PATHS) {
 		if (pattern.test(p)) return { type: 'approve', reason };
@@ -212,12 +310,13 @@ function guardWritePath(
 function guardCopyIntoPath(
 	args: Record<string, unknown>,
 	projectRoot?: string,
+	readOnlyRoots?: string[],
 ): GuardAction {
-	const writeGuard = guardWritePath('copy_into', args);
+	const writeGuard = guardWritePath(args, readOnlyRoots);
 	if (writeGuard.type === 'block') return writeGuard;
 
 	const sourcePath = typeof args.sourcePath === 'string' ? args.sourcePath : '';
-	const readGuard = guardReadPath(sourcePath, projectRoot);
+	const readGuard = guardReadPath(sourcePath, projectRoot, readOnlyRoots);
 	if (readGuard.type === 'block') return readGuard;
 	if (writeGuard.type === 'approve') return writeGuard;
 	if (readGuard.type === 'approve') return readGuard;

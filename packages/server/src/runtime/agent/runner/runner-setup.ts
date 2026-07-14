@@ -18,6 +18,7 @@ import { buildEnqueueSessionMessageTool } from '../../../tools/looper/index.ts';
 import { buildRunPluginCommandTool } from '../../../tools/plugins/run-plugin-command.ts';
 import { time } from '../../debug/index.ts';
 import { buildHistoryMessages } from '../../message/history-builder.ts';
+import { resolveReferences } from '../../context/references.ts';
 import { setupToolContext } from '../../tools/setup.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import { flattenAgentToolConfig, resolveAgentConfig } from '../registry.ts';
@@ -112,8 +113,17 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const sessionRowsPromise = timePromise(
 		db.select().from(sessions).where(eq(sessions.id, opts.sessionId)).limit(1),
 	);
+	const references = await resolveReferences(cfg);
+	const referenceRoots = references.flatMap((reference) =>
+		reference.path ? [reference.path] : [],
+	);
 	const discoveredToolsPromise = timePromise(
-		discoverProjectTools(cfg.projectRoot, undefined, cfg.skills),
+		discoverProjectTools(
+			cfg.projectRoot,
+			undefined,
+			cfg.skills,
+			referenceRoots,
+		),
 	);
 	const { value: agentCfg, durationMs: resolveAgentConfigMs } =
 		await agentCfgPromise;
@@ -273,6 +283,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const prompt = await buildRunnerPrompt({
 		opts,
 		cfg,
+		references,
 		agentPrompt: `${agentCfg.prompt || ''}${availableAgentsPrompt}`,
 		contextSummary,
 		historyLength: history.length,
@@ -305,6 +316,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const { sharedCtx, firstToolTimer, firstToolSeen } = await setupToolContext(
 		opts,
 		db,
+		prompt.referenceRoots,
 	);
 	const setupToolContextMs = nowMs() - setupToolContextStartedAt;
 

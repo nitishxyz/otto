@@ -139,8 +139,9 @@ export function getTerminalManager(
 function getStaticToolDiscoveryCacheKey(
 	projectRoot: string,
 	globalConfigDir?: string,
+	readOnlyRoots: string[] = [],
 ): string {
-	return `${projectRoot}::${globalConfigDir ?? ''}`;
+	return `${projectRoot}::${globalConfigDir ?? ''}::${[...readOnlyRoots].sort().join('\0')}`;
 }
 
 async function discoverStaticProjectTools(
@@ -150,9 +151,14 @@ async function discoverStaticProjectTools(
 		enabled?: boolean;
 		items?: Record<string, { enabled?: boolean }>;
 	},
+	readOnlyRoots: string[] = [],
 ): Promise<DiscoveredTool[]> {
 	setSkillSettings(skillSettings);
-	const cacheKey = getStaticToolDiscoveryCacheKey(projectRoot, globalConfigDir);
+	const cacheKey = getStaticToolDiscoveryCacheKey(
+		projectRoot,
+		globalConfigDir,
+		readOnlyRoots,
+	);
 	const cached = staticToolDiscoveryCache.get(cacheKey);
 	if (cached) return cached;
 
@@ -171,7 +177,7 @@ async function discoverStaticProjectTools(
 			tools.set(name, tool);
 		// Built-ins
 		tools.set('progress_update', progressUpdateTool);
-		const shell = buildShellTool(projectRoot);
+		const shell = buildShellTool(projectRoot, readOnlyRoots);
 		tools.set(shell.name, shell.tool);
 		// Search
 		const search = buildSearchTool(projectRoot);
@@ -218,12 +224,14 @@ export async function discoverProjectTools(
 		enabled?: boolean;
 		items?: Record<string, { enabled?: boolean }>;
 	},
+	readOnlyRoots: string[] = [],
 ): Promise<DiscoverResult> {
 	setSkillSettings(skillSettings);
 	const staticTools = await discoverStaticProjectTools(
 		projectRoot,
 		globalConfigDir,
 		skillSettings,
+		readOnlyRoots,
 	);
 	const tools = new Map<string, Tool>(
 		staticTools.map(({ name, tool }) => [name, tool]),

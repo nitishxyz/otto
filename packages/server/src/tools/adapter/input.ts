@@ -164,6 +164,7 @@ export async function handleAdaptedToolInputAvailable(
 		}
 		const guard = guardToolCall(args.name, input, {
 			projectRoot: args.ctx.projectRoot,
+			readOnlyRoots: args.ctx.readOnlyRoots,
 		});
 		if (guard.type === 'block') {
 			meta.blocked = true;

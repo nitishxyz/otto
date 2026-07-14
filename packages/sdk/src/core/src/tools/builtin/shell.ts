@@ -26,13 +26,68 @@ function normalizePath(p: string) {
 	return `/${stack.join('/')}`;
 }
 
-function resolveSafePath(projectRoot: string, p: string) {
+function isPathInRoot(path: string, root: string): boolean {
+	return path === root || path.startsWith(`${root}/`);
+}
+
+function isReadOnlyProbe(command: string): boolean {
+	if (/(^|[^<])>(?!>)|>>|\btee\b/.test(command)) return false;
+	const segments = command
+		.split(/&&|\|\||(?<!\|)\|(?!\|)|;|\n/)
+		.map((segment) => segment.trim())
+		.filter(Boolean);
+	return segments.every((segment) => {
+		const executable = segment.match(
+			/^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(\S+)/,
+		)?.[1];
+		if (!executable) return false;
+		const name = executable.split('/').pop();
+		if (name === 'git') {
+			return /\bgit\b(?:\s+-C\s+\S+)?\s+(status|log|show|diff|branch|rev-parse|ls-files)\b/.test(
+				segment,
+			);
+		}
+		return new Set([
+			'ls',
+			'pwd',
+			'cat',
+			'head',
+			'tail',
+			'grep',
+			'rg',
+			'tree',
+			'file',
+			'stat',
+			'wc',
+			'du',
+			'jq',
+		]).has(name ?? '');
+	});
+}
+
+function resolveSafePath(
+	projectRoot: string,
+	p: string,
+	command: string,
+	readOnlyRoots: string[],
+) {
 	const root = normalizePath(projectRoot);
-	const abs = normalizePath(`${root}/${p || '.'}`);
-	if (!(abs === root || abs.startsWith(`${root}/`))) {
-		throw new Error(`cwd escapes project root: ${p}`);
+	const requested = p || '.';
+	const abs = normalizePath(
+		requested.startsWith('/') || /^[A-Za-z]:[\\/]/.test(requested)
+			? requested
+			: `${root}/${requested}`,
+	);
+	if (isPathInRoot(abs, root)) return abs;
+	if (
+		readOnlyRoots.some((allowedRoot) =>
+			isPathInRoot(abs, normalizePath(allowedRoot)),
+		) &&
+		isReadOnlyProbe(command)
+	) {
+		return abs;
 	}
-	return abs;
+	throw new Error(`cwd escapes project root or is not read-only: ${p}`);
 }
 
 function killProcessTree(pid: number) {
@@ -239,7 +294,9 @@ const shellInputSchema = z
 		cwd: z
 			.string()
 			.default('.')
-			.describe('Working directory relative to project root'),
+			.describe(
+				'Working directory relative to project root, or an available read-only reference directory for probe commands.',
+			),
 		allowNonZeroExit: z
 			.boolean()
 			.optional()
@@ -298,7 +355,10 @@ type ShellToolFactory = (definition: {
 	): AsyncIterable<ShellStreamChunk> | ShellResult;
 }) => Tool;
 
-export function buildShellTool(projectRoot: string): {
+export function buildShellTool(
+	projectRoot: string,
+	readOnlyRoots: string[] = [],
+): {
 	name: string;
 	tool: Tool;
 } {
@@ -327,7 +387,12 @@ export function buildShellTool(projectRoot: string): {
 				});
 			}
 
-			const absCwd = resolveSafePath(projectRoot, cwd || '.');
+			const absCwd = resolveSafePath(
+				projectRoot,
+				cwd || '.',
+				cmd,
+				readOnlyRoots,
+			);
 			const finalCmd = injectCoAuthorIntoGitCommit(
 				cmd,
 				shouldCoAuthorCommits(projectRoot),

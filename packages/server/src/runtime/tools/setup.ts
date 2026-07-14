@@ -14,6 +14,7 @@ export type RunnerToolContext = ToolAdapterContext & { stepIndex: number };
 export async function setupToolContext(
 	opts: RunOpts,
 	db: Awaited<ReturnType<typeof getDb>>,
+	readOnlyRoots: string[] = [],
 ) {
 	const firstToolTimer = time('runner:first-tool-call');
 	let firstToolSeen = false;
@@ -38,6 +39,7 @@ export async function setupToolContext(
 		provider: opts.provider,
 		model: opts.model,
 		projectRoot: opts.projectRoot,
+		readOnlyRoots,
 		stepExecution: { states: new Map() },
 		toolApprovalMode: opts.toolApprovalMode,
 		onFirstToolCall: () => {

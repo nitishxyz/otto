@@ -7,7 +7,7 @@ import {
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { composeSystemPrompt } from '../../prompt/builder.ts';
-import { resolveReferences } from '../../context/references.ts';
+import type { ResolvedReference } from '../../context/references.ts';
 import { isDebugEnabled } from '../../debug/state.ts';
 import { getMaxOutputTokens } from '../../utils/token.ts';
 import { getCompactionSystemPrompt } from '../../message/compaction.ts';
@@ -19,6 +19,7 @@ import { nowMs } from './runner-setup-utils.ts';
 export type RunnerPromptSetup = {
 	system: string;
 	systemComponents: string[];
+	referenceRoots: string[];
 	additionalSystemMessages: Array<{ role: 'system' | 'user'; content: string }>;
 	maxOutputTokens: number | undefined;
 	providerOptions: Record<string, unknown>;
@@ -31,18 +32,17 @@ export type RunnerPromptSetup = {
 export async function buildRunnerPrompt(args: {
 	opts: RunOpts;
 	cfg: OttoConfig;
+	references: ResolvedReference[];
 	agentPrompt: string;
 	contextSummary?: string;
 	historyLength: number;
 	isFirstMessage: boolean;
 }): Promise<RunnerPromptSetup> {
-	const { opts, cfg, agentPrompt, contextSummary } = args;
+	const { opts, cfg, references, agentPrompt, contextSummary } = args;
 	const composeSystemPromptStartedAt = nowMs();
 	const { getAuth } = await import('@ottocode/sdk');
 	const auth = await getAuth(opts.provider, cfg.projectRoot);
 	const oauth = detectOAuth(opts.provider, auth);
-	const references = await resolveReferences(cfg);
-
 	const composed = await composeSystemPrompt({
 		provider: opts.provider,
 		model: opts.model,
@@ -128,6 +128,9 @@ export async function buildRunnerPrompt(args: {
 	return {
 		system,
 		systemComponents,
+		referenceRoots: references.flatMap((reference) =>
+			reference.path ? [reference.path] : [],
+		),
 		additionalSystemMessages,
 		maxOutputTokens: adapted.maxOutputTokens,
 		providerOptions: adapted.providerOptions,

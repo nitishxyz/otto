@@ -163,6 +163,55 @@ describe('guardToolCall', () => {
 				'allow',
 			);
 		});
+
+		test('allows absolute paths inside configured read-only reference roots', () => {
+			const projectRoot = resolve('/tmp/otto-project');
+			const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+			const path = join(referenceRoot, 'src', 'index.ts');
+
+			expect(
+				guardToolCall(
+					'read',
+					{ path },
+					{
+						projectRoot,
+						readOnlyRoots: [referenceRoot],
+					},
+				).type,
+			).toBe('allow');
+		});
+
+		test('allows list and search tools inside reference roots', () => {
+			const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+			const context = {
+				projectRoot: resolve('/tmp/otto-project'),
+				readOnlyRoots: [referenceRoot],
+			};
+
+			for (const toolName of ['ls', 'tree', 'search', 'glob']) {
+				expect(
+					guardToolCall(toolName, { path: referenceRoot }, context).type,
+				).toBe('allow');
+			}
+		});
+
+		test('does not extend reference access to sibling paths', () => {
+			const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+			const sibling = resolve(
+				'/tmp/otto-state/references/docs-hash-other/file.ts',
+			);
+
+			expect(
+				guardToolCall(
+					'read',
+					{ path: sibling },
+					{
+						projectRoot: resolve('/tmp/otto-project'),
+						readOnlyRoots: [referenceRoot],
+					},
+				).type,
+			).toBe('approve');
+		});
 	});
 
 	describe('copy_into — source and target path guards', () => {
@@ -194,12 +243,109 @@ describe('guardToolCall', () => {
 			).toBe('approve');
 		});
 
+		test('allows a reference file as a read-only copy source', () => {
+			const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+
+			expect(
+				guardToolCall(
+					'copy_into',
+					{
+						sourcePath: join(referenceRoot, 'LICENSE'),
+						targetPath: 'third-party/LICENSE',
+					},
+					{
+						projectRoot: resolve('/tmp/otto-project'),
+						readOnlyRoots: [referenceRoot],
+					},
+				).type,
+			).toBe('allow');
+		});
+
 		test('blocks sensitive copy source paths', () => {
 			expect(
 				guardToolCall('copy_into', {
 					sourcePath: '/etc/shadow',
 					targetPath: 'target.txt',
 				}).type,
+			).toBe('block');
+		});
+	});
+
+	describe('reference roots — shell probing', () => {
+		const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+		const context = {
+			projectRoot: resolve('/tmp/otto-project'),
+			readOnlyRoots: [referenceRoot],
+		};
+
+		test('allows read-only shell probes targeting a reference', () => {
+			expect(
+				guardToolCall('shell', { cmd: `ls -la ${referenceRoot}` }, context)
+					.type,
+			).toBe('allow');
+			expect(
+				guardToolCall(
+					'shell',
+					{ cmd: `rg "createViewer" ${referenceRoot} | head -20` },
+					context,
+				).type,
+			).toBe('allow');
+			expect(
+				guardToolCall(
+					'shell',
+					{ cmd: `git -C ${referenceRoot} status --short` },
+					context,
+				).type,
+			).toBe('allow');
+			expect(
+				guardToolCall(
+					'shell',
+					{ cmd: 'git status --short', cwd: referenceRoot },
+					context,
+				).type,
+			).toBe('allow');
+		});
+
+		test('blocks shell mutations targeting a reference', () => {
+			for (const cmd of [
+				`rm ${referenceRoot}/README.md`,
+				`echo changed > ${referenceRoot}/README.md`,
+				`git -C ${referenceRoot} checkout -- README.md`,
+				`cat ${referenceRoot}/README.md | sh`,
+			]) {
+				expect(guardToolCall('shell', { cmd }, context).type).toBe('block');
+			}
+			expect(
+				guardToolCall(
+					'shell',
+					{ cmd: 'git checkout -- README.md', cwd: referenceRoot },
+					context,
+				).type,
+			).toBe('block');
+		});
+	});
+
+	describe('reference roots — file mutations', () => {
+		const referenceRoot = resolve('/tmp/otto-state/references/docs-hash');
+		const context = { readOnlyRoots: [referenceRoot] };
+
+		test('blocks write and edit tools inside reference roots', () => {
+			const path = join(referenceRoot, 'README.md');
+			for (const toolName of ['write', 'edit', 'multiedit']) {
+				expect(guardToolCall(toolName, { path }, context).type).toBe('block');
+			}
+		});
+
+		test('blocks copy targets inside reference roots', () => {
+			expect(
+				guardToolCall(
+					'copy_into',
+					{
+						sourcePath: 'LICENSE',
+						targetPath: join(referenceRoot, 'LICENSE'),
+					},
+					context,
+				).type,
 			).toBe('block');
 		});
 	});
