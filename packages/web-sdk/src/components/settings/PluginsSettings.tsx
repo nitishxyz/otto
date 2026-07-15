@@ -73,22 +73,26 @@ function pluralize(count: number, noun: string) {
 }
 
 interface CapabilitySource {
-	skills?: unknown[];
-	recipes?: unknown[];
-	dependencies?: unknown[];
+	skills?: Array<{ name: string; description?: string }>;
+	recipes?: Array<{ name: string; description?: string }>;
+	agents?: Array<{ name: string; description?: string }>;
+	dependencies?: string[];
 	mcpServers?: Record<string, unknown>;
-	commands?: Record<string, unknown>;
+	commands?: Record<string, PluginCommand>;
+	requirements?: Array<{ kind: string; value: string; message?: string }>;
 }
 
 function capabilityCounts(source?: CapabilitySource): string[] {
 	const skills = source?.skills?.length ?? 0;
 	const recipes = source?.recipes?.length ?? 0;
+	const agents = source?.agents?.length ?? 0;
 	const dependencies = source?.dependencies?.length ?? 0;
 	const mcp = Object.keys(source?.mcpServers ?? {}).length;
 	const commands = Object.keys(source?.commands ?? {}).length;
 	return [
 		skills ? pluralize(skills, 'skill') : null,
 		recipes ? pluralize(recipes, 'recipe') : null,
+		agents ? pluralize(agents, 'agent') : null,
 		dependencies ? pluralize(dependencies, 'dep') : null,
 		mcp ? `${mcp} MCP` : null,
 		commands ? pluralize(commands, 'command') : null,
@@ -227,23 +231,24 @@ const DetailSection = memo(function DetailSection({
 });
 
 interface CapabilityListProps {
-	plugin: EffectivePlugin;
+	source?: CapabilitySource;
 }
 
 const CapabilityGroups = memo(function CapabilityGroups({
-	plugin,
+	source,
 }: CapabilityListProps) {
-	const manifest = plugin.manifest;
-	const skills = manifest?.skills ?? [];
-	const recipes = manifest?.recipes ?? [];
-	const dependencies = manifest?.dependencies ?? [];
-	const mcpServers = Object.keys(manifest?.mcpServers ?? {});
-	const commands = Object.entries(manifest?.commands ?? {});
-	const requirements = manifest?.requirements ?? [];
+	const skills = source?.skills ?? [];
+	const recipes = source?.recipes ?? [];
+	const agents = source?.agents ?? [];
+	const dependencies = source?.dependencies ?? [];
+	const mcpServers = Object.keys(source?.mcpServers ?? {});
+	const commands = Object.entries(source?.commands ?? {});
+	const requirements = source?.requirements ?? [];
 
 	if (
 		!skills.length &&
 		!recipes.length &&
+		!agents.length &&
 		!dependencies.length &&
 		!mcpServers.length &&
 		!commands.length &&
@@ -253,52 +258,45 @@ const CapabilityGroups = memo(function CapabilityGroups({
 	}
 
 	return (
-		<DetailSection label="Capabilities">
-			<div className="space-y-2 text-xs">
-				{dependencies.length ? (
-					<CapabilityGroup label="Depends on" items={dependencies} />
+		<DetailSection label="What this plugin adds">
+			<div className="grid gap-3 lg:grid-cols-2">
+				{agents.length ? (
+					<CapabilityGroup label="Agents" items={agents} />
 				) : null}
 				{skills.length ? (
-					<CapabilityGroup
-						label="Skills"
-						items={skills.map((skill) =>
-							skill.description
-								? `${skill.name} - ${skill.description}`
-								: skill.name,
-						)}
-					/>
+					<CapabilityGroup label="Skills" items={skills} />
 				) : null}
 				{recipes.length ? (
-					<CapabilityGroup
-						label="Recipes"
-						items={recipes.map((recipe) =>
-							recipe.description
-								? `${recipe.name} - ${recipe.description}`
-								: recipe.name,
-						)}
-					/>
+					<CapabilityGroup label="Recipes" items={recipes} />
 				) : null}
 				{mcpServers.length ? (
-					<CapabilityGroup label="MCP" items={mcpServers} />
+					<CapabilityGroup
+						label="MCP servers"
+						items={mcpServers.map((name) => ({ name }))}
+					/>
 				) : null}
 				{commands.length ? (
 					<CapabilityGroup
 						label="Commands"
-						items={commands.map(([name, command]) =>
-							command.label
-								? `${command.label}: ${commandText(command)}`
-								: `${name}: ${commandText(command)}`,
-						)}
+						items={commands.map(([name, command]) => ({
+							name: command.label ?? name,
+							description: commandText(command),
+						}))}
+					/>
+				) : null}
+				{dependencies.length ? (
+					<CapabilityGroup
+						label="Installs with"
+						items={dependencies.map((name) => ({ name }))}
 					/>
 				) : null}
 				{requirements.length ? (
 					<CapabilityGroup
-						label="Requirements"
-						items={requirements.map((requirement) =>
-							requirement.message
-								? `${requirement.kind}:${requirement.value} - ${requirement.message}`
-								: `${requirement.kind}:${requirement.value}`,
-						)}
+						label="Setup requirements"
+						items={requirements.map((requirement) => ({
+							name: `${requirement.kind}: ${requirement.value}`,
+							description: requirement.message,
+						}))}
 					/>
 				) : null}
 			</div>
@@ -308,7 +306,7 @@ const CapabilityGroups = memo(function CapabilityGroups({
 
 interface CapabilityGroupProps {
 	label: string;
-	items: string[];
+	items: Array<{ name: string; description?: string }>;
 }
 
 const CapabilityGroup = memo(function CapabilityGroup({
@@ -316,15 +314,24 @@ const CapabilityGroup = memo(function CapabilityGroup({
 	items,
 }: CapabilityGroupProps) {
 	return (
-		<div className="grid gap-1 sm:grid-cols-[88px_1fr]">
-			<div className="font-medium text-muted-foreground">{label}</div>
-			<div className="space-y-1 text-foreground/90">
+		<div className="overflow-hidden rounded-lg border border-border/70 bg-background/40">
+			<div className="flex items-center justify-between border-b border-border/60 bg-muted/20 px-3 py-2">
+				<h5 className="text-xs font-semibold text-foreground">{label}</h5>
+				<span className="text-[10px] tabular-nums text-muted-foreground">
+					{items.length}
+				</span>
+			</div>
+			<div className="divide-y divide-border/50">
 				{items.map((item) => (
-					<div
-						key={item}
-						className="break-words font-mono text-[11px] leading-relaxed"
-					>
-						{item}
+					<div key={item.name} className="px-3 py-2.5">
+						<div className="font-mono text-[11px] font-medium text-foreground">
+							{item.name}
+						</div>
+						{item.description ? (
+							<p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+								{item.description}
+							</p>
+						) : null}
 					</div>
 				))}
 			</div>
@@ -568,7 +575,9 @@ export function PluginsSettings() {
 									description={
 										plugin.manifest?.description ?? registry?.description
 									}
-									meta={capabilityCounts(plugin.manifest).join(' · ')}
+									meta={capabilityCounts(plugin.manifest ?? registry).join(
+										' · ',
+									)}
 									end={
 										<EnabledSwitch
 											checked={plugin.enabled}
@@ -584,7 +593,7 @@ export function PluginsSettings() {
 					<EntityEmptyState
 						icon={<Puzzle className="h-4 w-4" />}
 						title="No plugins installed"
-						description="Plugins add skills, recipes, MCP servers, and commands. Browse the registry to install one."
+						description="Plugins add agents, skills, recipes, MCP servers, and commands. Browse the registry to install one."
 						actionLabel="Browse registry"
 						onAction={() => setView('available')}
 					/>
@@ -609,7 +618,9 @@ export function PluginsSettings() {
 								}
 								badge={installed ? 'Installed' : undefined}
 								description={plugin.description}
-								meta={`v${plugin.version}`}
+								meta={[`v${plugin.version}`, ...capabilityCounts(plugin)].join(
+									' · ',
+								)}
 							/>
 						);
 					})}
@@ -730,7 +741,7 @@ function InstalledPluginDetail({
 					</Badge>
 				) : null}
 			</div>
-			<CapabilityGroups plugin={plugin} />
+			<CapabilityGroups source={manifest ?? registry} />
 			{registry?.source ? (
 				<DetailSection label="Source">
 					<SourceLink source={registry.source} />
@@ -807,13 +818,7 @@ function AvailablePluginDetail({
 					<Badge key={tag}>{tag}</Badge>
 				))}
 			</div>
-			{plugin.dependencies?.length ? (
-				<DetailSection label="Installs with">
-					<span className="font-mono text-[11px] text-foreground/90">
-						{plugin.dependencies.join(', ')}
-					</span>
-				</DetailSection>
-			) : null}
+			<CapabilityGroups source={plugin} />
 			<DetailSection label="Source">
 				<SourceLink source={plugin.source} />
 			</DetailSection>
