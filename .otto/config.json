@@ -7,6 +7,14 @@
         "type": "local",
         "path": "/Users/bat/dev/nitishxyz/setu"
       }
+    },
+    "redacted": {
+      "description": "Use this when user mentiond to refer redacted, which is fork of otto",
+      "enabled": true,
+      "source": {
+        "type": "local",
+        "path": "/Users/bat/dev/nitishxyz/redacted"
+      }
     }
   }
 }

@@ -82,6 +82,7 @@ export function ReferencesSettings() {
 	const deleteReference = useDeleteReference();
 	const [selectedName, setSelectedName] = useState('');
 	const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+	const [isEditorOpen, setIsEditorOpen] = useState(false);
 	const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 	const references = referencesQuery.data?.references ?? {};
 	const statuses = referencesQuery.data?.statuses ?? {};
@@ -100,16 +101,19 @@ export function ReferencesSettings() {
 	function selectReference(name: string, reference: Reference) {
 		setSelectedName(name);
 		setDraft(toDraft(name, reference));
+		setIsEditorOpen(true);
 	}
 
 	function createReference() {
 		setSelectedName('');
 		setDraft({ ...EMPTY_DRAFT, name: 'new-reference' });
+		setIsEditorOpen(true);
 	}
 
 	function clearDraft() {
 		setSelectedName('');
 		setDraft(EMPTY_DRAFT);
+		setIsEditorOpen(false);
 	}
 
 	async function handleBrowse() {
@@ -199,7 +203,7 @@ export function ReferencesSettings() {
 		}
 	}
 
-	if (draft.name !== '') {
+	if (isEditorOpen) {
 		return (
 			<EntityEditor
 				backLabel="All references"
