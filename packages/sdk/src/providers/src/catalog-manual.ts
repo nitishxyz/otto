@@ -414,7 +414,28 @@ const DEPRECATED_KIMI_MODEL_IDS = new Set([
 	'kimi-k2-turbo-preview',
 ]);
 
+export const KIMI_K3_COST = {
+	input: 3,
+	output: 15,
+	cacheRead: 0.3,
+} as const;
+
 const KIMI_MANUAL_MODELS: ModelInfo[] = [
+	{
+		id: 'kimi-k3',
+		ownedBy: 'kimi',
+		label: 'Kimi K3',
+		modalities: { input: ['text', 'image', 'video'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: true,
+		temperature: true,
+		releaseDate: '2026-07-16',
+		lastUpdated: '2026-07-16',
+		openWeights: true,
+		cost: KIMI_K3_COST,
+		limit: { context: 1_048_576, output: 131_072 },
+	},
 	{
 		id: 'kimi-k2.7-code-highspeed',
 		ownedBy: 'kimi',

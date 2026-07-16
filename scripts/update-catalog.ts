@@ -8,7 +8,10 @@ import type {
 	ModelProviderBinding,
 	ProviderCatalogEntry,
 } from '@ottocode/sdk';
-import { mergeManualCatalog } from '../packages/sdk/src/providers/src/catalog-manual.ts';
+import {
+	KIMI_K3_COST,
+	mergeManualCatalog,
+} from '../packages/sdk/src/providers/src/catalog-manual.ts';
 import { modelListToMap } from '../packages/sdk/src/providers/src/model-map.ts';
 
 const SOURCE = 'https://models.dev/api.json';
@@ -480,7 +483,7 @@ function normalizeOttoRouterOwner(owner: string): ModelOwner {
 }
 
 function buildOttoRouterEntry(
-	data: OttoRouterApiModel[],
+	data: PricedOttoRouterApiModel[],
 ): ProviderCatalogEntry {
 	const models: ModelInfo[] = data
 		.map((m) => {
@@ -628,15 +631,39 @@ interface OttoRouterApiModel {
 	last_updated?: string;
 	open_weights?: boolean;
 	modalities?: { input?: string[]; output?: string[] };
-	pricing: {
-		input: number;
-		output: number;
-		cache_read?: number;
-		cache_write?: number;
-	};
+	pricing?: OttoRouterPricing;
 	context_length: number;
 	max_output: number;
 	capabilities?: { tool_call?: boolean; reasoning?: boolean };
+}
+
+interface OttoRouterPricing {
+	input: number;
+	output: number;
+	cache_read?: number;
+	cache_write?: number;
+}
+
+type PricedOttoRouterApiModel = OttoRouterApiModel & {
+	pricing: OttoRouterPricing;
+};
+
+const OTTOROUTER_PRICING_FALLBACKS: Record<string, OttoRouterPricing> = {
+	'kimi-k3': {
+		input: KIMI_K3_COST.input,
+		output: KIMI_K3_COST.output,
+		cache_read: KIMI_K3_COST.cacheRead,
+	},
+};
+
+function applyOttoRouterPricingFallback(
+	model: OttoRouterApiModel,
+): PricedOttoRouterApiModel {
+	const pricing = model.pricing ?? OTTOROUTER_PRICING_FALLBACKS[model.id];
+	if (!pricing) {
+		throw new Error(`OttoRouter model "${model.id}" is missing pricing`);
+	}
+	return { ...model, pricing };
 }
 
 async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
@@ -652,7 +679,7 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 		...new Set(data.data.map((m) => normalizeOttoRouterOwner(m.owned_by))),
 	].sort();
 
-	const models = data.data
+	const pricedModels = data.data
 		.filter((m) =>
 			isSupportedCatalogModel({
 				id: m.id,
@@ -660,6 +687,9 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 				...(m.modalities ? { modalities: m.modalities } : {}),
 			}),
 		)
+		.map(applyOttoRouterPricingFallback);
+
+	const models = pricedModels
 		.map((m) => ({
 			id: m.id,
 			...(m.name ? { name: m.name } : {}),
@@ -705,7 +735,7 @@ async function updateOttoRouterCatalog(): Promise<ProviderCatalogEntry> {
 		`Wrote ${OTTOROUTER_TARGET} (${data.data.length} models, ${providers.length} providers)`,
 	);
 
-	return buildOttoRouterEntry(data.data);
+	return buildOttoRouterEntry(pricedModels);
 }
 
 main().catch((err) => {

@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-07-16T15:47:47.852Z",
+	"updatedAt": "2026-07-16T17:50:07.726Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -3944,17 +3944,17 @@
 					"toolCall": true,
 					"reasoningText": true,
 					"attachment": true,
-					"temperature": true,
+					"temperature": false,
 					"releaseDate": "2026-04-27",
 					"lastUpdated": "2026-04-27",
 					"openWeights": false,
 					"cost": {
-						"input": 0.66,
-						"output": 3.41,
-						"cacheRead": 0.15
+						"input": 3,
+						"output": 15,
+						"cacheRead": 0.3
 					},
 					"limit": {
-						"context": 262144,
+						"context": 1048576,
 						"output": 262144
 					}
 				},
@@ -4479,8 +4479,9 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": false,
-					"releaseDate": "2026-05-12",
-					"lastUpdated": "2026-05-12",
+					"knowledge": "2026-01-31",
+					"releaseDate": "2026-04-16",
+					"lastUpdated": "2026-04-16",
 					"openWeights": false,
 					"cost": {
 						"input": 30,
@@ -4532,8 +4533,9 @@
 					"reasoningText": true,
 					"attachment": true,
 					"temperature": false,
-					"releaseDate": "2026-05-27",
-					"lastUpdated": "2026-05-27",
+					"knowledge": "2026-01",
+					"releaseDate": "2026-05-28",
+					"lastUpdated": "2026-05-28",
 					"openWeights": false,
 					"cost": {
 						"input": 10,
@@ -5937,6 +5939,31 @@
 						"output": 16384
 					}
 				},
+				"meta/muse-spark-1.1": {
+					"id": "meta/muse-spark-1.1",
+					"ownedBy": "meta",
+					"label": "Muse Spark 1.1",
+					"modalities": {
+						"input": ["text", "image", "video", "pdf", "audio"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-04-08",
+					"lastUpdated": "2026-07-09",
+					"openWeights": false,
+					"cost": {
+						"input": 1.25,
+						"output": 4.25,
+						"cacheRead": 0.15
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 1048576
+					}
+				},
 				"minimax/minimax-m1": {
 					"id": "minimax/minimax-m1",
 					"ownedBy": "minimax",
@@ -6655,6 +6682,31 @@
 					"limit": {
 						"context": 262144,
 						"output": 262144
+					}
+				},
+				"moonshotai/kimi-k3": {
+					"id": "moonshotai/kimi-k3",
+					"ownedBy": "kimi",
+					"label": "Kimi K3",
+					"modalities": {
+						"input": ["text", "image"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": false,
+					"releaseDate": "2026-07-16",
+					"lastUpdated": "2026-07-16",
+					"openWeights": true,
+					"cost": {
+						"input": 3,
+						"output": 15,
+						"cacheRead": 0.3
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 1048576
 					}
 				},
 				"nex-agi/nex-n2-mini": {
@@ -10456,9 +10508,9 @@
 					"lastUpdated": "2026-06-13",
 					"openWeights": true,
 					"cost": {
-						"input": 0.9394,
-						"output": 2.9524,
-						"cacheRead": 0.17446
+						"input": 0.9338,
+						"output": 2.9348,
+						"cacheRead": 0.17342
 					},
 					"limit": {
 						"context": 1048576,
@@ -13665,6 +13717,11 @@
 					"limit": {
 						"context": 1048576,
 						"output": 131072
+					},
+					"cost": {
+						"input": 3,
+						"output": 15,
+						"cacheRead": 0.3
 					}
 				}
 			},
@@ -16661,6 +16718,34 @@
 						"npm": "@ai-sdk/openai-compatible"
 					}
 				},
+				"kimi-k3": {
+					"id": "kimi-k3",
+					"ownedBy": "kimi",
+					"label": "Kimi K3",
+					"modalities": {
+						"input": ["text", "image", "video"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": true,
+					"temperature": true,
+					"releaseDate": "2026-07-16",
+					"lastUpdated": "2026-07-16",
+					"openWeights": true,
+					"cost": {
+						"input": 3,
+						"output": 15,
+						"cacheRead": 0.3
+					},
+					"limit": {
+						"context": 1048576,
+						"output": 131072
+					},
+					"provider": {
+						"npm": "@ai-sdk/openai-compatible"
+					}
+				},
 				"muse-spark-1.1": {
 					"id": "muse-spark-1.1",
 					"ownedBy": "meta",
@@ -16965,8 +17050,8 @@
 						"cacheRead": 0.30149999999999993
 					},
 					"limit": {
-						"context": 202720,
-						"output": 202720
+						"context": 256000,
+						"output": 256000
 					},
 					"provider": {
 						"npm": "@ai-sdk/openai-compatible"

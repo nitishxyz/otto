@@ -295,6 +295,7 @@ describe('provider base prompts', () => {
 					'deepseek',
 					'kimi',
 					'google',
+					'meta',
 					'minimax',
 					'qwen',
 					'xai',

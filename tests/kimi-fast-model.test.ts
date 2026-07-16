@@ -29,4 +29,16 @@ describe('kimi fast model selection', () => {
 			limit: { context: 262_144, output: 262_144 },
 		});
 	});
+
+	test('includes Kimi K3 with official pricing', () => {
+		const expected = {
+			id: 'kimi-k3',
+			ownedBy: 'kimi',
+			cost: { input: 3, output: 15, cacheRead: 0.3 },
+			limit: { context: 1_048_576, output: 131_072 },
+		};
+
+		expect(catalog.kimi.models['kimi-k3']).toMatchObject(expected);
+		expect(catalog.ottorouter.models['kimi-k3']).toMatchObject(expected);
+	});
 });

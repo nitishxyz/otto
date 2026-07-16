@@ -45,7 +45,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 	meta: ['muse-spark-1.1'],
 	baseten: ['nvidia/Nemotron-120B-A12B'],
 	huggingface: ['deepseek-ai/DeepSeek-V4-Flash:deepinfra'],
-	wafer: ['deepseek-v4-flash'],
+	wafer: ['glm5.2-fast'],
 	openrouter: ['anthropic/claude-3.5-haiku'],
 	opencode: ['claude-3-5-haiku'],
 	ottorouter: ['gemini-3.5-flash'],

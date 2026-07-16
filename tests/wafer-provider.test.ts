@@ -8,7 +8,7 @@ import {
 } from '@ottocode/sdk';
 
 const WAFER_BASE_URL = 'https://pass.wafer.ai/v1';
-const WAFER_FAST_MODEL = 'deepseek-v4-flash';
+const WAFER_FAST_MODEL = 'glm5.2-fast';
 
 function createConfig(): OttoConfig {
 	return {
@@ -70,13 +70,11 @@ describe('Wafer provider', () => {
 		const models = new Set(Object.keys(catalog.wafer.models));
 
 		for (const model of [
-			'deepseek-v4-flash',
-			'deepseek-v4-pro',
-			'Qwen3.6-35B-A3B',
-			'Qwen3.5-397B-A17B',
-			'Kimi-K2.6',
-			'GLM-5.1',
 			'GLM-5.2',
+			'Kimi-K2.6',
+			'glm5.2-fast',
+			'MiniMax-M3',
+			'GLM-5.1',
 		]) {
 			expect(models.has(model)).toBe(true);
 		}
