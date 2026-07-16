@@ -69,9 +69,10 @@ import { useNavigate } from '@tanstack/react-router';
 import { isHostedApp } from '../../lib/hosted-app';
 
 const CHAT_MIN_WIDTH = 400;
-const VIEWER_PANEL_KEY = 'viewer';
+const CHAT_MAX_WIDTH = 4096;
+const CHAT_DEFAULT_MAX_WIDTH = 640;
+const CHAT_PANEL_KEY = 'chat';
 const VIEWER_MIN_WIDTH = 320;
-const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const RIGHT_RAIL_HOVER_RATIO = 0.05;
 const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
@@ -153,9 +154,7 @@ export const AppLayout = memo(function AppLayout({
 	const isMobile = useMediaQuery(MOBILE_QUERY);
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
-	const viewerPanelWidth = usePanelWidthStore(
-		(s) => s.widths[VIEWER_PANEL_KEY],
-	);
+	const chatPanelWidth = usePanelWidthStore((s) => s.widths[CHAT_PANEL_KEY]);
 	const sidebarCollapsed = useSidebarStore((s) => s.isCollapsed);
 	const gitExpanded = useGitStore((s) => s.isExpanded);
 	const sessionFilesExpanded = useSessionFilesStore((s) => s.isExpanded);
@@ -173,10 +172,11 @@ export const AppLayout = memo(function AppLayout({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
-	const viewerPreferredWidth = viewerPanelWidth
-		? `${viewerPanelWidth}px`
-		: '50%';
-	const viewerSideBySideWidth = `min(max(${VIEWER_MIN_WIDTH}px, ${viewerPreferredWidth}), max(0px, calc(100% - ${CHAT_MIN_WIDTH}px)))`;
+	const chatPreferredWidth = chatPanelWidth
+		? `${chatPanelWidth}px`
+		: `clamp(${CHAT_MIN_WIDTH}px, 30%, ${CHAT_DEFAULT_MAX_WIDTH}px)`;
+	const chatSideBySideWidth = `max(${CHAT_MIN_WIDTH}px, ${chatPreferredWidth})`;
+	const viewerSideBySideWidth = `min(max(${VIEWER_MIN_WIDTH}px, calc(100% - ${chatSideBySideWidth})), max(0px, calc(100% - ${CHAT_MIN_WIDTH}px)))`;
 	const previousViewerOpenRef = useRef(anyViewerOpen);
 	const previousSidePanelOpenRef = useRef(anySidePanelOpen);
 	const shouldAnimateViewer =
@@ -288,6 +288,15 @@ export const AppLayout = memo(function AppLayout({
 											: 'hidden'
 								}`}
 							>
+								{anyViewerOpen && viewerSideBySide && (
+									<ResizeHandle
+										panelKey={CHAT_PANEL_KEY}
+										side="left"
+										minWidth={CHAT_MIN_WIDTH}
+										maxWidth={CHAT_MAX_WIDTH}
+										defaultWidth={CHAT_MIN_WIDTH}
+									/>
+								)}
 								{children}
 							</main>
 							<section
@@ -305,15 +314,6 @@ export const AppLayout = memo(function AppLayout({
 								style={viewerPaneStyle}
 								aria-hidden={!anyViewerOpen}
 							>
-								{anyViewerOpen && viewerSideBySide && (
-									<ResizeHandle
-										panelKey={VIEWER_PANEL_KEY}
-										side="right"
-										minWidth={VIEWER_MIN_WIDTH}
-										maxWidth={VIEWER_MAX_WIDTH}
-										defaultWidth={VIEWER_MIN_WIDTH}
-									/>
-								)}
 								{anyViewerOpen && <ViewerTabs />}
 							</section>
 						</div>
