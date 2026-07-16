@@ -6,7 +6,7 @@ import type { ClientEvent } from '../events/types.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const STREAM_DESCRIPTION =
-	'SSE event stream. Events include notification, session.status, and heartbeat.';
+	'SSE event stream. Events include notification, session.status, reference.preparation, and heartbeat.';
 
 const MAX_BACKPRESSURE_DEFICIT = -256;
 

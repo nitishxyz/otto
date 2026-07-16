@@ -47,6 +47,7 @@ export { DiffView } from './messages/renderers/DiffView';
 // Session Components
 export * from './sessions/SessionItem';
 export * from './sessions/SessionListContainer';
+export * from './sessions/SessionSidebarNav';
 export * from './sessions/SessionHeader';
 export * from './sessions/LeanHeader';
 export * from './sessions/EditableTitle';

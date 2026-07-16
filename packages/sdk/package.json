@@ -25,6 +25,10 @@
 			"import": "./src/browser.ts",
 			"types": "./src/browser.ts"
 		},
+		"./references": {
+			"import": "./src/references.ts",
+			"types": "./src/references.ts"
+		},
 		"./tools/builtin/fs": {
 			"import": "./src/core/src/tools/builtin/fs/index.ts",
 			"types": "./src/core/src/tools/builtin/fs/index.ts"

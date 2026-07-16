@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import {
+	isSupportedGitReferenceUrl,
 	loadConfig,
 	logger,
 	readReferenceSettings,
@@ -14,6 +15,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import {
+	deleteReferenceClone,
 	getReferenceStatuses,
 	prepareReferences,
 	retryReferencePreparation,
@@ -51,7 +53,9 @@ const nameParamSchema = z.object({
 const sourceSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('git'),
-		url: z.string().min(1),
+		url: z.string().min(1).refine(isSupportedGitReferenceUrl, {
+			message: 'Git URL must use HTTP(S) or SSH',
+		}),
 		ref: z.string().optional(),
 	}),
 	z.object({ type: z.literal('local'), path: z.string().min(1) }),
@@ -64,6 +68,7 @@ const referenceSchema = z.object({
 const referenceStatusSchema = z.object({
 	status: z.enum(['cloning', 'available', 'error']),
 	error: z.string().optional(),
+	output: z.array(z.string()).optional(),
 });
 const referencesResponseSchema = z.object({
 	references: z.record(z.string(), referenceSchema),
@@ -277,10 +282,16 @@ export function registerReferencesRoutes(app: Hono) {
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const { name } = c.req.param();
 				const scope = c.req.query('scope') === 'local' ? 'local' : 'global';
+				const scopedReferences = await readReferenceSettings(
+					scope,
+					projectRoot,
+				);
+				const deletedReference = scopedReferences[name];
 				await removeReferenceSettings(scope, name, projectRoot);
 				const cfg =
 					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
 					(await loadConfig(projectRoot));
+				await deleteReferenceClone(name, deletedReference, cfg);
 				return c.json({
 					success: true,
 					references: cfg.references ?? {},

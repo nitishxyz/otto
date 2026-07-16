@@ -19,6 +19,13 @@ export type Reference = {
 export type ReferenceStatus = {
 	status: 'cloning' | 'available' | 'error';
 	error?: string;
+	output?: string[];
+};
+export type ReferencePreparationEvent = ReferenceStatus & {
+	name: string;
+	url: string;
+	ref?: string;
+	projectRoot: string;
 };
 export type ReferencesResponse = {
 	references: Record<string, Reference>;

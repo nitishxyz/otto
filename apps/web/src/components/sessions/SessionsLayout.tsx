@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '../layout/AppLayout';
 import {
 	SessionListContainer,
+	SessionSidebarNav,
 	MessageThreadContainer,
 	ChatInputContainer,
 	NewSessionLanding,
@@ -232,10 +233,15 @@ export function SessionsLayout({
 
 	const sidebarContent = useMemo(
 		() => (
-			<SessionListContainer
-				activeSessionId={sessionId}
-				onSelectSession={handleSelectSession}
-			/>
+			<div className="flex h-full min-h-0 flex-col">
+				<SessionSidebarNav />
+				<div className="min-h-0 flex-1">
+					<SessionListContainer
+						activeSessionId={sessionId}
+						onSelectSession={handleSelectSession}
+					/>
+				</div>
+			</div>
 		),
 		[sessionId, handleSelectSession],
 	);

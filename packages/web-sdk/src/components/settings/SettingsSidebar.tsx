@@ -30,7 +30,10 @@ import { Modal } from '../ui/Modal';
 import { OttoMark } from '../common/OttoOIcon';
 import { SidebarHeader } from '../ui/SidebarHeader';
 import { StableSpinner } from '../ui/StableSpinner';
-import { useSettingsStore } from '../../stores/settingsStore';
+import {
+	type PreferencesTab,
+	useSettingsStore,
+} from '../../stores/settingsStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
 import {
@@ -606,17 +609,8 @@ const NumberInputRow = memo(function NumberInputRow({
 interface PreferencesModalProps {
 	isOpen: boolean;
 	onClose: () => void;
+	initialTab?: PreferencesTab;
 }
-
-type PreferencesTab =
-	| 'editor'
-	| 'notifications'
-	| 'automation'
-	| 'reasoning'
-	| 'dictation'
-	| 'recipes'
-	| 'references'
-	| 'plugins';
 
 interface PreferenceTabConfig {
 	id: PreferencesTab;
@@ -689,12 +683,16 @@ const PREFERENCE_GROUPS: Array<{
 	},
 ];
 
-function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
+function PreferencesModal({
+	isOpen,
+	onClose,
+	initialTab = 'editor',
+}: PreferencesModalProps) {
 	const { data: config } = useConfig();
 	const { preferences, updatePreferences } = usePreferences();
 	const updateDefaults = useUpdateDefaults();
 	const isDesktop = isPlatformDesktop();
-	const [activeTab, setActiveTab] = useState<PreferencesTab>('editor');
+	const [activeTab, setActiveTab] = useState<PreferencesTab>(initialTab);
 	const isFullBleedTab =
 		activeTab === 'recipes' ||
 		activeTab === 'references' ||
@@ -720,8 +718,9 @@ function PreferencesModal({ isOpen, onClose }: PreferencesModalProps) {
 
 	useEffect(() => {
 		if (!isOpen) return;
+		setActiveTab(initialTab);
 		setNotificationPermission(getBrowserNotificationPermission());
-	}, [isOpen]);
+	}, [initialTab, isOpen]);
 
 	const handleNotificationsEnabledChange = useCallback(
 		async (checked: boolean) => {
@@ -1114,16 +1113,29 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 	onOpenDashboard,
 }: SettingsSidebarProps = {}) {
 	const isExpanded = useSettingsStore((state) => state.isExpanded);
-	return isExpanded ? (
-		<SettingsSidebarContent onOpenDashboard={onOpenDashboard} />
-	) : null;
+	const preferencesTab = useSettingsStore((state) => state.preferencesTab);
+	const closePreferences = useSettingsStore((state) => state.closePreferences);
+	return (
+		<>
+			{isExpanded ? (
+				<SettingsSidebarContent onOpenDashboard={onOpenDashboard} />
+			) : null}
+			{preferencesTab ? (
+				<PreferencesModal
+					isOpen
+					initialTab={preferencesTab}
+					onClose={closePreferences}
+				/>
+			) : null}
+		</>
+	);
 });
 
 const SettingsSidebarContent = memo(function SettingsSidebarContent({
 	onOpenDashboard,
 }: SettingsSidebarProps = {}) {
 	const collapseSidebar = useSettingsStore((state) => state.collapseSidebar);
-	const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+	const openPreferences = useSettingsStore((state) => state.openPreferences);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[SETTINGS_PANEL_KEY] ?? SETTINGS_DEFAULT_WIDTH,
 	);
@@ -1230,14 +1242,6 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 			scope: 'global',
 		});
 	};
-
-	const handleOpenPreferences = useCallback(() => {
-		setIsPreferencesOpen(true);
-	}, []);
-
-	const handleClosePreferences = useCallback(() => {
-		setIsPreferencesOpen(false);
-	}, []);
 
 	return (
 		<div
@@ -1371,7 +1375,7 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 
 				<button
 					type="button"
-					onClick={handleOpenPreferences}
+					onClick={() => openPreferences()}
 					title="Open preferences"
 					className="group shrink-0 w-full h-12 px-3 flex items-center gap-2 bg-muted/20 hover:bg-muted/60 border-t border-border transition-colors text-left cursor-pointer"
 				>
@@ -1381,10 +1385,6 @@ const SettingsSidebarContent = memo(function SettingsSidebarContent({
 					</span>
 					<ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
 				</button>
-
-				{isPreferencesOpen ? (
-					<PreferencesModal isOpen onClose={handleClosePreferences} />
-				) : null}
 			</div>
 		</div>
 	);

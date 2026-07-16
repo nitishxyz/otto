@@ -10,6 +10,7 @@ import {
 	EntityListGroup,
 	EntityListPage,
 	EntityRow,
+	entityInputClass,
 	entityMonoInputClass,
 	entitySelectClass,
 	SegmentedControl,
@@ -23,6 +24,10 @@ import { useMentionAgents } from '../../hooks/useAgents';
 import { toast } from '../../stores/toastStore';
 import type { RecipeScope } from '../../lib/api-client/recipes';
 import { isReservedRecipeCommandName } from '../../lib/reserved-recipe-names';
+import {
+	parseRecipeContent,
+	serializeRecipeContent,
+} from '../../lib/recipe-content';
 
 const RECIPE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const RECIPE_SCOPE_PATHS: Record<RecipeScope, string> = {
@@ -35,46 +40,12 @@ function recipeKey(scope: RecipeScope, name: string) {
 }
 const DEFAULT_RECIPE_AGENT = 'build';
 
-function defaultRecipeContent(name: string) {
-	return [
-		'---',
-		`description: Describe what /${name || 'recipe-name'} does`,
-		`agent: ${DEFAULT_RECIPE_AGENT}`,
-		'includeInHistory: true',
-		'---',
-		'',
-		'Write natural-language instructions for Otto here.',
-		'',
-		'Keep the task focused and mention any checks Otto should run.',
-	].join('\n');
-}
-
-function setFrontmatterField(content: string, key: string, value: string) {
-	const normalized = content.replace(/\r\n?/g, '\n');
-	const match = normalized.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-	if (!match) {
-		return ['---', `${key}: ${value}`, '---', '', normalized.trim()].join('\n');
-	}
-
-	const frontmatter = match[1] ?? '';
-	const body = match[2] ?? '';
-	const lines = frontmatter.split('\n');
-	const index = lines.findIndex((line) =>
-		new RegExp(`^${key}\\s*:`, 'i').test(line.trim()),
-	);
-	if (index >= 0) {
-		lines[index] = `${key}: ${value}`;
-	} else {
-		lines.push(`${key}: ${value}`);
-	}
-	return ['---', ...lines, '---', body].join('\n').trimEnd();
-}
-
 export function RecipesSettings() {
 	const recipeNameId = useId();
+	const recipeDescriptionId = useId();
 	const recipeAgentId = useId();
 	const recipeIncludeInHistoryId = useId();
-	const recipeContentId = useId();
+	const recipeInstructionsId = useId();
 	const [editorScope, setEditorScope] = useState<RecipeScope>('project');
 	const recipesQuery = useRecipes({ scope: editorScope });
 	const allRecipesQuery = useRecipes({ scope: 'all' });
@@ -88,13 +59,17 @@ export function RecipesSettings() {
 	const [draftAgent, setDraftAgent] = useState(DEFAULT_RECIPE_AGENT);
 	const [draftIncludeInHistory, setDraftIncludeInHistory] = useState(true);
 	const [draftName, setDraftName] = useState('');
-	const [draftContent, setDraftContent] = useState('');
+	const [draftDescription, setDraftDescription] = useState('');
+	const [draftInstructions, setDraftInstructions] = useState('');
+	const [unknownFrontmatter, setUnknownFrontmatter] = useState<string[]>([]);
+	const [parseError, setParseError] = useState<string>();
 	const [savedDraft, setSavedDraft] = useState<{
 		scope: RecipeScope;
 		name: string;
 		agent: string;
 		includeInHistory: boolean;
-		content: string;
+		description: string;
+		instructions: string;
 	} | null>(null);
 
 	const selectedRecipe = useMemo(
@@ -125,7 +100,8 @@ export function RecipesSettings() {
 				: null;
 	const isSaving = saveRecipe.isPending;
 	const isDeleting = deleteRecipe.isPending;
-	const hasDraft = draftName !== '' || draftContent !== '';
+	const hasDraft =
+		draftName !== '' || draftDescription !== '' || draftInstructions !== '';
 	const isEditingExisting =
 		selectedRecipe &&
 		selectedRecipe.name === effectiveName &&
@@ -137,26 +113,36 @@ export function RecipesSettings() {
 			effectiveName !== savedDraft.name ||
 			draftAgent !== savedDraft.agent ||
 			draftIncludeInHistory !== savedDraft.includeInHistory ||
-			draftContent !== savedDraft.content);
+			draftDescription !== savedDraft.description ||
+			draftInstructions !== savedDraft.instructions);
 
 	function selectRecipe(scope: RecipeScope, name: string) {
 		const recipe = recipes.find(
 			(item) => item.scope === scope && item.name === name,
 		);
+		const parsed = parseRecipeContent(recipe?.content ?? '', {
+			description: recipe?.description,
+			agent: recipe?.agent || DEFAULT_RECIPE_AGENT,
+			includeInHistory: recipe?.includeInHistory,
+		});
 		setSelectedKey(recipeKey(scope, name));
 		setEditorScope(scope);
 		setDraftName(name);
-		setDraftAgent(recipe?.agent || DEFAULT_RECIPE_AGENT);
-		setDraftIncludeInHistory(recipe?.includeInHistory ?? true);
-		setDraftContent(recipe?.content ?? '');
+		setDraftAgent(parsed.agent);
+		setDraftIncludeInHistory(parsed.includeInHistory);
+		setDraftDescription(parsed.description);
+		setDraftInstructions(parsed.instructions);
+		setUnknownFrontmatter(parsed.unknownFrontmatter);
+		setParseError(parsed.error);
 		setSavedDraft(
 			recipe
 				? {
 						scope: recipe.scope,
 						name: recipe.name,
-						agent: recipe.agent || DEFAULT_RECIPE_AGENT,
-						includeInHistory: recipe.includeInHistory,
-						content: recipe.content,
+						agent: parsed.agent,
+						includeInHistory: parsed.includeInHistory,
+						description: parsed.description,
+						instructions: parsed.instructions,
 					}
 				: null,
 		);
@@ -168,7 +154,10 @@ export function RecipesSettings() {
 		setDraftName(name);
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
 		setDraftIncludeInHistory(true);
-		setDraftContent(defaultRecipeContent(name));
+		setDraftDescription('');
+		setDraftInstructions('');
+		setUnknownFrontmatter([]);
+		setParseError(undefined);
 		setSavedDraft(null);
 	}
 
@@ -177,7 +166,10 @@ export function RecipesSettings() {
 		setDraftName('');
 		setDraftAgent(DEFAULT_RECIPE_AGENT);
 		setDraftIncludeInHistory(true);
-		setDraftContent('');
+		setDraftDescription('');
+		setDraftInstructions('');
+		setUnknownFrontmatter([]);
+		setParseError(undefined);
 		setSavedDraft(null);
 	}
 
@@ -186,25 +178,25 @@ export function RecipesSettings() {
 			toast.error('Names can only use lowercase letters, numbers, and dashes.');
 			return;
 		}
-		if (!draftContent.trim()) {
+		if (!draftInstructions.trim()) {
 			toast.error('Recipe instructions are required.');
 			return;
 		}
-		if (saveBlockedReason) {
-			toast.error(saveBlockedReason);
+		if (saveBlockedReason || parseError) {
+			toast.error(
+				saveBlockedReason ?? parseError ?? 'Cannot save this recipe.',
+			);
 			return;
 		}
 
 		try {
-			const content = setFrontmatterField(
-				setFrontmatterField(
-					draftContent,
-					'agent',
-					draftAgent || DEFAULT_RECIPE_AGENT,
-				),
-				'includeInHistory',
-				String(draftIncludeInHistory),
-			);
+			const content = serializeRecipeContent({
+				description: draftDescription,
+				agent: draftAgent || DEFAULT_RECIPE_AGENT,
+				includeInHistory: draftIncludeInHistory,
+				instructions: draftInstructions,
+				unknownFrontmatter,
+			});
 			await saveRecipe.mutateAsync({
 				name: effectiveName,
 				content,
@@ -271,7 +263,8 @@ export function RecipesSettings() {
 							disabled={
 								!isNameValid ||
 								Boolean(saveBlockedReason) ||
-								!draftContent.trim() ||
+								Boolean(parseError) ||
+								!draftInstructions.trim() ||
 								!hasChanges ||
 								isSaving
 							}
@@ -324,19 +317,38 @@ export function RecipesSettings() {
 						</div>
 					</EntityField>
 				</div>
+				<EntityField
+					id={recipeDescriptionId}
+					label="Short description"
+					hint="Shown in the recipe library and command picker."
+				>
+					<input
+						id={recipeDescriptionId}
+						value={draftDescription}
+						onChange={(event) => setDraftDescription(event.target.value)}
+						placeholder="Review a document and prepare it for publication"
+						className={entityInputClass}
+					/>
+				</EntityField>
+				{parseError ? (
+					<div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+						{parseError}
+					</div>
+				) : null}
 				<div className="flex min-h-0 flex-1 flex-col">
 					<label
 						className="mb-1 text-xs font-medium text-muted-foreground"
-						htmlFor={recipeContentId}
+						htmlFor={recipeInstructionsId}
 					>
-						Instructions
+						What should Otto do?
 					</label>
 					<textarea
-						id={recipeContentId}
-						value={draftContent}
-						onChange={(event) => setDraftContent(event.target.value)}
-						placeholder={defaultRecipeContent(effectiveName)}
-						className="min-h-[140px] w-full flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground outline-none transition-colors focus:border-primary"
+						id={recipeInstructionsId}
+						value={draftInstructions}
+						onChange={(event) => setDraftInstructions(event.target.value)}
+						placeholder="Explain the task in plain language. Include the files to review, the result you want, and any checks Otto should run."
+						disabled={Boolean(parseError)}
+						className="min-h-[180px] w-full flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
 					/>
 				</div>
 				<EntityCheckbox
@@ -365,7 +377,10 @@ export function RecipesSettings() {
 							setEditorScope(scope);
 							setSelectedKey('');
 							setDraftName('');
-							setDraftContent('');
+							setDraftDescription('');
+							setDraftInstructions('');
+							setUnknownFrontmatter([]);
+							setParseError(undefined);
 							setSavedDraft(null);
 						}}
 					/>

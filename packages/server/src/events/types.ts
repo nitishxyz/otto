@@ -70,7 +70,18 @@ export interface SessionStatusEvent {
 	createdAt: string;
 }
 
+export interface ReferencePreparationEvent {
+	name: string;
+	url: string;
+	ref?: string;
+	projectRoot: string;
+	status: 'cloning' | 'available' | 'error';
+	error?: string;
+	output?: string[];
+}
+
 export type ClientEvent =
 	| { type: 'notification'; payload: NotificationEvent }
 	| { type: 'session.status'; payload: SessionStatusEvent }
+	| { type: 'reference.preparation'; payload: ReferencePreparationEvent }
 	| { type: 'heartbeat'; payload: { createdAt: string } };

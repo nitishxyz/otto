@@ -39,6 +39,7 @@ export type {
 	OttoConfig,
 	ReasoningLevel,
 } from './types/src/index.ts';
+export { isSupportedGitReferenceUrl } from './references.ts';
 
 // =======================
 // Providers (from internal providers module)

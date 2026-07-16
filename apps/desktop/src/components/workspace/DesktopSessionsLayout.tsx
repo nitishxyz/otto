@@ -11,6 +11,7 @@ import {
 	LooperSessionRail,
 	LooperWorkspace,
 	SessionListContainer,
+	SessionSidebarNav,
 	Toaster,
 	type ChatInputContainerRef,
 } from '@ottocode/web-sdk/components';
@@ -345,19 +346,24 @@ export function DesktopSessionsLayout({
 				onCloseDashboard={onCloseDashboard}
 				titleBar={titleBar}
 				sidebar={
-					isLooperTab ? (
-						<LooperSessionRail
-							activeSessionId={sessionId}
-							onSelectSession={handleSelectLooperSession}
-							hasOverlayHeader
-						/>
-					) : (
-						<SessionListContainer
-							activeSessionId={sessionId}
-							onSelectSession={handleSelectSession}
-							hasOverlayHeader
-						/>
-					)
+					<div className="flex h-full min-h-0 flex-col pt-12">
+						{isLooperTab ? (
+							<LooperSessionRail
+								activeSessionId={sessionId}
+								onSelectSession={handleSelectLooperSession}
+							/>
+						) : (
+							<>
+								<SessionSidebarNav />
+								<div className="min-h-0 flex-1">
+									<SessionListContainer
+										activeSessionId={sessionId}
+										onSelectSession={handleSelectSession}
+									/>
+								</div>
+							</>
+						)}
+					</div>
 				}
 			>
 				{isLooperTab ? (

@@ -13,7 +13,7 @@ import {
 } from './project-context.ts';
 
 const STREAM_DESCRIPTION =
-	'Multiplexed SSE stream carrying all session events for the project plus global client events over ONE connection. Session events have `data: {"sessionId": ..., "payload": {...}}`; client events have `data: {"payload": {...}}`.';
+	'Multiplexed SSE stream carrying all session events for the project plus client events such as notifications, session status, and reference preparation over ONE connection. Session events have `data: {"sessionId": ..., "payload": {...}}`; client events have `data: {"payload": {...}}`.';
 
 // desiredSize = highWaterMark - queued chunks; a large negative value means
 // the consumer stopped reading. Treat the connection as stalled and drop it

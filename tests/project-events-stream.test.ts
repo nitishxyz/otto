@@ -141,6 +141,36 @@ describe('multiplexed project events stream', () => {
 		await stream.close();
 	});
 
+	it('carries reference preparation output on the same connection', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+
+		publishClientEvent({
+			type: 'reference.preparation',
+			payload: {
+				name: 'docs',
+				url: 'https://example.com/docs.git',
+				projectRoot: process.cwd(),
+				status: 'cloning',
+				output: ['Cloning repository...'],
+			},
+		});
+
+		const received = await stream.next(
+			(evt) => evt.event === 'reference.preparation',
+		);
+		expect(received.data.sessionId).toBeUndefined();
+		expect((received.data.payload as Record<string, unknown>).name).toBe(
+			'docs',
+		);
+		expect((received.data.payload as Record<string, unknown>).output).toEqual([
+			'Cloning repository...',
+		]);
+
+		await stream.close();
+	});
+
 	it('filters client events from other projects', async () => {
 		const stream = await openStream(
 			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,

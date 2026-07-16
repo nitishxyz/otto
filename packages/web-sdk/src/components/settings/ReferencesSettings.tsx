@@ -1,11 +1,13 @@
+import { isSupportedGitReferenceUrl } from '@ottocode/sdk/references';
 import {
 	BookOpen,
 	ChevronDown,
 	FolderOpen,
 	RefreshCw,
+	Terminal,
 	Trash2,
 } from 'lucide-react';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
 	useDeleteReference,
 	useReferences,
@@ -15,6 +17,7 @@ import {
 import type {
 	Reference,
 	ReferenceScope,
+	ReferenceStatus,
 } from '../../lib/api-client/references';
 import { pickPlatformDirectory } from '../../lib/platform';
 import { toast } from '../../stores/toastStore';
@@ -68,6 +71,63 @@ function toDraft(name: string, reference: Reference): Draft {
 	};
 }
 
+function ReferenceGitActivity({ status }: { status: ReferenceStatus }) {
+	const outputRef = useRef<HTMLPreElement>(null);
+	const isCloning = status.status === 'cloning';
+	const output = status.output?.length
+		? status.output
+		: [
+				isCloning
+					? 'Waiting for Git output...'
+					: 'Git clone exited with an error.',
+			];
+
+	useEffect(() => {
+		const element = outputRef.current;
+		if (element) element.scrollTop = element.scrollHeight;
+	});
+
+	return (
+		<div
+			className={`overflow-hidden rounded-md border ${
+				isCloning
+					? 'border-border/70 bg-muted/20'
+					: 'border-red-500/30 bg-red-500/5'
+			}`}
+		>
+			<div className="flex items-center gap-2 border-b border-border/50 px-2.5 py-1.5">
+				{isCloning ? (
+					<StableSpinner title="Cloning repository" className="h-3 w-3" />
+				) : (
+					<Terminal className="h-3 w-3 text-red-400" />
+				)}
+				<span className="text-[11px] font-medium text-foreground">
+					{isCloning ? 'Preparing repository' : 'Repository clone failed'}
+				</span>
+				<span
+					className={`ml-auto font-mono text-[9px] uppercase tracking-wide ${
+						isCloning ? 'text-emerald-500' : 'text-red-400'
+					}`}
+				>
+					{isCloning ? 'live' : 'failed'}
+				</span>
+			</div>
+			<pre
+				ref={outputRef}
+				aria-live="polite"
+				className="max-h-28 min-h-14 overflow-auto whitespace-pre-wrap break-all bg-background/60 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-muted-foreground"
+			>
+				{output.join('\n')}
+			</pre>
+			{status.error ? (
+				<p className="border-t border-red-500/20 px-2.5 py-1.5 font-mono text-[10px] text-red-400">
+					{status.error}
+				</p>
+			) : null}
+		</div>
+	);
+}
+
 export function ReferencesSettings() {
 	const nameId = useId();
 	const typeId = useId();
@@ -93,10 +153,18 @@ export function ReferencesSettings() {
 	const normalizedName = draft.name.trim().toLowerCase();
 	const isEditing = selectedName !== '' && selectedName === normalizedName;
 	const selectedStatus = selectedName ? statuses[selectedName] : undefined;
+	const trimmedLocation = draft.location.trim();
+	const gitUrlError =
+		draft.type === 'git' &&
+		trimmedLocation !== '' &&
+		!isSupportedGitReferenceUrl(trimmedLocation)
+			? 'Use an HTTP(S) or SSH Git URL. Choose Local directory for filesystem paths.'
+			: undefined;
 	const isValid =
 		NAME_PATTERN.test(normalizedName) &&
 		draft.description.trim() !== '' &&
-		draft.location.trim() !== '';
+		trimmedLocation !== '' &&
+		!gitUrlError;
 
 	function selectReference(name: string, reference: Reference) {
 		setSelectedName(name);
@@ -145,6 +213,10 @@ export function ReferencesSettings() {
 		}
 		if (!draft.description.trim() || !draft.location.trim()) {
 			toast.error('Description and source are required.');
+			return;
+		}
+		if (gitUrlError) {
+			toast.error(gitUrlError);
 			return;
 		}
 		const source: Reference['source'] =
@@ -258,13 +330,11 @@ export function ReferencesSettings() {
 					</>
 				}
 			>
-				{isEditing && selectedStatus?.status === 'error' ? (
-					<div className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
-						<p className="font-medium">Repository clone failed</p>
-						<p className="mt-1 break-words font-mono text-[11px] text-red-400/80">
-							{selectedStatus.error ?? 'Unknown Git error'}
-						</p>
-					</div>
+				{isEditing &&
+				draft.type === 'git' &&
+				selectedStatus &&
+				selectedStatus.status !== 'available' ? (
+					<ReferenceGitActivity status={selectedStatus} />
 				) : null}
 				<div className="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_160px]">
 					<EntityField id={nameId} label="Name">
@@ -300,6 +370,7 @@ export function ReferencesSettings() {
 				<EntityField
 					id={locationId}
 					label={draft.type === 'git' ? 'Git URL' : 'Directory path'}
+					error={gitUrlError}
 				>
 					<div className="flex gap-2">
 						<input
@@ -420,25 +491,33 @@ export function ReferencesSettings() {
 									? 'Cloning…'
 									: status?.status === 'error'
 										? 'Clone failed'
-										: 'Git';
+										: 'Ready';
 						const location =
 							reference.source.type === 'git'
 								? reference.source.url
 								: reference.source.path;
 						return (
-							<EntityRow
-								key={name}
-								onClick={() => selectReference(name, reference)}
-								title={name}
-								badge={badge}
-								warning={
-									status?.status === 'error'
-										? status.error || 'Repository clone failed'
-										: undefined
-								}
-								description={reference.description}
-								meta={location}
-							/>
+							<div key={name}>
+								<EntityRow
+									onClick={() => selectReference(name, reference)}
+									title={name}
+									badge={badge}
+									warning={
+										status?.status === 'error'
+											? status.error || 'Repository clone failed'
+											: undefined
+									}
+									description={reference.description}
+									meta={location}
+								/>
+								{reference.source.type === 'git' &&
+								status &&
+								status.status !== 'available' ? (
+									<div className="mx-3.5 mb-3">
+										<ReferenceGitActivity status={status} />
+									</div>
+								) : null}
+							</div>
 						);
 					})}
 				</EntityListGroup>

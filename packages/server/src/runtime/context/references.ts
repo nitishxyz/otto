@@ -1,11 +1,20 @@
-import type { OttoConfig, ReferenceConfig } from '@ottocode/sdk';
+import {
+	isSupportedGitReferenceUrl,
+	type OttoConfig,
+	type ReferenceConfig,
+} from '@ottocode/sdk';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
+import { publishClientEvent } from '../../events/bus.ts';
 
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const GIT_TIMEOUT_MS = 15_000;
-const preparations = new Map<string, Promise<void>>();
+const GIT_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_GIT_OUTPUT_LINES = 80;
+const preparations = new Map<
+	string,
+	{ promise: Promise<void>; abortController: AbortController }
+>();
 const preparationStates = new Map<string, ReferencePreparationStatus>();
 
 export type ResolvedReference = {
@@ -19,6 +28,7 @@ export type ResolvedReference = {
 export type ReferencePreparationStatus = {
 	status: 'cloning' | 'available' | 'error';
 	error?: string;
+	output?: string[];
 };
 
 /** Resolve enabled references from local state without performing network I/O. */
@@ -68,7 +78,12 @@ export function prepareReferences(cfg: OttoConfig): void {
 	for (const [name, reference] of Object.entries(cfg.references ?? {})) {
 		if (reference.enabled === false || reference.source.type !== 'git')
 			continue;
-		void prepareGitReference(name, reference, cfg.paths.cacheDir);
+		void prepareGitReference(
+			name,
+			reference,
+			cfg.paths.cacheDir,
+			cfg.projectRoot,
+		);
 	}
 }
 
@@ -79,7 +94,42 @@ export function retryReferencePreparation(
 	cfg: OttoConfig,
 ): void {
 	if (reference.enabled === false || reference.source.type !== 'git') return;
-	void prepareGitReference(name, reference, cfg.paths.cacheDir, true);
+	void prepareGitReference(
+		name,
+		reference,
+		cfg.paths.cacheDir,
+		cfg.projectRoot,
+		true,
+	);
+}
+
+/** Delete an unreferenced cached Git clone after its config entry is removed. */
+export async function deleteReferenceClone(
+	name: string,
+	reference: ReferenceConfig | undefined,
+	cfg: OttoConfig,
+): Promise<void> {
+	if (reference?.source.type !== 'git') return;
+	const deletedPaths = getGitReferencePaths(
+		name,
+		reference,
+		cfg.paths.cacheDir,
+		false,
+	);
+	const remainingReference = cfg.references?.[name];
+	const cloneIsStillReferenced =
+		remainingReference?.source.type === 'git' &&
+		remainingReference.source.url.trim() === reference.source.url.trim() &&
+		(remainingReference.source.ref ?? '') === (reference.source.ref ?? '');
+	if (cloneIsStillReferenced) return;
+
+	const pending = preparations.get(deletedPaths.key);
+	if (pending) {
+		pending.abortController.abort();
+		await pending.promise;
+	}
+	preparationStates.delete(deletedPaths.key);
+	await rm(deletedPaths.path, { recursive: true, force: true });
 }
 
 /** Read preparation state for configured references without waiting for clones. */
@@ -102,10 +152,16 @@ export async function getReferenceStatuses(
 			reference,
 			cfg.paths.cacheDir,
 		);
-		if (await isDirectory(join(path, '.git'))) {
+		const preparationState = preparationStates.get(key);
+		if (
+			preparationState?.status === 'cloning' ||
+			preparationState?.status === 'error'
+		) {
+			statuses[name] = preparationState;
+		} else if (await isDirectory(join(path, '.git'))) {
 			statuses[name] = { status: 'available' };
 		} else {
-			statuses[name] = preparationStates.get(key) ?? {
+			statuses[name] = {
 				status: 'error',
 				error: 'Repository has not been cloned yet',
 			};
@@ -146,10 +202,13 @@ function getGitReferencePaths(
 	name: string,
 	reference: ReferenceConfig,
 	cacheDir: string,
+	validateUrl = true,
 ): { key: string; path: string; metadataPath: string; url: string } {
 	if (reference.source.type !== 'git') throw new Error('Invalid Git reference');
 	const url = reference.source.url.trim();
-	if (!url) throw new Error('Git URL is required');
+	if (validateUrl && !isSupportedGitReferenceUrl(url)) {
+		throw new Error('Git URL must use HTTP(S) or SSH');
+	}
 	const hash = new Bun.CryptoHasher('sha256')
 		.update(`${url}\0${reference.source.ref ?? ''}`)
 		.digest('hex')
@@ -170,35 +229,57 @@ function prepareGitReference(
 	name: string,
 	reference: ReferenceConfig,
 	cacheDir: string,
+	projectRoot: string,
 	force = false,
 ): Promise<void> {
 	const paths = getGitReferencePaths(name, reference, cacheDir);
 	const existing = preparations.get(paths.key);
-	if (existing) return existing;
+	if (existing) return existing.promise;
 	if (!force && preparationStates.get(paths.key)?.status === 'error') {
 		return Promise.resolve();
 	}
-	preparationStates.set(paths.key, { status: 'cloning' });
-	const pending = runGitPreparation(reference, paths)
+	const abortController = new AbortController();
+	setPreparationState(paths.key, name, reference, projectRoot, {
+		status: 'cloning',
+		output: ['Starting Git preparation...'],
+	});
+	const pending = runGitPreparation(
+		reference,
+		paths,
+		(line) => {
+			appendPreparationOutput(paths.key, name, reference, projectRoot, line);
+		},
+		abortController.signal,
+	)
 		.then(() => {
-			preparationStates.set(paths.key, { status: 'available' });
+			if (abortController.signal.aborted) return;
+			setPreparationState(paths.key, name, reference, projectRoot, {
+				status: 'available',
+			});
 		})
 		.catch((error) => {
-			preparationStates.set(paths.key, {
+			if (abortController.signal.aborted) return;
+			const output = preparationStates.get(paths.key)?.output;
+			setPreparationState(paths.key, name, reference, projectRoot, {
 				status: 'error',
 				error: toErrorMessage(error),
+				...(output ? { output } : {}),
 			});
 		})
 		.finally(() => {
-			preparations.delete(paths.key);
+			if (preparations.get(paths.key)?.promise === pending) {
+				preparations.delete(paths.key);
+			}
 		});
-	preparations.set(paths.key, pending);
+	preparations.set(paths.key, { promise: pending, abortController });
 	return pending;
 }
 
 async function runGitPreparation(
 	reference: ReferenceConfig,
 	paths: { path: string; metadataPath: string; url: string },
+	onOutput: (line: string) => void,
+	signal: AbortSignal,
 ): Promise<void> {
 	if (reference.source.type !== 'git') throw new Error('Invalid Git reference');
 	const root = join(paths.path, '..');
@@ -206,13 +287,14 @@ async function runGitPreparation(
 
 	if (!(await isDirectory(join(paths.path, '.git')))) {
 		await rm(paths.path, { recursive: true, force: true });
-		const args = ['clone', '--depth', '1'];
+		const args = ['clone', '--progress', '--depth', '1'];
 		if (reference.source.ref) {
 			args.push('--branch', reference.source.ref, '--single-branch');
 		}
 		args.push('--', paths.url, paths.path);
+		onOutput('Cloning repository...');
 		try {
-			await runGit(args);
+			await runGit(args, onOutput, signal);
 		} catch (error) {
 			await rm(paths.path, { recursive: true, force: true });
 			throw error;
@@ -223,10 +305,24 @@ async function runGitPreparation(
 
 	if (await shouldRefresh(paths.metadataPath)) {
 		try {
-			const args = ['-C', paths.path, 'fetch', '--depth', '1', 'origin'];
+			const args = [
+				'-C',
+				paths.path,
+				'fetch',
+				'--progress',
+				'--depth',
+				'1',
+				'origin',
+			];
 			if (reference.source.ref) args.push(reference.source.ref);
-			await runGit(args);
-			await runGit(['-C', paths.path, 'reset', '--hard', 'FETCH_HEAD']);
+			onOutput('Fetching repository updates...');
+			await runGit(args, onOutput, signal);
+			onOutput('Updating cached checkout...');
+			await runGit(
+				['-C', paths.path, 'reset', '--hard', 'FETCH_HEAD'],
+				onOutput,
+				signal,
+			);
 		} catch {
 			// Keep a usable stale clone when a background refresh fails.
 		}
@@ -257,10 +353,52 @@ async function writeMetadata(metadataPath: string): Promise<void> {
 	await writeFile(metadataPath, JSON.stringify({ updatedAt: Date.now() }));
 }
 
-async function runGit(args: string[]): Promise<void> {
+function setPreparationState(
+	key: string,
+	name: string,
+	reference: ReferenceConfig,
+	projectRoot: string,
+	status: ReferencePreparationStatus,
+): void {
+	if (reference.source.type !== 'git') return;
+	preparationStates.set(key, status);
+	publishClientEvent({
+		type: 'reference.preparation',
+		payload: {
+			name,
+			url: reference.source.url,
+			...(reference.source.ref ? { ref: reference.source.ref } : {}),
+			projectRoot,
+			...status,
+		},
+	});
+}
+
+function appendPreparationOutput(
+	key: string,
+	name: string,
+	reference: ReferenceConfig,
+	projectRoot: string,
+	line: string,
+): void {
+	const state = preparationStates.get(key);
+	if (state?.status !== 'cloning' || !line.trim()) return;
+	setPreparationState(key, name, reference, projectRoot, {
+		...state,
+		output: [...(state.output ?? []), line.trimEnd()].slice(
+			-MAX_GIT_OUTPUT_LINES,
+		),
+	});
+}
+
+async function runGit(
+	args: string[],
+	onOutput: (line: string) => void,
+	signal: AbortSignal,
+): Promise<void> {
 	const process = Bun.spawn(['git', ...args], {
 		stdin: 'ignore',
-		stdout: 'ignore',
+		stdout: 'pipe',
 		stderr: 'pipe',
 		env: {
 			...Bun.env,
@@ -269,20 +407,56 @@ async function runGit(args: string[]): Promise<void> {
 		},
 	});
 	let timedOut = false;
+	const abort = () => process.kill();
+	signal.addEventListener('abort', abort, { once: true });
 	const timeout = setTimeout(() => {
 		timedOut = true;
 		process.kill();
 	}, GIT_TIMEOUT_MS);
 	try {
-		const exitCode = await process.exited;
+		const [exitCode, stdout, stderr] = await Promise.all([
+			process.exited,
+			readGitOutput(process.stdout, onOutput),
+			readGitOutput(process.stderr, onOutput),
+		]);
+		if (signal.aborted) throw new Error('Git operation cancelled');
 		if (timedOut) throw new Error('Git operation timed out');
 		if (exitCode !== 0) {
-			const stderr = await new Response(process.stderr).text();
-			throw new Error(stderr.trim() || `git exited with code ${exitCode}`);
+			throw new Error(
+				stderr.trim() || stdout.trim() || `git exited with code ${exitCode}`,
+			);
 		}
 	} finally {
 		clearTimeout(timeout);
+		signal.removeEventListener('abort', abort);
 	}
+}
+
+async function readGitOutput(
+	stream: ReadableStream<Uint8Array>,
+	onOutput: (line: string) => void,
+): Promise<string> {
+	const reader = stream.getReader();
+	const decoder = new TextDecoder();
+	const captured: string[] = [];
+	let buffered = '';
+	const emit = (line: string) => {
+		if (!line.trim()) return;
+		captured.push(line);
+		if (captured.length > MAX_GIT_OUTPUT_LINES) captured.shift();
+		onOutput(line);
+	};
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		buffered += decoder.decode(value, { stream: true });
+		const lines = buffered.split(/\r\n|\r|\n/);
+		buffered = lines.pop() ?? '';
+		for (const line of lines) emit(line);
+	}
+	buffered += decoder.decode();
+	if (buffered) emit(buffered);
+	return captured.join('\n');
 }
 
 function toErrorMessage(error: unknown): string {

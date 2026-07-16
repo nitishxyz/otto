@@ -325,6 +325,31 @@ describe('config loader', () => {
 		}
 	});
 
+	it('rejects filesystem paths as Git reference URLs', async () => {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-reference-url-'));
+		const app = createEmbeddedApp();
+
+		try {
+			const response = await app.request(
+				`http://localhost/v1/config/references/local-repo?project=${encodeURIComponent(projectRoot)}&scope=local`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						description: 'Local repository entered as Git',
+						source: { type: 'git', url: join(projectRoot, 'repo') },
+					}),
+				},
+			);
+
+			expect(response.status).toBe(400);
+			const cfg = await loadConfig(projectRoot);
+			expect(cfg.references?.['local-repo']).toBeUndefined();
+		} finally {
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('browses server directories for local references', async () => {
 		const projectRoot = await mkdtemp(
 			join(tmpdir(), 'otto-reference-browser-'),
