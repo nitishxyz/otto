@@ -132,6 +132,8 @@ interface ChatInputProps {
 	agentLocked?: boolean;
 	/** Extra bars rendered above the input alongside InputTodosBar (e.g. otto goals bar). */
 	topBars?: React.ReactNode;
+	/** Keeps the composer in document flow so growing content pushes nearby elements. */
+	inlineLayout?: boolean;
 }
 
 export const ChatInput = memo(
@@ -170,6 +172,7 @@ export const ChatInput = memo(
 			onAgentChange,
 			agentLocked = false,
 			topBars,
+			inlineLayout = false,
 		},
 		ref,
 	) {
@@ -915,7 +918,11 @@ export const ChatInput = memo(
 				) : null}
 				<div
 					data-chat-input-overlay
-					className="absolute bottom-0 left-0 right-0 px-2 pt-16 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20"
+					className={
+						inlineLayout
+							? 'relative px-2 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 pointer-events-none z-20'
+							: 'absolute bottom-0 left-0 right-0 px-2 pt-16 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:px-4 md:pb-6 bg-gradient-to-t from-background via-background to-transparent pointer-events-none z-20'
+					}
 				>
 					<div
 						ref={footerRef}

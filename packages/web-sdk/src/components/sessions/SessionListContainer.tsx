@@ -416,7 +416,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 	}) => (
 		<div key={group.label}>
 			<h4
-				className={`sticky ${hasOverlayHeader ? 'top-12' : 'top-0'} z-10 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/75 border-b border-sidebar-border/60`}
+				className={`sticky ${hasOverlayHeader ? 'top-12' : 'top-0'} z-30 isolate px-4 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-sidebar-muted-foreground/80 border-b border-sidebar-border/60 bg-sidebar`}
 			>
 				<span>{group.label}</span>
 				<span className="ml-2 text-sidebar-muted-foreground/60">

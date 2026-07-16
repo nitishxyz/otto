@@ -56,6 +56,27 @@ export interface OttoWordmarkProps {
 	className?: string;
 }
 
+/** Renders the original otto wordmark glyphs without the ShipWheel mark. */
+export function OttoTextWordmark({
+	height = 16,
+	className,
+}: OttoWordmarkProps) {
+	const width = Math.round(height * (744 / 303));
+	return (
+		<svg
+			width={width}
+			height={height}
+			viewBox="0 0 744 303"
+			className={className}
+			fill="currentColor"
+			aria-label="otto"
+			role="img"
+		>
+			<path d={OTTO_WORDMARK_TEXT_PATH} />
+		</svg>
+	);
+}
+
 /**
  * Otto brand lockup: the ShipWheel mark beside the original otto wordmark
  * glyphs, composed in a single SVG so spacing and alignment hold at any size.

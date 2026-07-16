@@ -19,7 +19,7 @@ import {
 import { toast } from '../../stores/toastStore';
 import { ChatInput } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
-import { OttoMark } from '../common/OttoOIcon';
+import { OttoTextWordmark } from '../common/OttoOIcon';
 import { apiClient } from '../../lib/api-client';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { getSessionsQueryKey } from '../../hooks/useSessions';
@@ -257,10 +257,9 @@ export const NewSessionLanding = memo(
 
 			const defaultWordmark = useMemo(
 				() => (
-					<OttoMark
-						size={compact ? 24 : 32}
+					<OttoTextWordmark
+						height={compact ? 24 : 36}
 						className="text-muted-foreground/30"
-						label="otto"
 					/>
 				),
 				[compact],
@@ -295,7 +294,7 @@ export const NewSessionLanding = memo(
 						<div className="flex justify-center mb-6">
 							{wordmark || defaultWordmark}
 						</div>
-						<div className="relative min-h-[110px]">
+						<div className="relative">
 							<ChatInput
 								ref={chatInputRef}
 								onSend={handleSend}
@@ -328,6 +327,7 @@ export const NewSessionLanding = memo(
 								agentLocked={lockAgent}
 								onPlanModeToggle={handlePlanModeToggle}
 								isPlanMode={isPlanMode}
+								inlineLayout
 							/>
 						</div>
 					</div>
