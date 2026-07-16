@@ -135,6 +135,31 @@ describe('OttoTunnel managed startup', () => {
 		expect(url).toBe('https://stable123.ottorouter.org');
 	});
 
+	test('accepts fragmented registration output with an IPv6 edge address', async () => {
+		const tunnel = new OttoTunnel({
+			ensureBinary: async () => '/tmp/tunnel',
+			spawn: (() => {
+				const child = fakeTunnelProcess(
+					'Registered tunnel connection connIndex=0 connection=abcdef12',
+				);
+				queueMicrotask(() =>
+					child.stderr?.emit(
+						'data',
+						Buffer.from(' ip=2606:4700:a0::1 location=fra06'),
+					),
+				);
+				return child;
+			}) as typeof import('node:child_process').spawn,
+		});
+
+		expect(
+			await tunnel.startManaged(
+				'secret-tunnel-token',
+				'https://stable123.ottorouter.org',
+			),
+		).toBe('https://stable123.ottorouter.org');
+	});
+
 	test('preserves quick tunnel URL readiness', async () => {
 		const tunnel = new OttoTunnel({
 			ensureBinary: async () => '/tmp/tunnel',

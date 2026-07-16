@@ -24,9 +24,15 @@ const realSdk = { ...sdkActual };
 class MockTunnel extends EventEmitter {
 	static starts: number[] = [];
 	static managedStarts: Array<{ token: string; url: string }> = [];
+	static instances: MockTunnel[] = [];
 	static stops = 0;
 	static nextId = 0;
 	isRunning = false;
+
+	constructor() {
+		super();
+		MockTunnel.instances.push(this);
+	}
 
 	async start(port: number) {
 		this.isRunning = true;
@@ -100,6 +106,7 @@ beforeEach(async () => {
 	service.tunnelTesting.setManagedStateWriter(async () => {});
 	MockTunnel.starts = [];
 	MockTunnel.managedStarts = [];
+	MockTunnel.instances = [];
 	MockTunnel.stops = 0;
 	MockTunnel.nextId = 0;
 });
@@ -246,6 +253,24 @@ describe('managed tunnel service', () => {
 		await service.startTunnel(undefined, { mode: 'managed' });
 		await service.stopTunnel({ mode: 'managed' });
 		expect(desired).toEqual([true, false]);
+	});
+
+	test('restarts a desired managed tunnel after its process exits', async () => {
+		const provisions = configureManagedTunnel();
+		service.tunnelTesting.setManagedRestartDelay(() => 0);
+		await service.startTunnel(undefined, { mode: 'managed' });
+
+		const first = MockTunnel.instances[0];
+		first.isRunning = false;
+		first.emit('exit', 1, null);
+		await Bun.sleep(10);
+
+		expect(MockTunnel.managedStarts).toHaveLength(2);
+		expect(provisions).toHaveLength(2);
+		expect(await service.getTunnelStatus({ mode: 'managed' })).toMatchObject({
+			status: 'connected',
+			isRunning: true,
+		});
 	});
 
 	test('stops managed process even when disabled state cannot be persisted', async () => {

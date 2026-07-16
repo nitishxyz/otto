@@ -25,9 +25,10 @@ export interface OttoTunnelDependencies {
 }
 
 const URL_REGEX = /https:\/\/([a-z0-9-]+)\.trycloudflare\.com/;
-const CONN_REGEX = /[Cc]onnection(?:=| )([a-f0-9-]+)/;
-const IP_REGEX = /(\d+\.\d+\.\d+\.\d+)/;
-const LOCATION_REGEX = /location=([a-z0-9]+)/i;
+const REGISTERED_CONNECTION_REGEX = /Registered tunnel connection/i;
+const CONN_REGEX = /\bconnection(?:=|\s+)([^\s]+)/i;
+const IP_REGEX = /\bip=([^\s]+)/i;
+const LOCATION_REGEX = /\blocation=([^\s]+)/i;
 const INDEX_REGEX = /connIndex=(\d+)/;
 
 const RATE_LIMIT_REGEX = /429 Too Many Requests|error code: 1015/i;
@@ -37,6 +38,7 @@ export class OttoTunnel extends EventEmitter {
 	private readonly dependencies: OttoTunnelDependencies;
 	private process: ChildProcess | null = null;
 	private connections: (TunnelConnection | undefined)[] = [];
+	private outputBuffers = { stdout: '', stderr: '' };
 	private _url: string | null = null;
 	private _stopped = false;
 
@@ -68,15 +70,17 @@ export class OttoTunnel extends EventEmitter {
 		const locationMatch = output.match(LOCATION_REGEX);
 		const indexMatch = output.match(INDEX_REGEX);
 
-		if (connMatch && ipMatch && locationMatch && indexMatch) {
-			const connection: TunnelConnection = {
-				id: connMatch[1],
-				ip: ipMatch[1],
-				location: locationMatch[1],
-			};
+		if (REGISTERED_CONNECTION_REGEX.test(output) && indexMatch) {
 			const index = Number(indexMatch[1]);
-			this.connections[index] = connection;
-			this.emit('connected', connection);
+			if (!this.connections[index]) {
+				const connection: TunnelConnection = {
+					id: connMatch?.[1] ?? `connection-${index}`,
+					ip: ipMatch?.[1] ?? '',
+					location: locationMatch?.[1] ?? '',
+				};
+				this.connections[index] = connection;
+				this.emit('connected', connection);
+			}
 		}
 
 		if (output.includes('terminated') && indexMatch) {
@@ -87,6 +91,21 @@ export class OttoTunnel extends EventEmitter {
 				this.connections[index] = undefined;
 			}
 		}
+	}
+
+	private handleOutputChunk(
+		output: string,
+		stream: 'stdout' | 'stderr',
+	): boolean {
+		const combined = `${this.outputBuffers[stream]}${output}`;
+		if (this.checkForRateLimit(combined)) return false;
+
+		const lines = combined.split(/\r?\n/);
+		const pending = lines.pop() ?? '';
+		for (const line of lines) this.handleOutput(line);
+		if (pending) this.handleOutput(pending);
+		this.outputBuffers[stream] = pending.slice(-8192);
+		return true;
 	}
 
 	private checkForRateLimit(output: string): boolean {
@@ -115,6 +134,7 @@ export class OttoTunnel extends EventEmitter {
 		this._stopped = false;
 		this._url = knownUrl;
 		this.connections = [];
+		this.outputBuffers = { stdout: '', stderr: '' };
 
 		return new Promise((resolve, reject) => {
 			let settled = false;
@@ -159,21 +179,17 @@ export class OttoTunnel extends EventEmitter {
 			this.process.stdout?.on('data', (data: Buffer) => {
 				const output = data.toString();
 				this.emit('stdout', output);
-				if (this.checkForRateLimit(output)) {
+				if (!this.handleOutputChunk(output, 'stdout')) {
 					this.stop();
-					return;
 				}
-				this.handleOutput(output);
 			});
 
 			this.process.stderr?.on('data', (data: Buffer) => {
 				const output = data.toString();
 				this.emit('stderr', output);
-				if (this.checkForRateLimit(output)) {
+				if (!this.handleOutputChunk(output, 'stderr')) {
 					this.stop();
-					return;
 				}
-				this.handleOutput(output);
 			});
 		});
 	}

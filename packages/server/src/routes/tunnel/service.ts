@@ -41,6 +41,10 @@ type ManagedProvisioner = (
 ) => Promise<ManagedTunnelProvision>;
 type ManagedStateReader = typeof readManagedTunnelDesiredState;
 type ManagedStateWriter = typeof writeManagedTunnelDesiredState;
+type ManagedRestartDelay = (attempt: number) => number;
+
+const defaultManagedRestartDelay: ManagedRestartDelay = (attempt) =>
+	Math.min(1000 * 2 ** attempt, 30_000);
 
 interface TunnelSlot {
 	scope: TunnelScope;
@@ -68,6 +72,10 @@ let managedProvisioner: ManagedProvisioner = provisionManagedTunnel;
 let managedStateReader: ManagedStateReader = readManagedTunnelDesiredState;
 let managedStateWriter: ManagedStateWriter = writeManagedTunnelDesiredState;
 let managedStartPromise: Promise<void> | null = null;
+let managedTunnelDesired = false;
+let managedRestartAttempt = 0;
+let managedRestartTimer: ReturnType<typeof setTimeout> | null = null;
+let managedRestartDelay = defaultManagedRestartDelay;
 const managedTunnel: TunnelSlot & { hostname: string | null } = {
 	scope: 'remote-control',
 	projectId: null,
@@ -99,6 +107,41 @@ function createTunnelSlot(options: TunnelScopeOptions = {}): TunnelSlot {
 		error: null,
 		progress: null,
 	};
+}
+
+function clearManagedRestartTimer() {
+	if (managedRestartTimer) clearTimeout(managedRestartTimer);
+	managedRestartTimer = null;
+}
+
+function scheduleManagedTunnelRestart() {
+	if (
+		!managedTunnelDesired ||
+		managedRestartTimer ||
+		managedTunnel.activeTunnel?.isRunning
+	) {
+		return;
+	}
+
+	const delay = managedRestartDelay(managedRestartAttempt++);
+	managedTunnel.progress = 'Waiting to reconnect managed tunnel...';
+	managedRestartTimer = setTimeout(() => {
+		managedRestartTimer = null;
+		managedTunnel.status = 'starting';
+		managedTunnel.progress = 'Reconnecting managed tunnel...';
+		void startManagedTunnel({ mode: 'managed' }, false)
+			.then((result) => {
+				if (result.ok) {
+					managedRestartAttempt = 0;
+					return;
+				}
+				scheduleManagedTunnelRestart();
+			})
+			.catch((error) => {
+				logger.error('Failed to restart managed tunnel:', error);
+				scheduleManagedTunnelRestart();
+			});
+	}, delay);
 }
 
 function getTunnelSlot(options: TunnelScopeOptions = {}) {
@@ -344,6 +387,20 @@ async function startManagedTunnelUnlocked(
 			managedTunnel.activeTunnel = tunnel;
 			managedTunnel.hostname = provision.hostname;
 			managedTunnel.url = provision.url;
+			tunnel.on('error', (error) => {
+				if (managedTunnel.activeTunnel !== tunnel) return;
+				logger.error('Managed tunnel error:', error);
+				managedTunnel.error = error.message;
+				managedTunnel.status = 'error';
+			});
+			tunnel.on('exit', () => {
+				if (managedTunnel.activeTunnel !== tunnel) return;
+				managedTunnel.status = 'idle';
+				managedTunnel.url = null;
+				managedTunnel.hostname = null;
+				managedTunnel.activeTunnel = null;
+				scheduleManagedTunnelRestart();
+			});
 			await tunnel.startManaged(
 				provision.tunnel_token,
 				provision.url,
@@ -353,18 +410,8 @@ async function startManagedTunnelUnlocked(
 			);
 			managedTunnel.status = 'connected';
 			managedTunnel.progress = null;
-
-			tunnel.on('error', (error) => {
-				logger.error('Managed tunnel error:', error);
-				managedTunnel.error = error.message;
-				managedTunnel.status = 'error';
-			});
-			tunnel.on('exit', () => {
-				managedTunnel.status = 'idle';
-				managedTunnel.url = null;
-				managedTunnel.hostname = null;
-				managedTunnel.activeTunnel = null;
-			});
+			managedRestartAttempt = 0;
+			clearManagedRestartTimer();
 		}
 
 		if (scope === 'project-share' && options.projectId) {
@@ -373,7 +420,11 @@ async function startManagedTunnelUnlocked(
 				managedTunnel.url ?? '',
 			);
 			managedShareIds.set(options.projectId, share.id);
-			if (persistDesiredState) await managedStateWriter(true);
+			if (persistDesiredState) {
+				await managedStateWriter(true);
+				managedTunnelDesired = true;
+				scheduleManagedTunnelRestart();
+			}
 			return {
 				ok: true,
 				mode: 'managed' as const,
@@ -383,7 +434,11 @@ async function startManagedTunnelUnlocked(
 				message: 'Project share started',
 			};
 		}
-		if (persistDesiredState) await managedStateWriter(true);
+		if (persistDesiredState) {
+			await managedStateWriter(true);
+			managedTunnelDesired = true;
+			scheduleManagedTunnelRestart();
+		}
 
 		return {
 			ok: true,
@@ -435,7 +490,11 @@ async function startManagedTunnel(
 /** Restores the desired managed daemon tunnel without blocking daemon startup. */
 export async function restoreManagedTunnel(): Promise<void> {
 	const desired = await managedStateReader();
-	if (!desired.enabled) return;
+	managedTunnelDesired = desired.enabled;
+	if (!desired.enabled) {
+		clearManagedRestartTimer();
+		return;
+	}
 	managedTunnel.status = 'starting';
 	managedTunnel.error = null;
 	managedTunnel.progress = 'Restoring managed tunnel...';
@@ -444,6 +503,7 @@ export async function restoreManagedTunnel(): Promise<void> {
 		managedTunnel.status = 'error';
 		managedTunnel.error = result.error ?? 'Managed tunnel restore failed';
 		managedTunnel.progress = null;
+		scheduleManagedTunnelRestart();
 	}
 }
 
@@ -585,6 +645,8 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 			};
 		}
 
+		managedTunnelDesired = false;
+		clearManagedRestartTimer();
 		let persistenceError: string | undefined;
 		try {
 			await managedStateWriter(false);
@@ -720,6 +782,9 @@ export function shutdownActiveTunnels(): void {
 }
 
 export function stopActiveTunnel() {
+	managedTunnelDesired = false;
+	managedRestartAttempt = 0;
+	clearManagedRestartTimer();
 	managedTunnel.activeTunnel?.stop();
 	managedTunnel.activeTunnel = null;
 	managedTunnel.url = null;
@@ -804,6 +869,9 @@ export const tunnelTesting = {
 	setManagedStateWriter(writer: ManagedStateWriter) {
 		managedStateWriter = writer;
 	},
+	setManagedRestartDelay(delay: ManagedRestartDelay) {
+		managedRestartDelay = delay;
+	},
 	reset() {
 		stopActiveTunnel();
 		tunnelSlots.clear();
@@ -812,6 +880,7 @@ export const tunnelTesting = {
 		managedProvisioner = provisionManagedTunnel;
 		managedStateReader = readManagedTunnelDesiredState;
 		managedStateWriter = writeManagedTunnelDesiredState;
+		managedRestartDelay = defaultManagedRestartDelay;
 		managedStartPromise = null;
 	},
 };

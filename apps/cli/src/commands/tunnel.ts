@@ -90,6 +90,7 @@ async function enableTunnel(
 	projectRoot?: string,
 	loginOffered = false,
 ) {
+	console.log('Enabling managed machine tunnel...');
 	const connection = await daemonConnection(version, projectRoot);
 	const response = await startTunnel({
 		...connection,
