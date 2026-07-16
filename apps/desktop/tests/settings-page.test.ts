@@ -32,6 +32,19 @@ describe('desktop settings page', () => {
 		expect(settings).toContain('onRestartDaemon');
 	});
 
+	test('keeps the desktop shell as the only theme writer', async () => {
+		const layout = await readFile(
+			'src/components/workspace/DesktopSessionsLayout.tsx',
+			'utf8',
+		);
+		const theme = await readFile('src/theme.ts', 'utf8');
+
+		expect(layout).not.toContain('\tuseTheme,');
+		expect(layout).not.toContain('useTheme();');
+		expect(theme).toContain('requestedAtVersion');
+		expect(theme).toContain('themeUpdateQueueRef.current.then');
+	});
+
 	test('uses the shared TitleBar with macOS inset and a back action', async () => {
 		const settings = await readFile(
 			'src/components/DesktopSettings.tsx',

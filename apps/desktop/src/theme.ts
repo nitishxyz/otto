@@ -3,6 +3,7 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useRef,
 	useState,
 } from 'react';
 import {
@@ -33,16 +34,26 @@ export function useNativeDesktopTheme(
 	serverReady: boolean,
 ): DesktopThemeContextValue {
 	const [theme, setThemeState] = useState<Theme>('otto-dark');
+	const themeRef = useRef<Theme>('otto-dark');
+	const persistedThemeRef = useRef<Theme>('otto-dark');
+	const themeChangeVersionRef = useRef(0);
+	const themeUpdateQueueRef = useRef(Promise.resolve());
 
 	useEffect(() => {
 		if (!serverReady) return;
 		let cancelled = false;
+		const requestedAtVersion = themeChangeVersionRef.current;
 
 		apiClient
 			.getConfig()
 			.then((config) => {
-				if (cancelled) return;
-				setThemeState(normalizeThemeId(config.defaults.theme));
+				if (cancelled || requestedAtVersion !== themeChangeVersionRef.current) {
+					return;
+				}
+				const configTheme = normalizeThemeId(config.defaults.theme);
+				themeRef.current = configTheme;
+				persistedThemeRef.current = configTheme;
+				setThemeState(configTheme);
 			})
 			.catch(() => {});
 
@@ -56,32 +67,28 @@ export function useNativeDesktopTheme(
 	}, [theme]);
 
 	const setTheme = useCallback((nextTheme: Theme) => {
-		let previousTheme: Theme | null = null;
-		setThemeState((currentTheme) => {
-			previousTheme = currentTheme;
-			return nextTheme;
-		});
-		apiClient.updateDefaults({ theme: nextTheme }).catch(() => {
-			setThemeState((currentTheme) => {
-				if (currentTheme === nextTheme && previousTheme) {
-					return previousTheme;
-				}
-				return currentTheme;
-			});
+		if (themeRef.current === nextTheme) return;
+
+		const changeVersion = ++themeChangeVersionRef.current;
+		themeRef.current = nextTheme;
+		setThemeState(nextTheme);
+
+		// Preserve click order so a slower request cannot persist an older theme last.
+		themeUpdateQueueRef.current = themeUpdateQueueRef.current.then(async () => {
+			try {
+				await apiClient.updateDefaults({ theme: nextTheme });
+				persistedThemeRef.current = nextTheme;
+			} catch {
+				if (changeVersion !== themeChangeVersionRef.current) return;
+				themeRef.current = persistedThemeRef.current;
+				setThemeState(persistedThemeRef.current);
+			}
 		});
 	}, []);
 
 	const toggleTheme = useCallback(() => {
-		setThemeState((currentTheme) => {
-			const nextTheme = getOppositeThemeId(currentTheme);
-			apiClient.updateDefaults({ theme: nextTheme }).catch(() => {
-				setThemeState((latestTheme) =>
-					latestTheme === nextTheme ? currentTheme : latestTheme,
-				);
-			});
-			return nextTheme;
-		});
-	}, []);
+		setTheme(getOppositeThemeId(themeRef.current));
+	}, [setTheme]);
 
 	return { theme, setTheme, toggleTheme };
 }

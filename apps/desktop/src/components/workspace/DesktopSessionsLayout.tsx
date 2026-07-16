@@ -30,7 +30,6 @@ import {
 	useRestoreFiles,
 	useSessions,
 	useStageFiles,
-	useTheme,
 	useUnstageFiles,
 	useWorkingDirectory,
 } from '@ottocode/web-sdk/hooks';
@@ -63,8 +62,6 @@ export function DesktopSessionsLayout({
 }: DesktopSessionsLayoutProps) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	// Applies the active theme from server config (in-workspace settings picker).
-	useTheme();
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
