@@ -112,6 +112,7 @@ class ApiClient {
 	deleteAgent = configMixin.deleteAgent;
 	getModels = configMixin.getModels;
 	getAllModels = configMixin.getAllModels;
+	getProviderDetails = configMixin.getProviderDetails;
 	discoverProviderModels = configMixin.discoverProviderModels;
 	updateProviderSettings = configMixin.updateProviderSettings;
 	deleteProviderSettings = configMixin.deleteProviderSettings;

@@ -9,6 +9,7 @@ import {
 	LogOut,
 	ArrowRight,
 	RefreshCw,
+	Pencil,
 	Plus,
 	ChevronRight,
 	Laptop,
@@ -249,6 +250,11 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const [customProviderError, setCustomProviderError] = useState<string | null>(
 		null,
 	);
+	const [editingCustomProvider, setEditingCustomProvider] = useState<
+		string | null
+	>(null);
+	const [isLoadingCustomProviderEdit, setIsLoadingCustomProviderEdit] =
+		useState(false);
 	const [isDiscoveringCustomModels, setIsDiscoveringCustomModels] =
 		useState(false);
 	const [discoveredCustomModels, setDiscoveredCustomModels] = useState<
@@ -262,6 +268,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		provider: string;
 		sessionId: string | null;
 		mode?: string;
+		wasConfigured?: boolean;
 	} | null>(null);
 	const [oauthCodeInput, setOauthCodeInput] = useState('');
 	const [isExchangingCode, setIsExchangingCode] = useState(false);
@@ -380,6 +387,7 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 
 	useEffect(() => {
 		if (!oauthSession) return;
+		if (oauthSession.wasConfigured) return;
 		if (authStatus.providers[oauthSession.provider]?.configured) {
 			setOauthSession(null);
 			setOauthCodeInput('');
@@ -593,12 +601,61 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		setCustomProviderError(null);
 		setDiscoveredCustomModels([]);
 		setCustomProviderDiscoveryMessage(null);
+		setEditingCustomProvider(null);
+		setIsLoadingCustomProviderEdit(false);
 	};
 
 	const handleCloseCustomProviderModal = () => {
 		if (isAddingCustomProvider) return;
 		setIsCustomProviderModalOpen(false);
 		resetCustomProviderForm();
+	};
+
+	const handleEditCustomProvider = async (providerId: string) => {
+		resetCustomProviderForm();
+		setEditingCustomProvider(providerId);
+		setIsCustomProviderModalOpen(true);
+		setIsLoadingCustomProviderEdit(true);
+		setCustomProviderId(providerId);
+		setCustomProviderLabel(authStatus.providers[providerId]?.label || '');
+		try {
+			const [details, models] = await Promise.all([
+				apiClient.getProviderDetails(),
+				apiClient.getModels(providerId).catch(() => null),
+			]);
+			const detail = details.find((entry) => entry.id === providerId);
+			if (detail?.label) setCustomProviderLabel(detail.label);
+			setCustomProviderBaseURL(detail?.baseURL ?? '');
+			const compatibility = detail?.compatibility;
+			setCustomProviderCompatibility(
+				CUSTOM_PROVIDER_COMPATIBILITY_OPTIONS.some(
+					(option) => option.value === compatibility,
+				)
+					? (compatibility as CustomProviderCompatibility)
+					: 'openai-compatible',
+			);
+			setCustomProviderAllowAnyModel(detail?.allowAnyModel ?? true);
+			const modelList = models?.models ?? [];
+			setCustomProviderModels(modelList.map((model) => model.id));
+			setDiscoveredCustomModels(
+				modelList.map((model) => ({
+					id: model.id,
+					label: model.label,
+					toolCall: model.toolCall,
+					reasoningText: model.reasoningText,
+					vision: model.vision,
+					attachment: model.attachment,
+					contextWindow: model.contextWindow,
+					maxOutputTokens: model.maxOutputTokens,
+				})),
+			);
+		} catch (err) {
+			setCustomProviderError(
+				err instanceof Error ? err.message : 'Failed to load provider settings',
+			);
+		} finally {
+			setIsLoadingCustomProviderEdit(false);
+		}
 	};
 
 	const handleDiscoverCustomProviderModels = async () => {
@@ -676,7 +733,11 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			resetCustomProviderForm();
 		} catch (err) {
 			setCustomProviderError(
-				err instanceof Error ? err.message : 'Failed to add custom provider',
+				err instanceof Error
+					? err.message
+					: editingCustomProvider
+						? 'Failed to save custom provider'
+						: 'Failed to add custom provider',
 			);
 		} finally {
 			setIsAddingCustomProvider(false);
@@ -761,7 +822,12 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 
 	const handleStartOAuth = async (providerId: string, mode?: string) => {
 		if (providerId === 'anthropic' || providerId === 'xai') {
-			setOauthSession({ provider: providerId, sessionId: null, mode });
+			setOauthSession({
+				provider: providerId,
+				sessionId: null,
+				mode,
+				wasConfigured: !!authStatus.providers[providerId]?.configured,
+			});
 		} else if (providerId === 'openai' && onStartOpenAIDeviceFlow) {
 			setOpenAIPolling(false);
 			setOpenAIDevice(null);
@@ -1006,6 +1072,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					setCustomProviderError(null);
 					setDiscoveredCustomModels([]);
 					setCustomProviderDiscoveryMessage(null);
+					setEditingCustomProvider(null);
+					setIsLoadingCustomProviderEdit(false);
 				}
 				return;
 			}
@@ -1360,13 +1428,41 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 											</div>
 										) : (
 											id !== 'ottorouter' && (
-												<button
-													type="button"
-													onClick={() => handleRemoveProvider(id)}
-													className="ml-1 p-1 text-green-600/40 dark:text-green-500/40 hover:text-green-600/80 dark:hover:text-green-500/80 opacity-0 group-hover:opacity-100 transition-opacity"
-												>
-													<X className="w-3 h-3" />
-												</button>
+												<div className="flex items-center max-w-0 opacity-0 -translate-x-1 overflow-hidden group-hover:max-w-24 group-hover:opacity-100 group-hover:translate-x-0 group-hover:ml-1 transition-all duration-300 ease-out">
+													{info.custom && (
+														<button
+															type="button"
+															onClick={() => handleEditCustomProvider(id)}
+															title="Edit provider"
+															className="p-1 text-green-600/40 dark:text-green-500/40 hover:text-green-600/80 dark:hover:text-green-500/80 transition-colors"
+														>
+															<Pencil className="w-3 h-3" />
+														</button>
+													)}
+													{info.type === 'oauth' && info.supportsOAuth && (
+														<button
+															type="button"
+															onClick={() =>
+																handleStartOAuth(
+																	id,
+																	id === 'anthropic' ? 'max' : undefined,
+																)
+															}
+															title="Re-authenticate"
+															className="p-1 text-green-600/40 dark:text-green-500/40 hover:text-green-600/80 dark:hover:text-green-500/80 transition-colors"
+														>
+															<RefreshCw className="w-3 h-3" />
+														</button>
+													)}
+													<button
+														type="button"
+														onClick={() => handleRemoveProvider(id)}
+														title="Remove provider"
+														className="p-1 text-green-600/40 dark:text-green-500/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+													>
+														<X className="w-3 h-3" />
+													</button>
+												</div>
 											)
 										)}
 									</div>
@@ -1566,9 +1662,20 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 					<div className="bg-background border border-border rounded-xl w-full max-w-2xl mx-6 shadow-2xl max-h-[90vh] overflow-y-auto">
 						<div className="flex items-center gap-3 p-6 border-b border-border">
 							<span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
-								<Plus className="w-4 h-4" />
+								{editingCustomProvider ? (
+									<Pencil className="w-3.5 h-3.5" />
+								) : (
+									<Plus className="w-4 h-4" />
+								)}
 							</span>
-							<h3 className="text-lg font-semibold">Add Custom Provider</h3>
+							<h3 className="text-lg font-semibold">
+								{editingCustomProvider
+									? 'Edit Custom Provider'
+									: 'Add Custom Provider'}
+							</h3>
+							{isLoadingCustomProviderEdit && (
+								<StableSpinner size="sm" title="Loading provider settings" />
+							)}
 						</div>
 						<div className="p-6 space-y-4">
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1581,7 +1688,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										value={customProviderId}
 										onChange={(e) => setCustomProviderId(e.target.value)}
 										placeholder="my-provider"
-										className="w-full h-11 px-4 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-sm"
+										disabled={!!editingCustomProvider}
+										className="w-full h-11 px-4 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-sm disabled:opacity-60"
 									/>
 								</label>
 								<label className="space-y-2">
@@ -1651,7 +1759,11 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										type="password"
 										value={customProviderApiKey}
 										onChange={(e) => setCustomProviderApiKey(e.target.value)}
-										placeholder="Optional"
+										placeholder={
+											editingCustomProvider
+												? 'Leave blank to keep existing'
+												: 'Optional'
+										}
 										className="w-full h-11 px-4 bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/30 transition-colors font-mono text-sm"
 									/>
 								</label>
@@ -1827,12 +1939,21 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 									disabled={
 										!customProviderId.trim() ||
 										!customProviderBaseURL.trim() ||
-										isAddingCustomProvider
+										isAddingCustomProvider ||
+										isLoadingCustomProviderEdit
 									}
 									className="flex-1 h-11 px-4 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
 								>
 									{isAddingCustomProvider ? (
-										<StableSpinner title="Adding provider" />
+										<StableSpinner
+											title={
+												editingCustomProvider
+													? 'Saving provider'
+													: 'Adding provider'
+											}
+										/>
+									) : editingCustomProvider ? (
+										'Save Changes'
 									) : (
 										'Add Provider'
 									)}

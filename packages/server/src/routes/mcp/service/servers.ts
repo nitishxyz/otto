@@ -25,6 +25,8 @@ export async function listMCPServers(projectRoot: string) {
 			command: server.command,
 			args: server.args ?? [],
 			url: server.url,
+			env: server.env,
+			headers: server.headers,
 			disabled: server.disabled ?? false,
 			connected: status?.connected ?? false,
 			tools: status?.tools ?? [],

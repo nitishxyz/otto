@@ -2,6 +2,7 @@ import {
 	getConfig as apiGetConfig,
 	getProviderModels as apiGetProviderModels,
 	getAllModels as apiGetAllModels,
+	getProviders as apiGetProviders,
 	getAgentDetails as apiGetAgentDetails,
 	getAgent as apiGetAgent,
 	getConfigTools as apiGetConfigTools,
@@ -57,6 +58,23 @@ export type ProviderModelSettings = {
 };
 
 export type ProviderModelSettingsMap = Record<string, ProviderModelSettings>;
+
+export type ProviderDetail = {
+	id: string;
+	label: string;
+	source: 'built-in' | 'custom';
+	enabled: boolean;
+	authorized: boolean;
+	custom?: boolean;
+	compatibility?: string | null;
+	family?: string | null;
+	baseURL?: string | null;
+	apiKeyEnv?: string | null;
+	hasApiKey?: boolean;
+	allowAnyModel?: boolean;
+	modelCount?: number;
+	authType?: string | null;
+};
 
 export type AgentDetail = GetAgentResponse['agent'];
 
@@ -188,6 +206,15 @@ export const configMixin = {
 		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return response.data as AllModelsResponse;
+	},
+
+	async getProviderDetails(): Promise<ProviderDetail[]> {
+		const response = await apiGetProviders({
+			query: getProjectQuery(),
+		} as never);
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		const data = response.data as { details?: ProviderDetail[] };
+		return data.details ?? [];
 	},
 
 	async discoverProviderModels(data: {

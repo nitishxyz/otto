@@ -8,6 +8,7 @@ import {
 	Globe,
 	Laptop,
 	Lock,
+	Pencil,
 	Plug,
 	Plus,
 	Search,
@@ -105,6 +106,7 @@ const MCPServerCard = memo(function MCPServerCard({
 	onStart,
 	onStop,
 	onRemove,
+	onEdit,
 	onAuth,
 }: {
 	server: MCPServerInfo;
@@ -114,6 +116,7 @@ const MCPServerCard = memo(function MCPServerCard({
 	onStart: () => void;
 	onStop: () => void;
 	onRemove: () => void;
+	onEdit: () => void;
 	onAuth: () => void;
 }) {
 	const [showTools, setShowTools] = useState(false);
@@ -208,15 +211,28 @@ const MCPServerCard = memo(function MCPServerCard({
 							)}
 						</button>
 					)}
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={onRemove}
-						title="Remove server"
-						className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-					>
-						<Trash2 className="w-3 h-3 text-muted-foreground hover:text-red-400" />
-					</Button>
+					<div className="flex items-center max-w-0 opacity-0 translate-x-1 overflow-hidden group-hover:max-w-16 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ease-out">
+						{!isPluginManaged && (
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={onEdit}
+								title="Edit server"
+								className="h-6 w-6 flex-shrink-0"
+							>
+								<Pencil className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+							</Button>
+						)}
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={onRemove}
+							title="Remove server"
+							className="h-6 w-6 flex-shrink-0"
+						>
+							<Trash2 className="w-3 h-3 text-muted-foreground hover:text-red-400" />
+						</Button>
+					</div>
 				</div>
 			</div>
 
@@ -317,6 +333,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 	const copilotDevice = useCopilotDevicePoller();
 
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	const [editTarget, setEditTarget] = useState<string | null>(null);
 	const [pollingServer, setPollingServer] = useState<string | null>(null);
 	const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
@@ -445,6 +462,9 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 	const deleteServer = deleteTarget
 		? servers.find((s) => s.name === deleteTarget)
 		: undefined;
+	const editServer = editTarget
+		? (servers.find((s) => s.name === editTarget) ?? null)
+		: null;
 	const deleteIsPluginManaged = deleteServer
 		? isPluginManagedMcpServer(deleteServer)
 		: false;
@@ -546,6 +566,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 								onStart={() => handleStart(server.name)}
 								onStop={() => stopServer.mutate(server.name)}
 								onRemove={() => setDeleteTarget(server.name)}
+								onEdit={() => setEditTarget(server.name)}
 								onAuth={() => handleAuth(server.name)}
 							/>
 						))}
@@ -556,6 +577,12 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 			<AddMCPServerModal
 				isOpen={isAddModalOpen}
 				onClose={() => setIsAddModalOpen(false)}
+			/>
+
+			<AddMCPServerModal
+				isOpen={!!editServer}
+				onClose={() => setEditTarget(null)}
+				editServer={editServer}
 			/>
 
 			<Modal

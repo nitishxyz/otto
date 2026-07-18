@@ -11,6 +11,8 @@ const mcpServerSchema = z
 		command: z.string().optional(),
 		args: z.array(z.string()),
 		url: z.string().optional(),
+		env: z.record(z.string(), z.string()).optional(),
+		headers: z.record(z.string(), z.string()).optional(),
 		disabled: z.boolean(),
 		connected: z.boolean(),
 		tools: z.array(z.string()),
