@@ -14,15 +14,15 @@
 		"url": "https://github.com/nitishxyz/otto/issues"
 	},
 	"type": "module",
-	"main": "./src/index.ts",
+	"main": "./dist/index.js",
 	"types": "./src/index.ts",
 	"exports": {
 		".": {
-			"import": "./src/index.ts",
+			"import": "./dist/index.js",
 			"types": "./src/index.ts"
 		},
 		"./browser": {
-			"import": "./src/browser.ts",
+			"import": "./dist/browser.js",
 			"types": "./src/browser.ts"
 		},
 		"./references": {
@@ -30,63 +30,63 @@
 			"types": "./src/references.ts"
 		},
 		"./tools/builtin/fs": {
-			"import": "./src/core/src/tools/builtin/fs/index.ts",
+			"import": "./dist/core/src/tools/builtin/fs/index.js",
 			"types": "./src/core/src/tools/builtin/fs/index.ts"
 		},
 		"./tools/builtin/git": {
-			"import": "./src/core/src/tools/builtin/git.ts",
+			"import": "./dist/core/src/tools/builtin/git.js",
 			"types": "./src/core/src/tools/builtin/git.ts"
 		},
 		"./tools/builtin/bash": {
-			"import": "./src/core/src/tools/builtin/bash.ts",
+			"import": "./dist/core/src/tools/builtin/bash.js",
 			"types": "./src/core/src/tools/builtin/bash.ts"
 		},
 		"./tools/builtin/shell": {
-			"import": "./src/core/src/tools/builtin/shell.ts",
+			"import": "./dist/core/src/tools/builtin/shell.js",
 			"types": "./src/core/src/tools/builtin/shell.ts"
 		},
 		"./tools/builtin/finish": {
-			"import": "./src/core/src/tools/builtin/finish.ts",
-			"types": "./src/core/src/tools/builtin/finish.ts"
+			"import": "./dist/core/src/tools/builtin/progress.js",
+			"types": "./src/core/src/tools/builtin/progress.ts"
 		},
 		"./tools/builtin/grep": {
-			"import": "./src/core/src/tools/builtin/grep.ts",
-			"types": "./src/core/src/tools/builtin/grep.ts"
+			"import": "./dist/core/src/tools/builtin/search.js",
+			"types": "./src/core/src/tools/builtin/search.ts"
 		},
 		"./tools/builtin/patch": {
-			"import": "./src/core/src/tools/builtin/patch.ts",
+			"import": "./dist/core/src/tools/builtin/patch.js",
 			"types": "./src/core/src/tools/builtin/patch.ts"
 		},
 		"./tools/builtin/plan": {
-			"import": "./src/core/src/tools/builtin/plan.ts",
-			"types": "./src/core/src/tools/builtin/plan.ts"
+			"import": "./dist/core/src/tools/builtin/todos.js",
+			"types": "./src/core/src/tools/builtin/todos.ts"
 		},
 		"./tools/builtin/progress": {
-			"import": "./src/core/src/tools/builtin/progress.ts",
+			"import": "./dist/core/src/tools/builtin/progress.js",
 			"types": "./src/core/src/tools/builtin/progress.ts"
 		},
 		"./tools/builtin/search": {
-			"import": "./src/core/src/tools/builtin/search.ts",
+			"import": "./dist/core/src/tools/builtin/search.js",
 			"types": "./src/core/src/tools/builtin/search.ts"
 		},
 		"./tools/builtin/websearch": {
-			"import": "./src/core/src/tools/builtin/websearch.ts",
+			"import": "./dist/core/src/tools/builtin/websearch.js",
 			"types": "./src/core/src/tools/builtin/websearch.ts"
 		},
 		"./tools/builtin/terminal": {
-			"import": "./src/core/src/tools/builtin/terminal.ts",
+			"import": "./dist/core/src/tools/builtin/terminal.js",
 			"types": "./src/core/src/tools/builtin/terminal.ts"
 		},
 		"./tools/error": {
-			"import": "./src/core/src/tools/error.ts",
+			"import": "./dist/core/src/tools/error.js",
 			"types": "./src/core/src/tools/error.ts"
 		},
 		"./tools/bin-manager": {
-			"import": "./src/core/src/tools/bin-manager.ts",
+			"import": "./dist/core/src/tools/bin-manager.js",
 			"types": "./src/core/src/tools/bin-manager.ts"
 		},
 		"./search/fff": {
-			"import": "./src/core/src/search/fff.ts",
+			"import": "./dist/core/src/search/fff.js",
 			"types": "./src/core/src/search/fff.ts"
 		},
 		"./search/file-rank": {
@@ -96,13 +96,16 @@
 		"./prompts/*": "./src/prompts/src/*"
 	},
 	"files": [
+		"dist",
 		"src",
 		"README.md",
 		"LICENSE"
 	],
 	"scripts": {
+		"build": "bun run build.ts",
 		"dev": "bun run src/index.ts",
 		"test": "bun test",
+		"prepublishOnly": "bun run build",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {

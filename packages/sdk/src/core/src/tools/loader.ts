@@ -4,7 +4,6 @@ import { buildFsTools } from './builtin/fs/index.ts';
 import { buildGitTools } from './builtin/git.ts';
 import { progressUpdateTool } from './builtin/progress.ts';
 import { buildShellTool } from './builtin/shell.ts';
-import { buildSearchTool } from './builtin/search.ts';
 import { buildGlobTool } from './builtin/glob.ts';
 import { buildApplyPatchTool } from './builtin/patch.ts';
 import { updateTodosTool } from './builtin/todos.ts';
@@ -180,6 +179,7 @@ async function discoverStaticProjectTools(
 		const shell = buildShellTool(projectRoot, readOnlyRoots);
 		tools.set(shell.name, shell.tool);
 		// Search
+		const { buildSearchTool } = await import('./builtin/search.ts');
 		const search = buildSearchTool(projectRoot);
 		tools.set(search.name, search.tool);
 		const glob = buildGlobTool(projectRoot);

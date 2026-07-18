@@ -2,15 +2,34 @@
 	"name": "@ottorouter/ai-sdk",
 	"version": "0.2.8",
 	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./src/index.ts",
 	"exports": {
-		".": "./src/index.ts",
-		"./catalog": "./src/catalog.ts",
-		"./providers": "./src/providers/index.ts",
-		"./types": "./src/types.ts"
+		".": {
+			"import": "./dist/index.js",
+			"types": "./src/index.ts"
+		},
+		"./catalog": {
+			"import": "./dist/catalog.js",
+			"types": "./src/catalog.ts"
+		},
+		"./providers": {
+			"import": "./dist/providers/index.js",
+			"types": "./src/providers/index.ts"
+		},
+		"./types": {
+			"import": "./dist/types.js",
+			"types": "./src/types.ts"
+		}
 	},
 	"files": [
+		"dist",
 		"src"
 	],
+	"scripts": {
+		"build": "bun run build.ts",
+		"prepublishOnly": "bun run build"
+	},
 	"dependencies": {
 		"@ai-sdk/anthropic": "3.0.82",
 		"@ai-sdk/google": "3.0.80",
