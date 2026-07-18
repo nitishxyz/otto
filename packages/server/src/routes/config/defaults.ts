@@ -152,8 +152,10 @@ export function registerDefaultsRoute(app: Hono) {
 						400,
 					);
 				}
-				const projectRoot =
-					scope === 'local' ? await resolveRequestProjectRoot(c) : undefined;
+				const requestProjectRoot = hasProjectContext
+					? await resolveRequestProjectRoot(c)
+					: undefined;
+				const projectRoot = scope === 'local' ? requestProjectRoot : undefined;
 				const cfg = projectRoot
 					? await loadConfig(projectRoot)
 					: await loadGlobalConfig();
@@ -228,9 +230,10 @@ export function registerDefaultsRoute(app: Hono) {
 
 				await setConfig(scope, updates, projectRoot);
 
-				const nextCfg = projectRoot
-					? ((await getProjectManager().refreshProjectConfig(projectRoot)) ??
-						(await loadConfig(projectRoot)))
+				const nextCfg = requestProjectRoot
+					? ((await getProjectManager().refreshProjectConfig(
+							requestProjectRoot,
+						)) ?? (await loadConfig(requestProjectRoot)))
 					: await loadGlobalConfig();
 
 				return c.json({

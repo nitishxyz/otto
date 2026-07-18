@@ -130,9 +130,7 @@ export function usePreferences() {
 				return;
 			}
 
-			const scope =
-				updates.threadNavigatorRail !== undefined ? 'local' : 'global';
-			updateDefaults.mutate({ ...nextUpdates, scope });
+			updateDefaults.mutate({ ...nextUpdates, scope: 'global' });
 		},
 		[updateDefaults],
 	);

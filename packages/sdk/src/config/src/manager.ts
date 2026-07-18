@@ -31,6 +31,7 @@ import {
 export type Scope = 'global' | 'local';
 
 const LOCAL_DEFAULT_UPDATE_KEYS = new Set(['agent', 'provider', 'model']);
+const configFileUpdateQueues = new Map<string, Promise<void>>();
 
 export type DebugConfig = {
 	enabled: boolean;
@@ -107,16 +108,16 @@ export async function writeDefaults(
 	if (Object.keys(scopedUpdates).length === 0) return;
 
 	const filePath = getConfigFilePath(scope, projectRoot);
-	const existing = await readJsonFile(filePath);
-	const prevDefaults =
-		existing && typeof existing.defaults === 'object'
-			? (existing.defaults as Record<string, unknown>)
-			: {};
-	const next = {
-		...existing,
-		defaults: { ...prevDefaults, ...scopedUpdates },
-	};
-	await writeConfigFile(filePath, next);
+	await updateConfigFile(filePath, (existing) => {
+		const prevDefaults =
+			existing && typeof existing.defaults === 'object'
+				? (existing.defaults as Record<string, unknown>)
+				: {};
+		return {
+			...existing,
+			defaults: { ...prevDefaults, ...scopedUpdates },
+		};
+	});
 }
 
 /**
@@ -129,23 +130,23 @@ export async function writeProviderSettings(
 	_projectRoot?: string,
 ) {
 	const filePath = getConfigFilePath('global');
-	const existing = await readJsonFile(filePath);
-	const prevProviders =
-		existing && typeof existing.providers === 'object'
-			? (existing.providers as Record<string, unknown>)
-			: {};
-	const previousEntry =
-		prevProviders[provider] && typeof prevProviders[provider] === 'object'
-			? (prevProviders[provider] as Record<string, unknown>)
-			: {};
-	const next = {
-		...existing,
-		providers: {
-			...prevProviders,
-			[provider]: { ...previousEntry, ...updates },
-		},
-	};
-	await writeConfigFile(filePath, next);
+	await updateConfigFile(filePath, (existing) => {
+		const prevProviders =
+			existing && typeof existing.providers === 'object'
+				? (existing.providers as Record<string, unknown>)
+				: {};
+		const previousEntry =
+			prevProviders[provider] && typeof prevProviders[provider] === 'object'
+				? (prevProviders[provider] as Record<string, unknown>)
+				: {};
+		return {
+			...existing,
+			providers: {
+				...prevProviders,
+				[provider]: { ...previousEntry, ...updates },
+			},
+		};
+	});
 }
 
 /**
@@ -157,12 +158,12 @@ export async function removeProviderSettings(
 	_projectRoot?: string,
 ) {
 	const filePath = getConfigFilePath('global');
-	const existing = await readJsonFile(filePath);
-	if (!existing || typeof existing.providers !== 'object') return;
-	const providers = { ...(existing.providers as Record<string, unknown>) };
-	delete providers[provider];
-	const next = { ...existing, providers };
-	await writeConfigFile(filePath, next);
+	await updateConfigFile(filePath, (existing) => {
+		if (!existing || typeof existing.providers !== 'object') return undefined;
+		const providers = { ...(existing.providers as Record<string, unknown>) };
+		delete providers[provider];
+		return { ...existing, providers };
+	});
 }
 
 export async function writeSkillSettings(
@@ -171,20 +172,20 @@ export async function writeSkillSettings(
 	_projectRoot?: string,
 ) {
 	const filePath = getGlobalSkillsConfigPath();
-	const existing = await readJsonFile(filePath);
-	const prevItems =
-		existing?.items && typeof existing.items === 'object'
-			? (existing.items as Record<string, unknown>)
-			: {};
-	const next = {
-		...existing,
-		...updates,
-		items: {
-			...prevItems,
-			...(updates.items ?? {}),
-		},
-	};
-	await writeConfigFile(filePath, next);
+	await updateConfigFile(filePath, (existing) => {
+		const prevItems =
+			existing?.items && typeof existing.items === 'object'
+				? (existing.items as Record<string, unknown>)
+				: {};
+		return {
+			...existing,
+			...updates,
+			items: {
+				...prevItems,
+				...(updates.items ?? {}),
+			},
+		};
+	});
 }
 
 /** Read references authored directly in one configuration scope. */
@@ -205,14 +206,15 @@ export async function writeReferenceSettings(
 	projectRoot?: string,
 ) {
 	const filePath = getConfigFilePath(scope, projectRoot);
-	const existing = await readJsonFile(filePath);
-	const references =
-		existing && typeof existing.references === 'object'
-			? (existing.references as Record<string, unknown>)
-			: {};
-	await writeConfigFile(filePath, {
-		...existing,
-		references: { ...references, [name]: reference },
+	await updateConfigFile(filePath, (existing) => {
+		const references =
+			existing && typeof existing.references === 'object'
+				? (existing.references as Record<string, unknown>)
+				: {};
+		return {
+			...existing,
+			references: { ...references, [name]: reference },
+		};
 	});
 }
 
@@ -223,11 +225,12 @@ export async function removeReferenceSettings(
 	projectRoot?: string,
 ) {
 	const filePath = getConfigFilePath(scope, projectRoot);
-	const existing = await readJsonFile(filePath);
-	if (!existing || typeof existing.references !== 'object') return;
-	const references = { ...(existing.references as Record<string, unknown>) };
-	delete references[name];
-	await writeConfigFile(filePath, { ...existing, references });
+	await updateConfigFile(filePath, (existing) => {
+		if (!existing || typeof existing.references !== 'object') return undefined;
+		const references = { ...(existing.references as Record<string, unknown>) };
+		delete references[name];
+		return { ...existing, references };
+	});
 }
 
 export async function readDebugConfig(
@@ -255,23 +258,44 @@ export async function writeDebugConfig(
 	}>,
 ) {
 	const globalPath = getGlobalConfigPath();
-	const existing = await readJsonFile(globalPath);
-	const next: Record<string, unknown> = { ...(existing ?? {}) };
+	await updateConfigFile(globalPath, (existing) => {
+		const next: Record<string, unknown> = { ...(existing ?? {}) };
 
-	if (updates.enabled !== undefined) {
-		next.debugEnabled = updates.enabled;
-	}
+		if (updates.enabled !== undefined) {
+			next.debugEnabled = updates.enabled;
+		}
 
-	if (updates.scopes !== undefined) {
-		next.debugScopes = updates.scopes;
-	}
+		if (updates.scopes !== undefined) {
+			next.debugScopes = updates.scopes;
+		}
 
-	const base = getGlobalConfigDir();
+		return next;
+	});
+}
+
+async function updateConfigFile(
+	filePath: string,
+	update: (
+		existing: Record<string, unknown> | undefined,
+	) => Record<string, unknown> | undefined,
+): Promise<void> {
+	const previousUpdate =
+		configFileUpdateQueues.get(filePath) ?? Promise.resolve();
+	const currentUpdate = previousUpdate
+		.catch(() => {})
+		.then(async () => {
+			const existing = await readJsonFile(filePath);
+			const next = update(existing);
+			if (next) await writeConfigFile(filePath, next);
+		});
+	configFileUpdateQueues.set(filePath, currentUpdate);
 	try {
-		const { promises: fs } = await import('node:fs');
-		await fs.mkdir(base, { recursive: true }).catch(() => {});
-	} catch {}
-	await Bun.write(globalPath, JSON.stringify(next, null, 2));
+		await currentUpdate;
+	} finally {
+		if (configFileUpdateQueues.get(filePath) === currentUpdate) {
+			configFileUpdateQueues.delete(filePath);
+		}
+	}
 }
 
 async function readJsonFile(
@@ -307,11 +331,15 @@ async function writeConfigFile(
 		filePath === getGlobalConfigPath()
 			? getGlobalConfigDir()
 			: filePath.slice(0, Math.max(0, filePath.lastIndexOf('/')));
+	const { promises: fs } = await import('node:fs');
+	await fs.mkdir(base, { recursive: true }).catch(() => {});
+	const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
 	try {
-		const { promises: fs } = await import('node:fs');
-		await fs.mkdir(base, { recursive: true }).catch(() => {});
-	} catch {}
-	await Bun.write(filePath, JSON.stringify(value, null, 2));
+		await Bun.write(temporaryPath, JSON.stringify(value, null, 2));
+		await fs.rename(temporaryPath, filePath);
+	} finally {
+		await fs.rm(temporaryPath, { force: true }).catch(() => {});
+	}
 }
 
 export async function writeAuth(
@@ -351,22 +379,8 @@ export async function setOnboardingComplete(
 	_projectRoot?: string,
 ): Promise<void> {
 	const globalPath = getGlobalConfigPath();
-	const base = getGlobalConfigDir();
-
-	let existing: Record<string, unknown> = {};
-	const f = Bun.file(globalPath);
-	if (await f.exists()) {
-		try {
-			existing = (await f.json()) as Record<string, unknown>;
-		} catch {}
-	}
-
-	const next = { ...existing, onboardingComplete: true };
-
-	try {
-		const { promises: fs } = await import('node:fs');
-		await fs.mkdir(base, { recursive: true }).catch(() => {});
-	} catch {}
-
-	await Bun.write(globalPath, JSON.stringify(next, null, 2));
+	await updateConfigFile(globalPath, (existing) => ({
+		...existing,
+		onboardingComplete: true,
+	}));
 }

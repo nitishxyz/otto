@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
 	applyCssTheme,
 	getOppositeThemeId,
@@ -15,15 +15,7 @@ export function useTheme() {
 	// null until the config query resolves; applying a fallback theme before
 	// then clobbers the theme already on the document (set by the desktop
 	// shell or a previous page) and causes a visible flicker on mount.
-	const configTheme = config ? normalizeThemeId(config.defaults?.theme) : null;
-	const [optimisticTheme, setOptimisticTheme] = useState<Theme | null>(null);
-	const theme = optimisticTheme ?? configTheme;
-
-	useEffect(() => {
-		if (optimisticTheme === configTheme) {
-			setOptimisticTheme(null);
-		}
-	}, [configTheme, optimisticTheme]);
+	const theme = config ? normalizeThemeId(config.defaults?.theme) : null;
 
 	useEffect(() => {
 		if (theme === null || typeof document === 'undefined') return;
@@ -37,17 +29,7 @@ export function useTheme() {
 
 	const setTheme = useCallback(
 		(nextTheme: Theme) => {
-			setOptimisticTheme(nextTheme);
-			updateDefaults.mutate(
-				{ theme: nextTheme, scope: 'global' },
-				{
-					onError: () => {
-						setOptimisticTheme((currentTheme) =>
-							currentTheme === nextTheme ? null : currentTheme,
-						);
-					},
-				},
-			);
+			updateDefaults.mutate({ theme: nextTheme, scope: 'global' });
 		},
 		[updateDefaults],
 	);

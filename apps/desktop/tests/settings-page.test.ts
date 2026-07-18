@@ -41,8 +41,9 @@ describe('desktop settings page', () => {
 
 		expect(layout).not.toContain('\tuseTheme,');
 		expect(layout).not.toContain('useTheme();');
-		expect(theme).toContain('requestedAtVersion');
-		expect(theme).toContain('themeUpdateQueueRef.current.then');
+		expect(theme).toContain('useConfig({ enabled: serverReady })');
+		expect(theme).toContain('useUpdateDefaults()');
+		expect(theme).not.toContain('apiClient.updateDefaults');
 	});
 
 	test('uses the shared TitleBar with macOS inset and a back action', async () => {

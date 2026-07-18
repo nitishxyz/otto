@@ -32,6 +32,7 @@ import {
 	loadGlobalConfig,
 	removeReferenceSettings,
 	setConfig,
+	setOnboardingComplete,
 	writeReferenceSettings,
 	writeSkillSettings,
 } from '@ottocode/sdk';
@@ -380,6 +381,90 @@ describe('config loader', () => {
 				),
 			).toBe(false);
 		} finally {
+			if (previousOttoHome === undefined) {
+				delete process.env.OTTO_HOME;
+			} else {
+				process.env.OTTO_HOME = previousOttoHome;
+			}
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('preserves concurrent updates to the same global config file', async () => {
+		const projectRoot = await mkdtemp(
+			join(tmpdir(), 'otto-config-concurrent-'),
+		);
+		const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		const previousOttoHome = process.env.OTTO_HOME;
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		process.env.OTTO_HOME = join(projectRoot, 'otto-home');
+
+		try {
+			await Promise.all([
+				setConfig('global', { theme: 'otto-light' }),
+				setConfig('global', { compactThread: false }),
+				setConfig('global', { fullWidthContent: true }),
+				setConfig('global', { vimMode: true }),
+				setOnboardingComplete(),
+			]);
+
+			const config = JSON.parse(await readFile(getGlobalConfigPath(), 'utf8'));
+			expect(config.onboardingComplete).toBe(true);
+			expect(config.defaults).toMatchObject({
+				theme: 'otto-light',
+				compactThread: false,
+				fullWidthContent: true,
+				vimMode: true,
+			});
+		} finally {
+			if (previousXdgConfigHome === undefined) {
+				delete process.env.XDG_CONFIG_HOME;
+			} else {
+				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+			}
+			if (previousOttoHome === undefined) {
+				delete process.env.OTTO_HOME;
+			} else {
+				process.env.OTTO_HOME = previousOttoHome;
+			}
+			await rm(projectRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('returns a global defaults update on the next project config read', async () => {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-config-refresh-'));
+		const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		const previousOttoHome = process.env.OTTO_HOME;
+		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		process.env.OTTO_HOME = join(projectRoot, 'otto-home');
+		const app = createEmbeddedApp();
+		const configUrl = `http://localhost/v1/config?project=${encodeURIComponent(projectRoot)}`;
+		const defaultsUrl = `http://localhost/v1/config/defaults?project=${encodeURIComponent(projectRoot)}`;
+
+		try {
+			await setConfig('global', { theme: 'otto-dark' });
+			const initialResponse = await app.request(configUrl);
+			expect(initialResponse.status).toBe(200);
+			expect((await initialResponse.json()).defaults.theme).toBe('otto-dark');
+
+			const updateResponse = await app.request(defaultsUrl, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ theme: 'otto-light', scope: 'global' }),
+			});
+			expect(updateResponse.status).toBe(200);
+
+			const refreshedResponse = await app.request(configUrl);
+			expect(refreshedResponse.status).toBe(200);
+			expect((await refreshedResponse.json()).defaults.theme).toBe(
+				'otto-light',
+			);
+		} finally {
+			if (previousXdgConfigHome === undefined) {
+				delete process.env.XDG_CONFIG_HOME;
+			} else {
+				process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
+			}
 			if (previousOttoHome === undefined) {
 				delete process.env.OTTO_HOME;
 			} else {

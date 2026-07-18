@@ -1,9 +1,58 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ThemeId } from '@ottocode/themes';
 import { apiClient } from '../lib/api-client';
 import { projectScopedKey } from '../lib/api-client/utils';
 
 type ConfigData = Awaited<ReturnType<typeof apiClient.getConfig>>;
+type DefaultsUpdate = Parameters<typeof apiClient.updateDefaults>[0];
+
+const pendingDefaultsUpdates = new WeakMap<object, Map<string, number>>();
+const defaultsUpdateQueues = new WeakMap<
+	object,
+	Map<string, Promise<unknown>>
+>();
+
+function enqueueDefaultsUpdate(
+	queryClient: object,
+	mutationGroup: string,
+	data: DefaultsUpdate,
+) {
+	const groups =
+		defaultsUpdateQueues.get(queryClient) ??
+		new Map<string, Promise<unknown>>();
+	const previousUpdate = groups.get(mutationGroup) ?? Promise.resolve();
+	const currentUpdate = previousUpdate
+		.catch(() => {})
+		.then(() => apiClient.updateDefaults(data));
+	groups.set(mutationGroup, currentUpdate);
+	defaultsUpdateQueues.set(queryClient, groups);
+	return currentUpdate.finally(() => {
+		if (groups.get(mutationGroup) === currentUpdate) {
+			groups.delete(mutationGroup);
+		}
+		if (groups.size === 0) defaultsUpdateQueues.delete(queryClient);
+	});
+}
+
+function updatePendingCount(
+	queryClient: object,
+	mutationGroup: string,
+	delta: 1 | -1,
+): number {
+	const groups =
+		pendingDefaultsUpdates.get(queryClient) ?? new Map<string, number>();
+	const nextCount = Math.max(0, (groups.get(mutationGroup) ?? 0) + delta);
+	if (nextCount === 0) {
+		groups.delete(mutationGroup);
+	} else {
+		groups.set(mutationGroup, nextCount);
+	}
+	if (groups.size === 0) {
+		pendingDefaultsUpdates.delete(queryClient);
+	} else {
+		pendingDefaultsUpdates.set(queryClient, groups);
+	}
+	return nextCount;
+}
 
 export const configQueryKey = () => projectScopedKey(['config'] as const);
 export const providerModelsQueryKey = (provider: string | undefined) =>
@@ -11,11 +60,12 @@ export const providerModelsQueryKey = (provider: string | undefined) =>
 export const allModelsQueryKey = () =>
 	projectScopedKey(['models', 'all'] as const);
 
-export function useConfig() {
+export function useConfig(options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: configQueryKey(),
 		queryFn: () => apiClient.getConfig(),
 		staleTime: 30000,
+		enabled: options?.enabled,
 	});
 }
 
@@ -36,42 +86,24 @@ export function useAllModels() {
 
 export function useUpdateDefaults() {
 	const queryClient = useQueryClient();
+	const queryKey = configQueryKey();
+	const mutationGroup = JSON.stringify(queryKey);
 
 	return useMutation({
-		mutationFn: (data: {
-			agent?: string;
-			provider?: string;
-			model?: string;
-			toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
-			guidedMode?: boolean;
-			reasoningText?: boolean;
-			reasoningLevel?: 'minimal' | 'low' | 'medium' | 'high' | 'max' | 'xhigh';
-			theme?: ThemeId;
-			tuiTheme?: string;
-			vimMode?: boolean;
-			compactThread?: boolean;
-			fontFamily?: string;
-			smartEdges?: boolean;
-			threadNavigatorRail?: boolean;
-			releaseToSend?: boolean;
-			fullWidthContent?: boolean;
-			notificationsEnabled?: boolean;
-			autoCompactThresholdTokens?: number | null;
-			coAuthorCommits?: boolean;
-			scope?: 'global' | 'local';
-		}) => apiClient.updateDefaults(data),
+		mutationKey: [...queryKey, 'update-defaults'],
+		mutationFn: (data: DefaultsUpdate) =>
+			enqueueDefaultsUpdate(queryClient, mutationGroup, data),
 		onMutate: async (data) => {
-			const queryKey = configQueryKey();
-			await queryClient.cancelQueries({ queryKey });
+			updatePendingCount(queryClient, mutationGroup, 1);
+			await queryClient.cancelQueries({ queryKey, exact: true });
 
 			const previousConfig = queryClient.getQueryData<ConfigData>(queryKey);
+			const defaultUpdates = Object.fromEntries(
+				Object.entries(data).filter(
+					([key, value]) => key !== 'scope' && value !== undefined,
+				),
+			) as Partial<ConfigData['defaults']>;
 			if (previousConfig) {
-				const defaultUpdates = Object.fromEntries(
-					Object.entries(data).filter(
-						([key, value]) => key !== 'scope' && value !== undefined,
-					),
-				) as Partial<ConfigData['defaults']>;
-
 				queryClient.setQueryData<ConfigData>(queryKey, {
 					...previousConfig,
 					defaults: {
@@ -81,15 +113,39 @@ export function useUpdateDefaults() {
 				});
 			}
 
-			return { previousConfig };
+			return { previousConfig, defaultUpdates };
 		},
 		onError: (_error, _data, context) => {
-			if (context?.previousConfig) {
-				queryClient.setQueryData(configQueryKey(), context.previousConfig);
-			}
+			if (!context?.previousConfig) return;
+			queryClient.setQueryData<ConfigData>(queryKey, (currentConfig) => {
+				if (!currentConfig) return context.previousConfig;
+				const currentDefaults = currentConfig.defaults as Record<
+					string,
+					unknown
+				>;
+				const previousDefaults = context.previousConfig.defaults as Record<
+					string,
+					unknown
+				>;
+				const nextDefaults = { ...currentDefaults };
+				for (const [key, value] of Object.entries(context.defaultUpdates)) {
+					if (!Object.is(currentDefaults[key], value)) continue;
+					if (Object.hasOwn(previousDefaults, key)) {
+						nextDefaults[key] = previousDefaults[key];
+					} else {
+						delete nextDefaults[key];
+					}
+				}
+				return {
+					...currentConfig,
+					defaults: nextDefaults as ConfigData['defaults'],
+				};
+			});
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: configQueryKey() });
+		onSettled: () => {
+			if (updatePendingCount(queryClient, mutationGroup, -1) === 0) {
+				return queryClient.invalidateQueries({ queryKey, exact: true });
+			}
 		},
 	});
 }
