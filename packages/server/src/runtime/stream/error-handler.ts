@@ -3,6 +3,7 @@ import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { APICallError } from 'ai';
 import { publish, publishClientEvent } from '../../events/bus.ts';
+import { isContextOverflowError } from '../errors/context-overflow.ts';
 import { toErrorPayload } from '../errors/handling.ts';
 import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
@@ -161,23 +162,7 @@ export function createErrorHandler(
 			return;
 		}
 
-		const errorType =
-			(errObj?.apiErrorType as string) ?? (nestedError?.type as string) ?? '';
-		const fullErrorStrLower = JSON.stringify(err).toLowerCase();
-
-		const isPromptTooLong =
-			fullErrorStrLower.includes('prompt is too long') ||
-			fullErrorStrLower.includes('maximum context length') ||
-			fullErrorStrLower.includes('too many tokens') ||
-			fullErrorStrLower.includes('context_length_exceeded') ||
-			fullErrorStrLower.includes('request too large') ||
-			fullErrorStrLower.includes('exceeds the model') ||
-			fullErrorStrLower.includes('exceeds the limit') ||
-			fullErrorStrLower.includes('prompt token count') ||
-			fullErrorStrLower.includes('context window') ||
-			fullErrorStrLower.includes('input is too long') ||
-			errorCode === 'context_length_exceeded' ||
-			errorType === 'invalid_request_error';
+		const isPromptTooLong = isContextOverflowError(err);
 
 		if (isPromptTooLong && !opts.isCompactCommand) {
 			const retries = opts.compactionRetries ?? 0;

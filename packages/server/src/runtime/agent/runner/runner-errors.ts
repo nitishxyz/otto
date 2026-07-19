@@ -3,7 +3,8 @@ import { messages, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish } from '../../../events/bus.ts';
 import { publishAssistantMessageError } from '../../errors/assistant-message-error.ts';
-import { toErrorMessage, toErrorPayload } from '../../errors/handling.ts';
+import { isContextOverflowError } from '../../errors/context-overflow.ts';
+import { toErrorPayload } from '../../errors/handling.ts';
 import {
 	pruneSession,
 	runAutoCompactionFlow,
@@ -153,26 +154,6 @@ export async function autoCompactSessionAfterTurn(args: {
 	return true;
 }
 
-function isPromptTooLongError(err: unknown): boolean {
-	const errorMessage = toErrorMessage(err);
-	const errorCode = (err as { code?: string })?.code ?? '';
-	const responseBody = (err as { responseBody?: string })?.responseBody ?? '';
-	const apiErrorType = (err as { apiErrorType?: string })?.apiErrorType ?? '';
-	const combinedError = `${errorMessage} ${responseBody}`.toLowerCase();
-
-	return (
-		combinedError.includes('prompt is too long') ||
-		combinedError.includes('maximum context length') ||
-		combinedError.includes('too many tokens') ||
-		combinedError.includes('context_length_exceeded') ||
-		combinedError.includes('request too large') ||
-		combinedError.includes('exceeds the model') ||
-		combinedError.includes('input is too long') ||
-		errorCode === 'context_length_exceeded' ||
-		apiErrorType === 'invalid_request_error'
-	);
-}
-
 export async function handleRunnerError(args: {
 	err: unknown;
 	opts: RunOpts;
@@ -185,7 +166,7 @@ export async function handleRunnerError(args: {
 	const { err, opts, db } = args;
 	const payload = toErrorPayload(err);
 
-	if (isPromptTooLongError(err) && !opts.isCompactCommand) {
+	if (isContextOverflowError(err) && !opts.isCompactCommand) {
 		try {
 			const pruneResult = await pruneSession(db, opts.sessionId);
 			void pruneResult;
