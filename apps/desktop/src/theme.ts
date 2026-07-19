@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useEffect } from 'react';
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useLayoutEffect,
+	useState,
+} from 'react';
 import {
 	applyCssTheme,
 	getOppositeThemeId,
@@ -6,6 +13,7 @@ import {
 	type ThemeId,
 } from '@ottocode/themes';
 import { useConfig, useUpdateDefaults } from '@ottocode/web-sdk/hooks';
+import { onDefaultsChange } from '@ottocode/web-sdk/lib';
 
 type Theme = ThemeId;
 
@@ -28,9 +36,29 @@ export function useNativeDesktopTheme(
 ): DesktopThemeContextValue {
 	const { data: config } = useConfig({ enabled: serverReady });
 	const updateDefaults = useUpdateDefaults();
-	const theme = normalizeThemeId(config?.defaults.theme);
+	const configTheme = config ? normalizeThemeId(config.defaults.theme) : null;
+	const [theme, setThemeState] = useState<Theme>(() =>
+		normalizeThemeId(
+			typeof document === 'undefined'
+				? undefined
+				: document.documentElement.dataset.theme,
+		),
+	);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
+		if (configTheme !== null) setThemeState(configTheme);
+	}, [configTheme]);
+
+	useEffect(
+		() =>
+			onDefaultsChange((defaults) => {
+				if (typeof defaults.theme !== 'string') return;
+				setThemeState(normalizeThemeId(defaults.theme));
+			}),
+		[],
+	);
+
+	useLayoutEffect(() => {
 		applyCssTheme(theme);
 	}, [theme]);
 

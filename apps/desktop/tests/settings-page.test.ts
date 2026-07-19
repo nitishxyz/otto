@@ -32,7 +32,7 @@ describe('desktop settings page', () => {
 		expect(settings).toContain('onRestartDaemon');
 	});
 
-	test('keeps the desktop shell as the only theme writer', async () => {
+	test('keeps the desktop shell as the only flicker-free theme writer', async () => {
 		const layout = await readFile(
 			'src/components/workspace/DesktopSessionsLayout.tsx',
 			'utf8',
@@ -43,6 +43,8 @@ describe('desktop settings page', () => {
 		expect(layout).not.toContain('useTheme();');
 		expect(theme).toContain('useConfig({ enabled: serverReady })');
 		expect(theme).toContain('useUpdateDefaults()');
+		expect(theme).toContain('onDefaultsChange');
+		expect(theme).toContain('useLayoutEffect');
 		expect(theme).not.toContain('apiClient.updateDefaults');
 	});
 

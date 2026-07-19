@@ -1,6 +1,12 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { projectScopedKey } from '../lib/api-client/utils';
+import {
+	emitDefaultsChange,
+	mergeDefaultsChange,
+	onDefaultsChange,
+} from '../lib/defaults-events';
 
 type ConfigData = Awaited<ReturnType<typeof apiClient.getConfig>>;
 type DefaultsUpdate = Parameters<typeof apiClient.updateDefaults>[0];
@@ -61,8 +67,23 @@ export const allModelsQueryKey = () =>
 	projectScopedKey(['models', 'all'] as const);
 
 export function useConfig(options?: { enabled?: boolean }) {
+	const queryClient = useQueryClient();
+	const queryKey = configQueryKey();
+	const serializedQueryKey = JSON.stringify(queryKey);
+
+	useEffect(() => {
+		const subscribedQueryKey = JSON.parse(serializedQueryKey) as ReturnType<
+			typeof configQueryKey
+		>;
+		return onDefaultsChange((defaults) => {
+			queryClient.setQueryData<ConfigData>(subscribedQueryKey, (config) =>
+				mergeDefaultsChange(config, defaults),
+			);
+		});
+	}, [queryClient, serializedQueryKey]);
+
 	return useQuery({
-		queryKey: configQueryKey(),
+		queryKey,
 		queryFn: () => apiClient.getConfig(),
 		staleTime: 30000,
 		enabled: options?.enabled,
@@ -95,14 +116,16 @@ export function useUpdateDefaults() {
 			enqueueDefaultsUpdate(queryClient, mutationGroup, data),
 		onMutate: async (data) => {
 			updatePendingCount(queryClient, mutationGroup, 1);
-			await queryClient.cancelQueries({ queryKey, exact: true });
-
-			const previousConfig = queryClient.getQueryData<ConfigData>(queryKey);
 			const defaultUpdates = Object.fromEntries(
 				Object.entries(data).filter(
 					([key, value]) => key !== 'scope' && value !== undefined,
 				),
 			) as Partial<ConfigData['defaults']>;
+			const previousConfig = queryClient.getQueryData<ConfigData>(queryKey);
+
+			emitDefaultsChange(defaultUpdates);
+			await queryClient.cancelQueries({ queryKey, exact: true });
+
 			if (previousConfig) {
 				queryClient.setQueryData<ConfigData>(queryKey, {
 					...previousConfig,
@@ -141,6 +164,18 @@ export function useUpdateDefaults() {
 					defaults: nextDefaults as ConfigData['defaults'],
 				};
 			});
+
+			const currentConfig = queryClient.getQueryData<ConfigData>(queryKey);
+			if (!currentConfig) return;
+			const currentDefaults = currentConfig.defaults as Record<string, unknown>;
+			emitDefaultsChange(
+				Object.fromEntries(
+					Object.keys(context.defaultUpdates).map((key) => [
+						key,
+						currentDefaults[key],
+					]),
+				),
+			);
 		},
 		onSettled: () => {
 			if (updatePendingCount(queryClient, mutationGroup, -1) === 0) {
