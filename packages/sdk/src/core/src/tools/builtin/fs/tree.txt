@@ -2,7 +2,8 @@
 - Accepts absolute, home, or project-relative paths
 - Skips common build/cache folders (node_modules, dist, .git, etc.) by default
 - Depth is capped to avoid excessive output (1–5)
-- Each file shows its line count (e.g. "index.ts (42 lines)")
+- Text files show line counts (e.g. "index.ts (42 lines)"); binary files do not
+- Custom ignore patterns apply to files and directories; target an ignored directory directly when it must be inspected
 
 Usage tips:
 - Use the LS tool for a flat listing of one directory

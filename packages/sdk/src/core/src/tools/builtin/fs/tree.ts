@@ -1,18 +1,111 @@
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
-import { promises as fs } from 'node:fs';
+import { createReadStream, promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { expandTilde, isAbsoluteLike, resolveSafePath } from './util.ts';
 import DESCRIPTION from './tree.txt' with { type: 'text' };
 import { toIgnoredBasenames } from '../ignore.ts';
 import { createToolError, type ToolResponse } from '../../error.ts';
 
+const FILE_TYPE_SAMPLE_BYTES = 64 * 1024;
+
+type IgnoreMatcher = (relativePath: string, name: string) => boolean;
+
+function createIgnoreMatcher(extra?: string[]): IgnoreMatcher {
+	const basenames = toIgnoredBasenames();
+	const globs: Bun.Glob[] = [];
+
+	for (const rawPattern of extra ?? []) {
+		const pattern = String(rawPattern)
+			.replace(/^!/, '')
+			.replace(/\\/g, '/')
+			.replace(/\/$/, '');
+		if (!pattern) continue;
+		const hasGlobCharacter = ['*', '?', '[', ']', '{', '}'].some((character) =>
+			pattern.includes(character),
+		);
+		if (!pattern.includes('/') && !hasGlobCharacter) {
+			basenames.add(pattern);
+			continue;
+		}
+		try {
+			globs.push(new Bun.Glob(pattern));
+		} catch {}
+	}
+
+	return (relativePath, name) =>
+		basenames.has(name) ||
+		globs.some((glob) => glob.match(relativePath) || glob.match(name));
+}
+
+function isProbablyText(sample: Uint8Array): boolean {
+	if (sample.length === 0) return true;
+
+	let controlBytes = 0;
+	for (const byte of sample) {
+		if (byte === 0) return false;
+		if (
+			byte < 0x20 &&
+			byte !== 0x09 &&
+			byte !== 0x0a &&
+			byte !== 0x0c &&
+			byte !== 0x0d
+		) {
+			controlBytes++;
+		}
+	}
+	if (controlBytes / sample.length > 0.05) return false;
+
+	const decoded = new TextDecoder('utf-8').decode(sample);
+	let replacementCharacters = 0;
+	for (const character of decoded) {
+		if (character === '\ufffd') replacementCharacters++;
+	}
+	return replacementCharacters <= Math.max(2, decoded.length * 0.01);
+}
+
+async function isTextFile(path: string): Promise<boolean> {
+	const stats = await fs.stat(path);
+	if (stats.size === 0) return true;
+
+	const sampleSize = Math.min(FILE_TYPE_SAMPLE_BYTES, stats.size);
+	const offsets = new Set([
+		0,
+		Math.max(0, Math.floor((stats.size - sampleSize) / 2)),
+		Math.max(0, stats.size - sampleSize),
+	]);
+	const handle = await fs.open(path, 'r');
+	try {
+		for (const offset of offsets) {
+			const sample = Buffer.allocUnsafe(sampleSize);
+			const { bytesRead } = await handle.read(sample, 0, sampleSize, offset);
+			if (!isProbablyText(sample.subarray(0, bytesRead))) return false;
+		}
+		return true;
+	} finally {
+		await handle.close();
+	}
+}
+
+async function countTextFileLines(path: string): Promise<number | null> {
+	if (!(await isTextFile(path))) return null;
+
+	let count = 1;
+	for await (const chunk of createReadStream(path)) {
+		for (const byte of chunk as Buffer) {
+			if (byte === 0x0a) count++;
+		}
+	}
+	return count;
+}
+
 async function walkTree(
 	dir: string,
-	ignored: Set<string>,
+	isIgnored: IgnoreMatcher,
 	maxDepth: number | null,
 	currentDepth: number,
 	prefix: string,
+	relativeDir: string,
 ): Promise<{ lines: string[]; dirs: number; files: number }> {
 	let dirs = 0;
 	let files = 0;
@@ -30,7 +123,10 @@ async function walkTree(
 
 		const filtered = entries
 			.filter((e) => !e.name.startsWith('.'))
-			.filter((e) => !(e.isDir && ignored.has(e.name)))
+			.filter((e) => {
+				const relativePath = relativeDir ? `${relativeDir}/${e.name}` : e.name;
+				return !isIgnored(relativePath, e.name);
+			})
 			.sort((a, b) => {
 				if (a.isDir && !b.isDir) return -1;
 				if (!a.isDir && b.isDir) return 1;
@@ -46,12 +142,16 @@ async function walkTree(
 			if (entry.isDir) {
 				dirs++;
 				lines.push(`${prefix}${connector}${entry.name}`);
+				const relativePath = relativeDir
+					? `${relativeDir}/${entry.name}`
+					: entry.name;
 				const sub = await walkTree(
 					join(dir, entry.name),
-					ignored,
+					isIgnored,
 					maxDepth,
 					currentDepth + 1,
 					`${prefix}${childPrefix}`,
+					relativePath,
 				);
 				lines.push(...sub.lines);
 				dirs += sub.dirs;
@@ -60,9 +160,8 @@ async function walkTree(
 				files++;
 				let lineCount = '';
 				try {
-					const content = await fs.readFile(join(dir, entry.name), 'utf-8');
-					const count = content.split('\n').length;
-					lineCount = ` (${count} lines)`;
+					const count = await countTextFileLines(join(dir, entry.name));
+					if (count !== null) lineCount = ` (${count} lines)`;
 				} catch {}
 				lines.push(`${prefix}${connector}${entry.name}${lineCount}`);
 			}
@@ -109,7 +208,7 @@ export function buildTreeTool(projectRoot: string): {
 			const start = isAbsoluteLike(req)
 				? req
 				: resolveSafePath(projectRoot, req || '.');
-			const ignored = toIgnoredBasenames(ignore);
+			const isIgnored = createIgnoreMatcher(ignore);
 
 			try {
 				await fs.access(start);
@@ -126,7 +225,14 @@ export function buildTreeTool(projectRoot: string): {
 			}
 
 			try {
-				const result = await walkTree(start, ignored, depth ?? null, 0, '');
+				const result = await walkTree(
+					start,
+					isIgnored,
+					depth ?? null,
+					0,
+					'',
+					'',
+				);
 				const header = '.';
 				const summary = `\n${result.dirs} director${result.dirs === 1 ? 'y' : 'ies'}, ${result.files} file${result.files === 1 ? '' : 's'}`;
 				const output = [header, ...result.lines, summary].join('\n');

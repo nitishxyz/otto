@@ -410,6 +410,54 @@ describe('Built-in Tools', () => {
 			expect(result).toHaveProperty('tree');
 			expect(typeof (result as { tree: string }).tree).toBe('string');
 		});
+
+		it('should count text lines without treating binary files as text', async () => {
+			const fixture = join(projectRoot, 'tree-binary-fixture');
+			await mkdir(fixture, { recursive: true });
+			await writeFile(join(fixture, 'notes.txt'), 'one\ntwo\n');
+			await writeFile(
+				join(fixture, 'weights.data'),
+				new Uint8Array([0x47, 0x47, 0x55, 0x46, 0, 0x0a, 0, 0x0a]),
+			);
+
+			const { tools } = await discoverProjectTools(projectRoot);
+			const treeTool = tools.find((t) => t.name === 'tree');
+			const result = await treeTool?.tool.execute({
+				path: 'tree-binary-fixture',
+			});
+			const tree = (result as { tree: string }).tree;
+
+			expect(tree).toContain('notes.txt (3 lines)');
+			expect(tree).toContain('weights.data');
+			expect(tree).not.toContain('weights.data (');
+		});
+
+		it('should ignore matching files and allow explicit ignored roots', async () => {
+			const fixture = join(projectRoot, 'tree-ignore-fixture');
+			await mkdir(join(fixture, 'node_modules'), { recursive: true });
+			await writeFile(join(fixture, 'README.md'), 'ignored\n');
+			await writeFile(join(fixture, 'keep.ts'), 'kept\n');
+			await writeFile(join(fixture, 'node_modules', 'visible.ts'), 'visible\n');
+
+			const { tools } = await discoverProjectTools(projectRoot);
+			const treeTool = tools.find((t) => t.name === 'tree');
+			const result = await treeTool?.tool.execute({
+				path: 'tree-ignore-fixture',
+				ignore: ['**/README*'],
+			});
+			const tree = (result as { tree: string }).tree;
+
+			expect(tree).toContain('keep.ts (2 lines)');
+			expect(tree).not.toContain('README.md');
+			expect(tree).not.toContain('node_modules');
+
+			const explicitResult = await treeTool?.tool.execute({
+				path: 'tree-ignore-fixture/node_modules',
+			});
+			expect((explicitResult as { tree: string }).tree).toContain(
+				'visible.ts (2 lines)',
+			);
+		});
 	});
 
 	describe('shell tool', () => {
