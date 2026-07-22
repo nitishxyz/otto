@@ -37,7 +37,7 @@ export function buildGoalKickoffMessage(
 		'<instructions>',
 		'The user started this goal. You orchestrate it.',
 		tasks.length
-			? 'Dispatch the first open task(s): mark them in_progress via goal_update (recording the worker sessionId), then delegate with delegate_task or enqueue into a worker session. Independent tasks may run in parallel.'
+			? 'Dispatch the first open task(s): mark them in_progress via goal_update (recording the worker sessionId), then use subagent action=delegate or enqueue into a worker session. Independent tasks may run in parallel.'
 			: 'The goal has no tasks yet. Create them with goal_update.',
 		'</instructions>',
 		'</looper_kickoff>',

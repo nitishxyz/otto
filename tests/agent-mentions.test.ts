@@ -67,7 +67,7 @@ describe('agent mentions', () => {
 		});
 		expect(context).toContain('<explicitly-mentioned-agents>');
 		expect(context).toContain('- build: Full coding agent');
-		expect(context).toContain('delegate_task');
+		expect(context).toContain('subagent(action: "delegate"');
 	});
 
 	test('returns empty context when nothing is mentioned', () => {

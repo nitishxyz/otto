@@ -69,7 +69,6 @@ export const BUILTIN_TOOLS = [
 	'shell',
 	'terminal',
 	'search',
-	'glob',
 	'git_status',
 	'git_diff',
 	'git_commit',

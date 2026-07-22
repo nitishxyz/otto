@@ -1,10 +1,1 @@
-Apply multiple exact text replacements to a single existing file atomically.
-
-Use this tool for several precise old/new text replacements in one existing file.
-
-Rules:
-- Read the file first before editing.
-- Prefer exact `oldString` -> `newString` replacements copied from the latest read output.
-- If an edit has no exact match, the tool may apply a unique whole-line match after whitespace normalization (tabs/spaces, leading/trailing whitespace, and repeated internal whitespace). It will not guess through non-whitespace text differences.
-- All edits must succeed or none are written.
-- Use `replaceAll: true` only when every occurrence should change.
+Apply several exact replacements to one existing file atomically. Read first and copy each `oldString` from current content. A unique whole-line whitespace-normalized fallback is allowed, but non-whitespace differences are never guessed. Every edit must succeed or none are written; use `replaceAll` only when every match should change.

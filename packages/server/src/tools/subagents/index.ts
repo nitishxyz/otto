@@ -1,9 +1,9 @@
-import { tool } from 'ai';
-import { z } from 'zod/v3';
 import { getDb } from '@ottocode/database';
 import { sessions } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
 import { loadConfig } from '@ottocode/sdk';
+import { tool } from 'ai';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod/v3';
 import {
 	listSubagentsForSession,
 	markSubagentsReported,
@@ -13,256 +13,208 @@ import {
 	stopSubagent,
 } from '../../runtime/subagents/service.ts';
 
-const delegateInputSchema = z.object({
-	agent: z
-		.string()
-		.min(1)
-		.describe('Name of the configured agent to delegate to'),
-	task: z.string().min(1).describe('The task the sub-agent should complete'),
-	context: z
-		.string()
-		.optional()
-		.describe(
-			'Relevant findings, file paths, and constraints the sub-agent needs',
-		),
+const subagentInputSchema = z.object({
+	action: z.enum(['delegate', 'list', 'message', 'stop', 'retry']),
+	agent: z.string().optional().describe('Agent name; required for delegate'),
+	task: z.string().optional().describe('Task; required for delegate'),
+	context: z.string().optional().describe('Optional delegate context'),
 	reuseSessionId: z
 		.string()
 		.optional()
-		.describe(
-			'Child session id of a previous delegation to the SAME agent type. The new task is dispatched into that session so prior context (explored files, changes) carries over. Use for related/continuation tasks; omit for unrelated work or parallel work, which starts a fresh instance even when another instance of this agent type is running.',
-		),
-});
-
-export function buildDelegateTaskTool(projectRoot: string, sessionId: string) {
-	return {
-		name: 'delegate_task',
-		tool: tool({
-			description:
-				'Delegate a bounded task to another configured agent type. Each call without reuseSessionId starts a fresh sub-agent instance, so independent tasks may run concurrently in multiple instances of the same agent type (for example, two separate plan delegations). Use reuseSessionId or message_subagent only for related continuation work that should retain an existing instance context; do not use them merely because that agent type is already running. Delegation transfers ownership of that task to the sub-agent: do not do the same work yourself unless the sub-agent fails, the user asks for independent verification, or your task explicitly says to work in parallel. The sub-agent runs asynchronously in its own session while you continue unrelated work. Returns immediately with the child session id. Results are delivered automatically at the next parent model step when possible, or in a continuation after the current turn ends. Do not poll for completion: continue unrelated work, and end the current turn if none remains.',
-			inputSchema: delegateInputSchema,
-			async execute(input) {
-				const cfg = await loadConfig(projectRoot);
-				const db = await getDb(cfg.projectRoot);
-				const sessionRows = await db
-					.select({ agent: sessions.agent })
-					.from(sessions)
-					.where(eq(sessions.id, sessionId))
-					.limit(1);
-				const parentAgent = sessionRows[0]?.agent ?? 'unknown';
-				const result = await spawnSubagent({
-					db,
-					cfg,
-					parentSessionId: sessionId,
-					parentAgent,
-					agent: input.agent,
-					task: input.task,
-					context: input.context,
-					reuseSessionId: input.reuseSessionId,
-				});
-				if (!result.ok) {
-					return { ok: false, error: result.error };
-				}
-				return {
-					ok: true,
-					subagentId: result.subagentId,
-					childSessionId: result.childSessionId,
-					agent: result.agent,
-					status: 'running',
-					note: 'Task ownership transferred to the sub-agent. Continue only unrelated work. Do not call list_subagents to poll: the result will be injected at the next parent model step when possible, or delivered in a continuation after this turn ends.',
-				};
-			},
-		}),
-	};
-}
-
-const listInputSchema = z.object({
+		.describe('Prior child session id for related delegate work'),
 	status: z
 		.enum(['running', 'completed', 'failed', 'cancelled'])
 		.optional()
-		.describe('Optionally filter by status'),
-});
-
-export function buildListSubagentsTool(projectRoot: string, sessionId: string) {
-	return {
-		name: 'list_subagents',
-		tool: tool({
-			description:
-				'List sub-agents spawned from this session with their status and result summaries. Use for an explicit status review or after automatic delivery, not to poll a running sub-agent. If a listed sub-agent is still running, do not check again in this turn; continue unrelated work or end the turn and let its result be delivered automatically.',
-			inputSchema: listInputSchema,
-			async execute(input) {
-				const db = await getDb(projectRoot);
-				const records = await listSubagentsForSession(db, sessionId);
-				const filtered = input.status
-					? records.filter((r) => r.status === input.status)
-					: records;
-				// The agent has now seen these summaries; mark them reported so the
-				// idle hook does not deliver the same results again.
-				const seen = filtered.filter(
-					(r) => r.status !== 'running' && !r.reported && r.summary,
-				);
-				if (seen.length) {
-					await markSubagentsReported(
-						db,
-						seen.map((r) => r.id),
-					);
-				}
-				return {
-					ok: true,
-					subagents: filtered.map((record) => ({
-						id: record.id,
-						agent: record.agent,
-						task: record.task,
-						status: record.status,
-						summary: record.summary ?? undefined,
-						canRetry: record.status === 'failed',
-						canMessage: record.status !== 'cancelled',
-						childSessionId: record.childSessionId,
-					})),
-				};
-			},
-		}),
-	};
-}
-
-const messageInputSchema = z.object({
+		.describe('Optional list filter'),
 	subagentId: z
 		.string()
-		.min(1)
-		.describe('Id of the sub-agent to follow up with (from list_subagents)'),
-	message: z
-		.string()
-		.min(1)
-		.describe('Follow-up question or task for the sub-agent'),
+		.optional()
+		.describe('Required for message, stop, and retry'),
+	message: z.string().optional().describe('Required for message'),
 	delivery: z
 		.enum(['queue', 'interrupt'])
 		.optional()
-		.default('queue')
-		.describe(
-			'queue waits behind the current turn; interrupt silently stops the current turn and delivers this message next',
-		),
+		.describe('Message delivery; defaults to queue'),
 });
 
-export function buildMessageSubagentTool(
-	projectRoot: string,
-	sessionId: string,
-) {
+type SubagentInput = z.infer<typeof subagentInputSchema>;
+
+function requiredText(
+	input: SubagentInput,
+	key: 'agent' | 'task' | 'subagentId' | 'message',
+): string | undefined {
+	const value = input[key]?.trim();
+	return value || undefined;
+}
+
+/** Builds the unified sub-agent lifecycle tool. */
+export function buildSubagentTool(projectRoot: string, sessionId: string) {
 	return {
-		name: 'message_subagent',
+		name: 'subagent',
 		tool: tool({
 			description:
-				'Send a follow-up message to a sub-agent session with full prior context. delivery="queue" (default) waits behind a running turn. delivery="interrupt" silently stops the current turn and delivers the follow-up next; use it only when the current work must change immediately. Use this tool for clarifications or incremental follow-up work instead of re-delegating from scratch.',
-			inputSchema: messageInputSchema,
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows status/results; message sends a queued or interrupting follow-up; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results arrive automatically at the next model step or after this turn; do not poll running agents.',
+			inputSchema: subagentInputSchema,
 			async execute(input) {
-				const cfg = await loadConfig(projectRoot);
-				const db = await getDb(cfg.projectRoot);
-				const result = await messageSubagent({
-					db,
-					cfg,
-					parentSessionId: sessionId,
-					subagentId: input.subagentId,
-					message: input.message,
-					delivery: input.delivery,
-				});
-				if (!result.ok) {
-					return { ok: false, error: result.error };
+				switch (input.action) {
+					case 'delegate': {
+						const agent = requiredText(input, 'agent');
+						const task = requiredText(input, 'task');
+						if (!agent || !task) {
+							return {
+								ok: false,
+								error: 'delegate requires non-empty agent and task',
+							};
+						}
+						const cfg = await loadConfig(projectRoot);
+						const db = await getDb(cfg.projectRoot);
+						const sessionRows = await db
+							.select({ agent: sessions.agent })
+							.from(sessions)
+							.where(eq(sessions.id, sessionId))
+							.limit(1);
+						const result = await spawnSubagent({
+							db,
+							cfg,
+							parentSessionId: sessionId,
+							parentAgent: sessionRows[0]?.agent ?? 'unknown',
+							agent,
+							task,
+							context: input.context,
+							reuseSessionId: input.reuseSessionId,
+						});
+						if (!result.ok) return { ok: false, error: result.error };
+						return {
+							ok: true,
+							subagentId: result.subagentId,
+							childSessionId: result.childSessionId,
+							agent: result.agent,
+							status: 'running',
+							note: 'Task delegated. Continue unrelated work; the result arrives automatically.',
+						};
+					}
+					case 'list': {
+						const db = await getDb(projectRoot);
+						const records = await listSubagentsForSession(db, sessionId);
+						const filtered = input.status
+							? records.filter((record) => record.status === input.status)
+							: records;
+						const seen = filtered.filter(
+							(record) =>
+								record.status !== 'running' &&
+								!record.reported &&
+								record.summary,
+						);
+						if (seen.length) {
+							await markSubagentsReported(
+								db,
+								seen.map((record) => record.id),
+							);
+						}
+						return {
+							ok: true,
+							subagents: filtered.map((record) => ({
+								id: record.id,
+								agent: record.agent,
+								task: record.task,
+								status: record.status,
+								summary: record.summary ?? undefined,
+								canRetry: record.status === 'failed',
+								canMessage: record.status !== 'cancelled',
+								childSessionId: record.childSessionId,
+							})),
+						};
+					}
+					case 'message': {
+						const subagentId = requiredText(input, 'subagentId');
+						const message = requiredText(input, 'message');
+						if (!subagentId || !message) {
+							return {
+								ok: false,
+								error: 'message requires non-empty subagentId and message',
+							};
+						}
+						const cfg = await loadConfig(projectRoot);
+						const db = await getDb(cfg.projectRoot);
+						const result = await messageSubagent({
+							db,
+							cfg,
+							parentSessionId: sessionId,
+							subagentId,
+							message,
+							delivery: input.delivery ?? 'queue',
+						});
+						if (!result.ok) return { ok: false, error: result.error };
+						return {
+							ok: true,
+							subagentId: result.subagentId,
+							childSessionId: result.childSessionId,
+							agent: result.agent,
+							messageId: result.messageId,
+							delivery: result.delivery,
+							preemptedMessageId: result.preemptedMessageId,
+							status: 'running',
+							note:
+								result.delivery === 'interrupt'
+									? 'Current work was preempted; the result arrives automatically.'
+									: 'Follow-up queued; the result arrives automatically.',
+						};
+					}
+					case 'stop': {
+						const subagentId = requiredText(input, 'subagentId');
+						if (!subagentId) {
+							return {
+								ok: false,
+								error: 'stop requires a non-empty subagentId',
+							};
+						}
+						const db = await getDb(projectRoot);
+						const result = await stopSubagent({
+							db,
+							parentSessionId: sessionId,
+							subagentId,
+						});
+						if (!result.ok) return { ok: false, error: result.error };
+						return {
+							...result,
+							status: 'cancelled',
+							note: 'Sub-agent stopped and queued follow-ups cleared.',
+						};
+					}
+					case 'retry': {
+						const subagentId = requiredText(input, 'subagentId');
+						if (!subagentId) {
+							return {
+								ok: false,
+								error: 'retry requires a non-empty subagentId',
+							};
+						}
+						const cfg = await loadConfig(projectRoot);
+						const db = await getDb(cfg.projectRoot);
+						const result = await retrySubagent({
+							db,
+							cfg,
+							parentSessionId: sessionId,
+							subagentId,
+						});
+						if (!result.ok) return { ok: false, error: result.error };
+						return {
+							ok: true,
+							subagentId: result.subagentId,
+							childSessionId: result.childSessionId,
+							agent: result.agent,
+							messageId: result.messageId,
+							status: 'running',
+							note: 'Retry queued; the result arrives automatically.',
+						};
+					}
 				}
-				return {
-					ok: true,
-					subagentId: result.subagentId,
-					childSessionId: result.childSessionId,
-					agent: result.agent,
-					messageId: result.messageId,
-					delivery: result.delivery,
-					preemptedMessageId: result.preemptedMessageId,
-					status: 'running',
-					note:
-						result.delivery === 'interrupt'
-							? 'The current turn was preempted and the follow-up will run next. The result arrives automatically when it finishes.'
-							: 'Follow-up queued. The sub-agent result arrives automatically when it finishes.',
-				};
 			},
 		}),
 	};
 }
 
-const stopInputSchema = z.object({
-	subagentId: z
-		.string()
-		.min(1)
-		.describe('Id of the running sub-agent to stop (from list_subagents)'),
-});
-
-export function buildStopSubagentTool(projectRoot: string, sessionId: string) {
-	return {
-		name: 'stop_subagent',
-		tool: tool({
-			description:
-				'Stop one running sub-agent owned by this session. This aborts its current turn, clears queued follow-ups, and marks it cancelled. Use delegate_task to start fresh if work is needed later.',
-			inputSchema: stopInputSchema,
-			async execute(input) {
-				const db = await getDb(projectRoot);
-				const result = await stopSubagent({
-					db,
-					parentSessionId: sessionId,
-					subagentId: input.subagentId,
-				});
-				if (!result.ok) return { ok: false, error: result.error };
-				return {
-					...result,
-					status: 'cancelled',
-					note: 'Sub-agent stopped. Its queued follow-ups were cleared.',
-				};
-			},
-		}),
-	};
-}
-
-const retryInputSchema = z.object({
-	subagentId: z
-		.string()
-		.min(1)
-		.describe('Id of the failed sub-agent to retry (from list_subagents)'),
-});
-
-export function buildRetrySubagentTool(projectRoot: string, sessionId: string) {
-	return {
-		name: 'retry_subagent',
-		tool: tool({
-			description:
-				'Retry the latest failed assistant run inside a sub-agent session, equivalent to pressing Retry in the UI. Use this when list_subagents shows a failed sub-agent whose work should be attempted again with the same context.',
-			inputSchema: retryInputSchema,
-			async execute(input) {
-				const cfg = await loadConfig(projectRoot);
-				const db = await getDb(cfg.projectRoot);
-				const result = await retrySubagent({
-					db,
-					cfg,
-					parentSessionId: sessionId,
-					subagentId: input.subagentId,
-				});
-				if (!result.ok) {
-					return { ok: false, error: result.error };
-				}
-				return {
-					ok: true,
-					subagentId: result.subagentId,
-					childSessionId: result.childSessionId,
-					agent: result.agent,
-					messageId: result.messageId,
-					status: 'running',
-					note: 'Retry queued. The sub-agent result arrives automatically when it finishes.',
-				};
-			},
-		}),
-	};
-}
-
+/** Builds the singleton sub-agent tool list used by runner setup. */
 export function buildSubagentTools(projectRoot: string, sessionId: string) {
-	return [
-		buildDelegateTaskTool(projectRoot, sessionId),
-		buildListSubagentsTool(projectRoot, sessionId),
-		buildMessageSubagentTool(projectRoot, sessionId),
-		buildStopSubagentTool(projectRoot, sessionId),
-		buildRetrySubagentTool(projectRoot, sessionId),
-	];
+	return [buildSubagentTool(projectRoot, sessionId)];
 }

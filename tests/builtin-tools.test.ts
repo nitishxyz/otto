@@ -106,7 +106,7 @@ describe('Built-in Tools', () => {
 		expect(names).toContain('git_diff');
 		expect(names).toContain('git_commit');
 		expect(names).toContain('search');
-		expect(names).toContain('glob');
+		expect(names).not.toContain('glob');
 		expect(names).toContain('apply_patch');
 		expect(names).toContain('progress_update');
 		expect(names).toContain('websearch');
@@ -617,7 +617,7 @@ describe('Built-in Tools', () => {
 			);
 		});
 
-		it('should hint to use glob for repository file discovery commands', async () => {
+		it('should hint to use search files mode for repository file discovery commands', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
 			const shellTool = tools.find((t) => t.name === 'shell');
 
@@ -629,7 +629,7 @@ describe('Built-in Tools', () => {
 
 			expect(result).toMatchObject({ ok: true, exitCode: 0 });
 			expect((result as { discoveryHint?: string }).discoveryHint).toContain(
-				'prefer the glob tool',
+				'prefer search with mode="files"',
 			);
 		});
 	});
@@ -739,33 +739,21 @@ describe('Built-in Tools', () => {
 				expect.arrayContaining([expect.objectContaining({ file: 'test.txt' })]),
 			);
 		});
-	});
 
-	describe('glob tool', () => {
-		it('should find files by pattern', async () => {
+		it('should find filenames in files mode', async () => {
 			const { tools } = await discoverProjectTools(projectRoot);
-			const globTool = tools.find((t) => t.name === 'glob');
+			const searchTool = tools.find((t) => t.name === 'search');
 
-			const result = await globTool?.tool.execute({
-				pattern: '*.ts',
+			const result = await searchTool?.tool.execute({
+				mode: 'files',
+				query: '**/*.txt',
 				path: 'packages/sdk/src/core/src/tools/builtin',
+				maxResults: 10,
 			});
+
 			expect(result).toHaveProperty('files');
 			expect(result).toHaveProperty('count');
 			expect(Array.isArray((result as { files: unknown }).files)).toBe(true);
-		});
-
-		it('should support glob patterns', async () => {
-			const { tools } = await discoverProjectTools(projectRoot);
-			const globTool = tools.find((t) => t.name === 'glob');
-
-			const result = await globTool?.tool.execute({
-				pattern: '**/*.txt',
-				path: 'packages/sdk/src/core/src/tools/builtin',
-				limit: 10,
-			});
-			expect(result).toHaveProperty('files');
-			expect(result).toHaveProperty('count');
 		});
 
 		it('should ignore dependency directories by default but allow direct paths', async () => {
@@ -777,22 +765,24 @@ describe('Built-in Tools', () => {
 				'export const ignored = true;\n',
 			);
 			const { tools } = await discoverProjectTools(projectRoot);
-			const globTool = tools.find((t) => t.name === 'glob');
+			const searchTool = tools.find((t) => t.name === 'search');
 
-			const defaultResult = await globTool?.tool.execute({
-				pattern: '**/{layout,page,metadata}.{ts,tsx,js,jsx}',
+			const defaultResult = await searchTool?.tool.execute({
+				mode: 'files',
+				query: '**/{layout,page,metadata}.{ts,tsx,js,jsx}',
 				path: '.',
-				limit: 100,
+				maxResults: 100,
 			});
 
 			expect((defaultResult as { files: string[] }).files).not.toContain(
 				'node_modules/pkg/metadata.ts',
 			);
 
-			const directResult = await globTool?.tool.execute({
-				pattern: '**/*.ts',
+			const directResult = await searchTool?.tool.execute({
+				mode: 'files',
+				query: '**/*.ts',
 				path: 'node_modules',
-				limit: 10,
+				maxResults: 10,
 			});
 
 			expect((directResult as { files: string[] }).files).toContain(

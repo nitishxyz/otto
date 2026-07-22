@@ -5,7 +5,6 @@ import { buildGitTools } from './builtin/git.ts';
 import { progressUpdateTool } from './builtin/progress.ts';
 import { buildShellTool } from './builtin/shell.ts';
 import { buildSearchTool } from './builtin/search.ts';
-import { buildGlobTool } from './builtin/glob.ts';
 import { buildApplyPatchTool } from './builtin/patch.ts';
 import { updateTodosTool } from './builtin/todos.ts';
 import { buildWebSearchTool } from './builtin/websearch.ts';
@@ -182,8 +181,6 @@ async function discoverStaticProjectTools(
 		// Search
 		const search = buildSearchTool(projectRoot);
 		tools.set(search.name, search.tool);
-		const glob = buildGlobTool(projectRoot);
-		tools.set(glob.name, glob.tool);
 		// Todo tracking
 		tools.set('update_todos', updateTodosTool);
 		// Web search

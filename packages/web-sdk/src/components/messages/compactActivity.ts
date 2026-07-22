@@ -16,6 +16,7 @@ const EXPLORATION_TOOL_NAMES = new Set([
 	'get_parent_session',
 	'goal_list',
 	'goal_update',
+	'subagent',
 	'delegate_task',
 	'list_subagents',
 	'message_subagent',
@@ -414,6 +415,56 @@ export function getCompactActivityEntry(
 		};
 	}
 
+	if (part.toolName === 'subagent') {
+		const action = getStringField(args, 'action');
+		if (action === 'delegate') {
+			const agent =
+				getStringField(args, 'agent') || getStringField(result, 'agent');
+			const task = getStringField(args, 'task');
+			return {
+				id: part.id,
+				toolName: part.toolName,
+				label: agent
+					? `Delegating to ${agent}${task ? `: ${truncate(task, 34)}` : ''}`
+					: 'Delegating sub-agent task',
+				startedAt: part.startedAt,
+				completedAt: part.completedAt,
+			};
+		}
+		if (action === 'message') {
+			const message = getStringField(args, 'message');
+			const delivery = getStringField(args, 'delivery');
+			return {
+				id: part.id,
+				toolName: part.toolName,
+				label: message
+					? `${delivery === 'interrupt' ? 'Interrupting' : 'Following up with'} sub-agent: ${truncate(message, 42)}`
+					: 'Following up with sub-agent',
+				startedAt: part.startedAt,
+				completedAt: part.completedAt,
+			};
+		}
+		if (action === 'list') {
+			const subagents = Array.isArray(result.subagents) ? result.subagents : [];
+			return {
+				id: part.id,
+				toolName: part.toolName,
+				label: subagents.length
+					? `Checking ${subagents.length} sub-agent${subagents.length === 1 ? '' : 's'}`
+					: 'Checking sub-agents',
+				startedAt: part.startedAt,
+				completedAt: part.completedAt,
+			};
+		}
+		return {
+			id: part.id,
+			toolName: part.toolName,
+			label: action === 'retry' ? 'Retrying sub-agent' : 'Stopping sub-agent',
+			startedAt: part.startedAt,
+			completedAt: part.completedAt,
+		};
+	}
+
 	if (part.toolName === 'delegate_task') {
 		const agent =
 			getStringField(args, 'agent') || getStringField(result, 'agent');
@@ -598,9 +649,12 @@ export function summarizeCompactActivities(
 			case 'goal_update':
 				goalUpdates += 1;
 				break;
+			case 'subagent':
 			case 'delegate_task':
 			case 'list_subagents':
 			case 'message_subagent':
+			case 'stop_subagent':
+			case 'retry_subagent':
 				subagentOps += 1;
 				break;
 		}

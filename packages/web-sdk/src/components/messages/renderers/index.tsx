@@ -191,9 +191,12 @@ export function ToolResultRenderer({
 		case 'goal_list':
 		case 'goal_update':
 			return <GoalToolRenderer {...props} toolName={normalizedName} />;
+		case 'subagent':
 		case 'delegate_task':
 		case 'list_subagents':
 		case 'message_subagent':
+		case 'stop_subagent':
+		case 'retry_subagent':
 			return <SubagentToolRenderer {...props} toolName={normalizedName} />;
 		case 'subagent_result':
 			return <SubagentResultRenderer {...props} />;

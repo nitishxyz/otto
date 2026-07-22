@@ -1,203 +1,107 @@
-# otto Project - AI Agent & Contributor Guidelines
+# otto Agent Guide
 
-This file defines conventions for AI agents and human contributors working in this repository.
+Use this file as a map, not a manual. Read the relevant code and linked docs before changing behavior.
 
-## Formatting and Linting
+## Priorities
 
-- Use Biome for linting/formatting: `bun lint` (or `bun lint --fix` to auto-fix issues)
-- Run `bun lint` before considering work done. If it reports formatting issues, run `bun lint --fix`; any remaining issues will still be shown.
-- Do not disable rules globally
-- If an exception is required, limit scope and add rationale in PR/commit message
-- Keep imports sorted and remove unused code
+- Make the smallest correct change; preserve public APIs and unrelated work.
+- Use strict TypeScript, existing patterns, focused modules, and no circular dependencies.
+- Use Bun only: never npm, yarn, or pnpm.
+- Do not commit unless explicitly asked.
+- Update tests and docs when behavior changes.
 
-## Modular Structure
+## Repository Map
 
-- Prefer many small, focused modules over large files
-- One route module per endpoint group (or per endpoint if it grows)
-- One schema/table per file under `packages/database/src/schema/`, re-exported via index
-- Keep `apps/tui` focused on interactive terminal UX and use `@ottocode/api` for server calls
-- Avoid circular dependencies
-- If a module grows beyond ~200–300 lines, consider refactoring
+```text
+otto/
+├── apps/
+│   ├── cli/          command-line entrypoint and daemon management
+│   ├── desktop/      Tauri desktop shell
+│   ├── tui/          terminal UI; consumes @ottocode/api
+│   ├── web/          web client
+│   └── landing/      public site and generated model catalog
+├── packages/
+│   ├── database/     SQLite, Drizzle schemas, migrations
+│   ├── sdk/          core agents, tools, auth, config, providers, prompts
+│   ├── api/          generated type-safe API client
+│   ├── server/       Hono routes and runtime orchestration
+│   ├── web-sdk/      shared React components, hooks, and stores
+│   └── web-ui/       prebuilt static web assets
+├── tests/            Bun integration/regression tests
+├── scripts/          build, catalog, and maintenance scripts
+├── docs/             architecture, development guides, and plans
+└── .otto/            project-local agent/tool/config overrides
+```
 
-## Auto-generated Files
+Dependency direction: `database/install → sdk → api → server → web-sdk → apps`. See `docs/architecture.md`; do not introduce cycles.
 
-- Do not edit auto-generated files directly; regenerate them from their source script instead.
-- Auto-generated files include, but are not limited to:
-  - `packages/sdk/src/providers/src/catalog.ts`
-  - `packages/ai-sdk/src/catalog.ts`
-  - `apps/landing/public/catalog/models.json`
-- Regenerate with `bun run scripts/update-catalog.ts` (and `--ottorouter` for the OttoRouter catalog) rather than hand-editing.
+## Commands
 
-## Frontend Performance Boundaries
+- Install/run/build/test with Bun.
+- Lint and format: `bun lint`; fix formatting with `bun lint --fix`.
+- Tests: `bun test` or a focused `bun test tests/<name>.test.ts`.
+- Typecheck: `bun typecheck` or a focused workspace filter.
+- Build binary: `bun run build`.
+- Before finishing: run focused tests, `bun lint`, and inspect the working tree.
 
-- Keep React parent/layout components focused on structure, not feature-specific state.
-- A component should only subscribe to stores, queries, and hooks needed to render its own immediate output.
-- If a dependency is only needed by a child panel, modal, list row, or controller, move that dependency into that child.
-- Do not run expensive hooks before visibility gates. Use lightweight wrappers for hidden panels/modals and mount the heavy content only when visible.
-- Prefer narrow Zustand selectors for exact values/actions; avoid subscribing to broad objects such as full store slices or all panel widths when only one value is needed.
-- Avoid per-row global store subscriptions in large lists. Compute shared state once in the parent and pass stable props to memoized rows.
-- Gate closed modals instead of always rendering them with `isOpen={false}` when the modal wrapper does non-trivial work.
-- For frontend performance work, follow the plan in [docs/plans/react-performance-optimization-plan.md](docs/plans/react-performance-optimization-plan.md) and verify changes with React Scan where possible.
+Tests use `bun:test`, live under `tests/`, and end in `.test.ts`.
 
-## Monorepo Package Imports
+## Code Conventions
 
-Use workspace package imports for cross-package dependencies:
+- Cross-package imports use `@ottocode/...`; imports within a package are relative. Never use `@/` aliases.
+- Keep files focused; consider splitting modules beyond roughly 200–300 lines.
+- Prefer explicit types and schemas. Avoid `any`; explain unavoidable uses.
+- Add concise JSDoc to exported functions when their contract is not obvious.
+- Do not add compatibility layers, comments, or abstractions without a concrete need.
+- Use conventional commit prefixes if asked to commit: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 
-- `@ottocode/api` - Type-safe API client
-- `@ottocode/database` - SQLite + Drizzle ORM
-- `@ottocode/install` - npm installer package
-- `@ottocode/sdk` - Core SDK (tools, streaming, agents, auth, config, providers, prompts)
-- `@ottocode/server` - HTTP server
-- `@ottocode/web-sdk` - React components, hooks, and utilities
-- `@ottocode/web-ui` - Pre-built static web UI assets
+## High-Risk Workflows
 
-**Import Rules:**
+### Generated files
 
-- Use workspace imports (`@ottocode/...`) for cross-package dependencies
-- Use relative imports (`./`, `../`) within the same package only
-- **Never use `@/` path aliases** (removed during monorepo migration)
+Never hand-edit generated catalogs:
 
-## Runtime and Tooling
+- `packages/sdk/src/providers/src/catalog.ts`
+- `packages/ai-sdk/src/catalog.ts`
+- `apps/landing/public/catalog/models.json`
 
-- Use Bun for everything: scripts, running, building, testing, linting
-- Do not use npm/yarn/pnpm commands
-- Tests must use `bun:test` and live in `tests/`
+Regenerate with `bun run scripts/update-catalog.ts` (`--ottorouter` when applicable).
 
-## Database and Migrations
+### Database
 
-- SQLite via Drizzle ORM
-- Schema lives under `packages/database/src/schema/`
-- Migrations generated with Drizzle Kit into `packages/database/drizzle/`
-- Server ensures database exists and runs migrations on startup
+Schemas live one table per file in `packages/database/src/schema/`.
 
-**Migration Workflow:**
+1. Update the schema.
+2. Run `bunx drizzle-kit generate`; never create migrations manually.
+3. Update `packages/database/src/runtime/migrations-bundled.ts`.
+4. Test the migration locally.
 
-When you need schema/database changes:
+### API/server
 
-1. Update the schema files in `packages/database/src/schema/`
-2. Generate migrations: `bunx drizzle-kit generate`
-3. Update `packages/database/src/runtime/migrations-bundled.ts` to include the new migration file
-4. Test the migration locally before committing
+Routes live in `packages/server/src/routes/` and are Zod-first.
 
-**Never manually create migration files** - always use `bunx drizzle-kit generate`
+1. Define explicit request/response schemas with Zod/`@hono/zod-openapi`.
+2. Register documented endpoints with `zodOpenApiRoute(...)`.
+3. Keep non-Zod exceptions narrow (WebSocket, SSE, binary, or multipart edges).
+4. Regenerate OpenAPI and the client: `bun run --filter @ottocode/api generate`.
+5. First-party clients use `@ottocode/api`, not duplicated URLs or response types.
 
-## API and Server
+### AI runtime
 
-- Hono-based app
-- Each endpoint belongs in its own module under `packages/server/src/routes/`
-- Endpoint contracts must be Zod-first: define request params/query/body and response schemas with `@hono/zod-openapi`/Zod in server route/schema modules, then derive OpenAPI from those schemas.
-- Register documented endpoints with `zodOpenApiRoute(...)`; do not reintroduce `openApiRoute(...)`, hand-written `OperationObject` route specs, or hardcoded OpenAPI component registries.
-- Avoid broad `z.any()` endpoint schemas. Prefer explicit Zod objects/enums/unions; use `z.unknown()` only for genuinely opaque payloads such as binary multipart/file content, and document the reason in the route module.
-- Do not hand-write OpenAPI schema objects as the source of truth for normal JSON endpoints. If an endpoint truly cannot be represented by Zod/OpenAPI (for example raw WebSocket upgrade handling, SSE helpers, binary file responses, or multipart edge cases), keep the exception narrow and document why in the route module.
-- Expose OpenAPI at `/openapi.json` from registered server routes; do not maintain a separate hardcoded spec file.
-- Generate clients from the OpenAPI output with hey (`bun run --filter @ottocode/api generate`/`build`) and have first-party clients call the generated SDK instead of duplicating endpoint URLs or response types.
-- Streaming uses SSE; prefer AI SDK helpers for stream responses
-- For API changes, follow this order:
-  1. Implement/update route methods in `packages/server/src/routes/`
-  2. Add/update Zod OpenAPI schemas alongside the route
-  3. Regenerate OpenAPI JSON + SDK: `bun run --filter @ottocode/api generate`
-- All first-party clients (web, desktop, tui, cli, acp) should consume `@ottocode/api`; avoid direct `fetch` calls to otto endpoints when SDK methods exist
+- Use AI SDK v6 APIs and keep provider switching in the SDK.
+- Agents/tools are modular; defaults live under `packages/sdk/src/`, with project overrides under `.otto/`.
+- Streaming uses SSE where appropriate.
+- OttoRouter authentication is configured through `otto auth login ottorouter` or `OTTOROUTER_PRIVATE_KEY`.
 
-## AI SDK and Agents
+### Frontend performance
 
-- Use AI SDK v6 APIs (`generateText`, `streamText`, `generateObject`, `streamObject`, `tool`, `embed`, `rerank`)
-- Support provider switching via SDK (OpenAI, Anthropic, Google, OpenRouter, OpenCode, OttoRouter)
-- OttoRouter uses Solana wallet auth — store the base58 private key with `otto auth login ottorouter` or via `OTTOROUTER_PRIVATE_KEY`
-- Agents and tools are modular
-- Load defaults from `packages/sdk/src/tools/`
-- Allow project overrides under `.otto/`
-
-## Commits and Changes
-
-- Make minimal, focused changes
-- Avoid unrelated refactors
-- Keep filenames, public APIs, and structure stable unless change is required
-- Use conventional commit format:
-  - `feat:` - New features
-  - `fix:` - Bug fixes
-  - `docs:` - Documentation changes
-  - `refactor:` - Code refactoring
-  - `test:` - Test additions/changes
-  - `chore:` - Maintenance tasks
-
-## Package Development
-
-Each package under `packages/` should have:
-
-- Clear single responsibility
-- Proper exports in `package.json`
-- `tsconfig.json` extending `../../tsconfig.base.json`
-- `README.md` for public packages (sdk, server, web-ui)
-
-**Dependency Rules:**
-
-- Follow dependency graph levels documented in [docs/architecture.md](docs/architecture.md)
-- No circular dependencies between packages
-- Level 0 (no deps): database, install
-- Level 1: sdk (standalone - includes auth, config, providers, prompts)
-- Level 2: api (standalone API client)
-- Level 3: server (depends on sdk, database)
-- Level 4: web-sdk (depends on api)
-- Level 5: cli (depends on sdk, server, database)
+- Parents/layouts own structure, not child feature state.
+- Subscribe only to state needed by the current component; use narrow Zustand selectors.
+- Mount expensive panels/modals only when visible.
+- Compute shared list state once; avoid per-row global subscriptions.
+- Preserve the existing design system and responsive behavior.
+- For performance work, follow `docs/plans/react-performance-optimization-plan.md` and verify with React Scan when possible.
 
 ## Documentation
 
-- All documentation lives in `docs/`
-- Root level contains only: `README.md`, `AGENTS.md`, `LICENSE`
-- Update docs when changing behavior
-- Keep examples up to date
-- See [docs/index.md](docs/index.md) for documentation overview
-
-## TypeScript
-
-- Always use TypeScript strict mode
-- Add JSDoc comments to exported functions
-- Prefer functional programming patterns where appropriate
-- No `any` types unless absolutely necessary (add comment explaining why)
-
-## Testing
-
-- Write tests for new features and bug fixes
-- Use Bun test framework (`bun:test`)
-- Tests live in `tests/` directory
-- Test files end with `.test.ts`
-- Run tests: `bun test`
-
-## Code Review
-
-- Keep PRs focused on a single change
-- Write clear PR descriptions
-- Link related issues
-- Respond to review comments promptly
-- All CI checks must pass before merge
-
-## AI Agent Specific Guidelines
-
-If you're an AI agent (like Claude) contributing to this project:
-
-- **Always read this file first** before making changes
-- Follow all conventions strictly
-- Ask for clarification if rules conflict or are unclear
-- Prefer smaller, incremental changes over large refactors
-- Test changes thoroughly before committing
-- **Do not commit changes without explicit permission**
-- When making multiple related changes, ask if you should commit after each logical step
-
-## Getting Help
-
-- Check [docs/](docs/) for detailed documentation
-- See [docs/architecture.md](docs/architecture.md) for system design
-- See [docs/development.md](docs/development.md) for development workflow
-- Search existing issues before creating new ones
-
-## Summary
-
-The key principles for contributing to otto:
-
-1. **Modular** - Small, focused files and packages
-2. **Type-safe** - TypeScript strict mode everywhere
-3. **Tested** - Write tests for new features
-4. **Documented** - Update docs when changing behavior
-5. **Consistent** - Follow existing patterns and conventions
-6. **Bun-first** - Use Bun for all tooling and runtime
-7. **Minimal changes** - Keep PRs focused and atomic
+Documentation belongs in `docs/`; the root contains only `README.md`, `AGENTS.md`, `LICENSE`. Start with `docs/index.md` and `docs/development.md`.

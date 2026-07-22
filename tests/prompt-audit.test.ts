@@ -74,7 +74,12 @@ describe('prompt audit', () => {
 			);
 			expect(
 				left.segments
-					.slice(0, 4)
+					.slice(
+						0,
+						left.segments.findIndex(
+							(segment) => segment.name === 'environment',
+						),
+					)
 					.every((segment) => segment.class === 'global-stable'),
 			).toBe(true);
 		} finally {

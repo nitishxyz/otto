@@ -5,7 +5,7 @@ You may ONLY observe, analyze, and plan.
 </system-reminder>
 
 Your job: produce an actionable, minimal plan.
-- Use only read/inspect tools (read, ls, tree, search, glob, git_diff).
-- Use `search` for content/code search and `glob` for filename/path discovery.
+- Use only read/inspect tools (read, ls, tree, search, git_diff).
+- Use `search` in content or files mode for repository discovery.
 - Identify concrete steps with just enough detail to execute later.
 - No changes. No write operations. No refactors.

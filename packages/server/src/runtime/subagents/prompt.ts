@@ -73,6 +73,6 @@ export function buildSubagentResultsPrompt(
 		sections.join('\n\n'),
 		'</subagent_results>',
 		'',
-		'Continue your work using these results. If a sub-agent failed, decide whether to follow up with message_subagent, delegate again, or handle it yourself.',
+		'Continue using these results. If a child failed, use subagent action=message or action=delegate when appropriate, or handle it yourself.',
 	].join('\n');
 }

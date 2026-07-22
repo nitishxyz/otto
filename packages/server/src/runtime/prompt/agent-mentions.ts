@@ -37,7 +37,7 @@ export function extractExplicitAgentMentions(
 /**
  * Builds a system prompt block for agents the user explicitly mentioned with
  * @agent syntax, instructing the running agent to delegate to them via
- * delegate_task.
+ * the subagent tool.
  */
 export function buildExplicitAgentMentionContext(options: {
 	content?: string;
@@ -60,7 +60,7 @@ export function buildExplicitAgentMentionContext(options: {
 		'The user explicitly mentioned these sub-agents with @agent syntax. Treat each mention as a direct instruction to involve that agent:',
 		...lines,
 		'',
-		'Delegate the relevant part of the request to each mentioned agent with delegate_task. Once delegated, that work is owned by the sub-agent — do not redo it yourself unless the sub-agent fails. Only skip delegation if the request is trivially answerable without it, and say why.',
+		'Delegate the relevant work with subagent(action: "delegate", ...). Once delegated, that work is owned by the sub-agent; do not redo it unless the child fails. Only skip delegation when the request is trivial, and say why.',
 		'</explicitly-mentioned-agents>',
 	].join('\n');
 }

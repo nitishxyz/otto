@@ -4,5 +4,5 @@
 - Optional ignore patterns allow further filtering of directory names
 
 Usage tips:
-- Prefer the Glob tool for pattern-based discovery and Grep for content search
+- Prefer Search for pattern-based filename or content discovery
 - Use the Tree tool for a hierarchical view with limited depth

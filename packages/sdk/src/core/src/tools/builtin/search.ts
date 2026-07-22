@@ -7,6 +7,7 @@ import {
 	refreshFffIndex,
 	resolveFffSearchScope,
 } from '../../search/fff.ts';
+import { searchFiles, type FileSearchResult } from './file-search.ts';
 
 const TEXT_MAX = 200;
 
@@ -18,6 +19,16 @@ type SearchToolResult = {
 	truncated?: boolean;
 	shownMatches?: number;
 	files?: Array<{ file: string; matches: number }>;
+};
+
+type SearchInput = {
+	query: string;
+	mode?: 'content' | 'files';
+	path?: string;
+	ignoreCase?: boolean;
+	glob?: string[];
+	ignore?: string[];
+	maxResults?: number;
 };
 
 function truncateText(text: string): string {
@@ -55,7 +66,11 @@ export function buildSearchTool(projectRoot: string): {
 	const search = tool({
 		description: DESCRIPTION,
 		inputSchema: z.object({
-			query: z.string().min(1).describe('Search pattern (regex by default)'),
+			query: z
+				.string()
+				.min(1)
+				.describe('Regex for content mode; glob pattern for files mode'),
+			mode: z.enum(['content', 'files']).optional().default('content'),
 			path: z
 				.string()
 				.optional()
@@ -65,22 +80,33 @@ export function buildSearchTool(projectRoot: string): {
 			glob: z
 				.array(z.string())
 				.optional()
-				.describe('One or more glob patterns to include'),
+				.describe('Content mode: file patterns to include'),
+			ignore: z
+				.array(z.string())
+				.optional()
+				.describe('Files mode: additional patterns to exclude'),
 			maxResults: z.number().int().min(1).max(5000).optional().default(100),
 		}),
 		async execute({
 			query,
+			mode = 'content',
 			path = '.',
 			ignoreCase,
 			glob,
+			ignore,
 			maxResults = 100,
-		}: {
-			query: string;
-			path?: string;
-			ignoreCase?: boolean;
-			glob?: string[];
-			maxResults?: number;
-		}): Promise<ToolResponse<SearchToolResult>> {
+		}: SearchInput): Promise<
+			ToolResponse<SearchToolResult | FileSearchResult>
+		> {
+			if (mode === 'files') {
+				return searchFiles({
+					projectRoot,
+					pattern: query,
+					path,
+					ignore,
+					limit: Math.min(maxResults, 1000),
+				});
+			}
 			try {
 				const { basePath, constraint } = await resolveFffSearchScope(
 					projectRoot,

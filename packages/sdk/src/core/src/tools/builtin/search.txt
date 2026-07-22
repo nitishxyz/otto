@@ -1,18 +1,3 @@
-- Search file contents using the FFF indexed search engine
-- Returns a flat list of matches with `file`, `line`, and `text`
-- Supports regex patterns, include globs, path constraints, and case-insensitive search
-- Respects `.gitignore` by default
+Search repository content or filenames. `mode: "content"` (default) uses regex and returns `file`, `line`, and matching text. `mode: "files"` treats `query` as a glob pattern and returns matching paths. Both respect `.gitignore` and support path scoping and bounded results.
 
-Use this for text/code search across the codebase. It is the primary tool for repository content discovery.
-
-Think of `search` as the repository's fast local `rg`/`grep` replacement: use it for exact string and regex searches before reaching for shell commands.
-
-## Usage tips
-
-- Narrow broad searches with `path` and `glob` values.
-- Keep `maxResults` low for broad searches; the tool returns at most that many matches.
-- Batch independent searches (e.g. multiple function names) in a single turn for parallel execution.
-- Use `ignoreCase: true` for case-insensitive matching; pass `glob` patterns (e.g. `["*.ts", "*.tsx"]`) to limit file types.
-- For filename/path discovery, use `glob` first when you already know the file pattern.
-- Instead of `grep -r "workspace:" packages apps`, call `search` with `query: "workspace:"`, `path: "."`, and `glob: ["**/package.json"]`.
-- Instead of `rg "function foo" src`, call `search` with `query: "function foo"` and `path: "src"`.
+Use this instead of shell `grep`/`rg`/`find`. In content mode, narrow with `path` and `glob`; in files mode, use `ignore` for extra exclusions. Keep `maxResults` small for broad searches.

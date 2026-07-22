@@ -1,256 +1,45 @@
-Apply a patch to modify one or more files.
+Apply targeted, multi-hunk, or multi-file patches. Read every target immediately before patching; copy context and indentation exactly. Wrap input in `*** Begin Patch` / `*** End Patch` and batch related edits in one call.
 
-Use this tool for code and text changes that fit patch semantics, including targeted, structural, multi-hunk, and multi-file edits in one call.
-
-Use the **enveloped format** by default. Standard unified diffs (`---` / `+++`) are also accepted.
-
-## Fastest / safest mode (recommended): Replace
-
-Use this when exact `+/-/context` hunks are hard to build.
-
+Preferred exact-replacement form:
 ```text
 *** Begin Patch
 *** Replace in: path/to/file.ts
 *** Find:
-old text block
+old text
 *** With:
-new text block
+new text
 *** End Patch
 ```
 
-You can include multiple `*** Find:` / `*** With:` pairs under one `*** Replace in:` block.
-
----
-
-## Line-number mode: Delete / Replace / Insert
-
-Use line-number directives for large removals or replacements after reading the
-target file. Lines are 1-indexed and ranges are inclusive. `end`, `eof`, and `$`
-can be used as a range end.
-
+Standard add/update/delete form:
 ```text
 *** Begin Patch
-*** Delete Lines in: path/to/file.ts
-*** Lines: 120-184
-*** End Patch
-```
-
-```text
-*** Begin Patch
-*** Replace Lines in: path/to/file.ts
-*** Lines: 120-184
-*** With:
-new replacement block
-*** End Patch
-```
-
-```text
-*** Begin Patch
-*** Insert Before in: path/to/file.ts
-*** Line: 120
-*** With:
-new block before line 120
-*** Insert After in: path/to/file.ts
-*** Line: 200
-*** With:
-new block after line 200
-*** End Patch
-```
-
-Line-number mode is concise but fragile if the file changes after you read it.
-Prefer text/context patches for small edits.
-
-When deleting a contiguous block larger than 10 lines, prefer line-number deletion:
-
-```text
-*** Begin Patch
-*** Delete Lines in: path/to/file.ts
-*** Lines: start-end
-*** End Patch
-```
-
-Do not reproduce the whole deleted block unless line numbers are unavailable or uncertain.
-
----
-
-## Standard mode: Add / Update / Delete
-
-```text
-*** Begin Patch
-*** Add File: path/to/new.txt
+*** Add File: path/to/new.ts
 +new content
 *** Update File: path/to/existing.ts
  context line
 -old line
 +new line
-*** Delete File: path/to/old.txt
+ context line
+*** Delete File: path/to/old.ts
 *** End Patch
 ```
 
-For multiple edits in the same file, use **one** `*** Update File:` block with multiple `@@` hunks.
-
----
-
-## Mandatory Rules (violations cause failures)
-
-**1. Read Before Patch — NO EXCEPTIONS.** Call `read` on the target file in THIS turn, immediately before creating the patch. Never patch from memory or earlier context. If you read a file 3+ tool calls ago, read it AGAIN.
-
-**2. Copy Context Verbatim.** Context lines (space prefix) must be CHARACTER-FOR-CHARACTER from `read` output. Never reconstruct or "fix" them. If a variable is misspelled in the file, keep it misspelled in the patch. The file is the source of truth, not training data.
-
-**3. Match Indentation Exactly.** The `read` tool returns an `indentation` field (e.g. `"tabs"`, `"2 spaces"`). Use it:
-- File uses tabs → patch uses tabs.
-- File uses 2 spaces → patch uses 2 spaces (not 4, not tabs).
-
-**4. Include Sufficient Context.** Minimum 2 context lines before AND after each change (3+ for YAML). A single context line is fragile — it may match multiple locations. For line-number mode, verify the exact line numbers from the latest `read` output instead.
-
-**5. Markers Required.** Every patch MUST start with `*** Begin Patch` and end with `*** End Patch`. Use `*** Update File:`, `*** Add File:`, `*** Delete File:`, or a line-number directive.
-
-**6. Batch Related Patch Edits.** A single patch may touch multiple files. For multiple edits in the same file, use multiple `@@` hunks in one `*** Update File:` block. Never make separate `apply_patch` calls for the same file in one turn.
-
-### Pre-Flight Checklist
-Before every `apply_patch` call, verify:
-- [ ] File was read with `read` tool in THIS turn (not earlier).
-- [ ] Context lines copied exactly from the `read` output.
-- [ ] Indentation matches the file's `indentation` field.
-- [ ] Wrapped in `*** Begin Patch` / `*** End Patch`.
-- [ ] `-` removal lines match the file EXACTLY.
-
----
-
-## Concrete WRONG vs RIGHT
-
-### Indentation mismatch (the #1 silent killer)
-
-File content (uses TABS):
-```
-→const port = 3000;
-→const host = "localhost";
-```
-
-❌ WRONG — spaces instead of tabs:
-```
-*** Begin Patch
-*** Update File: config.ts
-  const port = 3000;
--  const host = "localhost";
-+  const host = "0.0.0.0";
-*** End Patch
-```
-
-✅ RIGHT — tabs match the file:
-```
-*** Begin Patch
-*** Update File: config.ts
- →const port = 3000;
--→const host = "localhost";
-+→const host = "0.0.0.0";
-*** End Patch
-```
-
-### Reconstructed vs verbatim context
-
-File content (uses TABS):
-```
-const READ_ONLY = new Set([
-→'read',
-→'ls',
-]);
-```
-
-❌ WRONG — reconstructed from memory with spaces:
-```
- const READ_ONLY = new Set([
-   'read',
-   'ls',
-+  'glob',
- ]);
-```
-
-✅ RIGHT — copied exactly from read output:
-```
- const READ_ONLY = new Set([
- →'read',
- →'ls',
-+→'glob',
- ]);
-```
-
-### YAML — space count matters
-
-YAML uses spaces ONLY (never tabs). Count the exact spaces from `read`.
-
-File content (10-space indent):
-```
-          - os: linux
-            arch: arm64
-            runner: ubuntu-latest
-```
-
-❌ WRONG — guessed 8 spaces.
-✅ RIGHT — exact 10 spaces matching file.
-
-### Multi-hunk patch (multiple edits, one call)
-
+Line-number directives are available after reading the file:
 ```text
 *** Begin Patch
-*** Update File: src/app.ts
-@@ imports section
- import { foo } from "./foo";
-+import { bar } from "./bar";
- import { baz } from "./baz";
-@@ function section
- function init() {
--  const port = 3000;
-+  const port = 8080;
-   return port;
- }
+*** Replace Lines in: path/to/file.ts
+*** Lines: 20-30
+*** With:
+replacement
 *** End Patch
 ```
+Use `Delete Lines`, `Insert Before`, or `Insert After` similarly; ranges are 1-indexed and may end with `end`/`eof`/`$`.
 
-Note: `@@` lines are OPTIONAL hints — context lines (space prefix) are what the tool uses to locate hunks.
-
----
-
-## Matching behavior
-
-- `fuzzyMatch` defaults to `true` (helps with small whitespace differences).
-- Set `fuzzyMatch: false` for strict matching.
-- If a hunk may be stale, set `allowRejects: true` to apply valid parts and skip invalid ones.
-
----
-
-## When Patch Fails
-
-- Error means context didn't match or the file changed.
-- **Solution**: Read the file AGAIN, copy context character-by-character, rebuild.
-- After repeated failures on the same file, stop and choose a safer valid editing strategy.
-
----
-
-## Minimal templates
-
-### Update one line
-```text
-*** Begin Patch
-*** Update File: src/app.ts
- function main() {
--  console.log("old");
-+  console.log("new");
- }
-*** End Patch
-```
-
-### Add file
-```text
-*** Begin Patch
-*** Add File: src/new.ts
-+export const ok = true;
-*** End Patch
-```
-
-### Delete file
-```text
-*** Begin Patch
-*** Delete File: src/obsolete.ts
-*** End Patch
-```
+Rules:
+- Context/removal lines must match current file text verbatim, including tabs and spaces.
+- Include enough unique context around updates; use 3+ lines for YAML.
+- Use one file section with multiple hunks for multiple changes to that file.
+- `fuzzyMatch` permits whitespace-normalized matching; disable it for strict matching.
+- `allowRejects` applies valid operations while returning rejected ones.
+- On failure, reread the file and rebuild the patch from current content.

@@ -188,7 +188,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 			if (lines.length) {
 				availableAgentsPrompt = [
 					'',
-					'## Available agents (delegate_task)',
+					'## Available agents (subagent action=delegate)',
 					'',
 					'You can delegate bounded tasks to these agents:',
 					...lines,
@@ -205,7 +205,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	}
 
 	// Goals are single-writer: only looper carries goal tools. Workers stay
-	// goal-unaware and receive work via delegate_task / enqueued messages.
+	// goal-unaware and receive work via subagent delegation / enqueued messages.
 	const needsGoalTools = opts.agent === 'looper';
 	if (needsGoalTools) {
 		// Legacy looper sessions are children of the session they supervise and
@@ -261,8 +261,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		if (allowedLazyToolNames.includes('run_plugin_command')) {
 			lazyBriefs.push({
 				name: 'run_plugin_command',
-				description:
-					'Run an enabled installed plugin command in a visible terminal using the shared plugin command executor.',
+				description: 'Run an enabled plugin command.',
 			});
 		}
 		const loadTools = buildLoadToolsTool(lazyBriefs);

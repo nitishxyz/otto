@@ -126,7 +126,7 @@ export function buildGoalUpdateTool(args: BuildGoalToolsArgs) {
 		name: 'goal_update',
 		tool: tool({
 			description:
-				'Create or update the persistent goal/task queue you orchestrate. Workers never touch goals: you dispatch tasks with delegate_task, verify results, and record every status change here yourself.',
+				'Create or update the persistent goal/task queue you orchestrate. Workers never touch goals: dispatch with subagent action=delegate, verify results, and record every status change yourself.',
 			inputSchema,
 			async execute(input) {
 				const db = await getDb(args.projectRoot);

@@ -109,24 +109,11 @@ export function applyModelFamilyEditToolPolicy(
 	);
 	if (shouldUseStructuredEditTools(model, modelInfo)) {
 		return Array.from(
-			new Set([
-				...next,
-				'apply_patch',
-				'write',
-				'edit',
-				'multiedit',
-				'copy_into',
-			]),
+			new Set([...next, 'apply_patch', 'write', 'edit', 'multiedit']),
 		);
 	}
 
-	const preferredEditingTools = [
-		'apply_patch',
-		'write',
-		'edit',
-		'multiedit',
-		'copy_into',
-	];
+	const preferredEditingTools = ['apply_patch', 'write', 'edit', 'multiedit'];
 
 	return Array.from(new Set([...next, ...preferredEditingTools]));
 }

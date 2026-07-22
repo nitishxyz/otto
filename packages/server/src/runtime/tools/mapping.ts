@@ -27,7 +27,6 @@ export const CANONICAL_TO_PASCAL: Record<string, string> = {
 	pwd: 'Pwd',
 
 	// Search operations
-	glob: 'Glob',
 	search: 'Search',
 
 	// Execution
@@ -69,7 +68,6 @@ export const PASCAL_TO_CANONICAL: Record<string, string> = {
 	Pwd: 'pwd',
 
 	// Search operations
-	Glob: 'glob',
 	Grep: 'search',
 	Search: 'search',
 

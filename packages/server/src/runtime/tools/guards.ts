@@ -31,7 +31,6 @@ export function guardToolCall(
 		case 'ls':
 		case 'tree':
 		case 'search':
-		case 'glob':
 			return guardReadPath(
 				String(a.path ?? ''),
 				context.projectRoot,

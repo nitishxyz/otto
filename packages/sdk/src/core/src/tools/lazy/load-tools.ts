@@ -11,7 +11,7 @@ export function buildLazyToolCatalogDescription(
 ): string {
 	if (briefs.length === 0) return 'No lazy tools available.';
 	return briefs
-		.map((brief) => `- ${brief.name}: ${brief.description.slice(0, 180)}`)
+		.map((brief) => `${brief.name}: ${brief.description.slice(0, 80)}`)
 		.join('\n');
 }
 
@@ -25,11 +25,9 @@ export function buildLoadToolsTool(briefs: LazyToolBrief[]): {
 	return {
 		name: 'load_tools',
 		tool: tool({
-			description: `Load first-party tools by name so they become available for use in the next step. Call this before using a listed tool.\n\nAvailable tools:\n${catalog}`,
+			description: `Load tools for the next step.\n${catalog}`,
 			inputSchema: z.object({
-				tools: z
-					.array(z.string())
-					.describe('Array of first-party tool names to load.'),
+				tools: z.array(z.string()).describe('Tool names to load'),
 			}),
 			execute: async ({ tools: requested }) => {
 				const loaded: string[] = [];

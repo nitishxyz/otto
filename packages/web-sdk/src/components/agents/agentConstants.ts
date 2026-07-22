@@ -57,7 +57,6 @@ export function toolCategoryFromName(tool: string): string {
 			'read_image',
 			'ls',
 			'tree',
-			'glob',
 			'copy_into',
 			'copy_attachment_to_project',
 		].includes(tool)
@@ -204,7 +203,6 @@ export const TOOL_PRESETS: Record<
 				'read',
 				'ls',
 				'tree',
-				'glob',
 				'search',
 				'websearch',
 			],
@@ -220,7 +218,6 @@ export const TOOL_PRESETS: Record<
 				'read',
 				'ls',
 				'tree',
-				'glob',
 				'search',
 				'websearch',
 			],

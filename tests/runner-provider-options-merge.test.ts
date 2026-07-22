@@ -143,7 +143,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -173,7 +172,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -193,7 +191,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -212,7 +209,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -250,7 +246,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -278,7 +273,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 
@@ -297,7 +291,6 @@ describe('applyModelFamilyEditToolPolicy', () => {
 			'write',
 			'edit',
 			'multiedit',
-			'copy_into',
 		]);
 	});
 

@@ -17,7 +17,7 @@ export async function listSubagentsForSession(
 
 /**
  * Marks sub-agent records as reported, e.g. when the parent agent has already
- * seen their summaries via list_subagents, so the idle hook does not deliver
+ * seen their summaries via subagent action=list, so the idle hook does not deliver
  * the same results again.
  */
 export async function markSubagentsReported(

@@ -177,7 +177,7 @@ async function validateSpawnTarget(args: {
 	if (running.length >= MAX_CONCURRENT_PER_PARENT) {
 		return {
 			ok: false,
-			error: `Too many running sub-agents (max ${MAX_CONCURRENT_PER_PARENT}). Wait for one to finish or check list_subagents.`,
+			error: `Too many running sub-agents (max ${MAX_CONCURRENT_PER_PARENT}). Wait for one to finish or use subagent action=list.`,
 		};
 	}
 

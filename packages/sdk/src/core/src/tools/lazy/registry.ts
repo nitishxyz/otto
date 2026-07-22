@@ -1,5 +1,6 @@
 import type { Tool } from 'ai';
 import { buildCopyAttachmentTool } from '../builtin/fs/copy-attachment.ts';
+import { buildCopyIntoTool } from '../builtin/fs/copy-into.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
 import { buildBrowserTool } from './browser.ts';
 import { buildMCPManagerTool } from './mcp-manager.ts';
@@ -13,33 +14,33 @@ export type LazyToolDefinition = LazyToolBrief & {
 export function getLazyToolDefinitions(): LazyToolDefinition[] {
 	return [
 		{
+			name: 'copy_into',
+			description: 'Copy source lines into a project file.',
+			build: buildCopyIntoTool,
+		},
+		{
 			name: 'simulator',
-			description:
-				'Control Apple Simulator via serve-sim: start, status, click, drag, type, button, rotate, camera, permissions, screenshots, accessibility tree, foreground app, logs, stop.',
+			description: 'Control Apple Simulator via serve-sim.',
 			build: buildSimulatorTool,
 		},
 		{
 			name: 'browser',
-			description:
-				'Open a URL in Otto built-in browser preview for user-visible app, web, or serve-sim previews. Display-only; browser automation controls will be added later.',
+			description: 'Open a URL in the Otto browser preview.',
 			build: buildBrowserTool,
 		},
 		{
 			name: 'read_image',
-			description:
-				'Read and inspect a local image file. Do not use for images already attached to the current message; those are visible via native vision.',
+			description: 'Inspect a local image file.',
 			build: buildReadImageTool,
 		},
 		{
 			name: 'copy_attachment_to_project',
-			description:
-				'Copy an uploaded chat attachment into the project only when the user explicitly asks to save/add/copy it.',
+			description: 'Copy an uploaded attachment into the project.',
 			build: buildCopyAttachmentTool,
 		},
 		{
 			name: 'mcp_manager',
-			description:
-				'Manage otto MCP servers: list, add, update, remove, enable, or disable servers in project (.otto/config.json) or global config.',
+			description: 'Manage project or global MCP servers.',
 			build: buildMCPManagerTool,
 		},
 	];

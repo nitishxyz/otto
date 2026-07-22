@@ -23,7 +23,7 @@ export async function stopSubagent(
 	if (!record) {
 		return {
 			ok: false,
-			error: `No sub-agent with id "${subagentId}" for this session. Use list_subagents to find ids.`,
+			error: `No sub-agent with id "${subagentId}" for this session. Use subagent action=list to find ids.`,
 		};
 	}
 	if (record.status !== 'running') {

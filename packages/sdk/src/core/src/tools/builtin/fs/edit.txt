@@ -1,10 +1,1 @@
-Replace an exact text block in an existing file.
-
-Use this tool for one precise old/new text replacement in one existing file.
-
-Rules:
-- Read the file first when possible so `oldString` matches the current content.
-- Prefer exact `oldString` text copied from the latest read output.
-- If there is no exact match, the tool may apply a unique whole-line match after whitespace normalization (tabs/spaces, leading/trailing whitespace, and repeated internal whitespace). It will not guess through non-whitespace text differences.
-- If `oldString` appears multiple times, provide more context or set `replaceAll: true`.
-- This tool only modifies existing files.
+Replace one exact text block in an existing file. Read first and copy `oldString` from current content. If it is not exact, a unique whole-line whitespace-normalized match may be used; non-whitespace differences are never guessed. Add context when the text repeats, or use `replaceAll` only when every match should change.

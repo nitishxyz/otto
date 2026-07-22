@@ -1,48 +1,37 @@
 import { describe, expect, test } from 'bun:test';
+import { asSchema } from 'ai';
 import {
-	buildDelegateTaskTool,
-	buildListSubagentsTool,
-	buildMessageSubagentTool,
-	buildStopSubagentTool,
+	buildSubagentTool,
+	buildSubagentTools,
 } from '../packages/server/src/tools/subagents/index.ts';
 
 describe('subagent tool guidance', () => {
-	test('explains step-boundary delivery instead of polling', () => {
-		const delegateDescription = buildDelegateTaskTool('/tmp/project', 'parent')
-			.tool.description;
-		const listDescription = buildListSubagentsTool('/tmp/project', 'parent')
-			.tool.description;
-
-		expect(delegateDescription).toContain('Do not poll for completion');
-		expect(delegateDescription).toContain('next parent model step');
-		expect(delegateDescription).toContain('after the current turn ends');
-		expect(listDescription).toContain('not to poll a running sub-agent');
-		expect(listDescription).toContain('do not check again in this turn');
+	test('registers one lifecycle tool', () => {
+		const tools = buildSubagentTools('/tmp/project', 'parent');
+		expect(tools).toHaveLength(1);
+		expect(tools[0]?.name).toBe('subagent');
 	});
 
-	test('explains same-agent parallel delegation versus session reuse', () => {
-		const delegateDescription = buildDelegateTaskTool('/tmp/project', 'parent')
-			.tool.description;
+	test('exposes all lifecycle actions in one compact schema', () => {
+		const item = buildSubagentTool('/tmp/project', 'parent');
+		const schema = JSON.stringify(asSchema(item.tool.inputSchema).jsonSchema);
 
-		expect(delegateDescription).toContain(
-			'multiple instances of the same agent type',
-		);
-		expect(delegateDescription).toContain('two separate plan delegations');
-		expect(delegateDescription).toContain('only for related continuation work');
+		for (const action of ['delegate', 'list', 'message', 'stop', 'retry']) {
+			expect(schema).toContain(`"${action}"`);
+		}
+		expect(schema).toContain('reuseSessionId');
+		expect(schema).toContain('subagentId');
+		expect(schema).toContain('delivery');
 	});
 
-	test('explains queued and interrupt follow-ups plus explicit stopping', () => {
-		const messageDescription = buildMessageSubagentTool(
-			'/tmp/project',
-			'parent',
-		).tool.description;
-		const stopDescription = buildStopSubagentTool('/tmp/project', 'parent').tool
+	test('keeps ownership, reuse, automatic delivery, and no-poll guidance', () => {
+		const description = buildSubagentTool('/tmp/project', 'parent').tool
 			.description;
 
-		expect(messageDescription).toContain('delivery="queue"');
-		expect(messageDescription).toContain('delivery="interrupt"');
-		expect(messageDescription).toContain('silently stops the current turn');
-		expect(stopDescription).toContain('clears queued follow-ups');
-		expect(stopDescription).toContain('marks it cancelled');
+		expect(description).toContain('fresh parallel work');
+		expect(description).toContain('related continuation');
+		expect(description).toContain('owned by the child');
+		expect(description).toContain('arrive automatically');
+		expect(description).toContain('do not poll');
 	});
 });

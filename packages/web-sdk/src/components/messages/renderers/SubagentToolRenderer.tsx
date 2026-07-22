@@ -39,31 +39,50 @@ export function SubagentToolRenderer({
 	const timeStr = formatDuration(toolDurationMs);
 	const hasError = result.ok === false;
 	const name = toolName ?? 'subagent';
+	const legacyActions: Record<string, string> = {
+		delegate_task: 'delegate',
+		list_subagents: 'list',
+		message_subagent: 'message',
+		stop_subagent: 'stop',
+		retry_subagent: 'retry',
+	};
+	const action = String(args.action ?? legacyActions[name] ?? 'delegate');
 
-	const isList = name === 'list_subagents';
+	const isList = action === 'list';
 	const records: SubagentListItem[] = isList
 		? Array.isArray(result.subagents)
 			? (result.subagents as SubagentListItem[])
 			: []
 		: [];
 
-	const spawnAgent = String(result.agent ?? args.agent ?? '');
-	const spawnTask = String(args.task ?? args.message ?? '');
+	const agent = String(result.agent ?? args.agent ?? '');
+	const detail = String(
+		action === 'delegate'
+			? (args.task ?? '')
+			: action === 'message'
+				? (args.message ?? '')
+				: (args.subagentId ?? ''),
+	);
 
 	let headline: string;
 	if (hasError) headline = String(result.error ?? 'error');
 	else if (isList) {
 		const running = records.filter((r) => r.status === 'running').length;
 		headline = `${records.length} sub-agent${records.length === 1 ? '' : 's'}${running ? `, ${running} running` : ''}`;
+	} else if (action === 'stop' || action === 'retry') {
+		headline = `${action === 'stop' ? 'Stop' : 'Retry'} sub-agent${detail ? ` ${detail}` : ''}`;
 	} else {
-		headline = spawnAgent
-			? `${spawnAgent}${spawnTask ? ` — ${spawnTask}` : ''}`
-			: spawnTask;
+		headline = agent ? `${agent}${detail ? ` — ${detail}` : ''}` : detail;
 	}
 
-	const canExpand = isList
-		? records.length > 0
-		: Boolean(spawnTask || hasError);
+	const canExpand = isList ? records.length > 0 : Boolean(detail || hasError);
+	const isAsync = ['delegate', 'message', 'retry'].includes(action);
+	const detailNote =
+		action === 'delegate'
+			? 'Runs in parallel; results arrive automatically.'
+			: action === 'message' || action === 'retry'
+				? 'Results arrive automatically.'
+				: '';
 
 	return (
 		<div className="text-[12px]">
@@ -84,7 +103,7 @@ export function SubagentToolRenderer({
 						</span>
 					</>
 				)}
-				{!hasError && !compact && !isList && (
+				{!hasError && !compact && isAsync && (
 					<>
 						<ToolHeaderSeparator />
 						<ToolHeaderSuccess>async</ToolHeaderSuccess>
@@ -134,10 +153,12 @@ export function SubagentToolRenderer({
 						))
 					) : (
 						<div className="text-[11px] text-foreground/70">
-							{spawnTask}
-							<span className="block text-muted-foreground">
-								Runs in parallel; results arrive automatically.
-							</span>
+							{detail}
+							{detailNote ? (
+								<span className="block text-muted-foreground">
+									{detailNote}
+								</span>
+							) : null}
 						</div>
 					)}
 				</div>

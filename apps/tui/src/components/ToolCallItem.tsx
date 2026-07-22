@@ -324,6 +324,37 @@ function getToolSummary(part: MessagePart): string | null {
 			const title = goal ? str(goal.title) : null;
 			return title ?? (tasks !== null ? plural(tasks, 'task') : null);
 		}
+		case 'subagent': {
+			const action = str(src.action);
+			if (action === 'delegate') {
+				const agent = str(src.agent) ?? (result ? str(result.agent) : null);
+				const task = str(src.task);
+				return agent && task ? clip(`${agent}: ${task}`) : (agent ?? task);
+			}
+			if (action === 'message') {
+				const id = str(src.subagentId);
+				const message = str(src.message);
+				const agent = result ? str(result.agent) : null;
+				const head = agent ?? (id ? `${id.slice(0, 8)}…` : null);
+				return head && message
+					? clip(`${head}: ${message}`)
+					: (message ?? head);
+			}
+			if (action === 'list') {
+				const subagents = result?.subagents;
+				if (Array.isArray(subagents)) {
+					const running = subagents.filter(
+						(item) => asRecord(item)?.status === 'running',
+					).length;
+					return clip(
+						`${subagents.length} sub-agent${subagents.length === 1 ? '' : 's'}${running ? `, ${running} running` : ''}`,
+					);
+				}
+				return str(src.status);
+			}
+			const id = str(src.subagentId);
+			return id ? clip(`${action ?? 'subagent'} ${id}`) : action;
+		}
 		case 'delegate_task': {
 			const agent = str(src.agent) ?? (result ? str(result.agent) : null);
 			const task = str(src.task);
@@ -353,6 +384,11 @@ function getToolSummary(part: MessagePart): string | null {
 			}
 			const status = str(src.status);
 			return status ? clip(status) : null;
+		}
+		case 'stop_subagent':
+		case 'retry_subagent': {
+			const id = str(src.subagentId);
+			return id ? clip(id) : null;
 		}
 		case 'skill': {
 			const skillName = str(src.name);

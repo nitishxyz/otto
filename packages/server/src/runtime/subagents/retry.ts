@@ -23,7 +23,7 @@ export async function retrySubagent(
 	if (!record) {
 		return {
 			ok: false,
-			error: `No sub-agent with id "${subagentId}" for this session. Use list_subagents to find ids.`,
+			error: `No sub-agent with id "${subagentId}" for this session. Use subagent action=list to find ids.`,
 		};
 	}
 	if (record.status === 'running') {
@@ -32,7 +32,8 @@ export async function retrySubagent(
 	if (record.status === 'cancelled') {
 		return {
 			ok: false,
-			error: 'Sub-agent was cancelled. Use delegate_task to start a fresh one.',
+			error:
+				'Sub-agent was cancelled. Use subagent action=delegate to start a fresh one.',
 		};
 	}
 

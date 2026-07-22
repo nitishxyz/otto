@@ -36,7 +36,6 @@ const BUILTIN_TOOLS = new Set([
 	'copy_attachment_to_project',
 	'ls',
 	'tree',
-	'glob',
 	'search',
 	'shell',
 	'terminal',
@@ -59,11 +58,7 @@ const RESEARCH_TOOLS = new Set([
 ]);
 
 const ORCHESTRATION_TOOLS = new Set([
-	'delegate_task',
-	'list_subagents',
-	'message_subagent',
-	'stop_subagent',
-	'retry_subagent',
+	'subagent',
 	'goal_list',
 	'goal_update',
 	'enqueue_session_message',
@@ -135,7 +130,6 @@ function getToolCategory(name: string): ToolCategory {
 			'read_image',
 			'ls',
 			'tree',
-			'glob',
 			'copy_into',
 			'copy_attachment_to_project',
 		].includes(name)

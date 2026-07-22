@@ -111,7 +111,7 @@ function forceKillProcessTree(pid: number) {
 }
 
 const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
-const REDIRECTED_GLOB_COMMANDS = new Set(['find', 'fd']);
+const REDIRECTED_FILE_SEARCH_COMMANDS = new Set(['find', 'fd']);
 
 /**
  * Detect commands that start with a standalone grep-style search binary.
@@ -119,7 +119,7 @@ const REDIRECTED_GLOB_COMMANDS = new Set(['find', 'fd']);
  * with grep/rg are redirected to the dedicated `search` tool.
  */
 export function findRedirectedSearchCommand(cmd: string): string | null {
-	return findRepositoryDiscoveryCommand(cmd, 'search')?.command ?? null;
+	return findRepositoryDiscoveryCommand(cmd, 'content')?.command ?? null;
 }
 
 function commandTokens(segment: string): string[] {
@@ -137,24 +137,27 @@ function commandTokens(segment: string): string[] {
 
 function findRepositoryDiscoveryCommand(
 	cmd: string,
-	kind?: 'search' | 'glob',
-): { command: string; tool: 'search' | 'glob' } | null {
+	kind?: 'content' | 'files',
+): { command: string; mode: 'content' | 'files' } | null {
 	const segments = cmd.split(/&&|\|\||;|\n/);
 	for (const segment of segments) {
 		const tokens = commandTokens(segment);
 		const bin = tokens[0]?.split('/').pop() ?? '';
 		const second = tokens[1] ?? '';
-		if ((!kind || kind === 'search') && bin === 'git' && second === 'grep') {
-			return { command: 'git grep', tool: 'search' };
+		if ((!kind || kind === 'content') && bin === 'git' && second === 'grep') {
+			return { command: 'git grep', mode: 'content' };
 		}
-		if ((!kind || kind === 'search') && REDIRECTED_SEARCH_COMMANDS.has(bin)) {
-			return { command: bin, tool: 'search' };
+		if ((!kind || kind === 'content') && REDIRECTED_SEARCH_COMMANDS.has(bin)) {
+			return { command: bin, mode: 'content' };
 		}
-		if ((!kind || kind === 'glob') && REDIRECTED_GLOB_COMMANDS.has(bin)) {
-			return { command: bin, tool: 'glob' };
+		if (
+			(!kind || kind === 'files') &&
+			REDIRECTED_FILE_SEARCH_COMMANDS.has(bin)
+		) {
+			return { command: bin, mode: 'files' };
 		}
-		if ((!kind || kind === 'glob') && bin === 'ls' && segment.includes('**')) {
-			return { command: 'ls **', tool: 'glob' };
+		if ((!kind || kind === 'files') && bin === 'ls' && segment.includes('**')) {
+			return { command: 'ls **', mode: 'files' };
 		}
 	}
 	return null;
@@ -163,9 +166,9 @@ function findRepositoryDiscoveryCommand(
 function repositoryDiscoveryHint(cmd: string): string | undefined {
 	const discovery = findRepositoryDiscoveryCommand(cmd);
 	if (!discovery) return undefined;
-	return discovery.tool === 'search'
+	return discovery.mode === 'content'
 		? `Tip: For repository content search, prefer the search tool instead of shelling out to ${discovery.command}. It is indexed, faster, and returns structured file:line matches.`
-		: `Tip: For repository file discovery, prefer the glob tool instead of shelling out to ${discovery.command}. It returns structured paths and skips common build/cache folders.`;
+		: `Tip: For repository file discovery, prefer search with mode="files" instead of shelling out to ${discovery.command}. It returns structured paths and skips common build/cache folders.`;
 }
 
 const SHELL_ENV_HINT =
@@ -286,17 +289,8 @@ export const shellExecutorContext = new AsyncLocalStorage<ShellExecutor>();
 
 const shellInputSchema = z
 	.object({
-		cmd: z
-			.string()
-			.describe(
-				'Non-interactive shell command to run using the user shell. The default environment comes from a cached interactive shell env.',
-			),
-		cwd: z
-			.string()
-			.default('.')
-			.describe(
-				'Working directory relative to project root, or an available read-only reference directory for probe commands.',
-			),
+		cmd: z.string().describe('Command to run with the user shell'),
+		cwd: z.string().default('.').describe('Project-relative working directory'),
 		allowNonZeroExit: z
 			.boolean()
 			.optional()
@@ -306,21 +300,17 @@ const shellInputSchema = z
 			.number()
 			.optional()
 			.default(300000)
-			.describe('Timeout in milliseconds (default: 300000 = 5 minutes)'),
+			.describe('Timeout in milliseconds'),
 		envMode: z
 			.enum(['minimal', 'login-cache', 'login-fresh'])
 			.optional()
 			.default('login-cache')
-			.describe(
-				'Environment loading mode. "login-cache" is the default terminal-like environment captured from the user interactive shell and reused. "login-fresh" refreshes that cache. "minimal" skips interactive shell startup and uses only process env plus cached login PATH.',
-			),
+			.describe('Shell environment mode'),
 		outputMode: z
 			.enum(['auto', 'full', 'tail'])
 			.optional()
 			.default('auto')
-			.describe(
-				'Output capture mode. Use "auto" for bounded output, "full" for full output up to maxOutputBytes, or "tail" to keep only the last tailLines lines.',
-			),
+			.describe('Output capture mode'),
 		tailLines: z
 			.number()
 			.int()
@@ -328,9 +318,7 @@ const shellInputSchema = z
 			.max(5000)
 			.optional()
 			.default(DEFAULT_TAIL_LINES)
-			.describe(
-				'Number of trailing stdout/stderr lines to keep when outputMode is "tail"',
-			),
+			.describe('Lines retained in tail mode'),
 		maxOutputBytes: z
 			.number()
 			.int()
@@ -338,9 +326,7 @@ const shellInputSchema = z
 			.max(10_000_000)
 			.optional()
 			.default(DEFAULT_MAX_OUTPUT_BYTES)
-			.describe(
-				'Maximum bytes to keep per stdout/stderr in the final tool result. Use 0 to disable byte capping.',
-			),
+			.describe('Maximum bytes retained per output stream; 0 disables the cap'),
 	})
 	.strict();
 

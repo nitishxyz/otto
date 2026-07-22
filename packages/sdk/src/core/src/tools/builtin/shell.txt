@@ -1,34 +1,5 @@
-- Execute a non-interactive shell command using the user's shell
-- Returns `stdout`, `stderr`, and `exitCode`
-- `cwd` is relative to the project root and sandboxed within it
+Run a non-interactive command and return stdout, stderr, and exit code. Use `terminal` for prompts, TTYs, servers, watchers, or persistent processes.
 
-The shell tool uses a cached interactive shell environment by default, so commands usually see the same PATH and exported variables as the user's terminal. Use `terminal` when you need an interactive shell, a TTY, or a persistent process.
+Use `search` instead of `grep`/`find` for repository discovery. Use shell for builds, tests, diagnostics, processes, and ignored/generated files.
 
-`envMode` controls extra environment loading:
-- `login-cache` (default): reuses a cached environment captured from the user's interactive shell startup files.
-- `login-fresh`: refreshes that login/interactive shell environment cache before running the command.
-- `minimal`: skips interactive shell startup and uses only the process environment plus cached login PATH. Use this as a fallback when shell startup is slow, broken, or undesirable.
-
-Use `login-fresh` after the user changes shell configuration or credentials. Use `minimal` for CI-style commands or to work around problematic shell startup files.
-
-**Use `shell` for one-off, non-interactive commands.** These may be short-lived checks or long-running commands that finish on their own and do not require stdin. For commands that need interactive input, a TTY, or persistence across turns, use the `terminal` tool instead.
-
-For repository discovery, use `search` for content/code search and `glob` for filename/path discovery. Reserve `shell` for execution, builds, tests, diagnostics, and other command-line tasks.
-
-**Strongly prefer the `search` tool over `grep`/`rg`, and `glob` over `find`.** The `search` tool is indexed and faster, returns structured `file:line` matches, and supports regex, `glob` includes, `path` scoping, and `ignoreCase` — use it for all repository content search. Only fall back to `grep`/`rg` via shell for cases `search` cannot handle (e.g. gitignored files like node_modules or build output). Pipelines that filter program output (e.g. `ps aux | grep node`) are fine.
-
-Mapping from common shell habits:
-- `grep -r` / `rg` / `git grep` over repo files → use `search`.
-- `find` / `fd` / recursive `ls` for filenames → use `glob`.
-- Build, test, package manager, diagnostics, process inspection → use `shell`.
-
-## Usage tips
-
-- Chain commands with `&&` to fail-fast.
-- For long outputs, redirect to a file, inspect `wc -c`, then read a small range or tail.
-- `outputMode: "auto"` is the default and keeps bounded tail output. Use `outputMode: "tail"` with `tailLines` for verbose builds/tests, or `outputMode: "full"` only when complete output is truly needed.
-- Final `stdout`/`stderr` are capped by `maxOutputBytes` per stream to avoid huge tool results. Set `maxOutputBytes: 0` only when you intentionally need uncapped output.
-- For binary/minified inspection that cannot be handled by `search`, cap line width and output explicitly.
-- For long-running non-interactive commands, set an appropriate `timeout` and ensure the command exits on its own.
-- Batch independent checks (e.g. `git status && git diff`) in parallel tool calls rather than sequential shell chains when you need results separately.
-- Never use `shell` with `sed`/`awk` for programmatic file editing — use the dedicated file-editing tools instead.
+Defaults use the cached terminal environment and bounded output. Override `envMode`, output controls, or `timeout` only when needed. Chain dependent commands with `&&`; use editing tools for file changes.

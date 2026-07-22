@@ -394,7 +394,7 @@ describe('goal kickoff message', () => {
 		expect(message).toContain('Ship feature');
 		expect(message).toContain('do the thing');
 		expect(message).toContain('goal_update');
-		expect(message).toContain('delegate_task');
+		expect(message).toContain('subagent action=delegate');
 		expect(message).not.toContain('done_pending');
 	});
 });

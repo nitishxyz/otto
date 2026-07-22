@@ -26,11 +26,18 @@ export function normalizeUsage(
 				? Number(providerOptions.anthropic.cacheCreationInputTokens)
 				: undefined;
 
-	const cachedValue = cachedInputTokens ?? 0;
+	const cachedValue = Math.max(0, cachedInputTokens ?? 0);
+	const cacheCreationValue = Math.max(0, cacheCreationInputTokens ?? 0);
 
 	let inputTokens = rawInputTokens;
-	if (provider === 'openai') {
-		inputTokens = Math.max(0, rawInputTokens - cachedValue);
+	const includedCacheTokens =
+		provider === 'openai'
+			? cachedValue
+			: provider === 'anthropic'
+				? cachedValue + cacheCreationValue
+				: 0;
+	if (includedCacheTokens > 0 && rawInputTokens >= includedCacheTokens) {
+		inputTokens = rawInputTokens - includedCacheTokens;
 	}
 
 	return {
