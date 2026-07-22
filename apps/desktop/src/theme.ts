@@ -4,6 +4,7 @@ import {
 	useContext,
 	useEffect,
 	useLayoutEffect,
+	useRef,
 	useState,
 } from 'react';
 import {
@@ -37,6 +38,7 @@ export function useNativeDesktopTheme(
 	const { data: config } = useConfig({ enabled: serverReady });
 	const updateDefaults = useUpdateDefaults();
 	const configTheme = config ? normalizeThemeId(config.defaults.theme) : null;
+	const pendingThemeRef = useRef<Theme | null>(null);
 	const [theme, setThemeState] = useState<Theme>(() =>
 		normalizeThemeId(
 			typeof document === 'undefined'
@@ -46,14 +48,26 @@ export function useNativeDesktopTheme(
 	);
 
 	useLayoutEffect(() => {
-		if (configTheme !== null) setThemeState(configTheme);
-	}, [configTheme]);
+		if (
+			configTheme !== null &&
+			(!updateDefaults.isPending || pendingThemeRef.current === configTheme)
+		) {
+			setThemeState(configTheme);
+		}
+	}, [configTheme, updateDefaults.isPending]);
 
 	useEffect(
 		() =>
 			onDefaultsChange((defaults) => {
 				if (typeof defaults.theme !== 'string') return;
-				setThemeState(normalizeThemeId(defaults.theme));
+				const nextTheme = normalizeThemeId(defaults.theme);
+				if (
+					pendingThemeRef.current !== null &&
+					pendingThemeRef.current !== nextTheme
+				) {
+					return;
+				}
+				setThemeState(nextTheme);
 			}),
 		[],
 	);
@@ -64,9 +78,26 @@ export function useNativeDesktopTheme(
 
 	const setTheme = useCallback(
 		(nextTheme: Theme) => {
-			updateDefaults.mutate({ theme: nextTheme, scope: 'global' });
+			const previousTheme = theme;
+			pendingThemeRef.current = nextTheme;
+			setThemeState(nextTheme);
+			updateDefaults.mutate(
+				{ theme: nextTheme, scope: 'global' },
+				{
+					onError: () => {
+						if (pendingThemeRef.current !== nextTheme) return;
+						pendingThemeRef.current = null;
+						setThemeState(previousTheme);
+					},
+					onSettled: () => {
+						if (pendingThemeRef.current === nextTheme) {
+							pendingThemeRef.current = null;
+						}
+					},
+				},
+			);
 		},
-		[updateDefaults],
+		[theme, updateDefaults],
 	);
 
 	const toggleTheme = useCallback(() => {

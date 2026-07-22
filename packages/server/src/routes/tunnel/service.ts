@@ -7,6 +7,7 @@ import {
 	isTunnelBinaryInstalled,
 	killStaleTunnels,
 	logger,
+	ManagedTunnelProvisionError,
 	OttoTunnel,
 	provisionManagedTunnel,
 	type ManagedTunnelAuth,
@@ -34,7 +35,12 @@ export type TunnelMode = 'managed' | 'quick';
 type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
 
 type TunnelFactory = () => OttoTunnel;
-type ManagedAuthProvider = () => Promise<{ accessToken: string } | null>;
+type ManagedAuthProvider = () => Promise<{
+	accessToken: string;
+	refreshAccessToken?: (options?: {
+		staleAccessToken?: string;
+	}) => Promise<{ accessToken: string }>;
+} | null>;
 type ManagedProvisioner = (
 	auth: ManagedTunnelAuth,
 	options: ManagedTunnelProvisionOptions,
@@ -42,9 +48,11 @@ type ManagedProvisioner = (
 type ManagedStateReader = typeof readManagedTunnelDesiredState;
 type ManagedStateWriter = typeof writeManagedTunnelDesiredState;
 type ManagedRestartDelay = (attempt: number) => number;
+type ManagedDisconnectDelay = () => number;
 
 const defaultManagedRestartDelay: ManagedRestartDelay = (attempt) =>
 	Math.min(1000 * 2 ** attempt, 30_000);
+const defaultManagedDisconnectDelay: ManagedDisconnectDelay = () => 30_000;
 
 interface TunnelSlot {
 	scope: TunnelScope;
@@ -76,6 +84,9 @@ let managedTunnelDesired = false;
 let managedRestartAttempt = 0;
 let managedRestartTimer: ReturnType<typeof setTimeout> | null = null;
 let managedRestartDelay = defaultManagedRestartDelay;
+let managedDisconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let managedDisconnectDelay = defaultManagedDisconnectDelay;
+const managedConnections = new Set<string>();
 const managedTunnel: TunnelSlot & { hostname: string | null } = {
 	scope: 'remote-control',
 	projectId: null,
@@ -112,6 +123,34 @@ function createTunnelSlot(options: TunnelScopeOptions = {}): TunnelSlot {
 function clearManagedRestartTimer() {
 	if (managedRestartTimer) clearTimeout(managedRestartTimer);
 	managedRestartTimer = null;
+}
+
+function clearManagedDisconnectTimer() {
+	if (managedDisconnectTimer) clearTimeout(managedDisconnectTimer);
+	managedDisconnectTimer = null;
+}
+
+function scheduleManagedDisconnectRecovery(tunnel: OttoTunnel) {
+	if (!managedTunnelDesired || managedDisconnectTimer) return;
+	managedTunnel.status = 'starting';
+	managedTunnel.progress = 'Waiting for tunnel network recovery...';
+	managedDisconnectTimer = setTimeout(() => {
+		managedDisconnectTimer = null;
+		if (
+			!managedTunnelDesired ||
+			managedTunnel.activeTunnel !== tunnel ||
+			managedConnections.size > 0
+		) {
+			return;
+		}
+		managedTunnel.activeTunnel = null;
+		managedTunnel.url = null;
+		managedTunnel.hostname = null;
+		managedTunnel.status = 'idle';
+		managedTunnel.progress = 'Restarting disconnected managed tunnel...';
+		tunnel.stop();
+		scheduleManagedTunnelRestart();
+	}, managedDisconnectDelay());
 }
 
 function scheduleManagedTunnelRestart() {
@@ -375,15 +414,36 @@ async function startManagedTunnelUnlocked(
 			managedTunnel.status = 'starting';
 			managedTunnel.error = null;
 			managedTunnel.progress = 'Provisioning managed tunnel...';
-			const provision = await managedProvisioner(
-				{ accessToken: auth.accessToken },
-				{
-					localPort,
-					daemonVersion: getServerInfo().version ?? 'unknown',
-				},
-			);
+			const provisionOptions = {
+				localPort,
+				daemonVersion: getServerInfo().version ?? 'unknown',
+			};
+			let provision: ManagedTunnelProvision;
+			try {
+				provision = await managedProvisioner(
+					{ accessToken: auth.accessToken },
+					provisionOptions,
+				);
+			} catch (error) {
+				if (
+					!(error instanceof ManagedTunnelProvisionError) ||
+					(error.status !== 401 && error.status !== 403) ||
+					!auth.refreshAccessToken
+				) {
+					throw error;
+				}
+				const refreshed = await auth.refreshAccessToken({
+					staleAccessToken: auth.accessToken,
+				});
+				provision = await managedProvisioner(
+					{ accessToken: refreshed.accessToken },
+					provisionOptions,
+				);
+			}
 
 			const tunnel = tunnelFactory();
+			managedConnections.clear();
+			clearManagedDisconnectTimer();
 			managedTunnel.activeTunnel = tunnel;
 			managedTunnel.hostname = provision.hostname;
 			managedTunnel.url = provision.url;
@@ -393,8 +453,25 @@ async function startManagedTunnelUnlocked(
 				managedTunnel.error = error.message;
 				managedTunnel.status = 'error';
 			});
+			tunnel.on('connected', (connection) => {
+				if (managedTunnel.activeTunnel !== tunnel) return;
+				managedConnections.add(connection.id);
+				clearManagedDisconnectTimer();
+				managedTunnel.status = 'connected';
+				managedTunnel.error = null;
+				managedTunnel.progress = null;
+			});
+			tunnel.on('disconnected', (connection) => {
+				if (managedTunnel.activeTunnel !== tunnel) return;
+				managedConnections.delete(connection.id);
+				if (managedConnections.size === 0) {
+					scheduleManagedDisconnectRecovery(tunnel);
+				}
+			});
 			tunnel.on('exit', () => {
 				if (managedTunnel.activeTunnel !== tunnel) return;
+				managedConnections.clear();
+				clearManagedDisconnectTimer();
 				managedTunnel.status = 'idle';
 				managedTunnel.url = null;
 				managedTunnel.hostname = null;
@@ -455,6 +532,8 @@ async function startManagedTunnelUnlocked(
 		managedTunnel.progress = null;
 		managedTunnel.activeTunnel?.stop();
 		managedTunnel.activeTunnel = null;
+		managedConnections.clear();
+		clearManagedDisconnectTimer();
 		managedTunnel.url = null;
 		managedTunnel.hostname = null;
 		logger.error('Failed to start managed tunnel:', error);
@@ -647,6 +726,8 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 
 		managedTunnelDesired = false;
 		clearManagedRestartTimer();
+		clearManagedDisconnectTimer();
+		managedConnections.clear();
 		let persistenceError: string | undefined;
 		try {
 			await managedStateWriter(false);
@@ -785,6 +866,8 @@ export function stopActiveTunnel() {
 	managedTunnelDesired = false;
 	managedRestartAttempt = 0;
 	clearManagedRestartTimer();
+	clearManagedDisconnectTimer();
+	managedConnections.clear();
 	managedTunnel.activeTunnel?.stop();
 	managedTunnel.activeTunnel = null;
 	managedTunnel.url = null;
@@ -872,6 +955,9 @@ export const tunnelTesting = {
 	setManagedRestartDelay(delay: ManagedRestartDelay) {
 		managedRestartDelay = delay;
 	},
+	setManagedDisconnectDelay(delay: ManagedDisconnectDelay) {
+		managedDisconnectDelay = delay;
+	},
 	reset() {
 		stopActiveTunnel();
 		tunnelSlots.clear();
@@ -881,6 +967,7 @@ export const tunnelTesting = {
 		managedStateReader = readManagedTunnelDesiredState;
 		managedStateWriter = writeManagedTunnelDesiredState;
 		managedRestartDelay = defaultManagedRestartDelay;
+		managedDisconnectDelay = defaultManagedDisconnectDelay;
 		managedStartPromise = null;
 	},
 };

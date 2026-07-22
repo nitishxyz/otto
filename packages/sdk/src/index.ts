@@ -585,6 +585,7 @@ export {
 	killStaleTunnels,
 	getManagedTunnelDeviceId,
 	isManagedTunnelDeviceId,
+	ManagedTunnelProvisionError,
 	provisionManagedTunnel,
 	generateQRCode,
 	printQRCode,

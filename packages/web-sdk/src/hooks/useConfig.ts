@@ -116,6 +116,8 @@ export function useUpdateDefaults() {
 			enqueueDefaultsUpdate(queryClient, mutationGroup, data),
 		onMutate: async (data) => {
 			updatePendingCount(queryClient, mutationGroup, 1);
+			await queryClient.cancelQueries({ queryKey, exact: true });
+
 			const defaultUpdates = Object.fromEntries(
 				Object.entries(data).filter(
 					([key, value]) => key !== 'scope' && value !== undefined,
@@ -124,7 +126,6 @@ export function useUpdateDefaults() {
 			const previousConfig = queryClient.getQueryData<ConfigData>(queryKey);
 
 			emitDefaultsChange(defaultUpdates);
-			await queryClient.cancelQueries({ queryKey, exact: true });
 
 			if (previousConfig) {
 				queryClient.setQueryData<ConfigData>(queryKey, {

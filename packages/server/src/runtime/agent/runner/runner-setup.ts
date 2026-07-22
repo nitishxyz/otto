@@ -73,6 +73,7 @@ export interface SetupResult {
 	history: Awaited<ReturnType<typeof buildHistoryMessages>>;
 	system: string;
 	systemComponents: string[];
+	systemSegments: import('../../prompt/builder.ts').SystemPromptSegment[];
 	additionalSystemMessages: Array<{ role: 'system' | 'user'; content: string }>;
 	model: Awaited<ReturnType<typeof resolveRunnerModel>>['model'];
 	maxOutputTokens: number | undefined;
@@ -368,6 +369,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		history,
 		system: prompt.system,
 		systemComponents: prompt.systemComponents,
+		systemSegments: prompt.systemSegments,
 		additionalSystemMessages: prompt.additionalSystemMessages,
 		model,
 		maxOutputTokens: prompt.maxOutputTokens,

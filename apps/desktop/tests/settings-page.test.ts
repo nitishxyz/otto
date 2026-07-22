@@ -38,6 +38,10 @@ describe('desktop settings page', () => {
 			'utf8',
 		);
 		const theme = await readFile('src/theme.ts', 'utf8');
+		const configHook = await readFile(
+			'../../packages/web-sdk/src/hooks/useConfig.ts',
+			'utf8',
+		);
 
 		expect(layout).not.toContain('\tuseTheme,');
 		expect(layout).not.toContain('useTheme();');
@@ -45,7 +49,14 @@ describe('desktop settings page', () => {
 		expect(theme).toContain('useUpdateDefaults()');
 		expect(theme).toContain('onDefaultsChange');
 		expect(theme).toContain('useLayoutEffect');
+		expect(theme).toContain('pendingThemeRef.current = nextTheme');
+		expect(theme).toContain('setThemeState(nextTheme)');
+		expect(theme).toContain('updateDefaults.isPending');
+		expect(theme).toContain('setThemeState(previousTheme)');
 		expect(theme).not.toContain('apiClient.updateDefaults');
+		expect(configHook.indexOf('await queryClient.cancelQueries')).toBeLessThan(
+			configHook.indexOf('emitDefaultsChange(defaultUpdates)'),
+		);
 	});
 
 	test('uses the shared TitleBar with macOS inset and a back action', async () => {

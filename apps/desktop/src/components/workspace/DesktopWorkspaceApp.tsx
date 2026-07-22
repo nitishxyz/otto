@@ -29,7 +29,7 @@ export function DesktopWorkspaceApp({
 	titleBar,
 }: DesktopWorkspaceAppProps) {
 	return (
-		<DesktopWorkspaceProvider apiUrl={apiUrl} server={server}>
+		<DesktopWorkspaceProvider apiUrl={apiUrl} server={server} project={project}>
 			<div className="h-full min-h-0" data-project-path={project.path}>
 				<DesktopSessionsLayout
 					project={project}

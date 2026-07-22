@@ -186,11 +186,12 @@ function OnboardingRouteComponent() {
 }
 
 function ProjectsRouteComponent() {
-	const { machine, onSelectProject } = rootRoute.useRouteContext();
-	if (machine) {
+	const { daemon, machine, onSelectProject } = rootRoute.useRouteContext();
+	if (machine && daemon) {
 		return (
 			<ConnectedProjectPicker
 				machine={machine}
+				localDaemonUrl={daemon.url}
 				onSelectProject={onSelectProject}
 			/>
 		);

@@ -25,9 +25,16 @@ import { buildPluginCommandsPrompt } from './plugin-commands.ts';
 import { buildExplicitSkillMentionContext } from './skill-mentions.ts';
 import type { ResolvedReference } from '../context/references.ts';
 
+export type SystemPromptSegment = {
+	name: string;
+	components: string[];
+	content: string;
+};
+
 export type ComposedSystemPrompt = {
 	prompt: string;
 	components: string[];
+	segments: SystemPromptSegment[];
 };
 
 export async function composeSystemPrompt(options: {
@@ -49,6 +56,13 @@ export async function composeSystemPrompt(options: {
 	isOpenAIOAuth?: boolean;
 }): Promise<ComposedSystemPrompt> {
 	const components: string[] = [];
+	const segments: SystemPromptSegment[] = [];
+	const appendSegment = (content: string, ...names: string[]) => {
+		if (!content) return;
+		parts.push(content);
+		components.push(...names);
+		segments.push({ name: names[0] ?? 'unknown', components: names, content });
+	};
 	if (options.spoofPrompt) {
 		const prompt = options.spoofPrompt.trim();
 		const providerComponent = options.provider
@@ -57,20 +71,21 @@ export async function composeSystemPrompt(options: {
 		return {
 			prompt,
 			components: [providerComponent],
+			segments: [
+				{
+					name: providerComponent,
+					components: [providerComponent],
+					content: prompt,
+				},
+			],
 		};
 	}
 
 	const parts: string[] = [];
 	if (options.isOpenAIOAuth) {
 		const oauthInstructions = (OPENAI_OAUTH_PROMPT || '').trim();
-		if (oauthInstructions) {
-			parts.push(oauthInstructions);
-			components.push('provider:openai-oauth');
-		}
-		if (options.agentPrompt.trim()) {
-			parts.push(options.agentPrompt.trim());
-			components.push('agent');
-		}
+		appendSegment(oauthInstructions, 'provider:openai-oauth');
+		appendSegment(options.agentPrompt.trim(), 'agent');
 	} else {
 		const providerResult = await providerBasePrompt(
 			options.provider,
@@ -82,20 +97,12 @@ export async function composeSystemPrompt(options: {
 		const agentInstructions = options.agentPrompt.trim();
 		const providerInstructions = providerResult.prompt.trim();
 
-		parts.push(
-			baseInstructions.trim(),
-			agentInstructions,
+		appendSegment(baseInstructions.trim(), 'base');
+		appendSegment(agentInstructions, 'agent');
+		appendSegment(
 			providerInstructions,
+			`provider:${providerResult.resolvedType}`,
 		);
-		if (baseInstructions.trim()) {
-			components.push('base');
-		}
-		if (agentInstructions) {
-			components.push('agent');
-		}
-		if (providerInstructions) {
-			components.push(`provider:${providerResult.resolvedType}`);
-		}
 	}
 
 	if (options.oneShot) {
@@ -106,22 +113,19 @@ export async function composeSystemPrompt(options: {
 				'CRITICAL: One-shot mode ACTIVE — do NOT ask for user approval, confirmations, or interactive prompts. Execute tasks directly. Treat all necessary permissions as granted. If an operation is destructive, proceed carefully and state what you did, but DO NOT pause to ask. ZERO interactions requested.',
 				'</system-reminder>',
 			].join('\n');
-		parts.push(oneShotBlock);
-		components.push('mode:oneshot');
+		appendSegment(oneShotBlock, 'mode:oneshot');
 	}
 
 	if (options.guidedMode) {
 		const guidedBlock = (GUIDED_PROMPT || '').trim();
 		if (guidedBlock) {
-			parts.push(guidedBlock);
-			components.push('mode:guided');
+			appendSegment(guidedBlock, 'mode:guided');
 		}
 	}
 
 	const simulatorPrompt = buildSimulatorPrompt();
 	if (simulatorPrompt) {
-		parts.push(simulatorPrompt);
-		components.push('simulator-guidance');
+		appendSegment(simulatorPrompt, 'simulator-guidance');
 	}
 
 	if (options.includeEnvironment !== false) {
@@ -133,11 +137,11 @@ export async function composeSystemPrompt(options: {
 			},
 		);
 		if (envAndInstructions) {
-			parts.push(envAndInstructions);
-			components.push('environment');
-			if (options.includeProjectTree) {
-				components.push('project-tree');
-			}
+			appendSegment(
+				envAndInstructions,
+				'environment',
+				...(options.includeProjectTree ? ['project-tree'] : []),
+			);
 		}
 	}
 
@@ -146,8 +150,7 @@ export async function composeSystemPrompt(options: {
 		options.userContent,
 	);
 	if (referencesPrompt) {
-		parts.push(referencesPrompt);
-		components.push('references');
+		appendSegment(referencesPrompt, 'references');
 	}
 
 	const repoRoot =
@@ -159,14 +162,12 @@ export async function composeSystemPrompt(options: {
 		projectRoot: options.projectRoot,
 	});
 	if (capabilitySummary.prompt) {
-		parts.push(capabilitySummary.prompt);
-		components.push(...capabilitySummary.components);
+		appendSegment(capabilitySummary.prompt, ...capabilitySummary.components);
 	}
 
 	const pluginCommands = await buildPluginCommandsPrompt(options.projectRoot);
 	if (pluginCommands.prompt) {
-		parts.push(pluginCommands.prompt);
-		components.push(...pluginCommands.components);
+		appendSegment(pluginCommands.prompt, ...pluginCommands.components);
 	}
 
 	const explicitSkillContext = await buildExplicitSkillMentionContext({
@@ -175,8 +176,7 @@ export async function composeSystemPrompt(options: {
 		skillSettings: options.skillSettings,
 	});
 	if (explicitSkillContext) {
-		parts.push(explicitSkillContext);
-		components.push('skills:explicit');
+		appendSegment(explicitSkillContext, 'skills:explicit');
 	}
 
 	// Add user-provided context if present
@@ -186,8 +186,7 @@ export async function composeSystemPrompt(options: {
 			options.userContext.trim(),
 			'</user-provided-state-context>',
 		].join('\n');
-		parts.push(userContextBlock);
-		components.push('user-context');
+		appendSegment(userContextBlock, 'user-context');
 	}
 
 	// Add compacted conversation summary if present
@@ -207,8 +206,7 @@ export async function composeSystemPrompt(options: {
 				? '</session-handoff-context>'
 				: '</compacted-conversation-summary>',
 		].join('\n');
-		parts.push(summaryBlock);
-		components.push('context-summary');
+		appendSegment(summaryBlock, 'context-summary');
 	}
 
 	// Add terminal context if available
@@ -216,8 +214,7 @@ export async function composeSystemPrompt(options: {
 	if (terminalManager) {
 		const terminalContext = terminalManager.getContext();
 		if (terminalContext) {
-			parts.push(terminalContext);
-			components.push('terminal-context');
+			appendSegment(terminalContext, 'terminal-context');
 		}
 	}
 
@@ -226,6 +223,7 @@ export async function composeSystemPrompt(options: {
 		return {
 			prompt: composed,
 			components: dedupeComponents(components),
+			segments,
 		};
 	}
 
@@ -237,6 +235,9 @@ export async function composeSystemPrompt(options: {
 	return {
 		prompt: fallback,
 		components: dedupeComponents([...components, 'fallback']),
+		segments: [
+			{ name: 'fallback', components: ['fallback'], content: fallback },
+		],
 	};
 }
 

@@ -36,9 +36,11 @@ const STAGED_RECHECK_INTERVAL_MS = 7000;
 
 export function ConnectedProjectPicker({
 	machine,
+	localDaemonUrl,
 	onSelectProject,
 }: {
 	machine: MachineBootstrap;
+	localDaemonUrl: string;
 	onSelectProject: (project: Project) => void;
 }) {
 	const [access, setAccess] = useState<MachineProjectAccess | null>(null);
@@ -61,7 +63,7 @@ export function ConnectedProjectPicker({
 				setError(null);
 			}
 			try {
-				setAccess(await loadAuthorizedMachineProjects(machine));
+				setAccess(await loadAuthorizedMachineProjects(machine, localDaemonUrl));
 				if (background) setError(null);
 			} catch (cause) {
 				if (!background) setError(String(cause));
@@ -69,7 +71,7 @@ export function ConnectedProjectPicker({
 				if (!background) setLoading(false);
 			}
 		},
-		[machine],
+		[localDaemonUrl, machine],
 	);
 
 	useEffect(() => {

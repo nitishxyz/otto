@@ -18,6 +18,7 @@ export {
 export {
 	getManagedTunnelDeviceId,
 	isManagedTunnelDeviceId,
+	ManagedTunnelProvisionError,
 	provisionManagedTunnel,
 	type ManagedTunnelAuth,
 	type ManagedTunnelProvision,

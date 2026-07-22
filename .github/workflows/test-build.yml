@@ -53,7 +53,7 @@ jobs:
             enabled: ${{ inputs.platform_macos }}
           - os: linux
             arch: x64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
             enabled: ${{ inputs.platform_linux }}
           - os: linux
             arch: arm64
@@ -124,6 +124,10 @@ jobs:
           mkdir -p dist
           bun build --compile --minify --define FFF_LIBC='"gnu"' --target="bun-${{ matrix.os }}-${{ matrix.arch }}" ./index.ts --outfile "dist/otto-${{ matrix.os }}-${{ matrix.arch }}"
           ls -la dist/
+
+      - name: Smoke test CLI binary
+        if: matrix.enabled
+        run: apps/cli/dist/otto-${{ matrix.os }}-${{ matrix.arch }} --version
 
       - name: Upload artifact
         if: matrix.enabled

@@ -31,6 +31,17 @@ export interface ManagedTunnelProvision {
 	tunnel_token: string;
 }
 
+/** HTTP failure returned while provisioning a managed tunnel. */
+export class ManagedTunnelProvisionError extends Error {
+	readonly status: number;
+
+	constructor(status: number, message: string) {
+		super(message);
+		this.name = 'ManagedTunnelProvisionError';
+		this.status = status;
+	}
+}
+
 /** Returns whether a value is a canonical UUID accepted as a tunnel device ID. */
 export function isManagedTunnelDeviceId(value: string): boolean {
 	return UUID_PATTERN.test(value);
@@ -119,7 +130,10 @@ export async function provisionManagedTunnel(
 			payload && typeof payload.error === 'string'
 				? payload.error
 				: `HTTP ${response.status}`;
-		throw new Error(`OttoRouter managed tunnel provisioning failed: ${code}`);
+		throw new ManagedTunnelProvisionError(
+			response.status,
+			`OttoRouter managed tunnel provisioning failed: ${code}`,
+		);
 	}
 
 	const device = payload?.device;

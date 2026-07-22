@@ -23,6 +23,7 @@ export interface MachineDeviceState {
 
 export async function loadAuthorizedMachineProjects(
 	machine: MachineBootstrap,
+	localDaemonUrl: string,
 	forceOwnerSession = false,
 ): Promise<MachineProjectAccess> {
 	if (!machine.hostname) {
@@ -32,6 +33,7 @@ export async function loadAuthorizedMachineProjects(
 		};
 	}
 	const response = await listAuthorizedMachineProjects({
+		baseURL: localDaemonUrl,
 		body: {
 			deviceId: machine.deviceId,
 			hostname: machine.hostname,

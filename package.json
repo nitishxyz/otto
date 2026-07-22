@@ -41,6 +41,7 @@
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
 		"db:reset": "bun run scripts/reset-db.ts",
 		"daemon:doctor": "bun run scripts/daemon-doctor.ts",
+		"prompt:audit": "bun run scripts/prompt-audit.ts",
 		"catalog:update": "bun run scripts/update-catalog.ts",
 		"catalog:ottorouter": "bun run scripts/update-catalog.ts --ottorouter",
 		"compile": "bun run scripts/compile.ts",

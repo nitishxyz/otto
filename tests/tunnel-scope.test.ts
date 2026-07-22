@@ -185,6 +185,35 @@ describe('managed tunnel service', () => {
 		expect(MockTunnel.starts).toEqual([]);
 	});
 
+	test('refreshes a rejected bearer token and retries provisioning once', async () => {
+		setServerPort(47_477);
+		const tokens: string[] = [];
+		service.tunnelTesting.setManagedAuthProvider(async () => ({
+			accessToken: 'rejected-token',
+			refreshAccessToken: async ({ staleAccessToken } = {}) => {
+				expect(staleAccessToken).toBe('rejected-token');
+				return { accessToken: 'refreshed-token' };
+			},
+		}));
+		service.tunnelTesting.setManagedProvisioner(async (auth) => {
+			tokens.push(auth.accessToken);
+			if (auth.accessToken === 'rejected-token') {
+				throw new sdkActual.ManagedTunnelProvisionError(401, 'unauthorized');
+			}
+			return {
+				slug: 'device-slug',
+				hostname: 'device.ottorouter.org',
+				url: 'https://device.ottorouter.org',
+				tunnel_token: 'cloudflare-secret',
+			};
+		});
+
+		expect(
+			await service.startTunnel(undefined, { mode: 'managed' }),
+		).toMatchObject({ ok: true, url: 'https://device.ottorouter.org' });
+		expect(tokens).toEqual(['rejected-token', 'refreshed-token']);
+	});
+
 	test('creates and revokes managed shares without additional tunnel processes', async () => {
 		configureManagedTunnel();
 		const first = await service.startTunnel(undefined, {
@@ -267,6 +296,45 @@ describe('managed tunnel service', () => {
 
 		expect(MockTunnel.managedStarts).toHaveLength(2);
 		expect(provisions).toHaveLength(2);
+		expect(await service.getTunnelStatus({ mode: 'managed' })).toMatchObject({
+			status: 'connected',
+			isRunning: true,
+		});
+	});
+
+	test('keeps retrying desired state and recovers after auth becomes available', async () => {
+		configureManagedTunnel();
+		let authCalls = 0;
+		service.tunnelTesting.setManagedAuthProvider(async () => {
+			authCalls += 1;
+			return authCalls === 2 ? null : { accessToken: 'oauth-token' };
+		});
+		service.tunnelTesting.setManagedRestartDelay(() => 0);
+		await service.startTunnel(undefined, { mode: 'managed' });
+
+		const first = MockTunnel.instances[0];
+		first.isRunning = false;
+		first.emit('exit', 1, null);
+		await Bun.sleep(10);
+
+		expect(authCalls).toBe(3);
+		expect(MockTunnel.managedStarts).toHaveLength(2);
+	});
+
+	test('restarts a live managed process after a sustained full disconnect', async () => {
+		configureManagedTunnel();
+		service.tunnelTesting.setManagedDisconnectDelay(() => 0);
+		service.tunnelTesting.setManagedRestartDelay(() => 0);
+		await service.startTunnel(undefined, { mode: 'managed' });
+
+		const first = MockTunnel.instances[0];
+		const connection = { id: 'edge-1', ip: '198.51.100.1', location: 'sjc' };
+		first.emit('connected', connection);
+		first.emit('disconnected', connection);
+		await Bun.sleep(10);
+
+		expect(MockTunnel.stops).toBe(1);
+		expect(MockTunnel.managedStarts).toHaveLength(2);
 		expect(await service.getTunnelStatus({ mode: 'managed' })).toMatchObject({
 			status: 'connected',
 			isRunning: true,

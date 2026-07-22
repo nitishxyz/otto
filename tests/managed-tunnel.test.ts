@@ -99,6 +99,27 @@ test('provisionManagedTunnel sends runtime metadata and parses the deployed resp
 	});
 });
 
+test('provisionManagedTunnel preserves an unauthorized response status', async () => {
+	const ottoHome = await temporaryOttoHome();
+
+	await expect(
+		provisionManagedTunnel(
+			{ accessToken: 'rejected-token' },
+			{
+				baseUrl: 'https://setu.example/',
+				daemonVersion: '1.2.3',
+				fetch: async () =>
+					Response.json({ error: 'unauthorized' }, { status: 401 }),
+				localPort: 47_477,
+				ottoHome,
+			},
+		),
+	).rejects.toMatchObject({
+		name: 'ManagedTunnelProvisionError',
+		status: 401,
+	});
+});
+
 function fakeTunnelProcess(output: string): ChildProcess {
 	const child = new EventEmitter() as EventEmitter & Partial<ChildProcess>;
 	child.stdout = new PassThrough();

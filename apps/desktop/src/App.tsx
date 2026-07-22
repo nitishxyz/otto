@@ -16,6 +16,7 @@ import {
 	apiClient,
 	ownerRenewalDelay,
 	renewOwnerSession,
+	retryProjectConnection,
 	setOwnerRenewalHandler,
 } from '@ottocode/web-sdk/lib';
 import { useViewerTabsStore } from '@ottocode/web-sdk/stores';
@@ -126,7 +127,7 @@ function App() {
 	}, [machine, selectedProject?.projectId]);
 
 	useEffect(() => {
-		if (!machine || !selectedProject?.projectId) return;
+		if (!machine || !daemon || !selectedProject?.projectId) return;
 		let timer: number | undefined;
 		let cancelled = false;
 		let expiresAt = ownerExpiryRef.current;
@@ -140,7 +141,11 @@ function App() {
 		};
 		const renew = async () => {
 			try {
-				const access = await loadAuthorizedMachineProjects(machine, true);
+				const access = await loadAuthorizedMachineProjects(
+					machine,
+					daemon.url,
+					true,
+				);
 				if (access.status !== 'ready') throw new Error(access.message);
 				const project = access.projects.find(
 					(candidate) => candidate.id === selectedProject.projectId,
@@ -179,23 +184,27 @@ function App() {
 		if (expiresAt) {
 			schedule(ownerRenewalDelay(expiresAt));
 		}
-		const renewOnWake = () => {
-			if (expiresAt && ownerRenewalDelay(expiresAt) === 0) {
-				void renewOwnerSession().catch(() => {});
-			}
+		let wakeRecovery: Promise<void> | null = null;
+		const reconnectOnWake = () => {
+			if (document.visibilityState === 'hidden' || wakeRecovery) return;
+			const recovery = retryProjectConnection().catch(() => {});
+			wakeRecovery = recovery;
+			void recovery.finally(() => {
+				if (wakeRecovery === recovery) wakeRecovery = null;
+			});
 		};
-		window.addEventListener('focus', renewOnWake);
-		window.addEventListener('online', renewOnWake);
-		document.addEventListener('visibilitychange', renewOnWake);
+		window.addEventListener('focus', reconnectOnWake);
+		window.addEventListener('online', reconnectOnWake);
+		document.addEventListener('visibilitychange', reconnectOnWake);
 		return () => {
 			cancelled = true;
-			window.removeEventListener('focus', renewOnWake);
-			window.removeEventListener('online', renewOnWake);
-			document.removeEventListener('visibilitychange', renewOnWake);
+			window.removeEventListener('focus', reconnectOnWake);
+			window.removeEventListener('online', reconnectOnWake);
+			document.removeEventListener('visibilitychange', reconnectOnWake);
 			if (timer !== undefined) window.clearTimeout(timer);
 			setOwnerRenewalHandler(null);
 		};
-	}, [machine, selectedProject?.projectId]);
+	}, [daemon, machine, selectedProject?.projectId]);
 
 	const handleSelectProject = (project: Project) => {
 		const updatedProject = {
@@ -224,6 +233,7 @@ function App() {
 	};
 
 	const handleBack = async () => {
+		if (daemon) configureDesktopSdk(daemon.url, daemon);
 		useViewerTabsStore.getState().closeAllTabs();
 		setSelectedProject(null);
 		await router.navigate({ to: '/projects' });

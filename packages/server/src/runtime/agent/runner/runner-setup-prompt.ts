@@ -6,7 +6,10 @@ import {
 } from '@ottocode/sdk';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { composeSystemPrompt } from '../../prompt/builder.ts';
+import {
+	composeSystemPrompt,
+	type SystemPromptSegment,
+} from '../../prompt/builder.ts';
 import type { ResolvedReference } from '../../context/references.ts';
 import { isDebugEnabled } from '../../debug/state.ts';
 import { getMaxOutputTokens } from '../../utils/token.ts';
@@ -19,6 +22,7 @@ import { nowMs } from './runner-setup-utils.ts';
 export type RunnerPromptSetup = {
 	system: string;
 	systemComponents: string[];
+	systemSegments: SystemPromptSegment[];
 	referenceRoots: string[];
 	additionalSystemMessages: Array<{ role: 'system' | 'user'; content: string }>;
 	maxOutputTokens: number | undefined;
@@ -128,6 +132,16 @@ export async function buildRunnerPrompt(args: {
 	return {
 		system,
 		systemComponents,
+		systemSegments:
+			effectiveSystemPrompt === composed.prompt
+				? composed.segments
+				: [
+						{
+							name: promptMode,
+							components: systemComponents,
+							content: effectiveSystemPrompt,
+						},
+					],
 		referenceRoots: references.flatMap((reference) =>
 			reference.path ? [reference.path] : [],
 		),
