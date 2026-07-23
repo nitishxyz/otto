@@ -321,7 +321,7 @@ export const MessagePartItem = memo(
 					return (
 						<FolderTree className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
 					);
-				if (isShellTool(toolName))
+				if (isShellTool(toolName) || toolName === 'shell_result')
 					return <Terminal className="h-4 w-4 text-muted-foreground" />;
 				if (toolName === 'search' || toolName === 'grep' || toolName === 'glob')
 					return (

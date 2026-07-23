@@ -128,19 +128,25 @@ describe('runtime project scoping', () => {
 
 	it('scopes active shell aborts by project', () => {
 		const aborted: string[] = [];
-		const unregisterA = registerActiveShellProcess({
+		const shellA = registerActiveShellProcess({
 			projectRoot: '/tmp/project-a',
 			sessionId: 'same-session',
 			messageId: 'same-message',
 			callId: 'call-a',
+			command: 'sleep 1',
+			cwd: '/tmp/project-a',
 			abort: () => aborted.push('a'),
+			onDetach: () => {},
 		});
-		const unregisterB = registerActiveShellProcess({
+		const shellB = registerActiveShellProcess({
 			projectRoot: '/tmp/project-b',
 			sessionId: 'same-session',
 			messageId: 'same-message',
 			callId: 'call-b',
+			command: 'sleep 1',
+			cwd: '/tmp/project-b',
 			abort: () => aborted.push('b'),
+			onDetach: () => {},
 		});
 
 		expect(
@@ -152,8 +158,8 @@ describe('runtime project scoping', () => {
 		).toBe(1);
 		expect(aborted).toEqual(['a']);
 
-		unregisterA();
-		unregisterB();
+		shellA.unregister();
+		shellB.unregister();
 	});
 
 	it('scopes MCP managers by project root', async () => {

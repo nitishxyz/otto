@@ -568,6 +568,7 @@ export const AssistantMessageGroup = memo(
 						part={part}
 						showLine={hasFollowingContent}
 						compact={compact}
+						sessionId={sessionId}
 					/>
 				);
 			}

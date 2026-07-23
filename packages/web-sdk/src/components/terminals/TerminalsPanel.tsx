@@ -122,17 +122,18 @@ const TerminalsPanelContent = memo(function TerminalsPanelContent() {
 
 	const handleKillTerminal = useCallback(
 		async (id: string) => {
+			if (activeTabId === id) {
+				const remaining = terminalsListRef.current.filter((t) => t.id !== id);
+				if (remaining.length > 0) {
+					selectTab(remaining[0].id);
+				} else {
+					selectTab(null);
+					closePanel();
+				}
+			}
+
 			try {
 				await killTerminal.mutateAsync(id);
-				if (activeTabId === id) {
-					const remaining = terminalsListRef.current.filter((t) => t.id !== id);
-					if (remaining.length > 0) {
-						selectTab(remaining[0].id);
-					} else {
-						selectTab(null);
-						closePanel();
-					}
-				}
 			} catch {
 				// ignore
 			}

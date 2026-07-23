@@ -69,6 +69,10 @@ export async function handleSessionIdle(
 			return;
 		}
 
+		const { reportFinishedShellJobs } = await import('../shell-jobs/report.ts');
+		const shellReported = await reportFinishedShellJobs(db, cfg, sessionId);
+		if (shellReported) return;
+
 		const reported = await reportFinishedSubagents(db, cfg, sessionId);
 		if (reported) return;
 

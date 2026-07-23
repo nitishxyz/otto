@@ -27,6 +27,10 @@ import {
 	SubagentResultsNotice,
 	isSubagentResultsMessage,
 } from './SubagentResultsNotice';
+import {
+	ShellResultsNotice,
+	isShellResultsMessage,
+} from './ShellResultsNotice';
 import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
 import {
 	LooperKickoffNotice,
@@ -184,6 +188,9 @@ export const UserMessageGroup = memo(
 
 		if (isSubagentResultsMessage(rawContent)) {
 			return <SubagentResultsNotice content={rawContent} />;
+		}
+		if (isShellResultsMessage(rawContent)) {
+			return <ShellResultsNotice content={rawContent} />;
 		}
 		if (isLooperKickoffMessage(rawContent)) {
 			return <LooperKickoffNotice content={rawContent} />;

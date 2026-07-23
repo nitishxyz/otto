@@ -14,6 +14,7 @@ import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
 import { pluginsMixin } from './plugins';
 import { referencesMixin } from './references';
+import { shellJobsMixin } from './shell-jobs';
 
 export { configureApiClient } from './utils';
 export type {
@@ -24,6 +25,7 @@ export type {
 	Subagent,
 	SubagentStatus,
 } from './goals';
+export type { ShellJob, ShellJobStatus } from './shell-jobs';
 export type {
 	CreateDictationSessionInput,
 	CreateDictationSessionResponse,
@@ -140,6 +142,10 @@ class ApiClient {
 	deleteGoalTask = goalsMixin.deleteGoalTask;
 	startGoal = goalsMixin.startGoal;
 	listSessionSubagents = goalsMixin.listSessionSubagents;
+
+	listSessionShellJobs = shellJobsMixin.listSessionShellJobs;
+	detachSessionShellJob = shellJobsMixin.detachSessionShellJob;
+	abortSessionShellJob = shellJobsMixin.abortSessionShellJob;
 
 	approveToolCall = approvalMixin.approveToolCall;
 	getPendingApprovals = approvalMixin.getPendingApprovals;

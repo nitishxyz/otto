@@ -20,6 +20,7 @@ export * from './chat/ConfigSelector';
 export * from './chat/InputQueueBar';
 export * from './chat/InputTodosBar';
 export * from './chat/InputSubagentsBar';
+export * from './chat/InputShellJobsBar';
 export * from './chat/DictationInstallPrompt';
 export * from './chat/StopButton';
 export * from './chat/NewSessionLanding';

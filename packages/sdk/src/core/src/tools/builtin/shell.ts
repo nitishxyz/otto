@@ -248,9 +248,12 @@ export function appendTailLines(
 }
 
 type ShellResult = ToolResponse<{
-	exitCode: number;
-	stdout: string;
-	stderr: string;
+	exitCode?: number;
+	stdout?: string;
+	stderr?: string;
+	detached?: boolean;
+	jobId?: string;
+	status?: 'running';
 	outputMode?: ShellOutputMode;
 	tailLines?: number;
 	maxOutputBytes?: number;
@@ -327,6 +330,11 @@ const shellInputSchema = z
 			.optional()
 			.default(DEFAULT_MAX_OUTPUT_BYTES)
 			.describe('Maximum bytes retained per output stream; 0 disables the cap'),
+		detached: z
+			.boolean()
+			.optional()
+			.default(false)
+			.describe('Run as a background job and report completion later'),
 	})
 	.strict();
 
@@ -362,6 +370,7 @@ export function buildShellTool(
 				outputMode = 'auto',
 				tailLines = DEFAULT_TAIL_LINES,
 				maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
+				detached = false,
 			}: ShellInput,
 			options?: { abortSignal?: AbortSignal },
 		): AsyncIterable<ShellStreamChunk> | ShellResult {
@@ -395,6 +404,7 @@ export function buildShellTool(
 						outputMode,
 						tailLines,
 						maxOutputBytes,
+						detached,
 					},
 					options,
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
@@ -438,12 +448,12 @@ export function buildShellTool(
 				settled = true;
 				if ('stdout' in result && 'stderr' in result) {
 					const stdoutCompact = compactTextByBytes(
-						result.stdout,
+						result.stdout ?? '',
 						maxOutputBytes,
 						'shell stdout',
 					);
 					const stderrCompact = compactTextByBytes(
-						result.stderr,
+						result.stderr ?? '',
 						maxOutputBytes,
 						'shell stderr',
 					);

@@ -1,11 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Terminal, FileEdit, Diff, type LucideIcon } from 'lucide-react';
+import {
+	Terminal,
+	FileEdit,
+	Diff,
+	SquareArrowOutUpRight,
+	type LucideIcon,
+} from 'lucide-react';
 import type { MessagePart } from '../../types/api';
 import {
 	extractStreamingMultiEditPreviewEdits,
 	type StringEditPreview,
 } from '../../hooks/tool-preview-helpers';
 import { StableSpinner } from '../ui/StableSpinner';
+import {
+	useActiveShellJobForToolCall,
+	useDetachSessionShellJob,
+} from '../../hooks/useShellJobs';
 import { ToolResultRenderer, type ContentJson } from './renderers';
 import { useIsCompactThread } from './threadDensity';
 import {
@@ -189,9 +199,15 @@ interface ActionToolBoxProps {
 	part: MessagePart;
 	showLine: boolean;
 	compact?: boolean;
+	sessionId?: string;
 }
 
-export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
+export function ActionToolBox({
+	part,
+	showLine,
+	compact,
+	sessionId,
+}: ActionToolBoxProps) {
 	const isCompactThread = useIsCompactThread();
 	const isCompact = Boolean(compact || isCompactThread);
 	const contentMeasureRef = useRef<HTMLPreElement>(null);
@@ -202,6 +218,12 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 	const [contentHeight, setContentHeight] = useState(0);
 	const toolName = normalizeToolName(part.toolName || '');
 	const isComplete = part.type === 'tool_result';
+	const isLiveShell = isShellTool(toolName) && !isComplete;
+	const { data: matchingShellJob } = useActiveShellJobForToolCall(
+		sessionId,
+		isLiveShell ? part.toolCallId : null,
+	);
+	const detachMutation = useDetachSessionShellJob(sessionId);
 	const config = TOOL_CONFIG[toolName] || {
 		Icon: Terminal,
 		color: 'text-muted-foreground',
@@ -411,6 +433,23 @@ export function ActionToolBox({ part, showLine, compact }: ActionToolBoxProps) {
 								<span className="text-muted-foreground/50 animate-pulse lowercase tracking-normal font-normal">
 									generating…
 								</span>
+							)}
+							{matchingShellJob && (
+								<>
+									<span className="flex-1" />
+									<button
+										type="button"
+										onClick={() =>
+											detachMutation.mutate({ jobId: matchingShellJob.id })
+										}
+										disabled={detachMutation.isPending}
+										className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 flex-shrink-0"
+										title="Detach into background shell job"
+									>
+										<SquareArrowOutUpRight className="h-3 w-3" />
+										Detach
+									</button>
+								</>
 							)}
 						</div>
 

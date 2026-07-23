@@ -20,6 +20,7 @@ import { setupRunner } from './runner/runner-setup.ts';
 import { setupLazyToolLoading } from './runner/runner-lazy-tools.ts';
 import { withTodoReminderPrepareStep } from './runner/runner-todo-reminder.ts';
 import { withSubagentResultsPrepareStep } from './runner/runner-subagent-results.ts';
+import { withShellResultsPrepareStep } from './runner/runner-shell-results.ts';
 import type { ReasoningState } from './runner/runner-reasoning.ts';
 import { createOauthCodexTextGuardState } from '../stream/text-guard.ts';
 import {
@@ -120,6 +121,10 @@ async function runAssistant(opts: RunOpts) {
 	const prepareStepWithTodoReminder = withTodoReminderPrepareStep(prepareStep);
 	const prepareStepWithSubagentResults = withSubagentResultsPrepareStep(
 		prepareStepWithTodoReminder,
+		{ db, ctx: sharedCtx },
+	);
+	const prepareStepWithAsyncResults = withShellResultsPrepareStep(
+		prepareStepWithSubagentResults,
 		{ db, ctx: sharedCtx },
 	);
 
@@ -225,7 +230,7 @@ async function runAssistant(opts: RunOpts) {
 		queueWaitMs,
 		messages: messagesWithSystemInstructions,
 		toolset: toolset as Record<string, unknown>,
-		hasPrepareStep: Boolean(prepareStepWithSubagentResults),
+		hasPrepareStep: Boolean(prepareStepWithAsyncResults),
 	});
 
 	try {
@@ -239,7 +244,7 @@ async function runAssistant(opts: RunOpts) {
 			providerOptions,
 			abortSignal: opts.abortSignal,
 			stopWhen: stopWhenCondition,
-			prepareStep: prepareStepWithSubagentResults,
+			prepareStep: prepareStepWithAsyncResults,
 			onStepFinish: runnerHandlers.onStepFinish,
 			onError: runnerHandlers.onError,
 			onAbort: runnerHandlers.onAbort,

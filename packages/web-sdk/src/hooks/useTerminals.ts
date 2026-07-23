@@ -41,6 +41,10 @@ interface CreateTerminalResponse {
 	command: string;
 }
 
+interface KillTerminalContext {
+	previousTerminals?: TerminalsResponse;
+}
+
 export function useTerminals() {
 	return useQuery<TerminalsResponse>({
 		queryKey: ['terminals'],
@@ -79,7 +83,7 @@ export function useCreateTerminal() {
 export function useKillTerminal() {
 	const queryClient = useQueryClient();
 
-	return useMutation<void, Error, string>({
+	return useMutation<void, Error, string, KillTerminalContext>({
 		mutationFn: async (terminalId) => {
 			const response = await deleteTerminalsById({
 				path: { id: terminalId },
@@ -89,8 +93,32 @@ export function useKillTerminal() {
 				throw new Error('Failed to kill terminal');
 			}
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['terminals'] });
+		onMutate: async (terminalId) => {
+			await queryClient.cancelQueries({ queryKey: ['terminals'] });
+			const previousTerminals = queryClient.getQueryData<TerminalsResponse>([
+				'terminals',
+			]);
+
+			if (previousTerminals) {
+				const terminals = previousTerminals.terminals.filter(
+					(terminal) => terminal.id !== terminalId,
+				);
+				queryClient.setQueryData<TerminalsResponse>(['terminals'], {
+					...previousTerminals,
+					terminals,
+					count: terminals.length,
+				});
+			}
+
+			return { previousTerminals };
+		},
+		onError: (_error, _terminalId, context) => {
+			if (context?.previousTerminals) {
+				queryClient.setQueryData(['terminals'], context.previousTerminals);
+			}
+		},
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: ['terminals'] });
 		},
 	});
 }

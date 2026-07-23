@@ -24,6 +24,8 @@ export type OttoEventType =
 	| 'tool.call'
 	| 'tool.delta'
 	| 'tool.result'
+	| 'shell.job.updated'
+	| 'shell.job.output'
 	| 'plan.updated'
 	| 'goal.updated'
 	| 'finish-step'

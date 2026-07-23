@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { acquireSessionEventStream } from '../lib/event-stream';
 import { apiClient } from '../lib/api-client';
 import type { Message, MessagePart } from '../types/api';
+import type { ShellJob } from '../lib/api-client';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useSecureInputStore } from '../stores/secureInputStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
@@ -156,6 +157,44 @@ export function useSessionStream(
 			if (callId) return callId;
 			const name = getToolEventName(payload);
 			return name ? `name:${name}` : null;
+		};
+
+		const shellJobsQueryKey = projectScopedKey([
+			'shell-jobs',
+			sessionId,
+		] as const);
+		const upsertShellJob = (job: ShellJob) => {
+			queryClient.setQueryData<{ jobs: ShellJob[] }>(
+				shellJobsQueryKey,
+				(current) => ({
+					jobs: current?.jobs.some((entry) => entry.id === job.id)
+						? current.jobs.map((entry) => (entry.id === job.id ? job : entry))
+						: [job, ...(current?.jobs ?? [])],
+				}),
+			);
+		};
+		const appendShellJobOutput = (
+			jobId: string,
+			delta: string,
+			updatedAt: number,
+		) => {
+			queryClient.setQueryData<{ jobs: ShellJob[] }>(
+				shellJobsQueryKey,
+				(current) => {
+					if (!current) return current;
+					return {
+						jobs: current.jobs.map((job) =>
+							job.id === jobId
+								? {
+										...job,
+										output: `${job.output}${delta}`.slice(-1024 * 1024),
+										updatedAt,
+									}
+								: job,
+						),
+					};
+				},
+			);
 		};
 
 		const parseArgsRecord = (
@@ -1901,6 +1940,25 @@ export function useSessionStream(
 					handleToolActivityViewerEvent('tool.result', payload);
 					const key = getToolBufferKey(payload);
 					if (key) toolInputBuffersRef.current.delete(key);
+					break;
+				}
+				case 'shell.job.updated': {
+					const job = payload?.job;
+					if (job && typeof job === 'object' && !Array.isArray(job)) {
+						upsertShellJob(job as ShellJob);
+					}
+					break;
+				}
+				case 'shell.job.output': {
+					const jobId =
+						typeof payload?.jobId === 'string' ? payload.jobId : null;
+					const delta =
+						typeof payload?.delta === 'string' ? payload.delta : null;
+					const updatedAt =
+						typeof payload?.updatedAt === 'number'
+							? payload.updatedAt
+							: Date.now();
+					if (jobId && delta) appendShellJobOutput(jobId, delta, updatedAt);
 					break;
 				}
 				case 'tool.approval.required': {

@@ -7,7 +7,10 @@ import {
 import { createToolError, type ToolResponse } from '@ottocode/sdk/tools/error';
 import { spawn } from 'node:child_process';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
-import { registerActiveShellProcess } from '../../runtime/tools/active-shells.ts';
+import {
+	registerActiveShellProcess,
+	type ActiveShellRegistration,
+} from '../../runtime/tools/active-shells.ts';
 import { requestSecureInput } from '../../runtime/tools/secure-input.ts';
 import {
 	detectSecurePrompt,
@@ -15,9 +18,12 @@ import {
 } from '../../runtime/tools/secure-prompt.ts';
 
 type ShellResult = ToolResponse<{
-	exitCode: number;
-	stdout: string;
-	stderr: string;
+	exitCode?: number;
+	stdout?: string;
+	stderr?: string;
+	detached?: boolean;
+	jobId?: string;
+	status?: 'running';
 	outputMode?: 'full' | 'tail';
 	tailLines?: number;
 	envMode?: 'minimal' | 'login-cache' | 'login-fresh';
@@ -74,13 +80,15 @@ export function createSecureShellExecutor(args: {
 		let securePromptPending = false;
 		let didTimeout = false;
 		let didAbort = false;
-		let settled = false;
+		let processSettled = false;
+		let streamSettled = false;
+		let detached = false;
 		let terminating = false;
 		let done = false;
 		let timeoutId: ReturnType<typeof setTimeout> | null = null;
 		let killEscalationId: ReturnType<typeof setTimeout> | null = null;
 		let fallbackSettleId: ReturnType<typeof setTimeout> | null = null;
-		let unregisterActiveShell: () => void = () => {};
+		let activeShell: ActiveShellRegistration | null = null;
 		const queue: SecureShellStreamChunk[] = [];
 		let notify: (() => void) | null = null;
 
@@ -91,20 +99,60 @@ export function createSecureShellExecutor(args: {
 		};
 
 		const pushDelta = (text: string) => {
-			if (!text) return;
+			if (!text || streamSettled) return;
 			queue.push({ channel: 'output', delta: text });
 			wake();
 		};
 
 		const settle = (result: ShellResult) => {
-			if (settled) return;
-			settled = true;
+			if (processSettled) return;
+			processSettled = true;
 			if (timeoutId) clearTimeout(timeoutId);
 			if (killEscalationId) clearTimeout(killEscalationId);
 			if (fallbackSettleId) clearTimeout(fallbackSettleId);
-			unregisterActiveShell();
 			options?.abortSignal?.removeEventListener('abort', onAbort);
-			queue.push({ result });
+			const resultRecord = result as Record<string, unknown>;
+			const details =
+				resultRecord.details && typeof resultRecord.details === 'object'
+					? (resultRecord.details as Record<string, unknown>)
+					: undefined;
+			const exitCode =
+				typeof resultRecord.exitCode === 'number'
+					? resultRecord.exitCode
+					: typeof details?.exitCode === 'number'
+						? details.exitCode
+						: null;
+			const status =
+				resultRecord.ok === false
+					? resultRecord.errorType === 'abort'
+						? 'cancelled'
+						: 'failed'
+					: 'completed';
+			activeShell?.complete({ status, result, exitCode });
+			if (!streamSettled) {
+				streamSettled = true;
+				queue.push({ result });
+				done = true;
+				wake();
+			}
+		};
+
+		const detachStream = (jobId: string) => {
+			if (streamSettled || processSettled) return;
+			detached = true;
+			streamSettled = true;
+			options?.abortSignal?.removeEventListener('abort', onAbort);
+			queue.push({
+				result: {
+					ok: true,
+					detached: true,
+					jobId,
+					status: 'running',
+					stdout,
+					stderr,
+					envMode,
+				},
+			});
 			done = true;
 			wake();
 		};
@@ -150,17 +198,27 @@ export function createSecureShellExecutor(args: {
 			}, 2000);
 		};
 
-		unregisterActiveShell = registerActiveShellProcess({
+		activeShell = registerActiveShellProcess({
 			projectRoot: ctx.projectRoot,
 			sessionId: ctx.sessionId,
 			messageId: ctx.messageId,
 			callId,
+			command: input.cmd,
+			cwd: input.cwd,
 			abort: () => {
-				if (settled) return;
+				if (processSettled) return;
 				didAbort = true;
 				terminate(abortResult);
 			},
+			onDetach: detachStream,
+			onDetachedCompletion: (sessionId, projectRoot) => {
+				void import('../../runtime/shell-jobs/report.ts').then(
+					({ reportFinishedShellJobsWhenIdle }) =>
+						reportFinishedShellJobsWhenIdle(sessionId, projectRoot),
+				);
+			},
 		});
+		if (input.detached) activeShell.detach();
 
 		const maybeRequestSecureInput = (text: string) => {
 			recentOutput = `${recentOutput}${text}`.slice(-1000);
@@ -178,7 +236,7 @@ export function createSecureShellExecutor(args: {
 			}).then((value) => {
 				securePromptPending = false;
 				recentOutput = '';
-				if (settled) return;
+				if (processSettled) return;
 				if (value === null) {
 					didAbort = true;
 					terminate(abortResult);
@@ -189,7 +247,7 @@ export function createSecureShellExecutor(args: {
 		};
 
 		function onAbort() {
-			if (settled) return;
+			if (processSettled || detached) return;
 			didAbort = true;
 			terminate(abortResult);
 		}
@@ -205,6 +263,7 @@ export function createSecureShellExecutor(args: {
 
 		proc.stdout?.on('data', (chunk) => {
 			const text = chunk.toString();
+			activeShell?.appendOutput(text);
 			stdout =
 				outputMode === 'tail'
 					? appendTailLines(stdout, text, tailLines)
@@ -218,6 +277,7 @@ export function createSecureShellExecutor(args: {
 
 		proc.stderr?.on('data', (chunk) => {
 			const text = chunk.toString();
+			activeShell?.appendOutput(text);
 			stderr =
 				outputMode === 'tail'
 					? appendTailLines(stderr, text, tailLines)

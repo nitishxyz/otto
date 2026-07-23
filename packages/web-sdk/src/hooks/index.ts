@@ -40,3 +40,4 @@ export * from './useReferences';
 export * from './usePluginCommands';
 export * from './useProjectConnection';
 export * from './useProjects';
+export * from './useShellJobs';

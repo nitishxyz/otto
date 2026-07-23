@@ -215,6 +215,15 @@ function summarizeTaggedUserMessage(
 		const summary = summarizeSubagentResults(trimmed);
 		return summary ? { title: summary.title, preview: summary.preview } : null;
 	}
+	if (trimmed.startsWith('<shell_results>')) {
+		const command = cleanNavigatorPreviewText(
+			extractXmlBlock(trimmed, 'command'),
+		);
+		return {
+			title: 'Detached shell completed',
+			preview: command || 'Detached shell result received',
+		};
+	}
 
 	if (trimmed.startsWith('<goal_start')) {
 		const title = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'title'));

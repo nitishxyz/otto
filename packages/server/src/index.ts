@@ -20,6 +20,7 @@ import { registerBranchRoutes } from './routes/branch.ts';
 import { registerResearchRoutes } from './routes/research.ts';
 import { registerGoalsRoutes } from './routes/goals.ts';
 import { registerSubagentsRoutes } from './routes/subagents.ts';
+import { registerShellJobsRoutes } from './routes/shell-jobs.ts';
 import { registerSessionApprovalRoute } from './routes/session-approval.ts';
 import { registerSessionSecureInputRoute } from './routes/session-secure-input.ts';
 import { registerOttoRouterRoutes } from './routes/ottorouter.ts';
@@ -117,6 +118,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerResearchRoutes(app);
 	registerGoalsRoutes(app);
 	registerSubagentsRoutes(app);
+	registerShellJobsRoutes(app);
 	registerOttoRouterRoutes(app);
 	registerAuthRoutes(app);
 	registerTunnelRoutes(app);

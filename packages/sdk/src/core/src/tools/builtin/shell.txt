@@ -3,3 +3,5 @@ Run a non-interactive command and return stdout, stderr, and exit code. Use `ter
 Use `search` instead of `grep`/`find` for repository discovery. Use shell for builds, tests, diagnostics, processes, and ignored/generated files.
 
 Defaults use the cached terminal environment and bounded output. Override `envMode`, output controls, or `timeout` only when needed. Chain dependent commands with `&&`; use editing tools for file changes.
+
+Set `detached: true` only when useful work can continue while the command runs. Detached completion is delivered automatically; do not poll.
