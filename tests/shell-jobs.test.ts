@@ -226,6 +226,9 @@ describe('managed shell jobs', () => {
 		expect(claimFinishedShellJobs(sessionId)).toEqual([]);
 		markShellJobsReported([job.jobId]);
 		expect(claimFinishedShellJobs(sessionId)).toEqual([]);
+		expect(
+			listShellJobsForSession(sessionId, '/tmp/otto-shell-jobs')[0]?.reported,
+		).toBe(true);
 		job.unregister();
 	});
 

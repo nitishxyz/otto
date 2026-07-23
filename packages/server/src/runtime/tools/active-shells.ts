@@ -240,6 +240,7 @@ export function markShellJobsReported(jobIds: string[]): void {
 		entry.reporting = false;
 		entry.reported = true;
 		entry.updatedAt = Date.now();
+		publishJobUpdated(entry);
 	}
 }
 

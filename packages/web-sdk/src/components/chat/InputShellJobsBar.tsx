@@ -202,11 +202,12 @@ export const InputShellJobsBar = memo(function InputShellJobsBar({
 
 	const jobs = useMemo(() => data?.jobs ?? [], [data?.jobs]);
 	const running = jobs.filter(
-		(job) => job.detached && job.status === 'running',
+		(job) => job.detached && !job.reported && job.status === 'running',
 	);
 	const recentFinished = jobs.filter(
 		(job) =>
 			job.detached &&
+			!job.reported &&
 			job.status !== 'running' &&
 			Date.now() - job.updatedAt < RECENT_FINISHED_WINDOW_MS,
 	);
@@ -235,7 +236,7 @@ export const InputShellJobsBar = memo(function InputShellJobsBar({
 					>
 						<Terminal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 						<span className="shrink-0 text-xs font-medium text-foreground">
-							Shell jobs
+							Shell
 						</span>
 						{!isExpanded && currentJob && (
 							<>
