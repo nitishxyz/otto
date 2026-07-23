@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { createApp } from '@ottocode/server';
 import { subscribe } from '../packages/server/src/events/bus.ts';
 import {
+	abortAllActiveShellJobs,
 	abortActiveShellsForMessage,
 	claimFinishedShellJobs,
 	detachActiveShellJob,
@@ -243,5 +244,19 @@ describe('managed shell jobs', () => {
 		expect(listShellJobsForSession(sessionId, '/tmp/otto-shell-jobs')).toEqual(
 			[],
 		);
+	});
+
+	it('aborts detached jobs during daemon shutdown', () => {
+		let aborted = false;
+		const job = registerTestJob({
+			abort: () => {
+				aborted = true;
+			},
+		});
+		job.detach();
+
+		expect(abortAllActiveShellJobs()).toBeGreaterThanOrEqual(1);
+		expect(aborted).toBe(true);
+		job.unregister();
 	});
 });

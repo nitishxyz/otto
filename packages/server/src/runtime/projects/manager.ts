@@ -15,6 +15,9 @@ import {
 import { realpath, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { shutdownPartContentWriter } from '../persistence/part-content-writer.ts';
+import { abortAllActiveShellJobs } from '../tools/active-shells.ts';
+import { getServerInfo } from '../../state.ts';
+import { recoverInterruptedRuns } from './recovery.ts';
 import {
 	forgetProject,
 	listProjects,
@@ -72,6 +75,7 @@ export class ProjectManager {
 
 		const cfg = await loadConfig(root);
 		const db = await getDb(cfg.projectRoot);
+		recoverInterruptedRuns(db, getServerInfo().startedAt);
 		await touchProject(cfg.projectRoot, cfg.paths.dbPath);
 		const terminalManager = new TerminalManager();
 
@@ -244,6 +248,7 @@ export function getProjectManager(): ProjectManager {
 }
 
 export async function shutdownProjectManager(): Promise<void> {
+	abortAllActiveShellJobs();
 	try {
 		await shutdownPartContentWriter();
 	} catch {}

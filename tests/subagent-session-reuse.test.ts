@@ -9,7 +9,7 @@ import { spawnSubagent } from '../packages/server/src/runtime/subagents/service.
 
 let projectRoot = '';
 const PARENT_SESSION_ID = 'parent-1';
-const CHILD_SESSION_ID = 'child-frontend-1';
+const CHILD_SESSION_ID = 'child-plan-1';
 
 beforeAll(async () => {
 	projectRoot = await mkdtemp(join(tmpdir(), 'otto-subagent-reuse-'));
@@ -28,7 +28,7 @@ beforeAll(async () => {
 		},
 		{
 			id: CHILD_SESSION_ID,
-			agent: 'frontend',
+			agent: 'plan',
 			provider: 'anthropic',
 			model: 'test',
 			projectPath: cfg.projectRoot,
@@ -38,7 +38,7 @@ beforeAll(async () => {
 		},
 		{
 			id: 'unrelated-session',
-			agent: 'frontend',
+			agent: 'plan',
 			provider: 'anthropic',
 			model: 'test',
 			projectPath: cfg.projectRoot,
@@ -50,8 +50,8 @@ beforeAll(async () => {
 		id: 'subagent-prev',
 		parentSessionId: PARENT_SESSION_ID,
 		childSessionId: CHILD_SESSION_ID,
-		agent: 'frontend',
-		task: 'earlier frontend task',
+		agent: 'plan',
+		task: 'earlier planning task',
 		status: 'completed',
 		summary: 'done',
 		reported: true,
@@ -73,7 +73,7 @@ describe('delegate_task session reuse validation', () => {
 			cfg,
 			parentSessionId: PARENT_SESSION_ID,
 			parentAgent: 'looper',
-			agent: 'frontend',
+			agent: 'plan',
 			task: 'follow-up task',
 			reuseSessionId: 'missing-session',
 		});
@@ -89,7 +89,7 @@ describe('delegate_task session reuse validation', () => {
 			cfg,
 			parentSessionId: PARENT_SESSION_ID,
 			parentAgent: 'looper',
-			agent: 'frontend',
+			agent: 'plan',
 			task: 'follow-up task',
 			reuseSessionId: 'unrelated-session',
 		});
@@ -125,7 +125,7 @@ describe('delegate_task session reuse validation', () => {
 			id: 'subagent-running',
 			parentSessionId: PARENT_SESSION_ID,
 			childSessionId: CHILD_SESSION_ID,
-			agent: 'frontend',
+			agent: 'plan',
 			task: 'still running',
 			status: 'running',
 			summary: null,
@@ -138,7 +138,7 @@ describe('delegate_task session reuse validation', () => {
 			cfg,
 			parentSessionId: PARENT_SESSION_ID,
 			parentAgent: 'looper',
-			agent: 'frontend',
+			agent: 'plan',
 			task: 'follow-up task',
 			reuseSessionId: CHILD_SESSION_ID,
 		});

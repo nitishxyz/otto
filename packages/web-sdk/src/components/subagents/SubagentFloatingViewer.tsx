@@ -143,7 +143,9 @@ const SubagentViewerPanel = memo(function SubagentViewerPanel({
 			>
 				<div className="flex min-w-0 flex-1 items-center gap-2">
 					<Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
-					<span className="font-semibold text-sm">{agent ?? 'Sub-agent'}</span>
+					<span className="shrink-0 whitespace-nowrap font-semibold text-sm">
+						{agent ?? 'Sub-agent'}
+					</span>
 					{task ? (
 						<span className="truncate font-mono text-[11px] text-muted-foreground">
 							{task}

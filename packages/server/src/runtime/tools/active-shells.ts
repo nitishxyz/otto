@@ -290,3 +290,14 @@ export function abortActiveShellsForSession(
 	}
 	return count;
 }
+
+/** Aborts every running shell job, including jobs detached from their turn. */
+export function abortAllActiveShellJobs(): number {
+	let count = 0;
+	for (const entry of activeShells.values()) {
+		if (entry.status !== 'running') continue;
+		count++;
+		entry.abort();
+	}
+	return count;
+}
