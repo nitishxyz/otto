@@ -15,6 +15,17 @@ function formatCompact(num: number): string {
 	return num.toString();
 }
 
+const METER_WIDTH = 5;
+
+/** Renders a compact block meter like ▰▰▱▱▱ for context usage. */
+function contextMeter(percent: number): string {
+	const filled = Math.min(
+		METER_WIDTH,
+		Math.max(0, Math.round((percent / 100) * METER_WIDTH)),
+	);
+	return '▰'.repeat(filled) + '▱'.repeat(METER_WIDTH - filled);
+}
+
 export function StatusBar({
 	sessionTitle,
 	projectRoot,
@@ -31,17 +42,11 @@ export function StatusBar({
 			? colors.red
 			: contextUsagePercent >= 70
 				? colors.yellow
-				: colors.fgDimmed;
+				: colors.fgDark;
 
-	const rightParts: string[] = [];
-	if (projectRoot) {
-		rightParts.push(
-			`proj ${projectRoot.split('/').filter(Boolean).at(-1) ?? projectRoot}`,
-		);
-	}
-	if (queueSize > 0) rightParts.push(`${queueSize} queued`);
-	if (contextTokens > 0) rightParts.push(`ctx ${formatCompact(contextTokens)}`);
-	if (estimatedCost > 0) rightParts.push(`$${estimatedCost.toFixed(2)}`);
+	const projectName = projectRoot
+		? (projectRoot.split('/').filter(Boolean).at(-1) ?? projectRoot)
+		: null;
 
 	return (
 		<box
@@ -74,27 +79,39 @@ export function StatusBar({
 			</box>
 
 			<box style={{ flexShrink: 0, flexDirection: 'row' }}>
-				{rightParts.map((part, i) => {
-					const isCtx = part.startsWith('ctx ');
-					const isCost = part.startsWith('$');
-					const isQueued = part.includes('queued');
-					const isProject = part.startsWith('proj ');
-					let color = colors.fgDimmed;
-					if (isCtx) color = contextColor;
-					if (isCost) color = colors.fg;
-					if (isQueued) color = colors.yellow;
-					if (isProject) color = colors.blue;
-					return (
-						<box key={part} style={{ flexDirection: 'row', flexShrink: 0 }}>
-							{i > 0 ? (
-								<text fg={colors.fgDimmed}> │ </text>
-							) : (
-								<text fg={colors.fgDimmed}> </text>
-							)}
-							<text fg={color}>{part}</text>
-						</box>
-					);
-				})}
+				{projectName && (
+					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
+						<text fg={colors.fgDimmed}> </text>
+						<text fg={colors.blue}>{projectName}</text>
+					</box>
+				)}
+				{queueSize > 0 && (
+					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
+						<text fg={colors.fgDimmed}> │ </text>
+						<text fg={colors.yellow}>{queueSize} queued</text>
+					</box>
+				)}
+				{contextTokens > 0 && (
+					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
+						<text fg={colors.fgDimmed}> │ </text>
+						{contextUsagePercent > 0 && (
+							<text fg={contextColor}>
+								{contextMeter(contextUsagePercent)}{' '}
+							</text>
+						)}
+						<text fg={contextColor}>
+							{contextUsagePercent > 0
+								? `${Math.round(contextUsagePercent)}%`
+								: `ctx ${formatCompact(contextTokens)}`}
+						</text>
+					</box>
+				)}
+				{estimatedCost > 0 && (
+					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
+						<text fg={colors.fgDimmed}> │ </text>
+						<text fg={colors.fg}>${estimatedCost.toFixed(2)}</text>
+					</box>
+				)}
 			</box>
 		</box>
 	);
