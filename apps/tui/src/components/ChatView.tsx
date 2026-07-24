@@ -87,13 +87,26 @@ export const ChatView = memo(function ChatView({
 					gap: 1,
 				}}
 			>
-				<text fg={colors.blue}>
-					<b>otto</b>
-				</text>
-				<text fg={colors.fgDark}>
-					Type a message below to start a conversation
-				</text>
-				<text fg={colors.fgDimmed}>or type /help for commands</text>
+				<ascii-font
+					text="otto"
+					font="block"
+					color={[colors.blue, colors.purple]}
+				/>
+				<text fg={colors.fgDark}>Type a message to start a conversation</text>
+				<box style={{ flexDirection: 'row', gap: 3 }}>
+					<text fg={colors.fgDimmed}>
+						<span fg={colors.fgDark}>/help</span> commands
+					</text>
+					<text fg={colors.fgDimmed}>
+						<span fg={colors.fgDark}>⌃S</span> sessions
+					</text>
+					<text fg={colors.fgDimmed}>
+						<span fg={colors.fgDark}>⌃P</span> models
+					</text>
+					<text fg={colors.fgDimmed}>
+						<span fg={colors.fgDark}>⇥</span> plan mode
+					</text>
+				</box>
 			</box>
 		);
 	}
@@ -105,8 +118,8 @@ export const ChatView = memo(function ChatView({
 				flexGrow: 1,
 				paddingLeft: 0,
 				paddingRight: 0,
-				paddingTop: 1,
-				paddingBottom: 0,
+				paddingTop: 0,
+				paddingBottom: 1,
 			}}
 			stickyScroll
 			stickyStart="bottom"

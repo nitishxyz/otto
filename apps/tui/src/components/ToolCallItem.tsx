@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useTheme } from '../theme.ts';
 import { DiffView } from './DiffView.tsx';
+import { TinySpinner } from './TinySpinner.tsx';
 import type { MessagePart } from '../types.ts';
 
 const DIFF_TOOLS = new Set([
@@ -13,6 +14,8 @@ const DIFF_TOOLS = new Set([
 
 interface ToolCallItemProps {
 	part: MessagePart;
+	/** Tree connector glyph rendered in the gutter: '·', '├', or '└'. */
+	treePrefix?: string;
 }
 
 function clip(value: string, max = 120): string {
@@ -495,6 +498,7 @@ function extractToolError(part: MessagePart): string | null {
 
 export const ToolCallItem = memo(function ToolCallItem({
 	part,
+	treePrefix = '·',
 }: ToolCallItemProps) {
 	const { colors } = useTheme();
 	const toolName = part.toolName || 'unknown';
@@ -508,17 +512,14 @@ export const ToolCallItem = memo(function ToolCallItem({
 		? toolName.replace('__', ' > ')
 		: toolName;
 
-	const icon = hasError ? '✗' : isCompleted ? '✓' : '→';
-	const iconColor = hasError
-		? colors.red
-		: isCompleted
-			? colors.green
-			: colors.fgDark;
+	const isRunning = !isCompleted && !hasError;
+	const icon = hasError ? '✗' : '✓';
+	const iconColor = hasError ? colors.red : colors.green;
 	const nameColor = hasError
 		? colors.red
 		: isCompleted
 			? colors.fgMuted
-			: colors.fgDark;
+			: colors.fg;
 
 	const durationStr = duration
 		? duration < 1000
@@ -548,18 +549,23 @@ export const ToolCallItem = memo(function ToolCallItem({
 				style={{
 					flexDirection: 'row',
 					gap: 1,
-					paddingLeft: 2,
 					height: 1,
 					width: '100%',
-					backgroundColor: colors.toolBg,
 					overflow: 'hidden',
 				}}
 			>
-				<text style={{ flexShrink: 0 }} fg={iconColor}>
-					{icon}
+				<text style={{ flexShrink: 0 }} fg={colors.fgDimmed}>
+					{treePrefix}
 				</text>
+				{isRunning ? (
+					<TinySpinner fg={colors.streamDot} />
+				) : (
+					<text style={{ flexShrink: 0 }} fg={iconColor}>
+						{icon}
+					</text>
+				)}
 				<text style={{ flexShrink: 0 }} fg={nameColor}>
-					{displayName}
+					{isRunning ? <b>{displayName}</b> : displayName}
 				</text>
 				{hasError && truncatedError ? (
 					<text style={{ flexShrink: 0 }} fg={colors.red}>
@@ -574,7 +580,7 @@ export const ToolCallItem = memo(function ToolCallItem({
 				{!hasError && target && (
 					<text
 						style={{ flexShrink: 1, overflow: 'hidden' }}
-						fg={colors.toolArgs}
+						fg={isRunning ? colors.fgMuted : colors.toolArgs}
 					>
 						{target}
 					</text>

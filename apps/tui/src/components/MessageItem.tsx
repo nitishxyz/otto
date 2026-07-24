@@ -55,6 +55,20 @@ function formatTime(ts: number): string {
 	return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDuration(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+	const mins = Math.floor(ms / 60_000);
+	const secs = Math.round((ms % 60_000) / 1000);
+	return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+function formatTokens(count: number): string {
+	if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+	if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+	return String(count);
+}
+
 const SKIP_TOOLS = new Set(['finish', 'progress_update']);
 
 function formatError(raw: string | null | undefined): string {
@@ -140,16 +154,6 @@ const PartRenderer = memo(function PartRenderer({
 	if (part.type === 'text') {
 		const text = extractText(part);
 		if (!text.trim()) return null;
-		const isPartStreaming = isActive && isLastPart && !part.completedAt;
-		if (isPartStreaming) {
-			return (
-				<box style={{ width: '100%' }}>
-					<text wrapMode="word" fg={colors.fg}>
-						{text}
-					</text>
-				</box>
-			);
-		}
 		return (
 			<box style={{ width: '100%' }}>
 				<MarkdownView content={text} />
@@ -176,14 +180,13 @@ const PartRenderer = memo(function PartRenderer({
 						: preview;
 		}
 		return (
-			<box
-				style={{
-					flexDirection: 'column',
-					paddingLeft: 1,
-				}}
-			>
+			<box style={{ flexDirection: 'column' }}>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
-					<text fg={colors.fgDark}>~</text>
+					{isThinking ? (
+						<TinySpinner fg={colors.fgDark} />
+					) : (
+						<text fg={colors.fgDimmed}>∴</text>
+					)}
 					<text fg={colors.fgDark}>
 						<i>{isThinking ? 'thinking…' : 'thought'}</i>
 					</text>
@@ -200,8 +203,19 @@ const PartRenderer = memo(function PartRenderer({
 	if (part.type === 'error') {
 		const text = formatError(extractText(part));
 		return (
-			<box style={{ paddingLeft: 1 }}>
-				<text fg={colors.red}>{text || 'Error occurred'}</text>
+			<box
+				style={{
+					flexDirection: 'row',
+					gap: 1,
+					width: '100%',
+				}}
+			>
+				<text style={{ flexShrink: 0 }} fg={colors.red}>
+					✗
+				</text>
+				<text fg={colors.red} wrapMode="word">
+					{text || 'Error occurred'}
+				</text>
 			</box>
 		);
 	}
@@ -348,26 +362,28 @@ const UserMessage = memo(function UserMessage({
 		);
 	}
 
+	const railColor = isQueued ? colors.yellow : colors.userBadge;
+
 	return (
 		<box
 			style={{
 				flexDirection: 'column',
 				width: '100%',
-				backgroundColor: isQueued ? colors.bgHighlight : colors.userBg,
+				border: ['left'],
+				borderColor: railColor,
 				paddingLeft: 1,
 				paddingRight: 1,
-				paddingTop: 1,
-				paddingBottom: 1,
+				marginTop: 1,
 			}}
 		>
-			<box style={{ flexDirection: 'row', gap: 1 }}>
-				<text fg={colors.userBadge}>
+			<box style={{ flexDirection: 'row', gap: 1, height: 1 }}>
+				<text fg={railColor}>
 					<b>you</b>
 				</text>
 				{message.createdAt > 0 && (
 					<text fg={colors.fgDimmed}>{formatTime(message.createdAt)}</text>
 				)}
-				{isQueued && <text fg={colors.yellow}>queued</text>}
+				{isQueued && <text fg={colors.yellow}>· queued</text>}
 			</box>
 			{attachmentNames.length > 0 && (
 				<box
@@ -379,21 +395,22 @@ const UserMessage = memo(function UserMessage({
 							<box
 								key={name}
 								style={{
-									backgroundColor: colors.yellow,
+									backgroundColor: colors.bgSubtle,
 									paddingLeft: 1,
 									paddingRight: 1,
 									height: 1,
 								}}
 							>
-								<text fg={colors.bgDark}>{short}</text>
+								<text fg={colors.fgMuted}>◳ {short}</text>
 							</box>
 						);
 					})}
 				</box>
 			)}
-			{attachmentNames.length > 0 && <box style={{ height: 1 }} />}
 			{content ? (
-				<text fg={isQueued ? colors.fgDark : colors.fgBright}>{content}</text>
+				<text fg={isQueued ? colors.fgDark : colors.fgBright} wrapMode="word">
+					{content}
+				</text>
 			) : null}
 		</box>
 	);
@@ -416,6 +433,24 @@ function deduplicateToolParts(parts: MessagePart[]): MessagePart[] {
 		}
 		return true;
 	});
+}
+
+function TurnFooter({ message }: { message: Message }) {
+	const { colors } = useTheme();
+	const segments: string[] = [];
+	if (message.completedAt && message.createdAt > 0) {
+		const dur = message.completedAt - message.createdAt;
+		if (dur > 0) segments.push(formatDuration(dur));
+	}
+	const tokens = message.totalTokens ?? message.completionTokens;
+	if (tokens) segments.push(`${formatTokens(tokens)} tok`);
+	if (segments.length === 0) return null;
+	return (
+		<box style={{ flexDirection: 'row', gap: 1, height: 1, marginTop: 1 }}>
+			<text fg={colors.fgDimmed}>└</text>
+			<text fg={colors.fgDimmed}>{segments.join(' · ')}</text>
+		</box>
+	);
 }
 
 const AssistantMessage = memo(function AssistantMessage({
@@ -455,95 +490,102 @@ const AssistantMessage = memo(function AssistantMessage({
 	const lastPartId = lastBlock?.kind === 'part' ? lastBlock.part.id : null;
 
 	const showStreamingIndicator = isActive && !hasFinish;
+	const agentColor = message.agent === 'plan' ? colors.cyan : colors.purple;
 
 	return (
 		<box
 			style={{
 				flexDirection: 'column',
 				width: '100%',
-				backgroundColor: colors.assistantBg,
 				paddingLeft: 1,
 				paddingRight: 1,
-				paddingTop: 1,
-				paddingBottom: 1,
+				marginTop: 1,
 			}}
 		>
-			<box style={{ flexDirection: 'row', gap: 0 }}>
-				<text fg={colors.purple}>✦ </text>
+			<box style={{ flexDirection: 'row', gap: 0, height: 1 }}>
+				<text fg={agentColor}>✦ </text>
 				{message.agent && (
-					<text fg={message.agent === 'plan' ? colors.cyan : colors.purple}>
+					<text fg={agentColor}>
 						<b>{message.agent}</b>
 					</text>
 				)}
-				{message.provider && (
-					<>
-						<text fg={colors.fgDark}> · </text>
-						<text fg={colors.fgMuted}>{message.provider}</text>
-					</>
-				)}
-				{message.model && (
-					<>
-						<text fg={colors.fgDark}> · </text>
-						<text fg={colors.fgDimmed}>{message.model}</text>
-					</>
+				{(message.provider || message.model) && (
+					<text fg={colors.fgDimmed}>
+						{' '}
+						{[message.provider, message.model].filter(Boolean).join('/')}
+					</text>
 				)}
 				{message.createdAt > 0 && (
-					<>
-						<text fg={colors.fgDark}> · </text>
-						<text fg={colors.fgDimmed}>{formatTime(message.createdAt)}</text>
-					</>
+					<text fg={colors.fgDimmed}> · {formatTime(message.createdAt)}</text>
 				)}
 			</box>
 
-			{blocks.map((block) => (
-				<box
-					key={block.key}
-					style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
-				>
-					{block.kind === 'tools' ? (
-						block.parts.map((part) => {
-							const approval = part.toolCallId
-								? (pendingApprovals?.find(
-										(a) => a.callId === part.toolCallId,
-									) ?? null)
-								: null;
-							return (
-								<box
-									key={partKeyOf(part)}
-									style={{ flexDirection: 'column', width: '100%' }}
-								>
-									<ToolCallItem part={part} />
-									{approval && onApprove && onDeny && (
-										<InlineApproval
-											approval={approval}
-											onApprove={onApprove}
-											onDeny={onDeny}
-										/>
-									)}
-								</box>
-							);
-						})
-					) : block.kind === 'todos' ? (
-						<TodoListCard part={block.part} />
-					) : (
-						<PartRenderer
-							part={block.part}
-							isActive={isActive}
-							isLastPart={block.part.id === lastPartId}
-						/>
-					)}
-				</box>
-			))}
+			<box style={{ flexDirection: 'column', width: '100%', paddingLeft: 2 }}>
+				{blocks.map((block) => (
+					<box
+						key={block.key}
+						style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
+					>
+						{block.kind === 'tools' ? (
+							block.parts.map((part, i) => {
+								const approval = part.toolCallId
+									? (pendingApprovals?.find(
+											(a) => a.callId === part.toolCallId,
+										) ?? null)
+									: null;
+								const treePrefix =
+									block.parts.length === 1
+										? '·'
+										: i === block.parts.length - 1
+											? '└'
+											: '├';
+								return (
+									<box
+										key={partKeyOf(part)}
+										style={{ flexDirection: 'column', width: '100%' }}
+									>
+										<ToolCallItem part={part} treePrefix={treePrefix} />
+										{approval && onApprove && onDeny && (
+											<InlineApproval
+												approval={approval}
+												onApprove={onApprove}
+												onDeny={onDeny}
+											/>
+										)}
+									</box>
+								);
+							})
+						) : block.kind === 'todos' ? (
+							<TodoListCard part={block.part} />
+						) : (
+							<PartRenderer
+								part={block.part}
+								isActive={isActive}
+								isLastPart={block.part.id === lastPartId}
+							/>
+						)}
+					</box>
+				))}
 
-			{showStreamingIndicator && (
-				<StreamingIndicator progressPart={latestProgressPart} />
-			)}
+				{showStreamingIndicator && (
+					<StreamingIndicator progressPart={latestProgressPart} />
+				)}
 
-			{hasError && !sortedParts.some((p) => p.type === 'error') && (
-				<text fg={colors.red}>
-					{formatError(message.error) || 'Unknown error'}
-				</text>
-			)}
+				{hasError && !sortedParts.some((p) => p.type === 'error') && (
+					<box style={{ flexDirection: 'row', gap: 1, marginTop: 1 }}>
+						<text style={{ flexShrink: 0 }} fg={colors.red}>
+							✗
+						</text>
+						<text fg={colors.red} wrapMode="word">
+							{formatError(message.error) || 'Unknown error'}
+						</text>
+					</box>
+				)}
+
+				{!isActive && message.status === 'complete' && (
+					<TurnFooter message={message} />
+				)}
+			</box>
 		</box>
 	);
 });
