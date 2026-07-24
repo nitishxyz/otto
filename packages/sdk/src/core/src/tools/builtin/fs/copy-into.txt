@@ -5,6 +5,7 @@ Use this when duplicating large existing content such as SVGs, licenses, generat
 Rules:
 - Source paths may be relative to the project, absolute, or `~/...` so content can be copied from another project.
 - Target paths must resolve within the current project. Absolute target paths are accepted only when they are inside the project root.
+- Missing target files and parent directories are created. `insertAtLine` may be omitted when creating a target.
 - Read the target file first when possible so line numbers match the current content.
 - Line numbers are 1-indexed and inclusive.
 - `endLine` may be a line number, `"end"`, or `"eof"`. Prefer `"end"` over guessed sentinel values like `999`.

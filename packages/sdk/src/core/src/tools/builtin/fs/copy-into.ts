@@ -1,5 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { relative as relativePath, resolve as resolvePath } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import {
+	dirname,
+	relative as relativePath,
+	resolve as resolvePath,
+} from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import DESCRIPTION from './copy-into.txt' with { type: 'text' };
@@ -57,7 +61,7 @@ const copyIntoSchema = z.object({
 	insertAtLine: insertAtLineSchema
 		.optional()
 		.describe(
-			'Line to insert before, 1-indexed. Use "append" to add to the end.',
+			'Line to insert before, 1-indexed. Use "append" to add to the end. May be omitted when creating a target file.',
 		),
 	mode: z
 		.enum(['insert_before', 'insert_after', 'replace_range'])
@@ -124,6 +128,15 @@ function resolveEndLine(value: LineEndpoint, lineCount: number): number {
 	return lineCount;
 }
 
+function isFileNotFoundError(error: unknown): boolean {
+	return (
+		error !== null &&
+		typeof error === 'object' &&
+		'code' in error &&
+		error.code === 'ENOENT'
+	);
+}
+
 function getLineRange(
 	lines: string[],
 	startLine: number,
@@ -187,9 +200,15 @@ function applyCopiedLines(
 	}
 
 	if (input.insertAtLine === undefined) {
+		if (targetLines.length === 0) {
+			return { lines: copied, targetRange: '1' };
+		}
 		throw new Error(
 			'insertAtLine is required for insert_before and insert_after modes.',
 		);
+	}
+	if (targetLines.length === 0) {
+		return { lines: copied, targetRange: '1' };
 	}
 
 	const insertAtLine =
@@ -239,6 +258,7 @@ export function buildCopyIntoTool(projectRoot: string): {
 				linesCopied: number;
 				bytes: number;
 				bytesWritten: number;
+				created: boolean;
 				changed: boolean;
 				sha256: string;
 				summary: { files: number; additions: number; deletions: number };
@@ -280,17 +300,29 @@ export function buildCopyIntoTool(projectRoot: string): {
 			const targetDisplayPath = toProjectRelativePath(projectRoot, targetAbs);
 
 			try {
-				const [sourceContent, targetContent] = await Promise.all([
-					readFile(sourceAbs, 'utf-8'),
-					readFile(targetAbs, 'utf-8'),
-				]);
+				const sourceContent = await readFile(sourceAbs, 'utf-8');
+				let targetContent = '';
+				let targetExisted = true;
+				try {
+					targetContent = await readFile(targetAbs, 'utf-8');
+				} catch (error: unknown) {
+					if (!isFileNotFoundError(error)) throw error;
+					targetExisted = false;
+				}
 				const source = splitLinesForEdit(sourceContent);
 				const sourceRange = getLineRange(
 					source.lines,
 					input.startLine,
 					input.endLine,
 				);
-				const target = splitLinesForEdit(targetContent);
+				const target = targetExisted
+					? splitLinesForEdit(targetContent)
+					: {
+							lines: [],
+							trailingNewline:
+								sourceRange.endLine < source.lines.length ||
+								source.trailingNewline,
+						};
 				const applied = applyCopiedLines(
 					input,
 					target.lines,
@@ -302,10 +334,10 @@ export function buildCopyIntoTool(projectRoot: string): {
 				);
 				const nextContent = convertToLineEnding(
 					nextNormalized,
-					detectLineEnding(targetContent),
+					detectLineEnding(targetExisted ? targetContent : sourceContent),
 				);
 
-				if (nextContent === targetContent) {
+				if (targetExisted && nextContent === targetContent) {
 					return createToolError('No changes applied.', 'validation', {
 						suggestion:
 							'Choose a source range or target location that changes the file',
@@ -315,12 +347,15 @@ export function buildCopyIntoTool(projectRoot: string): {
 				if (options?.abortSignal?.aborted) {
 					return createToolAbortError('Copy');
 				}
+				if (!targetExisted) {
+					await mkdir(dirname(targetAbs), { recursive: true });
+				}
 				await writeFile(targetAbs, nextContent, 'utf-8');
 				await rememberFileWrite(projectRoot, targetAbs);
 				const metadata = buildMutationMetadata(targetContent, nextContent);
 				const artifact = await buildWriteArtifact(
 					targetDisplayPath,
-					true,
+					targetExisted,
 					targetContent,
 					nextContent,
 				);
@@ -335,29 +370,26 @@ export function buildCopyIntoTool(projectRoot: string): {
 					linesCopied: sourceRange.copied.length,
 					bytes: metadata.bytesWritten,
 					bytesWritten: metadata.bytesWritten,
+					created: !targetExisted,
 					changed: metadata.changed,
 					sha256: metadata.sha256,
 					summary: metadata.summary,
 					artifact,
 				};
 			} catch (error: unknown) {
-				const isEnoent =
-					error &&
-					typeof error === 'object' &&
-					'code' in error &&
-					error.code === 'ENOENT';
+				const isEnoent = isFileNotFoundError(error);
 				const staleHint = isEnoent
 					? undefined
 					: await getStaleReadHint(projectRoot, targetAbs, targetDisplayPath);
 				const message = error instanceof Error ? error.message : String(error);
 				return createToolError(
 					isEnoent
-						? 'Source or target file not found.'
+						? 'Source file not found.'
 						: `Failed to copy into file: ${message}${staleHint ? ` ${staleHint}` : ''}`,
 					isEnoent ? 'not_found' : 'execution',
 					{
 						suggestion: isEnoent
-							? 'Use read, ls, or tree to confirm both file paths first'
+							? 'Use read, ls, or tree to confirm the source file path first'
 							: staleHint,
 					},
 				);

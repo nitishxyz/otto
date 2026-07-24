@@ -52,12 +52,6 @@ function formatDuration(ms: number): string {
 	return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 }
 
-function formatTokens(count: number): string {
-	if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-	if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
-	return String(count);
-}
-
 function formatError(raw: string | null | undefined): string {
 	if (!raw) return '';
 	try {
@@ -462,17 +456,12 @@ function deduplicateToolParts(parts: MessagePart[]): MessagePart[] {
 
 function TurnFooter({ message }: { message: Message }) {
 	const { colors } = useTheme();
-	const segments: string[] = [];
-	if (message.completedAt && message.createdAt > 0) {
-		const dur = message.completedAt - message.createdAt;
-		if (dur > 0) segments.push(formatDuration(dur));
-	}
-	const tokens = message.totalTokens ?? message.completionTokens;
-	if (tokens) segments.push(`${formatTokens(tokens)} tok`);
-	if (segments.length === 0) return null;
+	if (!message.completedAt || message.createdAt <= 0) return null;
+	const duration = message.completedAt - message.createdAt;
+	if (duration <= 0) return null;
 	return (
 		<box style={{ flexDirection: 'row', gap: 1, height: 1, marginTop: 1 }}>
-			<text fg={colors.fgDimmed}>{segments.join(' · ')}</text>
+			<text fg={colors.fgDimmed}>{formatDuration(duration)}</text>
 		</box>
 	);
 }

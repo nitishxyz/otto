@@ -256,6 +256,35 @@ describe('Built-in Tools', () => {
 			).toBe('one\nB\nC\ntwo\n');
 		});
 
+		it('should create a missing target file and parent directories', async () => {
+			await writeFile(
+				join(projectRoot, 'copy-create-source.txt'),
+				'A\r\nB\r\nC\r\n',
+			);
+			const { tools } = await discoverProjectTools(projectRoot);
+			const copyIntoTool = tools.find((t) => t.name === 'copy_into');
+
+			const result = await copyIntoTool?.tool.execute({
+				sourcePath: 'copy-create-source.txt',
+				startLine: 2,
+				endLine: 'end',
+				targetPath: 'generated/nested/copied.txt',
+			});
+
+			expect(result).toMatchObject({
+				ok: true,
+				created: true,
+				linesCopied: 2,
+				targetRange: '1',
+			});
+			expect(
+				await readFile(
+					join(projectRoot, 'generated/nested/copied.txt'),
+					'utf-8',
+				),
+			).toBe('B\r\nC\r\n');
+		});
+
 		it('should replace a target line range', async () => {
 			await writeFile(join(projectRoot, 'copy-replace-source.txt'), 'X\nY\n');
 			await writeFile(
