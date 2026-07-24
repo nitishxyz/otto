@@ -88,7 +88,7 @@ export const ChatView = memo(function ChatView({
 				}}
 			>
 				<text fg={colors.blue}>
-					<b>● otto</b>
+					<b>otto</b>
 				</text>
 				<text fg={colors.fgDark}>Type a message to start a conversation</text>
 				<box style={{ flexDirection: 'row', gap: 3 }}>

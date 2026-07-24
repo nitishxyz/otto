@@ -2,8 +2,21 @@ import { createCliRenderer } from '@opentui/core';
 import { createRoot } from '@opentui/react';
 import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
-import { configureApi } from './src/api.ts';
+import { configureApi, configureProjectContext } from './src/api.ts';
+import { discoverLocalDaemon } from './src/daemon.ts';
 
+// Standalone entry: prefer a running local daemon unless the server is
+// explicitly configured via env.
+if (!process.env.OTTO_SERVER_URL && !process.env.OTTO_PORT) {
+	const daemon = await discoverLocalDaemon();
+	if (daemon) {
+		configureProjectContext({
+			baseUrl: daemon.baseUrl,
+			projectRoot: process.env.OTTO_PROJECT_ROOT || process.cwd(),
+			token: daemon.token,
+		});
+	}
+}
 configureApi();
 
 const renderer = await createCliRenderer({

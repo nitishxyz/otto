@@ -10,6 +10,7 @@ import {
 	isSubagentResultsMessage,
 	parseSubagentResults,
 } from './SubagentResultsCard.tsx';
+import { RAIL_BORDER_CHARS } from './rail.ts';
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
 
 interface MessageItemProps {
@@ -385,6 +386,7 @@ const UserMessage = memo(function UserMessage({
 
 	return (
 		<box
+			customBorderChars={RAIL_BORDER_CHARS}
 			style={{
 				flexDirection: 'column',
 				width: '100%',

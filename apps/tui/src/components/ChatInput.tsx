@@ -10,6 +10,7 @@ import { COMMANDS } from '../commands/index.ts';
 import { getVisibleWindow } from './ModalFrame.tsx';
 import type { StatusIndicator } from '../stores/overlay.ts';
 import { useFileAttachments, isFilePath } from '../hooks/useFileAttachments.ts';
+import { RAIL_BORDER_CHARS } from './rail.ts';
 import type {
 	ImageAttachment,
 	FileAttachment,
@@ -540,6 +541,7 @@ export function ChatInput({
 				</box>
 			)}
 			<box
+				customBorderChars={RAIL_BORDER_CHARS}
 				style={{
 					width: '100%',
 					border: ['left'],
@@ -607,7 +609,7 @@ export function ChatInput({
 					<box
 						style={{
 							flexDirection: 'row',
-							gap: 2,
+							gap: 1,
 							flexShrink: 1,
 							overflow: 'hidden',
 						}}

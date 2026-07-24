@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useTheme } from '../theme.ts';
 import { DiffView } from './DiffView.tsx';
+import { RAIL_BORDER_CHARS } from './rail.ts';
 import type { MessagePart } from '../types.ts';
 
 const DIFF_TOOLS = new Set([
@@ -599,6 +600,7 @@ export const ToolCallItem = memo(function ToolCallItem({
 			</box>
 			{liveOutput && (
 				<box
+					customBorderChars={RAIL_BORDER_CHARS}
 					style={{
 						flexDirection: 'column',
 						width: '100%',
