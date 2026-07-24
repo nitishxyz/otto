@@ -11,6 +11,7 @@ import {
 } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import { TinySpinner } from './TinySpinner.tsx';
 import { getProjectQuery } from '../api.ts';
 
 interface MCPServerInfo {
@@ -679,7 +680,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 
 			{loading && servers.length === 0 && (
 				<box style={{ flexDirection: 'row', gap: 1 }}>
-					<spinner name="dots" color={colors.blue} />
+					<TinySpinner fg={colors.blue} />
 					<text fg={colors.fgDark}>Loading servers…</text>
 				</box>
 			)}
@@ -721,7 +722,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 								footer={footer}
 								gutter={
 									isBusy ? (
-										<spinner name="dots" color={colors.yellow} />
+										<TinySpinner fg={colors.yellow} />
 									) : server.connected ? (
 										<text fg={colors.green}>●</text>
 									) : server.authRequired && !server.authenticated ? (

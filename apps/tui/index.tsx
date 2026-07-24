@@ -1,6 +1,5 @@
 import { createCliRenderer } from '@opentui/core';
 import { createRoot } from '@opentui/react';
-import 'opentui-spinner/react';
 import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
 import { configureApi } from './src/api.ts';

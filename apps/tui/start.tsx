@@ -4,7 +4,6 @@ import { createRoot } from '@opentui/react';
 import treeSitterWorkerPath from '../../node_modules/@opentui/core/parser.worker.js' with {
 	type: 'file',
 };
-import 'opentui-spinner/react';
 import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
 import { setPort, configureApi, configureProjectContext } from './src/api.ts';

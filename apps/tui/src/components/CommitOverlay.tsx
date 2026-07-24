@@ -9,6 +9,7 @@ import {
 } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
 import { ModalFrame } from './ModalFrame.tsx';
+import { TinySpinner } from './TinySpinner.tsx';
 import { getProjectQuery } from '../api.ts';
 
 interface GitFileInfo {
@@ -204,7 +205,7 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 		>
 			{phase === 'loading' && (
 				<box style={{ flexDirection: 'row', gap: 1 }}>
-					<spinner name="dots" color={colors.blue} />
+					<TinySpinner fg={colors.blue} />
 					<text fg={colors.blue}>Loading git status…</text>
 				</box>
 			)}
@@ -287,7 +288,7 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 							<text fg={colors.fgDimmed}>Commit message:</text>
 							{statusText && (
 								<box style={{ flexDirection: 'row', gap: 1 }}>
-									<spinner name="dots" color={colors.yellow} />
+									<TinySpinner fg={colors.yellow} />
 									<text fg={colors.yellow}>{statusText}</text>
 								</box>
 							)}
