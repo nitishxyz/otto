@@ -613,7 +613,7 @@ export function ChatInput({
 						}}
 					>
 						<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
-							{isPlanMode ? '✎' : '✦'} {agent || 'build'}
+							<b>{agent || 'build'}</b>
 						</text>
 						{hasStatus ? (
 							<box style={{ flexDirection: 'row', overflow: 'hidden' }}>

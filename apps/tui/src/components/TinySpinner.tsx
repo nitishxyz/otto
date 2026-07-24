@@ -1,13 +1,13 @@
 import { memo, useEffect, useState } from 'react';
 
-const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-const FRAME_MS = 80;
+const FRAMES = ['·', '✢', '✳', '✻', '✽', '✻', '✳', '✢'];
+const FRAME_MS = 120;
 
 interface TinySpinnerProps {
 	fg: string;
 }
 
-/** Minimal braille spinner. No external deps or renderable registration. */
+/** Minimal pulsing-star spinner. No external deps or renderable registration. */
 export const TinySpinner = memo(function TinySpinner({ fg }: TinySpinnerProps) {
 	const [frame, setFrame] = useState(0);
 

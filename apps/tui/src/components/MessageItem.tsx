@@ -388,14 +388,20 @@ const UserMessage = memo(function UserMessage({
 			style={{
 				flexDirection: 'column',
 				width: '100%',
-				paddingLeft: 1,
-				paddingRight: 1,
+				border: ['left'],
+				borderColor: badgeColor,
+				backgroundColor: colors.bgSubtle,
+				paddingLeft: 2,
+				paddingRight: 2,
+				paddingTop: 1,
+				paddingBottom: 1,
+				gap: 1,
 				marginTop: 1,
 			}}
 		>
 			<box style={{ flexDirection: 'row', gap: 1, height: 1 }}>
 				<text fg={badgeColor}>
-					<b>❯ you</b>
+					<b>you</b>
 				</text>
 				{message.createdAt > 0 && (
 					<text fg={colors.fgDimmed}>{formatTime(message.createdAt)}</text>
