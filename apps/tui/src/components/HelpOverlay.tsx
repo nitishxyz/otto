@@ -1,6 +1,6 @@
 import { useKeyboard } from '@opentui/react';
 import { useTheme } from '../theme.ts';
-import { COMMANDS } from '../commands.ts';
+import { COMMANDS } from '../commands/index.ts';
 import { ModalFrame } from './ModalFrame.tsx';
 
 interface HelpOverlayProps {

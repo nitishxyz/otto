@@ -1,17 +1,9 @@
-import { useKeyboard, useRenderer } from '@opentui/react';
+import { useSelectionHandler } from '@opentui/react';
 import { useCallback, useEffect, useRef, useMemo } from 'react';
-import {
-	createSessionHandoff,
-	resolveSecureInput,
-	stageFiles,
-	shareSession,
-	syncShare,
-	pushCommits,
-} from '@ottocode/api';
+import { resolveSecureInput } from '@ottocode/api';
 import {
 	estimateModelCostUsd,
 	getModelInfo,
-	openAuthUrl,
 	type ProviderId,
 } from '@ottocode/sdk';
 import { StatusBar } from './components/StatusBar.tsx';
@@ -23,43 +15,13 @@ import { SecureInputBar } from './components/SecureInputBar.tsx';
 import { useSession } from './hooks/useSession.ts';
 import { useStream } from './hooks/useStream.ts';
 import { useConfig } from './hooks/useConfig.ts';
-import { parseCommand, resolveCommand } from './commands.ts';
-import { getBaseUrl, getProjectContext, getProjectQuery } from './api.ts';
+import { useGlobalKeymap } from './hooks/useGlobalKeymap.ts';
+import { parseCommand, executeCommand } from './commands/index.ts';
+import { copyToClipboard } from './lib/clipboard.ts';
+import { getProjectContext, getProjectQuery } from './api.ts';
 import { useTheme } from './theme.ts';
 import { useOverlayStore } from './stores/overlay.ts';
 import type { Session } from './types.ts';
-
-async function copyToClipboard(text: string): Promise<void> {
-	const cmd =
-		process.platform === 'darwin'
-			? 'pbcopy'
-			: process.platform === 'win32'
-				? 'clip'
-				: 'xclip -selection clipboard';
-	const proc = Bun.spawn(['sh', '-c', cmd], {
-		stdin: 'pipe',
-	});
-	proc.stdin.write(text);
-	proc.stdin.end();
-	await proc.exited;
-}
-
-function buildWebSessionUrl(
-	webUrl: string | undefined,
-	sessionId?: string,
-): string {
-	const url = new URL(webUrl ?? getBaseUrl());
-	if (!webUrl) {
-		const apiPort = Number(url.port);
-		if (apiPort) url.port = String(apiPort + 1);
-	}
-	url.pathname = sessionId
-		? `/sessions/${encodeURIComponent(sessionId)}`
-		: '/sessions';
-	url.search = '';
-	url.hash = '';
-	return url.toString();
-}
 
 export function App({
 	onQuit,
@@ -75,7 +37,6 @@ export function App({
 		allowUnknownModel?: boolean;
 	};
 }) {
-	const renderer = useRenderer();
 	const { colors, setTheme } = useTheme();
 	const initialSessionDefaults = useMemo(
 		() => initialSession,
@@ -93,20 +54,14 @@ export function App({
 
 	useEffect(() => () => cleanup(), [cleanup]);
 
-	useEffect(() => {
-		const handler = (selection: { getSelectedText: () => string }) => {
-			const text = selection.getSelectedText();
-			if (text) {
-				copyToClipboard(text).then(() => {
-					showStatus({ type: 'success', label: 'copied to clipboard' }, 2000);
-				});
-			}
-		};
-		renderer.on('selection', handler);
-		return () => {
-			renderer.off('selection', handler);
-		};
-	}, [renderer, showStatus]);
+	useSelectionHandler((selection) => {
+		const text = selection.getSelectedText();
+		if (text) {
+			copyToClipboard(text).then(() => {
+				showStatus({ type: 'success', label: 'copied to clipboard' }, 2000);
+			});
+		}
+	});
 
 	const {
 		sessions,
@@ -215,237 +170,40 @@ export function App({
 	}, [sessionProvider, sessionModel, contextTokens]);
 
 	const handleCommand = useCallback(
-		async (name: string, args: string) => {
-			const cmd = resolveCommand(name);
-			switch (cmd) {
-				case 'exit':
-					onQuit();
-					break;
-				case 'sessions':
-					await loadSessions();
-					setOverlay('sessions');
-					break;
-				case 'new': {
-					const session = await createSession(args || undefined);
-					if (session) setOverlay('none');
-					break;
-				}
-				case 'delete':
-					if (activeSession) {
-						await deleteSession(activeSession.id);
-					}
-					break;
-				case 'mcp':
-					setOverlay('mcp');
-					break;
-				case 'skills':
-					setOverlay('skills');
-					break;
-				case 'models':
-					setOverlay('models');
-					break;
-				case 'agents':
-					setOverlay('agents');
-					break;
-				case 'commit':
-					setOverlay('commit');
-					break;
-				case 'push':
-					showStatus({ type: 'loading', label: 'pushing…' });
-					try {
-						const pushResponse = await pushCommits({
-							query: getProjectQuery(),
-							body: {},
-						} as never);
-						if (pushResponse.error) {
-							// biome-ignore lint/suspicious/noExplicitAny: SDK error type
-							const err = pushResponse.error as any;
-							showStatus(
-								{ type: 'error', label: err?.error || 'push failed' },
-								3000,
-							);
-						} else {
-							// biome-ignore lint/suspicious/noExplicitAny: SDK response type
-							const pushData = pushResponse.data as any;
-							showStatus(
-								{ type: 'success', label: pushData?.data?.output || 'pushed' },
-								3000,
-							);
-						}
-					} catch {
-						showStatus({ type: 'error', label: 'push failed' }, 3000);
-					}
-					break;
-				case 'web': {
-					const sessionWebUrl = buildWebSessionUrl(webUrl, activeSession?.id);
-					let copied = false;
-					try {
-						await copyToClipboard(sessionWebUrl);
-						copied = true;
-					} catch {}
-					const opened = await openAuthUrl(sessionWebUrl);
-					if (opened && copied) {
-						showStatus({ type: 'success', label: 'web opened & copied' }, 3000);
-					} else if (opened) {
-						showStatus({ type: 'success', label: 'web opened' }, 3000);
-					} else if (copied) {
-						showStatus({ type: 'success', label: 'web url copied' }, 3000);
-					} else {
-						showStatus({ type: 'error', label: 'could not open web' }, 3000);
-					}
-					break;
-				}
-				case 'stage':
-					try {
-						await stageFiles({
-							query: getProjectQuery(),
-							body: { files: ['.'] },
-						} as never);
-						showStatus({ type: 'success', label: 'staged all' }, 3000);
-					} catch {
-						showStatus({ type: 'error', label: 'stage failed' }, 3000);
-					}
-					break;
-				case 'help':
-					setOverlay('help');
-					break;
-				case 'theme':
-					setOverlay('theme');
-					break;
-				case 'approvals':
-					setOverlay('approvals');
-					break;
-				case 'usage':
-					setOverlay('usage');
-					break;
-				case 'clear':
-					reload();
-					break;
-				case 'provider':
-					if (args) {
-						if (activeSession) {
-							await updateSessionPrefs(activeSession.id, { provider: args });
-						} else {
-							const s = await createSession();
-							if (s) await updateSessionPrefs(s.id, { provider: args });
-						}
-					}
-					break;
-				case 'compact':
-					if (activeSession) {
-						await sendMessage(activeSession.id, '/compact');
-					}
-					break;
-				case 'init':
-					if (activeSession) {
-						await sendMessage(activeSession.id, '/init');
-					}
-					break;
-				case 'handoff':
-					if (activeSession) {
-						showStatus({ type: 'loading', label: 'creating handoff…' });
-						try {
-							const response = await createSessionHandoff({
-								path: { sessionId: activeSession.id },
-								query: getProjectQuery(),
-							} as never);
-							if (
-								response.error ||
-								typeof response.data?.sessionId !== 'string'
-							) {
-								throw new Error('handoff failed');
-							}
-							const updatedSessions = await loadSessions();
-							const next = updatedSessions.find(
-								(s) => s.id === response.data?.sessionId,
-							);
-							if (next) switchSession(next);
-							showStatus({ type: 'success', label: 'handoff created' }, 3000);
-						} catch {
-							showStatus({ type: 'error', label: 'handoff failed' }, 3000);
-						}
-					}
-					break;
-				case 'stop':
-					if (activeSession) {
-						await abortSession(activeSession.id);
-					}
-					break;
-				case 'reasoning':
-					await updateDefaults({
-						reasoningText: !(config.defaults.reasoningText ?? true),
-					});
-					break;
-				case 'share':
-					if (activeSession) {
-						showStatus({ type: 'loading', label: 'sharing…' });
-						try {
-							const shareResponse = await shareSession({
-								path: { sessionId: activeSession.id },
-								query: getProjectQuery(),
-							} as never);
-							// biome-ignore lint/suspicious/noExplicitAny: SDK response structure
-							const shareData = shareResponse.data as any;
-							const shareUrl = shareData?.url;
-							if (shareUrl) {
-								await copyToClipboard(shareUrl);
-								showStatus({ type: 'success', label: 'url copied' }, 3000);
-							} else {
-								showStatus({ type: 'error', label: 'share failed' }, 3000);
-							}
-						} catch {
-							showStatus({ type: 'error', label: 'share failed' }, 3000);
-						}
-					}
-					break;
-				case 'sync':
-					if (activeSession) {
-						showStatus({ type: 'loading', label: 'syncing…' });
-						try {
-							const syncResponse = await syncShare({
-								path: { sessionId: activeSession.id },
-								query: getProjectQuery(),
-							} as never);
-							// biome-ignore lint/suspicious/noExplicitAny: SDK response structure
-							const syncData = syncResponse.data as any;
-							const syncUrl = syncData?.url;
-							if (syncUrl) {
-								await copyToClipboard(syncUrl);
-								showStatus({ type: 'success', label: 'synced & copied' }, 3000);
-							} else {
-								showStatus({ type: 'error', label: 'sync failed' }, 3000);
-							}
-						} catch {
-							showStatus({ type: 'error', label: 'sync failed' }, 3000);
-						}
-					}
-					break;
-				default:
-					if (activeSession) {
-						await sendMessage(
-							activeSession.id,
-							`/${cmd}${args ? ` ${args}` : ''}`,
-						);
-					}
-					break;
-			}
-		},
+		(name: string, args: string) =>
+			executeCommand(name, args, {
+				activeSession,
+				webUrl,
+				reasoningText: config.defaults.reasoningText ?? true,
+				onQuit,
+				setOverlay,
+				showStatus,
+				loadSessions,
+				createSession,
+				deleteSession,
+				switchSession,
+				updateSessionPrefs,
+				sendMessage,
+				abortSession,
+				updateDefaults,
+				reload,
+			}),
 		[
 			activeSession,
-			config,
+			webUrl,
+			config.defaults.reasoningText,
+			onQuit,
+			setOverlay,
+			showStatus,
+			loadSessions,
 			createSession,
 			deleteSession,
-			loadSessions,
-			onQuit,
-			reload,
-			webUrl,
-			updateDefaults,
-			sendMessage,
-			abortSession,
-			showStatus,
-			setOverlay,
 			switchSession,
 			updateSessionPrefs,
+			sendMessage,
+			abortSession,
+			updateDefaults,
+			reload,
 		],
 	);
 
@@ -577,53 +335,28 @@ export function App({
 		[setPendingSecureInputs, showStatus],
 	);
 
-	useKeyboard((key) => {
-		if (pendingSecureInputs.length > 0 && !(key.ctrl && key.name === 'c')) {
-			return;
-		}
-		if (key.name === 'escape') {
-			if (overlay !== 'none') {
-				setOverlay('none');
-				return;
-			}
-			if (isStreaming && activeSession) {
-				if (escHint) {
-					abortSession(activeSession.id);
-					clearEscHint();
-				} else {
-					setEscHint(true);
-				}
-				return;
-			}
-		}
-		if (key.ctrl && key.name === 'n') {
-			createSession();
-			return;
-		}
-		if (key.ctrl && key.name === 's') {
-			loadSessions().then(() => setOverlay('sessions'));
-			return;
-		}
-		if (key.ctrl && key.name === 'p') {
-			setOverlay('models');
-			return;
-		}
-		if (key.ctrl && key.name === 't') {
-			setOverlay('theme');
-			return;
-		}
-		if (key.ctrl && key.name === 'm') {
-			setOverlay('mcp');
-			return;
-		}
-		if (key.ctrl && key.name === 'c') {
-			if (isStreaming && activeSession) {
-				abortSession(activeSession.id);
-				clearEscHint();
-			} else {
-				onQuit();
-			}
-		}
+	const abortActiveSession = useCallback(() => {
+		const sid = sessionIdRef.current;
+		if (sid) abortSession(sid);
+	}, [abortSession]);
+
+	const openSessions = useCallback(() => {
+		loadSessions().then(() => setOverlay('sessions'));
+	}, [loadSessions, setOverlay]);
+
+	useGlobalKeymap({
+		overlay,
+		isStreaming,
+		hasActiveSession: !!activeSession,
+		hasSecureInput: pendingSecureInputs.length > 0,
+		escHint,
+		setEscHint,
+		clearEscHint,
+		setOverlay,
+		createSession,
+		openSessions,
+		abortActiveSession,
+		onQuit,
 	});
 
 	useEffect(() => {
@@ -754,6 +487,7 @@ export function App({
 				provider={provider}
 				model={model}
 				escHint={escHint}
+				queueSize={queueSize}
 				isPlanMode={currentAgent === 'plan'}
 				onPlanModeToggle={handlePlanModeToggle}
 			/>

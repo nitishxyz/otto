@@ -6,7 +6,7 @@ import { searchFiles } from '@ottocode/api';
 import { fuzzyMatchFilePath } from '@ottocode/sdk/search/file-rank';
 import { useTheme } from '../theme.ts';
 import { TinySpinner } from './TinySpinner.tsx';
-import { COMMANDS } from '../commands.ts';
+import { COMMANDS } from '../commands/index.ts';
 import { getVisibleWindow } from './ModalFrame.tsx';
 import type { StatusIndicator } from '../stores/overlay.ts';
 import { useFileAttachments, isFilePath } from '../hooks/useFileAttachments.ts';
@@ -29,9 +29,12 @@ interface ChatInputProps {
 	provider: string;
 	model: string;
 	escHint: boolean;
+	queueSize?: number;
 	isPlanMode?: boolean;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
 }
+
+const MAX_PROMPT_HISTORY = 50;
 
 const MAX_FILE_RESULTS = 15;
 const MENU_VISIBLE_ROWS = 8;
@@ -50,6 +53,7 @@ export function ChatInput({
 	provider,
 	model,
 	escHint,
+	queueSize = 0,
 	isPlanMode: externalIsPlanMode,
 	onPlanModeToggle,
 }: ChatInputProps) {
@@ -115,6 +119,55 @@ export function ChatInput({
 	const filteredFilesRef = useRef(filteredFiles);
 	filteredFilesRef.current = filteredFiles;
 
+	const historyRef = useRef<string[]>([]);
+	const historyIdxRef = useRef<number | null>(null);
+	const historyDraftRef = useRef('');
+	const restoringHistoryRef = useRef(false);
+
+	const pushHistory = useCallback((text: string) => {
+		const entries = historyRef.current;
+		if (entries[entries.length - 1] !== text) {
+			entries.push(text);
+			if (entries.length > MAX_PROMPT_HISTORY) entries.shift();
+		}
+		historyIdxRef.current = null;
+		historyDraftRef.current = '';
+	}, []);
+
+	const recallHistory = useCallback((direction: -1 | 1): boolean => {
+		const textarea = textareaRef.current;
+		const entries = historyRef.current;
+		if (!textarea || entries.length === 0) return false;
+		const current = historyIdxRef.current;
+
+		if (direction === -1) {
+			if (current === null) {
+				if (textarea.plainText.trim().length > 0) return false;
+				historyDraftRef.current = textarea.plainText;
+				historyIdxRef.current = entries.length - 1;
+			} else if (current > 0) {
+				historyIdxRef.current = current - 1;
+			} else {
+				return true;
+			}
+		} else {
+			if (current === null) return false;
+			if (current < entries.length - 1) {
+				historyIdxRef.current = current + 1;
+			} else {
+				historyIdxRef.current = null;
+			}
+		}
+
+		const idx = historyIdxRef.current;
+		const next = idx === null ? historyDraftRef.current : entries[idx];
+		restoringHistoryRef.current = true;
+		textarea.editBuffer.setText(next);
+		textarea.editBuffer.setCursorByOffset(next.length);
+		restoringHistoryRef.current = false;
+		return true;
+	}, []);
+
 	useEffect(() => {
 		if (!showFileMention) return;
 		searchFiles({ query: { ...getProjectQuery(), q: mentionQuery } }).then(
@@ -163,6 +216,9 @@ export function ChatInput({
 
 	const handleContentChange = useCallback(() => {
 		if (!textareaRef.current) return;
+		if (!restoringHistoryRef.current) {
+			historyIdxRef.current = null;
+		}
 		const text = textareaRef.current.plainText;
 		const cursor = textareaRef.current.editBuffer.getCursorPosition();
 
@@ -208,6 +264,7 @@ export function ChatInput({
 		}
 		const text = textareaRef.current.plainText.trim();
 		if (!text && attachmentCountRef.current === 0) return;
+		if (text) pushHistory(text);
 		const imgData =
 			attachedImagesRef.current.length > 0
 				? attachedImagesRef.current
@@ -221,7 +278,7 @@ export function ChatInput({
 		clearAttachmentsRef.current();
 		setCommandMatches([]);
 		setShowFileMention(false);
-	}, [onSubmit, handleFileSelect, disabled]);
+	}, [onSubmit, handleFileSelect, disabled, pushHistory]);
 
 	useKeyboard((key) => {
 		if (disabled) return;
@@ -296,6 +353,15 @@ export function ChatInput({
 			const next = !isPlanModeRef.current;
 			setIsPlanMode(next);
 			onPlanModeToggle?.(next);
+			return;
+		}
+
+		if (key.name === 'up' && !key.ctrl && !key.meta && !key.shift) {
+			recallHistory(-1);
+			return;
+		}
+		if (key.name === 'down' && !key.ctrl && !key.meta && !key.shift) {
+			recallHistory(1);
 		}
 	});
 
@@ -322,7 +388,6 @@ export function ChatInput({
 	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
 	const borderColor = disabled ? colors.border : accent;
-	const modeLabel = ` ${agent || (isPlanMode ? 'plan' : 'build')} `;
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,
@@ -474,13 +539,11 @@ export function ChatInput({
 				</box>
 			)}
 			<box
-				title={modeLabel}
 				style={{
 					width: '100%',
 					border: true,
 					borderStyle: 'rounded',
 					borderColor,
-					titleColor: borderColor,
 					backgroundColor: colors.bg,
 					flexDirection: 'column',
 					paddingLeft: 1,
@@ -589,7 +652,12 @@ export function ChatInput({
 						</box>
 					) : (
 						<text fg={colors.fgDark} wrapMode="none" truncate>
-							↵ send · ⇧↵ newline · ⇥ mode · ⌃L clear
+							↵ send · ⇧↵ newline · ⇥ mode · ↑ history · ⌃L clear
+						</text>
+					)}
+					{queueSize > 0 && (
+						<text style={{ flexShrink: 0 }} fg={colors.yellow} wrapMode="none">
+							⧗ {queueSize} queued
 						</text>
 					)}
 				</box>
@@ -601,6 +669,16 @@ export function ChatInput({
 							overflow: 'hidden',
 						}}
 					>
+						<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
+							{isPlanMode ? '✎' : '✦'} {agent || 'build'}
+						</text>
+						<text
+							style={{ flexShrink: 0 }}
+							fg={colors.fgDimmed}
+							wrapMode="none"
+						>
+							{' · '}
+						</text>
 						{provider.length > 0 && (
 							<text
 								style={{ flexShrink: 0 }}
