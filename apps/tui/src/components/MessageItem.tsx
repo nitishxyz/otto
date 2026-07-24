@@ -11,6 +11,8 @@ import {
 	parseSubagentResults,
 } from './SubagentResultsCard.tsx';
 import { RAIL_BORDER_CHARS } from './rail.ts';
+
+const REASONING_PREVIEW_ROWS = 6;
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
 
 interface MessageItemProps {
@@ -186,19 +188,6 @@ const PartRenderer = memo(function PartRenderer({
 		if (!text.trim()) return null;
 		const isThinking = isActive && isLastPart && !part.completedAt;
 		const lines = text.split('\n').filter((l) => l.trim());
-		let display: string;
-		if (isThinking) {
-			const tail = lines.slice(-5);
-			display = (lines.length > 5 ? '…\n' : '') + tail.join('\n');
-		} else {
-			const preview = lines[0] ?? '';
-			display =
-				lines.length > 1
-					? `${preview.length > 120 ? `${preview.slice(0, 117)}…` : preview} (+${lines.length - 1} lines)`
-					: preview.length > 200
-						? `${preview.slice(0, 197)}…`
-						: preview;
-		}
 		return (
 			<box style={{ flexDirection: 'column' }}>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
@@ -210,12 +199,39 @@ const PartRenderer = memo(function PartRenderer({
 					<text fg={colors.fgDark}>
 						<i>{isThinking ? 'thinking…' : 'thought'}</i>
 					</text>
+					{!isThinking && (
+						<text fg={colors.fgDimmed}>
+							({lines.length} {lines.length === 1 ? 'line' : 'lines'})
+						</text>
+					)}
 				</box>
-				<box style={{ paddingLeft: 2 }}>
-					<text fg={colors.fgDark}>
-						<i>{display}</i>
-					</text>
-				</box>
+				{isThinking && (
+					<box
+						customBorderChars={RAIL_BORDER_CHARS}
+						style={{
+							flexDirection: 'column',
+							width: '100%',
+							backgroundColor: colors.bgSubtle,
+							border: ['left'],
+							borderColor: colors.border,
+							paddingLeft: 1,
+							paddingRight: 1,
+							marginLeft: 2,
+						}}
+					>
+						{lines.slice(-REASONING_PREVIEW_ROWS).map((line, i) => (
+							<text
+								key={`${i}-${line.slice(0, 24)}`}
+								style={{ height: 1 }}
+								fg={colors.fgDark}
+								wrapMode="none"
+								truncate
+							>
+								<i>{line}</i>
+							</text>
+						))}
+					</box>
+				)}
 			</box>
 		);
 	}

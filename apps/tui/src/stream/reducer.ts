@@ -94,6 +94,50 @@ function applyDelta(
 }
 
 const MAX_TOOL_OUTPUT_CHARS = 4000;
+const STREAM_INPUT_HEAD_CHARS = 2000;
+const STREAM_INPUT_TAIL_CHARS = 6000;
+
+function boundStreamedInput(value: string): string {
+	const max = STREAM_INPUT_HEAD_CHARS + STREAM_INPUT_TAIL_CHARS;
+	if (value.length <= max) return value;
+	return `${value.slice(0, STREAM_INPUT_HEAD_CHARS)}\n…\n${value.slice(
+		-STREAM_INPUT_TAIL_CHARS,
+	)}`;
+}
+
+function applyToolInputDelta(
+	state: Message[],
+	payload: Record<string, unknown>,
+): Message[] {
+	const callId = typeof payload.callId === 'string' ? payload.callId : null;
+	const delta = typeof payload.delta === 'string' ? payload.delta : null;
+	if (!callId || !delta) return state;
+
+	let changed = false;
+	const next = state.map((msg) => {
+		if (!msg.parts?.length) return msg;
+		const partIdx = msg.parts.findIndex(
+			(p) => p.ephemeral && p.toolCallId === callId && !p.completedAt,
+		);
+		if (partIdx === -1) return msg;
+		changed = true;
+		const parts = [...msg.parts];
+		const part = parts[partIdx];
+		const json =
+			typeof part.contentJson === 'object' && !Array.isArray(part.contentJson)
+				? (part.contentJson as Record<string, unknown>)
+				: {};
+		const prev =
+			typeof json._streamedInput === 'string' ? json._streamedInput : '';
+		const nextJson = {
+			...json,
+			_streamedInput: boundStreamedInput(prev + delta),
+		};
+		parts[partIdx] = { ...part, contentJson: nextJson };
+		return { ...msg, parts };
+	});
+	return changed ? next : state;
+}
 
 function applyToolOutputDelta(
 	state: Message[],
@@ -341,7 +385,8 @@ export function messageReducer(
 			const channel =
 				typeof payload.channel === 'string' ? payload.channel : null;
 			if (channel === 'input') {
-				return messageReducer(state, { type: 'TOOL_CALL', payload });
+				const withPart = messageReducer(state, { type: 'TOOL_CALL', payload });
+				return applyToolInputDelta(withPart, payload);
 			}
 			if (channel === 'output' || channel === 'terminal') {
 				return applyToolOutputDelta(state, payload);

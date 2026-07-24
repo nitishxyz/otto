@@ -176,6 +176,35 @@ describe('TUI stream reducer', () => {
 		);
 	});
 
+	test('TOOL_DELTA input channel accumulates _streamedInput on the part', () => {
+		const state = reduce(
+			[makeMessage({ id: 'a-1' })],
+			{
+				type: 'TOOL_DELTA',
+				payload: {
+					channel: 'input',
+					callId: 'c-1',
+					name: 'write',
+					delta: '{"path":"foo.ts","content":"hel',
+				},
+			},
+			{
+				type: 'TOOL_DELTA',
+				payload: {
+					channel: 'input',
+					callId: 'c-1',
+					name: 'write',
+					delta: 'lo\\nworld"}',
+				},
+			},
+		);
+		const part = state[0].parts?.[0];
+		expect(part?.toolName).toBe('write');
+		expect(part?.contentJson?._streamedInput).toBe(
+			'{"path":"foo.ts","content":"hello\\nworld"}',
+		);
+	});
+
 	test('TOOL_DELTA output for completed or unknown call is a no-op', () => {
 		const base = reduce(
 			[makeMessage({ id: 'a-1' })],

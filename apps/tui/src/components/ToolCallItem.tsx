@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { useTheme } from '../theme.ts';
 import { DiffView } from './DiffView.tsx';
 import { RAIL_BORDER_CHARS } from './rail.ts';
+import { getStreamedContent, getStreamedTarget } from '../lib/tool-stream.ts';
 import type { MessagePart } from '../types.ts';
 
 const DIFF_TOOLS = new Set([
@@ -473,15 +474,54 @@ function extractFilePath(part: MessagePart): string | undefined {
 	return undefined;
 }
 
-const LIVE_OUTPUT_ROWS = 6;
+const LIVE_OUTPUT_ROWS = 8;
 
-/** Last few lines of streamed tool output for the live preview box. */
+function getStreamedInput(part: MessagePart): string {
+	const cj = part.contentJson as Record<string, unknown> | undefined;
+	return typeof cj?._streamedInput === 'string' ? cj._streamedInput : '';
+}
+
+/** Target summary derived from a still-streaming args payload. */
+function getStreamedSummary(part: MessagePart): string | null {
+	const raw = getStreamedInput(part);
+	if (!raw) return null;
+	const target = getStreamedTarget(part.toolName, raw);
+	return target ? clip(target) : null;
+}
+
+/**
+ * Content for a completed args object (input finished streaming but the
+ * tool is still executing), e.g. write content while the file is written.
+ */
+function getContentFromArgs(part: MessagePart): string {
+	const cj = part.contentJson as Record<string, unknown> | undefined;
+	const args = asRecord(cj?.args);
+	if (!args) return '';
+	switch (normalizeToolName(part.toolName)) {
+		case 'write':
+			return typeof args.content === 'string' ? args.content : '';
+		case 'apply_patch':
+			return typeof args.patch === 'string' ? args.patch : '';
+		case 'edit':
+		case 'multiedit':
+			return typeof args.newString === 'string' ? args.newString : '';
+		default:
+			return '';
+	}
+}
+
+/** Tail lines of live tool activity for the scrolling preview box. */
 function extractLiveOutput(part: MessagePart): string[] | null {
 	const cj = part.contentJson as Record<string, unknown> | undefined;
-	const stream = typeof cj?.outputStream === 'string' ? cj.outputStream : '';
+	const outputStream =
+		typeof cj?.outputStream === 'string' ? cj.outputStream : '';
+	const stream =
+		outputStream.trim().length > 0
+			? outputStream
+			: getStreamedContent(part.toolName, getStreamedInput(part)) ||
+				getContentFromArgs(part);
 	if (!stream.trim()) return null;
-	const lines = stream.split('\n').filter((l) => l.trim().length > 0);
-	if (lines.length === 0) return null;
+	const lines = stream.replace(/\n+$/, '').split('\n');
 	return lines.slice(-LIVE_OUTPUT_ROWS);
 }
 
@@ -511,7 +551,7 @@ export const ToolCallItem = memo(function ToolCallItem({
 }: ToolCallItemProps) {
 	const { colors } = useTheme();
 	const toolName = part.toolName || 'unknown';
-	const target = getToolSummary(part);
+	const target = getToolSummary(part) ?? getStreamedSummary(part);
 	const isResult = part.type === 'tool_result';
 	const isCompleted = isResult || !!part.completedAt;
 	const toolError = extractToolError(part);
@@ -615,11 +655,12 @@ export const ToolCallItem = memo(function ToolCallItem({
 					{liveOutput.map((line, i) => (
 						<text
 							key={`${i}-${line.slice(0, 24)}`}
+							style={{ height: 1 }}
 							fg={colors.fgDark}
 							wrapMode="none"
 							truncate
 						>
-							{line}
+							{line || ' '}
 						</text>
 					))}
 				</box>

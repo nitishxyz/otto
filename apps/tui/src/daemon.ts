@@ -24,7 +24,10 @@ async function readToken(path: string): Promise<string | null> {
 	}
 }
 
-async function isHealthy(baseUrl: string, token: string | null): Promise<boolean> {
+async function isHealthy(
+	baseUrl: string,
+	token: string | null,
+): Promise<boolean> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 	try {
