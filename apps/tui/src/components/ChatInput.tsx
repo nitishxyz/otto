@@ -284,6 +284,20 @@ export function ChatInput({
 	useKeyboard((key) => {
 		if (disabled) return;
 
+		if (
+			key.name === '/' &&
+			!key.ctrl &&
+			!key.meta &&
+			!key.shift &&
+			!key.option &&
+			textareaRef.current &&
+			!textareaRef.current.focused
+		) {
+			key.preventDefault();
+			textareaRef.current.focus();
+			return;
+		}
+
 		if (key.ctrl && key.name === 'l') {
 			if (textareaRef.current) {
 				textareaRef.current.clear();

@@ -36,6 +36,11 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 			</box>
 			<box style={{ flexDirection: 'column', gap: 0 }}>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>/</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Focus input</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
 					<text fg={colors.fgMuted}>Ctrl+Enter</text>
 					<text fg={colors.fgDimmed}>—</text>
 					<text fg={colors.fgDark}>Send message</text>
