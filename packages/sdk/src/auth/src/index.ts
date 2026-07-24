@@ -120,6 +120,11 @@ export {
 } from './kimi-oauth.ts';
 
 export {
+	getFreshKimiOAuth,
+	type FreshKimiOAuthOptions,
+} from './kimi-refresh.ts';
+
+export {
 	refreshOttoRouterToken,
 	requestOttoRouterDeviceCode,
 	pollOttoRouterDeviceCodeOnce,

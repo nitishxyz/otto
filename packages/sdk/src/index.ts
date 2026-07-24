@@ -261,11 +261,13 @@ export {
 	refreshKimiToken,
 	requestKimiDeviceCode,
 	pollKimiDeviceCodeOnce,
+	getFreshKimiOAuth,
 } from './auth/src/index.ts';
 export type {
 	KimiOAuthTokens,
 	KimiDeviceCodeResponse,
 	KimiDevicePollResult,
+	FreshKimiOAuthOptions,
 } from './auth/src/index.ts';
 export {
 	refreshOttoRouterToken,

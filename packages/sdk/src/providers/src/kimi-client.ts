@@ -1,11 +1,13 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OAuth } from '../../types/src/index.ts';
 import { catalog } from './catalog-merged.ts';
+import { createKimiOAuthFetch } from './kimi-oauth-fetch.ts';
 
 export type KimiProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
 	oauth?: OAuth;
+	projectRoot?: string;
 	fetch?: typeof fetch;
 };
 
@@ -342,12 +344,15 @@ export function createKimiModel(model: string, config?: KimiProviderConfig) {
 			: (configuredBaseURL ?? defaultApiBaseURL);
 	const apiKey = oauthAccess || config?.apiKey || readKimiApiKeyFromEnv();
 	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+	const requestFetch = config?.oauth
+		? createKimiOAuthFetch(config.oauth, config.projectRoot, config.fetch)
+		: config?.fetch;
 
 	const instance = createOpenAICompatible({
 		name: 'Kimi',
 		baseURL,
 		headers,
-		fetch: createKimiUsageFetch(config?.fetch, isKimiCodeBaseURL(baseURL)),
+		fetch: createKimiUsageFetch(requestFetch, isKimiCodeBaseURL(baseURL)),
 	});
 
 	return instance(model);
