@@ -70,6 +70,10 @@ export function ChatInput({
 		}
 	}, [externalIsPlanMode]);
 
+	useEffect(() => {
+		if (!disabled) textareaRef.current?.focus();
+	}, [disabled]);
+
 	const {
 		images: attachedImages,
 		files: attachedFiles,
@@ -298,7 +302,7 @@ export function ChatInput({
 			return;
 		}
 
-		if (key.ctrl && key.name === 'l') {
+		if (key.ctrl && key.name === 'k') {
 			if (textareaRef.current) {
 				textareaRef.current.clear();
 			}
@@ -668,7 +672,7 @@ export function ChatInput({
 							</box>
 						) : (
 							<text fg={colors.fgDark} wrapMode="none" truncate>
-								⇧↵ newline · ⇥ mode · ⌃L clear
+								⇧↵ newline · ⇥ mode · ⌃K clear
 							</text>
 						)}
 						{queueSize > 0 && (

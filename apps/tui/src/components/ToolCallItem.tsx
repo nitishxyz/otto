@@ -643,13 +643,14 @@ export const ToolCallItem = memo(function ToolCallItem({
 					customBorderChars={RAIL_BORDER_CHARS}
 					style={{
 						flexDirection: 'column',
-						width: '100%',
 						backgroundColor: colors.bgSubtle,
 						border: ['left'],
 						borderColor: colors.border,
 						paddingLeft: 1,
 						paddingRight: 1,
+						marginTop: 1,
 						marginLeft: 2,
+						marginRight: 2,
 					}}
 				>
 					{liveOutput.map((line, i) => (

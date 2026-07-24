@@ -102,6 +102,9 @@ export const ChatView = memo(function ChatView({
 						<span fg={colors.fgDark}>⌃P</span> models
 					</text>
 					<text fg={colors.fgDimmed}>
+						<span fg={colors.fgDark}>⌃B</span> activity
+					</text>
+					<text fg={colors.fgDimmed}>
 						<span fg={colors.fgDark}>⇥</span> plan mode
 					</text>
 				</box>

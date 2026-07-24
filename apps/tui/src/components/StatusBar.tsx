@@ -15,15 +15,14 @@ function formatCompact(num: number): string {
 	return num.toString();
 }
 
-const METER_WIDTH = 5;
-
-/** Renders a compact block meter like ▰▰▱▱▱ for context usage. */
-function contextMeter(percent: number): string {
-	const filled = Math.min(
-		METER_WIDTH,
-		Math.max(0, Math.round((percent / 100) * METER_WIDTH)),
-	);
-	return '▰'.repeat(filled) + '▱'.repeat(METER_WIDTH - filled);
+export function formatContextUsage(
+	contextTokens: number,
+	contextUsagePercent: number,
+): string {
+	const tokens = `ctx ${formatCompact(contextTokens)}`;
+	return contextUsagePercent > 0
+		? `${tokens} · ${Math.round(contextUsagePercent)}%`
+		: tokens;
 }
 
 export function StatusBar({
@@ -94,15 +93,8 @@ export function StatusBar({
 				{contextTokens > 0 && (
 					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
 						<text fg={colors.fgDimmed}> │ </text>
-						{contextUsagePercent > 0 && (
-							<text fg={contextColor}>
-								{contextMeter(contextUsagePercent)}{' '}
-							</text>
-						)}
 						<text fg={contextColor}>
-							{contextUsagePercent > 0
-								? `${Math.round(contextUsagePercent)}%`
-								: `ctx ${formatCompact(contextTokens)}`}
+							{formatContextUsage(contextTokens, contextUsagePercent)}
 						</text>
 					</box>
 				)}

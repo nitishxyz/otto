@@ -11,6 +11,11 @@ import {
 	parseSubagentResults,
 } from './SubagentResultsCard.tsx';
 import { RAIL_BORDER_CHARS } from './rail.ts';
+import {
+	buildMessageBlocks,
+	extractPartText,
+	messagePartKey,
+} from '../lib/message-blocks.ts';
 
 const REASONING_PREVIEW_ROWS = 6;
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
@@ -23,25 +28,6 @@ interface MessageItemProps {
 	pendingApprovals?: PendingApproval[];
 	onApprove?: (callId: string) => void;
 	onDeny?: (callId: string) => void;
-}
-
-function extractText(part: MessagePart): string {
-	if (
-		part.contentJson &&
-		typeof part.contentJson === 'object' &&
-		!Array.isArray(part.contentJson) &&
-		'text' in part.contentJson
-	) {
-		return String(part.contentJson.text ?? '');
-	}
-	if (typeof part.content === 'string') {
-		try {
-			const parsed = JSON.parse(part.content);
-			if (parsed && typeof parsed.text === 'string') return parsed.text;
-		} catch {}
-		return part.content;
-	}
-	return '';
 }
 
 function getSortedParts(message: Message): MessagePart[] {
@@ -72,8 +58,6 @@ function formatTokens(count: number): string {
 	return String(count);
 }
 
-const SKIP_TOOLS = new Set(['finish', 'progress_update']);
-
 function formatError(raw: string | null | undefined): string {
 	if (!raw) return '';
 	try {
@@ -85,62 +69,6 @@ function formatError(raw: string | null | undefined): string {
 		}
 	} catch {}
 	return raw;
-}
-
-function isToolPart(part: MessagePart): boolean {
-	return part.type === 'tool_call' || part.type === 'tool_result';
-}
-
-type Block =
-	| { key: string; kind: 'part'; part: MessagePart }
-	| { key: string; kind: 'tools'; parts: MessagePart[] }
-	| { key: string; kind: 'todos'; part: MessagePart };
-
-function partKeyOf(part: MessagePart): string {
-	return isToolPart(part) && part.toolCallId
-		? `tool-${part.toolCallId}`
-		: part.id;
-}
-
-function isTodoTool(toolName: string | null): boolean {
-	return toolName === 'update_todos' || toolName === 'update_plan';
-}
-
-/**
- * Groups message parts into render blocks: consecutive tool parts merge into
- * one compact group, only the latest update_todos survives (as a todo card),
- * and empty text/reasoning parts are dropped so spacing stays uniform.
- */
-function buildBlocks(parts: MessagePart[]): Block[] {
-	let lastTodoId: string | null = null;
-	for (const p of parts) {
-		if (isToolPart(p) && isTodoTool(p.toolName)) lastTodoId = p.id;
-	}
-
-	const blocks: Block[] = [];
-	for (const part of parts) {
-		if (isToolPart(part)) {
-			const toolName = part.toolName || '';
-			if (SKIP_TOOLS.has(toolName)) continue;
-			if (isTodoTool(toolName)) {
-				if (part.id !== lastTodoId) continue;
-				blocks.push({ key: `todos-${part.id}`, kind: 'todos', part });
-				continue;
-			}
-			const prev = blocks[blocks.length - 1];
-			if (prev?.kind === 'tools') {
-				prev.parts.push(part);
-			} else {
-				blocks.push({ key: partKeyOf(part), kind: 'tools', parts: [part] });
-			}
-			continue;
-		}
-		if (part.type === 'text' || part.type === 'reasoning') {
-			if (!extractText(part).trim()) continue;
-		}
-		blocks.push({ key: part.id, kind: 'part', part });
-	}
-	return blocks;
 }
 
 const PartRenderer = memo(function PartRenderer({
@@ -155,7 +83,7 @@ const PartRenderer = memo(function PartRenderer({
 	const { colors } = useTheme();
 
 	if (part.type === 'text') {
-		const text = extractText(part);
+		const text = extractPartText(part);
 		if (!text.trim()) return null;
 		const isPartStreaming = isActive && isLastPart && !part.completedAt;
 		if (isPartStreaming) {
@@ -183,61 +111,8 @@ const PartRenderer = memo(function PartRenderer({
 		);
 	}
 
-	if (part.type === 'reasoning') {
-		const text = extractText(part);
-		if (!text.trim()) return null;
-		const isThinking = isActive && isLastPart && !part.completedAt;
-		const lines = text.split('\n').filter((l) => l.trim());
-		return (
-			<box style={{ flexDirection: 'column' }}>
-				<box style={{ flexDirection: 'row', gap: 1 }}>
-					{isThinking ? (
-						<TinySpinner fg={colors.fgDark} />
-					) : (
-						<text fg={colors.fgDimmed}>∴</text>
-					)}
-					<text fg={colors.fgDark}>
-						<i>{isThinking ? 'thinking…' : 'thought'}</i>
-					</text>
-					{!isThinking && (
-						<text fg={colors.fgDimmed}>
-							({lines.length} {lines.length === 1 ? 'line' : 'lines'})
-						</text>
-					)}
-				</box>
-				{isThinking && (
-					<box
-						customBorderChars={RAIL_BORDER_CHARS}
-						style={{
-							flexDirection: 'column',
-							width: '100%',
-							backgroundColor: colors.bgSubtle,
-							border: ['left'],
-							borderColor: colors.border,
-							paddingLeft: 1,
-							paddingRight: 1,
-							marginLeft: 2,
-						}}
-					>
-						{lines.slice(-REASONING_PREVIEW_ROWS).map((line, i) => (
-							<text
-								key={`${i}-${line.slice(0, 24)}`}
-								style={{ height: 1 }}
-								fg={colors.fgDark}
-								wrapMode="none"
-								truncate
-							>
-								<i>{line}</i>
-							</text>
-						))}
-					</box>
-				)}
-			</box>
-		);
-	}
-
 	if (part.type === 'error') {
-		const text = formatError(extractText(part));
+		const text = formatError(extractPartText(part));
 		return (
 			<box
 				style={{
@@ -257,6 +132,76 @@ const PartRenderer = memo(function PartRenderer({
 	}
 
 	return null;
+});
+
+const COMPLETED_REASONING_PREVIEW_CHARS = 240;
+
+const ReasoningBlockRenderer = memo(function ReasoningBlockRenderer({
+	parts,
+	isActive,
+	isLastBlock,
+}: {
+	parts: MessagePart[];
+	isActive: boolean;
+	isLastBlock: boolean;
+}) {
+	const { colors } = useTheme();
+	const text = parts.map(extractPartText).filter(Boolean).join('\n');
+	if (!text.trim()) return null;
+	const lastPart = parts[parts.length - 1];
+	const isThinking = isActive && isLastBlock && !lastPart?.completedAt;
+	const lines = text.split('\n').filter((line) => line.trim());
+	const completedPreview = text.replace(/\s+/g, ' ').trim();
+	const clippedPreview =
+		completedPreview.length > COMPLETED_REASONING_PREVIEW_CHARS
+			? `${completedPreview.slice(0, COMPLETED_REASONING_PREVIEW_CHARS - 1)}…`
+			: completedPreview;
+
+	return (
+		<box style={{ flexDirection: 'column' }}>
+			<box style={{ flexDirection: 'row', gap: 1 }}>
+				{isThinking ? (
+					<TinySpinner fg={colors.fgDark} />
+				) : (
+					<text fg={colors.fgDimmed}>∴</text>
+				)}
+				<text fg={colors.fgDark}>
+					<i>{isThinking ? 'thinking…' : 'thought'}</i>
+				</text>
+			</box>
+			<box
+				customBorderChars={RAIL_BORDER_CHARS}
+				style={{
+					flexDirection: 'column',
+					width: '100%',
+					backgroundColor: colors.bgSubtle,
+					border: ['left'],
+					borderColor: colors.border,
+					paddingLeft: 1,
+					paddingRight: 1,
+					marginLeft: 2,
+				}}
+			>
+				{isThinking ? (
+					lines.slice(-REASONING_PREVIEW_ROWS).map((line, index) => (
+						<text
+							key={`${index}-${line.slice(0, 24)}`}
+							style={{ height: 1 }}
+							fg={colors.fgDark}
+							wrapMode="none"
+							truncate
+						>
+							<i>{line}</i>
+						</text>
+					))
+				) : (
+					<text fg={colors.fgDark} wrapMode="word">
+						<i>{clippedPreview}</i>
+					</text>
+				)}
+			</box>
+		</box>
+	);
 });
 
 function extractProgressInfo(
@@ -358,7 +303,7 @@ const UserMessage = memo(function UserMessage({
 	const content = useMemo(() => {
 		return parts
 			.filter((p) => p.type === 'text')
-			.map(extractText)
+			.map(extractPartText)
 			.join('');
 	}, [parts]);
 
@@ -398,7 +343,47 @@ const UserMessage = memo(function UserMessage({
 		);
 	}
 
-	const badgeColor = isQueued ? colors.yellow : colors.userBadge;
+	if (isQueued) {
+		const attachmentLabel =
+			attachmentNames.length === 1
+				? `◳ ${attachmentNames[0]}`
+				: attachmentNames.length > 1
+					? `◳ ${attachmentNames.length} attachments`
+					: '';
+		const summary = [attachmentLabel, content.replace(/\s+/g, ' ').trim()]
+			.filter(Boolean)
+			.join(' · ');
+		return (
+			<box
+				style={{
+					height: 1,
+					marginTop: 1,
+					marginLeft: 2,
+					marginRight: 2,
+					paddingLeft: 1,
+					paddingRight: 1,
+					alignItems: 'center',
+					flexDirection: 'row',
+					gap: 1,
+					backgroundColor: colors.bgDark,
+				}}
+			>
+				<text style={{ flexShrink: 0 }} fg={colors.orange}>
+					○ queued
+				</text>
+				<text
+					style={{ flexGrow: 1, flexShrink: 1, overflow: 'hidden' }}
+					fg={colors.fgMuted}
+					wrapMode="none"
+					truncate
+				>
+					{summary || 'Message'}
+				</text>
+			</box>
+		);
+	}
+
+	const badgeColor = colors.userBadge;
 
 	return (
 		<box
@@ -424,7 +409,6 @@ const UserMessage = memo(function UserMessage({
 				{message.createdAt > 0 && (
 					<text fg={colors.fgDimmed}>{formatTime(message.createdAt)}</text>
 				)}
-				{isQueued && <text fg={colors.yellow}>· queued</text>}
 			</box>
 			{attachmentNames.length > 0 && (
 				<box
@@ -449,7 +433,7 @@ const UserMessage = memo(function UserMessage({
 				</box>
 			)}
 			{content ? (
-				<text fg={isQueued ? colors.fgDark : colors.fgBright} wrapMode="word">
+				<text fg={colors.fgBright} wrapMode="word">
 					{content}
 				</text>
 			) : null}
@@ -525,7 +509,10 @@ const AssistantMessage = memo(function AssistantMessage({
 		return null;
 	}, [sortedParts]);
 
-	const blocks = useMemo(() => buildBlocks(dedupedParts), [dedupedParts]);
+	const blocks = useMemo(
+		() => buildMessageBlocks(dedupedParts),
+		[dedupedParts],
+	);
 	const lastBlock = blocks[blocks.length - 1];
 	const lastPartId = lastBlock?.kind === 'part' ? lastBlock.part.id : null;
 
@@ -574,7 +561,7 @@ const AssistantMessage = memo(function AssistantMessage({
 								: null;
 							return (
 								<box
-									key={partKeyOf(part)}
+									key={messagePartKey(part)}
 									style={{ flexDirection: 'column', width: '100%' }}
 								>
 									<ToolCallItem part={part} />
@@ -590,6 +577,12 @@ const AssistantMessage = memo(function AssistantMessage({
 						})
 					) : block.kind === 'todos' ? (
 						<TodoListCard part={block.part} />
+					) : block.kind === 'reasoning' ? (
+						<ReasoningBlockRenderer
+							parts={block.parts}
+							isActive={isActive}
+							isLastBlock={block.key === lastBlock?.key}
+						/>
 					) : (
 						<PartRenderer
 							part={block.part}

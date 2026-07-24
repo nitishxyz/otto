@@ -34,6 +34,7 @@ export interface CommandContext {
 	) => Promise<void>;
 	sendMessage: (sessionId: string, content: string) => Promise<void>;
 	abortSession: (sessionId: string) => Promise<void>;
+	sendQueuedNow: (position?: number) => Promise<boolean>;
 	updateDefaults: (changes: Record<string, unknown>) => Promise<void>;
 	reload: () => void;
 }
@@ -246,6 +247,28 @@ export async function executeCommand(
 				await ctx.abortSession(ctx.activeSession.id);
 			}
 			break;
+		case 'send': {
+			const position = args ? Number(args) : 1;
+			if (!Number.isInteger(position) || position < 1) {
+				ctx.showStatus(
+					{ type: 'error', label: 'usage: /send [queue position]' },
+					3000,
+				);
+				break;
+			}
+			ctx.showStatus({ type: 'loading', label: 'sending queued message…' });
+			const sent = await ctx.sendQueuedNow(position);
+			ctx.showStatus(
+				sent
+					? { type: 'success', label: `sent queued message ${position}` }
+					: {
+							type: 'error',
+							label: `no queued message at position ${position}`,
+						},
+				3000,
+			);
+			break;
+		}
 		case 'reasoning':
 			await ctx.updateDefaults({ reasoningText: !ctx.reasoningText });
 			break;

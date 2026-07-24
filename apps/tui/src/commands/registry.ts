@@ -47,6 +47,11 @@ export const COMMANDS = [
 		description: 'Switch agent (build, plan, general, …)',
 	},
 	{ name: 'new', alias: '', description: 'Create a new session' },
+	{
+		name: 'send',
+		alias: '',
+		description: 'Send a queued message now (/send [position])',
+	},
 	{ name: 'stop', alias: '/x', description: 'Stop current generation' },
 	{ name: 'help', alias: '/?', description: 'Show this help' },
 	{ name: 'reasoning', alias: '', description: 'Toggle extended thinking' },

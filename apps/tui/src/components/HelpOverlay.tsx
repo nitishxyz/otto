@@ -61,6 +61,26 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 					<text fg={colors.fgDark}>Sessions list</text>
 				</box>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>Ctrl+B</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Show / hide activity</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>F6</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Cycle workspace focus</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>Ctrl+H / Ctrl+L</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Focus pane left / right</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>H / L</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Switch activity tabs</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
 					<text fg={colors.fgMuted}>Ctrl+P</text>
 					<text fg={colors.fgDimmed}>—</text>
 					<text fg={colors.fgDark}>Config</text>

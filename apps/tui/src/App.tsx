@@ -1,6 +1,9 @@
-import { useSelectionHandler } from '@opentui/react';
+import { useSelectionHandler, useTerminalDimensions } from '@opentui/react';
 import { useCallback, useEffect, useRef, useMemo } from 'react';
-import { resolveSecureInput } from '@ottocode/api';
+import {
+	resolveSecureInput,
+	sendQueuedMessageNow as apiSendQueuedMessageNow,
+} from '@ottocode/api';
 import {
 	estimateModelCostUsd,
 	getModelInfo,
@@ -12,15 +15,20 @@ import { ChatInput } from './components/ChatInput.tsx';
 import { Overlays } from './components/Overlays.tsx';
 import { ApproveAllBar } from './components/ApproveAllBar.tsx';
 import { SecureInputBar } from './components/SecureInputBar.tsx';
+import { ActivityPanel } from './components/activity/ActivityPanel.tsx';
+import { ActivityDetailPane } from './components/activity/ActivityDetailPane.tsx';
 import { useSession } from './hooks/useSession.ts';
 import { useStream } from './hooks/useStream.ts';
+import { useActivityData } from './hooks/useActivityData.ts';
 import { useConfig } from './hooks/useConfig.ts';
 import { useGlobalKeymap } from './hooks/useGlobalKeymap.ts';
 import { parseCommand, executeCommand } from './commands/index.ts';
 import { copyToClipboard } from './lib/clipboard.ts';
+import { moveWorkspaceFocus } from './lib/workspace-navigation.ts';
 import { getProjectContext, getProjectQuery } from './api.ts';
 import { useTheme } from './theme.ts';
 import { useOverlayStore } from './stores/overlay.ts';
+import { useWorkspaceStore } from './stores/workspace.ts';
 import type { Session } from './types.ts';
 
 export function App({
@@ -38,6 +46,7 @@ export function App({
 	};
 }) {
 	const { colors, setTheme } = useTheme();
+	const { width: terminalWidth } = useTerminalDimensions();
 	const initialSessionDefaults = useMemo(
 		() => initialSession,
 		[initialSession],
@@ -51,6 +60,16 @@ export function App({
 	const setEscHint = useOverlayStore((s) => s.setEscHint);
 	const clearEscHint = useOverlayStore((s) => s.clearEscHint);
 	const cleanup = useOverlayStore((s) => s.cleanup);
+	const workspaceOpen = useWorkspaceStore((s) => s.isOpen);
+	const workspaceTab = useWorkspaceStore((s) => s.tab);
+	const workspaceFocus = useWorkspaceStore((s) => s.focus);
+	const workspaceDetail = useWorkspaceStore((s) => s.detail);
+	const toggleWorkspace = useWorkspaceStore((s) => s.toggle);
+	const backWorkspace = useWorkspaceStore((s) => s.back);
+	const setWorkspaceTab = useWorkspaceStore((s) => s.setTab);
+	const setWorkspaceFocus = useWorkspaceStore((s) => s.setFocus);
+	const openWorkspaceDetail = useWorkspaceStore((s) => s.openDetail);
+	const resetWorkspaceDetail = useWorkspaceStore((s) => s.resetDetail);
 
 	useEffect(() => () => cleanup(), [cleanup]);
 
@@ -130,6 +149,12 @@ export function App({
 		handleMessageCompleted,
 		handleStepFinish,
 	);
+	const activityData = useActivityData(sessionId, messages, workspaceOpen);
+
+	useEffect(() => {
+		void sessionId;
+		resetWorkspaceDetail();
+	}, [sessionId, resetWorkspaceDetail]);
 
 	const contextTokens = activeSession?.currentContextTokens ?? 0;
 	const sessionProvider = activeSession?.provider ?? '';
@@ -169,6 +194,26 @@ export function App({
 		return (contextTokens / limit) * 100;
 	}, [sessionProvider, sessionModel, contextTokens]);
 
+	const handleSendQueuedNow = useCallback(
+		async (position = 1): Promise<boolean> => {
+			if (!sessionId) return false;
+			const messageId = [...queuedMessageIds][position - 1];
+			if (!messageId) return false;
+			try {
+				const response = await apiSendQueuedMessageNow({
+					path: { sessionId, messageId },
+					query: getProjectQuery(),
+				} as never);
+				if (response.error) return false;
+				setTimeout(reload, 150);
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		[sessionId, queuedMessageIds, reload],
+	);
+
 	const handleCommand = useCallback(
 		(name: string, args: string) =>
 			executeCommand(name, args, {
@@ -185,6 +230,7 @@ export function App({
 				updateSessionPrefs,
 				sendMessage,
 				abortSession,
+				sendQueuedNow: handleSendQueuedNow,
 				updateDefaults,
 				reload,
 			}),
@@ -202,6 +248,7 @@ export function App({
 			updateSessionPrefs,
 			sendMessage,
 			abortSession,
+			handleSendQueuedNow,
 			updateDefaults,
 			reload,
 		],
@@ -344,11 +391,50 @@ export function App({
 		loadSessions().then(() => setOverlay('sessions'));
 	}, [loadSessions, setOverlay]);
 
+	const handleToggleWorkspace = useCallback(() => {
+		toggleWorkspace();
+	}, [toggleWorkspace]);
+
+	const handleCycleWorkspaceFocus = useCallback(() => {
+		const state = useWorkspaceStore.getState();
+		if (!state.isOpen) {
+			state.open();
+			return;
+		}
+		if (state.focus === 'chat') {
+			state.setFocus(state.detail ? 'detail' : 'activity');
+		} else if (state.focus === 'detail') {
+			state.setFocus('activity');
+		} else {
+			state.setFocus('chat');
+		}
+	}, []);
+
+	const handleMoveWorkspaceFocus = useCallback(
+		(direction: 'left' | 'right') => {
+			const state = useWorkspaceStore.getState();
+			const threePane =
+				(terminalWidth || (process.stdout.columns ?? 120)) >= 140;
+			state.setFocus(
+				moveWorkspaceFocus(
+					{
+						focus: state.focus,
+						showDetail: state.isOpen && !!state.detail,
+						showActivity: state.isOpen && (!state.detail || threePane),
+					},
+					direction,
+				),
+			);
+		},
+		[terminalWidth],
+	);
+
 	useGlobalKeymap({
 		overlay,
 		isStreaming,
 		hasActiveSession: !!activeSession,
 		hasSecureInput: pendingSecureInputs.length > 0,
+		isWorkspaceFocused: workspaceFocus !== 'chat',
 		escHint,
 		setEscHint,
 		clearEscHint,
@@ -356,6 +442,10 @@ export function App({
 		createSession,
 		openSessions,
 		abortActiveSession,
+		toggleWorkspace: handleToggleWorkspace,
+		focusWorkspace: handleCycleWorkspaceFocus,
+		moveWorkspaceFocus: handleMoveWorkspaceFocus,
+		backWorkspace,
 		onQuit,
 	});
 
@@ -415,6 +505,22 @@ export function App({
 		[updateDefaults],
 	);
 
+	const layoutWidth = terminalWidth || (process.stdout.columns ?? 120);
+	const showThreePane = layoutWidth >= 140;
+	const showDetail = workspaceOpen && !!workspaceDetail;
+	const showActivity = workspaceOpen && (!workspaceDetail || showThreePane);
+	const activityWidth =
+		Math.floor(
+			(showThreePane
+				? 56
+				: Math.max(52, Math.min(60, Math.floor(layoutWidth * 0.42)))) / 4,
+		) *
+			4 +
+		2;
+	const detailWidth = showThreePane
+		? Math.max(42, Math.min(64, Math.floor(layoutWidth * 0.34)))
+		: Math.max(30, Math.min(58, Math.floor(layoutWidth * 0.42)));
+
 	const handleAgentSelect = useCallback(
 		async (agent: string) => {
 			if (activeSession) {
@@ -430,6 +536,8 @@ export function App({
 
 	return (
 		<box
+			border={['top']}
+			borderColor={colors.borderSubtle}
 			style={{
 				width: '100%',
 				height: '100%',
@@ -447,50 +555,114 @@ export function App({
 				contextUsagePercent={contextUsagePercent}
 			/>
 
-			<ChatView
-				messages={messages}
-				isStreaming={isStreaming}
-				streamingMessageId={streamingMessageId}
-				queuedMessageIds={queuedMessageIds}
-				pendingApprovals={pendingApprovals}
-				onApprove={handleApprove}
-				onDeny={handleDeny}
-			/>
+			<box
+				style={{
+					width: '100%',
+					flexGrow: 1,
+					flexDirection: 'row',
+					paddingLeft: 1,
+					paddingRight: 1,
+					gap: 1,
+				}}
+			>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI panes use mouse focus without DOM roles */}
+				<box
+					border
+					borderStyle="single"
+					borderColor={
+						workspaceFocus === 'chat' ? colors.borderActive : colors.bg
+					}
+					focusable
+					onMouseDown={() => setWorkspaceFocus('chat')}
+					style={{
+						flexGrow: 1,
+						height: '100%',
+						minWidth: 0,
+						flexDirection: 'column',
+					}}
+				>
+					<ChatView
+						messages={messages}
+						isStreaming={isStreaming}
+						streamingMessageId={streamingMessageId}
+						queuedMessageIds={queuedMessageIds}
+						pendingApprovals={pendingApprovals}
+						onApprove={handleApprove}
+						onDeny={handleDeny}
+					/>
 
-			{pendingApprovals.length > 0 && (
-				<ApproveAllBar
-					approvals={pendingApprovals}
-					onApprove={handleApprove}
-					onApproveAll={handleApproveAll}
-					onDeny={handleDeny}
-				/>
-			)}
+					{pendingApprovals.length > 0 && (
+						<ApproveAllBar
+							approvals={pendingApprovals}
+							onApprove={handleApprove}
+							onApproveAll={handleApproveAll}
+							onDeny={handleDeny}
+						/>
+					)}
 
-			{pendingSecureInputs.length > 0 && (
-				<SecureInputBar
-					pendingInput={pendingSecureInputs[0]}
-					onSubmit={handleSecureInputSubmit}
-					onCancel={handleSecureInputCancel}
-				/>
-			)}
+					{pendingSecureInputs.length > 0 && (
+						<SecureInputBar
+							pendingInput={pendingSecureInputs[0]}
+							onSubmit={handleSecureInputSubmit}
+							onCancel={handleSecureInputCancel}
+						/>
+					)}
 
-			<ChatInput
-				onSubmit={handleSubmit}
-				disabled={
-					pendingApprovals.length > 0 ||
-					pendingSecureInputs.length > 0 ||
-					overlay !== 'none'
-				}
-				status={status}
-				isStreaming={isStreaming}
-				agent={currentAgent}
-				provider={provider}
-				model={model}
-				escHint={escHint}
-				queueSize={queueSize}
-				isPlanMode={currentAgent === 'plan'}
-				onPlanModeToggle={handlePlanModeToggle}
-			/>
+					<ChatInput
+						onSubmit={handleSubmit}
+						disabled={
+							pendingApprovals.length > 0 ||
+							pendingSecureInputs.length > 0 ||
+							overlay !== 'none' ||
+							workspaceFocus !== 'chat'
+						}
+						status={status}
+						isStreaming={isStreaming}
+						agent={currentAgent}
+						provider={provider}
+						model={model}
+						escHint={escHint}
+						queueSize={queueSize}
+						isPlanMode={currentAgent === 'plan'}
+						onPlanModeToggle={handlePlanModeToggle}
+					/>
+				</box>
+				{showDetail && workspaceDetail ? (
+					<box
+						style={{
+							width: detailWidth,
+							height: '100%',
+							flexShrink: 0,
+						}}
+					>
+						<ActivityDetailPane
+							detail={workspaceDetail}
+							data={activityData}
+							focused={workspaceFocus === 'detail'}
+							onFocusRequest={() => setWorkspaceFocus('detail')}
+						/>
+					</box>
+				) : null}
+				{showActivity ? (
+					<box
+						style={{
+							width: activityWidth,
+							height: '100%',
+							flexShrink: 0,
+						}}
+					>
+						<ActivityPanel
+							data={activityData}
+							tab={workspaceTab}
+							panelWidth={activityWidth}
+							focused={workspaceFocus === 'activity'}
+							onTabChange={setWorkspaceTab}
+							onOpenDetail={openWorkspaceDetail}
+							onFocusRequest={() => setWorkspaceFocus('activity')}
+						/>
+					</box>
+				) : null}
+			</box>
 
 			<Overlays
 				sessions={sessions}
