@@ -387,7 +387,8 @@ export function ChatInput({
 	const hasStatus = isStreaming || status.type !== 'idle';
 	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
-	const borderColor = disabled ? colors.border : accent;
+	const railColor = disabled ? colors.border : accent;
+	const inputBg = colors.bgSubtle;
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,
@@ -416,7 +417,7 @@ export function ChatInput({
 				<box
 					style={{
 						position: 'absolute',
-						bottom: 4,
+						bottom: 2,
 						left: 1,
 						right: 1,
 						zIndex: 1001,
@@ -468,7 +469,7 @@ export function ChatInput({
 					<box
 						style={{
 							position: 'absolute',
-							bottom: 4,
+							bottom: 2,
 							left: 1,
 							right: 1,
 							zIndex: 1001,
@@ -489,7 +490,7 @@ export function ChatInput({
 				<box
 					style={{
 						position: 'absolute',
-						bottom: 4,
+						bottom: 2,
 						left: 1,
 						right: 1,
 						zIndex: 1001,
@@ -541,10 +542,9 @@ export function ChatInput({
 			<box
 				style={{
 					width: '100%',
-					border: true,
-					borderStyle: 'rounded',
-					borderColor,
-					backgroundColor: colors.bg,
+					border: ['left'],
+					borderColor: railColor,
+					backgroundColor: inputBg,
 					flexDirection: 'column',
 					paddingLeft: 1,
 					paddingRight: 1,
@@ -561,7 +561,7 @@ export function ChatInput({
 						}}
 					>
 						{attachmentNames.map((name) => (
-							<text key={name} fg={colors.fgMuted} bg={colors.bgSubtle}>
+							<text key={name} fg={colors.fgMuted} bg={colors.bgHighlight}>
 								{' ◳ '}
 								{name.length > 24 ? `${name.slice(0, 21)}…` : name}{' '}
 							</text>
@@ -579,8 +579,8 @@ export function ChatInput({
 						placeholderColor={colors.fgDark}
 						textColor={colors.fgBright}
 						focusedTextColor={colors.fgBright}
-						backgroundColor={colors.bg}
-						focusedBackgroundColor={colors.bg}
+						backgroundColor={inputBg}
+						focusedBackgroundColor={inputBg}
 						cursorColor={accent}
 						wrapMode="word"
 						keyBindings={INPUT_KEY_BINDINGS}
@@ -594,121 +594,124 @@ export function ChatInput({
 						}}
 					/>
 				</box>
-			</box>
-			<box
-				style={{
-					width: '100%',
-					height: 1,
-					flexShrink: 0,
-					flexDirection: 'row',
-					justifyContent: 'space-between',
-					overflow: 'hidden',
-					paddingLeft: 1,
-					paddingRight: 1,
-				}}
-			>
 				<box
 					style={{
+						width: '100%',
+						height: 1,
+						flexShrink: 0,
 						flexDirection: 'row',
-						gap: 1,
-						flexShrink: 1,
+						justifyContent: 'space-between',
 						overflow: 'hidden',
+						paddingLeft: 2,
 					}}
 				>
-					{hasStatus ? (
-						<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
-							{isStreaming && status.type === 'idle' && (
-								<box
-									style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
-								>
-									<TinySpinner fg={colors.streamDot} />
-									{escHint && (
-										<text fg={colors.yellow} wrapMode="none" truncate>
-											press Esc again to stop
-										</text>
-									)}
-								</box>
-							)}
-							{status.type === 'loading' && (
-								<box
-									style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
-								>
-									<TinySpinner fg={colors.blue} />
-									<text fg={colors.blue} wrapMode="none" truncate>
-										{status.label}
-									</text>
-								</box>
-							)}
-							{status.type === 'success' && (
-								<text fg={colors.green} wrapMode="none" truncate>
-									✓ {status.label}
-								</text>
-							)}
-							{status.type === 'error' && (
-								<text fg={colors.red} wrapMode="none" truncate>
-									✗ {status.label}
-								</text>
-							)}
-						</box>
-					) : (
-						<text fg={colors.fgDark} wrapMode="none" truncate>
-							↵ send · ⇧↵ newline · ⇥ mode · ↑ history · ⌃L clear
-						</text>
-					)}
-					{queueSize > 0 && (
-						<text style={{ flexShrink: 0 }} fg={colors.yellow} wrapMode="none">
-							⧗ {queueSize} queued
-						</text>
-					)}
-				</box>
-				{hasModelLabel && (
 					<box
 						style={{
 							flexDirection: 'row',
+							gap: 1,
 							flexShrink: 1,
 							overflow: 'hidden',
 						}}
 					>
-						<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
-							{isPlanMode ? '✎' : '✦'} {agent || 'build'}
-						</text>
-						<text
-							style={{ flexShrink: 0 }}
-							fg={colors.fgDimmed}
-							wrapMode="none"
-						>
-							{' · '}
-						</text>
-						{provider.length > 0 && (
-							<text
-								style={{ flexShrink: 0 }}
-								fg={colors.fgDark}
-								wrapMode="none"
-							>
-								{provider}
+						{hasStatus ? (
+							<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
+								{isStreaming && status.type === 'idle' && (
+									<box
+										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
+									>
+										<TinySpinner fg={colors.streamDot} />
+										{escHint && (
+											<text fg={colors.yellow} wrapMode="none" truncate>
+												press Esc again to stop
+											</text>
+										)}
+									</box>
+								)}
+								{status.type === 'loading' && (
+									<box
+										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
+									>
+										<TinySpinner fg={colors.blue} />
+										<text fg={colors.blue} wrapMode="none" truncate>
+											{status.label}
+										</text>
+									</box>
+								)}
+								{status.type === 'success' && (
+									<text fg={colors.green} wrapMode="none" truncate>
+										✓ {status.label}
+									</text>
+								)}
+								{status.type === 'error' && (
+									<text fg={colors.red} wrapMode="none" truncate>
+										✗ {status.label}
+									</text>
+								)}
+							</box>
+						) : (
+							<text fg={colors.fgDark} wrapMode="none" truncate>
+								↵ send · ⇧↵ newline · ⇥ mode · ↑ history · ⌃L clear
 							</text>
 						)}
-						{provider.length > 0 && model.length > 0 && (
+						{queueSize > 0 && (
+							<text
+								style={{ flexShrink: 0 }}
+								fg={colors.yellow}
+								wrapMode="none"
+							>
+								⧗ {queueSize} queued
+							</text>
+						)}
+					</box>
+					{hasModelLabel && (
+						<box
+							style={{
+								flexDirection: 'row',
+								flexShrink: 1,
+								overflow: 'hidden',
+							}}
+						>
+							<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
+								{isPlanMode ? '✎' : '✦'} {agent || 'build'}
+							</text>
 							<text
 								style={{ flexShrink: 0 }}
 								fg={colors.fgDimmed}
 								wrapMode="none"
 							>
-								/
+								{' · '}
 							</text>
-						)}
-						{model.length > 0 && (
-							<text
-								style={{ flexShrink: 1, overflow: 'hidden' }}
-								fg={colors.fgMuted}
-								wrapMode="none"
-								truncate
-							>
-								{model}
-							</text>
-						)}
-					</box>
-				)}
+							{provider.length > 0 && (
+								<text
+									style={{ flexShrink: 0 }}
+									fg={colors.fgDark}
+									wrapMode="none"
+								>
+									{provider}
+								</text>
+							)}
+							{provider.length > 0 && model.length > 0 && (
+								<text
+									style={{ flexShrink: 0 }}
+									fg={colors.fgDimmed}
+									wrapMode="none"
+								>
+									/
+								</text>
+							)}
+							{model.length > 0 && (
+								<text
+									style={{ flexShrink: 1, overflow: 'hidden' }}
+									fg={colors.fgMuted}
+									wrapMode="none"
+									truncate
+								>
+									{model}
+								</text>
+							)}
+						</box>
+					)}
+				</box>
 			</box>
 		</box>
 	);
