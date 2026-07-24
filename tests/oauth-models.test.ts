@@ -4,10 +4,27 @@ import {
 	filterModelsForAuthType,
 	isModelAllowedForOAuth,
 	normalizeModelCatalogPayload,
+	type ModelInfoMap,
 } from '@ottocode/sdk';
 
 describe('oauth model filtering', () => {
-	test('filters OpenAI OAuth models using explicit model ids', () => {
+	test('uses per-model catalog auth metadata', () => {
+		const models: ModelInfoMap = {
+			api: { id: 'api', auth: ['api'] },
+			oauth: { id: 'oauth', auth: ['oauth'] },
+			both: { id: 'both', auth: ['api', 'oauth'] },
+			legacy: { id: 'legacy' },
+			hidden: { id: 'hidden', auth: [] },
+		};
+
+		const api = filterModelsForAuthType('openai', models, 'api');
+		const oauth = filterModelsForAuthType('openai', models, 'oauth');
+
+		expect(Object.keys(api)).toEqual(['api', 'both', 'legacy']);
+		expect(Object.keys(oauth)).toEqual(['oauth', 'both', 'legacy']);
+	});
+
+	test('filters OpenAI models using catalog auth metadata', () => {
 		const filtered = filterModelsForAuthType(
 			'openai',
 			catalog.openai.models,
@@ -15,9 +32,7 @@ describe('oauth model filtering', () => {
 		);
 		const filteredIds = Object.keys(filtered);
 
-		expect(filteredIds).toContain('gpt-5.1-codex');
 		expect(filteredIds).toContain('gpt-5.2');
-		expect(filteredIds).toContain('gpt-5.2-codex');
 		expect(filteredIds).toContain('gpt-5.3-codex');
 		expect(filteredIds).toContain('gpt-5.4');
 		expect(filteredIds).toContain('gpt-5.5');
@@ -111,28 +126,63 @@ describe('oauth model filtering', () => {
 		expect(composer?.limit?.context).toBe(200_000);
 		expect(composer?.modalities?.input).toEqual(['text']);
 		expect(composer?.attachment).toBe(false);
+		expect(composer?.auth).toEqual(['oauth']);
 	});
 
-	test('keeps Anthropic OAuth prefix matching', () => {
+	test('materializes Anthropic OAuth families into catalog metadata', () => {
 		expect(isModelAllowedForOAuth('anthropic', 'claude-fable-5')).toBe(true);
-		expect(isModelAllowedForOAuth('anthropic', 'claude-fable-5-20260609')).toBe(
-			true,
-		);
+		expect(catalog.anthropic.models['claude-fable-5']?.auth).toEqual([
+			'api',
+			'oauth',
+		]);
 		expect(isModelAllowedForOAuth('anthropic', 'claude-sonnet-4-5')).toBe(true);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-sonnet-4-5-20251001'),
-		).toBe(true);
+		).toBe(false);
 		expect(isModelAllowedForOAuth('anthropic', 'claude-opus-4-8')).toBe(true);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-opus-4-8-20260529'),
-		).toBe(true);
+		).toBe(false);
 		expect(isModelAllowedForOAuth('anthropic', 'claude-sonnet-5')).toBe(true);
+		expect(isModelAllowedForOAuth('anthropic', 'claude-opus-5')).toBe(true);
+		expect(catalog.anthropic.models['claude-opus-5']?.auth).toEqual([
+			'api',
+			'oauth',
+		]);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-sonnet-5-20260701'),
-		).toBe(true);
+		).toBe(false);
 		expect(
 			isModelAllowedForOAuth('anthropic', 'claude-3-5-sonnet-latest'),
 		).toBe(false);
+	});
+
+	test('preserves auth metadata from a remote catalog payload', () => {
+		const providers = normalizeModelCatalogPayload({
+			providers: {
+				openai: {
+					id: 'openai',
+					models: {
+						'remote-oauth-release': {
+							id: 'remote-oauth-release',
+							auth: ['oauth'],
+						},
+						'remote-api-release': {
+							id: 'remote-api-release',
+							auth: ['api'],
+						},
+					},
+				},
+			},
+		});
+
+		const oauth = filterModelsForAuthType(
+			'openai',
+			providers.openai.models,
+			'oauth',
+		);
+		expect(Object.keys(oauth)).toEqual(['remote-oauth-release']);
+		expect(oauth['remote-oauth-release']?.auth).toEqual(['oauth']);
 	});
 
 	test('rejects OpenAI lookalike models that only share a prefix', () => {

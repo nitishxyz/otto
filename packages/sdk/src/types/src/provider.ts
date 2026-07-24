@@ -90,11 +90,18 @@ export type ModelProviderBinding = {
 	family?: ProviderFamily;
 };
 
+export type ModelAuthType = 'api' | 'oauth';
+
 /**
  * Information about a specific model
  */
 export type ModelInfo = {
 	id: string;
+	/**
+	 * Authentication methods that can access this model. An omitted value keeps
+	 * older catalogs and custom providers compatible by allowing either method.
+	 */
+	auth?: ModelAuthType[];
 	ownedBy?: ModelOwner;
 	label?: string;
 	modalities?: { input?: string[]; output?: string[] };

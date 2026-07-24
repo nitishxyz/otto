@@ -435,6 +435,11 @@ describe('custom declarative providers', () => {
 							id: 'cached-anthropic-only',
 							label: 'Cached Anthropic Only',
 						},
+						'cached-oauth-only': {
+							id: 'cached-oauth-only',
+							label: 'Cached OAuth Only',
+							auth: ['oauth'],
+						},
 					},
 				},
 			});
@@ -451,6 +456,7 @@ describe('custom declarative providers', () => {
 				(model) => model.id,
 			);
 			expect(anthropicModelIds).toContain('cached-anthropic-only');
+			expect(anthropicModelIds).not.toContain('cached-oauth-only');
 			expect(anthropicModelIds).toContain('claude-fable-5');
 		} finally {
 			if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;

@@ -9,6 +9,7 @@ import type {
 	ModelOwner,
 	ProviderCatalogEntry,
 } from '../../types/src/index.ts';
+import { applyCatalogModelAuth } from './catalog-auth.ts';
 import { modelListToMap, modelMapToList } from './model-map.ts';
 
 type CatalogMap = Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>;
@@ -91,6 +92,7 @@ const ZAI_CODING_MANUAL_MODELS: ModelInfo[] = [
 const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 	{
 		id: 'grok-build',
+		auth: [],
 		ownedBy: 'xai',
 		label: 'Grok Build',
 		modalities: { input: ['text', 'image'], output: ['text'] },
@@ -103,6 +105,7 @@ const XAI_GROK_CLI_MODELS: ModelInfo[] = [
 	},
 	{
 		id: 'grok-composer-2.5-fast',
+		auth: ['oauth'],
 		ownedBy: 'xai',
 		label: 'Grok Composer 2.5 Fast',
 		modalities: { input: ['text'], output: ['text'] },
@@ -655,5 +658,5 @@ export function mergeManualCatalog(
 	if (manualEntry) {
 		merged[OTTOROUTER_ID] = manualEntry;
 	}
-	return merged;
+	return applyCatalogModelAuth(merged);
 }

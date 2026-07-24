@@ -19,6 +19,7 @@ export type {
 	ProviderCompatibility,
 	ProviderPromptFamily,
 	ModelOwner,
+	ModelAuthType,
 	ModelInfo,
 	ModelInfoMap,
 	ModelProviderBinding,

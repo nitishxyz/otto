@@ -6,6 +6,7 @@ export type {
 	ProviderPromptFamily,
 	ProviderFamily,
 	ModelOwner,
+	ModelAuthType,
 	ModelInfo,
 	ModelInfoMap,
 	ModelProviderBinding,

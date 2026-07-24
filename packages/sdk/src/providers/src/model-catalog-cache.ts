@@ -1,5 +1,6 @@
 import { getGlobalConfigDir, joinPath } from '../../config/src/paths.ts';
 import type {
+	ModelAuthType,
 	ModelInfo,
 	ModelInfoMap,
 	ProviderId,
@@ -46,6 +47,15 @@ function readFileSyncCompat(path: string): string | null {
 	}
 }
 
+function normalizeModelAuth(
+	value: unknown,
+): ModelAuthType[] | undefined | null {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value)) return null;
+	if (!value.every((item) => item === 'api' || item === 'oauth')) return null;
+	return Array.from(new Set(value as ModelAuthType[]));
+}
+
 function normalizeProviderEntry(
 	id: string,
 	value: unknown,
@@ -55,7 +65,12 @@ function normalizeProviderEntry(
 	const models: ModelInfoMap = {};
 	for (const [modelId, model] of Object.entries(value.models)) {
 		if (!isRecord(model)) continue;
-		models[modelId] = { ...(model as ModelInfo), id: modelId };
+		const auth = normalizeModelAuth(model.auth);
+		if (auth === null) continue;
+		const normalized = { ...(model as ModelInfo), id: modelId };
+		if (auth === undefined) delete normalized.auth;
+		else normalized.auth = auth;
+		models[modelId] = normalized;
 	}
 	return {
 		id: (typeof value.id === 'string' ? value.id : id) as ProviderId,

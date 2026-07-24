@@ -1,5 +1,5 @@
 // Fetch models catalog and write to src/providers/catalog.ts
-// Usage: bun run scripts/update-catalog.ts [--from path/to/feed.json]
+// Usage: bun run scripts/update-catalog.ts [--from path/to/feed.json] [--remote-only]
 
 import type {
 	BuiltInProviderId,
@@ -12,6 +12,7 @@ import {
 	KIMI_K3_COST,
 	mergeManualCatalog,
 } from '../packages/sdk/src/providers/src/catalog-manual.ts';
+import { applyCatalogModelAuth } from '../packages/sdk/src/providers/src/catalog-auth.ts';
 import { modelListToMap } from '../packages/sdk/src/providers/src/model-map.ts';
 
 const SOURCE = 'https://models.dev/api.json';
@@ -320,6 +321,8 @@ function mapModel(
 ): ModelInfo {
 	const m = raw ?? {};
 	const info: ModelInfo = { id: String(m.id ?? id) };
+	const auth = normalizeModelAuth(m.auth);
+	if (auth) info.auth = auth;
 	if (ownedBy) info.ownedBy = ownedBy;
 	if (typeof m.name === 'string' && m.name.trim()) info.label = m.name;
 	const modalities = normalizeModalities(m.modalities);
@@ -347,6 +350,14 @@ function mapModel(
 	const provider = normalizeProviderBinding(m.provider);
 	if (provider) info.provider = provider;
 	return info;
+}
+
+function normalizeModelAuth(value: unknown): ModelInfo['auth'] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const auth = value.filter(
+		(item): item is 'api' | 'oauth' => item === 'api' || item === 'oauth',
+	);
+	return auth.length === value.length ? Array.from(new Set(auth)) : undefined;
 }
 
 function isSupportedCatalogModel(model: ModelInfo): boolean {
@@ -576,9 +587,17 @@ async function writeRemoteCatalogJson(
 
 async function main() {
 	const args = process.argv.slice(2);
+	const remoteOnly = args.includes('--remote-only');
 	const ottorouterOnly = args.includes('--ottorouter');
 	const skipOttoRouter = args.includes('--no-ottorouter');
 	const fromIdx = args.indexOf('--from');
+	if (remoteOnly) {
+		const { catalog: generatedCatalog } = await import(
+			'../packages/sdk/src/providers/src/catalog.ts'
+		);
+		await writeRemoteCatalogJson(mergeManualCatalog(generatedCatalog));
+		return;
+	}
 	let picked:
 		| Partial<Record<BuiltInProviderId, ProviderCatalogEntry>>
 		| undefined;
@@ -599,7 +618,7 @@ async function main() {
 				throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
 			feed = (await res.json()) as ProviderFeed;
 		}
-		picked = pickProviders(feed);
+		picked = applyCatalogModelAuth(pickProviders(feed));
 		const ts = toTs(picked);
 		await Bun.write(TARGET, ts);
 		console.log(`Wrote ${TARGET}`);

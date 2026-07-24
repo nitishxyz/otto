@@ -332,6 +332,7 @@ export async function handleGetProviderModels(c: Context) {
 			embeddedConfig,
 			provider,
 			projectRoot,
+			cfg,
 		);
 		const uiAuthType =
 			authType === 'api' || authType === 'oauth' ? authType : undefined;
@@ -404,6 +405,7 @@ export async function handleGetAllModels(c: Context) {
 				embeddedConfig,
 				provider,
 				cfg.projectRoot,
+				cfg,
 			);
 			const uiAuthType =
 				authType === 'api' || authType === 'oauth' ? authType : undefined;

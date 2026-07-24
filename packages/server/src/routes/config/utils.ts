@@ -3,6 +3,7 @@ import {
 	getConfiguredProviderIds,
 	getProviderDefinition,
 	getProviderSettings,
+	readEnvKey,
 	type ProviderId,
 	isProviderAuthorized,
 	getAuth,
@@ -92,6 +93,7 @@ export async function getProviderDetails(
 				embeddedConfig,
 				provider,
 				fileConfig.projectRoot,
+				fileConfig,
 			);
 			return {
 				id: provider,
@@ -126,11 +128,16 @@ export async function getAuthTypeForProvider(
 	embeddedConfig: EmbeddedAppConfig | undefined,
 	provider: ProviderId,
 	projectRoot: string,
+	fileConfig?: OttoConfig,
 ): Promise<'api' | 'oauth' | 'wallet' | undefined> {
 	if (embeddedConfig?.auth?.[provider]) {
 		const embeddedAuth = embeddedConfig.auth[provider];
 		return 'type' in embeddedAuth ? embeddedAuth.type : 'api';
 	}
 	const auth = await getAuth(provider, projectRoot);
-	return auth?.type as 'api' | 'oauth' | 'wallet' | undefined;
+	if (auth) return auth.type as 'api' | 'oauth' | 'wallet';
+	if (readEnvKey(provider)) return 'api';
+	if (fileConfig && getConfiguredProviderApiKey(fileConfig, provider))
+		return 'api';
+	return undefined;
 }
