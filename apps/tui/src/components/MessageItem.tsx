@@ -154,6 +154,25 @@ const PartRenderer = memo(function PartRenderer({
 	if (part.type === 'text') {
 		const text = extractText(part);
 		if (!text.trim()) return null;
+		const isPartStreaming = isActive && isLastPart && !part.completedAt;
+		if (isPartStreaming) {
+			// Split at the last newline: the completed head only changes when a
+			// line finishes, so the memoized MarkdownView skips re-parsing on
+			// every token; the in-progress tail renders as plain text.
+			const splitAt = text.lastIndexOf('\n');
+			const head = splitAt === -1 ? '' : text.slice(0, splitAt);
+			const tail = splitAt === -1 ? text : text.slice(splitAt + 1);
+			return (
+				<box style={{ width: '100%', flexDirection: 'column' }}>
+					{head.trim() ? <MarkdownView content={head} /> : null}
+					{tail.trim() ? (
+						<text wrapMode="word" fg={colors.fg}>
+							{tail}
+						</text>
+					) : null}
+				</box>
+			);
+		}
 		return (
 			<box style={{ width: '100%' }}>
 				<MarkdownView content={text} />
