@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { useTheme } from '../theme.ts';
 import { DiffView } from './DiffView.tsx';
-import { TinySpinner } from './TinySpinner.tsx';
 import type { MessagePart } from '../types.ts';
 
 const DIFF_TOOLS = new Set([
@@ -473,6 +472,18 @@ function extractFilePath(part: MessagePart): string | undefined {
 	return undefined;
 }
 
+const LIVE_OUTPUT_ROWS = 6;
+
+/** Last few lines of streamed tool output for the live preview box. */
+function extractLiveOutput(part: MessagePart): string[] | null {
+	const cj = part.contentJson as Record<string, unknown> | undefined;
+	const stream = typeof cj?.outputStream === 'string' ? cj.outputStream : '';
+	if (!stream.trim()) return null;
+	const lines = stream.split('\n').filter((l) => l.trim().length > 0);
+	if (lines.length === 0) return null;
+	return lines.slice(-LIVE_OUTPUT_ROWS);
+}
+
 function extractToolError(part: MessagePart): string | null {
 	if (part.type === 'error') return null;
 	const cj = part.contentJson as Record<string, unknown> | undefined;
@@ -510,8 +521,12 @@ export const ToolCallItem = memo(function ToolCallItem({
 		: toolName;
 
 	const isRunning = !isCompleted && !hasError;
-	const icon = hasError ? '✗' : '✓';
-	const iconColor = hasError ? colors.red : colors.green;
+	const icon = hasError ? '✗' : isCompleted ? '✓' : '→';
+	const iconColor = hasError
+		? colors.red
+		: isCompleted
+			? colors.green
+			: colors.blue;
 	const nameColor = hasError
 		? colors.red
 		: isCompleted
@@ -534,6 +549,7 @@ export const ToolCallItem = memo(function ToolCallItem({
 
 	const diffPatch = extractDiffPatch(part);
 	const filePath = extractFilePath(part);
+	const liveOutput = isRunning ? extractLiveOutput(part) : null;
 
 	return (
 		<box
@@ -551,13 +567,9 @@ export const ToolCallItem = memo(function ToolCallItem({
 					overflow: 'hidden',
 				}}
 			>
-				{isRunning ? (
-					<TinySpinner fg={colors.streamDot} />
-				) : (
-					<text style={{ flexShrink: 0 }} fg={iconColor}>
-						{icon}
-					</text>
-				)}
+				<text style={{ flexShrink: 0 }} fg={iconColor}>
+					{icon}
+				</text>
 				<text style={{ flexShrink: 0 }} fg={nameColor}>
 					{isRunning ? <b>{displayName}</b> : displayName}
 				</text>
@@ -585,6 +597,31 @@ export const ToolCallItem = memo(function ToolCallItem({
 					</text>
 				) : null}
 			</box>
+			{liveOutput && (
+				<box
+					style={{
+						flexDirection: 'column',
+						width: '100%',
+						backgroundColor: colors.bgSubtle,
+						border: ['left'],
+						borderColor: colors.border,
+						paddingLeft: 1,
+						paddingRight: 1,
+						marginLeft: 2,
+					}}
+				>
+					{liveOutput.map((line, i) => (
+						<text
+							key={`${i}-${line.slice(0, 24)}`}
+							fg={colors.fgDark}
+							wrapMode="none"
+							truncate
+						>
+							{line}
+						</text>
+					))}
+				</box>
+			)}
 			{diffPatch && <DiffView patch={diffPatch} filePath={filePath} />}
 		</box>
 	);

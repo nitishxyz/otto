@@ -93,6 +93,39 @@ function applyDelta(
 	return next;
 }
 
+const MAX_TOOL_OUTPUT_CHARS = 4000;
+
+function applyToolOutputDelta(
+	state: Message[],
+	payload: Record<string, unknown>,
+): Message[] {
+	const callId = typeof payload.callId === 'string' ? payload.callId : null;
+	const delta = typeof payload.delta === 'string' ? payload.delta : null;
+	if (!callId || !delta) return state;
+
+	let changed = false;
+	const next = state.map((msg) => {
+		if (!msg.parts?.length) return msg;
+		const partIdx = msg.parts.findIndex(
+			(p) => p.ephemeral && p.toolCallId === callId && !p.completedAt,
+		);
+		if (partIdx === -1) return msg;
+		changed = true;
+		const parts = [...msg.parts];
+		const part = parts[partIdx];
+		const json =
+			typeof part.contentJson === 'object' && !Array.isArray(part.contentJson)
+				? (part.contentJson as Record<string, unknown>)
+				: {};
+		const prev = typeof json.outputStream === 'string' ? json.outputStream : '';
+		const combined = (prev + delta).slice(-MAX_TOOL_OUTPUT_CHARS);
+		const nextJson = { ...json, outputStream: combined };
+		parts[partIdx] = { ...part, contentJson: nextJson };
+		return { ...msg, parts };
+	});
+	return changed ? next : state;
+}
+
 /**
  * Pure reducer for the TUI message stream. Applies SSE-derived actions to
  * the in-memory message list, keeping optimistic user messages and streaming
@@ -307,8 +340,13 @@ export function messageReducer(
 			const { payload } = action;
 			const channel =
 				typeof payload.channel === 'string' ? payload.channel : null;
-			if (channel !== 'input') return state;
-			return messageReducer(state, { type: 'TOOL_CALL', payload });
+			if (channel === 'input') {
+				return messageReducer(state, { type: 'TOOL_CALL', payload });
+			}
+			if (channel === 'output' || channel === 'terminal') {
+				return applyToolOutputDelta(state, payload);
+			}
+			return state;
 		}
 
 		case 'TOOL_RESULT': {

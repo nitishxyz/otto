@@ -155,6 +155,40 @@ describe('TUI stream reducer', () => {
 		expect(applied[0].parts).toHaveLength(1);
 	});
 
+	test('TOOL_DELTA output channel accumulates outputStream on running part', () => {
+		const state = reduce(
+			[makeMessage({ id: 'a-1' })],
+			{
+				type: 'TOOL_CALL',
+				payload: { callId: 'c-1', name: 'shell' },
+			},
+			{
+				type: 'TOOL_DELTA',
+				payload: { channel: 'output', callId: 'c-1', delta: 'line 1\n' },
+			},
+			{
+				type: 'TOOL_DELTA',
+				payload: { channel: 'output', callId: 'c-1', delta: 'line 2\n' },
+			},
+		);
+		expect(state[0].parts?.[0]?.contentJson?.outputStream).toBe(
+			'line 1\nline 2\n',
+		);
+	});
+
+	test('TOOL_DELTA output for completed or unknown call is a no-op', () => {
+		const base = reduce(
+			[makeMessage({ id: 'a-1' })],
+			{ type: 'TOOL_CALL', payload: { callId: 'c-1', name: 'shell' } },
+			{ type: 'TOOL_RESULT', payload: { callId: 'c-1', result: {} } },
+		);
+		const after = reduce(base, {
+			type: 'TOOL_DELTA',
+			payload: { channel: 'output', callId: 'c-1', delta: 'late' },
+		});
+		expect(after).toBe(base);
+	});
+
 	test('TOOL_RESULT completes the ephemeral part with duration and result', () => {
 		const state = reduce(
 			[makeMessage({ id: 'a-1' })],
