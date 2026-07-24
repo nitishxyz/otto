@@ -2,6 +2,9 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OAuth } from '../../types/src/index.ts';
 import { catalog } from './catalog-merged.ts';
 import { createKimiOAuthFetch } from './kimi-oauth-fetch.ts';
+import { readKimiApiKeyFromEnv } from './kimi-env.ts';
+
+export { readKimiApiKeyFromEnv } from './kimi-env.ts';
 
 export type KimiProviderConfig = {
 	apiKey?: string;
@@ -22,10 +25,6 @@ let fallbackKimiDeviceId: string | undefined;
 
 function processEnv(): Record<string, string | undefined> | undefined {
 	return typeof process !== 'undefined' ? process.env : undefined;
-}
-
-export function readKimiApiKeyFromEnv(): string {
-	return processEnv()?.KIMI_API_KEY || '';
 }
 
 function kimiCodeHomeDir(): string | undefined {

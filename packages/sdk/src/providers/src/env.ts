@@ -1,5 +1,5 @@
 import type { BuiltInProviderId, ProviderId } from '../../types/src/index.ts';
-import { readKimiApiKeyFromEnv } from './kimi-client.ts';
+import { readKimiApiKeyFromEnv } from './kimi-env.ts';
 
 const ENV_VARS: Record<BuiltInProviderId, string> = {
 	openai: 'OPENAI_API_KEY',
