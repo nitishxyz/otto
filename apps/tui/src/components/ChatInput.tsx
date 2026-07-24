@@ -417,7 +417,7 @@ export function ChatInput({
 				<box
 					style={{
 						position: 'absolute',
-						bottom: 2,
+						bottom: 5,
 						left: 1,
 						right: 1,
 						zIndex: 1001,
@@ -469,7 +469,7 @@ export function ChatInput({
 					<box
 						style={{
 							position: 'absolute',
-							bottom: 2,
+							bottom: 5,
 							left: 1,
 							right: 1,
 							zIndex: 1001,
@@ -490,7 +490,7 @@ export function ChatInput({
 				<box
 					style={{
 						position: 'absolute',
-						bottom: 2,
+						bottom: 5,
 						left: 1,
 						right: 1,
 						zIndex: 1001,
@@ -546,8 +546,11 @@ export function ChatInput({
 					borderColor: railColor,
 					backgroundColor: inputBg,
 					flexDirection: 'column',
-					paddingLeft: 1,
-					paddingRight: 1,
+					paddingLeft: 2,
+					paddingRight: 2,
+					paddingTop: 1,
+					paddingBottom: 1,
+					gap: 1,
 				}}
 			>
 				{attachmentCount > 0 && (
@@ -569,9 +572,6 @@ export function ChatInput({
 					</box>
 				)}
 				<box style={{ flexDirection: 'row', width: '100%' }}>
-					<box style={{ width: 2, flexShrink: 0 }}>
-						<text fg={disabled ? colors.fgDark : accent}>❯</text>
-					</box>
 					<textarea
 						ref={textareaRef}
 						focused={!disabled}
@@ -602,17 +602,19 @@ export function ChatInput({
 						flexDirection: 'row',
 						justifyContent: 'space-between',
 						overflow: 'hidden',
-						paddingLeft: 2,
 					}}
 				>
 					<box
 						style={{
 							flexDirection: 'row',
-							gap: 1,
+							gap: 2,
 							flexShrink: 1,
 							overflow: 'hidden',
 						}}
 					>
+						<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
+							{isPlanMode ? '✎' : '✦'} {agent || 'build'}
+						</text>
 						{hasStatus ? (
 							<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
 								{isStreaming && status.type === 'idle' && (
@@ -650,7 +652,7 @@ export function ChatInput({
 							</box>
 						) : (
 							<text fg={colors.fgDark} wrapMode="none" truncate>
-								↵ send · ⇧↵ newline · ⇥ mode · ↑ history · ⌃L clear
+								⇧↵ newline · ⇥ mode · ⌃L clear
 							</text>
 						)}
 						{queueSize > 0 && (
@@ -671,16 +673,6 @@ export function ChatInput({
 								overflow: 'hidden',
 							}}
 						>
-							<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
-								{isPlanMode ? '✎' : '✦'} {agent || 'build'}
-							</text>
-							<text
-								style={{ flexShrink: 0 }}
-								fg={colors.fgDimmed}
-								wrapMode="none"
-							>
-								{' · '}
-							</text>
 							{provider.length > 0 && (
 								<text
 									style={{ flexShrink: 0 }}
