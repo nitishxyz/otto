@@ -14,8 +14,6 @@ const DIFF_TOOLS = new Set([
 
 interface ToolCallItemProps {
 	part: MessagePart;
-	/** Tree connector glyph rendered in the gutter: '·', '├', or '└'. */
-	treePrefix?: string;
 }
 
 function clip(value: string, max = 120): string {
@@ -498,7 +496,6 @@ function extractToolError(part: MessagePart): string | null {
 
 export const ToolCallItem = memo(function ToolCallItem({
 	part,
-	treePrefix = '·',
 }: ToolCallItemProps) {
 	const { colors } = useTheme();
 	const toolName = part.toolName || 'unknown';
@@ -554,9 +551,6 @@ export const ToolCallItem = memo(function ToolCallItem({
 					overflow: 'hidden',
 				}}
 			>
-				<text style={{ flexShrink: 0 }} fg={colors.fgDimmed}>
-					{treePrefix}
-				</text>
 				{isRunning ? (
 					<TinySpinner fg={colors.streamDot} />
 				) : (

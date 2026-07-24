@@ -381,23 +381,21 @@ const UserMessage = memo(function UserMessage({
 		);
 	}
 
-	const railColor = isQueued ? colors.yellow : colors.userBadge;
+	const badgeColor = isQueued ? colors.yellow : colors.userBadge;
 
 	return (
 		<box
 			style={{
 				flexDirection: 'column',
 				width: '100%',
-				border: ['left'],
-				borderColor: railColor,
 				paddingLeft: 1,
 				paddingRight: 1,
 				marginTop: 1,
 			}}
 		>
 			<box style={{ flexDirection: 'row', gap: 1, height: 1 }}>
-				<text fg={railColor}>
-					<b>you</b>
+				<text fg={badgeColor}>
+					<b>❯ you</b>
 				</text>
 				{message.createdAt > 0 && (
 					<text fg={colors.fgDimmed}>{formatTime(message.createdAt)}</text>
@@ -466,7 +464,6 @@ function TurnFooter({ message }: { message: Message }) {
 	if (segments.length === 0) return null;
 	return (
 		<box style={{ flexDirection: 'row', gap: 1, height: 1, marginTop: 1 }}>
-			<text fg={colors.fgDimmed}>└</text>
 			<text fg={colors.fgDimmed}>{segments.join(' · ')}</text>
 		</box>
 	);
@@ -539,72 +536,64 @@ const AssistantMessage = memo(function AssistantMessage({
 				)}
 			</box>
 
-			<box style={{ flexDirection: 'column', width: '100%', paddingLeft: 2 }}>
-				{blocks.map((block) => (
-					<box
-						key={block.key}
-						style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
-					>
-						{block.kind === 'tools' ? (
-							block.parts.map((part, i) => {
-								const approval = part.toolCallId
-									? (pendingApprovals?.find(
-											(a) => a.callId === part.toolCallId,
-										) ?? null)
-									: null;
-								const treePrefix =
-									block.parts.length === 1
-										? '·'
-										: i === block.parts.length - 1
-											? '└'
-											: '├';
-								return (
-									<box
-										key={partKeyOf(part)}
-										style={{ flexDirection: 'column', width: '100%' }}
-									>
-										<ToolCallItem part={part} treePrefix={treePrefix} />
-										{approval && onApprove && onDeny && (
-											<InlineApproval
-												approval={approval}
-												onApprove={onApprove}
-												onDeny={onDeny}
-											/>
-										)}
-									</box>
-								);
-							})
-						) : block.kind === 'todos' ? (
-							<TodoListCard part={block.part} />
-						) : (
-							<PartRenderer
-								part={block.part}
-								isActive={isActive}
-								isLastPart={block.part.id === lastPartId}
-							/>
-						)}
-					</box>
-				))}
+			{blocks.map((block) => (
+				<box
+					key={block.key}
+					style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
+				>
+					{block.kind === 'tools' ? (
+						block.parts.map((part) => {
+							const approval = part.toolCallId
+								? (pendingApprovals?.find(
+										(a) => a.callId === part.toolCallId,
+									) ?? null)
+								: null;
+							return (
+								<box
+									key={partKeyOf(part)}
+									style={{ flexDirection: 'column', width: '100%' }}
+								>
+									<ToolCallItem part={part} />
+									{approval && onApprove && onDeny && (
+										<InlineApproval
+											approval={approval}
+											onApprove={onApprove}
+											onDeny={onDeny}
+										/>
+									)}
+								</box>
+							);
+						})
+					) : block.kind === 'todos' ? (
+						<TodoListCard part={block.part} />
+					) : (
+						<PartRenderer
+							part={block.part}
+							isActive={isActive}
+							isLastPart={block.part.id === lastPartId}
+						/>
+					)}
+				</box>
+			))}
 
-				{showStreamingIndicator && (
-					<StreamingIndicator progressPart={latestProgressPart} />
-				)}
+			{showStreamingIndicator && (
+				<StreamingIndicator progressPart={latestProgressPart} />
+			)}
 
-				{hasError && !sortedParts.some((p) => p.type === 'error') && (
-					<box style={{ flexDirection: 'row', gap: 1, marginTop: 1 }}>
-						<text style={{ flexShrink: 0 }} fg={colors.red}>
-							✗
-						</text>
-						<text fg={colors.red} wrapMode="word">
-							{formatError(message.error) || 'Unknown error'}
-						</text>
-					</box>
-				)}
+			{hasError && !sortedParts.some((p) => p.type === 'error') && (
+				<box style={{ flexDirection: 'row', gap: 1, marginTop: 1 }}>
+					<text style={{ flexShrink: 0 }} fg={colors.red}>
+						✗
+					</text>
+					<text fg={colors.red} wrapMode="word">
+						{formatError(message.error) || 'Unknown error'}
+					</text>
+				</box>
+			)}
 
-				{!isActive && message.status === 'complete' && (
-					<TurnFooter message={message} />
-				)}
-			</box>
+			{!isActive && message.status === 'complete' && (
+				<TurnFooter message={message} />
+			)}
 		</box>
 	);
 });
