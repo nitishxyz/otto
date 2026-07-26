@@ -1,6 +1,7 @@
 import type { Message, MessagePart } from '../../types/api';
 
-const COMPACTION_HEADER_PATTERN = /^📦\s*\*\*context\s+compacted\*\*/iu;
+const COMPACTION_HEADER_PATTERN =
+	/^(?:📦\s*\*\*context\s+compacted\*\*|#\s*session\s+checkpoint)/iu;
 
 export function getMessagePartText(part: MessagePart): string {
 	if (
@@ -48,6 +49,7 @@ export function summarizeCompactionText(text: string): string {
 	const withoutHeader = normalized
 		.replace(/^📦\s*/u, '')
 		.replace(/\*\*context compacted\*\*/iu, '')
+		.replace(/^#\s*session checkpoint/iu, '')
 		.replace(/context compacted:?/iu, '')
 		.trim();
 	if (!withoutHeader) return 'Context compacted';

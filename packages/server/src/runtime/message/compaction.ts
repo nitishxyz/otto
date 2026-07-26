@@ -18,6 +18,8 @@ export { buildCompactionContext } from './compaction-context.ts';
 
 export { markSessionCompacted } from './compaction-mark.ts';
 
+export { saveCompactionCheckpoint } from './compaction-checkpoint.ts';
+
 export { pruneSession } from './compaction-prune.ts';
 
 export { performAutoCompaction } from './compaction-auto.ts';

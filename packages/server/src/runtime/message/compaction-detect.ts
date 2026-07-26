@@ -5,22 +5,52 @@ export function isCompactCommand(content: string): boolean {
 
 export function getCompactionSystemPrompt(): string {
 	return `
-The conversation context is being compacted. The provided context is structured with
-RECENT conversation in full detail at the end, and OLDER conversation (with truncated tool data) at the start.
+Create a canonical session checkpoint that will REPLACE all conversation history provided below.
+Preserve execution state, not the transcript. The next run receives only this checkpoint and messages
+created after it, so include what a new agent needs to continue the work immediately.
 
-Generate a comprehensive summary that captures:
+Use this exact structure, omitting empty sections:
 
-1. **Current State**: What was the most recent task? What is the current state of the work RIGHT NOW?
-2. **Key Changes Made**: What files were created, modified, or deleted? Summarize recent code changes.
-3. **Main Goals**: What is the user trying to accomplish overall?
-4. **Important Decisions**: What approaches or solutions were chosen and why?
-5. **Pending Work**: What remains to be done? Any known issues or blockers?
-6. **Critical Context**: Any gotchas, errors encountered, or important details for continuing.
+# Session Checkpoint
 
-IMPORTANT: Prioritize the RECENT conversation. The summary must allow seamless continuation
-of work. Focus on what was just done and what comes next — not the early parts of the conversation.
+## Charter
+The session's durable overall goal, user priorities, and hard constraints. Preserve the original intent
+even when the active task is narrower.
 
-Format your response as a clear, structured summary. Start with "📦 **Context Compacted**" header.
-Keep under 2000 characters but be thorough. This summary will replace detailed tool history.
+## Active task
+Summarize the latest user instruction and what the agent was doing immediately before compaction.
+Never reproduce the complete latest turn. Quote only exact constraints, identifiers, or literal values
+whose wording matters.
+
+## Current state
+What is complete, what is partially complete, and what has not started.
+
+## Decisions and constraints
+Only choices and constraints that still affect future work.
+
+## Durable changes
+Changed files, persisted artifacts, configuration, or external mutations. Prefer references to durable
+state over copied content.
+
+## Verification
+Checks already run and their meaningful outcomes.
+
+## Continuation evidence
+At most 3 tiny, selected outcomes that are essential for the next action: an unresolved failure, an
+interrupted operation, an active terminal/sub-agent/approval, or an irreversible external action.
+Do not reproduce raw tool calls or logs. Omit successful reads, searches, edits, and routine commands.
+
+## Blockers
+Only unresolved errors or unknowns.
+
+## Next action
+The exact first action the next agent should take.
+
+Rules:
+- Do not narrate or quote the conversation.
+- Merge any PREVIOUS CHECKPOINT into one updated checkpoint; never retain checkpoint history.
+- Summarize the latest turn instead of preserving it verbatim.
+- Drop completed exploration, old errors, reasoning, and tool output unless they affect the next action.
+- Keep the whole checkpoint under 6000 characters. Be concise; 1500-3000 characters is preferred.
 `;
 }

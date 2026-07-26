@@ -4,7 +4,10 @@ import { eq } from 'drizzle-orm';
 import { publish, publishClientEvent } from '../../events/bus.ts';
 import { estimateModelCostUsd } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
-import { markSessionCompacted } from '../message/compaction.ts';
+import {
+	markSessionCompacted,
+	saveCompactionCheckpoint,
+} from '../message/compaction.ts';
 import { publishAssistantMessageError } from '../errors/assistant-message-error.ts';
 import type { FinishEvent } from './types.ts';
 import {
@@ -68,12 +71,32 @@ export function createFinishHandler(
 			if (!hasTextContent) {
 			} else {
 				try {
+					const summary = assistantParts
+						.filter((part) => part.type === 'text')
+						.map((part) => {
+							try {
+								const content = JSON.parse(part.content ?? '{}') as {
+									text?: unknown;
+								};
+								return typeof content.text === 'string' ? content.text : '';
+							} catch {
+								return '';
+							}
+						})
+						.join('\n')
+						.trim();
 					const result = await markSessionCompacted(
 						db,
 						opts.sessionId,
 						opts.assistantMessageId,
 					);
 					void result;
+					await saveCompactionCheckpoint({
+						db,
+						sessionId: opts.sessionId,
+						compactionMessageId: opts.assistantMessageId,
+						summary,
+					});
 				} catch {}
 			}
 		}

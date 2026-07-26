@@ -9,6 +9,7 @@ import { getModelLimits } from './compaction-limits.ts';
 import { buildCompactionContext } from './compaction-context.ts';
 import { getCompactionSystemPrompt } from './compaction-detect.ts';
 import { markSessionCompacted } from './compaction-mark.ts';
+import { saveCompactionCheckpoint } from './compaction-checkpoint.ts';
 import { detectOAuth, adaptSimpleCall } from '../provider/oauth-adapter.ts';
 import { toErrorMessage } from '../errors/handling.ts';
 
@@ -67,7 +68,7 @@ export async function performAutoCompaction(
 		const adapted = adaptSimpleCall(oauth, {
 			instructions: compactionPrompt,
 			userContent,
-			maxOutputTokens: 2000,
+			maxOutputTokens: 1200,
 		});
 
 		const compactPartId = crypto.randomUUID();
@@ -130,6 +131,12 @@ export async function performAutoCompaction(
 			throughMessageId,
 		);
 		void compactResult;
+		await saveCompactionCheckpoint({
+			db,
+			sessionId,
+			compactionMessageId: assistantMessageId,
+			summary,
+		});
 
 		return { success: true, summary, compactMessageId: assistantMessageId };
 	} catch (err) {

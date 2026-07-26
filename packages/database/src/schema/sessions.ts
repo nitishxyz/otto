@@ -25,6 +25,7 @@ export const sessions = sqliteTable(
 		// Compaction
 		contextSummary: text('context_summary'), // LLM-generated summary of conversation context
 		lastCompactedAt: integer('last_compacted_at', { mode: 'number' }),
+		compactionMessageId: text('compaction_message_id'), // Latest canonical checkpoint; model history starts after it
 		// Branching
 		parentSessionId: text('parent_session_id'),
 		branchPointMessageId: text('branch_point_message_id'),

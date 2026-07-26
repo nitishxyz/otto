@@ -184,6 +184,7 @@ export async function createBranch({
 		currentContextTokens: null,
 		contextSummary: null,
 		lastCompactedAt: null,
+		compactionMessageId: null,
 		parentSessionId: newSession.parentSessionId ?? null,
 		branchPointMessageId: newSession.branchPointMessageId ?? null,
 		sessionType: newSession.sessionType ?? null,

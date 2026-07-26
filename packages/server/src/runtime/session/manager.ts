@@ -75,6 +75,7 @@ export async function createSession({
 		currentContextTokens: null,
 		contextSummary: null,
 		lastCompactedAt: null,
+		compactionMessageId: null,
 		parentSessionId: parentSessionId ?? null,
 		branchPointMessageId: null,
 		sessionType,

@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `compaction_message_id` text;

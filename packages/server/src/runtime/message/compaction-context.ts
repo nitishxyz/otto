@@ -1,6 +1,8 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts } from '@ottocode/database/schema';
+import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import { eq, asc, desc } from 'drizzle-orm';
+
+const PREVIOUS_CHECKPOINT_MAX_CHARS = 6_000;
 
 export async function buildCompactionContext(
 	db: Awaited<ReturnType<typeof getDb>>,
@@ -8,6 +10,16 @@ export async function buildCompactionContext(
 	contextTokenLimit?: number,
 	throughMessageId?: string,
 ): Promise<string> {
+	const sessionRows = await db
+		.select({
+			contextSummary: sessions.contextSummary,
+			compactionMessageId: sessions.compactionMessageId,
+		})
+		.from(sessions)
+		.where(eq(sessions.id, sessionId))
+		.limit(1);
+	const previousCheckpoint = sessionRows[0]?.contextSummary?.trim() ?? '';
+	const compactionMessageId = sessionRows[0]?.compactionMessageId ?? undefined;
 	const sessionMessages = await db
 		.select()
 		.from(messages)
@@ -16,8 +28,14 @@ export async function buildCompactionContext(
 	const cutoffIndex = throughMessageId
 		? sessionMessages.findIndex((msg) => msg.id === throughMessageId)
 		: -1;
-	const allMessages =
+	let allMessages =
 		cutoffIndex >= 0 ? sessionMessages.slice(cutoffIndex) : sessionMessages;
+	const checkpointIndex = compactionMessageId
+		? allMessages.findIndex((msg) => msg.id === compactionMessageId)
+		: -1;
+	if (checkpointIndex >= 0) {
+		allMessages = allMessages.slice(0, checkpointIndex);
+	}
 
 	const maxChars = contextTokenLimit ? contextTokenLimit * 4 : 60000;
 	const recentBudget = Math.floor(maxChars * 0.65);
@@ -32,7 +50,7 @@ export async function buildCompactionContext(
 
 	for (const msg of allMessages) {
 		if (msg.role === 'user') userTurns++;
-		if (userTurns > 3 && inRecent) inRecent = false;
+		if (userTurns > 1 && inRecent) inRecent = false;
 
 		const parts = await db
 			.select()
@@ -95,11 +113,17 @@ export async function buildCompactionContext(
 	}
 
 	const result: string[] = [];
+	if (previousCheckpoint) {
+		result.push('[--- PREVIOUS CHECKPOINT (merge and replace) ---]');
+		result.push(previousCheckpoint.slice(0, PREVIOUS_CHECKPOINT_MAX_CHARS));
+		result.push('');
+		result.push('[--- POST-CHECKPOINT CONVERSATION ---]');
+	}
 	if (olderLines.length > 0) {
 		result.push('[...older conversation (tool data truncated)...]');
 		result.push(...olderLines);
 		result.push('');
-		result.push('[--- Recent conversation (full detail) ---]');
+		result.push('[--- Latest turn evidence (bounded) ---]');
 	}
 	result.push(...recentLines);
 

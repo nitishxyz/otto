@@ -31,6 +31,11 @@ describe('compaction summary UI helpers', () => {
 		expect(
 			isCompactionSummaryText('📦 **Context Compacted**\n\nCurrent state: foo'),
 		).toBe(true);
+		expect(
+			isCompactionSummaryText(
+				'# Session Checkpoint\n\n## Charter\nKeep context bounded.',
+			),
+		).toBe(true);
 	});
 
 	it('ignores explanatory mentions of context compaction', () => {
@@ -111,6 +116,11 @@ describe('compaction summary UI helpers', () => {
 				'📦 **Context Compacted**\n\nCurrent state: working on thread UI',
 			),
 		).toBe('Current state: working on thread UI');
+		expect(
+			summarizeCompactionText(
+				'# Session Checkpoint\n\n## Next action\nUpdate history reconstruction.',
+			),
+		).toBe('## Next action Update history reconstruction.');
 	});
 
 	it('reads user message text from parts', () => {

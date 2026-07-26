@@ -1,5 +1,5 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts } from '@ottocode/database/schema';
+import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
 import {
@@ -84,11 +84,23 @@ export async function buildHistoryMessages(
 	currentMessageId?: string,
 	options?: { projectRoot?: string },
 ): Promise<ModelMessage[]> {
-	const rows = await db
+	let rows = await db
 		.select()
 		.from(messages)
 		.where(eq(messages.sessionId, sessionId))
 		.orderBy(asc(messages.createdAt));
+	const sessionRows = await db
+		.select({ compactionMessageId: sessions.compactionMessageId })
+		.from(sessions)
+		.where(eq(sessions.id, sessionId))
+		.limit(1);
+	const compactionMessageId = sessionRows[0]?.compactionMessageId;
+	if (compactionMessageId) {
+		const checkpointIndex = rows.findIndex(
+			(message) => message.id === compactionMessageId,
+		);
+		if (checkpointIndex >= 0) rows = rows.slice(checkpointIndex + 1);
+	}
 	const queuedAssistantMessageIds = new Set(
 		getQueueState(sessionId)?.queuedMessages.map((item) => item.messageId) ??
 			[],

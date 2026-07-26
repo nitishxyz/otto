@@ -71,6 +71,13 @@
 			"when": 1782935501553,
 			"tag": "0009_tearful_roland_deschain",
 			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "6",
+			"when": 1785027498346,
+			"tag": "0010_aberrant_hellion",
+			"breakpoints": true
 		}
 	]
 }

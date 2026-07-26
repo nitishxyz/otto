@@ -24,6 +24,9 @@ import mig0008 from '../../drizzle/0008_quick_screwball.sql' with {
 import mig0009 from '../../drizzle/0009_tearful_roland_deschain.sql' with {
 	type: 'text',
 };
+import mig0010 from '../../drizzle/0010_aberrant_hellion.sql' with {
+	type: 'text',
+};
 
 export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0000_material_swarm.sql', content: mig0000 },
@@ -36,4 +39,5 @@ export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0007_drop_done_pending_status.sql', content: mig0007 },
 	{ name: '0008_quick_screwball.sql', content: mig0008 },
 	{ name: '0009_tearful_roland_deschain.sql', content: mig0009 },
+	{ name: '0010_aberrant_hellion.sql', content: mig0010 },
 ];
