@@ -514,9 +514,7 @@ export function App({
 			(showThreePane
 				? 56
 				: Math.max(52, Math.min(60, Math.floor(layoutWidth * 0.42)))) / 4,
-		) *
-			4 +
-		2;
+		) * 4;
 	const detailWidth = showThreePane
 		? Math.max(42, Math.min(64, Math.floor(layoutWidth * 0.34)))
 		: Math.max(30, Math.min(58, Math.floor(layoutWidth * 0.42)));
@@ -536,8 +534,6 @@ export function App({
 
 	return (
 		<box
-			border={['top']}
-			borderColor={colors.borderSubtle}
 			style={{
 				width: '100%',
 				height: '100%',
@@ -567,11 +563,6 @@ export function App({
 			>
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI panes use mouse focus without DOM roles */}
 				<box
-					border
-					borderStyle="single"
-					borderColor={
-						workspaceFocus === 'chat' ? colors.borderActive : colors.bg
-					}
 					focusable
 					onMouseDown={() => setWorkspaceFocus('chat')}
 					style={{
@@ -579,6 +570,8 @@ export function App({
 						height: '100%',
 						minWidth: 0,
 						flexDirection: 'column',
+						backgroundColor:
+							workspaceFocus === 'chat' ? colors.bg : colors.bgDark,
 					}}
 				>
 					<ChatView
@@ -624,6 +617,7 @@ export function App({
 						escHint={escHint}
 						queueSize={queueSize}
 						isPlanMode={currentAgent === 'plan'}
+						paneActive={workspaceFocus === 'chat'}
 						onPlanModeToggle={handlePlanModeToggle}
 					/>
 				</box>

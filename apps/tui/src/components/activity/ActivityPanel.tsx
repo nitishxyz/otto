@@ -168,9 +168,6 @@ export const ActivityPanel = memo(function ActivityPanel({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI panes use mouse focus without DOM roles
 		<box
-			border
-			borderStyle="single"
-			borderColor={focused ? colors.borderActive : colors.bg}
 			focusable
 			focused={focused}
 			onMouseDown={onFocusRequest}
@@ -178,24 +175,24 @@ export const ActivityPanel = memo(function ActivityPanel({
 				width: '100%',
 				height: '100%',
 				flexDirection: 'column',
-				backgroundColor: colors.bg,
+				backgroundColor: focused ? colors.bg : colors.bgDark,
 			}}
 		>
 			<tab-select
 				ref={tabsRef}
 				focused={focused && focusRegion === 'tabs'}
 				options={tabOptions}
-				tabWidth={Math.floor((panelWidth - 2) / TABS.length)}
+				tabWidth={Math.floor(panelWidth / TABS.length)}
 				showDescription={false}
 				showUnderline
 				showScrollArrows={false}
 				wrapSelection
-				backgroundColor={colors.bg}
-				textColor={colors.fgDark}
-				focusedBackgroundColor={colors.bg}
+				backgroundColor={focused ? colors.bg : colors.bgDark}
+				textColor={focused ? colors.fgDark : colors.fgDimmed}
+				focusedBackgroundColor={focused ? colors.bg : colors.bgDark}
 				focusedTextColor={colors.fgMuted}
-				selectedBackgroundColor={colors.bgSubtle}
-				selectedTextColor={colors.fgBright}
+				selectedBackgroundColor={focused ? colors.bgHighlight : colors.bgDark}
+				selectedTextColor={focused ? colors.fgBright : colors.fgMuted}
 				selectedDescriptionColor={colors.fgDimmed}
 				onChange={(_index, option) => {
 					if (option?.value) onTabChange(option.value as ActivityTab);
@@ -229,7 +226,7 @@ export const ActivityPanel = memo(function ActivityPanel({
 					</text>
 				) : tab === 'todos' ? (
 					data.todos?.todos.map((todo, index) => {
-						const active = index === selected;
+						const active = focused && index === selected;
 						return (
 							<box
 								key={`${index}-${todo.step}`}
@@ -265,7 +262,7 @@ export const ActivityPanel = memo(function ActivityPanel({
 					data.subagents.map((item, index) => (
 						<ActivityRow
 							key={item.id}
-							active={index === selected}
+							active={focused && index === selected}
 							status={item.status}
 							title={item.agent}
 							detail={item.task}
@@ -280,7 +277,7 @@ export const ActivityPanel = memo(function ActivityPanel({
 					data.shells.map((item, index) => (
 						<ActivityRow
 							key={item.id}
-							active={index === selected}
+							active={focused && index === selected}
 							status={item.status}
 							title={clip(item.command, 44)}
 							detail={item.cwd}
@@ -297,7 +294,7 @@ export const ActivityPanel = memo(function ActivityPanel({
 					data.terminals.map((item, index) => (
 						<ActivityRow
 							key={item.id}
-							active={index === selected}
+							active={focused && index === selected}
 							status={item.status}
 							title={item.title || item.purpose || item.command}
 							detail={item.purpose || item.command}

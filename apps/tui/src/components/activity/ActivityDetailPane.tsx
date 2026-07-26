@@ -41,9 +41,6 @@ export const ActivityDetailPane = memo(function ActivityDetailPane({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI panes use mouse focus without DOM roles
 		<box
-			border
-			borderStyle="single"
-			borderColor={focused ? colors.borderActive : colors.bg}
 			focusable
 			focused={focused}
 			onMouseDown={onFocusRequest}
@@ -51,6 +48,7 @@ export const ActivityDetailPane = memo(function ActivityDetailPane({
 				width: '100%',
 				height: '100%',
 				flexDirection: 'column',
+				backgroundColor: focused ? colors.bg : colors.bgDark,
 			}}
 		>
 			{content ?? (

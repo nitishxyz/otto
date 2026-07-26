@@ -32,6 +32,7 @@ interface ChatInputProps {
 	escHint: boolean;
 	queueSize?: number;
 	isPlanMode?: boolean;
+	paneActive?: boolean;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
 }
 
@@ -56,6 +57,7 @@ export function ChatInput({
 	escHint,
 	queueSize = 0,
 	isPlanMode: externalIsPlanMode,
+	paneActive = true,
 	onPlanModeToggle,
 }: ChatInputProps) {
 	const { colors } = useTheme();
@@ -407,7 +409,8 @@ export function ChatInput({
 	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
 	const railColor = disabled ? colors.border : accent;
-	const inputBg = colors.bgSubtle;
+	const inputBg = paneActive ? colors.bgSubtle : colors.bgDark;
+	const inputTextColor = paneActive ? colors.fgBright : colors.fgMuted;
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,
@@ -597,8 +600,8 @@ export function ChatInput({
 						focused={!disabled}
 						placeholder="Message otto…"
 						placeholderColor={colors.fgDark}
-						textColor={colors.fgBright}
-						focusedTextColor={colors.fgBright}
+						textColor={inputTextColor}
+						focusedTextColor={inputTextColor}
 						backgroundColor={inputBg}
 						focusedBackgroundColor={inputBg}
 						cursorColor={accent}

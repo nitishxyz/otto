@@ -217,8 +217,6 @@ function ProcessFrame({
 					paddingRight: 1,
 					flexDirection: 'row',
 					gap: 2,
-					border: ['top'],
-					borderColor: colors.border,
 				}}
 			>
 				<text fg={colors.fgDimmed}>{actionHint}</text>
