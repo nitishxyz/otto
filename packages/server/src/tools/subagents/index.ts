@@ -5,16 +5,28 @@ import { tool } from 'ai';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod/v3';
 import {
+	compactSubagent,
+	getSubagentStatus,
 	listSubagentsForSession,
 	markSubagentsReported,
 	messageSubagent,
+	readSubagentActivity,
 	retrySubagent,
 	spawnSubagent,
 	stopSubagent,
 } from '../../runtime/subagents/service.ts';
 
 const subagentInputSchema = z.object({
-	action: z.enum(['delegate', 'list', 'message', 'stop', 'retry']),
+	action: z.enum([
+		'delegate',
+		'list',
+		'status',
+		'read',
+		'message',
+		'compact',
+		'stop',
+		'retry',
+	]),
 	agent: z.string().optional().describe('Agent name; required for delegate'),
 	task: z.string().optional().describe('Task; required for delegate'),
 	context: z.string().optional().describe('Optional delegate context'),
@@ -29,12 +41,19 @@ const subagentInputSchema = z.object({
 	subagentId: z
 		.string()
 		.optional()
-		.describe('Required for message, stop, and retry'),
+		.describe('Required for status, read, message, compact, stop, and retry'),
 	message: z.string().optional().describe('Required for message'),
 	delivery: z
 		.enum(['queue', 'interrupt'])
 		.optional()
 		.describe('Message delivery; defaults to queue'),
+	limit: z
+		.number()
+		.int()
+		.min(1)
+		.max(20)
+		.optional()
+		.describe('Recent tool calls returned by read; defaults to 5'),
 });
 
 type SubagentInput = z.infer<typeof subagentInputSchema>;
@@ -53,7 +72,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 		name: 'subagent',
 		tool: tool({
 			description:
-				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows status/results; message sends a queued or interrupting follow-up; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results arrive automatically at the next model step or after this turn; do not poll running agents.',
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows all lifecycle results; status inspects one agent including context-window usage; read returns a bounded overview of recent tool calls; message sends a queued or interrupting follow-up; compact queues /compact after the child is idle; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results arrive automatically at the next model step or after this turn; do not poll running agents.',
 			inputSchema: subagentInputSchema,
 			async execute(input) {
 				switch (input.action) {
@@ -125,6 +144,37 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							})),
 						};
 					}
+					case 'status': {
+						const subagentId = requiredText(input, 'subagentId');
+						if (!subagentId) {
+							return {
+								ok: false,
+								error: 'status requires a non-empty subagentId',
+							};
+						}
+						const db = await getDb(projectRoot);
+						return getSubagentStatus({
+							db,
+							parentSessionId: sessionId,
+							subagentId,
+						});
+					}
+					case 'read': {
+						const subagentId = requiredText(input, 'subagentId');
+						if (!subagentId) {
+							return {
+								ok: false,
+								error: 'read requires a non-empty subagentId',
+							};
+						}
+						const db = await getDb(projectRoot);
+						return readSubagentActivity({
+							db,
+							parentSessionId: sessionId,
+							subagentId,
+							limit: input.limit ?? 5,
+						});
+					}
 					case 'message': {
 						const subagentId = requiredText(input, 'subagentId');
 						const message = requiredText(input, 'message');
@@ -158,6 +208,28 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 								result.delivery === 'interrupt'
 									? 'Current work was preempted; the result arrives automatically.'
 									: 'Follow-up queued; the result arrives automatically.',
+						};
+					}
+					case 'compact': {
+						const subagentId = requiredText(input, 'subagentId');
+						if (!subagentId) {
+							return {
+								ok: false,
+								error: 'compact requires a non-empty subagentId',
+							};
+						}
+						const cfg = await loadConfig(projectRoot);
+						const db = await getDb(cfg.projectRoot);
+						const result = await compactSubagent({
+							db,
+							cfg,
+							parentSessionId: sessionId,
+							subagentId,
+						});
+						if (!result.ok) return result;
+						return {
+							...result,
+							note: 'Compaction queued in the idle child session.',
 						};
 					}
 					case 'stop': {

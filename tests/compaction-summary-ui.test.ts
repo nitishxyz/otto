@@ -33,6 +33,19 @@ describe('compaction summary UI helpers', () => {
 		).toBe(true);
 	});
 
+	it('ignores explanatory mentions of context compaction', () => {
+		expect(
+			isCompactionSummaryText(
+				'## How work continues after context compaction\n\nOtto generates the `📦 **Context Compacted**` assistant message.',
+			),
+		).toBe(false);
+		expect(
+			isCompactionSummaryText(
+				'Context compacted messages are displayed in a collapsed row.',
+			),
+		).toBe(false);
+	});
+
 	it('renders compaction box after /compact user command in compact mode', () => {
 		const previousUserMessage: Message = {
 			id: 'user-1',

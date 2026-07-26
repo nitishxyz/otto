@@ -1,5 +1,7 @@
+export { compactSubagent } from './compact.ts';
 export { abortChildSubagents } from './abort.ts';
 export { finalizeSubagentForChildSession } from './finalize.ts';
+export { getSubagentStatus, readSubagentActivity } from './inspection.ts';
 export {
 	listSubagentsForSession,
 	markSubagentsReported,

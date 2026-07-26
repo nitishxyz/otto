@@ -16,12 +16,22 @@ describe('subagent tool guidance', () => {
 		const item = buildSubagentTool('/tmp/project', 'parent');
 		const schema = JSON.stringify(asSchema(item.tool.inputSchema).jsonSchema);
 
-		for (const action of ['delegate', 'list', 'message', 'stop', 'retry']) {
+		for (const action of [
+			'delegate',
+			'list',
+			'status',
+			'read',
+			'message',
+			'compact',
+			'stop',
+			'retry',
+		]) {
 			expect(schema).toContain(`"${action}"`);
 		}
 		expect(schema).toContain('reuseSessionId');
 		expect(schema).toContain('subagentId');
 		expect(schema).toContain('delivery');
+		expect(schema).toContain('limit');
 	});
 
 	test('keeps ownership, reuse, automatic delivery, and no-poll guidance', () => {
@@ -33,5 +43,8 @@ describe('subagent tool guidance', () => {
 		expect(description).toContain('owned by the child');
 		expect(description).toContain('arrive automatically');
 		expect(description).toContain('do not poll');
+		expect(description).toContain('context-window usage');
+		expect(description).toContain('recent tool calls');
+		expect(description).toContain('/compact');
 	});
 });

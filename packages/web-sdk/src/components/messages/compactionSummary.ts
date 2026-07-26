@@ -1,6 +1,6 @@
 import type { Message, MessagePart } from '../../types/api';
 
-const COMPACTION_HEADER_PATTERN = /context\s+compacted/i;
+const COMPACTION_HEADER_PATTERN = /^📦\s*\*\*context\s+compacted\*\*/iu;
 
 export function getMessagePartText(part: MessagePart): string {
 	if (
@@ -39,10 +39,7 @@ export function getUserMessageText(message: Message | undefined): string {
 export function isCompactionSummaryText(text: string): boolean {
 	const trimmed = text.trim();
 	if (!trimmed) return false;
-	return (
-		COMPACTION_HEADER_PATTERN.test(trimmed) ||
-		(trimmed.startsWith('📦') && COMPACTION_HEADER_PATTERN.test(trimmed))
-	);
+	return COMPACTION_HEADER_PATTERN.test(trimmed);
 }
 
 export function summarizeCompactionText(text: string): string {

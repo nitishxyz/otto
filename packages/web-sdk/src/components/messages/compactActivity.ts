@@ -456,10 +456,17 @@ export function getCompactActivityEntry(
 				completedAt: part.completedAt,
 			};
 		}
+		const actionLabels: Record<string, string> = {
+			status: 'Checking sub-agent status',
+			read: 'Reading sub-agent activity',
+			compact: 'Compacting sub-agent context',
+			retry: 'Retrying sub-agent',
+			stop: 'Stopping sub-agent',
+		};
 		return {
 			id: part.id,
 			toolName: part.toolName,
-			label: action === 'retry' ? 'Retrying sub-agent' : 'Stopping sub-agent',
+			label: (action && actionLabels[action]) || 'Managing sub-agent',
 			startedAt: part.startedAt,
 			completedAt: part.completedAt,
 		};

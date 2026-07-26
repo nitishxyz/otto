@@ -16,7 +16,35 @@ type SubagentListItem = {
 	status: string;
 	summary?: string;
 	childSessionId?: string;
+	context?: SubagentContext;
 };
+
+type SubagentContext = {
+	usedTokens?: number;
+	windowTokens?: number | null;
+	percentUsed?: number | null;
+};
+
+type SubagentActivityItem = {
+	tool?: string;
+	status?: string;
+	input?: string;
+	result?: string;
+};
+
+function formatContext(context: SubagentContext | undefined): string | null {
+	if (!context) return null;
+	const used = context.usedTokens;
+	const window = context.windowTokens;
+	if (typeof used !== 'number') return null;
+	const usedLabel = used.toLocaleString();
+	if (typeof window !== 'number') return `${usedLabel} tokens`;
+	const percent =
+		typeof context.percentUsed === 'number'
+			? ` (${context.percentUsed.toFixed(1)}%)`
+			: '';
+	return `${usedLabel} / ${window.toLocaleString()} tokens${percent}`;
+}
 
 function statusIcon(status: string) {
 	if (status === 'running')
@@ -47,6 +75,14 @@ export function SubagentToolRenderer({
 		retry_subagent: 'retry',
 	};
 	const action = String(args.action ?? legacyActions[name] ?? 'delegate');
+	const statusRecord =
+		result.subagent && typeof result.subagent === 'object'
+			? (result.subagent as SubagentListItem)
+			: undefined;
+	const activity = Array.isArray(result.activity)
+		? (result.activity as SubagentActivityItem[])
+		: [];
+	const statusContextLabel = formatContext(statusRecord?.context);
 
 	const isList = action === 'list';
 	const records: SubagentListItem[] = isList
@@ -55,7 +91,7 @@ export function SubagentToolRenderer({
 			: []
 		: [];
 
-	const agent = String(result.agent ?? args.agent ?? '');
+	const agent = String(result.agent ?? statusRecord?.agent ?? args.agent ?? '');
 	const detail = String(
 		action === 'delegate'
 			? (args.task ?? '')
@@ -69,20 +105,32 @@ export function SubagentToolRenderer({
 	else if (isList) {
 		const running = records.filter((r) => r.status === 'running').length;
 		headline = `${records.length} sub-agent${records.length === 1 ? '' : 's'}${running ? `, ${running} running` : ''}`;
+	} else if (action === 'status') {
+		headline = statusRecord
+			? `${statusRecord.agent} — ${statusRecord.status}${statusContextLabel ? ` — ${statusContextLabel}` : ''}`
+			: `Check sub-agent${detail ? ` ${detail}` : ''}`;
+	} else if (action === 'read') {
+		headline = `${agent || 'Sub-agent'} — ${activity.length} recent tool call${activity.length === 1 ? '' : 's'}`;
+	} else if (action === 'compact') {
+		headline = `${agent ? `${agent} — ` : ''}Compact context`;
 	} else if (action === 'stop' || action === 'retry') {
 		headline = `${action === 'stop' ? 'Stop' : 'Retry'} sub-agent${detail ? ` ${detail}` : ''}`;
 	} else {
 		headline = agent ? `${agent}${detail ? ` — ${detail}` : ''}` : detail;
 	}
 
-	const canExpand = isList ? records.length > 0 : Boolean(detail || hasError);
-	const isAsync = ['delegate', 'message', 'retry'].includes(action);
+	const canExpand = isList
+		? records.length > 0
+		: Boolean(detail || hasError || statusRecord || activity.length);
+	const isAsync = ['delegate', 'message', 'compact', 'retry'].includes(action);
 	const detailNote =
 		action === 'delegate'
 			? 'Runs in parallel; results arrive automatically.'
-			: action === 'message' || action === 'retry'
-				? 'Results arrive automatically.'
-				: '';
+			: action === 'compact'
+				? 'Compacts the idle child session without changing its task result.'
+				: action === 'message' || action === 'retry'
+					? 'Results arrive automatically.'
+					: '';
 
 	return (
 		<div className="text-[12px]">
@@ -149,6 +197,44 @@ export function SubagentToolRenderer({
 										</span>
 									) : null}
 								</span>
+							</div>
+						))
+					) : action === 'status' && statusRecord ? (
+						<div className="text-[11px] text-foreground/70">
+							<span className="font-medium text-foreground/90">
+								{statusRecord.agent} — {statusRecord.status}
+							</span>
+							{statusContextLabel ? (
+								<span className="block text-muted-foreground">
+									Context: {statusContextLabel}
+								</span>
+							) : null}
+							{statusRecord.summary ? (
+								<span className="block text-muted-foreground line-clamp-3">
+									{statusRecord.summary}
+								</span>
+							) : null}
+						</div>
+					) : action === 'read' ? (
+						activity.map((item, index) => (
+							<div
+								key={`${item.tool ?? 'tool'}-${index}`}
+								className="text-[11px]"
+							>
+								<span className="font-medium text-foreground/90">
+									{item.tool ?? 'tool'}
+								</span>{' '}
+								<span className="text-muted-foreground">{item.status}</span>
+								{item.input ? (
+									<span className="block truncate font-mono text-muted-foreground">
+										{item.input}
+									</span>
+								) : null}
+								{item.result ? (
+									<span className="block line-clamp-2 font-mono text-muted-foreground/80">
+										{item.result}
+									</span>
+								) : null}
 							</div>
 						))
 					) : (
