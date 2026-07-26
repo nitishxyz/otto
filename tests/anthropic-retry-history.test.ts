@@ -94,6 +94,16 @@ describe('assistant retry history', () => {
 		});
 	});
 
+	test('adds a user continuation when a checkpoint leaves an empty tail', () => {
+		expect(ensureUserTurnBeforeAssistantRun([])).toEqual([
+			{
+				role: 'user',
+				content:
+					'Continue the task from the current state. Do not repeat work already completed.',
+			},
+		]);
+	});
+
 	test('leaves a user-ended conversation unchanged', () => {
 		const messages = [{ role: 'user' as const, content: 'Fix the bug' }];
 		expect(ensureUserTurnBeforeAssistantRun(messages)).toBe(messages);

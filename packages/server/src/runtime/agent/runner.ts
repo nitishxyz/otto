@@ -131,12 +131,16 @@ async function runAssistant(opts: RunOpts) {
 	const isFirstMessage = !history.some((m) => m.role === 'assistant');
 
 	const runnerMessages = [...additionalSystemMessages, ...history];
+	const nonEmptyRunnerMessages =
+		runnerMessages.length === 0
+			? ensureUserTurnBeforeAssistantRun(runnerMessages)
+			: runnerMessages;
 	const messagesWithSystemInstructions = isAnthropicBasedModel(
 		opts.provider,
 		opts.model,
 	)
-		? ensureUserTurnBeforeAssistantRun(runnerMessages)
-		: runnerMessages;
+		? ensureUserTurnBeforeAssistantRun(nonEmptyRunnerMessages)
+		: nonEmptyRunnerMessages;
 
 	const dump = createRunnerTurnDump({
 		opts,
