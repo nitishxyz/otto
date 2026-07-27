@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { KeyRound, X } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { allowsEmptySecureInput } from '../../lib/secure-input-prompt';
@@ -121,13 +122,16 @@ const SecureInputDialog = memo(function SecureInputDialog({
 		return () => document.removeEventListener('keydown', handleKeyDown, true);
 	}, [handleCancel]);
 
-	return (
+	if (typeof document === 'undefined') return null;
+
+	return createPortal(
 		<div
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={titleId}
 			aria-describedby={showPrompt ? descriptionId : undefined}
-			className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+			data-native-overlay-root="true"
+			className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
 		>
 			<form
 				onSubmit={(event) => {
@@ -236,6 +240,7 @@ const SecureInputDialog = memo(function SecureInputDialog({
 					</button>
 				</div>
 			</form>
-		</div>
+		</div>,
+		document.body,
 	);
 });

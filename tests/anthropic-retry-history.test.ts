@@ -104,6 +104,21 @@ describe('assistant retry history', () => {
 		]);
 	});
 
+	test('adds a user continuation after an OAuth system message', () => {
+		const messages = ensureUserTurnBeforeAssistantRun([
+			{
+				role: 'system',
+				content: 'Compacted conversation summary',
+			},
+		]);
+
+		expect(messages.at(-1)).toEqual({
+			role: 'user',
+			content:
+				'Continue the task from the current state. Do not repeat work already completed.',
+		});
+	});
+
 	test('leaves a user-ended conversation unchanged', () => {
 		const messages = [{ role: 'user' as const, content: 'Fix the bug' }];
 		expect(ensureUserTurnBeforeAssistantRun(messages)).toBe(messages);

@@ -6,19 +6,17 @@ import { publishAssistantMessageError } from '../../errors/assistant-message-err
 import { isContextOverflowError } from '../../errors/context-overflow.ts';
 import { toErrorPayload } from '../../errors/handling.ts';
 import {
-	pruneSession,
 	runAutoCompactionFlow,
 	shouldAutoCompactBeforeOverflow,
 	shouldStopTurnForAutoCompact,
 } from '../../message/compaction.ts';
 import type {
-	completeAssistantMessage,
 	updateMessageTokensIncremental,
 	updateSessionTokensIncremental,
 } from '../../session/db-operations.ts';
 import { enqueueAssistantRun, type RunOpts } from '../../session/queue.ts';
+import { recoverContextOverflow } from './runner-context-overflow.ts';
 
-type CompleteAssistantMessage = typeof completeAssistantMessage;
 type UpdateSessionTokensIncremental = typeof updateSessionTokensIncremental;
 type UpdateMessageTokensIncremental = typeof updateMessageTokensIncremental;
 
@@ -158,9 +156,9 @@ export async function handleRunnerError(args: {
 	err: unknown;
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
-	completeAssistantMessage: CompleteAssistantMessage;
 	updateSessionTokensIncremental: UpdateSessionTokensIncremental;
 	updateMessageTokensIncremental: UpdateMessageTokensIncremental;
+	runSessionLoop: (sessionId: string) => Promise<void>;
 	nextPartIndex?: () => number | Promise<number>;
 }): Promise<'handled' | 'rethrow'> {
 	const { err, opts, db } = args;
@@ -168,23 +166,12 @@ export async function handleRunnerError(args: {
 
 	if (isContextOverflowError(err) && !opts.isCompactCommand) {
 		try {
-			const pruneResult = await pruneSession(db, opts.sessionId);
-			void pruneResult;
-
-			publish({
-				type: 'error',
-				sessionId: opts.sessionId,
-				payload: {
-					...payload,
-					message: `Context too large. Auto-compacted old tool results. Please retry your message.`,
-					name: 'ContextOverflow',
-				},
+			const recovery = await recoverContextOverflow({
+				db,
+				opts,
+				runSessionLoop: args.runSessionLoop,
 			});
-
-			try {
-				await args.completeAssistantMessage({}, opts, db);
-			} catch {}
-			return 'handled';
+			if (recovery !== 'failed') return 'handled';
 		} catch {}
 	}
 

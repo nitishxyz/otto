@@ -7,8 +7,7 @@ import { isContextOverflowError } from '../errors/context-overflow.ts';
 import { toErrorPayload } from '../errors/handling.ts';
 import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
-import { runAutoCompactionFlow } from '../message/compaction.ts';
-import { enqueueAssistantRun } from '../session/queue.ts';
+import { recoverContextOverflow } from '../agent/runner/runner-context-overflow.ts';
 import { hasRunningSubagentDescendant } from '../session/working.ts';
 import { clearPendingTopup } from '../topup/manager.ts';
 
@@ -17,7 +16,7 @@ export function createErrorHandler(
 	db: Awaited<ReturnType<typeof getDb>>,
 	getStepIndex: () => number,
 	sharedCtx: ToolAdapterContext,
-	retryCallback?: (sessionId: string) => Promise<void>,
+	retryCallback: (sessionId: string) => Promise<void>,
 ) {
 	return async (err: unknown) => {
 		if (
@@ -165,77 +164,16 @@ export function createErrorHandler(
 		const isPromptTooLong = isContextOverflowError(err);
 
 		if (isPromptTooLong && !opts.isCompactCommand) {
-			const retries = opts.compactionRetries ?? 0;
-			if (retries >= 2) {
-			} else {
-				await db
-					.update(messages)
-					.set({ status: 'complete', completedAt: Date.now() })
-					.where(eq(messages.id, opts.assistantMessageId));
-
-				publish({
-					type: 'message.completed',
-					sessionId: opts.sessionId,
-					payload: {
-						id: opts.assistantMessageId,
-						autoCompacted: true,
-					},
-				});
-
-				const { succeeded: compactionSucceeded } = await runAutoCompactionFlow({
-					db,
-					opts,
-					throughMessageId: opts.assistantMessageId,
-				});
-
-				if (compactionSucceeded && retryCallback) {
-					const retryMessageId = crypto.randomUUID();
-					await db.insert(messages).values({
-						id: retryMessageId,
-						sessionId: opts.sessionId,
-						role: 'assistant',
-						status: 'pending',
-						agent: opts.agent,
-						provider: opts.provider,
-						model: opts.model,
-						createdAt: Date.now(),
-					});
-
-					publish({
-						type: 'message.created',
-						sessionId: opts.sessionId,
-						payload: {
-							id: retryMessageId,
-							role: 'assistant',
-							agent: opts.agent,
-							provider: opts.provider,
-							model: opts.model,
-						},
-					});
-
-					enqueueAssistantRun(
-						{
-							...opts,
-							assistantMessageId: retryMessageId,
-							compactionRetries: retries + 1,
-						},
-						retryCallback,
-						{ front: true },
-					);
-					return;
-				}
-
-				if (compactionSucceeded) {
-					return;
-				}
-			}
+			const recovery = await recoverContextOverflow({
+				db,
+				opts,
+				runSessionLoop: retryCallback,
+			});
+			if (recovery !== 'failed') return;
 		}
 
 		const errorPartId = crypto.randomUUID();
-		const displayMessage =
-			isPromptTooLong && !opts.isCompactCommand
-				? `${errorPayload.message}. Context auto-compacted - please retry your message.`
-				: errorPayload.message;
+		const displayMessage = errorPayload.message;
 		const errorPartType = isPromptTooLong
 			? 'context_length_exceeded'
 			: errorPayload.type;
@@ -268,7 +206,7 @@ export function createErrorHandler(
 				errorDetails: JSON.stringify({
 					...errorPayload.details,
 					isApiError,
-					autoCompacted: isPromptTooLong && !opts.isCompactCommand,
+					autoCompacted: false,
 				}),
 				finishReason: 'error',
 				isAborted: false,
@@ -285,7 +223,7 @@ export function createErrorHandler(
 				errorType: errorPartType,
 				details: errorPayload.details,
 				isAborted: false,
-				autoCompacted: isPromptTooLong && !opts.isCompactCommand,
+				autoCompacted: false,
 			},
 		});
 

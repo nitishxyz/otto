@@ -67,7 +67,12 @@ export async function runAutoCompactionFlow(args: {
 			const pruneResult = await pruneSession(db, opts.sessionId);
 			succeeded = pruneResult.pruned > 0;
 		}
-	} catch {}
+	} catch {
+		try {
+			const pruneResult = await pruneSession(db, opts.sessionId);
+			succeeded = pruneResult.pruned > 0;
+		} catch {}
+	}
 
 	await db
 		.update(messages)

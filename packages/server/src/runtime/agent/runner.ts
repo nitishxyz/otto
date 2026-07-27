@@ -371,9 +371,9 @@ async function runAssistant(opts: RunOpts) {
 			err,
 			opts,
 			db,
-			completeAssistantMessage,
 			updateSessionTokensIncremental,
 			updateMessageTokensIncremental,
+			runSessionLoop,
 			nextPartIndex: sharedCtx.nextIndex,
 		});
 		if (outcome === 'handled') return;
