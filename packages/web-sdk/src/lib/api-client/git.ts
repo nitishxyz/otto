@@ -160,22 +160,22 @@ export const gitMixin = {
 		return (response.data as any)?.data as GitBranchInfo;
 	},
 
-	async pushCommits(): Promise<GitPushResponse> {
+	async pushCommits(sessionId?: string | null): Promise<GitPushResponse> {
 		const response = await apiPushCommits({
 			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
-			body: {} as any,
+			body: (sessionId ? { sessionId } : {}) as any,
 		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure
 		return (response.data as any)?.data as GitPushResponse;
 	},
 
-	async pullChanges(): Promise<GitPullResponse> {
+	async pullChanges(sessionId?: string | null): Promise<GitPullResponse> {
 		const response = await apiPullChanges({
 			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
-			body: {} as any,
+			body: (sessionId ? { sessionId } : {}) as any,
 		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure

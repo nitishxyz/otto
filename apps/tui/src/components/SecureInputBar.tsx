@@ -68,7 +68,10 @@ export function SecureInputBar({
 		}
 	});
 
-	const masked = value.length > 0 ? '•'.repeat(Math.min(value.length, 32)) : '';
+	const displayedValue =
+		pendingInput.inputKind === 'password'
+			? '•'.repeat(Math.min(value.length, 32))
+			: value;
 
 	return (
 		<box
@@ -91,8 +94,14 @@ export function SecureInputBar({
 			</box>
 			<box style={{ flexDirection: 'row', gap: 1, width: '100%' }}>
 				<text fg={colors.yellow}>❯</text>
-				<text fg={colors.fgBright}>{masked}</text>
-				{value.length === 0 && <text fg={colors.fgDark}>type secret…</text>}
+				<text fg={colors.fgBright}>{displayedValue}</text>
+				{value.length === 0 && (
+					<text fg={colors.fgDark}>
+						{pendingInput.inputKind === 'password'
+							? 'type secret…'
+							: 'type response…'}
+					</text>
+				)}
 				<text fg={colors.green}>↵ send</text>
 				<text fg={colors.red}>esc cancel</text>
 				{submitting && <text fg={colors.blue}>sending…</text>}

@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitPushSchema } from './schemas.ts';
+import { runInteractiveGitCommand } from './interactive.ts';
 import { getCurrentBranch, validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -11,6 +12,7 @@ const execFileAsync = promisify(execFile);
 
 const gitProjectBodySchema = z.object({
 	project: z.string().optional(),
+	sessionId: z.string().optional(),
 });
 
 const gitOutputResponseSchema = z.object({
@@ -78,7 +80,7 @@ export function registerPushRoute(app: Hono) {
 					);
 				}
 
-				gitPushSchema.parse(body);
+				const input = gitPushSchema.parse(body);
 
 				const requestedPath = await resolveRequestProjectRoot(c);
 
@@ -127,17 +129,23 @@ export function registerPushRoute(app: Hono) {
 					let pushError: string;
 
 					if (hasUpstream) {
-						const result = await execFileAsync('git', ['push'], {
+						const result = await runInteractiveGitCommand({
+							projectRoot: requestedPath,
+							sessionId: input.sessionId,
 							cwd: gitRoot,
+							gitArgs: ['push'],
+							operation: 'push',
 						});
 						pushOutput = result.stdout;
 						pushError = result.stderr;
 					} else {
-						const result = await execFileAsync(
-							'git',
-							['push', '--set-upstream', 'origin', branch],
-							{ cwd: gitRoot },
-						);
+						const result = await runInteractiveGitCommand({
+							projectRoot: requestedPath,
+							sessionId: input.sessionId,
+							cwd: gitRoot,
+							gitArgs: ['push', '--set-upstream', 'origin', branch],
+							operation: 'push',
+						});
 						pushOutput = result.stdout;
 						pushError = result.stderr;
 					}

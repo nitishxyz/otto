@@ -188,7 +188,9 @@ export function useStream(
 										typeof payload.callId === 'string'
 											? payload.callId
 											: undefined,
-									inputKind: 'password',
+									inputKind: payload.inputKind === 'text' ? 'text' : 'password',
+									allowRemember: payload.allowRemember === true,
+									allowEmpty: payload.allowEmpty === true,
 									createdAt: Date.now(),
 								},
 							];

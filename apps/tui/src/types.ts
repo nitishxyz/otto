@@ -81,7 +81,9 @@ export interface PendingSecureInput {
 	messageId?: string;
 	callId?: string;
 	prompt: string;
-	inputKind: 'password' | 'passphrase' | 'token';
+	inputKind: 'password' | 'text';
+	allowRemember: boolean;
+	allowEmpty: boolean;
 	createdAt: number;
 }
 

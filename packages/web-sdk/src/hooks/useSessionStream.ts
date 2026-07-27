@@ -6,6 +6,7 @@ import type { Message, MessagePart } from '../types/api';
 import type { ShellJob } from '../lib/api-client';
 import { useToolApprovalStore } from '../stores/toolApprovalStore';
 import { useSecureInputStore } from '../stores/secureInputStore';
+import { allowsEmptySecureInput } from '../lib/secure-input-prompt';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import {
 	getQueueStateQueryKey,
@@ -2014,7 +2015,12 @@ export function useSessionStream(
 								typeof payload?.callId === 'string'
 									? payload.callId
 									: undefined,
-							inputKind: 'password',
+							inputKind: payload?.inputKind === 'text' ? 'text' : 'password',
+							allowRemember: payload?.allowRemember === true,
+							allowEmpty: allowsEmptySecureInput(
+								prompt,
+								payload?.allowEmpty === true,
+							),
 							createdAt: Date.now(),
 						});
 					}

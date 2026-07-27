@@ -66,6 +66,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 	const { data: status, isLoading, error, refetch } = useGitStatus();
 	const { data: remotes } = useGitRemotes();
 	const queryClient = useQueryClient();
+	const activeSessionId = useGitStore((state) => state.activeSessionId);
 	const pushMutation = usePushCommits();
 	const pullMutation = usePullChanges();
 	const initMutation = useGitInit();
@@ -100,7 +101,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 
 	const handlePush = async () => {
 		try {
-			await pushMutation.mutateAsync();
+			await pushMutation.mutateAsync(activeSessionId);
 		} catch (err) {
 			addError(
 				err instanceof Error ? err.message : 'Failed to push',
@@ -111,7 +112,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 
 	const handlePull = async () => {
 		try {
-			await pullMutation.mutateAsync();
+			await pullMutation.mutateAsync(activeSessionId);
 		} catch (err) {
 			addError(
 				err instanceof Error ? err.message : 'Failed to pull',

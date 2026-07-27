@@ -119,7 +119,7 @@ export function usePushCommits() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: () => apiClient.pushCommits(),
+		mutationFn: (sessionId?: string | null) => apiClient.pushCommits(sessionId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
@@ -131,7 +131,7 @@ export function usePullChanges() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: () => apiClient.pullChanges(),
+		mutationFn: (sessionId?: string | null) => apiClient.pullChanges(sessionId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });

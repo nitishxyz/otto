@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 
+export type SecureInputKind = 'password' | 'text';
+
 export interface PendingSecureInput {
 	promptId: string;
 	messageId?: string;
 	callId?: string;
 	prompt: string;
-	inputKind?: 'password' | 'passphrase' | 'token';
+	inputKind: SecureInputKind;
+	allowRemember: boolean;
+	allowEmpty: boolean;
 	createdAt: number;
 }
 

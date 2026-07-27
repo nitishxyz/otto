@@ -1,16 +1,14 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { gitPullSchema } from './schemas.ts';
+import { runInteractiveGitCommand } from './interactive.ts';
 import { validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
-const execFileAsync = promisify(execFile);
-
 const gitProjectBodySchema = z.object({
 	project: z.string().optional(),
+	sessionId: z.string().optional(),
 });
 
 const gitOutputResponseSchema = z.object({
@@ -75,7 +73,7 @@ export function registerPullRoute(app: Hono) {
 					body = {};
 				}
 
-				gitPullSchema.parse(body);
+				const input = gitPullSchema.parse(body);
 
 				const requestedPath = await resolveRequestProjectRoot(c);
 
@@ -90,8 +88,12 @@ export function registerPullRoute(app: Hono) {
 				const { gitRoot } = validation;
 
 				try {
-					const result = await execFileAsync('git', ['pull'], {
+					const result = await runInteractiveGitCommand({
+						projectRoot: requestedPath,
+						sessionId: input.sessionId,
 						cwd: gitRoot,
+						gitArgs: ['pull'],
+						operation: 'pull',
 					});
 
 					return c.json({

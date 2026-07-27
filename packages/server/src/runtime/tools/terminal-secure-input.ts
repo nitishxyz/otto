@@ -1,7 +1,13 @@
 import { getTerminalManager } from '@ottocode/sdk';
 import type { ToolAdapterContext } from './context.ts';
-import { requestSecureInput } from './secure-input.ts';
-import { detectSecurePrompt } from './secure-prompt.ts';
+import {
+	invalidateCachedSecureInput,
+	requestSecureInput,
+} from './secure-input.ts';
+import {
+	detectSecurePrompt,
+	hasAuthenticationFailure,
+} from './secure-prompt.ts';
 
 interface TerminalSecureInputWatcher {
 	waitForPromptResolution: (timeoutMs?: number) => Promise<boolean>;
@@ -14,7 +20,7 @@ function delay(ms: number): Promise<void> {
 }
 
 export function attachTerminalSecureInput(args: {
-	ctx: ToolAdapterContext;
+	ctx: Pick<ToolAdapterContext, 'projectRoot' | 'sessionId' | 'messageId'>;
 	terminalId: string;
 	callId?: string;
 }): TerminalSecureInputWatcher | null {
@@ -29,6 +35,7 @@ export function attachTerminalSecureInput(args: {
 	let recentOutput = '';
 	let securePromptPending = false;
 	let currentPromptPromise: Promise<void> | null = null;
+	let lastSecureInputCacheKey: string | null = null;
 	const promptWaiters = new Set<() => void>();
 
 	const notifyPromptWaiters = () => {
@@ -70,16 +77,22 @@ export function attachTerminalSecureInput(args: {
 		recentOutput = `${recentOutput}${data}`.slice(-1000);
 		if (securePromptPending) return;
 
-		const prompt = detectSecurePrompt(recentOutput);
-		if (!prompt) return;
+		const detected = detectSecurePrompt(recentOutput);
+		if (!detected) return;
 
 		securePromptPending = true;
+		const cacheKey = `terminal:${terminal.command}\0${terminal.args.join('\0')}\0${detected.prompt}`;
+		lastSecureInputCacheKey = cacheKey;
 		currentPromptPromise = requestSecureInput({
 			projectRoot: args.ctx.projectRoot,
 			sessionId: args.ctx.sessionId,
 			messageId: args.ctx.messageId,
 			callId: args.callId,
-			prompt,
+			prompt: detected.prompt,
+			inputKind: detected.inputKind,
+			allowEmpty: detected.allowEmpty,
+			cacheKey,
+			bypassCache: hasAuthenticationFailure(recentOutput),
 		})
 			.then(async (value) => {
 				securePromptPending = false;
@@ -114,6 +127,15 @@ export function attachTerminalSecureInput(args: {
 	};
 
 	function onExit() {
+		if (
+			lastSecureInputCacheKey &&
+			hasAuthenticationFailure(terminal.read().join(''))
+		) {
+			invalidateCachedSecureInput(
+				args.ctx.projectRoot,
+				lastSecureInputCacheKey,
+			);
+		}
 		cleanup();
 	}
 

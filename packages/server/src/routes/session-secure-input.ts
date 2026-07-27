@@ -19,6 +19,7 @@ const secureInputResolveBodySchema = z.object({
 	promptId: z.string(),
 	value: z.string().optional(),
 	cancelled: z.boolean().optional(),
+	remember: z.boolean().optional(),
 });
 
 const secureInputResolveResponseSchema = z.object({
@@ -37,7 +38,9 @@ const pendingSecureInputSchema = z.object({
 	messageId: z.string(),
 	callId: z.string().optional(),
 	prompt: z.string(),
-	inputKind: z.literal('password'),
+	inputKind: z.enum(['password', 'text']),
+	allowRemember: z.boolean(),
+	allowEmpty: z.boolean(),
 	createdAt: z.number(),
 });
 
@@ -132,6 +135,7 @@ export function registerSessionSecureInputRoute(app: Hono) {
 				body.promptId,
 				value,
 				project.runtime.root,
+				body.remember === true,
 			);
 			if (!result.ok) {
 				return c.json({ ok: false, error: result.error }, 400);
@@ -178,7 +182,9 @@ export function registerSessionSecureInputRoute(app: Hono) {
 				messageId: input.messageId,
 				callId: input.callId,
 				prompt: input.prompt,
-				inputKind: 'password' as const,
+				inputKind: input.inputKind,
+				allowRemember: input.allowRemember,
+				allowEmpty: input.allowEmpty,
 				createdAt: input.createdAt,
 			}));
 

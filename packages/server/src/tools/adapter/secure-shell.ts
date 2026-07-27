@@ -11,9 +11,13 @@ import {
 	registerActiveShellProcess,
 	type ActiveShellRegistration,
 } from '../../runtime/tools/active-shells.ts';
-import { requestSecureInput } from '../../runtime/tools/secure-input.ts';
+import {
+	invalidateCachedSecureInput,
+	requestSecureInput,
+} from '../../runtime/tools/secure-input.ts';
 import {
 	detectSecurePrompt,
+	hasAuthenticationFailure,
 	normalizeSudoCommand,
 } from '../../runtime/tools/secure-prompt.ts';
 
@@ -77,6 +81,7 @@ export function createSecureShellExecutor(args: {
 		let stdout = '';
 		let stderr = '';
 		let recentOutput = '';
+		let lastSecureInputCacheKey: string | null = null;
 		let securePromptPending = false;
 		let didTimeout = false;
 		let didAbort = false;
@@ -223,16 +228,22 @@ export function createSecureShellExecutor(args: {
 		const maybeRequestSecureInput = (text: string) => {
 			recentOutput = `${recentOutput}${text}`.slice(-1000);
 			if (securePromptPending) return;
-			const prompt = detectSecurePrompt(recentOutput);
-			if (!prompt) return;
+			const detected = detectSecurePrompt(recentOutput);
+			if (!detected) return;
 
 			securePromptPending = true;
+			const cacheKey = `shell:${input.cmd}\n${detected.prompt}`;
+			lastSecureInputCacheKey = cacheKey;
 			void requestSecureInput({
 				projectRoot: ctx.projectRoot,
 				sessionId: ctx.sessionId,
 				messageId: ctx.messageId,
 				callId,
-				prompt,
+				prompt: detected.prompt,
+				inputKind: detected.inputKind,
+				allowEmpty: detected.allowEmpty,
+				cacheKey,
+				bypassCache: hasAuthenticationFailure(recentOutput),
 			}).then((value) => {
 				securePromptPending = false;
 				recentOutput = '';
@@ -291,6 +302,12 @@ export function createSecureShellExecutor(args: {
 
 		proc.on('close', (exitCode) => {
 			const resolvedExitCode = exitCode ?? 0;
+			if (
+				lastSecureInputCacheKey &&
+				hasAuthenticationFailure(`${stdout}\n${stderr}`)
+			) {
+				invalidateCachedSecureInput(ctx.projectRoot, lastSecureInputCacheKey);
+			}
 			const envHint = detectShellEnvHint({
 				stdout,
 				stderr,

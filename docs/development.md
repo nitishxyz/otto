@@ -120,6 +120,14 @@ For first-party clients, include selected project context in all route calls and
 
 React Query keys and TUI hook dependencies should include the project id/key so sessions, messages, config, files, and git state do not cross projects.
 
+## Runtime credential prompts
+
+Shell and terminal tools detect common interactive prompts and forward the response directly to the waiting process. This includes sudo, SSH and git credentials, yes/no confirmations, named text fields, selections, defaults, and “press Enter” prompts. Session-scoped git push and pull requests run in a pseudo-terminal so remote password, passphrase, username, and host-confirmation prompts can be answered by the client.
+
+Prompt detection is intentionally conservative because ordinary command output can also end in a question or colon. Full-screen, arrow-key, or raw-TTY interfaces should use the terminal tool, which provides an interactive pseudo-terminal; they cannot be represented by a single shell input modal.
+
+The web prompt can remember secret values for 15 minutes. Remembered values are scoped to the project, command, and prompt, kept only in server process memory, and cleared on expiry or server restart. They are never written to project files, configuration, logs, or chat history.
+
 ## Build targets
 
 ```bash
