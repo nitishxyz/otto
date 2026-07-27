@@ -3,6 +3,7 @@ import { useUsageStore } from '../../stores/usageStore';
 import { useProviderUsage } from '../../hooks/useProviderUsage';
 import { useAllModels } from '../../hooks/useConfig';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
+import { Tooltip } from '../ui/Tooltip';
 
 interface UsageRingProps {
 	provider: string;
@@ -40,48 +41,50 @@ export const UsageRing = memo(function UsageRing({ provider }: UsageRingProps) {
 	const titleLabel = windowSeconds > 1209600 ? 'monthly' : '5h window';
 	const dashOffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 	const color = getColor(percent);
+	const label = `Usage: ${Math.round(percent)}% (${titleLabel}) — Click for details`;
 
 	return (
-		<button
-			type="button"
-			onClick={() => openModal(provider)}
-			className="relative flex items-center hover:opacity-80 transition-opacity cursor-pointer"
-			title={`Usage: ${Math.round(percent)}% (${titleLabel}) — Click for details`}
-		>
-			<svg
-				width={SIZE}
-				height={SIZE}
-				className="-rotate-90"
-				role="img"
-				aria-label="Usage ring"
+		<Tooltip content={label} side="bottom">
+			<button
+				type="button"
+				onClick={() => openModal(provider)}
+				className="relative flex items-center hover:opacity-80 transition-opacity cursor-pointer"
+				aria-label={label}
 			>
-				<circle
-					cx={SIZE / 2}
-					cy={SIZE / 2}
-					r={RADIUS}
-					fill="none"
-					stroke="hsl(var(--muted))"
-					strokeWidth={STROKE}
-				/>
-				<circle
-					cx={SIZE / 2}
-					cy={SIZE / 2}
-					r={RADIUS}
-					fill="none"
-					stroke={color}
-					strokeWidth={STROKE}
-					strokeDasharray={CIRCUMFERENCE}
-					strokeDashoffset={dashOffset}
-					strokeLinecap="round"
-					className="transition-all duration-500"
-				/>
-			</svg>
-			<span
-				className="absolute inset-0 flex items-center justify-center rotate-0 font-medium text-muted-foreground"
-				style={{ fontSize: 7 }}
-			>
-				{windowLabel}
-			</span>
-		</button>
+				<svg
+					width={SIZE}
+					height={SIZE}
+					className="-rotate-90"
+					aria-hidden="true"
+				>
+					<circle
+						cx={SIZE / 2}
+						cy={SIZE / 2}
+						r={RADIUS}
+						fill="none"
+						stroke="hsl(var(--muted))"
+						strokeWidth={STROKE}
+					/>
+					<circle
+						cx={SIZE / 2}
+						cy={SIZE / 2}
+						r={RADIUS}
+						fill="none"
+						stroke={color}
+						strokeWidth={STROKE}
+						strokeDasharray={CIRCUMFERENCE}
+						strokeDashoffset={dashOffset}
+						strokeLinecap="round"
+						className="transition-all duration-500"
+					/>
+				</svg>
+				<span
+					className="absolute inset-0 flex items-center justify-center rotate-0 font-medium text-muted-foreground"
+					style={{ fontSize: 7 }}
+				>
+					{windowLabel}
+				</span>
+			</button>
+		</Tooltip>
 	);
 });

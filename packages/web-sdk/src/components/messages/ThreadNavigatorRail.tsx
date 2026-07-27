@@ -7,6 +7,7 @@ import {
 	type MotionValue,
 } from 'motion/react';
 import type { Message } from '../../types/api';
+import { TooltipPopup, type TooltipTargetRect } from '../ui/Tooltip';
 import { getMessagePartText, isCompactSlashCommand } from './compactionSummary';
 import {
 	getThreadNavigatorLayout,
@@ -36,7 +37,7 @@ interface ThreadNavigatorBarProps {
 	turn: NavTurn;
 	index: number;
 	mouseY: MotionValue<number>;
-	onHover: (index: number) => void;
+	onHover: (index: number | null, target: TooltipTargetRect | null) => void;
 	onNavigate: (index: number) => void;
 	barMinWidth: number;
 	barMaxWidth: number;
@@ -345,8 +346,13 @@ const ThreadNavigatorBar = memo(function ThreadNavigatorBar({
 	return (
 		<button
 			type="button"
-			onPointerEnter={() => onHover(index)}
-			onFocus={() => onHover(index)}
+			onPointerEnter={(event) =>
+				onHover(index, event.currentTarget.getBoundingClientRect())
+			}
+			onFocus={(event) =>
+				onHover(index, event.currentTarget.getBoundingClientRect())
+			}
+			onBlur={() => onHover(null, null)}
 			onClick={() => onNavigate(turn.index)}
 			className="absolute left-0 flex items-center justify-start w-full"
 			style={{
@@ -382,6 +388,9 @@ export const ThreadNavigatorRail = memo(function ThreadNavigatorRail({
 	const mouseY = useMotionValue(FAR_POINTER_Y);
 	const [availableRailHeight, setAvailableRailHeight] = useState(0);
 	const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+	const [previewTarget, setPreviewTarget] = useState<TooltipTargetRect | null>(
+		null,
+	);
 	const shellStyle = {
 		top: Math.max(0, topInset),
 		bottom: Math.max(0, bottomInset),
@@ -437,15 +446,14 @@ export const ThreadNavigatorRail = memo(function ThreadNavigatorRail({
 	);
 	const railHeight = turns.length * rowHeight;
 	const hoveredTurn = hoveredIndex !== null ? turns[hoveredIndex] : undefined;
-	const tooltipTop =
-		hoveredIndex !== null
-			? hoveredIndex * rowHeight + rowHeight / 2
-			: rowHeight / 2;
-
-	const setHoveredBar = (index: number | null) => {
+	const setHoveredBar = (
+		index: number | null,
+		target: TooltipTargetRect | null,
+	) => {
 		if (hoveredIndexRef.current === index) return;
 		hoveredIndexRef.current = index;
 		setHoveredIndex(index);
+		setPreviewTarget(target);
 	};
 
 	const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -458,12 +466,19 @@ export const ThreadNavigatorRail = memo(function ThreadNavigatorRail({
 			Math.max(0, Math.floor(y / rowHeight)),
 		);
 		mouseY.set(index * rowHeight + rowHeight / 2);
-		setHoveredBar(index);
+		setHoveredBar(index, {
+			left: rect.left,
+			right: rect.right,
+			top: rect.top + index * rowHeight,
+			bottom: rect.top + (index + 1) * rowHeight,
+			width: rect.width,
+			height: rowHeight,
+		});
 	};
 
 	const handlePointerLeave = () => {
 		mouseY.set(FAR_POINTER_Y);
-		setHoveredBar(null);
+		setHoveredBar(null, null);
 	};
 
 	return (
@@ -495,27 +510,31 @@ export const ThreadNavigatorRail = memo(function ThreadNavigatorRail({
 						rowHeight={rowHeight}
 					/>
 				))}
-
-				{hoveredTurn && layout.showPreviewCard && (
-					<div
-						className={`pointer-events-none absolute left-full top-0 ml-2 ${
-							layout.compact ? 'w-64' : 'w-80'
-						} rounded-xl border border-border bg-popover/95 backdrop-blur-sm shadow-lg p-3`}
-						style={{
-							transform: `translateY(${tooltipTop}px) translateY(-50%)`,
-						}}
-					>
-						<p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
-							{hoveredTurn.title}
-						</p>
-						{hoveredTurn.preview && (
-							<p className="mt-1 text-sm text-muted-foreground leading-snug line-clamp-3">
-								{hoveredTurn.preview}
-							</p>
-						)}
-					</div>
-				)}
 			</div>
+			<TooltipPopup
+				target={hoveredTurn && layout.showPreviewCard ? previewTarget : null}
+				side="right"
+				className="rounded-xl bg-popover/95 backdrop-blur-sm shadow-lg whitespace-normal"
+				style={{
+					width: layout.compact ? 256 : 320,
+					padding: 12,
+					whiteSpace: 'normal',
+				}}
+				content={
+					hoveredTurn ? (
+						<>
+							<p className="font-semibold text-foreground leading-snug line-clamp-2">
+								{hoveredTurn.title}
+							</p>
+							{hoveredTurn.preview && (
+								<p className="mt-1 font-normal text-muted-foreground leading-snug line-clamp-3">
+									{hoveredTurn.preview}
+								</p>
+							)}
+						</>
+					) : null
+				}
+			/>
 		</div>
 	);
 });

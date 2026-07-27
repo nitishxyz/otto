@@ -7,10 +7,12 @@ import { useFileBrowserStore } from '../stores/fileBrowserStore';
 import { useTunnelStore } from '../stores/tunnelStore';
 import { useMCPStore } from '../stores/mcpStore';
 import { useSkillsStore } from '../stores/skillsStore';
+import { useAgentsStore } from '../stores/agentsStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useResearchStore } from '../stores/researchStore';
 import { useFilePickerStore } from '../stores/filePickerStore';
 import { useTerminalStore } from '../stores/terminalStore';
+import { useViewerTabsStore } from '../stores/viewerTabsStore';
 
 interface UseKeyboardShortcutsOptions {
 	sessionIds?: string[];
@@ -68,6 +70,7 @@ export function useKeyboardShortcuts({
 	const toggleTunnel = useTunnelStore((state) => state.toggleSidebar);
 	const toggleMCP = useMCPStore((state) => state.toggleSidebar);
 	const toggleSkills = useSkillsStore((state) => state.toggleSidebar);
+	const toggleAgents = useAgentsStore((state) => state.toggleManager);
 	const toggleSettings = useSettingsStore((state) => state.toggleSidebar);
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
 	const toggleTerminalPanel = useTerminalStore((state) => state.togglePanel);
@@ -106,7 +109,7 @@ export function useKeyboardShortcuts({
 				!e.shiftKey &&
 				!e.altKey &&
 				e.key >= '1' &&
-				e.key <= '7'
+				e.key <= '9'
 			) {
 				e.preventDefault();
 
@@ -129,18 +132,38 @@ export function useKeyboardShortcuts({
 						setFocus('input');
 						break;
 					case '4':
-						toggleTunnel();
+						{
+							const viewerTabs = useViewerTabsStore.getState();
+							const browserTab = viewerTabs.tabOrder
+								.map((id) => viewerTabs.tabsById[id])
+								.find((tab) => tab?.type === 'browser');
+							if (browserTab?.id === viewerTabs.activeTabId) {
+								viewerTabs.closeTab(browserTab.id);
+							} else if (browserTab) {
+								viewerTabs.setActiveTab(browserTab.id);
+							} else {
+								viewerTabs.openBrowserTab();
+							}
+						}
 						setFocus('input');
 						break;
 					case '5':
-						toggleMCP();
+						toggleTunnel();
 						setFocus('input');
 						break;
 					case '6':
-						toggleSkills();
+						toggleMCP();
 						setFocus('input');
 						break;
 					case '7':
+						toggleSkills();
+						setFocus('input');
+						break;
+					case '8':
+						toggleAgents();
+						setFocus('input');
+						break;
+					case '9':
 						toggleSettings();
 						setFocus('input');
 						break;
@@ -394,6 +417,7 @@ export function useKeyboardShortcuts({
 			toggleTunnel,
 			toggleMCP,
 			toggleSkills,
+			toggleAgents,
 			toggleSettings,
 			toggleTerminalPanel,
 			toggleResearch,

@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { CircleCheck, Pin } from 'lucide-react';
 import type { Session } from '../../types/api';
 import { StableSpinner } from '../ui/StableSpinner';
+import { Tooltip } from '../ui/Tooltip';
 import { formatRelativeSessionTime } from './session-time';
 import { InlineChangeCount } from '../workspace/ViewerStatusBar';
 
@@ -29,6 +30,7 @@ export const SessionItem = memo(function SessionItem({
 	const hasFileStats = fileStats && fileStats.changedFiles > 0;
 	const showStats =
 		hasFileStats && (fileStats.additions > 0 || fileStats.deletions > 0);
+	const pinLabel = isPinned ? 'Unpin session' : 'Pin session';
 	const statusIcon = isRunning ? (
 		<StableSpinner className="text-sidebar-muted-foreground" title="Running" />
 	) : isReadyForReview ? (
@@ -62,19 +64,22 @@ export const SessionItem = memo(function SessionItem({
 					>
 						{title}
 					</span>
-					<button
-						type="button"
-						onClick={onTogglePinned}
-						className={`pointer-events-auto relative z-20 flex h-5 shrink-0 items-center justify-center overflow-hidden rounded text-sidebar-muted-foreground transition-all duration-150 ease-out hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring/50 ${
-							isPinned
-								? 'ml-1 w-5 translate-x-0 opacity-100 text-sidebar-foreground'
-								: 'ml-0 w-0 translate-x-1 opacity-0 group-hover:ml-1 group-hover:w-5 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:ml-1 group-focus-within:w-5 group-focus-within:translate-x-0 group-focus-within:opacity-100'
-						}`}
-						aria-label={isPinned ? 'Unpin session' : 'Pin session'}
-						title={isPinned ? 'Unpin session' : 'Pin session'}
-					>
-						<Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-current' : ''}`} />
-					</button>
+					<Tooltip content={pinLabel} side="right">
+						<button
+							type="button"
+							onClick={onTogglePinned}
+							className={`pointer-events-auto relative z-20 flex h-5 shrink-0 items-center justify-center overflow-hidden rounded text-sidebar-muted-foreground transition-all duration-150 ease-out hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring/50 ${
+								isPinned
+									? 'ml-1 w-5 translate-x-0 opacity-100 text-sidebar-foreground'
+									: 'ml-0 w-0 translate-x-1 opacity-0 group-hover:ml-1 group-hover:w-5 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:ml-1 group-focus-within:w-5 group-focus-within:translate-x-0 group-focus-within:opacity-100'
+							}`}
+							aria-label={pinLabel}
+						>
+							<Pin
+								className={`h-3.5 w-3.5 ${isPinned ? 'fill-current' : ''}`}
+							/>
+						</button>
+					</Tooltip>
 				</span>
 				<span className="mt-0.5 flex w-full items-center justify-between gap-3 text-left text-[11px] leading-4 text-sidebar-muted-foreground">
 					<span className="min-w-0 flex-1 truncate">

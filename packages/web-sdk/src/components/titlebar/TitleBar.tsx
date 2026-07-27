@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useRightRailStore } from '../../stores/rightRailStore';
+import { Tooltip } from '../ui/Tooltip';
 
 interface TitleBarButtonProps {
 	onClick: () => void;
@@ -19,17 +20,24 @@ export function TitleBarButton({
 	ariaPressed,
 	children,
 }: TitleBarButtonProps) {
-	return (
+	const button = (
 		<button
 			type="button"
 			onClick={onClick}
 			className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-			title={title}
 			aria-label={ariaLabel ?? title}
 			aria-pressed={ariaPressed}
 		>
 			{children}
 		</button>
+	);
+
+	if (!title) return button;
+
+	return (
+		<Tooltip content={title} side="bottom">
+			{button}
+		</Tooltip>
 	);
 }
 
@@ -125,15 +133,9 @@ export const TitleBar = memo(function TitleBar({
 		>
 			<div className={`flex items-center gap-2 ${leadingInset ? 'ml-20' : ''}`}>
 				{onBack && (
-					<button
-						type="button"
-						onClick={onBack}
-						className="w-8 h-8 flex items-center justify-center text-base text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-						title="Back"
-						aria-label="Back"
-					>
-						←
-					</button>
+					<TitleBarButton onClick={onBack} title="Back">
+						<span className="text-base">←</span>
+					</TitleBarButton>
 				)}
 				{showSidebarToggle && <TitleBarSidebarToggle />}
 				{leading}

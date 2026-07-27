@@ -2,7 +2,7 @@ import { memo, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePanelWidthStore, useSidebarStore } from '@ottocode/web-sdk/stores';
-import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
+import { Button, ResizeHandle, Tooltip } from '@ottocode/web-sdk/components';
 import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
 
 const PANEL_KEY = 'desktop-left-sidebar';
@@ -103,45 +103,49 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 								<div className="flex items-center text-sidebar-foreground/90">
 									<Wordmark />
 								</div>
-								<button
-									type="button"
-									onClick={onNewSession}
-									className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
-									title="New session"
-								>
-									<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
-								</button>
+								<Tooltip content="New session" side="bottom">
+									<button
+										type="button"
+										onClick={onNewSession}
+										className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation pointer-events-auto"
+										aria-label="New session"
+									>
+										<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
+									</button>
+								</Tooltip>
 							</div>
 						</div>
 						<div className="absolute inset-0 overflow-hidden">{children}</div>
 					</div>
 
 					<div className="h-12 border-t border-sidebar-border px-2 flex items-center justify-end">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={toggleCollapse}
-							title="Collapse sidebar"
-							className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								className="transition-transform duration-300"
-								role="img"
+						<Tooltip content="Collapse sidebar" side="top">
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={toggleCollapse}
 								aria-label="Collapse sidebar"
+								className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
 							>
-								<title>Collapse sidebar</title>
-								<path d="M15 18l-6-6 6-6" />
-							</svg>
-						</Button>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									className="transition-transform duration-300"
+									role="img"
+									aria-label="Collapse sidebar"
+								>
+									<title>Collapse sidebar</title>
+									<path d="M15 18l-6-6 6-6" />
+								</svg>
+							</Button>
+						</Tooltip>
 					</div>
 				</div>
 				<div className="hidden md:block">

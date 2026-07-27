@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useSidebarStore, usePanelWidthStore } from '@ottocode/web-sdk/stores';
 import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
-import { Button, ResizeHandle } from '@ottocode/web-sdk/components';
+import { Button, ResizeHandle, Tooltip } from '@ottocode/web-sdk/components';
 import { OttoWordmark } from './OttoWordmark';
 
 const PANEL_KEY = 'left-sidebar';
@@ -140,14 +140,16 @@ const ExpandedSidebarContent = memo(function ExpandedSidebarContent({
 					<div className="flex items-center text-sidebar-foreground/90">
 						<OttoWordmark height={14} className="select-none" />
 					</div>
-					<button
-						type="button"
-						onClick={onNewSession}
-						className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
-						title="New session"
-					>
-						<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
-					</button>
+					<Tooltip content="New session" side="bottom">
+						<button
+							type="button"
+							onClick={onNewSession}
+							className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
+							aria-label="New session"
+						>
+							<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
+						</button>
+					</Tooltip>
 				</div>
 				<div className="flex-1 relative overflow-hidden">
 					<div className="absolute inset-0 overflow-hidden">{children}</div>
@@ -193,14 +195,16 @@ const MobileSidebarHeader = memo(function MobileSidebarHeader({
 			<div className="flex-1 flex items-center">
 				<OttoWordmark height={14} className="text-sidebar-foreground" />
 			</div>
-			<button
-				type="button"
-				onClick={onNewSession}
-				className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
-				title="New session"
-			>
-				<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
-			</button>
+			<Tooltip content="New session" side="bottom">
+				<button
+					type="button"
+					onClick={onNewSession}
+					className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center hover:opacity-90 transition-opacity touch-manipulation"
+					aria-label="New session"
+				>
+					<Plus className="w-4 h-4 text-sidebar-primary-foreground" />
+				</button>
+			</Tooltip>
 		</div>
 	);
 });
@@ -222,15 +226,17 @@ const SidebarFooter = memo(function SidebarFooter({
 				connectionUrl={connectionUrl}
 				onSwitchConnection={onSwitchConnection}
 			/>
-			<Button
-				variant="ghost"
-				size="icon"
-				onClick={onCollapse}
-				title="Collapse sidebar"
-				className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
-			>
-				<CollapseSidebarIcon />
-			</Button>
+			<Tooltip content="Collapse sidebar" side="top">
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={onCollapse}
+					aria-label="Collapse sidebar"
+					className="transition-transform duration-200 hover:scale-110 touch-manipulation text-sidebar-muted-foreground hover:bg-sidebar-accent w-8 h-8"
+				>
+					<CollapseSidebarIcon />
+				</Button>
+			</Tooltip>
 		</div>
 	);
 });

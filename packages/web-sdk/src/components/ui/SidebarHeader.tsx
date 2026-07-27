@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface SidebarHeaderProps {
 	icon: ReactNode;
@@ -27,14 +28,16 @@ export function SidebarHeader({
 			{children && (
 				<div className="flex min-w-0 flex-1 items-center gap-1">{children}</div>
 			)}
-			<button
-				type="button"
-				onClick={onClose}
-				className="ml-auto h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
-				title={closeTitle}
-			>
-				<ChevronRight className="size-[17px]" />
-			</button>
+			<Tooltip content={closeTitle} side="left">
+				<button
+					type="button"
+					onClick={onClose}
+					className="ml-auto h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
+					aria-label={closeTitle}
+				>
+					<ChevronRight className="size-[17px]" />
+				</button>
+			</Tooltip>
 		</div>
 	);
 }
