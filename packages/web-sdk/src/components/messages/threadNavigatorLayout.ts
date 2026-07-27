@@ -32,10 +32,10 @@ export interface ThreadNavigatorLayout {
 export const RAIL_COMPACT_MAX_WIDTH = 640;
 
 /** Interactive rail width (px) in the roomy layout. */
-export const ROOMY_RAIL_WIDTH = 30;
+export const ROOMY_RAIL_WIDTH = 15;
 
 /** Interactive rail width (px) in the compact (dots/ticks) layout. */
-export const COMPACT_RAIL_WIDTH = 14;
+export const COMPACT_RAIL_WIDTH = 7;
 
 /** Default vertical slot height (px) for each navigator marker. */
 export const DEFAULT_NAVIGATOR_ROW_HEIGHT = 14;
@@ -71,16 +71,16 @@ export function getThreadNavigatorLayout(
 		return {
 			compact: true,
 			railWidth: COMPACT_RAIL_WIDTH,
-			barMinWidth: 4,
-			barMaxWidth: 8,
+			barMinWidth: 2,
+			barMaxWidth: 4,
 			showPreviewCard: true,
 		};
 	}
 	return {
 		compact: false,
 		railWidth: ROOMY_RAIL_WIDTH,
-		barMinWidth: 14,
-		barMaxWidth: 24,
+		barMinWidth: 7,
+		barMaxWidth: 12,
 		showPreviewCard: true,
 	};
 }

@@ -12,12 +12,13 @@ import {
 	unsetTerminalManager,
 	type OttoConfig,
 } from '@ottocode/sdk';
-import { realpath, stat } from 'node:fs/promises';
-import { basename, resolve } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { shutdownPartContentWriter } from '../persistence/part-content-writer.ts';
 import { abortAllActiveShellJobs } from '../tools/active-shells.ts';
 import { getServerInfo } from '../../state.ts';
 import { recoverInterruptedRuns } from './recovery.ts';
+import { validateProjectDirectory } from './filesystem.ts';
 import {
 	forgetProject,
 	listProjects,
@@ -67,7 +68,7 @@ export class ProjectManager {
 	private readonly cfgCacheById = new Map<string, ConfigCacheState>();
 
 	async openProject(input: { path: string }): Promise<ProjectRuntime> {
-		const root = await canonicalizeProjectRoot(input.path);
+		const root = await validateProjectDirectory(input.path);
 		const existingId = this.idsByRoot.get(root);
 		if (existingId) {
 			return this.getProject({ id: existingId });
@@ -190,7 +191,7 @@ export class ProjectManager {
 
 	async forgetProject(idOrPath: string): Promise<ProjectRuntimeSummary | null> {
 		const projects = await this.listProjects();
-		const root = await canonicalizeProjectRoot(idOrPath);
+		const root = await validateProjectDirectory(idOrPath).catch(() => idOrPath);
 		const project = projects.find(
 			(item) =>
 				item.id === idOrPath || item.path === root || item.path === idOrPath,
@@ -253,15 +254,6 @@ export async function shutdownProjectManager(): Promise<void> {
 		await shutdownPartContentWriter();
 	} catch {}
 	await defaultProjectManager.closeAllProjects();
-}
-
-async function canonicalizeProjectRoot(projectRoot: string): Promise<string> {
-	const absolute = resolve(projectRoot);
-	try {
-		return await realpath(absolute);
-	} catch {
-		return absolute;
-	}
 }
 
 function projectName(projectRoot: string): string {

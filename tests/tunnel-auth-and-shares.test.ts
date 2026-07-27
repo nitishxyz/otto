@@ -180,6 +180,7 @@ describe('tunnel auth middleware', () => {
 
 		for (const path of [
 			'/v1/projects',
+			'/v1/projects/directories',
 			'/v1/projects/other',
 			'/v1/tunnel/status',
 		]) {

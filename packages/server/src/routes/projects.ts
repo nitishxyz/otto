@@ -1,6 +1,10 @@
 import { z } from '@hono/zod-openapi';
+import { getOttoHomeDir } from '@ottocode/sdk';
 import type { Hono } from 'hono';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import { listProjectDirectories } from '../runtime/projects/filesystem.ts';
 import { getProjectManager } from '../runtime/projects/manager.ts';
 import { stopProjectTunnel } from './tunnel/service.ts';
 
@@ -24,6 +28,17 @@ const openProjectBodySchema = z.object({
 	path: z.string().min(1),
 });
 
+const projectDirectoriesQuerySchema = z.object({
+	path: z.string().min(1).optional(),
+});
+
+const projectDirectoriesResponseSchema = z.object({
+	path: z.string(),
+	parent: z.string().nullable(),
+	directories: z.array(z.object({ name: z.string(), path: z.string() })),
+	truncated: z.boolean(),
+});
+
 const projectIdParamsSchema = z.object({
 	projectId: z.string().openapi({
 		param: { name: 'projectId', in: 'path' },
@@ -34,6 +49,15 @@ const projectIdParamsSchema = z.object({
 const projectActionResponseSchema = z.object({ ok: z.boolean() });
 const projectPinnedBodySchema = z.object({ pinned: z.boolean() });
 const projectErrorSchema = z.object({ error: z.string() });
+
+async function openProjectSummary(path: string) {
+	const runtime = await getProjectManager().openProject({ path });
+	const project = getProjectManager()
+		.listOpenProjects()
+		.find((item) => item.id === runtime.id);
+	if (!project) throw new Error('Project failed to open');
+	return project;
+}
 
 export function registerProjectsRoutes(app: Hono) {
 	zodOpenApiRoute(
@@ -85,14 +109,57 @@ export function registerProjectsRoutes(app: Hono) {
 		},
 		async (c) => {
 			const body = openProjectBodySchema.parse(await c.req.json());
-			const runtime = await getProjectManager().openProject({
-				path: body.path,
+			return c.json(await openProjectSummary(body.path));
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/projects/directories',
+			tags: ['projects'],
+			operationId: 'listProjectDirectories',
+			summary: 'Browse host directories for project selection',
+			request: { query: projectDirectoriesQuerySchema },
+			responses: {
+				'200': {
+					description: 'Host directory listing',
+					content: {
+						'application/json': { schema: projectDirectoriesResponseSchema },
+					},
+				},
+			},
+		},
+		async (c) => {
+			const query = projectDirectoriesQuerySchema.parse({
+				path: c.req.query('path'),
 			});
-			const project = getProjectManager()
-				.listOpenProjects()
-				.find((item) => item.id === runtime.id);
-			if (!project) throw new Error('Project failed to open');
-			return c.json(project);
+			return c.json(await listProjectDirectories(query.path));
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/projects/general/open',
+			tags: ['projects'],
+			operationId: 'openGeneralProject',
+			summary: 'Create and open the host General workspace',
+			responses: {
+				'200': {
+					description: 'General project',
+					content: {
+						'application/json': { schema: projectSummarySchema },
+					},
+				},
+			},
+		},
+		async (c) => {
+			const path = join(getOttoHomeDir(), 'general');
+			await mkdir(path, { recursive: true });
+			return c.json(await openProjectSummary(path));
 		},
 	);
 

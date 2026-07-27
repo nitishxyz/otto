@@ -1,12 +1,30 @@
 import {
+	forgetProject,
 	listAuthorizedMachineProjects,
 	listOttoRouterDevices,
+	listProjectDirectories,
+	openGeneralProject,
+	openProject,
 	pollOttoRouterDeviceFlow,
 	removeProvider,
+	setProjectPinned,
 	stageServerUpgrade,
 	startOttoRouterDeviceFlow,
 } from '@ottocode/api';
-import type { MachineBootstrap, MachineProjectAccess } from './tauri-bridge';
+import type {
+	MachineBootstrap,
+	MachineProject,
+	MachineProjectAccess,
+} from './tauri-bridge';
+
+type ReadyMachineAccess = Extract<MachineProjectAccess, { status: 'ready' }>;
+
+export interface MachineDirectoryListing {
+	path: string;
+	parent: string | null;
+	directories: Array<{ name: string; path: string }>;
+	truncated: boolean;
+}
 
 export interface MachineDevice {
 	deviceId: string;
@@ -42,6 +60,75 @@ export async function loadAuthorizedMachineProjects(
 	});
 	if (response.error) throw new Error('Machine projects unavailable.');
 	return response.data as MachineProjectAccess;
+}
+
+function remoteOptions(access: ReadyMachineAccess) {
+	return {
+		baseURL: access.apiUrl,
+		headers: { 'X-Otto-Owner-Session': access.ownerSession },
+	};
+}
+
+export async function loadMachineDirectories(
+	access: ReadyMachineAccess,
+	path?: string,
+): Promise<MachineDirectoryListing> {
+	const response = await listProjectDirectories({
+		...remoteOptions(access),
+		query: path ? { path } : undefined,
+	});
+	if (response.error || !response.data) {
+		throw new Error('Could not browse directories on this machine.');
+	}
+	return response.data;
+}
+
+export async function openMachineProject(
+	access: ReadyMachineAccess,
+	path: string,
+): Promise<MachineProject> {
+	const response = await openProject({
+		...remoteOptions(access),
+		body: { path },
+	});
+	if (response.error || !response.data) {
+		throw new Error('Could not open the project on this machine.');
+	}
+	return response.data;
+}
+
+export async function openMachineGeneralProject(
+	access: ReadyMachineAccess,
+): Promise<MachineProject> {
+	const response = await openGeneralProject(remoteOptions(access));
+	if (response.error || !response.data) {
+		throw new Error('Could not open General on this machine.');
+	}
+	return response.data;
+}
+
+export async function setMachineProjectPinned(
+	access: ReadyMachineAccess,
+	projectId: string,
+	pinned: boolean,
+): Promise<void> {
+	const response = await setProjectPinned({
+		...remoteOptions(access),
+		path: { projectId },
+		body: { pinned },
+	});
+	if (response.error) throw new Error('Could not update the remote project.');
+}
+
+export async function forgetMachineProject(
+	access: ReadyMachineAccess,
+	projectId: string,
+): Promise<void> {
+	const response = await forgetProject({
+		...remoteOptions(access),
+		path: { projectId },
+	});
+	if (response.error) throw new Error('Could not forget the remote project.');
 }
 
 /**

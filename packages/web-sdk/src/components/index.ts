@@ -92,6 +92,7 @@ export * from './research/ResearchSidebarToggle';
 export * from './settings/SettingsSidebar';
 export * from './settings/SettingsSidebarToggle';
 export * from './settings/OttoRouterTopupModal';
+export * from './settings/DirectoryBrowserModal';
 export * from './settings/DictationSettings';
 
 // Tunnel Components

@@ -10,6 +10,7 @@ describe('connected machine project context', () => {
 				path: '/work/agi',
 				open: true,
 				lastUsedAt: 1,
+				pinned: true,
 			},
 			'https://device.ottorouter.org',
 			'owner-session-secret',
@@ -23,5 +24,7 @@ describe('connected machine project context', () => {
 		expect(project.remoteUrl).toBe('https://device.ottorouter.org');
 		expect(project.remoteUrl).not.toContain('owner-session-secret');
 		expect(project.path).toBe('/work/agi');
+		expect(project.pinned).toBe(true);
+		expect(project.lastOpened).toBe(new Date(1).toISOString());
 	});
 });

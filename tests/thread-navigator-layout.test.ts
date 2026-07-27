@@ -19,6 +19,8 @@ describe('thread navigator rail layout', () => {
 		const layout = getThreadNavigatorLayout(900);
 		expect(layout.compact).toBe(false);
 		expect(layout.showPreviewCard).toBe(true);
+		expect(layout.barMinWidth).toBe(7);
+		expect(layout.barMaxWidth).toBe(12);
 		expect(layout.barMaxWidth).toBeGreaterThan(layout.barMinWidth);
 		expect(layout.barMaxWidth).toBeLessThan(layout.railWidth);
 	});
@@ -27,6 +29,8 @@ describe('thread navigator rail layout', () => {
 		const layout = getThreadNavigatorLayout(RAIL_COMPACT_MAX_WIDTH - 1);
 		expect(layout.compact).toBe(true);
 		expect(layout.showPreviewCard).toBe(true);
+		expect(layout.barMinWidth).toBe(2);
+		expect(layout.barMaxWidth).toBe(4);
 		expect(layout.railWidth).toBeLessThan(ROOMY_RAIL_WIDTH);
 	});
 

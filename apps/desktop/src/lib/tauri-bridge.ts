@@ -4,7 +4,7 @@ export interface Project {
 	path: string;
 	name: string;
 	lastOpened: string;
-	pinned: boolean;
+	pinned?: boolean;
 	kind?: 'local' | 'remote' | 'general';
 	remoteUrl?: string;
 	projectId?: string;
@@ -64,6 +64,7 @@ export interface MachineProject {
 	path: string;
 	open: boolean;
 	lastUsedAt: number;
+	pinned: boolean;
 }
 
 export interface MachineServerInfo {

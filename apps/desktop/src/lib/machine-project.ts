@@ -11,9 +11,9 @@ export function toConnectedProject(
 	return {
 		path: project.path,
 		name: project.name,
-		lastOpened: now.toISOString(),
-		pinned: false,
-		kind: 'remote',
+		lastOpened: new Date(project.lastUsedAt || now.getTime()).toISOString(),
+		pinned: project.pinned ?? false,
+		kind: project.name.toLowerCase() === 'general' ? 'general' : 'remote',
 		remoteUrl: apiUrl,
 		projectId: project.id,
 		machineOwnerSession: ownerSession,

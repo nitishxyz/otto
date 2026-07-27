@@ -27,6 +27,7 @@ const machineProjectSchema = z.object({
 	path: z.string(),
 	open: z.boolean(),
 	lastUsedAt: z.number(),
+	pinned: z.boolean().optional(),
 });
 const remoteServerInfoSchema = z.object({
 	version: z.string().nullable(),

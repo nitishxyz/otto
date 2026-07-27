@@ -1,16 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, CornerDownRight, Folder } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
-import type { ReferenceDirectoryListing } from '../../lib/api-client/references';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { StableSpinner } from '../ui/StableSpinner';
+
+/** Directory page rendered by the browser, from any server-backed source. */
+export interface DirectoryBrowserListing {
+	path: string;
+	parent: string | null;
+	directories: Array<{ name: string; path: string }>;
+}
+
+export type DirectoryBrowserLoader = (
+	path?: string,
+) => Promise<DirectoryBrowserListing>;
 
 interface DirectoryBrowserModalProps {
 	isOpen: boolean;
 	initialPath?: string;
 	onClose: () => void;
 	onSelect: (path: string) => void;
+	/**
+	 * Optional listing source. Defaults to the configured API client, so
+	 * settings keeps browsing the current project's server.
+	 */
+	loadDirectories?: DirectoryBrowserLoader;
 }
 
 export function DirectoryBrowserModal({
@@ -18,15 +33,21 @@ export function DirectoryBrowserModal({
 	initialPath,
 	onClose,
 	onSelect,
+	loadDirectories,
 }: DirectoryBrowserModalProps) {
-	const [listing, setListing] = useState<ReferenceDirectoryListing | null>(
-		null,
-	);
+	const [listing, setListing] = useState<DirectoryBrowserListing | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [requestedPath, setRequestedPath] = useState<string | undefined>(
 		initialPath || undefined,
 	);
+	const loadDirectoriesRef = useRef<DirectoryBrowserLoader | undefined>(
+		loadDirectories,
+	);
+
+	useEffect(() => {
+		loadDirectoriesRef.current = loadDirectories;
+	}, [loadDirectories]);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -51,8 +72,10 @@ export function DirectoryBrowserModal({
 		let cancelled = false;
 		setIsLoading(true);
 		setError(null);
-		apiClient
-			.listReferenceDirectories(requestedPath)
+		const load =
+			loadDirectoriesRef.current ??
+			((path?: string) => apiClient.listReferenceDirectories(path));
+		load(requestedPath)
 			.then((result) => {
 				if (!cancelled) setListing(result);
 			})
