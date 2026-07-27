@@ -7,14 +7,17 @@ import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { StableSpinner } from '../ui/StableSpinner';
 
-export function GitCommitModal() {
+export function GitCommitModal({ sessionId }: { sessionId?: string }) {
 	const isCommitModalOpen = useGitStore((state) => state.isCommitModalOpen);
-	return isCommitModalOpen ? <GitCommitModalContent /> : null;
+	return isCommitModalOpen ? (
+		<GitCommitModalContent sessionId={sessionId} />
+	) : null;
 }
 
-function GitCommitModalContent() {
+function GitCommitModalContent({ sessionId }: { sessionId?: string }) {
 	const closeCommitModal = useGitStore((state) => state.closeCommitModal);
-	const commitSessionId = useGitStore((state) => state.commitSessionId);
+	const storedCommitSessionId = useGitStore((state) => state.commitSessionId);
+	const commitSessionId = sessionId ?? storedCommitSessionId;
 	const commitChanges = useCommitChanges();
 	const generateMessage = useGenerateCommitMessage(commitSessionId);
 	const [message, setMessage] = useState('');
@@ -24,13 +27,13 @@ function GitCommitModalContent() {
 		if (!message.trim()) return;
 
 		try {
-			await commitChanges.mutateAsync(message);
+			await commitChanges.mutateAsync({ message, sessionId: commitSessionId });
 			setMessage('');
 			closeCommitModal();
 		} catch (error) {
 			console.error('Failed to commit:', error);
 		}
-	}, [message, commitChanges, closeCommitModal]);
+	}, [message, commitSessionId, commitChanges, closeCommitModal]);
 
 	const handleClose = () => {
 		setMessage('');

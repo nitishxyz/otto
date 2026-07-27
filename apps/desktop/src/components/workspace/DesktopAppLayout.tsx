@@ -338,7 +338,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 				</div>
 			</div>
 
-			<GitCommitModal />
+			<GitCommitModal sessionId={sessionId} />
 			<ConfirmationDialog />
 			<AgentsManagerModal />
 			<QuickFilePicker />

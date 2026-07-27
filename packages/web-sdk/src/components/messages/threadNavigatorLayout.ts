@@ -72,7 +72,7 @@ export function getThreadNavigatorLayout(
 			compact: true,
 			railWidth: COMPACT_RAIL_WIDTH,
 			barMinWidth: 2,
-			barMaxWidth: 4,
+			barMaxWidth: 6,
 			showPreviewCard: true,
 		};
 	}
@@ -80,7 +80,7 @@ export function getThreadNavigatorLayout(
 		compact: false,
 		railWidth: ROOMY_RAIL_WIDTH,
 		barMinWidth: 7,
-		barMaxWidth: 12,
+		barMaxWidth: 16,
 		showPreviewCard: true,
 	};
 }

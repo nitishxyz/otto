@@ -18,6 +18,7 @@ import {
 } from '../../runtime/provider/oauth-adapter.ts';
 import { resolveModel } from '../../runtime/provider/index.ts';
 import { gitCommitSchema, gitGenerateCommitMessageSchema } from './schemas.ts';
+import { runInteractiveGitCommand } from './interactive.ts';
 import { parseGitStatus, validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -26,7 +27,7 @@ const execFileAsync = promisify(execFile);
 export async function handleCommitChanges(c: Context) {
 	try {
 		const body = await c.req.json();
-		const { message } = gitCommitSchema.parse(body);
+		const { message, sessionId } = gitCommitSchema.parse(body);
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
@@ -42,13 +43,13 @@ export async function handleCommitChanges(c: Context) {
 			message,
 			config.defaults.coAuthorCommits === true,
 		);
-		const { stdout } = await execFileAsync(
-			'git',
-			['commit', '-m', fullMessage],
-			{
-				cwd: validation.gitRoot,
-			},
-		);
+		const { stdout } = await runInteractiveGitCommand({
+			projectRoot: requestedPath,
+			sessionId,
+			cwd: validation.gitRoot,
+			gitArgs: ['commit', '-m', fullMessage],
+			operation: 'commit',
+		});
 
 		return c.json({
 			status: 'ok',

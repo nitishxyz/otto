@@ -8,6 +8,7 @@ import {
 describe('secure command prompt detection', () => {
 	test.each([
 		['[sudo] password for alice: ', 'password'],
+		['Passphrase: ', 'password'],
 		["alice@example.com's password: ", 'password'],
 		["Password for 'https://alice@example.com': ", 'password'],
 		['Password (alice@example.com): ', 'password'],

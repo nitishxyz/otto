@@ -13,6 +13,7 @@ export interface DetectedSecurePrompt {
 const PASSWORD_PROMPT_PATTERNS = [
 	/\[sudo\]\s+password\s+for\s+[^\r\n]+:\s*$/i,
 	/(?:^|[\r\n])password(?:\s+for\s+[^\r\n]+)?:\s*$/i,
+	/(?:^|[\r\n])passphrase(?:\s+for\s+[^\r\n]+)?:\s*$/i,
 	/(?:^|[\r\n])password\s+\([^\r\n)]+\):\s*$/i,
 	/(?:^|[\r\n])[^\r\n]+['’]s password:\s*$/i,
 	/enter\s+(?:password|passphrase|pin)(?:\s+for\s+[^\r\n]+)?:\s*$/i,

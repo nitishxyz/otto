@@ -140,11 +140,14 @@ export const gitMixin = {
 		return (response.data as any)?.data as { deleted: string[] };
 	},
 
-	async commitChanges(message: string): Promise<GitCommitResponse> {
+	async commitChanges(
+		message: string,
+		sessionId?: string | null,
+	): Promise<GitCommitResponse> {
 		const response = await apiCommitChanges({
 			query: getProjectQuery(),
 			// biome-ignore lint/suspicious/noExplicitAny: API type mismatch
-			body: { message } as any,
+			body: { message, ...(sessionId ? { sessionId } : {}) } as any,
 		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		// biome-ignore lint/suspicious/noExplicitAny: API response structure

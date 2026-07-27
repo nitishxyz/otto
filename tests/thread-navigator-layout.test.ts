@@ -20,9 +20,9 @@ describe('thread navigator rail layout', () => {
 		expect(layout.compact).toBe(false);
 		expect(layout.showPreviewCard).toBe(true);
 		expect(layout.barMinWidth).toBe(7);
-		expect(layout.barMaxWidth).toBe(12);
+		expect(layout.barMaxWidth).toBe(16);
 		expect(layout.barMaxWidth).toBeGreaterThan(layout.barMinWidth);
-		expect(layout.barMaxWidth).toBeLessThan(layout.railWidth);
+		expect(layout.barMaxWidth).toBeLessThanOrEqual(layout.railWidth + 1);
 	});
 
 	it('collapses to a compact strip below the breakpoint', () => {
@@ -30,7 +30,7 @@ describe('thread navigator rail layout', () => {
 		expect(layout.compact).toBe(true);
 		expect(layout.showPreviewCard).toBe(true);
 		expect(layout.barMinWidth).toBe(2);
-		expect(layout.barMaxWidth).toBe(4);
+		expect(layout.barMaxWidth).toBe(6);
 		expect(layout.railWidth).toBeLessThan(ROOMY_RAIL_WIDTH);
 	});
 

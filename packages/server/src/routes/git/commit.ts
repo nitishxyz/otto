@@ -9,6 +9,7 @@ import {
 const gitCommitBodySchema = z.object({
 	project: z.string().optional(),
 	message: z.string().min(1),
+	sessionId: z.string().optional(),
 });
 
 const gitGenerateCommitMessageBodySchema = z.object({

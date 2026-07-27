@@ -336,7 +336,7 @@ export const AppLayout = memo(function AppLayout({
 			/>
 
 			{/* Modals */}
-			<GitCommitModal />
+			<GitCommitModal sessionId={sessionId} />
 			<ConfirmationDialog />
 			<AgentsManagerModal />
 			<QuickFilePicker />

@@ -84,4 +84,59 @@ stty echo < /dev/tty
 			await terminalManager.killAll();
 		}
 	});
+
+	test('surfaces a signed commit passphrase and removes inherited GPG_TTY', async () => {
+		if (process.platform === 'win32') return;
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-commit-pty-'));
+		tempDirs.push(projectRoot);
+		const fakeGit = join(projectRoot, 'fake-git-commit');
+		await Bun.write(
+			fakeGit,
+			`#!/bin/sh
+[ -z "$GPG_TTY" ] || exit 22
+stty -echo < /dev/tty
+printf 'Passphrase: ' > /dev/tty
+IFS= read -r secret < /dev/tty
+stty echo < /dev/tty
+[ "$secret" = 'signing-secret' ] && printf 'commit:ok\\n'
+`,
+		);
+		await chmod(fakeGit, 0o755);
+
+		const terminalManager = new TerminalManager();
+		setTerminalManager(terminalManager, projectRoot);
+		const sessionId = crypto.randomUUID();
+		const originalGpgTty = process.env.GPG_TTY;
+		process.env.GPG_TTY = '/dev/wrong-daemon-terminal';
+		const unsubscribe = subscribe(
+			sessionId,
+			(event) => {
+				if (event.type !== 'shell.secure_input.required') return;
+				resolveSecureInput(
+					String(event.payload?.promptId ?? ''),
+					'signing-secret',
+					projectRoot,
+				);
+			},
+			projectRoot,
+		);
+
+		try {
+			const result = await runInteractiveGitCommand({
+				projectRoot,
+				sessionId,
+				cwd: projectRoot,
+				gitArgs: ['commit', '-m', 'test'],
+				operation: 'commit',
+				gitCommand: fakeGit,
+			});
+			expect(result.stdout).toContain('commit:ok');
+			expect(result.stdout).not.toContain('signing-secret');
+		} finally {
+			if (originalGpgTty === undefined) delete process.env.GPG_TTY;
+			else process.env.GPG_TTY = originalGpgTty;
+			unsubscribe();
+			await terminalManager.killAll();
+		}
+	});
 });

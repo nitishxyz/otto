@@ -36,6 +36,7 @@ export const gitDeleteSchema = z.object({
 export const gitCommitSchema = z.object({
 	project: z.string().optional(),
 	message: z.string().min(1),
+	sessionId: z.string().optional(),
 });
 
 export const gitGenerateCommitMessageSchema = z.object({

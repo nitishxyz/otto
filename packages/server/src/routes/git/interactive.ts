@@ -15,7 +15,7 @@ export async function runInteractiveGitCommand(args: {
 	sessionId?: string;
 	cwd: string;
 	gitArgs: string[];
-	operation: 'pull' | 'push';
+	operation: 'commit' | 'pull' | 'push';
 	gitCommand?: string;
 }): Promise<GitCommandResult> {
 	const gitCommand = args.gitCommand ?? 'git';
@@ -31,6 +31,12 @@ export async function runInteractiveGitCommand(args: {
 		);
 	}
 
+	const gitEnv = Object.fromEntries(
+		Object.entries(process.env).filter(
+			(entry): entry is [string, string] =>
+				entry[1] !== undefined && entry[0] !== 'GPG_TTY',
+		),
+	);
 	const terminal = terminalManager.create({
 		command: gitCommand,
 		args: args.gitArgs,
@@ -38,7 +44,8 @@ export async function runInteractiveGitCommand(args: {
 		purpose: `git ${args.operation}`,
 		title: `Git ${args.operation}`,
 		createdBy: 'user',
-		env: { GIT_TERMINAL_PROMPT: '1' },
+		inheritEnv: false,
+		env: { ...gitEnv, GIT_TERMINAL_PROMPT: '1' },
 	});
 
 	attachTerminalSecureInput({

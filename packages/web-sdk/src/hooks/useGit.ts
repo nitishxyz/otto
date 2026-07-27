@@ -107,7 +107,13 @@ export function useCommitChanges() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (message: string) => apiClient.commitChanges(message),
+		mutationFn: ({
+			message,
+			sessionId,
+		}: {
+			message: string;
+			sessionId?: string | null;
+		}) => apiClient.commitChanges(message, sessionId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: gitStatusQueryKey() });
 			queryClient.invalidateQueries({ queryKey: gitBranchQueryKey() });
