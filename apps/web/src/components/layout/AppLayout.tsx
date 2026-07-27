@@ -572,7 +572,7 @@ const RightPanelArea = memo(function RightPanelArea({
 					</Button>
 				)}
 				<div className="h-full w-full">
-					<GitSidebar onFixWithAI={onFixWithAI} />
+					<GitSidebar onFixWithAI={onFixWithAI} sessionId={sessionId} />
 					<SessionFilesSidebar sessionId={sessionId} />
 					<SettingsSidebar
 						onOpenDashboard={() => navigate({ to: '/dashboard' })}

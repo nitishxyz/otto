@@ -16,6 +16,8 @@ export interface CreateTerminalOptions {
 	createdBy: 'user' | 'llm';
 	title?: string;
 	env?: Record<string, string>;
+	inheritEnv?: boolean;
+	augmentPath?: boolean;
 }
 
 export class TerminalManager {
@@ -36,10 +38,13 @@ export class TerminalManager {
 				rows: 30,
 				cwd: options.cwd,
 				env: {
-					...process.env,
+					...(options.inheritEnv === false ? {} : process.env),
 					...options.env,
 					TERM: 'xterm-256color',
-					PATH: getAugmentedPath(),
+					PATH:
+						options.augmentPath === false
+							? (options.env?.PATH ?? process.env.PATH ?? '')
+							: getAugmentedPath(),
 					PROMPT_EOL_MARK: '',
 				} as Record<string, string>,
 			};

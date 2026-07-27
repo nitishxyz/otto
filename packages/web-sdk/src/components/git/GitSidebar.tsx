@@ -47,17 +47,22 @@ interface GitError {
 
 interface GitSidebarProps {
 	onFixWithAI?: (errorMessage: string) => void;
+	sessionId?: string;
 }
 
 export const GitSidebar = memo(function GitSidebar({
 	onFixWithAI,
+	sessionId,
 }: GitSidebarProps) {
 	const isExpanded = useGitStore((state) => state.isExpanded);
-	return isExpanded ? <GitSidebarContent onFixWithAI={onFixWithAI} /> : null;
+	return isExpanded ? (
+		<GitSidebarContent onFixWithAI={onFixWithAI} sessionId={sessionId} />
+	) : null;
 });
 
 const GitSidebarContent = memo(function GitSidebarContent({
 	onFixWithAI,
+	sessionId,
 }: GitSidebarProps) {
 	const collapseSidebar = useGitStore((state) => state.collapseSidebar);
 	const panelWidth = usePanelWidthStore(
@@ -66,7 +71,6 @@ const GitSidebarContent = memo(function GitSidebarContent({
 	const { data: status, isLoading, error, refetch } = useGitStatus();
 	const { data: remotes } = useGitRemotes();
 	const queryClient = useQueryClient();
-	const activeSessionId = useGitStore((state) => state.activeSessionId);
 	const pushMutation = usePushCommits();
 	const pullMutation = usePullChanges();
 	const initMutation = useGitInit();
@@ -101,7 +105,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 
 	const handlePush = async () => {
 		try {
-			await pushMutation.mutateAsync(activeSessionId);
+			await pushMutation.mutateAsync(sessionId);
 		} catch (err) {
 			addError(
 				err instanceof Error ? err.message : 'Failed to push',
@@ -112,7 +116,7 @@ const GitSidebarContent = memo(function GitSidebarContent({
 
 	const handlePull = async () => {
 		try {
-			await pullMutation.mutateAsync(activeSessionId);
+			await pullMutation.mutateAsync(sessionId);
 		} catch (err) {
 			addError(
 				err instanceof Error ? err.message : 'Failed to pull',

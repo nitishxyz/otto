@@ -1,10 +1,7 @@
 import { getTerminalManager } from '@ottocode/sdk';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { attachTerminalSecureInput } from '../../runtime/tools/terminal-secure-input.ts';
 import { cleanPromptOutput } from '../../runtime/tools/secure-prompt.ts';
 
-const execFileAsync = promisify(execFile);
 const GIT_OPERATION_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface GitCommandResult {
@@ -19,16 +16,23 @@ export async function runInteractiveGitCommand(args: {
 	cwd: string;
 	gitArgs: string[];
 	operation: 'pull' | 'push';
+	gitCommand?: string;
 }): Promise<GitCommandResult> {
-	const terminalManager = args.sessionId
-		? getTerminalManager(args.projectRoot)
-		: null;
-	if (!args.sessionId || !terminalManager) {
-		return execFileAsync('git', args.gitArgs, { cwd: args.cwd });
+	const gitCommand = args.gitCommand ?? 'git';
+	if (!args.sessionId) {
+		throw new Error(
+			`git ${args.operation} requires an active session to handle authentication prompts`,
+		);
+	}
+	const terminalManager = getTerminalManager(args.projectRoot);
+	if (!terminalManager) {
+		throw new Error(
+			`git ${args.operation} cannot start because the project terminal is unavailable`,
+		);
 	}
 
 	const terminal = terminalManager.create({
-		command: 'git',
+		command: gitCommand,
 		args: args.gitArgs,
 		cwd: args.cwd,
 		purpose: `git ${args.operation}`,

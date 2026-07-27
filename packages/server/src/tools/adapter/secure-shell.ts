@@ -1,4 +1,4 @@
-import type { ShellExecutor } from '@ottocode/sdk';
+import { getTerminalManager, type ShellExecutor } from '@ottocode/sdk';
 import { getShellExecutionConfig } from '@ottocode/sdk/tools/bin-manager';
 import {
 	appendTailLines,
@@ -40,6 +40,91 @@ type SecureShellStreamChunk =
 
 const SHELL_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 
+interface ShellProcess {
+	pid?: number;
+	usesPty: boolean;
+	write: (value: string) => void;
+	destroyInput: () => void;
+	kill: (signal: NodeJS.Signals) => void;
+	onStdout: (listener: (text: string) => void) => void;
+	onStderr: (listener: (text: string) => void) => void;
+	onClose: (listener: (exitCode: number | null) => void) => void;
+	onError: (listener: (error: Error) => void) => void;
+	cleanup: () => void;
+}
+
+const INTERACTIVE_COMMAND_PATTERN =
+	/(?:^|[;&|(\n]\s*)(?:env\s+(?:[^\s=]+=[^\s]+\s+)+)?(?:command\s+)?(?:(?:\S+\/)?git(?:\s+-C\s+(?:"[^"]*"|'[^']*'|\S+))*\s+(?:push|pull|fetch|clone|ls-remote|submodule|lfs)\b|(?:ssh|scp|sftp)\b|rsync\b)/i;
+
+export function commandNeedsPty(cmd: string): boolean {
+	return INTERACTIVE_COMMAND_PATTERN.test(cmd);
+}
+
+function createShellProcess(args: {
+	ctx: ToolAdapterContext;
+	cmd: string;
+	command: string;
+	commandArgs: string[];
+	cwd: string;
+	env: Record<string, string | undefined>;
+}): ShellProcess {
+	const terminalManager = commandNeedsPty(args.cmd)
+		? getTerminalManager(args.ctx.projectRoot)
+		: null;
+	if (terminalManager) {
+		const terminal = terminalManager.create({
+			command: args.command,
+			args: args.commandArgs,
+			cwd: args.cwd,
+			purpose: args.cmd,
+			title: 'Interactive shell command',
+			createdBy: 'llm',
+			inheritEnv: false,
+			augmentPath: false,
+			env: Object.fromEntries(
+				Object.entries(args.env).filter(
+					(entry): entry is [string, string] => entry[1] !== undefined,
+				),
+			),
+		});
+		return {
+			pid: terminal.pid,
+			usesPty: true,
+			write: (value) => terminal.write(value.replace(/\n$/, '\r')),
+			destroyInput: () => {},
+			kill: (signal) => terminal.kill(signal),
+			onStdout: (listener) => terminal.onData(listener),
+			onStderr: () => {},
+			onClose: (listener) => terminal.onExit(listener),
+			onError: () => {},
+			cleanup: () => {
+				terminalManager.delete(terminal.id);
+			},
+		};
+	}
+
+	const child = spawn(args.command, args.commandArgs, {
+		cwd: args.cwd,
+		stdio: ['pipe', 'pipe', 'pipe'],
+		env: args.env,
+		detached: true,
+	});
+	return {
+		pid: child.pid,
+		usesPty: false,
+		write: (value) => child.stdin?.write(value),
+		destroyInput: () => child.stdin?.destroy(),
+		kill: (signal) => child.kill(signal),
+		onStdout: (listener) =>
+			child.stdout?.on('data', (chunk) => listener(chunk.toString())),
+		onStderr: (listener) =>
+			child.stderr?.on('data', (chunk) => listener(chunk.toString())),
+		onClose: (listener) => child.on('close', listener),
+		onError: (listener) => child.on('error', listener),
+		cleanup: () => {},
+	};
+}
+
 function killProcessTree(pid: number) {
 	try {
 		process.kill(-pid, 'SIGTERM');
@@ -72,11 +157,13 @@ export function createSecureShellExecutor(args: {
 		const tailLines = input.tailLines ?? 100;
 		const envMode = input.envMode ?? 'login-cache';
 		const shellConfig = getShellExecutionConfig(cmd, { envMode });
-		const proc = spawn(shellConfig.command, shellConfig.args, {
+		const proc = createShellProcess({
+			ctx,
+			cmd,
+			command: shellConfig.command,
+			commandArgs: shellConfig.args,
 			cwd: input.cwd,
-			stdio: ['pipe', 'pipe', 'pipe'],
 			env: shellConfig.env,
-			detached: true,
 		});
 		let stdout = '';
 		let stderr = '';
@@ -134,6 +221,7 @@ export function createSecureShellExecutor(args: {
 						: 'failed'
 					: 'completed';
 			activeShell?.complete({ status, result, exitCode });
+			proc.cleanup();
 			if (!streamSettled) {
 				streamSettled = true;
 				queue.push({ result });
@@ -189,7 +277,10 @@ export function createSecureShellExecutor(args: {
 		const terminate = (fallbackResult: () => ShellResult) => {
 			if (terminating) return;
 			terminating = true;
-			if (proc.pid) {
+			if (proc.usesPty) {
+				proc.kill('SIGTERM');
+				killEscalationId = setTimeout(() => proc.kill('SIGKILL'), 1000);
+			} else if (proc.pid) {
 				killProcessTree(proc.pid);
 				killEscalationId = setTimeout(() => {
 					if (proc.pid) forceKillProcessTree(proc.pid);
@@ -197,7 +288,7 @@ export function createSecureShellExecutor(args: {
 			} else {
 				proc.kill('SIGTERM');
 			}
-			proc.stdin?.destroy();
+			proc.destroyInput();
 			fallbackSettleId = setTimeout(() => {
 				settle(fallbackResult());
 			}, 2000);
@@ -253,7 +344,7 @@ export function createSecureShellExecutor(args: {
 					terminate(abortResult);
 					return;
 				}
-				proc.stdin?.write(`${value}\n`);
+				proc.write(`${value}\n`);
 			});
 		};
 
@@ -272,8 +363,7 @@ export function createSecureShellExecutor(args: {
 			}, timeout);
 		}
 
-		proc.stdout?.on('data', (chunk) => {
-			const text = chunk.toString();
+		proc.onStdout((text) => {
 			activeShell?.appendOutput(text);
 			stdout =
 				outputMode === 'tail'
@@ -286,8 +376,7 @@ export function createSecureShellExecutor(args: {
 			maybeRequestSecureInput(text);
 		});
 
-		proc.stderr?.on('data', (chunk) => {
-			const text = chunk.toString();
+		proc.onStderr((text) => {
 			activeShell?.appendOutput(text);
 			stderr =
 				outputMode === 'tail'
@@ -300,7 +389,7 @@ export function createSecureShellExecutor(args: {
 			maybeRequestSecureInput(text);
 		});
 
-		proc.on('close', (exitCode) => {
+		proc.onClose((exitCode) => {
 			const resolvedExitCode = exitCode ?? 0;
 			if (
 				lastSecureInputCacheKey &&
@@ -353,7 +442,7 @@ export function createSecureShellExecutor(args: {
 			});
 		});
 
-		proc.on('error', (err) => {
+		proc.onError((err) => {
 			settle(
 				createToolError(
 					`Command execution failed: ${err.message}`,
