@@ -3,39 +3,39 @@
 @tailwind utilities;
 
 :root {
-	--otto-bg: 255 255 255;
-	--otto-surface: 244 244 245;
-	--otto-card: 228 228 231;
-	--otto-border: 212 212 216;
-	--otto-border-light: 161 161 170;
-	--otto-text: 9 9 11;
-	--otto-muted: 82 82 91;
-	--otto-dim: 161 161 170;
-	--otto-accent: 59 130 246;
-	--otto-accent-light: 37 99 235;
-	--otto-glow: rgba(59, 130, 246, 0.08);
-	--otto-code-bg: 244 244 245;
-	--otto-pre-bg: 250 250 250;
-	--otto-scrollbar-track: 255 255 255;
-	--otto-scrollbar-thumb: 212 212 216;
+	--otto-bg: 247 248 246;
+	--otto-surface: 239 242 240;
+	--otto-card: 229 234 231;
+	--otto-border: 188 198 195;
+	--otto-border-light: 127 142 140;
+	--otto-text: 24 29 31;
+	--otto-muted: 82 94 97;
+	--otto-dim: 132 144 146;
+	--otto-accent: 72 101 204;
+	--otto-accent-light: 65 91 184;
+	--otto-glow: rgba(72, 101, 204, 0.1);
+	--otto-code-bg: 239 242 240;
+	--otto-pre-bg: 243 245 243;
+	--otto-scrollbar-track: 247 248 246;
+	--otto-scrollbar-thumb: 188 198 195;
 }
 
 .dark {
 	--otto-bg: 9 9 11;
 	--otto-surface: 17 17 22;
-	--otto-card: 24 24 27;
-	--otto-border: 39 39 42;
-	--otto-border-light: 63 63 70;
+	--otto-card: 26 26 31;
+	--otto-border: 56 56 63;
+	--otto-border-light: 82 82 91;
 	--otto-text: 250 250 250;
 	--otto-muted: 161 161 170;
-	--otto-dim: 82 82 91;
-	--otto-accent: 59 130 246;
-	--otto-accent-light: 96 165 250;
-	--otto-glow: rgba(59, 130, 246, 0.125);
-	--otto-code-bg: 24 24 27;
-	--otto-pre-bg: 10 10 15;
+	--otto-dim: 113 113 122;
+	--otto-accent: 120 149 238;
+	--otto-accent-light: 143 169 246;
+	--otto-glow: rgba(120, 149, 238, 0.14);
+	--otto-code-bg: 26 26 31;
+	--otto-pre-bg: 10 10 14;
 	--otto-scrollbar-track: 9 9 11;
-	--otto-scrollbar-thumb: 39 39 42;
+	--otto-scrollbar-thumb: 56 56 63;
 }
 
 * {
@@ -200,5 +200,236 @@ body {
 	to {
 		grid-template-rows: 1fr;
 		opacity: 1;
+	}
+}
+
+/* ==========================================================================
+   NeoPop system — used by the homepage. Additive only: no existing docs or
+   OttoRouter selectors are redefined here.
+   ========================================================================== */
+
+:root {
+	--np-border: 49 60 63;
+	/* Light mode casts a deep ink shadow; dark mode casts a bright one. */
+	--np-shadow: 24 33 38;
+	--np-ink: 24 29 31;
+
+	--np-blue: 72 101 204;
+	--np-blue-on: 250 252 255;
+	--np-lime: 98 173 139;
+	--np-lime-on: 13 31 23;
+	--np-yellow: 210 163 74;
+	--np-yellow-on: 35 27 12;
+	--np-coral: 207 114 120;
+	--np-coral-on: 38 18 20;
+}
+
+.dark {
+	--np-border: 92 92 102;
+	--np-shadow: 150 158 180;
+	--np-ink: 250 250 250;
+
+	--np-blue: 120 149 238;
+	--np-blue-on: 11 18 22;
+	--np-lime: 120 195 159;
+	--np-lime-on: 9 25 17;
+	--np-yellow: 226 185 97;
+	--np-yellow-on: 29 22 9;
+	--np-coral: 223 133 139;
+	--np-coral-on: 31 15 17;
+}
+
+@layer components {
+	.np-edge {
+		border-width: 2px;
+		border-style: solid;
+		border-color: rgb(var(--np-border));
+	}
+	.np-edge-y {
+		border-top: 2px solid rgb(var(--np-border));
+		border-bottom: 2px solid rgb(var(--np-border));
+	}
+	.np-edge-t {
+		border-top: 2px solid rgb(var(--np-border));
+	}
+	.np-edge-b {
+		border-bottom: 2px solid rgb(var(--np-border));
+	}
+
+	.np-shadow-sm {
+		box-shadow: 3px 3px 0 0 rgb(var(--np-shadow));
+	}
+	.np-shadow-md {
+		box-shadow: 5px 5px 0 0 rgb(var(--np-shadow));
+	}
+	.np-shadow-lg {
+		box-shadow: 8px 8px 0 0 rgb(var(--np-shadow));
+	}
+
+	/* Hover lift for non-interactive cards. */
+	.np-lift {
+		transition:
+			transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+			box-shadow 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+	}
+	/* Deliberate pressed-state translation for buttons and links. */
+	.np-press {
+		transition:
+			transform 110ms cubic-bezier(0.2, 0.8, 0.3, 1),
+			box-shadow 110ms cubic-bezier(0.2, 0.8, 0.3, 1);
+		touch-action: manipulation;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* Hover reactions only where a real pointer exists; on touch they would
+	   otherwise stick after a tap. */
+	@media (hover: hover) and (pointer: fine) {
+		.np-lift:hover {
+			transform: translate3d(-2px, -2px, 0);
+		}
+		.np-lift:hover,
+		.np-press:hover {
+			border-color: rgb(var(--otto-border-light));
+		}
+		.np-lift.np-shadow-sm:hover {
+			box-shadow: 5px 5px 0 0 rgb(var(--np-shadow));
+		}
+		.np-lift.np-shadow-md:hover {
+			box-shadow: 7px 7px 0 0 rgb(var(--np-shadow));
+		}
+		.np-lift.np-shadow-lg:hover {
+			box-shadow: 10px 10px 0 0 rgb(var(--np-shadow));
+		}
+		.np-press:hover {
+			transform: translate3d(-1px, -1px, 0);
+		}
+		.np-press.np-shadow-sm:hover {
+			box-shadow: 4px 4px 0 0 rgb(var(--np-shadow));
+		}
+		.np-press.np-shadow-md:hover {
+			box-shadow: 6px 6px 0 0 rgb(var(--np-shadow));
+		}
+	}
+	/* On press the surface slides into its shadow: the translation and the
+	   shadow offset always sum to the resting offset, so the shadow's outer
+	   edge stays pinned to the same spot on the page. `is-pressed` is driven
+	   by pointer events so taps behave exactly like clicks. */
+	.np-press.np-shadow-sm:active,
+	.np-press.np-shadow-sm.is-pressed {
+		transform: translate3d(3px, 3px, 0);
+		box-shadow: 0 0 0 0 rgb(var(--np-shadow));
+	}
+	.np-press.np-shadow-md:active,
+	.np-press.np-shadow-md.is-pressed {
+		transform: translate3d(3px, 3px, 0);
+		box-shadow: 2px 2px 0 0 rgb(var(--np-shadow));
+	}
+	.np-press.np-shadow-lg:active,
+	.np-press.np-shadow-lg.is-pressed {
+		transform: translate3d(4px, 4px, 0);
+		box-shadow: 4px 4px 0 0 rgb(var(--np-shadow));
+	}
+
+	.np-display {
+		font-size: clamp(2rem, 5.4vw, 4rem);
+		line-height: 1.02;
+		letter-spacing: -0.045em;
+		font-weight: 700;
+		text-wrap: balance;
+	}
+	.np-title {
+		font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+		line-height: 1.08;
+		letter-spacing: -0.03em;
+		font-weight: 700;
+		text-wrap: balance;
+	}
+	.np-eyebrow {
+		font-size: 11px;
+		line-height: 1;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+
+	.np-grid-bg {
+		background-image:
+			linear-gradient(
+				to right,
+				rgb(var(--np-border) / 0.09) 1px,
+				transparent 1px
+			),
+			linear-gradient(
+				to bottom,
+				rgb(var(--np-border) / 0.09) 1px,
+				transparent 1px
+			);
+		background-size: 44px 44px;
+	}
+	.np-hatch {
+		background-image: repeating-linear-gradient(
+			45deg,
+			rgb(var(--np-border) / 0.5) 0,
+			rgb(var(--np-border) / 0.5) 1px,
+			transparent 1px,
+			transparent 7px
+		);
+	}
+
+	.np-reveal {
+		opacity: 0;
+		transform: translate3d(0, 18px, 0);
+		transition:
+			opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
+			transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: opacity, transform;
+	}
+	.np-reveal.is-visible {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.np-reveal,
+	.np-reveal.is-visible {
+		opacity: 1;
+		transform: none;
+		transition: none;
+		will-change: auto;
+	}
+	.np-lift,
+	.np-press {
+		transition-duration: 1ms;
+	}
+	.np-lift:hover,
+	.np-press:hover {
+		transform: none;
+	}
+	/* Without the paired translation the offsets would read as a moving
+	   shadow, so hold them at their resting values instead. */
+	.np-lift.np-shadow-sm:hover,
+	.np-press.np-shadow-sm:hover,
+	.np-press.np-shadow-sm:active,
+	.np-press.np-shadow-sm.is-pressed {
+		box-shadow: 3px 3px 0 0 rgb(var(--np-shadow));
+	}
+	.np-lift.np-shadow-md:hover,
+	.np-press.np-shadow-md:hover,
+	.np-press.np-shadow-md:active,
+	.np-press.np-shadow-md.is-pressed {
+		box-shadow: 5px 5px 0 0 rgb(var(--np-shadow));
+	}
+	.np-lift.np-shadow-lg:hover,
+	.np-press.np-shadow-lg:active,
+	.np-press.np-shadow-lg.is-pressed {
+		box-shadow: 8px 8px 0 0 rgb(var(--np-shadow));
+	}
+	.np-press:active,
+	.np-press.is-pressed {
+		transform: none;
+	}
+	.animate-fade-in {
+		animation: none;
 	}
 }

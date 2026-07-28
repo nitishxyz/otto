@@ -16,8 +16,8 @@ interface Props {
 }
 
 const {
-	title = 'otto — AI-powered coding assistant',
-	description = 'AI-powered coding assistant. CLI, interactive TUI, desktop app, embeddable server — one tool, multiple interfaces. Open source.',
+	title = 'otto — You describe it. Otto builds it.',
+	description = 'otto reads your repo, edits files, runs your tests, and checks the result — from the terminal, your browser, or a native desktop app. Open source, MIT licensed.',
 	isDocs = false,
 	ogType = 'landing',
 	ogTitle,
@@ -72,7 +72,7 @@ const canonicalUrl = new URL(Astro.url.pathname, 'https://ottocode.io').href;
 			<Nav client:load pathname={Astro.url.pathname} />
 			<slot />
 			<div class={isDocs ? 'lg:ml-64' : ''}>
-				<Footer />
+				<Footer isHome={Astro.url.pathname === '/'} />
 			</div>
 		</div>
 	</body>

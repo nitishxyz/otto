@@ -1,35 +1,19 @@
 import {
+	GetStartedSection,
 	HeroSection,
-	CanvasSection,
-	InterfacesSection,
-	EmbeddingSection,
-	AgentsSection,
 	ProvidersSection,
-	ToolsSection,
-	ArchitectureSection,
-	StackSection,
-	DesktopSection,
-	LauncherSection,
-	ShareSection,
-	InstallSection,
-} from './sections';
+	SurfacesSection,
+	UseCasesSection,
+} from './home';
 
 export function Landing() {
 	return (
-		<main className="overflow-hidden">
+		<main className="w-full overflow-x-clip">
 			<HeroSection />
-			<InterfacesSection />
-			<EmbeddingSection />
-			<AgentsSection />
+			<UseCasesSection />
+			<SurfacesSection />
 			<ProvidersSection />
-			<ToolsSection />
-			<ArchitectureSection />
-			<StackSection />
-			<DesktopSection />
-			<LauncherSection />
-			<ShareSection />
-			<CanvasSection />
-			<InstallSection />
+			<GetStartedSection />
 		</main>
 	);
 }

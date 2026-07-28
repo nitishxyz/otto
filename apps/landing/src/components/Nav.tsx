@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { OttoWordmark } from './OttoWordmark';
 import { useTheme } from '../hooks/useTheme';
+import { NeoButton } from './neopop';
 
 function OttoRouterIcon() {
 	return (
@@ -25,6 +26,25 @@ function OttoRouterIcon() {
 			<path d="M9.5 12H2" />
 			<path d="M10.23 10.23 5 5" />
 			<circle cx="12" cy="12" r="2.5" />
+		</svg>
+	);
+}
+
+function DesktopIcon() {
+	return (
+		<svg
+			aria-hidden="true"
+			className="w-3.5 h-3.5"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+			<polyline points="7 10 12 15 17 10" />
+			<line x1="12" x2="12" y1="15" y2="3" />
 		</svg>
 	);
 }
@@ -75,6 +95,9 @@ export function Nav({ pathname }: { pathname: string }) {
 	const [scrolled, setScrolled] = useState(false);
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const isDocs = pathname.startsWith('/docs');
+	// NeoPop chrome is homepage-only; /docs/** and /ottorouter keep the
+	// original nav appearance.
+	const isHome = pathname === '/';
 	const { theme, toggle } = useTheme();
 
 	const handleSectionLink = (hash: string) => (e: React.MouseEvent) => {
@@ -92,14 +115,20 @@ export function Nav({ pathname }: { pathname: string }) {
 		return () => window.removeEventListener('scroll', onScroll);
 	}, []);
 
+	const homeShell = scrolled
+		? 'bg-otto-bg np-edge-b'
+		: 'bg-transparent border-b-2 border-transparent';
+
+	const defaultShell = scrolled
+		? 'bg-otto-bg/90 backdrop-blur-md border-b border-otto-border'
+		: isDocs
+			? 'bg-otto-bg border-b border-otto-border'
+			: 'bg-transparent';
+
 	return (
 		<nav
-			className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-				scrolled
-					? 'bg-otto-bg/90 backdrop-blur-md border-b border-otto-border'
-					: isDocs
-						? 'bg-otto-bg border-b border-otto-border'
-						: 'bg-transparent'
+			className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${
+				isHome ? homeShell : defaultShell
 			}`}
 		>
 			<div className="h-14 flex items-center">
@@ -144,47 +173,72 @@ export function Nav({ pathname }: { pathname: string }) {
 						>
 							{theme === 'dark' ? <SunIcon /> : <MoonIcon />}
 						</button>
-						<a
-							href="https://ottorouter.org"
-							className="px-3.5 py-1.5 border border-blue-400/50 text-blue-400 text-xs font-medium rounded-sm hover:border-blue-400 transition-colors inline-flex items-center gap-1.5"
-							data-s-event="Click OttoRouter CTA"
-							data-s-event-props="source=nav"
-						>
-							<OttoRouterIcon />
-							OttoRouter
-						</a>
-						<button
-							type="button"
-							onClick={handleSectionLink('install')}
-							className="px-3.5 py-1.5 border border-otto-border text-otto-muted text-xs rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
-							data-s-event="Click install CTA"
-							data-s-event-props="source=nav"
-						>
-							Install
-						</button>
-						<button
-							type="button"
-							onClick={handleSectionLink('desktop')}
-							className="px-3.5 py-1.5 bg-otto-text text-otto-bg text-xs font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-1.5"
-							data-s-event="Click desktop CTA"
-							data-s-event-props="source=nav"
-						>
-							<svg
-								aria-hidden="true"
-								className="w-3.5 h-3.5"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-								<polyline points="7 10 12 15 17 10" />
-								<line x1="12" x2="12" y1="15" y2="3" />
-							</svg>
-							Desktop
-						</button>
+						{isHome ? (
+							<>
+								<NeoButton
+									href="https://ottorouter.org"
+									target="_self"
+									rel=""
+									tone="blue"
+									size="sm"
+									data-s-event="Click OttoRouter CTA"
+									data-s-event-props="source=nav"
+								>
+									<OttoRouterIcon />
+									OttoRouter
+								</NeoButton>
+								<NeoButton
+									variant="outline"
+									size="sm"
+									onClick={handleSectionLink('install')}
+									data-s-event="Click install CTA"
+									data-s-event-props="source=nav"
+								>
+									Install
+								</NeoButton>
+								<NeoButton
+									tone="ink"
+									size="sm"
+									onClick={handleSectionLink('desktop')}
+									data-s-event="Click desktop CTA"
+									data-s-event-props="source=nav"
+								>
+									<DesktopIcon />
+									Desktop
+								</NeoButton>
+							</>
+						) : (
+							<>
+								<a
+									href="https://ottorouter.org"
+									className="px-3.5 py-1.5 border border-blue-400/50 text-blue-400 text-xs font-medium rounded-sm hover:border-blue-400 transition-colors inline-flex items-center gap-1.5"
+									data-s-event="Click OttoRouter CTA"
+									data-s-event-props="source=nav"
+								>
+									<OttoRouterIcon />
+									OttoRouter
+								</a>
+								<button
+									type="button"
+									onClick={handleSectionLink('install')}
+									className="px-3.5 py-1.5 border border-otto-border text-otto-muted text-xs rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
+									data-s-event="Click install CTA"
+									data-s-event-props="source=nav"
+								>
+									Install
+								</button>
+								<button
+									type="button"
+									onClick={handleSectionLink('desktop')}
+									className="px-3.5 py-1.5 bg-otto-text text-otto-bg text-xs font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-1.5"
+									data-s-event="Click desktop CTA"
+									data-s-event-props="source=nav"
+								>
+									<DesktopIcon />
+									Desktop
+								</button>
+							</>
+						)}
 					</div>
 
 					<div className="flex items-center gap-3 md:hidden">
@@ -203,6 +257,8 @@ export function Nav({ pathname }: { pathname: string }) {
 						<button
 							type="button"
 							onClick={() => setMobileOpen(!mobileOpen)}
+							aria-expanded={mobileOpen}
+							aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
 							className="text-otto-muted hover:text-otto-text"
 						>
 							<svg
@@ -232,7 +288,13 @@ export function Nav({ pathname }: { pathname: string }) {
 			</div>
 
 			{mobileOpen && (
-				<div className="md:hidden bg-otto-bg/95 backdrop-blur-md border-b border-otto-border px-6 py-4 space-y-3 text-sm">
+				<div
+					className={`md:hidden px-6 py-4 space-y-3 text-sm ${
+						isHome
+							? 'bg-otto-bg np-edge-b'
+							: 'bg-otto-bg/95 backdrop-blur-md border-b border-otto-border'
+					}`}
+				>
 					<a
 						href="https://ottorouter.org"
 						className="flex items-center gap-1.5 text-otto-muted hover:text-otto-text"

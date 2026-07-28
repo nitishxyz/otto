@@ -1,9 +1,18 @@
 import { OttoWordmark } from './OttoWordmark';
 
-export function Footer() {
+/** `isHome` switches on the homepage-only NeoPop rule. Other pages are untouched. */
+export function Footer({ isHome = false }: { isHome?: boolean }) {
 	return (
-		<footer className="border-t border-otto-border bg-otto-bg">
-			<div className="max-w-4xl mx-auto px-6 py-10">
+		<footer
+			className={`bg-otto-bg ${
+				isHome ? 'np-edge-t' : 'border-t border-otto-border'
+			}`}
+		>
+			<div
+				className={`mx-auto px-6 py-10 ${
+					isHome ? 'max-w-[1080px] sm:px-8 lg:px-12' : 'max-w-4xl'
+				}`}
+			>
 				<div className="flex flex-col sm:flex-row justify-between items-start gap-8">
 					<div>
 						<OttoWordmark height={14} className="text-otto-dim mb-3" />
