@@ -22,7 +22,12 @@ import { useStream } from './hooks/useStream.ts';
 import { useActivityData } from './hooks/useActivityData.ts';
 import { useConfig } from './hooks/useConfig.ts';
 import { useGlobalKeymap } from './hooks/useGlobalKeymap.ts';
-import { parseCommand, executeCommand } from './commands/index.ts';
+import { useRecipeCommands } from './hooks/useRecipeCommands.ts';
+import {
+	executeCommand,
+	isLocalTuiCommand,
+	parseCommand,
+} from './commands/index.ts';
 import { copyToClipboard } from './lib/clipboard.ts';
 import { moveWorkspaceFocus } from './lib/workspace-navigation.ts';
 import { getProjectContext, getProjectQuery } from './api.ts';
@@ -108,6 +113,11 @@ export function App({
 	}, [sessionError, showStatus]);
 
 	const { config, isLoaded: isConfigLoaded, updateDefaults } = useConfig();
+	const recipeCommands = useRecipeCommands();
+	const recipeNames = useMemo(
+		() => new Set(recipeCommands.map((command) => command.name)),
+		[recipeCommands],
+	);
 
 	const themeSyncedRef = useRef(false);
 	useEffect(() => {
@@ -257,7 +267,7 @@ export function App({
 	const handleSubmit = useCallback(
 		async (text: string, images?: unknown[], files?: unknown[]) => {
 			const cmd = parseCommand(text);
-			if (cmd) {
+			if (cmd && isLocalTuiCommand(cmd.name)) {
 				await handleCommand(cmd.name, cmd.args);
 				return;
 			}
@@ -582,6 +592,7 @@ export function App({
 						pendingApprovals={pendingApprovals}
 						onApprove={handleApprove}
 						onDeny={handleDeny}
+						recipeNames={recipeNames}
 					/>
 
 					{pendingApprovals.length > 0 && (
@@ -619,6 +630,7 @@ export function App({
 						isPlanMode={currentAgent === 'plan'}
 						paneActive={workspaceFocus === 'chat'}
 						onPlanModeToggle={handlePlanModeToggle}
+						recipeCommands={recipeCommands}
 					/>
 				</box>
 				{showDetail && workspaceDetail ? (

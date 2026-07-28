@@ -28,6 +28,22 @@ interface MessageItemProps {
 	pendingApprovals?: PendingApproval[];
 	onApprove?: (callId: string) => void;
 	onDeny?: (callId: string) => void;
+	recipeNames?: ReadonlySet<string>;
+}
+
+export interface RecipeUserMessage {
+	command: string;
+	remainder: string;
+}
+
+/** Parses the leading command token when it names an available recipe. */
+export function parseRecipeUserMessage(
+	content: string,
+	recipeNames: ReadonlySet<string>,
+): RecipeUserMessage | null {
+	const match = content.match(/^\/([a-z0-9]+(?:-[a-z0-9]+)*)([\s\S]*)$/i);
+	if (!match || !recipeNames.has(match[1].toLowerCase())) return null;
+	return { command: `/${match[1]}`, remainder: match[2] };
 }
 
 function getSortedParts(message: Message): MessagePart[] {
@@ -238,10 +254,12 @@ const UserMessage = memo(function UserMessage({
 	message,
 	isQueued,
 	isFirstMessage: _isFirstMessage,
+	recipeNames,
 }: {
 	message: Message;
 	isQueued?: boolean;
 	isFirstMessage: boolean;
+	recipeNames: ReadonlySet<string>;
 }) {
 	const { colors } = useTheme();
 	const parts = useMemo(() => getSortedParts(message), [message]);
@@ -276,6 +294,10 @@ const UserMessage = memo(function UserMessage({
 		const parsed = parseSubagentResults(content);
 		return parsed.length ? parsed : null;
 	}, [content]);
+	const recipeMessage = useMemo(
+		() => parseRecipeUserMessage(content, recipeNames),
+		[content, recipeNames],
+	);
 
 	if (subagentResults) {
 		return (
@@ -377,7 +399,14 @@ const UserMessage = memo(function UserMessage({
 					})}
 				</box>
 			)}
-			{content ? (
+			{recipeMessage ? (
+				<text fg={colors.fgBright} wrapMode="word">
+					<span fg={colors.purple}>
+						<b>{recipeMessage.command}</b>
+					</span>
+					{recipeMessage.remainder}
+				</text>
+			) : content ? (
 				<text fg={colors.fgBright} wrapMode="word">
 					{content}
 				</text>
@@ -565,6 +594,7 @@ export const MessageItem = memo(function MessageItem({
 	pendingApprovals,
 	onApprove,
 	onDeny,
+	recipeNames = EMPTY_RECIPE_NAMES,
 }: MessageItemProps) {
 	if (message.role === 'user') {
 		return (
@@ -573,6 +603,7 @@ export const MessageItem = memo(function MessageItem({
 				message={message}
 				isQueued={isQueued}
 				isFirstMessage={isFirstMessage}
+				recipeNames={recipeNames}
 			/>
 		);
 	}
@@ -592,3 +623,5 @@ export const MessageItem = memo(function MessageItem({
 	}
 	return null;
 });
+
+const EMPTY_RECIPE_NAMES = new Set<string>();

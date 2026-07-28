@@ -614,25 +614,28 @@ export const ToolCallItem = memo(function ToolCallItem({
 				<text style={{ flexShrink: 0 }} fg={nameColor}>
 					{isRunning ? <b>{displayName}</b> : displayName}
 				</text>
-				{hasError && truncatedError ? (
-					<text style={{ flexShrink: 0 }} fg={colors.red}>
-						{truncatedError}
-					</text>
-				) : null}
-				{hasError && durationStr ? (
-					<text style={{ flexShrink: 0 }} fg={colors.fgDimmed}>
-						{durationStr}
-					</text>
-				) : null}
-				{!hasError && target && (
-					<text
-						style={{ flexShrink: 1, overflow: 'hidden' }}
-						fg={isRunning ? colors.fgMuted : colors.toolArgs}
-					>
-						{target}
-					</text>
-				)}
-				{!hasError && durationStr ? (
+				<box
+					style={{
+						flexGrow: 1,
+						flexShrink: 1,
+						overflow: 'hidden',
+					}}
+				>
+					{hasError && truncatedError ? (
+						<text fg={colors.red} wrapMode="none" truncate>
+							{truncatedError}
+						</text>
+					) : !hasError && target ? (
+						<text
+							fg={isRunning ? colors.fgMuted : colors.toolArgs}
+							wrapMode="none"
+							truncate
+						>
+							{target}
+						</text>
+					) : null}
+				</box>
+				{durationStr ? (
 					<text style={{ flexShrink: 0 }} fg={colors.fgDimmed}>
 						{durationStr}
 					</text>

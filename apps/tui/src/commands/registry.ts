@@ -37,7 +37,20 @@ export function resolveCommand(name: string): string {
 	return COMMAND_ALIASES[name] || name;
 }
 
-export const COMMANDS = [
+export interface SlashCommand {
+	name: string;
+	alias: string;
+	description: string;
+}
+
+export interface RecipeCommandSource {
+	name: string;
+	scope: 'project' | 'global';
+	description: string;
+	conflict?: unknown;
+}
+
+export const COMMANDS: SlashCommand[] = [
 	{ name: 'skills', alias: '/k', description: 'Manage skill toggles' },
 	{ name: 'mcp', alias: '/p', description: 'Manage MCP servers' },
 	{ name: 'models', alias: '/m', description: 'Open model selector' },
@@ -89,15 +102,48 @@ export const COMMANDS = [
 	{ name: 'exit', alias: '/q', description: 'Exit TUI' },
 ];
 
-export type SlashCommand = (typeof COMMANDS)[number];
+const SERVER_MESSAGE_COMMAND_NAMES = new Set(['compact', 'init']);
+
+/** Returns whether a slash command is handled locally instead of sent as chat. */
+export function isLocalTuiCommand(name: string): boolean {
+	const command = resolveCommand(name.toLowerCase());
+	if (SERVER_MESSAGE_COMMAND_NAMES.has(command)) return false;
+	return (
+		command === 'provider' || COMMANDS.some((item) => item.name === command)
+	);
+}
+
+/** Converts invokable recipes into TUI slash-command rows. */
+export function recipeSlashCommands(
+	recipes: RecipeCommandSource[],
+): SlashCommand[] {
+	const seen = new Set([
+		...COMMANDS.map((command) => command.name),
+		...Object.keys(COMMAND_ALIASES),
+	]);
+	return recipes.flatMap((recipe) => {
+		if (recipe.conflict || seen.has(recipe.name)) return [];
+		seen.add(recipe.name);
+		return [
+			{
+				name: recipe.name,
+				alias: '',
+				description: recipe.description
+					? `${recipe.description} (${recipe.scope})`
+					: `${recipe.scope} recipe`,
+			},
+		];
+	});
+}
 
 /** Returns slash commands available for the current queue state. */
 export function getCommandSuggestions(
 	query: string,
 	hasQueuedMessages: boolean,
+	extraCommands: SlashCommand[] = [],
 ): SlashCommand[] {
 	const normalizedQuery = query.toLowerCase();
-	return COMMANDS.filter((command) => {
+	return [...COMMANDS, ...extraCommands].filter((command) => {
 		if (command.name === 'send' && !hasQueuedMessages) return false;
 		return (
 			!normalizedQuery ||

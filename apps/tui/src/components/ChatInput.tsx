@@ -34,6 +34,7 @@ interface ChatInputProps {
 	isPlanMode?: boolean;
 	paneActive?: boolean;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
+	recipeCommands?: SlashCommand[];
 }
 
 const MAX_PROMPT_HISTORY = 50;
@@ -59,6 +60,7 @@ export function ChatInput({
 	isPlanMode: externalIsPlanMode,
 	paneActive = true,
 	onPlanModeToggle,
+	recipeCommands = [],
 }: ChatInputProps) {
 	const { colors } = useTheme();
 	const textareaRef = useRef<TextareaRenderable | null>(null);
@@ -232,14 +234,18 @@ export function ChatInput({
 		if (text.startsWith('/') && !text.includes(' ')) {
 			setShowFileMention(false);
 			const query = text.slice(1).toLowerCase();
-			const matches = getCommandSuggestions(query, queueSize > 0);
+			const matches = getCommandSuggestions(
+				query,
+				queueSize > 0,
+				recipeCommands,
+			);
 			setCommandMatches(matches);
 			setSelectedIdx(0);
 		} else {
 			setCommandMatches([]);
 			checkForMention(text, cursor.offset);
 		}
-	}, [checkForMention, queueSize]);
+	}, [checkForMention, queueSize, recipeCommands]);
 
 	useEffect(() => {
 		const textarea = textareaRef.current;
@@ -247,10 +253,14 @@ export function ChatInput({
 		const text = textarea.plainText;
 		if (!text.startsWith('/') || text.includes(' ')) return;
 		setCommandMatches(
-			getCommandSuggestions(text.slice(1).toLowerCase(), queueSize > 0),
+			getCommandSuggestions(
+				text.slice(1).toLowerCase(),
+				queueSize > 0,
+				recipeCommands,
+			),
 		);
 		setSelectedIdx(0);
-	}, [queueSize]);
+	}, [queueSize, recipeCommands]);
 
 	const handleSubmit = useCallback(() => {
 		if (disabled) return;
@@ -547,11 +557,25 @@ export function ChatInput({
 										backgroundColor: active ? colors.bgHighlight : undefined,
 									}}
 								>
-									<text fg={active ? colors.blue : colors.bg}>▌</text>
-									<text fg={active ? colors.green : colors.fgMuted}>
+									<text
+										style={{ flexShrink: 0 }}
+										fg={active ? colors.blue : colors.bg}
+									>
+										▌
+									</text>
+									<text
+										style={{ flexShrink: 0 }}
+										fg={active ? colors.green : colors.fgMuted}
+										wrapMode="none"
+									>
 										/{cmd.name}
 									</text>
-									<text fg={active ? colors.fgMuted : colors.fgDark}>
+									<text
+										style={{ flexShrink: 1, overflow: 'hidden' }}
+										fg={active ? colors.fgMuted : colors.fgDark}
+										wrapMode="none"
+										truncate
+									>
 										{cmd.description}
 									</text>
 								</box>

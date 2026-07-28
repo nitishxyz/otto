@@ -11,6 +11,7 @@ interface ChatViewProps {
 	pendingApprovals: PendingApproval[];
 	onApprove: (callId: string) => void;
 	onDeny: (callId: string) => void;
+	recipeNames?: ReadonlySet<string>;
 }
 
 export const ChatView = memo(function ChatView({
@@ -21,6 +22,7 @@ export const ChatView = memo(function ChatView({
 	pendingApprovals,
 	onApprove,
 	onDeny,
+	recipeNames = EMPTY_RECIPE_NAMES,
 }: ChatViewProps) {
 	const { colors } = useTheme();
 
@@ -140,6 +142,7 @@ export const ChatView = memo(function ChatView({
 						pendingApprovals={approvalsByMessage.get(msg.id) ?? EMPTY_APPROVALS}
 						onApprove={onApprove}
 						onDeny={onDeny}
+						recipeNames={recipeNames}
 					/>
 				);
 			})}
@@ -148,3 +151,4 @@ export const ChatView = memo(function ChatView({
 });
 
 const EMPTY_APPROVALS: PendingApproval[] = [];
+const EMPTY_RECIPE_NAMES = new Set<string>();

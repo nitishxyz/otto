@@ -173,9 +173,17 @@ const OVERLAY_COMMANDS: Partial<Record<string, Overlay>> = {
 	usage: 'usage',
 };
 
+async function sendServerCommand(
+	ctx: CommandContext,
+	content: string,
+): Promise<void> {
+	const session = ctx.activeSession ?? (await ctx.createSession());
+	if (session) await ctx.sendMessage(session.id, content);
+}
+
 /**
- * Executes a slash command. Unknown commands are forwarded to the active
- * session as a `/name args` message (server-side commands).
+ * Executes a slash command. Unknown commands are forwarded as `/name args`
+ * messages, creating a session first when needed.
  */
 export async function executeCommand(
 	name: string,
@@ -235,9 +243,7 @@ export async function executeCommand(
 			break;
 		case 'compact':
 		case 'init':
-			if (ctx.activeSession) {
-				await ctx.sendMessage(ctx.activeSession.id, `/${cmd}`);
-			}
+			await sendServerCommand(ctx, `/${cmd}`);
 			break;
 		case 'handoff':
 			await runHandoff(ctx);
@@ -279,12 +285,7 @@ export async function executeCommand(
 			await runSync(ctx);
 			break;
 		default:
-			if (ctx.activeSession) {
-				await ctx.sendMessage(
-					ctx.activeSession.id,
-					`/${cmd}${args ? ` ${args}` : ''}`,
-				);
-			}
+			await sendServerCommand(ctx, `/${cmd}${args ? ` ${args}` : ''}`);
 			break;
 	}
 }
