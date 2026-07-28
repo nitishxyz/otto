@@ -127,6 +127,7 @@ export const TitleBar = memo(function TitleBar({
 	return (
 		<div
 			className={`flex items-center gap-2 pl-4 pr-2 h-12 shrink-0 border-b border-border cursor-default select-none bg-background relative ${className ?? ''}`}
+			data-smart-edge-ignore
 			onMouseDown={onMouseDown}
 			{...(dragRegion ? { 'data-tauri-drag-region': true } : {})}
 			role="toolbar"

@@ -215,6 +215,7 @@ const TerminalPanelFrame = memo(function TerminalPanelFrame({
 	return (
 		<div
 			className="border-t border-border bg-background flex flex-col shrink-0 relative"
+			data-smart-edge-ignore
 			style={{ height, minHeight: MIN_HEIGHT }}
 		>
 			{!isMaximized && (
