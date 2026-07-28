@@ -1,0 +1,8 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { Skills as SkillsPage } from '../../react-pages/docs/Skills';
+---
+
+<DocsLayout title="Skills — otto docs" description="Write SKILL.md instruction bundles that otto loads on demand, including frontmatter fields, reference files, and discovery directories.">
+	<SkillsPage client:load />
+</DocsLayout>

@@ -9,7 +9,14 @@ function htmlToMarkdown(el: HTMLElement): string {
 		}
 		if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
-		const tag = (node as HTMLElement).tagName.toLowerCase();
+		const el = node as HTMLElement;
+		// Layout-only blocks (diagrams) opt out of the DOM walk and provide
+		// their own plain-text form via `data-md`.
+		if (el.hasAttribute('data-md-skip')) return '';
+		const authored = el.getAttribute('data-md');
+		if (authored) return `\`\`\`\n${authored.trim()}\n\`\`\`\n\n`;
+
+		const tag = el.tagName.toLowerCase();
 		const children = () => Array.from(node.childNodes).map(walk).join('');
 
 		switch (tag) {

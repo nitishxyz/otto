@@ -21,11 +21,19 @@ const NAV_SECTIONS = [
 		],
 	},
 	{
-		title: 'Features',
+		title: 'Extending otto',
 		items: [
 			{ href: '/docs/agents-tools', label: 'Agents & Tools' },
+			{ href: '/docs/skills', label: 'Skills' },
+			{ href: '/docs/plugins', label: 'Plugins' },
 			{ href: '/docs/mcp', label: 'MCP Servers' },
+		],
+	},
+	{
+		title: 'Access & Integration',
+		items: [
 			{ href: '/docs/sharing', label: 'Session Sharing' },
+			{ href: '/docs/remote-access', label: 'Remote Access' },
 			{ href: '/docs/acp', label: 'ACP Integration' },
 		],
 	},
@@ -33,6 +41,7 @@ const NAV_SECTIONS = [
 		title: 'Architecture',
 		items: [
 			{ href: '/docs/architecture', label: 'System Architecture' },
+			{ href: '/docs/surfaces', label: 'Surfaces & Apps' },
 			{ href: '/docs/embedding', label: 'Embedding Guide' },
 			{ href: '/docs/api', label: 'API Reference' },
 		],
@@ -51,7 +60,6 @@ const NAV_SECTIONS = [
 			{ href: '/docs/ottorouter', label: 'Overview', end: true },
 			{ href: '/docs/ottorouter/payments', label: 'Payments' },
 			{ href: '/docs/ottorouter/integration', label: 'Integration Guide' },
-			{ href: '/docs/ottorouter/openclaw', label: 'OpenClaw Plugin' },
 		],
 	},
 ];
@@ -80,7 +88,7 @@ const resolvedSection =
 
 <BaseLayout title={title} description={description} isDocs={true} ogType="docs" ogTitle={ogTitle} ogSection={resolvedSection} ogDescription={description}>
 	<div class="pt-14 min-h-screen">
-		<aside class="w-64 shrink-0 hidden lg:flex flex-col np-edge-r fixed top-14 bottom-0 left-0 overflow-y-auto">
+		<aside id="docs-sidebar" class="w-64 shrink-0 hidden lg:flex flex-col np-edge-r fixed top-14 bottom-0 left-0 overflow-y-auto">
 			<div class="flex-1 py-6 space-y-6">
 				{NAV_SECTIONS.map((section) => (
 					<div>
@@ -111,26 +119,73 @@ const resolvedSection =
 							{section.title}
 						</h4>
 						<div class="space-y-0.5">
-							{section.items.map((item) => (
-								<a
-									href={item.href}
-									class:list={[
-										'block py-2 pl-[13px] pr-4 text-sm truncate border-l-[3px] transition-colors',
-										isActive(item.href, 'end' in item ? item.end : false)
-											? 'bg-otto-card text-otto-text font-medium border-np-blue'
-											: 'text-otto-muted border-transparent hover:text-otto-text hover:bg-otto-surface hover:border-otto-border',
-									]}
-								>
-									{item.label}
-								</a>
-							))}
+							{section.items.map((item) => {
+								const active = isActive(item.href, 'end' in item ? item.end : false);
+								return (
+									<a
+										href={item.href}
+										aria-current={active ? 'page' : undefined}
+										class:list={[
+											'block py-2 pl-[13px] pr-4 text-sm truncate border-l-[3px] transition-colors',
+											active
+												? 'bg-otto-card text-otto-text font-medium border-np-blue'
+												: 'text-otto-muted border-transparent hover:text-otto-text hover:bg-otto-surface hover:border-otto-border',
+										]}
+									>
+										{item.label}
+									</a>
+								);
+							})}
 						</div>
 					</div>
 				))}
 			</div>
 		</aside>
+		{/* Full page loads reset both navs' scroll, so the current page lands
+		    off-screen. `is:inline` keeps this in the parse step: a bundled module
+		    would run after first paint and the correction would read as a jump.
+		    Both navs are server-rendered, so the active item is already in the DOM
+		    here — no need to wait on hydration. */}
+		<script is:inline>
+			(() => {
+				// The rail scrolls on X, the sidebar on Y; otherwise the maths match.
+				const position = (id, axis) => {
+					const nav = document.getElementById(id);
+					const active = nav && nav.querySelector('[aria-current="page"]');
+					if (!nav || !active) return;
+
+					const horizontal = axis === 'x';
+					const size = horizontal ? 'width' : 'height';
+					const edge = horizontal ? 'left' : 'top';
+					const prop = horizontal ? 'scrollLeft' : 'scrollTop';
+
+					// A hidden nav measures 0 at every breakpoint; skip it so the
+					// visible one is the only thing that moves.
+					const navBox = nav.getBoundingClientRect();
+					if (navBox[size] === 0) return;
+
+					const itemBox = active.getBoundingClientRect();
+					const offset = itemBox[edge] - navBox[edge] + nav[prop];
+
+					// Items already reachable without scrolling stay put, so the first
+					// section heading remains visible on shallow pages.
+					if (offset >= 0 && offset + itemBox[size] <= navBox[size]) return;
+					nav[prop] = offset - (navBox[size] - itemBox[size]) / 2;
+				};
+
+				const positionAll = () => {
+					position('docs-sidebar', 'y');
+					position('docs-rail', 'x');
+				};
+
+				positionAll();
+				// The webfont loads with `display: swap`, so the first pass measures
+				// fallback metrics. Re-run once the real font has reflowed the labels.
+				document.fonts?.ready.then(positionAll);
+			})();
+		</script>
 		<div class="lg:ml-64">
-			<main class="max-w-3xl mx-auto px-6 py-10 pb-24">
+			<main class="max-w-3xl mx-auto px-6 pt-4 pb-24 lg:pt-10">
 				<DocsMobileNav client:load pathname={pathname} />
 				<div class="prose-otto">
 					<slot />

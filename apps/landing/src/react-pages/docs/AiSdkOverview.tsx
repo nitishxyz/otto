@@ -1,20 +1,16 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+import { Callout, CardGrid, DocCard, DocHero } from '../../components/docs';
 
 export function AiSdkOverview() {
 	return (
 		<DocPage>
-			<h1 className="np-title mb-3">AI SDK</h1>
-			<p className="text-otto-dim text-sm mb-8">
-				Use <code>@ottorouter/ai-sdk</code> with Vercel AI SDK and OttoRouter.
-			</p>
-
-			<h2>What it is</h2>
-			<p>
-				The package creates AI SDK-compatible model objects that send requests
-				through OttoRouter. It is for app developers who want wallet-based
-				OttoRouter access from normal AI SDK calls.
-			</p>
+			<DocHero
+				eyebrow="AI SDK"
+				title="OttoRouter models in normal AI SDK calls"
+				lede="@ottorouter/ai-sdk returns model objects the Vercel AI SDK can use anywhere. One account and one balance instead of a key per provider."
+				tags={['ai sdk v6', 'generateText', 'streamText', 'oauth']}
+			/>
 
 			<h2>Install</h2>
 			<CodeBlock>{`bun add @ottorouter/ai-sdk ai`}</CodeBlock>
@@ -24,7 +20,8 @@ export function AiSdkOverview() {
 import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({
-  auth: { privateKey: process.env.OTTOROUTER_PRIVATE_KEY! },
+  accessToken: process.env.OTTOROUTER_ACCESS_TOKEN,
+  baseURL: "https://api.ottorouter.org",
 });
 
 const { text } = await generateText({
@@ -46,29 +43,45 @@ for await (const chunk of result.textStream) {
   process.stdout.write(chunk);
 }`}</CodeBlock>
 
-			<h2>Auth options</h2>
-			<ul>
-				<li>
-					Use <code>OTTOROUTER_PRIVATE_KEY</code> for server-side scripts.
-				</li>
-				<li>
-					Use an external signer when a wallet, hardware signer, or app-specific
-					signing flow owns the private key.
-				</li>
-			</ul>
+			<h2>Switching models</h2>
+			<p>
+				Every model on the router shares the same credential and balance, so
+				changing models is a one-line change with no new setup.
+			</p>
+			<CodeBlock>{`ottorouter.model("claude-sonnet-4-20250514")
+ottorouter.model("gpt-5-mini")`}</CodeBlock>
 
-			<h2>Related pages</h2>
-			<ul>
-				<li>
-					<a href="/docs/ai-sdk/configuration">AI SDK configuration</a>
-				</li>
-				<li>
-					<a href="/docs/ai-sdk/caching">Caching</a>
-				</li>
-				<li>
-					<a href="/docs/ottorouter/integration">OttoRouter integration</a>
-				</li>
-			</ul>
+			<Callout kind="warn" title="Keep the token server-side">
+				<p>
+					An access token can spend your balance. Read it from the environment
+					on a server; never ship it in a browser bundle.
+				</p>
+			</Callout>
+
+			<h2>Related</h2>
+			<CardGrid cols={3}>
+				<DocCard
+					kicker="options"
+					title="Configuration"
+					accent="blue"
+					desc="Base URL, callbacks, and environment variables."
+					href="/docs/ai-sdk/configuration"
+				/>
+				<DocCard
+					kicker="cost"
+					title="Caching"
+					accent="lime"
+					desc="Cut spend on long, repeated prompts."
+					href="/docs/ai-sdk/caching"
+				/>
+				<DocCard
+					kicker="account"
+					title="Balance & billing"
+					accent="coral"
+					desc="Top-ups, cost headers, and 402 handling."
+					href="/docs/ottorouter/payments"
+				/>
+			</CardGrid>
 		</DocPage>
 	);
 }

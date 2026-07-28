@@ -1,64 +1,64 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+import { Callout, DocHero } from '../../components/docs';
 
 export function AiSdkConfiguration() {
 	return (
 		<DocPage>
-			<h1 className="np-title mb-3">AI SDK Configuration</h1>
-			<p className="text-otto-dim text-sm mb-8">
-				Common configuration for <code>@ottorouter/ai-sdk</code>.
-			</p>
+			<DocHero
+				eyebrow="AI SDK"
+				title="Configuration"
+				lede="Credentials, base URL, and the callbacks worth wiring up before you ship."
+				tags={['accessToken', 'baseURL', 'callbacks']}
+			/>
 
-			<h2>Private key auth</h2>
-			<CodeBlock>{`const ottorouter = createOttoRouter({
-  auth: { privateKey: process.env.OTTOROUTER_PRIVATE_KEY! },
-});`}</CodeBlock>
-
-			<h2>External signer</h2>
+			<h2>Credentials</h2>
 			<p>
-				Use a signer when your app cannot or should not expose the wallet
-				private key to the SDK instance.
+				The SDK authenticates with an OttoRouter OAuth access token sent as a
+				bearer header.
 			</p>
 			<CodeBlock>{`const ottorouter = createOttoRouter({
-  auth: {
-    signer: {
-      walletAddress: "PUBLIC_KEY",
-      signNonce: async (nonce) => signMessage(nonce),
-      signTransaction: async (transaction) => signTransaction(transaction),
-    },
-  },
+  accessToken: process.env.OTTOROUTER_ACCESS_TOKEN,
 });`}</CodeBlock>
 
-			<h2>Base URL and RPC</h2>
+			<h2>Base URL</h2>
+			<p>Override when pointing at a self-hosted or staging router.</p>
 			<CodeBlock>{`const ottorouter = createOttoRouter({
-  auth,
+  accessToken,
   baseURL: "https://api.ottorouter.org",
-  rpcURL: "https://api.mainnet-beta.solana.com",
 });`}</CodeBlock>
 
-			<h2>Payment callbacks</h2>
+			<h2>Callbacks</h2>
 			<p>
-				Use callbacks to observe payment flow, update UI, or ask the user before
-				signing a top-up.
+				Use callbacks to keep your UI honest about spend and to fail loudly when
+				the balance runs out.
 			</p>
 			<CodeBlock>{`const ottorouter = createOttoRouter({
-  auth,
+  accessToken,
   callbacks: {
-    onPaymentRequired: (amountUsd, currentBalance) => {},
-    onPaymentSigning: () => {},
-    onPaymentComplete: (payment) => {},
-    onPaymentError: (error) => {},
     onBalanceUpdate: (usage) => {},
-    onPaymentApproval: async (request) => "crypto",
+    onPaymentRequired: (amountUsd, currentBalance) => {},
+    onPaymentError: (error) => {},
   },
 });`}</CodeBlock>
+
+			<Callout kind="note" title="Check the package for the current surface">
+				<p>
+					Options evolve with the router. Treat the{' '}
+					<code>@ottorouter/ai-sdk</code> package types as the source of truth
+					and this page as orientation.
+				</p>
+			</Callout>
 
 			<h2>Environment variables</h2>
-			<CodeBlock>{`OTTOROUTER_PRIVATE_KEY=...
-OTTOROUTER_BASE_URL=...
-OTTOROUTER_SOLANA_RPC_URL=...`}</CodeBlock>
+			<CodeBlock>{`OTTOROUTER_ACCESS_TOKEN=...
+OTTOROUTER_BASE_URL=...`}</CodeBlock>
 
-			<h2>Use with otto CLI</h2>
+			<h2>Use with the otto CLI</h2>
+			<p>
+				otto manages its own OttoRouter credentials — you do not need to set
+				environment variables for CLI usage.
+			</p>
 			<CodeBlock>{`otto auth login ottorouter
 otto ask "hello" --provider ottorouter`}</CodeBlock>
 		</DocPage>

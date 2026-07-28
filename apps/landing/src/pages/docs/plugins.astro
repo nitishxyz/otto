@@ -1,0 +1,8 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { Plugins as PluginsPage } from '../../react-pages/docs/Plugins';
+---
+
+<DocsLayout title="Plugins — otto docs" description="Install, manage, and author otto plugins: skills, recipes, agents, MCP servers, and terminal commands from a single otto.plugin.json manifest.">
+	<PluginsPage client:load />
+</DocsLayout>

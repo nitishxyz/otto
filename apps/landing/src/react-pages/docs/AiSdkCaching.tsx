@@ -1,51 +1,68 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+import { Callout, DocHero } from '../../components/docs';
 
 export function AiSdkCaching() {
 	return (
 		<DocPage>
-			<h1 className="np-title mb-3">Caching</h1>
-			<p className="text-otto-dim text-sm mb-8">
-				Prompt caching options for <code>@ottorouter/ai-sdk</code>.
-			</p>
+			<DocHero
+				eyebrow="AI SDK"
+				title="Prompt caching"
+				lede="Cached input tokens bill at the provider's reduced cache-read rate. On long system prompts that is the single biggest lever on cost."
+				tags={['anthropic cache-control', 'cache keys', 'lower cost']}
+			/>
 
 			<h2>Anthropic cache control</h2>
 			<p>
-				The SDK can add Anthropic cache-control metadata for supported Anthropic
-				requests. Keep this enabled for long, repeated system prompts; disable
-				it when debugging request bodies.
+				The SDK can add Anthropic cache-control metadata automatically. Keep it
+				on for long, repeated system prompts; turn it off when you are
+				inspecting raw request bodies.
 			</p>
-			<CodeBlock>{`createOttoRouter({ auth });
+			<CodeBlock>{`createOttoRouter({ accessToken });   // caching on by default
 
 createOttoRouter({
-  auth,
+  accessToken,
   cache: { anthropicCaching: false },
 });`}</CodeBlock>
 
 			<h2>Manual control</h2>
 			<p>
-				Use manual mode if your app already sets provider-specific caching
-				fields.
+				Use manual mode when your app already sets provider-specific caching
+				fields itself.
 			</p>
 			<CodeBlock>{`createOttoRouter({
-  auth,
+  accessToken,
   cache: {
     anthropicCaching: { strategy: "manual" },
   },
 });`}</CodeBlock>
 
-			<h2>Server-side cache keys</h2>
+			<h2>Cache keys</h2>
 			<p>
-				If you use OttoRouter cache keys, choose stable keys per application
-				context and avoid putting user secrets into the key.
+				Choose keys that are stable per application context — a project or
+				session id works well.
 			</p>
 			<CodeBlock>{`createOttoRouter({
-  auth,
+  accessToken,
   cache: {
     promptCacheKey: "project-or-session-key",
     promptCacheRetention: "in_memory",
   },
 });`}</CodeBlock>
+
+			<Callout kind="warn" title="Never put secrets in a cache key">
+				<p>
+					Cache keys are identifiers, not credentials. Keep user secrets and
+					tokens out of them.
+				</p>
+			</Callout>
+
+			<h2>What it saves</h2>
+			<p>
+				Cached reads are billed at the provider's cache-read rate rather than
+				the full input rate, and appear in the usual cost headers. See{' '}
+				<a href="/docs/ottorouter/payments">Balance &amp; billing</a>.
+			</p>
 		</DocPage>
 	);
 }

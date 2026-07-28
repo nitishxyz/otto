@@ -41,8 +41,8 @@ const PROVIDERS = [
 	{
 		id: 'ottorouter',
 		name: 'OttoRouter',
-		models: 'USDC pay-per-use proxy',
-		auth: ['Solana wallet'],
+		models: 'Pay-per-use across providers',
+		auth: ['OAuth'],
 	},
 	{ id: 'zai', name: 'Zai', models: 'Zai frontier models', auth: ['API key'] },
 	{

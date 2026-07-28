@@ -1,13 +1,45 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+import {
+	Diagram,
+	DiagramFlow,
+	DiagramNode,
+	DocHero,
+} from '../../components/docs';
 
 export function AcpIntegration() {
 	return (
 		<DocPage>
-			<h1 className="np-title mb-3">ACP Integration</h1>
-			<p className="text-otto-dim text-sm mb-8">
-				Run otto from an editor that supports Agent Client Protocol.
-			</p>
+			<DocHero
+				eyebrow="ACP"
+				title="otto inside your editor"
+				lede="Agent Client Protocol lets an editor run otto as a background agent over stdio. The editor renders everything; otto owns the session, tools, and history."
+				tags={['stdio', 'editor ui', 'otto --acp']}
+			/>
+
+			<Diagram
+				label="acp / editor drives, otto works"
+				status="stdout is protocol"
+				md={`editor  <--stdio-->  otto --acp  -->  otto session runtime
+																		 tools, MCP, slash commands, history
+
+editor renders: file edits, terminal output, tool calls, permissions`}
+			>
+				<DiagramNode
+					label="client"
+					title="ACP editor"
+					accent="blue"
+					desc="Starts otto as a child process and renders every update in its own UI."
+				/>
+				<DiagramFlow label="jsonrpc / stdio" />
+				<DiagramNode
+					label="agent"
+					title="otto --acp"
+					accent="lime"
+					emphasis
+					desc="Same agents, tools, models, and session history as the terminal UI."
+				/>
+			</Diagram>
 
 			<h2>What this does</h2>
 			<p>

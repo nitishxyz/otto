@@ -1,20 +1,54 @@
 import { CodeBlock } from '../../components/CodeBlock';
 import { DocPage } from '../../components/DocPage';
+import {
+	Diagram,
+	DiagramFlow,
+	DiagramNode,
+	DiagramRow,
+	DocHero,
+} from '../../components/docs';
 
 export function MCPServers() {
 	return (
 		<DocPage>
-			<h1 className="np-title mb-3">MCP Servers</h1>
-			<p className="text-otto-dim text-sm mb-8">
-				Connect otto to external tools through Model Context Protocol servers.
-			</p>
+			<DocHero
+				eyebrow="MCP"
+				title="Bring your own tools"
+				lede="Model Context Protocol servers add tools to a session at runtime — issue trackers, databases, docs search, internal APIs — without touching agent prompts."
+				tags={['stdio', 'http', 'sse', 'oauth']}
+			/>
 
-			<h2>What MCP is for</h2>
-			<p>
-				MCP servers expose extra tools to the agent. Use them for integrations
-				like issue trackers, databases, documentation search, local services, or
-				company-specific APIs.
-			</p>
+			<Diagram
+				label="mcp / tools resolved per session"
+				status="project scoped"
+				md={`local server    child process over stdio    otto mcp add <name> --command bunx
+remote server   http or sse endpoint       otto mcp add <name> --transport http --url ...
+													|
+							tools merged into the agent's tool set`}
+			>
+				<DiagramRow cols={2}>
+					<DiagramNode
+						label="local"
+						title="stdio server"
+						accent="lime"
+						desc="Runs as a child process on your machine."
+					/>
+					<DiagramNode
+						label="remote"
+						title="http / sse server"
+						accent="blue"
+						desc="Hosted endpoint, often with its own OAuth or API key."
+					/>
+				</DiagramRow>
+				<DiagramFlow label="merge" />
+				<DiagramNode
+					label="session"
+					title="Agent tool set"
+					accent="yellow"
+					emphasis
+					desc="MCP tools sit alongside built-ins and project tools, subject to the same approval rules."
+				/>
+			</Diagram>
 
 			<h2>CLI workflow</h2>
 			<CodeBlock>{`otto mcp list
@@ -79,6 +113,13 @@ otto mcp remove <name>`}</CodeBlock>
 				</li>
 				<li>Do not commit tokens or private credentials in MCP config.</li>
 			</ul>
+
+			<h2>Shipping servers to a team</h2>
+			<p>
+				A <a href="/docs/plugins">plugin</a> can declare <code>mcpServers</code>{' '}
+				in its manifest, so installing the plugin registers the server for
+				everyone instead of each person running <code>otto mcp add</code>.
+			</p>
 		</DocPage>
 	);
 }
