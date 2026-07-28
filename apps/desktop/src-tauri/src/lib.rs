@@ -176,6 +176,8 @@ pub fn run() {
             commands::server::get_cli_selection,
             commands::server::update_installed_cli,
             commands::native_browser::native_browser_mount,
+            commands::native_browser::native_browser_control,
+            commands::native_browser::native_browser_execute,
             commands::native_browser::native_browser_set_visible,
             commands::native_browser::native_browser_unmount,
             commands::fonts::list_system_fonts,

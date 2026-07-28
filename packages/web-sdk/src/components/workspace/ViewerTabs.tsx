@@ -271,8 +271,6 @@ const VIEWER_MODE_TAB_BUTTON_BASE =
 const VIEWER_MODE_ICON_BASE_CLASS =
 	'pointer-events-none absolute top-1/2 z-10 block h-4 w-4 -translate-x-1/2 -translate-y-1/2 shrink-0 transition-colors';
 
-const MAX_INACTIVE_PREVIEW_PANES = 1;
-
 function getTabIdsForMode(
 	tabOrder: string[],
 	tabsById: Record<string, ViewerTab | undefined>,
@@ -592,18 +590,10 @@ const PreviewPaneStrip = memo(function PreviewPaneStrip() {
 		tabsById,
 		'preview',
 	);
-	const mountedPreviewTabIds = activePreviewTabId
-		? [
-				activePreviewTabId,
-				...previewTabIds
-					.filter((tabId) => tabId !== activePreviewTabId)
-					.slice(0, MAX_INACTIVE_PREVIEW_PANES),
-			]
-		: previewTabIds.slice(0, MAX_INACTIVE_PREVIEW_PANES + 1);
 
 	return (
 		<>
-			{mountedPreviewTabIds.map((tabId) => (
+			{previewTabIds.map((tabId) => (
 				<PreviewPane
 					key={tabId}
 					tabId={tabId}
@@ -629,7 +619,7 @@ const PreviewPane = memo(function PreviewPane({
 			aria-hidden={!isActive}
 			className={`absolute inset-0 ${isActive ? 'block' : 'hidden'}`}
 		>
-			<BrowserViewerPanel tab={tab} />
+			<BrowserViewerPanel tab={tab} isActive={isActive} />
 		</div>
 	);
 });

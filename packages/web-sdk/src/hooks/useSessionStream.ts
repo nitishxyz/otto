@@ -1053,7 +1053,12 @@ export function useSessionStream(
 						: 'Browser';
 			const newTab =
 				kind === 'browser' && resultRecord.newTab === true ? true : undefined;
+			const id =
+				typeof resultRecord.tabId === 'string' && resultRecord.tabId.trim()
+					? resultRecord.tabId
+					: undefined;
 			useViewerTabsStore.getState().openBrowserTab(url, {
+				id,
 				kind,
 				title,
 				newTab,

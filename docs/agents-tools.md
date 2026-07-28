@@ -4,6 +4,29 @@
 
 ---
 
+## Browser tool
+
+The loadable `browser` tool opens pages in Otto's preview and supports an
+inspect-and-act loop for agents:
+
+- `open`, `navigate`, `back`, `forward`, `reload`, and `stop` control navigation.
+- `snapshot` returns visible page text and interactive elements with stable
+  references such as `@e1`.
+- `click`, `type`, `press`, `scroll`, and `wait_for` act on a CSS selector or a
+  snapshot reference.
+- `evaluate` runs JavaScript in the page and returns a serializable result.
+
+The desktop app renders pages in a native top-level webview, so sites that deny
+iframe embedding with `X-Frame-Options` or CSP still work. In a normal web
+client, arbitrary cross-origin pages remain display-only because browser
+same-origin rules prevent DOM inspection. Full cross-origin automation should
+therefore use the desktop app.
+
+Desktop browser tabs retain the native webview while navigating, preserving
+cookies, storage, JavaScript state, and the webview's real history. Page-driven
+and single-page-app navigation synchronize back to Otto's address bar; toolbar
+back, forward, reload, and stop controls operate on that same native webview.
+
 ## Built-in agents
 
 The server runtime currently exports these built-in presets:

@@ -10,6 +10,10 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { discoverProjectTools } from '@ottocode/sdk';
+import {
+	submitBrowserControlResult,
+	waitForBrowserControlCommand,
+} from '@ottocode/sdk/browser-control';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -212,6 +216,63 @@ describe('Built-in Tools', () => {
 				url: 'http://localhost:3200/',
 				title: 'Simulator',
 				kind: 'simulator',
+			});
+		});
+
+		it('should route page commands to the targeted browser tab', async () => {
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const browserTool = lazyToolsRecord.browser;
+			const resultPromise = browserTool?.execute?.({
+				action: 'click',
+				tabId: 'browser:test',
+				selector: '@e2',
+			});
+
+			const command = await waitForBrowserControlCommand(
+				projectRoot,
+				'browser:test',
+				100,
+			);
+			expect(command).toMatchObject({
+				tabId: 'browser:test',
+				action: 'click',
+				args: { selector: '@e2' },
+			});
+			expect(
+				submitBrowserControlResult(projectRoot, command?.id ?? '', {
+					ok: true,
+					clicked: '@e2',
+				}),
+			).toBe(true);
+			expect(await resultPromise).toMatchObject({
+				ok: true,
+				action: 'click',
+				tabId: 'browser:test',
+				clicked: '@e2',
+			});
+		});
+
+		it('should route stop navigation commands', async () => {
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const resultPromise = lazyToolsRecord.browser?.execute?.({
+				action: 'stop',
+				tabId: 'browser:test-stop',
+			});
+			const command = await waitForBrowserControlCommand(
+				projectRoot,
+				'browser:test-stop',
+				100,
+			);
+			expect(command).toMatchObject({ action: 'stop', args: {} });
+			expect(
+				submitBrowserControlResult(projectRoot, command?.id ?? '', {
+					ok: true,
+				}),
+			).toBe(true);
+			expect(await resultPromise).toMatchObject({
+				ok: true,
+				action: 'stop',
+				tabId: 'browser:test-stop',
 			});
 		});
 	});

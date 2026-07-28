@@ -25,7 +25,7 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 		},
 		{
 			name: 'browser',
-			description: 'Open a URL in the Otto browser preview.',
+			description: 'Open, inspect, and interact with a browser page.',
 			build: buildBrowserTool,
 		},
 		{

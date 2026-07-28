@@ -34,6 +34,7 @@ import { registerSkillsRoutes } from './routes/skills.ts';
 import { registerRecipesRoutes } from './routes/recipes.ts';
 import { registerUsageRoutes } from './routes/usage.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
+import { registerBrowserRoutes } from './routes/browser.ts';
 import { registerSimulatorRoutes } from './routes/simulator.ts';
 import { registerDictationRoutes } from './routes/dictation.ts';
 import { registerPluginsRoutes } from './routes/plugins/index.ts';
@@ -131,6 +132,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerPluginsRoutes(app);
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
+	registerBrowserRoutes(app);
 	registerSimulatorRoutes(app);
 	registerDictationRoutes(app);
 }

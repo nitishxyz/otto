@@ -25,6 +25,10 @@
 			"import": "./src/browser.ts",
 			"types": "./src/browser.ts"
 		},
+		"./browser-control": {
+			"import": "./src/browser-control.ts",
+			"types": "./src/browser-control.ts"
+		},
 		"./references": {
 			"import": "./src/references.ts",
 			"types": "./src/references.ts"

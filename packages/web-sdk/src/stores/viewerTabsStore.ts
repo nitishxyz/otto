@@ -217,6 +217,7 @@ export interface ViewerTabsState {
 	openBrowserTab: (
 		url?: string,
 		options?: {
+			id?: string;
 			kind?: 'browser' | 'simulator';
 			title?: string;
 			newTab?: boolean;
@@ -1316,7 +1317,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 		const kind = options.kind ?? 'browser';
 		set((state) => {
 			const shouldCreate = kind === 'browser' && options.newTab === true;
-			const id = shouldCreate ? newBrowserTabId() : browserTabId(kind);
+			const id =
+				options.id ?? (shouldCreate ? newBrowserTabId() : browserTabId(kind));
 			const existing = state.tabs.find(
 				(tab): tab is Extract<ViewerTab, { type: 'browser' }> =>
 					!shouldCreate && tab.type === 'browser' && tab.id === id,
