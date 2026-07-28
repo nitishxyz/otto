@@ -21,15 +21,35 @@ afterEach(async () => {
 });
 
 describe('interactive git command', () => {
-	test('fails immediately without a session for prompt routing', async () => {
-		await expect(
-			runInteractiveGitCommand({
-				projectRoot: process.cwd(),
-				cwd: process.cwd(),
+	test('runs non-interactively without a session', async () => {
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-git-no-session-'));
+		tempDirs.push(projectRoot);
+		const fakeGit = join(projectRoot, 'fake-git');
+		await Bun.write(
+			fakeGit,
+			`#!/bin/sh
+[ "$GIT_TERMINAL_PROMPT" = '0' ] || exit 21
+[ -z "$GPG_TTY" ] || exit 22
+printf 'non-interactive:ok\\n'
+`,
+		);
+		await chmod(fakeGit, 0o755);
+
+		const originalGpgTty = process.env.GPG_TTY;
+		process.env.GPG_TTY = '/dev/wrong-daemon-terminal';
+		try {
+			const result = await runInteractiveGitCommand({
+				projectRoot,
+				cwd: projectRoot,
 				gitArgs: ['push'],
 				operation: 'push',
-			}),
-		).rejects.toThrow('requires an active session');
+				gitCommand: fakeGit,
+			});
+			expect(result.stdout).toContain('non-interactive:ok');
+		} finally {
+			if (originalGpgTty === undefined) delete process.env.GPG_TTY;
+			else process.env.GPG_TTY = originalGpgTty;
+		}
 	});
 
 	test('surfaces a panel git prompt written to /dev/tty', async () => {

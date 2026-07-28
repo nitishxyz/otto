@@ -1,7 +1,10 @@
 import { getTerminalManager } from '@ottocode/sdk';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { attachTerminalSecureInput } from '../../runtime/tools/terminal-secure-input.ts';
 import { cleanPromptOutput } from '../../runtime/tools/secure-prompt.ts';
 
+const execFileAsync = promisify(execFile);
 const GIT_OPERATION_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface GitCommandResult {
@@ -19,10 +22,18 @@ export async function runInteractiveGitCommand(args: {
 	gitCommand?: string;
 }): Promise<GitCommandResult> {
 	const gitCommand = args.gitCommand ?? 'git';
+	const gitEnv = Object.fromEntries(
+		Object.entries(process.env).filter(
+			(entry): entry is [string, string] =>
+				entry[1] !== undefined && entry[0] !== 'GPG_TTY',
+		),
+	);
 	if (!args.sessionId) {
-		throw new Error(
-			`git ${args.operation} requires an active session to handle authentication prompts`,
-		);
+		return execFileAsync(gitCommand, args.gitArgs, {
+			cwd: args.cwd,
+			env: { ...gitEnv, GIT_TERMINAL_PROMPT: '0' },
+			timeout: GIT_OPERATION_TIMEOUT_MS,
+		});
 	}
 	const terminalManager = getTerminalManager(args.projectRoot);
 	if (!terminalManager) {
@@ -31,12 +42,6 @@ export async function runInteractiveGitCommand(args: {
 		);
 	}
 
-	const gitEnv = Object.fromEntries(
-		Object.entries(process.env).filter(
-			(entry): entry is [string, string] =>
-				entry[1] !== undefined && entry[0] !== 'GPG_TTY',
-		),
-	);
 	const terminal = terminalManager.create({
 		command: gitCommand,
 		args: args.gitArgs,
