@@ -5,6 +5,8 @@ import { messageReducer } from '../stream/reducer.ts';
 import {
 	connectSSE,
 	getQueuedMessageIds,
+	getStreamingMessageIdAfterTerminalEvent,
+	hasSameQueuedMessageOrder,
 	loadPendingSecureInputs,
 	loadSessionMessages,
 	loadSessionQueueState,
@@ -210,7 +212,9 @@ export function useStream(
 				}
 				case 'message.completed':
 					dispatch({ type: 'MESSAGE_COMPLETED', payload });
-					setStreamingMessageId(null);
+					setStreamingMessageId((currentMessageId) =>
+						getStreamingMessageIdAfterTerminalEvent(currentMessageId, payload),
+					);
 					onMessageCompletedRef.current?.();
 					setTimeout(() => {
 						if (controller.signal.aborted) return;
@@ -228,7 +232,9 @@ export function useStream(
 					break;
 				case 'error':
 					dispatch({ type: 'ERROR', payload });
-					setStreamingMessageId(null);
+					setStreamingMessageId((currentMessageId) =>
+						getStreamingMessageIdAfterTerminalEvent(currentMessageId, payload),
+					);
 					break;
 				case 'session.updated': {
 					onSessionUpdateRef.current?.(payload);
@@ -247,10 +253,7 @@ export function useStream(
 							: nextIds.length;
 					setQueueSize(queueLength);
 					setQueuedMessageIds((prev) => {
-						if (
-							prev.size === nextIds.length &&
-							nextIds.every((id: string) => prev.has(id))
-						) {
+						if (hasSameQueuedMessageOrder(prev, nextIds)) {
 							return prev;
 						}
 						return new Set(nextIds);

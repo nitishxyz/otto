@@ -88,3 +88,21 @@ export const COMMANDS = [
 	{ name: 'clear', alias: '', description: 'Reload messages' },
 	{ name: 'exit', alias: '/q', description: 'Exit TUI' },
 ];
+
+export type SlashCommand = (typeof COMMANDS)[number];
+
+/** Returns slash commands available for the current queue state. */
+export function getCommandSuggestions(
+	query: string,
+	hasQueuedMessages: boolean,
+): SlashCommand[] {
+	const normalizedQuery = query.toLowerCase();
+	return COMMANDS.filter((command) => {
+		if (command.name === 'send' && !hasQueuedMessages) return false;
+		return (
+			!normalizedQuery ||
+			command.name.startsWith(normalizedQuery) ||
+			command.alias?.slice(1).startsWith(normalizedQuery)
+		);
+	});
+}

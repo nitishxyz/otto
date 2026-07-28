@@ -3,7 +3,11 @@ import {
 	executeCommand,
 	type CommandContext,
 } from '../apps/tui/src/commands/dispatcher.ts';
-import { COMMANDS } from '../apps/tui/src/commands/registry.ts';
+import { getCommandSuggestions } from '../apps/tui/src/commands/registry.ts';
+import {
+	getStreamingMessageIdAfterTerminalEvent,
+	hasSameQueuedMessageOrder,
+} from '../apps/tui/src/stream/client.ts';
 import type { StatusIndicator } from '../apps/tui/src/stores/overlay.ts';
 
 function commandContext(overrides: Partial<CommandContext> = {}): {
@@ -33,8 +37,32 @@ function commandContext(overrides: Partial<CommandContext> = {}): {
 }
 
 describe('TUI queued-message command', () => {
-	test('registers /send in slash command suggestions', () => {
-		expect(COMMANDS.some((command) => command.name === 'send')).toBe(true);
+	test('only suggests /send when a message is queued', () => {
+		expect(
+			getCommandSuggestions('', false).some(
+				(command) => command.name === 'send',
+			),
+		).toBe(false);
+		expect(
+			getCommandSuggestions('', true).some(
+				(command) => command.name === 'send',
+			),
+		).toBe(true);
+	});
+
+	test('keeps a promoted message active when the preempted message completes', () => {
+		expect(
+			getStreamingMessageIdAfterTerminalEvent('promoted', { id: 'preempted' }),
+		).toBe('promoted');
+		expect(
+			getStreamingMessageIdAfterTerminalEvent('promoted', { id: 'promoted' }),
+		).toBeNull();
+	});
+
+	test('preserves queue position changes', () => {
+		const current = new Set(['first', 'second']);
+		expect(hasSameQueuedMessageOrder(current, ['first', 'second'])).toBe(true);
+		expect(hasSameQueuedMessageOrder(current, ['second', 'first'])).toBe(false);
 	});
 
 	test('sends the first queued message by default', async () => {

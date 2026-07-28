@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useTheme } from '../theme.ts';
 import { DiffView } from './DiffView.tsx';
-import { RAIL_BORDER_CHARS } from './rail.ts';
+import { NARROW_RAIL_BORDER_CHARS } from './rail.ts';
 import { getStreamedContent, getStreamedTarget } from '../lib/tool-stream.ts';
 import type { MessagePart } from '../types.ts';
 
@@ -640,7 +640,7 @@ export const ToolCallItem = memo(function ToolCallItem({
 			</box>
 			{liveOutput && (
 				<box
-					customBorderChars={RAIL_BORDER_CHARS}
+					customBorderChars={NARROW_RAIL_BORDER_CHARS}
 					style={{
 						flexDirection: 'column',
 						backgroundColor: colors.bgSubtle,

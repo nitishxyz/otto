@@ -37,7 +37,7 @@ export function buildGoalKickoffMessage(
 		'<instructions>',
 		'The user started this goal. You orchestrate it.',
 		tasks.length
-			? 'Dispatch the first open task(s): mark them in_progress via goal_update (recording the worker sessionId), then use subagent action=delegate or enqueue into a worker session. Independent tasks may run in parallel.'
+			? 'Dispatch the first open task(s): mark them in_progress via goal_update, use subagent action=delegate, then record the returned childSessionId on the task. Independent tasks may run in parallel.'
 			: 'The goal has no tasks yet. Create them with goal_update.',
 		'</instructions>',
 		'</looper_kickoff>',
@@ -131,9 +131,10 @@ export async function buildLooperWakeMessage(args: {
 	lines.push(
 		'<instructions>',
 		'A worker session run finished. Check up on it.',
-		'Follow your instructions: verify finished work, update task statuses, and dispatch or enqueue a continuation only if work remains or the error needs a retry.',
+		'Follow your instructions: verify finished work and update task statuses. If an owned delegated child needs related follow-up, find its subagentId with subagent action=list and send one subagent action=message; its response returns automatically.',
+		'If this is a legacy worker session with no subagent record owned by you, do not inject a message into it. Delegate remaining work to a new owned child and update the task sessionId, or block the task if transfer is unsafe.',
 		'If a previous [looper] message of yours was already answered in the conversation above, act on that answer (complete or keep tasks with a note) — never re-ask the same thing.',
-		'Sub-agent results are delivered to the dispatching session automatically — never repeat, summarize, or re-send them. Keep any enqueued continuation to one short line: which task to do next.',
+		'Sub-agent results are delivered to the dispatching session automatically — never poll, repeat, summarize, or re-send them. Keep a follow-up to one short line: which task to do next.',
 		'</instructions>',
 		'</looper_wakeup>',
 	);

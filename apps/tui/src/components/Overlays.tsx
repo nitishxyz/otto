@@ -14,6 +14,7 @@ import type { Session } from '../types.ts';
 
 interface OverlaysProps {
 	sessions: Session[];
+	hasQueuedMessages: boolean;
 	hasMore: boolean;
 	loadingMore: boolean;
 	onLoadMore: () => void;
@@ -32,6 +33,7 @@ interface OverlaysProps {
 
 export const Overlays = memo(function Overlays({
 	sessions,
+	hasQueuedMessages,
 	hasMore,
 	loadingMore,
 	onLoadMore,
@@ -87,7 +89,12 @@ export const Overlays = memo(function Overlays({
 				/>
 			);
 		case 'help':
-			return <HelpOverlay onClose={handleClose} />;
+			return (
+				<HelpOverlay
+					hasQueuedMessages={hasQueuedMessages}
+					onClose={handleClose}
+				/>
+			);
 		case 'theme':
 			return <ThemeOverlay onClose={handleClose} onSave={onThemeSave} />;
 		case 'approvals':

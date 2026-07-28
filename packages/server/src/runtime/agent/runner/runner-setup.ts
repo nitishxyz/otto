@@ -14,7 +14,6 @@ import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import { buildDatabaseTools } from '../../../tools/database/index.ts';
 import { buildSubagentTools } from '../../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../../tools/goals/index.ts';
-import { buildEnqueueSessionMessageTool } from '../../../tools/looper/index.ts';
 import { buildRunPluginCommandTool } from '../../../tools/plugins/run-plugin-command.ts';
 import { time } from '../../debug/index.ts';
 import { buildHistoryMessages } from '../../message/history-builder.ts';
@@ -223,17 +222,6 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 			discovered.tools.push(item);
 			injectedToolNames.push(item.name);
 		}
-	}
-
-	if (opts.agent === 'looper') {
-		const enqueueTool = buildEnqueueSessionMessageTool(
-			cfg.projectRoot,
-			currentSessionType === 'looper' && currentParentSessionId
-				? currentParentSessionId
-				: undefined,
-		);
-		discovered.tools.push(enqueueTool);
-		injectedToolNames.push(enqueueTool.name);
 	}
 
 	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);

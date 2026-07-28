@@ -2098,6 +2098,15 @@ export function useSessionStream(
 					});
 					break;
 				}
+				case 'session.updated': {
+					queryClient.invalidateQueries({
+						queryKey: getSessionQueryKey(sessionId),
+					});
+					queryClient.invalidateQueries({
+						queryKey: projectScopedKey(['subagents', sessionId] as const),
+					});
+					break;
+				}
 				case 'queue.updated': {
 					const queueState = normalizeQueueState({
 						currentMessageId: payload?.currentMessageId as string | null,

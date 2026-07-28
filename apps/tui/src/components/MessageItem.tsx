@@ -10,20 +10,20 @@ import {
 	isSubagentResultsMessage,
 	parseSubagentResults,
 } from './SubagentResultsCard.tsx';
-import { RAIL_BORDER_CHARS } from './rail.ts';
+import { NARROW_RAIL_BORDER_CHARS } from './rail.ts';
 import {
 	buildMessageBlocks,
 	extractPartText,
 	messagePartKey,
 } from '../lib/message-blocks.ts';
 
-const REASONING_PREVIEW_ROWS = 6;
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
 
 interface MessageItemProps {
 	message: Message;
 	isStreaming: boolean;
 	isQueued?: boolean;
+	showHeader?: boolean;
 	isFirstMessage: boolean;
 	pendingApprovals?: PendingApproval[];
 	onApprove?: (callId: string) => void;
@@ -128,73 +128,24 @@ const PartRenderer = memo(function PartRenderer({
 	return null;
 });
 
-const COMPLETED_REASONING_PREVIEW_CHARS = 240;
-
 const ReasoningBlockRenderer = memo(function ReasoningBlockRenderer({
 	parts,
-	isActive,
-	isLastBlock,
 }: {
 	parts: MessagePart[];
-	isActive: boolean;
-	isLastBlock: boolean;
 }) {
 	const { colors } = useTheme();
-	const text = parts.map(extractPartText).filter(Boolean).join('\n');
-	if (!text.trim()) return null;
-	const lastPart = parts[parts.length - 1];
-	const isThinking = isActive && isLastBlock && !lastPart?.completedAt;
-	const lines = text.split('\n').filter((line) => line.trim());
-	const completedPreview = text.replace(/\s+/g, ' ').trim();
-	const clippedPreview =
-		completedPreview.length > COMPLETED_REASONING_PREVIEW_CHARS
-			? `${completedPreview.slice(0, COMPLETED_REASONING_PREVIEW_CHARS - 1)}…`
-			: completedPreview;
+	const text = parts
+		.map(extractPartText)
+		.filter(Boolean)
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+	if (!text) return null;
 
 	return (
-		<box style={{ flexDirection: 'column' }}>
-			<box style={{ flexDirection: 'row', gap: 1 }}>
-				{isThinking ? (
-					<TinySpinner fg={colors.fgDark} />
-				) : (
-					<text fg={colors.fgDimmed}>∴</text>
-				)}
-				<text fg={colors.fgDark}>
-					<i>{isThinking ? 'thinking…' : 'thought'}</i>
-				</text>
-			</box>
-			<box
-				customBorderChars={RAIL_BORDER_CHARS}
-				style={{
-					flexDirection: 'column',
-					width: '100%',
-					backgroundColor: colors.bgSubtle,
-					border: ['left'],
-					borderColor: colors.border,
-					paddingLeft: 1,
-					paddingRight: 1,
-					marginLeft: 2,
-				}}
-			>
-				{isThinking ? (
-					lines.slice(-REASONING_PREVIEW_ROWS).map((line, index) => (
-						<text
-							key={`${index}-${line.slice(0, 24)}`}
-							style={{ height: 1 }}
-							fg={colors.fgDark}
-							wrapMode="none"
-							truncate
-						>
-							<i>{line}</i>
-						</text>
-					))
-				) : (
-					<text fg={colors.fgDark} wrapMode="word">
-						<i>{clippedPreview}</i>
-					</text>
-				)}
-			</box>
-		</box>
+		<text fg={colors.fgDark} wrapMode="none" truncate>
+			Thought: {text}
+		</text>
 	);
 });
 
@@ -381,7 +332,7 @@ const UserMessage = memo(function UserMessage({
 
 	return (
 		<box
-			customBorderChars={RAIL_BORDER_CHARS}
+			customBorderChars={NARROW_RAIL_BORDER_CHARS}
 			style={{
 				flexDirection: 'column',
 				width: '100%',
@@ -470,6 +421,7 @@ const AssistantMessage = memo(function AssistantMessage({
 	message,
 	isStreaming,
 	isQueued: _isQueued,
+	showHeader = true,
 	isFirstMessage: _isFirstMessage,
 	pendingApprovals,
 	onApprove,
@@ -514,73 +466,73 @@ const AssistantMessage = memo(function AssistantMessage({
 				flexDirection: 'column',
 				width: '100%',
 				paddingLeft: 1,
-				paddingRight: 1,
-				marginTop: 1,
+				paddingRight: 2,
+				marginTop: showHeader ? 1 : 0,
 			}}
 		>
-			<box style={{ flexDirection: 'row', gap: 0, height: 1 }}>
-				<text fg={agentColor}>✦ </text>
-				{message.agent && (
-					<text fg={agentColor}>
-						<b>{message.agent}</b>
-					</text>
-				)}
-				{(message.provider || message.model) && (
-					<text fg={colors.fgDimmed}>
-						{' '}
-						{[message.provider, message.model].filter(Boolean).join('/')}
-					</text>
-				)}
-				{message.createdAt > 0 && (
-					<text fg={colors.fgDimmed}> · {formatTime(message.createdAt)}</text>
-				)}
-			</box>
-
-			{blocks.map((block) => (
-				<box
-					key={block.key}
-					style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
-				>
-					{block.kind === 'tools' ? (
-						block.parts.map((part) => {
-							const approval = part.toolCallId
-								? (pendingApprovals?.find(
-										(a) => a.callId === part.toolCallId,
-									) ?? null)
-								: null;
-							return (
-								<box
-									key={messagePartKey(part)}
-									style={{ flexDirection: 'column', width: '100%' }}
-								>
-									<ToolCallItem part={part} />
-									{approval && onApprove && onDeny && (
-										<InlineApproval
-											approval={approval}
-											onApprove={onApprove}
-											onDeny={onDeny}
-										/>
-									)}
-								</box>
-							);
-						})
-					) : block.kind === 'todos' ? (
-						<TodoListCard part={block.part} />
-					) : block.kind === 'reasoning' ? (
-						<ReasoningBlockRenderer
-							parts={block.parts}
-							isActive={isActive}
-							isLastBlock={block.key === lastBlock?.key}
-						/>
-					) : (
-						<PartRenderer
-							part={block.part}
-							isActive={isActive}
-							isLastPart={block.part.id === lastPartId}
-						/>
+			{showHeader && (
+				<box style={{ flexDirection: 'row', gap: 0, height: 1 }}>
+					<text fg={agentColor}>✦ </text>
+					{message.agent && (
+						<text fg={agentColor}>
+							<b>{message.agent}</b>
+						</text>
+					)}
+					{(message.provider || message.model) && (
+						<text fg={colors.fgDimmed}>
+							{' '}
+							{[message.provider, message.model].filter(Boolean).join('/')}
+						</text>
+					)}
+					{message.createdAt > 0 && (
+						<text fg={colors.fgDimmed}> · {formatTime(message.createdAt)}</text>
 					)}
 				</box>
-			))}
+			)}
+
+			{blocks.map((block) => {
+				return (
+					<box
+						key={block.key}
+						style={{ flexDirection: 'column', width: '100%', marginTop: 1 }}
+					>
+						{block.kind === 'tools' ? (
+							block.parts.map((part) => {
+								const approval = part.toolCallId
+									? (pendingApprovals?.find(
+											(a) => a.callId === part.toolCallId,
+										) ?? null)
+									: null;
+								return (
+									<box
+										key={messagePartKey(part)}
+										style={{ flexDirection: 'column', width: '100%' }}
+									>
+										<ToolCallItem part={part} />
+										{approval && onApprove && onDeny && (
+											<InlineApproval
+												approval={approval}
+												onApprove={onApprove}
+												onDeny={onDeny}
+											/>
+										)}
+									</box>
+								);
+							})
+						) : block.kind === 'todos' ? (
+							<TodoListCard part={block.part} />
+						) : block.kind === 'reasoning' ? (
+							<ReasoningBlockRenderer parts={block.parts} />
+						) : (
+							<PartRenderer
+								part={block.part}
+								isActive={isActive}
+								isLastPart={block.part.id === lastPartId}
+							/>
+						)}
+					</box>
+				);
+			})}
 
 			{showStreamingIndicator && (
 				<StreamingIndicator progressPart={latestProgressPart} />
@@ -608,6 +560,7 @@ export const MessageItem = memo(function MessageItem({
 	message,
 	isStreaming,
 	isQueued,
+	showHeader,
 	isFirstMessage,
 	pendingApprovals,
 	onApprove,
@@ -616,6 +569,7 @@ export const MessageItem = memo(function MessageItem({
 	if (message.role === 'user') {
 		return (
 			<UserMessage
+				key={isQueued ? 'queued' : 'sent'}
 				message={message}
 				isQueued={isQueued}
 				isFirstMessage={isFirstMessage}
@@ -628,6 +582,7 @@ export const MessageItem = memo(function MessageItem({
 				message={message}
 				isStreaming={isStreaming}
 				isQueued={isQueued}
+				showHeader={showHeader}
 				isFirstMessage={isFirstMessage}
 				pendingApprovals={pendingApprovals}
 				onApprove={onApprove}

@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { logger } from '@ottocode/sdk';
 import { subagents } from '@ottocode/database/schema';
+import { publish } from '../../events/bus.ts';
 import { getSessionById } from '../session/manager.ts';
 import { sendQueuedMessageNow } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
@@ -54,7 +55,12 @@ export async function messageSubagent(
 	const now = Date.now();
 	await db
 		.update(subagents)
-		.set({ status: 'running', reported: false, updatedAt: now })
+		.set({
+			status: 'running',
+			summary: null,
+			reported: false,
+			updatedAt: now,
+		})
 		.where(eq(subagents.id, record.id));
 
 	const { assistantMessageId } = await dispatchSubagentMessage({
@@ -73,6 +79,21 @@ export async function messageSubagent(
 			runSessionLoop,
 		);
 	}
+
+	publish({
+		type: 'session.updated',
+		sessionId: parentSessionId,
+		projectRoot: cfg.projectRoot,
+		payload: {
+			id: parentSessionId,
+			subagentUpdated: {
+				subagentId: record.id,
+				childSessionId: record.childSessionId,
+				agent: record.agent,
+				status: 'running',
+			},
+		},
+	});
 
 	logger.info('[subagent] follow-up sent', {
 		subagentId: record.id,

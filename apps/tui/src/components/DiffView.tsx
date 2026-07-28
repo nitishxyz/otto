@@ -1,6 +1,8 @@
-import type { DiffRenderable } from '@opentui/core';
-import { useCallback, useMemo, useRef } from 'react';
+import type { BoxRenderable, DiffRenderable } from '@opentui/core';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../theme.ts';
+
+const SPLIT_VIEW_MIN_WIDTH = 120;
 
 const EXT_TO_FILETYPE: Record<string, string> = {
 	ts: 'typescript',
@@ -243,6 +245,13 @@ function countSplitViewRows(patch: string): number {
 	return rows;
 }
 
+function countUnifiedViewRows(patch: string): number {
+	return patch.split('\n').filter((line) => {
+		if (line.startsWith('---') || line.startsWith('+++')) return false;
+		return line.startsWith('+') || line.startsWith('-') || line.startsWith(' ');
+	}).length;
+}
+
 interface DiffViewProps {
 	patch: string;
 	filePath?: string;
@@ -287,10 +296,12 @@ function findScrollableChild(renderable: unknown): ScrollableRenderable | null {
 function SingleDiffView({
 	unifiedDiff,
 	filePath,
+	view,
 	maxHeight = 30,
 }: {
 	unifiedDiff: string;
 	filePath?: string;
+	view: 'unified' | 'split';
 	maxHeight?: number;
 }) {
 	const { colors, syntaxStyle } = useTheme();
@@ -298,10 +309,11 @@ function SingleDiffView({
 
 	const diffRef = useRef<DiffRenderable | null>(null);
 
-	const totalRows = useMemo(
-		() => countSplitViewRows(unifiedDiff),
-		[unifiedDiff],
-	);
+	const totalRows = useMemo(() => {
+		return view === 'split'
+			? countSplitViewRows(unifiedDiff)
+			: countUnifiedViewRows(unifiedDiff);
+	}, [unifiedDiff, view]);
 	const height = useMemo(
 		() => Math.min(Math.max(totalRows, 1), maxHeight),
 		[totalRows, maxHeight],
@@ -335,7 +347,8 @@ function SingleDiffView({
 				style={{ width: '100%', height }}
 				diff={unifiedDiff}
 				onMouseScroll={handleMouseScroll}
-				view="split"
+				view={view}
+				syncScroll={view === 'split'}
 				filetype={filetype}
 				syntaxStyle={syntaxStyle}
 				showLineNumbers
@@ -351,6 +364,14 @@ function SingleDiffView({
 }
 
 export function DiffView({ patch, filePath, maxHeight = 30 }: DiffViewProps) {
+	const [availableWidth, setAvailableWidth] = useState(0);
+	const handleSizeChange = useCallback(function handleSizeChange(
+		this: BoxRenderable,
+	) {
+		setAvailableWidth(this.width);
+	}, []);
+	const view = availableWidth >= SPLIT_VIEW_MIN_WIDTH ? 'split' : 'unified';
+
 	const fileDiffs = useMemo(() => {
 		if (isEnvelopedPatch(patch)) {
 			return splitEnvelopedPatch(patch);
@@ -378,6 +399,7 @@ export function DiffView({ patch, filePath, maxHeight = 30 }: DiffViewProps) {
 
 	return (
 		<box
+			onSizeChange={handleSizeChange}
 			style={{
 				width: '100%',
 				flexDirection: 'column',
@@ -390,6 +412,7 @@ export function DiffView({ patch, filePath, maxHeight = 30 }: DiffViewProps) {
 					key={fd.filePath}
 					unifiedDiff={fd.unifiedDiff}
 					filePath={fd.filePath}
+					view={view}
 					maxHeight={maxHeight}
 				/>
 			))}

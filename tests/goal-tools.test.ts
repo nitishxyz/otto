@@ -395,6 +395,8 @@ describe('goal kickoff message', () => {
 		expect(message).toContain('do the thing');
 		expect(message).toContain('goal_update');
 		expect(message).toContain('subagent action=delegate');
+		expect(message).toContain('record the returned childSessionId');
+		expect(message).not.toContain('enqueue');
 		expect(message).not.toContain('done_pending');
 	});
 });

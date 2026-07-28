@@ -105,10 +105,7 @@ const TodoRow = memo(function TodoRow({ todo }: { todo: TodoItem }) {
 	);
 });
 
-/**
- * Compact card rendering for `update_todos` tool calls: grouped list with
- * status icons, in-progress emphasis, and a done/total counter.
- */
+/** Compact card rendering for `update_todos` tool calls. */
 export const TodoListCard = memo(function TodoListCard({
 	part,
 }: {
@@ -118,11 +115,7 @@ export const TodoListCard = memo(function TodoListCard({
 	const parsed = useMemo(() => extractTodos(part), [part]);
 	if (!parsed) return null;
 
-	const { todos, note } = parsed;
-	const done = todos.filter((t) => t.status === 'completed').length;
-	const total = todos.filter((t) => t.status !== 'cancelled').length;
-	const allDone = total > 0 && done === total;
-	const current = todos.find((t) => t.status === 'in_progress');
+	const { todos } = parsed;
 
 	return (
 		<box
@@ -130,41 +123,13 @@ export const TodoListCard = memo(function TodoListCard({
 				flexDirection: 'column',
 				width: '100%',
 				paddingLeft: 1,
+				paddingRight: 1,
+				backgroundColor: colors.bgSubtle,
 			}}
 		>
-			<box style={{ flexDirection: 'row', gap: 1, height: 1 }}>
-				<text style={{ flexShrink: 0 }} fg={colors.fgMuted}>
-					<b>Todos</b>
-				</text>
-				<box
-					style={{
-						flexShrink: 0,
-						backgroundColor: allDone ? colors.green : colors.bgHighlight,
-						paddingLeft: 1,
-						paddingRight: 1,
-						height: 1,
-					}}
-				>
-					<text fg={allDone ? colors.bgDark : colors.fgMuted}>
-						{done}/{total}
-					</text>
-				</box>
-				{!allDone && current ? (
-					<text
-						style={{ flexShrink: 1, overflow: 'hidden' }}
-						fg={colors.fgDimmed}
-					>
-						{clip(current.step, 100)}
-					</text>
-				) : note ? (
-					<text
-						style={{ flexShrink: 1, overflow: 'hidden' }}
-						fg={colors.fgDimmed}
-					>
-						{clip(note, 100)}
-					</text>
-				) : null}
-			</box>
+			<text fg={colors.fgMuted}>
+				<b>Todos</b>
+			</text>
 			<box style={{ flexDirection: 'column', width: '100%', paddingLeft: 1 }}>
 				{todos.map((todo, i) => (
 					<TodoRow key={`${i}-${todo.step.slice(0, 32)}`} todo={todo} />

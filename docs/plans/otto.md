@@ -233,7 +233,7 @@ Otto's tools (read-only + control, no editing):
 ```txt
 read, ls, tree, search, glob   — verify claims against the repo
 goal_update                    — mark tasks done/blocked with notes
-enqueue_session_message        — inject a continuation into the main session
+subagent action=message        — continue an owned worker session
 finish
 ```
 
@@ -316,7 +316,7 @@ toggle disables otto AND goals together (per session or global); no degraded goa
 ### Phase 3: otto MVP
 
 - [ ] Built-in `otto` agent definition (prompt + read-only/control toolset).
-- [ ] `enqueue_session_message` tool (otto-only).
+- [ ] Continue owned worker sessions through `subagent` action=`message`.
 - [ ] Session-end hook in finish-handler with trigger conditions + stall cap.
 - [ ] Config: single toggle disabling otto + goals together, model override, stall limit (goal tools/routes are gated by the same toggle).
 

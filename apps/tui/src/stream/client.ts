@@ -66,6 +66,30 @@ export function getQueuedMessageIds(value: unknown): string[] {
 		.filter((id): id is string => id !== null);
 }
 
+/** Compares queued ids without discarding their positional order. */
+export function hasSameQueuedMessageOrder(
+	currentIds: Set<string>,
+	nextIds: string[],
+): boolean {
+	if (currentIds.size !== nextIds.length) return false;
+	return [...currentIds].every((id, index) => id === nextIds[index]);
+}
+
+/** Clears streaming state only when the completed message is still active. */
+export function getStreamingMessageIdAfterTerminalEvent(
+	currentMessageId: string | null,
+	payload: Record<string, unknown>,
+): string | null {
+	const terminalMessageId =
+		typeof payload.id === 'string'
+			? payload.id
+			: typeof payload.messageId === 'string'
+				? payload.messageId
+				: null;
+	if (!terminalMessageId || terminalMessageId === currentMessageId) return null;
+	return currentMessageId;
+}
+
 /** Connects to the session SSE stream and forwards parsed events. */
 export async function connectSSE(
 	url: string,

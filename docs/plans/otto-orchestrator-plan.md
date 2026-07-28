@@ -64,8 +64,8 @@ These are intentionally narrow and should not be treated as the target model:
 - `findOrCreateLegacyOttoSession` can create a goal-less otto session for an
   errored worker/session run, still bound with `sessions.parentSessionId`.
 - `runner-setup.ts` keeps a `currentParentSessionId` fallback for legacy otto
-  child sessions so `goal_list`/`goal_update` and `enqueue_session_message`
-  operate on the supervised parent session when no per-goal binding exists.
+  child sessions so `goal_list`/`goal_update` operate on the supervised parent
+  session when no per-goal binding exists.
 - `AUTOMATED_PREFIXES` still includes `<goal_start` so historical automated
   messages do not reset stall state or appear as manual user input.
 
@@ -108,15 +108,14 @@ update `migrations-bundled.ts`, test locally.
   `NO_GOAL_SESSION_TYPES`.
 - Delegation tools: unchanged (all driver agents at depth 0; subagents still
   excluded).
-- `enqueue_session_message`: otto must pass the target `sessionId` explicitly
-  for normal per-goal orchestration. It only defaults to the supervised parent
-  session for legacy child-otto sessions; it does not infer a worker session
-  from a task id.
+- Worker continuations use `subagent` action=`message`, keyed by the owning
+  `subagentId`. This preserves active-state tracking and automatic result
+  delivery; there is no separate session-message enqueue tool.
 
 `packages/server/src/runtime/agent/registry.ts`:
 
 - Remove `goal_list`/`goal_update` from any non-otto defaults. Otto keeps
-  read/search tools + goal tools + delegation + enqueue.
+  read/search tools + goal tools + unified sub-agent lifecycle actions.
 
 ### Phase 3 — Otto loop per goal (implemented with compatibility)
 

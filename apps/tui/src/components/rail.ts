@@ -1,20 +1,23 @@
 import type { BorderCharacters } from '@opentui/core';
 
-/**
- * Half-block characters for left accent rails. With `border: ['left']` only
- * the vertical char is drawn; `▌` fills the left half of the cell for a
- * chunkier, web-like accent bar than the default `│`.
- */
-export const RAIL_BORDER_CHARS: BorderCharacters = {
-	topLeft: '▌',
-	topRight: '▌',
-	bottomLeft: '▌',
-	bottomRight: '▌',
-	horizontal: ' ',
-	vertical: '▌',
-	topT: '▌',
-	bottomT: '▌',
-	leftT: '▌',
-	rightT: '▌',
-	cross: '▌',
-};
+function createRailBorderChars(glyph: string): BorderCharacters {
+	return {
+		topLeft: glyph,
+		topRight: glyph,
+		bottomLeft: glyph,
+		bottomRight: glyph,
+		horizontal: ' ',
+		vertical: glyph,
+		topT: glyph,
+		bottomT: glyph,
+		leftT: glyph,
+		rightT: glyph,
+		cross: glyph,
+	};
+}
+
+/** Half-block characters for prominent left accent rails. */
+export const RAIL_BORDER_CHARS = createRailBorderChars('▌');
+
+/** Three-eighths-block characters for compact left accent rails. */
+export const NARROW_RAIL_BORDER_CHARS = createRailBorderChars('▍');

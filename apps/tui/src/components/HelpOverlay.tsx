@@ -1,14 +1,16 @@
 import { useKeyboard } from '@opentui/react';
 import { useTheme } from '../theme.ts';
-import { COMMANDS } from '../commands/index.ts';
+import { getCommandSuggestions } from '../commands/index.ts';
 import { ModalFrame } from './ModalFrame.tsx';
 
 interface HelpOverlayProps {
+	hasQueuedMessages: boolean;
 	onClose: () => void;
 }
 
-export function HelpOverlay({ onClose }: HelpOverlayProps) {
+export function HelpOverlay({ hasQueuedMessages, onClose }: HelpOverlayProps) {
 	const { colors } = useTheme();
+	const commands = getCommandSuggestions('', hasQueuedMessages);
 
 	useKeyboard((key) => {
 		if (key.name === 'escape') onClose();
@@ -20,7 +22,7 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 				<b>Commands</b>
 			</text>
 			<box style={{ flexDirection: 'column', marginTop: 1, gap: 0 }}>
-				{COMMANDS.map((cmd) => (
+				{commands.map((cmd) => (
 					<box key={cmd.name} style={{ flexDirection: 'row', gap: 1 }}>
 						<text fg={colors.green}>/{cmd.name}</text>
 						{cmd.alias && <text fg={colors.fgDimmed}>({cmd.alias})</text>}

@@ -4,6 +4,7 @@ import {
 	buildSubagentTool,
 	buildSubagentTools,
 } from '../packages/server/src/tools/subagents/index.ts';
+import { defaultToolConfigForAgent } from '../packages/server/src/runtime/agent/registry/tools.ts';
 
 describe('subagent tool guidance', () => {
 	test('registers one lifecycle tool', () => {
@@ -41,10 +42,26 @@ describe('subagent tool guidance', () => {
 		expect(description).toContain('fresh parallel work');
 		expect(description).toContain('related continuation');
 		expect(description).toContain('owned by the child');
-		expect(description).toContain('arrive automatically');
-		expect(description).toContain('do not poll');
+		expect(description).toContain('message marks the child active');
+		expect(description).toContain('delivered automatically when ready');
+		expect(description).toContain('must not sleep');
+		expect(description).toContain('repeatedly call list, status, or read');
+		expect(description).toContain('end the turn instead');
 		expect(description).toContain('context-window usage');
 		expect(description).toContain('recent tool calls');
 		expect(description).toContain('/compact');
+	});
+
+	test('uses the unified subagent tool for looper follow-ups', async () => {
+		const looperTools = defaultToolConfigForAgent('looper');
+		const prompt = await Bun.file(
+			'packages/sdk/src/prompts/src/agents/looper.txt',
+		).text();
+
+		expect(looperTools.firstClass).not.toContain('enqueue_session_message');
+		expect(prompt).not.toContain('enqueue_session_message');
+		expect(prompt).toContain('subagent` action=`message');
+		expect(prompt).toContain('marks the sub-agent active again');
+		expect(prompt).toContain('result returns automatically');
 	});
 });

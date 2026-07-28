@@ -57,12 +57,7 @@ const RESEARCH_TOOLS = new Set([
 	'present_action',
 ]);
 
-const ORCHESTRATION_TOOLS = new Set([
-	'subagent',
-	'goal_list',
-	'goal_update',
-	'enqueue_session_message',
-]);
+const ORCHESTRATION_TOOLS = new Set(['subagent', 'goal_list', 'goal_update']);
 
 const getToolsQuerySchema = z.object({
 	project: z

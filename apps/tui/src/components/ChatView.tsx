@@ -125,18 +125,24 @@ export const ChatView = memo(function ChatView({
 			stickyScroll
 			stickyStart="bottom"
 		>
-			{visibleMessages.map((msg, i) => (
-				<MessageItem
-					key={msg.id}
-					message={msg}
-					isStreaming={msg.id === streamingMessageId}
-					isQueued={queuedUserIds.has(msg.id)}
-					isFirstMessage={i === 0}
-					pendingApprovals={approvalsByMessage.get(msg.id) ?? EMPTY_APPROVALS}
-					onApprove={onApprove}
-					onDeny={onDeny}
-				/>
-			))}
+			{visibleMessages.map((msg, i) => {
+				const previousMessage = visibleMessages[i - 1];
+				const showHeader =
+					msg.role !== 'assistant' || previousMessage?.role !== 'assistant';
+				return (
+					<MessageItem
+						key={msg.id}
+						message={msg}
+						isStreaming={msg.id === streamingMessageId}
+						isQueued={queuedUserIds.has(msg.id)}
+						showHeader={showHeader}
+						isFirstMessage={i === 0}
+						pendingApprovals={approvalsByMessage.get(msg.id) ?? EMPTY_APPROVALS}
+						onApprove={onApprove}
+						onDeny={onDeny}
+					/>
+				);
+			})}
 		</scrollbox>
 	);
 });

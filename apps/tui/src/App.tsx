@@ -660,6 +660,7 @@ export function App({
 
 			<Overlays
 				sessions={sessions}
+				hasQueuedMessages={queueSize > 0}
 				hasMore={hasMore}
 				loadingMore={loadingMore}
 				onLoadMore={loadMoreSessions}

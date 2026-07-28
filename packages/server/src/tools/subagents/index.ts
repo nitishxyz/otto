@@ -72,7 +72,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 		name: 'subagent',
 		tool: tool({
 			description:
-				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows all lifecycle results; status inspects one agent including context-window usage; read returns a bounded overview of recent tool calls; message sends a queued or interrupting follow-up; compact queues /compact after the child is idle; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results arrive automatically at the next model step or after this turn; do not poll running agents.',
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows all lifecycle results; status inspects one agent including context-window usage; read returns a bounded overview of recent tool calls; message marks the child active and sends a queued or interrupting follow-up; compact queues /compact after the child is idle; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results are delivered automatically when ready. The main agent must not sleep, wait, or repeatedly call list, status, or read to poll a running child; continue other work or end the turn instead.',
 			inputSchema: subagentInputSchema,
 			async execute(input) {
 				switch (input.action) {
@@ -109,7 +109,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							childSessionId: result.childSessionId,
 							agent: result.agent,
 							status: 'running',
-							note: 'Task delegated. Continue unrelated work; the result arrives automatically.',
+							note: 'Task delegated. Do not sleep or poll; continue unrelated work or end the turn. The result will arrive automatically when ready.',
 						};
 					}
 					case 'list': {
@@ -206,8 +206,8 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							status: 'running',
 							note:
 								result.delivery === 'interrupt'
-									? 'Current work was preempted; the result arrives automatically.'
-									: 'Follow-up queued; the result arrives automatically.',
+									? 'Sub-agent is active again; current work was preempted and the result arrives automatically.'
+									: 'Sub-agent is active again; follow-up queued and the result arrives automatically.',
 						};
 					}
 					case 'compact': {

@@ -6,11 +6,11 @@ import { searchFiles } from '@ottocode/api';
 import { fuzzyMatchFilePath } from '@ottocode/sdk/search/file-rank';
 import { useTheme } from '../theme.ts';
 import { TinySpinner } from './TinySpinner.tsx';
-import { COMMANDS } from '../commands/index.ts';
+import { getCommandSuggestions, type SlashCommand } from '../commands/index.ts';
 import { getVisibleWindow } from './ModalFrame.tsx';
 import type { StatusIndicator } from '../stores/overlay.ts';
 import { useFileAttachments, isFilePath } from '../hooks/useFileAttachments.ts';
-import { RAIL_BORDER_CHARS } from './rail.ts';
+import { NARROW_RAIL_BORDER_CHARS } from './rail.ts';
 import type {
 	ImageAttachment,
 	FileAttachment,
@@ -95,7 +95,7 @@ export function ChatInput({
 	attachmentCountRef.current = attachmentCount;
 	clearAttachmentsRef.current = clearAttachments;
 
-	const [commandMatches, setCommandMatches] = useState<typeof COMMANDS>([]);
+	const [commandMatches, setCommandMatches] = useState<SlashCommand[]>([]);
 	const [selectedIdx, setSelectedIdx] = useState(0);
 	const commandMatchesRef = useRef(commandMatches);
 	const selectedIdxRef = useRef(selectedIdx);
@@ -232,20 +232,25 @@ export function ChatInput({
 		if (text.startsWith('/') && !text.includes(' ')) {
 			setShowFileMention(false);
 			const query = text.slice(1).toLowerCase();
-			const matches =
-				query.length === 0
-					? COMMANDS
-					: COMMANDS.filter(
-							(c) =>
-								c.name.startsWith(query) || c.alias?.slice(1).startsWith(query),
-						);
+			const matches = getCommandSuggestions(query, queueSize > 0);
 			setCommandMatches(matches);
 			setSelectedIdx(0);
 		} else {
 			setCommandMatches([]);
 			checkForMention(text, cursor.offset);
 		}
-	}, [checkForMention]);
+	}, [checkForMention, queueSize]);
+
+	useEffect(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+		const text = textarea.plainText;
+		if (!text.startsWith('/') || text.includes(' ')) return;
+		setCommandMatches(
+			getCommandSuggestions(text.slice(1).toLowerCase(), queueSize > 0),
+		);
+		setSelectedIdx(0);
+	}, [queueSize]);
 
 	const handleSubmit = useCallback(() => {
 		if (disabled) return;
@@ -562,7 +567,7 @@ export function ChatInput({
 				</box>
 			)}
 			<box
-				customBorderChars={RAIL_BORDER_CHARS}
+				customBorderChars={NARROW_RAIL_BORDER_CHARS}
 				style={{
 					width: '100%',
 					border: ['left'],
@@ -644,7 +649,7 @@ export function ChatInput({
 									<box
 										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
 									>
-										<TinySpinner fg={colors.streamDot} />
+										<TinySpinner fg={railColor} />
 										{escHint && (
 											<text fg={colors.yellow} wrapMode="none" truncate>
 												press Esc again to stop
@@ -656,7 +661,7 @@ export function ChatInput({
 									<box
 										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
 									>
-										<TinySpinner fg={colors.blue} />
+										<TinySpinner fg={railColor} />
 										<text fg={colors.blue} wrapMode="none" truncate>
 											{status.label}
 										</text>
@@ -679,13 +684,12 @@ export function ChatInput({
 							</text>
 						)}
 						{queueSize > 0 && (
-							<text
-								style={{ flexShrink: 0 }}
-								fg={colors.yellow}
-								wrapMode="none"
-							>
-								⧗ {queueSize} queued
-							</text>
+							<box style={{ flexDirection: 'row', gap: 1, flexShrink: 0 }}>
+								<text fg={colors.fgDark}>·</text>
+								<text fg={colors.yellow} wrapMode="none">
+									{queueSize} queued
+								</text>
+							</box>
 						)}
 					</box>
 					{hasModelLabel && (

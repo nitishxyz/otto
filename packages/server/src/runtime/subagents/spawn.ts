@@ -110,6 +110,7 @@ export async function spawnSubagent(
 	publish({
 		type: 'session.updated',
 		sessionId: parentSessionId,
+		projectRoot: cfg.projectRoot,
 		payload: {
 			id: parentSessionId,
 			subagentSpawned: {

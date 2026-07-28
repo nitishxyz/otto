@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { subagents } from '@ottocode/database/schema';
 import { logger, type OttoConfig } from '@ottocode/sdk';
+import { publish } from '../../events/bus.ts';
 import { getSessionById } from '../session/manager.ts';
 import { getRunnerState } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
@@ -45,6 +46,21 @@ export async function reportFinishedSubagents(
 			.set({ reported: true, updatedAt: now })
 			.where(eq(subagents.id, record.id));
 	}
+
+	publish({
+		type: 'session.updated',
+		sessionId: parentSessionId,
+		projectRoot: cfg.projectRoot,
+		payload: {
+			id: parentSessionId,
+			subagentsFinished: finished.map((record) => ({
+				subagentId: record.id,
+				childSessionId: record.childSessionId,
+				agent: record.agent,
+				status: record.status,
+			})),
+		},
+	});
 
 	await dispatchSubagentMessage({
 		cfg,
