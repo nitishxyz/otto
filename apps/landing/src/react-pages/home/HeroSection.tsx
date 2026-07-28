@@ -42,8 +42,13 @@ export function HeroSection() {
 
 					<h1 className="np-display max-w-[20ch] text-otto-text">
 						<span className="block whitespace-nowrap">You describe it.</span>
-						<span className="mt-[0.08em] block whitespace-nowrap">
-							<span className="text-np-blue">Otto</span> builds it.
+						<span className="mt-[0.12em] block whitespace-nowrap">
+							{/* Padded highlight: leading is tightened with a negative inline
+							    margin so the box does not widen the heading's line box. */}
+							<span className="np-edge np-shadow-sm mr-[0.12em] inline-block rounded-[3px] bg-np-blue px-[0.18em] pb-[0.04em] text-np-blue-on">
+								otto
+							</span>
+							builds it.
 						</span>
 					</h1>
 

@@ -40,8 +40,8 @@ export interface NeoButtonProps {
 }
 
 /**
- * NeoPop action. Solid variants carry a hard offset shadow and translate into
- * it on press; outline and ghost stay flat for secondary actions.
+ * NeoPop action. Solid and outline variants carry a hard offset shadow and
+ * translate into it on press; ghost stays flat for tertiary actions.
  */
 export function NeoButton({
 	children,
@@ -86,8 +86,11 @@ export function NeoButton({
 				)
 			: variant === 'outline'
 				? cn(
-						'np-edge bg-transparent text-otto-text',
-						'hover:bg-otto-card transition-colors duration-150',
+						// Opaque so the hard shadow never reads through the surface.
+						'np-edge bg-otto-bg text-otto-text',
+						SHADOW[size],
+						'np-press',
+						pressed && 'is-pressed',
 					)
 				: cn(
 						'border-2 border-transparent text-otto-muted',
@@ -96,7 +99,7 @@ export function NeoButton({
 
 	const classes = cn(base, skin, className);
 	const pressHandlers =
-		variant === 'solid'
+		variant === 'solid' || variant === 'outline'
 			? {
 					onPointerDown: press,
 					onPointerUp: release,
