@@ -59,9 +59,10 @@ otto/
 │   ├── api/
 │   ├── database/
 │   ├── install/
-│   ├── openclaw-ottorouter/
+│   ├── plugin-registry/
 │   ├── sdk/
 │   ├── server/
+│   ├── themes/
 │   ├── web-sdk/
 │   └── web-ui/
 ├── infra/

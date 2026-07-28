@@ -51,7 +51,6 @@ It also builds and attaches CLI binaries to the GitHub release.
 These have dedicated publish workflows:
 
 - `.github/workflows/publish-ai-sdk.yml` → `@ottocode/ai-sdk`
-- `.github/workflows/publish-openclaw-ottorouter.yml` → `@ottorouter/openclaw`
 
 These are controlled via `publish.env` flags rather than the main tag workflow.
 
@@ -59,7 +58,6 @@ These are controlled via `publish.env` flags rather than the main tag workflow.
 
 - `@ottocode/acp` — present in the repo, but not currently published by `publish-from-tag.yml`
 - `@ottocode/ai-sdk` — separate workflow, not part of the main synchronized tag publish flow
-- `@ottorouter/openclaw` — separate workflow, not part of the main synchronized tag publish flow
 
 ## Release workflows
 
@@ -113,12 +111,6 @@ Behavior:
 - publishes to npm
 - resets the publish flag and commits the version change
 
-### `publish-openclaw-ottorouter.yml`
-
-Standalone workflow for `@ottocode/openclaw`.
-
-Behavior mirrors `publish-ai-sdk.yml`, but uses `PUBLISH_OPENCLAW_OTTOROUTER=true`.
-
 ## Versioning model
 
 ### Synchronized packages
@@ -141,7 +133,6 @@ These should share the same version during the main release flow:
 These have their own publish/version path:
 
 - `packages/ai-sdk/package.json`
-- `packages/openclaw/package.json`
 
 ## Manual release commands
 
@@ -179,7 +170,7 @@ Repository workflows require:
 ## Practical guidance
 
 - use the main synchronized flow for the core otto packages
-- use the dedicated workflows for `@ottocode/ai-sdk` and `@ottocode/openclaw`
+- use the dedicated workflow for `@ottocode/ai-sdk`
 - do not assume every public package in the repo is published by the same workflow
 - if you change server APIs, regenerate `@ottocode/api` before tagging/publishing
 - if you add a new public package, update both the docs and the relevant workflow/prepare script

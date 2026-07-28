@@ -68,9 +68,10 @@ otto/
 │   ├── api/
 │   ├── database/
 │   ├── install/
-│   ├── openclaw-ottorouter/
+│   ├── plugin-registry/
 │   ├── sdk/
 │   ├── server/
+│   ├── themes/
 │   ├── web-sdk/
 │   └── web-ui/
 ├── infra/
@@ -222,9 +223,13 @@ ACP adapter for editor/client integrations.
 
 Companion package/versioning surface for AI SDK-related integration.
 
-### `@ottocode/openclaw`
+### `@ottocode/themes`
 
-OttoRouter integration package for OpenClaw workflows.
+Shared theme definitions consumed by the TUI and web surfaces.
+
+### `packages/plugin-registry`
+
+Official plugin list and payloads that `otto plugins` searches and installs from.
 
 ---
 

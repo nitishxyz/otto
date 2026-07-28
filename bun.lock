@@ -57,7 +57,7 @@
     },
     "apps/cli": {
       "name": "@ottocode/cli",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "bin": {
         "otto": "./dist/otto",
       },
@@ -84,7 +84,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.213",
+      "version": "0.1.214",
       "dependencies": {
         "@ottocode/themes": "workspace:*",
         "@ottocode/web-sdk": "workspace:*",
@@ -420,7 +420,7 @@
     },
     "packages/api": {
       "name": "@ottocode/api",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "axios": "1.13.5",
         "eventsource-parser": "2.0.1",
@@ -433,7 +433,7 @@
     },
     "packages/database": {
       "name": "@ottocode/database",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "drizzle-orm": "0.44.7",
@@ -446,26 +446,10 @@
     },
     "packages/install": {
       "name": "@ottocode/install",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "bin": {
         "otto": "./start.js",
       },
-    },
-    "packages/openclaw-ottorouter": {
-      "name": "@ottorouter/openclaw",
-      "version": "0.1.11",
-      "bin": {
-        "openclaw": "./dist/cli.mjs",
-      },
-      "devDependencies": {
-        "typescript": "5.9.3",
-      },
-      "peerDependencies": {
-        "openclaw": ">=2025.1.0",
-      },
-      "optionalPeers": [
-        "openclaw",
-      ],
     },
     "packages/plugin-registry": {
       "name": "@ottocode/plugin-registry",
@@ -473,7 +457,7 @@
     },
     "packages/sdk": {
       "name": "@ottocode/sdk",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.82",
         "@ai-sdk/baseten": "1.0.54",
@@ -510,7 +494,7 @@
     },
     "packages/server": {
       "name": "@ottocode/server",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "@ai-sdk/devtools": "0.0.18",
         "@ai-sdk/provider": "3.0.10",
@@ -536,14 +520,14 @@
     },
     "packages/themes": {
       "name": "@ottocode/themes",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "devDependencies": {
         "typescript": "5.9.3",
       },
     },
     "packages/web-sdk": {
       "name": "@ottocode/web-sdk",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "@codemirror/lang-css": "6.3.1",
         "@codemirror/lang-html": "6.4.11",
@@ -600,7 +584,7 @@
     },
     "packages/web-ui": {
       "name": "@ottocode/web-ui",
-      "version": "0.1.375",
+      "version": "0.1.376",
       "dependencies": {
         "express": "5.2.1",
       },
@@ -1491,8 +1475,6 @@
     "@ottocode/web-ui": ["@ottocode/web-ui@workspace:packages/web-ui"],
 
     "@ottorouter/ai-sdk": ["@ottorouter/ai-sdk@workspace:packages/ai-sdk"],
-
-    "@ottorouter/openclaw": ["@ottorouter/openclaw@workspace:packages/openclaw-ottorouter"],
 
     "@paulmillr/qr": ["@paulmillr/qr@0.2.1", "", {}, "sha512-IHnV6A+zxU7XwmKFinmYjUcwlyK9+xkG3/s9KcQhI9BjQKycrJ1JRO+FbNYPwZiPKW3je/DR0k7w8/gLa5eaxQ=="],
 

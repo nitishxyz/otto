@@ -212,7 +212,6 @@ export OPENAI_API_KEY="sk-..."
 export GOOGLE_GENERATIVE_AI_API_KEY="..."
 export OPENROUTER_API_KEY="..."
 export OPENCODE_API_KEY="..."
-export OTTOROUTER_PRIVATE_KEY="..."          # Solana wallet (base58)
 export KIMI_API_KEY="..."
 export MINIMAX_API_KEY="..."
 export ZAI_API_KEY="..."
@@ -287,7 +286,7 @@ A single Bun monorepo.
 `canvas` · `cli` · `desktop` · `intro-video` · `landing` · `launcher` · `mobile` · `preview-api` · `preview-web` · `tui` · `web`
 
 **Packages** (`packages/`)
-`@ottocode/acp` · `@ottocode/ai-sdk` · `@ottocode/api` · `@ottocode/database` · `@ottocode/install` · `@ottocode/openclaw` · `@ottocode/sdk` · `@ottocode/server` · `@ottocode/web-sdk` · `@ottocode/web-ui`
+`@ottocode/acp` · `@ottocode/ai-sdk` · `@ottocode/api` · `@ottocode/database` · `@ottocode/install` · `@ottocode/sdk` · `@ottocode/server` · `@ottocode/themes` · `@ottocode/web-sdk` · `@ottocode/web-ui`
 
 **Infra** (`infra/`) — SST modules
 `script` · `landing` · `preview-api` · `preview-web` · `og`

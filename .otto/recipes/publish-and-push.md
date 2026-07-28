@@ -17,7 +17,6 @@ Read `publish.env` first. Map recipe arguments (from `<recipe-arguments>`) to en
 | `canvas` | `PUBLISH_CANVAS` |
 | `launcher` | `PUBLISH_LAUNCHER` |
 | `ai-sdk` | `PUBLISH_AI_SDK` |
-| `openclaw-ottorouter` | `PUBLISH_OPENCLAW_OTTOROUTER` |
 
 If there are no recipe arguments, enable **cli** and **desktop** only.
 
