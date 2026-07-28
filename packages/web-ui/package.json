@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/web-ui",
-	"version": "0.1.375",
+	"version": "0.1.376",
 	"description": "Embeddable web UI for ottocode - pre-built static assets",
 	"type": "module",
 	"main": "./dist/index.js",
