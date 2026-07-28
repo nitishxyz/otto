@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { OttoWordmark } from './OttoWordmark';
 import { useTheme } from '../hooks/useTheme';
+import { sectionLink } from '../lib/section-link';
 import { NeoButton } from './neopop';
 
 function OttoRouterIcon() {
@@ -100,14 +101,14 @@ export function Nav({ pathname }: { pathname: string }) {
 	const isNeo = pathname === '/' || isDocs;
 	const { theme, toggle } = useTheme();
 
-	const handleSectionLink = (hash: string) => (e: React.MouseEvent) => {
-		e.preventDefault();
-		if (pathname !== '/') {
-			window.location.href = `/#${hash}`;
-		} else {
-			document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
-		}
-	};
+	// The mobile panel overlays the page, so it has to close before a smooth
+	// scroll starts or it sits on top of the destination.
+	const closeThen =
+		(handler: (event: React.MouseEvent<HTMLElement>) => void) =>
+		(event: React.MouseEvent<HTMLElement>) => {
+			setMobileOpen(false);
+			handler(event);
+		};
 
 	useEffect(() => {
 		const onScroll = () => setScrolled(window.scrollY > 20);
@@ -191,7 +192,7 @@ export function Nav({ pathname }: { pathname: string }) {
 								<NeoButton
 									variant="outline"
 									size="sm"
-									onClick={handleSectionLink('install')}
+									onClick={sectionLink('install')}
 									data-s-event="Click install CTA"
 									data-s-event-props="source=nav"
 								>
@@ -200,7 +201,7 @@ export function Nav({ pathname }: { pathname: string }) {
 								<NeoButton
 									tone="ink"
 									size="sm"
-									onClick={handleSectionLink('desktop')}
+									onClick={sectionLink('desktop')}
 									data-s-event="Click desktop CTA"
 									data-s-event-props="source=nav"
 								>
@@ -221,7 +222,7 @@ export function Nav({ pathname }: { pathname: string }) {
 								</a>
 								<button
 									type="button"
-									onClick={handleSectionLink('install')}
+									onClick={sectionLink('install')}
 									className="px-3.5 py-1.5 border border-otto-border text-otto-muted text-xs rounded-sm hover:border-otto-border-light hover:text-otto-text transition-colors"
 									data-s-event="Click install CTA"
 									data-s-event-props="source=nav"
@@ -230,7 +231,7 @@ export function Nav({ pathname }: { pathname: string }) {
 								</button>
 								<button
 									type="button"
-									onClick={handleSectionLink('desktop')}
+									onClick={sectionLink('desktop')}
 									className="px-3.5 py-1.5 bg-otto-text text-otto-bg text-xs font-medium rounded-sm hover:opacity-80 transition-colors flex items-center gap-1.5"
 									data-s-event="Click desktop CTA"
 									data-s-event-props="source=nav"
@@ -327,7 +328,7 @@ export function Nav({ pathname }: { pathname: string }) {
 					</a>
 					<button
 						type="button"
-						onClick={handleSectionLink('install')}
+						onClick={closeThen(sectionLink('install'))}
 						className="block text-otto-muted hover:text-otto-text"
 						data-s-event="Click install CTA"
 						data-s-event-props="source=mobile-nav"
@@ -336,7 +337,7 @@ export function Nav({ pathname }: { pathname: string }) {
 					</button>
 					<button
 						type="button"
-						onClick={handleSectionLink('desktop')}
+						onClick={closeThen(sectionLink('desktop'))}
 						className="block text-otto-muted hover:text-otto-text"
 						data-s-event="Click desktop CTA"
 						data-s-event-props="source=mobile-nav"

@@ -5,6 +5,7 @@ import {
 	NeoReveal,
 } from '../../components/neopop';
 import { CopyButton } from '../../components/CopyButton';
+import { sectionLink } from '../../lib/section-link';
 import { AgentMockup } from './AgentMockup';
 import { DownloadIcon } from './icons';
 
@@ -62,6 +63,7 @@ export function HeroSection() {
 					<div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
 						<NeoButton
 							href="#install"
+							onClick={sectionLink('install')}
 							tone="blue"
 							size="lg"
 							data-s-event="Click install CTA"
@@ -71,6 +73,7 @@ export function HeroSection() {
 						</NeoButton>
 						<NeoButton
 							href="#desktop"
+							onClick={sectionLink('desktop')}
 							tone="ink"
 							size="lg"
 							data-s-event="Click desktop CTA"
