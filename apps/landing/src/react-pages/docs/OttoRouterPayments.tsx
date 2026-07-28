@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function OttoRouterPayments() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Payments</h1>
+			<h1 className="np-title mb-3">Payments</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				How OttoRouter identifies wallets and handles balance/top-up flows.
 			</p>

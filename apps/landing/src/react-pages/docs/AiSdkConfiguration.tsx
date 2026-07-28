@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function AiSdkConfiguration() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">AI SDK Configuration</h1>
+			<h1 className="np-title mb-3">AI SDK Configuration</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Common configuration for <code>@ottorouter/ai-sdk</code>.
 			</p>

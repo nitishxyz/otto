@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function Architecture() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Architecture</h1>
+			<h1 className="np-title mb-3">Architecture</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				A practical map of the monorepo and how the main pieces fit together.
 			</p>

@@ -69,25 +69,30 @@ body {
 	border-radius: 3px;
 }
 
+/* Docs typography, NeoPop flavoured: hard 2px edges, near-square corners and
+   offset shadows on the block-level surfaces. Tokens are shared with the
+   homepage primitives so both themes stay in sync. */
 .prose-otto a {
 	color: rgb(var(--otto-accent-light));
 	text-decoration: underline;
-	text-underline-offset: 2px;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 3px;
 }
 .prose-otto a:hover {
 	color: rgb(var(--otto-accent));
 }
 .prose-otto code {
 	background: rgb(var(--otto-code-bg));
-	border: 1px solid rgb(var(--otto-border));
-	border-radius: 4px;
-	padding: 2px 6px;
+	border: 2px solid rgb(var(--np-border) / 0.55);
+	border-radius: 3px;
+	padding: 1px 5px;
 	font-size: 0.875em;
 }
 .prose-otto pre {
 	background: rgb(var(--otto-pre-bg));
-	border: 1px solid rgb(var(--otto-border));
-	border-radius: 8px;
+	border: 2px solid rgb(var(--np-border));
+	border-radius: 3px;
+	box-shadow: 3px 3px 0 0 rgb(var(--np-shadow));
 	padding: 16px;
 	overflow-x: auto;
 }
@@ -96,17 +101,23 @@ body {
 	border: none;
 	padding: 0;
 }
+.prose-otto h1 {
+	letter-spacing: -0.03em;
+	line-height: 1.1;
+}
 .prose-otto h2 {
 	font-size: 1.5rem;
-	font-weight: 600;
-	margin-top: 2.5rem;
+	font-weight: 700;
+	letter-spacing: -0.025em;
+	margin-top: 2.75rem;
 	margin-bottom: 1rem;
 	padding-bottom: 0.5rem;
-	border-bottom: 1px solid rgb(var(--otto-border));
+	border-bottom: 2px solid rgb(var(--np-border));
 }
 .prose-otto h3 {
 	font-size: 1.125rem;
-	font-weight: 600;
+	font-weight: 700;
+	letter-spacing: -0.015em;
 	margin-top: 2rem;
 	margin-bottom: 0.75rem;
 }
@@ -134,31 +145,57 @@ body {
 	margin-bottom: 0.25rem;
 	line-height: 1.75;
 }
+.prose-otto li::marker {
+	color: rgb(var(--otto-dim));
+}
 .prose-otto table {
 	width: 100%;
-	border-collapse: collapse;
-	margin-top: 1rem;
-	margin-bottom: 1rem;
+	/* `separate` keeps the outer 2px box and radius from being swallowed by
+	   the individual cell borders. */
+	border-collapse: separate;
+	border-spacing: 0;
+	margin-top: 1.25rem;
+	margin-bottom: 1.25rem;
 	font-size: 0.875rem;
+	border: 2px solid rgb(var(--np-border));
+	border-radius: 3px;
+	box-shadow: 3px 3px 0 0 rgb(var(--np-shadow));
+	overflow: hidden;
 }
 .prose-otto th {
 	text-align: left;
-	padding: 8px 12px;
-	border-bottom: 1px solid rgb(var(--otto-border));
+	padding: 9px 12px;
+	background: rgb(var(--otto-surface));
+	border-bottom: 2px solid rgb(var(--np-border));
 	color: rgb(var(--otto-text));
-	font-weight: 600;
+	font-weight: 700;
+	letter-spacing: -0.01em;
 }
 .prose-otto td {
-	padding: 8px 12px;
+	padding: 9px 12px;
 	border-bottom: 1px solid rgb(var(--otto-border));
 	color: rgb(var(--otto-muted));
 }
+.prose-otto tr:last-child td {
+	border-bottom: none;
+}
 .prose-otto blockquote {
-	border-left: 3px solid rgb(var(--otto-accent));
-	padding-left: 1rem;
-	margin: 1rem 0;
-	color: rgb(var(--otto-dim));
-	font-style: italic;
+	border: 2px solid rgb(var(--np-border));
+	border-left-width: 6px;
+	border-left-color: rgb(var(--np-blue));
+	border-radius: 3px;
+	background: rgb(var(--otto-surface));
+	padding: 0.75rem 1rem;
+	margin: 1.25rem 0;
+	color: rgb(var(--otto-muted));
+}
+.prose-otto blockquote p {
+	margin: 0;
+}
+.prose-otto hr {
+	border: none;
+	border-top: 2px solid rgb(var(--np-border));
+	margin: 2rem 0;
 }
 
 .scrollbar-hide {
@@ -255,6 +292,9 @@ body {
 	.np-edge-b {
 		border-bottom: 2px solid rgb(var(--np-border));
 	}
+	.np-edge-r {
+		border-right: 2px solid rgb(var(--np-border));
+	}
 
 	.np-shadow-sm {
 		box-shadow: 3px 3px 0 0 rgb(var(--np-shadow));
@@ -276,7 +316,8 @@ body {
 	.np-press {
 		transition:
 			transform 110ms cubic-bezier(0.2, 0.8, 0.3, 1),
-			box-shadow 110ms cubic-bezier(0.2, 0.8, 0.3, 1);
+			box-shadow 110ms cubic-bezier(0.2, 0.8, 0.3, 1),
+			border-color 110ms cubic-bezier(0.2, 0.8, 0.3, 1);
 		touch-action: manipulation;
 		-webkit-tap-highlight-color: transparent;
 	}
@@ -287,8 +328,7 @@ body {
 		.np-lift:hover {
 			transform: translate3d(-2px, -2px, 0);
 		}
-		.np-lift:hover,
-		.np-press:hover {
+		.np-lift:hover {
 			border-color: rgb(var(--otto-border-light));
 		}
 		.np-lift.np-shadow-sm:hover {
@@ -300,8 +340,12 @@ body {
 		.np-lift.np-shadow-lg:hover {
 			box-shadow: 10px 10px 0 0 rgb(var(--np-shadow));
 		}
+		/* Buttons swallow their edge on hover: the border takes the button's own
+		   fill (via `--np-edge-hover`) so the surface reads as growing outward
+		   rather than picking up a grey outline. */
 		.np-press:hover {
 			transform: translate3d(-1px, -1px, 0);
+			border-color: rgb(var(--np-edge-hover, var(--np-border)));
 		}
 		.np-press.np-shadow-sm:hover {
 			box-shadow: 4px 4px 0 0 rgb(var(--np-shadow));

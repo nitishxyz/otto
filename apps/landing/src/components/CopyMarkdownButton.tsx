@@ -145,7 +145,7 @@ export function CopyMarkdownButton({
 		<button
 			type="button"
 			onClick={copy}
-			className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-sm border border-otto-border text-otto-muted hover:text-otto-text hover:bg-otto-card transition-colors"
+			className="np-edge np-shadow-sm np-press [--np-edge-hover:var(--otto-text)] flex items-center gap-1.5 rounded-[3px] bg-otto-bg px-3 py-1.5 text-xs text-otto-muted hover:text-otto-text"
 			title="Copy page as Markdown"
 		>
 			{copied ? (

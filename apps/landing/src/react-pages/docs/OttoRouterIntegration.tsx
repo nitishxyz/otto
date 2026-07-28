@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function OttoRouterIntegration() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">OttoRouter Integration</h1>
+			<h1 className="np-title mb-3">OttoRouter Integration</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Use OttoRouter from an application or from the otto CLI.
 			</p>

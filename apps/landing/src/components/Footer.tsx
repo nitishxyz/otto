@@ -1,16 +1,25 @@
 import { OttoWordmark } from './OttoWordmark';
 
-/** `isHome` switches on the homepage-only NeoPop rule. Other pages are untouched. */
-export function Footer({ isHome = false }: { isHome?: boolean }) {
+/**
+ * `neo` switches on the NeoPop hard rule (homepage and docs); `wide` matches
+ * the homepage content width. /ottorouter keeps the original treatment.
+ */
+export function Footer({
+	neo = false,
+	wide = false,
+}: {
+	neo?: boolean;
+	wide?: boolean;
+}) {
 	return (
 		<footer
 			className={`bg-otto-bg ${
-				isHome ? 'np-edge-t' : 'border-t border-otto-border'
+				neo ? 'np-edge-t' : 'border-t border-otto-border'
 			}`}
 		>
 			<div
 				className={`mx-auto px-6 py-10 ${
-					isHome ? 'max-w-[1080px] sm:px-8 lg:px-12' : 'max-w-4xl'
+					wide ? 'max-w-[1080px] sm:px-8 lg:px-12' : 'max-w-4xl'
 				}`}
 			>
 				<div className="flex flex-col sm:flex-row justify-between items-start gap-8">

@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function Configuration() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Configuration</h1>
+			<h1 className="np-title mb-3">Configuration</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Where otto reads settings, credentials, agents, tools, and MCP servers.
 			</p>

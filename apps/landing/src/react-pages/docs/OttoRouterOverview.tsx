@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function OttoRouterOverview() {
 	return (
 		<DocPage>
-			<h1 className="flex items-center gap-3 text-3xl font-bold mb-2">
+			<h1 className="flex items-center gap-3 np-title mb-3">
 				<svg
 					aria-hidden="true"
 					className="w-7 h-7 shrink-0 text-[#9333ea]"

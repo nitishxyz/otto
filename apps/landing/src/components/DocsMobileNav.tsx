@@ -53,7 +53,7 @@ function isActive(pathname: string, href: string, end?: boolean): boolean {
 
 export function DocsMobileNav({ pathname }: { pathname: string }) {
 	return (
-		<div className="lg:hidden mb-8 -mx-6 px-6 overflow-x-auto pb-3 border-b border-otto-border scrollbar-hide">
+		<div className="lg:hidden mb-8 -mx-6 px-6 overflow-x-auto pb-3 np-edge-b scrollbar-hide">
 			<div className="flex gap-1 w-max">
 				{NAV_ITEMS.map((item) => {
 					const active = isActive(pathname, item.href, item.end);
@@ -61,10 +61,10 @@ export function DocsMobileNav({ pathname }: { pathname: string }) {
 						<a
 							key={item.href}
 							href={item.href}
-							className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-sm whitespace-nowrap transition-colors ${
+							className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[3px] whitespace-nowrap border-2 transition-colors ${
 								active
-									? 'bg-otto-card text-otto-text border border-otto-border'
-									: 'text-otto-muted hover:text-otto-text'
+									? 'np-edge np-shadow-sm bg-otto-card text-otto-text font-medium'
+									: 'border-transparent text-otto-muted hover:text-otto-text hover:bg-otto-surface'
 							}`}
 						>
 							{'mark' in item && item.mark && <ShipWheelIcon />}

@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function GettingStarted() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Getting Started</h1>
+			<h1 className="np-title mb-3">Getting Started</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Install otto, configure a model provider, and run your first prompt.
 			</p>

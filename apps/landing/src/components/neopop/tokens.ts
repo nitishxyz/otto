@@ -29,6 +29,22 @@ export const TONE_SURFACE: Record<NeoTone, string> = {
 	coral: 'bg-np-coral text-np-coral-on',
 };
 
+/**
+ * Hover edge colour per tone, consumed by `.np-press:hover` in `index.css`.
+ * Matching the tone's fill makes a hovered button look like it grows instead
+ * of gaining a grey outline.
+ */
+export const TONE_EDGE_HOVER: Record<NeoTone, string> = {
+	surface: '[--np-edge-hover:var(--otto-surface)]',
+	bg: '[--np-edge-hover:var(--otto-bg)]',
+	card: '[--np-edge-hover:var(--otto-card)]',
+	ink: '[--np-edge-hover:var(--otto-text)]',
+	blue: '[--np-edge-hover:var(--np-blue)]',
+	lime: '[--np-edge-hover:var(--np-lime)]',
+	yellow: '[--np-edge-hover:var(--np-yellow)]',
+	coral: '[--np-edge-hover:var(--np-coral)]',
+};
+
 /** Foreground-only accent colour, for text and icons on neutral surfaces. */
 export const TONE_TEXT: Record<NeoTone, string> = {
 	surface: 'text-otto-text',

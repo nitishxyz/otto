@@ -80,11 +80,11 @@ const resolvedSection =
 
 <BaseLayout title={title} description={description} isDocs={true} ogType="docs" ogTitle={ogTitle} ogSection={resolvedSection} ogDescription={description}>
 	<div class="pt-14 min-h-screen">
-		<aside class="w-64 shrink-0 hidden lg:flex flex-col border-r border-otto-border fixed top-14 bottom-0 left-0 overflow-y-auto">
+		<aside class="w-64 shrink-0 hidden lg:flex flex-col np-edge-r fixed top-14 bottom-0 left-0 overflow-y-auto">
 			<div class="flex-1 py-6 space-y-6">
 				{NAV_SECTIONS.map((section) => (
 					<div>
-						<h4 class="flex items-center gap-1.5 text-[10px] font-semibold text-otto-dim uppercase tracking-[0.15em] mb-2 px-4">
+						<h4 class="np-eyebrow flex items-center gap-1.5 text-otto-dim mb-2 px-4">
 							{section.title === 'OttoRouter' && (
 								<svg
 									aria-hidden="true"
@@ -115,10 +115,10 @@ const resolvedSection =
 								<a
 									href={item.href}
 									class:list={[
-										'block py-2 text-sm transition-colors truncate px-4',
+										'block py-2 pl-[13px] pr-4 text-sm truncate border-l-[3px] transition-colors',
 										isActive(item.href, 'end' in item ? item.end : false)
-											? 'bg-otto-card text-otto-text'
-											: 'text-otto-muted hover:text-otto-text',
+											? 'bg-otto-card text-otto-text font-medium border-np-blue'
+											: 'text-otto-muted border-transparent hover:text-otto-text hover:bg-otto-surface hover:border-otto-border',
 									]}
 								>
 									{item.label}

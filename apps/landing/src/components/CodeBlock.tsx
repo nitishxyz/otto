@@ -5,7 +5,7 @@ export function CodeBlock({ children }: { children: string }) {
 		<div className="relative group/code">
 			<CopyButton
 				text={children}
-				className="absolute right-2 top-2 opacity-0 group-hover/code:opacity-100"
+				className="absolute right-2.5 top-2.5 np-edge bg-otto-bg opacity-0 group-hover/code:opacity-100"
 			/>
 			<pre>
 				<code>{children}</code>

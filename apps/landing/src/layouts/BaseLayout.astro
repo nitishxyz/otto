@@ -72,7 +72,7 @@ const canonicalUrl = new URL(Astro.url.pathname, 'https://ottocode.io').href;
 			<Nav client:load pathname={Astro.url.pathname} />
 			<slot />
 			<div class={isDocs ? 'lg:ml-64' : ''}>
-				<Footer isHome={Astro.url.pathname === '/'} />
+				<Footer neo={Astro.url.pathname === '/' || isDocs} wide={Astro.url.pathname === '/'} />
 			</div>
 		</div>
 	</body>

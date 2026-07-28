@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function Embedding() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Embedding Guide</h1>
+			<h1 className="np-title mb-3">Embedding Guide</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Use otto packages from another app or service.
 			</p>

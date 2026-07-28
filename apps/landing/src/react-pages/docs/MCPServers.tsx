@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function MCPServers() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">MCP Servers</h1>
+			<h1 className="np-title mb-3">MCP Servers</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Connect otto to external tools through Model Context Protocol servers.
 			</p>

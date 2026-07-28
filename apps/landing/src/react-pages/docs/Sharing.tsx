@@ -4,7 +4,7 @@ import { DocPage } from '../../components/DocPage';
 export function Sharing() {
 	return (
 		<DocPage>
-			<h1 className="text-3xl font-bold mb-2">Session Sharing</h1>
+			<h1 className="np-title mb-3">Session Sharing</h1>
 			<p className="text-otto-dim text-sm mb-8">
 				Create read-only links for otto sessions.
 			</p>

@@ -5,7 +5,7 @@ export function DocPage({ children }: { children: ReactNode }) {
 	const ref = useRef<HTMLDivElement>(null);
 	return (
 		<div>
-			<div className="flex justify-end mb-4">
+			<div className="mb-6 flex justify-end">
 				<CopyMarkdownButton contentRef={ref} />
 			</div>
 			<div ref={ref}>{children}</div>

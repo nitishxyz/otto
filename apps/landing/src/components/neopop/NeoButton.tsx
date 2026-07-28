@@ -1,7 +1,12 @@
 import { useCallback, useState } from 'react';
 import type { MouseEventHandler, ReactNode } from 'react';
 import { cn } from './cn';
-import { NEO_RADIUS, TONE_SURFACE, type NeoTone } from './tokens';
+import {
+	NEO_RADIUS,
+	TONE_EDGE_HOVER,
+	TONE_SURFACE,
+	type NeoTone,
+} from './tokens';
 
 export type NeoButtonVariant = 'solid' | 'outline' | 'ghost';
 export type NeoButtonSize = 'sm' | 'md' | 'lg';
@@ -80,6 +85,7 @@ export function NeoButton({
 			? cn(
 					'np-edge',
 					TONE_SURFACE[tone],
+					TONE_EDGE_HOVER[tone],
 					SHADOW[size],
 					'np-press',
 					pressed && 'is-pressed',
@@ -88,6 +94,9 @@ export function NeoButton({
 				? cn(
 						// Opaque so the hard shadow never reads through the surface.
 						'np-edge bg-otto-bg text-otto-text',
+						// The fill matches the page, so the edge takes the text colour
+						// on hover instead of disappearing.
+						'[--np-edge-hover:var(--otto-text)]',
 						SHADOW[size],
 						'np-press',
 						pressed && 'is-pressed',

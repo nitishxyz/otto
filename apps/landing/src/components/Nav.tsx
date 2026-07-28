@@ -95,9 +95,9 @@ export function Nav({ pathname }: { pathname: string }) {
 	const [scrolled, setScrolled] = useState(false);
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const isDocs = pathname.startsWith('/docs');
-	// NeoPop chrome is homepage-only; /docs/** and /ottorouter keep the
+	// NeoPop chrome covers the homepage and /docs/**; /ottorouter keeps the
 	// original nav appearance.
-	const isHome = pathname === '/';
+	const isNeo = pathname === '/' || isDocs;
 	const { theme, toggle } = useTheme();
 
 	const handleSectionLink = (hash: string) => (e: React.MouseEvent) => {
@@ -115,20 +115,21 @@ export function Nav({ pathname }: { pathname: string }) {
 		return () => window.removeEventListener('scroll', onScroll);
 	}, []);
 
-	const homeShell = scrolled
-		? 'bg-otto-bg np-edge-b'
-		: 'bg-transparent border-b-2 border-transparent';
+	// Docs keep the hard edge at all times because content scrolls beneath the
+	// sidebar; the homepage only draws it once the hero has scrolled away.
+	const neoShell =
+		scrolled || isDocs
+			? 'bg-otto-bg np-edge-b'
+			: 'bg-transparent border-b-2 border-transparent';
 
 	const defaultShell = scrolled
 		? 'bg-otto-bg/90 backdrop-blur-md border-b border-otto-border'
-		: isDocs
-			? 'bg-otto-bg border-b border-otto-border'
-			: 'bg-transparent';
+		: 'bg-transparent';
 
 	return (
 		<nav
 			className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${
-				isHome ? homeShell : defaultShell
+				isNeo ? neoShell : defaultShell
 			}`}
 		>
 			<div className="h-14 flex items-center">
@@ -173,7 +174,7 @@ export function Nav({ pathname }: { pathname: string }) {
 						>
 							{theme === 'dark' ? <SunIcon /> : <MoonIcon />}
 						</button>
-						{isHome ? (
+						{isNeo ? (
 							<>
 								<NeoButton
 									href="https://ottorouter.org"
@@ -290,7 +291,7 @@ export function Nav({ pathname }: { pathname: string }) {
 			{mobileOpen && (
 				<div
 					className={`md:hidden px-6 py-4 space-y-3 text-sm ${
-						isHome
+						isNeo
 							? 'bg-otto-bg np-edge-b'
 							: 'bg-otto-bg/95 backdrop-blur-md border-b border-otto-border'
 					}`}
