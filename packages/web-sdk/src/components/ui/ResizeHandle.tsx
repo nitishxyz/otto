@@ -64,10 +64,11 @@ export const ResizeHandle = memo(function ResizeHandle({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: mouse-only resize handle
 		<div
-			className={`w-1 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors absolute top-0 bottom-0 z-10 ${
+			className={`w-1 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors absolute top-0 bottom-0 z-[60] ${
 				side === 'right' ? 'left-0' : 'right-0'
 			}`}
 			onMouseDown={handleMouseDown}
+			data-no-drag
 		/>
 	);
 });

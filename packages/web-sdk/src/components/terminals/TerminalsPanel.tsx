@@ -221,8 +221,9 @@ const TerminalPanelFrame = memo(function TerminalPanelFrame({
 			{!isMaximized && (
 				// biome-ignore lint/a11y/noStaticElementInteractions: mouse-only resize handle
 				<div
-					className="h-2 w-full cursor-row-resize hover:bg-primary/30 active:bg-primary/50 transition-colors absolute -top-1 left-0 right-0 z-10"
+					className="h-2 w-full cursor-row-resize hover:bg-primary/30 active:bg-primary/50 transition-colors absolute -top-1 left-0 right-0 z-[60]"
 					onMouseDown={onResizeStart}
+					data-no-drag
 				/>
 			)}
 			{children}

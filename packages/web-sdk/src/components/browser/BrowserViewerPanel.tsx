@@ -17,6 +17,11 @@ import { Button } from '../ui/Button';
 const DEFAULT_BROWSER_URL = 'http://localhost:3000';
 const DEFAULT_SIMULATOR_URL = 'http://localhost:3200';
 const IFRAME_EMBED_TIMEOUT_MS = 6000;
+/**
+ * Keeps the native page clear of the viewer resize handle on the left and the
+ * terminals panel resize handle along the bottom edge.
+ */
+const NATIVE_HANDLE_GUTTER_CLASS = 'pl-1 pb-1';
 
 type BrowserViewerTab = Extract<ViewerTab, { type: 'browser' }>;
 
@@ -625,7 +630,11 @@ export function BrowserViewerPanel({
 
 			<div className="min-h-0 flex-1 bg-muted/20">
 				{canRenderUrl && !embedError && nativeBridge ? (
-					<div ref={nativeHostRef} className="h-full w-full bg-background" />
+					// Native child webviews always paint above the DOM, so inset the page
+					// by the panel resize handles' hit area to keep them grabbable.
+					<div className={`h-full w-full ${NATIVE_HANDLE_GUTTER_CLASS}`}>
+						<div ref={nativeHostRef} className="h-full w-full bg-background" />
+					</div>
 				) : canRenderUrl && !embedError ? (
 					<iframe
 						ref={iframeRef}
