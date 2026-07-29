@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export interface NativeBrowserBounds {
@@ -45,11 +46,14 @@ export function registerNativeBrowserBridge() {
 	const win = window as unknown as {
 		OTTO_NATIVE_BROWSER?: NativeBrowserBridge;
 	};
+	if (win.OTTO_NATIVE_BROWSER) return;
 
 	const navigationListeners = new Map<
 		string,
 		Set<(event: NativeBrowserNavigationEvent) => void>
 	>();
+	// Browser webviews belong to this window only, so the backend targets
+	// navigation events at this window label to keep tabs isolated per window.
 	const navigationReady = listen<NativeBrowserNavigationEvent>(
 		'native-browser-navigation',
 		({ payload }) => {
@@ -57,6 +61,7 @@ export function registerNativeBrowserBridge() {
 				listener(payload);
 			}
 		},
+		{ target: getCurrentWindow().label },
 	).catch((error) => {
 		console.error('[otto] Failed to listen for browser navigation:', error);
 	});

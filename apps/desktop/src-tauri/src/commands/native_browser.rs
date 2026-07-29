@@ -20,21 +20,24 @@ fn safe_id(id: &str) -> String {
         .collect()
 }
 
-fn label_prefix_for_browser_tab(id: &str) -> String {
-    format!("browser_{}__", safe_id(id))
+/// Browser tab webviews are labelled per owner window so two windows can host
+/// the same tab id (for example `browser:browser`) without colliding in the
+/// app-wide webview label registry.
+fn label_prefix_for_browser_tab(window_label: &str, id: &str) -> String {
+    format!("browser_{}__{}__", safe_id(window_label), safe_id(id))
 }
 
-fn label_for_browser_tab(id: &str) -> String {
-    format!("{}view", label_prefix_for_browser_tab(id))
+fn label_for_browser_tab(window_label: &str, id: &str) -> String {
+    format!("{}view", label_prefix_for_browser_tab(window_label, id))
 }
 
 fn browser_tab_webview(window: &tauri::Window, id: &str) -> Option<tauri::Webview> {
-    let label = label_for_browser_tab(id);
+    let label = label_for_browser_tab(window.label(), id);
     window.get_webview(&label)
 }
 
 fn close_browser_tab_webviews(window: &tauri::Window, id: &str, except_label: Option<&str>) {
-    let prefix = label_prefix_for_browser_tab(id);
+    let prefix = label_prefix_for_browser_tab(window.label(), id);
     for webview in window.webviews() {
         let label = webview.label();
         if label.starts_with(&prefix) && Some(label) != except_label {
@@ -77,7 +80,7 @@ pub async fn native_browser_mount(
     visible: bool,
 ) -> Result<(), String> {
     let _ = reload_key;
-    let label = label_for_browser_tab(&id);
+    let label = label_for_browser_tab(window.label(), &id);
     if let Some(existing) = window.get_webview(&label) {
         close_browser_tab_webviews(&window, &id, Some(&label));
         apply_webview_layout(&existing, x, y, width, height, visible)?;
@@ -91,11 +94,13 @@ pub async fn native_browser_mount(
         return Err("native browser only supports http and https URLs".to_string());
     }
     let event_window = window.clone();
+    let event_target = window.label().to_string();
     let event_id = id.clone();
     let builder = WebviewBuilder::new(label, WebviewUrl::External(parsed_url))
         .zoom_hotkeys_enabled(true)
         .on_page_load(move |_webview, payload| {
-            let _ = event_window.emit(
+            let _ = event_window.emit_to(
+                event_target.as_str(),
                 "native-browser-navigation",
                 NativeBrowserNavigationEvent {
                     id: event_id.clone(),
@@ -121,7 +126,7 @@ pub async fn native_browser_set_visible(
     id: String,
     visible: bool,
 ) -> Result<(), String> {
-    let prefix = label_prefix_for_browser_tab(&id);
+    let prefix = label_prefix_for_browser_tab(window.label(), &id);
     for webview in window.webviews() {
         if webview.label().starts_with(&prefix) {
             if visible {
@@ -214,16 +219,27 @@ mod tests {
 
     #[test]
     fn browser_tab_prefixes_do_not_overlap() {
-        let main_prefix = label_prefix_for_browser_tab("browser:browser");
-        let secondary = label_for_browser_tab("browser:browser:secondary");
+        let main_prefix = label_prefix_for_browser_tab("main", "browser:browser");
+        let secondary = label_for_browser_tab("main", "browser:browser:secondary");
         assert!(!secondary.starts_with(&main_prefix));
     }
 
     #[test]
     fn browser_tab_label_is_stable_across_navigation() {
         assert_eq!(
-            label_for_browser_tab("browser:browser"),
-            label_for_browser_tab("browser:browser")
+            label_for_browser_tab("main", "browser:browser"),
+            label_for_browser_tab("main", "browser:browser")
         );
+    }
+
+    #[test]
+    fn browser_tab_labels_are_scoped_to_the_owner_window() {
+        assert_ne!(
+            label_for_browser_tab("main", "browser:browser"),
+            label_for_browser_tab("main-1", "browser:browser")
+        );
+        let main_prefix = label_prefix_for_browser_tab("main", "browser:browser");
+        let other = label_for_browser_tab("main-1", "browser:browser");
+        assert!(!other.starts_with(&main_prefix));
     }
 }
