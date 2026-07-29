@@ -84,7 +84,8 @@ export function normalizeDiffHunks(patch: string): string {
 			declaredOldLines !== counts.oldLines ||
 			declaredNewLines !== counts.newLines
 		) {
-			lines[index] = `@@ -${formatRange(oldStart, counts.oldLines)} +${formatRange(newStart, counts.newLines)} @@${suffix}`;
+			lines[index] =
+				`@@ -${formatRange(oldStart, counts.oldLines)} +${formatRange(newStart, counts.newLines)} @@${suffix}`;
 		}
 
 		fallbackOldStart = oldStart + counts.oldLines;
