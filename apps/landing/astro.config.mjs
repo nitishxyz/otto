@@ -11,5 +11,25 @@ export default defineConfig({
 		configPath: process.env.SST_WRANGLER_PATH,
 	}),
 	integrations: [react(), tailwind(), sitemap()],
+	vite: {
+		plugins: [
+			{
+				name: 'landing-cloudflare-server-dependencies',
+				configEnvironment(environmentName) {
+					if (!['astro', 'ssr', 'prerender'].includes(environmentName)) {
+						return;
+					}
+
+					return {
+						optimizeDeps: {
+							include: [
+								'@astrojs/react > @astrojs/internal-helpers > picomatch',
+							],
+						},
+					};
+				},
+			},
+		],
+	},
 	server: { port: 4000 },
 });

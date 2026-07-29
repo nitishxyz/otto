@@ -6,7 +6,7 @@ export const script = new sst.cloudflare.Worker('OttoIo', {
 	handler: 'infra/handlers/install-worker.ts',
 	build: {
 		loader: {
-			'.sh': 'text',
+			'.sh': 'base64',
 		},
 	},
 	url: true,
