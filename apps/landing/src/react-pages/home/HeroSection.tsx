@@ -2,6 +2,7 @@ import {
 	NeoBadge,
 	NeoBox,
 	NeoButton,
+	NeoOttoLogo,
 	NeoReveal,
 } from '../../components/neopop';
 import { CopyButton } from '../../components/CopyButton';
@@ -44,11 +45,10 @@ export function HeroSection() {
 					<h1 className="np-display max-w-[20ch] text-otto-text">
 						<span className="block whitespace-nowrap">You describe it.</span>
 						<span className="mt-[0.12em] block whitespace-nowrap">
-							{/* Padded highlight: leading is tightened with a negative inline
-							    margin so the box does not widen the heading's line box. */}
-							<span className="np-edge np-shadow-sm mr-[0.12em] inline-block rounded-[3px] bg-np-blue px-[0.18em] pb-[0.04em] text-np-blue-on">
-								otto
-							</span>
+							{/* The wordmark is sized in `em` so it tracks the display type, and
+							    nudged down by the slice of its viewBox that sits below the
+							    baseline (padding plus the hard extrusion). */}
+							<NeoOttoLogo className="mr-[0.16em] inline-block h-[0.82em] w-auto align-[-0.08em]" />
 							builds it.
 						</span>
 					</h1>

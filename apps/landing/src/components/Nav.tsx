@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { OttoWordmark } from './OttoWordmark';
 import { useTheme } from '../hooks/useTheme';
 import { sectionLink } from '../lib/section-link';
-import { NeoButton } from './neopop';
+import { NeoButton, NeoOttoLogo } from './neopop';
 
 function OttoRouterIcon() {
 	return (
@@ -136,12 +135,12 @@ export function Nav({ pathname }: { pathname: string }) {
 			<div className="h-14 flex items-center">
 				<div className="w-64 shrink-0 hidden lg:flex items-center px-4">
 					<a href="/" className="flex items-center gap-2 group">
-						<OttoWordmark height={18} className="text-otto-text" />
+						<NeoOttoLogo height={22} depth={2} />
 					</a>
 				</div>
 				<div className="flex-1 flex items-center justify-between px-6 lg:px-8">
 					<a href="/" className="flex items-center gap-2 group lg:hidden">
-						<OttoWordmark height={18} className="text-otto-text" />
+						<NeoOttoLogo height={22} depth={2} />
 					</a>
 
 					<div className="hidden md:flex items-center gap-5 text-[13px] ml-auto">

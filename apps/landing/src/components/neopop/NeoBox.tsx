@@ -1,9 +1,12 @@
 import type { HTMLAttributes } from 'react';
 import { cn } from './cn';
 import {
+	ACCENT_TINT,
 	ELEVATION,
 	NEO_RADIUS,
+	TONE_EDGE,
 	TONE_SURFACE,
+	type NeoAccent,
 	type NeoElevation,
 	type NeoTone,
 } from './tokens';
@@ -23,6 +26,12 @@ export interface NeoBoxProps extends HTMLAttributes<HTMLElement> {
 	as?: BoxElement;
 	/** Background/foreground pair. */
 	tone?: NeoTone;
+	/**
+	 * Draws the edge and hard shadow in a brand colour while the fill stays
+	 * neutral. Ignored when `tone` is itself an accent, since that surface
+	 * already carries the colour and takes its deep shade instead.
+	 */
+	accent?: NeoAccent;
 	/** Hard offset shadow depth. */
 	elevation?: NeoElevation;
 	/** 2px hard border. Disable for cells inside a hairline grid. */
@@ -38,6 +47,7 @@ export interface NeoBoxProps extends HTMLAttributes<HTMLElement> {
 export function NeoBox({
 	as: Tag = 'div',
 	tone = 'surface',
+	accent,
 	elevation = 'none',
 	bordered = true,
 	interactive = false,
@@ -45,11 +55,13 @@ export function NeoBox({
 	children,
 	...rest
 }: NeoBoxProps) {
+	const toneEdge = TONE_EDGE[tone];
 	return (
 		<Tag
 			className={cn(
 				NEO_RADIUS,
 				TONE_SURFACE[tone],
+				toneEdge || (accent && ACCENT_TINT[accent]),
 				bordered && 'np-edge',
 				ELEVATION[elevation],
 				interactive && elevation !== 'none' && 'np-lift',

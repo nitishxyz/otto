@@ -17,6 +17,36 @@ export type NeoTone =
 
 export type NeoElevation = 'none' | 'sm' | 'md' | 'lg';
 
+/** The four brand colours, i.e. every tone that is not a neutral surface. */
+export type NeoAccent = 'blue' | 'lime' | 'yellow' | 'coral';
+
+/**
+ * Colours the edge and hard shadow in the accent itself, leaving the fill
+ * neutral. Use on cards that should read as outlined-and-dropped in a colour.
+ */
+export const ACCENT_TINT: Record<NeoAccent, string> = {
+	blue: 'np-tint-blue',
+	lime: 'np-tint-lime',
+	yellow: 'np-tint-yellow',
+	coral: 'np-tint-coral',
+};
+
+/**
+ * Edge and shadow for a surface already filled with the accent: both take the
+ * deep shade of that colour, so the extrusion looks like the fill in shadow.
+ * Neutral tones keep the default ink edge.
+ */
+export const TONE_EDGE: Record<NeoTone, string> = {
+	surface: '',
+	bg: '',
+	card: '',
+	ink: '',
+	blue: 'np-solid-blue',
+	lime: 'np-solid-lime',
+	yellow: 'np-solid-yellow',
+	coral: 'np-solid-coral',
+};
+
 /** Background + foreground pair for each tone. */
 export const TONE_SURFACE: Record<NeoTone, string> = {
 	surface: 'bg-otto-surface text-otto-text',

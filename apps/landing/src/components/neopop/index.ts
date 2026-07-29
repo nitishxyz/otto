@@ -9,11 +9,20 @@ export type {
 	NeoButtonSize,
 	NeoButtonVariant,
 } from './NeoButton';
+export { NeoOttoLogo } from './NeoOttoLogo';
+export type { NeoOttoLogoProps, NeoOttoLogoTone } from './NeoOttoLogo';
 export { NeoEyebrow, NeoReveal, NeoSection } from './NeoSection';
 export type {
 	NeoEyebrowProps,
 	NeoRevealProps,
 	NeoSectionProps,
 } from './NeoSection';
-export { ELEVATION, NEO_RADIUS, TONE_SURFACE, TONE_TEXT } from './tokens';
-export type { NeoElevation, NeoTone } from './tokens';
+export {
+	ACCENT_TINT,
+	ELEVATION,
+	NEO_RADIUS,
+	TONE_EDGE,
+	TONE_SURFACE,
+	TONE_TEXT,
+} from './tokens';
+export type { NeoAccent, NeoElevation, NeoTone } from './tokens';

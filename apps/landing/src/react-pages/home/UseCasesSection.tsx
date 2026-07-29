@@ -4,7 +4,7 @@ import {
 	NeoReveal,
 	NeoSection,
 	cn,
-	type NeoTone,
+	type NeoAccent,
 } from '../../components/neopop';
 import {
 	FileEditIcon,
@@ -18,7 +18,7 @@ type UseCase = {
 	title: string;
 	body: string;
 	cmd: string;
-	tone: NeoTone;
+	tone: NeoAccent;
 	icon: (p: { className?: string }) => React.ReactElement;
 	wide?: boolean;
 };
@@ -63,7 +63,7 @@ const USE_CASES: UseCase[] = [
 	},
 ];
 
-const ICON_TILE: Record<string, string> = {
+const ICON_TILE: Record<NeoAccent, string> = {
 	blue: 'bg-np-blue text-np-blue-on',
 	lime: 'bg-np-lime text-np-lime-on',
 	yellow: 'bg-np-yellow text-np-yellow-on',
@@ -97,6 +97,7 @@ export function UseCasesSection() {
 									elevation="md"
 									interactive
 									tone="surface"
+									accent={item.tone}
 									className="flex h-full flex-col gap-4 p-5 sm:p-6"
 								>
 									<span

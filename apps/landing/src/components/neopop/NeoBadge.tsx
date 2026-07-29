@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from './cn';
-import { NEO_RADIUS, TONE_SURFACE, type NeoTone } from './tokens';
+import { NEO_RADIUS, TONE_EDGE, TONE_SURFACE, type NeoTone } from './tokens';
 
 export type NeoBadgeSize = 'sm' | 'md';
 
@@ -39,7 +39,9 @@ export function NeoBadge({
 				'tracking-[0.12em] leading-none np-edge',
 				NEO_RADIUS,
 				SIZE[size],
-				outline ? 'bg-transparent text-otto-text' : TONE_SURFACE[tone],
+				outline
+					? 'bg-transparent text-otto-text'
+					: cn(TONE_SURFACE[tone], TONE_EDGE[tone]),
 				elevated && 'np-shadow-sm',
 				className,
 			)}

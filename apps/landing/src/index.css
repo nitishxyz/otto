@@ -44,6 +44,29 @@
 	box-sizing: border-box;
 }
 
+/* Anything clickable gets a pointer. The UA sheet does not reliably supply one
+   for links inside the desktop webview, and Tailwind's preflight only covers
+   `button`, so state it once here rather than per component. */
+a[href],
+button,
+summary,
+label[for],
+select,
+[role="button"],
+[role="tab"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="submit"],
+input[type="button"] {
+	cursor: pointer;
+}
+button:disabled,
+select:disabled,
+input:disabled,
+[aria-disabled="true"] {
+	cursor: not-allowed;
+}
+
 html {
 	scrollbar-width: thin;
 	scrollbar-color: rgb(var(--otto-scrollbar-thumb))
@@ -245,38 +268,90 @@ body {
    OttoRouter selectors are redefined here.
    ========================================================================== */
 
+/* The four accents are brand colours: they hold the same value in both themes
+   so a badge, button, or the wordmark reads identically light or dark. Only the
+   structural tokens below flip, because a hard offset shadow has to invert to
+   stay visible, and `ink` means "the solid that contrasts the background". */
 :root {
-	--np-border: 49 60 63;
-	/* Light mode casts a deep ink shadow; dark mode casts a bright one. */
-	--np-shadow: 24 33 38;
-	--np-ink: 24 29 31;
-
 	--np-blue: 72 101 204;
 	--np-blue-on: 250 252 255;
 	--np-lime: 98 173 139;
 	--np-lime-on: 13 31 23;
-	--np-yellow: 210 163 74;
+	/* Saturated saffron: brighter than the old tan without going beige. */
+	--np-yellow: 233 162 27;
 	--np-yellow-on: 35 27 12;
-	--np-coral: 207 114 120;
-	--np-coral-on: 38 18 20;
+	/* A true red, so it carries near-white type instead of dark ink. */
+	--np-coral: 201 64 58;
+	--np-coral-on: 255 250 249;
+
+	/* Edge and drop under a filled accent surface, so the extrusion reads as
+	   that colour rather than as ink. Deep enough to separate from the fill at
+	   small sizes: a near-fill cast only produces an antialiased fringe, which
+	   reads as blur. Shared by both themes — the accents are far lighter than
+	   the dark page, so a deeper shade still shows against it. */
+	--np-blue-cast: 40 60 140;
+	--np-lime-cast: 52 104 82;
+	--np-yellow-cast: 158 106 12;
+	--np-coral-cast: 132 36 31;
+
+	--np-border: 49 60 63;
+	--np-shadow: 24 33 38;
+	--np-ink: 24 29 31;
 }
 
 .dark {
 	--np-border: 92 92 102;
 	--np-shadow: 178 187 209;
 	--np-ink: 250 250 250;
-
-	--np-blue: 120 149 238;
-	--np-blue-on: 11 18 22;
-	--np-lime: 120 195 159;
-	--np-lime-on: 9 25 17;
-	--np-yellow: 226 185 97;
-	--np-yellow-on: 29 22 9;
-	--np-coral: 223 133 139;
-	--np-coral-on: 31 15 17;
 }
 
 @layer components {
+	/* Accent skins. Both families rebind `--np-border` and `--np-shadow`, so
+	   every existing `.np-edge`/`.np-shadow-*` rule picks the colour up without
+	   needing a variant of its own.
+
+	   `np-tint-*` keeps a neutral fill and draws the edge and drop in the accent
+	   itself — a white card outlined and shadowed in blue.
+	   `np-solid-*` sits under a filled accent surface, so the edge and drop take
+	   the deep shade of that same colour. */
+	.np-tint-blue {
+		--np-border: var(--np-blue);
+		--np-shadow: var(--np-blue);
+		--np-edge-hover: var(--np-blue);
+	}
+	.np-tint-lime {
+		--np-border: var(--np-lime);
+		--np-shadow: var(--np-lime);
+		--np-edge-hover: var(--np-lime);
+	}
+	.np-tint-yellow {
+		--np-border: var(--np-yellow);
+		--np-shadow: var(--np-yellow);
+		--np-edge-hover: var(--np-yellow);
+	}
+	.np-tint-coral {
+		--np-border: var(--np-coral);
+		--np-shadow: var(--np-coral);
+		--np-edge-hover: var(--np-coral);
+	}
+
+	.np-solid-blue {
+		--np-border: var(--np-blue-cast);
+		--np-shadow: var(--np-blue-cast);
+	}
+	.np-solid-lime {
+		--np-border: var(--np-lime-cast);
+		--np-shadow: var(--np-lime-cast);
+	}
+	.np-solid-yellow {
+		--np-border: var(--np-yellow-cast);
+		--np-shadow: var(--np-yellow-cast);
+	}
+	.np-solid-coral {
+		--np-border: var(--np-coral-cast);
+		--np-shadow: var(--np-coral-cast);
+	}
+
 	.np-edge {
 		border-width: 2px;
 		border-style: solid;
@@ -328,8 +403,9 @@ body {
 		.np-lift:hover {
 			transform: translate3d(-2px, -2px, 0);
 		}
+		/* Accent cards keep their own edge on hover; neutral ones lighten. */
 		.np-lift:hover {
-			border-color: rgb(var(--otto-border-light));
+			border-color: rgb(var(--np-edge-hover, var(--otto-border-light)));
 		}
 		.np-lift.np-shadow-sm:hover {
 			box-shadow: 5px 5px 0 0 rgb(var(--np-shadow));
@@ -372,6 +448,29 @@ body {
 	.np-press.np-shadow-lg.is-pressed {
 		transform: translate3d(4px, 4px, 0);
 		box-shadow: 4px 4px 0 0 rgb(var(--np-shadow));
+	}
+
+	/* Custom-drawn otto wordmark (components/neopop/NeoOttoLogo.tsx). The face
+	   sits `--np-logo-depth` user units above its extrusion; on hover it slides
+	   down into the shadow, mirroring `.np-press`. */
+	.np-logo-face {
+		transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+	}
+	@media (hover: hover) and (pointer: fine) {
+		.np-logo-press:hover .np-logo-face {
+			transform: translate(
+				calc(var(--np-logo-depth, 7) * 1px),
+				calc(var(--np-logo-depth, 7) * 1px)
+			);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.np-logo-face {
+			transition: none;
+		}
+		.np-logo-press:hover .np-logo-face {
+			transform: none;
+		}
 	}
 
 	.np-display {

@@ -3,6 +3,7 @@ import type { MouseEventHandler, ReactNode } from 'react';
 import { cn } from './cn';
 import {
 	NEO_RADIUS,
+	TONE_EDGE,
 	TONE_EDGE_HOVER,
 	TONE_SURFACE,
 	type NeoTone,
@@ -85,6 +86,8 @@ export function NeoButton({
 			? cn(
 					'np-edge',
 					TONE_SURFACE[tone],
+					// Accent fills carry an edge and drop in their own deep shade.
+					TONE_EDGE[tone],
 					TONE_EDGE_HOVER[tone],
 					SHADOW[size],
 					'np-press',

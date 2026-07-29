@@ -1,7 +1,15 @@
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
+import {
+	WORDMARK_ASCENDER_TOP,
+	WORDMARK_HEIGHT,
+	WORDMARK_PAD,
+	WORDMARK_WIDTH,
+	type WordmarkLetter,
+	wordmarkShapes,
+} from './wordmark';
 
-interface OGRequest {
+export interface OGRequest {
 	title: string;
 	username: string;
 	model: string;
@@ -15,7 +23,7 @@ interface OGRequest {
 	shareId: string;
 }
 
-interface PageOGRequest {
+export interface PageOGRequest {
 	type: 'landing' | 'docs' | 'blog' | 'ottorouter';
 	title?: string;
 	description?: string;
@@ -68,11 +76,51 @@ function formatCompactNumber(num: number): string {
 	return num.toString();
 }
 
-async function loadFont(): Promise<ArrayBuffer> {
-	const response = await fetch(
-		'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.0.8/files/ibm-plex-mono-latin-400-normal.woff',
-	);
-	return response.arrayBuffer();
+export async function loadFonts(): Promise<{
+	regular: ArrayBuffer;
+	bold: ArrayBuffer;
+}> {
+	const [regular, bold] = await Promise.all([
+		fetch(
+			'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.0.8/files/ibm-plex-mono-latin-400-normal.woff',
+		).then((r) => r.arrayBuffer()),
+		fetch(
+			'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.0.8/files/ibm-plex-mono-latin-700-normal.woff',
+		).then((r) => r.arrayBuffer()),
+	]);
+	return { regular, bold };
+}
+
+export function satoriFonts(fonts: {
+	regular: ArrayBuffer;
+	bold: ArrayBuffer;
+}) {
+	return [
+		{
+			name: 'IBM Plex Mono',
+			data: fonts.regular,
+			weight: 400 as const,
+			style: 'normal' as const,
+		},
+		{
+			name: 'IBM Plex Mono',
+			data: fonts.regular,
+			weight: 500 as const,
+			style: 'normal' as const,
+		},
+		{
+			name: 'IBM Plex Mono',
+			data: fonts.regular,
+			weight: 600 as const,
+			style: 'normal' as const,
+		},
+		{
+			name: 'IBM Plex Mono',
+			data: fonts.bold,
+			weight: 700 as const,
+			style: 'normal' as const,
+		},
+	];
 }
 
 const bgColor = '#09090b';
@@ -83,6 +131,34 @@ const cardColor = '#1c1c22';
 const borderColor = '#3f3f46';
 const accentColor = '#3b82f6';
 const purpleColor = '#9333ea';
+
+/**
+ * NeoPop tokens mirrored from `apps/landing/src/index.css`. The four accents
+ * are brand colours and hold the same value in both themes; only the
+ * structural tokens below are the dark-theme ones, since the card is dark.
+ */
+const np = {
+	bg: '#09090b',
+	card: '#1a1a1f',
+	border: '#5c5c66',
+	shadow: '#b2bbd1',
+	text: '#fafafa',
+	muted: '#a1a1aa',
+	dim: '#71717a',
+	blue: '#4865cc',
+	lime: '#62ad8b',
+	yellow: '#e9a21b',
+	coral: '#c9403a',
+	grid: 'rgba(92,92,102,0.13)',
+};
+
+/** Per-letter palette, matching `POP_FILL` in `NeoOttoLogo`. */
+const WORDMARK_FILL: Record<WordmarkLetter, string> = {
+	o1: np.blue,
+	t1: np.coral,
+	t2: np.coral,
+	o2: np.lime,
+};
 
 const OTTO_WORDMARK_PATH =
 	'M192.877 257.682C192.877 263.287 191.783 268.551 189.596 273.473C187.545 278.395 184.674 282.701 180.982 286.393C177.428 289.947 173.189 292.818 168.268 295.006C163.482 297.057 158.287 298.082 152.682 298.082H44.1953C38.7266 298.082 33.5312 297.057 28.6094 295.006C23.6875 292.818 19.3809 289.947 15.6895 286.393C12.1348 282.701 9.26367 278.395 7.07617 273.473C5.02539 268.551 4 263.287 4 257.682V120.074C4 114.469 5.02539 109.205 7.07617 104.283C9.26367 99.3613 12.1348 95.123 15.6895 91.5684C19.3809 87.877 23.6875 85.0059 28.6094 82.9551C33.5312 80.7676 38.7266 79.6738 44.1953 79.6738H152.682C158.287 79.6738 163.482 80.7676 168.268 82.9551C173.189 85.0059 177.428 87.877 180.982 91.5684C184.674 95.123 187.545 99.3613 189.596 104.283C191.783 109.205 192.877 114.469 192.877 120.074V257.682ZM44.1953 120.074V257.682H152.682V120.074H44.1953ZM331.715 4V298.082H289.674V46.041H239.225V4H331.715ZM478.961 4V298.082H436.92V46.041H386.471V4H478.961ZM743.717 257.682C743.717 263.287 742.623 268.551 740.436 273.473C738.385 278.395 735.514 282.701 731.822 286.393C728.268 289.947 724.029 292.818 719.107 295.006C714.322 297.057 709.127 298.082 703.521 298.082H595.035C589.566 298.082 584.371 297.057 579.449 295.006C574.527 292.818 570.221 289.947 566.529 286.393C562.975 282.701 560.104 278.395 557.916 273.473C555.865 268.551 554.84 263.287 554.84 257.682V120.074C554.84 114.469 555.865 109.205 557.916 104.283C560.104 99.3613 562.975 95.123 566.529 91.5684C570.221 87.877 574.527 85.0059 579.449 82.9551C584.371 80.7676 589.566 79.6738 595.035 79.6738H703.521C709.127 79.6738 714.322 80.7676 719.107 82.9551C724.029 85.0059 728.268 87.877 731.822 91.5684C735.514 95.123 738.385 99.3613 740.436 104.283C742.623 109.205 743.717 114.469 743.717 120.074V257.682ZM595.035 120.074V257.682H703.521V120.074H595.035Z';
@@ -186,7 +262,103 @@ function OttoRouterLogo({ size = 32 }: { size?: number }) {
 	);
 }
 
-function renderLandingOG() {
+/** Hairline grid plate matching the homepage `.np-grid-bg` treatment. */
+function NeoGrid() {
+	const columns = Array.from({ length: 26 }, (_, i) => (i + 1) * 44);
+	const rows = Array.from({ length: 14 }, (_, i) => (i + 1) * 44);
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: '1200px',
+				height: '630px',
+				display: 'flex',
+			}}
+		>
+			{columns.map((x) => (
+				<div
+					key={`c${x}`}
+					style={{
+						position: 'absolute',
+						left: `${x}px`,
+						top: 0,
+						width: '1px',
+						height: '630px',
+						background: np.grid,
+						display: 'flex',
+					}}
+				/>
+			))}
+			{rows.map((y) => (
+				<div
+					key={`r${y}`}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: `${y}px`,
+						width: '1200px',
+						height: '1px',
+						background: np.grid,
+						display: 'flex',
+					}}
+				/>
+			))}
+		</div>
+	);
+}
+
+/**
+ * The custom-drawn wordmark: every glyph painted twice, once as a hard offset
+ * extrusion and once as the front face with the 2px NeoPop edge. Counters are
+ * knocked out with the background rather than an even-odd fill rule, which
+ * Satori does not honour.
+ */
+function NeoWordmark({
+	height = 88,
+	depth = 5,
+}: {
+	height?: number;
+	depth?: number;
+}) {
+	const viewWidth = WORDMARK_WIDTH + depth + WORDMARK_PAD * 2;
+	const viewHeight = WORDMARK_HEIGHT + depth + WORDMARK_PAD * 2;
+	const width = Math.round((height * viewWidth) / viewHeight);
+
+	return (
+		<svg
+			width={width}
+			height={height}
+			viewBox={`${-WORDMARK_PAD} ${WORDMARK_ASCENDER_TOP - WORDMARK_PAD} ${viewWidth} ${viewHeight}`}
+			role="img"
+			aria-label="otto"
+		>
+			{wordmarkShapes(depth, depth).map((shape) => (
+				<path
+					key={`shade-${shape.key}`}
+					d={shape.d}
+					fill={shape.counter ? np.bg : np.shadow}
+					stroke={shape.counter ? 'none' : np.shadow}
+					strokeWidth={2}
+					strokeLinejoin="round"
+				/>
+			))}
+			{wordmarkShapes().map((shape) => (
+				<path
+					key={`face-${shape.key}`}
+					d={shape.d}
+					fill={shape.counter ? np.bg : WORDMARK_FILL[shape.letter]}
+					stroke={shape.counter ? 'none' : np.border}
+					strokeWidth={2}
+					strokeLinejoin="round"
+				/>
+			))}
+		</svg>
+	);
+}
+
+export function renderLandingOG() {
 	return (
 		<div
 			style={{
@@ -194,118 +366,51 @@ function renderLandingOG() {
 				height: '100%',
 				display: 'flex',
 				flexDirection: 'column',
-				background: '#09090b',
+				alignItems: 'center',
+				justifyContent: 'center',
+				background: np.bg,
 				fontFamily: 'IBM Plex Mono',
-				color: '#ffffff',
+				color: np.text,
 				position: 'relative',
 				overflow: 'hidden',
 			}}
 		>
+			<NeoGrid />
+
+			<NeoWordmark height={104} />
+
+			<div
+				style={{
+					display: 'flex',
+					marginTop: '36px',
+					fontSize: '27px',
+					color: np.muted,
+					letterSpacing: '-0.01em',
+				}}
+			>
+				You describe it. otto builds it.
+			</div>
+
+			{/* Tone bar — the NeoPop colour signature. */}
 			<div
 				style={{
 					position: 'absolute',
-					top: '-120px',
-					right: '-120px',
-					width: '500px',
-					height: '500px',
-					borderRadius: '50%',
-					background:
-						'radial-gradient(circle, rgba(59,130,246,0.12), transparent 70%)',
+					bottom: 0,
+					left: 0,
+					width: '1200px',
+					height: '16px',
 					display: 'flex',
-				}}
-			/>
-
-			<div
-				style={{
-					display: 'flex',
-					flexDirection: 'column',
-					justifyContent: 'center',
-					alignItems: 'center',
-					flex: 1,
-					padding: '60px',
-					position: 'relative',
 				}}
 			>
-				<OttoLogo size={80} />
-
-				<div
-					style={{
-						fontSize: '36px',
-						color: '#d4d4d8',
-						marginTop: '36px',
-						textAlign: 'center',
-						lineHeight: 1.4,
-						letterSpacing: '-0.01em',
-						maxWidth: '800px',
-						display: 'flex',
-					}}
-				>
-					AI-powered coding assistant
-				</div>
-
-				<div
-					style={{
-						display: 'flex',
-						alignItems: 'center',
-						gap: '16px',
-						marginTop: '44px',
-					}}
-				>
-					{['CLI', 'TUI', 'Desktop', 'Server', 'Embeddable'].map((label) => (
-						<div
-							key={label}
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								padding: '10px 24px',
-								background: '#18181b',
-								border: '1px solid #3f3f46',
-								borderRadius: '8px',
-								fontSize: '17px',
-								color: '#d4d4d8',
-								letterSpacing: '0.04em',
-							}}
-						>
-							{label}
-						</div>
-					))}
-				</div>
-			</div>
-
-			<div
-				style={{
-					display: 'flex',
-					justifyContent: 'space-between',
-					alignItems: 'center',
-					padding: '0 60px 40px',
-				}}
-			>
-				<div
-					style={{
-						fontSize: '18px',
-						color: '#a1a1aa',
-						display: 'flex',
-						letterSpacing: '0.04em',
-					}}
-				>
-					ottocode.io
-				</div>
-				<div
-					style={{
-						fontSize: '18px',
-						color: '#a1a1aa',
-						display: 'flex',
-						letterSpacing: '0.04em',
-					}}
-				>
-					open source
-				</div>
+				<div style={{ display: 'flex', flex: 1, background: np.blue }} />
+				<div style={{ display: 'flex', flex: 1, background: np.lime }} />
+				<div style={{ display: 'flex', flex: 1, background: np.yellow }} />
+				<div style={{ display: 'flex', flex: 1, background: np.coral }} />
 			</div>
 		</div>
 	);
 }
-
-function renderOttoRouterOG(data: PageOGRequest) {
+export function renderOttoRouterOG(data: PageOGRequest) {
 	const description =
 		data.description || 'One key. Every model. Pay as you go.';
 
@@ -399,7 +504,7 @@ function renderOttoRouterOG(data: PageOGRequest) {
 	);
 }
 
-function renderDocsOG(data: PageOGRequest) {
+export function renderDocsOG(data: PageOGRequest) {
 	const title = data.title || 'Documentation';
 	const section = data.section || '';
 
@@ -534,7 +639,7 @@ function renderDocsOG(data: PageOGRequest) {
 	);
 }
 
-function renderBlogOG(data: PageOGRequest) {
+export function renderBlogOG(data: PageOGRequest) {
 	const title = data.title || 'Blog';
 	const date = data.date || '';
 	const author = data.author || 'otto team';
@@ -669,7 +774,7 @@ function renderBlogOG(data: PageOGRequest) {
 	);
 }
 
-function renderShareOG(data: OGRequest) {
+export function renderShareOG(data: OGRequest) {
 	const cost =
 		data.inputTokens && data.outputTokens
 			? estimateCost(data.model, data.inputTokens, data.outputTokens)
@@ -824,7 +929,7 @@ export const handler = async (event: {
 	const params = event.queryStringParameters || {};
 	const type = params.type as string | undefined;
 
-	const font = await loadFont();
+	const fonts = await loadFonts();
 
 	let element: JSX.Element;
 
@@ -880,26 +985,7 @@ export const handler = async (event: {
 	const svg = await satori(element, {
 		width: 1200,
 		height: 630,
-		fonts: [
-			{
-				name: 'IBM Plex Mono',
-				data: font,
-				weight: 400,
-				style: 'normal',
-			},
-			{
-				name: 'IBM Plex Mono',
-				data: font,
-				weight: 500,
-				style: 'normal',
-			},
-			{
-				name: 'IBM Plex Mono',
-				data: font,
-				weight: 600,
-				style: 'normal',
-			},
-		],
+		fonts: satoriFonts(fonts),
 	});
 
 	const resvg = new Resvg(svg, {

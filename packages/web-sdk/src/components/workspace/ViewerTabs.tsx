@@ -699,7 +699,11 @@ export const ViewerTabs = memo(function ViewerTabs() {
 	if (tabCount === 0) return null;
 
 	return (
-		<section className="h-full w-full min-w-0 bg-sidebar flex flex-col">
+		<section
+			className="h-full w-full min-w-0 bg-sidebar flex flex-col"
+			data-smart-edge-ignore
+			data-smart-edge-ignore-mode="content"
+		>
 			<ViewerHeader />
 			<ViewerPaneArea />
 		</section>
