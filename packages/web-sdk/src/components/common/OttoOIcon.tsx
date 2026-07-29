@@ -48,73 +48,82 @@ export function OttoOIcon({ className }: { className?: string }) {
 	return <OttoMark className={className} />;
 }
 
-const OTTO_WORDMARK_TEXT_PATH =
-	'M192.877 257.682C192.877 263.287 191.783 268.551 189.596 273.473C187.545 278.395 184.674 282.701 180.982 286.393C177.428 289.947 173.189 292.818 168.268 295.006C163.482 297.057 158.287 298.082 152.682 298.082H44.1953C38.7266 298.082 33.5312 297.057 28.6094 295.006C23.6875 292.818 19.3809 289.947 15.6895 286.393C12.1348 282.701 9.26367 278.395 7.07617 273.473C5.02539 268.551 4 263.287 4 257.682V120.074C4 114.469 5.02539 109.205 7.07617 104.283C9.26367 99.3613 12.1348 95.123 15.6895 91.5684C19.3809 87.877 23.6875 85.0059 28.6094 82.9551C33.5312 80.7676 38.7266 79.6738 44.1953 79.6738H152.682C158.287 79.6738 163.482 80.7676 168.268 82.9551C173.189 85.0059 177.428 87.877 180.982 91.5684C184.674 95.123 187.545 99.3613 189.596 104.283C191.783 109.205 192.877 114.469 192.877 120.074V257.682ZM44.1953 120.074V257.682H152.682V120.074H44.1953ZM331.715 4V298.082H289.674V46.041H239.225V4H331.715ZM478.961 4V298.082H436.92V46.041H386.471V4H478.961ZM743.717 257.682C743.717 263.287 742.623 268.551 740.436 273.473C738.385 278.395 735.514 282.701 731.822 286.393C728.268 289.947 724.029 292.818 719.107 295.006C714.322 297.057 709.127 298.082 703.521 298.082H595.035C589.566 298.082 584.371 297.057 579.449 295.006C574.527 292.818 570.221 289.947 566.529 286.393C562.975 282.701 560.104 278.395 557.916 273.473C555.865 268.551 554.84 263.287 554.84 257.682V120.074C554.84 114.469 555.865 109.205 557.916 104.283C560.104 99.3613 562.975 95.123 566.529 91.5684C570.221 87.877 574.527 85.0059 579.449 82.9551C584.371 80.7676 589.566 79.6738 595.035 79.6738H703.521C709.127 79.6738 714.322 80.7676 719.107 82.9551C724.029 85.0059 728.268 87.877 731.822 91.5684C735.514 95.123 738.385 99.3613 740.436 104.283C742.623 109.205 743.717 114.469 743.717 120.074V257.682ZM595.035 120.074V257.682H703.521V120.074H595.035Z';
+const O_GLYPH =
+	'M0 27Q0 20 7 20L33 20Q40 20 40 27L40 49Q40 56 33 56L7 56Q0 56 0 49Z M10 33Q10 30 13 30L27 30Q30 30 30 33L30 43Q30 46 27 46L13 46Q10 46 10 43Z';
+const T_ONE_GLYPH =
+	'M57 11Q57 8 60 8L64 8Q67 8 67 11L67 17Q67 20 70 20L72 20Q75 20 75 23L75 27Q75 30 72 30L70 30Q67 30 67 33L67 43Q67 46 70 46L73 46Q76 46 76 49L76 53Q76 56 73 56L60 56Q57 56 57 53L57 32.5Q57 30 54.5 30Q52 30 52 27.5L52 22.5Q52 20 54.5 20Q57 20 57 17.5Z';
+const T_TWO_GLYPH =
+	'M93 11Q93 8 96 8L100 8Q103 8 103 11L103 17Q103 20 106 20L108 20Q111 20 111 23L111 27Q111 30 108 30L106 30Q103 30 103 33L103 43Q103 46 106 46L109 46Q112 46 112 49L112 53Q112 56 109 56L96 56Q93 56 93 53L93 32.5Q93 30 90.5 30Q88 30 88 27.5L88 22.5Q88 20 90.5 20Q93 20 93 17.5Z';
+const O_TWO_GLYPH =
+	'M124 27Q124 20 131 20L157 20Q164 20 164 27L164 49Q164 56 157 56L131 56Q124 56 124 49Z M134 33Q134 30 137 30L151 30Q154 30 154 33L154 43Q154 46 151 46L137 46Q134 46 134 43Z';
+
+const WORDMARK_GLYPHS = [
+	{ key: 'o1', d: O_GLYPH, fill: '#4865cc', cast: '#283c8c', evenOdd: true },
+	{
+		key: 't1',
+		d: T_ONE_GLYPH,
+		fill: '#c9403a',
+		cast: '#84241f',
+		evenOdd: false,
+	},
+	{
+		key: 't2',
+		d: T_TWO_GLYPH,
+		fill: '#c9403a',
+		cast: '#84241f',
+		evenOdd: false,
+	},
+	{
+		key: 'o2',
+		d: O_TWO_GLYPH,
+		fill: '#62ad8b',
+		cast: '#346852',
+		evenOdd: true,
+	},
+] as const;
 
 export interface OttoWordmarkProps {
 	height?: number;
 	className?: string;
 }
 
-/** Renders the original otto wordmark glyphs without the ShipWheel mark. */
-export function OttoTextWordmark({
-	height = 16,
-	className,
-}: OttoWordmarkProps) {
-	const width = Math.round(height * (744 / 303));
+/** Renders the multicolor NeoPop otto wordmark used across product surfaces. */
+export function OttoWordmark({ height = 16, className }: OttoWordmarkProps) {
+	const width = Math.round(height * (171 / 55));
 	return (
 		<svg
 			width={width}
 			height={height}
-			viewBox="0 0 744 303"
+			viewBox="-2 6 171 55"
 			className={className}
-			fill="currentColor"
 			aria-label="otto"
 			role="img"
 		>
-			<path d={OTTO_WORDMARK_TEXT_PATH} />
+			<g transform="translate(3 3)" stroke="none">
+				{WORDMARK_GLYPHS.map((glyph) => (
+					<path
+						key={glyph.key}
+						d={glyph.d}
+						fill={glyph.cast}
+						fillRule={glyph.evenOdd ? 'evenodd' : 'nonzero'}
+					/>
+				))}
+			</g>
+			<g stroke="none">
+				{WORDMARK_GLYPHS.map((glyph) => (
+					<path
+						key={glyph.key}
+						d={glyph.d}
+						fill={glyph.fill}
+						fillRule={glyph.evenOdd ? 'evenodd' : 'nonzero'}
+					/>
+				))}
+			</g>
 		</svg>
 	);
 }
 
-/**
- * Otto brand lockup: the ShipWheel mark beside the original otto wordmark
- * glyphs, composed in a single SVG so spacing and alignment hold at any size.
- * The mark is sized to the lowercase x-height band and sits a tight half
- * mark-width from the text.
- */
-export function OttoWordmark({ height = 16, className }: OttoWordmarkProps) {
-	const width = Math.round(height * (1098 / 303));
-	return (
-		<svg
-			width={width}
-			height={height}
-			viewBox="0 0 1098 303"
-			className={className}
-			fill="currentColor"
-			aria-label="otto"
-			role="img"
-		>
-			<g
-				fill="none"
-				stroke="currentColor"
-				strokeWidth={2}
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				transform="translate(0 68.878) scale(10)"
-			>
-				<circle cx="12" cy="12" r="8" />
-				<path d="M12 2v7.5" />
-				<path d="m19 5-5.23 5.23" />
-				<path d="M22 12h-7.5" />
-				<path d="m19 19-5.23-5.23" />
-				<path d="M12 14.5V22" />
-				<path d="M10.23 13.77 5 19" />
-				<path d="M9.5 12H2" />
-				<path d="M10.23 10.23 5 5" />
-				<circle cx="12" cy="12" r="2.5" />
-			</g>
-			<path d={OTTO_WORDMARK_TEXT_PATH} transform="translate(350 0)" />
-		</svg>
-	);
+/** Compatibility export for previous text-only wordmark call sites. */
+export function OttoTextWordmark(props: OttoWordmarkProps) {
+	return <OttoWordmark {...props} />;
 }

@@ -1,16 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <style>
-    :root { color: #141416; }
-    @media (prefers-color-scheme: dark) { :root { color: #f7f7f8; } }
-  </style>
-<circle cx="12" cy="12" r="8"/>
-  <path d="M12 2v7.5"/>
-  <path d="m19 5-5.23 5.23"/>
-  <path d="M22 12h-7.5"/>
-  <path d="m19 19-5.23-5.23"/>
-  <path d="M12 14.5V22"/>
-  <path d="M10.23 13.77 5 19"/>
-  <path d="M9.5 12H2"/>
-  <path d="M10.23 10.23 5 5"/>
-  <circle cx="12" cy="12" r="2.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#f7f8f6"/>
+  <g transform="translate(210 230) scale(14)">
+    <path transform="translate(3 -17)" d="M0 27Q0 20 7 20L33 20Q40 20 40 27L40 49Q40 56 33 56L7 56Q0 56 0 49Z M10 33Q10 30 13 30L27 30Q30 30 30 33L30 43Q30 46 27 46L13 46Q10 46 10 43Z" fill="#283c8c" fill-rule="evenodd"/>
+    <path transform="translate(0 -20)" d="M0 27Q0 20 7 20L33 20Q40 20 40 27L40 49Q40 56 33 56L7 56Q0 56 0 49Z M10 33Q10 30 13 30L27 30Q30 30 30 33L30 43Q30 46 27 46L13 46Q10 46 10 43Z" fill="#4865cc" fill-rule="evenodd"/>
+  </g>
 </svg>

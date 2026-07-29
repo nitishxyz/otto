@@ -11,7 +11,6 @@ import { ImportDialog } from './components/ImportDialog';
 import { PasswordPrompt } from './components/PasswordPrompt';
 import { SetupProgress } from './components/SetupProgress';
 import { handleTitleBarDrag } from './utils/title-bar';
-import { ShipWheel } from 'lucide-react';
 
 function App() {
 	const view = useStore((s) => s.view);
@@ -47,8 +46,12 @@ function App() {
 				role="toolbar"
 			>
 				<span className="text-xs font-semibold tracking-wider text-muted-foreground flex-1 flex items-center justify-center gap-1.5">
-					<ShipWheel size={13} aria-hidden="true" />
-					otto launcher
+					<img
+						src="/otto-wordmark.svg"
+						alt="otto"
+						className="h-[13px] w-auto"
+					/>
+					launcher
 				</span>
 				{appVersion && (
 					<span className="text-[10px] text-muted-foreground/50">

@@ -57,7 +57,7 @@ export function GitFileList({ status }: GitFileListProps) {
 		<div className="flex flex-col">
 			{hasConflicts && (
 				<div className="border-b border-border">
-					<div className="px-3 py-2 bg-red-500/10 flex items-center justify-between">
+					<div className="sticky top-0 z-10 px-3 py-2 bg-red-500/10 backdrop-blur-sm flex items-center justify-between">
 						<span className="text-xs font-semibold text-red-500 uppercase flex items-center gap-1.5">
 							<AlertTriangle className="w-3.5 h-3.5" />
 							Conflicts ({conflictedLength})
@@ -76,7 +76,7 @@ export function GitFileList({ status }: GitFileListProps) {
 
 			{hasStaged && (
 				<div className={hasUnstaged ? 'border-b border-border' : undefined}>
-					<div className="px-3 py-2 bg-muted/50 flex items-center justify-between">
+					<div className="sticky top-0 z-10 px-3 py-2 bg-muted flex items-center justify-between">
 						<span className="text-xs font-semibold text-foreground uppercase">
 							Staged Changes ({status.staged.length})
 						</span>
@@ -113,9 +113,10 @@ export function GitFileList({ status }: GitFileListProps) {
 
 			{hasUnstaged && (
 				<div>
-					<div className="px-3 py-2 bg-muted/50 flex items-center justify-between">
+					<div className="sticky top-0 z-10 px-3 py-2 bg-muted flex items-center justify-between">
 						<span className="text-xs font-semibold text-foreground uppercase">
-							Changes ({status.unstaged.length + status.untracked.length})
+							Unstaged Changes (
+							{status.unstaged.length + status.untracked.length})
 						</span>
 						{hasUnstagedFiles && (
 							<Button

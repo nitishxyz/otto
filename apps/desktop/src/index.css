@@ -372,33 +372,27 @@ button:focus-visible {
 	height: 72px;
 }
 
-.ottorouter-loader-ring > * {
+.otto-wordmark-loader {
 	position: absolute;
 	top: 50%;
 	left: 50%;
+	width: 64px;
+	height: 64px;
+	object-fit: contain;
 	transform: translate(-50%, -50%);
 }
 
-.ottorouter-loader-ring::before {
+.ottorouter-loader-ring::before,
+.ottorouter-loader-ring::after {
 	content: "";
 	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
+	inset: 0;
 	border-radius: 50%;
 	border: 2px solid hsl(var(--muted));
 }
 
 .ottorouter-loader-ring::after {
-	content: "";
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	border-radius: 50%;
-	border: 2px solid transparent;
+	border-color: transparent;
 	border-top-color: hsl(var(--foreground));
 	animation: ottorouter-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -406,6 +400,12 @@ button:focus-visible {
 @keyframes ottorouter-spin {
 	to {
 		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ottorouter-loader-ring::after {
+		animation: none;
 	}
 }
 

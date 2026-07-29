@@ -320,6 +320,7 @@ export const AppLayout = memo(function AppLayout({
 
 						<RightPanelArea
 							isMobile={isMobile}
+							anyViewerOpen={anyViewerOpen}
 							sessionId={sessionId}
 							onFixWithAI={onFixWithAI}
 						/>
@@ -418,12 +419,14 @@ const MobileTopBar = memo(function MobileTopBar({
 
 interface RightPanelAreaProps {
 	isMobile: boolean;
+	anyViewerOpen: boolean;
 	sessionId?: string;
 	onFixWithAI?: (errorMessage: string) => void;
 }
 
 const RightPanelArea = memo(function RightPanelArea({
 	isMobile,
+	anyViewerOpen,
 	sessionId,
 	onFixWithAI,
 }: RightPanelAreaProps) {
@@ -459,7 +462,7 @@ const RightPanelArea = memo(function RightPanelArea({
 		skillsExpanded;
 	const { isVisible: isRightRailVisible, isHoverPending } = useEdgeHover({
 		side: 'right',
-		enabled: !isMobile && preferences.smartEdges,
+		enabled: !isMobile && !anyViewerOpen && preferences.smartEdges,
 		hoverRatio: RIGHT_RAIL_HOVER_RATIO,
 		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,
 	});

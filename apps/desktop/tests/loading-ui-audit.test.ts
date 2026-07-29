@@ -20,8 +20,8 @@ async function listTsxFiles(dir: string): Promise<string[]> {
 
 /**
  * Major/full-page loading surfaces: daemon/bootstrap gate, workspace open,
- * and onboarding. These must render the branded OttoRouterLoader (Otto logo
- * inside a spinning ring), never the compact StableSpinner.
+ * and onboarding. These must render the branded OttoRouterLoader (the square
+ * Otto wordmark inside the existing spinning ring), never StableSpinner.
  */
 const MAJOR_LOADER_SITES = [
 	'src/router.tsx',
@@ -54,19 +54,23 @@ describe('desktop loading UI standardization', () => {
 		}
 	});
 
-	test('the branded loader is the Otto logo in a spinning ring', async () => {
+	test('the branded loader uses the square Otto wordmark inside its ring', async () => {
 		const loader = await readFile(
 			'src/components/OttoRouterLoader.tsx',
 			'utf8',
 		);
-		expect(loader).toContain('OttoLogo');
+		expect(loader).toContain('/otto-wordmark-1x1.png');
+		expect(loader).toContain('otto-wordmark-loader');
 		expect(loader).toContain('ottorouter-loader-ring');
 		expect(loader).toContain('aria-busy');
+		expect(loader).toContain("aria-label={label ?? 'Loading'}");
 		expect(loader).not.toContain('StableSpinner');
 
 		const css = await readFile('src/index.css', 'utf8');
+		expect(css).toContain('.otto-wordmark-loader');
 		expect(css).toContain('.ottorouter-loader-ring');
 		expect(css).toContain('@keyframes ottorouter-spin');
+		expect(css).toContain('prefers-reduced-motion: reduce');
 	});
 
 	test('compact loading states use the shared StableSpinner', async () => {

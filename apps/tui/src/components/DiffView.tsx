@@ -1,5 +1,6 @@
 import type { BoxRenderable, DiffRenderable } from '@opentui/core';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { normalizeDiffHunks } from '../lib/diff.ts';
 import { useTheme } from '../theme.ts';
 
 const SPLIT_VIEW_MIN_WIDTH = 120;
@@ -306,14 +307,18 @@ function SingleDiffView({
 }) {
 	const { colors, syntaxStyle } = useTheme();
 	const filetype = filePath ? detectFiletype(filePath) : undefined;
+	const renderableDiff = useMemo(
+		() => normalizeDiffHunks(unifiedDiff),
+		[unifiedDiff],
+	);
 
 	const diffRef = useRef<DiffRenderable | null>(null);
 
 	const totalRows = useMemo(() => {
 		return view === 'split'
-			? countSplitViewRows(unifiedDiff)
-			: countUnifiedViewRows(unifiedDiff);
-	}, [unifiedDiff, view]);
+			? countSplitViewRows(renderableDiff)
+			: countUnifiedViewRows(renderableDiff);
+	}, [renderableDiff, view]);
 	const height = useMemo(
 		() => Math.min(Math.max(totalRows, 1), maxHeight),
 		[totalRows, maxHeight],
@@ -345,7 +350,7 @@ function SingleDiffView({
 			<diff
 				ref={diffRef}
 				style={{ width: '100%', height }}
-				diff={unifiedDiff}
+				diff={renderableDiff}
 				onMouseScroll={handleMouseScroll}
 				view={view}
 				syncScroll={view === 'split'}
@@ -407,9 +412,9 @@ export function DiffView({ patch, filePath, maxHeight = 30 }: DiffViewProps) {
 				marginBottom: 1,
 			}}
 		>
-			{fileDiffs.map((fd) => (
+			{fileDiffs.map((fd, index) => (
 				<SingleDiffView
-					key={fd.filePath}
+					key={`${fd.kind}:${fd.filePath}:${index}`}
 					unifiedDiff={fd.unifiedDiff}
 					filePath={fd.filePath}
 					view={view}

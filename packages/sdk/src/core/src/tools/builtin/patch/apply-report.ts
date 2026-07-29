@@ -61,6 +61,7 @@ export function formatNormalizedPatch(
 		}
 
 		for (const hunk of op.hunks) {
+			if (hunk.additions === 0 && hunk.deletions === 0) continue;
 			lines.push(formatHunkHeader(hunk));
 			for (const line of hunk.lines) {
 				lines.push(serializePatchLine(line));

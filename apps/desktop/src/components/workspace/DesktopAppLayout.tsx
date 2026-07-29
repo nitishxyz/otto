@@ -139,7 +139,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		isHoverPending: isRightRailHoverPending,
 	} = useEdgeHover({
 		side: 'right',
-		enabled: preferences.smartEdges,
+		enabled: !anyViewerOpen && preferences.smartEdges,
 		hoverRatio: RIGHT_RAIL_HOVER_RATIO,
 		activeWidth: activeRightPanelWidth,
 		ignoreSelector: SMART_EDGE_IGNORE_SELECTOR,

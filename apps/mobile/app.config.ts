@@ -33,7 +33,7 @@ const config = {
    },
     android: {
       adaptiveIcon: {
-        backgroundColor: "#141416",
+        backgroundColor: "#f7f8f6",
         foregroundImage: "./assets/images/android-icon-foreground.png",
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -54,9 +54,9 @@ const config = {
           image: "./assets/images/splash-icon.png",
           imageWidth: 200,
           resizeMode: "contain",
-          backgroundColor: "#161616",
+          backgroundColor: "#f7f8f6",
           dark: {
-            backgroundColor: "#161616",
+            backgroundColor: "#f7f8f6",
           },
         },
       ],
