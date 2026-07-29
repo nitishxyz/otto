@@ -4,8 +4,13 @@ import {
 	waitForBrowserControlCommand,
 } from '@ottocode/sdk/browser-control';
 import type { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { resolveRequestProjectRoot } from './project-context.ts';
+
+const BROWSER_TAB_ID_PATTERN = /^browser:[A-Za-z0-9:_-]+$/;
+const MAX_BROWSER_RESULT_LENGTH = 32 * 1024 * 1024;
+const MAX_BROWSER_REQUEST_BYTES = 34 * 1024 * 1024;
 
 const browserCommandSchema = z.object({
 	id: z.string(),
@@ -16,7 +21,7 @@ const browserCommandSchema = z.object({
 });
 
 const pollBrowserCommandQuerySchema = z.object({
-	tabId: z.string().min(1),
+	tabId: z.string().max(128).regex(BROWSER_TAB_ID_PATTERN),
 });
 
 const pollBrowserCommandResponseSchema = z.object({
@@ -24,7 +29,7 @@ const pollBrowserCommandResponseSchema = z.object({
 });
 
 const browserCommandResultBodySchema = z.object({
-	result: z.string(),
+	result: z.string().max(MAX_BROWSER_RESULT_LENGTH),
 });
 
 const browserCommandResultResponseSchema = z.object({
@@ -33,6 +38,15 @@ const browserCommandResultResponseSchema = z.object({
 
 /** Registers the owner-only browser viewer command channel. */
 export function registerBrowserRoutes(app: Hono) {
+	app.use(
+		'/v1/browser/*',
+		bodyLimit({
+			maxSize: MAX_BROWSER_REQUEST_BYTES,
+			onError: (c) =>
+				c.json({ error: 'Browser result payload is too large' }, 413),
+		}),
+	);
+
 	zodOpenApiRoute(
 		app,
 		{

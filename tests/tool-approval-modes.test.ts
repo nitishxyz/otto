@@ -18,6 +18,42 @@ describe('tool approval modes', () => {
 		expect(requiresApproval('read', 'dangerous')).toBe(false);
 	});
 
+	test('dangerous mode only prompts for mutating browser actions', () => {
+		for (const action of [
+			'open',
+			'navigate',
+			'back',
+			'forward',
+			'reload',
+			'click',
+			'type',
+			'press',
+			'evaluate',
+		]) {
+			expect(requiresApproval('browser', 'dangerous', { action })).toBe(true);
+		}
+		for (const action of [
+			'snapshot',
+			'screenshot',
+			'html',
+			'find',
+			'console',
+			'network',
+			'hover',
+			'scroll',
+			'wait_for',
+			'stop',
+		]) {
+			expect(requiresApproval('browser', 'dangerous', { action })).toBe(false);
+		}
+		expect(requiresApproval('browser', 'all', { action: 'snapshot' })).toBe(
+			true,
+		);
+		expect(requiresApproval('browser', 'yolo', { action: 'click' })).toBe(
+			false,
+		);
+	});
+
 	test('yolo skips guard-driven approvals only', () => {
 		expect(skipsGuardApproval('yolo')).toBe(true);
 		expect(skipsGuardApproval('auto')).toBe(false);

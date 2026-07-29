@@ -7,6 +7,9 @@ export default $config({
       removal: input?.stage === "prod" ? "retain" : "remove",
       // protect: ["prod"].includes(input?.stage),
       home: "aws",
+      watch: {
+        ignore: ["target"],
+      },
       providers: {
         aws: {
           profile: "slashforge",

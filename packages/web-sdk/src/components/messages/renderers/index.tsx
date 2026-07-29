@@ -26,6 +26,7 @@ import { LoadMcpToolsRenderer } from './LoadMcpToolsRenderer';
 import { LoadToolsRenderer } from './LoadToolsRenderer';
 import { McpManagerRenderer } from './McpManagerRenderer';
 import { SimulatorRenderer } from './SimulatorRenderer';
+import { BrowserRenderer } from './BrowserRenderer';
 import { SkillRenderer } from './SkillRenderer';
 import { GoalToolRenderer } from './GoalToolRenderer';
 import { SubagentToolRenderer } from './SubagentToolRenderer';
@@ -87,6 +88,7 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
 	LoadMcpTools: 'load_mcp_tools',
 	McpManager: 'mcp_manager',
 	Simulator: 'simulator',
+	Browser: 'browser',
 
 	Skill: 'skill',
 };
@@ -187,6 +189,8 @@ export function ToolResultRenderer({
 			return <McpManagerRenderer {...props} />;
 		case 'simulator':
 			return <SimulatorRenderer {...props} />;
+		case 'browser':
+			return <BrowserRenderer {...props} />;
 		case 'skill':
 			return <SkillRenderer {...props} />;
 		case 'goal_list':

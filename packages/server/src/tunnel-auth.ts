@@ -95,7 +95,9 @@ export async function isDaemonTokenAuthorized(c: Context): Promise<boolean> {
 /** Returns true for daemon-global paths unavailable to project shares. */
 export function isBlockedProjectSharePath(pathname: string): boolean {
 	return (
-		pathname.startsWith('/v1/projects') || pathname.startsWith('/v1/tunnel')
+		pathname.startsWith('/v1/projects') ||
+		pathname.startsWith('/v1/tunnel') ||
+		pathname.startsWith('/v1/browser')
 	);
 }
 

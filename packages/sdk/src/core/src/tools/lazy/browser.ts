@@ -22,11 +22,18 @@ type JsonValue =
 const DEFAULT_CONTROL_TIMEOUT_MS = 20_000;
 const NAVIGATION_CONTROL_TIMEOUT_MS = 30_000;
 const SCREENSHOT_CONTROL_TIMEOUT_MS = 30_000;
+const WAIT_FOR_CONTROL_MARGIN_MS = 15_000;
+const MAX_SCREENSHOT_BYTES = 24 * 1024 * 1024;
+const SUPPORTED_SCREENSHOT_MEDIA_TYPES = new Set([
+	'image/png',
+	'image/jpeg',
+	'image/webp',
+]);
 
 const description = [
 	'Open and control a page in Otto built-in browser.',
 	'Use open first, then snapshot to read visible text and interactive elements; snapshot returns stable references such as @e1 that work as selectors for click, hover, type, press, scroll, and wait_for.',
-	'screenshot returns the rendered page as an image for visual checks (desktop app only).',
+	'screenshot returns the rendered page as an image for visual checks (macOS desktop app only).',
 	'html returns the live DOM markup and find searches the rendered text and markup, so you can inspect the code actually running in the page.',
 	'console lists captured console output and page errors; network lists fetch/XHR/resource requests.',
 	'navigate/back/forward/reload/stop control navigation and wait for the next document to load.',
@@ -37,7 +44,7 @@ const description = [
 function controlTimeoutMs(input: BrowserInput): number {
 	switch (input.action) {
 		case 'wait_for':
-			return waitForTimeoutMs(input) + 10_000;
+			return waitForTimeoutMs(input) + WAIT_FOR_CONTROL_MARGIN_MS;
 		case 'navigate':
 		case 'back':
 		case 'forward':
@@ -84,9 +91,27 @@ async function buildScreenshotResult(
 	capture: ScreenshotCapture,
 	tabId: string,
 ): Promise<Record<string, unknown>> {
+	const mediaType = capture.mediaType ?? 'image/png';
+	if (!SUPPORTED_SCREENSHOT_MEDIA_TYPES.has(mediaType)) {
+		throw new Error(`Unsupported browser screenshot media type: ${mediaType}`);
+	}
+	if (capture.data.length > Math.ceil((MAX_SCREENSHOT_BYTES * 4) / 3) + 4) {
+		throw new Error('Browser screenshot exceeds the 24 MB size limit');
+	}
+	if (
+		capture.data.length % 4 !== 0 ||
+		!/^[A-Za-z0-9+/]*={0,2}$/.test(capture.data)
+	) {
+		throw new Error('Browser screenshot is not valid base64 data');
+	}
 	const raw = Buffer.from(capture.data, 'base64');
+	if (raw.byteLength === 0 || raw.byteLength > MAX_SCREENSHOT_BYTES) {
+		throw new Error(
+			'Browser screenshot is empty or exceeds the 24 MB size limit',
+		);
+	}
 	const prepared = await prepareScreenshotForModel(new Uint8Array(raw), {
-		mediaType: capture.mediaType,
+		mediaType,
 	});
 	return {
 		ok: true,
@@ -161,8 +186,18 @@ export function buildBrowserTool(projectRoot: string): {
 				}
 				return { type: 'json', value: toJsonValue(output) };
 			},
-			execute: async (input: BrowserInput) => {
+			execute: async (
+				input: BrowserInput,
+				options?: { abortSignal?: AbortSignal },
+			) => {
 				try {
+					if (options?.abortSignal?.aborted) {
+						return createToolError(
+							'Browser action was cancelled',
+							'execution',
+							{ action: input.action },
+						);
+					}
 					const kind = input.kind ?? 'browser';
 					if (input.action === 'open') {
 						const url = validateBrowserUrl(input.url ?? '');
@@ -195,6 +230,7 @@ export function buildBrowserTool(projectRoot: string): {
 							args: browserControlArgs(input),
 						},
 						controlTimeoutMs(input),
+						options?.abortSignal,
 					);
 
 					if (input.action === 'screenshot' && result.ok === true) {
@@ -206,7 +242,7 @@ export function buildBrowserTool(projectRoot: string): {
 								{ action: input.action, tabId },
 							);
 						}
-						return buildScreenshotResult(capture, tabId);
+						return await buildScreenshotResult(capture, tabId);
 					}
 
 					return { ...result, action: input.action, tabId };

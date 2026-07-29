@@ -183,6 +183,8 @@ describe('tunnel auth middleware', () => {
 			'/v1/projects/directories',
 			'/v1/projects/other',
 			'/v1/tunnel/status',
+			'/v1/browser/commands?tabId=browser%3Abrowser',
+			'/v1/browser/commands/test/result',
 		]) {
 			const blocked = await app.request(`https://device.example${path}`, {
 				headers: { Authorization: `Bearer ${share.token}` },

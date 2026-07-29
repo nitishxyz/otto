@@ -17,6 +17,7 @@ import {
 	Database,
 	Plug,
 	BookOpen,
+	Globe2,
 } from 'lucide-react';
 import {
 	Fragment,
@@ -364,6 +365,10 @@ export const MessagePartItem = memo(
 				if (toolName === 'skill')
 					return (
 						<BookOpen className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+					);
+				if (toolName === 'browser' || toolName === 'Browser')
+					return (
+						<Globe2 className="h-4 w-4 text-blue-600 dark:text-blue-300" />
 					);
 				if (toolName.includes('__'))
 					return (

@@ -4,10 +4,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { discoverProjectTools } from '@ottocode/sdk';
 import {
+	requestBrowserControl,
 	submitBrowserControlResult,
 	waitForBrowserControlCommand,
 } from '@ottocode/sdk/browser-control';
-import { browserControlArgs } from '../packages/sdk/src/core/src/tools/lazy/browser-command';
+import {
+	browserControlArgs,
+	browserInputSchema,
+} from '../packages/sdk/src/core/src/tools/lazy/browser-command';
 import {
 	actionScript,
 	pageStateScript,
@@ -76,6 +80,30 @@ describe('browser tool arguments', () => {
 			/Missing required string field: selector/,
 		);
 	});
+
+	it('rejects tab IDs that could overwrite non-browser viewer tabs', () => {
+		expect(
+			browserInputSchema.safeParse({
+				action: 'open',
+				url: 'https://example.com',
+				tabId: 'file:README.md',
+			}).success,
+		).toBe(false);
+		expect(
+			browserInputSchema.safeParse({
+				action: 'open',
+				url: 'https://example.com',
+				tabId: 'browser:agent:test',
+			}).success,
+		).toBe(true);
+		expect(
+			browserInputSchema.safeParse({
+				action: 'open',
+				url: 'https://example.com',
+				tabId: 'browser:agent:a?b',
+			}).success,
+		).toBe(false);
+	});
 });
 
 describe('browser page scripts', () => {
@@ -116,19 +144,173 @@ describe('browser page scripts', () => {
 		expect(consoleScript.startsWith(BROWSER_RECORDER_SCRIPT)).toBe(true);
 	});
 
-	it('resolves snapshot references through data attributes', () => {
-		const script = actionScript({
-			id: 'c',
-			tabId: 't',
-			action: 'click',
-			args: { selector: '@e7' },
+	it('keeps snapshot references isolated from page-controlled attributes', () => {
+		class FakeElement {
+			readonly isConnected = true;
+			readonly tagName = 'BUTTON';
+			readonly innerText: string;
+			readonly value = '';
+			readonly disabled = false;
+			clicks = 0;
+
+			constructor(
+				label: string,
+				private readonly attributes: Record<string, string> = {},
+			) {
+				this.innerText = label;
+			}
+
+			getAttribute(name: string): string | null {
+				return this.attributes[name] ?? null;
+			}
+
+			getBoundingClientRect() {
+				return { left: 0, top: 0, width: 100, height: 30 };
+			}
+
+			scrollIntoView() {}
+			dispatchEvent() {}
+			focus() {}
+			click() {
+				this.clicks += 1;
+			}
+		}
+
+		class FakeInputElement extends FakeElement {}
+		class FakeTextAreaElement extends FakeElement {}
+		class FakeSelectElement extends FakeElement {}
+		class FakeEvent {
+			constructor(
+				readonly type: string,
+				readonly options?: Record<string, unknown>,
+			) {}
+		}
+
+		const trusted = new FakeElement('Trusted button', {
+			'data-otto-ref': 'e1',
 		});
-		expect(script).toContain('data-otto-ref');
-		expect(script).toContain('"@e7"');
+		const attacker = new FakeElement('Attacker button', {
+			'data-otto-ref': 'e1',
+		});
+		let selectorQueries = 0;
+		const document = {
+			activeElement: null,
+			body: { innerText: 'Test page' },
+			documentElement: { scrollHeight: 800 },
+			title: 'Test',
+			readyState: 'complete',
+			querySelectorAll: () => [trusted],
+			querySelector: () => {
+				selectorQueries += 1;
+				return attacker;
+			},
+		};
+		const environment = {
+			window: {},
+			document,
+			location: { href: 'https://example.com/' },
+			HTMLElement: FakeElement,
+			HTMLInputElement: FakeInputElement,
+			HTMLTextAreaElement: FakeTextAreaElement,
+			HTMLSelectElement: FakeSelectElement,
+			getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+			innerWidth: 1200,
+			innerHeight: 800,
+			scrollY: 0,
+			PointerEvent: FakeEvent,
+			MouseEvent: FakeEvent,
+		};
+		const run = (script: string): unknown => {
+			const names = Object.keys(environment);
+			const execute = new Function(...names, `return ${script};`);
+			return execute(...Object.values(environment));
+		};
+		const referenceChannel = 'integrity-test';
+		const snapshot = JSON.parse(
+			String(
+				run(
+					actionScript(
+						{ id: 'snapshot', tabId: 't', action: 'snapshot', args: {} },
+						referenceChannel,
+					),
+				),
+			),
+		) as { elements: Array<{ ref: string }> };
+		expect(snapshot.elements[0]?.ref).toBe('@e1');
+
+		const clicked = JSON.parse(
+			String(
+				run(
+					actionScript(
+						{
+							id: 'click',
+							tabId: 't',
+							action: 'click',
+							args: { selector: '@e1' },
+						},
+						referenceChannel,
+					),
+				),
+			),
+		) as { ok: boolean; name: string };
+		expect(clicked).toMatchObject({ ok: true, name: 'Trusted button' });
+		expect(trusted.clicks).toBe(1);
+		expect(attacker.clicks).toBe(0);
+		expect(selectorQueries).toBe(0);
+
+		const wrongChannel = JSON.parse(
+			String(
+				run(
+					actionScript(
+						{
+							id: 'wrong-channel',
+							tabId: 't',
+							action: 'click',
+							args: { selector: '@e1' },
+						},
+						'other-channel',
+					),
+				),
+			),
+		) as { ok: boolean; error: string };
+		expect(wrongChannel).toEqual({
+			ok: false,
+			error: 'Element not found: @e1',
+		});
+		expect(trusted.clicks).toBe(1);
 	});
 });
 
 describe('browser tool routing', () => {
+	it('removes queued commands when execution is cancelled', async () => {
+		await withProject(async (projectRoot) => {
+			const abortController = new AbortController();
+			const resultPromise = requestBrowserControl(
+				{
+					projectRoot,
+					tabId: 'browser:test-cancel',
+					action: 'click',
+					args: { selector: '@e1' },
+				},
+				5_000,
+				abortController.signal,
+			);
+			abortController.abort();
+
+			expect(await resultPromise).toEqual({
+				ok: false,
+				error: 'Browser action was cancelled',
+			});
+			expect(
+				await waitForBrowserControlCommand(
+					projectRoot,
+					'browser:test-cancel',
+					10,
+				),
+			).toBeNull();
+		});
+	});
+
 	it('returns console entries collected by the viewer', async () => {
 		await withProject(async (projectRoot) => {
 			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
@@ -151,6 +333,50 @@ describe('browser tool routing', () => {
 				action: 'console',
 				tabId: 'browser:test-console',
 				messages: [{ level: 'error', text: 'boom' }],
+			});
+		});
+	});
+
+	it('rejects unsupported screenshot media types', async () => {
+		await withProject(async (projectRoot) => {
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const browserTool = lazyToolsRecord.browser;
+			const resultPromise = browserTool?.execute?.({
+				action: 'screenshot',
+				tabId: 'browser:test-invalid-shot',
+			});
+
+			await routeCommand(projectRoot, 'browser:test-invalid-shot', {
+				ok: true,
+				data: onePixelPngBase64,
+				mediaType: 'image/svg+xml',
+			});
+
+			expect(await resultPromise).toMatchObject({
+				ok: false,
+				errorType: 'execution',
+			});
+		});
+	});
+
+	it('rejects malformed screenshot data', async () => {
+		await withProject(async (projectRoot) => {
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const resultPromise = lazyToolsRecord.browser?.execute?.({
+				action: 'screenshot',
+				tabId: 'browser:test-malformed-shot',
+			});
+
+			await routeCommand(projectRoot, 'browser:test-malformed-shot', {
+				ok: true,
+				data: 'not base64',
+				mediaType: 'image/png',
+			});
+
+			expect(await resultPromise).toMatchObject({
+				ok: false,
+				error: 'Browser screenshot is not valid base64 data',
+				errorType: 'execution',
 			});
 		});
 	});

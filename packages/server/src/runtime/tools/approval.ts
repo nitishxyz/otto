@@ -19,6 +19,18 @@ export const DANGEROUS_TOOLS = new Set([
 
 export const SAFE_TOOLS = new Set(['progress_update', 'update_todos']);
 
+const DANGEROUS_BROWSER_ACTIONS = new Set([
+	'open',
+	'navigate',
+	'back',
+	'forward',
+	'reload',
+	'click',
+	'type',
+	'press',
+	'evaluate',
+]);
+
 export interface PendingApproval {
 	projectRoot?: string;
 	callId: string;
@@ -35,11 +47,23 @@ const pendingApprovals = new Map<string, PendingApproval>();
 export function requiresApproval(
 	toolName: string,
 	mode: ToolApprovalMode,
+	args?: unknown,
 ): boolean {
 	if (SAFE_TOOLS.has(toolName)) return false;
 	if (mode === 'auto' || mode === 'yolo') return false;
 	if (mode === 'all') return true;
-	if (mode === 'dangerous') return DANGEROUS_TOOLS.has(toolName);
+	if (mode === 'dangerous') {
+		if (toolName === 'browser') {
+			const action =
+				args && typeof args === 'object' && !Array.isArray(args)
+					? (args as { action?: unknown }).action
+					: undefined;
+			return (
+				typeof action !== 'string' || DANGEROUS_BROWSER_ACTIONS.has(action)
+			);
+		}
+		return DANGEROUS_TOOLS.has(toolName);
+	}
 	return false;
 }
 

@@ -29,6 +29,10 @@ Inspection:
 | `network` | `fetch`, `XHR`, and resource requests with status and duration (`query`, `limit`) |
 | `evaluate` | The serializable value of a JavaScript snippet |
 
+Snapshot references are kept in an isolated per-viewer registry rather than in
+page-controlled DOM attributes, so a page cannot redirect an `@e1` action by
+duplicating or changing an attribute.
+
 Interaction:
 
 - `click`, `hover`, `type`, `press`, and `scroll` act on a CSS selector or a
@@ -51,6 +55,9 @@ should therefore use the desktop app.
 
 Page commands are queued until a preview tab connects. If nothing is connected,
 the tool reports that no preview is attached instead of silently timing out.
+The command channel is owner-only and is not exposed to project-share clients.
+In `dangerous` approval mode, page-opening, navigation, click, type, press, and
+JavaScript evaluation actions require approval; inspection-only actions do not.
 
 Desktop browser tabs retain the native webview while navigating, preserving
 cookies, storage, JavaScript state, and the webview's real history. Page-driven

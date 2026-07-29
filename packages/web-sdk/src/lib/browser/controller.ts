@@ -89,11 +89,12 @@ async function waitForDocumentReady(
 async function runNavigation(
 	command: BrowserControlCommand,
 	executor: BrowserPageExecutor,
+	referenceChannel: string,
 ): Promise<PageResult> {
 	const before = await readPageState(executor);
 	const previousUrl = stringField(before, 'url');
 	const dispatched = decodeResult(
-		await executor.execute(actionScript(command)),
+		await executor.execute(actionScript(command, referenceChannel)),
 	);
 	if (dispatched.ok === false) return dispatched;
 
@@ -138,10 +139,11 @@ async function runNavigation(
 async function runWaitFor(
 	command: BrowserControlCommand,
 	executor: BrowserPageExecutor,
+	referenceChannel: string,
 ): Promise<PageResult> {
 	const timeout = Math.max(100, Number(command.args.timeoutMs) || 5_000);
 	const deadline = Date.now() + timeout;
-	const script = actionScript(command);
+	const script = actionScript(command, referenceChannel);
 	let last: PageResult = {
 		ok: false,
 		error: 'Timed out waiting for the page condition',
@@ -163,6 +165,7 @@ async function runWaitFor(
 async function runScreenshot(
 	command: BrowserControlCommand,
 	executor: BrowserPageExecutor,
+	referenceChannel: string,
 ): Promise<PageResult> {
 	if (!executor.capture) {
 		return {
@@ -176,7 +179,7 @@ async function runScreenshot(
 		typeof command.args.selector === 'string' ? command.args.selector : '';
 	if (selector) {
 		const scrolled = decodeResult(
-			await executor.execute(scrollIntoViewScript(selector)),
+			await executor.execute(scrollIntoViewScript(selector, referenceChannel)),
 		);
 		if (scrolled.ok === false) return scrolled;
 		await delay(POLL_INTERVAL_MS);
@@ -199,24 +202,29 @@ async function runScreenshot(
 async function executeCommand(
 	command: BrowserControlCommand,
 	executor: BrowserPageExecutor,
+	referenceChannel: string,
 ): Promise<PageResult> {
 	try {
 		if (command.action === 'stop') {
-			return decodeResult(await executor.execute(actionScript(command)));
+			return decodeResult(
+				await executor.execute(actionScript(command, referenceChannel)),
+			);
 		}
 
 		await waitForDocumentReady(executor);
 
 		if (NAVIGATION_ACTIONS.has(command.action)) {
-			return await runNavigation(command, executor);
+			return await runNavigation(command, executor, referenceChannel);
 		}
 		if (command.action === 'wait_for') {
-			return await runWaitFor(command, executor);
+			return await runWaitFor(command, executor, referenceChannel);
 		}
 		if (command.action === 'screenshot') {
-			return await runScreenshot(command, executor);
+			return await runScreenshot(command, executor, referenceChannel);
 		}
-		return decodeResult(await executor.execute(actionScript(command)));
+		return decodeResult(
+			await executor.execute(actionScript(command, referenceChannel)),
+		);
 	} catch (error) {
 		return errorResult(error);
 	}
@@ -228,6 +236,7 @@ export function connectBrowserController(
 	executor: BrowserPageExecutor,
 ): () => void {
 	const abortController = new AbortController();
+	const referenceChannel = crypto.randomUUID();
 
 	void (async () => {
 		while (!abortController.signal.aborted) {
@@ -245,7 +254,11 @@ export function connectBrowserController(
 					...payload.command,
 					args: JSON.parse(payload.command.args) as Record<string, unknown>,
 				};
-				const result = await executeCommand(command, executor);
+				const result = await executeCommand(
+					command,
+					executor,
+					referenceChannel,
+				);
 				const completion = await submitBrowserCommandResult({
 					path: { commandId: payload.command.id },
 					body: { result: JSON.stringify(result) },

@@ -150,7 +150,7 @@ export async function handleAdaptedToolInputAvailable(
 	if (args.name !== 'progress_update') {
 		if (
 			args.ctx.toolApprovalMode &&
-			requiresApproval(args.name, args.ctx.toolApprovalMode)
+			requiresApproval(args.name, args.ctx.toolApprovalMode, input)
 		) {
 			meta.approvalPromise = requestApproval(
 				args.ctx.sessionId,

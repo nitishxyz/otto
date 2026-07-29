@@ -10,6 +10,8 @@ export interface BrowserControlCommand {
 const MAX_SNAPSHOT_TEXT = 30_000;
 const MAX_SNAPSHOT_ELEMENTS = 250;
 const MAX_HTML_LENGTH = 40_000;
+const MAX_REFERENCE_ELEMENTS = 5_000;
+const REFERENCE_STATE_PLACEHOLDER = '__OTTO_REFERENCE_STATE_KEY__';
 
 function json(value: unknown): string {
 	return JSON.stringify(value === undefined ? null : value);
@@ -21,28 +23,62 @@ function selectorArg(selector: unknown): string {
 
 /** Shared helpers injected into every generated page script. */
 const HELPERS = `
-	function ottoSelector(requested) {
-		return requested.charAt(0) === '@'
-			? '[data-otto-ref="' + CSS.escape(requested.slice(1)) + '"]'
-			: requested;
+	var OTTO_REFERENCE_STATE_KEY = ${json(REFERENCE_STATE_PLACEHOLDER)};
+	function ottoReferenceStore() {
+		var existing = window[OTTO_REFERENCE_STATE_KEY];
+		if (existing) {
+			if (typeof existing.resolve !== 'function' || typeof existing.ref !== 'function') {
+				throw new Error('Browser reference channel is unavailable');
+			}
+			return existing;
+		}
+		var elementToRef = new WeakMap();
+		var refToElement = new Map();
+		var nextId = 1;
+		function prune() {
+			refToElement.forEach(function (element, ref) {
+				if (element && element.isConnected) return;
+				refToElement.delete(ref);
+				if (element) elementToRef.delete(element);
+			});
+		}
+		var store = Object.freeze({
+			resolve: function (requested) {
+				if (!/^@e\\d+$/.test(requested)) return null;
+				prune();
+				return refToElement.get(requested.slice(1)) || null;
+			},
+			ref: function (element) {
+				prune();
+				var existingRef = elementToRef.get(element);
+				if (existingRef && refToElement.get(existingRef) === element) return existingRef;
+				if (refToElement.size >= ${MAX_REFERENCE_ELEMENTS}) {
+					var oldestRef = refToElement.keys().next().value;
+					var oldestElement = refToElement.get(oldestRef);
+					refToElement.delete(oldestRef);
+					if (oldestElement) elementToRef.delete(oldestElement);
+				}
+				var ref = 'e' + nextId++;
+				elementToRef.set(element, ref);
+				refToElement.set(ref, element);
+				return ref;
+			}
+		});
+		Object.defineProperty(window, OTTO_REFERENCE_STATE_KEY, {
+			value: store,
+			writable: false,
+			configurable: false,
+			enumerable: false
+		});
+		return store;
 	}
 	function ottoQuery(requested) {
 		if (!requested) return document.activeElement;
-		return document.querySelector(ottoSelector(requested));
+		if (requested.charAt(0) === '@') return ottoReferenceStore().resolve(requested);
+		return document.querySelector(requested);
 	}
 	function ottoRef(element) {
-		var existing = element.getAttribute('data-otto-ref');
-		if (existing) return existing;
-		var root = document.documentElement;
-		var counter = Number(root.getAttribute('data-otto-ref-seq') || '0');
-		var ref = '';
-		do {
-			counter += 1;
-			ref = 'e' + counter;
-		} while (document.querySelector('[data-otto-ref="' + ref + '"]'));
-		root.setAttribute('data-otto-ref-seq', String(counter));
-		element.setAttribute('data-otto-ref', ref);
-		return ref;
+		return ottoReferenceStore().ref(element);
 	}
 	function ottoVisible(element) {
 		var style = getComputedStyle(element);
@@ -71,6 +107,16 @@ const HELPERS = `
 
 function wrap(body: string): string {
 	return `(function(){${HELPERS}${body}})()`;
+}
+
+function bindReferenceChannel(
+	script: string,
+	referenceChannel: string,
+): string {
+	return script.replace(
+		json(REFERENCE_STATE_PLACEHOLDER),
+		json(`__ottoBrowserRefs:${referenceChannel}`),
+	);
 }
 
 function withElement(selector: unknown, body: string): string {
@@ -334,21 +380,29 @@ function evaluateScript(args: Record<string, unknown>): string {
 }
 
 /** Reports document readiness so the controller can gate and await navigation. */
-export const pageStateScript = wrap('return ottoPage({});');
+export const pageStateScript = bindReferenceChannel(
+	wrap('return ottoPage({});'),
+	'page-state',
+);
 
 /** Brings an element into view before the host captures a screenshot. */
-export function scrollIntoViewScript(selector: string): string {
-	return withElement(
-		selector,
-		`
+export function scrollIntoViewScript(
+	selector: string,
+	referenceChannel = 'default',
+): string {
+	return bindReferenceChannel(
+		withElement(
+			selector,
+			`
 		element.scrollIntoView({ block: 'center', inline: 'center' });
 		return ottoPage({ selector: requested });
 	`,
+		),
+		referenceChannel,
 	);
 }
 
-/** Builds the page script that fulfils a browser control command. */
-export function actionScript(command: BrowserControlCommand): string {
+function buildActionScript(command: BrowserControlCommand): string {
 	const { action, args } = command;
 	switch (action) {
 		case 'navigate':
@@ -388,4 +442,12 @@ export function actionScript(command: BrowserControlCommand): string {
 		default:
 			return `JSON.stringify({ ok: false, error: ${json(`Unsupported browser action: ${action}`)} })`;
 	}
+}
+
+/** Builds the page script that fulfils a browser control command. */
+export function actionScript(
+	command: BrowserControlCommand,
+	referenceChannel = 'default',
+): string {
+	return bindReferenceChannel(buildActionScript(command), referenceChannel);
 }

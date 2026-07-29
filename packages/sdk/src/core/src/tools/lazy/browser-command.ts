@@ -43,6 +43,11 @@ export const browserInputSchema = z.object({
 		.describe('Create a new controllable browser tab when opening.'),
 	tabId: z
 		.string()
+		.max(128)
+		.regex(/^browser:[A-Za-z0-9:_-]+$/, {
+			message:
+				'Browser tab IDs must start with "browser:" and contain only letters, numbers, colons, underscores, or hyphens',
+		})
 		.optional()
 		.describe(
 			'Target browser tab ID. Omit to use the main browser (or simulator) tab.',

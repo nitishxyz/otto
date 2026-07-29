@@ -19,8 +19,11 @@ interface CommandWaiter {
 
 interface ResultWaiter {
 	projectRoot: string;
+	tabId: string;
 	resolve: (result: BrowserControlResult) => void;
 	timer: ReturnType<typeof setTimeout>;
+	abortSignal?: AbortSignal;
+	onAbort?: () => void;
 }
 
 const commandQueues = new Map<string, BrowserControlCommand[]>();
@@ -62,11 +65,37 @@ function removeCommand(
 	else commandQueues.delete(key);
 }
 
+function settleBrowserControl(
+	commandId: string,
+	result: BrowserControlResult,
+	removeQueuedCommand: boolean,
+): boolean {
+	const waiter = resultWaiters.get(commandId);
+	if (!waiter) return false;
+	clearTimeout(waiter.timer);
+	if (waiter.abortSignal && waiter.onAbort) {
+		waiter.abortSignal.removeEventListener('abort', waiter.onAbort);
+	}
+	resultWaiters.delete(commandId);
+	if (removeQueuedCommand) {
+		removeCommand(commandId, waiter.projectRoot, waiter.tabId);
+	}
+	waiter.resolve(result);
+	return true;
+}
+
 /** Queues a browser command and waits for the connected viewer to return a result. */
 export function requestBrowserControl(
 	input: Omit<BrowserControlCommand, 'id' | 'createdAt'>,
 	timeoutMs = 20_000,
+	abortSignal?: AbortSignal,
 ): Promise<BrowserControlResult> {
+	if (abortSignal?.aborted) {
+		return Promise.resolve({
+			ok: false,
+			error: 'Browser action was cancelled',
+		});
+	}
 	const command: BrowserControlCommand = {
 		...input,
 		id: crypto.randomUUID(),
@@ -75,20 +104,33 @@ export function requestBrowserControl(
 
 	return new Promise((resolve) => {
 		const timer = setTimeout(() => {
-			resultWaiters.delete(command.id);
-			removeCommand(command.id, command.projectRoot, command.tabId);
-			resolve({
-				ok: false,
-				error: isBrowserViewerConnected(command.projectRoot)
-					? `Browser preview did not respond in time for "${command.action}". Make sure the ${command.tabId} tab is open and visible in Otto, then try again.`
-					: 'No Otto browser preview is connected. Open the workspace preview (desktop app or `otto web`) so the page can be controlled, then try again.',
-			});
+			settleBrowserControl(
+				command.id,
+				{
+					ok: false,
+					error: isBrowserViewerConnected(command.projectRoot)
+						? `Browser preview did not respond in time for "${command.action}". Make sure the ${command.tabId} tab is open and visible in Otto, then try again.`
+						: 'No Otto browser preview is connected. Open the workspace preview (desktop app or `otto web`) so the page can be controlled, then try again.',
+				},
+				true,
+			);
 		}, timeoutMs);
+		const onAbort = () => {
+			settleBrowserControl(
+				command.id,
+				{ ok: false, error: 'Browser action was cancelled' },
+				true,
+			);
+		};
 		resultWaiters.set(command.id, {
 			projectRoot: command.projectRoot,
+			tabId: command.tabId,
 			resolve,
 			timer,
+			abortSignal,
+			onAbort,
 		});
+		abortSignal?.addEventListener('abort', onAbort, { once: true });
 
 		const key = targetKey(command.projectRoot, command.tabId);
 		const waitingClients = commandWaiters.get(key);
@@ -147,8 +189,5 @@ export function submitBrowserControlResult(
 ): boolean {
 	const waiter = resultWaiters.get(commandId);
 	if (!waiter || waiter.projectRoot !== projectRoot) return false;
-	clearTimeout(waiter.timer);
-	resultWaiters.delete(commandId);
-	waiter.resolve(result);
-	return true;
+	return settleBrowserControl(commandId, result, false);
 }
