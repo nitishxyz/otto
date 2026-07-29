@@ -37,6 +37,7 @@ chrono = { version = "0.4", features = ["serde"] }
 url = "2"
 semver = "1"
 fontdb = "0.23"
+base64 = "0.22"
 
 rand = "0.8"
 
@@ -49,7 +50,10 @@ openssl = { version = "0.10", features = ["vendored"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
 mac-notification-sys = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "block2"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "block2"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSString"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebView", "WKSnapshotConfiguration", "objc2-app-kit", "block2"] }
 
 # Windows: use native SChannel TLS (no OpenSSL/Perl needed)
 [target.'cfg(target_os = "windows")'.dependencies]

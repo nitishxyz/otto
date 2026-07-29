@@ -7,6 +7,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { getProjectTmpDir } from '../../../../config/src/paths.ts';
 import { createToolError } from '../error.ts';
+import { prepareScreenshotForModel } from './screenshot-image.ts';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const FETCH_TIMEOUT_MS = 5_000;
@@ -14,8 +15,6 @@ const LOG_TIMEOUT_MS = 2_000;
 const DEFAULT_PREVIEW_PORT = 3200;
 const DEFAULT_PREVIEW_URL = `http://localhost:${DEFAULT_PREVIEW_PORT}`;
 const SCREENSHOT_ARTIFACTS_DIR = 'artifacts/simulator';
-const SCREENSHOT_MODEL_MAX_EDGE = 1024;
-const SCREENSHOT_MODEL_JPEG_QUALITY = 70;
 const HID_KEYBOARD_LEFT_GUI = 227;
 const HID_KEYBOARD_V = 25;
 
@@ -72,30 +71,6 @@ type ExecResult = {
 	stdout: string;
 	stderr: string;
 };
-
-type BunImageMetadata = {
-	width?: number;
-	height?: number;
-	format?: string;
-};
-
-type BunImagePipeline = {
-	metadata(): Promise<BunImageMetadata>;
-	resize(
-		width: number,
-		height?: number,
-		options?: {
-			fit?: 'inside';
-			withoutEnlargement?: boolean;
-		},
-	): BunImagePipeline;
-	jpeg(options?: { quality?: number }): BunImagePipeline;
-	bytes(): Promise<Uint8Array>;
-};
-
-type BunImageConstructor = new (
-	input: string | ArrayBuffer | Uint8Array | Blob,
-) => BunImagePipeline;
 
 type JsonValue =
 	| null
@@ -159,10 +134,6 @@ type SimulatorInput =
 
 function withDevice(args: string[], device?: string): string[] {
 	return device ? [...args, '-d', device] : args;
-}
-
-function getBunImageConstructor(): BunImageConstructor | undefined {
-	return (Bun as typeof Bun & { Image?: BunImageConstructor }).Image;
 }
 
 function toJsonValue(value: unknown): JsonValue {
@@ -845,61 +816,6 @@ async function fetchFirstMjpegFrame(url: string): Promise<Uint8Array> {
 		throw new Error('serve-sim stream ended before a complete frame was read');
 	} finally {
 		clearTimeout(timeout);
-	}
-}
-
-async function prepareScreenshotForModel(bytes: Uint8Array): Promise<{
-	data: Uint8Array;
-	mediaType: string;
-	compressed: boolean;
-	width?: number;
-	height?: number;
-}> {
-	const ImageCtor = getBunImageConstructor();
-	if (!ImageCtor) {
-		return { data: bytes, mediaType: 'image/jpeg', compressed: false };
-	}
-
-	try {
-		const image = new ImageCtor(bytes);
-		const metadata = await image.metadata();
-		const width = metadata.width;
-		const height = metadata.height;
-		if (!width || !height) {
-			return { data: bytes, mediaType: 'image/jpeg', compressed: false };
-		}
-
-		const longestEdge = Math.max(width, height);
-		if (longestEdge <= SCREENSHOT_MODEL_MAX_EDGE) {
-			return {
-				data: bytes,
-				mediaType: 'image/jpeg',
-				compressed: false,
-				width,
-				height,
-			};
-		}
-
-		const scale = SCREENSHOT_MODEL_MAX_EDGE / longestEdge;
-		const targetWidth = Math.max(1, Math.round(width * scale));
-		const targetHeight = Math.max(1, Math.round(height * scale));
-		const compressed = await image
-			.resize(targetWidth, targetHeight, {
-				fit: 'inside',
-				withoutEnlargement: true,
-			})
-			.jpeg({ quality: SCREENSHOT_MODEL_JPEG_QUALITY })
-			.bytes();
-
-		return {
-			data: compressed,
-			mediaType: 'image/jpeg',
-			compressed: true,
-			width: targetWidth,
-			height: targetHeight,
-		};
-	} catch {
-		return { data: bytes, mediaType: 'image/jpeg', compressed: false };
 	}
 }
 

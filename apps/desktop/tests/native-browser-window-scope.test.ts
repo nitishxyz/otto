@@ -37,4 +37,22 @@ describe('native browser window scoping', () => {
 		expect(source).toContain('if (win.OTTO_NATIVE_BROWSER) return;');
 		expect(source).toContain('{ target: getCurrentWindow().label }');
 	});
+
+	test('the screenshot command is exposed through the bridge and registered', async () => {
+		const [bridge, backend, registration] = await Promise.all([
+			readFile('src/lib/native-browser.ts', 'utf8'),
+			readFile('src-tauri/src/commands/native_browser.rs', 'utf8'),
+			readFile('src-tauri/src/lib.rs', 'utf8'),
+		]);
+
+		expect(bridge).toContain(
+			"invoke<string>('native_browser_screenshot', { id })",
+		);
+		expect(bridge).toContain('initScript: options.initScript');
+		expect(backend).toContain('pub async fn native_browser_screenshot(');
+		expect(backend).toContain('builder.initialization_script(script)');
+		expect(registration).toContain(
+			'commands::native_browser::native_browser_screenshot',
+		);
+	});
 });

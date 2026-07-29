@@ -7,20 +7,50 @@
 ## Browser tool
 
 The loadable `browser` tool opens pages in Otto's preview and supports an
-inspect-and-act loop for agents:
+inspect-and-act loop for agents.
 
-- `open`, `navigate`, `back`, `forward`, `reload`, and `stop` control navigation.
-- `snapshot` returns visible page text and interactive elements with stable
-  references such as `@e1`.
-- `click`, `type`, `press`, `scroll`, and `wait_for` act on a CSS selector or a
-  snapshot reference.
-- `evaluate` runs JavaScript in the page and returns a serializable result.
+Navigation:
+
+- `open` shows a URL in the preview (`newTab: true` creates a dedicated agent
+  tab, `kind: "simulator"` targets the serve-sim preview tab).
+- `navigate`, `back`, `forward`, and `reload` wait for the next document to
+  finish loading and return the settled URL, title, and ready state.
+- `stop` aborts an in-flight load.
+
+Inspection:
+
+| Action | Returns |
+|---|---|
+| `snapshot` | Visible text, interactive elements with stable `@e1` references, and viewport/scroll state |
+| `screenshot` | The rendered page as an image attached to the tool result for vision models |
+| `html` | Live DOM markup for the document or a selector (`maxLength` caps the payload) |
+| `find` | Elements whose own text or opening tag match `query`, with refs and markup snippets |
+| `console` | Console output and page errors captured since the document loaded (`level`, `limit`) |
+| `network` | `fetch`, `XHR`, and resource requests with status and duration (`query`, `limit`) |
+| `evaluate` | The serializable value of a JavaScript snippet |
+
+Interaction:
+
+- `click`, `hover`, `type`, `press`, and `scroll` act on a CSS selector or a
+  snapshot reference such as `@e3`. `type` also selects `<select>` options by
+  value or label.
+- `wait_for` polls until a selector becomes visible or `text` appears, up to
+  `timeoutMs` (default 5000).
+
+Console and network entries come from a small recorder that the desktop webview
+injects before page scripts run, so activity from the first paint onward is
+captured. Web clients inject the same recorder on demand, so they only see
+activity from the first `console`/`network` call onward.
 
 The desktop app renders pages in a native top-level webview, so sites that deny
-iframe embedding with `X-Frame-Options` or CSP still work. In a normal web
-client, arbitrary cross-origin pages remain display-only because browser
-same-origin rules prevent DOM inspection. Full cross-origin automation should
-therefore use the desktop app.
+iframe embedding with `X-Frame-Options` or CSP still work, and screenshots are
+captured from the real webview (macOS today). In a normal web client, arbitrary
+cross-origin pages remain display-only because browser same-origin rules prevent
+DOM inspection, and `screenshot` is unavailable. Full cross-origin automation
+should therefore use the desktop app.
+
+Page commands are queued until a preview tab connects. If nothing is connected,
+the tool reports that no preview is attached instead of silently timing out.
 
 Desktop browser tabs retain the native webview while navigating, preserving
 cookies, storage, JavaScript state, and the webview's real history. Page-driven

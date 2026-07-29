@@ -26,9 +26,27 @@ interface ResultWaiter {
 const commandQueues = new Map<string, BrowserControlCommand[]>();
 const commandWaiters = new Map<string, CommandWaiter[]>();
 const resultWaiters = new Map<string, ResultWaiter>();
+const viewerSeenAt = new Map<string, number>();
+
+/** A viewer is considered connected while it keeps long-polling for commands. */
+const VIEWER_PRESENCE_TTL_MS = 90_000;
 
 function targetKey(projectRoot: string, tabId: string): string {
 	return `${projectRoot}\0${tabId}`;
+}
+
+/** Records that a browser viewer for the project polled the command channel. */
+export function markBrowserViewerSeen(projectRoot: string): void {
+	viewerSeenAt.set(projectRoot, Date.now());
+}
+
+/** Reports whether a browser viewer recently polled for this project. */
+export function isBrowserViewerConnected(projectRoot: string): boolean {
+	const seenAt = viewerSeenAt.get(projectRoot);
+	if (seenAt === undefined) return false;
+	if (Date.now() - seenAt <= VIEWER_PRESENCE_TTL_MS) return true;
+	viewerSeenAt.delete(projectRoot);
+	return false;
 }
 
 function removeCommand(
@@ -61,8 +79,9 @@ export function requestBrowserControl(
 			removeCommand(command.id, command.projectRoot, command.tabId);
 			resolve({
 				ok: false,
-				error:
-					'Browser viewer did not respond. Open the browser preview and keep Otto connected, then try again.',
+				error: isBrowserViewerConnected(command.projectRoot)
+					? `Browser preview did not respond in time for "${command.action}". Make sure the ${command.tabId} tab is open and visible in Otto, then try again.`
+					: 'No Otto browser preview is connected. Open the workspace preview (desktop app or `otto web`) so the page can be controlled, then try again.',
 			});
 		}, timeoutMs);
 		resultWaiters.set(command.id, {
@@ -94,6 +113,7 @@ export function waitForBrowserControlCommand(
 	tabId: string,
 	timeoutMs = 25_000,
 ): Promise<BrowserControlCommand | null> {
+	markBrowserViewerSeen(projectRoot);
 	const key = targetKey(projectRoot, tabId);
 	const queue = commandQueues.get(key);
 	const command = queue?.shift();

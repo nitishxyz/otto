@@ -2729,12 +2729,16 @@ name = "otto-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "block2",
  "chrono",
  "dirs 5.0.1",
  "fontdb",
  "mac-notification-sys",
+ "objc2",
  "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
  "openssl",
  "rand 0.8.5",
  "reqwest 0.12.28",

@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
-import { connectBrowserController } from '../../lib/browser-control';
+import { connectBrowserController } from '../../lib/browser/controller';
+import { BROWSER_RECORDER_SCRIPT } from '../../lib/browser/recorder-script';
 import { subscribeNativeOverlay } from '../../lib/native-overlay';
 import { Button } from '../ui/Button';
 
@@ -33,6 +34,7 @@ interface NativeBrowserBridge {
 		reloadKey: number;
 		bounds: { x: number; y: number; width: number; height: number };
 		visible: boolean;
+		initScript?: string;
 	}): Promise<void>;
 	unmount(id: string): Promise<void>;
 	setVisible(id: string, visible: boolean): Promise<void>;
@@ -42,6 +44,7 @@ interface NativeBrowserBridge {
 		url?: string,
 	): Promise<void>;
 	execute(id: string, script: string): Promise<unknown>;
+	screenshot(id: string): Promise<string>;
 	subscribe(
 		id: string,
 		listener: (event: { id: string; url: string; loading: boolean }) => void,
@@ -292,6 +295,7 @@ export function BrowserViewerPanel({
 							!nativeOverlayOpen &&
 							bounds.width > 0 &&
 							bounds.height > 0,
+						initScript: BROWSER_RECORDER_SCRIPT,
 					})
 					.then(() => {
 						nativeMountedRef.current = true;
@@ -444,6 +448,12 @@ export function BrowserViewerPanel({
 					);
 				}
 			},
+			capture: nativeBridge
+				? async () => ({
+						data: await nativeBridge.screenshot(tab.id),
+						mediaType: 'image/png',
+					})
+				: undefined,
 		});
 	}, [canRenderUrl, nativeBridge, tab.id]);
 

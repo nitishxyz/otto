@@ -21,6 +21,8 @@ export interface NativeBrowserBridge {
 		url?: string,
 	) => Promise<void>;
 	execute: (id: string, script: string) => Promise<unknown>;
+	/** Captures the webview contents and returns base64 PNG bytes. */
+	screenshot: (id: string) => Promise<string>;
 	subscribe: (
 		id: string,
 		listener: (event: NativeBrowserNavigationEvent) => void,
@@ -40,6 +42,8 @@ export interface NativeBrowserMountOptions {
 	reloadKey: number;
 	bounds: NativeBrowserBounds;
 	visible: boolean;
+	/** Script injected before page scripts on every navigation. */
+	initScript?: string;
 }
 
 export function registerNativeBrowserBridge() {
@@ -79,6 +83,7 @@ export function registerNativeBrowserBridge() {
 				width: options.bounds.width,
 				height: options.bounds.height,
 				visible: options.visible,
+				initScript: options.initScript,
 			});
 		},
 		async unmount(id) {
@@ -92,6 +97,9 @@ export function registerNativeBrowserBridge() {
 		},
 		async execute(id, script) {
 			return invoke('native_browser_execute', { id, script });
+		},
+		async screenshot(id) {
+			return invoke<string>('native_browser_screenshot', { id });
 		},
 		subscribe(id, listener) {
 			const listeners = navigationListeners.get(id) ?? new Set();

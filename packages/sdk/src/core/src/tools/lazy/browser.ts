@@ -1,152 +1,112 @@
 import { tool, type Tool } from 'ai';
-import { z } from 'zod/v3';
 import { requestBrowserControl } from '../../../../browser-control.ts';
 import { createToolError } from '../error.ts';
+import {
+	browserControlArgs,
+	browserInputSchema,
+	defaultTabId,
+	validateBrowserUrl,
+	waitForTimeoutMs,
+	type BrowserInput,
+} from './browser-command.ts';
+import { prepareScreenshotForModel } from './screenshot-image.ts';
 
-const browserActions = [
-	'open',
-	'navigate',
-	'back',
-	'forward',
-	'reload',
-	'stop',
-	'snapshot',
-	'click',
-	'type',
-	'press',
-	'scroll',
-	'wait_for',
-	'evaluate',
-] as const;
-const browserKinds = ['browser', 'simulator'] as const;
+type JsonValue =
+	| null
+	| boolean
+	| number
+	| string
+	| JsonValue[]
+	| { [key: string]: JsonValue };
 
-const browserInputSchema = z.object({
-	action: z.enum(browserActions),
-	url: z
-		.string()
-		.optional()
-		.describe('URL for open or navigate. Localhost may omit the scheme.'),
-	title: z.string().optional().describe('Optional browser tab title for open.'),
-	kind: z
-		.enum(browserKinds)
-		.optional()
-		.describe('Use simulator for serve-sim previews; otherwise use browser.'),
-	newTab: z
-		.boolean()
-		.optional()
-		.describe('Create a new controllable browser tab when opening.'),
-	tabId: z
-		.string()
-		.optional()
-		.describe(
-			'Target browser tab ID. Omit to use the main browser (or simulator) tab.',
-		),
-	selector: z
-		.string()
-		.optional()
-		.describe('CSS selector or snapshot reference such as @e3.'),
-	text: z.string().optional().describe('Text to enter for action=type.'),
-	key: z
-		.string()
-		.optional()
-		.describe('Keyboard key for action=press, such as Enter or Escape.'),
-	x: z.number().optional().describe('Horizontal scroll delta in CSS pixels.'),
-	y: z.number().optional().describe('Vertical scroll delta in CSS pixels.'),
-	timeoutMs: z
-		.number()
-		.int()
-		.min(100)
-		.max(30_000)
-		.optional()
-		.describe('Timeout for wait_for. Defaults to 5000ms.'),
-	script: z
-		.string()
-		.optional()
-		.describe(
-			'JavaScript source for action=evaluate. Keep results serializable.',
-		),
-});
+const DEFAULT_CONTROL_TIMEOUT_MS = 20_000;
+const NAVIGATION_CONTROL_TIMEOUT_MS = 30_000;
+const SCREENSHOT_CONTROL_TIMEOUT_MS = 30_000;
 
-type BrowserInput = z.infer<typeof browserInputSchema>;
+const description = [
+	'Open and control a page in Otto built-in browser.',
+	'Use open first, then snapshot to read visible text and interactive elements; snapshot returns stable references such as @e1 that work as selectors for click, hover, type, press, scroll, and wait_for.',
+	'screenshot returns the rendered page as an image for visual checks (desktop app only).',
+	'html returns the live DOM markup and find searches the rendered text and markup, so you can inspect the code actually running in the page.',
+	'console lists captured console output and page errors; network lists fetch/XHR/resource requests.',
+	'navigate/back/forward/reload/stop control navigation and wait for the next document to load.',
+	'evaluate runs JavaScript and returns a serializable result.',
+	'Desktop uses a native top-level webview; web clients can only automate same-origin iframe pages and cannot capture screenshots because browser security blocks cross-origin access.',
+].join(' ');
 
-function normalizeBrowserUrl(value: string): string {
-	const trimmed = value.trim();
-	if (!trimmed) throw new Error('Missing required string field: url');
-	if (
-		/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:\/|$)/i.test(
-			trimmed,
-		)
-	) {
-		return `http://${trimmed}`;
-	}
-	if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
-	return `https://${trimmed}`;
-}
-
-function validateBrowserUrl(value: string): string {
-	const normalized = normalizeBrowserUrl(value);
-	const url = new URL(normalized);
-	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-		throw new Error(
-			'Only http and https URLs can be opened in the built-in browser',
-		);
-	}
-	return url.toString();
-}
-
-function requiredString(
-	input: BrowserInput,
-	field: 'selector' | 'text' | 'key' | 'script',
-): string {
-	const value = input[field];
-	if (typeof value !== 'string' || (field !== 'text' && !value.trim())) {
-		throw new Error(`Missing required string field: ${field}`);
-	}
-	return value;
-}
-
-function defaultTabId(kind: (typeof browserKinds)[number]): string {
-	return `browser:${kind}`;
-}
-
-function controlArgs(input: BrowserInput): Record<string, unknown> {
+function controlTimeoutMs(input: BrowserInput): number {
 	switch (input.action) {
-		case 'navigate':
-			return { url: validateBrowserUrl(input.url ?? '') };
-		case 'click':
-			return { selector: requiredString(input, 'selector') };
-		case 'type':
-			return {
-				selector: requiredString(input, 'selector'),
-				text: requiredString(input, 'text'),
-			};
-		case 'press':
-			return {
-				selector: input.selector,
-				key: requiredString(input, 'key'),
-			};
-		case 'scroll':
-			return {
-				selector: input.selector,
-				x: input.x ?? 0,
-				y: input.y ?? 600,
-			};
 		case 'wait_for':
-			return {
-				selector: requiredString(input, 'selector'),
-				timeoutMs: input.timeoutMs ?? 5_000,
-			};
-		case 'evaluate':
-			return { script: requiredString(input, 'script') };
+			return waitForTimeoutMs(input) + 10_000;
+		case 'navigate':
 		case 'back':
 		case 'forward':
 		case 'reload':
-		case 'stop':
-		case 'snapshot':
-			return {};
-		case 'open':
-			throw new Error('Open is handled directly');
+			return NAVIGATION_CONTROL_TIMEOUT_MS;
+		case 'screenshot':
+			return SCREENSHOT_CONTROL_TIMEOUT_MS;
+		default:
+			return DEFAULT_CONTROL_TIMEOUT_MS;
 	}
+}
+
+function toJsonValue(value: unknown): JsonValue {
+	if (value === undefined) return null;
+	try {
+		return JSON.parse(JSON.stringify(value)) as JsonValue;
+	} catch {
+		return String(value);
+	}
+}
+
+interface ScreenshotCapture {
+	data: string;
+	mediaType?: string;
+	url?: string;
+	title?: string;
+}
+
+function readScreenshotCapture(
+	result: Record<string, unknown>,
+): ScreenshotCapture | null {
+	const data = result.data;
+	if (typeof data !== 'string' || !data) return null;
+	return {
+		data,
+		mediaType:
+			typeof result.mediaType === 'string' ? result.mediaType : 'image/png',
+		url: typeof result.url === 'string' ? result.url : undefined,
+		title: typeof result.title === 'string' ? result.title : undefined,
+	};
+}
+
+async function buildScreenshotResult(
+	capture: ScreenshotCapture,
+	tabId: string,
+): Promise<Record<string, unknown>> {
+	const raw = Buffer.from(capture.data, 'base64');
+	const prepared = await prepareScreenshotForModel(new Uint8Array(raw), {
+		mediaType: capture.mediaType,
+	});
+	return {
+		ok: true,
+		action: 'screenshot',
+		tabId,
+		url: capture.url,
+		title: capture.title,
+		message:
+			'Browser screenshot captured and sent to the model; it is not stored on disk.',
+		artifact: {
+			kind: 'browser_screenshot',
+			mediaType: prepared.mediaType,
+			data: Buffer.from(prepared.data).toString('base64'),
+			originalSize: raw.byteLength,
+			transmittedSize: prepared.data.byteLength,
+			compressed: prepared.compressed,
+			width: prepared.width,
+			height: prepared.height,
+		},
+	};
 }
 
 export function buildBrowserTool(projectRoot: string): {
@@ -156,10 +116,52 @@ export function buildBrowserTool(projectRoot: string): {
 	return {
 		name: 'browser',
 		tool: tool({
-			description:
-				'Open and control a page in Otto built-in browser. Use open first, then snapshot to inspect visible text and interactive elements. Snapshot returns stable element references such as @e1 that can be passed as selectors to click, type, press, scroll, or wait_for. navigate/back/forward/reload/stop control navigation. evaluate runs JavaScript for deeper page inspection. Desktop uses a native top-level webview; web clients can only automate same-origin iframe pages because browser security blocks cross-origin DOM access.',
+			description,
 			inputSchema: browserInputSchema,
-			execute: async (input) => {
+			toModelOutput({ output }) {
+				const result = output as {
+					ok?: boolean;
+					url?: string;
+					artifact?: {
+						kind?: string;
+						data?: string;
+						mediaType?: string;
+						transmittedSize?: number;
+						compressed?: boolean;
+						width?: number;
+						height?: number;
+					};
+				};
+				const image = result.artifact;
+				if (
+					result.ok === true &&
+					image?.kind === 'browser_screenshot' &&
+					typeof image.data === 'string' &&
+					typeof image.mediaType === 'string'
+				) {
+					const dimensions =
+						typeof image.width === 'number' && typeof image.height === 'number'
+							? `, ${image.width}x${image.height}`
+							: '';
+					const compressed = image.compressed ? ', compressed' : '';
+					return {
+						type: 'content',
+						value: [
+							{
+								type: 'text',
+								text: `Browser screenshot of ${result.url ?? 'the current page'} (${image.mediaType}${dimensions}${compressed}, ${image.transmittedSize ?? image.data.length} bytes sent to the model). Inspect the following image. If the image is unreadable, use browser snapshot or html instead of guessing from pixels.`,
+							},
+							{
+								type: 'image-data',
+								data: image.data,
+								mediaType: image.mediaType,
+							},
+						],
+					};
+				}
+				return { type: 'json', value: toJsonValue(output) };
+			},
+			execute: async (input: BrowserInput) => {
 				try {
 					const kind = input.kind ?? 'browser';
 					if (input.action === 'open') {
@@ -180,6 +182,7 @@ export function buildBrowserTool(projectRoot: string): {
 							tabId,
 							newTab: input.newTab ?? false,
 							message: `Opened ${url} in Otto built-in browser preview`,
+							hint: 'The preview loads the page asynchronously. Call snapshot (or screenshot) next; it waits for the page to be ready.',
 						};
 					}
 
@@ -189,12 +192,23 @@ export function buildBrowserTool(projectRoot: string): {
 							projectRoot,
 							tabId,
 							action: input.action,
-							args: controlArgs(input),
+							args: browserControlArgs(input),
 						},
-						input.action === 'wait_for'
-							? (input.timeoutMs ?? 5_000) + 5_000
-							: undefined,
+						controlTimeoutMs(input),
 					);
+
+					if (input.action === 'screenshot' && result.ok === true) {
+						const capture = readScreenshotCapture(result);
+						if (!capture) {
+							return createToolError(
+								'The browser preview returned an empty screenshot.',
+								'execution',
+								{ action: input.action, tabId },
+							);
+						}
+						return buildScreenshotResult(capture, tabId);
+					}
+
 					return { ...result, action: input.action, tabId };
 				} catch (error) {
 					return createToolError(

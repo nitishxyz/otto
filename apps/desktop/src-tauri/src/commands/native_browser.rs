@@ -3,6 +3,9 @@ use std::time::Duration;
 use tauri::webview::{PageLoadEvent, WebviewBuilder};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 
+/// Screenshots re-render the page, so they only need a modest budget.
+const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(15);
+
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NativeBrowserNavigationEvent {
@@ -68,6 +71,7 @@ fn apply_webview_layout(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn native_browser_mount(
     window: tauri::Window,
     id: String,
@@ -78,6 +82,7 @@ pub async fn native_browser_mount(
     width: f64,
     height: f64,
     visible: bool,
+    init_script: Option<String>,
 ) -> Result<(), String> {
     let _ = reload_key;
     let label = label_for_browser_tab(window.label(), &id);
@@ -96,7 +101,12 @@ pub async fn native_browser_mount(
     let event_window = window.clone();
     let event_target = window.label().to_string();
     let event_id = id.clone();
-    let builder = WebviewBuilder::new(label, WebviewUrl::External(parsed_url))
+    let mut builder = WebviewBuilder::new(label, WebviewUrl::External(parsed_url));
+    if let Some(script) = init_script {
+        // Otto's page recorder must run before page scripts on every document.
+        builder = builder.initialization_script(script);
+    }
+    let builder = builder
         .zoom_hotkeys_enabled(true)
         .on_page_load(move |_webview, payload| {
             let _ = event_window.emit_to(
@@ -211,6 +221,87 @@ pub async fn native_browser_execute(
         return Err("browser script result exceeds the 1 MiB limit".to_string());
     }
     Ok(serde_json::from_str(&raw).unwrap_or(serde_json::Value::String(raw)))
+}
+
+/// Captures the rendered contents of a mounted browser tab as base64 PNG bytes.
+///
+/// The tab must be mounted and visible: the platform webview renders the
+/// snapshot from the live view hierarchy.
+#[tauri::command]
+pub async fn native_browser_screenshot(window: tauri::Window, id: String) -> Result<String, String> {
+    let webview = browser_tab_webview(&window, &id)
+        .ok_or_else(|| format!("browser tab is not mounted: {id}"))?;
+    let png = capture_webview_png(&webview)?;
+    Ok(base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        png,
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn capture_webview_png(webview: &tauri::Webview) -> Result<Vec<u8>, String> {
+    use block2::RcBlock;
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSImage;
+    use objc2_foundation::NSError;
+    use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
+
+    let (sender, receiver) = std::sync::mpsc::channel::<Result<Vec<u8>, String>>();
+    webview
+        .with_webview(move |platform| {
+            let handle = platform.inner();
+            if handle.is_null() {
+                let _ = sender.send(Err("native webview handle is unavailable".to_string()));
+                return;
+            }
+            // SAFETY: Tauri runs this closure on the main thread and the handle
+            // is the live WKWebView backing this tab.
+            unsafe {
+                let view: &WKWebView = &*(handle as *mut WKWebView);
+                let configuration = WKSnapshotConfiguration::new(MainThreadMarker::new_unchecked());
+                configuration.setAfterScreenUpdates(true);
+                let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
+                    let _ = sender.send(encode_snapshot_png(image, error));
+                });
+                view.takeSnapshotWithConfiguration_completionHandler(Some(&configuration), &handler);
+            }
+        })
+        .map_err(|error| error.to_string())?;
+
+    receiver
+        .recv_timeout(SCREENSHOT_TIMEOUT)
+        .map_err(|_| "browser screenshot timed out".to_string())?
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn encode_snapshot_png(
+    image: *mut objc2_app_kit::NSImage,
+    error: *mut objc2_foundation::NSError,
+) -> Result<Vec<u8>, String> {
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep};
+    use objc2_foundation::NSDictionary;
+
+    if !error.is_null() {
+        return Err((*error).localizedDescription().to_string());
+    }
+    if image.is_null() {
+        return Err("the browser tab returned an empty snapshot".to_string());
+    }
+
+    let tiff = (*image)
+        .TIFFRepresentation()
+        .ok_or_else(|| "the browser snapshot could not be read".to_string())?;
+    let representation = NSBitmapImageRep::imageRepWithData(&tiff)
+        .ok_or_else(|| "the browser snapshot could not be decoded".to_string())?;
+    let png = representation
+        .representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
+        .ok_or_else(|| "the browser snapshot could not be encoded as PNG".to_string())?;
+    Ok(png.to_vec())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_webview_png(_webview: &tauri::Webview) -> Result<Vec<u8>, String> {
+    Err("browser screenshots are only supported on macOS today".to_string())
 }
 
 #[cfg(test)]
