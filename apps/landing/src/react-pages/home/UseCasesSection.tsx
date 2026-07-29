@@ -3,79 +3,76 @@ import {
 	NeoEyebrow,
 	NeoReveal,
 	NeoSection,
-	cn,
 	type NeoAccent,
 } from '../../components/neopop';
 import {
-	FileEditIcon,
-	GitBranchIcon,
-	SearchIcon,
-	SparkIcon,
-	TerminalIcon,
-} from './icons';
+	AskIllustration,
+	ChecksIllustration,
+	ConnectIllustration,
+	DoneIllustration,
+	EditsIllustration,
+	WorksIllustration,
+} from './HowIllustrations';
 
-type UseCase = {
-	title: string;
-	body: string;
-	cmd: string;
-	tone: NeoAccent;
-	icon: (p: { className?: string }) => React.ReactElement;
-	wide?: boolean;
-};
+type Art = (p: { className?: string }) => React.ReactElement;
 
-const USE_CASES: UseCase[] = [
+const STEPS: { label: string; art: Art }[] = [
+	{ label: 'You ask', art: AskIllustration },
+	{ label: 'otto works', art: WorksIllustration },
+	{ label: "It's done", art: DoneIllustration },
+];
+
+const CARDS: { title: string; line: string; tone: NeoAccent; art: Art }[] = [
 	{
-		title: 'Fix the bug you just described',
-		body: 'Describe the symptom in plain English. otto finds the cause, patches the files, and runs your test suite to prove it worked.',
-		cmd: 'otto ask "checkout total is off by the discount"',
-		tone: 'blue',
-		icon: SparkIcon,
-		wide: true,
-	},
-	{
-		title: 'Plan before it writes',
-		body: 'A read-only planning mode that maps the change and shows you the approach first.',
-		cmd: 'otto ask --agent plan "add SSO"',
-		tone: 'yellow',
-		icon: SearchIcon,
-	},
-	{
-		title: 'Refactor across the repo',
-		body: 'Rename, restructure, and migrate patterns over dozens of files in one pass.',
-		cmd: 'otto ask "move api calls into a client"',
+		title: 'It changes the files',
+		line: 'Across the whole project, not one line at a time.',
 		tone: 'coral',
-		icon: FileEditIcon,
+		art: EditsIllustration,
 	},
 	{
-		title: 'Review before you push',
-		body: 'Walk the working diff, catch the thing you missed, and write the commit message.',
-		cmd: 'otto ask "review my changes"',
+		title: 'It checks its own work',
+		line: 'Runs your tests and shows you what passed.',
 		tone: 'lime',
-		icon: GitBranchIcon,
+		art: ChecksIllustration,
 	},
 	{
-		title: 'Find the work you did before',
-		body: 'The research agent searches prior sessions and your current repo to bring old decisions and fixes back into context.',
-		cmd: 'otto ask --agent research "where did we fix auth retries?"',
-		tone: 'blue',
-		icon: TerminalIcon,
-		wide: true,
+		title: 'It plugs into your stuff',
+		line: 'Your tools, your rules, the model you already pay for.',
+		tone: 'yellow',
+		art: ConnectIllustration,
 	},
 ];
 
-const ICON_TILE: Record<NeoAccent, string> = {
-	blue: 'bg-np-blue text-np-blue-on',
-	lime: 'bg-np-lime text-np-lime-on',
-	yellow: 'bg-np-yellow text-np-yellow-on',
-	coral: 'bg-np-coral text-np-coral-on',
-};
+function StepArrow({ left }: { left: string }) {
+	return (
+		<span
+			aria-hidden="true"
+			style={{ left }}
+			className="absolute top-1/2 hidden h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[3px] border-2 border-otto-border bg-otto-bg sm:flex"
+		>
+			<svg
+				viewBox="0 0 24 24"
+				className="h-3.5 w-3.5"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
+				<title>then</title>
+				<path d="m9 5 7 7-7 7" />
+			</svg>
+		</span>
+	);
+}
 
+/** Illustration-led overview: three steps across the top, then three cards. */
 export function UseCasesSection() {
 	return (
 		<NeoSection id="use-cases" aria-labelledby="use-cases-title">
 			<div className="py-16 sm:py-24">
 				<NeoReveal>
-					<NeoEyebrow>What you do with it</NeoEyebrow>
+					<NeoEyebrow>What it does</NeoEyebrow>
 					<h2
 						id="use-cases-title"
 						className="np-title mt-4 max-w-[16ch] text-otto-text"
@@ -84,45 +81,67 @@ export function UseCasesSection() {
 					</h2>
 				</NeoReveal>
 
-				<div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{USE_CASES.map((item, i) => {
-						const Icon = item.icon;
+				<NeoReveal delay={70}>
+					<NeoBox
+						tone="surface"
+						elevation="md"
+						className="mt-10 overflow-hidden"
+					>
+						<div className="np-grid-bg relative bg-otto-card">
+							<div className="grid grid-cols-1 divide-y-2 divide-otto-border sm:grid-cols-3 sm:divide-x-2 sm:divide-y-0">
+								{STEPS.map((step) => {
+									const Art = step.art;
+									return (
+										<div
+											key={step.label}
+											className="flex flex-col items-center gap-4 px-6 py-8"
+										>
+											<div className="flex h-[124px] w-full items-center justify-center">
+												<Art className="h-full w-auto" />
+											</div>
+											<p className="np-eyebrow text-otto-dim">{step.label}</p>
+										</div>
+									);
+								})}
+							</div>
+							<StepArrow left="33.3333%" />
+							<StepArrow left="66.6666%" />
+						</div>
+
+						<div className="np-edge-t flex flex-col gap-2 px-5 py-5 sm:flex-row sm:items-baseline sm:justify-between sm:px-7">
+							<h3 className="text-[17px] font-semibold tracking-tight text-otto-text">
+								You ask. It builds. You get it back done.
+							</h3>
+							<p className="text-[13px] text-otto-muted">
+								Plain words in, finished work out.
+							</p>
+						</div>
+					</NeoBox>
+				</NeoReveal>
+
+				<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+					{CARDS.map((card, i) => {
+						const Art = card.art;
 						return (
-							<NeoReveal
-								key={item.title}
-								delay={Math.min(i * 70, 280)}
-								className={cn(item.wide && 'lg:col-span-2')}
-							>
+							<NeoReveal key={card.title} delay={120 + i * 60}>
 								<NeoBox
+									tone="surface"
+									accent={card.tone}
 									elevation="md"
 									interactive
-									tone="surface"
-									accent={item.tone}
-									className="flex h-full flex-col gap-4 p-5 sm:p-6"
+									className="flex h-full flex-col overflow-hidden"
 								>
-									<span
-										className={cn(
-											'flex h-10 w-10 shrink-0 items-center justify-center',
-											'border-2 border-otto-border rounded-[3px]',
-											ICON_TILE[item.tone],
-										)}
-									>
-										<Icon className="h-5 w-5" />
-									</span>
-
-									<div className="flex-1">
-										<h3 className="text-[17px] font-semibold leading-snug tracking-tight text-otto-text">
-											{item.title}
+									<div className="np-grid-bg np-edge-b bg-otto-card px-5 py-6">
+										<Art className="h-auto w-full" />
+									</div>
+									<div className="flex flex-1 flex-col gap-1.5 p-5">
+										<h3 className="text-[15px] font-semibold tracking-tight text-otto-text">
+											{card.title}
 										</h3>
-										<p className="mt-2 text-[13px] leading-relaxed text-otto-muted">
-											{item.body}
+										<p className="text-[13px] leading-relaxed text-otto-muted">
+											{card.line}
 										</p>
 									</div>
-
-									<code className="block overflow-x-auto whitespace-nowrap border-2 border-otto-border bg-otto-card px-2.5 py-1.5 text-[11px] text-otto-muted rounded-[3px]">
-										<span className="select-none text-otto-dim">$ </span>
-										{item.cmd}
-									</code>
 								</NeoBox>
 							</NeoReveal>
 						);

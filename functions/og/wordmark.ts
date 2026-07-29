@@ -132,6 +132,8 @@ export const WORDMARK_PAD = PAD;
 export const WORDMARK_ASCENDER_TOP = ASCENDER_TOP;
 export const WORDMARK_WIDTH = WORD_WIDTH;
 export const WORDMARK_HEIGHT = BASELINE - ASCENDER_TOP;
+/** x-height in grid units, for setting type on the wordmark's own metrics. */
+export const WORDMARK_X_HEIGHT = BASELINE - X_HEIGHT_TOP;
 
 export type WordmarkLetter = 'o1' | 't1' | 't2' | 'o2';
 
