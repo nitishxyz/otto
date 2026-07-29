@@ -2,10 +2,9 @@
  * Geometry for the custom-drawn "otto" wordmark, mirroring
  * `apps/landing/src/components/neopop/NeoOttoLogo.tsx`.
  *
- * The landing component paints with CSS custom properties and Tailwind, neither
- * of which Satori resolves, so the maths lives here too. Keep the metric grid
- * and the two glyph builders in sync with that file; the paths are emitted with
- * their offset baked in so no `transform` is needed on the rendered groups.
+ * The landing component paints with CSS custom properties, which Satori does
+ * not resolve, so the palette is re-declared on the OG side. The geometry is
+ * identical — keep the metric grid and the two glyph builders in sync.
  */
 
 type Point = [number, number];
@@ -17,9 +16,7 @@ const ASCENDER_TOP = 8;
 const WEIGHT = 10;
 const O_WIDTH = 40;
 const GAP = 12;
-
-export const WORDMARK_PAD = 2;
-export const WORDMARK_ASCENDER_TOP = ASCENDER_TOP;
+const PAD = 2;
 
 /** Crossbar sits on the x-height line so `t` and `o` share a shoulder. */
 const CROSS_TOP = X_HEIGHT_TOP;
@@ -72,54 +69,51 @@ function rect(x: number, y: number, w: number, h: number): Point[] {
 	];
 }
 
-/** Outer ring of the square-countered `o`. */
-function oOuter(x: number, dy: number): string {
-	return roundedPolygon(
-		rect(x, X_HEIGHT_TOP + dy, O_WIDTH, BASELINE - X_HEIGHT_TOP),
+/** Square-countered `o`: outer ring plus a reversed counter, drawn even-odd. */
+function oGlyph(x: number): string {
+	const outer = roundedPolygon(
+		rect(x, X_HEIGHT_TOP, O_WIDTH, BASELINE - X_HEIGHT_TOP),
 		7,
 	);
-}
-
-/** Counter of the `o`, drawn as its own shape so no fill rule is needed. */
-function oCounter(x: number, dy: number): string {
-	return roundedPolygon(
+	const counter = roundedPolygon(
 		rect(
 			x + WEIGHT,
-			X_HEIGHT_TOP + WEIGHT + dy,
+			X_HEIGHT_TOP + WEIGHT,
 			O_WIDTH - WEIGHT * 2,
 			BASELINE - X_HEIGHT_TOP - WEIGHT * 2,
 		),
 		3,
 	);
+	return `${outer} ${counter}`;
 }
 
 /**
  * Single-outline `t`: ascending stem, a short crossbar weighted to the right,
  * and an L-shaped foot that turns right on the baseline.
  */
-function tGlyph(stemX: number, dy: number): string {
+function tGlyph(stemX: number): string {
 	const stemRight = stemX + WEIGHT;
 	const barRight = stemRight + CROSS_RIGHT_ARM;
 	const barLeft = stemX - CROSS_LEFT_ARM;
 	const footRight = stemRight + FOOT_WIDTH;
-	const footTop = BASELINE - WEIGHT + dy;
+	const footTop = BASELINE - WEIGHT;
 
 	return roundedPolygon(
 		[
-			[stemX, ASCENDER_TOP + dy],
-			[stemRight, ASCENDER_TOP + dy],
-			[stemRight, CROSS_TOP + dy],
-			[barRight, CROSS_TOP + dy],
-			[barRight, CROSS_BOTTOM + dy],
-			[stemRight, CROSS_BOTTOM + dy],
+			[stemX, ASCENDER_TOP],
+			[stemRight, ASCENDER_TOP],
+			[stemRight, CROSS_TOP],
+			[barRight, CROSS_TOP],
+			[barRight, CROSS_BOTTOM],
+			[stemRight, CROSS_BOTTOM],
 			[stemRight, footTop],
 			[footRight, footTop],
-			[footRight, BASELINE + dy],
-			[stemX, BASELINE + dy],
-			[stemX, CROSS_BOTTOM + dy],
-			[barLeft, CROSS_BOTTOM + dy],
-			[barLeft, CROSS_TOP + dy],
-			[stemX, CROSS_TOP + dy],
+			[footRight, BASELINE],
+			[stemX, BASELINE],
+			[stemX, CROSS_BOTTOM],
+			[barLeft, CROSS_BOTTOM],
+			[barLeft, CROSS_TOP],
+			[stemX, CROSS_TOP],
 		],
 		3,
 	);
@@ -132,37 +126,22 @@ const T_TWO_STEM = T_ONE_RIGHT + GAP + CROSS_LEFT_ARM;
 const T_TWO_RIGHT = T_TWO_STEM + WEIGHT + Math.max(CROSS_RIGHT_ARM, FOOT_WIDTH);
 const O_TWO_X = T_TWO_RIGHT + GAP;
 
-export const WORDMARK_WIDTH = O_TWO_X + O_WIDTH;
+const WORD_WIDTH = O_TWO_X + O_WIDTH;
+
+export const WORDMARK_PAD = PAD;
+export const WORDMARK_ASCENDER_TOP = ASCENDER_TOP;
+export const WORDMARK_WIDTH = WORD_WIDTH;
 export const WORDMARK_HEIGHT = BASELINE - ASCENDER_TOP;
 
 export type WordmarkLetter = 'o1' | 't1' | 't2' | 'o2';
 
-export interface WordmarkShape {
-	key: string;
-	letter: WordmarkLetter;
+export const WORDMARK_LETTERS: Array<{
+	key: WordmarkLetter;
 	d: string;
-	/** Counters are knocked out with the page background, not a fill rule. */
-	counter: boolean;
-}
-
-/** Every shape of the wordmark, shifted by `dx`/`dy` grid units. */
-export function wordmarkShapes(dx = 0, dy = 0): WordmarkShape[] {
-	return [
-		{ key: 'o1', letter: 'o1', d: oOuter(O_ONE_X + dx, dy), counter: false },
-		{
-			key: 'o1c',
-			letter: 'o1',
-			d: oCounter(O_ONE_X + dx, dy),
-			counter: true,
-		},
-		{ key: 't1', letter: 't1', d: tGlyph(T_ONE_STEM + dx, dy), counter: false },
-		{ key: 't2', letter: 't2', d: tGlyph(T_TWO_STEM + dx, dy), counter: false },
-		{ key: 'o2', letter: 'o2', d: oOuter(O_TWO_X + dx, dy), counter: false },
-		{
-			key: 'o2c',
-			letter: 'o2',
-			d: oCounter(O_TWO_X + dx, dy),
-			counter: true,
-		},
-	];
-}
+	evenOdd: boolean;
+}> = [
+	{ key: 'o1', d: oGlyph(O_ONE_X), evenOdd: true },
+	{ key: 't1', d: tGlyph(T_ONE_STEM), evenOdd: false },
+	{ key: 't2', d: tGlyph(T_TWO_STEM), evenOdd: false },
+	{ key: 'o2', d: oGlyph(O_TWO_X), evenOdd: true },
+];

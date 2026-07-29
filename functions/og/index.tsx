@@ -3,10 +3,10 @@ import { Resvg } from '@resvg/resvg-js';
 import {
 	WORDMARK_ASCENDER_TOP,
 	WORDMARK_HEIGHT,
+	WORDMARK_LETTERS,
 	WORDMARK_PAD,
 	WORDMARK_WIDTH,
 	type WordmarkLetter,
-	wordmarkShapes,
 } from './wordmark';
 
 export interface OGRequest {
@@ -152,12 +152,34 @@ const np = {
 	grid: 'rgba(92,92,102,0.13)',
 };
 
-/** Per-letter palette, matching `POP_FILL` in `NeoOttoLogo`. */
+/**
+ * Shade each accent casts, matching `--np-*-cast`. Deep enough to separate
+ * from the fill, so the extrusion reads as a solid offset rather than a blur.
+ */
+const npCast = {
+	blue: '#283c8c',
+	lime: '#346852',
+	yellow: '#9e6a0c',
+	coral: '#84241f',
+};
+
+/**
+ * Per-letter palette, matching `POP_FILL` in `NeoOttoLogo`: the repeated `tt`
+ * shares one colour so the pair reads as a unit, and the two `o`s bracket the
+ * word with the primary blue and lime.
+ */
 const WORDMARK_FILL: Record<WordmarkLetter, string> = {
 	o1: np.blue,
 	t1: np.coral,
 	t2: np.coral,
 	o2: np.lime,
+};
+
+const WORDMARK_CAST: Record<WordmarkLetter, string> = {
+	o1: npCast.blue,
+	t1: npCast.coral,
+	t2: npCast.coral,
+	o2: npCast.lime,
 };
 
 const OTTO_WORDMARK_PATH =
@@ -311,9 +333,8 @@ function NeoGrid() {
 
 /**
  * The custom-drawn wordmark: every glyph painted twice, once as a hard offset
- * extrusion and once as the front face with the 2px NeoPop edge. Counters are
- * knocked out with the background rather than an even-odd fill rule, which
- * Satori does not honour.
+ * extrusion in a shade of its own fill and once as the front face. Unstroked
+ * on both layers, so the extrusion stays a clean offset rather than a halo.
  */
 function NeoWordmark({
 	height = 88,
@@ -334,30 +355,29 @@ function NeoWordmark({
 			role="img"
 			aria-label="otto"
 		>
-			{wordmarkShapes(depth, depth).map((shape) => (
-				<path
-					key={`shade-${shape.key}`}
-					d={shape.d}
-					fill={shape.counter ? np.bg : np.shadow}
-					stroke={shape.counter ? 'none' : np.shadow}
-					strokeWidth={2}
-					strokeLinejoin="round"
-				/>
-			))}
-			{wordmarkShapes().map((shape) => (
-				<path
-					key={`face-${shape.key}`}
-					d={shape.d}
-					fill={shape.counter ? np.bg : WORDMARK_FILL[shape.letter]}
-					stroke={shape.counter ? 'none' : np.border}
-					strokeWidth={2}
-					strokeLinejoin="round"
-				/>
-			))}
+			<g transform={`translate(${depth} ${depth})`} stroke="none">
+				{WORDMARK_LETTERS.map((letter) => (
+					<path
+						key={`shade-${letter.key}`}
+						d={letter.d}
+						fill={WORDMARK_CAST[letter.key]}
+						fillRule={letter.evenOdd ? 'evenodd' : 'nonzero'}
+					/>
+				))}
+			</g>
+			<g stroke="none">
+				{WORDMARK_LETTERS.map((letter) => (
+					<path
+						key={`face-${letter.key}`}
+						d={letter.d}
+						fill={WORDMARK_FILL[letter.key]}
+						fillRule={letter.evenOdd ? 'evenodd' : 'nonzero'}
+					/>
+				))}
+			</g>
 		</svg>
 	);
 }
-
 export function renderLandingOG() {
 	return (
 		<div
@@ -377,7 +397,8 @@ export function renderLandingOG() {
 		>
 			<NeoGrid />
 
-			<NeoWordmark height={104} />
+			{/* Depth matches the hero's default, so the mark reads identically. */}
+			<NeoWordmark height={120} depth={3} />
 
 			<div
 				style={{
