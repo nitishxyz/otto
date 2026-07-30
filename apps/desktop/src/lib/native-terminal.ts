@@ -145,24 +145,53 @@ export interface NativeTerminalOutputBatcher {
 	dispose(): void;
 }
 
+export interface NativeTerminalOutputBatcherTimers {
+	schedule: (callback: () => void, delayMs: number) => number;
+	cancel: (id: number) => void;
+	now: () => number;
+}
+
+export interface NativeTerminalOutputBatcherOptions {
+	/** Replay flushes after this quiet gap between history chunks. */
+	quietMs?: number;
+	/** Replay force-flushes after this total duration. */
+	maxMs?: number;
+	timers?: NativeTerminalOutputBatcherTimers;
+}
+
+const defaultBatcherTimers: NativeTerminalOutputBatcherTimers = {
+	schedule: (callback, delayMs) => window.setTimeout(callback, delayMs),
+	cancel: (id) => window.clearTimeout(id),
+	now: () => performance.now(),
+};
+
 /**
- * Coalesces only the initial WebSocket history burst. Once that first browser
- * frame is flushed, steady-state PTY output is delivered immediately.
+ * Coalesces the initial history replay into one atomic delivery. Remote
+ * daemons stream history across many frames over time, so replay batching is
+ * quiet-window based rather than single-frame. After the replay flush,
+ * steady-state PTY output is delivered immediately.
  */
 export function createNativeTerminalOutputBatcher(
 	deliver: (data: string) => void,
-	schedule: (callback: () => void) => number,
-	cancel: (id: number) => void,
+	options: NativeTerminalOutputBatcherOptions = {},
 ): NativeTerminalOutputBatcher {
+	const quietMs = options.quietMs ?? 48;
+	const maxMs = options.maxMs ?? 750;
+	const timers = options.timers ?? defaultBatcherTimers;
 	let replaying = true;
 	let pending = '';
 	let scheduled: number | null = null;
+	let replayStartedAt = timers.now();
 
-	const flush = () => {
+	const clearScheduled = () => {
 		if (scheduled !== null) {
-			cancel(scheduled);
+			timers.cancel(scheduled);
 			scheduled = null;
 		}
+	};
+
+	const flush = () => {
+		clearScheduled();
 		replaying = false;
 		const output = pending;
 		pending = '';
@@ -171,10 +200,10 @@ export function createNativeTerminalOutputBatcher(
 
 	return {
 		beginReplay() {
-			if (scheduled !== null) cancel(scheduled);
+			clearScheduled();
 			replaying = true;
 			pending = '';
-			scheduled = null;
+			replayStartedAt = timers.now();
 		},
 		push(data) {
 			if (!data) return;
@@ -183,12 +212,16 @@ export function createNativeTerminalOutputBatcher(
 				return;
 			}
 			pending += data;
-			scheduled ??= schedule(flush);
+			if (timers.now() - replayStartedAt >= maxMs) {
+				flush();
+				return;
+			}
+			clearScheduled();
+			scheduled = timers.schedule(flush, quietMs);
 		},
 		flush,
 		dispose() {
-			if (scheduled !== null) cancel(scheduled);
-			scheduled = null;
+			clearScheduled();
 			pending = '';
 			replaying = false;
 		},

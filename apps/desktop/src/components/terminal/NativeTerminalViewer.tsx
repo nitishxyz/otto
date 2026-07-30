@@ -373,37 +373,45 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			setError(cause instanceof Error ? cause.message : String(cause));
 		};
 
+		// Chunks arriving while a native feed is in flight merge into the next
+		// feed, so heavy output costs one IPC per drain instead of one per chunk.
+		let liveOutputBuffer = '';
+		const sendPtyWrites = (ptyWrites: number[]) => {
+			if (
+				ptyWrites.length > 0 &&
+				socketRef.current?.readyState === WebSocket.OPEN
+			) {
+				socketRef.current.send(
+					terminalDecoder.decode(new Uint8Array(ptyWrites)),
+				);
+			}
+		};
 		const feedOutput = (message: string) => {
 			if (!message || disposed) return;
+			const drainPending = liveOutputBuffer.length > 0;
+			liveOutputBuffer += message;
+			if (drainPending) return;
 			void enqueue(async () => {
-				if (disposed) return;
-				if (gpuActiveRef.current) {
-					const result = await feedNativeTerminalGpu(
-						nativeSessionId,
-						encoder.encode(message),
-					);
-					if (
-						result.ptyWrites.length > 0 &&
-						socketRef.current?.readyState === WebSocket.OPEN
-					) {
-						socketRef.current.send(
-							terminalDecoder.decode(new Uint8Array(result.ptyWrites)),
+				while (liveOutputBuffer && !disposed) {
+					const chunk = liveOutputBuffer;
+					liveOutputBuffer = '';
+					if (gpuActiveRef.current) {
+						const result = await feedNativeTerminalGpu(
+							nativeSessionId,
+							encoder.encode(chunk),
 						);
+						sendPtyWrites(result.ptyWrites);
+					} else {
+						const update = await feedNativeTerminal(
+							nativeSessionId,
+							encoder.encode(chunk),
+						);
+						if (!disposed) applyUpdate(update);
 					}
-					return;
 				}
-				const update = await feedNativeTerminal(
-					nativeSessionId,
-					encoder.encode(message),
-				);
-				if (!disposed) applyUpdate(update);
 			}).catch(fail);
 		};
-		const outputBatcher = createNativeTerminalOutputBatcher(
-			feedOutput,
-			(callback) => window.requestAnimationFrame(callback),
-			(id) => window.cancelAnimationFrame(id),
-		);
+		const outputBatcher = createNativeTerminalOutputBatcher(feedOutput);
 
 		const processOutput = (message: string) => {
 			if (disposed) return;
@@ -559,6 +567,10 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			});
 			window.addEventListener('resize', syncSurface);
 			window.addEventListener('scroll', syncSurface, true);
+			// Clicking the webview raises the owner window above the GPU overlay
+			// child; re-assert overlay order on any pointer or focus activity.
+			window.addEventListener('pointerdown', syncSurface, true);
+			window.addEventListener('focus', syncSurface);
 			if (!overlayFollowsOwner) {
 				void getCurrentWindow()
 					.onMoved(syncSurface)
@@ -610,11 +622,14 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			disposed = true;
 			gpuActiveRef.current = false;
 			outputBatcher.dispose();
+			liveOutputBuffer = '';
 			resizeObserver?.disconnect();
 			overlayObserver?.disconnect();
 			unlistenMoved?.();
 			window.removeEventListener('resize', syncSurface);
 			window.removeEventListener('scroll', syncSurface, true);
+			window.removeEventListener('pointerdown', syncSurface, true);
+			window.removeEventListener('focus', syncSurface);
 			if (reconnectTimerRef.current !== null) {
 				window.clearTimeout(reconnectTimerRef.current);
 				reconnectTimerRef.current = null;

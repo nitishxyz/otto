@@ -64,27 +64,68 @@ describe('native desktop terminal', () => {
 		expect(dark.foreground).not.toEqual(light.foreground);
 	});
 
-	test('batches startup history but delivers live output immediately', () => {
+	test('batches spread-out history replay but delivers live output immediately', () => {
 		const delivered: string[] = [];
-		const scheduled = new Map<number, () => void>();
+		const scheduled = new Map<number, { callback: () => void; at: number }>();
 		let nextId = 1;
-		const batcher = createNativeTerminalOutputBatcher(
-			(data) => delivered.push(data),
-			(callback) => {
+		let clock = 0;
+		const timers = {
+			schedule(callback: () => void, delayMs: number) {
 				const id = nextId++;
-				scheduled.set(id, callback);
+				scheduled.set(id, { callback, at: clock + delayMs });
 				return id;
 			},
-			(id) => scheduled.delete(id),
+			cancel(id: number) {
+				scheduled.delete(id);
+			},
+			now: () => clock,
+		};
+		const advance = (ms: number) => {
+			clock += ms;
+			for (const [id, entry] of [...scheduled]) {
+				if (entry.at <= clock) {
+					scheduled.delete(id);
+					entry.callback();
+				}
+			}
+		};
+		const batcher = createNativeTerminalOutputBatcher(
+			(data) => delivered.push(data),
+			{ quietMs: 48, maxMs: 750, timers },
 		);
 
+		// Remote daemons stream history chunks across time; a quiet gap shorter
+		// than quietMs keeps coalescing them into one delivery.
 		batcher.push('old-1');
+		advance(20);
 		batcher.push('old-2');
+		advance(20);
+		batcher.push('old-3');
 		expect(delivered).toEqual([]);
-		for (const callback of scheduled.values()) callback();
-		expect(delivered).toEqual(['old-1old-2']);
+		advance(48);
+		expect(delivered).toEqual(['old-1old-2old-3']);
 		batcher.push('live');
-		expect(delivered).toEqual(['old-1old-2', 'live']);
+		expect(delivered).toEqual(['old-1old-2old-3', 'live']);
+	});
+
+	test('replay batching force-flushes long continuous output streams', () => {
+		const delivered: string[] = [];
+		let clock = 0;
+		const timers = {
+			schedule: () => 1,
+			cancel: () => undefined,
+			now: () => clock,
+		};
+		const batcher = createNativeTerminalOutputBatcher(
+			(data) => delivered.push(data),
+			{ quietMs: 48, maxMs: 750, timers },
+		);
+		batcher.push('start');
+		clock = 800;
+		batcher.push('more');
+		expect(delivered).toEqual(['startmore']);
+		batcher.push('live');
+		expect(delivered).toEqual(['startmore', 'live']);
 	});
 
 	test('maps standard desktop terminal shortcuts', () => {
