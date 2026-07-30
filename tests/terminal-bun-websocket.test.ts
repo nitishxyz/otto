@@ -173,7 +173,9 @@ describe('actual Bun terminal WebSocket lifecycle', () => {
 	});
 
 	test('frames buffered history explicitly for native desktop clients', async () => {
-		const project = await mkdtemp(join(tmpdir(), 'otto-terminal-framed-history-'));
+		const project = await mkdtemp(
+			join(tmpdir(), 'otto-terminal-framed-history-'),
+		);
 		roots.push(project);
 		const { server, baseUrl } = await startServer(project);
 		try {
