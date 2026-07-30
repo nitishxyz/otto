@@ -5,7 +5,6 @@ use commands::server::ServerState;
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::Emitter;
-#[cfg(target_os = "linux")]
 use tauri::Manager;
 
 #[cfg(target_os = "macos")]
@@ -118,12 +117,21 @@ pub fn run() {
                 .id("check_for_updates")
                 .build(app)?;
 
+            // Custom Close item: the predefined close_window() accelerator
+            // fires natively before the webview sees Cmd+W, which would close
+            // the window even when a viewer tab should be closed instead. The
+            // frontend closes the active tab or asks the window to close.
+            let close_window = MenuItemBuilder::new("Close Window")
+                .id("close_window")
+                .accelerator("CmdOrCtrl+W")
+                .build(app)?;
+
             let file_menu = SubmenuBuilder::new(app, "File")
                 .item(&new_window)
                 .separator()
                 .item(&check_updates)
                 .separator()
-                .close_window()
+                .item(&close_window)
                 .quit()
                 .build()?;
 
@@ -167,6 +175,14 @@ pub fn run() {
                 });
             } else if event.id().as_ref() == "check_for_updates" {
                 let _ = app.emit("menu-check-for-updates", ());
+            } else if event.id().as_ref() == "close_window" {
+                let focused = app
+                    .webview_windows()
+                    .into_values()
+                    .find(|window| window.is_focused().unwrap_or(false));
+                if let Some(window) = focused {
+                    let _ = app.emit_to(window.label(), "menu-close-request", ());
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![

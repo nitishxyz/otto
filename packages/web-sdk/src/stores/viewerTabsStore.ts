@@ -286,6 +286,14 @@ export function terminalViewerTabId(terminalId: string): string {
 	return `terminal:${terminalId}`;
 }
 
+/**
+ * Cancelable window CustomEvent asking the viewer to close its active tab.
+ * Dispatchers should treat a `false` return from `window.dispatchEvent` (i.e.
+ * defaultPrevented) as "a tab consumed the close"; otherwise no tab was open
+ * and the host may close the window itself.
+ */
+export const VIEWER_CLOSE_ACTIVE_TAB_EVENT = 'otto-viewer:close-active-tab';
+
 export function modeForViewerTab(tab: ViewerTab): ViewerMode {
 	if (tab.type === 'browser') return 'preview';
 	if (tab.type === 'terminal') return 'terminal';

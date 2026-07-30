@@ -21,6 +21,7 @@ import {
 	setOwnerRenewalHandler,
 } from '@ottocode/web-sdk/lib';
 import { useViewerTabsStore } from '@ottocode/web-sdk/stores';
+import { useMenuCloseWindow } from './hooks/useMenuCloseWindow';
 import './index.css';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
 	const { theme, setTheme, toggleTheme } = useNativeDesktopTheme(
 		daemon !== null,
 	);
+	useMenuCloseWindow();
 	const ownerExpiryRef = useRef<number | undefined>(undefined);
 	ownerExpiryRef.current = selectedProject?.machineOwnerSessionExpiresAt;
 

@@ -14,6 +14,7 @@ import {
 	hydrateViewerTab,
 	modeForViewerTab,
 	useViewerTabsStore,
+	VIEWER_CLOSE_ACTIVE_TAB_EVENT,
 	type ViewerMode,
 	type ViewerTab,
 	type ViewerTabPayloadCache,
@@ -324,7 +325,27 @@ function getFirstTabIdForMode(
 
 function useViewerTabsKeyboardShortcuts() {
 	const openNewTerminalTab = useOpenNewTerminalTab();
+	const { mutate: killTerminalById } = useKillTerminal();
 	useEffect(() => {
+		const closeActiveTab = (): boolean => {
+			const state = useViewerTabsStore.getState();
+			const activeId = state.activeTabId;
+			if (!activeId) return false;
+			const activeTab = state.tabsById[activeId];
+			if (!activeTab) return false;
+			state.closeTab(activeId);
+			if (activeTab.type === 'terminal') {
+				killTerminalById(activeTab.terminalId);
+			}
+			return true;
+		};
+
+		// Native menus (desktop) intercept Cmd/Ctrl+W before the webview sees
+		// the keydown, so the host re-dispatches it as this cancelable event.
+		const handleCloseRequest = (event: Event) => {
+			if (closeActiveTab()) event.preventDefault();
+		};
+
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (!event.metaKey && !event.ctrlKey) return;
 			const key = event.key.toLowerCase();
@@ -359,16 +380,21 @@ function useViewerTabsKeyboardShortcuts() {
 				target?.isContentEditable;
 			if (isInInput) return;
 
-			const activeId = useViewerTabsStore.getState().activeTabId;
-			if (!activeId) return;
-
+			if (!closeActiveTab()) return;
 			event.preventDefault();
-			useViewerTabsStore.getState().closeTab(activeId);
+			event.stopPropagation();
 		};
 
+		window.addEventListener(VIEWER_CLOSE_ACTIVE_TAB_EVENT, handleCloseRequest);
 		window.addEventListener('keydown', handleKeyDown, true);
-		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [openNewTerminalTab]);
+		return () => {
+			window.removeEventListener(
+				VIEWER_CLOSE_ACTIVE_TAB_EVENT,
+				handleCloseRequest,
+			);
+			window.removeEventListener('keydown', handleKeyDown, true);
+		};
+	}, [openNewTerminalTab, killTerminalById]);
 }
 
 const ViewerModeControls = memo(function ViewerModeControls() {
