@@ -46,6 +46,34 @@ pub fn get_machine_bootstrap(
         .map(|context| context.bootstrap.clone()))
 }
 
+/// Selects a remote machine for the current window, or clears the selection
+/// when returning to this computer's local projects.
+#[tauri::command]
+pub fn set_current_machine(
+    window: WebviewWindow,
+    state: tauri::State<'_, MachineWindowState>,
+    device: Option<TunnelDevice>,
+) -> Result<Option<MachineBootstrap>, String> {
+    let mut windows = state.0.lock().map_err(|error| error.to_string())?;
+    let Some(device) = device else {
+        windows.remove(window.label());
+        return Ok(None);
+    };
+    let bootstrap = MachineBootstrap {
+        device_id: device.device_id,
+        hostname: device.hostname,
+        name: device.name,
+    };
+    windows.insert(
+        window.label().to_string(),
+        MachineWindowContext {
+            bootstrap: bootstrap.clone(),
+            project_id: None,
+        },
+    );
+    Ok(Some(bootstrap))
+}
+
 /// Renderer reports which project its machine window has open (or `None`
 /// when it returns to the project picker) so duplicate open requests can
 /// reuse idle picker windows instead of focusing busy project windows.
@@ -64,7 +92,7 @@ pub fn set_machine_window_project(
 
 #[cfg(test)]
 mod tests {
-    use super::TunnelDevice;
+    use super::{MachineBootstrap, TunnelDevice};
 
     #[test]
     fn renderer_device_metadata_contains_no_credentials() {
@@ -76,6 +104,18 @@ mod tests {
             local_api_url: None,
         };
         let json = serde_json::to_string(&device).unwrap();
+        assert!(!json.contains("token"));
+        assert!(!json.contains("secret"));
+    }
+
+    #[test]
+    fn machine_bootstrap_contains_only_routing_metadata() {
+        let bootstrap = MachineBootstrap {
+            device_id: "device-1".to_string(),
+            hostname: Some("device.ottorouter.org".to_string()),
+            name: Some("Studio".to_string()),
+        };
+        let json = serde_json::to_string(&bootstrap).unwrap();
         assert!(!json.contains("token"));
         assert!(!json.contains("secret"));
     }

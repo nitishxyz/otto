@@ -3,7 +3,11 @@ import type { Hono } from 'hono';
 import { getProtocolInfo } from '../protocol.ts';
 import { getServerInfo } from '../state.ts';
 import { isDaemonTokenAuthorized } from '../tunnel-auth.ts';
-import { stageDaemonUpgrade } from '../upgrade.ts';
+import {
+	isDaemonRestartAvailable,
+	requestDaemonRestart,
+} from '../daemon-restart.ts';
+import { resolveStagedDaemonUpgrade, stageDaemonUpgrade } from '../upgrade.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
 	isOwnerSessionAuthorized,
@@ -17,6 +21,11 @@ const upgradeResponseSchema = z.object({
 	targetVersion: z.string(),
 	stagedPath: z.string(),
 	restartRequired: z.literal(true),
+});
+const restartBodySchema = z.object({ targetVersion: z.string().optional() });
+const restartResponseSchema = z.object({
+	status: z.literal('restarting'),
+	targetVersion: z.string().nullable(),
 });
 
 const serverInfoSchema = z.object({
@@ -124,6 +133,59 @@ export function registerRootRoutes(app: Hono) {
 			try {
 				return c.json(
 					await stageDaemonUpgrade(getServerInfo().version, targetVersion),
+				);
+			} catch (error) {
+				return c.json(
+					{ error: error instanceof Error ? error.message : String(error) },
+					409,
+				);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/server/restart',
+			tags: ['server'],
+			operationId: 'restartServer',
+			summary: 'Restart the managed daemon with a supervised process handoff',
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: restartBodySchema } },
+				},
+			},
+			responses: {
+				'202': {
+					description: 'Supervised daemon restart queued',
+					content: { 'application/json': { schema: restartResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			if (!isOwnerSessionAuthorized(c.req.header(OWNER_SESSION_HEADER))) {
+				return c.json({ error: 'Owner authorization required' }, 403);
+			}
+			if (!isDaemonRestartAvailable()) {
+				return c.json({ error: 'Supervised daemon restart unavailable' }, 409);
+			}
+			const { targetVersion } = restartBodySchema.parse(await c.req.json());
+			try {
+				const executable = targetVersion
+					? await resolveStagedDaemonUpgrade(
+							getServerInfo().version,
+							targetVersion,
+						)
+					: undefined;
+				requestDaemonRestart({ executable, targetVersion });
+				return c.json(
+					{
+						status: 'restarting' as const,
+						targetVersion: targetVersion ?? null,
+					},
+					202,
 				);
 			} catch (error) {
 				return c.json(

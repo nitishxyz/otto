@@ -7,6 +7,7 @@ import {
 	openProject,
 	pollOttoRouterDeviceFlow,
 	removeProvider,
+	restartServer,
 	setProjectPinned,
 	stageServerUpgrade,
 	startOttoRouterDeviceFlow,
@@ -158,6 +159,27 @@ export async function stageRemoteHostUpgrade(
 		throw new Error(detail);
 	}
 	return { stagedPath: response.data.stagedPath };
+}
+
+/** Queues a capability-gated supervised restart on the remote daemon. */
+export async function restartRemoteHost(
+	access: ReadyMachineAccess,
+	targetVersion?: string,
+): Promise<void> {
+	const response = await restartServer({
+		...remoteOptions(access),
+		body: targetVersion ? { targetVersion } : {},
+	});
+	if (response.error) {
+		const detail =
+			response.error &&
+			typeof response.error === 'object' &&
+			'error' in response.error &&
+			typeof (response.error as { error?: unknown }).error === 'string'
+				? (response.error as { error: string }).error
+				: 'The machine rejected the restart request.';
+		throw new Error(detail);
+	}
 }
 
 export async function loadMachineDevices(): Promise<MachineDeviceState> {

@@ -14,17 +14,20 @@ import {
 	getDaemonStatus,
 	openProjectOnServer,
 	readDaemonRegistration,
+	readActiveDaemonSelection,
 	removeDaemonRegistration,
 	rotateDaemonPassword,
 	startDaemon,
 	stopDaemon,
 	writeDaemonRegistration,
+	writeActiveDaemonSelection,
 	type DaemonPaths,
 	type DaemonRegistration,
 } from '../apps/cli/src/daemon.ts';
 import {
 	createSameOriginFetch,
 	serveApi,
+	spawnDaemonReplacement,
 } from '../apps/cli/src/commands/serve.ts';
 import { assetPaths } from '../apps/cli/src/web-assets.ts';
 import { createWebUIFetch } from '../apps/cli/src/web-server.ts';
@@ -111,6 +114,51 @@ describe('daemon service', () => {
 		]);
 	});
 
+	it('spawns a detached replacement with stable handoff identity and port', () => {
+		let spawnOptions: Parameters<typeof Bun.spawn>[0] | null = null;
+		let unrefCalls = 0;
+		spawnDaemonReplacement({
+			projectRoot: '/tmp/project',
+			executable: '/tmp/otto-staged',
+			port: 49_999,
+			daemonId: 'replacement-id',
+			cwd: '/tmp',
+			env: { PATH: '/bin' },
+			spawn: ((options) => {
+				spawnOptions = options;
+				return {
+					unref: () => {
+						unrefCalls++;
+					},
+				} as ReturnType<typeof Bun.spawn>;
+			}) as typeof Bun.spawn,
+		});
+
+		expect(spawnOptions).toMatchObject({
+			cmd: [
+				'/tmp/otto-staged',
+				'serve',
+				'--api-only',
+				'--no-open',
+				'--daemon-register',
+				'--port',
+				'49999',
+				'--project',
+				'/tmp/project',
+			],
+			cwd: '/tmp',
+			env: {
+				PATH: '/bin',
+				OTTO_DAEMON_ID: 'replacement-id',
+				OTTO_DAEMON_PORT: '49999',
+			},
+			stdin: 'ignore',
+			stdout: 'ignore',
+			stderr: 'ignore',
+		});
+		expect(unrefCalls).toBe(1);
+	});
+
 	it('uses the documented daemon port by default and allows env override', () => {
 		expect(getPreferredDaemonPort(undefined, {})).toBe(DEFAULT_DAEMON_PORT);
 		expect(
@@ -195,6 +243,23 @@ describe('daemon service', () => {
 		).rejects.toThrow('otto daemon failed to start on port 49123');
 
 		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('persists a verified active daemon without overriding a newer install', async () => {
+		const paths = await createDaemonPaths();
+		const activePath = join(paths.dir, 'upgrades', '1.2.4', 'otto');
+		await mkdir(join(paths.dir, 'upgrades', '1.2.4'), { recursive: true });
+		await Bun.write(activePath, 'binary');
+		await writeActiveDaemonSelection(
+			{ path: activePath, version: '1.2.4' },
+			{ paths },
+		);
+
+		expect(await readActiveDaemonSelection('1.2.3', { paths })).toEqual({
+			path: activePath,
+			version: '1.2.4',
+		});
+		expect(await readActiveDaemonSelection('1.2.5', { paths })).toBeNull();
 	});
 
 	it('stores default daemon files under global state', () => {

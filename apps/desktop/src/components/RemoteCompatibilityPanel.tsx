@@ -42,6 +42,9 @@ export function RemoteHostTooOldPanel({
 	onStageUpgrade,
 	onRecheck,
 	rechecking,
+	canRestart,
+	restarting,
+	onRestart,
 }: {
 	machineName: string;
 	hostVersion: string | null;
@@ -51,6 +54,9 @@ export function RemoteHostTooOldPanel({
 	onStageUpgrade: (targetVersion: string) => void;
 	onRecheck: () => void;
 	rechecking: boolean;
+	canRestart: boolean;
+	restarting: boolean;
+	onRestart: (targetVersion: string) => void;
 }) {
 	return (
 		<div className="px-6 py-10 text-center">
@@ -69,13 +75,30 @@ export function RemoteHostTooOldPanel({
 				<div className="mx-auto mt-5 max-w-md">
 					<p className="text-xs leading-relaxed text-foreground">
 						Upgrade v{upgrade.targetVersion} is staged on {machineName}. It has
-						not been applied: restart the otto daemon on that machine to
-						activate it.
+						not been applied yet.
 					</p>
-					<output className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-						<StableSpinner size="xs" title="Waiting for the machine" />
-						Watching for the machine to come back...
-					</output>
+					{canRestart ? (
+						<button
+							type="button"
+							onClick={() => onRestart(upgrade.targetVersion)}
+							disabled={restarting}
+							className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+						>
+							{restarting && (
+								<StableSpinner size="xs" title="Restarting daemon" />
+							)}
+							{restarting ? 'Restarting...' : 'Restart & apply update'}
+						</button>
+					) : (
+						<p className="mt-3 text-xs text-muted-foreground">
+							Restart the Otto daemon on {machineName} to activate it.
+						</p>
+					)}
+					{restarting && (
+						<output className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+							Watching for the machine to come back...
+						</output>
+					)}
 					<button
 						type="button"
 						onClick={onRecheck}

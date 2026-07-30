@@ -10,7 +10,11 @@ import { useProjects } from '../hooks/useProjects';
 import { useGitHub } from '../hooks/useGitHub';
 import { usePlatform } from '../hooks/usePlatform';
 import { DesktopDragRegion } from './DesktopDragRegion';
-import { tauriBridge, type Project } from '../lib/tauri-bridge';
+import {
+	tauriBridge,
+	type Project,
+	type TunnelDevice,
+} from '../lib/tauri-bridge';
 import { OttoWordmark } from './Icons';
 import { ProjectCard } from './ProjectCard';
 import { DeviceCodeModal } from './DeviceCodeModal';
@@ -131,8 +135,10 @@ function PickerTabList({
 
 export function ProjectPicker({
 	onSelectProject,
+	onSelectMachine,
 }: {
 	onSelectProject: (project: Project) => void;
+	onSelectMachine: (device: TunnelDevice) => Promise<void>;
 }) {
 	const { projects, loading, openProjectDialog, removeProject, togglePinned } =
 		useProjects();
@@ -676,6 +682,7 @@ export function ProjectPicker({
 											onCancelConnect={machineAccount.cancel}
 											authPhase={machineAccount.phase}
 											connectError={machineAccount.error}
+											onSelectMachine={onSelectMachine}
 										/>
 									</>
 								)}

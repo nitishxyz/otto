@@ -1,3 +1,8 @@
+import {
+	isDaemonRestartAvailable,
+	REMOTE_DAEMON_RESTART_CAPABILITY,
+} from './daemon-restart.ts';
+
 export const OTTO_PROTOCOL_VERSION = 1;
 export const OTTO_PROTOCOL_MIN_VERSION = 1;
 export const OTTO_PROTOCOL_MAX_VERSION = 1;
@@ -14,6 +19,9 @@ export function getProtocolInfo() {
 		version: OTTO_PROTOCOL_VERSION,
 		minVersion: OTTO_PROTOCOL_MIN_VERSION,
 		maxVersion: OTTO_PROTOCOL_MAX_VERSION,
-		capabilities: [...OTTO_SERVER_CAPABILITIES],
+		capabilities: [
+			...OTTO_SERVER_CAPABILITIES,
+			...(isDaemonRestartAvailable() ? [REMOTE_DAEMON_RESTART_CAPABILITY] : []),
+		],
 	};
 }

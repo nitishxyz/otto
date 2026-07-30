@@ -185,6 +185,7 @@ pub fn run() {
             commands::window::create_new_window,
             commands::window::open_machine_window,
             commands::machine::get_machine_bootstrap,
+            commands::machine::set_current_machine,
             commands::machine::set_machine_window_project,
             commands::notification::show_native_notification,
             get_initial_project,

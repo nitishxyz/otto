@@ -1,5 +1,5 @@
 import { getOttoHomeDir } from '@ottocode/sdk';
-import { chmod, mkdir, rename, rm } from 'node:fs/promises';
+import { chmod, mkdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
 export interface DaemonRegistration {
@@ -8,6 +8,11 @@ export interface DaemonRegistration {
 	url: string;
 	pid: number;
 	startedAt: number;
+}
+
+export interface ActiveDaemonSelection {
+	path: string;
+	version: string;
 }
 
 export interface DaemonHealth {
@@ -106,6 +111,61 @@ export function getDaemonPaths(): DaemonPaths {
 		registrationPath: join(dir, 'server.json'),
 		tokenPath: join(dir, 'server-token'),
 	};
+}
+
+function activeDaemonPath(
+	options?: Pick<DaemonServiceOptions, 'paths'>,
+): string {
+	return join(pathsFromOptions(options).dir, 'active-daemon.json');
+}
+
+function compareVersions(left: string, right: string): number | null {
+	if (!/^\d+\.\d+\.\d+$/.test(left) || !/^\d+\.\d+\.\d+$/.test(right)) {
+		return null;
+	}
+	const leftParts = left.split('.').map(Number);
+	const rightParts = right.split('.').map(Number);
+	for (let index = 0; index < 3; index++) {
+		const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+		if (difference !== 0) return difference;
+	}
+	return 0;
+}
+
+/** Reads a valid activated daemon binary that is at least as new as the CLI. */
+export async function readActiveDaemonSelection(
+	installedVersion: string,
+	options?: Pick<DaemonServiceOptions, 'paths'>,
+): Promise<ActiveDaemonSelection | null> {
+	try {
+		const parsed = (await Bun.file(
+			activeDaemonPath(options),
+		).json()) as Partial<ActiveDaemonSelection>;
+		if (
+			typeof parsed.path !== 'string' ||
+			typeof parsed.version !== 'string' ||
+			(compareVersions(parsed.version, installedVersion) ?? -1) < 0
+		) {
+			return null;
+		}
+		const info = await stat(parsed.path);
+		return info.isFile() ? (parsed as ActiveDaemonSelection) : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Atomically persists a health-verified activated daemon binary. */
+export async function writeActiveDaemonSelection(
+	selection: ActiveDaemonSelection,
+	options?: Pick<DaemonServiceOptions, 'paths'>,
+): Promise<void> {
+	const paths = pathsFromOptions(options);
+	await mkdir(paths.dir, { recursive: true });
+	const destination = activeDaemonPath(options);
+	const temporary = `${destination}.${process.pid}.${Date.now()}.tmp`;
+	await Bun.write(temporary, `${JSON.stringify(selection, null, 2)}\n`);
+	await rename(temporary, destination);
 }
 
 function pathsFromOptions(
@@ -252,6 +312,8 @@ export async function fetchDaemonHealth(
 export async function getDaemonStatus(
 	options: Pick<DaemonServiceOptions, 'version' | 'paths' | 'fetch'>,
 ): Promise<DaemonStatus> {
+	const active = await readActiveDaemonSelection(options.version, options);
+	const expectedVersion = active?.version ?? options.version;
 	const registration = await readDaemonRegistration(options);
 	if (!registration) return { state: 'missing' };
 	const health = await fetchDaemonHealth(registration, options);
@@ -268,8 +330,8 @@ export async function getDaemonStatus(
 		return { state: 'stale', registration, reason: 'pid mismatch' };
 	}
 	if (
-		registration.version !== options.version ||
-		health.version !== options.version
+		registration.version !== expectedVersion ||
+		health.version !== expectedVersion
 	) {
 		return { state: 'stale', registration, reason: 'version mismatch' };
 	}
@@ -405,9 +467,11 @@ export async function startDaemon(
 	const id = crypto.randomUUID();
 	const projectRoot = resolve(options.projectRoot ?? process.cwd());
 	const port = getPreferredDaemonPort(options.port);
+	const active = await readActiveDaemonSelection(options.version, options);
+	const executable = active?.path ?? process.execPath;
 	const spawnImpl = options.spawn ?? Bun.spawn;
 	const proc = spawnImpl({
-		cmd: getDaemonSpawnCommand(projectRoot, process.execPath, port),
+		cmd: getDaemonSpawnCommand(projectRoot, executable, port),
 		cwd: process.cwd(),
 		env: {
 			...process.env,

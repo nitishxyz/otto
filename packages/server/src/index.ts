@@ -315,6 +315,10 @@ export {
 	getServerPort,
 	getServerInfo,
 } from './state.ts';
+export {
+	setDaemonRestartHandler,
+	type DaemonRestartRequest,
+} from './daemon-restart.ts';
 export { shutdownProjectManager } from './runtime/projects/manager.ts';
 export {
 	restoreManagedTunnel,

@@ -12,21 +12,27 @@ import {
 import {
 	DirectoryBrowserModal,
 	StableSpinner,
+	TitleBar,
 } from '@ottocode/web-sdk/components';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { usePlatform } from '../hooks/usePlatform';
+import { useFullscreen } from '../hooks/useFullscreen';
 import {
 	forgetMachineProject,
 	loadAuthorizedMachineProjects,
 	loadMachineDirectories,
 	openMachineGeneralProject,
 	openMachineProject,
+	restartRemoteHost,
 	setMachineProjectPinned,
 	stageRemoteHostUpgrade,
 } from '../lib/machine-api';
 import { toConnectedProject } from '../lib/machine-project';
-import { assessRemoteCompatibility } from '../lib/remote-compatibility';
+import {
+	assessRemoteCompatibility,
+	REMOTE_RESTART_CAPABILITY,
+} from '../lib/remote-compatibility';
 import type {
 	MachineBootstrap,
 	MachineProject,
@@ -34,7 +40,7 @@ import type {
 	Project,
 } from '../lib/tauri-bridge';
 import { tauriBridge } from '../lib/tauri-bridge';
-import { DesktopDragRegion } from './DesktopDragRegion';
+import { handleTitleBarDrag } from '../utils/title-bar';
 import { OttoWordmark } from './Icons';
 import { ProjectCard } from './ProjectCard';
 import {
@@ -68,10 +74,12 @@ export function ConnectedProjectPicker({
 	machine,
 	localDaemonUrl,
 	onSelectProject,
+	onLeaveMachine,
 }: {
 	machine: MachineBootstrap;
 	localDaemonUrl: string;
 	onSelectProject: (project: Project) => void;
+	onLeaveMachine: () => Promise<void>;
 }) {
 	const [access, setAccess] = useState<MachineProjectAccess | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -81,12 +89,14 @@ export function ConnectedProjectPicker({
 		phase: 'idle',
 	});
 	const [rechecking, setRechecking] = useState(false);
+	const [restartingUpgrade, setRestartingUpgrade] = useState(false);
 	const [actionBusy, setActionBusy] = useState<RemoteAction>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [browserOpen, setBrowserOpen] = useState(false);
 	const [projectSearch, setProjectSearch] = useState('');
 	const renewingRef = useRef(false);
 	const platform = usePlatform();
+	const isFullscreen = useFullscreen();
 	const navigate = useNavigate();
 	const machineName = machine.name || machine.hostname || 'Otto machine';
 
@@ -131,6 +141,10 @@ export function ConnectedProjectPicker({
 		? assessRemoteCompatibility(ready.serverInfo, machineName, clientRelease)
 		: null;
 	const ownerSessionExpiresAt = ready?.ownerSessionExpiresAt ?? null;
+	const canRestartRemote =
+		ready?.serverInfo?.protocol?.capabilities?.includes(
+			REMOTE_RESTART_CAPABILITY,
+		) ?? false;
 
 	// Keep the owner session valid while the landing stays open: force a broker
 	// refresh shortly before expiry so entering a project never starts with a
@@ -206,6 +220,24 @@ export function ConnectedProjectPicker({
 			setRechecking(false);
 		}
 	}, [loadProjects]);
+
+	const restartStagedUpgrade = useCallback(
+		async (targetVersion: string) => {
+			if (!ready || restartingUpgrade) return;
+			setRestartingUpgrade(true);
+			try {
+				await restartRemoteHost(ready, targetVersion);
+			} catch (cause) {
+				setUpgrade({
+					phase: 'error',
+					targetVersion,
+					message: describeError(cause),
+				});
+				setRestartingUpgrade(false);
+			}
+		},
+		[ready, restartingUpgrade],
+	);
 
 	const enterProject = useCallback(
 		(project: MachineProject, current: ReadyAccess) => {
@@ -336,22 +368,27 @@ export function ConnectedProjectPicker({
 
 	return (
 		<div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-			<DesktopDragRegion className="relative flex h-12 shrink-0 cursor-default select-none items-center border-b border-border/50 px-4">
-				<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-					<OttoWordmark height={16} className="text-foreground" />
-				</div>
-				<div className="ml-auto flex items-center gap-2">
-					<button
-						type="button"
-						onClick={() => navigate({ to: '/settings' })}
-						className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						title="Settings"
-					>
-						<Settings className="h-4 w-4" aria-hidden="true" />
-					</button>
-					{platform === 'linux' && <WindowControls />}
-				</div>
-			</DesktopDragRegion>
+			<TitleBar
+				onMouseDown={handleTitleBarDrag}
+				dragRegion
+				leadingInset={platform === 'macos' && !isFullscreen}
+				onBack={() => void onLeaveMachine()}
+				showSidebarToggle={false}
+				title={<OttoWordmark height={16} className="text-foreground" />}
+				trailing={
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={() => navigate({ to: '/settings' })}
+							className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							title="Settings"
+						>
+							<Settings className="h-4 w-4" aria-hidden="true" />
+						</button>
+						{platform === 'linux' && <WindowControls />}
+					</div>
+				}
+			/>
 
 			<main className="flex-1 overflow-y-auto">
 				<div className="relative flex min-h-full flex-col">
@@ -460,6 +497,11 @@ export function ConnectedProjectPicker({
 											}
 											onRecheck={() => void recheckCompatibility()}
 											rechecking={rechecking}
+											canRestart={canRestartRemote}
+											restarting={restartingUpgrade}
+											onRestart={(targetVersion) =>
+												void restartStagedUpgrade(targetVersion)
+											}
 										/>
 									)}
 									{!loading && gate?.kind === 'client-too-old' && (
@@ -473,7 +515,7 @@ export function ConnectedProjectPicker({
 
 							{showProjects && (
 								<>
-									<div className="mx-auto mb-8 grid w-full max-w-md grid-cols-2 gap-3">
+									<div className="mx-auto mb-8 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
 										<button
 											type="button"
 											onClick={() => {
@@ -519,6 +561,25 @@ export function ConnectedProjectPicker({
 												</div>
 												<div className="mt-0.5 text-xs text-muted-foreground/60">
 													No project
+												</div>
+											</div>
+										</button>
+
+										<button
+											type="button"
+											onClick={() => navigate({ to: '/machine-settings' })}
+											disabled={actionBusy !== null}
+											className="group flex flex-col items-center gap-3 rounded-xl border border-border/50 p-5 text-center transition-all duration-150 hover:border-border hover:bg-muted/30 disabled:opacity-60"
+										>
+											<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/60 transition-colors group-hover:bg-muted">
+												<Settings className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
+											</div>
+											<div>
+												<div className="text-sm font-medium text-foreground">
+													Machine
+												</div>
+												<div className="mt-0.5 text-xs text-muted-foreground/60">
+													Settings & updates
 												</div>
 											</div>
 										</button>

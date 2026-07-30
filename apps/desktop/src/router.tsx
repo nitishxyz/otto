@@ -13,6 +13,7 @@ import { NativeOnboarding } from './components/onboarding/NativeOnboarding';
 import { ConnectedProjectPicker } from './components/ConnectedProjectPicker';
 import { ProjectPicker } from './components/ProjectPicker';
 import { DesktopSettings } from './components/DesktopSettings';
+import { RemoteMachineSettings } from './components/RemoteMachineSettings';
 import { Workspace } from './components/Workspace';
 import { OttoRouterLoader } from './components/OttoRouterLoader';
 import { useStartupMessage } from './hooks/useStartupMessage';
@@ -21,6 +22,7 @@ import type {
 	MachineBootstrap,
 	Project,
 	ServerInfo,
+	TunnelDevice,
 } from './lib/tauri-bridge';
 import { DesktopThemeContext, type DesktopThemeContextValue } from './theme';
 
@@ -31,6 +33,8 @@ export interface DesktopRouterContext extends DesktopThemeContextValue {
 	cliSelection: CliSelectionInfo | null;
 	selectedProject: Project | null;
 	onSelectProject: (project: Project) => void;
+	onSelectMachine: (device: TunnelDevice) => Promise<void>;
+	onLeaveMachine: () => Promise<void>;
 	onBackToProjects: () => void | Promise<void>;
 	onOnboardingComplete: () => void;
 	onStartDaemon: () => Promise<void>;
@@ -59,6 +63,12 @@ const projectsRoute = createRoute({
 	getParentRoute: () => rootRoute,
 	path: 'projects',
 	component: ProjectsRouteComponent,
+});
+
+const machineSettingsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: 'machine-settings',
+	component: MachineSettingsRouteComponent,
 });
 
 const settingsRoute = createRoute({
@@ -108,6 +118,7 @@ const routeTree = rootRoute.addChildren([
 	onboardingRoute,
 	projectsRoute,
 	settingsRoute,
+	machineSettingsRoute,
 	workspaceRoute.addChildren([
 		sessionsRoute,
 		sessionDetailRoute,
@@ -127,6 +138,8 @@ const defaultRouterContext: DesktopRouterContext = {
 	setTheme: () => {},
 	toggleTheme: () => {},
 	onSelectProject: () => {},
+	onSelectMachine: async () => {},
+	onLeaveMachine: async () => {},
 	onBackToProjects: () => {},
 	onOnboardingComplete: () => {},
 	onStartDaemon: async () => {},
@@ -186,17 +199,32 @@ function OnboardingRouteComponent() {
 }
 
 function ProjectsRouteComponent() {
-	const { daemon, machine, onSelectProject } = rootRoute.useRouteContext();
+	const { daemon, machine, onSelectProject, onSelectMachine, onLeaveMachine } =
+		rootRoute.useRouteContext();
 	if (machine && daemon) {
 		return (
 			<ConnectedProjectPicker
 				machine={machine}
 				localDaemonUrl={daemon.url}
 				onSelectProject={onSelectProject}
+				onLeaveMachine={onLeaveMachine}
 			/>
 		);
 	}
-	return <ProjectPicker onSelectProject={onSelectProject} />;
+	return (
+		<ProjectPicker
+			onSelectProject={onSelectProject}
+			onSelectMachine={onSelectMachine}
+		/>
+	);
+}
+
+function MachineSettingsRouteComponent() {
+	const { daemon, machine } = rootRoute.useRouteContext();
+	if (!machine || !daemon) return <Navigate to="/projects" replace />;
+	return (
+		<RemoteMachineSettings machine={machine} localDaemonUrl={daemon.url} />
+	);
 }
 
 function SettingsRouteComponent() {

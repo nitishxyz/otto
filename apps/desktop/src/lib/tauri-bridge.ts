@@ -69,6 +69,8 @@ export interface MachineProject {
 
 export interface MachineServerInfo {
 	version: string | null;
+	pid?: number;
+	startedAt?: number;
 	protocol?: {
 		version: number;
 		minVersion: number;
@@ -109,8 +111,8 @@ export const tauriBridge = {
 		invoke('show_native_notification', { notification }),
 
 	createNewWindow: () => invoke('create_new_window'),
-	openMachineWindow: (device: TunnelDevice) =>
-		invoke('open_machine_window', { device }),
+	setCurrentMachine: (device: TunnelDevice | null) =>
+		invoke<MachineBootstrap | null>('set_current_machine', { device }),
 	getMachineBootstrap: () =>
 		invoke<MachineBootstrap | null>('get_machine_bootstrap'),
 	setMachineWindowProject: (projectId: string | null) =>

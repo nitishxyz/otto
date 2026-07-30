@@ -6,14 +6,23 @@ import {
 	setDefaultProjectRoot,
 	setServerPort,
 	setServerVersion,
+	setDaemonRestartHandler,
 	restoreManagedTunnel,
 	shutdownActiveTunnels,
 	shutdownProjectManager,
 	bunWebSocket,
+	type DaemonRestartRequest,
 } from '@ottocode/server';
 import { getDb } from '@ottocode/database';
 import { startTunnel } from '@ottocode/api';
-import { DEFAULT_DAEMON_PORT, parseDaemonPort } from '../daemon.ts';
+import {
+	DEFAULT_DAEMON_PORT,
+	fetchDaemonHealth,
+	getDaemonSpawnCommand,
+	parseDaemonPort,
+	readDaemonRegistration,
+	writeActiveDaemonSelection,
+} from '../daemon.ts';
 import { createWebServer, createWebUIFetch } from '../web-server.ts';
 import { colors } from '../ui.ts';
 
@@ -84,6 +93,73 @@ async function ensureProjectStorage(projectRoot: string) {
 
 async function activateProject(projectRoot: string): Promise<void> {
 	await ensureProjectStorage(projectRoot);
+}
+
+/** Spawns the detached successor after the current daemon releases its port. */
+export function spawnDaemonReplacement(options: {
+	projectRoot: string;
+	executable: string;
+	port: number;
+	daemonId: string;
+	spawn?: typeof Bun.spawn;
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
+}): ReturnType<typeof Bun.spawn> {
+	const spawn = options.spawn ?? Bun.spawn;
+	const proc = spawn({
+		cmd: getDaemonSpawnCommand(
+			options.projectRoot,
+			options.executable,
+			options.port,
+		),
+		cwd: options.cwd ?? process.cwd(),
+		env: {
+			...(options.env ?? process.env),
+			OTTO_DAEMON_ID: options.daemonId,
+			OTTO_DAEMON_PORT: String(options.port),
+		},
+		stdin: 'ignore',
+		stdout: 'ignore',
+		stderr: 'ignore',
+	});
+	proc.unref();
+	return proc;
+}
+
+/** Waits until the successor owns registration and answers authenticated health. */
+export async function waitForDaemonReplacement(options: {
+	process: ReturnType<typeof Bun.spawn>;
+	daemonId: string;
+	version: string;
+	timeoutMs?: number;
+	sleep?: (ms: number) => Promise<void>;
+}): Promise<void> {
+	let exited = false;
+	void options.process.exited.then(() => {
+		exited = true;
+	});
+	const deadline = Date.now() + (options.timeoutMs ?? 15_000);
+	const sleep = options.sleep ?? Bun.sleep;
+	while (Date.now() < deadline) {
+		if (exited) throw new Error('Replacement daemon exited before startup');
+		const registration = await readDaemonRegistration();
+		if (
+			registration?.id === options.daemonId &&
+			registration.pid === options.process.pid &&
+			registration.version === options.version
+		) {
+			const health = await fetchDaemonHealth(registration);
+			if (
+				health?.daemonId === options.daemonId &&
+				health.pid === options.process.pid &&
+				health.version === options.version
+			) {
+				return;
+			}
+		}
+		await sleep(150);
+	}
+	throw new Error('Timed out waiting for replacement daemon');
 }
 
 export function serveApi(options: {
@@ -182,6 +258,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	setServerVersion(version);
 	setDaemonId(process.env.OTTO_DAEMON_ID || null);
 	setDefaultProjectRoot(opts.daemonRegister ? null : opts.project);
+	setDaemonRestartHandler(null);
 
 	const app = createServer();
 	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
@@ -310,11 +387,8 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	}
 
 	let shuttingDown = false;
-	const shutdown = async (signal: NodeJS.Signals) => {
-		if (shuttingDown) return;
-		shuttingDown = true;
-		console.log(`\nReceived ${signal}, shutting down...`);
-
+	const cleanup = async () => {
+		setDaemonRestartHandler(null);
 		try {
 			shutdownActiveTunnels();
 		} catch (error) {
@@ -338,9 +412,79 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		} catch (error) {
 			logger.error('Error stopping API server', error);
 		}
+	};
+
+	const shutdown = async (signal: NodeJS.Signals) => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		console.log(`\nReceived ${signal}, shutting down...`);
+		await cleanup();
 
 		process.exit(0);
 	};
+
+	const restart = async (request: DaemonRestartRequest) => {
+		console.log('\nRestarting managed daemon...');
+		await cleanup();
+		const executable = request.executable ?? process.execPath;
+		const expectedVersion = request.targetVersion ?? version;
+		const daemonId = crypto.randomUUID();
+		let replacement: ReturnType<typeof Bun.spawn> | null = null;
+		try {
+			replacement = spawnDaemonReplacement({
+				projectRoot: opts.project,
+				executable,
+				port: serverPort,
+				daemonId,
+			});
+			await waitForDaemonReplacement({
+				process: replacement,
+				daemonId,
+				version: expectedVersion,
+			});
+			if (request.executable && request.targetVersion) {
+				await writeActiveDaemonSelection({
+					path: request.executable,
+					version: request.targetVersion,
+				});
+			}
+			process.exit(0);
+		} catch (error) {
+			logger.error('Replacement daemon failed to start', error);
+			if (request.executable && request.executable !== process.execPath) {
+				try {
+					if (replacement) {
+						replacement.kill('SIGTERM');
+						await Promise.race([replacement.exited, Bun.sleep(2000)]);
+					}
+					const rollbackId = crypto.randomUUID();
+					const rollback = spawnDaemonReplacement({
+						projectRoot: opts.project,
+						executable: process.execPath,
+						port: serverPort,
+						daemonId: rollbackId,
+					});
+					await waitForDaemonReplacement({
+						process: rollback,
+						daemonId: rollbackId,
+						version,
+					});
+				} catch (rollbackError) {
+					logger.error('Failed to roll back daemon executable', rollbackError);
+				}
+			}
+			process.exit(1);
+		}
+	};
+
+	if (opts.daemonRegister) {
+		setDaemonRestartHandler((request) => {
+			if (shuttingDown) throw new Error('Daemon restart already in progress');
+			shuttingDown = true;
+			// Let the accepted response flush before closing the API and tunnel.
+			setTimeout(() => void restart(request), 300);
+		});
+	}
 
 	process.once('SIGINT', shutdown);
 	process.once('SIGTERM', shutdown);

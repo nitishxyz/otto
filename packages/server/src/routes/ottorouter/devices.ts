@@ -31,6 +31,8 @@ const machineProjectSchema = z.object({
 });
 const remoteServerInfoSchema = z.object({
 	version: z.string().nullable(),
+	pid: z.number().optional(),
+	startedAt: z.number().optional(),
 	protocol: z
 		.object({
 			version: z.number().int(),

@@ -6,6 +6,7 @@ export const OTTO_CLIENT_CAPABILITIES = [
 	'projects.list',
 	'remote.owner-session',
 	'remote.upgrade.stage',
+	'remote.daemon.restart',
 ] as const;
 
 export type CompatibilityStatus =

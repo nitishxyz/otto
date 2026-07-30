@@ -4,7 +4,7 @@ import { OttoMark, StableSpinner } from '@ottocode/web-sdk/components';
 import type { MachineDeviceState } from '../lib/machine-api';
 import type { OttoRouterAuthPhase } from '../lib/ottorouter-actions';
 import { machinePresence, type MachinePresence } from '../lib/machine-status';
-import { tauriBridge } from '../lib/tauri-bridge';
+import type { TunnelDevice } from '../lib/tauri-bridge';
 
 const PRESENCE_STYLES: Record<
 	MachinePresence,
@@ -58,6 +58,7 @@ export function MachineLauncher({
 	onCancelConnect,
 	authPhase = 'idle',
 	connectError,
+	onSelectMachine,
 }: {
 	state: MachineDeviceState | null;
 	loading: boolean;
@@ -67,6 +68,7 @@ export function MachineLauncher({
 	/** Device-flow phase; 'pending' keeps the waiting view across refreshes. */
 	authPhase?: OttoRouterAuthPhase;
 	connectError?: string | null;
+	onSelectMachine: (device: TunnelDevice) => Promise<void>;
 }) {
 	const [opening, setOpening] = useState<string | null>(null);
 	const [openError, setOpenError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function MachineLauncher({
 		setOpening(device.deviceId);
 		setOpenError(null);
 		try {
-			await tauriBridge.openMachineWindow(device);
+			await onSelectMachine(device);
 		} catch (cause) {
 			setOpenError(String(cause));
 		} finally {

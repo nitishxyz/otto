@@ -7,6 +7,7 @@ import {
 	type MachineBootstrap,
 	type Project,
 	type ServerInfo,
+	type TunnelDevice,
 } from './lib/tauri-bridge';
 import { loadAuthorizedMachineProjects } from './lib/machine-api';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
@@ -232,6 +233,28 @@ function App() {
 		router.navigate({ to: '/sessions' }).catch(() => {});
 	};
 
+	const handleSelectMachine = async (device: TunnelDevice) => {
+		const bootstrap = await tauriBridge.setCurrentMachine(device);
+		if (!bootstrap) throw new Error('Could not select this machine.');
+		useViewerTabsStore.getState().closeAllTabs();
+		flushSync(() => {
+			setSelectedProject(null);
+			setMachine(bootstrap);
+		});
+		await router.navigate({ to: '/projects', replace: true });
+	};
+
+	const handleLeaveMachine = async () => {
+		if (daemon) configureDesktopSdk(daemon.url, daemon);
+		await tauriBridge.setCurrentMachine(null);
+		useViewerTabsStore.getState().closeAllTabs();
+		flushSync(() => {
+			setSelectedProject(null);
+			setMachine(null);
+		});
+		await router.navigate({ to: '/projects', replace: true });
+	};
+
 	const handleBack = async () => {
 		if (daemon) configureDesktopSdk(daemon.url, daemon);
 		useViewerTabsStore.getState().closeAllTabs();
@@ -300,6 +323,8 @@ function App() {
 				setTheme,
 				toggleTheme,
 				onSelectProject: handleSelectProject,
+				onSelectMachine: handleSelectMachine,
+				onLeaveMachine: handleLeaveMachine,
 				onBackToProjects: handleBack,
 				onOnboardingComplete: handleOnboardingComplete,
 				onStartDaemon: handleStartDaemon,

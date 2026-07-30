@@ -39,6 +39,7 @@ const COMPACT_SPINNER_CONSUMERS = [
 	'src/components/MachineLauncher.tsx',
 	'src/components/LocalTunnelPanel.tsx',
 	'src/components/ConnectedProjectPicker.tsx',
+	'src/components/RemoteMachineSettings.tsx',
 	'src/components/ProjectPicker.tsx',
 	'src/components/CloneModal.tsx',
 	'src/components/DeviceCodeModal.tsx',

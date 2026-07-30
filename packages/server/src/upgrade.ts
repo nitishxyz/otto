@@ -1,4 +1,4 @@
-import { chmod, mkdir, rename, rm } from 'node:fs/promises';
+import { chmod, mkdir, rename, rm, stat } from 'node:fs/promises';
 import { arch, platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { getOttoHomeDir } from '@ottocode/sdk';
@@ -34,6 +34,10 @@ export function assertUpgradeTarget(
 	}
 }
 
+function stagedUpgradePath(target: string): string {
+	return join(getOttoHomeDir(), 'upgrades', target, releaseAsset());
+}
+
 function releaseAsset(): string {
 	const platformMap: Partial<Record<NodeJS.Platform, string>> = {
 		darwin: 'darwin',
@@ -67,7 +71,7 @@ export async function stageDaemonUpgrade(
 ): Promise<StagedUpgrade> {
 	assertUpgradeTarget(current, target);
 	const asset = releaseAsset();
-	const destination = join(getOttoHomeDir(), 'upgrades', target, asset);
+	const destination = stagedUpgradePath(target);
 	const temporary = `${destination}.${crypto.randomUUID()}.tmp`;
 	await mkdir(dirname(destination), { recursive: true });
 	const response = await fetcher(
@@ -95,4 +99,21 @@ export async function stageDaemonUpgrade(
 		stagedPath: destination,
 		restartRequired: true,
 	};
+}
+
+/** Resolves a previously staged official binary for supervised activation. */
+export async function resolveStagedDaemonUpgrade(
+	current: string | null,
+	target: string,
+): Promise<string> {
+	assertUpgradeTarget(current, target);
+	const path = stagedUpgradePath(target);
+	const info = await stat(path).catch(() => null);
+	if (!info?.isFile()) {
+		throw new Error(`Otto v${target} is not staged on this machine`);
+	}
+	if (platform() !== 'win32' && (info.mode & 0o111) === 0) {
+		throw new Error(`Staged Otto v${target} binary is not executable`);
+	}
+	return path;
 }

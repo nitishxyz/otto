@@ -6,6 +6,7 @@ import {
 
 /** Stable host capability required to offer the explicit staged-upgrade action. */
 export const REMOTE_UPGRADE_CAPABILITY = 'remote.upgrade.stage';
+export const REMOTE_RESTART_CAPABILITY = 'remote.daemon.restart';
 
 const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
