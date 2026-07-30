@@ -67,4 +67,9 @@ resources
 !apps/canvas/src-tauri/resources/
 apps/canvas/src-tauri/resources/*
 !apps/canvas/src-tauri/resources/entitlements.plist
+!apps/canvas/src-tauri/resources/fonts/
+!apps/desktop/src-tauri/resources/
+apps/desktop/src-tauri/resources/*
+!apps/desktop/src-tauri/resources/entitlements.plist
+!apps/desktop/src-tauri/resources/fonts/
 .wrangler
