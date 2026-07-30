@@ -17,9 +17,12 @@ import {
 } from '../packages/server/src/runtime/session/queue.ts';
 
 describe('agent config merging', () => {
-	it('includes browser as a loadable tool for collaborative agents', () => {
+	it('includes browser and excludes simulator for collaborative agents', () => {
 		for (const agent of ['build', 'general', 'plan', 'research']) {
 			expect(defaultToolConfigForAgent(agent).loadable).toContain('browser');
+			expect(defaultToolConfigForAgent(agent).loadable).not.toContain(
+				'simulator',
+			);
 		}
 	});
 
@@ -358,9 +361,6 @@ describe('agent config merging', () => {
 			const loadTools = payload.tools.find(
 				(tool: { name: string }) => tool.name === 'load_tools',
 			);
-			const simulator = payload.tools.find(
-				(tool: { name: string }) => tool.name === 'simulator',
-			);
 			const querySessions = payload.tools.find(
 				(tool: { name: string }) => tool.name === 'query_sessions',
 			);
@@ -384,12 +384,11 @@ describe('agent config merging', () => {
 				risky: true,
 				available: true,
 			});
-			expect(simulator).toMatchObject({
-				category: 'loadable',
-				source: 'builtin',
-				activation: 'loadable',
-				available: true,
-			});
+			expect(
+				payload.tools.some(
+					(tool: { name: string }) => tool.name === 'simulator',
+				),
+			).toBe(false);
 			expect(querySessions).toMatchObject({
 				category: 'research',
 				source: 'builtin',

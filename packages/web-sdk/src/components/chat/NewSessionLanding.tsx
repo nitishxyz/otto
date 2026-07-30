@@ -16,14 +16,20 @@ import {
 	NEW_SESSION_FILE_SELECTIONS_KEY,
 	useFileSelectionStore,
 } from '../../stores/fileSelectionStore';
+import { getNewSessionChatDraftKey } from '../../stores/chatDraftStore';
 import { toast } from '../../stores/toastStore';
-import { ChatInput } from './ChatInput';
+import { ChatInput, type ChatInputRef } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
 import { OttoTextWordmark } from '../common/OttoOIcon';
 import { apiClient } from '../../lib/api-client';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { getSessionsQueryKey } from '../../hooks/useSessions';
-import type { Session } from '../../types/api';
+import { getMessagesQueryKey } from '../../hooks/useMessages';
+import {
+	captureComposerRect,
+	useSessionTransitionStore,
+} from '../../stores/sessionTransitionStore';
+import type { Message, Session } from '../../types/api';
 
 interface NewSessionLandingProps {
 	onSessionCreated: (sessionId: string) => void;
@@ -57,8 +63,6 @@ export const NewSessionLanding = memo(
 		) {
 			const queryClient = useQueryClient();
 			const [sending, setSending] = useState(false);
-			const [transitioning, setTransitioning] = useState(false);
-			const pendingSessionIdRef = useRef<string | null>(null);
 			const {
 				config,
 				agent,
@@ -86,10 +90,7 @@ export const NewSessionLanding = memo(
 				closeConfig,
 				openModelConfig,
 			} = useConfigModalControls();
-			const chatInputRef = useRef<{
-				focus: () => void;
-				setValue: (value: string) => void;
-			}>(null);
+			const chatInputRef = useRef<ChatInputRef>(null);
 
 			const {
 				images,
@@ -168,6 +169,9 @@ export const NewSessionLanding = memo(
 						return;
 					}
 					setSending(true);
+					const composerRect = captureComposerRect(
+						chatInputRef.current?.getBoundaryElement(),
+					);
 
 					try {
 						const session: Session = await apiClient.createSession({
@@ -222,13 +226,23 @@ export const NewSessionLanding = memo(
 
 						clearFiles();
 						clearFileSelections(NEW_SESSION_FILE_SELECTIONS_KEY);
-						pendingSessionIdRef.current = session.id;
-						setTransitioning(true);
-						setTimeout(() => {
-							if (pendingSessionIdRef.current) {
-								onSessionCreated(pendingSessionIdRef.current);
-							}
-						}, 250);
+
+						// Warm the thread before navigating so the new route paints the
+						// sent message immediately instead of flashing a loading state,
+						// which would break the composer handoff animation.
+						await queryClient
+							.fetchQuery<Message[]>({
+								queryKey: getMessagesQueryKey(session.id),
+								queryFn: () => apiClient.getMessages(session.id),
+							})
+							.catch(() => undefined);
+
+						if (composerRect) {
+							useSessionTransitionStore
+								.getState()
+								.startHandoff(session.id, composerRect);
+						}
+						onSessionCreated(session.id);
 					} catch (error) {
 						toast.error(
 							error instanceof Error
@@ -266,12 +280,7 @@ export const NewSessionLanding = memo(
 			);
 
 			return (
-				<div
-					className={`flex-1 flex flex-col items-center justify-center px-4 transition-opacity duration-250 ease-out ${
-						transitioning ? 'opacity-0 scale-[0.98]' : 'opacity-100 scale-100'
-					}`}
-					style={{ transitionProperty: 'opacity, transform' }}
-				>
+				<div className="flex-1 flex flex-col items-center justify-center px-4">
 					{isConfigOpen ? (
 						<ConfigModal
 							isOpen
@@ -291,7 +300,11 @@ export const NewSessionLanding = memo(
 						/>
 					) : null}
 					<div className={`w-full ${compact ? 'max-w-xl' : 'max-w-2xl'}`}>
-						<div className="flex justify-center mb-6">
+						<div
+							className={`flex justify-center mb-6 transition-all duration-200 ease-out ${
+								sending ? 'opacity-0 -translate-y-2' : 'opacity-100'
+							}`}
+						>
 							{wordmark || defaultWordmark}
 						</div>
 						<div className="relative">
@@ -301,6 +314,7 @@ export const NewSessionLanding = memo(
 								onCommand={handleCommand}
 								disabled={sending}
 								sessionId={undefined}
+								draftKey={getNewSessionChatDraftKey(sessionType)}
 								images={images}
 								documents={documents}
 								onFileRemove={removeFile}

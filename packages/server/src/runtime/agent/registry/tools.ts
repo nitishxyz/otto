@@ -85,7 +85,6 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'copy_into',
 			'read_image',
 			'copy_attachment_to_project',
-			'simulator',
 			'browser',
 			'mcp_manager',
 			'run_plugin_command',

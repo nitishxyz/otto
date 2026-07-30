@@ -25,7 +25,7 @@ import { toast } from '../../stores/toastStore';
 import { useToastStore } from '../../stores/toastStore';
 import { apiClient } from '../../lib/api-client';
 import { openPlatformSession } from '../../lib/platform';
-import { ChatInput } from './ChatInput';
+import { ChatInput, type ChatInputRef } from './ChatInput';
 import { ConfigModal } from './ConfigModal';
 
 interface ChatInputContainerProps {
@@ -78,10 +78,7 @@ export const ChatInputContainer = memo(
 		) {
 			const [inputKey, setInputKey] = useState(0);
 
-			const chatInputRef = useRef<{
-				focus: () => void;
-				setValue: (value: string) => void;
-			}>(null);
+			const chatInputRef = useRef<ChatInputRef>(null);
 
 			const sendMessage = useSendMessage(sessionId);
 			const deleteSession = useDeleteSession();

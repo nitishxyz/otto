@@ -39,6 +39,7 @@ import { usePreferences } from '../../hooks/usePreferences';
 import { useConfig, useUpdateDefaults } from '../../hooks/useConfig';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { useVimMode } from '../../hooks/useVimMode';
+import { useComposerHandoff } from '../../hooks/useSessionHandoff';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useFileMention } from '../../hooks/useFileMention';
 import { useSkillMention } from '../../hooks/useSkillMention';
@@ -50,6 +51,10 @@ import {
 	shouldSendSlashCommandAsMessage,
 } from '../../lib/commands';
 import { useOttoRouterStore } from '../../stores/ottorouterStore';
+import {
+	getSessionChatDraftKey,
+	useChatDraftStore,
+} from '../../stores/chatDraftStore';
 import type { FileAttachment } from '../../hooks/useFileUpload';
 import { StableSpinner } from '../ui/StableSpinner';
 import { InputApprovalBar } from './InputApprovalBar';
@@ -135,13 +140,19 @@ interface ChatInputProps {
 	topBars?: React.ReactNode;
 	/** Keeps the composer in document flow so growing content pushes nearby elements. */
 	inlineLayout?: boolean;
+	/** Persistent draft key for composers that do not have a session yet. */
+	draftKey?: string;
+}
+
+export interface ChatInputRef {
+	focus: () => void;
+	setValue: (value: string) => void;
+	/** Composer boundary element, used to capture geometry for session handoffs. */
+	getBoundaryElement: () => HTMLElement | null;
 }
 
 export const ChatInput = memo(
-	forwardRef<
-		{ focus: () => void; setValue: (value: string) => void },
-		ChatInputProps
-	>(function ChatInput(
+	forwardRef<ChatInputRef, ChatInputProps>(function ChatInput(
 		{
 			onSend,
 			onCommand,
@@ -174,10 +185,29 @@ export const ChatInput = memo(
 			agentLocked = false,
 			topBars,
 			inlineLayout = false,
+			draftKey,
 		},
 		ref,
 	) {
-		const [message, setMessage] = useState('');
+		const resolvedDraftKey = sessionId
+			? getSessionChatDraftKey(sessionId)
+			: draftKey;
+		const persistedMessage = useChatDraftStore((state) =>
+			resolvedDraftKey ? (state.drafts[resolvedDraftKey] ?? '') : '',
+		);
+		const setDraft = useChatDraftStore((state) => state.setDraft);
+		const [ephemeralMessage, setEphemeralMessage] = useState('');
+		const message = resolvedDraftKey ? persistedMessage : ephemeralMessage;
+		const setMessage = useCallback(
+			(value: string) => {
+				if (resolvedDraftKey) {
+					setDraft(resolvedDraftKey, value);
+					return;
+				}
+				setEphemeralMessage(value);
+			},
+			[resolvedDraftKey, setDraft],
+		);
 		const [isPlanMode, setIsPlanMode] = useState(externalIsPlanMode || false);
 		const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 		const [showDictationInstallPrompt, setShowDictationInstallPrompt] =
@@ -385,6 +415,7 @@ export const ChatInput = memo(
 			setCurrentSkillToSelect,
 			setCurrentCommandToSelect,
 			setVimMode,
+			setMessage,
 		]);
 
 		const voiceBaseTextRef = useRef('');
@@ -671,7 +702,10 @@ export const ChatInput = memo(
 				setMessage(value);
 				textareaRef.current?.focus();
 			},
+			getBoundaryElement: () => footerRef.current,
 		}));
+
+		useComposerHandoff(sessionId, footerRef);
 
 		const adjustTextareaHeight = useCallback(() => {
 			const textarea = textareaRef.current;
@@ -704,14 +738,14 @@ export const ChatInput = memo(
 			(filePath: string) => {
 				selectFile(filePath, textareaRef, setMessage);
 			},
-			[selectFile],
+			[selectFile, setMessage],
 		);
 
 		const handleSkillMentionSelect = useCallback(
 			(skillName: string) => {
 				selectSkill(skillName, textareaRef, setMessage);
 			},
-			[selectSkill],
+			[selectSkill, setMessage],
 		);
 
 		const handleSend = useCallback(() => {
@@ -806,6 +840,7 @@ export const ChatInput = memo(
 				setCurrentCommandToSelect,
 				checkForMention,
 				checkForSkillMention,
+				setMessage,
 			],
 		);
 

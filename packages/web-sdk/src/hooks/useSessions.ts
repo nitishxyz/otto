@@ -13,6 +13,10 @@ import type {
 	Session,
 	SessionsPage,
 } from '../types/api';
+import {
+	getSessionChatDraftKey,
+	useChatDraftStore,
+} from '../stores/chatDraftStore';
 
 const SESSIONS_PAGE_SIZE = 50;
 
@@ -196,7 +200,10 @@ export function useDeleteSession() {
 
 	return useMutation({
 		mutationFn: (sessionId: string) => apiClient.deleteSession(sessionId),
-		onSuccess: () => {
+		onSuccess: (_result, sessionId) => {
+			useChatDraftStore
+				.getState()
+				.setDraft(getSessionChatDraftKey(sessionId), '');
 			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 		},
 	});

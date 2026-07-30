@@ -28,6 +28,7 @@ import {
 	type TodoSnapshot,
 } from '../../stores/todoStore';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
+import { useThreadHandoff } from '../../hooks/useSessionHandoff';
 import { ThreadDensityProvider } from './threadDensity';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
@@ -470,6 +471,7 @@ export const MessageThread = memo(function MessageThread({
 	const sessionHeaderRef = useRef<HTMLDivElement>(null);
 	const threadRootRef = useRef<HTMLDivElement>(null);
 	const threadWidth = useContainerWidth(threadRootRef);
+	useThreadHandoff(sessionId, threadRootRef);
 	const density: 'normal' | 'compact' =
 		compact || (responsiveCompact && threadWidth > 0 && threadWidth < 640)
 			? 'compact'

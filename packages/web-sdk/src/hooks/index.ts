@@ -41,3 +41,4 @@ export * from './usePluginCommands';
 export * from './useProjectConnection';
 export * from './useProjects';
 export * from './useShellJobs';
+export * from './useSessionHandoff';

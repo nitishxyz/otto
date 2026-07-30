@@ -4,7 +4,6 @@ import { buildCopyIntoTool } from '../builtin/fs/copy-into.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
 import { buildBrowserTool } from './browser.ts';
 import { buildMCPManagerTool } from './mcp-manager.ts';
-import { buildSimulatorTool } from './simulator.ts';
 import { buildLoadToolsTool, type LazyToolBrief } from './load-tools.ts';
 
 export type LazyToolDefinition = LazyToolBrief & {
@@ -17,11 +16,6 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 			name: 'copy_into',
 			description: 'Copy source lines into a project file.',
 			build: buildCopyIntoTool,
-		},
-		{
-			name: 'simulator',
-			description: 'Control Apple Simulator via serve-sim.',
-			build: buildSimulatorTool,
 		},
 		{
 			name: 'browser',
