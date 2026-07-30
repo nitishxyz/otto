@@ -74,6 +74,59 @@ async function shouldExcludeRecipeInvocationFromHistory(args: {
 	return recipe ? !recipe.includeInHistory : false;
 }
 
+function readToolPartIdentity(
+	part: MessagePartRow,
+): { callId: string; name?: string } | null {
+	try {
+		const value = JSON.parse(part.content ?? '{}') as {
+			callId?: unknown;
+			name?: unknown;
+		};
+		if (typeof value.callId !== 'string') return null;
+		return {
+			callId: value.callId,
+			name: typeof value.name === 'string' ? value.name : undefined,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function buildRetryHistoryPrefix(parts: MessagePartRow[]): MessagePartRow[] {
+	const toolCallIndexes = new Map<string, number>();
+	const completedCallIds = new Set<string>();
+	let lastCompletedResultIndex = -1;
+
+	for (const [index, part] of parts.entries()) {
+		if (part.compactedAt) continue;
+		if (part.type === 'tool_call') {
+			const identity = readToolPartIdentity(part);
+			if (identity && identity.name !== 'finish') {
+				toolCallIndexes.set(identity.callId, index);
+			}
+			continue;
+		}
+		if (part.type !== 'tool_result') continue;
+
+		const identity = readToolPartIdentity(part);
+		const toolCallIndex = identity
+			? toolCallIndexes.get(identity.callId)
+			: undefined;
+		if (identity && toolCallIndex !== undefined && toolCallIndex < index) {
+			completedCallIds.add(identity.callId);
+			lastCompletedResultIndex = index;
+		}
+	}
+
+	if (lastCompletedResultIndex < 0) return [];
+	return parts.slice(0, lastCompletedResultIndex + 1).filter((part) => {
+		if (part.type !== 'tool_call' && part.type !== 'tool_result') return true;
+		if (part.compactedAt) return true;
+		const identity = readToolPartIdentity(part);
+		return identity ? completedCallIds.has(identity.callId) : false;
+	});
+}
+
 /**
  * Builds the conversation history for a session from the database,
  * converting it to the format expected by the AI SDK.
@@ -133,14 +186,18 @@ export async function buildHistoryMessages(
 
 	for (const message of rows) {
 		if (
-			message.id === currentMessageId ||
 			queuedAssistantMessageIds.has(message.id) ||
 			queuedUserMessageIds.has(message.id)
 		) {
 			continue;
 		}
 
-		const parts = partsByMessageId.get(message.id) ?? [];
+		const storedParts = partsByMessageId.get(message.id) ?? [];
+		const parts =
+			message.id === currentMessageId
+				? buildRetryHistoryPrefix(storedParts)
+				: storedParts;
+		if (message.id === currentMessageId && parts.length === 0) continue;
 		if (message.role === 'assistant' && skipNextAssistantMessage) {
 			skipNextAssistantMessage = false;
 			continue;

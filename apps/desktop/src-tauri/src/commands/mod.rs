@@ -2,6 +2,7 @@ pub mod clipboard;
 pub mod fonts;
 pub mod machine;
 pub mod native_browser;
+pub mod native_terminal;
 pub mod notification;
 pub mod project;
 pub mod server;

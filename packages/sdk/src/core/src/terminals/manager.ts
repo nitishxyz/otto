@@ -20,6 +20,25 @@ export interface CreateTerminalOptions {
 	augmentPath?: boolean;
 }
 
+/** Builds a portable PTY environment with widely available terminfo support. */
+export function resolveTerminalEnvironment(
+	options: Pick<CreateTerminalOptions, 'env' | 'inheritEnv' | 'augmentPath'>,
+): Record<string, string> {
+	return {
+		...(options.inheritEnv === false ? {} : process.env),
+		...options.env,
+		// Keep this on a system entry; xterm-ghostty requires bundled terminfo.
+		TERM: 'xterm-256color',
+		COLORTERM: 'truecolor',
+		TERM_PROGRAM: 'otto',
+		PATH:
+			options.augmentPath === false
+				? (options.env?.PATH ?? process.env.PATH ?? '')
+				: getAugmentedPath(),
+		PROMPT_EOL_MARK: '',
+	} as Record<string, string>;
+}
+
 export class TerminalManager {
 	private terminals = new Map<string, Terminal>();
 	private cleanupTimers = new Map<string, NodeJS.Timeout>();
@@ -37,16 +56,7 @@ export class TerminalManager {
 				cols: 80,
 				rows: 30,
 				cwd: options.cwd,
-				env: {
-					...(options.inheritEnv === false ? {} : process.env),
-					...options.env,
-					TERM: 'xterm-256color',
-					PATH:
-						options.augmentPath === false
-							? (options.env?.PATH ?? process.env.PATH ?? '')
-							: getAugmentedPath(),
-					PROMPT_EOL_MARK: '',
-				} as Record<string, string>,
+				env: resolveTerminalEnvironment(options),
 			};
 
 			const pty = spawnPty(options.command, options.args || [], ptyOptions);

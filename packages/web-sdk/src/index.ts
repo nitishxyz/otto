@@ -1,8 +1,10 @@
 export {
 	TerminalsPanel,
+	type TerminalsPanelProps,
 	TerminalPanelToggle,
 	TerminalTabBar,
 	TerminalViewer,
+	type TerminalViewerProps,
 	TerminalsSidebar,
 	TerminalsSidebarToggle,
 	TerminalList,

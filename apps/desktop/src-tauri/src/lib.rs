@@ -92,6 +92,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(ServerState::default())
         .manage(commands::machine::MachineWindowState::default())
+        .manage(commands::native_terminal::NativeTerminalManager::new())
         .manage(commands::updater::PendingUpdate(Mutex::new(None)))
         .manage(commands::updater::ReadyUpdate(Mutex::new(None)))
         .manage(InitialProjectState {
@@ -181,6 +182,21 @@ pub fn run() {
             commands::native_browser::native_browser_screenshot,
             commands::native_browser::native_browser_set_visible,
             commands::native_browser::native_browser_unmount,
+            commands::native_terminal::native_terminal_status,
+            commands::native_terminal::native_terminal_create,
+            commands::native_terminal::native_terminal_set_theme,
+            commands::native_terminal::native_terminal_feed,
+            commands::native_terminal::native_terminal_feed_gpu,
+            commands::native_terminal::native_terminal_resize,
+            commands::native_terminal::native_terminal_key,
+            commands::native_terminal::native_terminal_scroll,
+            commands::native_terminal::native_terminal_select,
+            commands::native_terminal::native_terminal_reset,
+            commands::native_terminal::native_terminal_destroy,
+            commands::native_terminal::native_terminal_surface_create,
+            commands::native_terminal::native_terminal_surface_update,
+            commands::native_terminal::native_terminal_surface_set_font,
+            commands::native_terminal::native_terminal_surface_destroy,
             commands::fonts::list_system_fonts,
             commands::window::create_new_window,
             commands::window::open_machine_window,

@@ -30,7 +30,9 @@ async function createTicket(
 	project: string,
 ) {
 	const response = await fetch(
-		`${baseUrl}/v1/terminals/${terminalId}/ws-ticket?projectId=${encodeURIComponent(project)}`,
+		`${baseUrl}/v1/terminals/${terminalId}/ws-ticket?projectId=${encodeURIComponent(
+			project,
+		)}`,
 		{ method: 'POST' },
 	);
 	expect(response.status).toBe(200);
@@ -48,6 +50,52 @@ async function createTerminal(baseUrl: string, project: string) {
 	);
 	expect(response.status).toBe(200);
 	return (await response.json()) as { terminalId: string };
+}
+
+function seedTerminalHistory(url: string, inputs: string[]): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const ws = new WebSocket(url);
+		let index = 0;
+		const timeout = setTimeout(() => {
+			ws.close();
+			reject(new Error('WebSocket history setup timed out'));
+		}, 5_000);
+		ws.onopen = () => ws.send(`${inputs[index]}\n`);
+		ws.onmessage = (event) => {
+			if (!String(event.data).includes(inputs[index])) return;
+			index += 1;
+			if (index < inputs.length) {
+				ws.send(`${inputs[index]}\n`);
+				return;
+			}
+			clearTimeout(timeout);
+			ws.close();
+			resolve();
+		};
+		ws.onerror = () => {
+			clearTimeout(timeout);
+			reject(new Error('WebSocket history setup failed'));
+		};
+	});
+}
+
+function readFirstFrame(url: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const ws = new WebSocket(url);
+		const timeout = setTimeout(() => {
+			ws.close();
+			reject(new Error('WebSocket history replay timed out'));
+		}, 5_000);
+		ws.onmessage = (event) => {
+			clearTimeout(timeout);
+			ws.close();
+			resolve(String(event.data));
+		};
+		ws.onerror = () => {
+			clearTimeout(timeout);
+			reject(new Error('WebSocket history replay failed'));
+		};
+	});
 }
 
 function roundTrip(url: string, input: string): Promise<void> {
@@ -87,7 +135,12 @@ describe('actual Bun terminal WebSocket lifecycle', () => {
 		try {
 			const { terminalId } = await createTerminal(baseUrl, project);
 			await roundTrip(
-				`${baseUrl.replace('http:', 'ws:')}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(project)}`,
+				`${baseUrl.replace(
+					'http:',
+					'ws:',
+				)}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(
+					project,
+				)}`,
 				'local-roundtrip',
 			);
 			expect((await fetch(`${baseUrl}/`)).status).toBe(200);
@@ -107,10 +160,54 @@ describe('actual Bun terminal WebSocket lifecycle', () => {
 			).id;
 			const ticket = await createTicket(baseUrl, terminalId, projectId);
 			await roundTrip(
-				`${baseUrl.replace('http:', 'ws:')}/v1/terminals/${terminalId}/ws?ticket=${ticket}`,
+				`${baseUrl.replace(
+					'http:',
+					'ws:',
+				)}/v1/terminals/${terminalId}/ws?ticket=${ticket}`,
 				'ticket-roundtrip',
 			);
 			expect((await fetch(`${baseUrl}/`)).status).toBe(200);
+		} finally {
+			server.stop(true);
+		}
+	});
+
+	test('frames buffered history explicitly for native desktop clients', async () => {
+		const project = await mkdtemp(join(tmpdir(), 'otto-terminal-framed-history-'));
+		roots.push(project);
+		const { server, baseUrl } = await startServer(project);
+		try {
+			const { terminalId } = await createTerminal(baseUrl, project);
+			const wsUrl = `${baseUrl.replace(
+				'http:',
+				'ws:',
+			)}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(project)}`;
+			await seedTerminalHistory(wsUrl, ['framed-one', 'framed-two']);
+			const frame = JSON.parse(
+				await readFirstFrame(`${wsUrl}&historyMode=framed`),
+			) as { type: string; data: string };
+			expect(frame.type).toBe('history');
+			expect(frame.data).toContain('framed-one');
+			expect(frame.data).toContain('framed-two');
+		} finally {
+			server.stop(true);
+		}
+	});
+
+	test('replays buffered history in one WebSocket frame', async () => {
+		const project = await mkdtemp(join(tmpdir(), 'otto-terminal-history-'));
+		roots.push(project);
+		const { server, baseUrl } = await startServer(project);
+		try {
+			const { terminalId } = await createTerminal(baseUrl, project);
+			const wsUrl = `${baseUrl.replace(
+				'http:',
+				'ws:',
+			)}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(project)}`;
+			const markers = ['history-one', 'history-two', 'history-three'];
+			await seedTerminalHistory(wsUrl, markers);
+			const replay = await readFirstFrame(wsUrl);
+			for (const marker of markers) expect(replay).toContain(marker);
 		} finally {
 			server.stop(true);
 		}
@@ -124,7 +221,12 @@ describe('actual Bun terminal WebSocket lifecycle', () => {
 			for (let index = 0; index < 8; index += 1) {
 				const { terminalId } = await createTerminal(baseUrl, project);
 				await roundTrip(
-					`${baseUrl.replace('http:', 'ws:')}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(project)}`,
+					`${baseUrl.replace(
+						'http:',
+						'ws:',
+					)}/v1/terminals/${terminalId}/ws?project=${encodeURIComponent(
+						project,
+					)}`,
 					`stress-${index}`,
 				);
 			}

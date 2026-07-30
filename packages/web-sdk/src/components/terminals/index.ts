@@ -1,7 +1,7 @@
-export { TerminalsPanel } from './TerminalsPanel';
+export { TerminalsPanel, type TerminalsPanelProps } from './TerminalsPanel';
 export { TerminalPanelToggle } from './TerminalPanelToggle';
 export { TerminalTabBar } from './TerminalTabBar';
-export { TerminalViewer } from './TerminalViewer';
+export { TerminalViewer, type TerminalViewerProps } from './TerminalViewer';
 
 /** @deprecated Use TerminalsPanel instead */
 export { TerminalsPanel as TerminalsSidebar } from './TerminalsPanel';

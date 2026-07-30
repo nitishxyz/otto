@@ -105,7 +105,14 @@ export function createTerminalWebSocketHandler(c: Context) {
 
 			try {
 				const history = terminal.read();
-				for (const chunk of history) ws.send(chunk);
+				if (history.length > 0) {
+					const replay = history.join('');
+					ws.send(
+						c.req.query('historyMode') === 'framed'
+							? JSON.stringify({ type: 'history', data: replay })
+							: replay,
+					);
+				}
 			} catch (error) {
 				logger.error('Terminal WebSocket history failed', error, { id });
 				ws.close(1011, 'Terminal unavailable');

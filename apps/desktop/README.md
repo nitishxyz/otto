@@ -30,6 +30,16 @@ CLI selection is conservative: desktop checks the embedded CLI and a local insta
 
 When the CLI detects the desktop app is installed, running `otto` with no arguments opens the desktop app instead of the browser.
 
+### Native terminal
+
+The desktop terminal uses the cross-platform `libghostty-vt` Rust bindings for VT parsing, render state, keyboard encoding, scrollback, and terminal-generated responses. A parented, non-focusable `wgpu` surface renders with Metal on macOS, Vulkan/GLES on Linux, and DirectX 12 on Windows. The web app continues to use `ghostty-web`, and Desktop retains a Canvas fallback when no compatible GPU adapter is available.
+
+Four JetBrains Mono Nerd Font variants are bundled for complete terminal and private-use glyph coverage. Native Desktop terminals always use the bundled monospace family, matching `ghostty-web` and preventing remote UI-font preferences or unavailable system fonts from breaking the PTY grid. Terminal metrics are measured from that font so the PTY grid and renderer remain aligned.
+
+Native terminal colors, including the ANSI palette, cursor, and selection, are derived from the active Otto application theme and update without reconnecting the PTY. Drag selection supports the platform clipboard conventions (`Cmd+C`/`Cmd+V` on macOS, `Ctrl+Shift+C`/`Ctrl+Shift+V` and Insert variants elsewhere). macOS shell editing also maps Option+Arrow to word navigation, Option+Backspace to word deletion, Cmd+Arrow to line boundaries, and Cmd+Backspace to line deletion.
+
+Terminal processes remain owned by the otto daemon. Desktop feeds the daemon's existing ticket-authenticated WebSocket stream into the native parser, so local terminals, remote machines, managed tunnels, and project-share tunnels use the same protocol and authorization path. PTYs advertise the portable `xterm-256color` terminfo entry and `COLORTERM=truecolor`; Otto does not advertise Ghostty-specific terminfo unless that database is explicitly bundled on the daemon host. If the native Tauri command is unavailable, the desktop viewer falls back to `ghostty-web`.
+
 ## Changing the App Icon
 
 ### Main App Icon
@@ -80,4 +90,4 @@ await tray?.setIconAsTemplate(true); // Enable template mode
 
 - macOS: `.dmg`, `.app`
 - Linux: `.AppImage`
-- Windows: `.trash`
+- Windows: `.msi`, `.exe`

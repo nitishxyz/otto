@@ -21,7 +21,7 @@ const WS_RECONNECT_DELAY = 1500;
 const WS_MAX_RETRIES = 5;
 const CURSOR_BLINK_RESUME_DELAY = 600;
 
-function resolveBackgroundColor(): string {
+export function resolveTerminalBackgroundColor(): string {
 	if (typeof document === 'undefined') return '#121216';
 	const el = document.createElement('div');
 	el.style.display = 'none';
@@ -41,7 +41,7 @@ function resolveBackgroundColor(): string {
 
 let fontsLoaded = false;
 
-async function loadEmbeddedFont(): Promise<void> {
+export async function loadEmbeddedTerminalFont(): Promise<void> {
 	if (fontsLoaded) return;
 	if (typeof document === 'undefined' || !('FontFace' in window)) return;
 
@@ -90,7 +90,7 @@ async function loadEmbeddedFont(): Promise<void> {
 	fontsLoaded = true;
 }
 
-function resolveApiBaseUrl(): string {
+export function resolveTerminalApiBaseUrl(): string {
 	const config = client.getConfig?.();
 	if (
 		config &&
@@ -116,7 +116,7 @@ export function terminalWebSocketUrl(
 	return url.toString();
 }
 
-async function requestTerminalWebSocketTicket(
+export async function requestTerminalWebSocketTicket(
 	baseUrl: string,
 	terminalId: string,
 ): Promise<string> {
@@ -178,7 +178,7 @@ function registerPlatformLinkProviders(term: Terminal) {
 	);
 }
 
-interface TerminalViewerProps {
+export interface TerminalViewerProps {
 	terminalId: string;
 	isActive: boolean;
 	onExit?: (terminalId: string) => void;
@@ -342,10 +342,10 @@ export const TerminalViewer = memo(function TerminalViewer({
 			await init();
 			if (disposed || !containerRef.current) return;
 
-			await loadEmbeddedFont();
+			await loadEmbeddedTerminalFont();
 			await document.fonts.ready;
 
-			const bg = resolveBackgroundColor();
+			const bg = resolveTerminalBackgroundColor();
 
 			term = new Terminal({
 				theme: {
@@ -438,7 +438,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 
 			if (disposed) return;
 
-			const baseUrl = resolveApiBaseUrl();
+			const baseUrl = resolveTerminalApiBaseUrl();
 
 			connectWebSocket(term, baseUrl);
 

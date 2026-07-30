@@ -46,7 +46,9 @@ const subagentInputSchema = z.object({
 	delivery: z
 		.enum(['queue', 'interrupt'])
 		.optional()
-		.describe('Message delivery; defaults to queue'),
+		.describe(
+			'Follow-up delivery; defaults to queue. Use interrupt only for an urgent correction that invalidates current work, never for status checks.',
+		),
 	limit: z
 		.number()
 		.int()
@@ -109,7 +111,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							childSessionId: result.childSessionId,
 							agent: result.agent,
 							status: 'running',
-							note: 'Task delegated. Do not sleep or poll; continue unrelated work or end the turn. The result will arrive automatically when ready.',
+							note: 'Task delegated. The result will return automatically when the child finishes. Do not monitor or message it for progress; continue independent work or end the turn.',
 						};
 					}
 					case 'list': {

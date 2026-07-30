@@ -32,6 +32,9 @@ describe('subagent tool guidance', () => {
 		expect(schema).toContain('reuseSessionId');
 		expect(schema).toContain('subagentId');
 		expect(schema).toContain('delivery');
+		expect(schema).toContain('defaults to queue');
+		expect(schema).toContain('urgent correction');
+		expect(schema).toContain('never for status checks');
 		expect(schema).toContain('limit');
 	});
 

@@ -1,5 +1,9 @@
 import { memo, useCallback, useRef, useEffect } from 'react';
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import type {
+	ComponentType,
+	MouseEvent as ReactMouseEvent,
+	ReactNode,
+} from 'react';
 import {
 	Terminal as TerminalIcon,
 	Maximize2,
@@ -14,18 +18,36 @@ import {
 	type Terminal,
 } from '../../hooks/useTerminals';
 import { TerminalTabBar } from './TerminalTabBar';
-import { TerminalViewer } from './TerminalViewer';
+import { TerminalViewer, type TerminalViewerProps } from './TerminalViewer';
 
 const MIN_HEIGHT = 150;
 const MAX_HEIGHT_RATIO = 0.85;
 
-export const TerminalsPanel = memo(function TerminalsPanel() {
+export interface TerminalsPanelProps {
+	/** Override the terminal renderer (defaults to web TerminalViewer). */
+	Viewer?: ComponentType<TerminalViewerProps>;
+	/** Keep previously viewed terminals mounted while switching or collapsing. */
+	preserveViewerSessions?: boolean;
+}
+
+export const TerminalsPanel = memo(function TerminalsPanel({
+	Viewer = TerminalViewer,
+	preserveViewerSessions = false,
+}: TerminalsPanelProps) {
 	const isOpen = useTerminalStore((s) => s.isOpen);
 
 	return (
 		<>
 			<TerminalPanelShortcutController />
-			{isOpen ? <TerminalsPanelContent /> : null}
+			{isOpen || preserveViewerSessions ? (
+				<div className={isOpen ? 'contents' : 'hidden'}>
+					<TerminalsPanelContent
+						Viewer={Viewer}
+						panelVisible={isOpen}
+						preserveViewerSessions={preserveViewerSessions}
+					/>
+				</div>
+			) : null}
 		</>
 	);
 });
@@ -47,7 +69,17 @@ function TerminalPanelShortcutController() {
 	return null;
 }
 
-const TerminalsPanelContent = memo(function TerminalsPanelContent() {
+interface TerminalsPanelContentProps {
+	Viewer: ComponentType<TerminalViewerProps>;
+	panelVisible: boolean;
+	preserveViewerSessions: boolean;
+}
+
+const TerminalsPanelContent = memo(function TerminalsPanelContent({
+	Viewer,
+	panelVisible,
+	preserveViewerSessions,
+}: TerminalsPanelContentProps) {
 	const panelHeight = useTerminalStore((s) => s.panelHeight);
 	const setPanelHeight = useTerminalStore((s) => s.setPanelHeight);
 	const activeTabId = useTerminalStore((s) => s.activeTabId);
@@ -74,6 +106,7 @@ const TerminalsPanelContent = memo(function TerminalsPanelContent() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional - use ref to avoid re-renders, length triggers recheck
 	useEffect(() => {
 		if (
+			panelVisible &&
 			terminalsListRef.current.length > 0 &&
 			(!activeTabId ||
 				!terminalsListRef.current.find((t) => t.id === activeTabId))
@@ -81,11 +114,12 @@ const TerminalsPanelContent = memo(function TerminalsPanelContent() {
 			selectTab(terminalsListRef.current[0].id);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [terminalsList.length, activeTabId, selectTab]);
+	}, [panelVisible, terminalsList.length, activeTabId, selectTab]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional - avoid re-triggering auto-create on mutation object changes
 	useEffect(() => {
 		if (
+			panelVisible &&
 			terminals &&
 			terminalsList.length === 0 &&
 			!autoCreatingRef.current &&
@@ -106,7 +140,7 @@ const TerminalsPanelContent = memo(function TerminalsPanelContent() {
 				});
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [terminals, terminalsList.length, selectTab]);
+	}, [panelVisible, terminals, terminalsList.length, selectTab]);
 
 	const handleNewTerminal = useCallback(async () => {
 		try {
@@ -191,8 +225,11 @@ const TerminalsPanelContent = memo(function TerminalsPanelContent() {
 				onClose={closePanel}
 			/>
 			<TerminalPanelBody
+				Viewer={Viewer}
 				terminalsList={terminalsList}
 				activeTabId={activeTabId}
+				panelVisible={panelVisible}
+				preserveViewerSessions={preserveViewerSessions}
 				onKillTerminal={handleKillTerminal}
 			/>
 		</TerminalPanelFrame>
@@ -318,12 +355,15 @@ const TerminalPanelActions = memo(function TerminalPanelActions({
 });
 
 interface TerminalPanelBodyProps {
+	Viewer: ComponentType<TerminalViewerProps>;
 	terminalsList: Terminal[];
 	activeTabId: string | null;
+	panelVisible: boolean;
+	preserveViewerSessions: boolean;
 	onKillTerminal: (id: string) => void;
 }
 
-/** Returns the one terminal viewer that should hold a live WebSocket. */
+/** Returns the terminal that is currently visible in the panel. */
 export function getActiveTerminal<T extends { id: string }>(
 	terminals: T[],
 	activeTabId: string | null,
@@ -332,22 +372,41 @@ export function getActiveTerminal<T extends { id: string }>(
 }
 
 const TerminalPanelBody = memo(function TerminalPanelBody({
+	Viewer,
 	terminalsList,
 	activeTabId,
+	panelVisible,
+	preserveViewerSessions,
 	onKillTerminal,
 }: TerminalPanelBodyProps) {
 	const activeTerminal = getActiveTerminal(terminalsList, activeTabId);
+	const mountedTerminalIdsRef = useRef(new Set<string>());
+	if (activeTerminal) mountedTerminalIdsRef.current.add(activeTerminal.id);
+	const mountedTerminals = preserveViewerSessions
+		? terminalsList.filter((terminal) =>
+				mountedTerminalIdsRef.current.has(terminal.id),
+			)
+		: activeTerminal
+			? [activeTerminal]
+			: [];
 
 	return (
 		<div className="flex-1 min-h-0 overflow-hidden relative">
-			{activeTerminal ? (
-				<TerminalViewer
-					key={activeTerminal.id}
-					terminalId={activeTerminal.id}
-					isActive
-					onExit={onKillTerminal}
-				/>
-			) : null}
+			{mountedTerminals.map((terminal) => {
+				const isActive = panelVisible && terminal.id === activeTerminal?.id;
+				return (
+					<div
+						key={terminal.id}
+						className={isActive ? 'absolute inset-0' : 'hidden'}
+					>
+						<Viewer
+							terminalId={terminal.id}
+							isActive={isActive}
+							onExit={onKillTerminal}
+						/>
+					</div>
+				);
+			})}
 			{terminalsList.length === 0 && <EmptyTerminalPanel />}
 		</div>
 	);

@@ -26,7 +26,7 @@ describe('terminal WebSocket URL', () => {
 		).toBe('ws:');
 	});
 
-	test('keeps only the active terminal connected in each window', () => {
+	test('selects the active terminal in each window', () => {
 		const terminals = [
 			{ id: 'term-1', title: 'One' },
 			{ id: 'term-2', title: 'Two' },

@@ -8,7 +8,7 @@ import { ensureUserTurnBeforeAssistantRun } from '../packages/server/src/runtime
 import { buildHistoryMessages } from '../packages/server/src/runtime/message/history-builder.ts';
 
 describe('assistant retry history', () => {
-	test('excludes retained parts from the assistant message being retried', async () => {
+	test('retains history through the last completed tool result', async () => {
 		const projectRoot = mkdtempSync(join(tmpdir(), 'otto-retry-history-'));
 		const db = await getDb(projectRoot);
 		const now = Date.now();
@@ -60,7 +60,74 @@ describe('assistant retry history', () => {
 				messageId: 'retry-assistant',
 				index: 0,
 				type: 'text',
+				content: JSON.stringify({ text: "I'll inspect the file." }),
+				agent: 'build',
+				provider: 'anthropic',
+				model: 'claude-sonnet-4-5',
+			},
+		]);
+
+		const textOnlyHistory = await buildHistoryMessages(
+			db,
+			'retry-session',
+			'retry-assistant',
+		);
+		expect(textOnlyHistory).toEqual([
+			{
+				role: 'user',
+				content: [{ type: 'text', text: 'Fix the bug' }],
+			},
+		]);
+
+		await db.insert(messageParts).values([
+			{
+				id: 'retry-assistant-tool-call',
+				messageId: 'retry-assistant',
+				index: 1,
+				type: 'tool_call',
+				content: JSON.stringify({
+					name: 'read',
+					callId: 'call-readme',
+					args: { path: 'README.md' },
+				}),
+				agent: 'build',
+				provider: 'anthropic',
+				model: 'claude-sonnet-4-5',
+			},
+			{
+				id: 'retry-assistant-tool-result',
+				messageId: 'retry-assistant',
+				index: 3,
+				type: 'tool_result',
+				content: JSON.stringify({
+					name: 'read',
+					callId: 'call-readme',
+					result: { ok: true, path: 'README.md' },
+				}),
+				agent: 'build',
+				provider: 'anthropic',
+				model: 'claude-sonnet-4-5',
+			},
+			{
+				id: 'retry-assistant-trailing-text',
+				messageId: 'retry-assistant',
+				index: 4,
+				type: 'text',
 				content: JSON.stringify({ text: 'Partial failed response' }),
+				agent: 'build',
+				provider: 'anthropic',
+				model: 'claude-sonnet-4-5',
+			},
+			{
+				id: 'retry-assistant-dangling-tool-call',
+				messageId: 'retry-assistant',
+				index: 2,
+				type: 'tool_call',
+				content: JSON.stringify({
+					name: 'read',
+					callId: 'call-package',
+					args: { path: 'package.json' },
+				}),
 				agent: 'build',
 				provider: 'anthropic',
 				model: 'claude-sonnet-4-5',
@@ -77,6 +144,32 @@ describe('assistant retry history', () => {
 			{
 				role: 'user',
 				content: [{ type: 'text', text: 'Fix the bug' }],
+			},
+			{
+				role: 'assistant',
+				content: [
+					{ type: 'text', text: "I'll inspect the file." },
+					{
+						type: 'tool-call',
+						toolCallId: 'call-readme',
+						toolName: 'read',
+						input: { path: 'README.md' },
+					},
+				],
+			},
+			{
+				role: 'tool',
+				content: [
+					{
+						type: 'tool-result',
+						toolCallId: 'call-readme',
+						toolName: 'read',
+						output: {
+							type: 'text',
+							value: '{"ok":true,"path":"README.md"}',
+						},
+					},
+				],
 			},
 		]);
 	});

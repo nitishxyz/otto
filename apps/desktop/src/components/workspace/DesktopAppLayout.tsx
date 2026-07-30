@@ -46,6 +46,7 @@ import {
 	useViewerTabsStore,
 } from '@ottocode/web-sdk/stores';
 import { DesktopSidebar } from './DesktopSidebar';
+import { NativeTerminalViewer } from '../terminal/NativeTerminalViewer';
 
 const CHAT_MIN_WIDTH = 400;
 const VIEWER_PANEL_KEY = 'viewer';
@@ -334,7 +335,10 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 						</div>
 					</div>
 
-					<TerminalsPanel />
+					<TerminalsPanel
+						Viewer={NativeTerminalViewer}
+						preserveViewerSessions
+					/>
 				</div>
 			</div>
 
