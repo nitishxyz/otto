@@ -169,10 +169,12 @@ const defaultBatcherTimers: NativeTerminalOutputBatcherTimers = {
  * Coalesces the initial history replay into one atomic delivery. Remote
  * daemons stream history across many frames over time, so replay batching is
  * quiet-window based rather than single-frame. After the replay flush,
- * steady-state PTY output is delivered immediately.
+ * steady-state PTY output is delivered immediately. Replay deliveries are
+ * flagged so callers can drop VT query replies that the replayed history
+ * would otherwise regenerate and echo into the live PTY.
  */
 export function createNativeTerminalOutputBatcher(
-	deliver: (data: string) => void,
+	deliver: (data: string, replay: boolean) => void,
 	options: NativeTerminalOutputBatcherOptions = {},
 ): NativeTerminalOutputBatcher {
 	const quietMs = options.quietMs ?? 48;
@@ -195,7 +197,7 @@ export function createNativeTerminalOutputBatcher(
 		replaying = false;
 		const output = pending;
 		pending = '';
-		if (output) deliver(output);
+		if (output) deliver(output, true);
 	};
 
 	return {
@@ -208,7 +210,7 @@ export function createNativeTerminalOutputBatcher(
 		push(data) {
 			if (!data) return;
 			if (!replaying) {
-				deliver(data);
+				deliver(data, false);
 				return;
 			}
 			pending += data;

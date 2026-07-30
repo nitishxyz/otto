@@ -2,6 +2,10 @@ export { TerminalsPanel, type TerminalsPanelProps } from './TerminalsPanel';
 export { TerminalPanelToggle } from './TerminalPanelToggle';
 export { TerminalTabBar } from './TerminalTabBar';
 export { TerminalViewer, type TerminalViewerProps } from './TerminalViewer';
+export {
+	TerminalViewerPane,
+	type TerminalViewerPaneProps,
+} from './TerminalViewerPane';
 
 /** @deprecated Use TerminalsPanel instead */
 export { TerminalsPanel as TerminalsSidebar } from './TerminalsPanel';

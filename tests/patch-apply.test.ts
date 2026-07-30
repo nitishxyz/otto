@@ -2465,3 +2465,92 @@ describe('patch apply — Replace mode robustness', () => {
 		expect(returnLines).toEqual(['  return 1;', '  return 2;']);
 	});
 });
+
+describe('patch apply — mixed Update File + Find/With recovery', () => {
+	it('applies Find/With written under Update File (workflow YAML case)', async () => {
+		await writeTestFile(
+			'desktop.yml',
+			[
+				'jobs:',
+				'  build:',
+				'    steps:',
+				'      - name: Setup Rust',
+				'        uses: dtolnay/rust-toolchain@stable',
+				'        with:',
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions syntax
+				'          targets: ${{ matrix.target }}',
+				'',
+				'      - name: Cache Rust dependencies',
+				'        uses: Swatinem/rust-cache@v2',
+			].join('\n'),
+		);
+
+		const patch = [
+			'*** Begin Patch',
+			'*** Update File: desktop.yml',
+			'*** Find:',
+			'      - name: Setup Rust',
+			'        uses: dtolnay/rust-toolchain@stable',
+			'        with:',
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions syntax
+			'          targets: ${{ matrix.target }}',
+			'',
+			'      - name: Cache Rust dependencies',
+			'*** With:',
+			'      - name: Setup Rust',
+			'        uses: dtolnay/rust-toolchain@stable',
+			'        with:',
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions syntax
+			'          targets: ${{ matrix.target }}',
+			'',
+			'      - name: Setup Zig',
+			'        uses: mlugg/setup-zig@v2',
+			'',
+			'      - name: Cache Rust dependencies',
+			'*** End Patch',
+		].join('\n');
+
+		await applyPatch(patch);
+		const content = await readTestFile('desktop.yml');
+		expect(content).toContain('      - name: Setup Zig');
+		expect(content).toContain('        uses: mlugg/setup-zig@v2');
+		expect(content).toContain('      - name: Cache Rust dependencies');
+	});
+});
+
+describe('patch apply — failure diagnostics', () => {
+	it('includes file path and closest-match excerpt on hunk failure', async () => {
+		await writeTestFile(
+			'diag.ts',
+			[
+				'function setup() {',
+				'  const registry = createRegistry();',
+				'  registry.register("alpha");',
+				'  return registry;',
+				'}',
+			].join('\n'),
+		);
+
+		const patch = [
+			'*** Begin Patch',
+			'*** Update File: diag.ts',
+			' function setup() {',
+			'-  const registry = buildRegistry();',
+			'+  const registry = buildRegistry({ strict: true });',
+			'   registry.register("alpha");',
+			'*** End Patch',
+		].join('\n');
+
+		let message = '';
+		try {
+			await applyPatch(patch);
+		} catch (error) {
+			message = error instanceof Error ? error.message : String(error);
+		}
+
+		expect(message).toContain('diag.ts');
+		expect(message).toContain('Closest match in file');
+		expect(message).toContain('createRegistry()');
+		expect(message).toContain('Tip: reread the file');
+	});
+});

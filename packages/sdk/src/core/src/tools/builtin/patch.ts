@@ -184,7 +184,7 @@ export function buildApplyPatchTool(projectRoot: string): {
 					'execution',
 					{
 						suggestion:
-							'Check that the patch format is correct and target files exist',
+							'Reread the target file and rebuild the patch from its current content, or switch to *** Replace Lines in: with fresh line numbers.',
 					},
 				);
 			}

@@ -54,6 +54,50 @@ function isHunkAlreadyApplied(
 	return removals.every((line) => !lineExists(lines, line.content, useFuzzy));
 }
 
+const CLOSEST_MATCH_MIN_RATIO = 0.3;
+const CLOSEST_MATCH_MAX_FILE_LINES = 20000;
+const ERROR_EXCERPT_MAX_LINES = 30;
+
+/**
+ * Locate the file region most similar to the expected block so failure
+ * messages show what the file actually contains near the intended edit.
+ */
+function describeClosestMatch(
+	lines: string[],
+	expected: string[],
+): string | null {
+	if (expected.length === 0 || lines.length === 0) return null;
+	if (lines.length > CLOSEST_MATCH_MAX_FILE_LINES) return null;
+	const windowSize = Math.min(expected.length, lines.length);
+	let bestIndex = -1;
+	let bestScore = 0;
+	for (let i = 0; i + windowSize <= lines.length; i++) {
+		let score = 0;
+		for (let j = 0; j < windowSize; j++) {
+			if (linesMatch(lines[i + j], expected[j], true)) score++;
+		}
+		if (score > bestScore) {
+			bestScore = score;
+			bestIndex = i;
+		}
+	}
+	if (
+		bestIndex === -1 ||
+		bestScore / expected.length < CLOSEST_MATCH_MIN_RATIO
+	) {
+		return null;
+	}
+	const end = Math.min(
+		lines.length,
+		bestIndex + Math.min(windowSize, ERROR_EXCERPT_MAX_LINES),
+	);
+	const excerpt = lines
+		.slice(bestIndex, end)
+		.map((content, offset) => `  ${bestIndex + offset + 1}| ${content}`)
+		.join('\n');
+	return `Closest match in file (lines ${bestIndex + 1}-${end}):\n${excerpt}`;
+}
+
 export function applyHunkToLines(
 	lines: string[],
 	originalLines: string[],
@@ -236,9 +280,13 @@ export function applyHunkToLines(
 
 		let errorMsg = `Failed to apply patch hunk${contextInfo}.`;
 		if (expected.length > 0) {
-			errorMsg += `\nExpected to find:\n${expected
+			const shown = expected.slice(0, ERROR_EXCERPT_MAX_LINES);
+			errorMsg += `\nExpected to find:\n${shown
 				.map((l) => `  ${l}`)
 				.join('\n')}`;
+			if (expected.length > shown.length) {
+				errorMsg += `\n  ... (${expected.length - shown.length} more lines)`;
+			}
 		}
 		if (removals.length > 0) {
 			const missing = removals
@@ -249,6 +297,12 @@ export function applyHunkToLines(
 					'\nAll removal lines already absent; consider reading the file again to capture current state.';
 			}
 		}
+		const closest = describeClosestMatch(lines, expected);
+		if (closest) {
+			errorMsg += `\n${closest}`;
+		}
+		errorMsg +=
+			'\nTip: reread the file and rebuild this hunk from current content, or use *** Replace Lines in: <path> with *** Lines: <start>-<end> and *** With: from a fresh read.';
 		throw new Error(errorMsg);
 	}
 

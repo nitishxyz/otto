@@ -65,7 +65,7 @@ describe('native desktop terminal', () => {
 	});
 
 	test('batches spread-out history replay but delivers live output immediately', () => {
-		const delivered: string[] = [];
+		const delivered: Array<[string, boolean]> = [];
 		const scheduled = new Map<number, { callback: () => void; at: number }>();
 		let nextId = 1;
 		let clock = 0;
@@ -90,12 +90,13 @@ describe('native desktop terminal', () => {
 			}
 		};
 		const batcher = createNativeTerminalOutputBatcher(
-			(data) => delivered.push(data),
+			(data, replay) => delivered.push([data, replay]),
 			{ quietMs: 48, maxMs: 750, timers },
 		);
 
 		// Remote daemons stream history chunks across time; a quiet gap shorter
-		// than quietMs keeps coalescing them into one delivery.
+		// than quietMs keeps coalescing them into one delivery. Replay deliveries
+		// are flagged so regenerated VT query replies never reach the live PTY.
 		batcher.push('old-1');
 		advance(20);
 		batcher.push('old-2');
@@ -103,13 +104,16 @@ describe('native desktop terminal', () => {
 		batcher.push('old-3');
 		expect(delivered).toEqual([]);
 		advance(48);
-		expect(delivered).toEqual(['old-1old-2old-3']);
+		expect(delivered).toEqual([['old-1old-2old-3', true]]);
 		batcher.push('live');
-		expect(delivered).toEqual(['old-1old-2old-3', 'live']);
+		expect(delivered).toEqual([
+			['old-1old-2old-3', true],
+			['live', false],
+		]);
 	});
 
 	test('replay batching force-flushes long continuous output streams', () => {
-		const delivered: string[] = [];
+		const delivered: Array<[string, boolean]> = [];
 		let clock = 0;
 		const timers = {
 			schedule: () => 1,
@@ -117,15 +121,18 @@ describe('native desktop terminal', () => {
 			now: () => clock,
 		};
 		const batcher = createNativeTerminalOutputBatcher(
-			(data) => delivered.push(data),
+			(data, replay) => delivered.push([data, replay]),
 			{ quietMs: 48, maxMs: 750, timers },
 		);
 		batcher.push('start');
 		clock = 800;
 		batcher.push('more');
-		expect(delivered).toEqual(['startmore']);
+		expect(delivered).toEqual([['startmore', true]]);
 		batcher.push('live');
-		expect(delivered).toEqual(['startmore', 'live']);
+		expect(delivered).toEqual([
+			['startmore', true],
+			['live', false],
+		]);
 	});
 
 	test('maps standard desktop terminal shortcuts', () => {
@@ -201,17 +208,22 @@ describe('native desktop terminal', () => {
 	});
 
 	test('desktop injects the native viewer without changing the web default', async () => {
-		const [desktopLayout, sharedPanel, nativeViewer] = await Promise.all([
-			readFile('src/components/workspace/DesktopAppLayout.tsx', 'utf8'),
-			readFile(
-				'../../packages/web-sdk/src/components/terminals/TerminalsPanel.tsx',
-				'utf8',
-			),
-			readFile('src/components/terminal/NativeTerminalViewer.tsx', 'utf8'),
-		]);
-		expect(desktopLayout).toContain('Viewer={NativeTerminalViewer}');
-		expect(desktopLayout).toContain('preserveViewerSessions');
-		expect(sharedPanel).toContain('Viewer = TerminalViewer');
+		const [desktopLayout, viewerTabs, terminalPane, nativeViewer] =
+			await Promise.all([
+				readFile('src/components/workspace/DesktopAppLayout.tsx', 'utf8'),
+				readFile(
+					'../../packages/web-sdk/src/components/workspace/ViewerTabs.tsx',
+					'utf8',
+				),
+				readFile(
+					'../../packages/web-sdk/src/components/terminals/TerminalViewerPane.tsx',
+					'utf8',
+				),
+				readFile('src/components/terminal/NativeTerminalViewer.tsx', 'utf8'),
+			]);
+		expect(desktopLayout).toContain('terminalViewer={NativeTerminalViewer}');
+		expect(viewerTabs).toContain('TerminalPaneStrip');
+		expect(terminalPane).toContain('Viewer = TerminalViewer');
 		expect(nativeViewer).toContain("NATIVE_FONT_FAMILY = 'JetBrainsMono NF'");
 		expect(nativeViewer).not.toContain('usePreferences');
 	});

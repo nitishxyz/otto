@@ -20,6 +20,16 @@ export function repairPatchContent(patch: string): string {
 	return patch;
 }
 
+/**
+ * Find a marker occurrence anchored at the start of a line. Markers embedded
+ * mid-line (for example inside added file content) must not terminate parsing.
+ */
+function findMarkerLineIndex(patch: string, marker: string): number {
+	if (patch.startsWith(marker)) return 0;
+	const idx = patch.indexOf(`\n${marker}`);
+	return idx === -1 ? -1 : idx + 1;
+}
+
 function looksLikeUnifiedPatch(patch: string): boolean {
 	const trimmed = patch.trimStart();
 	return (
@@ -30,7 +40,7 @@ function looksLikeUnifiedPatch(patch: string): boolean {
 }
 
 function extractEnvelopedPatchFromText(patch: string): string {
-	const beginIndex = patch.indexOf(PATCH_BEGIN_MARKER);
+	const beginIndex = findMarkerLineIndex(patch, PATCH_BEGIN_MARKER);
 	if (beginIndex === -1) return patch;
 	if (beginIndex === patch.search(/\S/)) return patch;
 	if (looksLikeUnifiedPatch(patch)) return patch;
@@ -38,7 +48,7 @@ function extractEnvelopedPatchFromText(patch: string): string {
 }
 
 function extractPatchFromWrappedJson(patch: string): string {
-	if (patch.includes(PATCH_BEGIN_MARKER)) return patch;
+	if (findMarkerLineIndex(patch, PATCH_BEGIN_MARKER) !== -1) return patch;
 
 	const trimmed = patch.trim();
 	if (!trimmed.startsWith('{')) return patch;
@@ -62,8 +72,8 @@ function extractPatchFromWrappedJson(patch: string): string {
 
 function appendMissingEndMarker(patch: string): string {
 	const trimmed = patch.trimEnd();
-	if (!trimmed.includes(PATCH_BEGIN_MARKER)) return patch;
-	if (trimmed.includes(PATCH_END_MARKER)) return patch;
+	if (findMarkerLineIndex(trimmed, PATCH_BEGIN_MARKER) === -1) return patch;
+	if (findMarkerLineIndex(trimmed, PATCH_END_MARKER) !== -1) return patch;
 
 	const hasContent =
 		trimmed.includes(PATCH_UPDATE_PREFIX) ||
@@ -87,7 +97,7 @@ function stripTrailingMarkdownFenceBeforeMissingEndMarker(
 ): string {
 	const trimmed = patch.trimEnd();
 	if (!trimmed.trimStart().startsWith(PATCH_BEGIN_MARKER)) return patch;
-	if (trimmed.includes(PATCH_END_MARKER)) return patch;
+	if (findMarkerLineIndex(trimmed, PATCH_END_MARKER) !== -1) return patch;
 	const lines = trimmed.split('\n');
 	const last = lines.at(-1)?.trim();
 	if (last !== '```') return patch;
@@ -96,7 +106,7 @@ function stripTrailingMarkdownFenceBeforeMissingEndMarker(
 
 function trimAfterEndMarker(patch: string): string {
 	if (!patch.trimStart().startsWith(PATCH_BEGIN_MARKER)) return patch;
-	const endIndex = patch.indexOf(PATCH_END_MARKER);
+	const endIndex = findMarkerLineIndex(patch, PATCH_END_MARKER);
 	if (endIndex === -1) return patch;
 	const endOfMarker = endIndex + PATCH_END_MARKER.length;
 	const suffix = patch.slice(endOfMarker);

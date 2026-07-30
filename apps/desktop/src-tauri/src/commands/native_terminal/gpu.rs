@@ -208,6 +208,39 @@ impl GpuTerminalManager {
             .map_err(|error| error.to_string())?;
         surface.resize(size.width, size.height, scale as f32);
         surface.window.show().map_err(|error| error.to_string())?;
+
+        // The overlay is a rectangular child window; clip whichever of its
+        // corners coincide with the owner window's rounded corners so the
+        // terminal never pokes outside the window silhouette.
+        #[cfg(target_os = "macos")]
+        {
+            let inner = owner.inner_size().map_err(|error| error.to_string())?;
+            let owner_width = inner.width as f64 / scale;
+            let owner_height = inner.height as f64 / scale;
+            const EDGE_EPSILON: f64 = 2.0;
+            let left = bounds.x <= EDGE_EPSILON;
+            let right = bounds.x + bounds.width >= owner_width - EDGE_EPSILON;
+            let top = bounds.y <= EDGE_EPSILON;
+            let bottom = bounds.y + bounds.height >= owner_height - EDGE_EPSILON;
+            // CALayer coordinates are bottom-up: MinY corners are the bottom edge.
+            let mut mask: usize = 0;
+            if left && bottom {
+                mask |= 1 << 0; // kCALayerMinXMinYCorner
+            }
+            if right && bottom {
+                mask |= 1 << 1; // kCALayerMaxXMinYCorner
+            }
+            if left && top {
+                mask |= 1 << 2; // kCALayerMinXMaxYCorner
+            }
+            if right && top {
+                mask |= 1 << 3; // kCALayerMaxXMaxYCorner
+            }
+            if surface.corner_mask != Some(mask) {
+                surface.corner_mask = Some(mask);
+                apply_overlay_corner_mask(&surface.window, mask, macos_window_corner_radius());
+            }
+        }
         Ok(())
     }
 
@@ -276,7 +309,7 @@ impl GpuTerminalManager {
 
 #[cfg(target_os = "macos")]
 fn configure_overlay_window(window: &Window<Wry>) -> Result<(), String> {
-    use objc2_app_kit::{NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior};
+    use objc2_app_kit::{NSColor, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior};
 
     let pointer = window.ns_window().map_err(|error| error.to_string())?;
     // SAFETY: Tauri returns the live NSWindow for this overlay. Creation and
@@ -290,12 +323,63 @@ fn configure_overlay_window(window: &Window<Wry>) -> Result<(), String> {
     window.setAnimationBehavior(NSWindowAnimationBehavior::None);
     window.setExcludedFromWindowsMenu(true);
     window.setMovable(false);
+    // Corner-masked regions must show the owner window beneath, not an
+    // opaque window background.
+    window.setOpaque(false);
+    window.setBackgroundColor(Some(&NSColor::clearColor()));
     Ok(())
 }
 
 #[cfg(not(target_os = "macos"))]
 fn configure_overlay_window(_window: &Window<Wry>) -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn macos_window_corner_radius() -> f64 {
+    use objc2_foundation::NSProcessInfo;
+    let version = NSProcessInfo::processInfo().operatingSystemVersion();
+    // macOS 26 (Tahoe) uses substantially larger window corner radii than
+    // Big Sur through Sequoia (~10pt). Slight over-clipping is invisible
+    // because the owner webview beneath shares the terminal background.
+    if version.majorVersion >= 26 {
+        26.0
+    } else {
+        12.0
+    }
+}
+
+/// Applies a rounded-corner mask to the overlay's layer (the CAMetalLayer
+/// wgpu attached to the content view) so GPU output respects the owner
+/// window's silhouette. Runs on AppKit's main thread.
+#[cfg(target_os = "macos")]
+fn apply_overlay_corner_mask(overlay: &Window<Wry>, mask: usize, radius: f64) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let window = overlay.clone();
+    let _ = overlay.run_on_main_thread(move || {
+        let Ok(pointer) = window.ns_window() else {
+            return;
+        };
+        // SAFETY: Tauri returns the live NSWindow for this overlay and the
+        // closure runs on AppKit's main thread. contentView and layer are
+        // standard AppKit/CoreAnimation selectors.
+        unsafe {
+            let ns_window = pointer.cast::<AnyObject>();
+            let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+            if content_view.is_null() {
+                return;
+            }
+            let layer: *mut AnyObject = msg_send![content_view, layer];
+            if layer.is_null() {
+                return;
+            }
+            let _: () = msg_send![layer, setMasksToBounds: true];
+            let _: () = msg_send![layer, setCornerRadius: radius];
+            let _: () = msg_send![layer, setMaskedCorners: mask];
+        }
+    });
 }
 
 struct GpuTerminalSurface {
@@ -317,6 +401,8 @@ struct GpuTerminalSurface {
     font: ResolvedFont,
     scale_factor: f32,
     window: Window<Wry>,
+    #[cfg(target_os = "macos")]
+    corner_mask: Option<usize>,
 }
 
 struct PendingGpuTerminalSurface {
@@ -447,6 +533,8 @@ impl PendingGpuTerminalSurface {
             font: ResolvedFont::from(self.font, self.scale_factor),
             scale_factor: self.scale_factor,
             window: self.window,
+            #[cfg(target_os = "macos")]
+            corner_mask: None,
         })
     }
 }

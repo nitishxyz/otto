@@ -59,8 +59,8 @@ block2 = "0.6"
 libc = "0.2"
 mac-notification-sys = "0.6"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSWindow", "block2"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSString"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSColor", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSWindow", "block2"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSProcessInfo", "NSString"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebView", "WKSnapshotConfiguration", "objc2-app-kit", "block2"] }
 wgpu = { version = "30.0.0", default-features = false, features = ["metal"] }
 

@@ -40,6 +40,8 @@ Rules:
 - Context/removal lines must match current file text verbatim, including tabs and spaces.
 - Include enough unique context around updates; use 3+ lines for YAML.
 - Use one file section with multiple hunks for multiple changes to that file.
+- `*** Find:`/`*** With:` pairs belong under `*** Replace in:`, not `*** Update File:`.
+- In `*** Update File:` hunks, prefix every content line with ' ', '+', or '-'.
 - `fuzzyMatch` permits whitespace-normalized matching; disable it for strict matching.
 - `allowRejects` applies valid operations while returning rejected ones.
-- On failure, reread the file and rebuild the patch from current content.
+- On failure, reread the file, then either rebuild the hunk from current content or switch to `*** Replace Lines in:` with fresh line numbers.

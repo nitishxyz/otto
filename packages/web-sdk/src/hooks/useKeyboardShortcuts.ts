@@ -11,8 +11,8 @@ import { useAgentsStore } from '../stores/agentsStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useResearchStore } from '../stores/researchStore';
 import { useFilePickerStore } from '../stores/filePickerStore';
-import { useTerminalStore } from '../stores/terminalStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
+import { useToggleTerminalTabs } from './useTerminalTabs';
 
 interface UseKeyboardShortcutsOptions {
 	sessionIds?: string[];
@@ -73,7 +73,7 @@ export function useKeyboardShortcuts({
 	const toggleAgents = useAgentsStore((state) => state.toggleManager);
 	const toggleSettings = useSettingsStore((state) => state.toggleSidebar);
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
-	const toggleTerminalPanel = useTerminalStore((state) => state.togglePanel);
+	const toggleTerminalTabs = useToggleTerminalTabs();
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
@@ -246,7 +246,7 @@ export function useKeyboardShortcuts({
 
 			if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
 				e.preventDefault();
-				toggleTerminalPanel();
+				void toggleTerminalTabs();
 				return;
 			}
 
@@ -419,7 +419,7 @@ export function useKeyboardShortcuts({
 			toggleSkills,
 			toggleAgents,
 			toggleSettings,
-			toggleTerminalPanel,
+			toggleTerminalTabs,
 			toggleResearch,
 			toggleSessionList,
 			onSelectSession,

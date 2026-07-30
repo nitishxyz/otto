@@ -171,9 +171,15 @@ export type ViewerTab =
 			url: string;
 			kind: 'browser' | 'simulator';
 			reloadKey: number;
+	  }
+	| {
+			id: string;
+			type: 'terminal';
+			title: string;
+			terminalId: string;
 	  };
 
-export type ViewerMode = 'work' | 'preview';
+export type ViewerMode = 'work' | 'preview' | 'terminal';
 
 export interface ViewerTabPayloadCache {
 	patchPreviews: Record<string, ToolPatchPreview | undefined>;
@@ -196,6 +202,7 @@ export interface ViewerTabsState {
 	activeMode: ViewerMode;
 	activeWorkTabId: string | null;
 	activePreviewTabId: string | null;
+	activeTerminalTabId: string | null;
 	followToolActivity: boolean;
 	followReadActivity: boolean;
 	toggleFollowToolActivity: () => void;
@@ -223,6 +230,8 @@ export interface ViewerTabsState {
 			newTab?: boolean;
 		},
 	) => void;
+	openTerminalTab: (terminalId: string, title?: string) => void;
+	syncTerminalTabs: (terminals: Array<{ id: string; title: string }>) => void;
 	updateBrowserTabUrl: (id: string, url: string) => void;
 	reloadBrowserTab: (id: string) => void;
 	toggleFileTabPinned: (id: string) => void;
@@ -272,8 +281,29 @@ function newBrowserTabId(): string {
 	return `browser:browser:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
-function modeForTab(tab: ViewerTab): ViewerMode {
-	return tab.type === 'browser' ? 'preview' : 'work';
+/** Deterministic viewer tab id for a daemon terminal. */
+export function terminalViewerTabId(terminalId: string): string {
+	return `terminal:${terminalId}`;
+}
+
+export function modeForViewerTab(tab: ViewerTab): ViewerMode {
+	if (tab.type === 'browser') return 'preview';
+	if (tab.type === 'terminal') return 'terminal';
+	return 'work';
+}
+
+const modeForTab = modeForViewerTab;
+
+function activeIdForMode(
+	state: Pick<
+		ViewerTabsState,
+		'activeWorkTabId' | 'activePreviewTabId' | 'activeTerminalTabId'
+	>,
+	mode: ViewerMode,
+): string | null {
+	if (mode === 'preview') return state.activePreviewTabId;
+	if (mode === 'terminal') return state.activeTerminalTabId;
+	return state.activeWorkTabId;
 }
 
 function findFallbackTabId(
@@ -294,9 +324,8 @@ function activeIdForWorkUpdate(
 	state: ViewerTabsState,
 	targetId: string,
 ): string {
-	return state.activeMode === 'preview' && state.activePreviewTabId
-		? state.activePreviewTabId
-		: targetId;
+	if (state.activeMode === 'work') return targetId;
+	return activeIdForMode(state, state.activeMode) ?? targetId;
 }
 
 function indexTabs(
@@ -767,6 +796,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	activeMode: 'work',
 	activeWorkTabId: null,
 	activePreviewTabId: null,
+	activeTerminalTabId: null,
 	followToolActivity: false,
 	followReadActivity: false,
 
@@ -779,14 +809,10 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	setFollowReadActivity: (enabled) => set({ followReadActivity: enabled }),
 
 	setViewerMode: (mode) =>
-		set((state) => {
-			const activeTabId =
-				mode === 'preview' ? state.activePreviewTabId : state.activeWorkTabId;
-			return {
-				activeMode: mode,
-				activeTabId: activeTabId ?? null,
-			};
-		}),
+		set((state) => ({
+			activeMode: mode,
+			activeTabId: activeIdForMode(state, mode) ?? null,
+		})),
 
 	openGitDiffTab: (path, staged) => {
 		const id = `git-diff:${staged ? 'staged' : 'unstaged'}:${path}`;
@@ -1341,6 +1367,87 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 		});
 	},
 
+	openTerminalTab: (terminalId, title) => {
+		const id = terminalViewerTabId(terminalId);
+		set((state) => {
+			const existing = state.tabsById[id];
+			const existingTitle =
+				existing?.type === 'terminal' ? existing.title : undefined;
+			return {
+				...tabsState(
+					upsertTab(state.tabs, {
+						id,
+						type: 'terminal',
+						title: title ?? existingTitle ?? 'Terminal',
+						terminalId,
+					}),
+				),
+				activeMode: 'terminal',
+				activeTerminalTabId: id,
+				activeTabId: id,
+			};
+		});
+	},
+
+	syncTerminalTabs: (terminals) =>
+		set((state) => {
+			if (!state.tabs.some((tab) => tab.type === 'terminal')) return {};
+			const titlesByTabId = new Map(
+				terminals.map((terminal) => [
+					terminalViewerTabId(terminal.id),
+					terminal.title,
+				]),
+			);
+			let changed = false;
+			const nextTabs: ViewerTab[] = [];
+			for (const tab of state.tabs) {
+				if (tab.type !== 'terminal') {
+					nextTabs.push(tab);
+					continue;
+				}
+				const title = titlesByTabId.get(tab.id);
+				if (title === undefined) {
+					changed = true;
+					continue;
+				}
+				if (title && title !== tab.title) {
+					nextTabs.push({ ...tab, title });
+					changed = true;
+					continue;
+				}
+				nextTabs.push(tab);
+			}
+			if (!changed) return {};
+
+			const removedIds = state.tabs
+				.map((tab) => tab.id)
+				.filter((id) => !nextTabs.some((tab) => tab.id === id));
+			let activeMode = state.activeMode;
+			let activeTerminalTabId = state.activeTerminalTabId;
+			if (
+				activeTerminalTabId &&
+				!nextTabs.some((tab) => tab.id === activeTerminalTabId)
+			) {
+				activeTerminalTabId =
+					nextTabs.find((tab) => modeForTab(tab) === 'terminal')?.id ?? null;
+			}
+			const nextState = { ...state, activeTerminalTabId };
+			if (activeMode === 'terminal' && !activeTerminalTabId) {
+				activeMode = activeIdForMode(nextState, 'work')
+					? 'work'
+					: activeIdForMode(nextState, 'preview')
+						? 'preview'
+						: activeMode;
+			}
+			return {
+				...tabsState(nextTabs),
+				tabPayloads: withoutTabPayloads(state.tabPayloads, removedIds),
+				activeMode,
+				activeTerminalTabId,
+				activeTabId: activeIdForMode(nextState, activeMode),
+			};
+		}),
+
 	updateBrowserTabUrl: (id, url) =>
 		set((state) => ({
 			...tabsState(
@@ -1386,6 +1493,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeMode: mode,
 				activeWorkTabId: mode === 'work' ? id : state.activeWorkTabId,
 				activePreviewTabId: mode === 'preview' ? id : state.activePreviewTabId,
+				activeTerminalTabId:
+					mode === 'terminal' ? id : state.activeTerminalTabId,
 				activeTabId: id,
 			};
 		}),
@@ -1398,6 +1507,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			let activeMode = state.activeMode;
 			let activeWorkTabId = state.activeWorkTabId;
 			let activePreviewTabId = state.activePreviewTabId;
+			let activeTerminalTabId = state.activeTerminalTabId;
 
 			if (
 				closingTab &&
@@ -1415,12 +1525,24 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activePreviewTabId = findFallbackTabId(tabs, 'preview', closingIndex);
 			}
 
-			if (activeMode === 'work' && !activeWorkTabId && activePreviewTabId) {
-				activeMode = 'preview';
+			if (
+				closingTab &&
+				modeForTab(closingTab) === 'terminal' &&
+				activeTerminalTabId === id
+			) {
+				activeTerminalTabId = findFallbackTabId(tabs, 'terminal', closingIndex);
 			}
 
-			if (activeMode === 'preview' && !activePreviewTabId && activeWorkTabId) {
-				activeMode = 'work';
+			const nextState = {
+				activeWorkTabId,
+				activePreviewTabId,
+				activeTerminalTabId,
+			};
+			if (!activeIdForMode(nextState, activeMode)) {
+				const fallbackMode = (['work', 'preview', 'terminal'] as const).find(
+					(mode) => mode !== activeMode && activeIdForMode(nextState, mode),
+				);
+				if (fallbackMode) activeMode = fallbackMode;
 			}
 
 			return {
@@ -1429,8 +1551,8 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeMode,
 				activeWorkTabId,
 				activePreviewTabId,
-				activeTabId:
-					activeMode === 'preview' ? activePreviewTabId : activeWorkTabId,
+				activeTerminalTabId,
+				activeTabId: activeIdForMode(nextState, activeMode),
 			};
 		}),
 
@@ -1460,5 +1582,6 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			activeMode: 'work',
 			activeWorkTabId: null,
 			activePreviewTabId: null,
+			activeTerminalTabId: null,
 		}),
 }));

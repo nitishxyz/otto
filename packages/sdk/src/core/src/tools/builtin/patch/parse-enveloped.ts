@@ -44,6 +44,14 @@ function parseDirectivePath(line: string, prefix: string): string {
 	return filePath;
 }
 
+/** Case-insensitive directive prefix match so minor casing slips still parse. */
+function matchesDirective(line: string, prefix: string): boolean {
+	return line.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase();
+}
+
+/** Unprefixed lines that look like directives; content must use ' ', '+', or '-'. */
+const DIRECTIVE_LIKE_PATTERN = /^\*{3}(\s|$)/;
+
 function parsePositiveLineNumber(value: string, label: string): number {
 	const trimmed = value.trim();
 	if (!/^\d+$/.test(trimmed)) {
@@ -207,7 +215,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 
 		if (!inside) {
 			if (line.trim() === '') continue;
-			if (line.startsWith(PATCH_BEGIN_MARKER)) {
+			if (matchesDirective(line, PATCH_BEGIN_MARKER)) {
 				inside = true;
 				continue;
 			}
@@ -216,11 +224,11 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			);
 		}
 
-		if (line.startsWith(PATCH_BEGIN_MARKER)) {
+		if (matchesDirective(line, PATCH_BEGIN_MARKER)) {
 			throw new Error('Nested "*** Begin Patch" markers are not supported.');
 		}
 
-		if (line.startsWith(PATCH_END_MARKER)) {
+		if (matchesDirective(line, PATCH_END_MARKER)) {
 			flushBuilder();
 			encounteredEnd = true;
 			const remaining = lines.slice(i + 1).find((rest) => rest.trim() !== '');
@@ -232,7 +240,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			break;
 		}
 
-		if (line.startsWith(PATCH_ADD_PREFIX)) {
+		if (matchesDirective(line, PATCH_ADD_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'add',
@@ -242,7 +250,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_UPDATE_PREFIX)) {
+		if (matchesDirective(line, PATCH_UPDATE_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'update',
@@ -253,7 +261,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_DELETE_PREFIX)) {
+		if (matchesDirective(line, PATCH_DELETE_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'delete',
@@ -262,7 +270,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_REPLACE_PREFIX)) {
+		if (matchesDirective(line, PATCH_REPLACE_PREFIX)) {
 			flushBuilder();
 			builder = createReplaceBuilder(
 				parseDirectivePath(line, PATCH_REPLACE_PREFIX),
@@ -270,7 +278,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_DELETE_LINES_PREFIX)) {
+		if (matchesDirective(line, PATCH_DELETE_LINES_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'line-delete',
@@ -279,7 +287,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_REPLACE_LINES_PREFIX)) {
+		if (matchesDirective(line, PATCH_REPLACE_LINES_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'line-replace',
@@ -290,7 +298,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_INSERT_BEFORE_PREFIX)) {
+		if (matchesDirective(line, PATCH_INSERT_BEFORE_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'line-insert',
@@ -302,7 +310,7 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			continue;
 		}
 
-		if (line.startsWith(PATCH_INSERT_AFTER_PREFIX)) {
+		if (matchesDirective(line, PATCH_INSERT_AFTER_PREFIX)) {
 			flushBuilder();
 			builder = {
 				kind: 'line-insert',
@@ -315,12 +323,12 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 		}
 
 		if (builder && builder.kind === 'replace') {
-			if (line.startsWith(PATCH_FIND_MARKER)) {
+			if (matchesDirective(line, PATCH_FIND_MARKER)) {
 				flushReplacePair(builder);
 				builder.phase = 'find';
 				continue;
 			}
-			if (line.startsWith(PATCH_WITH_MARKER)) {
+			if (matchesDirective(line, PATCH_WITH_MARKER)) {
 				if (builder.phase !== 'find' || builder.findLines.length === 0) {
 					throw new Error(
 						`Replace in ${builder.filePath}: *** With: must follow a non-empty *** Find: block.`,
@@ -343,13 +351,59 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 			);
 		}
 
+		if (builder && builder.kind === 'update') {
+			if (matchesDirective(line, PATCH_FIND_MARKER)) {
+				const filePath: string = builder.filePath;
+				if (builder.currentHunk && builder.currentHunk.lines.length === 0) {
+					builder.hunks.pop();
+					builder.currentHunk = null;
+				}
+				if (builder.hunks.length > 0) {
+					flushBuilder();
+				} else {
+					builder = null;
+				}
+				const replaceBuilder = createReplaceBuilder(filePath);
+				replaceBuilder.phase = 'find';
+				builder = replaceBuilder;
+				continue;
+			}
+			if (matchesDirective(line, PATCH_WITH_MARKER)) {
+				throw new Error(
+					`Update File for ${builder.filePath}: *** With: must follow a *** Find: block. Use *** Replace in: ${builder.filePath} with *** Find:/*** With: pairs for search-and-replace edits.`,
+				);
+			}
+			if (matchesDirective(line, PATCH_LINES_MARKER)) {
+				const filePath: string = builder.filePath;
+				if (builder.currentHunk && builder.currentHunk.lines.length === 0) {
+					builder.hunks.pop();
+					builder.currentHunk = null;
+				}
+				if (builder.hunks.length > 0) {
+					flushBuilder();
+				} else {
+					builder = null;
+				}
+				const range = parseLineRange(line.slice(PATCH_LINES_MARKER.length));
+				builder = {
+					kind: 'line-replace',
+					filePath,
+					lines: [],
+					phase: 'range',
+					startLine: range.startLine,
+					endLine: range.endLine,
+				};
+				continue;
+			}
+		}
+
 		if (!builder) {
 			if (line.trim() === '') continue;
 			throw new Error(`Unexpected content in patch: "${line}"`);
 		}
 
 		if (builder.kind === 'line-delete') {
-			if (line.startsWith(PATCH_LINES_MARKER)) {
+			if (matchesDirective(line, PATCH_LINES_MARKER)) {
 				const range = parseLineRange(line.slice(PATCH_LINES_MARKER.length));
 				builder.startLine = range.startLine;
 				builder.endLine = range.endLine;
@@ -368,13 +422,13 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 				builder.lines.push(line);
 				continue;
 			}
-			if (line.startsWith(PATCH_LINES_MARKER)) {
+			if (matchesDirective(line, PATCH_LINES_MARKER)) {
 				const range = parseLineRange(line.slice(PATCH_LINES_MARKER.length));
 				builder.startLine = range.startLine;
 				builder.endLine = range.endLine;
 				continue;
 			}
-			if (line.startsWith(PATCH_WITH_MARKER)) {
+			if (matchesDirective(line, PATCH_WITH_MARKER)) {
 				if (!builder.startLine || !builder.endLine) {
 					throw new Error(
 						`Replace Lines in ${builder.filePath}: *** With: must follow *** Lines:.`,
@@ -394,14 +448,14 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 				builder.lines.push(line);
 				continue;
 			}
-			if (line.startsWith(PATCH_LINE_MARKER)) {
+			if (matchesDirective(line, PATCH_LINE_MARKER)) {
 				builder.line = parsePositiveLineNumber(
 					line.slice(PATCH_LINE_MARKER.length),
 					'Insert line',
 				);
 				continue;
 			}
-			if (line.startsWith(PATCH_WITH_MARKER)) {
+			if (matchesDirective(line, PATCH_WITH_MARKER)) {
 				if (!builder.line) {
 					throw new Error(
 						`Insert ${builder.position} in ${builder.filePath}: *** With: must follow *** Line:.`,
@@ -417,6 +471,11 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 		}
 
 		if (builder.kind === 'add') {
+			if (!line.startsWith('+') && DIRECTIVE_LIKE_PATTERN.test(line)) {
+				throw new Error(
+					`Unrecognized directive in Add File for ${builder.filePath}: "${line}". Check the directive spelling, or prefix literal file content with '+'.`,
+				);
+			}
 			builder.lines.push(line.startsWith('+') ? line.slice(1) : line);
 			continue;
 		}
@@ -459,6 +518,11 @@ export function parseEnvelopedPatch(patch: string): PatchOperation[] {
 		} else if (prefix === ' ') {
 			hunk.lines.push(createLine('context', line.slice(1)));
 		} else {
+			if (DIRECTIVE_LIKE_PATTERN.test(line)) {
+				throw new Error(
+					`Unrecognized directive in update for ${builder.filePath}: "${line}". Use exact directives such as *** Find:, *** With:, or *** Lines:, or prefix file content lines with ' ', '+', or '-'.`,
+				);
+			}
 			hunk.lines.push(createLine('context', line));
 		}
 	}

@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent } from 'react';
-import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
+import {
+	useEdgeHover,
+	usePreferences,
+	useToggleTerminalTabs,
+} from '@ottocode/web-sdk/hooks';
 import {
 	clearRuntimeApiBaseUrl,
 	configureApiClient,
@@ -10,7 +14,6 @@ import {
 	GitSidebarToggle,
 	GitSidebar,
 	TerminalPanelToggle,
-	TerminalsPanel,
 	GitCommitModal,
 	ConfirmationDialog,
 	Button,
@@ -47,7 +50,6 @@ import {
 	usePanelWidthStore,
 	useViewerTabsStore,
 	useSidebarStore,
-	useTerminalStore,
 	useRightRailStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
@@ -271,7 +273,7 @@ export const AppLayout = memo(function AppLayout({
 					{sidebar}
 				</Sidebar>
 
-				{/* Main content area with bottom terminal panel */}
+				{/* Main content area */}
 				<div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto pt-[calc(var(--mobile-safe-area-top)+3rem)] md:pt-0">
 					<MobileTopBar
 						anyViewerOpen={anyViewerOpen}
@@ -325,9 +327,6 @@ export const AppLayout = memo(function AppLayout({
 							onFixWithAI={onFixWithAI}
 						/>
 					</div>
-
-					{/* Bottom terminal panel */}
-					<TerminalsPanel />
 				</div>
 			</div>
 
@@ -357,8 +356,11 @@ const MobileTopBar = memo(function MobileTopBar({
 	onOpenPanelMenu,
 }: MobileTopBarProps) {
 	const closeAllViewerTabs = useViewerTabsStore((s) => s.closeAllTabs);
-	const terminalOpen = useTerminalStore((s) => s.isOpen);
-	const toggleTerminalPanel = useTerminalStore((s) => s.togglePanel);
+	const terminalTabActive = useViewerTabsStore((s) => {
+		const tab = s.activeTabId ? s.tabsById[s.activeTabId] : undefined;
+		return tab?.type === 'terminal';
+	});
+	const toggleTerminalTabs = useToggleTerminalTabs();
 	const openSessionsSidebar = useSidebarStore((s) => s.setCollapsed);
 
 	return (
@@ -404,9 +406,9 @@ const MobileTopBar = memo(function MobileTopBar({
 					<PanelRight className="h-5 w-5" />
 				</Button>
 				<Button
-					variant={terminalOpen ? 'secondary' : 'ghost'}
+					variant={terminalTabActive ? 'secondary' : 'ghost'}
 					size="icon"
-					onClick={toggleTerminalPanel}
+					onClick={() => void toggleTerminalTabs()}
 					aria-label="Toggle terminal"
 					className="h-10 w-10 rounded-xl"
 				>

@@ -46,6 +46,14 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY_MS = 1_500;
 const CURSOR_BLINK_MS = 500;
 const terminalDecoder = new TextDecoder();
+// Matches web-sdk's native-overlay selector: any modal layer must cover the
+// GPU overlay child window, which otherwise floats above all webview content.
+const BLOCKING_OVERLAY_SELECTOR =
+	'[data-native-overlay-root="true"], [aria-modal="true"]';
+
+function hasBlockingOverlay(): boolean {
+	return document.querySelector(BLOCKING_OVERLAY_SELECTOR) !== null;
+}
 
 function rgb(color: NativeTerminalRgb): string {
 	return `rgb(${color.r} ${color.g} ${color.b})`;
@@ -293,9 +301,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 				y: bounds.y,
 				width: bounds.width,
 				height: bounds.height,
-				hidden:
-					!isActive ||
-					document.querySelector('[data-native-overlay-root="true"]') !== null,
+				hidden: !isActive || hasBlockingOverlay(),
 			})
 				.then(async () => {
 					if (!isActive) return;
@@ -355,9 +361,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 				y: bounds.y,
 				width: bounds.width,
 				height: bounds.height,
-				hidden:
-					!isActiveRef.current ||
-					document.querySelector('[data-native-overlay-root="true"]') !== null,
+				hidden: !isActiveRef.current || hasBlockingOverlay(),
 			};
 		};
 
@@ -375,7 +379,10 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 
 		// Chunks arriving while a native feed is in flight merge into the next
 		// feed, so heavy output costs one IPC per drain instead of one per chunk.
-		let liveOutputBuffer = '';
+		// Replay chunks are kept separate: replayed history regenerates VT query
+		// replies (DECRQM, DA1, DSR, OSC color reports) that must never reach the
+		// live PTY, where the shell would echo them as line noise.
+		let outputQueue: Array<{ data: string; replay: boolean }> = [];
 		const sendPtyWrites = (ptyWrites: number[]) => {
 			if (
 				ptyWrites.length > 0 &&
@@ -386,27 +393,34 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 				);
 			}
 		};
-		const feedOutput = (message: string) => {
+		const feedOutput = (message: string, replay: boolean) => {
 			if (!message || disposed) return;
-			const drainPending = liveOutputBuffer.length > 0;
-			liveOutputBuffer += message;
+			const drainPending = outputQueue.length > 0;
+			const tail = outputQueue[outputQueue.length - 1];
+			if (tail && tail.replay === replay) {
+				tail.data += message;
+			} else {
+				outputQueue.push({ data: message, replay });
+			}
 			if (drainPending) return;
 			void enqueue(async () => {
-				while (liveOutputBuffer && !disposed) {
-					const chunk = liveOutputBuffer;
-					liveOutputBuffer = '';
+				while (outputQueue.length > 0 && !disposed) {
+					const { data: chunk, replay: isReplay } = outputQueue[0];
+					outputQueue.shift();
 					if (gpuActiveRef.current) {
 						const result = await feedNativeTerminalGpu(
 							nativeSessionId,
 							encoder.encode(chunk),
 						);
-						sendPtyWrites(result.ptyWrites);
+						if (!isReplay) sendPtyWrites(result.ptyWrites);
 					} else {
 						const update = await feedNativeTerminal(
 							nativeSessionId,
 							encoder.encode(chunk),
 						);
-						if (!disposed) applyUpdate(update);
+						if (!disposed) {
+							applyUpdate(isReplay ? { ...update, ptyWrites: [] } : update);
+						}
 					}
 				}
 			}).catch(fail);
@@ -622,7 +636,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			disposed = true;
 			gpuActiveRef.current = false;
 			outputBatcher.dispose();
-			liveOutputBuffer = '';
+			outputQueue = [];
 			resizeObserver?.disconnect();
 			overlayObserver?.disconnect();
 			unlistenMoved?.();

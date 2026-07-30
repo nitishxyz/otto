@@ -126,7 +126,10 @@ async function applyUpdateOperation(
 			appliedHunks.push(applied);
 			hint = applied.newStart + applied.newLines - 1;
 		} catch (error) {
-			if (!allowRejects) throw error;
+			if (!allowRejects) {
+				const message = error instanceof Error ? error.message : String(error);
+				throw new Error(`${operation.filePath}: ${message}`);
+			}
 			failedHunkCount++;
 		}
 	}

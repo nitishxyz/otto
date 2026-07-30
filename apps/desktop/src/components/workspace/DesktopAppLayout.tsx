@@ -26,7 +26,6 @@ import {
 	SkillsSidebarToggle,
 	SubagentFloatingViewer,
 	TerminalPanelToggle,
-	TerminalsPanel,
 	TunnelSidebar,
 	TunnelSidebarToggle,
 	UsageDashboard,
@@ -275,7 +274,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 										defaultWidth={VIEWER_MIN_WIDTH}
 									/>
 								)}
-								{anyViewerOpen && <ViewerTabs />}
+								{anyViewerOpen && (
+									<ViewerTabs terminalViewer={NativeTerminalViewer} />
+								)}
 							</section>
 						</div>
 
@@ -334,11 +335,6 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							</div>
 						</div>
 					</div>
-
-					<TerminalsPanel
-						Viewer={NativeTerminalViewer}
-						preserveViewerSessions
-					/>
 				</div>
 			</div>
 

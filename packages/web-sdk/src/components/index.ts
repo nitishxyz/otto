@@ -73,6 +73,7 @@ export * from './terminals/TerminalsPanel';
 export * from './terminals/TerminalPanelToggle';
 export * from './terminals/TerminalTabBar';
 export * from './terminals/TerminalViewer';
+export * from './terminals/TerminalViewerPane';
 export {
 	TerminalsSidebar,
 	TerminalsSidebarToggle,

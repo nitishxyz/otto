@@ -1,23 +1,40 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Terminal } from 'lucide-react';
-import { useTerminalStore } from '../../stores/terminalStore';
+import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { useTerminals } from '../../hooks/useTerminals';
+import { useToggleTerminalTabs } from '../../hooks/useTerminalTabs';
 import { Tooltip } from '../ui/Tooltip';
 
 export const TerminalPanelToggle = memo(function TerminalPanelToggle() {
-	const isOpen = useTerminalStore((s) => s.isOpen);
-	const togglePanel = useTerminalStore((s) => s.togglePanel);
+	const isActive = useViewerTabsStore((state) => {
+		const tab = state.activeTabId
+			? state.tabsById[state.activeTabId]
+			: undefined;
+		return tab?.type === 'terminal';
+	});
+	const toggleTerminalTabs = useToggleTerminalTabs();
 	const { data } = useTerminals();
 
 	const count = data?.count ?? 0;
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === '`' && e.ctrlKey) {
+				e.preventDefault();
+				void toggleTerminalTabs();
+			}
+		};
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [toggleTerminalTabs]);
 
 	return (
 		<Tooltip content="Terminals (⌘J / Ctrl+J)" side="left">
 			<button
 				type="button"
-				onClick={togglePanel}
+				onClick={() => void toggleTerminalTabs()}
 				className={`relative h-12 w-full transition-colors touch-manipulation flex items-center justify-center ${
-					isOpen ? 'bg-muted border-r-2 border-primary' : 'hover:bg-muted/50'
+					isActive ? 'bg-muted border-r-2 border-primary' : 'hover:bg-muted/50'
 				}`}
 				aria-label="Terminals (⌘J / Ctrl+J)"
 			>

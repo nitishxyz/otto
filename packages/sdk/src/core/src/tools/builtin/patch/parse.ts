@@ -14,7 +14,7 @@ export function parsePatchInput(patch: string): {
 		throw new Error('Patch content is empty.');
 	}
 
-	if (trimmed.startsWith(PATCH_BEGIN_MARKER)) {
+	if (trimmed.toLowerCase().startsWith(PATCH_BEGIN_MARKER.toLowerCase())) {
 		return {
 			format: 'enveloped',
 			operations: parseEnvelopedPatch(patch),

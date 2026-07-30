@@ -42,3 +42,4 @@ export * from './useProjectConnection';
 export * from './useProjects';
 export * from './useShellJobs';
 export * from './useSessionHandoff';
+export * from './useTerminalTabs';

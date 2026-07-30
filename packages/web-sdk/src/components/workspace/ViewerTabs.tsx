@@ -1,11 +1,29 @@
 import { memo, useEffect, useRef } from 'react';
-import { Code2, GitCommit, Globe2, Pin, Smartphone, X } from 'lucide-react';
+import type { ComponentType } from 'react';
+import {
+	Code2,
+	GitCommit,
+	Globe2,
+	Pin,
+	Plus,
+	Smartphone,
+	Terminal as TerminalIcon,
+	X,
+} from 'lucide-react';
 import {
 	hydrateViewerTab,
+	modeForViewerTab,
 	useViewerTabsStore,
+	type ViewerMode,
 	type ViewerTab,
 	type ViewerTabPayloadCache,
 } from '../../stores/viewerTabsStore';
+import {
+	useOpenNewTerminalTab,
+	useOpenTerminalTabs,
+	useSyncTerminalTabs,
+} from '../../hooks/useTerminalTabs';
+import { useKillTerminal } from '../../hooks/useTerminals';
 import { getScrollLeftToRevealTarget } from '../../lib/viewerTabScroll';
 import { FileTypeIcon } from '../common/FileTypeIcon';
 import { Button } from '../ui/Button';
@@ -14,6 +32,8 @@ import { SessionFilesDiffPanel } from '../session-files/SessionFilesDiffPanel';
 import { FileViewerPanel } from '../file-browser/FileViewerPanel';
 import { SkillViewerPanel } from '../skills/SkillViewerPanel';
 import { BrowserViewerPanel } from '../browser/BrowserViewerPanel';
+import type { TerminalViewerProps } from '../terminals/TerminalViewer';
+import { TerminalViewerPane } from '../terminals/TerminalViewerPane';
 import { ToolPreviewPanel } from './ToolPreviewPanel';
 
 function tabKindLabel(tab: ViewerTab): string {
@@ -34,6 +54,8 @@ function tabKindLabel(tab: ViewerTab): string {
 			return tab.skill;
 		case 'browser':
 			return tab.kind === 'simulator' ? 'simulator' : 'browser';
+		case 'terminal':
+			return 'terminal';
 	}
 }
 
@@ -49,14 +71,16 @@ function getTabPath(tab: ViewerTab): string {
 			return tab.file ?? 'SKILL.md';
 		case 'browser':
 			return tab.url || tab.title;
+		case 'terminal':
+			return tab.title;
 	}
 }
 
-function isPreviewTab(
-	tab: ViewerTab,
-): tab is Extract<ViewerTab, { type: 'browser' }> {
-	return tab.type === 'browser';
-}
+const EMPTY_PANE_MESSAGES: Record<ViewerMode, string> = {
+	work: 'No work tabs open',
+	preview: 'No preview tabs open',
+	terminal: 'No terminals open',
+};
 
 function renderTabIcon(tab: ViewerTab) {
 	if (tab.type === 'git-diff') {
@@ -93,6 +117,10 @@ function renderTabIcon(tab: ViewerTab) {
 		) : (
 			<Globe2 className="h-3.5 w-3.5 shrink-0 text-blue-500" />
 		);
+	}
+
+	if (tab.type === 'terminal') {
+		return <TerminalIcon className="h-3.5 w-3.5 shrink-0 text-green-500" />;
 	}
 
 	const path = getTabPath(tab);
@@ -262,6 +290,9 @@ function renderTabContent(
 			);
 		case 'browser':
 			return <BrowserViewerPanel tab={tab} />;
+		case 'terminal':
+			// Terminal panes stay persistently mounted in TerminalPaneStrip.
+			return null;
 	}
 }
 
@@ -274,34 +305,59 @@ const VIEWER_MODE_ICON_BASE_CLASS =
 function getTabIdsForMode(
 	tabOrder: string[],
 	tabsById: Record<string, ViewerTab | undefined>,
-	mode: 'work' | 'preview',
+	mode: ViewerMode,
 ): string[] {
 	return tabOrder.filter((id) => {
 		const tab = tabsById[id];
 		if (!tab) return false;
-		return mode === 'preview' ? isPreviewTab(tab) : !isPreviewTab(tab);
+		return modeForViewerTab(tab) === mode;
 	});
 }
 
 function getFirstTabIdForMode(
 	tabOrder: string[],
 	tabsById: Record<string, ViewerTab | undefined>,
-	mode: 'work' | 'preview',
+	mode: ViewerMode,
 ): string | null {
 	return getTabIdsForMode(tabOrder, tabsById, mode)[0] ?? null;
 }
 
 function useViewerTabsKeyboardShortcuts() {
+	const openNewTerminalTab = useOpenNewTerminalTab();
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey && !event.ctrlKey) return;
+			const key = event.key.toLowerCase();
+
+			// Cmd/Ctrl+T opens a sibling tab when a terminal or browser tab is
+			// focused. Registered on capture so terminal key handlers (which
+			// swallow every key) never see it.
+			if (key === 't') {
+				const state = useViewerTabsStore.getState();
+				const activeTab = state.activeTabId
+					? state.tabsById[state.activeTabId]
+					: undefined;
+				if (!activeTab) return;
+				const mode = modeForViewerTab(activeTab);
+				if (mode === 'terminal') {
+					event.preventDefault();
+					event.stopPropagation();
+					void openNewTerminalTab();
+				} else if (mode === 'preview') {
+					event.preventDefault();
+					event.stopPropagation();
+					state.openBrowserTab('', { newTab: true });
+				}
+				return;
+			}
+
+			if (key !== 'w') return;
 			const target = event.target as HTMLElement | null;
 			const isInInput =
 				target?.tagName === 'INPUT' ||
 				target?.tagName === 'TEXTAREA' ||
 				target?.isContentEditable;
-
-			if (isInInput || event.key.toLowerCase() !== 'w') return;
-			if (!event.metaKey && !event.ctrlKey) return;
+			if (isInInput) return;
 
 			const activeId = useViewerTabsStore.getState().activeTabId;
 			if (!activeId) return;
@@ -310,9 +366,9 @@ function useViewerTabsKeyboardShortcuts() {
 			useViewerTabsStore.getState().closeTab(activeId);
 		};
 
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, []);
+		window.addEventListener('keydown', handleKeyDown, true);
+		return () => window.removeEventListener('keydown', handleKeyDown, true);
+	}, [openNewTerminalTab]);
 }
 
 const ViewerModeControls = memo(function ViewerModeControls() {
@@ -324,21 +380,30 @@ const ViewerModeControls = memo(function ViewerModeControls() {
 		(state) =>
 			getTabIdsForMode(state.tabOrder, state.tabsById, 'preview').length,
 	);
+	const terminalTabCount = useViewerTabsStore(
+		(state) =>
+			getTabIdsForMode(state.tabOrder, state.tabsById, 'terminal').length,
+	);
 	const setViewerMode = useViewerTabsStore((state) => state.setViewerMode);
 	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
-	const showWorkActivityDot = activeMode === 'preview' && workTabCount > 0;
+	const openTerminalTabs = useOpenTerminalTabs();
+	const showWorkActivityDot = activeMode !== 'work' && workTabCount > 0;
 
 	return (
 		<div className="h-12 shrink-0 border-r border-b border-sidebar-border bg-background flex items-center px-2">
 			<div
 				role="tablist"
 				aria-label="Viewer mode"
-				className="relative h-8 w-[4.75rem] shrink-0 rounded-full ring-1 ring-inset ring-sidebar-border bg-muted/40 p-0.5"
+				className="relative h-8 w-[7rem] shrink-0 rounded-full ring-1 ring-inset ring-sidebar-border bg-muted/40 p-0.5"
 			>
 				<span
 					aria-hidden="true"
 					className={`absolute left-0.5 inset-y-0.5 w-9 rounded-full bg-background shadow-sm ring-1 ring-sidebar-border transition-transform duration-200 ease-out pointer-events-none ${
-						activeMode === 'preview' ? 'translate-x-9' : 'translate-x-0'
+						activeMode === 'terminal'
+							? 'translate-x-[4.5rem]'
+							: activeMode === 'preview'
+								? 'translate-x-9'
+								: 'translate-x-0'
 					}`}
 				/>
 				<Code2
@@ -353,6 +418,14 @@ const ViewerModeControls = memo(function ViewerModeControls() {
 					aria-hidden="true"
 					className={`${VIEWER_MODE_ICON_BASE_CLASS} left-14 ${
 						activeMode === 'preview'
+							? 'text-foreground'
+							: 'text-muted-foreground/70'
+					}`}
+				/>
+				<TerminalIcon
+					aria-hidden="true"
+					className={`${VIEWER_MODE_ICON_BASE_CLASS} left-[5.75rem] ${
+						activeMode === 'terminal'
 							? 'text-foreground'
 							: 'text-muted-foreground/70'
 					}`}
@@ -384,6 +457,21 @@ const ViewerModeControls = memo(function ViewerModeControls() {
 					aria-label="Preview tabs"
 					className={`${VIEWER_MODE_TAB_BUTTON_BASE} left-[2.375rem]`}
 				/>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={activeMode === 'terminal'}
+					onClick={() => {
+						if (terminalTabCount === 0) {
+							void openTerminalTabs();
+							return;
+						}
+						setViewerMode('terminal');
+					}}
+					title="Terminal tabs"
+					aria-label="Terminal tabs"
+					className={`${VIEWER_MODE_TAB_BUTTON_BASE} left-[4.625rem]`}
+				/>
 			</div>
 		</div>
 	);
@@ -411,13 +499,10 @@ function getActiveTabIdForMode(
 	activeTabId: string | null,
 	tabOrder: string[],
 	tabsById: Record<string, ViewerTab | undefined>,
-	mode: 'work' | 'preview',
+	mode: ViewerMode,
 ): string | null {
 	const activeTab = activeTabId ? tabsById[activeTabId] : undefined;
-	if (
-		activeTab &&
-		(mode === 'preview' ? isPreviewTab(activeTab) : !isPreviewTab(activeTab))
-	) {
+	if (activeTab && modeForViewerTab(activeTab) === mode) {
 		return activeTab.id;
 	}
 	return getFirstTabIdForMode(tabOrder, tabsById, mode);
@@ -477,8 +562,25 @@ const ViewerTabStrip = memo(function ViewerTabStrip() {
 					isActive={tabId === selectedTabId}
 				/>
 			))}
+			{activeMode === 'terminal' && <NewTerminalTabButton />}
 			<div className="min-w-8 flex-1 border-b border-sidebar-border bg-background" />
 		</div>
+	);
+});
+
+const NewTerminalTabButton = memo(function NewTerminalTabButton() {
+	const openNewTerminalTab = useOpenNewTerminalTab();
+
+	return (
+		<button
+			type="button"
+			onClick={() => void openNewTerminalTab()}
+			title="New terminal (⌘T / Ctrl+T)"
+			aria-label="New terminal"
+			className="h-12 w-10 shrink-0 border-r border-b border-sidebar-border bg-background flex items-center justify-center text-muted-foreground/70 transition-colors hover:text-foreground hover:bg-sidebar-accent/40"
+		>
+			<Plus className="h-3.5 w-3.5" />
+		</button>
 	);
 });
 
@@ -501,6 +603,7 @@ const ViewerTabButton = memo(function ViewerTabButton({
 	const toggleFileTabPinned = useViewerTabsStore(
 		(state) => state.toggleFileTabPinned,
 	);
+	const killTerminal = useKillTerminal();
 	if (!tab) return null;
 
 	const activityKind = getTabActivityKind(tab, {
@@ -558,8 +661,11 @@ const ViewerTabButton = memo(function ViewerTabButton({
 				size="icon"
 				onClick={() => {
 					closeTab(tab.id);
+					if (tab.type === 'terminal') {
+						killTerminal.mutate(tab.terminalId);
+					}
 				}}
-				title="Close tab"
+				title={tab.type === 'terminal' ? 'Kill terminal' : 'Close tab'}
 				className="h-6 w-6 opacity-60 group-hover:opacity-100 shrink-0"
 			>
 				<X className="h-3.5 w-3.5" />
@@ -624,6 +730,60 @@ const PreviewPane = memo(function PreviewPane({
 	);
 });
 
+const TerminalPaneStrip = memo(function TerminalPaneStrip({
+	terminalViewer,
+}: {
+	terminalViewer?: ComponentType<TerminalViewerProps>;
+}) {
+	const activeMode = useViewerTabsStore((state) => state.activeMode);
+	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
+	const tabOrder = useViewerTabsStore((state) => state.tabOrder);
+	const tabsById = useViewerTabsStore((state) => state.tabsById);
+	const terminalTabIds = tabOrder.filter(
+		(id) => tabsById[id]?.type === 'terminal',
+	);
+	const activeModeTerminalTabId = getActiveTabIdForMode(
+		activeTabId,
+		tabOrder,
+		tabsById,
+		'terminal',
+	);
+	const activeTerminalTabId =
+		activeMode === 'terminal' ? activeModeTerminalTabId : null;
+	const mountedTabIdsRef = useRef(new Set<string>());
+	if (activeTerminalTabId) mountedTabIdsRef.current.add(activeTerminalTabId);
+	for (const id of [...mountedTabIdsRef.current]) {
+		if (!terminalTabIds.includes(id)) mountedTabIdsRef.current.delete(id);
+	}
+	useSyncTerminalTabs(terminalTabIds.length > 0);
+
+	return (
+		<>
+			{terminalTabIds
+				.filter((tabId) => mountedTabIdsRef.current.has(tabId))
+				.map((tabId) => {
+					const tab = tabsById[tabId];
+					if (tab?.type !== 'terminal') return null;
+					const isActive = tabId === activeTerminalTabId;
+					return (
+						<div
+							key={tabId}
+							aria-hidden={!isActive}
+							className={`absolute inset-0 ${isActive ? 'block' : 'hidden'}`}
+						>
+							<TerminalViewerPane
+								tabId={tabId}
+								terminalId={tab.terminalId}
+								isActive={isActive}
+								Viewer={terminalViewer}
+							/>
+						</div>
+					);
+				})}
+		</>
+	);
+});
+
 const ActiveWorkPane = memo(function ActiveWorkPane() {
 	const activeMode = useViewerTabsStore((state) => state.activeMode);
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
@@ -677,22 +837,34 @@ const EmptyActivePaneMessage = memo(function EmptyActivePaneMessage() {
 
 	return (
 		<div className="absolute inset-0 flex items-center justify-center bg-sidebar text-muted-foreground/60 text-sm">
-			{activeMode === 'work' ? 'No work tabs open' : 'No preview tabs open'}
+			{EMPTY_PANE_MESSAGES[activeMode]}
 		</div>
 	);
 });
 
-const ViewerPaneArea = memo(function ViewerPaneArea() {
+const ViewerPaneArea = memo(function ViewerPaneArea({
+	terminalViewer,
+}: {
+	terminalViewer?: ComponentType<TerminalViewerProps>;
+}) {
 	return (
 		<div className="relative flex-1 min-h-0 overflow-hidden">
 			<PreviewPaneStrip />
+			<TerminalPaneStrip terminalViewer={terminalViewer} />
 			<ActiveWorkPane />
 			<EmptyActivePaneMessage />
 		</div>
 	);
 });
 
-export const ViewerTabs = memo(function ViewerTabs() {
+export interface ViewerTabsProps {
+	/** Override the terminal renderer (defaults to web TerminalViewer). */
+	terminalViewer?: ComponentType<TerminalViewerProps>;
+}
+
+export const ViewerTabs = memo(function ViewerTabs({
+	terminalViewer,
+}: ViewerTabsProps) {
 	const tabCount = useViewerTabsStore((state) => state.tabOrder.length);
 	useViewerTabsKeyboardShortcuts();
 
@@ -705,7 +877,7 @@ export const ViewerTabs = memo(function ViewerTabs() {
 			data-smart-edge-ignore-mode="content"
 		>
 			<ViewerHeader />
-			<ViewerPaneArea />
+			<ViewerPaneArea terminalViewer={terminalViewer} />
 		</section>
 	);
 });

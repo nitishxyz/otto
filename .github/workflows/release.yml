@@ -365,6 +365,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # libghostty-vt-sys builds Ghostty's VT library from source with Zig.
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
