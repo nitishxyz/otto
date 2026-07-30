@@ -83,7 +83,7 @@ export function SessionsOverlay({
 			title="Sessions"
 			size="lg"
 			fill
-			footer="↑↓ nav · ↵ select · esc close"
+			footer="Up/Down navigate · Enter select · Esc close"
 		>
 			{sessions.length === 0 ? (
 				<box style={{ padding: 1, flexGrow: 1, alignItems: 'center' }}>

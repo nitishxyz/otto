@@ -528,6 +528,20 @@ export function App({
 	const detailWidth = showThreePane
 		? Math.max(42, Math.min(64, Math.floor(layoutWidth * 0.34)))
 		: Math.max(30, Math.min(58, Math.floor(layoutWidth * 0.42)));
+	const chatPaneWidth =
+		layoutWidth -
+		2 -
+		(showDetail ? detailWidth + 1 : 0) -
+		(showActivity ? activityWidth + 1 : 0);
+	const emptyStateInputWidth = chatPaneWidth < 80 ? '100%' : '80%';
+	const isNewSession = !messages.some(
+		(message) =>
+			message.role === 'user' ||
+			(message.role === 'assistant' &&
+				(message.status !== 'pending' ||
+					(message.parts?.length ?? 0) > 0 ||
+					message.id === streamingMessageId)),
+	);
 
 	const handleAgentSelect = useCallback(
 		async (agent: string) => {
@@ -540,6 +554,29 @@ export function App({
 			showStatus({ type: 'success', label: `agent: ${agent}` }, 2000);
 		},
 		[activeSession, updateSessionPrefs, createSession, showStatus],
+	);
+
+	const chatInput = (
+		<ChatInput
+			onSubmit={handleSubmit}
+			disabled={
+				pendingApprovals.length > 0 ||
+				pendingSecureInputs.length > 0 ||
+				overlay !== 'none' ||
+				workspaceFocus !== 'chat'
+			}
+			status={status}
+			isStreaming={isStreaming}
+			agent={currentAgent}
+			provider={provider}
+			model={model}
+			escHint={escHint}
+			queueSize={queueSize}
+			isPlanMode={currentAgent === 'plan'}
+			paneActive={workspaceFocus === 'chat'}
+			onPlanModeToggle={handlePlanModeToggle}
+			recipeCommands={recipeCommands}
+		/>
 	);
 
 	return (
@@ -593,6 +630,8 @@ export function App({
 						onApprove={handleApprove}
 						onDeny={handleDeny}
 						recipeNames={recipeNames}
+						emptyStateInput={isNewSession ? chatInput : undefined}
+						emptyStateInputWidth={emptyStateInputWidth}
 					/>
 
 					{pendingApprovals.length > 0 && (
@@ -612,26 +651,7 @@ export function App({
 						/>
 					)}
 
-					<ChatInput
-						onSubmit={handleSubmit}
-						disabled={
-							pendingApprovals.length > 0 ||
-							pendingSecureInputs.length > 0 ||
-							overlay !== 'none' ||
-							workspaceFocus !== 'chat'
-						}
-						status={status}
-						isStreaming={isStreaming}
-						agent={currentAgent}
-						provider={provider}
-						model={model}
-						escHint={escHint}
-						queueSize={queueSize}
-						isPlanMode={currentAgent === 'plan'}
-						paneActive={workspaceFocus === 'chat'}
-						onPlanModeToggle={handlePlanModeToggle}
-						recipeCommands={recipeCommands}
-					/>
+					{!isNewSession && chatInput}
 				</box>
 				{showDetail && workspaceDetail ? (
 					<box

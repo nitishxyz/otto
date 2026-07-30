@@ -1,5 +1,6 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { MessageItem } from './MessageItem.tsx';
+import { OttoWordmark } from './OttoWordmark.tsx';
 import { useTheme } from '../theme.ts';
 import type { Message, PendingApproval } from '../types.ts';
 
@@ -12,6 +13,8 @@ interface ChatViewProps {
 	onApprove: (callId: string) => void;
 	onDeny: (callId: string) => void;
 	recipeNames?: ReadonlySet<string>;
+	emptyStateInput?: ReactNode;
+	emptyStateInputWidth?: '80%' | '100%';
 }
 
 export const ChatView = memo(function ChatView({
@@ -23,6 +26,8 @@ export const ChatView = memo(function ChatView({
 	onApprove,
 	onDeny,
 	recipeNames = EMPTY_RECIPE_NAMES,
+	emptyStateInput,
+	emptyStateInputWidth = '80%',
 }: ChatViewProps) {
 	const { colors } = useTheme();
 
@@ -89,27 +94,35 @@ export const ChatView = memo(function ChatView({
 					gap: 1,
 				}}
 			>
-				<text fg={colors.blue}>
-					<b>otto</b>
-				</text>
+				<OttoWordmark />
 				<text fg={colors.fgDark}>Type a message to start a conversation</text>
 				<box style={{ flexDirection: 'row', gap: 3 }}>
 					<text fg={colors.fgDimmed}>
 						<span fg={colors.fgDark}>/help</span> commands
 					</text>
 					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>⌃S</span> sessions
+						<span fg={colors.fgDark}>Ctrl+S</span> sessions
 					</text>
 					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>⌃P</span> models
+						<span fg={colors.fgDark}>Ctrl+P</span> models
 					</text>
 					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>⌃B</span> activity
+						<span fg={colors.fgDark}>Ctrl+B</span> activity
 					</text>
 					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>⇥</span> plan mode
+						<span fg={colors.fgDark}>Tab</span> plan mode
 					</text>
 				</box>
+				{emptyStateInput && (
+					<box
+						style={{
+							width: emptyStateInputWidth,
+							flexDirection: 'column',
+						}}
+					>
+						{emptyStateInput}
+					</box>
+				)}
 			</box>
 		);
 	}

@@ -43,17 +43,9 @@ export const zaiLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmlns="h
 <path d="M20.1312 7.50002L17.4088 11.1913H5.81625L8.5375 7.50002H20.1325H20.1312ZM34.0675 28.81L31.3475 32.5H19.795L22.5125 28.81H34.0675ZM35 7.50002L16.58 32.5H5L23.42 7.50002H35Z" fill="currentColor"/>
 </svg>`;
 
-export const ottorouterLogo = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-<circle cx="12" cy="12" r="8"/>
-<path d="M12 2v7.5"/>
-<path d="m19 5-5.23 5.23"/>
-<path d="M22 12h-7.5"/>
-<path d="m19 19-5.23-5.23"/>
-<path d="M12 14.5V22"/>
-<path d="M10.23 13.77 5 19"/>
-<path d="M9.5 12H2"/>
-<path d="M10.23 10.23 5 5"/>
-<circle cx="12" cy="12" r="2.5"/>
+export const ottorouterLogo = `<svg width="24" height="24" viewBox="-2 18 47 43" xmlns="http://www.w3.org/2000/svg">
+<path transform="translate(3 3)" d="M0 27Q0 20 7 20L33 20Q40 20 40 27L40 49Q40 56 33 56L7 56Q0 56 0 49Z M10 33Q10 30 13 30L27 30Q30 30 30 33L30 43Q30 46 27 46L13 46Q10 46 10 43Z" fill="#283c8c" fill-rule="evenodd"/>
+<path d="M0 27Q0 20 7 20L33 20Q40 20 40 27L40 49Q40 56 33 56L7 56Q0 56 0 49Z M10 33Q10 30 13 30L27 30Q30 30 30 33L30 43Q30 46 27 46L13 46Q10 46 10 43Z" fill="#4865cc" fill-rule="evenodd"/>
 </svg>`;
 
 export const minimaxLogo = `<svg width="24" height="24" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">

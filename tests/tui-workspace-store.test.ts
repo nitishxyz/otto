@@ -11,12 +11,12 @@ beforeEach(() => {
 });
 
 describe('TUI workspace focus', () => {
-	test('opens the activity sidebar without taking chat focus', () => {
+	test('opens and focuses the activity sidebar', () => {
 		useWorkspaceStore.getState().toggle();
 
 		expect(useWorkspaceStore.getState()).toMatchObject({
 			isOpen: true,
-			focus: 'chat',
+			focus: 'activity',
 			detail: null,
 		});
 	});

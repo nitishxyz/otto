@@ -2734,6 +2734,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "fontdb",
+ "libc",
  "mac-notification-sys",
  "objc2",
  "objc2-app-kit",

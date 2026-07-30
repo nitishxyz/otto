@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { OttoWordmark } from '@ottocode/web-sdk/wordmark';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { tauri } from '../lib/tauri';
@@ -76,7 +77,7 @@ export function Welcome() {
 		<div className="px-4 pb-4 space-y-4 min-h-[calc(100vh-40px)]">
 			<div className="pt-4 text-center space-y-2">
 				<div className="flex items-center justify-center">
-					<img src="/otto-wordmark.svg" alt="otto" className="h-8 w-auto" />
+					<OttoWordmark height={32} />
 				</div>
 				<div className="text-xs text-muted-foreground">
 					Team development environments

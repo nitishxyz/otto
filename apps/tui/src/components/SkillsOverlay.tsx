@@ -210,7 +210,9 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 	});
 
 	const footerText =
-		error ?? status ?? '↑↓ nav · space toggle · r refresh · esc close';
+		error ??
+		status ??
+		'Up/Down navigate · Space toggle · R refresh · Esc close';
 
 	type DisplayRow =
 		| { type: 'global'; rowIndex: 0 }

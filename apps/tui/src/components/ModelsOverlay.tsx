@@ -276,7 +276,7 @@ export function ModelsOverlay({
 			title="Models"
 			size="lg"
 			fill
-			footer="↑↓ nav · ↵ select · esc close"
+			footer="Up/Down navigate · Enter select · Esc close"
 		>
 			<box
 				style={{

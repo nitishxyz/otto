@@ -85,20 +85,45 @@ const WORDMARK_GLYPHS = [
 export interface OttoWordmarkProps {
 	height?: number;
 	className?: string;
+	/** Press the face into its hard extrusion on hover. */
+	animated?: boolean;
+	/** Accessible label. Pass an empty string when a parent labels the mark. */
+	label?: string;
 }
 
 /** Renders the multicolor NeoPop otto wordmark used across product surfaces. */
-export function OttoWordmark({ height = 16, className }: OttoWordmarkProps) {
+export function OttoWordmark({
+	height = 16,
+	className,
+	animated = true,
+	label = 'otto',
+}: OttoWordmarkProps) {
 	const width = Math.round(height * (171 / 55));
+	const svgClassName = [animated && 'otto-wordmark-interactive', className]
+		.filter(Boolean)
+		.join(' ');
 	return (
 		<svg
 			width={width}
 			height={height}
 			viewBox="-2 6 171 55"
-			className={className}
-			aria-label="otto"
-			role="img"
+			className={svgClassName || undefined}
+			aria-label={label || undefined}
+			aria-hidden={label ? undefined : true}
+			role={label ? 'img' : undefined}
 		>
+			{animated && (
+				<style>{`
+					.otto-wordmark-face { transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+					@media (hover: hover) and (pointer: fine) {
+						.otto-wordmark-interactive:hover .otto-wordmark-face { transform: translate(3px, 3px); }
+					}
+					@media (prefers-reduced-motion: reduce) {
+						.otto-wordmark-face { transition: none; }
+						.otto-wordmark-interactive:hover .otto-wordmark-face { transform: none; }
+					}
+				`}</style>
+			)}
 			<g transform="translate(3 3)" stroke="none">
 				{WORDMARK_GLYPHS.map((glyph) => (
 					<path
@@ -109,7 +134,7 @@ export function OttoWordmark({ height = 16, className }: OttoWordmarkProps) {
 					/>
 				))}
 			</g>
-			<g stroke="none">
+			<g className="otto-wordmark-face" stroke="none">
 				{WORDMARK_GLYPHS.map((glyph) => (
 					<path
 						key={glyph.key}
@@ -120,6 +145,60 @@ export function OttoWordmark({ height = 16, className }: OttoWordmarkProps) {
 				))}
 			</g>
 		</svg>
+	);
+}
+
+export interface OttoRouterWordmarkProps {
+	height?: number;
+	className?: string;
+	/** Press the Otto face into its hard extrusion on hover. */
+	animated?: boolean;
+}
+
+/** Renders the NeoPop OttoRouter lockup used by the OttoRouter application. */
+export function OttoRouterWordmark({
+	height = 16,
+	className,
+	animated = true,
+}: OttoRouterWordmarkProps) {
+	const xHeight = (36 / 55) * height;
+	const fontSize = xHeight / 0.516;
+	const baselineFromBottom = (5 / 55) * height;
+	const classNames = [
+		'inline-flex items-end',
+		animated && 'otto-router-wordmark-interactive',
+		className,
+	]
+		.filter(Boolean)
+		.join(' ');
+
+	return (
+		<span className={classNames} aria-label="OttoRouter" role="img">
+			{animated && (
+				<style>{`
+					.otto-router-wordmark-interactive .otto-wordmark-face { transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+					@media (hover: hover) and (pointer: fine) {
+						.otto-router-wordmark-interactive:hover .otto-wordmark-face { transform: translate(3px, 3px); }
+					}
+					@media (prefers-reduced-motion: reduce) {
+						.otto-router-wordmark-interactive .otto-wordmark-face { transition: none; }
+						.otto-router-wordmark-interactive:hover .otto-wordmark-face { transform: none; }
+					}
+				`}</style>
+			)}
+			<OttoWordmark height={height} animated={false} label="" />
+			<span
+				aria-hidden="true"
+				className="font-mono font-bold leading-none tracking-[-0.055em]"
+				style={{
+					fontSize: `${fontSize}px`,
+					marginLeft: `${height * 0.14}px`,
+					marginBottom: `${baselineFromBottom - fontSize * 0.125}px`,
+				}}
+			>
+				router
+			</span>
+		</span>
 	);
 }
 

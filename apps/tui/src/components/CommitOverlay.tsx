@@ -201,7 +201,7 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 		<ModalFrame
 			title="Commit"
 			size="md"
-			footer="⌃G generate · ⌃↵ commit · esc close"
+			footer="Ctrl+G generate · Ctrl+Enter commit · Esc close"
 		>
 			{phase === 'loading' && (
 				<box style={{ flexDirection: 'row', gap: 1 }}>
@@ -307,7 +307,7 @@ export function CommitOverlay({ onClose, onCommitted }: CommitOverlayProps) {
 							<textarea
 								ref={textareaRef}
 								focused
-								placeholder="Type commit message or press ⌃G to generate"
+								placeholder="Type commit message or press Ctrl+G to generate"
 								placeholderColor={colors.fgDark}
 								textColor={colors.fgBright}
 								focusedTextColor={colors.fgBright}

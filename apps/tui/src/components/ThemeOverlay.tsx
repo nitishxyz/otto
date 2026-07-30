@@ -46,7 +46,7 @@ export function ThemeOverlay({ onClose, onSave }: ThemeOverlayProps) {
 		<ModalFrame
 			title="Theme"
 			size="sm"
-			footer="↑↓ preview · ↵ confirm · esc cancel"
+			footer="Up/Down preview · Enter confirm · Esc cancel"
 		>
 			<box style={{ flexDirection: 'column', gap: 0 }}>
 				{themeList.map((t, i) => {

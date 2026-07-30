@@ -50,14 +50,51 @@ function getRecords(value: unknown): Record<string, unknown>[] {
 function actionLabel(action: string | null): string {
 	switch (action) {
 		case 'open':
-			return 'open page';
+			return 'opening page';
+		case 'navigate':
+			return 'navigating';
+		case 'back':
+			return 'going back';
+		case 'forward':
+			return 'going forward';
+		case 'reload':
+			return 'reloading';
+		case 'stop':
+			return 'stopping load';
+		case 'snapshot':
+			return 'inspecting page';
+		case 'screenshot':
+			return 'capturing screenshot';
 		case 'wait_for':
-			return 'wait for';
+			return 'waiting for';
 		case 'html':
-			return 'read HTML';
+			return 'reading HTML';
+		case 'find':
+			return 'finding';
+		case 'console':
+			return 'reading console';
+		case 'network':
+			return 'reading network';
+		case 'click':
+			return 'clicking';
+		case 'hover':
+			return 'hovering';
+		case 'type':
+			return 'typing';
+		case 'press':
+			return 'pressing key';
+		case 'scroll':
+			return 'scrolling';
+		case 'evaluate':
+			return 'evaluating script';
 		default:
 			return action?.replace(/_/g, ' ') || 'browser';
 	}
+}
+
+function conciseDetail(value: string | null): string | null {
+	if (!value) return null;
+	return value.length > 120 ? `${value.slice(0, 117)}…` : value;
 }
 
 function actionDetail(
@@ -66,14 +103,37 @@ function actionDetail(
 	result: Record<string, unknown>,
 ): string | null {
 	if (action === 'open' || action === 'navigate') {
-		return getString(args.url) ?? getString(result.url);
+		return conciseDetail(getString(args.url) ?? getString(result.url));
 	}
-	if (action === 'find' || action === 'network') return getString(args.query);
+	if (action === 'find' || action === 'network') {
+		return conciseDetail(getString(args.query) ?? getString(result.query));
+	}
 	if (action === 'wait_for') {
-		return getString(args.selector) ?? getString(args.text);
+		return conciseDetail(
+			getString(args.selector) ??
+				getString(args.text) ??
+				getString(result.found),
+		);
 	}
-	if (action === 'press') return getString(args.key);
-	return getString(args.selector) ?? getString(result.url);
+	if (action === 'press') {
+		return conciseDetail(getString(args.key) ?? getString(result.key));
+	}
+	if (action === 'console') {
+		return conciseDetail(getString(args.level) ?? getString(result.level));
+	}
+	if (action === 'evaluate') return conciseDetail(getString(args.script));
+	if (action === 'click') {
+		return conciseDetail(getString(args.selector) ?? getString(result.clicked));
+	}
+	if (action === 'hover') {
+		return conciseDetail(getString(args.selector) ?? getString(result.hovered));
+	}
+	if (action === 'type') {
+		return conciseDetail(
+			getString(args.selector) ?? getString(result.selector),
+		);
+	}
+	return conciseDetail(getString(args.selector) ?? getString(result.url));
 }
 
 function safeExternalUrl(value: unknown): string | null {
@@ -264,20 +324,20 @@ export function BrowserRenderer({
 				colorVariant="blue"
 				canExpand={hasContent}
 			>
-				{!compact && (
+				<ToolHeaderSeparator />
+				<span className="shrink-0 text-foreground/70">
+					{actionLabel(action)}
+				</span>
+				{detail && (
 					<>
 						<ToolHeaderSeparator />
-						<span className="shrink-0 text-foreground/70">
-							{actionLabel(action)}
+						<span className="min-w-0 truncate font-mono text-[11px] text-foreground/60">
+							{detail}
 						</span>
-						{detail && (
-							<>
-								<ToolHeaderSeparator />
-								<span className="min-w-0 truncate font-mono text-[11px] text-foreground/60">
-									{detail}
-								</span>
-							</>
-						)}
+					</>
+				)}
+				{!compact && (
+					<>
 						<ToolHeaderSeparator />
 						{hasError ? (
 							<ToolHeaderError>error</ToolHeaderError>

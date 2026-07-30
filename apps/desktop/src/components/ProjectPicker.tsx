@@ -38,7 +38,10 @@ import {
 	Star,
 	X,
 } from 'lucide-react';
-import { StableSpinner } from '@ottocode/web-sdk/components';
+import {
+	ConfirmationDialog,
+	StableSpinner,
+} from '@ottocode/web-sdk/components';
 import { useNavigate } from '@tanstack/react-router';
 import { WindowControls } from './WindowControls';
 import { useUpdate } from '../hooks/useUpdate';
@@ -810,6 +813,7 @@ export function ProjectPicker({
 					</div>
 				</div>
 			)}
+			<ConfirmationDialog />
 		</div>
 	);
 }

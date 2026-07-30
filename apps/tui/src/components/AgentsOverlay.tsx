@@ -78,7 +78,7 @@ export function AgentsOverlay({
 		<ModalFrame
 			title="Agents"
 			size="md"
-			footer="↑↓ move · ↵ select · esc close"
+			footer="Up/Down move · Enter select · Esc close"
 		>
 			{loading && <text fg={colors.fgDimmed}>loading…</text>}
 			{error && <text fg={colors.red}>{error}</text>}

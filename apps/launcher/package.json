@@ -11,6 +11,7 @@
 		"icon": "tauri icon ../../assets/brand/otto-app-icon.svg --output src-tauri/icons"
 	},
 	"dependencies": {
+		"@ottocode/web-sdk": "workspace:*",
 		"@tauri-apps/api": "2.10.1",
 		"@tauri-apps/plugin-dialog": "2.6.0",
 		"@tauri-apps/plugin-fs": "2.4.5",

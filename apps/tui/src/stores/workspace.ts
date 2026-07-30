@@ -31,7 +31,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 		set(
 			isOpen
 				? { isOpen: false, focus: 'chat', detail: null }
-				: { isOpen: true, focus: 'chat' },
+				: { isOpen: true, focus: 'activity' },
 		);
 	},
 	open: (tab) =>

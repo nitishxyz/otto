@@ -28,6 +28,8 @@ pub struct NativeNotificationPayload {
 }
 
 const NOTIFICATION_DEDUP_TTL: Duration = Duration::from_secs(600);
+#[cfg(target_os = "macos")]
+const NOTIFICATION_HELPER_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NotificationTarget {
@@ -144,6 +146,45 @@ fn notify_click_callback(callback_url: &str) {
 }
 
 #[cfg(target_os = "macos")]
+fn notification_helper_should_exit(owner_alive: bool, elapsed: Duration) -> bool {
+    !owner_alive || elapsed >= NOTIFICATION_DEDUP_TTL
+}
+
+#[cfg(target_os = "macos")]
+fn notification_helper_owner_pid(args: &[String]) -> Option<u32> {
+    args.get(5)
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|pid| *pid > 0)
+}
+
+#[cfg(target_os = "macos")]
+fn notification_helper_owner_is_alive(owner_pid: u32) -> bool {
+    if owner_pid == 0 || owner_pid > i32::MAX as u32 {
+        return false;
+    }
+
+    // Signal 0 checks for the process without delivering a signal. The helper
+    // and owner run as the same user, so a failure means the owner has exited.
+    unsafe { libc::kill(owner_pid as libc::pid_t, 0) == 0 }
+}
+
+#[cfg(target_os = "macos")]
+fn start_notification_helper_watchdog(owner_pid: Option<u32>) {
+    std::thread::spawn(move || {
+        let started = Instant::now();
+        loop {
+            std::thread::sleep(NOTIFICATION_HELPER_POLL_INTERVAL);
+            let owner_alive = owner_pid
+                .map(notification_helper_owner_is_alive)
+                .unwrap_or(true);
+            if notification_helper_should_exit(owner_alive, started.elapsed()) {
+                std::process::exit(0);
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
 pub fn run_notification_helper(args: &[String]) -> i32 {
     if args.len() < 5 {
         return 2;
@@ -153,6 +194,9 @@ pub fn run_notification_helper(args: &[String]) -> i32 {
     let title = &args[2];
     let body = &args[3];
     let callback_url = &args[4];
+    let owner_pid = notification_helper_owner_pid(args);
+
+    start_notification_helper_watchdog(owner_pid);
 
     let _ = mac_notification_sys::set_application(identifier);
     let mut notification = mac_notification_sys::Notification::new();
@@ -179,6 +223,7 @@ fn spawn_click_helper(identifier: String, title: String, body: String, callback_
         .arg(title)
         .arg(body)
         .arg(callback_url)
+        .arg(std::process::id().to_string())
         .spawn();
 }
 
@@ -339,6 +384,10 @@ pub fn show_native_notification(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
+    use super::{
+        notification_helper_owner_pid, notification_helper_should_exit, NOTIFICATION_DEDUP_TTL,
+    };
     use super::{
         notification_target, register_notification, NotificationTarget, PendingNotification,
     };
@@ -402,5 +451,35 @@ mod tests {
                 .window_label,
             "main-2"
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn notification_helper_exits_with_its_owner_or_after_the_click_window() {
+        assert!(notification_helper_should_exit(false, Duration::ZERO));
+        assert!(!notification_helper_should_exit(
+            true,
+            NOTIFICATION_DEDUP_TTL - Duration::from_millis(1)
+        ));
+        assert!(notification_helper_should_exit(
+            true,
+            NOTIFICATION_DEDUP_TTL
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn notification_helper_reads_the_spawning_app_pid() {
+        let args = [
+            "--otto-notification-helper",
+            "io.ottocode.otto",
+            "Title",
+            "Body",
+            "http://127.0.0.1:1234/notification-click/token",
+            "4242",
+        ]
+        .map(str::to_string);
+
+        assert_eq!(notification_helper_owner_pid(&args), Some(4242));
     }
 }

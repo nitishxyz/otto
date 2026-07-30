@@ -54,6 +54,12 @@ describe('landing Connect button de-duplication (static)', () => {
 		// Drag guards and disconnect affordance stay intact.
 		expect(control).toContain('data-no-drag');
 		expect(control).toContain('Disconnect OttoRouter');
+		expect(control).toContain("title: 'Disconnect OttoRouter?'");
+		expect(control).toContain("variant: 'destructive'");
+		expect(control).not.toContain('rounded-full bg-primary');
+
+		const picker = await readFile('src/components/ProjectPicker.tsx', 'utf8');
+		expect(picker).toContain('<ConfirmationDialog />');
 	});
 
 	test('local tunnel card carries no auth button, only the requirement notice', async () => {

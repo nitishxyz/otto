@@ -3,27 +3,18 @@ import { ottorouterLogo as webSdkOttorouterLogo } from '../packages/web-sdk/src/
 import { ottorouterLogo as landingOttorouterLogo } from '../apps/landing/src/assets/provider-logos';
 
 const OLD_BOLT_PATH_START = 'M55.0151 11H45.7732';
-const SHIPWHEEL_NODES = [
-	'<circle cx="12" cy="12" r="8"/>',
-	'<path d="M12 2v7.5"/>',
-	'<path d="m19 5-5.23 5.23"/>',
-	'<path d="M22 12h-7.5"/>',
-	'<path d="m19 19-5.23-5.23"/>',
-	'<path d="M12 14.5V22"/>',
-	'<path d="M10.23 13.77 5 19"/>',
-	'<path d="M9.5 12H2"/>',
-	'<path d="M10.23 10.23 5 5"/>',
-	'<circle cx="12" cy="12" r="2.5"/>',
-];
+const O_GLYPH_PATH_START = 'M0 27Q0 20 7 20L33 20';
 
 describe('ottorouter brand mark', () => {
-	test('web-sdk ottorouterLogo renders the canonical ShipWheel geometry', () => {
-		for (const node of SHIPWHEEL_NODES) {
-			expect(webSdkOttorouterLogo).toContain(node);
-		}
-		expect(webSdkOttorouterLogo).toContain('viewBox="0 0 24 24"');
-		expect(webSdkOttorouterLogo).toContain('stroke="currentColor"');
-		expect(webSdkOttorouterLogo).toContain('fill="none"');
+	test('web-sdk ottorouterLogo renders the canonical app-icon O', () => {
+		expect(
+			webSdkOttorouterLogo.match(new RegExp(O_GLYPH_PATH_START, 'g')),
+		).toHaveLength(2);
+		expect(webSdkOttorouterLogo).toContain('viewBox="-2 18 47 43"');
+		expect(webSdkOttorouterLogo).toContain('transform="translate(3 3)"');
+		expect(webSdkOttorouterLogo).toContain('fill="#283c8c"');
+		expect(webSdkOttorouterLogo).toContain('fill="#4865cc"');
+		expect(webSdkOttorouterLogo).not.toContain('<circle');
 		expect(webSdkOttorouterLogo).not.toContain(OLD_BOLT_PATH_START);
 	});
 
@@ -40,6 +31,6 @@ describe('ottorouter brand mark', () => {
 		expect(injected.startsWith(`<svg width="${size}" height="${size}"`)).toBe(
 			true,
 		);
-		expect(injected).toContain('viewBox="0 0 24 24"');
+		expect(injected).toContain('viewBox="-2 18 47 43"');
 	});
 });

@@ -1,7 +1,11 @@
 import { LogOut } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { OttoMark, StableSpinner } from '@ottocode/web-sdk/components';
+import {
+	OttoRouterWordmark,
+	StableSpinner,
+} from '@ottocode/web-sdk/components';
+import { useConfirmationStore } from '@ottocode/web-sdk/stores';
 import {
 	planOttoRouterActions,
 	type OttoRouterAuthPhase,
@@ -118,9 +122,9 @@ export function useOttoRouterAccount(onChanged: () => void): OttoRouterAccount {
  * Renders nothing when signed out (the single Connect action lives in the
  * Machines tab), a neutral checking pill until the daemon answers the first
  * account-status query (no Connect flash), and — when signed in — a single
- * status pill (dot + OttoRouter) whose content swaps to a disconnect
- * affordance on hover/keyboard focus without changing size; clicking (or
- * tapping) the pill disconnects.
+ * OttoRouter pill whose content swaps to a disconnect affordance on
+ * hover/keyboard focus without changing size. Clicking (or tapping) the pill
+ * asks for confirmation before disconnecting.
  */
 export function OttoRouterAccountControl({
 	configured,
@@ -134,6 +138,19 @@ export function OttoRouterAccountControl({
 }) {
 	const { busy, error, disconnect } = account;
 	const plan = planOttoRouterActions({ configured, initializing });
+	const openConfirmation = useConfirmationStore(
+		(state) => state.openConfirmation,
+	);
+	const confirmDisconnect = useCallback(() => {
+		openConfirmation({
+			title: 'Disconnect OttoRouter?',
+			message:
+				'You will need to connect OttoRouter again to access remote machines and managed tunnels.',
+			confirmLabel: 'Disconnect',
+			variant: 'destructive',
+			onConfirm: disconnect,
+		});
+	}, [disconnect, openConfirmation]);
 
 	if (plan.headerControl === 'none') return null;
 
@@ -146,8 +163,7 @@ export function OttoRouterAccountControl({
 				className="h-7 px-3 flex items-center gap-1.5 text-sm text-muted-foreground/70 border border-border/50 rounded-full select-none"
 			>
 				<StableSpinner size="xs" title="Checking OttoRouter connection" />
-				<OttoMark className="w-3.5 h-3.5" />
-				OttoRouter
+				<OttoRouterWordmark height={13} className="-translate-y-px" />
 			</output>
 		);
 	}
@@ -156,7 +172,7 @@ export function OttoRouterAccountControl({
 		<div className="relative flex items-center gap-1.5">
 			<button
 				type="button"
-				onClick={disconnect}
+				onClick={confirmDisconnect}
 				disabled={busy}
 				data-no-drag
 				aria-label="Disconnect OttoRouter"
@@ -172,9 +188,7 @@ export function OttoRouterAccountControl({
 							: 'group-hover:opacity-0 group-focus-visible:opacity-0'
 					}`}
 				>
-					<span className="w-2 h-2 rounded-full bg-primary" />
-					<OttoMark className="w-3.5 h-3.5" />
-					OttoRouter
+					<OttoRouterWordmark height={13} className="-translate-y-px" />
 				</span>
 				<span
 					aria-hidden="true"

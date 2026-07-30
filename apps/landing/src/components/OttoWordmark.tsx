@@ -8,5 +8,5 @@ export function OttoWordmark({
 	height?: number;
 	className?: string;
 }) {
-	return <NeoOttoLogo height={height} className={className} animated={false} />;
+	return <NeoOttoLogo height={height} className={className} />;
 }

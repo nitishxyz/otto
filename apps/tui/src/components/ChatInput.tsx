@@ -667,7 +667,7 @@ export function ChatInput({
 						<text style={{ flexShrink: 0 }} fg={accent} wrapMode="none">
 							<b>{agent || 'build'}</b>
 						</text>
-						{hasStatus ? (
+						{hasStatus && (
 							<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
 								{isStreaming && status.type === 'idle' && (
 									<box
@@ -702,10 +702,6 @@ export function ChatInput({
 									</text>
 								)}
 							</box>
-						) : (
-							<text fg={colors.fgDark} wrapMode="none" truncate>
-								⇧↵ newline · ⇥ mode · ⌃K clear
-							</text>
 						)}
 						{queueSize > 0 && (
 							<box style={{ flexDirection: 'row', gap: 1, flexShrink: 0 }}>

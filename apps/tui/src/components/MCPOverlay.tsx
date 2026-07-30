@@ -508,7 +508,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 			<ModalFrame
 				title="Add MCP Server"
 				size="md"
-				footer="tab/↑↓ fields · ↵ submit · esc cancel"
+				footer="Tab/Up/Down fields · Enter submit · Esc cancel"
 			>
 				<box style={{ flexDirection: 'column', gap: 1 }}>
 					<box style={{ flexDirection: 'column' }}>
@@ -594,7 +594,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 			<ModalFrame
 				title="Remove Server"
 				size="sm"
-				footer="y/↵ confirm · any key cancel"
+				footer="Y/Enter confirm · any key cancel"
 			>
 				<text fg={colors.fgMuted}>
 					Remove <b>{target?.name}</b>?
@@ -612,7 +612,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 				title={`${toolsServer.name} — Tools (${toolsServer.tools.length})`}
 				size="md"
 				fill
-				footer="esc/↵ back"
+				footer="Esc/Enter back"
 			>
 				<box
 					style={{ flexDirection: 'column', overflow: 'hidden', flexGrow: 1 }}
@@ -634,7 +634,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 			title="MCP Servers"
 			size="lg"
 			fill
-			footer="↑↓ nav · ↵ toggle · a add · d del · t tools · esc close"
+			footer="Up/Down navigate · Enter toggle · A add · D delete · T tools · Esc close"
 		>
 			<box style={{ flexDirection: 'row', gap: 2, marginBottom: 1 }}>
 				<text fg={colors.fgMuted}>

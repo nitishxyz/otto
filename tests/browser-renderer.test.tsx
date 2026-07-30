@@ -24,11 +24,28 @@ describe('browser tool renderer', () => {
 		);
 
 		expect(markup).toContain('browser');
-		expect(markup).toContain('snapshot');
+		expect(markup).toContain('inspecting page');
 		expect(markup).toContain('Example page');
 		expect(markup).toContain('@e1');
 		expect(markup).toContain('Continue');
 		expect(markup).not.toContain('&quot;elements&quot;');
+	});
+
+	test('shows the action and target in compact thread rows', () => {
+		const markup = renderToStaticMarkup(
+			<ToolResultRenderer
+				toolName="browser"
+				compact
+				contentJson={{
+					args: { action: 'click', selector: '@e7' },
+					result: { ok: true, action: 'click', clicked: '@e7' },
+				}}
+			/>,
+		);
+
+		expect(markup).toContain('browser');
+		expect(markup).toContain('clicking');
+		expect(markup).toContain('@e7');
 	});
 
 	test('renders browser errors without the generic JSON renderer', () => {

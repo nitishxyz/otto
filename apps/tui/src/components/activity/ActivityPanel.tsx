@@ -72,14 +72,23 @@ export const ActivityPanel = memo(function ActivityPanel({
 					? data.shells.length
 					: data.terminals.length;
 	const selected = Math.min(selectedByTab[tab], Math.max(0, itemCount - 1));
+	const tabWidth = Math.floor(panelWidth / TABS.length);
 	const tabOptions = useMemo<TabSelectOption[]>(
 		() =>
-			TABS.map((candidate) => ({
-				name: candidate.label,
-				description: '',
-				value: candidate.id,
-			})),
-		[],
+			TABS.map((candidate) => {
+				const contentWidth = Math.max(candidate.label.length, tabWidth - 2);
+				const leftPadding = Math.floor(
+					(contentWidth - candidate.label.length) / 2,
+				);
+				return {
+					name: candidate.label
+						.padStart(candidate.label.length + leftPadding)
+						.padEnd(contentWidth),
+					description: '',
+					value: candidate.id,
+				};
+			}),
+		[tabWidth],
 	);
 
 	useEffect(() => {
@@ -182,7 +191,7 @@ export const ActivityPanel = memo(function ActivityPanel({
 				ref={tabsRef}
 				focused={focused && focusRegion === 'tabs'}
 				options={tabOptions}
-				tabWidth={Math.floor(panelWidth / TABS.length)}
+				tabWidth={tabWidth}
 				showDescription={false}
 				showUnderline
 				showScrollArrows={false}

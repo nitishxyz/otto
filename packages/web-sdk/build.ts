@@ -17,6 +17,7 @@ const fontsDistDir = join(distDir, 'assets', 'fonts');
 const entrypoints = [
 	join(packageDir, 'src', 'index.ts'),
 	join(packageDir, 'src', 'components', 'index.ts'),
+	join(packageDir, 'src', 'components', 'common', 'OttoOIcon.tsx'),
 	join(packageDir, 'src', 'hooks', 'index.ts'),
 	join(packageDir, 'src', 'lib', 'index.ts'),
 	join(packageDir, 'src', 'stores', 'index.ts'),

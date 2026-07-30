@@ -102,7 +102,7 @@ export function SecureInputBar({
 							: 'type response…'}
 					</text>
 				)}
-				<text fg={colors.green}>↵ send</text>
+				<text fg={colors.green}>Enter send</text>
 				<text fg={colors.red}>esc cancel</text>
 				{submitting && <text fg={colors.blue}>sending…</text>}
 			</box>

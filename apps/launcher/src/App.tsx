@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useState } from 'react';
+import { OttoWordmark } from '@ottocode/web-sdk/wordmark';
 import { getVersion } from '@tauri-apps/api/app';
 import { useStore } from './store';
 import { useUpdate } from './hooks/useUpdate';
@@ -46,11 +47,7 @@ function App() {
 				role="toolbar"
 			>
 				<span className="text-xs font-semibold tracking-wider text-muted-foreground flex-1 flex items-center justify-center gap-1.5">
-					<img
-						src="/otto-wordmark.svg"
-						alt="otto"
-						className="h-[13px] w-auto"
-					/>
+					<OttoWordmark height={13} />
 					launcher
 				</span>
 				{appVersion && (
