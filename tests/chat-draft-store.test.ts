@@ -28,7 +28,7 @@ describe('chat draft store', () => {
 	beforeEach(() => {
 		values.clear();
 		useChatDraftStore.persist.setOptions({ storage });
-		useChatDraftStore.setState({ drafts: {} });
+		useChatDraftStore.setState({ drafts: {}, attachments: {} });
 	});
 
 	afterAll(() => {
@@ -61,6 +61,28 @@ describe('chat draft store', () => {
 		setDraft('session-a', '');
 
 		expect(useChatDraftStore.getState().drafts).toEqual({});
+	});
+
+	it('persists uploaded attachment references without file payloads', () => {
+		useChatDraftStore.getState().setAttachments('session-a', [
+			{
+				id: 'local-file',
+				type: 'image',
+				name: 'screenshot.png',
+				mediaType: 'image/png',
+				attachmentId: 'attachment-1',
+				original: {
+					filename: 'screenshot.png',
+					size: 1024,
+					sha256: 'abc123',
+					mimeType: 'image/png',
+				},
+			},
+		]);
+
+		const persisted = values.get('chat-drafts-storage') ?? '';
+		expect(persisted).toContain('attachment-1');
+		expect(persisted).not.toContain('data:image/png');
 	});
 
 	it('restores drafts from persistent storage', async () => {

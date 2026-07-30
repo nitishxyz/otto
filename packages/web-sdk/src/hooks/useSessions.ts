@@ -201,9 +201,10 @@ export function useDeleteSession() {
 	return useMutation({
 		mutationFn: (sessionId: string) => apiClient.deleteSession(sessionId),
 		onSuccess: (_result, sessionId) => {
-			useChatDraftStore
-				.getState()
-				.setDraft(getSessionChatDraftKey(sessionId), '');
+			const draftKey = getSessionChatDraftKey(sessionId);
+			const draftStore = useChatDraftStore.getState();
+			draftStore.setDraft(draftKey, '');
+			draftStore.setAttachments(draftKey, []);
 			queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
 		},
 	});

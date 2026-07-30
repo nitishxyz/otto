@@ -34,6 +34,7 @@ export const sessionSchema = z
 			.optional(),
 		toolCounts: z.record(z.string(), z.number()).optional(),
 		isRunning: z.boolean().optional(),
+		needsAttention: z.boolean().optional(),
 		fileStats: z
 			.object({
 				changedFiles: z.number(),

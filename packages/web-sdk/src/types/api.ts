@@ -23,6 +23,7 @@ export interface Session {
 	branchPointMessageId?: string | null;
 	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'looper' | 'subagent';
 	isRunning?: boolean;
+	needsAttention?: boolean;
 	fileStats?: {
 		changedFiles: number;
 		additions: number;

@@ -2,11 +2,20 @@ import {
 	useState,
 	useCallback,
 	useEffect,
+	useRef,
 	type DragEvent,
 	type ClipboardEvent,
 } from 'react';
-import { uploadAttachment } from '@ottocode/api';
+import { getAttachment, uploadAttachment } from '@ottocode/api';
 import { extractErrorMessage } from '../lib/api-client/utils';
+import {
+	fromChatDraftAttachment,
+	toChatDraftAttachment,
+} from '../lib/chatAttachments';
+import {
+	type ChatDraftAttachment,
+	useChatDraftStore,
+} from '../stores/chatDraftStore';
 
 export type FileAttachmentType = 'image' | 'pdf' | 'text' | 'binary';
 export type FileUploadStatus = 'uploading' | 'ready' | 'failed';
@@ -170,6 +179,43 @@ async function fileToText(file: File): Promise<string> {
 	});
 }
 
+async function hydrateDraftAttachment(
+	attachment: ChatDraftAttachment,
+): Promise<FileAttachment> {
+	const restored = fromChatDraftAttachment(attachment);
+	try {
+		const response = await getAttachment({
+			path: { id: attachment.attachmentId },
+		});
+		if (response.error || !(response.data instanceof Blob)) return restored;
+		const file = new File([response.data], attachment.name, {
+			type: attachment.mediaType,
+		});
+		if (attachment.type === 'image') {
+			const [preview, data] = await Promise.all([
+				fileToPreview(file),
+				fileToBase64(file),
+			]);
+			return { ...restored, file, preview, data };
+		}
+		if (attachment.type === 'pdf') {
+			return { ...restored, file, data: await fileToBase64(file) };
+		}
+		if (attachment.type === 'text') {
+			const textContent = await fileToText(file);
+			return {
+				...restored,
+				file,
+				data: textContent,
+				textContent,
+			};
+		}
+		return { ...restored, file };
+	} catch {
+		return restored;
+	}
+}
+
 async function fileToPreview(file: File): Promise<string> {
 	return new Promise((resolve, reject) => {
 		const reader = new FileReader();
@@ -203,6 +249,7 @@ interface UseFileUploadOptions {
 	supportsImages?: boolean;
 	supportsFileAttachments?: boolean;
 	sessionId?: string;
+	draftKey?: string;
 	onError?: (message: string) => void;
 }
 
@@ -215,12 +262,58 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 		supportsImages = true,
 		supportsFileAttachments = true,
 		sessionId,
+		draftKey,
 		onError,
 	} = options;
 
-	const [files, setFiles] = useState<FileAttachment[]>([]);
+	const [files, setFiles] = useState<FileAttachment[]>(() =>
+		draftKey
+			? (useChatDraftStore.getState().attachments[draftKey] ?? []).map(
+					fromChatDraftAttachment,
+				)
+			: [],
+	);
 	const [isDragging, setIsDragging] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const setDraftAttachments = useChatDraftStore(
+		(state) => state.setAttachments,
+	);
+	const activeDraftKeyRef = useRef(draftKey);
+	const skipNextPersistRef = useRef(false);
+
+	useEffect(() => {
+		const draftKeyChanged = activeDraftKeyRef.current !== draftKey;
+		activeDraftKeyRef.current = draftKey;
+		const persistedAttachments = draftKey
+			? (useChatDraftStore.getState().attachments[draftKey] ?? [])
+			: [];
+		if (draftKeyChanged) {
+			skipNextPersistRef.current = true;
+			setFiles(persistedAttachments.map(fromChatDraftAttachment));
+			setError(null);
+		}
+		if (persistedAttachments.length === 0) return;
+		void Promise.all(persistedAttachments.map(hydrateDraftAttachment)).then(
+			(hydrated) => {
+				if (activeDraftKeyRef.current === draftKey) setFiles(hydrated);
+			},
+		);
+	}, [draftKey]);
+
+	useEffect(() => {
+		if (!draftKey || activeDraftKeyRef.current !== draftKey) return;
+		if (skipNextPersistRef.current) {
+			skipNextPersistRef.current = false;
+			return;
+		}
+		setDraftAttachments(
+			draftKey,
+			files.flatMap((file) => {
+				const attachment = toChatDraftAttachment(file);
+				return attachment ? [attachment] : [];
+			}),
+		);
+	}, [draftKey, files, setDraftAttachments]);
 
 	const addFiles = useCallback(
 		async (inputFiles: FileList | File[]) => {
@@ -237,7 +330,10 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
 			const filesToAdd = fileArray.slice(0, remaining);
 			const newFiles: FileAttachment[] = [];
-			let stagedBytes = files.reduce((sum, f) => sum + f.file.size, 0);
+			let stagedBytes = files.reduce(
+				(sum, f) => sum + (f.uploadedAttachment?.size ?? f.file.size),
+				0,
+			);
 
 			for (const file of filesToAdd) {
 				const validation = validateStagedFile(file, stagedBytes, {
@@ -365,6 +461,17 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 		setError(null);
 	}, []);
 
+	const restoreFiles = useCallback((attachments: ChatDraftAttachment[]) => {
+		const restoreDraftKey = activeDraftKeyRef.current;
+		setFiles(attachments.map(fromChatDraftAttachment));
+		setError(null);
+		void Promise.all(attachments.map(hydrateDraftAttachment)).then(
+			(hydrated) => {
+				if (activeDraftKeyRef.current === restoreDraftKey) setFiles(hydrated);
+			},
+		);
+	}, []);
+
 	const handleDragEnter = useCallback((e: DragEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -487,6 +594,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 		isDragging,
 		error,
 		addFiles,
+		restoreFiles,
 		removeFile,
 		clearFiles,
 		handleDragEnter,

@@ -15,6 +15,7 @@ import {
 	useQueueState,
 } from '../../hooks/useQueueState';
 import { apiClient } from '../../lib/api-client';
+import { getMessageChatDraftAttachments } from '../../lib/chatAttachments';
 import { useQueueStore } from '../../stores/queueStore';
 import type { Message } from '../../types/api';
 
@@ -26,6 +27,7 @@ interface QueuedMessagePreview {
 	assistantMessageId: string;
 	position: number;
 	text: string;
+	attachments: ReturnType<typeof getMessageChatDraftAttachments>;
 }
 
 function getMessageText(message: Message | undefined) {
@@ -65,6 +67,7 @@ function getQueuedPreviews(
 			assistantMessageId: queued.messageId,
 			position: queued.position,
 			text: getMessageText(userMessage),
+			attachments: getMessageChatDraftAttachments(userMessage),
 		};
 	});
 }
@@ -126,9 +129,7 @@ export const InputQueueBar = memo(function InputQueueBar({
 		staleTime: Infinity,
 	});
 	const queueState = useQueueState(sessionId);
-	const setPendingRestoreText = useQueueStore(
-		(state) => state.setPendingRestoreText,
-	);
+	const setPendingRestore = useQueueStore((state) => state.setPendingRestore);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const queuedItems = useMemo(
 		() => getQueuedPreviews(messages, queueState.queuedMessages),
@@ -143,7 +144,11 @@ export const InputQueueBar = memo(function InputQueueBar({
 		restoreToInput: boolean,
 	) => {
 		if (restoreToInput) {
-			setPendingRestoreText(item.text);
+			setPendingRestore({
+				sessionId,
+				text: item.text,
+				attachments: item.attachments,
+			});
 		}
 		try {
 			await apiClient.removeFromQueue(sessionId, item.assistantMessageId);

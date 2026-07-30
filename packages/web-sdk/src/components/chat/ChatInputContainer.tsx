@@ -19,6 +19,7 @@ import { useFileUpload } from '../../hooks/useFileUpload';
 import { useQueueStore } from '../../stores/queueStore';
 import { usePendingResearchStore } from '../../stores/pendingResearchStore';
 import { useFileSelectionStore } from '../../stores/fileSelectionStore';
+import { getSessionChatDraftKey } from '../../stores/chatDraftStore';
 import { formatResearchContextForMessage } from '../../lib/parseResearchContext';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { toast } from '../../stores/toastStore';
@@ -117,6 +118,7 @@ export const ChatInputContainer = memo(
 				(state) => state.setActiveSessionId,
 			);
 			const queryClient = useQueryClient();
+			const draftKey = getSessionChatDraftKey(sessionId);
 
 			const {
 				images,
@@ -124,11 +126,13 @@ export const ChatInputContainer = memo(
 				isDragging,
 				removeFile,
 				clearFiles,
+				restoreFiles,
 				handlePaste,
 			} = useFileUpload({
 				supportsImages: !!modelSupportsVision,
 				supportsFileAttachments: !!modelSupportsAttachment,
 				sessionId,
+				draftKey,
 				onError: toast.error,
 			});
 
@@ -196,21 +200,16 @@ export const ChatInputContainer = memo(
 				setInputKey((prev) => prev + 1);
 			}, []);
 
-			const pendingRestoreText = useQueueStore(
-				(state) => state.pendingRestoreText,
-			);
-			const consumeRestoreText = useQueueStore(
-				(state) => state.consumeRestoreText,
-			);
+			const pendingRestore = useQueueStore((state) => state.pendingRestore);
+			const consumeRestore = useQueueStore((state) => state.consumeRestore);
 
 			useEffect(() => {
-				if (pendingRestoreText) {
-					const text = consumeRestoreText();
-					if (text) {
-						chatInputRef.current?.setValue(text);
-					}
-				}
-			}, [pendingRestoreText, consumeRestoreText]);
+				if (!pendingRestore || pendingRestore.sessionId !== sessionId) return;
+				const restore = consumeRestore(sessionId);
+				if (!restore) return;
+				chatInputRef.current?.setValue(restore.text);
+				restoreFiles(restore.attachments);
+			}, [pendingRestore, consumeRestore, restoreFiles, sessionId]);
 
 			useImperativeHandle(ref, () => ({
 				focus: () => {

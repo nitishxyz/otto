@@ -63,6 +63,7 @@ export const NewSessionLanding = memo(
 		) {
 			const queryClient = useQueryClient();
 			const [sending, setSending] = useState(false);
+			const draftKey = getNewSessionChatDraftKey(sessionType);
 			const {
 				config,
 				agent,
@@ -102,6 +103,7 @@ export const NewSessionLanding = memo(
 			} = useFileUpload({
 				supportsImages: !!modelSupportsVision,
 				supportsFileAttachments: !!modelSupportsAttachment,
+				draftKey,
 				onError: toast.error,
 			});
 			const pendingFileSelectionsMap = useFileSelectionStore(
@@ -314,7 +316,7 @@ export const NewSessionLanding = memo(
 								onCommand={handleCommand}
 								disabled={sending}
 								sessionId={undefined}
-								draftKey={getNewSessionChatDraftKey(sessionType)}
+								draftKey={draftKey}
 								images={images}
 								documents={documents}
 								onFileRemove={removeFile}

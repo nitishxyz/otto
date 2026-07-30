@@ -141,7 +141,11 @@ function updateSessionStatusInCache(
 							session.id === status.sessionId
 								? {
 										...session,
-										isRunning: status.status === 'running',
+										isRunning:
+											status.status === 'needs_attention'
+												? session.isRunning
+												: status.status === 'running',
+										needsAttention: status.status === 'needs_attention',
 									}
 								: session,
 						),

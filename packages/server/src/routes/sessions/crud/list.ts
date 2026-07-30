@@ -4,6 +4,7 @@ import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { getRunningSessionTreeIds } from '../../../runtime/session/working.ts';
+import { sessionNeedsAttention } from '../../../runtime/session/attention.ts';
 import { resolveRequestProject } from '../../project-context.ts';
 import {
 	attachSessionCostSummary,
@@ -87,11 +88,17 @@ export function registerListSessionsRoute(app: Hono) {
 				const sessionWithRunningDescendants = runningTreeIds.has(row.id)
 					? { ...normalizedSession, isRunning: true }
 					: normalizedSession;
+				const sessionWithAttention = sessionNeedsAttention(
+					row.id,
+					cfg.projectRoot,
+				)
+					? { ...sessionWithRunningDescendants, needsAttention: true }
+					: sessionWithRunningDescendants;
 				const stats = fileStats.get(row.id);
 				const sessionWithStats =
 					stats && stats.changedFiles > 0
-						? { ...sessionWithRunningDescendants, fileStats: stats }
-						: sessionWithRunningDescendants;
+						? { ...sessionWithAttention, fileStats: stats }
+						: sessionWithAttention;
 				return attachSessionCostSummary(
 					sessionWithStats,
 					costSummaries.get(row.id),

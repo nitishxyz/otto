@@ -1,5 +1,10 @@
 import { publish } from '../../events/bus.ts';
 import { scopedCallKey } from '../projects/scope.ts';
+import {
+	discardSessionAttention,
+	requireSessionAttention,
+	resolveSessionAttention,
+} from '../session/attention.ts';
 
 export type ToolApprovalMode = 'auto' | 'dangerous' | 'all' | 'yolo';
 
@@ -94,6 +99,14 @@ export async function requestApproval(
 
 		const key = scopedCallKey(projectRoot, callId);
 		pendingApprovals.set(key, approval);
+		requireSessionAttention({
+			key: `tool-approval:${callId}`,
+			sessionId,
+			messageId,
+			projectRoot,
+			title: 'Permission required',
+			body: `The agent wants to use ${toolName.replaceAll('_', ' ')}.`,
+		});
 
 		publish({
 			type: 'tool.approval.required',
@@ -110,6 +123,12 @@ export async function requestApproval(
 		setTimeout(() => {
 			if (pendingApprovals.has(key)) {
 				pendingApprovals.delete(key);
+				resolveSessionAttention({
+					key: `tool-approval:${callId}`,
+					sessionId,
+					messageId,
+					projectRoot,
+				});
 				resolve(false);
 				publish({
 					type: 'tool.approval.resolved',
@@ -139,6 +158,12 @@ export function resolveApproval(
 	}
 
 	pendingApprovals.delete(key);
+	resolveSessionAttention({
+		key: `tool-approval:${callId}`,
+		sessionId: approval.sessionId,
+		messageId: approval.messageId,
+		projectRoot: approval.projectRoot,
+	});
 	approval.resolve(approved);
 
 	publish({
@@ -208,6 +233,11 @@ export function clearPendingApprovalsForSession(
 		) {
 			approval.resolve(false);
 			pendingApprovals.delete(callId);
+			discardSessionAttention({
+				key: `tool-approval:${approval.callId}`,
+				sessionId: approval.sessionId,
+				projectRoot: approval.projectRoot,
+			});
 		}
 	}
 }

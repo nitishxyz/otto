@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { CircleCheck, Pin } from 'lucide-react';
+import { CircleAlert, CircleCheck, Pin } from 'lucide-react';
 import type { Session } from '../../types/api';
 import { StableSpinner } from '../ui/StableSpinner';
 import { Tooltip } from '../ui/Tooltip';
@@ -21,6 +21,7 @@ export const SessionItem = memo(function SessionItem({
 }: SessionItemProps) {
 	const title = session.title || `Session ${session.id.slice(0, 8)}`;
 	const isRunning = session.isRunning ?? false;
+	const needsAttention = session.needsAttention ?? false;
 	const isPinned = session.pinnedAt != null;
 	const lastUpdatedAt = session.lastActiveAt ?? session.createdAt;
 	const isReadyForReview =
@@ -31,7 +32,9 @@ export const SessionItem = memo(function SessionItem({
 	const showStats =
 		hasFileStats && (fileStats.additions > 0 || fileStats.deletions > 0);
 	const pinLabel = isPinned ? 'Unpin session' : 'Pin session';
-	const statusIcon = isRunning ? (
+	const statusIcon = needsAttention ? (
+		<CircleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+	) : isRunning ? (
 		<StableSpinner className="text-sidebar-muted-foreground" title="Running" />
 	) : isReadyForReview ? (
 		<CircleCheck className="h-4 w-4" />
@@ -53,9 +56,20 @@ export const SessionItem = memo(function SessionItem({
 				aria-label={`Open ${title}`}
 			/>
 			{statusIcon && (
-				<span className="pointer-events-none relative z-10 mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80">
-					{statusIcon}
-				</span>
+				<Tooltip
+					content={
+						needsAttention
+							? 'Needs your input'
+							: isRunning
+								? 'Running'
+								: 'Ready for review'
+					}
+					side="right"
+				>
+					<span className="pointer-events-none relative z-10 mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted-foreground transition-colors group-hover:text-sidebar-foreground/80">
+						{statusIcon}
+					</span>
+				</Tooltip>
 			)}
 			<span className="pointer-events-none relative z-10 block min-w-0 flex-1">
 				<span className="flex min-w-0 items-center">
@@ -83,7 +97,11 @@ export const SessionItem = memo(function SessionItem({
 				</span>
 				<span className="mt-0.5 flex w-full items-center justify-between gap-3 text-left text-[11px] leading-4 text-sidebar-muted-foreground">
 					<span className="min-w-0 flex-1 truncate">
-						{showStats ? (
+						{needsAttention ? (
+							<span className="font-medium text-amber-700 dark:text-amber-400">
+								Needs input
+							</span>
+						) : showStats ? (
 							<InlineChangeCount
 								count={{
 									additions: fileStats.additions,
@@ -96,7 +114,7 @@ export const SessionItem = memo(function SessionItem({
 							session.agent
 						)}
 					</span>
-					{!isRunning && (
+					{(!isRunning || needsAttention) && (
 						<span className="shrink-0 text-sidebar-muted-foreground">
 							{metadata}
 						</span>

@@ -750,9 +750,12 @@ export const ChatInput = memo(
 
 		const handleSend = useCallback(() => {
 			const trimmedMessage = message.trim();
-			if (!trimmedMessage || disabled) return;
+			const hasAttachments = images.length > 0 || documents.length > 0;
+			if ((!trimmedMessage && !hasAttachments) || disabled) return;
 
-			const exactCommand = findExactCommand(trimmedMessage);
+			const exactCommand = trimmedMessage
+				? findExactCommand(trimmedMessage)
+				: undefined;
 			if (exactCommand) {
 				if (shouldSendSlashCommandAsMessage(exactCommand.id)) {
 					onSend(exactCommand.label);
@@ -768,7 +771,15 @@ export const ChatInput = memo(
 
 			onSend(message);
 			resetComposer();
-		}, [message, disabled, onCommand, onSend, resetComposer]);
+		}, [
+			message,
+			images.length,
+			documents.length,
+			disabled,
+			onCommand,
+			onSend,
+			resetComposer,
+		]);
 
 		useEffect(() => {
 			handleSendRef.current = handleSend;

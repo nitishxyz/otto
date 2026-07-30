@@ -53,6 +53,7 @@ import {
 	type CommandKind,
 } from '../../lib/commands';
 import { AuthenticatedImage } from '../AuthenticatedImage';
+import { getMessageChatDraftAttachments } from '../../lib/chatAttachments';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -179,9 +180,7 @@ export const UserMessageGroup = memo(
 			sessionId,
 			nextAssistantMessageId ?? '',
 		);
-		const setPendingRestoreText = useQueueStore(
-			(state) => state.setPendingRestoreText,
-		);
+		const setPendingRestore = useQueueStore((state) => state.setPendingRestore);
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
 			parseResearchContext(rawContent);
@@ -288,7 +287,11 @@ export const UserMessageGroup = memo(
 
 		const handleCancel = async () => {
 			if (!sessionId || !nextAssistantMessageId) return;
-			setPendingRestoreText(content);
+			setPendingRestore({
+				sessionId,
+				text: content,
+				attachments: getMessageChatDraftAttachments(message),
+			});
 			try {
 				await apiClient.removeFromQueue(sessionId, nextAssistantMessageId);
 				// Invalidate messages to refresh UI

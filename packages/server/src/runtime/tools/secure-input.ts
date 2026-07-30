@@ -1,5 +1,10 @@
 import { publish } from '../../events/bus.ts';
 import { scopedCallKey } from '../projects/scope.ts';
+import {
+	discardSessionAttention,
+	requireSessionAttention,
+	resolveSessionAttention,
+} from '../session/attention.ts';
 import type { SecureInputKind } from './secure-prompt.ts';
 
 const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
@@ -110,6 +115,14 @@ export function requestSecureInput(args: {
 
 		const key = scopedCallKey(args.projectRoot, promptId);
 		pendingSecureInputs.set(key, pending);
+		requireSessionAttention({
+			key: `secure-input:${promptId}`,
+			sessionId: args.sessionId,
+			messageId: args.messageId,
+			projectRoot: args.projectRoot,
+			title: 'Input required',
+			body: args.prompt,
+		});
 
 		publish({
 			type: 'shell.secure_input.required',
@@ -128,6 +141,12 @@ export function requestSecureInput(args: {
 		pending.timeoutId = setTimeout(() => {
 			if (!pendingSecureInputs.has(key)) return;
 			pendingSecureInputs.delete(key);
+			resolveSessionAttention({
+				key: `secure-input:${promptId}`,
+				sessionId: args.sessionId,
+				messageId: args.messageId,
+				projectRoot: args.projectRoot,
+			});
 			if (pending.timeoutId) clearTimeout(pending.timeoutId);
 			resolve(null);
 			publish({
@@ -162,6 +181,12 @@ export function resolveSecureInput(
 	}
 
 	pendingSecureInputs.delete(key);
+	resolveSessionAttention({
+		key: `secure-input:${promptId}`,
+		sessionId: pending.sessionId,
+		messageId: pending.messageId,
+		projectRoot: pending.projectRoot,
+	});
 	if (pending.timeoutId) clearTimeout(pending.timeoutId);
 	if (value !== null && remember && pending.allowRemember && pending.cacheKey) {
 		const cacheKey = secureInputCacheKey(pending.projectRoot, pending.cacheKey);
@@ -226,6 +251,11 @@ export function clearPendingSecureInputsForSession(
 			if (pending.timeoutId) clearTimeout(pending.timeoutId);
 			pending.resolve(null);
 			pendingSecureInputs.delete(promptId);
+			discardSessionAttention({
+				key: `secure-input:${pending.promptId}`,
+				sessionId: pending.sessionId,
+				projectRoot: pending.projectRoot,
+			});
 		}
 	}
 }
