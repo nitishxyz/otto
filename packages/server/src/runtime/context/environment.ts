@@ -65,6 +65,9 @@ export async function getEnvironmentContext(
 	);
 	parts.push('<env>');
 	parts.push(`  Working directory: ${projectRoot}`);
+	parts.push(
+		'  This is the absolute project root. Operations default to it, so use project-relative paths and do not repeat the absolute path.',
+	);
 
 	try {
 		const { existsSync } = await import('node:fs');

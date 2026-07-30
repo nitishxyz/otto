@@ -59,6 +59,20 @@ describe('system prompt composition', () => {
 		expect(components).not.toContain('mode:oneshot');
 	});
 
+	it('instructs agents to use project-relative paths by default', async () => {
+		const { prompt } = await composeSystemPrompt({
+			provider: 'openrouter',
+			model: 'gpt-4o-mini',
+			projectRoot: tempDir,
+			agentPrompt: 'AGENT',
+		});
+
+		expect(prompt).toContain(`Working directory: ${tempDir}`);
+		expect(prompt).toContain(
+			'Operations default to it, so use project-relative paths and do not repeat the absolute path.',
+		);
+	});
+
 	it('discovers current project skills for the capability summary', async () => {
 		await writeSkill('ea', 'Enterprise architecture planning guidance');
 
