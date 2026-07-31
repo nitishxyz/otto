@@ -228,7 +228,10 @@ pub async fn native_browser_execute(
 /// The tab must be mounted and visible: the platform webview renders the
 /// snapshot from the live view hierarchy.
 #[tauri::command]
-pub async fn native_browser_screenshot(window: tauri::Window, id: String) -> Result<String, String> {
+pub async fn native_browser_screenshot(
+    window: tauri::Window,
+    id: String,
+) -> Result<String, String> {
     let webview = browser_tab_webview(&window, &id)
         .ok_or_else(|| format!("browser tab is not mounted: {id}"))?;
     let png = capture_webview_png(&webview)?;
@@ -263,7 +266,10 @@ fn capture_webview_png(webview: &tauri::Webview) -> Result<Vec<u8>, String> {
                 let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
                     let _ = sender.send(encode_snapshot_png(image, error));
                 });
-                view.takeSnapshotWithConfiguration_completionHandler(Some(&configuration), &handler);
+                view.takeSnapshotWithConfiguration_completionHandler(
+                    Some(&configuration),
+                    &handler,
+                );
             }
         })
         .map_err(|error| error.to_string())?;

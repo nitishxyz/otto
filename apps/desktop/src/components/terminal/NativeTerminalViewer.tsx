@@ -23,6 +23,7 @@ import {
 	feedNativeTerminalGpu,
 	getNativeTerminalStatus,
 	measureNativeTerminalMetrics,
+	nativeTerminalScrollDelta,
 	resetNativeTerminal,
 	resolveNativeTerminalTheme,
 	resolveNativeTerminalShortcut,
@@ -618,14 +619,34 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 					return;
 				}
 				if (surfaceCreated && !disposed) {
+					// Adopt the cell metrics the GPU font system actually resolved;
+					// the canvas measurement can disagree, which drifts the cursor
+					// and right-aligned TUI content away from the shaped text.
+					if (surface.cellWidth && surface.cellHeight) {
+						metricsRef.current = {
+							...metricsRef.current,
+							cellWidth: surface.cellWidth,
+							cellHeight: surface.cellHeight,
+						};
+					}
 					gpuActiveRef.current = true;
 					setGpuActive(true);
+					const hostBounds = host.getBoundingClientRect();
+					const grid = calculateNativeTerminalGrid(
+						hostBounds.width,
+						hostBounds.height,
+						metricsRef.current,
+					);
+					lastGrid = grid;
 					const rendered = await resizeNativeTerminal(
 						nativeSessionId,
-						lastGrid.cols,
-						lastGrid.rows,
+						grid.cols,
+						grid.rows,
 					);
 					applyUpdate(rendered);
+					if (socketRef.current?.readyState === WebSocket.OPEN) {
+						socketRef.current.send(JSON.stringify({ type: 'resize', ...grid }));
+					}
 				}
 			} catch {
 				// Canvas fallback remains active when a GPU adapter is unavailable.
@@ -897,7 +918,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 					event.preventDefault();
 					const nativeSessionId = nativeSessionIdRef.current;
 					if (!nativeSessionId) return;
-					const delta = Math.sign(event.deltaY) * 3;
+					const delta = nativeTerminalScrollDelta(event);
 					if (delta === 0) return;
 					selectionAnchorRef.current = null;
 					selectionFocusRef.current = null;

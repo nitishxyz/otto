@@ -4,6 +4,7 @@ import {
 	calculateNativeTerminalGrid,
 	createNativeTerminalOutputBatcher,
 	encodeNativeTerminalKeyLocally,
+	nativeTerminalScrollDelta,
 	resolveNativeTerminalShortcut,
 	resolveNativeTerminalTheme,
 	type NativeTerminalShortcutEvent,
@@ -24,6 +25,19 @@ function shortcutEvent(
 }
 
 describe('native desktop terminal', () => {
+	test('caps wheel deltas so trackpad momentum stays controllable', () => {
+		// Pixel mode (trackpads): small deltas scroll one line, capped at two.
+		expect(nativeTerminalScrollDelta({ deltaY: 4, deltaMode: 0 })).toBe(1);
+		expect(nativeTerminalScrollDelta({ deltaY: 120, deltaMode: 0 })).toBe(2);
+		expect(nativeTerminalScrollDelta({ deltaY: -900, deltaMode: 0 })).toBe(-2);
+		// Line mode (mice): proportional, capped at three.
+		expect(nativeTerminalScrollDelta({ deltaY: 3, deltaMode: 1 })).toBe(2);
+		expect(nativeTerminalScrollDelta({ deltaY: -40, deltaMode: 1 })).toBe(-3);
+		// Page mode.
+		expect(nativeTerminalScrollDelta({ deltaY: 1, deltaMode: 2 })).toBe(8);
+		expect(nativeTerminalScrollDelta({ deltaY: 0, deltaMode: 0 })).toBe(0);
+	});
+
 	test('computes a positive terminal grid for any visible host', () => {
 		expect(calculateNativeTerminalGrid(800, 340)).toEqual({
 			cols: 100,
@@ -187,9 +201,20 @@ describe('native desktop terminal', () => {
 		expect(gpu).toContain('if self.render_latest(&session_id)');
 		expect(gpu).toContain('did not present its initial frame');
 		expect(gpu).toContain('surface.window.hide()');
-		expect(gpu).toContain('NSWindowCollectionBehavior::Transient');
+		// Transient windows float onto the active Space, leaking the overlay
+		// onto other fullscreen Otto windows; it must stay a plain child.
+		expect(gpu).not.toContain('NSWindowCollectionBehavior::Transient');
 		expect(gpu).toContain('NSWindowCollectionBehavior::IgnoresCycle');
 		expect(gpu).toContain('setExcludedFromWindowsMenu(true)');
+		// hide() detaches macOS child windows; re-attach on every bounds sync
+		// so the overlay follows the owner during drags.
+		expect(gpu).toContain(
+			'ensure_overlay_child_window(owner, &surface.window)',
+		);
+		expect(gpu).toContain('addChildWindow: overlay_window, ordered: 1isize');
+		// The rect grid and cursor must use the advance the GPU font system
+		// measured, not the JS canvas estimate.
+		expect(gpu).toContain('measure_cell_advance(');
 		expect(viewer).toContain('createNativeTerminalOutputBatcher');
 		expect(viewer).toContain("searchParams.set('historyMode', 'framed')");
 		expect(viewer).toContain('feedNativeTerminalGpu');

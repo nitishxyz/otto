@@ -125,6 +125,7 @@ const SubagentViewerPanel = memo(function SubagentViewerPanel({
 		<div
 			ref={panelRef}
 			onPointerDown={handlePanelPointerDown}
+			data-native-overlay-root="true"
 			className="fixed flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
 			style={{
 				left: position.x,

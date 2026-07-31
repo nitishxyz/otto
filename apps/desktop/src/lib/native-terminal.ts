@@ -32,6 +32,34 @@ export interface NativeTerminalSurfaceStatus {
 	available: boolean;
 	backend: string;
 	message: string;
+	/** Logical cell width measured from the font the GPU renderer resolved. */
+	cellWidth?: number;
+	cellHeight?: number;
+}
+
+/**
+ * Terminal-line wheel delta matching the Canvas Ghostty implementation:
+ * deltaMode-aware, capped per event so trackpad momentum stays controllable.
+ */
+export function nativeTerminalScrollDelta(event: {
+	deltaY: number;
+	deltaMode: number;
+}): number {
+	const direction = Math.sign(event.deltaY);
+	if (direction === 0) return 0;
+	if (event.deltaMode === 1) {
+		return (
+			direction *
+			Math.min(3, Math.max(1, Math.round(Math.abs(event.deltaY) / 2)))
+		);
+	}
+	if (event.deltaMode === 2) {
+		return direction * 8;
+	}
+	return (
+		direction *
+		Math.min(2, Math.max(1, Math.round(Math.abs(event.deltaY) / 80)))
+	);
 }
 
 export interface NativeTerminalStatus {

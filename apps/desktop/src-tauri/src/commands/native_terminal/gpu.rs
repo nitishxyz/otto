@@ -50,6 +50,13 @@ pub struct GpuTerminalStatus {
     pub available: bool,
     pub backend: String,
     pub message: String,
+    /// Effective logical cell width measured from the font the GPU renderer
+    /// actually resolved. The JS canvas measurement can disagree with it,
+    /// which skews cursor/rect positions against shaped text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cell_width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cell_height: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
@@ -160,13 +167,26 @@ impl GpuTerminalManager {
                 available: false,
                 backend: "canvas".into(),
                 message: "Native GPU terminal did not present its initial frame.".into(),
+                cell_width: None,
+                cell_height: None,
             });
         }
+
+        let cell_metrics = self.surfaces.lock().ok().and_then(|surfaces| {
+            surfaces.get(&session_id).map(|surface| {
+                (
+                    surface.font.cell_width / surface.scale_factor,
+                    surface.font.cell_height / surface.scale_factor,
+                )
+            })
+        });
 
         Ok(GpuTerminalStatus {
             available: true,
             backend: "wgpu".into(),
             message: "Native GPU terminal uses Metal, Vulkan/GLES, or DirectX 12.".into(),
+            cell_width: cell_metrics.map(|(width, _)| width),
+            cell_height: cell_metrics.map(|(_, height)| height),
         })
     }
 
@@ -207,6 +227,14 @@ impl GpuTerminalManager {
             .set_size(size)
             .map_err(|error| error.to_string())?;
         surface.resize(size.width, size.height, scale as f32);
+        // tao's show() runs makeKeyAndOrderFront on macOS, which activates the
+        // overlay's window and steals focus from whichever window the user is
+        // in. Bounds syncs fire on any DOM mutation (terminal output updates
+        // badges/timestamps), so that stole focus continuously. Order the
+        // overlay above its owner without focusing instead.
+        #[cfg(target_os = "macos")]
+        show_overlay_without_focus(owner, &surface.window);
+        #[cfg(not(target_os = "macos"))]
         surface.window.show().map_err(|error| error.to_string())?;
 
         // The overlay is a rectangular child window; clip whichever of its
@@ -214,6 +242,7 @@ impl GpuTerminalManager {
         // terminal never pokes outside the window silhouette.
         #[cfg(target_os = "macos")]
         {
+            ensure_overlay_child_window(owner, &surface.window);
             let inner = owner.inner_size().map_err(|error| error.to_string())?;
             let owner_width = inner.width as f64 / scale;
             let owner_height = inner.height as f64 / scale;
@@ -336,6 +365,72 @@ fn configure_overlay_window(window: &Window<Wry>) -> Result<(), String> {
 #[cfg(not(target_os = "macos"))]
 fn configure_overlay_window(_window: &Window<Wry>) -> Result<(), String> {
     Ok(())
+}
+
+/// Shows the overlay by ordering it above its owner without making it key,
+/// so appearing/re-appearing never activates the window or steals focus.
+#[cfg(target_os = "macos")]
+fn show_overlay_without_focus(owner: &Window<Wry>, overlay: &Window<Wry>) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let owner = owner.clone();
+    let overlay_window = overlay.clone();
+    let _ = overlay.run_on_main_thread(move || {
+        let (Ok(owner_ptr), Ok(overlay_ptr)) = (owner.ns_window(), overlay_window.ns_window())
+        else {
+            return;
+        };
+        // SAFETY: live NSWindow pointers on AppKit's main thread.
+        // orderWindow:relativeTo: shows without key/main or app activation.
+        unsafe {
+            let owner_window = owner_ptr.cast::<AnyObject>();
+            let overlay_window = overlay_ptr.cast::<AnyObject>();
+            let visible: bool = msg_send![overlay_window, isVisible];
+            if visible {
+                return;
+            }
+            let owner_number: isize = msg_send![owner_window, windowNumber];
+            // NSWindowAbove = 1
+            let _: () = msg_send![overlay_window, orderWindow: 1isize, relativeTo: owner_number];
+        }
+    });
+}
+
+/// Re-attaches the overlay as a child of its owner window. macOS silently
+/// removes a child window from its parent when the child is ordered out
+/// (`hide()`), so a later `show()` leaves it detached: it stops following the
+/// owner during drags (snapping only on the next JS bounds sync) and floats
+/// over other windows and Spaces.
+#[cfg(target_os = "macos")]
+fn ensure_overlay_child_window(owner: &Window<Wry>, overlay: &Window<Wry>) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let owner = owner.clone();
+    let overlay_window = overlay.clone();
+    let _ = overlay.run_on_main_thread(move || {
+        let (Ok(owner_ptr), Ok(overlay_ptr)) = (owner.ns_window(), overlay_window.ns_window())
+        else {
+            return;
+        };
+        // SAFETY: both pointers are live NSWindow instances owned by Tauri and
+        // this closure runs on AppKit's main thread. parentWindow /
+        // addChildWindow:ordered: are standard AppKit selectors.
+        unsafe {
+            let owner_window = owner_ptr.cast::<AnyObject>();
+            let overlay_window = overlay_ptr.cast::<AnyObject>();
+            let parent: *mut AnyObject = msg_send![overlay_window, parentWindow];
+            if std::ptr::eq(parent, owner_window) {
+                return;
+            }
+            if !parent.is_null() {
+                let _: () = msg_send![parent, removeChildWindow: overlay_window];
+            }
+            // NSWindowAbove = 1
+            let _: () = msg_send![owner_window, addChildWindow: overlay_window, ordered: 1isize];
+        }
+    });
 }
 
 #[cfg(target_os = "macos")]
@@ -509,6 +604,17 @@ impl PendingGpuTerminalSurface {
 
         let mut font_system = FontSystem::new();
         load_embedded_fonts(app, &mut font_system);
+        let mut resolved_font = ResolvedFont::from(self.font, self.scale_factor);
+        if let Some(advance) = measure_cell_advance(
+            &mut font_system,
+            &resolved_font.family,
+            resolved_font.size,
+            resolved_font.cell_height,
+        ) {
+            if advance.is_finite() && advance >= 1.0 {
+                resolved_font.cell_width = advance;
+            }
+        }
         let swash_cache = SwashCache::new();
         let cache = Cache::new(&device);
         let viewport = Viewport::new(&device, &cache);
@@ -533,7 +639,7 @@ impl PendingGpuTerminalSurface {
             prepared_cursor: None,
             prepared_colors: None,
             rect_pipeline,
-            font: ResolvedFont::from(self.font, self.scale_factor),
+            font: resolved_font,
             scale_factor: self.scale_factor,
             window: self.window,
             #[cfg(target_os = "macos")]
@@ -754,6 +860,31 @@ impl GpuTerminalSurface {
         self.prepared_cursor = Some(cursor);
         self.prepared_colors = Some(colors);
     }
+}
+
+/// Measures the shaped advance of a reference glyph in the font the GPU font
+/// system actually resolved. The JS canvas measurement can disagree with it
+/// (different family resolution, hinting, or fallback), and any mismatch
+/// accumulates across columns: the rect grid, cursor, and right-aligned TUI
+/// content drift away from the shaped text.
+fn measure_cell_advance(
+    font_system: &mut FontSystem,
+    family: &str,
+    font_size: f32,
+    line_height: f32,
+) -> Option<f32> {
+    let mut buffer = Buffer::new(font_system, Metrics::new(font_size, line_height));
+    buffer.set_metrics_and_size(
+        Metrics::new(font_size, line_height),
+        Some(font_size * 8.0),
+        Some(line_height),
+    );
+    let attrs = Attrs::new().family(Family::Name(family));
+    buffer.set_rich_text([("M", attrs.clone())], &attrs, Shaping::Advanced, None);
+    buffer.shape_until_scroll(font_system, false);
+    let run = buffer.layout_runs().next()?;
+    let glyph = run.glyphs.first()?;
+    Some(glyph.w)
 }
 
 #[repr(C)]

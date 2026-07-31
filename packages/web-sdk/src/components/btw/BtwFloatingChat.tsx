@@ -116,6 +116,7 @@ export const BtwFloatingChat = memo(function BtwFloatingChat() {
 
 	return (
 		<div
+			data-native-overlay-root="true"
 			className="fixed z-[95] flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
 			style={{
 				top: position.top,
