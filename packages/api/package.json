@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/api",
-	"version": "0.1.385",
+	"version": "0.1.386",
 	"description": "Type-safe API client for ottocode server",
 	"type": "module",
 	"main": "./dist/index.js",
