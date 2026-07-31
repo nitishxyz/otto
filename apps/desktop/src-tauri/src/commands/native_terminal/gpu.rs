@@ -315,8 +315,11 @@ fn configure_overlay_window(window: &Window<Wry>) -> Result<(), String> {
     // SAFETY: Tauri returns the live NSWindow for this overlay. Creation and
     // configuration both run on AppKit's main thread.
     let window = unsafe { &*pointer.cast::<NSWindow>() };
+    // No Transient: transient windows float to the active Space, which made
+    // the overlay follow the user onto another fullscreen window's Space. As a
+    // child window it already tracks its parent's Space; FullScreenAuxiliary
+    // only permits it on the parent's fullscreen Space.
     let behavior = window.collectionBehavior()
-        | NSWindowCollectionBehavior::Transient
         | NSWindowCollectionBehavior::IgnoresCycle
         | NSWindowCollectionBehavior::FullScreenAuxiliary;
     window.setCollectionBehavior(behavior);
