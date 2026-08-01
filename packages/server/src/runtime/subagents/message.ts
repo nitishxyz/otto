@@ -52,7 +52,7 @@ export async function messageSubagent(
 		return { ok: false, error: 'Sub-agent session no longer exists.' };
 	}
 
-	const now = Date.now();
+	const now = Math.max(Date.now(), record.updatedAt + 1);
 	await db
 		.update(subagents)
 		.set({

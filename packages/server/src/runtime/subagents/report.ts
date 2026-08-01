@@ -8,6 +8,29 @@ import { getRunnerState } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
 import { buildSubagentResultsPrompt } from './prompt.ts';
 
+/** Atomically claims an unchanged terminal result for parent delivery. */
+export function claimFinishedSubagentForReport(
+	db: DB,
+	record: typeof subagents.$inferSelect,
+): boolean {
+	if (record.status === 'running' || record.reported) return false;
+	const updatedAt = Math.max(Date.now(), record.updatedAt + 1);
+	const claimed = db
+		.update(subagents)
+		.set({ reported: true, updatedAt })
+		.where(
+			and(
+				eq(subagents.id, record.id),
+				eq(subagents.reported, false),
+				eq(subagents.status, record.status),
+				eq(subagents.updatedAt, record.updatedAt),
+			),
+		)
+		.returning({ updatedAt: subagents.updatedAt })
+		.get();
+	return claimed?.updatedAt === updatedAt;
+}
+
 /**
  * Reports unreported finished sub-agents to their parent session by
  * enqueueing a continuation run. Only runs when the parent is idle.
@@ -39,13 +62,11 @@ export async function reportFinishedSubagents(
 	});
 	if (!parentSession) return false;
 
-	const now = Date.now();
+	const claimed: typeof finished = [];
 	for (const record of finished) {
-		await db
-			.update(subagents)
-			.set({ reported: true, updatedAt: now })
-			.where(eq(subagents.id, record.id));
+		if (claimFinishedSubagentForReport(db, record)) claimed.push(record);
 	}
+	if (!claimed.length) return false;
 
 	publish({
 		type: 'session.updated',
@@ -53,7 +74,7 @@ export async function reportFinishedSubagents(
 		projectRoot: cfg.projectRoot,
 		payload: {
 			id: parentSessionId,
-			subagentsFinished: finished.map((record) => ({
+			subagentsFinished: claimed.map((record) => ({
 				subagentId: record.id,
 				childSessionId: record.childSessionId,
 				agent: record.agent,
@@ -67,12 +88,12 @@ export async function reportFinishedSubagents(
 		db,
 		session: parentSession,
 		agent: parentSession.agent,
-		content: buildSubagentResultsPrompt(finished),
+		content: buildSubagentResultsPrompt(claimed),
 	});
 
 	logger.info('[subagent] reported results to parent', {
 		parentSessionId,
-		count: finished.length,
+		count: claimed.length,
 	});
 	return true;
 }

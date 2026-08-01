@@ -56,10 +56,10 @@ export async function finalizeSubagentForChildSession(
 	}
 
 	const status = failed ? 'failed' : 'completed';
-	const updatedAt = Date.now();
+	const updatedAt = Math.max(Date.now(), record.updatedAt + 1);
 	await db
 		.update(subagents)
-		.set({ status, summary, updatedAt })
+		.set({ status, summary, reported: false, updatedAt })
 		.where(eq(subagents.id, record.id));
 
 	logger.info('[subagent] finalized', {
@@ -68,7 +68,7 @@ export async function finalizeSubagentForChildSession(
 		status,
 	});
 
-	return { ...record, status, summary, updatedAt };
+	return { ...record, status, summary, reported: false, updatedAt };
 }
 
 async function extractAssistantText(

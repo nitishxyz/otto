@@ -49,6 +49,12 @@ const subagentInputSchema = z.object({
 		.describe(
 			'Follow-up delivery; defaults to queue. Use interrupt only for an urgent correction that invalidates current work, never for status checks.',
 		),
+	confirmCancel: z
+		.boolean()
+		.optional()
+		.describe(
+			'Stop safety confirmation. Set true only when the user explicitly asked to cancel the delegated work itself. Requests to stop polling, checking, waiting, or messaging do not qualify.',
+		),
 	limit: z
 		.number()
 		.int()
@@ -74,7 +80,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 		name: 'subagent',
 		tool: tool({
 			description:
-				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows all lifecycle results; status inspects one agent including context-window usage; read returns a bounded overview of recent tool calls; message marks the child active and sends a queued or interrupting follow-up; compact queues /compact after the child is idle; stop cancels; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child. Results are delivered automatically when ready. The main agent must not sleep, wait, or repeatedly call list, status, or read to poll a running child; continue other work or end the turn instead.',
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows lifecycle results; status inspects one agent including context-window usage and read returns recent tool calls, but both are one-time diagnostics only when explicitly needed, never progress polling; message sends a queued or interrupting follow-up only for an urgent correction that invalidates current work; compact queues /compact after the child is idle; stop cancels only with explicit user cancellation confirmation; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child: after delegation, do not inspect its files, check Git, rerun its verification, or send suggestions. Results return automatically. Continue only genuinely independent work or end the turn. A request to stop polling/checking/waiting means end the turn, not stop the child.',
 			inputSchema: subagentInputSchema,
 			async execute(input) {
 				switch (input.action) {
@@ -111,7 +117,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							childSessionId: result.childSessionId,
 							agent: result.agent,
 							status: 'running',
-							note: 'Task delegated. The result will return automatically when the child finishes. Do not monitor or message it for progress; continue independent work or end the turn.',
+							note: 'Delegation boundary: the child now owns this scope. Do not inspect its files, check Git, rerun checks, or send suggestions. The result returns automatically; continue only genuinely independent work or end the turn now.',
 						};
 					}
 					case 'list': {
@@ -240,6 +246,13 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							return {
 								ok: false,
 								error: 'stop requires a non-empty subagentId',
+							};
+						}
+						if (input.confirmCancel !== true) {
+							return {
+								ok: false,
+								error:
+									'Stop requires confirmCancel=true, which is valid only when the user explicitly asked to cancel the delegated work itself. If the user asked to stop polling, checking, waiting, or messaging, leave the child running and end the parent turn.',
 							};
 						}
 						const db = await getDb(projectRoot);

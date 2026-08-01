@@ -73,6 +73,6 @@ export function buildSubagentResultsPrompt(
 		sections.join('\n\n'),
 		'</subagent_results>',
 		'',
-		'Continue using these results. If a child failed, use subagent action=message or action=delegate when appropriate, or handle it yourself.',
+		"The delegated work is complete and the report above is the source of truth. Accept the child's ownership and verification: do not inspect its files, check Git, or rerun commands merely to verify it again. Update any parent task state and respond to the user with the outcome. If the report identifies a concrete unresolved issue inside the delegated scope, send a focused follow-up to the same child (or delegate another child) rather than silently taking over. Handle work yourself only when it is outside the delegated scope.",
 	].join('\n');
 }

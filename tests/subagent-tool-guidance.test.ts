@@ -32,9 +32,11 @@ describe('subagent tool guidance', () => {
 		expect(schema).toContain('reuseSessionId');
 		expect(schema).toContain('subagentId');
 		expect(schema).toContain('delivery');
+		expect(schema).toContain('confirmCancel');
 		expect(schema).toContain('defaults to queue');
 		expect(schema).toContain('urgent correction');
 		expect(schema).toContain('never for status checks');
+		expect(schema).toContain('stop polling');
 		expect(schema).toContain('limit');
 	});
 
@@ -45,14 +47,37 @@ describe('subagent tool guidance', () => {
 		expect(description).toContain('fresh parallel work');
 		expect(description).toContain('related continuation');
 		expect(description).toContain('owned by the child');
-		expect(description).toContain('message marks the child active');
-		expect(description).toContain('delivered automatically when ready');
-		expect(description).toContain('must not sleep');
-		expect(description).toContain('repeatedly call list, status, or read');
-		expect(description).toContain('end the turn instead');
+		expect(description).toContain('do not inspect its files');
+		expect(description).toContain('check Git');
+		expect(description).toContain('never progress polling');
+		expect(description).toContain('end the turn');
+		expect(description).toContain('not stop the child');
 		expect(description).toContain('context-window usage');
 		expect(description).toContain('recent tool calls');
 		expect(description).toContain('/compact');
+	});
+
+	test('refuses to stop a child without explicit cancellation confirmation', async () => {
+		const execute = buildSubagentTool('/tmp/project', 'parent').tool.execute;
+		expect(execute).toBeDefined();
+		const result = await execute?.({
+			action: 'stop',
+			subagentId: 'child',
+		});
+
+		expect(result).toMatchObject({ ok: false });
+		expect(JSON.stringify(result)).toContain('stop polling');
+		expect(JSON.stringify(result)).toContain('confirmCancel=true');
+	});
+
+	test('keeps the delegation boundary in the shared base prompt', async () => {
+		const base = await Bun.file('packages/sdk/src/prompts/src/base.txt').text();
+		const normalized = base.toLowerCase();
+
+		expect(normalized).toContain('stop working on that scope');
+		expect(normalized).toContain('git');
+		expect(normalized).toContain('stop polling');
+		expect(normalized).toContain('never');
 	});
 
 	test('uses the unified subagent tool for looper follow-ups', async () => {

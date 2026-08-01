@@ -82,28 +82,27 @@ export async function composeSystemPrompt(options: {
 	}
 
 	const parts: string[] = [];
-	if (options.isOpenAIOAuth) {
-		const oauthInstructions = (OPENAI_OAUTH_PROMPT || '').trim();
-		appendSegment(oauthInstructions, 'provider:openai-oauth');
-		appendSegment(options.agentPrompt.trim(), 'agent');
-	} else {
-		const providerResult = await providerBasePrompt(
-			options.provider,
-			options.model,
-			options.projectRoot,
-			options.promptFamily ?? undefined,
-		);
-		const baseInstructions = (BASE_PROMPT || '').trim();
-		const agentInstructions = options.agentPrompt.trim();
-		const providerInstructions = providerResult.prompt.trim();
+	const providerResult = options.isOpenAIOAuth
+		? {
+				prompt: (OPENAI_OAUTH_PROMPT || '').trim(),
+				resolvedType: 'openai-oauth',
+			}
+		: await providerBasePrompt(
+				options.provider,
+				options.model,
+				options.projectRoot,
+				options.promptFamily ?? undefined,
+			);
+	const baseInstructions = (BASE_PROMPT || '').trim();
+	const agentInstructions = options.agentPrompt.trim();
+	const providerInstructions = providerResult.prompt.trim();
 
-		appendSegment(baseInstructions.trim(), 'base');
-		appendSegment(agentInstructions, 'agent');
-		appendSegment(
-			providerInstructions,
-			`provider:${providerResult.resolvedType}`,
-		);
-	}
+	appendSegment(baseInstructions, 'base');
+	appendSegment(agentInstructions, 'agent');
+	appendSegment(
+		providerInstructions,
+		`provider:${providerResult.resolvedType}`,
+	);
 
 	if (options.oneShot) {
 		const oneShotBlock =

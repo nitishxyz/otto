@@ -38,6 +38,10 @@ describe('subagent_result inline renderer', () => {
 			task: 'Investigate flaky test',
 		});
 		expect(results[1]?.result).toBe('(no summary)');
+		expect(prompt).toContain('source of truth');
+		expect(prompt).toContain('do not inspect its files');
+		expect(prompt).toContain('rerun commands');
+		expect(prompt).toContain('rather than silently taking over');
 	});
 
 	test('summarizeSubagentResults for a single completed result', () => {
