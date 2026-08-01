@@ -1,787 +1,104 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Globe2, RefreshCw } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { ArrowLeft, Globe2, RefreshCw, X } from 'lucide-react';
 import { ProviderLogo } from '../common/ProviderLogo';
-import { apiClient } from '../../lib/api-client';
-import type { UsageStats } from '../../lib/api-client/usage';
+import {
+	cn,
+	NEO_EYEBROW,
+	NEO_RADIUS,
+	NEO_SCOPE,
+	NeoBadge,
+	NeoIconButton,
+	NeoPanel,
+	NeoTabs,
+	type NeoTabOption,
+} from './neopop';
+import {
+	authTag,
+	cacheHitRate,
+	formatNumber,
+	formatPct,
+	formatUsd,
+} from './format';
+import {
+	RANGE_OPTIONS,
+	useUsageDashboardData,
+	type UsageRangeKey,
+	type UsageScope,
+} from './useUsageDashboardData';
+import { UsageCache } from './UsageCache';
+import { UsageHero } from './UsageHero';
+import { UsageInsights } from './UsageInsights';
+import { UsageSection } from './UsageSection';
+import { UsagePaymentSplit } from './UsagePaymentSplit';
+import { UsageProjects } from './UsageProjects';
+import { UsageSkeleton } from './UsageSkeleton';
+import { BreakdownList, type BreakdownItem } from './UsageBreakdown';
+import { UsageActivityChart, type ChartMetric } from './UsageActivityChart';
 
-interface UsageDashboardProps {
+export interface UsageDashboardProps {
 	onBack?: () => void;
 }
 
-function formatNumber(n: number): string {
-	if (!Number.isFinite(n) || n === 0) return '0';
-	if (Math.abs(n) >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-	if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-	return n.toLocaleString();
-}
+type ModelSort = 'cost' | 'tokens' | 'msgs';
 
-function formatUsd(n: number): string {
-	if (!Number.isFinite(n) || n === 0) return '$0';
-	if (n < 0.01) return `$${n.toFixed(4)}`;
-	if (n < 1) return `$${n.toFixed(3)}`;
-	if (n < 100) return `$${n.toFixed(2)}`;
-	return `$${n.toFixed(0)}`;
-}
-
-function authLabel(t: string) {
-	if (t === 'oauth') return 'oauth';
-	if (t === 'subscription') return 'sub';
-	if (t === 'wallet') return 'wallet';
-	if (t === 'api') return 'api';
-	return '—';
-}
-
-function authColor(t: string) {
-	if (t === 'oauth') return 'text-emerald-400';
-	if (t === 'subscription') return 'text-violet-400';
-	if (t === 'wallet') return 'text-fuchsia-400';
-	if (t === 'api') return 'text-sky-400';
-	return 'text-muted-foreground';
-}
-
-/* ------------------------------------------------------------------ */
-/* Daily activity chart                                                */
-/* ------------------------------------------------------------------ */
-
-type ChartTab = 'cost' | 'tokens';
-
-function DailyChart({ data }: { data: UsageStats['daily'] }) {
-	const [tab, setTab] = useState<ChartTab>('cost');
-	const [hover, setHover] = useState<number | null>(null);
-
-	const max = useMemo(() => {
-		if (tab === 'tokens') {
-			return data.reduce(
-				(m, d) => Math.max(m, d.inputTokens + d.outputTokens),
-				0,
-			);
-		}
-		// For cost: include notional, so OAuth/sub days show their would-have-cost
-		return data.reduce((m, d) => Math.max(m, d.notionalCostUsd), 0);
-	}, [data, tab]);
-
-	if (data.length === 0) {
-		return (
-			<div className="h-44 flex items-center justify-center text-xs text-muted-foreground">
-				No activity yet
-			</div>
-		);
-	}
-
-	const focus = hover != null ? data[hover] : data[data.length - 1];
-
-	const focusValue =
-		tab === 'tokens'
-			? formatNumber(focus.inputTokens + focus.outputTokens)
-			: formatUsd(focus.notionalCostUsd);
-	const focusSub =
-		tab === 'tokens'
-			? `${formatNumber(focus.inputTokens)} in · ${formatNumber(
-					focus.outputTokens,
-				)} out`
-			: focus.costUsd > 0
-				? `${formatUsd(focus.costUsd)} pay-as-you-go · ${formatUsd(
-						focus.notionalCostUsd - focus.costUsd,
-					)} via plans`
-				: `${formatUsd(focus.notionalCostUsd)} via plans`;
-
-	return (
-		<div>
-			<div className="flex items-baseline justify-between gap-4 mb-4">
-				<div className="min-w-0">
-					<div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-						{focus.date}
-					</div>
-					<div className="text-xl font-semibold tabular-nums mt-0.5 truncate">
-						{focusValue}
-					</div>
-					<div className="text-[11px] text-muted-foreground tabular-nums mt-0.5 truncate">
-						{focusSub}
-					</div>
-				</div>
-				<div className="shrink-0 inline-flex p-0.5 rounded-md border border-border bg-muted/30 text-[11px]">
-					<button
-						type="button"
-						onClick={() => setTab('cost')}
-						className={`px-2.5 py-1 rounded transition-colors ${
-							tab === 'cost'
-								? 'bg-background text-foreground shadow-sm'
-								: 'text-muted-foreground hover:text-foreground'
-						}`}
-					>
-						Cost
-					</button>
-					<button
-						type="button"
-						onClick={() => setTab('tokens')}
-						className={`px-2.5 py-1 rounded transition-colors ${
-							tab === 'tokens'
-								? 'bg-background text-foreground shadow-sm'
-								: 'text-muted-foreground hover:text-foreground'
-						}`}
-					>
-						Tokens
-					</button>
-				</div>
-			</div>
-
-			{tab === 'cost' ? (
-				<CostChart data={data} max={max} hover={hover} onHover={setHover} />
-			) : (
-				<TokenChart data={data} max={max} hover={hover} onHover={setHover} />
-			)}
-
-			<div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-				<span>{data[0]?.date}</span>
-				{tab === 'cost' ? (
-					<span className="flex items-center gap-3">
-						<Dot color="bg-sky-400" label="api" />
-						<Dot color="bg-emerald-400/70" label="oauth" />
-						<Dot color="bg-violet-400/70" label="sub" />
-					</span>
-				) : (
-					<span className="flex items-center gap-3">
-						<Dot color="bg-muted-foreground/60" label="input" />
-						<Dot color="bg-foreground/80" label="output" />
-					</span>
-				)}
-				<span>{data[data.length - 1]?.date}</span>
-			</div>
-		</div>
-	);
-}
-
-interface SubChartProps {
-	data: UsageStats['daily'];
-	max: number;
-	hover: number | null;
-	onHover: (i: number | null) => void;
-}
-
-function CostChart({ data, max, hover, onHover }: SubChartProps) {
-	return (
-		<div
-			role="img"
-			aria-label="Daily cost chart"
-			className="flex items-end gap-[3px] h-44 select-none"
-			onMouseLeave={() => onHover(null)}
-		>
-			{data.map((d, i) => {
-				// Bar = notional cost (what it would have cost on the API)
-				// Within each bar, sky portion = actually paid, lighter portion = saved
-				const notional = d.notionalCostUsd;
-				const heightPct = max > 0 ? Math.max(2, (notional / max) * 100) : 2;
-				const apiPct =
-					notional > 0 ? (d.notionalByAuth.api / notional) * 100 : 0;
-				const oauthPct =
-					notional > 0 ? (d.notionalByAuth.oauth / notional) * 100 : 0;
-				const subPct =
-					notional > 0 ? (d.notionalByAuth.subscription / notional) * 100 : 0;
-				const active = hover === i;
-				return (
-					<button
-						type="button"
-						key={d.date}
-						onMouseEnter={() => onHover(i)}
-						onFocus={() => onHover(i)}
-						className="flex-1 h-full flex flex-col justify-end min-w-0 group cursor-default"
-					>
-						<div
-							className={`w-full rounded-sm overflow-hidden flex flex-col-reverse transition-all ${
-								active ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'
-							}`}
-							style={{ height: `${heightPct}%` }}
-						>
-							{apiPct > 0 && (
-								<div className="bg-sky-400" style={{ height: `${apiPct}%` }} />
-							)}
-							{oauthPct > 0 && (
-								<div
-									className="bg-emerald-400/70"
-									style={{
-										height: `${oauthPct}%`,
-										backgroundImage:
-											'repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 4px)',
-									}}
-								/>
-							)}
-							{subPct > 0 && (
-								<div
-									className="bg-violet-400/70"
-									style={{
-										height: `${subPct}%`,
-										backgroundImage:
-											'repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 4px)',
-									}}
-								/>
-							)}
-							{notional === 0 && d.messages > 0 && (
-								<div className="bg-muted-foreground/30 h-full" />
-							)}
-						</div>
-					</button>
-				);
-			})}
-		</div>
-	);
-}
-
-function TokenChart({ data, max, hover, onHover }: SubChartProps) {
-	return (
-		<div
-			role="img"
-			aria-label="Daily tokens chart"
-			className="flex items-end gap-[3px] h-44 select-none"
-			onMouseLeave={() => onHover(null)}
-		>
-			{data.map((d, i) => {
-				const total = d.inputTokens + d.outputTokens;
-				const heightPct = max > 0 ? Math.max(2, (total / max) * 100) : 2;
-				const inputPct = total > 0 ? (d.inputTokens / total) * 100 : 0;
-				const outputPct = total > 0 ? (d.outputTokens / total) * 100 : 0;
-				const active = hover === i;
-				return (
-					<button
-						type="button"
-						key={d.date}
-						onMouseEnter={() => onHover(i)}
-						onFocus={() => onHover(i)}
-						className="flex-1 h-full flex flex-col justify-end min-w-0 group cursor-default"
-					>
-						<div
-							className={`w-full rounded-sm overflow-hidden flex flex-col-reverse transition-all ${
-								active ? 'opacity-100' : 'opacity-90 group-hover:opacity-100'
-							}`}
-							style={{ height: `${heightPct}%` }}
-						>
-							{inputPct > 0 && (
-								<div
-									className="bg-muted-foreground/60"
-									style={{ height: `${inputPct}%` }}
-								/>
-							)}
-							{outputPct > 0 && (
-								<div
-									className="bg-foreground/80"
-									style={{ height: `${outputPct}%` }}
-								/>
-							)}
-						</div>
-					</button>
-				);
-			})}
-		</div>
-	);
-}
-/* ------------------------------------------------------------------ */
-/* Skeleton loading state                                              */
-/* ------------------------------------------------------------------ */
-
-const SKELETON_BARS = [
-	{ id: 'a', height: 32 },
-	{ id: 'b', height: 48 },
-	{ id: 'c', height: 24 },
-	{ id: 'd', height: 64 },
-	{ id: 'e', height: 40 },
-	{ id: 'f', height: 72 },
-	{ id: 'g', height: 16 },
-	{ id: 'h', height: 56 },
-	{ id: 'i', height: 36 },
-	{ id: 'j', height: 80 },
-	{ id: 'k', height: 28 },
-	{ id: 'l', height: 44 },
-	{ id: 'm', height: 20 },
-	{ id: 'n', height: 60 },
-	{ id: 'o', height: 52 },
-	{ id: 'p', height: 12 },
-	{ id: 'q', height: 68 },
-	{ id: 'r', height: 76 },
-	{ id: 's', height: 44 },
-	{ id: 't', height: 32 },
-	{ id: 'u', height: 50 },
-	{ id: 'v', height: 18 },
-	{ id: 'w', height: 66 },
-	{ id: 'x', height: 38 },
-	{ id: 'y', height: 58 },
-	{ id: 'z', height: 26 },
-	{ id: 'aa', height: 70 },
-	{ id: 'ab', height: 22 },
-	{ id: 'ac', height: 46 },
-	{ id: 'ad', height: 54 },
+const SCOPE_TABS: Array<NeoTabOption<UsageScope>> = [
+	{ value: 'project', label: 'Project', title: 'This project only' },
+	{
+		value: 'global',
+		label: (
+			<span className="inline-flex items-center gap-1">
+				<Globe2 className="size-3" />
+				Global
+			</span>
+		),
+		title: 'Every registered project',
+	},
 ];
 
-const SKELETON_LIST_ROWS = [
-	{ id: 'a' },
-	{ id: 'b' },
-	{ id: 'c' },
-	{ id: 'd' },
-	{ id: 'e' },
-	{ id: 'f' },
-	{ id: 'g' },
-	{ id: 'h' },
-	{ id: 'i' },
-	{ id: 'j' },
-	{ id: 'k' },
-	{ id: 'l' },
+const MODEL_SORTS: Array<NeoTabOption<ModelSort>> = [
+	{ value: 'cost', label: 'Cost' },
+	{ value: 'tokens', label: 'Tokens' },
+	{ value: 'msgs', label: 'Msgs' },
 ];
 
-function SkeletonHero() {
-	return (
-		<div className="rounded-2xl border border-border bg-card/60 px-6 py-7">
-			<div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr] gap-6 md:gap-10 items-center">
-				<div>
-					<div className="h-3 w-32 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-12 w-40 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-3 w-56 bg-muted rounded animate-pulse" />
-				</div>
-				<div className="md:border-l md:border-border/60 md:pl-6">
-					<div className="h-3 w-24 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-9 w-32 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-3 w-40 bg-muted rounded animate-pulse" />
-				</div>
-				<div className="md:border-l md:border-border/60 md:pl-6">
-					<div className="h-3 w-28 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-9 w-32 bg-muted rounded animate-pulse" />
-					<div className="mt-3 h-3 w-44 bg-muted rounded animate-pulse" />
-				</div>
-			</div>
-			<div className="mt-6 pt-5 border-t border-border/40 grid grid-cols-3 gap-6">
-				<div>
-					<div className="h-3 w-20 bg-muted rounded animate-pulse" />
-					<div className="mt-2 h-5 w-32 bg-muted rounded animate-pulse" />
-				</div>
-				<div>
-					<div className="h-3 w-16 bg-muted rounded animate-pulse" />
-					<div className="mt-2 h-5 w-36 bg-muted rounded animate-pulse" />
-				</div>
-				<div>
-					<div className="h-3 w-12 bg-muted rounded animate-pulse" />
-					<div className="mt-2 h-5 w-40 bg-muted rounded animate-pulse" />
-				</div>
-			</div>
-		</div>
-	);
+const RANGE_TABS: Array<NeoTabOption<UsageRangeKey>> = RANGE_OPTIONS.map(
+	(option) => ({
+		value: option.value,
+		label: option.label,
+		title: option.title,
+	}),
+);
+
+/** `null` when the provider reports no prompt tokens, so the tag is dropped. */
+function cacheRate(counts: {
+	inputTokens: number;
+	cachedInputTokens: number;
+	cacheCreationInputTokens: number;
+}): string | null {
+	const rate = cacheHitRate(counts);
+	return rate === null ? null : `${formatPct(rate)} cached`;
 }
-
-function SkeletonSplit() {
-	return (
-		<div className="space-y-2">
-			{[1, 2, 3].map((i) => (
-				<div key={i} className="flex items-center gap-3 py-2">
-					<div className="h-3 w-20 bg-muted rounded animate-pulse shrink-0" />
-					<div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
-						<div className="h-full w-2/3 bg-muted rounded animate-pulse" />
-					</div>
-					<div className="h-3 w-20 bg-muted rounded animate-pulse shrink-0" />
-					<div className="h-4 w-16 bg-muted rounded animate-pulse shrink-0" />
-				</div>
-			))}
-		</div>
-	);
-}
-
-function SkeletonChart() {
-	return (
-		<div>
-			<div className="flex items-baseline justify-between gap-4 mb-4">
-				<div className="min-w-0 space-y-2">
-					<div className="h-3 w-24 bg-muted rounded animate-pulse" />
-					<div className="h-7 w-28 bg-muted rounded animate-pulse" />
-					<div className="h-3 w-48 bg-muted rounded animate-pulse" />
-				</div>
-				<div className="h-7 w-28 bg-muted rounded animate-pulse shrink-0" />
-			</div>
-			<div className="flex items-end gap-[3px] h-44">
-				{SKELETON_BARS.map((bar) => (
-					<div
-						key={`chart-skeleton-${bar.id}`}
-						className="flex-1 bg-muted rounded-sm animate-pulse"
-						style={{ height: `${bar.height}%` }}
-					/>
-				))}
-			</div>
-			<div className="mt-3 flex items-center justify-between">
-				<div className="h-3 w-16 bg-muted rounded animate-pulse" />
-				<div className="h-3 w-24 bg-muted rounded animate-pulse" />
-				<div className="h-3 w-16 bg-muted rounded animate-pulse" />
-			</div>
-		</div>
-	);
-}
-
-function SkeletonList({ rows = 6 }: { rows?: number }) {
-	return (
-		<div className="divide-y divide-border/60">
-			{SKELETON_LIST_ROWS.slice(0, rows).map((row, index) => (
-				<div
-					key={`list-skeleton-${row.id}-${index}`}
-					className="flex items-center gap-3 py-2.5 px-1"
-				>
-					<div className="size-7 shrink-0 rounded-md bg-muted animate-pulse" />
-					<div className="flex-1 min-w-0 space-y-1.5">
-						<div className="h-3.5 w-24 bg-muted rounded animate-pulse" />
-						<div className="h-2.5 w-36 bg-muted rounded animate-pulse" />
-					</div>
-					<div className="space-y-1.5 text-right shrink-0">
-						<div className="h-3.5 w-16 bg-muted rounded animate-pulse" />
-						<div className="h-2.5 w-14 bg-muted rounded animate-pulse ml-auto" />
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-function UsageDashboardSkeleton() {
-	return (
-		<div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-			<SkeletonHero />
-			<Section title="How you're paying">
-				<SkeletonSplit />
-			</Section>
-			<Section title="Daily activity">
-				<SkeletonChart />
-			</Section>
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-				<Section title="By provider">
-					<SkeletonList />
-				</Section>
-				<Section title="Top models">
-					<SkeletonList />
-				</Section>
-			</div>
-		</div>
-	);
-}
-
-function Dot({ color, label }: { color: string; label: string }) {
-	return (
-		<span className="flex items-center gap-1">
-			<span className={`size-1.5 rounded-full ${color}`} />
-			<span>{label}</span>
-		</span>
-	);
-}
-
-/* ------------------------------------------------------------------ */
-/* Auth split (kept — user liked this)                                 */
-/* ------------------------------------------------------------------ */
-
-function SplitRow({
-	color,
-	label,
-	msgs,
-	value,
-	total,
-}: {
-	color: string;
-	label: string;
-	msgs: number;
-	value: number;
-	total: number;
-}) {
-	const pct = total > 0 ? (msgs / total) * 100 : 0;
-	return (
-		<div className="flex items-center gap-3 py-2">
-			<span className="text-xs text-muted-foreground w-20 shrink-0">
-				{label}
-			</span>
-			<div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
-				<div
-					className={`h-full ${color} transition-all duration-500`}
-					style={{ width: `${pct}%` }}
-				/>
-			</div>
-			<span className="text-[11px] text-muted-foreground tabular-nums w-20 text-right shrink-0">
-				{formatNumber(msgs)} msgs
-			</span>
-			<span className="text-sm font-medium tabular-nums w-20 text-right shrink-0 text-foreground">
-				{formatUsd(value)}
-			</span>
-		</div>
-	);
-}
-
-function AuthSplit({ stats }: { stats: UsageStats }) {
-	const total =
-		stats.totals.messagesByAuth.api +
-		stats.totals.messagesByAuth.oauth +
-		stats.totals.messagesByAuth.subscription;
-
-	if (total === 0)
-		return (
-			<div className="text-xs text-muted-foreground">No activity yet.</div>
-		);
-
-	// Derive notional cost per bucket by summing providers' notionalCostUsd
-	const notionalByAuth = { oauth: 0, api: 0, subscription: 0 };
-	for (const p of stats.providers) {
-		if (p.authType === 'oauth') notionalByAuth.oauth += p.notionalCostUsd;
-		else if (p.authType === 'subscription' || p.authType === 'wallet')
-			notionalByAuth.subscription += p.notionalCostUsd;
-		else if (p.authType === 'api') notionalByAuth.api += p.notionalCostUsd;
-	}
-
-	const rows = [
-		{
-			key: 'api',
-			color: 'bg-sky-400',
-			label: 'API key',
-			msgs: stats.totals.messagesByAuth.api,
-			value: notionalByAuth.api,
-		},
-		{
-			key: 'oauth',
-			color: 'bg-emerald-400',
-			label: 'OAuth',
-			msgs: stats.totals.messagesByAuth.oauth,
-			value: notionalByAuth.oauth,
-		},
-		{
-			key: 'subscription',
-			color: 'bg-violet-400',
-			label: 'Subscription',
-			msgs: stats.totals.messagesByAuth.subscription,
-			value: notionalByAuth.subscription,
-		},
-	].sort((a, b) => b.value - a.value || b.msgs - a.msgs);
-
-	return (
-		<div className="space-y-0.5">
-			{rows.map((r) => (
-				<SplitRow
-					key={r.key}
-					total={total}
-					color={r.color}
-					label={r.label}
-					msgs={r.msgs}
-					value={r.value}
-				/>
-			))}
-		</div>
-	);
-}
-
-/* ------------------------------------------------------------------ */
-/* Top usage list (combined providers + models)                        */
-/* ------------------------------------------------------------------ */
-
-function ProviderList({ providers }: { providers: UsageStats['providers'] }) {
-	if (providers.length === 0) {
-		return (
-			<div className="py-10 text-center text-xs text-muted-foreground">
-				No usage yet
-			</div>
-		);
-	}
-	return (
-		<div className="divide-y divide-border/60">
-			{providers.map((p) => (
-				<div
-					key={p.provider}
-					className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/20 transition-colors"
-				>
-					<div className="size-7 shrink-0 rounded-md bg-muted/30 flex items-center justify-center text-muted-foreground">
-						<ProviderLogo provider={p.provider} size={16} />
-					</div>
-					<div className="flex-1 min-w-0">
-						<div className="text-sm text-foreground truncate capitalize">
-							{p.provider}
-						</div>
-						<div className="text-[10px] text-muted-foreground tabular-nums">
-							{formatNumber(p.messages)} msgs ·{' '}
-							<span className={authColor(p.authType)}>
-								{authLabel(p.authType)}
-							</span>
-						</div>
-					</div>
-					<div className="text-right tabular-nums shrink-0">
-						<div className="text-sm font-medium text-foreground">
-							{formatUsd(p.notionalCostUsd)}
-						</div>
-						<div className="text-[10px] text-muted-foreground">
-							{formatNumber(p.inputTokens + p.outputTokens)} tok
-						</div>
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-function ModelList({ models }: { models: UsageStats['models'] }) {
-	if (models.length === 0) {
-		return (
-			<div className="py-10 text-center text-xs text-muted-foreground">
-				No model usage yet
-			</div>
-		);
-	}
-	return (
-		<div className="divide-y divide-border/60">
-			{models.slice(0, 12).map((m) => (
-				<div
-					key={`${m.provider}-${m.model}`}
-					className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/20 transition-colors"
-				>
-					<div className="size-7 shrink-0 rounded-md bg-muted/30 flex items-center justify-center text-muted-foreground">
-						<ProviderLogo provider={m.provider} size={14} />
-					</div>
-					<div className="flex-1 min-w-0">
-						<div className="text-sm text-foreground truncate font-mono">
-							{m.model}
-						</div>
-						<div className="text-[10px] text-muted-foreground tabular-nums">
-							{formatNumber(m.messages)} msgs ·{' '}
-							{formatNumber(m.inputTokens + m.outputTokens)} tok
-						</div>
-					</div>
-					<div className="text-right tabular-nums shrink-0">
-						<div className="text-sm font-medium text-foreground">
-							{formatUsd(m.notionalCostUsd)}
-						</div>
-						<div className={`text-[10px] ${authColor(m.authType)}`}>
-							{authLabel(m.authType)}
-						</div>
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-/* ------------------------------------------------------------------ */
-/* Project list (global scope)                                         */
-/* ------------------------------------------------------------------ */
-
-function ProjectList({
-	projects,
-}: {
-	projects: NonNullable<UsageStats['projects']>;
-}) {
-	if (projects.included.length === 0 && projects.unavailable.length === 0) {
-		return (
-			<div className="py-10 text-center text-xs text-muted-foreground">
-				No projects registered yet
-			</div>
-		);
-	}
-	return (
-		<div className="divide-y divide-border/60">
-			{projects.included.map((p) => (
-				<div
-					key={p.id}
-					className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/20 transition-colors"
-				>
-					<div className="flex-1 min-w-0">
-						<div className="text-sm text-foreground truncate">{p.name}</div>
-						<div className="text-[10px] text-muted-foreground tabular-nums truncate font-mono">
-							{p.path}
-						</div>
-					</div>
-					<div className="text-right tabular-nums shrink-0">
-						<div className="text-sm font-medium text-foreground">
-							{formatUsd(p.notionalCostUsd)}
-						</div>
-						<div className="text-[10px] text-muted-foreground">
-							{formatNumber(p.messages)} msgs
-						</div>
-					</div>
-				</div>
-			))}
-			{projects.unavailable.map((p) => (
-				<div
-					key={p.id}
-					className="flex items-center gap-3 py-2.5 px-1 opacity-60"
-					title={p.reason}
-				>
-					<AlertTriangle className="size-3.5 text-amber-400 shrink-0" />
-					<div className="flex-1 min-w-0">
-						<div className="text-sm text-foreground/80 truncate">{p.name}</div>
-						<div className="text-[10px] text-muted-foreground truncate font-mono">
-							{p.path} · {p.reason}
-						</div>
-					</div>
-					<div className="text-[10px] text-amber-400 shrink-0">unavailable</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-/* ------------------------------------------------------------------ */
-/* Card primitive                                                      */
-/* ------------------------------------------------------------------ */
-
-function Section({
-	title,
-	subtitle,
-	right,
-	children,
-	className = '',
-}: {
-	title?: string;
-	subtitle?: string;
-	right?: React.ReactNode;
-	children: React.ReactNode;
-	className?: string;
-}) {
-	return (
-		<section
-			className={`rounded-2xl border border-border bg-card/60 backdrop-blur-sm ${className}`}
-		>
-			{(title || right) && (
-				<header className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
-					<div className="min-w-0">
-						{title && (
-							<h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-								{title}
-							</h2>
-						)}
-						{subtitle && (
-							<p className="text-xs text-muted-foreground/70 mt-0.5">
-								{subtitle}
-							</p>
-						)}
-					</div>
-					{right}
-				</header>
-			)}
-			<div className="px-5 pb-5">{children}</div>
-		</section>
-	);
-}
-
-/* ------------------------------------------------------------------ */
-/* Dashboard                                                           */
-/* ------------------------------------------------------------------ */
 
 export function UsageDashboard({ onBack }: UsageDashboardProps) {
-	const [stats, setStats] = useState<UsageStats | null>(null);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [scope, setScope] = useState<'project' | 'global'>('project');
+	const {
+		stats,
+		loading,
+		error,
+		scope,
+		setScope,
+		rangeKey,
+		setRangeKey,
+		rangeLabel,
+		series,
+		activeDays,
+		previous,
+		refresh,
+		scopeLabel,
+	} = useUsageDashboardData();
 
-	const fetchStats = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		try {
-			const data =
-				scope === 'global'
-					? await apiClient.getGlobalUsageStats()
-					: await apiClient.getUsageStats();
-			setStats(data);
-		} catch (e) {
-			setError(e instanceof Error ? e.message : 'Failed to load usage stats');
-		} finally {
-			setLoading(false);
-		}
-	}, [scope]);
-
-	useEffect(() => {
-		void fetchStats();
-	}, [fetchStats]);
+	const [metric, setMetric] = useState<ChartMetric>('cost');
+	const [modelSort, setModelSort] = useState<ModelSort>('cost');
+	const [provider, setProvider] = useState<string | null>(null);
 
 	const handleBack = useCallback(() => {
 		if (onBack) return onBack();
@@ -790,249 +107,242 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 		else window.location.assign('/');
 	}, [onBack]);
 
-	const handleScopeChange = useCallback((next: 'project' | 'global') => {
-		setScope(next);
-		setStats(null);
-		setError(null);
-	}, []);
+	const providerItems = useMemo<BreakdownItem[]>(() => {
+		if (!stats) return [];
+		return stats.providers.map((entry) => ({
+			key: entry.provider,
+			label: entry.provider,
+			icon: <ProviderLogo provider={entry.provider} size={15} />,
+			value: entry.notionalCostUsd,
+			valueLabel: formatUsd(entry.notionalCostUsd),
+			metaLabel: `${formatNumber(entry.inputTokens + entry.outputTokens)} tok`,
+			sublabel: [
+				`${formatNumber(entry.messages)} msgs`,
+				`${formatNumber(entry.sessions)} sessions`,
+				authTag(entry.authType),
+				cacheRate(entry),
+			]
+				.filter(Boolean)
+				.join(' · '),
+			title: `Filter models by ${entry.provider}`,
+		}));
+	}, [stats]);
 
-	const projectName = useMemo(() => {
-		if (scope === 'global') {
-			const included = stats?.projects?.included.length ?? 0;
-			const unavailable = stats?.projects?.unavailable.length ?? 0;
-			const total = included + unavailable;
-			if (total === 0) return 'all projects';
-			return unavailable > 0
-				? `${included} of ${total} projects`
-				: `${total} project${total === 1 ? '' : 's'}`;
-		}
-		if (!stats?.project) return '';
-		const parts = stats.project.split('/').filter(Boolean);
-		return parts[parts.length - 1] ?? stats.project;
-	}, [scope, stats?.project, stats?.projects]);
+	const modelItems = useMemo<BreakdownItem[]>(() => {
+		if (!stats) return [];
+		const rows = provider
+			? stats.models.filter((model) => model.provider === provider)
+			: stats.models;
+		const sorted = [...rows].sort((a, b) => {
+			if (modelSort === 'tokens') {
+				return (
+					b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens)
+				);
+			}
+			if (modelSort === 'msgs') return b.messages - a.messages;
+			return b.notionalCostUsd - a.notionalCostUsd;
+		});
+		return sorted.map((model) => ({
+			key: `${model.provider}/${model.model}`,
+			label: model.model,
+			icon: <ProviderLogo provider={model.provider} size={14} />,
+			value:
+				modelSort === 'tokens'
+					? model.inputTokens + model.outputTokens
+					: modelSort === 'msgs'
+						? model.messages
+						: model.notionalCostUsd,
+			valueLabel:
+				modelSort === 'tokens'
+					? `${formatNumber(model.inputTokens + model.outputTokens)} tok`
+					: modelSort === 'msgs'
+						? `${formatNumber(model.messages)} msgs`
+						: formatUsd(model.notionalCostUsd),
+			metaLabel: authTag(model.authType),
+			sublabel: `${model.provider} · ${formatNumber(
+				model.messages,
+			)} msgs · ${formatNumber(model.inputTokens + model.outputTokens)} tok`,
+			title: `${model.provider}/${model.model}`,
+		}));
+	}, [stats, provider, modelSort]);
 
-	const totalSpend = stats?.totals.costUsd ?? 0;
-	const totalMessages = stats?.totals.messages ?? 0;
-	const totalTokens =
-		(stats?.totals.inputTokens ?? 0) + (stats?.totals.outputTokens ?? 0);
+	const empty = Boolean(stats && stats.totals.messages === 0);
 
 	return (
-		<div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
-			{/* Header */}
-			<header className="shrink-0 h-10 border-b border-border/60 bg-background/80 backdrop-blur">
-				<div className="h-full max-w-5xl mx-auto px-6 flex items-center justify-between gap-3">
-					<div className="flex items-center gap-2 min-w-0">
-						<button
-							type="button"
-							onClick={handleBack}
-							className="inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-							title="Back"
-							aria-label="Back"
-						>
+		<div
+			className={cn(
+				'fixed inset-0 z-50 flex flex-col bg-background text-foreground',
+				NEO_SCOPE,
+			)}
+		>
+			<header className="shrink-0 border-b-2 border-[rgb(var(--np-edge))] bg-card">
+				<div className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
+					<div className="flex min-w-0 items-center gap-2.5">
+						<NeoIconButton label="Back" onClick={handleBack}>
 							<ArrowLeft className="size-3.5" />
-						</button>
-						<div className="min-w-0 flex items-baseline gap-1.5 text-xs">
-							<span className="text-muted-foreground/70 uppercase tracking-[0.1em] text-[10px]">
+						</NeoIconButton>
+						<div className="flex min-w-0 items-baseline gap-1.5">
+							<span className={cn(NEO_EYEBROW, 'text-muted-foreground')}>
 								Usage
 							</span>
-							<span className="text-muted-foreground/40">/</span>
-							<span className="font-medium truncate text-foreground">
-								{projectName || '—'}
+							<span className="text-muted-foreground/50">/</span>
+							<span className="truncate text-[13px] font-medium">
+								{scopeLabel || '—'}
 							</span>
 						</div>
 					</div>
-					<div className="flex items-center gap-1.5">
-						<div className="inline-flex p-0.5 rounded-md border border-border bg-muted/30 text-[11px]">
-							<button
-								type="button"
-								onClick={() => handleScopeChange('project')}
-								className={`px-2 py-0.5 rounded transition-colors ${
-									scope === 'project'
-										? 'bg-background text-foreground shadow-sm'
-										: 'text-muted-foreground hover:text-foreground'
-								}`}
-							>
-								Project
-							</button>
-							<button
-								type="button"
-								onClick={() => handleScopeChange('global')}
-								className={`px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 ${
-									scope === 'global'
-										? 'bg-background text-foreground shadow-sm'
-										: 'text-muted-foreground hover:text-foreground'
-								}`}
-							>
-								<Globe2 className="size-3" />
-								Global
-							</button>
-						</div>
-						<button
-							type="button"
-							onClick={() => void fetchStats()}
-							disabled={loading}
-							className="inline-flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
-							title="Refresh"
-							aria-label="Refresh"
-						>
+					<div className="flex items-center gap-2">
+						<NeoTabs
+							aria-label="Usage scope"
+							options={SCOPE_TABS}
+							value={scope}
+							onChange={(value) => {
+								setScope(value);
+								setProvider(null);
+							}}
+						/>
+						<NeoTabs
+							aria-label="Date range"
+							options={RANGE_TABS}
+							value={rangeKey}
+							onChange={setRangeKey}
+						/>
+						<NeoIconButton label="Refresh" onClick={refresh} disabled={loading}>
 							<RefreshCw
-								className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
+								className={cn('size-3.5', loading && 'animate-spin')}
 							/>
-						</button>
+						</NeoIconButton>
 					</div>
 				</div>
 			</header>
 
-			{/* Body */}
-			<main className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-				<div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+			<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+				<div className="mx-auto w-full max-w-[1100px] space-y-4 px-4 py-8 sm:px-6">
 					{error && (
-						<div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-							{error}
+						<div
+							className={cn(
+								'border-2 border-[rgb(var(--np-coral))] bg-[rgb(var(--np-coral)/0.1)] px-4 py-3',
+								NEO_RADIUS,
+							)}
+						>
+							<p className="text-[13px]">{error}</p>
 						</div>
 					)}
 
-					{loading && !stats && <UsageDashboardSkeleton />}
+					{loading && !stats && <UsageSkeleton />}
 
-					{stats && (
+					{stats && empty && (
+						<NeoPanel elevation="sm" className="px-6 py-12 text-center">
+							<p className="text-[13px] font-medium">No usage recorded yet</p>
+							<p className="mt-2 text-[12px] text-muted-foreground">
+								Send a message in this{' '}
+								{scope === 'global' ? 'workspace' : 'project'} and the breakdown
+								will appear here.
+							</p>
+						</NeoPanel>
+					)}
+
+					{stats && !empty && (
 						<>
-							{/* HERO — Token value at API rates is the headline */}
-							<div className="rounded-2xl border border-border bg-gradient-to-br from-card to-card/40 px-6 py-7">
-								<div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr] gap-6 md:gap-10 items-center">
-									<div>
-										<div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-											Token value · API rates
-										</div>
-										<div className="mt-2 text-5xl font-semibold tabular-nums tracking-tight">
-											{formatUsd(stats.totals.notionalCostUsd)}
-										</div>
-										<div className="mt-2 text-[11px] text-muted-foreground tabular-nums">
-											all {formatNumber(stats.totals.messages)} msgs valued at
-											catalog API pricing
-										</div>
-									</div>
+							<UsageHero
+								totals={stats.totals}
+								previous={previous}
+								series={series}
+								activeDays={activeDays}
+								rangeLabel={rangeLabel}
+							/>
 
-									<div className="md:border-l md:border-border/60 md:pl-6">
-										<div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-											API spend
-										</div>
-										<div className="mt-2 text-3xl font-semibold tabular-nums tracking-tight">
-											{formatUsd(totalSpend)}
-										</div>
-										<div className="mt-2 text-[11px] text-muted-foreground tabular-nums">
-											{formatNumber(stats.totals.messagesByAuth.api)}{' '}
-											pay-as-you-go msgs
-										</div>
-									</div>
+							<UsageInsights
+								stats={stats}
+								series={series}
+								activeDays={activeDays}
+								rangeLabel={rangeLabel}
+							/>
 
-									<div className="md:border-l md:border-border/60 md:pl-6">
-										<div className="text-[10px] uppercase tracking-[0.18em] text-emerald-400/80">
-											OAuth · plan value
-										</div>
-										<div className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-emerald-400">
-											{formatUsd(
-												stats.providers
-													.filter((p) => p.authType === 'oauth')
-													.reduce((s, p) => s + p.notionalCostUsd, 0),
-											)}
-										</div>
-										<div className="mt-2 text-[11px] text-muted-foreground tabular-nums">
-											{formatNumber(stats.totals.messagesByAuth.oauth)} msgs via
-											plan subscriptions
-										</div>
-									</div>
-								</div>
-
-								<div className="mt-6 pt-5 border-t border-border/40 grid grid-cols-3 gap-6 text-[11px] text-muted-foreground">
-									<div>
-										<div className="uppercase tracking-[0.14em] text-muted-foreground/70">
-											Messages
-										</div>
-										<div className="mt-1 text-sm text-foreground tabular-nums">
-											{formatNumber(totalMessages)}{' '}
-											<span className="text-muted-foreground/70">
-												· {formatNumber(stats.totals.sessions)} sessions
-											</span>
-										</div>
-									</div>
-									<div>
-										<div className="uppercase tracking-[0.14em] text-muted-foreground/70">
-											Tokens
-										</div>
-										<div className="mt-1 text-sm text-foreground tabular-nums">
-											{formatNumber(totalTokens)}{' '}
-											<span className="text-muted-foreground/70">
-												· {formatNumber(stats.totals.inputTokens)} in /{' '}
-												{formatNumber(stats.totals.outputTokens)} out
-											</span>
-										</div>
-									</div>
-									<div>
-										<div className="uppercase tracking-[0.14em] text-muted-foreground/70">
-											Mix
-										</div>
-										<div className="mt-1 text-sm tabular-nums">
-											<span className={authColor('api')}>
-												{formatNumber(stats.totals.messagesByAuth.api)} api
-											</span>
-											{stats.totals.messagesByAuth.oauth > 0 && (
-												<>
-													<span className="text-muted-foreground/40"> · </span>
-													<span className={authColor('oauth')}>
-														{formatNumber(stats.totals.messagesByAuth.oauth)}{' '}
-														oauth
-													</span>
-												</>
-											)}
-											{stats.totals.messagesByAuth.subscription > 0 && (
-												<>
-													<span className="text-muted-foreground/40"> · </span>
-													<span className={authColor('subscription')}>
-														{formatNumber(
-															stats.totals.messagesByAuth.subscription,
-														)}{' '}
-														sub
-													</span>
-												</>
-											)}
-										</div>
-									</div>
-								</div>
-							</div>
-
-							{/* Auth split */}
-							<Section
-								title="How you're paying"
-								subtitle="OAuth & Subscription are flat-rate · not per-token"
+							<UsageSection
+								title="Daily activity"
+								subtitle={`${rangeLabel} · ${series.length} days`}
 							>
-								<AuthSplit stats={stats} />
-							</Section>
+								<UsageActivityChart
+									series={series}
+									metric={metric}
+									onMetricChange={setMetric}
+								/>
+							</UsageSection>
 
-							{/* Daily chart */}
-							<Section title="Daily activity">
-								<DailyChart data={stats.daily} />
-							</Section>
+							<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+								<UsageSection
+									title="How you're paying"
+									subtitle={rangeLabel.toLowerCase()}
+								>
+									<UsagePaymentSplit
+										stats={stats}
+										resetKey={`${scope}:${rangeKey}`}
+									/>
+								</UsageSection>
 
-							{/* Top providers + models */}
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-								<Section title="By provider">
-									<ProviderList providers={stats.providers} />
-								</Section>
-								<Section
-									title="Top models"
-									subtitle={
-										stats.models.length > 12
-											? `Showing 12 of ${stats.models.length}`
-											: undefined
+								<UsageSection
+									title="By provider"
+									subtitle={`${rangeLabel.toLowerCase()} · select one to filter models`}
+									actions={
+										provider ? (
+											<button
+												type="button"
+												onClick={() => setProvider(null)}
+												className="inline-flex items-center gap-1"
+											>
+												<NeoBadge accent="blue">
+													{provider}
+													<X className="size-2.5" />
+												</NeoBadge>
+											</button>
+										) : undefined
 									}
 								>
-									<ModelList models={stats.models} />
-								</Section>
+									<BreakdownList
+										items={providerItems}
+										limit={8}
+										emptyLabel="No providers used yet"
+										resetKey={`${scope}:${rangeKey}`}
+										selectedKey={provider}
+										onSelect={(key) =>
+											setProvider((current) => (current === key ? null : key))
+										}
+									/>
+								</UsageSection>
 							</div>
 
-							{/* Projects (global scope only) */}
+							<UsageSection
+								title={provider ? `Models · ${provider}` : 'Top models'}
+								subtitle={`${rangeLabel.toLowerCase()} · ${
+									modelItems.length
+								} model${modelItems.length === 1 ? '' : 's'}`}
+								actions={
+									<NeoTabs
+										aria-label="Sort models"
+										options={MODEL_SORTS}
+										value={modelSort}
+										onChange={(value) => setModelSort(value)}
+									/>
+								}
+							>
+								<BreakdownList
+									items={modelItems}
+									limit={8}
+									emptyLabel="No model usage yet"
+									resetKey={`${scope}:${rangeKey}:${modelSort}:${provider ?? ''}`}
+								/>
+							</UsageSection>
+
+							<UsageSection
+								title="Cache efficiency"
+								subtitle={`${rangeLabel.toLowerCase()} · prompt tokens served from cache`}
+							>
+								<UsageCache stats={stats} resetKey={`${scope}:${rangeKey}`} />
+							</UsageSection>
+
 							{scope === 'global' && stats.projects && (
-								<Section
+								<UsageSection
 									title="Projects"
 									subtitle={
 										stats.projects.unavailable.length > 0
@@ -1040,21 +350,24 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 											: `${stats.projects.included.length} included`
 									}
 								>
-									<ProjectList projects={stats.projects} />
-								</Section>
+									<UsageProjects projects={stats.projects} />
+								</UsageSection>
 							)}
 
-							{stats.notes.missingPricing.length > 0 && (
-								<div className="text-[10px] text-muted-foreground/70 text-center font-mono py-2">
-									pricing missing for {stats.notes.missingPricing.length} model
-									{stats.notes.missingPricing.length === 1 ? '' : 's'} · cost
-									shown as $0
-								</div>
-							)}
-
-							<div className="text-[10px] text-muted-foreground/60 text-center pt-2 pb-4">
-								estimated from catalog pricing · generated{' '}
-								{new Date(stats.generatedAt).toLocaleString()}
+							<div className="flex flex-wrap items-center justify-center gap-2 pb-4 pt-1">
+								{stats.notes.missingPricing.length > 0 && (
+									<NeoBadge
+										accent="yellow"
+										title={stats.notes.missingPricing.join('\n')}
+									>
+										pricing missing · {stats.notes.missingPricing.length} model
+										{stats.notes.missingPricing.length === 1 ? '' : 's'}
+									</NeoBadge>
+								)}
+								<span className="text-[11px] text-muted-foreground">
+									estimated from catalog pricing · generated{' '}
+									{new Date(stats.generatedAt).toLocaleString()}
+								</span>
 							</div>
 						</>
 					)}
