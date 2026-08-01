@@ -11,6 +11,12 @@ export type {
 } from './NeoButton';
 export { NeoOttoLogo } from './NeoOttoLogo';
 export type { NeoOttoLogoProps, NeoOttoLogoTone } from './NeoOttoLogo';
+export { buildNeoCodeMarkSvg, NeoCodeMark } from './NeoCodeMark';
+export type {
+	NeoCodeMarkGeometry,
+	NeoCodeMarkPalette,
+	NeoCodeMarkProps,
+} from './NeoCodeMark';
 export { NeoEyebrow, NeoReveal, NeoSection } from './NeoSection';
 export type {
 	NeoEyebrowProps,

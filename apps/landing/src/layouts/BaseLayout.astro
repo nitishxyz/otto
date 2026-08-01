@@ -13,6 +13,7 @@ interface Props {
 	ogDescription?: string;
 	ogDate?: string;
 	ogAuthor?: string;
+	noindex?: boolean;
 }
 
 const {
@@ -25,6 +26,7 @@ const {
 	ogDescription,
 	ogDate,
 	ogAuthor,
+	noindex = false,
 } = Astro.props;
 
 const OG_BASE = (import.meta.env.PUBLIC_OG_URL || '').replace(/\/$/, '');
@@ -46,6 +48,7 @@ const canonicalUrl = new URL(Astro.url.pathname, 'https://ottocode.io').href;
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>{title}</title>
 		<meta name="description" content={description} />
+		{noindex && <meta name="robots" content="noindex, nofollow" />}
 		<link rel="canonical" href={canonicalUrl} />
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content={title} />
