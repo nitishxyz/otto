@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { getModelInfo, type ProviderId } from '@ottocode/sdk/browser';
+import { Tooltip } from '../ui/Tooltip';
 
 interface ContextUsageIndicatorProps {
 	provider: string;
@@ -52,12 +53,12 @@ export const ContextUsageIndicator = memo(function ContextUsageIndicator({
 	const remaining =
 		contextLimit != null ? Math.max(0, contextLimit - contextTokens) : null;
 
-	const title = useMemo(() => {
+	const tooltipLabel = useMemo(() => {
 		if (contextLimit == null) {
 			return `Context: ${contextTokens.toLocaleString()} tokens (model limit unknown)`;
 		}
 		const pct = Math.round((contextTokens / contextLimit) * 100);
-		let label = `Context: ${pct}% · ${contextTokens.toLocaleString()} / ${contextLimit.toLocaleString()} tokens`;
+		let label = `Context window: ${contextTokens.toLocaleString()} / ${contextLimit.toLocaleString()} tokens (${pct}% used)`;
 		if (remaining != null && remaining > 0) {
 			label += ` — ~${formatCompactNumber(remaining)} remaining`;
 		}
@@ -69,29 +70,31 @@ export const ContextUsageIndicator = memo(function ContextUsageIndicator({
 	const colorClass = getTextColorClass(usagePercent ?? 0);
 
 	return (
-		<div className={`flex items-center ${className}`.trim()} title={title}>
-			<div className="flex items-center gap-1">
-				<span className="text-xs opacity-70">ctx</span>
-				{emphasizePercent ? (
-					<span className={`font-medium tabular-nums ${colorClass}`}>
-						{displayPercent}%
-					</span>
-				) : contextLimit != null && displayPercent != null ? (
-					<>
-						<span className="font-medium tabular-nums text-foreground">
-							{formatCompactNumber(contextTokens)}
-						</span>
-						<span className="text-xs opacity-50">·</span>
+		<Tooltip content={tooltipLabel} side="bottom">
+			<div className={`flex items-center ${className}`.trim()}>
+				<div className="flex items-center gap-1">
+					<span className="text-xs opacity-70">ctx</span>
+					{emphasizePercent ? (
 						<span className={`font-medium tabular-nums ${colorClass}`}>
 							{displayPercent}%
 						</span>
-					</>
-				) : (
-					<span className={`font-medium tabular-nums ${colorClass}`}>
-						{formatCompactNumber(contextTokens)}
-					</span>
-				)}
+					) : contextLimit != null && displayPercent != null ? (
+						<>
+							<span className="font-medium tabular-nums text-foreground">
+								{formatCompactNumber(contextTokens)}
+							</span>
+							<span className="text-xs opacity-50">·</span>
+							<span className={`font-medium tabular-nums ${colorClass}`}>
+								{displayPercent}%
+							</span>
+						</>
+					) : (
+						<span className={`font-medium tabular-nums ${colorClass}`}>
+							{formatCompactNumber(contextTokens)}
+						</span>
+					)}
+				</div>
 			</div>
-		</div>
+		</Tooltip>
 	);
 });

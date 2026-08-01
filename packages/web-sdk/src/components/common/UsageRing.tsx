@@ -36,12 +36,10 @@ export const UsageRing = memo(function UsageRing({ provider }: UsageRingProps) {
 		0,
 		Math.min(usage.primaryWindow?.usedPercent ?? 0, 100),
 	);
-	const windowSeconds = usage.primaryWindow?.windowSeconds ?? 18000;
-	const windowLabel = windowSeconds > 1209600 ? 'mo' : '5h';
-	const titleLabel = windowSeconds > 1209600 ? 'monthly' : '5h window';
+	const roundedPercent = Math.round(percent);
 	const dashOffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
 	const color = getColor(percent);
-	const label = `Usage: ${Math.round(percent)}% (${titleLabel}) — Click for details`;
+	const label = `Usage: ${roundedPercent}% used — Click for details`;
 
 	return (
 		<Tooltip content={label} side="bottom">
@@ -80,9 +78,9 @@ export const UsageRing = memo(function UsageRing({ provider }: UsageRingProps) {
 				</svg>
 				<span
 					className="absolute inset-0 flex items-center justify-center rotate-0 font-medium text-muted-foreground"
-					style={{ fontSize: 7 }}
+					style={{ fontSize: 6 }}
 				>
-					{windowLabel}
+					{roundedPercent}%
 				</span>
 			</button>
 		</Tooltip>
