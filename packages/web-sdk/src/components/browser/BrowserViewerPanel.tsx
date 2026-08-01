@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
+import { toast } from '../../stores/toastStore';
 import { connectBrowserController } from '../../lib/browser/controller';
 import { BROWSER_RECORDER_SCRIPT } from '../../lib/browser/recorder-script';
 import { subscribeNativeOverlay } from '../../lib/native-overlay';
@@ -48,6 +49,20 @@ interface NativeBrowserBridge {
 	subscribe(
 		id: string,
 		listener: (event: { id: string; url: string; loading: boolean }) => void,
+	): () => void;
+	subscribeNewTab(
+		id: string,
+		listener: (event: { id: string; url: string }) => void,
+	): () => void;
+	subscribeDownload(
+		id: string,
+		listener: (event: {
+			id: string;
+			url: string;
+			status: 'requested' | 'finished';
+			path?: string | null;
+			success?: boolean | null;
+		}) => void,
 	): () => void;
 	openWindow(url: string): Promise<void>;
 }
@@ -89,6 +104,16 @@ function decodeNativePageUrl(value: unknown): string | null {
 	return typeof url === 'string' ? url : null;
 }
 
+function downloadName(path: string | null | undefined, url: string): string {
+	const fromPath = path?.split(/[\\/]/).filter(Boolean).pop();
+	if (fromPath) return fromPath;
+	try {
+		return new URL(url).pathname.split('/').filter(Boolean).pop() || 'file';
+	} catch {
+		return 'file';
+	}
+}
+
 function isEmbeddableUrl(value: string): boolean {
 	if (!value) return false;
 	try {
@@ -122,6 +147,7 @@ export function BrowserViewerPanel({
 	const observedNativeUrlRef = useRef(normalizeBrowserUrl(tab.url));
 	const requestedTabUrlRef = useRef(normalizeBrowserUrl(tab.url));
 	const pendingHistoryIndexRef = useRef<number | null>(null);
+	const downloadNamesRef = useRef(new Map<string, string>());
 	const loadingDoneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
 	);
@@ -376,6 +402,40 @@ export function BrowserViewerPanel({
 	}, [completeLoading, nativeBridge, recordNativeNavigation, tab.id]);
 
 	useEffect(() => {
+		if (!nativeBridge) return;
+		return nativeBridge.subscribeNewTab(tab.id, (event) => {
+			openBrowserTab(event.url, {
+				kind: 'browser',
+				title: 'Browser',
+				newTab: true,
+			});
+		});
+	}, [nativeBridge, openBrowserTab, tab.id]);
+
+	useEffect(() => {
+		if (!nativeBridge) return;
+		return nativeBridge.subscribeDownload(tab.id, (event) => {
+			if (event.status === 'requested') {
+				const name = downloadName(event.path, event.url);
+				downloadNamesRef.current.set(event.url, name);
+				toast.info(`Downloading ${name}…`);
+			} else if (event.success) {
+				const name =
+					downloadNamesRef.current.get(event.url) ??
+					downloadName(event.path, event.url);
+				downloadNamesRef.current.delete(event.url);
+				toast.success(`Downloaded ${name} to Downloads`);
+			} else {
+				const name =
+					downloadNamesRef.current.get(event.url) ??
+					downloadName(event.path, event.url);
+				downloadNamesRef.current.delete(event.url);
+				toast.error(`Failed to download ${name}`);
+			}
+		});
+	}, [nativeBridge, tab.id]);
+
+	useEffect(() => {
 		if (!nativeBridge || !isActive || !canRenderUrl) return;
 		let disposed = false;
 		const syncSpaNavigation = async () => {
@@ -432,8 +492,16 @@ export function BrowserViewerPanel({
 	}, [canRenderUrl, nativeBridge, normalizedUrl, tab.id]);
 
 	useEffect(() => {
-		if (!canRenderUrl) return;
 		return connectBrowserController(tab.id, {
+			metadata: () => {
+				const current = useViewerTabsStore.getState().tabsById[tab.id];
+				if (current?.type !== 'browser') return {};
+				return {
+					url: normalizeBrowserUrl(current.url) || undefined,
+					title: current.title,
+					kind: current.kind,
+				};
+			},
 			execute: (script) => {
 				if (nativeBridge) return nativeBridge.execute(tab.id, script);
 				const page = iframeRef.current?.contentWindow;
@@ -454,8 +522,18 @@ export function BrowserViewerPanel({
 						mediaType: 'image/png',
 					})
 				: undefined,
+			openTab: async (url) => {
+				const tabId = `browser:page:${crypto.randomUUID()}`;
+				openBrowserTab(url, {
+					id: tabId,
+					kind: 'browser',
+					title: 'Browser',
+					newTab: true,
+				});
+				return tabId;
+			},
 		});
-	}, [canRenderUrl, nativeBridge, tab.id]);
+	}, [nativeBridge, openBrowserTab, tab.id]);
 
 	useEffect(() => {
 		if (nativeBridge) return;

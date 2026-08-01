@@ -27,7 +27,28 @@ export interface NativeBrowserBridge {
 		id: string,
 		listener: (event: NativeBrowserNavigationEvent) => void,
 	) => () => void;
+	subscribeNewTab: (
+		id: string,
+		listener: (event: NativeBrowserNewTabEvent) => void,
+	) => () => void;
+	subscribeDownload: (
+		id: string,
+		listener: (event: NativeBrowserDownloadEvent) => void,
+	) => () => void;
 	openWindow: (url: string) => Promise<void>;
+}
+
+export interface NativeBrowserNewTabEvent {
+	id: string;
+	url: string;
+}
+
+export interface NativeBrowserDownloadEvent {
+	id: string;
+	url: string;
+	status: 'requested' | 'finished';
+	path?: string | null;
+	success?: boolean | null;
 }
 
 export interface NativeBrowserNavigationEvent {
@@ -56,6 +77,14 @@ export function registerNativeBrowserBridge() {
 		string,
 		Set<(event: NativeBrowserNavigationEvent) => void>
 	>();
+	const newTabListeners = new Map<
+		string,
+		Set<(event: NativeBrowserNewTabEvent) => void>
+	>();
+	const downloadListeners = new Map<
+		string,
+		Set<(event: NativeBrowserDownloadEvent) => void>
+	>();
 	// Browser webviews belong to this window only, so the backend targets
 	// navigation events at this window label to keep tabs isolated per window.
 	const navigationReady = listen<NativeBrowserNavigationEvent>(
@@ -69,11 +98,33 @@ export function registerNativeBrowserBridge() {
 	).catch((error) => {
 		console.error('[otto] Failed to listen for browser navigation:', error);
 	});
+	const newTabReady = listen<NativeBrowserNewTabEvent>(
+		'native-browser-new-tab',
+		({ payload }) => {
+			for (const listener of newTabListeners.get(payload.id) ?? []) {
+				listener(payload);
+			}
+		},
+		{ target: getCurrentWindow().label },
+	).catch((error) => {
+		console.error('[otto] Failed to listen for browser new tabs:', error);
+	});
+	const downloadReady = listen<NativeBrowserDownloadEvent>(
+		'native-browser-download',
+		({ payload }) => {
+			for (const listener of downloadListeners.get(payload.id) ?? []) {
+				listener(payload);
+			}
+		},
+		{ target: getCurrentWindow().label },
+	).catch((error) => {
+		console.error('[otto] Failed to listen for browser downloads:', error);
+	});
 
 	win.OTTO_NATIVE_BROWSER = {
 		isAvailable: true,
 		async mount(options) {
-			await navigationReady;
+			await Promise.all([navigationReady, newTabReady, downloadReady]);
 			await invoke('native_browser_mount', {
 				id: options.id,
 				url: options.url,
@@ -108,6 +159,24 @@ export function registerNativeBrowserBridge() {
 			return () => {
 				listeners.delete(listener);
 				if (listeners.size === 0) navigationListeners.delete(id);
+			};
+		},
+		subscribeNewTab(id, listener) {
+			const listeners = newTabListeners.get(id) ?? new Set();
+			listeners.add(listener);
+			newTabListeners.set(id, listeners);
+			return () => {
+				listeners.delete(listener);
+				if (listeners.size === 0) newTabListeners.delete(id);
+			};
+		},
+		subscribeDownload(id, listener) {
+			const listeners = downloadListeners.get(id) ?? new Set();
+			listeners.add(listener);
+			downloadListeners.set(id, listeners);
+			return () => {
+				listeners.delete(listener);
+				if (listeners.size === 0) downloadListeners.delete(id);
 			};
 		},
 		async openWindow(url) {

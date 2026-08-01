@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::webview::{PageLoadEvent, WebviewBuilder};
+use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 
 /// Screenshots re-render the page, so they only need a modest budget.
@@ -12,6 +12,23 @@ struct NativeBrowserNavigationEvent {
     id: String,
     url: String,
     loading: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeBrowserNewTabEvent {
+    id: String,
+    url: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeBrowserDownloadEvent {
+    id: String,
+    url: String,
+    status: &'static str,
+    path: Option<String>,
+    success: Option<bool>,
 }
 
 fn safe_id(id: &str) -> String {
@@ -101,6 +118,12 @@ pub async fn native_browser_mount(
     let event_window = window.clone();
     let event_target = window.label().to_string();
     let event_id = id.clone();
+    let new_tab_window = window.clone();
+    let new_tab_target = window.label().to_string();
+    let new_tab_id = id.clone();
+    let download_window = window.clone();
+    let download_target = window.label().to_string();
+    let download_id = id.clone();
     let mut builder = WebviewBuilder::new(label, WebviewUrl::External(parsed_url));
     if let Some(script) = init_script {
         // Otto's page recorder must run before page scripts on every document.
@@ -108,6 +131,44 @@ pub async fn native_browser_mount(
     }
     let builder = builder
         .zoom_hotkeys_enabled(true)
+        .on_new_window(move |url, _features| {
+            if url.scheme() == "http" || url.scheme() == "https" {
+                let _ = new_tab_window.emit_to(
+                    new_tab_target.as_str(),
+                    "native-browser-new-tab",
+                    NativeBrowserNewTabEvent {
+                        id: new_tab_id.clone(),
+                        url: url.to_string(),
+                    },
+                );
+            }
+            NewWindowResponse::Deny
+        })
+        .on_download(move |_webview, event| {
+            let payload = match event {
+                DownloadEvent::Requested { url, destination } => NativeBrowserDownloadEvent {
+                    id: download_id.clone(),
+                    url: url.to_string(),
+                    status: "requested",
+                    path: Some(destination.to_string_lossy().into_owned()),
+                    success: None,
+                },
+                DownloadEvent::Finished { url, path, success } => NativeBrowserDownloadEvent {
+                    id: download_id.clone(),
+                    url: url.to_string(),
+                    status: "finished",
+                    path: path.map(|value| value.to_string_lossy().into_owned()),
+                    success: Some(success),
+                },
+                _ => return true,
+            };
+            let _ = download_window.emit_to(
+                download_target.as_str(),
+                "native-browser-download",
+                payload,
+            );
+            true
+        })
         .on_page_load(move |_webview, payload| {
             let _ = event_window.emit_to(
                 event_target.as_str(),

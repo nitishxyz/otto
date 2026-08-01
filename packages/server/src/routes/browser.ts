@@ -22,6 +22,9 @@ const browserCommandSchema = z.object({
 
 const pollBrowserCommandQuerySchema = z.object({
 	tabId: z.string().max(128).regex(BROWSER_TAB_ID_PATTERN),
+	url: z.string().max(8_192).optional(),
+	title: z.string().max(512).optional(),
+	kind: z.enum(['browser', 'simulator']).optional(),
 });
 
 const pollBrowserCommandResponseSchema = z.object({
@@ -69,7 +72,16 @@ export function registerBrowserRoutes(app: Hono) {
 			const tabId = c.req.query('tabId');
 			if (!tabId) return c.json({ command: null }, 200);
 			const projectRoot = await resolveRequestProjectRoot(c);
-			const command = await waitForBrowserControlCommand(projectRoot, tabId);
+			const command = await waitForBrowserControlCommand(
+				projectRoot,
+				tabId,
+				undefined,
+				{
+					url: c.req.query('url'),
+					title: c.req.query('title'),
+					kind: c.req.query('kind') as 'browser' | 'simulator' | undefined,
+				},
+			);
 			const wireCommand = command
 				? {
 						id: command.id,

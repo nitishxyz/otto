@@ -1,5 +1,8 @@
 import { tool, type Tool } from 'ai';
-import { requestBrowserControl } from '../../../../browser-control.ts';
+import {
+	listBrowserViewers,
+	requestBrowserControl,
+} from '../../../../browser-control.ts';
 import { createToolError } from '../error.ts';
 import {
 	browserControlArgs,
@@ -32,10 +35,12 @@ const SUPPORTED_SCREENSHOT_MEDIA_TYPES = new Set([
 
 const description = [
 	'Open and control a page in Otto built-in browser.',
+	'Use tabs to list the currently connected browser tabs, including each tabId, URL, title, and kind; pass a listed tabId to control that tab.',
 	'Use open first, then snapshot to read visible text and interactive elements; snapshot returns stable references such as @e1 that work as selectors for click, hover, type, press, scroll, and wait_for.',
 	'screenshot returns the rendered page as an image for visual checks (macOS desktop app only).',
 	'html returns the live DOM markup and find searches the rendered text and markup, so you can inspect the code actually running in the page.',
 	'console lists captured console output and page errors; network lists fetch/XHR/resource requests.',
+	'Links that target a new window open as a new controllable Otto browser tab; download clicks a link and saves it through the host browser (the desktop app uses the OS Downloads folder).',
 	'navigate/back/forward/reload/stop control navigation and wait for the next document to load.',
 	'evaluate runs JavaScript and returns a serializable result.',
 	'Desktop uses a native top-level webview; web clients can only automate same-origin iframe pages and cannot capture screenshots because browser security blocks cross-origin access.',
@@ -199,6 +204,19 @@ export function buildBrowserTool(projectRoot: string): {
 						);
 					}
 					const kind = input.kind ?? 'browser';
+					if (input.action === 'tabs') {
+						const tabs = listBrowserViewers(projectRoot);
+						return {
+							ok: true,
+							action: 'tabs',
+							count: tabs.length,
+							tabs,
+							message:
+								tabs.length > 0
+									? `Found ${tabs.length} connected browser tab${tabs.length === 1 ? '' : 's'}`
+									: 'No connected Otto browser tabs were found',
+						};
+					}
 					if (input.action === 'open') {
 						const url = validateBrowserUrl(input.url ?? '');
 						const title =

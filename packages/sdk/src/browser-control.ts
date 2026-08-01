@@ -12,6 +12,17 @@ export interface BrowserControlResult {
 	[key: string]: unknown;
 }
 
+export interface BrowserViewerMetadata {
+	url?: string;
+	title?: string;
+	kind?: 'browser' | 'simulator';
+}
+
+export interface BrowserViewer extends BrowserViewerMetadata {
+	tabId: string;
+	lastSeenAt: number;
+}
+
 interface CommandWaiter {
 	resolve: (command: BrowserControlCommand | null) => void;
 	timer: ReturnType<typeof setTimeout>;
@@ -30,6 +41,10 @@ const commandQueues = new Map<string, BrowserControlCommand[]>();
 const commandWaiters = new Map<string, CommandWaiter[]>();
 const resultWaiters = new Map<string, ResultWaiter>();
 const viewerSeenAt = new Map<string, number>();
+const browserViewers = new Map<
+	string,
+	BrowserViewer & { projectRoot: string }
+>();
 
 /** A viewer is considered connected while it keeps long-polling for commands. */
 const VIEWER_PRESENCE_TTL_MS = 90_000;
@@ -38,9 +53,46 @@ function targetKey(projectRoot: string, tabId: string): string {
 	return `${projectRoot}\0${tabId}`;
 }
 
-/** Records that a browser viewer for the project polled the command channel. */
-export function markBrowserViewerSeen(projectRoot: string): void {
-	viewerSeenAt.set(projectRoot, Date.now());
+/** Records that a browser viewer tab polled the command channel. */
+export function markBrowserViewerSeen(
+	projectRoot: string,
+	tabId?: string,
+	metadata: BrowserViewerMetadata = {},
+): void {
+	const now = Date.now();
+	viewerSeenAt.set(projectRoot, now);
+	if (!tabId) return;
+	const key = targetKey(projectRoot, tabId);
+	const existing = browserViewers.get(key);
+	browserViewers.set(key, {
+		projectRoot,
+		tabId,
+		url: metadata.url ?? existing?.url,
+		title: metadata.title ?? existing?.title,
+		kind: metadata.kind ?? existing?.kind,
+		lastSeenAt: now,
+	});
+}
+
+/** Lists browser tabs that have recently polled for this project. */
+export function listBrowserViewers(projectRoot: string): BrowserViewer[] {
+	const now = Date.now();
+	const viewers: BrowserViewer[] = [];
+	for (const [key, viewer] of browserViewers) {
+		if (now - viewer.lastSeenAt > VIEWER_PRESENCE_TTL_MS) {
+			browserViewers.delete(key);
+			continue;
+		}
+		if (viewer.projectRoot !== projectRoot) continue;
+		viewers.push({
+			tabId: viewer.tabId,
+			url: viewer.url,
+			title: viewer.title,
+			kind: viewer.kind,
+			lastSeenAt: viewer.lastSeenAt,
+		});
+	}
+	return viewers.sort((left, right) => left.tabId.localeCompare(right.tabId));
 }
 
 /** Reports whether a browser viewer recently polled for this project. */
@@ -154,8 +206,9 @@ export function waitForBrowserControlCommand(
 	projectRoot: string,
 	tabId: string,
 	timeoutMs = 25_000,
+	metadata: BrowserViewerMetadata = {},
 ): Promise<BrowserControlCommand | null> {
-	markBrowserViewerSeen(projectRoot);
+	markBrowserViewerSeen(projectRoot, tabId, metadata);
 	const key = targetKey(projectRoot, tabId);
 	const queue = commandQueues.get(key);
 	const command = queue?.shift();

@@ -19,8 +19,16 @@ export interface BrowserPageCapture {
 
 export interface BrowserPageExecutor {
 	execute(script: string): Promise<unknown>;
+	/** Reports viewer tab metadata to browser tab discovery. */
+	metadata?(): {
+		url?: string;
+		title?: string;
+		kind?: 'browser' | 'simulator';
+	};
 	/** Host-side screen capture; unavailable for iframe-based previews. */
 	capture?(): Promise<BrowserPageCapture>;
+	/** Opens a page-requested window as a controllable Otto browser tab. */
+	openTab?(url: string): Promise<string | null>;
 }
 
 type PageResult = Record<string, unknown>;
@@ -222,9 +230,26 @@ async function executeCommand(
 		if (command.action === 'screenshot') {
 			return await runScreenshot(command, executor, referenceChannel);
 		}
-		return decodeResult(
+		const result = decodeResult(
 			await executor.execute(actionScript(command, referenceChannel)),
 		);
+		if (command.action === 'click') {
+			const newTab = result.newTab;
+			const url =
+				newTab && typeof newTab === 'object' && !Array.isArray(newTab)
+					? (newTab as Record<string, unknown>).url
+					: undefined;
+			if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+				if (executor.openTab) {
+					const tabId = await executor.openTab(url);
+					result.newTab = { url, tabId };
+				} else {
+					result.warning =
+						'The page requested a new tab, but this client cannot open it.';
+				}
+			}
+		}
+		return result;
 	} catch (error) {
 		return errorResult(error);
 	}
@@ -241,8 +266,14 @@ export function connectBrowserController(
 	void (async () => {
 		while (!abortController.signal.aborted) {
 			try {
+				const reported = executor.metadata?.() ?? {};
+				const metadata = {
+					url: reported.url?.slice(0, 8_192),
+					title: reported.title?.slice(0, 512),
+					kind: reported.kind,
+				};
 				const response = await pollBrowserCommand({
-					query: { tabId },
+					query: { tabId, ...metadata },
 					signal: abortController.signal,
 				});
 				if (response.error) throw new Error('Browser command poll failed');

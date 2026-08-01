@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 
 export const browserActions = [
+	'tabs',
 	'open',
 	'navigate',
 	'back',
@@ -14,6 +15,7 @@ export const browserActions = [
 	'console',
 	'network',
 	'click',
+	'download',
 	'hover',
 	'type',
 	'press',
@@ -55,7 +57,9 @@ export const browserInputSchema = z.object({
 	selector: z
 		.string()
 		.optional()
-		.describe('CSS selector or snapshot reference such as @e3.'),
+		.describe(
+			'CSS selector or snapshot reference such as @e3 for element actions, including click and download.',
+		),
 	text: z
 		.string()
 		.optional()
@@ -164,6 +168,7 @@ export function browserControlArgs(
 		case 'navigate':
 			return { url: validateBrowserUrl(input.url ?? '') };
 		case 'click':
+		case 'download':
 		case 'hover':
 			return { selector: requiredString(input, 'selector') };
 		case 'type':
@@ -216,6 +221,7 @@ export function browserControlArgs(
 			};
 		case 'screenshot':
 			return { selector: input.selector };
+		case 'tabs':
 		case 'back':
 		case 'forward':
 		case 'reload':

@@ -55,4 +55,19 @@ describe('native browser window scoping', () => {
 			'commands::native_browser::native_browser_screenshot',
 		);
 	});
+
+	test('new windows become tabs and downloads are allowed and reported', async () => {
+		const [bridge, backend] = await Promise.all([
+			readFile('src/lib/native-browser.ts', 'utf8'),
+			readFile('src-tauri/src/commands/native_browser.rs', 'utf8'),
+		]);
+
+		expect(backend).toContain('.on_new_window(move |url, _features|');
+		expect(backend).toContain('"native-browser-new-tab"');
+		expect(backend).toContain('NewWindowResponse::Deny');
+		expect(backend).toContain('.on_download(move |_webview, event|');
+		expect(backend).toContain('"native-browser-download"');
+		expect(bridge).toContain('subscribeNewTab(id, listener)');
+		expect(bridge).toContain('subscribeDownload(id, listener)');
+	});
 });

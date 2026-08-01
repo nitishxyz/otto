@@ -49,6 +49,8 @@ function getRecords(value: unknown): Record<string, unknown>[] {
 
 function actionLabel(action: string | null): string {
 	switch (action) {
+		case 'tabs':
+			return 'listing tabs';
 		case 'open':
 			return 'opening page';
 		case 'navigate':
@@ -77,6 +79,8 @@ function actionLabel(action: string | null): string {
 			return 'reading network';
 		case 'click':
 			return 'clicking';
+		case 'download':
+			return 'downloading';
 		case 'hover':
 			return 'hovering';
 		case 'type':
@@ -122,7 +126,7 @@ function actionDetail(
 		return conciseDetail(getString(args.level) ?? getString(result.level));
 	}
 	if (action === 'evaluate') return conciseDetail(getString(args.script));
-	if (action === 'click') {
+	if (action === 'click' || action === 'download') {
 		return conciseDetail(getString(args.selector) ?? getString(result.clicked));
 	}
 	if (action === 'hover') {

@@ -247,10 +247,28 @@ function networkScript(args: Record<string, unknown>): string {
 	`);
 }
 
-function clickScript(args: Record<string, unknown>): string {
+function clickScript(
+	args: Record<string, unknown>,
+	requireDownload = false,
+): string {
 	return withElement(
 		args.selector,
 		`
+		var anchor = typeof element.closest === 'function' ? element.closest('a[href]') : null;
+		var downloadRequested = ${requireDownload} || (anchor instanceof HTMLElement && anchor.hasAttribute('download'));
+		var target = anchor instanceof HTMLElement ? (anchor.getAttribute('target') || '').toLowerCase() : '';
+		var targetRequestsNewTab = !downloadRequested && target && target !== '_self' && target !== '_parent' && target !== '_top';
+		var openedUrl = '';
+		var originalOpen = window.open;
+		var interceptedOpen = function (url) {
+			try { openedUrl = new URL(String(url || 'about:blank'), location.href).href; } catch (error) {}
+			return null;
+		};
+		try { if (!${requireDownload}) {
+			window.open = interceptedOpen;
+		} } catch (error) {}
+		var preventNewTab = function (event) { event.preventDefault(); };
+		if (targetRequestsNewTab) anchor.addEventListener('click', preventNewTab, true);
 		element.scrollIntoView({ block: 'center', inline: 'center' });
 		var rect = element.getBoundingClientRect();
 		var options = { bubbles: true, cancelable: true, composed: true, view: window, button: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
@@ -259,8 +277,19 @@ function clickScript(args: Record<string, unknown>): string {
 		if (typeof element.focus === 'function') element.focus();
 		try { element.dispatchEvent(new PointerEvent('pointerup', options)); } catch (error) {}
 		element.dispatchEvent(new MouseEvent('mouseup', options));
-		element.click();
-		return ottoPage({ clicked: requested, tag: element.tagName.toLowerCase(), name: ottoLabel(element) });
+		try { element.click(); } finally {
+			if (targetRequestsNewTab) anchor.removeEventListener('click', preventNewTab, true);
+			try { if (!${requireDownload} && window.open === interceptedOpen) window.open = originalOpen; } catch (error) {}
+		}
+		var anchorUrl = anchor instanceof HTMLElement ? anchor.href : '';
+		var newTabUrl = openedUrl || (targetRequestsNewTab ? anchorUrl : '');
+		return ottoPage({
+			clicked: requested,
+			tag: element.tagName.toLowerCase(),
+			name: ottoLabel(element),
+			newTab: newTabUrl ? { url: newTabUrl } : undefined,
+			download: downloadRequested ? { url: anchorUrl || undefined, filename: anchor instanceof HTMLElement ? (anchor.getAttribute('download') || undefined) : undefined } : undefined
+		});
 	`,
 	);
 }
@@ -427,6 +456,8 @@ function buildActionScript(command: BrowserControlCommand): string {
 			return networkScript(args);
 		case 'click':
 			return clickScript(args);
+		case 'download':
+			return clickScript(args, true);
 		case 'hover':
 			return hoverScript(args);
 		case 'type':

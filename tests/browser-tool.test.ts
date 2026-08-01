@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { discoverProjectTools } from '@ottocode/sdk';
 import {
+	markBrowserViewerSeen,
 	requestBrowserControl,
 	submitBrowserControlResult,
 	waitForBrowserControlCommand,
@@ -46,6 +47,7 @@ async function routeCommand(
 
 describe('browser tool arguments', () => {
 	it('applies defaults for inspection actions', () => {
+		expect(browserControlArgs({ action: 'tabs' })).toEqual({});
 		expect(browserControlArgs({ action: 'console' })).toEqual({
 			level: 'all',
 			limit: 50,
@@ -77,6 +79,14 @@ describe('browser tool arguments', () => {
 
 	it('requires a selector for pointer actions', () => {
 		expect(() => browserControlArgs({ action: 'hover' })).toThrow(
+			/Missing required string field: selector/,
+		);
+		expect(browserControlArgs({ action: 'download', selector: '@e2' })).toEqual(
+			{
+				selector: '@e2',
+			},
+		);
+		expect(() => browserControlArgs({ action: 'download' })).toThrow(
 			/Missing required string field: selector/,
 		);
 	});
@@ -114,6 +124,7 @@ describe('browser page scripts', () => {
 		{ action: 'console', args: { level: 'error', limit: 10 } },
 		{ action: 'network', args: { query: '/api', limit: 10 } },
 		{ action: 'click', args: { selector: '@e1' } },
+		{ action: 'download', args: { selector: '@e2' } },
 		{ action: 'hover', args: { selector: '.menu' } },
 		{ action: 'type', args: { selector: '#name', text: 'Ada' } },
 		{ action: 'press', args: { key: 'Enter' } },
@@ -131,6 +142,115 @@ describe('browser page scripts', () => {
 		expect(() => new Function(pageStateScript)).not.toThrow();
 		expect(() => new Function(scrollIntoViewScript('@e3'))).not.toThrow();
 		expect(() => new Function(BROWSER_RECORDER_SCRIPT)).not.toThrow();
+	});
+
+	it('reports new-tab and download link outcomes', () => {
+		class FakeElement {
+			readonly isConnected = true;
+			readonly tagName = 'A';
+			readonly innerText = 'Resource';
+			readonly value = '';
+			readonly disabled = false;
+			clicks = 0;
+			private clickListener?: (event: { preventDefault(): void }) => void;
+
+			constructor(
+				readonly href: string,
+				private readonly attributes: Record<string, string>,
+			) {}
+
+			getAttribute(name: string): string | null {
+				return this.attributes[name] ?? null;
+			}
+			hasAttribute(name: string): boolean {
+				return name in this.attributes;
+			}
+			closest(selector: string) {
+				return selector === 'a[href]' ? this : null;
+			}
+			addEventListener(
+				type: string,
+				listener: (event: { preventDefault(): void }) => void,
+			) {
+				if (type === 'click') this.clickListener = listener;
+			}
+			removeEventListener(type: string) {
+				if (type === 'click') this.clickListener = undefined;
+			}
+			getBoundingClientRect() {
+				return { left: 0, top: 0, width: 100, height: 30 };
+			}
+			scrollIntoView() {}
+			dispatchEvent() {}
+			focus() {}
+			click() {
+				this.clicks += 1;
+				this.clickListener?.({ preventDefault() {} });
+			}
+		}
+
+		class FakeInputElement extends FakeElement {}
+		class FakeTextAreaElement extends FakeElement {}
+		class FakeSelectElement extends FakeElement {}
+		class FakeEvent {
+			constructor(
+				readonly type: string,
+				readonly options?: Record<string, unknown>,
+			) {}
+		}
+
+		const run = (element: FakeElement, action: 'click' | 'download') => {
+			const originalOpen = () => null;
+			const environment = {
+				window: { open: originalOpen },
+				document: {
+					activeElement: null,
+					title: 'Links',
+					readyState: 'complete',
+					querySelector: () => element,
+				},
+				location: { href: 'https://example.com/' },
+				HTMLElement: FakeElement,
+				HTMLInputElement: FakeInputElement,
+				HTMLTextAreaElement: FakeTextAreaElement,
+				HTMLSelectElement: FakeSelectElement,
+				PointerEvent: FakeEvent,
+				MouseEvent: FakeEvent,
+			};
+			const names = Object.keys(environment);
+			const execute = new Function(
+				...names,
+				`return ${actionScript({ id: action, tabId: 't', action, args: { selector: '#link' } })};`,
+			);
+			const result = JSON.parse(
+				String(execute(...Object.values(environment))),
+			) as Record<string, unknown>;
+			expect(environment.window.open).toBe(originalOpen);
+			return result;
+		};
+
+		const popup = new FakeElement('https://example.com/docs', {
+			href: '/docs',
+			target: '_blank',
+		});
+		expect(run(popup, 'click')).toMatchObject({
+			ok: true,
+			newTab: { url: 'https://example.com/docs' },
+		});
+
+		const download = new FakeElement('https://example.com/report.csv', {
+			href: '/report.csv',
+			download: 'report.csv',
+		});
+		expect(run(download, 'download')).toMatchObject({
+			ok: true,
+			download: {
+				url: 'https://example.com/report.csv',
+				filename: 'report.csv',
+			},
+		});
+		expect(popup.clicks).toBe(1);
+		expect(download.clicks).toBe(1);
 	});
 
 	it('installs the recorder before reading console and network state', () => {
@@ -282,6 +402,46 @@ describe('browser page scripts', () => {
 });
 
 describe('browser tool routing', () => {
+	it('lists connected browser tabs with their current metadata', async () => {
+		await withProject(async (projectRoot) => {
+			markBrowserViewerSeen(projectRoot, 'browser:browser', {
+				url: 'https://example.com/docs',
+				title: 'Documentation',
+				kind: 'browser',
+			});
+			markBrowserViewerSeen(projectRoot, 'browser:simulator', {
+				url: 'http://localhost:3200/',
+				title: 'Simulator',
+				kind: 'simulator',
+			});
+
+			const { lazyToolsRecord } = await discoverProjectTools(projectRoot);
+			const result = await lazyToolsRecord.browser?.execute?.({
+				action: 'tabs',
+			});
+
+			expect(result).toMatchObject({
+				ok: true,
+				action: 'tabs',
+				count: 2,
+				tabs: [
+					{
+						tabId: 'browser:browser',
+						url: 'https://example.com/docs',
+						title: 'Documentation',
+						kind: 'browser',
+					},
+					{
+						tabId: 'browser:simulator',
+						url: 'http://localhost:3200/',
+						title: 'Simulator',
+						kind: 'simulator',
+					},
+				],
+			});
+		});
+	});
+
 	it('removes queued commands when execution is cancelled', async () => {
 		await withProject(async (projectRoot) => {
 			const abortController = new AbortController();
