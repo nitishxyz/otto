@@ -10,6 +10,7 @@ import {
 	type TunnelDevice,
 } from './lib/tauri-bridge';
 import { loadAuthorizedMachineProjects } from './lib/machine-api';
+import { ensureDesktopDaemonReady } from './lib/daemon-startup';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
 import { router } from './router';
 import { useNativeDesktopTheme } from './theme';
@@ -46,7 +47,9 @@ function App() {
 		const init = async () => {
 			setDaemonError(null);
 			try {
-				const daemonInfo = await tauriBridge.ensureDesktopDaemon();
+				const daemonInfo = await ensureDesktopDaemonReady(() =>
+					tauriBridge.ensureDesktopDaemon(),
+				);
 				configureDesktopSdk(daemonInfo.url, daemonInfo);
 				setDaemon(daemonInfo);
 			} catch (cause) {
@@ -265,7 +268,9 @@ function App() {
 	};
 
 	const handleStartDaemon = async () => {
-		const daemonInfo = await tauriBridge.ensureDesktopDaemon();
+		const daemonInfo = await ensureDesktopDaemonReady(() =>
+			tauriBridge.ensureDesktopDaemon(),
+		);
 		configureDesktopSdk(daemonInfo.url, daemonInfo);
 		setDaemon(daemonInfo);
 	};

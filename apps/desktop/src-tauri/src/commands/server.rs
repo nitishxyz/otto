@@ -88,6 +88,8 @@ enum DaemonReuseDecision {
 
 const HEALTH_TIMEOUT: Duration = Duration::from_millis(1_500);
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
+const SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 fn otto_home_dir() -> PathBuf {
     if let Ok(otto_home) = std::env::var("OTTO_HOME") {
@@ -487,7 +489,26 @@ async fn stop_registered_daemon(registration: &DaemonRegistration, token: &str) 
                 .map(|id| id == &registration.id)
                 .unwrap_or(true)
         {
-            let _ = stop_process(registration.pid);
+            if stop_process(registration.pid) {
+                let deadline = std::time::Instant::now() + SHUTDOWN_TIMEOUT;
+                while std::time::Instant::now() < deadline {
+                    tokio::time::sleep(SHUTDOWN_POLL_INTERVAL).await;
+                    let still_running = fetch_daemon_health(registration, token)
+                        .await
+                        .map(|current| {
+                            current.pid == registration.pid
+                                && current
+                                    .daemon_id
+                                    .as_ref()
+                                    .map(|id| id == &registration.id)
+                                    .unwrap_or(true)
+                        })
+                        .unwrap_or(false);
+                    if !still_running {
+                        break;
+                    }
+                }
+            }
         }
     }
     remove_daemon_registration();
@@ -606,6 +627,7 @@ async fn start_daemon(
     }
 
     let _ = child.kill();
+    let _ = child.wait();
     Err(format!(
         "Timed out waiting for otto daemon to start; see {}",
         log_path.display()
