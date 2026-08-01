@@ -48,7 +48,7 @@ export function HeroSection() {
 							{/* The wordmark is sized in `em` so it tracks the display type, and
 							    nudged down by the slice of its viewBox that sits below the
 							    baseline (padding plus the hard extrusion). */}
-							<NeoOttoLogo className="mr-[0.16em] inline-block h-[0.82em] w-auto align-[-0.08em]" />
+							<NeoOttoLogo className="mr-[0.55em] inline-block h-[0.82em] w-auto align-[-0.08em]" />
 							builds it.
 						</span>
 					</h1>
