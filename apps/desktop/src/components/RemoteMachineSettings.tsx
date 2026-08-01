@@ -116,9 +116,22 @@ export function RemoteMachineSettings({
 		ready?.serverInfo?.protocol?.capabilities?.includes(
 			REMOTE_RESTART_CAPABILITY,
 		) ?? false;
+	const canUpdate = canStageUpdate && canRestart;
 
-	const stageUpgrade = useCallback(async () => {
-		if (!ready || !updateTarget || upgrade.phase === 'staging') return;
+	const updateDaemon = useCallback(async () => {
+		if (
+			!ready ||
+			!updateTarget ||
+			!canUpdate ||
+			upgrade.phase === 'staging' ||
+			restart.phase === 'reconnecting'
+		)
+			return;
+		const confirmed = await confirm(
+			`Update the Otto CLI on ${machineName} to v${updateTarget} and restart its service? Active sessions will reconnect after the daemon and tunnel return.`,
+			{ title: 'Update Otto CLI' },
+		);
+		if (!confirmed) return;
 		setUpgrade({ phase: 'staging', targetVersion: updateTarget });
 		try {
 			await stageRemoteHostUpgrade(
@@ -126,15 +139,33 @@ export function RemoteMachineSettings({
 				ready.ownerSession,
 				updateTarget,
 			);
-			setUpgrade({ phase: 'staged', targetVersion: updateTarget });
 		} catch (cause) {
 			setUpgrade({
 				phase: 'error',
 				targetVersion: updateTarget,
 				message: describeError(cause),
 			});
+			return;
 		}
-	}, [ready, updateTarget, upgrade.phase]);
+		setUpgrade({ phase: 'staged', targetVersion: updateTarget });
+		setRestart({
+			phase: 'reconnecting',
+			previousStartedAt: ready.serverInfo?.startedAt,
+			targetVersion: updateTarget,
+		});
+		try {
+			await restartRemoteHost(ready, updateTarget);
+		} catch (cause) {
+			setRestart({ phase: 'error', message: describeError(cause) });
+		}
+	}, [
+		canUpdate,
+		machineName,
+		ready,
+		restart.phase,
+		updateTarget,
+		upgrade.phase,
+	]);
 
 	const restartDaemon = useCallback(async () => {
 		if (!ready || !canRestart || restart.phase === 'reconnecting') return;
@@ -305,7 +336,7 @@ export function RemoteMachineSettings({
 										{restart.phase === 'reconnecting'
 											? 'Reconnecting...'
 											: upgrade.phase === 'staged'
-												? 'Restart & apply'
+												? 'Finish update'
 												: 'Restart daemon'}
 									</button>
 								)}
@@ -343,7 +374,7 @@ export function RemoteMachineSettings({
 											<CheckCircle2 className="h-4 w-4 text-emerald-500" />
 										)}
 										{upgrade.phase === 'staged'
-											? `Otto v${upgrade.targetVersion} is staged`
+											? `Otto v${upgrade.targetVersion} is downloaded`
 											: updateTarget
 												? `Otto v${updateTarget} is available`
 												: hostIsNewer
@@ -354,39 +385,42 @@ export function RemoteMachineSettings({
 									</p>
 									<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
 										{upgrade.phase === 'staged'
-											? `Restart Otto on ${machineName} to activate the staged release.`
+											? `Restart Otto on ${machineName} to finish the update.`
 											: hostVersion
 												? `Installed version v${hostVersion}${clientRelease ? ` · Desktop CLI v${clientRelease}` : ''}`
 												: 'The remote daemon did not report a release version.'}
 									</p>
 								</div>
-								{canStageUpdate && upgrade.phase !== 'staged' && (
+								{canUpdate && upgrade.phase !== 'staged' && (
 									<button
 										type="button"
-										onClick={() => void stageUpgrade()}
-										disabled={upgrade.phase === 'staging'}
+										onClick={() => void updateDaemon()}
+										disabled={
+											upgrade.phase === 'staging' ||
+											restart.phase === 'reconnecting'
+										}
 										className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
 									>
 										{upgrade.phase === 'staging' ? (
-											<StableSpinner size="sm" title="Staging update" />
+											<StableSpinner size="sm" title="Updating CLI" />
 										) : (
 											<Download className="h-3.5 w-3.5" />
 										)}
 										{upgrade.phase === 'staging'
-											? 'Staging...'
-											: 'Stage update'}
+											? 'Updating CLI...'
+											: 'Update CLI'}
 									</button>
 								)}
 							</div>
 
-							{updateTarget && !canStageUpdate && (
+							{updateTarget && !canUpdate && (
 								<p className="border-t border-border/40 px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-									This daemon cannot stage updates remotely. On {machineName},
-									run{' '}
+									This daemon cannot update and restart automatically. On{' '}
+									{machineName}, run{' '}
 									<code className="rounded bg-muted px-1.5 py-0.5 text-foreground">
-										otto upgrade
-									</code>{' '}
-									and then restart the daemon.
+										otto upgrade &amp;&amp; otto service restart
+									</code>
+									.
 								</p>
 							)}
 							{upgrade.phase === 'error' && (

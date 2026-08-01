@@ -22,7 +22,7 @@ describe('remote machine settings', () => {
 		expect(router).toContain('if (!machine || !daemon)');
 	});
 
-	test('checks owner-authorized status and only stages supported upgrades', async () => {
+	test('updates the remote CLI and restarts supported daemons', async () => {
 		const settings = await readFile(
 			new URL('../src/components/RemoteMachineSettings.tsx', import.meta.url),
 			'utf8',
@@ -32,10 +32,11 @@ describe('remote machine settings', () => {
 		expect(settings).toContain('REMOTE_UPGRADE_CAPABILITY');
 		expect(settings).toContain('isStrictlyNewerRelease');
 		expect(settings).toContain('stageRemoteHostUpgrade');
-		expect(settings).toContain('Stage update');
+		expect(settings).toContain('Update CLI');
+		expect(settings).not.toContain("'Stage update'");
 		expect(settings).toContain('otto service restart');
 		expect(settings).toContain('restartRemoteHost');
 		expect(settings).toContain('REMOTE_RESTART_CAPABILITY');
-		expect(settings).toContain('Restart & apply');
+		expect(settings).toContain('await restartRemoteHost(ready, updateTarget)');
 	});
 });
