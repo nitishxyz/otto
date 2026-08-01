@@ -1,5 +1,9 @@
 import type { OttoConfig } from '@ottocode/sdk';
-import { getAuth, createOpenAIOAuthModel } from '@ottocode/sdk';
+import {
+	getAuth,
+	createOpenAIOAuthModel,
+	createPromptCacheKeyFetch,
+} from '@ottocode/sdk';
 import { createOpenAI } from '@ai-sdk/openai';
 import { providerFetch } from './fetch.ts';
 
@@ -17,8 +21,13 @@ export async function resolveOpenAIModel(
 		});
 	}
 	if (auth?.type === 'api' && auth.key) {
-		const instance = createOpenAI({ apiKey: auth.key, fetch: providerFetch });
+		const instance = createOpenAI({
+			apiKey: auth.key,
+			fetch: createPromptCacheKeyFetch(providerFetch, sessionId),
+		});
 		return instance(model);
 	}
-	return createOpenAI({ fetch: providerFetch })(model);
+	return createOpenAI({
+		fetch: createPromptCacheKeyFetch(providerFetch, sessionId),
+	})(model);
 }

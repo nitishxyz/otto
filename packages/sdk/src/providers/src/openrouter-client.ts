@@ -1,11 +1,13 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createConditionalCachingFetch } from './anthropic-caching.ts';
+import { createPromptCacheKeyFetch } from './prompt-caching.ts';
 import { getModelNpmBinding } from './utils.ts';
 
 export type OpenRouterProviderConfig = {
 	apiKey?: string;
 	baseURL?: string;
 	fetch?: typeof fetch;
+	promptCacheKey?: string;
 };
 
 function isAnthropicModel(model: string): boolean {
@@ -18,12 +20,16 @@ export function getOpenRouterInstance(
 	config?: OpenRouterProviderConfig,
 ) {
 	const apiKey = config?.apiKey ?? process.env.OPENROUTER_API_KEY ?? '';
-	const customFetch = model
+	const cachingFetch = model
 		? createConditionalCachingFetch(isAnthropicModel, model, config?.fetch)
 		: config?.fetch;
+	const customFetch = createPromptCacheKeyFetch(
+		cachingFetch,
+		config?.promptCacheKey,
+	);
 	return createOpenRouter({
 		apiKey,
-		fetch: customFetch as typeof fetch | undefined,
+		fetch: customFetch,
 	});
 }
 

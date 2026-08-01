@@ -3,6 +3,9 @@ import { providerFetch } from './fetch.ts';
 
 export { getOpenRouterInstance };
 
-export function resolveOpenRouterModel(model: string) {
-	return createOpenRouterModel(model, { fetch: providerFetch });
+export function resolveOpenRouterModel(model: string, sessionId?: string) {
+	return createOpenRouterModel(model, {
+		fetch: providerFetch,
+		promptCacheKey: sessionId,
+	});
 }

@@ -110,6 +110,9 @@ export async function resolveOttoRouterModel(
 		fetch: providerFetch,
 		callbacks,
 		middleware: isDevtoolsEnabled() ? devToolsMiddleware() : undefined,
+		cache: {
+			promptCacheKey: sessionId,
+		},
 		payment: {
 			topupApprovalMode,
 			autoPayThresholdUsd,

@@ -112,6 +112,7 @@ export {
 	createAnthropicCachingFetch,
 	createConditionalCachingFetch,
 } from './anthropic-caching.ts';
+export { createPromptCacheKeyFetch } from './prompt-caching.ts';
 export {
 	createAnthropicOAuthFetch,
 	createAnthropicOAuthModel,

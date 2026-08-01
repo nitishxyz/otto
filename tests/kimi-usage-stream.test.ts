@@ -4,6 +4,7 @@ import {
 	hoistKimiSseUsage,
 	sanitizeKimiToolSchema,
 } from '../packages/sdk/src/providers/src/kimi-client.ts';
+import { createPromptCacheKeyFetch } from '../packages/sdk/src/providers/src/prompt-caching.ts';
 
 const FINAL_CHUNK = JSON.stringify({
 	id: 'cmpl-1',
@@ -28,6 +29,22 @@ describe('hoistKimiSseUsage', () => {
 			total_tokens: 32,
 		});
 		expect(parsed.choices[0].usage).toEqual(parsed.usage);
+	});
+
+	test('normalizes Moonshot cached tokens for AI SDK accounting', () => {
+		const chunk = JSON.stringify({
+			choices: [
+				{
+					index: 0,
+					delta: {},
+					usage: { prompt_tokens: 19, cached_tokens: 16 },
+				},
+			],
+		});
+		const out = hoistKimiSseUsage(`data: ${chunk}`);
+		const usage = JSON.parse(out.slice('data: '.length)).usage;
+		expect(usage.cached_tokens).toBe(16);
+		expect(usage.prompt_tokens_details.cached_tokens).toBe(16);
 	});
 
 	test('keeps existing top-level usage untouched', () => {
@@ -157,6 +174,40 @@ describe('createKimiUsageFetch', () => {
 		const wrapped = createKimiUsageFetch(baseFetch);
 		const res = await wrapped('https://api.kimi.test/v1/models');
 		expect(await res.text()).toBe(body);
+	});
+
+	test('normalizes cached tokens in JSON responses', async () => {
+		const baseFetch = (async () =>
+			Response.json({
+				usage: { prompt_tokens: 19, cached_tokens: 16 },
+			})) as typeof fetch;
+		const wrapped = createKimiUsageFetch(baseFetch);
+		const res = await wrapped('https://api.kimi.test/v1/chat/completions');
+		const body = await res.json();
+		expect(body.usage.prompt_tokens_details.cached_tokens).toBe(16);
+	});
+});
+
+describe('createPromptCacheKeyFetch', () => {
+	test('adds a stable key without replacing an explicit key', async () => {
+		const bodies: Array<Record<string, unknown>> = [];
+		const baseFetch = (async (_input, init) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			return Response.json({ ok: true });
+		}) as typeof fetch;
+		const wrapped = createPromptCacheKeyFetch(baseFetch, 'session-1');
+
+		await wrapped('https://api.test/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({ model: 'kimi' }),
+		});
+		await wrapped('https://api.test/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({ prompt_cache_key: 'explicit' }),
+		});
+
+		expect(bodies[0].prompt_cache_key).toBe('session-1');
+		expect(bodies[1].prompt_cache_key).toBe('explicit');
 	});
 });
 

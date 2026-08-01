@@ -103,7 +103,7 @@ export async function resolveModel(
 		});
 	}
 	if (provider === 'openrouter') {
-		return resolveOpenRouterModel(model);
+		return resolveOpenRouterModel(model, options?.sessionId);
 	}
 	if (provider === 'opencode') {
 		return resolveOpencodeModel(model, cfg);
@@ -132,7 +132,7 @@ export async function resolveModel(
 		return getDeepSeekInstance(cfg, model);
 	}
 	if (provider === 'kimi') {
-		return getKimiInstance(cfg, model);
+		return getKimiInstance(cfg, model, options?.sessionId);
 	}
 	if (provider === 'minimax') {
 		return getMinimaxInstance(cfg, model);

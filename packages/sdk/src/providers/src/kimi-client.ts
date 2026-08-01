@@ -3,6 +3,7 @@ import type { OAuth } from '../../types/src/index.ts';
 import { catalog } from './catalog-merged.ts';
 import { createKimiOAuthFetch } from './kimi-oauth-fetch.ts';
 import { readKimiApiKeyFromEnv } from './kimi-env.ts';
+import { createPromptCacheKeyFetch } from './prompt-caching.ts';
 
 export { readKimiApiKeyFromEnv } from './kimi-env.ts';
 
@@ -12,6 +13,7 @@ export type KimiProviderConfig = {
 	oauth?: OAuth;
 	projectRoot?: string;
 	fetch?: typeof fetch;
+	promptCacheKey?: string;
 };
 
 const KIMI_CODE_CLI_VERSION = '0.16.0';
@@ -255,17 +257,55 @@ export function hoistKimiSseUsage(line: string): string {
 			usage?: unknown;
 			choices?: Array<{ usage?: unknown } | null>;
 		};
-		if (!parsed || typeof parsed !== 'object' || parsed.usage != null) {
-			return line;
+		if (!parsed || typeof parsed !== 'object') return line;
+		let changed = false;
+		if (parsed.usage == null) {
+			const choiceUsage = Array.isArray(parsed.choices)
+				? parsed.choices.find((choice) => choice?.usage != null)?.usage
+				: undefined;
+			if (choiceUsage != null) {
+				parsed.usage = choiceUsage;
+				changed = true;
+			}
 		}
-		const choiceUsage = Array.isArray(parsed.choices)
-			? parsed.choices.find((choice) => choice?.usage != null)?.usage
-			: undefined;
-		if (choiceUsage == null) return line;
-		parsed.usage = choiceUsage;
-		return `data: ${JSON.stringify(parsed)}${hasCarriageReturn ? '\r' : ''}`;
+		if (normalizeKimiCachedTokens(parsed.usage)) changed = true;
+		return changed
+			? `data: ${JSON.stringify(parsed)}${hasCarriageReturn ? '\r' : ''}`
+			: line;
 	} catch {
 		return line;
+	}
+}
+
+function normalizeKimiCachedTokens(usage: unknown): boolean {
+	if (!isRecord(usage) || typeof usage.cached_tokens !== 'number') return false;
+	const details = isRecord(usage.prompt_tokens_details)
+		? usage.prompt_tokens_details
+		: {};
+	if (typeof details.cached_tokens === 'number') return false;
+	usage.prompt_tokens_details = {
+		...details,
+		cached_tokens: usage.cached_tokens,
+	};
+	return true;
+}
+
+async function normalizeKimiJsonUsage(response: Response): Promise<Response> {
+	try {
+		const parsed = (await response.clone().json()) as unknown;
+		if (!isRecord(parsed) || !normalizeKimiCachedTokens(parsed.usage)) {
+			return response;
+		}
+		const headers = new Headers(response.headers);
+		headers.delete('content-length');
+		headers.delete('content-encoding');
+		return new Response(JSON.stringify(parsed), {
+			status: response.status,
+			statusText: response.statusText,
+			headers,
+		});
+	} catch {
+		return response;
 	}
 }
 
@@ -294,7 +334,9 @@ export function createKimiUsageFetch(
 			!response.body ||
 			!contentType.includes('text/event-stream')
 		) {
-			return response;
+			return response.ok && contentType.includes('application/json')
+				? normalizeKimiJsonUsage(response)
+				: response;
 		}
 
 		const decoder = new TextDecoder();
@@ -346,12 +388,16 @@ export function createKimiModel(model: string, config?: KimiProviderConfig) {
 	const requestFetch = config?.oauth
 		? createKimiOAuthFetch(config.oauth, config.projectRoot, config.fetch)
 		: config?.fetch;
+	const cacheAwareFetch = createPromptCacheKeyFetch(
+		requestFetch,
+		config?.promptCacheKey,
+	);
 
 	const instance = createOpenAICompatible({
 		name: 'Kimi',
 		baseURL,
 		headers,
-		fetch: createKimiUsageFetch(requestFetch, isKimiCodeBaseURL(baseURL)),
+		fetch: createKimiUsageFetch(cacheAwareFetch, isKimiCodeBaseURL(baseURL)),
 	});
 
 	return instance(model);
