@@ -1,10 +1,32 @@
-import type { ProjectAggregate, UsageStatsResponse } from './types.ts';
+import type { UsageRange } from './range.ts';
+import type {
+	ProjectAggregate,
+	UsageStatsResponse,
+	UsageTotals,
+} from './types.ts';
+
+const round = (value: number) => Number(value.toFixed(6));
+
+function roundTotals(totals: UsageTotals): UsageTotals {
+	return {
+		...totals,
+		costUsd: round(totals.costUsd),
+		notionalCostUsd: round(totals.notionalCostUsd),
+		savedUsd: round(totals.savedUsd),
+		costByAuth: {
+			oauth: round(totals.costByAuth.oauth),
+			api: round(totals.costByAuth.api),
+			subscription: round(totals.costByAuth.subscription),
+		},
+	};
+}
 
 export function finalizeResponse(
 	scope: 'project' | 'global',
 	projectLabel: string,
 	agg: ProjectAggregate,
 	extras?: UsageStatsResponse['projects'],
+	range?: UsageRange,
 ): UsageStatsResponse {
 	const providersArr = Array.from(agg.providers.values()).sort(
 		(a, b) => b.notionalCostUsd - a.notionalCostUsd || b.messages - a.messages,
@@ -26,30 +48,17 @@ export function finalizeResponse(
 		)
 		.map((provider) => provider.provider);
 
-	const round = (value: number) => Number(value.toFixed(6));
-
 	return {
 		scope,
 		project: projectLabel,
 		generatedAt: Date.now(),
-		totals: {
-			messages: agg.totals.messages,
-			sessions: agg.totals.sessions,
-			inputTokens: agg.totals.inputTokens,
-			outputTokens: agg.totals.outputTokens,
-			cachedInputTokens: agg.totals.cachedInputTokens,
-			cacheCreationInputTokens: agg.totals.cacheCreationInputTokens,
-			reasoningTokens: agg.totals.reasoningTokens,
-			costUsd: round(agg.totals.costUsd),
-			notionalCostUsd: round(agg.totals.notionalCostUsd),
-			savedUsd: round(agg.totals.savedUsd),
-			costByAuth: {
-				oauth: round(agg.totals.costByAuth.oauth),
-				api: round(agg.totals.costByAuth.api),
-				subscription: round(agg.totals.costByAuth.subscription),
-			},
-			messagesByAuth: agg.totals.messagesByAuth,
+		range: {
+			days: range?.days ?? null,
+			since: range?.sinceMs ?? null,
 		},
+		totals: roundTotals(agg.totals),
+		// Only meaningful for a bounded window: all-time has no prior period.
+		previousTotals: range ? roundTotals(agg.previousTotals) : null,
 		providers: providersArr.map((provider) => ({
 			...provider,
 			costUsd: round(provider.costUsd),

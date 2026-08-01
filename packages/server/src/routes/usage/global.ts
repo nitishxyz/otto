@@ -15,8 +15,12 @@ import {
 	emptyAggregate,
 	mergeAggregate,
 } from './aggregate.ts';
+import { resolveUsageRange } from './range.ts';
 import { finalizeResponse } from './response.ts';
-import { usageStatsResponseSchema } from './schemas.ts';
+import {
+	globalUsageStatsQuerySchema,
+	usageStatsResponseSchema,
+} from './schemas.ts';
 import type { UsageStatsResponse } from './types.ts';
 
 export function registerGlobalUsageRoute(app: Hono) {
@@ -29,6 +33,9 @@ export function registerGlobalUsageRoute(app: Hono) {
 			operationId: 'getGlobalUsageStats',
 			summary:
 				'Get aggregated usage statistics across all known otto projects (fan-out across local registries)',
+			request: {
+				query: globalUsageStatsQuerySchema,
+			},
 			responses: {
 				'200': {
 					description: 'Aggregated usage stats across all registered projects',
@@ -43,6 +50,8 @@ export function registerGlobalUsageRoute(app: Hono) {
 		async (c) => {
 			try {
 				const cwd = await resolveRequestProjectRoot(c);
+				const { days } = c.req.valid('query');
+				const range = resolveUsageRange(days);
 				// Ensure the current project is registered even if usage/stats
 				// hasn't been hit yet this session.
 				try {
@@ -77,7 +86,7 @@ export function registerGlobalUsageRoute(app: Hono) {
 
 				const results = await Promise.allSettled(
 					known.map(async (project) => {
-						const out = await aggregateProject(project.path);
+						const out = await aggregateProject(project.path, range);
 						return { project, out };
 					}),
 				);
@@ -110,12 +119,18 @@ export function registerGlobalUsageRoute(app: Hono) {
 				const label = `all projects (${included.length}${
 					unavailable.length ? ` / ${included.length + unavailable.length}` : ''
 				})`;
-				const response = finalizeResponse('global', label, merged, {
-					included: included.sort(
-						(a, b) => b.notionalCostUsd - a.notionalCostUsd,
-					),
-					unavailable,
-				});
+				const response = finalizeResponse(
+					'global',
+					label,
+					merged,
+					{
+						included: included.sort(
+							(a, b) => b.notionalCostUsd - a.notionalCostUsd,
+						),
+						unavailable,
+					},
+					range,
+				);
 				return c.json(response);
 			} catch (error) {
 				logger.error('Failed to compute global usage stats', error);

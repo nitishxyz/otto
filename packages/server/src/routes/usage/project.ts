@@ -3,6 +3,7 @@ import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { aggregateProject } from './aggregate.ts';
+import { resolveUsageRange } from './range.ts';
 import { finalizeResponse } from './response.ts';
 import { usageStatsQuerySchema, usageStatsResponseSchema } from './schemas.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
@@ -34,9 +35,19 @@ export function registerProjectUsageRoute(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const { projectRoot: resolvedRoot, agg } =
-					await aggregateProject(projectRoot);
-				const response = finalizeResponse('project', resolvedRoot, agg);
+				const { days } = c.req.valid('query');
+				const range = resolveUsageRange(days);
+				const { projectRoot: resolvedRoot, agg } = await aggregateProject(
+					projectRoot,
+					range,
+				);
+				const response = finalizeResponse(
+					'project',
+					resolvedRoot,
+					agg,
+					undefined,
+					range,
+				);
 				return c.json(response);
 			} catch (error) {
 				logger.error('Failed to compute usage stats', error);

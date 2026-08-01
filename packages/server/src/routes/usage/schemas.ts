@@ -1,5 +1,17 @@
 import { z } from '@hono/zod-openapi';
 
+const usageDaysSchema = z.coerce
+	.number()
+	.int()
+	.min(1)
+	.max(3650)
+	.optional()
+	.openapi({
+		param: { name: 'days', in: 'query' },
+		description:
+			'Restrict every aggregate to the last N days (local calendar days, including today). Omit for all-time.',
+	});
+
 export const usageStatsQuerySchema = z.object({
 	project: z
 		.string()
@@ -9,6 +21,11 @@ export const usageStatsQuerySchema = z.object({
 			description:
 				'Project root override (defaults to current working directory).',
 		}),
+	days: usageDaysSchema,
+});
+
+export const globalUsageStatsQuerySchema = z.object({
+	days: usageDaysSchema,
 });
 
 const usageAuthAmountSchema = z.object({
@@ -111,7 +128,12 @@ export const usageStatsResponseSchema = z
 		scope: z.enum(['project', 'global']),
 		project: z.string(),
 		generatedAt: z.number().int(),
+		range: z.object({
+			days: z.number().int().nullable(),
+			since: z.number().int().nullable(),
+		}),
 		totals: usageTotalsSchema,
+		previousTotals: usageTotalsSchema.nullable(),
 		providers: z.array(usageProviderAggSchema),
 		models: z.array(usageModelAggSchema),
 		daily: z.array(usageDailyAggSchema),

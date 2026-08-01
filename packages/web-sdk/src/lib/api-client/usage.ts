@@ -17,15 +17,26 @@ export type UsageProjectUnavailable =
 
 export type UsageAuthBucket = 'oauth' | 'api' | 'subscription';
 
+/** Omit `days` for all-time; otherwise every aggregate is scoped to the window. */
+export interface UsageStatsOptions {
+	days?: number;
+}
+
 export const usageMixin = {
-	async getUsageStats(): Promise<UsageStats> {
-		const { data, error } = await apiGetUsageStats();
+	async getUsageStats(options: UsageStatsOptions = {}): Promise<UsageStats> {
+		const { data, error } = await apiGetUsageStats({
+			query: options.days ? { days: options.days } : undefined,
+		});
 		if (error) throw new Error(extractErrorMessage(error));
 		if (!data) throw new Error('Empty response from /v1/usage/stats');
 		return data;
 	},
-	async getGlobalUsageStats(): Promise<UsageStats> {
-		const { data, error } = await apiGetGlobalUsageStats();
+	async getGlobalUsageStats(
+		options: UsageStatsOptions = {},
+	): Promise<UsageStats> {
+		const { data, error } = await apiGetGlobalUsageStats({
+			query: options.days ? { days: options.days } : undefined,
+		});
 		if (error) throw new Error(extractErrorMessage(error));
 		if (!data) throw new Error('Empty response from /v1/usage/stats/global');
 		return data;

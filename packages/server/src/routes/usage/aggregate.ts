@@ -8,7 +8,8 @@ import { eq } from 'drizzle-orm';
 import { touchProject } from '../../runtime/projects/registry.ts';
 import { loadProjectDb } from '../sessions/service.ts';
 import { bucketAuth, resolveAuthKind } from './auth.ts';
-import type { ProjectAggregate } from './types.ts';
+import { bucketForTimestamp, type UsageRange } from './range.ts';
+import type { ProjectAggregate, UsageTotals } from './types.ts';
 
 function dateKey(ts: number): string {
 	const d = new Date(ts);
@@ -18,22 +19,27 @@ function dateKey(ts: number): string {
 	return `${y}-${m}-${day}`;
 }
 
+export function emptyTotals(): UsageTotals {
+	return {
+		messages: 0,
+		sessions: 0,
+		inputTokens: 0,
+		outputTokens: 0,
+		cachedInputTokens: 0,
+		cacheCreationInputTokens: 0,
+		reasoningTokens: 0,
+		costUsd: 0,
+		notionalCostUsd: 0,
+		savedUsd: 0,
+		costByAuth: { oauth: 0, api: 0, subscription: 0 },
+		messagesByAuth: { oauth: 0, api: 0, subscription: 0 },
+	};
+}
+
 export function emptyAggregate(): ProjectAggregate {
 	return {
-		totals: {
-			messages: 0,
-			sessions: 0,
-			inputTokens: 0,
-			outputTokens: 0,
-			cachedInputTokens: 0,
-			cacheCreationInputTokens: 0,
-			reasoningTokens: 0,
-			costUsd: 0,
-			notionalCostUsd: 0,
-			savedUsd: 0,
-			costByAuth: { oauth: 0, api: 0, subscription: 0 },
-			messagesByAuth: { oauth: 0, api: 0, subscription: 0 },
-		},
+		totals: emptyTotals(),
+		previousTotals: emptyTotals(),
 		providers: new Map(),
 		models: new Map(),
 		daily: new Map(),
@@ -44,8 +50,15 @@ export function emptyAggregate(): ProjectAggregate {
 /**
  * Aggregate usage for a single project. Opens the project's DB (running
  * migrations idempotently), reads assistant messages, and rolls them up.
+ *
+ * When `range` is set every aggregate is restricted to that window, and the
+ * preceding window of equal length is accumulated into `previousTotals` during
+ * the same pass so period deltas cost no extra query.
  */
-export async function aggregateProject(projectRoot: string): Promise<{
+export async function aggregateProject(
+	projectRoot: string,
+	range?: UsageRange,
+): Promise<{
 	projectRoot: string;
 	agg: ProjectAggregate;
 	sessionCount: number;
@@ -71,6 +84,7 @@ export async function aggregateProject(projectRoot: string): Promise<{
 
 	const agg = emptyAggregate();
 	const providerSessions = new Map<string, Set<string>>();
+	const rangedSessions = new Set<string>();
 
 	for (const message of messageRows) {
 		const provider = message.provider || 'unknown';
@@ -101,6 +115,24 @@ export async function aggregateProject(projectRoot: string): Promise<{
 			cost = notionalEstimate;
 		}
 
+		const window = bucketForTimestamp(message.createdAt, range);
+		if (window === 'outside') continue;
+		if (window === 'previous') {
+			const previous = agg.previousTotals;
+			previous.messages += 1;
+			previous.inputTokens += inputTokens;
+			previous.outputTokens += outputTokens;
+			previous.cachedInputTokens += cachedInputTokens;
+			previous.cacheCreationInputTokens += cacheCreationInputTokens;
+			previous.reasoningTokens += reasoningTokens;
+			previous.costUsd += cost;
+			previous.notionalCostUsd += notionalEstimate;
+			previous.costByAuth[bucketAuth(authKind)] += cost;
+			previous.messagesByAuth[bucketAuth(authKind)] += 1;
+			continue;
+		}
+
+		rangedSessions.add(message.sessionId);
 		agg.totals.messages += 1;
 		agg.totals.inputTokens += inputTokens;
 		agg.totals.outputTokens += outputTokens;
@@ -201,10 +233,16 @@ export async function aggregateProject(projectRoot: string): Promise<{
 	for (const provider of agg.providers.values()) {
 		provider.sessions = providerSessions.get(provider.provider)?.size ?? 0;
 	}
-	agg.totals.sessions = sessionRows.length;
+	// Within a window, "sessions" means sessions that saw activity in it; the
+	// project's lifetime session count would not match the other figures.
+	agg.totals.sessions = range ? rangedSessions.size : sessionRows.length;
 	agg.totals.savedUsd = Math.max(
 		0,
 		agg.totals.notionalCostUsd - agg.totals.costUsd,
+	);
+	agg.previousTotals.savedUsd = Math.max(
+		0,
+		agg.previousTotals.notionalCostUsd - agg.previousTotals.costUsd,
 	);
 
 	// Register / refresh this project in the global registry.
@@ -217,24 +255,29 @@ export async function aggregateProject(projectRoot: string): Promise<{
 	};
 }
 
+function mergeTotals(into: UsageTotals, src: UsageTotals): void {
+	into.messages += src.messages;
+	into.sessions += src.sessions;
+	into.inputTokens += src.inputTokens;
+	into.outputTokens += src.outputTokens;
+	into.cachedInputTokens += src.cachedInputTokens;
+	into.cacheCreationInputTokens += src.cacheCreationInputTokens;
+	into.reasoningTokens += src.reasoningTokens;
+	into.costUsd += src.costUsd;
+	into.notionalCostUsd += src.notionalCostUsd;
+	into.savedUsd += src.savedUsd;
+	for (const key of ['oauth', 'api', 'subscription'] as const) {
+		into.costByAuth[key] += src.costByAuth[key];
+		into.messagesByAuth[key] += src.messagesByAuth[key];
+	}
+}
+
 export function mergeAggregate(
 	into: ProjectAggregate,
 	src: ProjectAggregate,
 ): void {
-	into.totals.messages += src.totals.messages;
-	into.totals.sessions += src.totals.sessions;
-	into.totals.inputTokens += src.totals.inputTokens;
-	into.totals.outputTokens += src.totals.outputTokens;
-	into.totals.cachedInputTokens += src.totals.cachedInputTokens;
-	into.totals.cacheCreationInputTokens += src.totals.cacheCreationInputTokens;
-	into.totals.reasoningTokens += src.totals.reasoningTokens;
-	into.totals.costUsd += src.totals.costUsd;
-	into.totals.notionalCostUsd += src.totals.notionalCostUsd;
-	into.totals.savedUsd += src.totals.savedUsd;
-	for (const key of ['oauth', 'api', 'subscription'] as const) {
-		into.totals.costByAuth[key] += src.totals.costByAuth[key];
-		into.totals.messagesByAuth[key] += src.totals.messagesByAuth[key];
-	}
+	mergeTotals(into.totals, src.totals);
+	mergeTotals(into.previousTotals, src.previousTotals);
 
 	for (const [key, provider] of src.providers) {
 		const existing = into.providers.get(key);

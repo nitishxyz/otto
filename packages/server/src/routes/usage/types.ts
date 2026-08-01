@@ -59,7 +59,11 @@ export interface UsageStatsResponse {
 	scope: 'project' | 'global';
 	project: string;
 	generatedAt: number;
+	/** Window every aggregate below is restricted to. `days: null` is all-time. */
+	range: { days: number | null; since: number | null };
 	totals: UsageTotals;
+	/** Totals for the preceding window of equal length, for period deltas. */
+	previousTotals: UsageTotals | null;
 	providers: ProviderAgg[];
 	models: ModelAgg[];
 	daily: DailyAgg[];
@@ -88,6 +92,8 @@ export interface UsageStatsResponse {
 
 export interface ProjectAggregate {
 	totals: UsageTotals;
+	/** Totals for the window immediately preceding the selected one. */
+	previousTotals: UsageTotals;
 	providers: Map<string, ProviderAgg>;
 	models: Map<string, ModelAgg>;
 	daily: Map<string, DailyAgg>;
