@@ -1,7 +1,7 @@
 {
 	"name": "@ottocode/desktop",
 	"private": true,
-	"version": "0.1.224",
+	"version": "0.1.225",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
