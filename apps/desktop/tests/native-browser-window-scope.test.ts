@@ -38,7 +38,26 @@ describe('native browser window scoping', () => {
 		expect(source).toContain('{ target: getCurrentWindow().label }');
 	});
 
-	test('the screenshot command is exposed through the bridge and registered', async () => {
+	test('macOS browser tabs identify as Safari instead of a generic webview', async () => {
+		const source = await readFile(
+			'src-tauri/src/commands/native_browser.rs',
+			'utf8',
+		);
+
+		expect(source).toContain('fn macos_browser_user_agent() -> String {');
+		expect(source).toContain('.user_agent(&macos_browser_user_agent());');
+		expect(source).toContain('Safari/605.1.15');
+		expect(source).toContain('.data_store_identifier(*b"otto-browser-v2!")');
+		expect(source).not.toContain('needs_webkit_compatibility_user_agent');
+		expect(source).toContain('fn remove_initialization_scripts(');
+		expect(source).toContain('.removeAllUserScripts();');
+		expect(source).toContain(
+			'WebviewUrl::External(url::Url::parse("about:blank").unwrap())',
+		);
+		expect(source).toContain('.navigate(parsed_url)');
+	});
+
+	test('the screenshot command is exposed without preloading page instrumentation', async () => {
 		const [bridge, backend, registration] = await Promise.all([
 			readFile('src/lib/native-browser.ts', 'utf8'),
 			readFile('src-tauri/src/commands/native_browser.rs', 'utf8'),
@@ -48,9 +67,9 @@ describe('native browser window scoping', () => {
 		expect(bridge).toContain(
 			"invoke<string>('native_browser_screenshot', { id })",
 		);
-		expect(bridge).toContain('initScript: options.initScript');
 		expect(backend).toContain('pub async fn native_browser_screenshot(');
-		expect(backend).toContain('builder.initialization_script(script)');
+		expect(bridge).not.toContain('initScript: options.initScript');
+		expect(backend).not.toContain('builder.initialization_script(script)');
 		expect(registration).toContain(
 			'commands::native_browser::native_browser_screenshot',
 		);
@@ -62,9 +81,12 @@ describe('native browser window scoping', () => {
 			readFile('src-tauri/src/commands/native_browser.rs', 'utf8'),
 		]);
 
-		expect(backend).toContain('.on_new_window(move |url, _features|');
+		expect(backend).toContain('.on_new_window(move |url, features|');
 		expect(backend).toContain('"native-browser-new-tab"');
 		expect(backend).toContain('NewWindowResponse::Deny');
+		expect(backend).toContain('if url.scheme() != "about"');
+		expect(backend).toContain('WebviewWindowBuilder::new(');
+		expect(backend).toContain('NewWindowResponse::Create { window }');
 		expect(backend).toContain('.on_download(move |_webview, event|');
 		expect(backend).toContain('"native-browser-download"');
 		expect(bridge).toContain('subscribeNewTab(id, listener)');

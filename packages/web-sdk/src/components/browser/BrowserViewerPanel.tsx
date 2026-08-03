@@ -4,7 +4,6 @@ import {
 	ChevronRight,
 	ExternalLink,
 	Globe2,
-	Plus,
 	RefreshCw,
 	X,
 } from 'lucide-react';
@@ -12,7 +11,6 @@ import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { toast } from '../../stores/toastStore';
 import { connectBrowserController } from '../../lib/browser/controller';
-import { BROWSER_RECORDER_SCRIPT } from '../../lib/browser/recorder-script';
 import { subscribeNativeOverlay } from '../../lib/native-overlay';
 import { Button } from '../ui/Button';
 
@@ -35,7 +33,6 @@ interface NativeBrowserBridge {
 		reloadKey: number;
 		bounds: { x: number; y: number; width: number; height: number };
 		visible: boolean;
-		initScript?: string;
 	}): Promise<void>;
 	unmount(id: string): Promise<void>;
 	setVisible(id: string, visible: boolean): Promise<void>;
@@ -321,7 +318,6 @@ export function BrowserViewerPanel({
 							!nativeOverlayOpen &&
 							bounds.width > 0 &&
 							bounds.height > 0,
-						initScript: BROWSER_RECORDER_SCRIPT,
 					})
 					.then(() => {
 						nativeMountedRef.current = true;
@@ -697,20 +693,6 @@ export function BrowserViewerPanel({
 							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground disabled:text-muted-foreground/40 disabled:hover:bg-transparent"
 						>
 							<ExternalLink className="h-4 w-4" />
-						</button>
-						<button
-							type="button"
-							onClick={() =>
-								openBrowserTab('', {
-									kind: 'browser',
-									title: 'Browser',
-									newTab: true,
-								})
-							}
-							title="New browser preview"
-							className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
-						>
-							<Plus className="h-4 w-4" />
 						</button>
 					</div>
 				</div>

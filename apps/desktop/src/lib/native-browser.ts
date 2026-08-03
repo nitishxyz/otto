@@ -63,8 +63,6 @@ export interface NativeBrowserMountOptions {
 	reloadKey: number;
 	bounds: NativeBrowserBounds;
 	visible: boolean;
-	/** Script injected before page scripts on every navigation. */
-	initScript?: string;
 }
 
 export function registerNativeBrowserBridge() {
@@ -134,7 +132,6 @@ export function registerNativeBrowserBridge() {
 				width: options.bounds.width,
 				height: options.bounds.height,
 				visible: options.visible,
-				initScript: options.initScript,
 			});
 		},
 		async unmount(id) {

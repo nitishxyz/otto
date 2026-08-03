@@ -264,6 +264,15 @@ describe('browser page scripts', () => {
 		expect(consoleScript.startsWith(BROWSER_RECORDER_SCRIPT)).toBe(true);
 	});
 
+	it('records network resources without replacing page request APIs', () => {
+		expect(BROWSER_RECORDER_SCRIPT).toContain('new PerformanceObserver');
+		expect(BROWSER_RECORDER_SCRIPT).not.toContain('window.fetch =');
+		expect(BROWSER_RECORDER_SCRIPT).not.toContain(
+			'XMLHttpRequest.prototype.open =',
+		);
+		expect(BROWSER_RECORDER_SCRIPT).not.toContain('XHR.prototype.open =');
+	});
+
 	it('keeps snapshot references isolated from page-controlled attributes', () => {
 		class FakeElement {
 			readonly isConnected = true;

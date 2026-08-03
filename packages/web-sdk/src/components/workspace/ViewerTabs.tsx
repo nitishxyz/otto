@@ -588,9 +588,26 @@ const ViewerTabStrip = memo(function ViewerTabStrip() {
 					isActive={tabId === selectedTabId}
 				/>
 			))}
+			{activeMode === 'preview' && <NewBrowserTabButton />}
 			{activeMode === 'terminal' && <NewTerminalTabButton />}
 			<div className="min-w-8 flex-1 border-b border-sidebar-border bg-background" />
 		</div>
+	);
+});
+
+const NewBrowserTabButton = memo(function NewBrowserTabButton() {
+	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
+
+	return (
+		<button
+			type="button"
+			onClick={() => openBrowserTab('', { newTab: true })}
+			title="New browser (⌘T / Ctrl+T)"
+			aria-label="New browser"
+			className="h-12 w-10 shrink-0 border-r border-b border-sidebar-border bg-background flex items-center justify-center text-muted-foreground/70 transition-colors hover:text-foreground hover:bg-sidebar-accent/40"
+		>
+			<Plus className="h-3.5 w-3.5" />
+		</button>
 	);
 });
 

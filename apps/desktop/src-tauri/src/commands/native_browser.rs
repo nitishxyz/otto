@@ -1,10 +1,14 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder};
+use tauri::webview::{
+    DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder, WebviewWindowBuilder,
+};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 
 /// Screenshots re-render the page, so they only need a modest budget.
 const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(15);
+static POPUP_RELAY_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,6 +44,33 @@ fn safe_id(id: &str) -> String {
         .collect()
 }
 
+#[cfg(target_os = "macos")]
+fn safari_major_for_macos(macos_major: isize) -> isize {
+    match macos_major {
+        26.. => macos_major,
+        15 => 18,
+        14 => 17,
+        13 => 16,
+        12 => 15,
+        11 => 14,
+        _ => 13,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_browser_user_agent() -> String {
+    use objc2_foundation::NSProcessInfo;
+
+    let macos_major = NSProcessInfo::processInfo()
+        .operatingSystemVersion()
+        .majorVersion;
+    let safari_major = safari_major_for_macos(macos_major);
+    format!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
+AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{safari_major}.0 Safari/605.1.15"
+    )
+}
+
 /// Browser tab webviews are labelled per owner window so two windows can host
 /// the same tab id (for example `browser:browser`) without colliding in the
 /// app-wide webview label registry.
@@ -64,6 +95,28 @@ fn close_browser_tab_webviews(window: &tauri::Window, id: &str, except_label: Op
             let _ = webview.close();
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn remove_initialization_scripts(webview: &tauri::Webview) -> Result<(), String> {
+    use objc2_web_kit::WKWebView;
+
+    webview
+        .with_webview(|platform| {
+            let handle = platform.inner();
+            if handle.is_null() {
+                return;
+            }
+            // SAFETY: Tauri runs this closure on the main thread and the handle is
+            // the live WKWebView backing this browser tab.
+            unsafe {
+                let view: &WKWebView = &*(handle as *mut WKWebView);
+                view.configuration()
+                    .userContentController()
+                    .removeAllUserScripts();
+            }
+        })
+        .map_err(|error| error.to_string())
 }
 
 fn apply_webview_layout(
@@ -99,7 +152,6 @@ pub async fn native_browser_mount(
     width: f64,
     height: f64,
     visible: bool,
-    init_script: Option<String>,
 ) -> Result<(), String> {
     let _ = reload_key;
     let label = label_for_browser_tab(window.label(), &id);
@@ -121,17 +173,24 @@ pub async fn native_browser_mount(
     let new_tab_window = window.clone();
     let new_tab_target = window.label().to_string();
     let new_tab_id = id.clone();
+    let popup_app = window.app_handle().clone();
     let download_window = window.clone();
     let download_target = window.label().to_string();
     let download_id = id.clone();
-    let mut builder = WebviewBuilder::new(label, WebviewUrl::External(parsed_url));
-    if let Some(script) = init_script {
-        // Otto's page recorder must run before page scripts on every document.
-        builder = builder.initialization_script(script);
+    #[cfg(target_os = "macos")]
+    let initial_url = WebviewUrl::External(url::Url::parse("about:blank").unwrap());
+    #[cfg(not(target_os = "macos"))]
+    let initial_url = WebviewUrl::External(parsed_url.clone());
+    let mut builder = WebviewBuilder::new(label, initial_url);
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .data_store_identifier(*b"otto-browser-v2!")
+            .user_agent(&macos_browser_user_agent());
     }
     let builder = builder
         .zoom_hotkeys_enabled(true)
-        .on_new_window(move |url, _features| {
+        .on_new_window(move |url, features| {
             if url.scheme() == "http" || url.scheme() == "https" {
                 let _ = new_tab_window.emit_to(
                     new_tab_target.as_str(),
@@ -141,8 +200,60 @@ pub async fn native_browser_mount(
                         url: url.to_string(),
                     },
                 );
+                return NewWindowResponse::Deny;
             }
-            NewWindowResponse::Deny
+
+            if url.scheme() != "about" {
+                return NewWindowResponse::Deny;
+            }
+
+            // Some sites open about:blank and assign the destination through
+            // the returned window handle. Keep that popup hidden just long
+            // enough to observe its first real navigation, then turn it into
+            // an Otto browser tab.
+            let relay_window = new_tab_window.clone();
+            let relay_target = new_tab_target.clone();
+            let relay_id = new_tab_id.clone();
+            let relay_label = format!(
+                "browser_popup_relay_{}",
+                POPUP_RELAY_ID.fetch_add(1, Ordering::Relaxed)
+            );
+            let relay = WebviewWindowBuilder::new(
+                &popup_app,
+                relay_label,
+                WebviewUrl::External(url.clone()),
+            )
+            .window_features(features)
+            .visible(false)
+            .skip_taskbar(true)
+            .on_page_load(move |popup, payload| {
+                let destination = payload.url();
+                if destination.scheme() != "http" && destination.scheme() != "https" {
+                    return;
+                }
+                let _ = relay_window.emit_to(
+                    relay_target.as_str(),
+                    "native-browser-new-tab",
+                    NativeBrowserNewTabEvent {
+                        id: relay_id.clone(),
+                        url: destination.to_string(),
+                    },
+                );
+                let _ = popup.close();
+            })
+            .build();
+
+            match relay {
+                Ok(window) => {
+                    let stale_relay = window.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(15)).await;
+                        let _ = stale_relay.close();
+                    });
+                    NewWindowResponse::Create { window }
+                }
+                Err(_) => NewWindowResponse::Deny,
+            }
         })
         .on_download(move |_webview, event| {
             let payload = match event {
@@ -170,6 +281,9 @@ pub async fn native_browser_mount(
             true
         })
         .on_page_load(move |_webview, payload| {
+            if payload.url().scheme() == "about" {
+                return;
+            }
             let _ = event_window.emit_to(
                 event_target.as_str(),
                 "native-browser-navigation",
@@ -187,6 +301,14 @@ pub async fn native_browser_mount(
             LogicalSize::new(width.max(1.0), height.max(1.0)),
         )
         .map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        remove_initialization_scripts(&webview)?;
+        webview
+            .navigate(parsed_url)
+            .map_err(|error| error.to_string())?;
+    }
 
     apply_webview_layout(&webview, x, y, width, height, visible)
 }
@@ -374,6 +496,21 @@ fn capture_webview_png(_webview: &tauri::Webview) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::{label_for_browser_tab, label_prefix_for_browser_tab};
+
+    #[cfg(target_os = "macos")]
+    use super::{macos_browser_user_agent, safari_major_for_macos};
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_browser_identifies_as_the_matching_safari_generation() {
+        assert_eq!(safari_major_for_macos(15), 18);
+        assert_eq!(safari_major_for_macos(26), 26);
+
+        let user_agent = macos_browser_user_agent();
+        assert!(user_agent.contains("AppleWebKit/605.1.15"));
+        assert!(user_agent.contains("Version/"));
+        assert!(user_agent.ends_with("Safari/605.1.15"));
+    }
 
     #[test]
     fn browser_tab_prefixes_do_not_overlap() {
