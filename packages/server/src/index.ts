@@ -26,6 +26,7 @@ import { registerSessionSecureInputRoute } from './routes/session-secure-input.t
 import { registerOttoRouterRoutes } from './routes/ottorouter.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerTunnelRoutes } from './routes/tunnel.ts';
+import { registerOAuthCallbackProxyRoutes } from './routes/oauth-callback-proxy.ts';
 import { registerMCPRoutes } from './routes/mcp.ts';
 import { registerProviderUsageRoutes } from './routes/provider-usage.ts';
 import { registerDoctorRoutes } from './routes/doctor.ts';
@@ -122,6 +123,7 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerShellJobsRoutes(app);
 	registerOttoRouterRoutes(app);
 	registerAuthRoutes(app);
+	registerOAuthCallbackProxyRoutes(app);
 	registerTunnelRoutes(app);
 	registerMCPRoutes(app);
 	registerProviderUsageRoutes(app);

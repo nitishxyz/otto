@@ -145,7 +145,6 @@ export class MCPServerManager {
 				const provider = this.authProviders.get(config.name);
 				if (provider?.pendingAuthUrl) {
 					this.pendingAuth.set(config.name, provider.pendingAuthUrl);
-					this.waitForAuthAndReconnect(config.name, provider);
 				}
 				return;
 			}
@@ -154,24 +153,6 @@ export class MCPServerManager {
 			this.startupErrors.set(config.name, msg);
 			console.error(`[mcp] Failed to start server "${config.name}": ${msg}`);
 		}
-	}
-
-	private waitForAuthAndReconnect(
-		name: string,
-		provider: OttoOAuthProvider,
-	): void {
-		provider
-			.waitForAuthCode()
-			.then(async (code) => {
-				console.log(`[mcp] Auth code received for "${name}", reconnecting...`);
-				const success = await this.completeAuth(name, code);
-				if (success) {
-					console.log(`[mcp] Successfully authenticated "${name}"`);
-				} else {
-					console.error(`[mcp] Failed to complete auth for "${name}"`);
-				}
-			})
-			.catch(() => {});
 	}
 
 	async stopAll(): Promise<void> {
@@ -288,6 +269,10 @@ export class MCPServerManager {
 		return this.pendingAuth.get(name) ?? null;
 	}
 
+	getAuthCallbackUrl(name: string): string | null {
+		return this.authProviders.get(name)?.redirectUrl ?? null;
+	}
+
 	async initiateAuth(config: MCPServerConfig): Promise<string | null> {
 		const transport = config.transport ?? 'stdio';
 		if (transport === 'stdio') return null;
@@ -355,7 +340,6 @@ export class MCPServerManager {
 
 			if (provider.pendingAuthUrl) {
 				this.pendingAuth.set(config.name, provider.pendingAuthUrl);
-				this.waitForAuthAndReconnect(config.name, provider);
 				return provider.pendingAuthUrl;
 			}
 			return null;

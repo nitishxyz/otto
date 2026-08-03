@@ -29,6 +29,8 @@ export interface WebServerContext {
 	projectId?: string;
 	projectRoot?: string;
 	serverToken?: string | null;
+	clientApiBaseUrl?: string;
+	clientServerToken?: string | null;
 }
 
 function injectRuntimeContext(
@@ -41,6 +43,10 @@ function injectRuntimeContext(
 		projectId: context?.projectId,
 		projectRoot: context?.projectRoot,
 		serverToken: context?.serverToken,
+		clientApiBaseUrl:
+			context?.clientApiBaseUrl ??
+			(context?.serverToken ? serverUrl : undefined),
+		clientServerToken: context?.clientServerToken ?? context?.serverToken,
 	};
 	return html.replace(
 		'</head>',

@@ -69,6 +69,13 @@ export async function startWebUi(
 	if (apiUrl) {
 		validateApiUrl(apiUrl);
 		await ensureRemoteApi(apiUrl);
+		const projectRoot = opts.project ?? process.cwd();
+		const { ensureDaemonProject } = await import('../daemon.ts');
+		const local = await ensureDaemonProject({ version, projectRoot });
+		context = {
+			clientApiBaseUrl: local.baseUrl,
+			clientServerToken: local.token,
+		};
 	} else {
 		const projectRoot = opts.project ?? process.cwd();
 		const { ensureAuth } = await import('../middleware/with-auth.ts');
@@ -90,6 +97,8 @@ export async function startWebUi(
 			projectId: serverContext.projectId,
 			projectRoot: serverContext.projectRoot,
 			serverToken: serverContext.token,
+			clientApiBaseUrl: serverContext.baseUrl,
+			clientServerToken: serverContext.token,
 		};
 	}
 

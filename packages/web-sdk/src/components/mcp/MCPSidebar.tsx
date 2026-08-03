@@ -398,7 +398,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 				} else if (result.authUrl) {
 					setAuthUrl(name, result.authUrl);
 					setPollingServer(name);
-					openUrl(result.authUrl);
+					if (!result.callbackProxyOpened) openUrl(result.authUrl);
 				} else {
 					setLoading(name, false);
 				}
@@ -426,7 +426,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 				} else if (result.authRequired && result.authUrl) {
 					setAuthUrl(name, result.authUrl);
 					setPollingServer(name);
-					openUrl(result.authUrl);
+					if (!result.callbackProxyOpened) openUrl(result.authUrl);
 				} else {
 					setLoading(name, false);
 				}

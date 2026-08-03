@@ -1,7 +1,9 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { isTunnelRequest } from '../../tunnel-auth.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
+import { configureMCPAuthCallback } from './local-oauth-callback.ts';
 import { startMCPServer, stopMCPServer, testMCPServer } from './service.ts';
 import { copilotMCPOAuthStore, copilotMCPSessions } from './state.ts';
 
@@ -29,6 +31,10 @@ const mcpLifecycleResponseSchema = z.object({
 	verificationUri: z.string().optional(),
 	interval: z.number().int().optional(),
 	authUrl: z.string().optional(),
+	flowId: z.string().optional(),
+	callbackUrl: z.string().optional(),
+	expiresAt: z.number().optional(),
+	callbackMode: z.enum(['daemon-loopback', 'client-relay']).optional(),
 	error: z.string().optional(),
 });
 
@@ -75,9 +81,10 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
 			});
-			return result.ok
-				? c.json(result.body)
-				: c.json(result.body, result.status);
+			if (!result.ok) return c.json(result.body, result.status);
+			return c.json(
+				await configureMCPAuthCallback(result.body, isTunnelRequest(c)),
+			);
 		},
 	);
 

@@ -8,6 +8,8 @@ export type WorkspaceSdkConfiguration =
 			projectRoot: string;
 			ownerSession: string;
 			ownerSessionExpiresAt: number;
+			clientApiBaseUrl: string;
+			clientServerToken?: string | null;
 	  }
 	| {
 			kind: 'desktop';
@@ -34,6 +36,8 @@ export function resolveWorkspaceSdkConfiguration(
 			projectRoot: project.path,
 			ownerSession: project.machineOwnerSession,
 			ownerSessionExpiresAt: project.machineOwnerSessionExpiresAt,
+			clientApiBaseUrl: server?.url ?? '',
+			clientServerToken: server?.token,
 		};
 	}
 	return { kind: 'desktop', apiUrl, server };

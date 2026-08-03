@@ -8,8 +8,10 @@ import {
 	revokeMcpAuth,
 	getMcpAuthStatus,
 	completeMcpAuth,
+	startOAuthCallbackProxy,
 } from '@ottocode/api';
 import { exec } from 'node:child_process';
+import { readDaemonRegistration, readDaemonToken } from '../daemon.ts';
 
 export function registerMCPCommand(program: Command) {
 	const mcp = program
@@ -324,6 +326,9 @@ async function runMCPAuth(
 		verificationUri?: string;
 		interval?: number;
 		authenticated?: boolean;
+		flowId?: string;
+		callbackUrl?: string;
+		callbackMode?: 'daemon-loopback' | 'client-relay';
 		error?: string;
 	};
 
@@ -380,11 +385,50 @@ async function runMCPAuth(
 	if (result.authUrl) {
 		console.log(`\n🔐 Opening browser for authorization...`);
 		console.log(`   ${result.authUrl}`);
-		openBrowser(result.authUrl);
+		const proxied = await startCliOAuthCallbackProxy(result);
+		if (!proxied) openBrowser(result.authUrl);
 		console.log('Complete the authorization in your browser.');
 	} else {
 		console.log('Already authenticated or no auth required.');
 	}
+}
+
+async function startCliOAuthCallbackProxy(flow: {
+	authUrl?: string;
+	flowId?: string;
+	callbackUrl?: string;
+	callbackMode?: 'daemon-loopback' | 'client-relay';
+}): Promise<boolean> {
+	if (flow.callbackMode === 'daemon-loopback') return false;
+	if (!flow.authUrl || !flow.flowId || !flow.callbackUrl) return false;
+	const callback = new URL(flow.callbackUrl);
+	if (
+		callback.protocol !== 'http:' ||
+		!['localhost', '127.0.0.1', '[::1]'].includes(callback.hostname)
+	) {
+		return false;
+	}
+	const registration = await readDaemonRegistration();
+	const token = await readDaemonToken();
+	if (!registration || !token) {
+		throw new Error('Local daemon is unavailable for the OAuth callback');
+	}
+	const response = await startOAuthCallbackProxy({
+		baseURL: registration.url,
+		headers: { 'X-Otto-Server-Token': token },
+		body: {
+			authorizationUrl: flow.authUrl,
+			callbackUrl: flow.callbackUrl,
+			remoteBaseUrl: registration.url,
+			remoteFlowId: flow.flowId,
+			remoteToken: token,
+		},
+	});
+	if (response.error) {
+		const error = response.error as { error?: string };
+		throw new Error(error.error ?? 'Failed to start OAuth callback proxy');
+	}
+	return Boolean(response.data?.opened);
 }
 
 function openBrowser(url: string) {

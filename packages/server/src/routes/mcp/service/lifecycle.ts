@@ -9,6 +9,7 @@ import {
 	MCPClientWrapper,
 } from '@ottocode/sdk';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
+import { createMCPAuthFlow } from '../oauth-flows.ts';
 import type { MCPAuthSessionOptions } from './types.ts';
 
 export async function startMCPServer(options: MCPAuthSessionOptions) {
@@ -80,6 +81,17 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 			}
 		}
 
+		const authUrl = manager.getAuthUrl(name);
+		const callbackUrl = authUrl ? manager.getAuthCallbackUrl(name) : null;
+		const flow =
+			authUrl && callbackUrl
+				? createMCPAuthFlow({
+						name,
+						projectRoot,
+						authUrl,
+						callbackUrl,
+					})
+				: undefined;
 		return {
 			ok: true as const,
 			body: {
@@ -88,7 +100,8 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 				connected: status?.connected ?? false,
 				tools: status?.tools ?? [],
 				authRequired: status?.authRequired ?? false,
-				authUrl: manager.getAuthUrl(name),
+				authUrl: authUrl ?? undefined,
+				...flow,
 			},
 		};
 	} catch (error) {

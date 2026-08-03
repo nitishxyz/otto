@@ -11,6 +11,7 @@ import {
 	pollForCopilotTokenOnce,
 } from '@ottocode/sdk';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
+import { claimMCPAuthFlow, createMCPAuthFlow } from '../oauth-flows.ts';
 import type { MCPAuthSessionOptions, MCPAuthStoreOptions } from './types.ts';
 
 export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
@@ -96,8 +97,21 @@ export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
 
 		const authUrl = await manager.initiateAuth(serverConfig);
 		if (authUrl) {
-			return { ok: true as const, body: { ok: true, authUrl, name } };
+			const callbackUrl = manager.getAuthCallbackUrl(name);
+			if (!callbackUrl)
+				throw new Error('MCP OAuth callback URL is unavailable');
+			const flow = createMCPAuthFlow({
+				name,
+				projectRoot,
+				authUrl,
+				callbackUrl,
+			});
+			return {
+				ok: true as const,
+				body: { ok: true, authUrl, name, ...flow },
+			};
 		}
+
 		return {
 			ok: true as const,
 			body: {
@@ -111,6 +125,60 @@ export async function initiateMCPAuth(options: MCPAuthSessionOptions) {
 			ok: false as const,
 			body: { ok: false, error: toErrorMessage(error) },
 			status: 500 as const,
+		};
+	}
+}
+
+export async function completeMCPAuthFlow(options: {
+	flowId: string;
+	code?: string;
+	state?: string;
+	error?: string;
+	errorDescription?: string;
+}) {
+	if (!options.state) {
+		return {
+			ok: false as const,
+			body: { error: 'OAuth callback is missing state' },
+			status: 400 as const,
+		};
+	}
+
+	try {
+		const flow = claimMCPAuthFlow(options.flowId, options.state);
+		if (options.error) {
+			return {
+				ok: false as const,
+				body: {
+					error: options.errorDescription
+						? `${options.error}: ${options.errorDescription}`
+						: options.error,
+				},
+				status: 400 as const,
+			};
+		}
+		if (!options.code) throw new Error('OAuth callback is missing code');
+		const manager = getMCPManager(flow.projectRoot);
+		if (!manager) throw new Error('No MCP manager active for OAuth flow');
+		const success = await manager.completeAuth(flow.name, options.code);
+		if (!success) throw new Error('MCP OAuth completion failed');
+		const status = (await manager.getStatusAsync()).find(
+			(server) => server.name === flow.name,
+		);
+		return {
+			ok: true as const,
+			body: {
+				ok: true,
+				name: flow.name,
+				connected: status?.connected ?? false,
+				tools: status?.tools ?? [],
+			},
+		};
+	} catch (error) {
+		return {
+			ok: false as const,
+			body: { error: toErrorMessage(error) },
+			status: 400 as const,
 		};
 	}
 }

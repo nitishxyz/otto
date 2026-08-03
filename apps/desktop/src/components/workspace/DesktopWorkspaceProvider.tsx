@@ -28,6 +28,8 @@ function configureWorkspaceSdk(
 			config.projectRoot,
 			config.ownerSession,
 			config.ownerSessionExpiresAt,
+			config.clientApiBaseUrl,
+			config.clientServerToken,
 		);
 		return;
 	}

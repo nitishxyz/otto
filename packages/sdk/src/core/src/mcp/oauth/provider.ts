@@ -5,7 +5,6 @@ import type {
 	OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { OAuthCredentialStore } from './store.ts';
-import { OAuthCallbackServer } from './callback.ts';
 
 const DEFAULT_CALLBACK_PORT = 8090;
 
@@ -21,9 +20,7 @@ export class OttoOAuthProvider implements OAuthClientProvider {
 	private callbackPort: number;
 	private presetClientId?: string;
 	private scopes?: string[];
-	private callbackServer: OAuthCallbackServer | null = null;
 	private _pendingAuthUrl: string | null = null;
-	private _authResolve: ((code: string) => void) | null = null;
 
 	constructor(
 		serverName: string,
@@ -106,18 +103,6 @@ export class OttoOAuthProvider implements OAuthClientProvider {
 
 	async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
 		this._pendingAuthUrl = authorizationUrl.toString();
-
-		this.callbackServer = new OAuthCallbackServer(this.callbackPort);
-
-		this.callbackServer
-			.waitForCallback()
-			.then((result) => {
-				if (this._authResolve) {
-					this._authResolve(result.code);
-					this._authResolve = null;
-				}
-			})
-			.catch(() => {});
 	}
 
 	async saveCodeVerifier(codeVerifier: string): Promise<void> {
@@ -130,17 +115,8 @@ export class OttoOAuthProvider implements OAuthClientProvider {
 		return stored;
 	}
 
-	waitForAuthCode(): Promise<string> {
-		return new Promise((resolve) => {
-			this._authResolve = resolve;
-		});
-	}
-
 	cleanup(): void {
-		this.callbackServer?.close();
-		this.callbackServer = null;
 		this._pendingAuthUrl = null;
-		this._authResolve = null;
 	}
 
 	async clearCredentials(): Promise<void> {

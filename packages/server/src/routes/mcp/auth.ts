@@ -1,13 +1,21 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import {
+	getOwnerSessionToken,
+	isDaemonTokenAuthorized,
+	isTunnelRequest,
+} from '../../tunnel-auth.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
+import { isOwnerSessionAuthorized } from '../tunnel/owner-auth.ts';
 import {
 	completeMCPAuth,
+	completeMCPAuthFlow,
 	getMCPAuthStatus,
 	initiateMCPAuth,
 	revokeMCPAuth,
 } from './service.ts';
+import { configureMCPAuthCallback } from './local-oauth-callback.ts';
 import { copilotMCPOAuthStore, copilotMCPSessions } from './state.ts';
 
 const mcpServerNameParamsSchema = z.object({
@@ -26,6 +34,10 @@ const mcpAuthResponseSchema = z.object({
 	ok: z.boolean(),
 	name: z.string().optional(),
 	authUrl: z.string().optional(),
+	flowId: z.string().optional(),
+	callbackUrl: z.string().optional(),
+	expiresAt: z.number().optional(),
+	callbackMode: z.enum(['daemon-loopback', 'client-relay']).optional(),
 	authType: z.string().optional(),
 	authenticated: z.boolean().optional(),
 	sessionId: z.string().optional(),
@@ -37,6 +49,13 @@ const mcpAuthResponseSchema = z.object({
 	connected: z.boolean().optional(),
 	tools: z.array(mcpToolSchema).optional(),
 	error: z.string().optional(),
+});
+
+const completeMCPAuthFlowBodySchema = z.object({
+	code: z.string().optional(),
+	state: z.string().optional(),
+	error: z.string().optional(),
+	errorDescription: z.string().optional(),
 });
 
 const completeMCPAuthBodySchema = z.object({
@@ -59,6 +78,70 @@ const mcpAuthErrorSchema = z.object({
 });
 
 export function registerMCPAuthRoutes(app: Hono) {
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/mcp/oauth/flows/{flowId}/complete',
+			tags: ['mcp'],
+			operationId: 'completeMCPAuthFlow',
+			summary: 'Complete a daemon-owned MCP OAuth flow',
+			request: {
+				params: z.object({
+					flowId: z.string().openapi({
+						param: { name: 'flowId', in: 'path' },
+					}),
+				}),
+				body: {
+					required: true,
+					content: {
+						'application/json': { schema: completeMCPAuthFlowBodySchema },
+					},
+				},
+			},
+			responses: {
+				'200': {
+					description: 'OAuth flow completed',
+					content: {
+						'application/json': { schema: mcpAuthResponseSchema },
+					},
+				},
+				'400': {
+					description: 'OAuth flow rejected',
+					content: {
+						'application/json': { schema: mcpAuthErrorSchema },
+					},
+				},
+				'401': {
+					description: 'Machine owner authorization required',
+					content: {
+						'application/json': { schema: mcpAuthErrorSchema },
+					},
+				},
+			},
+		},
+		async (c) => {
+			if (
+				!(await isDaemonTokenAuthorized(c)) &&
+				!isOwnerSessionAuthorized(getOwnerSessionToken(c))
+			) {
+				return c.json({ error: 'Unauthorized' }, 401);
+			}
+			const body =
+				await c.req.json<z.infer<typeof completeMCPAuthFlowBodySchema>>();
+			const result = await completeMCPAuthFlow({
+				flowId: c.req.param('flowId'),
+				code: body.code,
+				state: body.state,
+				error: body.error,
+				errorDescription: body.errorDescription,
+			});
+			return result.ok
+				? c.json(result.body)
+				: c.json(result.body, result.status);
+		},
+	);
+
 	zodOpenApiRoute(
 		app,
 		{
@@ -92,9 +175,10 @@ export function registerMCPAuthRoutes(app: Hono) {
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
 			});
-			return result.ok
-				? c.json(result.body)
-				: c.json(result.body, result.status);
+			if (!result.ok) return c.json(result.body, result.status);
+			return c.json(
+				await configureMCPAuthCallback(result.body, isTunnelRequest(c)),
+			);
 		},
 	);
 

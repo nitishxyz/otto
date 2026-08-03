@@ -12,6 +12,7 @@ import {
 	getMcpAuthStatus,
 	completeMcpAuth,
 } from '@ottocode/api';
+import { startLoopbackOAuthProxy } from '../lib/oauth-callback-proxy';
 
 interface MCPServersResponse {
 	servers: MCPServerInfo[];
@@ -55,13 +56,22 @@ export function useStartMCPServer() {
 				authUrl?: string;
 				authType?: string;
 				authenticated?: boolean;
+				flowId?: string;
+				callbackUrl?: string;
+				callbackProxyStarted?: boolean;
+				callbackProxyOpened?: boolean;
 				sessionId?: string;
 				userCode?: string;
 				verificationUri?: string;
 				interval?: number;
 			};
 			if (!result.ok) throw new Error(result.error || 'Failed to start server');
-			return result;
+			const proxy = await startLoopbackOAuthProxy(result);
+			return {
+				...result,
+				callbackProxyStarted: proxy.proxied,
+				callbackProxyOpened: proxy.opened,
+			};
 		},
 		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: ['mcp', 'servers'] });
@@ -161,12 +171,21 @@ export function useAuthenticateMCPServer() {
 				verificationUri?: string;
 				interval?: number;
 				authenticated?: boolean;
+				flowId?: string;
+				callbackUrl?: string;
+				callbackProxyStarted?: boolean;
+				callbackProxyOpened?: boolean;
 				name: string;
 				error?: string;
 			};
 			if (!result.ok)
 				throw new Error(result.error || 'Failed to initiate auth');
-			return result;
+			const proxy = await startLoopbackOAuthProxy(result);
+			return {
+				...result,
+				callbackProxyStarted: proxy.proxied,
+				callbackProxyOpened: proxy.opened,
+			};
 		},
 		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: ['mcp', 'servers'] });

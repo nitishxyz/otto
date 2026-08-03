@@ -1,5 +1,6 @@
 export {
 	completeMCPAuth,
+	completeMCPAuthFlow,
 	getMCPAuthStatus,
 	initiateMCPAuth,
 	revokeMCPAuth,

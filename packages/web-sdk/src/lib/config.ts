@@ -8,6 +8,8 @@ interface OttoWindow extends Window {
 		projectId?: string;
 		projectRoot?: string;
 		serverToken?: string;
+		clientApiBaseUrl?: string;
+		clientServerToken?: string;
 		// Memory-only owner session bearer supplied by the desktop shell for a
 		// machine window. Never persisted to disk, URL, or web storage.
 		ownerSession?: {
@@ -69,6 +71,18 @@ export function getConfiguredRuntimeApiBaseUrl(): string | undefined {
 	if (storedUrl) return normalizeApiBaseUrl(storedUrl);
 
 	return undefined;
+}
+
+export function getClientDaemonContext():
+	| { baseUrl: string; token: string }
+	| undefined {
+	const context = getRuntimeProjectContext();
+	if (!context?.clientApiBaseUrl || !context.clientServerToken)
+		return undefined;
+	return {
+		baseUrl: normalizeApiBaseUrl(context.clientApiBaseUrl),
+		token: context.clientServerToken,
+	};
 }
 
 export function getRuntimeProjectContext() {

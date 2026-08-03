@@ -13,6 +13,7 @@ import { useTheme } from '../theme.ts';
 import { ModalFrame, SelectRow } from './ModalFrame.tsx';
 import { TinySpinner } from './TinySpinner.tsx';
 import { getProjectQuery } from '../api.ts';
+import { startLocalOAuthCallbackProxy } from '../oauth-callback-proxy.ts';
 
 interface MCPServerInfo {
 	name: string;
@@ -48,6 +49,9 @@ type MCPMutationResponse = {
 	authRequired?: boolean;
 	authenticated?: boolean;
 	authUrl?: string;
+	flowId?: string;
+	callbackUrl?: string;
+	callbackMode?: 'daemon-loopback' | 'client-relay';
 	authType?: string;
 	sessionId?: string;
 	userCode?: string;
@@ -242,7 +246,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 							return;
 						}
 					} else if (result.authUrl) {
-						openUrlExternal(result.authUrl);
+						const proxied = await startLocalOAuthCallbackProxy(result);
+						if (!proxied) openUrlExternal(result.authUrl);
 						showStatus('Browser opened for auth');
 						setBusy(server.name, false);
 						return;
@@ -272,7 +277,8 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 							return;
 						}
 					} else if (result.authRequired && result.authUrl) {
-						openUrlExternal(result.authUrl);
+						const proxied = await startLocalOAuthCallbackProxy(result);
+						if (!proxied) openUrlExternal(result.authUrl);
 						showStatus('Browser opened for auth');
 						setBusy(server.name, false);
 						return;

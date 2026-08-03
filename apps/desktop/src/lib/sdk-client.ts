@@ -16,6 +16,8 @@ interface OttoWindow extends Window {
 		projectId?: string;
 		projectRoot?: string;
 		serverToken?: string;
+		clientApiBaseUrl?: string;
+		clientServerToken?: string;
 		ownerSession?: { token: string; expiresAt?: number };
 	};
 	OTTO_OPEN_URL?: (url: string) => void | Promise<void>;
@@ -144,6 +146,8 @@ export function configureDesktopSdk(
 			projectId: server.projectId,
 			projectRoot: server.projectPath,
 			serverToken: server.token ?? undefined,
+			clientApiBaseUrl: apiUrl,
+			clientServerToken: server.token ?? undefined,
 		};
 	} else {
 		const remote = normalizeDesktopRemoteUrl(apiUrl);
@@ -162,6 +166,8 @@ export function configureMachineSdk(
 	projectRoot: string,
 	ownerSession: string,
 	ownerSessionExpiresAt: number,
+	clientApiBaseUrl: string,
+	clientServerToken?: string | null,
 ) {
 	const win = window as OttoWindow;
 	clearShareMode();
@@ -170,6 +176,8 @@ export function configureMachineSdk(
 		projectId,
 		projectRoot,
 		ownerSession: { token: ownerSession, expiresAt: ownerSessionExpiresAt },
+		clientApiBaseUrl,
+		clientServerToken: clientServerToken ?? undefined,
 	};
 	registerDesktopPlatformAdapters();
 	configureApiClient();
