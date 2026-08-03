@@ -54,6 +54,7 @@ import {
 } from '../../lib/commands';
 import { AuthenticatedImage } from '../AuthenticatedImage';
 import { getMessageChatDraftAttachments } from '../../lib/chatAttachments';
+import { StableSpinner } from '../ui/StableSpinner';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -180,6 +181,8 @@ export const UserMessageGroup = memo(
 			sessionId,
 			nextAssistantMessageId ?? '',
 		);
+		const isSending =
+			message.optimistic === 'sending' && message.status === 'pending';
 		const setPendingRestore = useQueueStore((state) => state.setPendingRestore);
 
 		const { researchContexts: parsedResearchContexts, cleanContent: content } =
@@ -283,7 +286,10 @@ export const UserMessageGroup = memo(
 		)
 			return null;
 
-		if (isQueued) return null;
+		// Queued messages surface in the queue bar instead of the thread. This
+		// covers server-queued turns and optimistic sends made while a stream
+		// was already running.
+		if (isQueued || message.optimistic === 'queued') return null;
 
 		const handleCancel = async () => {
 			if (!sessionId || !nextAssistantMessageId) return;
@@ -351,6 +357,15 @@ export const UserMessageGroup = memo(
 											{position !== null && position > 0
 												? ` #${position + 1}`
 												: ''}
+										</span>
+									</>
+								)}
+								{isSending && (
+									<>
+										<span className="text-muted-foreground/50">·</span>
+										<span className="inline-flex items-center gap-1 text-muted-foreground whitespace-nowrap">
+											<StableSpinner size="xs" title="Sending" />
+											Sending
 										</span>
 									</>
 								)}
@@ -624,6 +639,8 @@ export const UserMessageGroup = memo(
 			prevFirstPart?.content === nextFirstPart?.content &&
 			prevFirstPart?.contentJson === nextFirstPart?.contentJson &&
 			prevProps.message.createdAt === nextProps.message.createdAt &&
+			prevProps.message.status === nextProps.message.status &&
+			prevProps.message.optimistic === nextProps.message.optimistic &&
 			prevProps.message.parts?.length === nextProps.message.parts?.length &&
 			prevProps.sessionId === nextProps.sessionId &&
 			prevProps.nextAssistantMessageId === nextProps.nextAssistantMessageId

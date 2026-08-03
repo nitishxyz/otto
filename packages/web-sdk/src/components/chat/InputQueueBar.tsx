@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getMessagesQueryKey, useMessages } from '../../hooks/useMessages';
+import { StableSpinner } from '../ui/StableSpinner';
 import {
 	getQueueStateQueryKey,
 	useQueueState,
@@ -28,6 +29,8 @@ interface QueuedMessagePreview {
 	position: number;
 	text: string;
 	attachments: ReturnType<typeof getMessageChatDraftAttachments>;
+	/** Optimistic entry whose send request has not resolved yet. */
+	sending: boolean;
 }
 
 function getMessageText(message: Message | undefined) {
@@ -60,14 +63,22 @@ function getQueuedPreviews(
 		const assistantIndex = sortedMessages.findIndex(
 			(message) => message.id === queued.messageId,
 		);
+		const queuedMessage = sortedMessages[assistantIndex];
+		// Optimistic entries reference the user message directly until the send
+		// request resolves with the server-assigned assistant message id.
 		const userMessage =
-			assistantIndex > 0 ? sortedMessages[assistantIndex - 1] : undefined;
+			queuedMessage?.role === 'user'
+				? queuedMessage
+				: assistantIndex > 0
+					? sortedMessages[assistantIndex - 1]
+					: undefined;
 
 		return {
 			assistantMessageId: queued.messageId,
 			position: queued.position,
 			text: getMessageText(userMessage),
 			attachments: getMessageChatDraftAttachments(userMessage),
+			sending: Boolean(userMessage?.optimistic),
 		};
 	});
 }
@@ -91,32 +102,38 @@ function QueueRow({
 			<span className="text-xs text-foreground truncate flex-1">
 				{item.text}
 			</span>
-			<div className="flex items-center gap-1 flex-shrink-0">
-				<button
-					type="button"
-					onClick={() => onSendNow(item)}
-					className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-					title="Send now"
-				>
-					<Send className="h-3.5 w-3.5" />
-				</button>
-				<button
-					type="button"
-					onClick={() => onCancel(item)}
-					className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					title="Cancel and restore to input"
-				>
-					<RotateCcw className="h-3.5 w-3.5" />
-				</button>
-				<button
-					type="button"
-					onClick={() => onDelete(item)}
-					className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-					title="Delete from queue"
-				>
-					<Trash2 className="h-3.5 w-3.5" />
-				</button>
-			</div>
+			{item.sending ? (
+				<span className="flex h-7 w-7 items-center justify-center text-muted-foreground flex-shrink-0">
+					<StableSpinner size="xs" title="Sending" />
+				</span>
+			) : (
+				<div className="flex items-center gap-1 flex-shrink-0">
+					<button
+						type="button"
+						onClick={() => onSendNow(item)}
+						className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+						title="Send now"
+					>
+						<Send className="h-3.5 w-3.5" />
+					</button>
+					<button
+						type="button"
+						onClick={() => onCancel(item)}
+						className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						title="Cancel and restore to input"
+					>
+						<RotateCcw className="h-3.5 w-3.5" />
+					</button>
+					<button
+						type="button"
+						onClick={() => onDelete(item)}
+						className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+						title="Delete from queue"
+					>
+						<Trash2 className="h-3.5 w-3.5" />
+					</button>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -38,7 +38,50 @@ export function normalizeQueueState(state: {
 	};
 }
 
+/**
+ * Adds a message id to a cached queue state under an explicit query key.
+ * Used by the stream engine, which captures its query keys at start so
+ * background engines keep writing to the right project scope.
+ */
+export function queueMessageIdInCache(
+	queryClient: QueryClient,
+	queryKey: readonly unknown[],
+	messageId: string,
+) {
+	queryClient.setQueryData<QueueState>(queryKey, (current) => {
+		if (!current) return current;
+		if (!current.isRunning || !current.currentMessageId) return current;
+		if (current.currentMessageId === messageId) return current;
+		if (current.queuedMessages.some((item) => item.messageId === messageId)) {
+			return current;
+		}
+
+		const queuedMessages = [
+			...current.queuedMessages,
+			{ messageId, position: current.queuedMessages.length },
+		];
+		return {
+			...current,
+			queuedMessages,
+			queueLength: queuedMessages.length,
+		};
+	});
+}
+
 export function optimisticallyQueueMessage(
+	queryClient: QueryClient,
+	sessionId: string,
+	messageId: string,
+) {
+	queueMessageIdInCache(
+		queryClient,
+		getQueueStateQueryKey(sessionId),
+		messageId,
+	);
+}
+
+/** Removes a message id from the cached queue state and re-indexes positions. */
+export function removeQueuedMessageFromCache(
 	queryClient: QueryClient,
 	sessionId: string,
 	messageId: string,
@@ -47,16 +90,53 @@ export function optimisticallyQueueMessage(
 		getQueueStateQueryKey(sessionId),
 		(current) => {
 			if (!current) return current;
-			if (!current.isRunning || !current.currentMessageId) return current;
-			if (current.currentMessageId === messageId) return current;
-			if (current.queuedMessages.some((item) => item.messageId === messageId)) {
+			if (
+				!current.queuedMessages.some((item) => item.messageId === messageId)
+			) {
 				return current;
 			}
+			const queuedMessages = current.queuedMessages
+				.filter((item) => item.messageId !== messageId)
+				.map((item, index) => ({ ...item, position: index }));
+			return {
+				...current,
+				queuedMessages,
+				queueLength: queuedMessages.length,
+			};
+		},
+	);
+}
 
-			const queuedMessages = [
-				...current.queuedMessages,
-				{ messageId, position: current.queuedMessages.length },
-			];
+/**
+ * Swaps an optimistic queue entry for the server-assigned message id once the
+ * send request resolves. Drops the optimistic entry when the real id is
+ * already present (queue.updated arrived first).
+ */
+export function replaceQueuedMessageIdInCache(
+	queryClient: QueryClient,
+	sessionId: string,
+	fromMessageId: string,
+	toMessageId: string,
+) {
+	queryClient.setQueryData<QueueState>(
+		getQueueStateQueryKey(sessionId),
+		(current) => {
+			if (!current) return current;
+			if (
+				!current.queuedMessages.some((item) => item.messageId === fromMessageId)
+			) {
+				return current;
+			}
+			const hasReal = current.queuedMessages.some(
+				(item) => item.messageId === toMessageId,
+			);
+			const queuedMessages = current.queuedMessages
+				.filter((item) => (hasReal ? item.messageId !== fromMessageId : true))
+				.map((item, index) => ({
+					messageId:
+						item.messageId === fromMessageId ? toMessageId : item.messageId,
+					position: index,
+				}));
 			return {
 				...current,
 				queuedMessages,

@@ -22,6 +22,7 @@ import { useFileSelectionStore } from '../../stores/fileSelectionStore';
 import { getSessionChatDraftKey } from '../../stores/chatDraftStore';
 import { formatResearchContextForMessage } from '../../lib/parseResearchContext';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
+import { toChatDraftAttachment } from '../../lib/chatAttachments';
 import { toast } from '../../stores/toastStore';
 import { useToastStore } from '../../stores/toastStore';
 import { apiClient } from '../../lib/api-client';
@@ -289,6 +290,18 @@ export const ChatInputContainer = memo(
 						clearFileSelections(sessionId);
 					} catch (error) {
 						console.error('Failed to send message:', error);
+						// Put the typed message (and any uploaded attachments) back into
+						// the input so a failed send never loses the user's text.
+						useQueueStore.getState().setPendingRestore({
+							sessionId,
+							text: content,
+							attachments: [...images, ...documents]
+								.map(toChatDraftAttachment)
+								.filter(
+									(attachment): attachment is NonNullable<typeof attachment> =>
+										Boolean(attachment),
+								),
+						});
 						toast.error(
 							error instanceof Error ? error.message : 'Failed to send message',
 						);

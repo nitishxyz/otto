@@ -1,6 +1,8 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CircleAlert, CircleCheck, Pin } from 'lucide-react';
 import type { Session } from '../../types/api';
+import { prefetchSessionMessages } from '../../hooks/useMessages';
 import { StableSpinner } from '../ui/StableSpinner';
 import { Tooltip } from '../ui/Tooltip';
 import { formatRelativeSessionTime } from './session-time';
@@ -19,6 +21,11 @@ export const SessionItem = memo(function SessionItem({
 	onClick,
 	onTogglePinned,
 }: SessionItemProps) {
+	const queryClient = useQueryClient();
+	const handlePrefetch = useCallback(() => {
+		if (isActive) return;
+		prefetchSessionMessages(queryClient, session.id);
+	}, [isActive, queryClient, session.id]);
 	const title = session.title || `Session ${session.id.slice(0, 8)}`;
 	const isRunning = session.isRunning ?? false;
 	const needsAttention = session.needsAttention ?? false;
@@ -52,6 +59,8 @@ export const SessionItem = memo(function SessionItem({
 			<button
 				type="button"
 				onClick={onClick}
+				onMouseEnter={handlePrefetch}
+				onFocus={handlePrefetch}
 				className="absolute inset-0 z-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/50"
 				aria-label={`Open ${title}`}
 			/>

@@ -51,6 +51,13 @@ export interface Message {
 	finishDetails?: string | null;
 	error: string | null;
 	parts?: MessagePart[];
+	/**
+	 * Client-only marker for messages inserted before the send request
+	 * resolves. `sending` renders inline with a spinner; `queued` stays hidden
+	 * in the thread and surfaces in the queue bar instead. Cleared once the
+	 * server-confirmed message replaces the optimistic one.
+	 */
+	optimistic?: 'sending' | 'queued';
 }
 
 export interface MessagePart {
