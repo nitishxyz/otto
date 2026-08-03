@@ -12,13 +12,14 @@ import { serializeError } from '../../runtime/errors/api-error.ts';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
 import { buildSubagentTools } from '../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../tools/goals/index.ts';
+import { getServerLazyToolDefinitions } from '../../tools/lazy.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
 const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 const RISKY_TOOLS = new Set([
 	'shell',
 	'terminal',
-	'run_plugin_command',
+	'forge',
 	'write',
 	'apply_patch',
 	'git_commit',
@@ -45,6 +46,7 @@ const BUILTIN_TOOLS = new Set([
 	'git_commit',
 	'websearch',
 	'skill',
+	'forge',
 	'load_tools',
 	'load_mcp_tools',
 ]);
@@ -234,6 +236,21 @@ export function registerToolsRoute(app: Hono) {
 						item.name,
 						toToolDetail({ name: item.name, tool: item.tool }),
 					);
+				}
+
+				for (const definition of getServerLazyToolDefinitions()) {
+					const built = definition.build(cfg.projectRoot);
+					details.set(built.name, {
+						...toToolDetail({
+							name: built.name,
+							tool: built.tool,
+							activation: 'loadable',
+						}),
+						category: 'loadable',
+						description: definition.description,
+						source: 'builtin',
+						available: true,
+					});
 				}
 
 				const lazyDescriptions = new Map(

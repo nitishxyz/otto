@@ -3,7 +3,6 @@ import { buildCopyAttachmentTool } from '../builtin/fs/copy-attachment.ts';
 import { buildCopyIntoTool } from '../builtin/fs/copy-into.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
 import { buildBrowserTool } from './browser.ts';
-import { buildMCPManagerTool } from './mcp-manager.ts';
 import { buildLoadToolsTool, type LazyToolBrief } from './load-tools.ts';
 
 export type LazyToolDefinition = LazyToolBrief & {
@@ -31,11 +30,6 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 			name: 'copy_attachment_to_project',
 			description: 'Copy an uploaded attachment into the project.',
 			build: buildCopyAttachmentTool,
-		},
-		{
-			name: 'mcp_manager',
-			description: 'Manage project or global MCP servers.',
-			build: buildMCPManagerTool,
 		},
 	];
 }

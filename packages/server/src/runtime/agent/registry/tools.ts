@@ -86,8 +86,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'read_image',
 			'copy_attachment_to_project',
 			'browser',
-			'mcp_manager',
-			'run_plugin_command',
+			'forge',
 		],
 	},
 	plan: {
@@ -113,7 +112,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 			'update_todos',
 		],
-		loadable: ['browser', 'mcp_manager', 'run_plugin_command'],
+		loadable: ['browser', 'forge'],
 	},
 	git: { firstClass: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'] },
 	commit: {

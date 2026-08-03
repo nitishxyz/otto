@@ -99,6 +99,7 @@ function mcpActionLabel(action: string | null): string {
 		case 'list':
 			return 'list servers';
 		case 'add':
+		case 'create':
 			return 'add server';
 		case 'update':
 			return 'update server';
@@ -108,6 +109,8 @@ function mcpActionLabel(action: string | null): string {
 			return 'enable server';
 		case 'disable':
 			return 'disable server';
+		case 'execute':
+			return 'run server lifecycle';
 		default:
 			return action?.replace(/_/g, ' ') || 'mcp manager';
 	}
@@ -253,6 +256,23 @@ function getToolSummary(part: MessagePart): string | null {
 						(result ? str(result.name) : null) ??
 						str(src.name));
 			return clip([mcpActionLabel(action), detail].filter(Boolean).join(' '));
+		}
+		case 'forge': {
+			const kind = str(src.kind);
+			if (kind === 'mcp-server') {
+				const action = (result ? str(result.action) : null) ?? str(src.action);
+				const server = result ? asRecord(result.server) : undefined;
+				const detail = (server ? str(server.name) : null) ?? str(src.name);
+				return clip([mcpActionLabel(action), detail].filter(Boolean).join(' '));
+			}
+			if (kind === 'plugin-command') {
+				return clip(
+					[str(src.plugin), str(src.commandName)].filter(Boolean).join(' '),
+				);
+			}
+			return clip(
+				[str(src.action), kind, str(src.name)].filter(Boolean).join(' '),
+			);
 		}
 		case 'simulator': {
 			const action = str(src.action);

@@ -14,7 +14,7 @@ import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import { buildDatabaseTools } from '../../../tools/database/index.ts';
 import { buildSubagentTools } from '../../../tools/subagents/index.ts';
 import { buildGoalTools } from '../../../tools/goals/index.ts';
-import { buildRunPluginCommandTool } from '../../../tools/plugins/run-plugin-command.ts';
+import { buildConfiguredServerTools } from '../../../tools/lazy.ts';
 import { time } from '../../debug/index.ts';
 import { buildHistoryMessages } from '../../message/history-builder.ts';
 import { resolveReferences } from '../../context/references.ts';
@@ -225,9 +225,16 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	}
 
 	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);
-	if (configuredLoadableNames.has('run_plugin_command')) {
-		const runPluginTool = buildRunPluginCommandTool(cfg.projectRoot);
-		discovered.tools.push(runPluginTool);
+	const configuredServerTools = buildConfiguredServerTools({
+		projectRoot: cfg.projectRoot,
+		firstClassNames: agentCfg.toolConfig.firstClass ?? [],
+		loadableNames: configuredLoadableNames,
+	});
+	for (const item of configuredServerTools.firstClass) {
+		allTools.push({ name: item.name, tool: item.tool });
+	}
+	for (const item of configuredServerTools.loadable) {
+		lazyToolsRecord[item.name] = item.tool;
 	}
 	for (const toolItem of allTools) {
 		if (!configuredLoadableNames.has(toolItem.name)) continue;
@@ -239,17 +246,21 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 	const allowedLazyToolNames = Object.keys(lazyToolsRecord).filter((name) =>
 		configuredLoadableNames.has(name),
 	);
-	if (allowedLazyToolNames.length !== Object.keys(lazyToolsRecord).length) {
+	if (
+		allowedLazyToolNames.length !== Object.keys(lazyToolsRecord).length ||
+		configuredServerTools.loadable.length > 0
+	) {
 		lazyToolsRecord = Object.fromEntries(
 			allowedLazyToolNames.map((name) => [name, lazyToolsRecord[name]]),
 		) as Record<string, Tool>;
 		const lazyBriefs = getLazyToolDefinitions()
 			.filter(({ name }) => allowedLazyToolNames.includes(name))
 			.map(({ name, description }) => ({ name, description }));
-		if (allowedLazyToolNames.includes('run_plugin_command')) {
+		for (const item of configuredServerTools.loadable) {
+			if (!allowedLazyToolNames.includes(item.name)) continue;
 			lazyBriefs.push({
-				name: 'run_plugin_command',
-				description: 'Run an enabled plugin command.',
+				name: item.name,
+				description: item.description,
 			});
 		}
 		const loadTools = buildLoadToolsTool(lazyBriefs);

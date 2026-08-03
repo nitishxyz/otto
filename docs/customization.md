@@ -4,11 +4,42 @@
 
 Customize otto with project-local `.otto/` files or global `~/.config/otto/` files.
 
+## Forge
+
+`forge` is the loadable agent tool for creating, managing, and running Otto
+capabilities. It can inventory the current project, preview changes, create,
+update, or remove standalone recipes, skills, and agents, manage MCP servers,
+and run enabled plugin commands in visible terminals.
+
+- Project scope writes under `.otto/`.
+- Global scope writes under `~/.config/otto/`.
+- Project scope is the default; global scope must be requested explicitly.
+- `inventory` and `plan` are read-only. Mutations follow normal tool approval.
+- `dryRun: true` returns the exact paths and generated content without writing.
+- MCP servers support create, update, remove, enable, disable, start, stop, and
+  restart operations for stdio, HTTP, and SSE transports.
+- Plugin commands use `action: "execute"` and `kind: "plugin-command"`.
+
+Load it before use:
+
+```text
+load_tools({ tools: ['forge'] })
+```
+
+Plugins remain the packaging and distribution format. Forge creates standalone
+capabilities directly; those capabilities can be packaged as plugins in a later
+workflow without requiring every project customization to be a plugin.
+
+Forge replaces the former `mcp_manager` and `run_plugin_command` entries in the
+loadable tool catalog. Their underlying MCP and plugin command runtimes remain
+shared infrastructure; Forge is the unified agent-facing interface.
+
 ## Recipes
 
-Recipes are project-local markdown instructions that become reusable slash commands in chat. They are discovered from:
+Recipes are project or global markdown instructions that become reusable slash commands in chat. They are discovered from:
 
 - `.otto/recipes/*.md`
+- `~/.config/otto/recipes/*.md`
 
 The filename is the command name, so `.otto/recipes/publish-ready.md` runs with `/publish-ready`. Recipe names must use lowercase letters, numbers, and dashes.
 

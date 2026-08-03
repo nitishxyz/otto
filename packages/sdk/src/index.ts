@@ -456,7 +456,6 @@ export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildLoadToolsTool,
-	buildMCPManagerTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
 } from './core/src/index.ts';

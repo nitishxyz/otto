@@ -60,7 +60,6 @@ export {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildLoadToolsTool,
-	buildMCPManagerTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
 } from './tools/lazy/index';

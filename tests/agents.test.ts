@@ -364,6 +364,9 @@ describe('agent config merging', () => {
 			const querySessions = payload.tools.find(
 				(tool: { name: string }) => tool.name === 'query_sessions',
 			);
+			const forge = payload.tools.find(
+				(tool: { name: string }) => tool.name === 'forge',
+			);
 			expect(progressUpdate).toMatchObject({
 				category: 'core',
 				source: 'builtin',
@@ -395,6 +398,19 @@ describe('agent config merging', () => {
 				activation: 'first_class',
 				available: true,
 			});
+			expect(forge).toMatchObject({
+				category: 'loadable',
+				source: 'builtin',
+				activation: 'loadable',
+				risky: true,
+				available: true,
+			});
+			expect(
+				payload.tools.some(
+					(tool: { name: string }) =>
+						tool.name === 'mcp_manager' || tool.name === 'run_plugin_command',
+				),
+			).toBe(false);
 		} finally {
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}

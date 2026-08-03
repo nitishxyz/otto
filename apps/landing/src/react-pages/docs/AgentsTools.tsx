@@ -78,7 +78,7 @@ external     MCP tools · project tools · plugins`}
 						accent="coral"
 						items={[
 							'write, edit, apply_patch',
-							'shell, terminal, run_plugin_command',
+							'shell, terminal, forge',
 							'git_commit, git_push',
 						]}
 					/>

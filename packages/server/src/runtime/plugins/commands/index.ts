@@ -30,3 +30,5 @@ export type {
 } from './execute.ts';
 export type { PluginCommandRunResult } from './types.ts';
 export { normalizePluginCommandRunInput } from './parse.ts';
+export { executePluginCommandForAgent } from './agent-execute.ts';
+export type { AgentPluginCommandInput } from './agent-execute.ts';

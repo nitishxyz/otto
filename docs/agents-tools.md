@@ -172,6 +172,7 @@ only receive the subset defined by their preset or config overrides.
 | `progress_update` | Emit short status/progress updates |
 | `finish` | Signal task completion |
 | `skill` | Load specialized instructions from a skill bundle |
+| `forge` | Create, manage, and run capabilities, MCP servers, and plugin commands |
 
 ### Research helpers
 

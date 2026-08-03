@@ -11,4 +11,3 @@ export {
 } from './registry.ts';
 export { buildBrowserTool } from './browser.ts';
 export { buildSimulatorTool } from './simulator.ts';
-export { buildMCPManagerTool } from './mcp-manager.ts';

@@ -25,6 +25,7 @@ import { McpToolRenderer, isMcpTool } from './McpToolRenderer';
 import { LoadMcpToolsRenderer } from './LoadMcpToolsRenderer';
 import { LoadToolsRenderer } from './LoadToolsRenderer';
 import { McpManagerRenderer } from './McpManagerRenderer';
+import { ForgeRenderer } from './ForgeRenderer';
 import { SimulatorRenderer } from './SimulatorRenderer';
 import { BrowserRenderer } from './BrowserRenderer';
 import { SkillRenderer } from './SkillRenderer';
@@ -187,6 +188,8 @@ export function ToolResultRenderer({
 			return <LoadMcpToolsRenderer {...props} toolName={toolName} />;
 		case 'mcp_manager':
 			return <McpManagerRenderer {...props} />;
+		case 'forge':
+			return <ForgeRenderer {...props} />;
 		case 'simulator':
 			return <SimulatorRenderer {...props} />;
 		case 'browser':

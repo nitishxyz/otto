@@ -4,6 +4,7 @@ export const REQUIRED_TOOLS = new Set(['progress_update', 'load_tools']);
 export const RISKY_TOOLS = new Set([
 	'shell',
 	'terminal',
+	'forge',
 	'write',
 	'apply_patch',
 	'git_commit',
@@ -41,12 +42,9 @@ export function getAgentConfigScope(agent: AgentDetail): 'local' | 'global' {
 export function toolCategoryFromName(tool: string): string {
 	if (tool === 'load_tools') return 'First-class tools';
 	if (
-		[
-			'simulator',
-			'read_image',
-			'copy_attachment_to_project',
-			'mcp_manager',
-		].includes(tool)
+		['simulator', 'read_image', 'copy_attachment_to_project', 'forge'].includes(
+			tool,
+		)
 	)
 		return 'Loadable tools';
 	if (['progress_update', 'update_todos'].includes(tool))
@@ -119,7 +117,7 @@ const FALLBACK_LOADABLE_TOOLS = new Set([
 	'read_image',
 	'copy_attachment_to_project',
 	'simulator',
-	'mcp_manager',
+	'forge',
 ]);
 
 export function buildAgentToolConfig(

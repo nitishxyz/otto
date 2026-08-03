@@ -21,7 +21,7 @@ export async function buildPluginCommandsPrompt(
 		'Available plugin commands:',
 		...lines,
 		'',
-		'Recommend these to the user or run them with the `run_plugin_command` loadable tool (visible terminal).',
+		'Recommend these to the user or run them with the `forge` loadable tool using action `execute` and kind `plugin-command` (visible terminal).',
 	].join('\n');
 
 	return {

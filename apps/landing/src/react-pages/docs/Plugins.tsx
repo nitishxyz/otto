@@ -120,8 +120,9 @@ otto plugins remove <name>`}</CodeBlock>
 			<p>
 				Declared commands show up to the agent as{' '}
 				<code>/&lt;plugin&gt; &lt;command&gt;</code>. They run in a{' '}
-				<em>visible</em> terminal through the <code>run_plugin_command</code>{' '}
-				tool, which is approval-gated like any other execution tool.
+				<em>visible</em> terminal through <code>forge</code> with kind{' '}
+				<code>plugin-command</code>, which is approval-gated like any other
+				execution tool.
 			</p>
 			<CodeBlock>{`/serve-sim start
 /expo doctor --fix`}</CodeBlock>

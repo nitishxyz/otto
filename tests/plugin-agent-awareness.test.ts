@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import {
 	TerminalManager,
+	getLazyToolDefinitions,
 	getProjectPluginsDir,
 	setTerminalManager,
 	unsetTerminalManager,
@@ -15,7 +16,12 @@ import {
 	MAX_PLUGIN_COMMAND_LINES,
 } from '../packages/server/src/runtime/prompt/plugin-commands.ts';
 import { requiresApproval } from '../packages/server/src/runtime/tools/approval.ts';
-import { buildRunPluginCommandTool } from '../packages/server/src/tools/plugins/run-plugin-command.ts';
+import { buildForgeTool } from '../packages/server/src/tools/forge.ts';
+import {
+	buildConfiguredServerTools,
+	getServerLazyToolDefinitions,
+} from '../packages/server/src/tools/lazy.ts';
+import { defaultToolConfigForAgent } from '../packages/server/src/runtime/agent/registry.ts';
 
 describe('plugin command agent awareness', () => {
 	async function setupProject() {
@@ -101,7 +107,8 @@ describe('plugin command agent awareness', () => {
 			const result = await buildPluginCommandsPrompt(projectRoot);
 			expect(result.prompt).toContain('Available plugin commands:');
 			expect(result.prompt).toContain('/serve-sim start --port');
-			expect(result.prompt).toContain('run_plugin_command');
+			expect(result.prompt).toContain('`forge`');
+			expect(result.prompt).toContain('`plugin-command`');
 			expect(result.components).toEqual(['plugin-commands']);
 		} finally {
 			await cleanup();
@@ -125,9 +132,36 @@ describe('plugin command agent awareness', () => {
 		}
 	});
 
-	it('requires approval for run_plugin_command in dangerous mode', () => {
-		expect(requiresApproval('run_plugin_command', 'dangerous')).toBe(true);
-		expect(requiresApproval('run_plugin_command', 'auto')).toBe(false);
+	it('removes legacy MCP and plugin command tools from the lazy registry', () => {
+		const names = getLazyToolDefinitions().map(({ name }) => name);
+		const serverNames = getServerLazyToolDefinitions().map(({ name }) => name);
+		const buildTools = defaultToolConfigForAgent('build');
+		expect(names).not.toContain('mcp_manager');
+		expect(names).not.toContain('run_plugin_command');
+		expect(serverNames).toEqual(['forge']);
+		expect(buildTools.loadable).toContain('forge');
+		expect(buildTools.firstClass).not.toContain('forge');
+		expect(requiresApproval('forge', 'dangerous', { action: 'execute' })).toBe(
+			true,
+		);
+	});
+
+	it('allows an orchestrator to promote Forge to first class explicitly', () => {
+		const loadable = buildConfiguredServerTools({
+			projectRoot: '/tmp/otto-forge-loadable',
+			firstClassNames: [],
+			loadableNames: ['forge'],
+		});
+		expect(loadable.firstClass).toHaveLength(0);
+		expect(loadable.loadable.map(({ name }) => name)).toEqual(['forge']);
+
+		const orchestrator = buildConfiguredServerTools({
+			projectRoot: '/tmp/otto-forge-orchestrator',
+			firstClassNames: ['forge'],
+			loadableNames: ['forge'],
+		});
+		expect(orchestrator.firstClass.map(({ name }) => name)).toEqual(['forge']);
+		expect(orchestrator.loadable).toHaveLength(0);
 	});
 
 	it('runs enabled plugin commands through the shared terminal bridge', async () => {
@@ -143,10 +177,12 @@ describe('plugin command agent awareness', () => {
 				},
 			});
 
-			const { tool } = buildRunPluginCommandTool(projectRoot);
+			const { tool } = buildForgeTool(projectRoot);
 			const result = await tool.execute?.({
+				action: 'execute',
+				kind: 'plugin-command',
 				plugin: 'serve-sim',
-				command: 'doctor',
+				commandName: 'doctor',
 			});
 
 			expect(result).toEqual({
@@ -173,10 +209,12 @@ describe('plugin command agent awareness', () => {
 				false,
 			);
 
-			const { tool } = buildRunPluginCommandTool(projectRoot);
+			const { tool } = buildForgeTool(projectRoot);
 			const result = await tool.execute?.({
+				action: 'execute',
+				kind: 'plugin-command',
 				plugin: 'hidden',
-				command: 'run',
+				commandName: 'run',
 			});
 
 			expect(result).toMatchObject({

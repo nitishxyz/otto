@@ -1,5 +1,10 @@
 # Plugin Capabilities & Commands Plan
 
+> Status: implemented with Forge as the unified agent-facing tool. Historical
+> references to `run_plugin_command` below describe the original design; plugin
+> commands now run through `forge` with `action: "execute"` and
+> `kind: "plugin-command"`. MCP management is also consolidated into Forge.
+
 ## Goal
 
 Make plugins the umbrella packaging format for reusable Otto capabilities:

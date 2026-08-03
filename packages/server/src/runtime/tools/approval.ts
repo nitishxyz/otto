@@ -17,7 +17,7 @@ export const DANGEROUS_TOOLS = new Set([
 	'copy_into',
 	'apply_patch',
 	'terminal',
-	'run_plugin_command',
+	'forge',
 	'git_commit',
 	'git_push',
 ]);
@@ -58,6 +58,17 @@ export function requiresApproval(
 	if (mode === 'auto' || mode === 'yolo') return false;
 	if (mode === 'all') return true;
 	if (mode === 'dangerous') {
+		if (toolName === 'forge') {
+			const input =
+				args && typeof args === 'object' && !Array.isArray(args)
+					? (args as { action?: unknown; dryRun?: unknown })
+					: {};
+			return (
+				input.dryRun !== true &&
+				input.action !== 'inventory' &&
+				input.action !== 'plan'
+			);
+		}
 		if (toolName === 'browser') {
 			const action =
 				args && typeof args === 'object' && !Array.isArray(args)

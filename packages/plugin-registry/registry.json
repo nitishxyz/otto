@@ -449,13 +449,7 @@
 							"terminal",
 							"websearch"
 						],
-						"loadable": [
-							"read_image",
-							"simulator",
-							"browser",
-							"mcp_manager",
-							"run_plugin_command"
-						]
+						"loadable": ["read_image", "simulator", "browser", "forge"]
 					}
 				}
 			],

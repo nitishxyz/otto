@@ -47,6 +47,7 @@ function getActionLabel(action: string | null): string {
 		case 'list':
 			return 'list servers';
 		case 'add':
+		case 'create':
 			return 'add server';
 		case 'update':
 			return 'update server';
@@ -56,6 +57,8 @@ function getActionLabel(action: string | null): string {
 			return 'enable server';
 		case 'disable':
 			return 'disable server';
+		case 'execute':
+			return 'run server lifecycle';
 		default:
 			return action?.replace(/_/g, ' ') || 'mcp manager';
 	}
@@ -124,7 +127,8 @@ export function McpManagerRenderer({
 	isExpanded,
 	onToggle,
 	compact,
-}: GenericRendererProps) {
+	toolName = 'mcp_manager',
+}: GenericRendererProps & { toolName?: string }) {
 	const result = (contentJson.result || {}) as Record<string, unknown>;
 	const args = (contentJson.args || {}) as Record<string, unknown>;
 	const timeStr = formatDuration(toolDurationMs);
@@ -152,7 +156,7 @@ export function McpManagerRenderer({
 	return (
 		<div className="text-[12px]">
 			<ToolHeader
-				toolName="mcp_manager"
+				toolName={toolName}
 				isExpanded={isExpanded}
 				onToggle={onToggle}
 				isError={hasError}
