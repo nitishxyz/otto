@@ -164,6 +164,8 @@ function App() {
 					project.path,
 					access.ownerSession,
 					access.ownerSessionExpiresAt,
+					daemon.url,
+					daemon.token,
 				);
 				expiresAt = access.ownerSessionExpiresAt;
 				failureCount = 0;
@@ -230,6 +232,8 @@ function App() {
 				updatedProject.path,
 				updatedProject.machineOwnerSession,
 				updatedProject.machineOwnerSessionExpiresAt,
+				daemon?.url ?? '',
+				daemon?.token,
 			);
 		}
 		flushSync(() => {

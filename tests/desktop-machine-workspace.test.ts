@@ -19,10 +19,15 @@ const machineProject: Project = {
 
 describe('desktop machine workspace SDK configuration', () => {
 	it('preserves machine project and owner credentials in the open workspace', () => {
+		const server = {
+			url: 'http://127.0.0.1:9100',
+			token: 'desktop-token',
+		} as ServerInfo;
+
 		expect(
 			resolveWorkspaceSdkConfiguration(
 				'https://machine.ottorouter.test',
-				null,
+				server,
 				machineProject,
 			),
 		).toEqual({
@@ -32,6 +37,8 @@ describe('desktop machine workspace SDK configuration', () => {
 			projectRoot: '/srv/project',
 			ownerSession: 'owner-token',
 			ownerSessionExpiresAt: 123_456,
+			clientApiBaseUrl: server.url,
+			clientServerToken: server.token,
 		});
 	});
 
