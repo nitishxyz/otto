@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { getProjectKey } from '../lib/api-client/utils';
 import type {
 	DictationModelInstallEvent,
 	DictationModelState,
 	DictationStatusResponse,
 } from '../lib/api-client';
-
-const DICTATION_STATUS_QUERY_KEY = ['dictation', 'status'] as const;
 
 function mergeModelState(
 	current: DictationStatusResponse | undefined,
@@ -32,6 +31,11 @@ function parseInstallEvent(raw: string): DictationModelInstallEvent | null {
 
 export function useDictationModels() {
 	const queryClient = useQueryClient();
+	const projectKey = getProjectKey();
+	const statusQueryKey = useMemo(
+		() => ['project', projectKey, 'dictation', 'status'] as const,
+		[projectKey],
+	);
 	const eventSourceRef = useRef<EventSource | null>(null);
 	const [activeInstallModelId, setActiveInstallModelId] = useState<
 		string | null
@@ -43,7 +47,7 @@ export function useDictationModels() {
 	);
 
 	const statusQuery = useQuery({
-		queryKey: DICTATION_STATUS_QUERY_KEY,
+		queryKey: statusQueryKey,
 		queryFn: () => apiClient.getDictationStatus(),
 		refetchInterval: (query) =>
 			query.state.data?.models.some((model) => model.installing) ? 1000 : 30000,
@@ -73,14 +77,14 @@ export function useDictationModels() {
 				if (!payload) return;
 				setInstallProgress(payload.model);
 				queryClient.setQueryData<DictationStatusResponse | undefined>(
-					DICTATION_STATUS_QUERY_KEY,
+					statusQueryKey,
 					(current) => mergeModelState(current, payload.model),
 				);
 				if (!payload.model.installing) {
 					closeInstallStream();
 					setActiveInstallModelId(null);
 					void queryClient.invalidateQueries({
-						queryKey: DICTATION_STATUS_QUERY_KEY,
+						queryKey: statusQueryKey,
 					});
 				}
 			};
@@ -90,11 +94,11 @@ export function useDictationModels() {
 				closeInstallStream();
 				setActiveInstallModelId(null);
 				void queryClient.invalidateQueries({
-					queryKey: DICTATION_STATUS_QUERY_KEY,
+					queryKey: statusQueryKey,
 				});
 			};
 		},
-		[closeInstallStream, queryClient],
+		[closeInstallStream, queryClient, statusQueryKey],
 	);
 
 	useEffect(() => closeInstallStream, [closeInstallStream]);
@@ -105,7 +109,7 @@ export function useDictationModels() {
 		onSuccess: (data) => {
 			setInstallProgress(data.model);
 			queryClient.setQueryData<DictationStatusResponse | undefined>(
-				DICTATION_STATUS_QUERY_KEY,
+				statusQueryKey,
 				(current) => mergeModelState(current, data.model),
 			);
 			if (data.model.installing) {
@@ -114,7 +118,7 @@ export function useDictationModels() {
 				closeInstallStream();
 				setActiveInstallModelId(null);
 				void queryClient.invalidateQueries({
-					queryKey: DICTATION_STATUS_QUERY_KEY,
+					queryKey: statusQueryKey,
 				});
 			}
 		},
@@ -124,11 +128,11 @@ export function useDictationModels() {
 		mutationFn: (model: string) => apiClient.removeDictationModel(model),
 		onSuccess: (data) => {
 			queryClient.setQueryData<DictationStatusResponse | undefined>(
-				DICTATION_STATUS_QUERY_KEY,
+				statusQueryKey,
 				(current) => mergeModelState(current, data.model),
 			);
 			void queryClient.invalidateQueries({
-				queryKey: DICTATION_STATUS_QUERY_KEY,
+				queryKey: statusQueryKey,
 			});
 		},
 	});

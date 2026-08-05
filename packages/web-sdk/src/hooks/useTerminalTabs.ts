@@ -65,8 +65,8 @@ export function useOpenTerminalTabs() {
 }
 
 /**
- * Toggles the terminal viewer section: hides terminal tabs when one is
- * active, otherwise focuses or opens them.
+ * Toggles the terminal viewer section: collapses the viewer when a terminal
+ * is active, otherwise focuses or opens the existing terminal tabs.
  */
 export function useToggleTerminalTabs() {
 	const openTerminalTabs = useOpenTerminalTabs();
@@ -76,10 +76,8 @@ export function useToggleTerminalTabs() {
 			? state.tabsById[state.activeTabId]
 			: undefined;
 
-		if (activeTab?.type === 'terminal') {
-			for (const id of getTerminalTabIds()) {
-				useViewerTabsStore.getState().closeTab(id);
-			}
+		if (activeTab?.type === 'terminal' && !state.isCollapsed) {
+			state.collapseViewer();
 			return;
 		}
 

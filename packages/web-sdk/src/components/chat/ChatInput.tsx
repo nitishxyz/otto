@@ -41,6 +41,7 @@ import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { useVimMode } from '../../hooks/useVimMode';
 import { useComposerHandoff } from '../../hooks/useSessionHandoff';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
+import { appendDictationTranscript } from '../../lib/dictation-text';
 import { useFileMention } from '../../hooks/useFileMention';
 import { useSkillMention } from '../../hooks/useSkillMention';
 import { useReferences } from '../../hooks/useReferences';
@@ -434,9 +435,10 @@ export const ChatInput = memo(
 		} = useVoiceInput({
 			onNeedsInstall: handleNeedsDictationInstall,
 			onTranscript: (transcript, isFinal) => {
-				const base = voiceBaseTextRef.current;
-				const sep = base && !/\s$/.test(base) ? ' ' : '';
-				const nextMessage = transcript ? `${base}${sep}${transcript}` : base;
+				const nextMessage = appendDictationTranscript(
+					voiceBaseTextRef.current,
+					transcript,
+				);
 
 				if (isFinal && preferences.releaseToSend && nextMessage.trim()) {
 					onSend(nextMessage);

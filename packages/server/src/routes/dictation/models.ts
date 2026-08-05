@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { DICTATION_MODELS } from '../../dictation/manifest.ts';
+import { deriveProjectVocabulary } from '../../dictation/prompt.ts';
 import {
 	installDictationModel,
 	listDictationModelStates,
@@ -11,6 +12,7 @@ import {
 	DEFAULT_DICTATION_MODEL,
 } from '../../dictation/types.ts';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { resolveRequestProjectRoot } from '../project-context.ts';
 import { modelErrorResponse, streamModelInstallEvents } from './helpers.ts';
 import {
 	dictationModelResponseSchema,
@@ -48,15 +50,22 @@ function registerDictationStatusRoute(app: Hono) {
 				},
 			},
 		},
-		async (c) =>
-			c.json({
+		async (c) => {
+			const projectRoot = await resolveRequestProjectRoot(c).catch(
+				() => undefined,
+			);
+			return c.json({
 				available: true,
 				engine: 'whisper.cpp',
 				engineInstalled: false,
 				defaultModel: DEFAULT_DICTATION_MODEL,
 				format: DEFAULT_AUDIO_FORMAT,
+				projectKeywords: projectRoot
+					? await deriveProjectVocabulary(projectRoot)
+					: [],
 				models: await listDictationModelStates(DICTATION_MODELS),
-			}),
+			});
+		},
 	);
 }
 

@@ -22,6 +22,11 @@ export type ReasoningLevel =
 	| 'max'
 	| 'xhigh';
 
+export type DictationKeyword = {
+	keyword: string;
+	aliases?: string[];
+};
+
 export type DefaultConfig = {
 	agent: string;
 	provider: ProviderId;
@@ -40,6 +45,9 @@ export type DefaultConfig = {
 	releaseToSend?: boolean;
 	fullWidthContent?: boolean;
 	notificationsEnabled?: boolean;
+	dictationKeywords?: DictationKeyword[];
+	dictationExcludedProjectKeywords?: string[];
+	dictationSmartFormatting?: boolean;
 	autoCompactThresholdTokens?: number | null;
 	/** Adds the ottocode bot as a co-author on commits made through Otto. */
 	coAuthorCommits?: boolean;

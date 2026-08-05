@@ -92,6 +92,9 @@ export async function writeDefaults(
 		releaseToSend: boolean;
 		fullWidthContent: boolean;
 		notificationsEnabled: boolean;
+		dictationKeywords: Array<{ keyword: string; aliases?: string[] }>;
+		dictationExcludedProjectKeywords: string[];
+		dictationSmartFormatting: boolean;
 		autoCompactThresholdTokens: number | null;
 		coAuthorCommits: boolean;
 	}>,

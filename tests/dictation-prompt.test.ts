@@ -3,9 +3,12 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
+	applyDictationKeywordAliases,
 	BASE_DICTATION_PROMPT,
+	deriveProjectVocabulary,
 	getDictationPromptPath,
 	getProjectDictationPromptPath,
+	mergeDictationKeywords,
 	resolveDictationPrompt,
 } from '../packages/server/src/dictation/prompt.ts';
 
@@ -67,6 +70,7 @@ describe('resolveDictationPrompt', () => {
 		});
 		expect(prompt).toStartWith(BASE_DICTATION_PROMPT);
 		expect(prompt).toContain('rocketship');
+		expect(prompt).toContain('acme');
 		expect(prompt).toContain('otto-dictation-prompt-project');
 		expect(prompt).toContain('TypeScript');
 	});
@@ -90,13 +94,15 @@ describe('resolveDictationPrompt', () => {
 		expect(prompt).not.toContain('TypeScript');
 	});
 
-	test('project dictation-prompt.txt overrides derived vocabulary', async () => {
+	test('appends project vocabulary to a project prompt override', async () => {
 		const projectPromptPath = getProjectDictationPromptPath(tempProjectRoot);
 		await mkdir(dirname(projectPromptPath), { recursive: true });
 		await writeFile(projectPromptPath, 'project vocab\n');
-		expect(await resolveDictationPrompt({ projectRoot: tempProjectRoot })).toBe(
-			'project vocab',
-		);
+		const prompt = await resolveDictationPrompt({
+			projectRoot: tempProjectRoot,
+		});
+		expect(prompt).toStartWith('project vocab');
+		expect(prompt).toContain('otto-dictation-prompt-project');
 	});
 
 	test('reads the global prompt.txt vocabulary file', async () => {
@@ -111,5 +117,80 @@ describe('resolveDictationPrompt', () => {
 		await mkdir(dirname(promptPath), { recursive: true });
 		await writeFile(promptPath, '   \n');
 		expect(await resolveDictationPrompt()).toBe(BASE_DICTATION_PROMPT);
+	});
+
+	test('appends user keywords to the selected prompt', async () => {
+		expect(
+			await resolveDictationPrompt({
+				prompt: 'custom prompt',
+				keywords: [{ keyword: 'AcmeDB', aliases: ['acme database'] }],
+			}),
+		).toBe('custom prompt Vocabulary: AcmeDB.');
+	});
+
+	test('excludes detected terms without excluding explicit user keywords', async () => {
+		await writeFile(join(tempProjectRoot, 'Cargo.toml'), '[package]\n');
+		const prompt = await resolveDictationPrompt({
+			projectRoot: tempProjectRoot,
+			excludedProjectKeywords: ['Rust', 'otto-dictation-prompt-project'],
+			keywords: [{ keyword: 'Rust' }],
+		});
+		expect(prompt).toContain('Vocabulary: Cargo, crate, Rust.');
+		expect(prompt).not.toContain('otto-dictation-prompt-project');
+	});
+
+	test('has no hardcoded product vocabulary', async () => {
+		expect(BASE_DICTATION_PROMPT).not.toContain('OttoCode');
+		expect(mergeDictationKeywords()).toEqual([]);
+		expect(await deriveProjectVocabulary(tempProjectRoot)).not.toContain(
+			'OttoCode',
+		);
+	});
+});
+
+describe('applyDictationKeywordAliases', () => {
+	test('corrects user-provided aliases', () => {
+		expect(
+			applyDictationKeywordAliases(
+				'Use autocode, then open the auto   code repository.',
+				[
+					{
+						keyword: 'OttoCode',
+						aliases: ['autocode', 'auto code'],
+					},
+				],
+			),
+		).toBe('Use OttoCode, then open the OttoCode repository.');
+	});
+
+	test('matches aliases case-insensitively without replacing substrings', () => {
+		expect(
+			applyDictationKeywordAliases('ACME database and acme databases', [
+				{ keyword: 'AcmeDB', aliases: ['acme database'] },
+			]),
+		).toBe('AcmeDB and acme databases');
+	});
+
+	test('treats spaces and hyphens in aliases as equivalent', () => {
+		expect(
+			applyDictationKeywordAliases('Open autocode, auto code, and auto-code.', [
+				{ keyword: 'OttoCode', aliases: ['autocode', 'auto-code'] },
+			]),
+		).toBe('Open OttoCode, OttoCode, and OttoCode.');
+	});
+
+	test('merges duplicate user keywords and preserves alias precedence', () => {
+		const keywords = mergeDictationKeywords([
+			{ keyword: 'OttoCode', aliases: ['autocode', 'auto code'] },
+			{ keyword: 'ottocode', aliases: ['otto project'] },
+			{ keyword: 'OtherCode', aliases: ['autocode'] },
+		]);
+		expect(keywords.find(({ keyword }) => keyword === 'OttoCode')).toEqual({
+			keyword: 'OttoCode',
+			aliases: ['autocode', 'auto code', 'otto project'],
+		});
+		expect(
+			applyDictationKeywordAliases('autocode and otto project', keywords),
+		).toBe('OttoCode and OttoCode');
 	});
 });

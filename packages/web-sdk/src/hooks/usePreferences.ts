@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useConfig, useUpdateDefaults } from './useConfig';
 import { notifyPlatformFontFamilyChanged } from '../lib/platform';
 import { getDefaultNotificationsEnabled } from '../lib/notifications';
+import type { DictationKeyword } from '../lib/api-client/config';
 
 interface Preferences {
 	vimMode: boolean;
@@ -12,6 +13,9 @@ interface Preferences {
 	releaseToSend: boolean;
 	fullWidthContent: boolean;
 	notificationsEnabled: boolean;
+	dictationKeywords: DictationKeyword[];
+	dictationExcludedProjectKeywords: string[];
+	dictationSmartFormatting: boolean;
 }
 
 const DEFAULT_FONT_FAMILY = 'IBM Plex Mono';
@@ -24,6 +28,9 @@ const DEFAULT_PREFERENCES: Preferences = {
 	releaseToSend: false,
 	fullWidthContent: false,
 	notificationsEnabled: false,
+	dictationKeywords: [],
+	dictationExcludedProjectKeywords: [],
+	dictationSmartFormatting: true,
 };
 
 function cssFontFamily(fontFamily: string): string {
@@ -78,6 +85,15 @@ export function usePreferences() {
 			notificationsEnabled:
 				config?.defaults?.notificationsEnabled ??
 				getDefaultNotificationsEnabled(),
+			dictationKeywords:
+				config?.defaults?.dictationKeywords ??
+				DEFAULT_PREFERENCES.dictationKeywords,
+			dictationExcludedProjectKeywords:
+				config?.defaults?.dictationExcludedProjectKeywords ??
+				DEFAULT_PREFERENCES.dictationExcludedProjectKeywords,
+			dictationSmartFormatting:
+				config?.defaults?.dictationSmartFormatting ??
+				DEFAULT_PREFERENCES.dictationSmartFormatting,
 		}),
 		[
 			config?.defaults?.vimMode,
@@ -88,6 +104,9 @@ export function usePreferences() {
 			config?.defaults?.releaseToSend,
 			config?.defaults?.fullWidthContent,
 			config?.defaults?.notificationsEnabled,
+			config?.defaults?.dictationKeywords,
+			config?.defaults?.dictationExcludedProjectKeywords,
+			config?.defaults?.dictationSmartFormatting,
 		],
 	);
 
@@ -124,6 +143,16 @@ export function usePreferences() {
 			}
 			if (updates.notificationsEnabled !== undefined) {
 				nextUpdates.notificationsEnabled = updates.notificationsEnabled;
+			}
+			if (updates.dictationKeywords !== undefined) {
+				nextUpdates.dictationKeywords = updates.dictationKeywords;
+			}
+			if (updates.dictationExcludedProjectKeywords !== undefined) {
+				nextUpdates.dictationExcludedProjectKeywords =
+					updates.dictationExcludedProjectKeywords;
+			}
+			if (updates.dictationSmartFormatting !== undefined) {
+				nextUpdates.dictationSmartFormatting = updates.dictationSmartFormatting;
 			}
 
 			if (Object.keys(nextUpdates).length === 0) {

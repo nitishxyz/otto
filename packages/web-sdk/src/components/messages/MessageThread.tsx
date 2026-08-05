@@ -485,6 +485,7 @@ export const MessageThread = memo(function MessageThread({
 		ReturnType<typeof setTimeout> | undefined
 	>(undefined);
 	const animationFrameRef = useRef<number | undefined>(undefined);
+	const chromeFrameRef = useRef<number | undefined>(undefined);
 	const initialScrollDoneRef = useRef(false);
 	const lastSessionIdRef = useRef<string | undefined>(sessionId);
 	const prevMessagesLengthRef = useRef(messages.length);
@@ -539,6 +540,12 @@ export const MessageThread = memo(function MessageThread({
 		autoScrollRef.current = false;
 		userScrollingRef.current = true;
 		setAutoScroll(false);
+		// Kill any queued programmatic scroll frames immediately so a pending
+		// multi-frame scroll burst cannot fight the user's scroll.
+		if (animationFrameRef.current) {
+			cancelAnimationFrame(animationFrameRef.current);
+			animationFrameRef.current = undefined;
+		}
 		if (userScrollTimeoutRef.current) {
 			clearTimeout(userScrollTimeoutRef.current);
 		}
@@ -668,15 +675,25 @@ export const MessageThread = memo(function MessageThread({
 			setAutoScroll(true);
 		}
 
-		const headerElement = sessionHeaderRef.current;
-		let nextShowLeanHeader = showLeanHeader;
-		if (headerElement) {
-			const headerRect = headerElement.getBoundingClientRect();
-			const containerRect = container.getBoundingClientRect();
-			nextShowLeanHeader = headerRect.bottom < containerRect.top;
-			setShowLeanHeader(nextShowLeanHeader);
-		}
-		updateRailInsets(nextShowLeanHeader);
+		// The lean header + rail insets need getBoundingClientRect reads, which
+		// force synchronous layout. Running them on every scroll event while
+		// Virtuoso is also writing scroll offsets causes layout thrash and the
+		// "bouncy" feel mid-stream. Coalesce to at most one update per frame.
+		if (chromeFrameRef.current !== undefined) return;
+		chromeFrameRef.current = requestAnimationFrame(() => {
+			chromeFrameRef.current = undefined;
+			const scroller = scrollContainerRef.current;
+			if (!scroller) return;
+			const headerElement = sessionHeaderRef.current;
+			let nextShowLeanHeader = showLeanHeader;
+			if (headerElement) {
+				const headerRect = headerElement.getBoundingClientRect();
+				const containerRect = scroller.getBoundingClientRect();
+				nextShowLeanHeader = headerRect.bottom < containerRect.top;
+				setShowLeanHeader(nextShowLeanHeader);
+			}
+			updateRailInsets(nextShowLeanHeader);
+		});
 	}, [disableAutoFollow, showLeanHeader, updateRailInsets]);
 
 	useLayoutEffect(() => {
@@ -724,6 +741,12 @@ export const MessageThread = memo(function MessageThread({
 
 			let remainingFrames = Math.max(1, frames);
 			const tick = () => {
+				// The user may have scrolled away between frames; stop the burst
+				// instead of yanking them back to the bottom.
+				if (!autoScrollRef.current) {
+					animationFrameRef.current = undefined;
+					return;
+				}
 				scrollToThreadBottom(behavior);
 				remainingFrames -= 1;
 				if (remainingFrames > 0) {
@@ -782,9 +805,14 @@ export const MessageThread = memo(function MessageThread({
 			autoScrollRef.current = true;
 			setAutoScroll(true);
 			scheduleScrollToThreadBottom('auto', 4);
-		} else if (messagesAdded && !userScrollingRef.current && !isGenerating) {
-			autoScrollRef.current = true;
-			setAutoScroll(true);
+		} else if (
+			messagesAdded &&
+			!userScrollingRef.current &&
+			!isGenerating &&
+			autoScrollRef.current
+		) {
+			// Only follow new messages if the user is still in follow mode; never
+			// force-resume and yank a reader who scrolled up.
 			scheduleScrollToThreadBottom('auto', 2);
 		}
 	}, [
@@ -812,6 +840,10 @@ export const MessageThread = memo(function MessageThread({
 			}
 			if (animationFrameRef.current) {
 				cancelAnimationFrame(animationFrameRef.current);
+			}
+			if (chromeFrameRef.current !== undefined) {
+				cancelAnimationFrame(chromeFrameRef.current);
+				chromeFrameRef.current = undefined;
 			}
 			if (detachScrollIntentRef.current) {
 				detachScrollIntentRef.current();

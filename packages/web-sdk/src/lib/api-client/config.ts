@@ -85,6 +85,11 @@ export type AgentToolGroups = {
 
 export type AgentToolConfig = AgentToolGroups;
 
+export type DictationKeyword = {
+	keyword: string;
+	aliases?: string[];
+};
+
 export type UpdateAgentInput = UpsertAgentData['body'];
 
 export type ToolDetail = GetConfigToolsResponse['tools'][number];
@@ -111,6 +116,9 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			notificationsEnabled?: boolean;
+			dictationKeywords?: DictationKeyword[];
+			dictationExcludedProjectKeywords?: string[];
+			dictationSmartFormatting?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
 		};
@@ -296,6 +304,9 @@ export const configMixin = {
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		notificationsEnabled?: boolean;
+		dictationKeywords?: DictationKeyword[];
+		dictationExcludedProjectKeywords?: string[];
+		dictationSmartFormatting?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
 		scope?: 'global' | 'local';
@@ -319,6 +330,9 @@ export const configMixin = {
 			releaseToSend?: boolean;
 			fullWidthContent?: boolean;
 			notificationsEnabled?: boolean;
+			dictationKeywords?: DictationKeyword[];
+			dictationExcludedProjectKeywords?: string[];
+			dictationSmartFormatting?: boolean;
 			autoCompactThresholdTokens?: number | null;
 			coAuthorCommits?: boolean;
 		};

@@ -26,6 +26,7 @@ export type {
 	SubagentStatus,
 } from './goals';
 export type { ShellJob, ShellJobStatus } from './shell-jobs';
+export type { DictationKeyword } from './config';
 export type {
 	CreateDictationSessionInput,
 	CreateDictationSessionResponse,

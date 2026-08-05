@@ -14,6 +14,7 @@
 - [Agents & Tools](agents-tools.md)
 - [MCP Servers](mcp.md)
 - [Customization](customization.md)
+- [Local Dictation](dictation.md)
 - [API Reference](api.md)
 - [Troubleshooting](troubleshooting.md)
 

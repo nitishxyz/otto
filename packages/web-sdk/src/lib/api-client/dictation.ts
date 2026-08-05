@@ -42,6 +42,7 @@ export interface DictationStatusResponse {
 		sampleRate?: number;
 		channels?: number;
 	};
+	projectKeywords: string[];
 	models: DictationModelState[];
 }
 

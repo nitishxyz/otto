@@ -1,18 +1,14 @@
 import { access, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import type { DictationKeyword } from '@ottocode/sdk';
 import { getDictationDir } from './paths.ts';
 
 /**
- * Generic base prompt passed to whisper.cpp. Whisper biases decoding
- * toward the vocabulary and style of this text, which fixes common
- * misrecognitions of technical terms. Project-specific vocabulary is
- * appended at resolve time from the active project.
+ * Generic context passed to whisper.cpp. Project and user vocabulary is
+ * appended at resolve time rather than being hardcoded here.
  */
 export const BASE_DICTATION_PROMPT =
-	'A software developer dictating notes about a codebase. ' +
-	'Vocabulary: monorepo, repo, CLI, SDK, API, UI, UX, JSON, YAML, ' +
-	'frontend, backend, endpoint, schema, refactor, lint, changelog, ' +
-	'commit, PR, diff, middleware, async, config, env var.';
+	'A software developer dictating notes about a codebase.';
 
 /**
  * Manifest files that indicate which language ecosystems a project uses.
@@ -42,16 +38,14 @@ const LANGUAGE_MARKERS: Array<{ file: string; terms: string[] }> = [
 ];
 
 /**
- * Global user-editable vocabulary file. Its contents replace the built-in
- * base prompt when present.
+ * Global user-editable prompt file. Its contents replace the generic prompt.
  */
 export function getDictationPromptPath(): string {
 	return join(getDictationDir(), 'prompt.txt');
 }
 
 /**
- * Project-level vocabulary file. Its contents replace the built-in base
- * prompt for dictation sessions created in that project.
+ * Project-level prompt file for dictation sessions created in that project.
  */
 export function getProjectDictationPromptPath(projectRoot: string): string {
 	return join(projectRoot, '.otto', 'dictation-prompt.txt');
@@ -60,6 +54,8 @@ export function getProjectDictationPromptPath(projectRoot: string): string {
 export type ResolveDictationPromptInput = {
 	prompt?: string;
 	projectRoot?: string;
+	keywords?: DictationKeyword[];
+	excludedProjectKeywords?: string[];
 };
 
 /**
@@ -71,34 +67,155 @@ export type ResolveDictationPromptInput = {
 export async function resolveDictationPrompt(
 	input: ResolveDictationPromptInput = {},
 ): Promise<string> {
+	const keywords = mergeDictationKeywords(input.keywords);
+	let prompt: string;
 	const fromSession = input.prompt?.trim();
-	if (fromSession) return fromSession;
-
 	const fromEnv = process.env.OTTO_DICTATION_PROMPT?.trim();
-	if (fromEnv) return fromEnv;
-
-	if (input.projectRoot) {
+	if (fromSession) {
+		prompt = fromSession;
+	} else if (fromEnv) {
+		prompt = fromEnv;
+	} else if (input.projectRoot) {
 		const fromProjectFile = await readPromptFile(
 			getProjectDictationPromptPath(input.projectRoot),
 		);
-		if (fromProjectFile) return fromProjectFile;
+		prompt = fromProjectFile ?? (await resolveGlobalPrompt());
+	} else {
+		prompt = await resolveGlobalPrompt();
 	}
-
-	const fromGlobalFile = await readPromptFile(getDictationPromptPath());
-	if (fromGlobalFile) return fromGlobalFile;
 
 	const projectTerms = input.projectRoot
 		? await deriveProjectVocabulary(input.projectRoot)
 		: [];
-	if (projectTerms.length === 0) return BASE_DICTATION_PROMPT;
-	return `${BASE_DICTATION_PROMPT} Project terms: ${projectTerms.join(', ')}.`;
+	const excludedProjectKeywords = new Set(
+		(input.excludedProjectKeywords ?? []).map((term) =>
+			term.trim().toLocaleLowerCase(),
+		),
+	);
+	return appendVocabulary(prompt, [
+		...projectTerms.filter(
+			(term) => !excludedProjectKeywords.has(term.toLocaleLowerCase()),
+		),
+		...keywords.map(({ keyword }) => keyword),
+	]);
+}
+
+export function mergeDictationKeywords(
+	customKeywords: readonly DictationKeyword[] = [],
+): DictationKeyword[] {
+	return normalizeDictationKeywords(customKeywords);
+}
+
+export function normalizeDictationKeywords(
+	keywords: readonly DictationKeyword[],
+): DictationKeyword[] {
+	const normalized = new Map<string, DictationKeyword>();
+	for (const entry of keywords) {
+		const keyword = entry.keyword.trim().replace(/\s+/g, ' ');
+		if (!keyword || keyword.length > 80) continue;
+		const normalizedKeyword = keyword.toLocaleLowerCase();
+		const existing = normalized.get(normalizedKeyword);
+		const aliases = Array.from(
+			new Set(
+				[...(existing?.aliases ?? []), ...(entry.aliases ?? [])]
+					.map((alias) => alias.trim().replace(/\s+/g, ' '))
+					.filter(
+						(alias) =>
+							alias &&
+							alias.length <= 80 &&
+							alias.toLocaleLowerCase() !== keyword.toLocaleLowerCase(),
+					),
+			),
+		).slice(0, 12);
+		normalized.set(normalizedKeyword, {
+			keyword: existing?.keyword ?? keyword,
+			aliases,
+		});
+	}
+	return Array.from(normalized.values()).slice(0, 100);
+}
+
+export function applyDictationKeywordAliases(
+	text: string,
+	keywords: readonly DictationKeyword[],
+): string {
+	const replacements = new Map<string, string>();
+	const aliasPatterns = new Map<string, string>();
+	for (const { keyword, aliases = [] } of keywords) {
+		for (const alias of aliases) {
+			const normalizedAlias = normalizeAlias(alias);
+			if (!normalizedAlias || normalizedAlias === normalizeAlias(keyword)) {
+				continue;
+			}
+			const owner = replacements.get(normalizedAlias);
+			if (!owner) {
+				replacements.set(normalizedAlias, keyword);
+			}
+			if (owner && owner !== keyword) continue;
+			const aliasPattern = escapeRegExp(alias.trim()).replace(
+				/[ -]+/g,
+				'[\\s-]*',
+			);
+			const existingPattern = aliasPatterns.get(normalizedAlias);
+			aliasPatterns.set(
+				normalizedAlias,
+				existingPattern
+					? `(?:${existingPattern}|${aliasPattern})`
+					: aliasPattern,
+			);
+		}
+	}
+	if (replacements.size === 0) return text;
+
+	const alternatives = Array.from(aliasPatterns.values())
+		.sort((a, b) => b.length - a.length)
+		.filter(Boolean);
+	const pattern = new RegExp(
+		`(?<![\\p{L}\\p{N}_])(?:${alternatives.join('|')})(?![\\p{L}\\p{N}_])`,
+		'giu',
+	);
+	return text.replace(
+		pattern,
+		(match) => replacements.get(normalizeAlias(match)) ?? match,
+	);
+}
+
+async function resolveGlobalPrompt(): Promise<string> {
+	const fromGlobalFile = await readPromptFile(getDictationPromptPath());
+	return fromGlobalFile ?? BASE_DICTATION_PROMPT;
+}
+
+function appendVocabulary(
+	prompt: string,
+	vocabulary: readonly string[],
+): string {
+	const promptLower = prompt.toLocaleLowerCase();
+	const additions = Array.from(
+		new Set(vocabulary.map((term) => term.trim())),
+	).filter((term) => term && !promptLower.includes(term.toLocaleLowerCase()));
+	return additions.length === 0
+		? prompt
+		: `${prompt} Vocabulary: ${additions.join(', ')}.`;
+}
+
+function normalizeAlias(value: string): string {
+	return value
+		.trim()
+		.replace(/[\s-]+/g, '')
+		.toLocaleLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
  * Derive vocabulary terms from the project itself so proper nouns like the
  * project or package name are transcribed correctly.
  */
-async function deriveProjectVocabulary(projectRoot: string): Promise<string[]> {
+export async function deriveProjectVocabulary(
+	projectRoot: string,
+): Promise<string[]> {
 	const terms = new Set<string>();
 
 	const dirName = normalizeTerm(basename(projectRoot));
@@ -106,8 +223,10 @@ async function deriveProjectVocabulary(projectRoot: string): Promise<string[]> {
 
 	const pkg = await readJsonFile(join(projectRoot, 'package.json'));
 	if (typeof pkg?.name === 'string') {
-		const pkgName = normalizeTerm(pkg.name.split('/').pop() ?? '');
-		if (pkgName) terms.add(pkgName);
+		for (const part of pkg.name.replace(/^@/, '').split('/')) {
+			const pkgName = normalizeTerm(part);
+			if (pkgName) terms.add(pkgName);
+		}
 	}
 
 	for (const languageTerm of await detectLanguageTerms(projectRoot)) {

@@ -54,6 +54,7 @@ const VIEWER_MAX_WIDTH = 4096;
 const RIGHT_PANEL_DEFAULT_WIDTH = 320;
 const RIGHT_RAIL_HOVER_RATIO = 0.05;
 const VIEWER_SIDE_BY_SIDE_QUERY = '(min-width: 1024px)';
+const COMPACT_LAYOUT_QUERY = '(max-width: 767px)';
 const SMART_EDGE_IGNORE_SELECTOR = '[data-smart-edge-ignore]';
 
 function useMediaQuery(query: string): boolean {
@@ -70,6 +71,16 @@ function useMediaQuery(query: string): boolean {
 		return () => mql.removeEventListener('change', handler);
 	}, [query]);
 	return matches;
+}
+
+function collapseRightPanels() {
+	useGitStore.getState().collapseSidebar();
+	useSessionFilesStore.getState().collapseSidebar();
+	useSettingsStore.getState().collapseSidebar();
+	useTunnelStore.getState().collapseSidebar();
+	useFileBrowserStore.getState().collapseSidebar();
+	useMCPStore.getState().collapseSidebar();
+	useSkillsStore.getState().collapseSidebar();
 }
 
 interface DesktopAppLayoutProps {
@@ -106,6 +117,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const sessionsCollapsed = useSidebarStore((s) => s.isCollapsed);
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
+	const viewerCollapsed = useViewerTabsStore((s) => s.isCollapsed);
 	const panelWidths = usePanelWidthStore((s) => s.widths);
 	const { preferences } = usePreferences();
 	const anyRightPanelOpen =
@@ -116,8 +128,9 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		fileBrowserExpanded ||
 		mcpExpanded ||
 		skillsExpanded;
-	const anyViewerOpen = viewerTabCount > 0;
+	const anyViewerOpen = viewerTabCount > 0 && !viewerCollapsed;
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
+	const compactLayout = useMediaQuery(COMPACT_LAYOUT_QUERY);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
 	const activeRightPanelWidth = gitExpanded
 		? (panelWidths.git ?? RIGHT_PANEL_DEFAULT_WIDTH)
@@ -165,7 +178,11 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 			: '0px',
 	} as CSSProperties;
 	const rightPanelStyle = {
-		width: `${rightPanelWidth}px`,
+		width: compactLayout
+			? anyRightPanelOpen
+				? 'min(calc(100vw - 3rem), 380px)'
+				: '0px'
+			: `${rightPanelWidth}px`,
 	} as CSSProperties;
 	const shouldRenderRightPanel = anyRightPanelOpen || isRightPanelMounted;
 	const shouldShowRightRail =
@@ -280,12 +297,22 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							</section>
 						</div>
 
+						{compactLayout && anyRightPanelOpen && (
+							<button
+								type="button"
+								onClick={collapseRightPanels}
+								className="absolute inset-y-0 left-0 right-12 z-50 bg-black/50 backdrop-blur-sm"
+								aria-label="Close panel"
+							/>
+						)}
 						<div className="flex">
 							<div
 								className={`h-full shrink-0 overflow-hidden bg-sidebar ${
-									isRightPanelTransitioning
-										? 'transition-[width] duration-300 ease-out'
-										: 'transition-none'
+									compactLayout
+										? 'absolute inset-y-0 right-12 z-[60] border-l border-sidebar-border shadow-2xl transition-[width] duration-300 ease-out'
+										: isRightPanelTransitioning
+											? 'transition-[width] duration-300 ease-out'
+											: 'transition-none'
 								}`}
 								style={rightPanelStyle}
 								aria-hidden={!shouldRenderRightPanel}
@@ -304,7 +331,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 						</div>
 
 						<div
-							className={`relative z-40 hidden h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out md:block ${
+							className={`relative z-[70] block h-full shrink-0 overflow-hidden transition-[width] duration-150 ease-out ${
 								shouldShowRightRail
 									? 'w-12 pointer-events-auto'
 									: 'w-0 pointer-events-none'

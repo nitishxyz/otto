@@ -30,4 +30,5 @@ export type {
 	OttoConfig,
 	ToolApprovalMode,
 	ReasoningLevel,
+	DictationKeyword,
 } from './config';

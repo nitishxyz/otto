@@ -54,6 +54,8 @@ describe('config loader', () => {
 			expect(cfg.defaults.provider).toBeDefined();
 			expect(cfg.defaults.model).toBeDefined();
 			expect(cfg.defaults.fullWidthContent).toBe(false);
+			expect(cfg.defaults.dictationExcludedProjectKeywords).toEqual([]);
+			expect(cfg.defaults.dictationSmartFormatting).toBe(true);
 			expect(cfg.paths.projectConfigDir).toBe(join(projectRoot, '.otto'));
 			expect(cfg.paths.projectConfigPath).toBeNull();
 			expect(cfg.paths.projectStateDir).toBe(projectStateDir);
@@ -450,15 +452,29 @@ describe('config loader', () => {
 			const updateResponse = await app.request(defaultsUrl, {
 				method: 'PATCH',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ theme: 'otto-light', scope: 'global' }),
+				body: JSON.stringify({
+					theme: 'otto-light',
+					dictationKeywords: [
+						{ keyword: ' AcmeDB ', aliases: [' acme database '] },
+					],
+					dictationExcludedProjectKeywords: [' Rust ', 'Rust'],
+					dictationSmartFormatting: true,
+					scope: 'global',
+				}),
 			});
 			expect(updateResponse.status).toBe(200);
 
 			const refreshedResponse = await app.request(configUrl);
 			expect(refreshedResponse.status).toBe(200);
-			expect((await refreshedResponse.json()).defaults.theme).toBe(
-				'otto-light',
-			);
+			const refreshedDefaults = (await refreshedResponse.json()).defaults;
+			expect(refreshedDefaults.theme).toBe('otto-light');
+			expect(refreshedDefaults.dictationKeywords).toEqual([
+				{ keyword: 'AcmeDB', aliases: ['acme database'] },
+			]);
+			expect(refreshedDefaults.dictationExcludedProjectKeywords).toEqual([
+				'Rust',
+			]);
+			expect(refreshedDefaults.dictationSmartFormatting).toBe(true);
 		} finally {
 			if (previousXdgConfigHome === undefined) {
 				delete process.env.XDG_CONFIG_HOME;

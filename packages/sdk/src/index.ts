@@ -39,6 +39,7 @@ export type {
 	ReferenceSource,
 	OttoConfig,
 	ReasoningLevel,
+	DictationKeyword,
 } from './types/src/index.ts';
 export { isSupportedGitReferenceUrl } from './references.ts';
 

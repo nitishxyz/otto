@@ -29,6 +29,28 @@ function hydratedAgentActivityTab(path: string) {
 	return tab?.type === 'agent-activity' ? tab : undefined;
 }
 
+describe('viewer visibility', () => {
+	afterEach(() => {
+		useViewerTabsStore.getState().closeAllTabs();
+	});
+
+	test('collapses without closing tabs and expands when a tab is activated', () => {
+		const store = useViewerTabsStore.getState();
+		store.openBrowserTab('https://example.com');
+		store.openTerminalTab('terminal-1', 'Terminal');
+
+		store.collapseViewer();
+
+		expect(useViewerTabsStore.getState().isCollapsed).toBe(true);
+		expect(useViewerTabsStore.getState().tabOrder).toHaveLength(2);
+
+		store.setActiveTab('browser:browser');
+
+		expect(useViewerTabsStore.getState().isCollapsed).toBe(false);
+		expect(useViewerTabsStore.getState().tabOrder).toHaveLength(2);
+	});
+});
+
 describe('viewer tab tool activity annotations', () => {
 	afterEach(() => {
 		useViewerTabsStore.getState().closeAllTabs();

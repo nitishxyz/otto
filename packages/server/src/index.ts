@@ -223,6 +223,9 @@ export type EmbeddedAppConfig = {
 		releaseToSend?: boolean;
 		fullWidthContent?: boolean;
 		notificationsEnabled?: boolean;
+		dictationKeywords?: Array<{ keyword: string; aliases?: string[] }>;
+		dictationExcludedProjectKeywords?: string[];
+		dictationSmartFormatting?: boolean;
 		autoCompactThresholdTokens?: number | null;
 		coAuthorCommits?: boolean;
 	};

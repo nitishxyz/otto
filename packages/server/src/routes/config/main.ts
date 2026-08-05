@@ -62,6 +62,16 @@ const configDefaultsSchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
+	dictationKeywords: z
+		.array(
+			z.object({
+				keyword: z.string(),
+				aliases: z.array(z.string()).optional(),
+			}),
+		)
+		.optional(),
+	dictationExcludedProjectKeywords: z.array(z.string()).optional(),
+	dictationSmartFormatting: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 });
@@ -208,6 +218,24 @@ export function registerMainConfigRoute(app: Hono) {
 						embeddedConfig?.defaults?.notificationsEnabled,
 						cfg.defaults.notificationsEnabled,
 					),
+					dictationKeywords:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.dictationKeywords,
+							cfg.defaults.dictationKeywords,
+						) ?? [],
+					dictationExcludedProjectKeywords:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.dictationExcludedProjectKeywords,
+							cfg.defaults.dictationExcludedProjectKeywords,
+						) ?? [],
+					dictationSmartFormatting:
+						getDefault(
+							undefined,
+							embeddedConfig?.defaults?.dictationSmartFormatting,
+							cfg.defaults.dictationSmartFormatting,
+						) ?? true,
 					autoCompactThresholdTokens:
 						getDefault(
 							undefined,

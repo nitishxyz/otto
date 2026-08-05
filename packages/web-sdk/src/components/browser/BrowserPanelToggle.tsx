@@ -13,8 +13,9 @@ export const BrowserPanelToggle = memo(function BrowserPanelToggle() {
 	const activeTabId = useViewerTabsStore((state) => state.activeTabId);
 	const openBrowserTab = useViewerTabsStore((state) => state.openBrowserTab);
 	const setActiveTab = useViewerTabsStore((state) => state.setActiveTab);
-	const closeTab = useViewerTabsStore((state) => state.closeTab);
-	const isActive = browserTab?.id === activeTabId;
+	const isCollapsed = useViewerTabsStore((state) => state.isCollapsed);
+	const collapseViewer = useViewerTabsStore((state) => state.collapseViewer);
+	const isActive = browserTab?.id === activeTabId && !isCollapsed;
 
 	return (
 		<Tooltip content="Browser preview" side="left">
@@ -22,7 +23,7 @@ export const BrowserPanelToggle = memo(function BrowserPanelToggle() {
 				type="button"
 				onClick={() => {
 					if (isActive && browserTab) {
-						closeTab(browserTab.id);
+						collapseViewer();
 						return;
 					}
 					if (browserTab) {

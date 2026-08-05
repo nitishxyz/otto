@@ -203,12 +203,14 @@ export interface ViewerTabsState {
 	activeWorkTabId: string | null;
 	activePreviewTabId: string | null;
 	activeTerminalTabId: string | null;
+	isCollapsed: boolean;
 	followToolActivity: boolean;
 	followReadActivity: boolean;
 	toggleFollowToolActivity: () => void;
 	toggleFollowReadActivity: () => void;
 	setFollowToolActivity: (enabled: boolean) => void;
 	setFollowReadActivity: (enabled: boolean) => void;
+	collapseViewer: () => void;
 	setViewerMode: (mode: ViewerMode) => void;
 	openGitDiffTab: (path: string, staged: boolean) => void;
 	openSessionFileDiffTab: (
@@ -805,6 +807,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 	activeWorkTabId: null,
 	activePreviewTabId: null,
 	activeTerminalTabId: null,
+	isCollapsed: false,
 	followToolActivity: false,
 	followReadActivity: false,
 
@@ -815,11 +818,13 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 
 	setFollowToolActivity: (enabled) => set({ followToolActivity: enabled }),
 	setFollowReadActivity: (enabled) => set({ followReadActivity: enabled }),
+	collapseViewer: () => set({ isCollapsed: true }),
 
 	setViewerMode: (mode) =>
 		set((state) => ({
 			activeMode: mode,
 			activeTabId: activeIdForMode(state, mode) ?? null,
+			isCollapsed: false,
 		})),
 
 	openGitDiffTab: (path, staged) => {
@@ -837,6 +842,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
+			isCollapsed: false,
 		}));
 	},
 
@@ -856,6 +862,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
+			isCollapsed: false,
 		}));
 	},
 
@@ -899,6 +906,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeMode: 'work',
 				activeWorkTabId: targetId,
 				activeTabId: targetId,
+				isCollapsed: false,
 			};
 		});
 	},
@@ -1344,6 +1352,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			activeMode: 'work',
 			activeWorkTabId: id,
 			activeTabId: id,
+			isCollapsed: false,
 		}));
 	},
 
@@ -1371,6 +1380,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeMode: 'preview',
 				activePreviewTabId: id,
 				activeTabId: id,
+				isCollapsed: false,
 			};
 		});
 	},
@@ -1393,6 +1403,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeMode: 'terminal',
 				activeTerminalTabId: id,
 				activeTabId: id,
+				isCollapsed: false,
 			};
 		});
 	},
@@ -1504,6 +1515,7 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeTerminalTabId:
 					mode === 'terminal' ? id : state.activeTerminalTabId,
 				activeTabId: id,
+				isCollapsed: false,
 			};
 		}),
 
@@ -1591,5 +1603,6 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 			activeWorkTabId: null,
 			activePreviewTabId: null,
 			activeTerminalTabId: null,
+			isCollapsed: false,
 		}),
 }));

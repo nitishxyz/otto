@@ -1,9 +1,11 @@
 import { memo } from 'react';
 import { Download, Mic, RefreshCw, Trash2 } from 'lucide-react';
 import { useDictationModels } from '../../hooks/useDictationModels';
+import { usePreferences } from '../../hooks/usePreferences';
 import type { DictationModelState } from '../../lib/api-client';
 import { Button } from '../ui/Button';
 import { StableSpinner } from '../ui/StableSpinner';
+import { DictationVocabularySettings } from './DictationVocabularySettings';
 
 function formatBytes(bytes: number): string {
 	if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
@@ -141,68 +143,82 @@ export const DictationSettings = memo(function DictationSettings({
 		removeMutation,
 		installStreamError,
 	} = useDictationModels();
+	const { preferences, updatePreferences } = usePreferences();
 
 	const isBusy = installMutation.isPending || removeMutation.isPending;
 
 	if (embedded) {
 		return (
-			<section className="pt-4">
-				<div className="flex items-center justify-between gap-2 pb-1">
-					<h3
-						className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60"
-						title="Download a local model for on-device voice input."
-					>
-						Local Speech Models
-					</h3>
-					<button
-						type="button"
-						onClick={() => statusQuery.refetch()}
-						disabled={statusQuery.isFetching}
-						className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-						title="Refresh dictation status"
-					>
-						<RefreshCw
-							className={`h-3 w-3 ${statusQuery.isFetching ? 'animate-spin' : ''}`}
-						/>
-					</button>
-				</div>
-				{statusQuery.isLoading ? (
-					<div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-						<StableSpinner className="h-4 w-4" />
-						Loading dictation models…
+			<>
+				<DictationVocabularySettings
+					projectKeywords={statusQuery.data?.projectKeywords ?? []}
+					excludedProjectKeywords={preferences.dictationExcludedProjectKeywords}
+					customKeywords={preferences.dictationKeywords}
+					onExcludedProjectKeywordsChange={(dictationExcludedProjectKeywords) =>
+						updatePreferences({ dictationExcludedProjectKeywords })
+					}
+					onChange={(dictationKeywords) =>
+						updatePreferences({ dictationKeywords })
+					}
+				/>
+				<section className="pt-4">
+					<div className="flex items-center justify-between gap-2 pb-1">
+						<h3
+							className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60"
+							title="Download a local model for on-device voice input."
+						>
+							Local Speech Models
+						</h3>
+						<button
+							type="button"
+							onClick={() => statusQuery.refetch()}
+							disabled={statusQuery.isFetching}
+							className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+							title="Refresh dictation status"
+						>
+							<RefreshCw
+								className={`h-3 w-3 ${statusQuery.isFetching ? 'animate-spin' : ''}`}
+							/>
+						</button>
 					</div>
-				) : statusQuery.error ? (
-					<div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-						{statusQuery.error instanceof Error
-							? statusQuery.error.message
-							: 'Failed to load dictation settings'}
-					</div>
-				) : !isAvailable ? (
-					<p className="py-2 text-xs leading-relaxed text-muted-foreground">
-						Local dictation is not available on this platform yet.
-					</p>
-				) : (
-					<div>
-						{installStreamError ? (
-							<div className="mb-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-								{installStreamError}
-							</div>
-						) : null}
-						<div className="divide-y divide-border/60">
-							{models.map((model) => (
-								<DictationModelRow
-									key={model.id}
-									model={model}
-									isBusy={isBusy}
-									isDefault={model.id === defaultModel}
-									onInstall={(modelId) => void installModel(modelId)}
-									onRemove={(modelId) => void removeModel(modelId)}
-								/>
-							))}
+					{statusQuery.isLoading ? (
+						<div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+							<StableSpinner className="h-4 w-4" />
+							Loading dictation models…
 						</div>
-					</div>
-				)}
-			</section>
+					) : statusQuery.error ? (
+						<div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+							{statusQuery.error instanceof Error
+								? statusQuery.error.message
+								: 'Failed to load dictation settings'}
+						</div>
+					) : !isAvailable ? (
+						<p className="py-2 text-xs leading-relaxed text-muted-foreground">
+							Local dictation is not available on this platform yet.
+						</p>
+					) : (
+						<div>
+							{installStreamError ? (
+								<div className="mb-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+									{installStreamError}
+								</div>
+							) : null}
+							<div className="divide-y divide-border/60">
+								{models.map((model) => (
+									<DictationModelRow
+										key={model.id}
+										model={model}
+										isBusy={isBusy}
+										isDefault={model.id === defaultModel}
+										onInstall={(modelId) => void installModel(modelId)}
+										onRemove={(modelId) => void removeModel(modelId)}
+									/>
+								))}
+							</div>
+						</div>
+					)}
+				</section>
+			</>
 		);
 	}
 
@@ -228,6 +244,17 @@ export const DictationSettings = memo(function DictationSettings({
 				<p className="text-xs text-muted-foreground">
 					Download a local speech model for voice input.
 				</p>
+				<DictationVocabularySettings
+					projectKeywords={statusQuery.data?.projectKeywords ?? []}
+					excludedProjectKeywords={preferences.dictationExcludedProjectKeywords}
+					customKeywords={preferences.dictationKeywords}
+					onExcludedProjectKeywordsChange={(dictationExcludedProjectKeywords) =>
+						updatePreferences({ dictationExcludedProjectKeywords })
+					}
+					onChange={(dictationKeywords) =>
+						updatePreferences({ dictationKeywords })
+					}
+				/>
 
 				{statusQuery.isLoading ? (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">

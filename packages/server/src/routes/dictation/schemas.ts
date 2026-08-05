@@ -86,6 +86,7 @@ export const dictationStatusResponseSchema = z.object({
 	engineInstalled: z.boolean(),
 	defaultModel: z.string(),
 	format: audioFormatSchema.optional(),
+	projectKeywords: z.array(z.string()),
 	models: z.array(dictationModelSchema),
 });
 

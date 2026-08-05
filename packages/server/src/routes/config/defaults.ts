@@ -11,6 +11,7 @@ import {
 import type { Hono } from 'hono';
 import { normalizeThemeId, themeIds, type ThemeId } from '@ottocode/themes';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
+import { normalizeDictationKeywords } from '../../dictation/prompt.ts';
 import { serializeError } from '../../runtime/errors/api-error.ts';
 import { getProjectManager } from '../../runtime/projects/manager.ts';
 import {
@@ -40,6 +41,10 @@ const reasoningLevelSchema = z.enum([
 ]);
 const themeSchema = z.enum(themeIds);
 const tuiThemeSchema = z.string().min(1);
+const dictationKeywordSchema = z.object({
+	keyword: z.string().min(1).max(80),
+	aliases: z.array(z.string().min(1).max(80)).max(12).optional(),
+});
 
 const defaultsUpdateBodySchema = z.object({
 	agent: z.string().optional(),
@@ -59,6 +64,12 @@ const defaultsUpdateBodySchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
+	dictationKeywords: z.array(dictationKeywordSchema).max(100).optional(),
+	dictationExcludedProjectKeywords: z
+		.array(z.string().min(1).max(80))
+		.max(100)
+		.optional(),
+	dictationSmartFormatting: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 	scope: z.enum(['global', 'local']).optional().default('global'),
@@ -82,6 +93,9 @@ const defaultsSchema = z.object({
 	releaseToSend: z.boolean().optional(),
 	fullWidthContent: z.boolean().optional(),
 	notificationsEnabled: z.boolean().optional(),
+	dictationKeywords: z.array(dictationKeywordSchema).optional(),
+	dictationExcludedProjectKeywords: z.array(z.string()).optional(),
+	dictationSmartFormatting: z.boolean().optional(),
 	autoCompactThresholdTokens: z.number().int().nullable().optional(),
 	coAuthorCommits: z.boolean().optional(),
 });
@@ -139,6 +153,12 @@ export function registerDefaultsRoute(app: Hono) {
 					releaseToSend?: boolean;
 					fullWidthContent?: boolean;
 					notificationsEnabled?: boolean;
+					dictationKeywords?: Array<{
+						keyword: string;
+						aliases?: string[];
+					}>;
+					dictationExcludedProjectKeywords?: string[];
+					dictationSmartFormatting?: boolean;
 					autoCompactThresholdTokens?: number | null;
 					coAuthorCommits?: boolean;
 					scope?: 'global' | 'local';
@@ -177,6 +197,12 @@ export function registerDefaultsRoute(app: Hono) {
 					releaseToSend: boolean;
 					fullWidthContent: boolean;
 					notificationsEnabled: boolean;
+					dictationKeywords: Array<{
+						keyword: string;
+						aliases?: string[];
+					}>;
+					dictationExcludedProjectKeywords: string[];
+					dictationSmartFormatting: boolean;
 					autoCompactThresholdTokens: number | null;
 					coAuthorCommits: boolean;
 				}> = {};
@@ -217,6 +243,23 @@ export function registerDefaultsRoute(app: Hono) {
 					updates.fullWidthContent = body.fullWidthContent;
 				if (body.notificationsEnabled !== undefined)
 					updates.notificationsEnabled = body.notificationsEnabled;
+				if (body.dictationKeywords !== undefined) {
+					updates.dictationKeywords = normalizeDictationKeywords(
+						body.dictationKeywords,
+					);
+				}
+				if (body.dictationExcludedProjectKeywords !== undefined) {
+					updates.dictationExcludedProjectKeywords = Array.from(
+						new Set(
+							body.dictationExcludedProjectKeywords
+								.map((term) => term.trim().replace(/\s+/g, ' '))
+								.filter(Boolean),
+						),
+					);
+				}
+				if (body.dictationSmartFormatting !== undefined) {
+					updates.dictationSmartFormatting = body.dictationSmartFormatting;
+				}
 				if (body.autoCompactThresholdTokens !== undefined) {
 					const threshold = body.autoCompactThresholdTokens;
 					if (threshold === null) {

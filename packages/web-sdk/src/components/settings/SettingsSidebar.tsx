@@ -996,6 +996,14 @@ function PreferencesModal({
 									updatePreferences({ releaseToSend: checked })
 								}
 							/>
+							<ToggleRow
+								label="Smart Formatting"
+								description="Turn spoken layout commands and clear sequences into Markdown paragraphs and lists."
+								checked={preferences.dictationSmartFormatting}
+								onChange={(checked) =>
+									updatePreferences({ dictationSmartFormatting: checked })
+								}
+							/>
 						</PrefSection>
 						<DictationSettings embedded />
 					</div>

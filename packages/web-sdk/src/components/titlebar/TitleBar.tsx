@@ -89,7 +89,7 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 export interface TitleBarProps {
-	/** Centered title text (absolutely positioned, never shifts layout). */
+	/** Centered title text, truncated to the space between leading and trailing controls. */
 	title?: ReactNode;
 	/** Renders a back arrow button at the very start. */
 	onBack?: () => void;
@@ -132,7 +132,9 @@ export const TitleBar = memo(function TitleBar({
 			{...(dragRegion ? { 'data-tauri-drag-region': true } : {})}
 			role="toolbar"
 		>
-			<div className={`flex items-center gap-2 ${leadingInset ? 'ml-20' : ''}`}>
+			<div
+				className={`flex shrink-0 items-center gap-2 ${leadingInset ? 'ml-20' : ''}`}
+			>
 				{onBack && (
 					<TitleBarButton onClick={onBack} title="Back">
 						<span className="text-base">←</span>
@@ -141,15 +143,16 @@ export const TitleBar = memo(function TitleBar({
 				{showSidebarToggle && <TitleBarSidebarToggle />}
 				{leading}
 			</div>
-			{title != null && (
-				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-					<span className="font-medium text-foreground truncate text-base max-w-[40%]">
+			<div className="flex min-w-0 flex-1 items-center justify-center px-2 pointer-events-none">
+				{title != null && (
+					<span className="max-w-full truncate text-base font-medium text-foreground">
 						{title}
 					</span>
-				</div>
+				)}
+			</div>
+			{trailing != null && (
+				<div className="flex shrink-0 items-center">{trailing}</div>
 			)}
-			<div className="flex-1" />
-			{trailing}
 		</div>
 	);
 });

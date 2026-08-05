@@ -152,7 +152,8 @@ export const AppLayout = memo(function AppLayout({
 	);
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
-	const anyViewerOpen = viewerTabCount > 0;
+	const viewerCollapsed = useViewerTabsStore((s) => s.isCollapsed);
+	const anyViewerOpen = viewerTabCount > 0 && !viewerCollapsed;
 	const isMobile = useMediaQuery(MOBILE_QUERY);
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
@@ -355,17 +356,17 @@ const MobileTopBar = memo(function MobileTopBar({
 	anyViewerOpen,
 	onOpenPanelMenu,
 }: MobileTopBarProps) {
-	const closeAllViewerTabs = useViewerTabsStore((s) => s.closeAllTabs);
+	const collapseViewer = useViewerTabsStore((s) => s.collapseViewer);
 	const terminalTabActive = useViewerTabsStore((s) => {
 		const tab = s.activeTabId ? s.tabsById[s.activeTabId] : undefined;
-		return tab?.type === 'terminal';
+		return tab?.type === 'terminal' && !s.isCollapsed;
 	});
 	const toggleTerminalTabs = useToggleTerminalTabs();
 	const openSessionsSidebar = useSidebarStore((s) => s.setCollapsed);
 
 	return (
 		<div className="fixed left-0 right-0 top-0 z-40 flex h-[calc(var(--mobile-safe-area-top)+3rem)] items-end border-b border-border bg-background/85 px-2 pb-1 backdrop-blur-xl md:hidden">
-			<div className="flex h-11 w-full items-center gap-1">
+			<div className="relative flex h-11 w-full items-center gap-1">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -375,22 +376,23 @@ const MobileTopBar = memo(function MobileTopBar({
 				>
 					<Menu className="h-5 w-5" />
 				</Button>
-				<div className="flex min-w-0 flex-1 items-center justify-center px-1">
+				<div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center justify-center">
 					{anyViewerOpen ? (
 						<span className="truncate text-sm font-medium text-foreground/80">
 							Viewer
 						</span>
 					) : (
-						<div className="w-full min-w-[9.5rem] max-w-[13.5rem]">
+						<div className="pointer-events-auto w-[42vw] max-w-[13.5rem] min-w-32">
 							<RoutedLooperTabs variant="mobile" />
 						</div>
 					)}
 				</div>
+				<div className="flex-1" />
 				{anyViewerOpen && (
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={closeAllViewerTabs}
+						onClick={collapseViewer}
 						className="h-10 rounded-xl px-3 text-xs"
 					>
 						Chat

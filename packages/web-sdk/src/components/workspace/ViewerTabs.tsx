@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from 'react';
 import type { ComponentType } from 'react';
 import {
+	ChevronRight,
 	Code2,
 	GitCommit,
 	Globe2,
@@ -503,19 +504,19 @@ const ViewerModeControls = memo(function ViewerModeControls() {
 	);
 });
 
-const CloseAllTabsButton = memo(function CloseAllTabsButton() {
-	const closeAllTabs = useViewerTabsStore((state) => state.closeAllTabs);
+const CollapseViewerButton = memo(function CollapseViewerButton() {
+	const collapseViewer = useViewerTabsStore((state) => state.collapseViewer);
 
 	return (
-		<div className="h-12 w-12 shrink-0 border-r border-b border-sidebar-border bg-background flex items-stretch">
+		<div className="h-12 w-12 shrink-0 border-l border-b border-sidebar-border bg-background flex items-stretch">
 			<button
 				type="button"
-				onClick={closeAllTabs}
-				title="Close all tabs and collapse viewer"
-				aria-label="Close all tabs and collapse viewer"
-				className="h-full w-full inline-flex items-center justify-center rounded-none text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive active:translate-y-0 active:scale-100"
+				onClick={collapseViewer}
+				title="Collapse viewer"
+				aria-label="Collapse viewer"
+				className="h-full w-full inline-flex items-center justify-center rounded-none text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/40 hover:text-foreground active:translate-y-0 active:scale-100"
 			>
-				<X className="h-3.5 w-3.5" />
+				<ChevronRight className="h-4 w-4" />
 			</button>
 		</div>
 	);
@@ -721,8 +722,8 @@ const ViewerHeader = memo(function ViewerHeader() {
 	return (
 		<div className="h-12 shrink-0 bg-background flex overflow-hidden">
 			<ViewerModeControls />
-			<CloseAllTabsButton />
 			<ViewerTabStrip />
+			<CollapseViewerButton />
 		</div>
 	);
 });

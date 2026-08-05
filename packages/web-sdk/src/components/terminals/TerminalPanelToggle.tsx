@@ -10,7 +10,7 @@ export const TerminalPanelToggle = memo(function TerminalPanelToggle() {
 		const tab = state.activeTabId
 			? state.tabsById[state.activeTabId]
 			: undefined;
-		return tab?.type === 'terminal';
+		return tab?.type === 'terminal' && !state.isCollapsed;
 	});
 	const toggleTerminalTabs = useToggleTerminalTabs();
 	const { data } = useTerminals();

@@ -1,8 +1,17 @@
 import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
-import { getGlobalConfigDir } from '@ottocode/sdk';
+import {
+	getGlobalConfigDir,
+	loadConfig,
+	loadGlobalConfig,
+} from '@ottocode/sdk';
+import { formatDictationTranscript } from './format.ts';
 import { getDictationModelPath, getDictationTempDir } from './paths.ts';
-import { resolveDictationPrompt } from './prompt.ts';
+import {
+	applyDictationKeywordAliases,
+	mergeDictationKeywords,
+	resolveDictationPrompt,
+} from './prompt.ts';
 import type { DictationErrorCode, DictationSession } from './types.ts';
 
 export type DictationTranscriptionInput = {
@@ -57,9 +66,18 @@ export function createWhisperCppTranscriptionRunner(): DictationTranscriptionRun
 			const { binaryPath, modelPath } = await resolveWhisperRuntime(
 				input.session.model,
 			);
+			const config = input.session.projectRoot
+				? await loadConfig(input.session.projectRoot)
+				: await loadGlobalConfig();
+			const keywords = mergeDictationKeywords(
+				config.defaults.dictationKeywords,
+			);
 			const prompt = await resolveDictationPrompt({
 				prompt: input.session.prompt,
 				projectRoot: input.session.projectRoot,
+				keywords,
+				excludedProjectKeywords:
+					config.defaults.dictationExcludedProjectKeywords,
 			});
 
 			const { stdout } = await runWhisperCli([
@@ -75,7 +93,15 @@ export function createWhisperCppTranscriptionRunner(): DictationTranscriptionRun
 				...(prompt ? ['--prompt', prompt] : []),
 			]);
 
-			return { text: extractTranscript(stdout) };
+			const corrected = applyDictationKeywordAliases(
+				extractTranscript(stdout),
+				keywords,
+			);
+			return {
+				text: config.defaults.dictationSmartFormatting
+					? formatDictationTranscript(corrected)
+					: corrected,
+			};
 		},
 	};
 }

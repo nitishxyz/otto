@@ -151,6 +151,7 @@ describe('dictation routes', () => {
 		expect(response.status).toBe(200);
 		expect(body.engine).toBe('whisper.cpp');
 		expect(body.defaultModel).toBe('small.en-q5_1');
+		expect(Array.isArray(body.projectKeywords)).toBe(true);
 		expect(Array.isArray(body.models)).toBe(true);
 		expect(
 			body.models.some((model: { installed: boolean }) => model.installed),
