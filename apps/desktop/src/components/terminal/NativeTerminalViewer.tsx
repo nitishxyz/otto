@@ -47,6 +47,7 @@ const NATIVE_FONT_FAMILY = 'JetBrainsMono NF';
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY_MS = 1_500;
 const CURSOR_BLINK_MS = 500;
+const RESIZE_SETTLE_DELAY_MS = 120;
 const terminalDecoder = new TextDecoder();
 // Matches web-sdk's native-overlay selector: any modal layer must cover the
 // GPU overlay child window, which otherwise floats above all webview content.
@@ -385,6 +386,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 		appliedThemeIdRef.current = null;
 		const encoder = new TextEncoder();
 		let resizeObserver: ResizeObserver | null = null;
+		let resizeTimer: number | null = null;
 		let overlayObserver: MutationObserver | null = null;
 		let unlistenMoved: (() => void) | null = null;
 		const overlayFollowsOwner = /Macintosh|Mac OS X/.test(navigator.userAgent);
@@ -592,6 +594,15 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			}).catch(fail);
 		};
 
+		const scheduleResize = () => {
+			syncSurface();
+			if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+			resizeTimer = window.setTimeout(() => {
+				resizeTimer = null;
+				resize();
+			}, RESIZE_SETTLE_DELAY_MS);
+		};
+
 		void (async () => {
 			const bounds = host.getBoundingClientRect();
 			lastGrid = calculateNativeTerminalGrid(
@@ -608,7 +619,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			if (disposed) return;
 			appliedThemeIdRef.current = activeThemeIdRef.current ?? null;
 			applyUpdate(update);
-			resizeObserver = new ResizeObserver(resize);
+			resizeObserver = new ResizeObserver(scheduleResize);
 			resizeObserver.observe(host);
 			overlayObserver = new MutationObserver(syncSurface);
 			overlayObserver.observe(document.body, {
@@ -697,6 +708,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			outputBatcher.dispose();
 			outputQueue = [];
 			resizeObserver?.disconnect();
+			if (resizeTimer !== null) window.clearTimeout(resizeTimer);
 			overlayObserver?.disconnect();
 			unlistenMoved?.();
 			window.removeEventListener('resize', syncSurface);

@@ -20,6 +20,7 @@ const FONT_FAMILY = '"JetBrainsMono NFM", monospace';
 const WS_RECONNECT_DELAY = 1500;
 const WS_MAX_RETRIES = 5;
 const CURSOR_BLINK_RESUME_DELAY = 600;
+const RESIZE_SETTLE_DELAY = 120;
 
 export function resolveTerminalBackgroundColor(): string {
 	if (typeof document === 'undefined') return '#121216';
@@ -325,6 +326,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 		let term: Terminal | null = null;
 		let fitAddon: FitAddon | null = null;
 		let resizeObserver: ResizeObserver | null = null;
+		let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
 		setReady(false);
 		retryCountRef.current = 0;
@@ -462,7 +464,9 @@ export const TerminalViewer = memo(function TerminalViewer({
 			fitAddonRef.current = fitAddon;
 
 			resizeObserver = new ResizeObserver(() => {
-				requestAnimationFrame(() => {
+				if (resizeTimer) clearTimeout(resizeTimer);
+				resizeTimer = setTimeout(() => {
+					resizeTimer = null;
 					if (fitAddonRef.current && !disposed) {
 						try {
 							fitAddonRef.current.fit();
@@ -470,7 +474,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 							// ignore
 						}
 					}
-				});
+				}, RESIZE_SETTLE_DELAY);
 			});
 			resizeObserver.observe(containerRef.current);
 		};
@@ -507,6 +511,9 @@ export const TerminalViewer = memo(function TerminalViewer({
 			}
 			if (resizeObserver) {
 				resizeObserver.disconnect();
+			}
+			if (resizeTimer) {
+				clearTimeout(resizeTimer);
 			}
 			if (term) {
 				term.dispose();
