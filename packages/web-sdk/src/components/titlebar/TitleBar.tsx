@@ -89,7 +89,7 @@ function PanelIcon({ side }: { side: 'left' | 'right' }) {
 }
 
 export interface TitleBarProps {
-	/** Centered title text, truncated to the space between leading and trailing controls. */
+	/** Centered title text (absolutely positioned, never shifts with controls). */
 	title?: ReactNode;
 	/** Renders a back arrow button at the very start. */
 	onBack?: () => void;
@@ -143,13 +143,14 @@ export const TitleBar = memo(function TitleBar({
 				{showSidebarToggle && <TitleBarSidebarToggle />}
 				{leading}
 			</div>
-			<div className="flex min-w-0 flex-1 items-center justify-center px-2 pointer-events-none">
-				{title != null && (
-					<span className="max-w-full truncate text-base font-medium text-foreground">
+			{title != null && (
+				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+					<span className="max-w-[40%] truncate text-base font-medium text-foreground">
 						{title}
 					</span>
-				)}
-			</div>
+				</div>
+			)}
+			<div className="flex-1" />
 			{trailing != null && (
 				<div className="flex shrink-0 items-center">{trailing}</div>
 			)}

@@ -15,6 +15,7 @@ interface Config {
 		theme?: string;
 		tuiTheme?: string;
 		coAuthorCommits?: boolean;
+		releaseToSend?: boolean;
 	};
 }
 

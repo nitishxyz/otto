@@ -10,6 +10,7 @@ import { MCPOverlay } from './MCPOverlay.tsx';
 import { SkillsOverlay } from './SkillsOverlay.tsx';
 import { UsageOverlay } from './UsageOverlay.tsx';
 import { AgentsOverlay } from './AgentsOverlay.tsx';
+import { DictationInstallOverlay } from './DictationInstallOverlay.tsx';
 import type { Session } from '../types.ts';
 
 interface OverlaysProps {
@@ -50,6 +51,9 @@ export const Overlays = memo(function Overlays({
 	const overlay = useOverlayStore((s) => s.overlay);
 	const setOverlay = useOverlayStore((s) => s.setOverlay);
 	const showStatus = useOverlayStore((s) => s.showStatus);
+	const completeDictationInstall = useOverlayStore(
+		(s) => s.completeDictationInstall,
+	);
 
 	const handleClose = useCallback(() => setOverlay('none'), [setOverlay]);
 
@@ -119,6 +123,13 @@ export const Overlays = memo(function Overlays({
 			);
 		case 'usage':
 			return <UsageOverlay currentProvider={provider} onClose={handleClose} />;
+		case 'dictation':
+			return (
+				<DictationInstallOverlay
+					onClose={handleClose}
+					onReady={completeDictationInstall}
+				/>
+			);
 		default:
 			return null;
 	}

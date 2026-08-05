@@ -1,8 +1,16 @@
 # Local dictation
 
-Otto's web and desktop chat inputs stream microphone audio to the local daemon over a WebSocket. The daemon converts the stream to 16 kHz mono PCM and transcribes it locally with `whisper.cpp`; audio is not sent to a hosted speech service.
+Otto's web, desktop, and terminal chat inputs stream microphone audio to the daemon over a WebSocket. The daemon receives 16 kHz mono PCM and transcribes it locally with `whisper.cpp`; audio is not sent to a hosted speech service.
 
 Install or remove speech models under **Preferences → Dictation**. The default model is `small.en-q5_1`.
+
+## Terminal UI
+
+In the TUI, press `Ctrl+D` or run `/dictate` to start recording. Press `Ctrl+D` or Enter to stop and transcribe, or Escape to cancel. The composer displays a live terminal waveform calculated from the same PCM frames sent to the daemon. If the default model is missing, the TUI opens a setup overlay with download progress before recording.
+
+Terminal microphone capture uses OpenTUI's native miniaudio input stream. The TUI opens the default input at 16 kHz mono, converts OpenTUI's floating-point PCM chunks to signed PCM16, and streams each chunk directly to the daemon. No external recorder such as FFmpeg or SoX is required.
+
+The microphone belongs to the machine running the TUI process. When the TUI connects to a remote daemon, PCM audio is sent to that daemon for transcription. A TUI running over SSH therefore uses audio devices on the remote host, when available.
 
 ## Vocabulary and spoken aliases
 

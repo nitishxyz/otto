@@ -16,6 +16,9 @@ import type {
 	FileAttachment,
 } from '../hooks/useFileAttachments.ts';
 import { getProjectQuery } from '../api.ts';
+import { useDictation } from '../hooks/useDictation.ts';
+import { useOverlayStore } from '../stores/overlay.ts';
+import { DictationWaveform } from './DictationWaveform.tsx';
 
 interface ChatInputProps {
 	onSubmit: (
@@ -33,6 +36,7 @@ interface ChatInputProps {
 	queueSize?: number;
 	isPlanMode?: boolean;
 	paneActive?: boolean;
+	releaseToSend?: boolean;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
 	recipeCommands?: SlashCommand[];
 }
@@ -59,6 +63,7 @@ export function ChatInput({
 	queueSize = 0,
 	isPlanMode: externalIsPlanMode,
 	paneActive = true,
+	releaseToSend = false,
 	onPlanModeToggle,
 	recipeCommands = [],
 }: ChatInputProps) {
@@ -73,10 +78,6 @@ export function ChatInput({
 			setIsPlanMode(externalIsPlanMode);
 		}
 	}, [externalIsPlanMode]);
-
-	useEffect(() => {
-		if (!disabled) textareaRef.current?.focus();
-	}, [disabled]);
 
 	const {
 		images: attachedImages,
@@ -96,6 +97,41 @@ export function ChatInput({
 	attachedFilesRef.current = attachedFiles;
 	attachmentCountRef.current = attachmentCount;
 	clearAttachmentsRef.current = clearAttachments;
+
+	const requestDictationInstall = useOverlayStore(
+		(state) => state.requestDictationInstall,
+	);
+	const showStatus = useOverlayStore((state) => state.showStatus);
+	const dictation = useDictation({
+		getDraft: () => textareaRef.current?.plainText ?? '',
+		setDraft: (text) => {
+			const textarea = textareaRef.current;
+			if (!textarea) return;
+			textarea.editBuffer.setText(text);
+			textarea.editBuffer.setCursorByOffset(text.length);
+			textarea.focus();
+		},
+		submit: (text) => {
+			const imageData =
+				attachedImagesRef.current.length > 0
+					? attachedImagesRef.current
+					: undefined;
+			const fileData =
+				attachedFilesRef.current.length > 0
+					? attachedFilesRef.current
+					: undefined;
+			onSubmit(text, imageData, fileData);
+			textareaRef.current?.clear();
+			clearAttachmentsRef.current();
+		},
+		releaseToSend,
+		onNeedsInstall: requestDictationInstall,
+		onError: (message) => showStatus({ type: 'error', label: message }, 5_000),
+	});
+
+	useEffect(() => {
+		if (!disabled && !dictation.isActive) textareaRef.current?.focus();
+	}, [dictation.isActive, disabled]);
 
 	const [commandMatches, setCommandMatches] = useState<SlashCommand[]>([]);
 	const [selectedIdx, setSelectedIdx] = useState(0);
@@ -262,6 +298,15 @@ export function ChatInput({
 		setSelectedIdx(0);
 	}, [queueSize, recipeCommands]);
 
+	const handleToggleDictation = useCallback(() => {
+		setCommandMatches([]);
+		setSelectedIdx(0);
+		setShowFileMention(false);
+		setMentionQuery('');
+		setMentionSelectedIdx(0);
+		dictation.toggle();
+	}, [dictation]);
+
 	const handleSubmit = useCallback(() => {
 		if (disabled) return;
 		if (!textareaRef.current) return;
@@ -281,10 +326,20 @@ export function ChatInput({
 			const cmd = matches[idx];
 			textareaRef.current.clear();
 			setCommandMatches([]);
+			if (cmd.name === 'dictate') {
+				handleToggleDictation();
+				return;
+			}
 			onSubmit(`/${cmd.name}`);
 			return;
 		}
 		const text = textareaRef.current.plainText.trim();
+		if (text === '/dictate' || text === '/d') {
+			textareaRef.current.clear();
+			setCommandMatches([]);
+			handleToggleDictation();
+			return;
+		}
 		if (!text && attachmentCountRef.current === 0) return;
 		if (text) pushHistory(text);
 		const imgData =
@@ -300,10 +355,38 @@ export function ChatInput({
 		clearAttachmentsRef.current();
 		setCommandMatches([]);
 		setShowFileMention(false);
-	}, [onSubmit, handleFileSelect, disabled, pushHistory]);
+	}, [
+		onSubmit,
+		handleFileSelect,
+		disabled,
+		pushHistory,
+		handleToggleDictation,
+	]);
 
 	useKeyboard((key) => {
+		if (dictation.isActive) {
+			if (
+				(key.ctrl && key.name === 'd') ||
+				(key.name === 'return' && dictation.phase === 'recording')
+			) {
+				key.preventDefault();
+				key.stopPropagation();
+				void dictation.stop();
+			} else if (key.name === 'escape') {
+				key.preventDefault();
+				key.stopPropagation();
+				void dictation.cancel();
+			}
+			return;
+		}
 		if (disabled) return;
+
+		if (key.ctrl && key.name === 'd') {
+			key.preventDefault();
+			key.stopPropagation();
+			handleToggleDictation();
+			return;
+		}
 
 		if (
 			key.name === '/' &&
@@ -600,12 +683,12 @@ export function ChatInput({
 					flexDirection: 'column',
 					paddingLeft: 2,
 					paddingRight: 2,
-					paddingTop: 1,
-					paddingBottom: 1,
-					gap: 1,
+					paddingTop: dictation.isActive ? 0 : 1,
+					paddingBottom: dictation.isActive ? 0 : 1,
+					gap: dictation.isActive ? 0 : 1,
 				}}
 			>
-				{attachmentCount > 0 && (
+				{attachmentCount > 0 && !dictation.isActive && (
 					<box
 						style={{
 							flexDirection: 'row',
@@ -623,10 +706,16 @@ export function ChatInput({
 						))}
 					</box>
 				)}
-				<box style={{ flexDirection: 'row', width: '100%' }}>
+				<box
+					style={{
+						flexDirection: 'row',
+						width: '100%',
+					}}
+					visible={!dictation.isActive}
+				>
 					<textarea
 						ref={textareaRef}
-						focused={!disabled}
+						focused={!disabled && !dictation.isActive}
 						placeholder="Message otto…"
 						placeholderColor={colors.fgDark}
 						textColor={inputTextColor}
@@ -646,17 +735,42 @@ export function ChatInput({
 						}}
 					/>
 				</box>
+				{dictation.isActive && (
+					<box
+						style={{
+							width: '100%',
+							height: 6,
+							flexShrink: 0,
+						}}
+					>
+						<DictationWaveform
+							phase={dictation.phase}
+							level={dictation.level}
+							startedAt={dictation.startedAt}
+						/>
+					</box>
+				)}
 				<box
 					style={{
 						width: '100%',
 						height: 1,
 						flexShrink: 0,
 						flexDirection: 'row',
-						justifyContent: 'space-between',
+						justifyContent: dictation.isActive ? 'center' : 'space-between',
 						overflow: 'hidden',
 					}}
 				>
+					{dictation.isActive && (
+						<text fg={colors.fgDark} wrapMode="none">
+							{dictation.phase === 'recording'
+								? 'Ctrl+D or Enter stop  ·  Esc cancel'
+								: dictation.phase === 'transcribing'
+									? 'Finishing transcript  ·  Esc cancel'
+									: 'Esc cancel'}
+						</text>
+					)}
 					<box
+						visible={!dictation.isActive}
 						style={{
 							flexDirection: 'row',
 							gap: 1,
@@ -714,6 +828,7 @@ export function ChatInput({
 					</box>
 					{hasModelLabel && (
 						<box
+							visible={!dictation.isActive}
 							style={{
 								flexDirection: 'row',
 								flexShrink: 1,

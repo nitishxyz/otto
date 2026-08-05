@@ -48,6 +48,11 @@ export function HelpOverlay({ hasQueuedMessages, onClose }: HelpOverlayProps) {
 					<text fg={colors.fgDark}>Send message</text>
 				</box>
 				<box style={{ flexDirection: 'row', gap: 1 }}>
+					<text fg={colors.fgMuted}>Ctrl+D</text>
+					<text fg={colors.fgDimmed}>—</text>
+					<text fg={colors.fgDark}>Start / stop dictation</text>
+				</box>
+				<box style={{ flexDirection: 'row', gap: 1 }}>
 					<text fg={colors.fgMuted}>Ctrl+C</text>
 					<text fg={colors.fgDimmed}>—</text>
 					<text fg={colors.fgDark}>Abort / Exit</text>

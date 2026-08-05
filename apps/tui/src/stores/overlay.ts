@@ -9,11 +9,14 @@ export type StatusIndicator =
 
 interface OverlayState {
 	overlay: Overlay;
+	dictationReady: (() => void) | null;
 	status: StatusIndicator;
 	escHint: boolean;
 	_statusTimer: ReturnType<typeof setTimeout> | null;
 	_escTimer: ReturnType<typeof setTimeout> | null;
 	setOverlay: (overlay: Overlay) => void;
+	requestDictationInstall: (onReady: () => void) => void;
+	completeDictationInstall: () => void;
 	showStatus: (s: StatusIndicator, autoClearMs?: number) => void;
 	setEscHint: (hint: boolean) => void;
 	clearEscHint: () => void;
@@ -22,12 +25,26 @@ interface OverlayState {
 
 export const useOverlayStore = create<OverlayState>((set, get) => ({
 	overlay: 'none',
+	dictationReady: null,
 	status: { type: 'idle' },
 	escHint: false,
 	_statusTimer: null,
 	_escTimer: null,
 
-	setOverlay: (overlay) => set({ overlay }),
+	setOverlay: (overlay) =>
+		set((state) => ({
+			overlay,
+			dictationReady: overlay === 'dictation' ? state.dictationReady : null,
+		})),
+
+	requestDictationInstall: (onReady) =>
+		set({ overlay: 'dictation', dictationReady: onReady }),
+
+	completeDictationInstall: () => {
+		const onReady = get().dictationReady;
+		set({ overlay: 'none', dictationReady: null });
+		onReady?.();
+	},
 
 	showStatus: (s, autoClearMs) => {
 		const prev = get()._statusTimer;

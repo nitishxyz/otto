@@ -98,7 +98,8 @@ export type Overlay =
 	| 'mcp'
 	| 'skills'
 	| 'agents'
-	| 'usage';
+	| 'usage'
+	| 'dictation';
 
 export interface AppState {
 	sessionId: string | null;

@@ -574,6 +574,7 @@ export function App({
 			queueSize={queueSize}
 			isPlanMode={currentAgent === 'plan'}
 			paneActive={workspaceFocus === 'chat'}
+			releaseToSend={config.defaults.releaseToSend}
 			onPlanModeToggle={handlePlanModeToggle}
 			recipeCommands={recipeCommands}
 		/>

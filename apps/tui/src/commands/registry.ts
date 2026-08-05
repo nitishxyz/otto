@@ -30,6 +30,7 @@ export const COMMAND_ALIASES: Record<string, string> = {
 	a: 'approvals',
 	g: 'agents',
 	w: 'web',
+	d: 'dictate',
 	agent: 'agents',
 };
 
@@ -54,6 +55,7 @@ export const COMMANDS: SlashCommand[] = [
 	{ name: 'skills', alias: '/k', description: 'Manage skill toggles' },
 	{ name: 'mcp', alias: '/p', description: 'Manage MCP servers' },
 	{ name: 'models', alias: '/m', description: 'Open model selector' },
+	{ name: 'dictate', alias: '/d', description: 'Start or stop voice input' },
 	{
 		name: 'agents',
 		alias: '/g',

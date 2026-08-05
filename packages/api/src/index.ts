@@ -48,6 +48,27 @@ export type {
 	SessionStatusEvent,
 } from './streaming';
 
+export {
+	connectDictationSession,
+	DICTATION_AUDIO_FORMAT,
+	parseDictationServerEvent,
+	resolveDictationWebSocketUrl,
+	streamDictationModelInstall,
+} from './dictation';
+export type {
+	ConnectDictationSessionOptions,
+	DictationConnection,
+	DictationFinalEvent,
+	DictationModelInstallResponse,
+	DictationModelState,
+	DictationServerEvent,
+	DictationSession,
+	DictationStatus,
+	DictationWebSocketFactory,
+	DictationWebSocketLike,
+	StreamDictationModelInstallOptions,
+} from './dictation';
+
 // Export helpers
 export { isApiError, handleApiError } from './utils';
 export type { ApiError } from './utils';

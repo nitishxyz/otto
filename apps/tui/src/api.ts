@@ -37,6 +37,19 @@ export function getProjectContext() {
 	return { projectId, projectRoot, authToken };
 }
 
+export function getApiHeaders(): Record<string, string> {
+	return {
+		...(authToken
+			? {
+					Authorization: `Bearer ${authToken}`,
+					'X-Otto-Server-Token': authToken,
+				}
+			: {}),
+		...(projectId ? { 'X-Otto-Project-Id': projectId } : {}),
+		...(projectRoot ? { 'X-Otto-Project': projectRoot } : {}),
+	};
+}
+
 export function getProjectQuery() {
 	return {
 		...(projectId ? { projectId } : {}),
@@ -51,15 +64,6 @@ export function getProjectKey(): string {
 export function configureApi() {
 	client.setConfig({
 		baseURL: getBaseUrl(),
-		headers: {
-			...(authToken
-				? {
-						Authorization: `Bearer ${authToken}`,
-						'X-Otto-Server-Token': authToken,
-					}
-				: {}),
-			...(projectId ? { 'X-Otto-Project-Id': projectId } : {}),
-			...(projectRoot ? { 'X-Otto-Project': projectRoot } : {}),
-		},
+		headers: getApiHeaders(),
 	});
 }
