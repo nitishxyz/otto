@@ -558,6 +558,21 @@ export function setNativeTerminalSurfaceFont(
 	return invoke<void>('native_terminal_surface_set_font', { sessionId, font });
 }
 
+export interface NativeTerminalSurfaceCursor {
+	/** Draw the cursor as a hollow outline (unfocused terminal). */
+	hollow: boolean;
+	/** Hide the cursor entirely (focused blink off-phase). */
+	hidden: boolean;
+}
+
+/** Overrides GPU cursor presentation for focus and blink state. */
+export function setNativeTerminalSurfaceCursor(
+	sessionId: string,
+	cursor: NativeTerminalSurfaceCursor,
+) {
+	return invoke<void>('native_terminal_surface_cursor', { sessionId, cursor });
+}
+
 export function destroyNativeTerminalSurface(sessionId: string) {
 	return invoke<void>('native_terminal_surface_destroy', { sessionId });
 }

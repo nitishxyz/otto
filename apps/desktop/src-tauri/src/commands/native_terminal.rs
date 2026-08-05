@@ -1,6 +1,9 @@
 mod gpu;
 
-use gpu::{GpuTerminalBounds, GpuTerminalFont, GpuTerminalManager, GpuTerminalStatus};
+use gpu::{
+    GpuTerminalBounds, GpuTerminalCursorOverride, GpuTerminalFont, GpuTerminalManager,
+    GpuTerminalStatus,
+};
 use libghostty_vt::{
     key::{Action as KeyAction, Encoder as KeyEncoder, Event as KeyEvent, Key, Mods},
     render::{CellIterator, CursorVisualStyle, RenderState, RowIterator},
@@ -1060,6 +1063,15 @@ pub fn native_terminal_surface_set_font(
     font: GpuTerminalFont,
 ) -> Result<(), String> {
     manager.gpu.set_font(&session_id, font)
+}
+
+#[tauri::command]
+pub fn native_terminal_surface_cursor(
+    manager: tauri::State<'_, NativeTerminalManager>,
+    session_id: String,
+    cursor: GpuTerminalCursorOverride,
+) -> Result<(), String> {
+    manager.gpu.set_cursor(&session_id, cursor)
 }
 
 #[tauri::command]

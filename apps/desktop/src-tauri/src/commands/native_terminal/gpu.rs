@@ -42,6 +42,18 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 pub struct GpuTerminalManager {
     surfaces: std::sync::Arc<Mutex<HashMap<String, GpuTerminalSurface>>>,
     snapshots: std::sync::Arc<Mutex<HashMap<String, NativeTerminalSnapshot>>>,
+    cursor_overrides: std::sync::Arc<Mutex<HashMap<String, GpuTerminalCursorOverride>>>,
+}
+
+/// Host-driven cursor presentation: the webview owns focus and blink phase,
+/// so it overrides how the snapshot cursor is drawn without touching VT state.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GpuTerminalCursorOverride {
+    /// Draw the cursor as a hollow outline (unfocused terminal).
+    pub hollow: bool,
+    /// Hide the cursor entirely (focused blink off-phase).
+    pub hidden: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -292,13 +304,49 @@ impl GpuTerminalManager {
     }
 
     fn render_snapshot(&self, session_id: &str, snapshot: &NativeTerminalSnapshot) -> bool {
+        let cursor_override = self
+            .cursor_overrides
+            .lock()
+            .ok()
+            .and_then(|overrides| overrides.get(session_id).copied())
+            .unwrap_or_default();
         let Ok(mut surfaces) = self.surfaces.lock() else {
             return false;
         };
         let Some(surface) = surfaces.get_mut(session_id) else {
             return false;
         };
+        if snapshot.cursor.visible && cursor_override != GpuTerminalCursorOverride::default() {
+            let mut adjusted = snapshot.clone();
+            if cursor_override.hidden {
+                adjusted.cursor.visible = false;
+            } else if cursor_override.hollow {
+                adjusted.cursor.shape = "blockHollow";
+            }
+            return surface.render(&adjusted).unwrap_or(false);
+        }
         surface.render(snapshot).unwrap_or(false)
+    }
+
+    /// Updates the cursor presentation override and re-renders the latest
+    /// snapshot so focus/blink changes appear without new PTY output.
+    pub fn set_cursor(
+        &self,
+        session_id: &str,
+        cursor: GpuTerminalCursorOverride,
+    ) -> Result<(), String> {
+        {
+            let mut overrides = self
+                .cursor_overrides
+                .lock()
+                .map_err(|_| "GPU terminal cursor registry is unavailable".to_string())?;
+            if overrides.get(session_id).copied().unwrap_or_default() == cursor {
+                return Ok(());
+            }
+            overrides.insert(session_id.to_string(), cursor);
+        }
+        self.render_latest(session_id);
+        Ok(())
     }
 
     pub fn set_font(&self, session_id: &str, font: GpuTerminalFont) -> Result<(), String> {
@@ -332,6 +380,9 @@ impl GpuTerminalManager {
         self.destroy(session_id);
         if let Ok(mut snapshots) = self.snapshots.lock() {
             snapshots.remove(session_id);
+        }
+        if let Ok(mut overrides) = self.cursor_overrides.lock() {
+            overrides.remove(session_id);
         }
     }
 }

@@ -14,6 +14,106 @@ import { useFilePickerStore } from '../stores/filePickerStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
 import { useToggleTerminalTabs } from './useTerminalTabs';
 
+/** Right rail panels in visual top-to-bottom order for Cmd/Ctrl+J/K cycling. */
+const RIGHT_PANEL_ORDER = [
+	'git',
+	'session-files',
+	'file-browser',
+	'tunnel',
+	'mcp',
+	'skills',
+	'settings',
+] as const;
+
+type RightPanelId = (typeof RIGHT_PANEL_ORDER)[number];
+
+function getOpenRightPanelId(): RightPanelId | null {
+	if (useGitStore.getState().isExpanded) return 'git';
+	if (useSessionFilesStore.getState().isExpanded) return 'session-files';
+	if (useFileBrowserStore.getState().isExpanded) return 'file-browser';
+	if (useTunnelStore.getState().isExpanded) return 'tunnel';
+	if (useMCPStore.getState().isExpanded) return 'mcp';
+	if (useSkillsStore.getState().isExpanded) return 'skills';
+	if (useSettingsStore.getState().isExpanded) return 'settings';
+	return null;
+}
+
+/** Opens a right panel exclusively (each toggle collapses its siblings). */
+function expandRightPanel(id: RightPanelId) {
+	switch (id) {
+		case 'git':
+			if (!useGitStore.getState().isExpanded)
+				useGitStore.getState().toggleSidebar();
+			break;
+		case 'session-files':
+			if (!useSessionFilesStore.getState().isExpanded)
+				useSessionFilesStore.getState().toggleSidebar();
+			break;
+		case 'file-browser':
+			if (!useFileBrowserStore.getState().isExpanded)
+				useFileBrowserStore.getState().toggleSidebar();
+			break;
+		case 'tunnel':
+			if (!useTunnelStore.getState().isExpanded)
+				useTunnelStore.getState().toggleSidebar();
+			break;
+		case 'mcp':
+			if (!useMCPStore.getState().isExpanded)
+				useMCPStore.getState().toggleSidebar();
+			break;
+		case 'skills':
+			if (!useSkillsStore.getState().isExpanded)
+				useSkillsStore.getState().toggleSidebar();
+			break;
+		case 'settings':
+			if (!useSettingsStore.getState().isExpanded)
+				useSettingsStore.getState().toggleSidebar();
+			break;
+	}
+}
+
+function collapseAllRightPanels() {
+	useGitStore.getState().collapseSidebar();
+	useSessionFilesStore.getState().collapseSidebar();
+	useFileBrowserStore.getState().collapseSidebar();
+	useTunnelStore.getState().collapseSidebar();
+	useMCPStore.getState().collapseSidebar();
+	useSkillsStore.getState().collapseSidebar();
+	useSettingsStore.getState().collapseSidebar();
+}
+
+function isViewerPaneVisible(): boolean {
+	const state = useViewerTabsStore.getState();
+	return state.tabs.length > 0 && !state.isCollapsed;
+}
+
+function focusViewerPaneElement() {
+	const viewerPane = document.querySelector<HTMLElement>('[data-viewer-pane]');
+	if (!viewerPane) return;
+
+	// Terminals use a hidden textarea (native renderer) or an xterm-generated
+	// textarea. Focus it directly so pane navigation is immediately ready for
+	// typing rather than requiring a follow-up click.
+	const visibleTerminalInput = [
+		...viewerPane.querySelectorAll<HTMLTextAreaElement>(
+			'[data-terminal-viewer] textarea',
+		),
+	].find((input) => {
+		const terminal = input.closest<HTMLElement>('[data-terminal-viewer]');
+		return (
+			terminal &&
+			getComputedStyle(terminal).visibility !== 'hidden' &&
+			input.getClientRects().length > 0
+		);
+	});
+	if (visibleTerminalInput) {
+		visibleTerminalInput.focus({ preventScroll: true });
+		return;
+	}
+
+	viewerPane.focus({ preventScroll: true });
+}
+
 interface UseKeyboardShortcutsOptions {
 	sessionIds?: string[];
 	getSessionIds?: () => string[];
@@ -84,6 +184,9 @@ export function useKeyboardShortcuts({
 				target.isContentEditable;
 			const isInTerminal = !!target.closest('[data-terminal-viewer]');
 			const isShortcutModifierPressed = e.ctrlKey || e.metaKey;
+			// Plain Ctrl chords (no Cmd) are meaningful inside terminals
+			// (Ctrl+H/J/K/L etc.), so pane navigation must not swallow them.
+			const isTerminalCtrlChord = isInTerminal && e.ctrlKey && !e.metaKey;
 			const latestSessionIds = getSessionIds?.() ?? sessionIds;
 			const currentSessionIndex = latestSessionIds.indexOf(
 				activeSessionId || '',
@@ -205,29 +308,107 @@ export function useKeyboardShortcuts({
 			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'r') {
 				e.preventDefault();
 
-				// Ctrl+R: center -> right, right -> center, left -> center
-				if (currentFocus === 'git') {
-					// Already on git, go back to center
-					(document.activeElement as HTMLElement)?.blur();
-					setFocus('input');
-					toggleGit();
+				// Ctrl+R: toggle the right panel. Closes whichever right panel
+				// is open (even if it was opened manually); opens git otherwise.
+				(document.activeElement as HTMLElement)?.blur();
+				if (getOpenRightPanelId()) {
+					collapseAllRightPanels();
 					closeDiff();
+					setFocus('input');
 					// Focus the input after a small delay to ensure sidebar is collapsing
 					setTimeout(() => onReturnToInput?.(), 50);
-				} else if (currentFocus === 'sessions') {
-					// On left sidebar, go back to center (don't jump to right)
-					(document.activeElement as HTMLElement)?.blur();
-					setFocus('input');
-					setSessionListCollapsed(true);
-					setTimeout(() => onReturnToInput?.(), 50);
 				} else {
-					// From center, go to right sidebar
-					(document.activeElement as HTMLElement)?.blur();
-					if (!isGitExpanded) {
-						toggleGit();
-					}
+					expandRightPanel('git');
 					setFocus('git');
 					resetGitFileIndex();
+				}
+				return;
+			}
+
+			// Ctrl+H / Ctrl+L: vim-style pane focus movement across whatever is
+			// visible: sessions <-> chat <-> viewer (when open) <-> right panel.
+			// Pushing past an edge opens that sidebar; pushing again at the edge
+			// closes it.
+			if (
+				isShortcutModifierPressed &&
+				!e.shiftKey &&
+				!e.altKey &&
+				!isTerminalCtrlChord &&
+				(e.key === 'h' || e.key === 'l')
+			) {
+				e.preventDefault();
+				e.stopPropagation();
+				const blurActive = () =>
+					(document.activeElement as HTMLElement)?.blur();
+				const focusChat = () => {
+					blurActive();
+					setFocus('input');
+					setTimeout(() => onReturnToInput?.(), 50);
+				};
+				const focusViewer = () => {
+					blurActive();
+					setFocus('viewer');
+					setTimeout(focusViewerPaneElement, 0);
+				};
+				const focusRightPanel = (panel: RightPanelId) => {
+					blurActive();
+					if (panel === 'git') {
+						setFocus('git');
+						resetGitFileIndex();
+					} else {
+						setFocus('rightPanel');
+					}
+				};
+				const viewerVisible = isViewerPaneVisible();
+				const openRightPanel = getOpenRightPanelId();
+				const onRightPanel =
+					currentFocus === 'git' || currentFocus === 'rightPanel';
+
+				if (e.key === 'h') {
+					if (onRightPanel) {
+						if (viewerVisible) focusViewer();
+						else focusChat();
+					} else if (currentFocus === 'viewer') {
+						focusChat();
+					} else if (currentFocus === 'sessions') {
+						// Already at the leftmost pane: close the sidebar
+						setSessionListCollapsed(true);
+						focusChat();
+					} else {
+						// From chat, open (if needed) and focus the left sidebar
+						blurActive();
+						setSessionListCollapsed(false);
+						setFocus('sessions');
+						if (currentSessionIndex >= 0) {
+							setSessionIndex(currentSessionIndex);
+						}
+					}
+					return;
+				}
+
+				// 'l': move focus one pane to the right
+				if (currentFocus === 'sessions') {
+					focusChat();
+				} else if (onRightPanel) {
+					// Already at the rightmost pane: close the panel
+					collapseAllRightPanels();
+					closeDiff();
+					if (viewerVisible) focusViewer();
+					else focusChat();
+				} else if (currentFocus === 'viewer') {
+					if (openRightPanel) {
+						focusRightPanel(openRightPanel);
+					} else {
+						expandRightPanel('git');
+						focusRightPanel('git');
+					}
+				} else if (viewerVisible) {
+					focusViewer();
+				} else if (openRightPanel) {
+					focusRightPanel(openRightPanel);
+				} else {
+					expandRightPanel('git');
+					focusRightPanel('git');
 				}
 				return;
 			}
@@ -244,10 +425,41 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
-				e.preventDefault();
-				void toggleTerminalTabs();
-				return;
+			// Ctrl+J / Ctrl+K: with a right panel open, cycle up/down through
+			// the right rail panels. With none open, Ctrl+J toggles terminals.
+			if (
+				isShortcutModifierPressed &&
+				!e.shiftKey &&
+				!e.altKey &&
+				!isTerminalCtrlChord &&
+				(e.key === 'j' || e.key === 'k')
+			) {
+				const openRightPanel = getOpenRightPanelId();
+				if (openRightPanel) {
+					e.preventDefault();
+					e.stopPropagation();
+					const index = RIGHT_PANEL_ORDER.indexOf(openRightPanel);
+					const delta = e.key === 'j' ? 1 : -1;
+					const next =
+						RIGHT_PANEL_ORDER[
+							(index + delta + RIGHT_PANEL_ORDER.length) %
+								RIGHT_PANEL_ORDER.length
+						];
+					expandRightPanel(next);
+					(document.activeElement as HTMLElement)?.blur();
+					if (next === 'git') {
+						setFocus('git');
+						resetGitFileIndex();
+					} else {
+						setFocus('rightPanel');
+					}
+					return;
+				}
+				if (e.key === 'j') {
+					e.preventDefault();
+					void toggleTerminalTabs();
+					return;
+				}
 			}
 
 			if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'r') {
@@ -268,19 +480,22 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			// Only handle q when not in input and a sidebar is focused
+			// Only handle q when not in input and a side pane is focused
 			if (
 				(e.key === 'Escape' && !isInTerminal) ||
 				(e.key === 'q' &&
 					!isInInput &&
-					(currentFocus === 'sessions' || currentFocus === 'git'))
+					(currentFocus === 'sessions' ||
+						currentFocus === 'git' ||
+						currentFocus === 'rightPanel' ||
+						currentFocus === 'viewer'))
 			) {
 				e.preventDefault();
-				// Close sidebar if focused on one
+				// Close sidebar if focused on one (the viewer stays open)
 				if (currentFocus === 'sessions') {
 					setSessionListCollapsed(true);
-				} else if (currentFocus === 'git') {
-					toggleGit();
+				} else if (currentFocus === 'git' || currentFocus === 'rightPanel') {
+					collapseAllRightPanels();
 					closeDiff();
 				}
 				setFocus('input');

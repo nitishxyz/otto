@@ -29,6 +29,7 @@ import {
 	resolveNativeTerminalShortcut,
 	resizeNativeTerminal,
 	selectNativeTerminal,
+	setNativeTerminalSurfaceCursor,
 	setNativeTerminalTheme,
 	scrollNativeTerminal,
 	updateNativeTerminalSurface,
@@ -60,10 +61,12 @@ function rgb(color: NativeTerminalRgb): string {
 	return `rgb(${color.r} ${color.g} ${color.b})`;
 }
 
+type TerminalCursorDisplay = 'solid' | 'hidden' | 'hollow';
+
 function drawTerminalSnapshot(
 	canvas: HTMLCanvasElement,
 	snapshot: NativeTerminalSnapshot,
-	showBlinkingCursor: boolean,
+	cursorDisplay: TerminalCursorDisplay,
 	metrics: NativeTerminalMetrics,
 	fontFamily: string,
 ) {
@@ -138,11 +141,14 @@ function drawTerminalSnapshot(
 	}
 
 	const cursor = snapshot.cursor;
-	if (!cursor.visible || (cursor.blinking && !showBlinkingCursor)) return;
+	if (!cursor.visible || cursorDisplay === 'hidden') return;
 	const x = cursor.col * metrics.cellWidth;
 	const y = cursor.row * metrics.cellHeight;
 	context.fillStyle = rgb(cursor.color ?? snapshot.defaultFg);
-	switch (cursor.shape) {
+	// Unfocused terminals render a steady hollow outline regardless of the
+	// shape the running application configured.
+	const shape = cursorDisplay === 'hollow' ? 'blockHollow' : cursor.shape;
+	switch (shape) {
 		case 'bar':
 			context.fillRect(x, y, 2, metrics.cellHeight);
 			break;
@@ -219,9 +225,12 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 	);
 	const canvasFontFamilyRef = useRef(FONT_FAMILY);
 	const onExitRef = useRef(onExit);
+	const focusedRef = useRef(false);
+	const blinkHiddenRef = useRef(false);
 	const [ready, setReady] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [gpuActive, setGpuActive] = useState(false);
+	const [focused, setFocused] = useState(false);
 	const activeThemeId =
 		themeId ??
 		(typeof document === 'undefined'
@@ -233,17 +242,38 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 	isActiveRef.current = isActive;
 	canvasFontFamilyRef.current = FONT_FAMILY;
 
-	const redraw = useCallback((showCursor = true) => {
+	const redraw = useCallback(() => {
 		if (!gpuActiveRef.current && canvasRef.current && snapshotRef.current) {
 			drawTerminalSnapshot(
 				canvasRef.current,
 				snapshotRef.current,
-				showCursor,
+				focusedRef.current
+					? blinkHiddenRef.current
+						? 'hidden'
+						: 'solid'
+					: 'hollow',
 				metricsRef.current,
 				canvasFontFamilyRef.current,
 			);
 		}
 	}, []);
+
+	const syncGpuCursor = useCallback(() => {
+		const nativeSessionId = nativeSessionIdRef.current;
+		if (!nativeSessionId || !gpuActiveRef.current) return;
+		void setNativeTerminalSurfaceCursor(nativeSessionId, {
+			hollow: !focusedRef.current,
+			hidden: focusedRef.current && blinkHiddenRef.current,
+		}).catch(() => undefined);
+	}, []);
+
+	/** Restarts the blink phase so the cursor is solid while typing. */
+	const resetCursorBlink = useCallback(() => {
+		if (!blinkHiddenRef.current) return;
+		blinkHiddenRef.current = false;
+		redraw();
+		syncGpuCursor();
+	}, [redraw, syncGpuCursor]);
 
 	const applyUpdate = useCallback(
 		(update: NativeTerminalUpdate) => {
@@ -251,7 +281,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			if (update.selectedText !== undefined) {
 				selectionTextRef.current = update.selectedText ?? '';
 			}
-			redraw(true);
+			redraw();
 			if (
 				update.ptyWrites.length > 0 &&
 				socketRef.current?.readyState === WebSocket.OPEN
@@ -320,16 +350,22 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 		return () => window.cancelAnimationFrame(frame);
 	}, [applyUpdate, isActive]);
 
+	// Focused terminals blink; unfocused terminals show a steady hollow
+	// outline. Focus and blink phase live in the webview, so the GPU surface
+	// mirrors them through a cursor override.
 	useEffect(() => {
-		let visible = true;
+		focusedRef.current = focused;
+		blinkHiddenRef.current = false;
+		redraw();
+		syncGpuCursor();
+		if (!focused) return;
 		const timer = window.setInterval(() => {
-			const snapshot = snapshotRef.current;
-			if (!snapshot?.cursor.blinking) return;
-			visible = !visible;
-			redraw(visible);
+			blinkHiddenRef.current = !blinkHiddenRef.current;
+			redraw();
+			syncGpuCursor();
 		}, CURSOR_BLINK_MS);
 		return () => window.clearInterval(timer);
-	}, [redraw]);
+	}, [focused, redraw, syncGpuCursor]);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -631,6 +667,8 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 					}
 					gpuActiveRef.current = true;
 					setGpuActive(true);
+					// The GPU override defaults to solid; mirror current focus state.
+					syncGpuCursor();
 					const hostBounds = host.getBoundingClientRect();
 					const grid = calculateNativeTerminalGrid(
 						hostBounds.width,
@@ -695,7 +733,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 				nativeSessionIdRef.current = null;
 			}
 		};
-	}, [applyUpdate, enqueue, terminalId]);
+	}, [applyUpdate, enqueue, syncGpuCursor, terminalId]);
 
 	const updateSelection = useCallback(
 		(selection: NativeTerminalSelection | null) => {
@@ -795,6 +833,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 			if (event.key === 'Process' || event.nativeEvent.isComposing) return;
 			event.preventDefault();
 			event.stopPropagation();
+			resetCursorBlink();
 			clearSelection();
 			if (shortcut.action === 'send') {
 				sendTerminalData(shortcut.data);
@@ -828,7 +867,7 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 					setError(cause instanceof Error ? cause.message : String(cause));
 				});
 		},
-		[clearSelection, sendTerminalData],
+		[clearSelection, resetCursorBlink, sendTerminalData],
 	);
 
 	return (
@@ -851,6 +890,8 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 				className="absolute inset-0 z-10 h-full w-full resize-none opacity-0"
 				onChange={() => undefined}
 				onKeyDown={handleKeyDown}
+				onFocus={() => setFocused(true)}
+				onBlur={() => setFocused(false)}
 				onCopy={(event) => {
 					if (!selectionTextRef.current) return;
 					event.preventDefault();

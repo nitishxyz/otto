@@ -212,6 +212,7 @@ pub fn run() {
             commands::native_terminal::native_terminal_surface_create,
             commands::native_terminal::native_terminal_surface_update,
             commands::native_terminal::native_terminal_surface_set_font,
+            commands::native_terminal::native_terminal_surface_cursor,
             commands::native_terminal::native_terminal_surface_destroy,
             commands::fonts::list_system_fonts,
             commands::window::create_new_window,

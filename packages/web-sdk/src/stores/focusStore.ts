@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
-type FocusArea = 'input' | 'sessions' | 'git' | null;
+export type FocusArea =
+	| 'input'
+	| 'sessions'
+	| 'git'
+	| 'viewer'
+	| 'rightPanel'
+	| null;
 
 interface FocusState {
 	currentFocus: FocusArea;

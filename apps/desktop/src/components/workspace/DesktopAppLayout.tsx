@@ -33,6 +33,7 @@ import {
 } from '@ottocode/web-sdk/components';
 import {
 	useFileBrowserStore,
+	useFocusStore,
 	useGitStore,
 	useMCPStore,
 	usePanelWidthStore,
@@ -118,6 +119,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
 	const viewerCollapsed = useViewerTabsStore((s) => s.isCollapsed);
+	const viewerFocused = useFocusStore((s) => s.currentFocus === 'viewer');
 	const panelWidths = usePanelWidthStore((s) => s.widths);
 	const { preferences } = usePreferences();
 	const anyRightPanelOpen =
@@ -268,12 +270,18 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								{children}
 							</main>
 							<section
-								className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar ${
+								data-viewer-pane
+								tabIndex={-1}
+								className={`relative shrink-0 min-w-0 overflow-hidden border-l bg-sidebar outline-none ${
 									anyViewerOpen ? 'flex' : 'hidden md:flex'
 								} ${
 									anyViewerOpen
 										? 'border-sidebar-border opacity-100'
 										: 'border-transparent opacity-0'
+								} ${
+									anyViewerOpen && viewerFocused
+										? 'ring-1 ring-inset ring-ring/60'
+										: ''
 								} ${
 									shouldAnimateViewer
 										? 'transition-[width,opacity,border-color] duration-300 ease-out'

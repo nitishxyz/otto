@@ -21,7 +21,22 @@ const SHORTCUTS: ShortcutItem[] = [
 	},
 	{
 		keys: ['Ctrl', 'R'],
-		description: 'Toggle right sidebar (git)',
+		description: 'Toggle right panel (opens git, closes any open panel)',
+		category: 'Navigation',
+	},
+	{
+		keys: ['Ctrl', 'H'],
+		description: 'Focus pane to the left (opens/closes left sidebar at edge)',
+		category: 'Navigation',
+	},
+	{
+		keys: ['Ctrl', 'L'],
+		description: 'Focus pane to the right (opens/closes right panel at edge)',
+		category: 'Navigation',
+	},
+	{
+		keys: ['Ctrl', 'J/K'],
+		description: 'Cycle right rail panels (when a right panel is open)',
 		category: 'Navigation',
 	},
 	{
