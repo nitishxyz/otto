@@ -78,6 +78,8 @@ export function requiresApproval(
 					: {};
 			return (
 				input.dryRun !== true &&
+				input.action !== 'docs' &&
+				input.action !== 'capabilities' &&
 				input.action !== 'inventory' &&
 				input.action !== 'plan'
 			);

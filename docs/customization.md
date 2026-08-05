@@ -15,6 +15,8 @@ and run enabled plugin commands in visible terminals.
 - Global scope writes under `~/.config/otto/`.
 - Project scope is the default; global scope must be requested explicitly.
 - `inventory` and `plan` are read-only. Mutations follow normal tool approval.
+- `docs` is read-only and returns bundled, version-matched guides. Omit `kind`
+  to list documented kinds, or omit `topic` to list topics for one kind.
 - `dryRun: true` returns the exact paths and generated content without writing.
 - MCP servers support create, update, remove, enable, disable, start, stop, and
   restart operations for stdio, HTTP, and SSE transports.
@@ -25,6 +27,29 @@ Load it before use:
 ```text
 load_tools({ tools: ['forge'] })
 ```
+
+Discover documentation or read one exact topic:
+
+```text
+forge({ action: "docs", kind: "skill" })
+forge({ action: "docs", kind: "plugin", topic: "manifest" })
+forge({ action: "docs", kind: "app", topic: "permissions" })
+```
+
+Use `query` to search the bundled guides. Agent authors can inspect the live,
+project-aware tool catalog separately:
+
+```text
+forge({ action: "docs", query: "where are agent prompts stored" })
+forge({ action: "capabilities", kind: "agent" })
+forge({ action: "capabilities", kind: "agent", query: "filesystem" })
+```
+
+The capability catalog reports built-in, plugin, and connected MCP tools with
+their descriptions, activation mode, source, risk, and availability. Forge
+validates tool names when it plans or writes an agent configuration. The same
+configuration files remain directly editable and are documented by the bundled
+guides.
 
 Plugins remain the packaging and distribution format. Forge creates standalone
 capabilities directly; those capabilities can be packaged as plugins in a later

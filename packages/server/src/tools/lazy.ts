@@ -1,5 +1,6 @@
 import type { Tool } from 'ai';
 import { buildForgeTool } from './forge.ts';
+import { SERVER_LAZY_TOOL_CATALOG } from './lazy-catalog.ts';
 
 export type ServerLazyToolDefinition = {
 	name: string;
@@ -14,14 +15,10 @@ export type ConfiguredServerTool = {
 };
 
 export function getServerLazyToolDefinitions(): ServerLazyToolDefinition[] {
-	return [
-		{
-			name: 'forge',
-			description:
-				'Create, manage, and run Otto capabilities, MCP servers, and plugin commands.',
-			build: buildForgeTool,
-		},
-	];
+	return SERVER_LAZY_TOOL_CATALOG.map((definition) => ({
+		...definition,
+		build: buildForgeTool,
+	}));
 }
 
 export function buildConfiguredServerTools(args: {

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
+	getForgeDocs,
 	getForgeInventory,
 	planForgeMutation,
 	runForgeAction,
@@ -19,6 +20,89 @@ describe('forge', () => {
 
 	afterEach(async () => {
 		await rm(projectRoot, { recursive: true, force: true });
+	});
+
+	it('lists bounded documentation topics and returns an exact document', () => {
+		const topics = getForgeDocs('skill');
+		expect(topics).toMatchObject({
+			kind: 'skill',
+			topics: expect.arrayContaining([
+				expect.objectContaining({ topic: 'getting-started' }),
+				expect.objectContaining({ topic: 'manifest' }),
+			]),
+		});
+
+		const document = getForgeDocs('plugin', 'manifest');
+		expect(document).toMatchObject({
+			kind: 'plugin',
+			topic: 'manifest',
+			title: 'Plugin manifest',
+		});
+		expect('content' in document ? document.content : '').toContain(
+			'otto.plugin.json',
+		);
+	});
+
+	it('searches bundled documentation without reading arbitrary files', () => {
+		const result = getForgeDocs(undefined, undefined, 'otto.plugin.json');
+		expect(result).toMatchObject({
+			query: 'otto.plugin.json',
+			matches: expect.arrayContaining([
+				expect.objectContaining({ kind: 'plugin', topic: 'manifest' }),
+			]),
+			truncated: false,
+		});
+	});
+
+	it('discovers documentation kinds and rejects unknown topics', () => {
+		const docs = getForgeDocs();
+		expect(docs.kinds).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ kind: 'recipe' }),
+				expect.objectContaining({ kind: 'plugin' }),
+				expect.objectContaining({ kind: 'app' }),
+			]),
+		);
+		expect(() => getForgeDocs('skill', 'missing')).toThrow(
+			'Available topics: getting-started, manifest',
+		);
+	});
+
+	it('searches the live project tool catalog for agent configuration', async () => {
+		const result = await runForgeAction(projectRoot, {
+			action: 'capabilities',
+			kind: 'agent',
+			query: 'filesystem',
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			capabilities: {
+				kind: 'agent',
+				query: 'filesystem',
+				tools: expect.arrayContaining([
+					expect.objectContaining({
+						name: 'read',
+						category: 'filesystem',
+						available: true,
+					}),
+				]),
+			},
+		});
+	});
+
+	it('serves documentation through the Forge action', async () => {
+		const result = await runForgeAction(projectRoot, {
+			action: 'docs',
+			kind: 'app',
+			topic: 'permissions',
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			docs: {
+				kind: 'app',
+				topic: 'permissions',
+			},
+		});
 	});
 
 	it('previews a project recipe without writing it', async () => {
@@ -178,6 +262,20 @@ describe('forge', () => {
 		expect(JSON.stringify(result)).toContain('https://example.com/mcp');
 	});
 
+	it('rejects unknown agent tools during planning', async () => {
+		expect(
+			planForgeMutation(projectRoot, {
+				action: 'create',
+				kind: 'agent',
+				name: 'invalid-tools',
+				content: 'Use a tool that is not installed.',
+				tools: { firstClass: ['not-a-real-tool'] },
+			}),
+		).rejects.toThrow(
+			'Use Forge action=capabilities with kind=agent to inspect the live project tool catalog',
+		);
+	});
+
 	it('creates and removes a project agent through agent config management', async () => {
 		const result = await runForgeMutation(projectRoot, {
 			action: 'create',
@@ -220,6 +318,12 @@ describe('forge', () => {
 	it('only requires dangerous-mode approval for mutations', () => {
 		expect(
 			requiresApproval('forge', 'dangerous', { action: 'inventory' }),
+		).toBe(false);
+		expect(requiresApproval('forge', 'dangerous', { action: 'docs' })).toBe(
+			false,
+		);
+		expect(
+			requiresApproval('forge', 'dangerous', { action: 'capabilities' }),
 		).toBe(false);
 		expect(requiresApproval('forge', 'dangerous', { action: 'plan' })).toBe(
 			false,

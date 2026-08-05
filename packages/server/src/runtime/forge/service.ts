@@ -26,6 +26,8 @@ import {
 	parseRecipeContent,
 	validateRecipeNameForScope,
 } from '../commands/recipes.ts';
+import { getForgeDocs } from './docs.ts';
+import { getProjectToolCatalog } from '../tools/catalog.ts';
 import type {
 	ForgeInput,
 	ForgeKind,
@@ -46,6 +48,9 @@ function assertTargetInput(input: ForgeInput): {
 	name: string;
 } {
 	if (!input.kind) throw new Error('kind is required');
+	if (input.kind === 'plugin' || input.kind === 'app') {
+		throw new Error(`kind '${input.kind}' only supports the Forge docs action`);
+	}
 	if (input.kind === 'mcp-server' || input.kind === 'plugin-command') {
 		throw new Error(`kind '${input.kind}' uses a dedicated Forge operation`);
 	}
@@ -253,6 +258,7 @@ export async function planForgeMutation(
 ): Promise<ForgePlan> {
 	const normalized = assertTargetInput(input);
 	const action = mutationForPlan(input);
+	if (action !== 'remove') await validateAgentToolNames(projectRoot, input);
 	const target = getTarget(
 		projectRoot,
 		normalized.kind,
@@ -345,7 +351,84 @@ async function applyAgentMutation(
 	});
 }
 
+async function validateAgentToolNames(
+	projectRoot: string,
+	input: ForgeInput,
+): Promise<void> {
+	if (input.kind !== 'agent') return;
+	const names = [
+		...(input.tools?.firstClass ?? []),
+		...(input.tools?.loadable ?? []),
+		...(input.appendTools?.firstClass ?? []),
+		...(input.appendTools?.loadable ?? []),
+	];
+	if (names.length === 0) return;
+
+	const available = new Set(
+		(await getProjectToolCatalog(projectRoot)).map((tool) => tool.name),
+	);
+	const unknown = Array.from(
+		new Set(
+			names.map((name) => name.trim()).filter((name) => !available.has(name)),
+		),
+	);
+	if (unknown.length > 0) {
+		throw new Error(
+			`Unknown agent tools: ${unknown.join(', ')}. Use Forge action=capabilities with kind=agent to inspect the live project tool catalog.`,
+		);
+	}
+}
+
+async function getForgeCapabilities(projectRoot: string, input: ForgeInput) {
+	if (input.kind && input.kind !== 'agent') {
+		throw new Error("Forge capabilities currently supports kind 'agent' only");
+	}
+	const tools = await getProjectToolCatalog(projectRoot);
+	const query = input.query?.trim().toLowerCase();
+	const terms = query?.split(/\s+/).filter(Boolean) ?? [];
+	const matches = terms.length
+		? tools.filter((tool) => {
+				const haystack = [
+					tool.name,
+					tool.description,
+					tool.category,
+					tool.source,
+					tool.activation,
+				]
+					.filter(Boolean)
+					.join('\n')
+					.toLowerCase();
+				return terms.every((term) => haystack.includes(term));
+			})
+		: tools;
+	return {
+		kind: 'agent' as const,
+		...(query ? { query } : {}),
+		tools: matches.slice(0, 50),
+		total: tools.length,
+		matched: matches.length,
+		truncated: matches.length > 50,
+	};
+}
+
 export async function runForgeAction(projectRoot: string, input: ForgeInput) {
+	if (input.action === 'docs') {
+		if (input.kind === 'plugin-command') {
+			throw new Error(
+				"kind 'plugin-command' uses the 'plugin' Forge documentation kind",
+			);
+		}
+		return {
+			ok: true,
+			docs: getForgeDocs(input.kind, input.topic, input.query),
+		};
+	}
+	if (input.action === 'capabilities') {
+		return {
+			ok: true,
+			capabilities: await getForgeCapabilities(projectRoot, input),
+		};
+	}
 	if (input.kind === 'mcp-server') {
 		if (input.action === 'plan') {
 			if (!input.targetAction) {

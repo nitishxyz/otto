@@ -1,6 +1,8 @@
 import type { AgentToolConfig } from '../agent/registry.ts';
 
 export const FORGE_ACTIONS = [
+	'docs',
+	'capabilities',
 	'inventory',
 	'plan',
 	'create',
@@ -18,17 +20,30 @@ export const FORGE_KINDS = [
 	'mcp-server',
 	'plugin-command',
 ] as const;
+export const FORGE_DOC_KINDS = [
+	'recipe',
+	'skill',
+	'agent',
+	'mcp-server',
+	'plugin',
+	'app',
+] as const;
+export const FORGE_INPUT_KINDS = [...FORGE_KINDS, 'plugin', 'app'] as const;
 export const FORGE_SCOPES = ['project', 'global'] as const;
 export const FORGE_MUTATIONS = ['create', 'update', 'remove'] as const;
 
 export type ForgeAction = (typeof FORGE_ACTIONS)[number];
 export type ForgeKind = (typeof FORGE_KINDS)[number];
+export type ForgeDocKind = (typeof FORGE_DOC_KINDS)[number];
+export type ForgeInputKind = (typeof FORGE_INPUT_KINDS)[number];
 export type ForgeScope = (typeof FORGE_SCOPES)[number];
 export type ForgeMutation = (typeof FORGE_MUTATIONS)[number];
 
 export type ForgeInput = {
 	action: ForgeAction;
-	kind?: ForgeKind;
+	kind?: ForgeInputKind;
+	topic?: string;
+	query?: string;
 	scope?: ForgeScope;
 	name?: string;
 	targetAction?: ForgeMutation;

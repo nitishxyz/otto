@@ -2,7 +2,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import {
 	FORGE_ACTIONS,
-	FORGE_KINDS,
+	FORGE_INPUT_KINDS,
 	FORGE_MUTATIONS,
 	FORGE_SCOPES,
 	getForgeInventory,
@@ -18,9 +18,19 @@ const toolGroupsSchema = z.object({
 const inputSchema = z.object({
 	action: z.enum(FORGE_ACTIONS).describe('Forge operation to perform.'),
 	kind: z
-		.enum(FORGE_KINDS)
+		.enum(FORGE_INPUT_KINDS)
 		.optional()
-		.describe('Capability kind. Required except for inventory.'),
+		.describe(
+			'Capability kind. Required except for inventory and docs discovery.',
+		),
+	topic: z
+		.string()
+		.optional()
+		.describe('Exact documentation topic. Omit to list topics for the kind.'),
+	query: z
+		.string()
+		.optional()
+		.describe('Search text for docs or the live agent capability catalog.'),
 	scope: z
 		.enum(FORGE_SCOPES)
 		.optional()
@@ -89,11 +99,15 @@ Kinds:
 - recipe, skill, agent: inventory, plan, create, update, or remove project/global capabilities
 - mcp-server: inventory; plan/create/update/remove; enable/disable; execute start/stop/restart
 - plugin-command: execute an enabled installed plugin command in a visible terminal
+- docs: read local version-matched guides for recipe, skill, agent, mcp-server, plugin, or app; omit topic to discover topics
 
 Project scope is the default. Use global only when explicitly requested. Prefer plan or dryRun before consequential configuration changes. MCP http/sse servers may return authRequired and authUrl; share that URL with the user.`,
 			inputSchema,
 			execute: async (input) => {
 				try {
+					if (input.action === 'docs' || input.action === 'capabilities') {
+						return await runForgeAction(projectRoot, input);
+					}
 					if (input.action === 'inventory') {
 						return {
 							ok: true,
