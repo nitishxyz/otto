@@ -144,10 +144,8 @@ export const TitleBar = memo(function TitleBar({
 				{leading}
 			</div>
 			{title != null && (
-				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-					<span className="max-w-[40%] truncate text-base font-medium text-foreground">
-						{title}
-					</span>
+				<div className="pointer-events-none absolute left-1/2 top-1/2 max-w-[40%] -translate-x-1/2 -translate-y-1/2 truncate text-base font-medium text-foreground">
+					{title}
 				</div>
 			)}
 			<div className="flex-1" />
