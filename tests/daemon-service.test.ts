@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
 	DEFAULT_DAEMON_PORT,
+	DaemonVersionMismatchError,
 	ensureDaemon,
 	ensureDaemonToken,
 	ensureDaemonProject,
@@ -73,21 +74,22 @@ afterEach(async () => {
 
 describe('daemon service', () => {
 	it('spawns source daemon through bun and compiled daemon directly', () => {
-		expect(getDaemonSpawnCommand('/tmp/project', '/usr/local/bin/bun')).toEqual(
-			[
-				'/usr/local/bin/bun',
-				'run',
-				'apps/cli/index.ts',
-				'serve',
-				'--api-only',
-				'--no-open',
-				'--daemon-register',
-				'--port',
-				String(DEFAULT_DAEMON_PORT),
-				'--project',
-				'/tmp/project',
-			],
+		const sourceCommand = getDaemonSpawnCommand(
+			'/tmp/project',
+			'/usr/local/bin/bun',
 		);
+		expect(sourceCommand.slice(0, 2)).toEqual(['/usr/local/bin/bun', 'run']);
+		expect(sourceCommand[2]).toStartWith('/');
+		expect(sourceCommand.slice(3)).toEqual([
+			'serve',
+			'--api-only',
+			'--no-open',
+			'--daemon-register',
+			'--port',
+			String(DEFAULT_DAEMON_PORT),
+			'--project',
+			'/tmp/project',
+		]);
 		expect(getDaemonSpawnCommand('/tmp/project', '/tmp/dist/otto')).toEqual([
 			'/tmp/dist/otto',
 			'serve',
@@ -455,6 +457,76 @@ describe('daemon service', () => {
 		expect(signaled).toEqual([[oldReg.pid, 'SIGTERM']]);
 		expect(ensured.version).toBe('1.2.3');
 		expect(ensured.url).toBe('http://127.0.0.1:49124');
+	});
+
+	it('does not replace a healthy daemon with an older CLI version', async () => {
+		const paths = await createDaemonPaths();
+		const newerReg = registration({ version: '1.2.4' });
+		let spawnCalls = 0;
+		const signaled: number[] = [];
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(newerReg, { paths });
+
+		await expect(
+			ensureDaemon({
+				version: '1.2.3',
+				paths,
+				fetch: async () =>
+					jsonResponse({
+						port: 12345,
+						version: newerReg.version,
+						pid: newerReg.pid,
+						daemonId: newerReg.id,
+						startedAt: newerReg.startedAt,
+					}),
+				signal: (pid) => {
+					signaled.push(pid);
+					return true;
+				},
+				spawn: (() => {
+					spawnCalls++;
+					throw new Error('must not spawn');
+				}) as typeof Bun.spawn,
+			}),
+		).rejects.toBeInstanceOf(DaemonVersionMismatchError);
+
+		expect(signaled).toEqual([]);
+		expect(spawnCalls).toBe(0);
+		expect(await readDaemonRegistration({ paths })).toEqual(newerReg);
+	});
+
+	it('requires an old CLI to upgrade even when the newer daemon is active', async () => {
+		const paths = await createDaemonPaths();
+		const activePath = join(paths.dir, 'upgrades', '1.2.4', 'otto');
+		const newerReg = registration({ version: '1.2.4' });
+		await mkdir(join(paths.dir, 'upgrades', '1.2.4'), { recursive: true });
+		await Bun.write(activePath, 'binary');
+		await writeActiveDaemonSelection(
+			{ path: activePath, version: newerReg.version },
+			{ paths },
+		);
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(newerReg, { paths });
+
+		await expect(
+			ensureDaemon({
+				version: '1.2.3',
+				paths,
+				fetch: async () =>
+					jsonResponse({
+						port: 12345,
+						version: newerReg.version,
+						pid: newerReg.pid,
+						daemonId: newerReg.id,
+						startedAt: newerReg.startedAt,
+					}),
+			}),
+		).rejects.toMatchObject({
+			cliVersion: '1.2.3',
+			daemonVersion: '1.2.4',
+		});
+
+		expect(await readDaemonRegistration({ paths })).toEqual(newerReg);
 	});
 
 	it('opens a project on an existing daemon with auth headers', async () => {

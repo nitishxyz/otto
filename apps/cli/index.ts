@@ -26,7 +26,29 @@ if (argv[0] === '__extension-host') {
 	import('./src/cli.ts').then(({ runCli }) =>
 		runCli(argv, (PKG as { version: string }).version)
 			.then(() => process.exit(0))
-			.catch((error) => {
+			.catch(async (error) => {
+				const { DaemonVersionMismatchError } = await import('./src/daemon.ts');
+				if (error instanceof DaemonVersionMismatchError) {
+					try {
+						const { offerDaemonMismatchUpgrade } = await import(
+							'./src/commands/upgrade.ts'
+						);
+						const upgraded = await offerDaemonMismatchUpgrade(error, {
+							interactive: argv.includes('--ci') ? false : undefined,
+						});
+						if (upgraded) {
+							console.log('Upgrade complete. Run otto again to continue.');
+						}
+						process.exit(upgraded ? 0 : 1);
+					} catch (upgradeError) {
+						const upgradeMessage =
+							upgradeError instanceof Error
+								? (upgradeError.stack ?? upgradeError.message)
+								: String(upgradeError);
+						console.error(upgradeMessage);
+						process.exit(1);
+					}
+				}
 				const message =
 					error instanceof Error
 						? (error.stack ?? error.message)

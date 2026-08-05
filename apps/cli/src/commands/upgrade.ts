@@ -1,9 +1,11 @@
 import type { Command } from 'commander';
+import { confirm, isCancel } from '@clack/prompts';
 import { createWriteStream, chmodSync, renameSync, unlinkSync } from 'node:fs';
 import { get } from 'node:https';
 import { homedir, platform, arch, tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { colors } from '../ui.ts';
+import type { DaemonVersionMismatchError } from '../daemon.ts';
 
 const GITHUB_REPO = 'nitishxyz/otto';
 const BIN_NAME = 'otto';
@@ -143,7 +145,7 @@ function downloadBinary(url: string, dest: string): Promise<void> {
 	});
 }
 
-async function runUpgrade(version: string): Promise<void> {
+export async function upgradeOttoToVersion(version: string): Promise<void> {
 	const asset = getPlatformAsset();
 	const url = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${asset}`;
 	const ext = platform() === 'win32' ? '.exe' : '';
@@ -172,6 +174,51 @@ async function runUpgrade(version: string): Promise<void> {
 	}
 
 	console.log(`\n  ${colors.green('✓')} Downloaded to ${colors.dim(binPath)}`);
+}
+
+interface DaemonMismatchUpgradeOptions {
+	interactive?: boolean;
+	confirmUpgrade?: () => Promise<boolean>;
+	upgrade?: (version: string) => Promise<void>;
+	print?: (message: string) => void;
+}
+
+export async function offerDaemonMismatchUpgrade(
+	error: DaemonVersionMismatchError,
+	options: DaemonMismatchUpgradeOptions = {},
+): Promise<boolean> {
+	const print = options.print ?? console.error;
+	print(
+		`Daemon version mismatch: daemon v${error.daemonVersion}, CLI v${error.cliVersion}.`,
+	);
+
+	const interactive =
+		options.interactive ??
+		(process.stdin.isTTY === true &&
+			process.stdout.isTTY === true &&
+			!process.env.CI &&
+			process.env.OTTO_CI_MODE !== '1');
+	if (!interactive) {
+		print(`Run 'otto upgrade' to upgrade the CLI before continuing.`);
+		return false;
+	}
+
+	const confirmUpgrade =
+		options.confirmUpgrade ??
+		(async () => {
+			const result = await confirm({
+				message: `Upgrade the CLI to v${error.daemonVersion} now?`,
+				initialValue: true,
+			});
+			return !isCancel(result) && result;
+		});
+	if (!(await confirmUpgrade())) {
+		print(`Upgrade cancelled. The newer daemon was left running.`);
+		return false;
+	}
+
+	await (options.upgrade ?? upgradeOttoToVersion)(error.daemonVersion);
+	return true;
 }
 
 export function registerUpgradeCommand(program: Command, version: string) {
@@ -203,7 +250,7 @@ export function registerUpgradeCommand(program: Command, version: string) {
 				return;
 			}
 
-			await runUpgrade(latest);
+			await upgradeOttoToVersion(latest);
 
 			console.log(`  ${colors.green('✓')} Upgrade complete!`);
 			console.log(`  Run ${colors.bold('otto')} to use the new version.`);

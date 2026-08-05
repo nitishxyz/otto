@@ -25,8 +25,27 @@ export interface DaemonHealth {
 
 export type DaemonStatus =
 	| { state: 'running'; registration: DaemonRegistration; health: DaemonHealth }
-	| { state: 'stale'; registration: DaemonRegistration; reason: string }
+	| {
+			state: 'stale';
+			registration: DaemonRegistration;
+			reason: string;
+			health?: DaemonHealth;
+	  }
 	| { state: 'missing' };
+
+export class DaemonVersionMismatchError extends Error {
+	readonly cliVersion: string;
+	readonly daemonVersion: string;
+
+	constructor(cliVersion: string, daemonVersion: string) {
+		super(
+			`Otto daemon v${daemonVersion} is newer than CLI v${cliVersion}. Upgrade the CLI before continuing.`,
+		);
+		this.name = 'DaemonVersionMismatchError';
+		this.cliVersion = cliVersion;
+		this.daemonVersion = daemonVersion;
+	}
+}
 
 export interface DaemonPaths {
 	dir: string;
@@ -66,6 +85,7 @@ export interface DaemonProjectSummary {
 export const DEFAULT_DAEMON_PORT = 47_477;
 
 const HEALTH_TIMEOUT_MS = 1_500;
+const SOURCE_CLI_ENTRY = resolve(import.meta.dir, '..', 'index.ts');
 
 export function parseDaemonPort(value: string | undefined): number | undefined {
 	if (!value) return undefined;
@@ -98,8 +118,8 @@ export function getDaemonSpawnCommand(
 		'--project',
 		projectRoot,
 	];
-	if (basename(executable) === 'bun') {
-		return [executable, 'run', 'apps/cli/index.ts', ...serveArgs];
+	if (/^bun(?:\.exe)?$/.test(basename(executable))) {
+		return [executable, 'run', SOURCE_CLI_ENTRY, ...serveArgs];
 	}
 	return [executable, ...serveArgs];
 }
@@ -333,7 +353,12 @@ export async function getDaemonStatus(
 		registration.version !== expectedVersion ||
 		health.version !== expectedVersion
 	) {
-		return { state: 'stale', registration, reason: 'version mismatch' };
+		return {
+			state: 'stale',
+			registration,
+			health,
+			reason: 'version mismatch',
+		};
 	}
 	return { state: 'running', registration, health };
 }
@@ -342,9 +367,24 @@ export async function ensureDaemon(
 	options: DaemonServiceOptions,
 ): Promise<DaemonRegistration> {
 	const current = await getDaemonStatus(options);
-	if (current.state === 'running') return current.registration;
+	if (current.state === 'running') {
+		if (
+			(compareVersions(current.registration.version, options.version) ?? 0) > 0
+		) {
+			throw new DaemonVersionMismatchError(
+				options.version,
+				current.registration.version,
+			);
+		}
+		return current.registration;
+	}
 	if (current.state === 'stale') {
 		if (current.reason === 'version mismatch') {
+			const daemonVersion =
+				current.health?.version ?? current.registration.version;
+			if ((compareVersions(daemonVersion, options.version) ?? 0) > 0) {
+				throw new DaemonVersionMismatchError(options.version, daemonVersion);
+			}
 			await stopDaemon(options);
 		} else {
 			await removeDaemonRegistration(options);
