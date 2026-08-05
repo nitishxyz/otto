@@ -1,6 +1,6 @@
 {
 	"name": "@ottocode/themes",
-	"version": "0.1.390",
+	"version": "0.1.391",
 	"description": "Shared theme registry and adapters for ottocode apps",
 	"type": "module",
 	"main": "./src/index.ts",
