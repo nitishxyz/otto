@@ -55,10 +55,9 @@ Project-local `.otto/` contains commit-safe configuration and extension files on
 │   ├── <command>.json
 │   ├── <command>.md
 │   └── <command>.txt
-├── tools/
-│   └── <tool-name>/
-│       ├── tool.js
-│       └── tool.mjs
+├── plugins/
+│   └── <plugin-name>/
+│       └── otto.plugin.json
 └── skills/
 ```
 

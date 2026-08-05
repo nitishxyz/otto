@@ -4,16 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { listAvailableTools } from '@ottocode/cli/src/scaffold.ts';
 
-const pluginSource = `export default async () => ({
-  name: 'custom_thing',
-  description: 'custom tool',
-  parameters: {
-    flag: { type: 'boolean', default: false }
-  },
-  async execute({ input }) {
-    return { flag: !!input.flag };
-  }
-});\n`;
+const pluginSource = `export default async (input) => ({ flag: !!input.flag });\n`;
 
 describe('listAvailableTools', () => {
 	it('includes custom tools and curated built-ins only', async () => {
@@ -29,12 +20,27 @@ describe('listAvailableTools', () => {
 		process.env.XDG_CONFIG_HOME = join(home, '.config');
 
 		try {
-			const toolDir = join(home, '.config', 'otto', 'tools', 'custom_thing');
+			const toolDir = join(home, '.config', 'otto', 'plugins', 'custom-thing');
 			await mkdir(toolDir, { recursive: true });
-			await writeFile(join(toolDir, 'tool.js'), pluginSource);
+			await writeFile(join(toolDir, 'tool.ts'), pluginSource);
+			await writeFile(
+				join(toolDir, 'otto.plugin.json'),
+				JSON.stringify({
+					name: 'custom-thing',
+					version: '1.0.0',
+					tools: [
+						{
+							name: 'custom_thing',
+							entry: 'tool.ts',
+							description: 'custom tool',
+							inputSchema: { type: 'object' },
+						},
+					],
+				}),
+			);
 
 			const tools = await listAvailableTools(projectRoot, 'local');
-			expect(tools).toContain('custom_thing');
+			expect(tools).toContain('custom-thing__custom_thing');
 			expect(tools).toContain('read');
 			expect(tools).not.toContain('cd');
 			expect(tools).not.toContain('pwd');

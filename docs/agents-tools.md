@@ -215,16 +215,13 @@ Prompt files are typically stored at:
 - `~/.config/otto/agents/<name>.md`
 - `~/.config/otto/agents/<name>.txt`
 
-## Custom tools
+## Native plugin tools
 
-Project or global custom tools are discovered from plugin folders:
+Installed plugins can contribute namespaced TypeScript or JavaScript tools
+through their `otto.plugin.json` manifest. Tool code runs in an isolated Bun
+host only when called.
 
-- `.otto/tools/<tool-name>/tool.js`
-- `.otto/tools/<tool-name>/tool.mjs`
-- `~/.config/otto/tools/<tool-name>/tool.js`
-- `~/.config/otto/tools/<tool-name>/tool.mjs`
-
-See [Customization](./customization.md) for the plugin descriptor format.
+See [Customization](./customization.md) for the manifest and handler format.
 
 ## MCP tools
 

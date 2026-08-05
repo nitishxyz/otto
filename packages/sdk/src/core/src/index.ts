@@ -31,6 +31,9 @@ export type { ProviderId, ModelInfo } from '../../types/src/index.ts';
 // =======================
 export { discoverProjectTools } from './tools/loader';
 export type { DiscoveredTool, DiscoverResult } from './tools/loader';
+export { getToolMetadata, setToolMetadata } from './tools/metadata';
+export type { ToolMetadata, ToolSourceKind } from './tools/metadata';
+export { runNativeExtensionHost } from './tools/extensions/host';
 export {
 	setTerminalManager,
 	unsetTerminalManager,

@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import { logger } from '@ottocode/sdk';
+import { getToolMetadata, logger } from '@ottocode/sdk';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
 import {
 	requiresApproval,
@@ -150,7 +150,12 @@ export async function handleAdaptedToolInputAvailable(
 	if (args.name !== 'progress_update') {
 		if (
 			args.ctx.toolApprovalMode &&
-			requiresApproval(args.name, args.ctx.toolApprovalMode, input)
+			requiresApproval(
+				args.name,
+				args.ctx.toolApprovalMode,
+				input,
+				getToolMetadata(args.base)?.effects,
+			)
 		) {
 			meta.approvalPromise = requestApproval(
 				args.ctx.sessionId,

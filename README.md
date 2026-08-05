@@ -170,23 +170,11 @@ otto mcp auth linear
 
 See [docs/mcp.md](docs/mcp.md).
 
-### Custom tools
+### Native plugin tools
 
-Drop a plugin in `.otto/tools/<name>/tool.js`:
-
-```js
-export default {
-  name: 'file_size',
-  description: 'Return the byte size for a file path',
-  parameters: {
-    path: { type: 'string', description: 'Path to inspect' },
-  },
-  async execute({ input, fs }) {
-    const content = await fs.readFile(input.path, 'utf8');
-    return { bytes: Buffer.byteLength(content, 'utf8') };
-  },
-};
-```
+Plugins can contribute namespaced TypeScript or JavaScript tools through
+`otto.plugin.json`. Tools run on the Bun runtime bundled with Otto in an
+isolated child process and are imported only when called.
 
 See [docs/customization.md](docs/customization.md).
 

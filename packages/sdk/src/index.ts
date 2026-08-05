@@ -338,7 +338,6 @@ export {
 	getGlobalPluginsDir,
 	getGlobalAgentsJsonPath,
 	getGlobalAgentsDir,
-	getGlobalToolsDir,
 	getGlobalCommandsDir,
 	getGlobalRecipesDir,
 	getGlobalDebugDir,
@@ -365,6 +364,8 @@ export {
 	pluginNameSchema,
 	pluginRegistryEntrySchema,
 	pluginRegistrySchema,
+	pluginToolEffectSchema,
+	pluginToolSchema,
 	pluginsConfigSchema,
 	removePlugin,
 	resolveRegistryPlugin,
@@ -391,6 +392,8 @@ export type {
 	PluginScope,
 	PluginsScopeState,
 	PluginStatus,
+	PluginTool,
+	PluginToolEffect,
 	ResolveRegistryPluginOptions,
 } from './plugins/index.ts';
 export {
@@ -433,6 +436,12 @@ export {
 	tool,
 } from './core/src/index.ts';
 export type { ModelMessage, Tool } from './core/src/index.ts';
+export {
+	getToolMetadata,
+	setToolMetadata,
+	runNativeExtensionHost,
+} from './core/src/index.ts';
+export type { ToolMetadata, ToolSourceKind } from './core/src/index.ts';
 // Re-export from AI SDK
 export type { ToolCallPart } from 'ai';
 

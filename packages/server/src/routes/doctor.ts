@@ -1,13 +1,12 @@
 import { z } from '@hono/zod-openapi';
 import {
-	buildFsTools,
-	buildGitTools,
+	discoverProjectTools,
 	getConfiguredProviderApiKey,
 	getConfiguredProviderEnvVar,
 	getConfiguredProviderIds,
 	getGlobalAgentsJsonPath,
 	getGlobalCommandsDir,
-	getGlobalToolsDir,
+	getToolMetadata,
 	getSecureAuthPath,
 	isProviderAuthorized,
 	logger,
@@ -81,11 +80,8 @@ const doctorResponseSchema = z.object({
 		localNames: z.array(z.string()),
 	}),
 	tools: z.object({
-		defaultNames: z.array(z.string()),
-		globalPath: z.string().nullable().optional(),
-		globalNames: z.array(z.string()),
-		localPath: z.string().nullable().optional(),
-		localNames: z.array(z.string()),
+		builtInNames: z.array(z.string()),
+		extensionNames: z.array(z.string()),
 		effectiveNames: z.array(z.string()),
 	}),
 	commands: z.object({
@@ -210,31 +206,27 @@ export function registerDoctorRoutes(app: Hono) {
 					localNames: Object.keys(localAgents).sort(),
 				};
 
-				const defaultToolNames = Array.from(
-					new Set([
-						...buildFsTools(projectRoot).map((t) => t.name),
-						...buildGitTools(projectRoot).map((t) => t.name),
-					]),
+				const discoveredTools = await discoverProjectTools(projectRoot);
+				const availableTools = [
+					...discoveredTools.tools,
+					...Object.entries(discoveredTools.lazyToolsRecord).map(
+						([name, tool]) => ({ name, tool }),
+					),
+				];
+				const extensionNames = availableTools
+					.filter(({ tool }) => getToolMetadata(tool)?.source === 'extension')
+					.map(({ name }) => name)
+					.sort();
+				const extensionNameSet = new Set(extensionNames);
+				const effectiveNames = Array.from(
+					new Set(availableTools.map(({ name }) => name)),
 				).sort();
-
-				const globalToolsDir = getGlobalToolsDir();
-				const localToolsDir = `${projectRoot}/.otto/tools`;
-				const globalToolNames = await listDir(globalToolsDir);
-				const localToolNames = await listDir(localToolsDir);
-
 				const tools = {
-					defaultNames: defaultToolNames,
-					globalPath: globalToolNames.length ? globalToolsDir : null,
-					globalNames: globalToolNames.sort(),
-					localPath: localToolNames.length ? localToolsDir : null,
-					localNames: localToolNames.sort(),
-					effectiveNames: Array.from(
-						new Set([
-							...defaultToolNames,
-							...globalToolNames,
-							...localToolNames,
-						]),
-					).sort(),
+					builtInNames: effectiveNames.filter(
+						(name) => !extensionNameSet.has(name),
+					),
+					extensionNames,
+					effectiveNames,
 				};
 
 				const globalCommandsDir = getGlobalCommandsDir();

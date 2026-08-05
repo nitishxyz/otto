@@ -2,6 +2,7 @@ import {
 	buildLoadToolsTool,
 	discoverProjectTools,
 	getLazyToolDefinitions,
+	getToolMetadata,
 	loadConfig,
 	logger,
 } from '@ottocode/sdk';
@@ -118,12 +119,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		reference.path ? [reference.path] : [],
 	);
 	const discoveredToolsPromise = timePromise(
-		discoverProjectTools(
-			cfg.projectRoot,
-			undefined,
-			cfg.skills,
-			referenceRoots,
-		),
+		discoverProjectTools(cfg.projectRoot, cfg.skills, referenceRoots),
 	);
 	const { value: agentCfg, durationMs: resolveAgentConfigMs } =
 		await agentCfgPromise;
@@ -243,8 +239,10 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		lazyToolsRecord[toolItem.name] = toolItem.tool;
 	}
 
-	const allowedLazyToolNames = Object.keys(lazyToolsRecord).filter((name) =>
-		configuredLoadableNames.has(name),
+	const allowedLazyToolNames = Object.keys(lazyToolsRecord).filter(
+		(name) =>
+			configuredLoadableNames.has(name) ||
+			getToolMetadata(lazyToolsRecord[name])?.source === 'extension',
 	);
 	if (
 		allowedLazyToolNames.length !== Object.keys(lazyToolsRecord).length ||
@@ -253,16 +251,24 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		lazyToolsRecord = Object.fromEntries(
 			allowedLazyToolNames.map((name) => [name, lazyToolsRecord[name]]),
 		) as Record<string, Tool>;
-		const lazyBriefs = getLazyToolDefinitions()
-			.filter(({ name }) => allowedLazyToolNames.includes(name))
-			.map(({ name, description }) => ({ name, description }));
+		const lazyDescriptions = new Map(
+			getLazyToolDefinitions().map(({ name, description }) => [
+				name,
+				description,
+			]),
+		);
 		for (const item of configuredServerTools.loadable) {
 			if (!allowedLazyToolNames.includes(item.name)) continue;
-			lazyBriefs.push({
-				name: item.name,
-				description: item.description,
-			});
+			lazyDescriptions.set(item.name, item.description);
 		}
+		const lazyBriefs = allowedLazyToolNames.map((name) => ({
+			name,
+			description:
+				lazyDescriptions.get(name) ??
+				(typeof lazyToolsRecord[name]?.description === 'string'
+					? lazyToolsRecord[name].description
+					: `Load ${name}`),
+		}));
 		const loadTools = buildLoadToolsTool(lazyBriefs);
 		allTools = allTools.map((item) =>
 			item.name === loadTools.name ? loadTools : item,

@@ -120,73 +120,54 @@ Supported manifest fields:
 | `confirm` | Confirmation policy/message |
 | `interactive` | Prompt for input if none was supplied |
 
-## Custom tools
+## Native plugin tools
 
-Custom tools are plugin folders discovered from:
+Plugins can contribute TypeScript or JavaScript tools through `otto.plugin.json`.
+Native tools run in an isolated child process using the Bun runtime bundled with
+the Otto CLI. Their code is imported only when the tool is called.
 
-- `.otto/tools/<tool-name>/tool.js`
-- `.otto/tools/<tool-name>/tool.mjs`
-- `~/.config/otto/tools/<tool-name>/tool.js`
-- `~/.config/otto/tools/<tool-name>/tool.mjs`
-
-The loader expects a descriptor object or a factory function returning one.
-
-### Descriptor shape
-
-```ts
+```json
 {
-  name?: string;
-  description?: string;
-  parameters?: Record<string, {
-    type: 'string' | 'number' | 'boolean';
-    description?: string;
-    default?: string | number | boolean;
-    enum?: string[];
-    optional?: boolean;
-  }>;
-  execute?: (args) => unknown | Promise<unknown>;
-  run?: (args) => unknown | Promise<unknown>;
-  handler?: (args) => unknown | Promise<unknown>;
-  setup?: (context) => unknown | Promise<unknown>;
-  onInit?: (context) => unknown | Promise<unknown>;
+  "name": "project-info",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "summary",
+      "entry": "tools/summary.ts",
+      "description": "Summarize project metadata",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "effects": ["workspace-read"],
+      "timeoutMs": 120000
+    }
+  ]
 }
 ```
 
-`execute`, `run`, or `handler` can be used as the entrypoint.
+Native plugin tools are always loadable and never enter the first-class tool set.
+The model-facing name is namespaced as `project-info__summary`. Supported effects
+are `workspace-read`, `workspace-write`, `process`, `network`, `secrets`, and
+`external-write`. Effects participate in dangerous-mode approval decisions.
 
-### Example tool
+An entry exports a function or an object with an `execute` function:
 
-Create `.otto/tools/file-size/tool.js`:
+```ts
+import type { NativeToolHandler } from '@ottocode/sdk/tool-extension';
 
-```js
-export default {
-  name: 'file_size',
-  description: 'Get the byte size of a file',
-  parameters: {
-    path: {
-      type: 'string',
-      description: 'Path to inspect',
-    },
-  },
-  async execute({ input, fs }) {
-    const content = await fs.readFile(input.path, 'utf8');
-    return { bytes: Buffer.byteLength(content, 'utf8') };
-  },
-};
+export default (async (input, context) => {
+  const content = await context.workspace.readText(String(input.path));
+  return { characters: content.length };
+}) satisfies NativeToolHandler;
 ```
 
-### Helper context
-
-Tool executors receive helpers including:
-
-- `input` — validated input object
-- `project` / `projectRoot`
-- `directory` / `worktree`
-- `exec()` / `run()` — run a command
-- ``$`` — template-string command helper
-- `fs.readFile()` / `fs.writeFile()` / `fs.exists()`
-- `env` — environment variables
-- `context` — tool/plugin metadata including `toolDir`
+See [Native Tool Extension Architecture](./plans/native-tool-extension-architecture.md)
+for the runtime and trust model.
 
 ## Custom agents
 

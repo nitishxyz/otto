@@ -307,7 +307,8 @@ Core built-ins include:
 - agent control: `update_todos`, `progress_update`, `finish`, `skill`
 - research helpers: `query_sessions`, `query_messages`, `get_session_context`, `search_history`, `get_parent_session`, `present_action`
 
-Custom tools are loaded from project/global tool directories as `tool.js` or `tool.mjs` plugins.
+Native extension tools are declared by installed `otto.plugin.json` manifests
+and execute in isolated Bun host processes.
 
 ---
 

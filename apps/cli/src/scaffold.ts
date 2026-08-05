@@ -93,7 +93,7 @@ async function scaffoldAgent(
 	}
 	const tools = await multiselect({
 		message: 'Select tools to allow for this agent',
-		// built-ins + discovered custom ids under .otto/tools/
+		// built-ins + tools contributed by installed plugins
 		options: (await listAvailableTools(projectRoot, scope)).map((t) => ({
 			value: t,
 			label: t,
@@ -161,25 +161,56 @@ async function scaffoldTool(projectRoot: string, baseDir: string) {
 		placeholder: 'What does this tool do?',
 	});
 	if (isCancel(desc)) return cancel('Cancelled');
-	const dir = `${baseDir}/tools/${String(id)}`;
-	await ensureDir(dir);
-	const file = `${dir}/tool.js`;
-	const content = toolTemplate(String(id), String(desc));
+	const dir = `${baseDir}/plugins/${String(id)}`;
+	const toolsDir = `${dir}/tools`;
+	await ensureDir(toolsDir);
+	const file = `${toolsDir}/${String(id)}.ts`;
+	const content = toolTemplate();
 	await Bun.write(file, content);
+	await Bun.write(
+		`${dir}/otto.plugin.json`,
+		`${JSON.stringify(
+			{
+				name: String(id),
+				version: '0.1.0',
+				description: String(desc),
+				tools: [
+					{
+						name: String(id),
+						entry: `tools/${String(id)}.ts`,
+						description: String(desc),
+						inputSchema: {
+							type: 'object',
+							properties: {
+								text: { type: 'string', description: 'Text to echo' },
+							},
+							required: ['text'],
+							additionalProperties: false,
+						},
+						effects: [],
+					},
+				],
+			},
+			null,
+			2,
+		)}\n`,
+	);
 	const scope = isGlobalBase(baseDir, projectRoot) ? 'global' : 'local';
 	const home = getHomeDir();
 	const displayBase = baseDir.startsWith(home)
 		? baseDir.replace(home, '~')
 		: baseDir;
-	const display = `${displayBase}/tools/${String(id)}`;
-	log.success(`Tool created (${scope}): ${display}/tool.js`);
+	const display = `${displayBase}/plugins/${String(id)}`;
+	log.success(`Native plugin tool created (${scope}): ${display}`);
 	log.info(
-		`Edit ${display}/tool.js to customize parameters and execution logic.`,
+		`Edit ${display}/otto.plugin.json and ${display}/tools/${String(id)}.ts.`,
 	);
 	const agentsFile = baseDir.startsWith(home)
 		? `${baseDir.replace(home, '~')}/agents.json`
 		: `${baseDir}/agents.json`;
-	log.info(`Remember to allow it in your agent via ${agentsFile}.`);
+	log.info(
+		`Remember to allow ${String(id)}__${String(id)} in your agent via ${agentsFile}.`,
+	);
 	outro('Done');
 }
 
@@ -469,13 +500,9 @@ export async function listAvailableTools(
 	_projectRoot: string,
 	_scope: 'local' | 'global',
 ): Promise<string[]> {
-	const globalConfigDir = getGlobalConfigDir();
-	const { tools: discovered } = await discoverProjectTools(
-		_projectRoot,
-		globalConfigDir,
-	).catch(() => ({
+	const discovered = await discoverProjectTools(_projectRoot).catch(() => ({
 		tools: [] as { name: string }[],
-		lazyToolsRecord: {},
+		lazyToolsRecord: {} as Record<string, unknown>,
 		mcpToolsRecord: {},
 	}));
 	const names = new Set<string>();
@@ -492,7 +519,10 @@ export async function listAvailableTools(
 		'git_commit',
 	];
 	for (const builtin of curatedBuiltIns) names.add(builtin);
-	for (const { name } of discovered) {
+	for (const name of [
+		...discovered.tools.map(({ name }) => name),
+		...Object.keys(discovered.lazyToolsRecord),
+	]) {
 		// Hide internal helpers
 		if (name === 'pwd' || name === 'cd' || name === 'progress_update') continue;
 		names.add(name);
@@ -617,35 +647,15 @@ function defaultCommandPromptTemplate(name: string): string {
 	return `# ${name} command\n\nDescribe what this command should do.\n\n- Outline the steps the agent should follow.\n- Mention any tools or context to gather first.\n- Include {input} where the user's input should be referenced.\n`;
 }
 
-function toolTemplate(id: string, description: string): string {
-	const nameLiteral = JSON.stringify(id);
-	const descLiteral = JSON.stringify(description);
-	return `// Example otto tool plugin. Adjust parameters and execute() as needed.
-// export default async ({ project, exec, fs }) => ({
-//   name: ${nameLiteral},
-//   description: ${descLiteral},
-//   parameters: {
-//     text: { type: 'string', description: 'Text to echo' },
-//     loud: { type: 'boolean', default: false }
-//   },
-//   async execute({ input }) {
-//     const value = input.loud ? String(input.text).toUpperCase() : input.text;
-//     return { project, value };
-//   }
-// });
+function toolTemplate(): string {
+	return `import type { NativeToolHandler } from '@ottocode/sdk/tool-extension';
 
-export default async ({ project }) => ({
-  name: ${nameLiteral},
-  description: ${descLiteral},
-  parameters: {
-    text: { type: 'string', description: 'Text to echo' },
-    loud: { type: 'boolean', default: false }
-  },
-  async execute({ input }) {
-    const value = input.loud ? String(input.text).toUpperCase() : input.text;
-    return { project, value };
-  }
-});
+export default (async (input, context) => {
+	return {
+		projectRoot: context.projectRoot,
+		value: String(input.text),
+	};
+}) satisfies NativeToolHandler;
 `;
 }
 

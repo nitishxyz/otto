@@ -178,12 +178,8 @@ If you do not inject everything explicitly, embedded otto can still read:
 - `~/.config/otto/config.json`
 - `~/.config/otto/agents.json`
 
-Custom tools can still be discovered from:
-
-- `.otto/tools/<tool-name>/tool.js`
-- `.otto/tools/<tool-name>/tool.mjs`
-- `~/.config/otto/tools/<tool-name>/tool.js`
-- `~/.config/otto/tools/<tool-name>/tool.mjs`
+Native tools are discovered from installed plugins with `tools` contributions in
+their `otto.plugin.json` manifests.
 
 ## API routing expectations
 

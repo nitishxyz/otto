@@ -1,4 +1,5 @@
 import { publish } from '../../events/bus.ts';
+import type { PluginToolEffect } from '@ottocode/sdk';
 import { scopedCallKey } from '../projects/scope.ts';
 import {
 	discardSessionAttention,
@@ -23,6 +24,14 @@ export const DANGEROUS_TOOLS = new Set([
 ]);
 
 export const SAFE_TOOLS = new Set(['progress_update', 'update_todos']);
+
+const APPROVAL_REQUIRED_EFFECTS = new Set<PluginToolEffect>([
+	'workspace-write',
+	'process',
+	'network',
+	'secrets',
+	'external-write',
+]);
 
 const DANGEROUS_BROWSER_ACTIONS = new Set([
 	'open',
@@ -53,11 +62,15 @@ export function requiresApproval(
 	toolName: string,
 	mode: ToolApprovalMode,
 	args?: unknown,
+	effects?: PluginToolEffect[],
 ): boolean {
 	if (SAFE_TOOLS.has(toolName)) return false;
 	if (mode === 'auto' || mode === 'yolo') return false;
 	if (mode === 'all') return true;
 	if (mode === 'dangerous') {
+		if (effects) {
+			return effects.some((effect) => APPROVAL_REQUIRED_EFFECTS.has(effect));
+		}
 		if (toolName === 'forge') {
 			const input =
 				args && typeof args === 'object' && !Array.isArray(args)

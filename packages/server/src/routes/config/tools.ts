@@ -1,9 +1,11 @@
 import { z } from '@hono/zod-openapi';
 import {
 	discoverProjectTools,
+	getToolMetadata,
 	getLazyToolDefinitions,
 	loadConfig,
 	logger,
+	type ToolMetadata,
 } from '@ottocode/sdk';
 import type { Tool } from 'ai';
 import type { Hono } from 'hono';
@@ -164,6 +166,7 @@ function getToolSource(name: string, options: { mcp: boolean }): ToolSource {
 function toToolDetail(args: {
 	name: string;
 	tool?: Tool;
+	metadata?: ToolMetadata;
 	mcp?: boolean;
 	available?: boolean;
 	activation?: ToolDetail['activation'];
@@ -176,7 +179,12 @@ function toToolDetail(args: {
 		activation:
 			args.activation ?? (args.mcp ? 'mcp' : ('first_class' as const)),
 		required: REQUIRED_TOOLS.has(args.name) || undefined,
-		risky: RISKY_TOOLS.has(args.name) || undefined,
+		risky:
+			RISKY_TOOLS.has(args.name) ||
+			Boolean(
+				args.metadata?.effects?.some((effect) => effect !== 'workspace-read'),
+			) ||
+			undefined,
 		available: args.available ?? true,
 	};
 }
@@ -206,7 +214,6 @@ export function registerToolsRoute(app: Hono) {
 				const cfg = await loadConfig(projectRoot);
 				const discovered = await discoverProjectTools(
 					cfg.projectRoot,
-					undefined,
 					cfg.skills,
 				);
 				const details = new Map<string, ToolDetail>();
@@ -214,7 +221,11 @@ export function registerToolsRoute(app: Hono) {
 				for (const item of discovered.tools) {
 					details.set(
 						item.name,
-						toToolDetail({ name: item.name, tool: item.tool }),
+						toToolDetail({
+							name: item.name,
+							tool: item.tool,
+							metadata: item.metadata,
+						}),
 					);
 				}
 
@@ -260,15 +271,18 @@ export function registerToolsRoute(app: Hono) {
 					]),
 				);
 				for (const [name, tool] of Object.entries(discovered.lazyToolsRecord)) {
+					const metadata = getToolMetadata(tool);
+					const isExtension = metadata?.source === 'extension';
 					details.set(name, {
 						...toToolDetail({
 							name,
 							tool,
+							metadata,
 							activation: 'loadable',
 						}),
-						category: 'loadable',
+						category: isExtension ? 'custom' : 'loadable',
 						description: lazyDescriptions.get(name) ?? getToolDescription(tool),
-						source: 'builtin',
+						source: isExtension ? 'custom' : 'builtin',
 						available: true,
 					});
 				}

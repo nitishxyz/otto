@@ -48,9 +48,17 @@ export function buildLazyToolsRecord(
 export function buildLoadFirstPartyToolsTool(allowedNames?: Iterable<string>): {
 	name: string;
 	tool: Tool;
-} {
+};
+export function buildLoadFirstPartyToolsTool(
+	allowedNames: Iterable<string> | undefined,
+	extraBriefs: LazyToolBrief[],
+): { name: string; tool: Tool };
+export function buildLoadFirstPartyToolsTool(
+	allowedNames?: Iterable<string>,
+	extraBriefs: LazyToolBrief[] = [],
+): { name: string; tool: Tool } {
 	const allowed = allowedNames ? new Set(allowedNames) : null;
-	const briefs = getLazyToolDefinitions()
+	const briefs = [...getLazyToolDefinitions(), ...extraBriefs]
 		.filter(({ name }) => !allowed || allowed.has(name))
 		.map(({ name, description }) => ({
 			name,

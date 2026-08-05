@@ -89,6 +89,10 @@
 			"import": "./src/core/src/tools/bin-manager.ts",
 			"types": "./src/core/src/tools/bin-manager.ts"
 		},
+		"./tool-extension": {
+			"import": "./src/tool-extension.ts",
+			"types": "./src/tool-extension.ts"
+		},
 		"./search/fff": {
 			"import": "./src/core/src/search/fff.ts",
 			"types": "./src/core/src/search/fff.ts"

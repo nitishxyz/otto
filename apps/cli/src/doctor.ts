@@ -21,11 +21,8 @@ type DoctorResult = {
 		localNames: string[];
 	};
 	tools: {
-		defaultNames: string[];
-		globalPath: string | null;
-		globalNames: string[];
-		localPath: string | null;
-		localNames: string[];
+		builtInNames: string[];
+		extensionNames: string[];
 		effectiveNames: string[];
 	};
 	commands: {
@@ -101,23 +98,11 @@ export async function runDoctorCommand(opts: { project?: string } = {}) {
 	box('Agents', agentLines);
 
 	const toolScopes = buildScopeLines([
-		['default', result.tools.defaultNames],
-		['global', result.tools.globalNames],
-		['local', result.tools.localNames],
+		['built-in', result.tools.builtInNames],
+		['extensions', result.tools.extensionNames],
 		['effective', result.tools.effectiveNames],
 	]);
-	const toolLines: string[] = [];
-	if (result.tools.globalPath)
-		toolLines.push(
-			colors.dim(`global dir: ${friendlyPath(result.tools.globalPath)}`),
-		);
-	if (result.tools.localPath)
-		toolLines.push(
-			colors.dim(`local dir: ${friendlyPath(result.tools.localPath)}`),
-		);
-	if (toolLines.length) toolLines.push(' ');
-	toolLines.push(...toolScopes);
-	box('Tools', toolLines);
+	box('Tools', toolScopes);
 
 	const commandLines: string[] = [];
 	if (result.commands.globalPath)

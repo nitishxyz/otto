@@ -190,12 +190,13 @@ otto tools             # tools and which agents can use them`}</CodeBlock>
 ~/.config/otto/agents/reviewer.md    # same agent, machine-wide`}</CodeBlock>
 			<CodeBlock>{`otto scaffold          # generate an agent, tool, or command`}</CodeBlock>
 
-			<h2>Custom tools</h2>
+			<h2>Native plugin tools</h2>
 			<p>
-				Tools are plugins discovered from project and global tool directories.
+				Installed plugins contribute namespaced TypeScript or JavaScript tools
+				through their <code>otto.plugin.json</code> manifests.
 			</p>
-			<CodeBlock>{`.otto/tools/<tool-name>/tool.js
-~/.config/otto/tools/<tool-name>/tool.js`}</CodeBlock>
+			<CodeBlock>{`.otto/plugins/<plugin-name>/otto.plugin.json
+~/.config/otto/plugins/<plugin-name>/otto.plugin.json`}</CodeBlock>
 
 			<h2>Skills</h2>
 			<p>

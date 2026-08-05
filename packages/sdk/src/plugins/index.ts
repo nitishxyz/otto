@@ -110,6 +110,38 @@ export const pluginRequirementSchema = z.object({
 	message: z.string().optional(),
 });
 
+export const pluginToolEffectSchema = z.enum([
+	'workspace-read',
+	'workspace-write',
+	'process',
+	'network',
+	'secrets',
+	'external-write',
+]);
+
+const pluginToolEntrySchema = z
+	.string()
+	.min(1)
+	.refine(
+		(entry) => {
+			if (entry.startsWith('/') || /^[A-Za-z]:[\\/]/.test(entry)) return false;
+			return !entry.split(/[\\/]/).includes('..');
+		},
+		{ message: 'Plugin tool entry must stay within the plugin directory' },
+	);
+
+const jsonObjectSchema = z.record(z.unknown());
+
+export const pluginToolSchema = z.object({
+	name: pluginNameSchema,
+	entry: pluginToolEntrySchema,
+	description: z.string().min(1),
+	inputSchema: jsonObjectSchema,
+	outputSchema: jsonObjectSchema.optional(),
+	effects: z.array(pluginToolEffectSchema).default([]),
+	timeoutMs: z.number().int().min(100).max(900_000).default(120_000),
+});
+
 export const pluginManifestSchema = z.object({
 	$schema: z.string().optional(),
 	name: pluginNameSchema,
@@ -127,6 +159,7 @@ export const pluginManifestSchema = z.object({
 	dependencies: z.array(pluginNameSchema).optional(),
 	mcpServers: z.record(z.unknown()).optional(),
 	commands: z.record(pluginCommandSchema).optional(),
+	tools: z.array(pluginToolSchema).optional(),
 	browser: z
 		.object({
 			previewUrl: z.string().optional(),
@@ -182,6 +215,7 @@ export const pluginRegistryEntrySchema = pluginManifestSchema
 		dependencies: true,
 		mcpServers: true,
 		commands: true,
+		tools: true,
 		browser: true,
 		requirements: true,
 	})
@@ -226,6 +260,8 @@ export type PluginCommand = {
 	allowExtraArgs?: boolean;
 	fallback?: PluginCommand;
 };
+export type PluginTool = z.infer<typeof pluginToolSchema>;
+export type PluginToolEffect = z.infer<typeof pluginToolEffectSchema>;
 export type PluginSource = z.infer<typeof pluginSourceSchema>;
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 export type PluginConfigEntry = z.infer<typeof pluginConfigEntrySchema>;

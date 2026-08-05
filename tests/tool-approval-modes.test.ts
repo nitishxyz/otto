@@ -18,6 +18,21 @@ describe('tool approval modes', () => {
 		expect(requiresApproval('read', 'dangerous')).toBe(false);
 	});
 
+	test('dangerous mode uses extension effects instead of tool names', () => {
+		expect(
+			requiresApproval('plugin__inspect', 'dangerous', {}, ['workspace-read']),
+		).toBe(false);
+		expect(
+			requiresApproval('plugin__deploy', 'dangerous', {}, [
+				'workspace-read',
+				'external-write',
+			]),
+		).toBe(true);
+		expect(requiresApproval('plugin__run', 'dangerous', {}, ['process'])).toBe(
+			true,
+		);
+	});
+
 	test('dangerous mode only prompts for mutating browser actions', () => {
 		for (const action of [
 			'open',

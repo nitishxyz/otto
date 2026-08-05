@@ -138,7 +138,7 @@ Project config:
 .otto/config.json
 .otto/agents.json
 .otto/agents/<name>.md
-.otto/tools/<tool-name>/tool.js
+.otto/plugins/<plugin-name>/otto.plugin.json
 ```
 
 ---

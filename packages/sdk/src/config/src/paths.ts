@@ -88,10 +88,6 @@ export function getGlobalAgentsDir(): string {
 	return joinPath(getGlobalConfigDir(), 'agents');
 }
 
-export function getGlobalToolsDir(): string {
-	return joinPath(getGlobalConfigDir(), 'tools');
-}
-
 export function getGlobalCommandsDir(): string {
 	return joinPath(getGlobalConfigDir(), 'commands');
 }
