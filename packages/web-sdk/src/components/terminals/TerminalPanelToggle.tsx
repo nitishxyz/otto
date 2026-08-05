@@ -29,14 +29,14 @@ export const TerminalPanelToggle = memo(function TerminalPanelToggle() {
 	}, [toggleTerminalTabs]);
 
 	return (
-		<Tooltip content="Terminals (⌘J / Ctrl+J)" side="left">
+		<Tooltip content="Terminals (Ctrl+`)" side="left">
 			<button
 				type="button"
 				onClick={() => void toggleTerminalTabs()}
 				className={`relative h-12 w-full transition-colors touch-manipulation flex items-center justify-center ${
 					isActive ? 'bg-muted border-r-2 border-primary' : 'hover:bg-muted/50'
 				}`}
-				aria-label="Terminals (⌘J / Ctrl+J)"
+				aria-label="Terminals (Ctrl+`)"
 			>
 				<Terminal className="w-5 h-5 text-muted-foreground mx-auto" />
 				{count > 0 && (

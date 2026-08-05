@@ -36,7 +36,7 @@ const SHORTCUTS: ShortcutItem[] = [
 	},
 	{
 		keys: ['Ctrl', 'J/K'],
-		description: 'Cycle right rail panels (when a right panel is open)',
+		description: 'Cycle numbered right rail items in visual order',
 		category: 'Navigation',
 	},
 	{
@@ -50,7 +50,7 @@ const SHORTCUTS: ShortcutItem[] = [
 		category: 'Navigation',
 	},
 	{
-		keys: ['Ctrl', 'J'],
+		keys: ['Ctrl', '`'],
 		description: 'Toggle terminal panel',
 		category: 'Navigation',
 	},

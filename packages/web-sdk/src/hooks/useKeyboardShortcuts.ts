@@ -12,20 +12,22 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useResearchStore } from '../stores/researchStore';
 import { useFilePickerStore } from '../stores/filePickerStore';
 import { useViewerTabsStore } from '../stores/viewerTabsStore';
-import { useToggleTerminalTabs } from './useTerminalTabs';
 
-/** Right rail panels in visual top-to-bottom order for Cmd/Ctrl+J/K cycling. */
-const RIGHT_PANEL_ORDER = [
+/** Numbered right-rail items in their exact visual 1–9 order. */
+const RIGHT_RAIL_ORDER = [
 	'git',
 	'session-files',
 	'file-browser',
+	'browser',
 	'tunnel',
 	'mcp',
 	'skills',
+	'agents',
 	'settings',
 ] as const;
 
-type RightPanelId = (typeof RIGHT_PANEL_ORDER)[number];
+type RightRailItemId = (typeof RIGHT_RAIL_ORDER)[number];
+type RightPanelId = Exclude<RightRailItemId, 'browser' | 'agents'>;
 
 function getOpenRightPanelId(): RightPanelId | null {
 	if (useGitStore.getState().isExpanded) return 'git';
@@ -82,6 +84,39 @@ function collapseAllRightPanels() {
 	useSettingsStore.getState().collapseSidebar();
 }
 
+function getActiveRightRailItem(): RightRailItemId | null {
+	const openPanel = getOpenRightPanelId();
+	if (openPanel) return openPanel;
+	if (useAgentsStore.getState().isExpanded) return 'agents';
+	const viewer = useViewerTabsStore.getState();
+	const activeTab = viewer.activeTabId
+		? viewer.tabsById[viewer.activeTabId]
+		: undefined;
+	if (!viewer.isCollapsed && activeTab?.type === 'browser') return 'browser';
+	return null;
+}
+
+function activateRightRailItem(id: RightRailItemId) {
+	if (id === 'browser') {
+		collapseAllRightPanels();
+		useAgentsStore.getState().closeManager();
+		const viewer = useViewerTabsStore.getState();
+		const browserTab = viewer.tabOrder
+			.map((tabId) => viewer.tabsById[tabId])
+			.find((tab) => tab?.type === 'browser');
+		if (browserTab) viewer.setActiveTab(browserTab.id);
+		else viewer.openBrowserTab();
+		return;
+	}
+	if (id === 'agents') {
+		collapseAllRightPanels();
+		useAgentsStore.getState().openManager();
+		return;
+	}
+	useAgentsStore.getState().closeManager();
+	expandRightPanel(id);
+}
+
 function isViewerPaneVisible(): boolean {
 	const state = useViewerTabsStore.getState();
 	return state.tabs.length > 0 && !state.isCollapsed;
@@ -112,6 +147,15 @@ function focusViewerPaneElement() {
 	}
 
 	viewerPane.focus({ preventScroll: true });
+}
+
+function focusChatInputElement(): boolean {
+	const input = document.querySelector<HTMLTextAreaElement>(
+		'[data-chat-input]:not(:disabled)',
+	);
+	if (!input || input.getClientRects().length === 0) return false;
+	input.focus({ preventScroll: true });
+	return true;
 }
 
 interface UseKeyboardShortcutsOptions {
@@ -173,7 +217,6 @@ export function useKeyboardShortcuts({
 	const toggleAgents = useAgentsStore((state) => state.toggleManager);
 	const toggleSettings = useSettingsStore((state) => state.toggleSidebar);
 	const toggleResearch = useResearchStore((state) => state.toggleSidebar);
-	const toggleTerminalTabs = useToggleTerminalTabs();
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
@@ -338,12 +381,23 @@ export function useKeyboardShortcuts({
 			) {
 				e.preventDefault();
 				e.stopPropagation();
+				// One physical press moves exactly one pane. Without this guard,
+				// key repeat can move terminal -> chat -> sessions in one hold.
+				if (e.repeat) return;
+				// Opening a terminal can move DOM focus before React commits the
+				// corresponding store update. The event target is authoritative:
+				// an H/L chord originating in a terminal starts from the viewer.
+				const paneFocus = isInTerminal
+					? 'viewer'
+					: useFocusStore.getState().currentFocus;
 				const blurActive = () =>
 					(document.activeElement as HTMLElement)?.blur();
 				const focusChat = () => {
 					blurActive();
 					setFocus('input');
-					setTimeout(() => onReturnToInput?.(), 50);
+					if (!focusChatInputElement()) {
+						setTimeout(() => onReturnToInput?.(), 50);
+					}
 				};
 				const focusViewer = () => {
 					blurActive();
@@ -361,16 +415,15 @@ export function useKeyboardShortcuts({
 				};
 				const viewerVisible = isViewerPaneVisible();
 				const openRightPanel = getOpenRightPanelId();
-				const onRightPanel =
-					currentFocus === 'git' || currentFocus === 'rightPanel';
+				const onRightPanel = paneFocus === 'git' || paneFocus === 'rightPanel';
 
 				if (e.key === 'h') {
 					if (onRightPanel) {
 						if (viewerVisible) focusViewer();
 						else focusChat();
-					} else if (currentFocus === 'viewer') {
+					} else if (paneFocus === 'viewer') {
 						focusChat();
-					} else if (currentFocus === 'sessions') {
+					} else if (paneFocus === 'sessions') {
 						// Already at the leftmost pane: close the sidebar
 						setSessionListCollapsed(true);
 						focusChat();
@@ -387,7 +440,7 @@ export function useKeyboardShortcuts({
 				}
 
 				// 'l': move focus one pane to the right
-				if (currentFocus === 'sessions') {
+				if (paneFocus === 'sessions') {
 					focusChat();
 				} else if (onRightPanel) {
 					// Already at the rightmost pane: close the panel
@@ -395,7 +448,7 @@ export function useKeyboardShortcuts({
 					closeDiff();
 					if (viewerVisible) focusViewer();
 					else focusChat();
-				} else if (currentFocus === 'viewer') {
+				} else if (paneFocus === 'viewer') {
 					if (openRightPanel) {
 						focusRightPanel(openRightPanel);
 					} else {
@@ -425,8 +478,8 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			// Ctrl+J / Ctrl+K: with a right panel open, cycle up/down through
-			// the right rail panels. With none open, Ctrl+J toggles terminals.
+			// Ctrl+J / Ctrl+K: cycle through the numbered right rail in exact
+			// visual order. Terminal toggling remains exclusively Ctrl+`.
 			if (
 				isShortcutModifierPressed &&
 				!e.shiftKey &&
@@ -434,30 +487,31 @@ export function useKeyboardShortcuts({
 				!isTerminalCtrlChord &&
 				(e.key === 'j' || e.key === 'k')
 			) {
-				const openRightPanel = getOpenRightPanelId();
-				if (openRightPanel) {
+				const activeRailItem = getActiveRightRailItem();
+				if (activeRailItem) {
 					e.preventDefault();
 					e.stopPropagation();
-					const index = RIGHT_PANEL_ORDER.indexOf(openRightPanel);
+					if (e.repeat) return;
+					const index = RIGHT_RAIL_ORDER.indexOf(activeRailItem);
 					const delta = e.key === 'j' ? 1 : -1;
 					const next =
-						RIGHT_PANEL_ORDER[
-							(index + delta + RIGHT_PANEL_ORDER.length) %
-								RIGHT_PANEL_ORDER.length
+						RIGHT_RAIL_ORDER[
+							(index + delta + RIGHT_RAIL_ORDER.length) %
+								RIGHT_RAIL_ORDER.length
 						];
-					expandRightPanel(next);
+					activateRightRailItem(next);
 					(document.activeElement as HTMLElement)?.blur();
-					if (next === 'git') {
+					if (next === 'browser') {
+						setFocus('viewer');
+						setTimeout(focusViewerPaneElement, 0);
+					} else if (next === 'agents') {
+						setFocus('rightPanel');
+					} else if (next === 'git') {
 						setFocus('git');
 						resetGitFileIndex();
 					} else {
 						setFocus('rightPanel');
 					}
-					return;
-				}
-				if (e.key === 'j') {
-					e.preventDefault();
-					void toggleTerminalTabs();
 					return;
 				}
 			}
@@ -634,7 +688,6 @@ export function useKeyboardShortcuts({
 			toggleSkills,
 			toggleAgents,
 			toggleSettings,
-			toggleTerminalTabs,
 			toggleResearch,
 			toggleSessionList,
 			onSelectSession,
@@ -656,6 +709,19 @@ export function useKeyboardShortcuts({
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
 	}, [handleKeyDown]);
+
+	useEffect(() => {
+		const handleFocusIn = (event: FocusEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (target?.closest('[data-terminal-viewer]')) {
+				useFocusStore.getState().setFocus('viewer');
+			} else if (target?.matches('[data-chat-input]')) {
+				useFocusStore.getState().setFocus('input');
+			}
+		};
+		window.addEventListener('focusin', handleFocusIn, true);
+		return () => window.removeEventListener('focusin', handleFocusIn, true);
+	}, []);
 
 	return {
 		currentFocus,

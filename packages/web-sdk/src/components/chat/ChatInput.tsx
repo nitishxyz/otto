@@ -1091,6 +1091,7 @@ export const ChatInput = memo(
 											/>
 											<Textarea
 												ref={textareaRef}
+												data-chat-input
 												value={message}
 												onChange={handleChange}
 												onKeyDown={handleKeyDown}
