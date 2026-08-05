@@ -6,6 +6,7 @@ import {
 	getProjectConfigPath,
 	initializeMCP,
 	loadMCPConfig,
+	logger,
 	removeMCPServerFromConfig,
 	type MCPServerConfig,
 	type MCPServerStatus,
@@ -13,6 +14,15 @@ import {
 	type MCPTransport,
 } from '@ottocode/sdk';
 import type { ForgeInput, ForgeScope } from './types.ts';
+import {
+	completeMCPAuth,
+	getMCPAuthStatus,
+	initiateMCPAuth,
+} from '../../routes/mcp/service.ts';
+import {
+	copilotMCPOAuthStore,
+	copilotMCPSessions,
+} from '../../routes/mcp/state.ts';
 
 type MCPAction =
 	| 'create'
@@ -20,7 +30,38 @@ type MCPAction =
 	| 'remove'
 	| 'enable'
 	| 'disable'
+	| 'status'
+	| 'authenticate'
+	| 'reauthenticate'
+	| 'logout'
 	| 'execute';
+
+function scheduleCopilotAuthPolling(
+	projectRoot: string,
+	name: string,
+	sessionId: string,
+	intervalSeconds: number,
+): void {
+	let attempts = 0;
+	const run = async () => {
+		try {
+			attempts += 1;
+			const result = await completeMCPAuth({
+				name,
+				projectRoot,
+				oAuthStore: copilotMCPOAuthStore,
+				sessions: copilotMCPSessions,
+				body: { sessionId },
+			});
+			if (result.body.status === 'pending' && attempts < 60) {
+				setTimeout(() => void run(), Math.max(intervalSeconds, 1) * 1000);
+			}
+		} catch (error) {
+			logger.error(`MCP OAuth polling failed for '${name}'`, error);
+		}
+	};
+	setTimeout(() => void run(), Math.max(intervalSeconds, 1) * 1000);
+}
 
 function summarizeServer(
 	server: MCPServerConfig,
@@ -148,6 +189,19 @@ export async function runForgeMCPAction(
 	const config = await loadMCPConfig(projectRoot, globalConfigDir);
 	const existing = config.servers.find((server) => server.name === name);
 
+	if (action === 'status') {
+		if (!existing) throw new Error(`MCP server '${name}' not found`);
+		return {
+			ok: true,
+			name,
+			auth: await getMCPAuthStatus({
+				name,
+				projectRoot,
+				oAuthStore: copilotMCPOAuthStore,
+			}),
+		};
+	}
+
 	if (action === 'create' || action === 'update') {
 		if (action === 'create' && existing) {
 			throw new Error(`MCP server '${name}' already exists; use update`);
@@ -221,6 +275,47 @@ export async function runForgeMCPAction(
 		changes: [`${action} MCP server '${name}'`],
 	};
 	if (input.dryRun) return { ok: true, applied: false, plan };
+
+	if (action === 'authenticate' || action === 'reauthenticate') {
+		if (action === 'reauthenticate') {
+			let manager = getMCPManager(projectRoot);
+			if (!manager) manager = await initializeMCP({ servers: [] }, projectRoot);
+			await manager.clearAuthData(
+				name,
+				existing.scope ?? 'global',
+				projectRoot,
+			);
+			await manager.stopServer(name);
+		}
+		const result = await initiateMCPAuth({
+			name,
+			projectRoot,
+			oAuthStore: copilotMCPOAuthStore,
+			sessions: copilotMCPSessions,
+		});
+		if (!result.ok) throw new Error(result.body.error);
+		if (
+			result.body.authType === 'copilot-device' &&
+			result.body.sessionId &&
+			result.body.interval
+		) {
+			scheduleCopilotAuthPolling(
+				projectRoot,
+				name,
+				result.body.sessionId,
+				result.body.interval,
+			);
+		}
+		return { ok: true, applied: true, plan, auth: result.body };
+	}
+
+	if (action === 'logout') {
+		let manager = getMCPManager(projectRoot);
+		if (!manager) manager = await initializeMCP({ servers: [] }, projectRoot);
+		await manager.clearAuthData(name, existing.scope ?? 'global', projectRoot);
+		await manager.stopServer(name);
+		return { ok: true, applied: true, plan };
+	}
 
 	if (action === 'remove') {
 		try {

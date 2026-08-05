@@ -4,12 +4,16 @@ export const FORGE_ACTIONS = [
 	'docs',
 	'capabilities',
 	'inventory',
+	'status',
 	'plan',
 	'create',
 	'update',
 	'remove',
 	'enable',
 	'disable',
+	'authenticate',
+	'reauthenticate',
+	'logout',
 	'execute',
 ] as const;
 
@@ -19,12 +23,18 @@ export const FORGE_KINDS = [
 	'agent',
 	'mcp-server',
 	'plugin-command',
+	'provider',
+	'auth',
+	'tunnel',
 ] as const;
 export const FORGE_DOC_KINDS = [
 	'recipe',
 	'skill',
 	'agent',
 	'mcp-server',
+	'provider',
+	'auth',
+	'tunnel',
 	'plugin',
 	'app',
 ] as const;
@@ -48,6 +58,7 @@ export type ForgeInput = {
 	name?: string;
 	targetAction?: ForgeMutation;
 	description?: string;
+	label?: string;
 	content?: string;
 	dryRun?: boolean;
 	recipeAgent?: string;
@@ -58,6 +69,30 @@ export type ForgeInput = {
 	appendTools?: AgentToolConfig;
 	provider?: string;
 	model?: string;
+	compatibility?:
+		| 'ollama'
+		| 'openai-compatible'
+		| 'openai'
+		| 'anthropic'
+		| 'google'
+		| 'openrouter';
+	family?:
+		| 'default'
+		| 'openai'
+		| 'anthropic'
+		| 'google'
+		| 'kimi'
+		| 'glm'
+		| 'minimax';
+	baseURL?: string;
+	apiKeyEnv?: string;
+	models?: string[];
+	fastModels?: string[];
+	allowAnyModel?: boolean;
+	modelDiscovery?: 'openai-models' | 'ollama' | 'none';
+	apiKey?: string;
+	authMethod?: 'api-key' | 'oauth';
+	oauthMode?: 'browser' | 'device';
 	transport?: 'stdio' | 'http' | 'sse';
 	command?: string;
 	args?: string[];
@@ -66,6 +101,10 @@ export type ForgeInput = {
 	headers?: Record<string, string>;
 	start?: boolean;
 	operation?: 'start' | 'stop' | 'restart';
+	tunnelMode?: 'managed' | 'quick';
+	tunnelScope?: 'remote-control' | 'project-share';
+	projectId?: string;
+	port?: number;
 	plugin?: string;
 	commandName?: string;
 	commandArgs?: Record<string, string | number | boolean>;

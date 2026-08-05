@@ -7,6 +7,9 @@ export {
 	runForgeMutation,
 } from './service.ts';
 export { listForgeMCPServers, runForgeMCPAction } from './mcp.ts';
+export { listForgeProviders, runForgeProviderAction } from './provider.ts';
+export { listForgeAuth, runForgeAuthAction } from './auth.ts';
+export { runForgeTunnelAction } from './tunnel.ts';
 export {
 	FORGE_ACTIONS,
 	FORGE_DOC_KINDS,

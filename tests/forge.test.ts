@@ -226,6 +226,25 @@ describe('forge', () => {
 		expect(updated).toMatchObject({ ok: true, applied: false });
 		expect(JSON.stringify(updated)).toContain('updated');
 
+		const authStatus = await runForgeAction(projectRoot, {
+			action: 'status',
+			kind: 'mcp-server',
+			name: 'example',
+		});
+		expect(authStatus).toMatchObject({
+			ok: true,
+			name: 'example',
+			auth: { authenticated: false },
+		});
+
+		const reauthPreview = await runForgeAction(projectRoot, {
+			action: 'reauthenticate',
+			kind: 'mcp-server',
+			name: 'example',
+			dryRun: true,
+		});
+		expect(reauthPreview).toMatchObject({ ok: true, applied: false });
+
 		await runForgeAction(projectRoot, {
 			action: 'disable',
 			kind: 'mcp-server',
@@ -260,6 +279,70 @@ describe('forge', () => {
 		});
 		expect(result).toMatchObject({ ok: true, applied: false });
 		expect(JSON.stringify(result)).toContain('https://example.com/mcp');
+	});
+
+	it('previews custom provider creation without exposing credentials', async () => {
+		const result = await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'provider',
+			name: 'forge-test-provider',
+			description: 'Forge test provider',
+			compatibility: 'openai-compatible',
+			baseURL: 'https://models.example.test/v1',
+			models: ['test-model'],
+			dryRun: true,
+		});
+
+		expect(result).toMatchObject({
+			ok: true,
+			applied: false,
+			plan: {
+				target: { kind: 'provider', scope: 'global' },
+			},
+		});
+		expect(JSON.stringify(result)).toContain('test-model');
+	});
+
+	it('reports safe provider auth status and previews reauthentication', async () => {
+		const status = await runForgeAction(projectRoot, {
+			action: 'status',
+			kind: 'auth',
+			name: 'openai',
+		});
+		expect(status).toMatchObject({
+			ok: true,
+			auth: { provider: 'openai' },
+		});
+		expect(JSON.stringify(status)).not.toContain('refresh');
+		expect(JSON.stringify(status)).not.toContain('access');
+
+		const preview = await runForgeAction(projectRoot, {
+			action: 'reauthenticate',
+			kind: 'auth',
+			name: 'openai',
+			authMethod: 'oauth',
+			dryRun: true,
+		});
+		expect(preview).toMatchObject({ ok: true, applied: false });
+	});
+
+	it('previews managed tunnel lifecycle operations', async () => {
+		const result = await runForgeAction(projectRoot, {
+			action: 'enable',
+			kind: 'tunnel',
+			tunnelMode: 'managed',
+			tunnelScope: 'remote-control',
+			dryRun: true,
+		});
+
+		expect(result).toMatchObject({
+			ok: true,
+			applied: false,
+			plan: {
+				action: 'start',
+				target: { kind: 'tunnel', scope: 'global' },
+			},
+		});
 	});
 
 	it('rejects unknown agent tools during planning', async () => {
@@ -319,6 +402,9 @@ describe('forge', () => {
 		expect(
 			requiresApproval('forge', 'dangerous', { action: 'inventory' }),
 		).toBe(false);
+		expect(requiresApproval('forge', 'dangerous', { action: 'status' })).toBe(
+			false,
+		);
 		expect(requiresApproval('forge', 'dangerous', { action: 'docs' })).toBe(
 			false,
 		);

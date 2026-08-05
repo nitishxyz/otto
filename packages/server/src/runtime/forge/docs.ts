@@ -119,7 +119,32 @@ forge({
 		transports: {
 			title: 'MCP transports and lifecycle',
 			summary: 'Configure stdio, HTTP, or SSE and manage lifecycle.',
-			content: `stdio requires command and optionally args and env. http and sse require url and optionally headers. Set start: true on create/update to connect immediately. Use action enable or disable for configured servers. Use action execute with operation start, stop, or restart for lifecycle control. Remote servers may return authRequired and authUrl.`,
+			content: `stdio requires command and optionally args and env. http and sse require url and optionally headers. Set start: true on create/update to connect immediately. Use action enable or disable for configured servers. Use action execute with operation start, stop, or restart for lifecycle control. Use status, authenticate, reauthenticate, and logout for MCP OAuth lifecycle. Browser flows return authUrl; Copilot device flows return verificationUri and userCode while Forge polls in the daemon.`,
+		},
+	},
+	provider: {
+		management: {
+			title: 'Provider management',
+			summary: 'Create, edit, enable, disable, and remove providers.',
+			content: `Provider controls are global. Use status to inspect one provider, create for a custom provider, update for custom providers or built-in overrides, enable/disable for availability, and remove to delete a configured custom provider or built-in override.
+
+Custom providers require compatibility and baseURL on creation. Optional fields include label, family, apiKeyEnv, models, fastModels, allowAnyModel, and modelDiscovery. Use dryRun before mutations. Credentials belong to kind auth, not provider configuration.`,
+		},
+	},
+	auth: {
+		management: {
+			title: 'Provider authentication',
+			summary: 'Manage API keys, OAuth, reauthentication, and logout.',
+			content: `Use kind auth with the provider id in name. status returns only safe metadata and never tokens. authenticate and reauthenticate accept authMethod api-key or oauth. API-key authentication requires apiKey and never returns it. OAuth returns authUrl and, for device flows, userCode while Forge polls securely in the daemon. Use logout or remove to delete credentials.
+
+OpenAI supports browser or device OAuth. Anthropic and xAI support browser OAuth. Copilot, Kimi, and OttoRouter use device OAuth. Logging out of OttoRouter also disables the managed remote-control tunnel.`,
+		},
+	},
+	tunnel: {
+		lifecycle: {
+			title: 'Tunnel lifecycle',
+			summary: 'Inspect, enable, disable, start, stop, or restart tunnels.',
+			content: `Use kind tunnel with action status, enable, disable, or execute. execute requires operation start, stop, or restart. tunnelMode defaults to managed and tunnelScope defaults to remote-control. project-share scope requires projectId. Managed remote-control tunnels persist their desired enabled state across daemon restarts. Use dryRun to preview lifecycle changes.`,
 		},
 	},
 	plugin: {

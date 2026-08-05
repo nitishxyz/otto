@@ -43,6 +43,7 @@ const inputSchema = z.object({
 		.optional()
 		.describe('Mutation to preview when action is plan.'),
 	description: z.string().optional(),
+	label: z.string().optional().describe('Display label for a provider.'),
 	content: z
 		.string()
 		.optional()
@@ -62,6 +63,41 @@ const inputSchema = z.object({
 		.describe('Tools appended to an agent default configuration.'),
 	provider: z.string().optional(),
 	model: z.string().optional(),
+	compatibility: z
+		.enum([
+			'ollama',
+			'openai-compatible',
+			'openai',
+			'anthropic',
+			'google',
+			'openrouter',
+		])
+		.optional(),
+	family: z
+		.enum([
+			'default',
+			'openai',
+			'anthropic',
+			'google',
+			'kimi',
+			'glm',
+			'minimax',
+		])
+		.optional(),
+	baseURL: z.string().optional(),
+	apiKeyEnv: z.string().optional(),
+	models: z.array(z.string()).optional(),
+	fastModels: z.array(z.string()).optional(),
+	allowAnyModel: z.boolean().optional(),
+	modelDiscovery: z.enum(['openai-models', 'ollama', 'none']).optional(),
+	apiKey: z
+		.string()
+		.optional()
+		.describe(
+			'Provider API key. Accepted only by auth actions and never returned.',
+		),
+	authMethod: z.enum(['api-key', 'oauth']).optional(),
+	oauthMode: z.enum(['browser', 'device']).optional(),
 	transport: z.enum(['stdio', 'http', 'sse']).optional(),
 	command: z.string().optional(),
 	args: z.array(z.string()).optional(),
@@ -75,7 +111,11 @@ const inputSchema = z.object({
 	operation: z
 		.enum(['start', 'stop', 'restart'])
 		.optional()
-		.describe('MCP lifecycle operation when action is execute.'),
+		.describe('MCP or tunnel lifecycle operation when action is execute.'),
+	tunnelMode: z.enum(['managed', 'quick']).optional(),
+	tunnelScope: z.enum(['remote-control', 'project-share']).optional(),
+	projectId: z.string().optional(),
+	port: z.number().int().positive().optional(),
 	plugin: z.string().optional().describe('Enabled plugin namespace.'),
 	commandName: z.string().optional().describe('Plugin command name.'),
 	commandArgs: z
@@ -93,15 +133,18 @@ export function buildForgeTool(projectRoot: string): {
 	return {
 		name: 'forge',
 		tool: tool({
-			description: `Create, manage, and run Otto capabilities.
+			description: `Create, manage, and run Otto extensions and control-plane resources.
 
 Kinds:
 - recipe, skill, agent: inventory, plan, create, update, or remove project/global capabilities
-- mcp-server: inventory; plan/create/update/remove; enable/disable; execute start/stop/restart
+- mcp-server: inventory/status; plan/create/update/remove; enable/disable; authenticate/reauthenticate/logout; execute start/stop/restart
+- provider: inventory/status; plan/create/update/remove; enable/disable provider definitions and overrides
+- auth: inventory/status; authenticate/reauthenticate with API keys or OAuth; logout/remove credentials
+- tunnel: inventory/status; enable/disable; execute start/stop/restart for managed or quick tunnels
 - plugin-command: execute an enabled installed plugin command in a visible terminal
-- docs: read local version-matched guides for recipe, skill, agent, mcp-server, plugin, or app; omit topic to discover topics
+- docs: authoritative, local, version-matched guides for recipe, skill, agent, mcp-server, provider, auth, tunnel, plugin, or app; omit topic to discover topics
 
-Project scope is the default. Use global only when explicitly requested. Prefer plan or dryRun before consequential configuration changes. MCP http/sse servers may return authRequired and authUrl; share that URL with the user.`,
+Project scope is the default for explicit extension work. Providers, auth, and machine tunnels are global. Prefer plan or dryRun before consequential configuration changes. OAuth and MCP servers may return authUrl/userCode; share them with the user. Never repeat apiKey values.`,
 			inputSchema,
 			execute: async (input) => {
 				try {

@@ -37,6 +37,9 @@ import type {
 	ForgeTarget,
 } from './types.ts';
 import { listForgeMCPServers, runForgeMCPAction } from './mcp.ts';
+import { listForgeAuth, runForgeAuthAction } from './auth.ts';
+import { listForgeProviders, runForgeProviderAction } from './provider.ts';
+import { runForgeTunnelAction } from './tunnel.ts';
 
 function normalizeName(name: string | undefined): string {
 	return name?.trim().toLowerCase() ?? '';
@@ -442,6 +445,15 @@ export async function runForgeAction(projectRoot: string, input: ForgeInput) {
 		}
 		return runForgeMCPAction(projectRoot, input);
 	}
+	if (input.kind === 'provider') {
+		return runForgeProviderAction(projectRoot, input);
+	}
+	if (input.kind === 'auth') {
+		return runForgeAuthAction(projectRoot, input);
+	}
+	if (input.kind === 'tunnel') {
+		return runForgeTunnelAction(input);
+	}
 	return runForgeMutation(projectRoot, input);
 }
 
@@ -471,14 +483,25 @@ export async function runForgeMutation(
 
 export async function getForgeInventory(projectRoot: string) {
 	const repoRoot = (await findGitRoot(projectRoot)) ?? projectRoot;
-	const [recipes, skills, agentDetails, effectivePlugins, mcpServers] =
-		await Promise.all([
-			discoverAllRecipes(projectRoot),
-			discoverSkills(projectRoot, repoRoot),
-			getAllAgentDetails(projectRoot),
-			resolveEffectivePlugins(projectRoot),
-			listForgeMCPServers(projectRoot),
-		]);
+	const [
+		recipes,
+		skills,
+		agentDetails,
+		effectivePlugins,
+		mcpServers,
+		providers,
+		auth,
+		tunnel,
+	] = await Promise.all([
+		discoverAllRecipes(projectRoot),
+		discoverSkills(projectRoot, repoRoot),
+		getAllAgentDetails(projectRoot),
+		resolveEffectivePlugins(projectRoot),
+		listForgeMCPServers(projectRoot),
+		listForgeProviders(projectRoot),
+		listForgeAuth(projectRoot),
+		runForgeTunnelAction({ action: 'status', kind: 'tunnel' }),
+	]);
 
 	return {
 		projectRoot,
@@ -504,6 +527,9 @@ export async function getForgeInventory(projectRoot: string) {
 			hasGlobalOverride: agent.hasGlobalOverride,
 		})),
 		mcpServers,
+		providers,
+		auth,
+		tunnel: tunnel.tunnel,
 		plugins: effectivePlugins.plugins.map((plugin) => ({
 			name: plugin.name,
 			scope: plugin.scope,
