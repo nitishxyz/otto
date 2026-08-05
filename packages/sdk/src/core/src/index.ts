@@ -70,12 +70,41 @@ export { buildFsTools } from './tools/builtin/fs/index';
 export { buildGitTools } from './tools/builtin/git';
 export { buildTerminalTool } from './tools/builtin/terminal';
 export {
+	buildArtifactTool,
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildLoadToolsTool,
+	buildMiniAppTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
 } from './tools/lazy/index';
+
+export {
+	compileReactArtifact,
+	readArtifactBuildDocument,
+	resolveArtifactBuildAsset,
+} from './artifacts/compiler';
+export type {
+	ReactArtifactBuild,
+	ReactArtifactInput,
+} from './artifacts/compiler';
+
+export {
+	inspectMiniApp,
+	miniAppManifestSchema,
+} from './mini-apps/manifest';
+export {
+	compileMiniApp,
+	compileMiniAppInScope,
+	readMiniAppBuildDocument,
+	resolveMiniAppBuildAsset,
+	resolveMiniAppBuildAssetInCache,
+} from './mini-apps/compiler';
+export type { MiniAppCompileScope } from './mini-apps/compiler';
+export type {
+	MiniAppArtifact as MiniAppDescriptor,
+	MiniAppManifest,
+} from './mini-apps/manifest';
 
 // =======================
 // Terminals
@@ -100,6 +129,8 @@ export type {
 	Artifact,
 	FileDiffArtifact,
 	FileArtifact,
+	MiniAppArtifact,
+	ReactArtifact,
 } from './streaming/artifacts';
 
 // =======================

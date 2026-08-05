@@ -114,9 +114,11 @@ export function groupTools(
 }
 
 const FALLBACK_LOADABLE_TOOLS = new Set([
+	'artifact',
 	'read_image',
 	'copy_attachment_to_project',
 	'simulator',
+	'mini_app',
 	'forge',
 ]);
 

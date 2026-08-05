@@ -23,6 +23,7 @@ export * from './btwStore';
 export * from './subagentViewerStore';
 export * from './mcpStore';
 export * from './skillsStore';
+export * from './appsStore';
 export * from './agentsStore';
 export * from './filePickerStore';
 export * from './viewerTabsStore';

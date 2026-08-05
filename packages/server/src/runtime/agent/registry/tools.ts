@@ -82,10 +82,12 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 		],
 		loadable: [
+			'artifact',
 			'copy_into',
 			'read_image',
 			'copy_attachment_to_project',
 			'browser',
+			'mini_app',
 			'forge',
 		],
 	},
@@ -112,7 +114,7 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 			'websearch',
 			'update_todos',
 		],
-		loadable: ['browser', 'forge'],
+		loadable: ['artifact', 'browser', 'forge'],
 	},
 	git: { firstClass: ['git_status', 'git_diff', 'git_commit', 'read', 'ls'] },
 	commit: {

@@ -140,6 +140,7 @@ describe('plugin command agent awareness', () => {
 		expect(names).not.toContain('run_plugin_command');
 		expect(serverNames).toEqual(['forge']);
 		expect(buildTools.loadable).toContain('forge');
+		expect(buildTools.loadable).toContain('mini_app');
 		expect(buildTools.firstClass).not.toContain('forge');
 		expect(requiresApproval('forge', 'dangerous', { action: 'execute' })).toBe(
 			true,

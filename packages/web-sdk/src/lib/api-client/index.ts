@@ -15,6 +15,7 @@ import { secureInputMixin } from './secure-input';
 import { pluginsMixin } from './plugins';
 import { referencesMixin } from './references';
 import { shellJobsMixin } from './shell-jobs';
+import { miniAppsMixin } from './mini-apps';
 
 export { configureApiClient } from './utils';
 export type {
@@ -26,6 +27,12 @@ export type {
 	SubagentStatus,
 } from './goals';
 export type { ShellJob, ShellJobStatus } from './shell-jobs';
+export type {
+	MiniAppBuildResponse,
+	MiniAppListResponse,
+	MiniAppScope,
+	MiniAppSummary,
+} from './mini-apps';
 export type { DictationKeyword } from './config';
 export type {
 	CreateDictationSessionInput,
@@ -192,6 +199,8 @@ class ApiClient {
 	getSkillFileContent = skillsMixin.getSkillFileContent;
 	getSkillsConfig = skillsMixin.getSkillsConfig;
 	updateSkillsConfig = skillsMixin.updateSkillsConfig;
+	listMiniApps = miniAppsMixin.listMiniApps;
+	buildMiniApp = miniAppsMixin.buildMiniApp;
 
 	listRecipes = recipesMixin.listRecipes;
 	saveRecipe = recipesMixin.saveRecipe;

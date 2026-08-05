@@ -40,6 +40,8 @@ import { registerSimulatorRoutes } from './routes/simulator.ts';
 import { registerDictationRoutes } from './routes/dictation.ts';
 import { registerPluginsRoutes } from './routes/plugins/index.ts';
 import { registerProjectsRoutes } from './routes/projects.ts';
+import { registerArtifactRoutes } from './routes/artifacts.ts';
+import { registerMiniAppRoutes } from './routes/mini-apps.ts';
 import type {
 	AgentConfigEntry,
 	AgentToolConfig,
@@ -135,6 +137,8 @@ function registerRoutes(app: OpenAPIHono<BlankEnv>) {
 	registerUsageRoutes(app);
 	registerAttachmentRoutes(app);
 	registerBrowserRoutes(app);
+	registerArtifactRoutes(app);
+	registerMiniAppRoutes(app);
 	registerSimulatorRoutes(app);
 	registerDictationRoutes(app);
 }

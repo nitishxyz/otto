@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AgentDetail } from '../lib/api-client/config';
 import type { AgentEditorPage } from '../components/agents/agentConstants';
+import { useAppsStore } from './appsStore';
 import { useFileBrowserStore } from './fileBrowserStore';
 import { useGitStore } from './gitStore';
 import { useMCPStore } from './mcpStore';
@@ -44,6 +45,7 @@ function collapseOtherRightPanels() {
 	useFileBrowserStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAppsStore.getState().collapseSidebar();
 }
 
 export const useAgentsStore = create<AgentsState>((set) => ({

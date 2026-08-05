@@ -28,6 +28,7 @@ export * from './useProviderUsage';
 export * from './useFileBrowser';
 export * from './useMCP';
 export * from './useSkills';
+export * from './useMiniApps';
 export * from './useAgents';
 export * from './useChatComposer';
 export * from './useConfigModalControls';

@@ -340,6 +340,8 @@ export {
 	getGlobalAgentsDir,
 	getGlobalCommandsDir,
 	getGlobalRecipesDir,
+	getGlobalAppsDir,
+	getGlobalAppsCacheDir,
 	getGlobalDebugDir,
 	getGlobalDebugLogPath,
 	getGlobalDebugSessionsDir,
@@ -471,11 +473,36 @@ export { createToolError } from './core/src/index.ts';
 export { buildFsTools } from './core/src/index.ts';
 export { buildGitTools } from './core/src/index.ts';
 export {
+	buildArtifactTool,
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
 	buildLoadToolsTool,
+	buildMiniAppTool,
 	buildSimulatorTool,
 	getLazyToolDefinitions,
+} from './core/src/index.ts';
+export {
+	compileReactArtifact,
+	readArtifactBuildDocument,
+	resolveArtifactBuildAsset,
+} from './core/src/index.ts';
+export type {
+	ReactArtifactBuild,
+	ReactArtifactInput,
+} from './core/src/index.ts';
+export {
+	compileMiniApp,
+	compileMiniAppInScope,
+	inspectMiniApp,
+	miniAppManifestSchema,
+	readMiniAppBuildDocument,
+	resolveMiniAppBuildAsset,
+	resolveMiniAppBuildAssetInCache,
+} from './core/src/index.ts';
+export type { MiniAppCompileScope } from './core/src/index.ts';
+export type {
+	MiniAppDescriptor,
+	MiniAppManifest,
 } from './core/src/index.ts';
 export {
 	appendCoAuthorTrailer,
@@ -505,6 +532,7 @@ export type {
 	Artifact,
 	FileDiffArtifact,
 	FileArtifact,
+	MiniAppArtifact,
 } from './core/src/index.ts';
 
 // Core Types

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useGitStore } from './gitStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useResearchStore } from './researchStore';
@@ -42,11 +43,15 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 				useFileBrowserStore.getState().collapseSidebar();
 				useMCPStore.getState().collapseSidebar();
 				useSkillsStore.getState().collapseSidebar();
+				useAppsStore.getState().collapseSidebar();
 			}
 			return { isExpanded: newExpanded };
 		});
 	},
-	expandSidebar: () => set({ isExpanded: true }),
+	expandSidebar: () => {
+		useAppsStore.getState().collapseSidebar();
+		set({ isExpanded: true });
+	},
 	collapseSidebar: () => set({ isExpanded: false }),
 	openPreferences: (tab = 'editor') => set({ preferencesTab: tab }),
 	closePreferences: () => set({ preferencesTab: null }),

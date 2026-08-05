@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useGitStore } from './gitStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useResearchStore } from './researchStore';
@@ -63,6 +64,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
 				useTunnelStore.getState().collapseSidebar();
 				useFileBrowserStore.getState().collapseSidebar();
 				useMCPStore.getState().collapseSidebar();
+				useAppsStore.getState().collapseSidebar();
 			}
 			return { isExpanded: newExpanded };
 		});
@@ -76,6 +78,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
 		useTunnelStore.getState().collapseSidebar();
 		useFileBrowserStore.getState().collapseSidebar();
 		useMCPStore.getState().collapseSidebar();
+		useAppsStore.getState().collapseSidebar();
 		set({ isExpanded: true });
 	},
 

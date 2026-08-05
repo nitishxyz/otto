@@ -133,7 +133,7 @@ export function buildForgeTool(projectRoot: string): {
 	return {
 		name: 'forge',
 		tool: tool({
-			description: `Create, manage, and run Otto extensions and control-plane resources.
+			description: `Create, manage, and run Otto-specific extensions and control-plane resources. Use Forge only when the user explicitly asks to manage Otto recipes, skills, agents, MCP servers, providers, authentication, tunnels, plugins, Mini Apps, or their documentation. Never reinterpret ordinary project work such as building a website or app as a Forge operation.
 
 Kinds:
 - recipe, skill, agent: inventory, plan, create, update, or remove project/global capabilities

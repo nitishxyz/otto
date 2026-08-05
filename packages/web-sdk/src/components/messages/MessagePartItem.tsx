@@ -38,6 +38,8 @@ import {
 } from './renderers';
 import { CopyButton } from './renderers/shared';
 import { useIsCompactThread } from './threadDensity';
+import { extractHtmlArtifact, HtmlArtifact } from './HtmlArtifact';
+import { ArtifactStreamingPreview } from './ArtifactStreamingPreview';
 
 function getToolCallPayload(part: MessagePart): Record<string, unknown> | null {
 	const fromJson = part.contentJson;
@@ -425,6 +427,10 @@ export const MessagePartItem = memo(
 				} else if (data) {
 					content = JSON.stringify(data, null, 2);
 				}
+				const htmlArtifact = extractHtmlArtifact(content);
+				if (htmlArtifact) {
+					return <HtmlArtifact html={htmlArtifact} />;
+				}
 
 				return (
 					<div className="relative group">
@@ -564,6 +570,18 @@ export const MessagePartItem = memo(
 					| Record<string, unknown>
 					| undefined;
 				const args = partArgs || approvalArgs;
+				if (normalizedToolName === 'artifact' && part.ephemeral) {
+					const streamedInput =
+						typeof payload?._streamedInput === 'string'
+							? payload._streamedInput
+							: '';
+					return (
+						<ArtifactStreamingPreview
+							streamedInput={streamedInput}
+							args={args}
+						/>
+					);
+				}
 				const primary = normalizeToolTarget(normalizedToolName, args);
 				const argsPreview = formatArgsPreview(args, primary?.key);
 				const command = isShellTool(normalizedToolName)

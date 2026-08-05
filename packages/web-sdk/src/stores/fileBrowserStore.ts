@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useGitStore } from './gitStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useResearchStore } from './researchStore';
@@ -60,6 +61,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set) => ({
 				useTunnelStore.getState().collapseSidebar();
 				useMCPStore.getState().collapseSidebar();
 				useSkillsStore.getState().collapseSidebar();
+				useAppsStore.getState().collapseSidebar();
 			}
 			return { isExpanded: newExpanded };
 		});
@@ -72,6 +74,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set) => ({
 		useTunnelStore.getState().collapseSidebar();
 		useMCPStore.getState().collapseSidebar();
 		useSkillsStore.getState().collapseSidebar();
+		useAppsStore.getState().collapseSidebar();
 		set({ isExpanded: true });
 	},
 	collapseSidebar: () =>

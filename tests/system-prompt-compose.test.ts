@@ -59,6 +59,36 @@ describe('system prompt composition', () => {
 		expect(components).not.toContain('mode:oneshot');
 	});
 
+	it('keeps ordinary app and website requests as normal project work', async () => {
+		const { prompt } = await composeSystemPrompt({
+			provider: 'openrouter',
+			model: 'gpt-4o-mini',
+			projectRoot: tempDir,
+			agentPrompt: 'AGENT',
+		});
+
+		expect(prompt).toContain(
+			"Treat ordinary requests to build websites, apps, components, dashboards, scripts, or other software as normal work in the user's current project.",
+		);
+		expect(prompt).toContain(
+			'Do not reinterpret them as Otto Artifacts, Mini Apps, plugins, recipes, skills, or Forge operations',
+		);
+	});
+
+	it('routes explicit Artifacts through the curated runtime tool', async () => {
+		const { prompt } = await composeSystemPrompt({
+			provider: 'openrouter',
+			model: 'gpt-4o-mini',
+			projectRoot: tempDir,
+			agentPrompt: 'AGENT',
+		});
+
+		expect(prompt).toContain(
+			'When the user explicitly requests a visual or interactive Artifact, load and use the `artifact` tool.',
+		);
+		expect(prompt).toContain('never return raw HTML');
+	});
+
 	it('instructs agents to use project-relative paths by default', async () => {
 		const { prompt } = await composeSystemPrompt({
 			provider: 'openrouter',

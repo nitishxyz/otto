@@ -30,6 +30,8 @@ import {
 	MCPSidebarToggle,
 	SkillsSidebar,
 	SkillsSidebarToggle,
+	AppsSidebar,
+	AppsSidebarToggle,
 	AgentsManagerModal,
 	AgentsSidebarToggle,
 	QuickFilePicker,
@@ -47,6 +49,7 @@ import {
 	useFileBrowserStore,
 	useMCPStore,
 	useSkillsStore,
+	useAppsStore,
 	useAgentsStore,
 	usePanelWidthStore,
 	useViewerTabsStore,
@@ -60,6 +63,7 @@ import {
 	FileCode2,
 	FolderOpen,
 	GitBranch,
+	LayoutGrid,
 	Menu,
 	Network,
 	PanelRight,
@@ -115,6 +119,7 @@ function collapseRightPanels() {
 	useFileBrowserStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAppsStore.getState().collapseSidebar();
 	useAgentsStore.getState().closeManager();
 }
 
@@ -126,7 +131,8 @@ function getAnyRightPanelOpen(): boolean {
 		useTunnelStore.getState().isExpanded ||
 		useFileBrowserStore.getState().isExpanded ||
 		useMCPStore.getState().isExpanded ||
-		useSkillsStore.getState().isExpanded
+		useSkillsStore.getState().isExpanded ||
+		useAppsStore.getState().isExpanded
 	);
 }
 
@@ -168,6 +174,7 @@ export const AppLayout = memo(function AppLayout({
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const appsExpanded = useAppsStore((s) => s.isExpanded);
 	const anySidePanelOpen =
 		!sidebarCollapsed ||
 		gitExpanded ||
@@ -176,7 +183,8 @@ export const AppLayout = memo(function AppLayout({
 		tunnelExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
-		skillsExpanded;
+		skillsExpanded ||
+		appsExpanded;
 	const chatPreferredWidth = chatPanelWidth
 		? `${chatPanelWidth}px`
 		: `clamp(${CHAT_MIN_WIDTH}px, 30%, ${CHAT_DEFAULT_MAX_WIDTH}px)`;
@@ -450,6 +458,7 @@ const RightPanelArea = memo(function RightPanelArea({
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const appsExpanded = useAppsStore((s) => s.isExpanded);
 	const gitWidth = usePanelWidthStore(
 		(s) => s.widths.git ?? RIGHT_PANEL_DEFAULT_WIDTH,
 	);
@@ -471,7 +480,8 @@ const RightPanelArea = memo(function RightPanelArea({
 		tunnelExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
-		skillsExpanded;
+		skillsExpanded ||
+		appsExpanded;
 	const { isVisible: isRightRailVisible, isHoverPending } = useEdgeHover({
 		side: 'right',
 		enabled: !isMobile && !anyViewerOpen && preferences.smartEdges,
@@ -596,6 +606,7 @@ const RightPanelArea = memo(function RightPanelArea({
 					<FileBrowserSidebar />
 					<MCPSidebar />
 					<SkillsSidebar />
+					<AppsSidebar />
 				</div>
 			</div>
 
@@ -624,6 +635,7 @@ const RightPanelArea = memo(function RightPanelArea({
 					<TunnelSidebarToggle />
 					<MCPSidebarToggle />
 					<SkillsSidebarToggle />
+					<AppsSidebarToggle />
 					<AgentsSidebarToggle />
 					<SettingsSidebarToggle />
 					<div className="flex-1" />
@@ -657,6 +669,7 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 	const toggleFileBrowserPanel = useFileBrowserStore((s) => s.toggleSidebar);
 	const toggleMcpPanel = useMCPStore((s) => s.toggleSidebar);
 	const toggleSkillsPanel = useSkillsStore((s) => s.toggleSidebar);
+	const toggleAppsPanel = useAppsStore((s) => s.toggleSidebar);
 	const toggleAgentsPanel = useAgentsStore((s) => s.toggleManager);
 
 	if (!isOpen) return null;
@@ -723,6 +736,13 @@ const MobilePanelMenu = memo(function MobilePanelMenu({
 						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
 					>
 						<Wrench className="h-4 w-4" /> Skills
+					</button>
+					<button
+						type="button"
+						onClick={() => openMobilePanel(toggleAppsPanel)}
+						className="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-3 py-3 text-left text-sm active:bg-accent"
+					>
+						<LayoutGrid className="h-4 w-4" /> Apps
 					</button>
 					<button
 						type="button"

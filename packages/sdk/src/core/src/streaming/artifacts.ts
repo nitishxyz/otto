@@ -15,9 +15,47 @@ export type FileArtifact = {
 	sha256?: string;
 };
 
+export type MiniAppArtifact = {
+	kind: 'mini_app';
+	schemaVersion: 1;
+	appId: string;
+	name: string;
+	description?: string;
+	runtime: 'otto-react';
+	root: string;
+	entry: string;
+	contentHash: string;
+	revisionId: string;
+	availability: {
+		global: boolean;
+		project: boolean;
+		requiresProject: boolean;
+	};
+	permissions: string[];
+	capabilities: string[];
+	placements: Array<'apps' | 'project' | 'commandPalette'>;
+	previewUrl?: string;
+	previewPath?: string;
+};
+
+export type ReactArtifact = {
+	kind: 'artifact';
+	schemaVersion: 1;
+	artifactId: string;
+	title: string;
+	description?: string;
+	runtime: 'otto-react-artifact';
+	contentHash: string;
+	revisionId: string;
+	previewPath: string;
+	libraries: string[];
+};
+
 export type Artifact =
 	| FileDiffArtifact
 	| FileArtifact
+	| ReactArtifact
+	| MiniAppArtifact
 	| { kind: string; [k: string]: unknown };
 
 export function createFileDiffArtifact(

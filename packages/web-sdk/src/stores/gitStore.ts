@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useResearchStore } from './researchStore';
 import { useSettingsStore } from './settingsStore';
@@ -115,11 +116,15 @@ export const useGitStore = create<GitState>((set) => ({
 				useFileBrowserStore.getState().collapseSidebar();
 				useMCPStore.getState().collapseSidebar();
 				useSkillsStore.getState().collapseSidebar();
+				useAppsStore.getState().collapseSidebar();
 			}
 			return { isExpanded: newExpanded };
 		});
 	},
-	expandSidebar: () => set({ isExpanded: true }),
+	expandSidebar: () => {
+		useAppsStore.getState().collapseSidebar();
+		set({ isExpanded: true });
+	},
 	collapseSidebar: () =>
 		set({ isExpanded: false, isDiffOpen: false, selectedFile: null }),
 

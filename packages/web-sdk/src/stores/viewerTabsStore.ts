@@ -174,6 +174,15 @@ export type ViewerTab =
 	  }
 	| {
 			id: string;
+			type: 'mini-app';
+			title: string;
+			appId: string;
+			url: string;
+			revisionId: string;
+			reloadKey: number;
+	  }
+	| {
+			id: string;
 			type: 'terminal';
 			title: string;
 			terminalId: string;
@@ -232,6 +241,12 @@ export interface ViewerTabsState {
 			newTab?: boolean;
 		},
 	) => void;
+	openMiniAppTab: (app: {
+		appId: string;
+		title: string;
+		url: string;
+		revisionId: string;
+	}) => void;
 	openTerminalTab: (terminalId: string, title?: string) => void;
 	syncTerminalTabs: (terminals: Array<{ id: string; title: string }>) => void;
 	updateBrowserTabUrl: (id: string, url: string) => void;
@@ -283,6 +298,10 @@ function newBrowserTabId(): string {
 	return `browser:browser:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
+function miniAppTabId(appId: string): string {
+	return `mini-app:${appId}`;
+}
+
 /** Deterministic viewer tab id for a daemon terminal. */
 export function terminalViewerTabId(terminalId: string): string {
 	return `terminal:${terminalId}`;
@@ -297,7 +316,7 @@ export function terminalViewerTabId(terminalId: string): string {
 export const VIEWER_CLOSE_ACTIVE_TAB_EVENT = 'otto-viewer:close-active-tab';
 
 export function modeForViewerTab(tab: ViewerTab): ViewerMode {
-	if (tab.type === 'browser') return 'preview';
+	if (tab.type === 'browser' || tab.type === 'mini-app') return 'preview';
 	if (tab.type === 'terminal') return 'terminal';
 	return 'work';
 }
@@ -1375,6 +1394,33 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 						url: url || existing?.url || '',
 						kind,
 						reloadKey: existing?.reloadKey ?? 0,
+					}),
+				),
+				activeMode: 'preview',
+				activePreviewTabId: id,
+				activeTabId: id,
+				isCollapsed: false,
+			};
+		});
+	},
+
+	openMiniAppTab: ({ appId, title, url, revisionId }) => {
+		const id = miniAppTabId(appId);
+		set((state) => {
+			const existing = state.tabs.find(
+				(tab): tab is Extract<ViewerTab, { type: 'mini-app' }> =>
+					tab.type === 'mini-app' && tab.id === id,
+			);
+			return {
+				...tabsState(
+					upsertTab(state.tabs, {
+						id,
+						type: 'mini-app',
+						title,
+						appId,
+						url,
+						revisionId,
+						reloadKey: (existing?.reloadKey ?? -1) + 1,
 					}),
 				),
 				activeMode: 'preview',

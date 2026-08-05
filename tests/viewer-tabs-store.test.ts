@@ -49,6 +49,33 @@ describe('viewer visibility', () => {
 		expect(useViewerTabsStore.getState().isCollapsed).toBe(false);
 		expect(useViewerTabsStore.getState().tabOrder).toHaveLength(2);
 	});
+
+	test('opens Mini Apps as deterministic preview tabs', () => {
+		const store = useViewerTabsStore.getState();
+		store.openMiniAppTab({
+			appId: 'project-health',
+			title: 'Project Health',
+			url: 'http://localhost:4173/',
+			revisionId: 'first',
+		});
+		store.openMiniAppTab({
+			appId: 'project-health',
+			title: 'Project Health',
+			url: 'http://localhost:4174/',
+			revisionId: 'second',
+		});
+
+		const state = useViewerTabsStore.getState();
+		const tab = state.tabsById['mini-app:project-health'];
+		expect(state.activeMode).toBe('preview');
+		expect(state.tabOrder).toEqual(['mini-app:project-health']);
+		expect(tab?.type).toBe('mini-app');
+		if (tab?.type === 'mini-app') {
+			expect(tab.url).toBe('http://localhost:4174/');
+			expect(tab.revisionId).toBe('second');
+			expect(tab.reloadKey).toBe(1);
+		}
+	});
 });
 
 describe('viewer tab tool activity annotations', () => {

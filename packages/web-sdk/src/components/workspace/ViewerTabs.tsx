@@ -5,6 +5,7 @@ import {
 	Code2,
 	GitCommit,
 	Globe2,
+	LayoutGrid,
 	Pin,
 	Plus,
 	Smartphone,
@@ -34,6 +35,7 @@ import { SessionFilesDiffPanel } from '../session-files/SessionFilesDiffPanel';
 import { FileViewerPanel } from '../file-browser/FileViewerPanel';
 import { SkillViewerPanel } from '../skills/SkillViewerPanel';
 import { BrowserViewerPanel } from '../browser/BrowserViewerPanel';
+import { MiniAppViewerPanel } from '../mini-apps/MiniAppViewerPanel';
 import type { TerminalViewerProps } from '../terminals/TerminalViewer';
 import { TerminalViewerPane } from '../terminals/TerminalViewerPane';
 import { ToolPreviewPanel } from './ToolPreviewPanel';
@@ -56,6 +58,8 @@ function tabKindLabel(tab: ViewerTab): string {
 			return tab.skill;
 		case 'browser':
 			return tab.kind === 'simulator' ? 'simulator' : 'browser';
+		case 'mini-app':
+			return 'mini app';
 		case 'terminal':
 			return 'terminal';
 	}
@@ -73,6 +77,8 @@ function getTabPath(tab: ViewerTab): string {
 			return tab.file ?? 'SKILL.md';
 		case 'browser':
 			return tab.url || tab.title;
+		case 'mini-app':
+			return tab.url;
 		case 'terminal':
 			return tab.title;
 	}
@@ -111,6 +117,10 @@ function renderTabIcon(tab: ViewerTab) {
 				}`}
 			/>
 		);
+	}
+
+	if (tab.type === 'mini-app') {
+		return <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-purple-500" />;
 	}
 
 	if (tab.type === 'browser') {
@@ -292,6 +302,8 @@ function renderTabContent(
 			);
 		case 'browser':
 			return <BrowserViewerPanel tab={tab} />;
+		case 'mini-app':
+			return <MiniAppViewerPanel tab={tab} />;
 		case 'terminal':
 			// Terminal panes stay persistently mounted in TerminalPaneStrip.
 			return null;

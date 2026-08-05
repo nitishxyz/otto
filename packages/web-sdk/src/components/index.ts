@@ -109,6 +109,10 @@ export * from './skills/SkillsSidebar';
 export * from './skills/SkillsSidebarToggle';
 export * from './skills/SkillViewerPanel';
 
+// Apps Components
+export * from './apps/AppsSidebar';
+export * from './apps/AppsSidebarToggle';
+
 // Agents Components
 export * from './agents/AgentsSidebar';
 export * from './agents/AgentsSidebarToggle';

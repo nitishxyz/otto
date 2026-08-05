@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useGitStore } from './gitStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useResearchStore } from './researchStore';
@@ -77,6 +78,7 @@ export const useMCPStore = create<MCPState>((set) => ({
 				useTunnelStore.getState().collapseSidebar();
 				useFileBrowserStore.getState().collapseSidebar();
 				useSkillsStore.getState().collapseSidebar();
+				useAppsStore.getState().collapseSidebar();
 			}
 			return { isExpanded: newExpanded };
 		});
@@ -90,6 +92,7 @@ export const useMCPStore = create<MCPState>((set) => ({
 		useTunnelStore.getState().collapseSidebar();
 		useFileBrowserStore.getState().collapseSidebar();
 		useSkillsStore.getState().collapseSidebar();
+		useAppsStore.getState().collapseSidebar();
 		set({ isExpanded: true });
 	},
 

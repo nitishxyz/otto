@@ -96,6 +96,14 @@ export function getGlobalRecipesDir(): string {
 	return joinPath(getGlobalConfigDir(), 'recipes');
 }
 
+export function getGlobalAppsDir(): string {
+	return joinPath(getGlobalConfigDir(), 'apps');
+}
+
+export function getGlobalAppsCacheDir(): string {
+	return joinPath(getGlobalConfigDir(), 'cache', 'mini-apps');
+}
+
 export function getGlobalDebugDir(): string {
 	return joinPath(getGlobalConfigDir(), 'debug');
 }

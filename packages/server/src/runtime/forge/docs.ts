@@ -187,15 +187,112 @@ forge({
 		},
 	},
 	app: {
+		'intent-and-artifacts': {
+			title: 'Normal work, artifacts, and Mini Apps',
+			summary: 'Preserve the user’s requested output and installation intent.',
+			content: `Normal project work is the default. Do not turn ordinary requests for websites, apps, landing pages, dashboards, components, scripts, charts, or visualizations into Forge calls, Artifacts, or Otto Mini Apps. Forge documentation is reference material and never overrides the user’s request.
+
+Implement the request in the user's current project unless the user explicitly asks for a chat Artifact or Otto-specific extension. Use a chat Artifact only when the user explicitly asks for an artifact, an in-chat interactive output, a detachable chat result, or clearly chooses that presentation after it is offered. Use a Mini App only when the user explicitly asks for an Otto Mini App, an app installed inside Otto, project/global installation, or promotion of existing work into a Mini App.
+
+Examples:
+- "Create a landing page" → normal work in the current project.
+- "Build an app for tracking expenses" → normal application in the current project.
+- "Visualize this CSV interactively" → normal project implementation unless the user asks for an in-chat Artifact.
+- "Show this as an interactive Artifact in chat" → Artifact.
+- "Build an Otto app for exploring PRs" → Mini App.
+- "Save this dashboard so I can reopen it in every project" → global Mini App.
+
+When intent is ambiguous, preserve normal project work. Never silently route a request through Forge or install an Otto extension.`,
+		},
 		'getting-started': {
-			title: 'Mini App availability',
-			summary: 'Check the installed Mini App authoring contract.',
-			content: `This Otto version does not expose a stable Mini App manifest, runtime, or Forge app mutation action. Do not create app manifests based on proposal documents. Use visual outputs or a normal project application until a versioned app contract is available.`,
+			title: 'Create a Mini App',
+			summary: 'Create and build a project-local React Mini App.',
+			content: `Mini Apps are first-class application packages, not raw index.html files. Project apps currently live under .otto/apps/<app-id>/ and require app.json plus a default-exported React component.
+
+Minimum layout:
+.otto/apps/project-health/
+	app.json
+	src/main.tsx
+
+Build workflow:
+1. Create app.json and source files with the normal filesystem tools.
+2. Load the loadable mini_app tool with load_tools.
+3. Run mini_app({ action: "build", root: ".otto/apps/project-health" }).
+4. The result contains an immutable revision and previewPath; Otto renders it as a Mini App card and sandboxed preview.
+
+Use action "present" only to validate source or attach an already-running localhost preview. Saved project apps are discovered from .otto/apps. Saved global apps are discovered from ~/.config/otto/apps when availability.global is true. Forge does not yet create or publish Mini Apps; storage, host capabilities, plugins, and public publishing are not available in the current contract.`,
+		},
+		manifest: {
+			title: 'Mini App manifest',
+			summary: 'Reference the versioned app.json contract.',
+			content: `app.json is strict and currently supports schemaVersion 1 with runtime "otto-react".
+
+Example:
+{
+	"$schema": "otto://schemas/mini-app/v1",
+	"schemaVersion": 1,
+	"id": "project-health",
+	"name": "Project Health",
+	"description": "Inspect the active project",
+	"runtime": "otto-react",
+	"entry": "src/main.tsx",
+	"availability": {
+		"global": false,
+		"project": true,
+		"requiresProject": true
+	},
+	"permissions": [],
+	"capabilities": [],
+	"placements": ["apps", "project"]
+}
+
+IDs use lowercase letters, numbers, and hyphens. entry and optional icon are relative paths that must remain inside the app directory. Supported placements are apps, project, and commandPalette. Permissions and capabilities are declared for forward compatibility but no host bridge is available yet.`,
+		},
+		runtime: {
+			title: 'Curated Mini App runtime',
+			summary: 'Use React, Motion, icons, CSS, and local assets.',
+			content: `The otto-react runtime uses Bun embedded in Otto; users do not need Bun, Node.js, or npm installed. The entry module must default-export a React component. Otto provides the document and React root.
+
+Example:
+import { motion } from "motion/react";
+import { Activity } from "lucide-react";
+import "./styles.css";
+
+export default function App() {
+	return (
+		<motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+			<Activity />
+			<h1>Project Health</h1>
+		</motion.main>
+	);
+}
+
+Curated package imports are react, react-dom, motion, and lucide-react, including their subpath exports. Relative TypeScript, TSX, JavaScript, JSX, CSS, and local asset imports are bundled. Other bare package imports are rejected. Custom CSS, responsive design, CSS variables, transitions, and Motion animations are supported.`,
+		},
+		building: {
+			title: 'Build and preview Mini Apps',
+			summary: 'Compile immutable app revisions with the loadable tool.',
+			content: `Load the tool on demand:
+load_tools({ tools: ["mini_app"] })
+
+Then compile:
+mini_app({
+	action: "build",
+	root: ".otto/apps/project-health"
+})
+
+Builds are content-addressed by the validated source tree and stored under .otto/cache/mini-apps/<app-id>/<revision-id>/. Rebuilding unchanged source reuses the immutable build. Editing source and building again creates a new revision.
+
+The Apps panel discovers project apps from .otto/apps and global apps from ~/.config/otto/apps. Opening a saved app builds its current revision on demand and launches it in the Mini App viewer.
+
+The compiler limits source files, source bytes, manifest size, and build output size. It rejects symbolic links, paths outside the project, and package imports outside the curated runtime.`,
 		},
 		permissions: {
 			title: 'Mini App permissions',
-			summary: 'Check the status of the Mini App permission contract.',
-			content: `Mini App permissions are not a stable extension contract in this Otto version. Generated browser code must not receive Otto credentials, environment secrets, unrestricted filesystem or shell access, Docker sockets, or direct host process access. Wait for a versioned host bridge and permission schema before targeting Otto capabilities.`,
+			summary: 'Understand the current Mini App security boundary.',
+			content: `Generated Mini App code is untrusted browser UI. Preview assets use a restrictive Content Security Policy and run in a sandboxed iframe without same-origin access. Network connections are disabled for curated builds.
+
+Mini Apps must not receive Otto credentials, provider keys, environment secrets, unrestricted filesystem or shell access, Docker sockets, or direct host process access. The manifest can record future permission and capability IDs, but the host bridge is not implemented in this version. Do not simulate privileged access in browser code or call daemon APIs directly. Wait for versioned typed capabilities and approval policies.`,
 		},
 	},
 } as const satisfies Record<ForgeDocKind, Record<string, ForgeDocTopic>>;

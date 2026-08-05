@@ -105,6 +105,38 @@ describe('forge', () => {
 		});
 	});
 
+	it('documents the shipped Mini App manifest and build workflow', () => {
+		const manifest = getForgeDocs('app', 'manifest');
+		const runtime = getForgeDocs('app', 'runtime');
+		const building = getForgeDocs('app', 'building');
+
+		expect('content' in manifest ? manifest.content : '').toContain(
+			'otto://schemas/mini-app/v1',
+		);
+		expect('content' in runtime ? runtime.content : '').toContain(
+			'motion/react',
+		);
+		expect('content' in building ? building.content : '').toContain(
+			'load_tools({ tools: ["mini_app"] })',
+		);
+		expect('content' in building ? building.content : '').toContain(
+			'action: "build"',
+		);
+	});
+
+	it('documents that normal user app requests are not Forge or Artifact work', () => {
+		const intent = getForgeDocs('app', 'intent-and-artifacts');
+		const content = 'content' in intent ? intent.content : '';
+
+		expect(content).toContain('Normal project work is the default');
+		expect(content).toContain(
+			'"Build an app for tracking expenses" → normal application in the current project.',
+		);
+		expect(content).toContain(
+			'Never silently route a request through Forge or install an Otto extension.',
+		);
+	});
+
 	it('previews a project recipe without writing it', async () => {
 		const result = await runForgeMutation(projectRoot, {
 			action: 'create',

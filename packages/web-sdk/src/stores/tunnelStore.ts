@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAppsStore } from './appsStore';
 import { useGitStore } from './gitStore';
 import { useSessionFilesStore } from './sessionFilesStore';
 import { useSettingsStore } from './settingsStore';
@@ -69,6 +70,7 @@ function collapseOtherSidebars() {
 	useFileBrowserStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAppsStore.getState().collapseSidebar();
 }
 
 export const useTunnelStore = create<TunnelState>((set) => ({

@@ -71,6 +71,30 @@ if (prepareTarget) prepareArgs.push(prepareTarget);
 }
 spinner.succeed();
 
+spinner.begin('Building curated browser runtime');
+{
+	const proc = Bun.spawn(
+		[process.execPath, 'run', 'scripts/build-curated-browser-runtime.ts'],
+		{
+			cwd: ROOT,
+			stdout: verbose ? 'inherit' : 'pipe',
+			stderr: verbose ? 'inherit' : 'pipe',
+		},
+	);
+	const exitCode = await proc.exited;
+	if (exitCode !== 0) {
+		spinner.fail();
+		if (!verbose) {
+			const out =
+				(await new Response(proc.stderr).text()).trim() ||
+				(await new Response(proc.stdout).text()).trim();
+			if (out) console.error(out);
+		}
+		process.exit(1);
+	}
+}
+spinner.succeed();
+
 spinner.begin('Compiling binary');
 mkdirSync('dist', { recursive: true });
 

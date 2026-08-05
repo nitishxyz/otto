@@ -24,6 +24,8 @@ import {
 	SettingsSidebarToggle,
 	SkillsSidebar,
 	SkillsSidebarToggle,
+	AppsSidebar,
+	AppsSidebarToggle,
 	SubagentFloatingViewer,
 	TerminalPanelToggle,
 	TunnelSidebar,
@@ -42,6 +44,7 @@ import {
 	useSettingsStore,
 	useSidebarStore,
 	useSkillsStore,
+	useAppsStore,
 	useTunnelStore,
 	useViewerTabsStore,
 } from '@ottocode/web-sdk/stores';
@@ -82,6 +85,7 @@ function collapseRightPanels() {
 	useFileBrowserStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAppsStore.getState().collapseSidebar();
 }
 
 interface DesktopAppLayoutProps {
@@ -115,6 +119,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const fileBrowserExpanded = useFileBrowserStore((s) => s.isExpanded);
 	const mcpExpanded = useMCPStore((s) => s.isExpanded);
 	const skillsExpanded = useSkillsStore((s) => s.isExpanded);
+	const appsExpanded = useAppsStore((s) => s.isExpanded);
 	const sessionsCollapsed = useSidebarStore((s) => s.isCollapsed);
 	const isRightRailPinned = useRightRailStore((s) => s.isPinned);
 	const viewerTabCount = useViewerTabsStore((s) => s.tabs.length);
@@ -129,7 +134,8 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 		tunnelExpanded ||
 		fileBrowserExpanded ||
 		mcpExpanded ||
-		skillsExpanded;
+		skillsExpanded ||
+		appsExpanded;
 	const anyViewerOpen = viewerTabCount > 0 && !viewerCollapsed;
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const compactLayout = useMediaQuery(COMPACT_LAYOUT_QUERY);
@@ -333,6 +339,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 									<FileBrowserSidebar />
 									<MCPSidebar />
 									<SkillsSidebar />
+									<AppsSidebar />
 									<AgentsSidebar />
 								</div>
 							</div>
@@ -363,6 +370,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								<TunnelSidebarToggle />
 								<MCPSidebarToggle />
 								<SkillsSidebarToggle />
+								<AppsSidebarToggle />
 								<AgentsSidebarToggle />
 								<SettingsSidebarToggle />
 								<div className="flex-1" />

@@ -2,7 +2,9 @@ import type { Tool } from 'ai';
 import { buildCopyAttachmentTool } from '../builtin/fs/copy-attachment.ts';
 import { buildCopyIntoTool } from '../builtin/fs/copy-into.ts';
 import { buildReadImageTool } from '../builtin/fs/read-image.ts';
+import { buildArtifactTool } from './artifact.ts';
 import { buildBrowserTool } from './browser.ts';
+import { buildMiniAppTool } from './mini-app.ts';
 import { buildLoadToolsTool, type LazyToolBrief } from './load-tools.ts';
 
 export type LazyToolDefinition = LazyToolBrief & {
@@ -12,6 +14,12 @@ export type LazyToolDefinition = LazyToolBrief & {
 export function getLazyToolDefinitions(): LazyToolDefinition[] {
 	return [
 		{
+			name: 'artifact',
+			description:
+				'Create an inline Artifact with the curated Otto UI runtime.',
+			build: buildArtifactTool,
+		},
+		{
 			name: 'copy_into',
 			description: 'Copy source lines into a project file.',
 			build: buildCopyIntoTool,
@@ -20,6 +28,11 @@ export function getLazyToolDefinitions(): LazyToolDefinition[] {
 			name: 'browser',
 			description: 'Open, inspect, and interact with a browser page.',
 			build: buildBrowserTool,
+		},
+		{
+			name: 'mini_app',
+			description: 'Validate and present an Otto Mini App package.',
+			build: buildMiniAppTool,
 		},
 		{
 			name: 'read_image',

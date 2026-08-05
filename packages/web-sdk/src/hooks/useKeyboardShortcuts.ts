@@ -7,6 +7,7 @@ import { useFileBrowserStore } from '../stores/fileBrowserStore';
 import { useTunnelStore } from '../stores/tunnelStore';
 import { useMCPStore } from '../stores/mcpStore';
 import { useSkillsStore } from '../stores/skillsStore';
+import { useAppsStore } from '../stores/appsStore';
 import { useAgentsStore } from '../stores/agentsStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useResearchStore } from '../stores/researchStore';
@@ -81,6 +82,7 @@ function collapseAllRightPanels() {
 	useTunnelStore.getState().collapseSidebar();
 	useMCPStore.getState().collapseSidebar();
 	useSkillsStore.getState().collapseSidebar();
+	useAppsStore.getState().collapseSidebar();
 	useSettingsStore.getState().collapseSidebar();
 }
 
