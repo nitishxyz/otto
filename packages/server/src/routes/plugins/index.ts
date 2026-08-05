@@ -1,5 +1,7 @@
 import {
 	DEFAULT_PLUGIN_REGISTRY_URL,
+	clearProjectToolDiscoveryCache,
+	disposeNativeExtensionHosts,
 	fetchPluginRegistry,
 	installPlugin,
 	loadPluginsConfig,
@@ -21,6 +23,14 @@ import {
 	listPluginCommands,
 	runPluginCommand,
 } from '../../runtime/plugins/commands/index.ts';
+
+function resetNativePluginRuntime(
+	scope: PluginScope,
+	projectRoot: string,
+): void {
+	disposeNativeExtensionHosts(scope === 'project' ? projectRoot : undefined);
+	clearProjectToolDiscoveryCache(scope === 'project' ? projectRoot : undefined);
+}
 import {
 	apiErrorResponseSchema,
 	pluginCommandParamsSchema,
@@ -358,12 +368,14 @@ export function registerPluginsRoutes(app: Hono) {
 			try {
 				const body = await c.req.json();
 				const parsed = pluginInstallBodySchema.parse(body);
+				const projectRoot = await getProjectRoot(c, parsed.project);
 				const plugin = await installPlugin(parsed.source, {
 					scope: parsed.scope,
-					projectRoot: await getProjectRoot(c, parsed.project),
+					projectRoot,
 					enabled: parsed.enabled,
 					...getRegistryOptions(parsed),
 				});
+				resetNativePluginRuntime(parsed.scope ?? 'global', projectRoot);
 				return c.json({ success: true, plugin });
 			} catch (error) {
 				logger.error('Failed to install plugin', error);
@@ -378,6 +390,7 @@ export function registerPluginsRoutes(app: Hono) {
 		summary: 'Remove a plugin from a scope',
 		handler: async ({ name, scope, projectRoot }) => {
 			await removePlugin(name, { scope, projectRoot });
+			resetNativePluginRuntime(scope ?? 'global', projectRoot);
 			return undefined;
 		},
 	});
@@ -390,6 +403,7 @@ export function registerPluginsRoutes(app: Hono) {
 				scope,
 				projectRoot,
 			});
+			resetNativePluginRuntime(scope ?? 'global', projectRoot);
 			return resolveMutationPlugin(name, scope, projectRoot);
 		},
 	});
@@ -402,6 +416,7 @@ export function registerPluginsRoutes(app: Hono) {
 				scope,
 				projectRoot,
 			});
+			resetNativePluginRuntime(scope ?? 'global', projectRoot);
 			return resolveMutationPlugin(name, scope, projectRoot);
 		},
 	});
@@ -446,6 +461,7 @@ export function registerPluginsRoutes(app: Hono) {
 
 				if (parsed.name) {
 					const plugin = await updatePlugin(parsed.name, options);
+					resetNativePluginRuntime(scope ?? 'global', projectRoot);
 					return c.json({ success: true, plugin });
 				}
 
@@ -454,6 +470,7 @@ export function registerPluginsRoutes(app: Hono) {
 				for (const name of Object.keys(config.plugins).sort()) {
 					plugins.push(await updatePlugin(name, options));
 				}
+				resetNativePluginRuntime(scope ?? 'global', projectRoot);
 				return c.json({ success: true, plugins });
 			} catch (error) {
 				logger.error('Failed to update plugins', error);

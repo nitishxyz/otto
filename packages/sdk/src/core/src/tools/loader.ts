@@ -45,6 +45,17 @@ const legacyTerminalManagerKey = 'legacy';
 const terminalManagersByProject = new Map<string, TerminalManager>();
 const staticToolDiscoveryCache = new Map<string, Promise<DiscoveredTool[]>>();
 
+export function clearProjectToolDiscoveryCache(projectRoot?: string): void {
+	if (!projectRoot) {
+		staticToolDiscoveryCache.clear();
+		return;
+	}
+	for (const key of staticToolDiscoveryCache.keys()) {
+		if (key.startsWith(`${projectRoot}::`))
+			staticToolDiscoveryCache.delete(key);
+	}
+}
+
 function getTerminalManagerKey(projectRoot?: string): string {
 	return projectRoot || legacyTerminalManagerKey;
 }

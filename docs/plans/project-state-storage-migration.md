@@ -329,7 +329,7 @@ It must not delete:
 .otto/config.json
 .otto/agents
 .otto/commands
-.otto/tools
+.otto/plugins
 .otto/mcp.json
 .otto/.gitignore
 ```

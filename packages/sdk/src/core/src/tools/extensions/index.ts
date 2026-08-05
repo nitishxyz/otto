@@ -1,10 +1,11 @@
 import { access } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
-import { jsonSchema, tool, type Tool } from 'ai';
+import { join, resolve, sep } from 'node:path';
+import { jsonSchema, tool, type JSONValue, type Tool } from 'ai';
 import {
 	resolveEffectivePlugins,
 	type PluginTool,
 } from '../../../../plugins/index.ts';
+import { getProjectStateDir } from '../../../../config/src/paths.ts';
 import { logger } from '../../utils/logger.ts';
 import { setToolMetadata, type ToolMetadata } from '../metadata.ts';
 import { executeNativeExtension } from './client.ts';
@@ -50,6 +51,7 @@ async function entryExists(path: string): Promise<boolean> {
 
 function buildTool(args: {
 	projectRoot: string;
+	storagePath: string;
 	pluginDir: string;
 	pluginName: string;
 	pluginVersion: string;
@@ -71,13 +73,29 @@ function buildTool(args: {
 		inputSchema: jsonSchema<Record<string, unknown>>(
 			args.definition.inputSchema,
 		),
-		async execute(input, options) {
+		toModelOutput({ output }) {
+			return toNativeToolModelOutput(output);
+		},
+		execute(input, options) {
+			const secrets: Record<string, string> = {};
+			for (const secret of args.definition.secrets) {
+				const value = process.env[secret.env];
+				if (!value && secret.required) {
+					throw new Error(
+						`Native tool ${name} requires secret ${secret.name} from ${secret.env}`,
+					);
+				}
+				if (value) secrets[secret.name] = value;
+			}
 			return executeNativeExtension({
 				entryPath: args.definition.entry,
 				pluginDir: args.pluginDir,
 				projectRoot: args.projectRoot,
+				storagePath: args.storagePath,
 				toolName: name,
 				input,
+				secrets,
+				outputSchema: args.definition.outputSchema,
 				timeoutMs: args.definition.timeoutMs,
 				signal: options.abortSignal,
 			});
@@ -87,10 +105,65 @@ function buildTool(args: {
 	return { name, tool: wrapped, metadata };
 }
 
+function toJsonValue(value: unknown): JSONValue {
+	if (value === undefined) return null;
+	return JSON.parse(JSON.stringify(value)) as JSONValue;
+}
+
+function toNativeToolModelOutput(output: unknown) {
+	if (!output || typeof output !== 'object' || !('content' in output)) {
+		return { type: 'json' as const, value: toJsonValue(output) };
+	}
+	const result = output as {
+		content?: Array<{
+			type?: string;
+			text?: string;
+			value?: unknown;
+			data?: string;
+			mediaType?: string;
+		}>;
+		structuredContent?: unknown;
+	};
+	if (!Array.isArray(result.content)) {
+		return { type: 'json' as const, value: toJsonValue(output) };
+	}
+	const value: Array<
+		| { type: 'text'; text: string }
+		| { type: 'image-data'; data: string; mediaType: string }
+	> = [];
+	for (const part of result.content) {
+		if (part.type === 'text' && typeof part.text === 'string') {
+			value.push({ type: 'text', text: part.text });
+		} else if (part.type === 'json') {
+			value.push({ type: 'text', text: JSON.stringify(part.value, null, 2) });
+		} else if (
+			part.type === 'image' &&
+			typeof part.data === 'string' &&
+			typeof part.mediaType === 'string'
+		) {
+			value.push({
+				type: 'image-data',
+				data: part.data,
+				mediaType: part.mediaType,
+			});
+		}
+	}
+	if (result.structuredContent !== undefined) {
+		value.unshift({
+			type: 'text',
+			text: JSON.stringify(result.structuredContent, null, 2),
+		});
+	}
+	return value.length > 0
+		? { type: 'content' as const, value }
+		: { type: 'json' as const, value: toJsonValue(output) };
+}
+
 export async function discoverNativeExtensionTools(
 	projectRoot: string,
 ): Promise<NativeExtensionTool[]> {
 	const effective = await resolveEffectivePlugins(projectRoot);
+	const projectStateDir = await getProjectStateDir(projectRoot);
 	const tools: NativeExtensionTool[] = [];
 	const names = new Set<string>();
 
@@ -128,6 +201,7 @@ export async function discoverNativeExtensionTools(
 			tools.push(
 				buildTool({
 					projectRoot,
+					storagePath: join(projectStateDir, 'plugins', plugin.name, 'storage'),
 					pluginDir: plugin.dir,
 					pluginName: plugin.name,
 					pluginVersion: plugin.manifest.version,

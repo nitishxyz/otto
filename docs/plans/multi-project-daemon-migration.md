@@ -317,7 +317,7 @@ Project-scoped:
 - approvals and secure input prompts
 - event streams and client event filters
 - subagent runtime state
-- tools discovered from `.otto/tools` / project plugins / project skills
+- tools contributed by project plugins and project skills
 
 Global/user-scoped:
 

@@ -8,6 +8,8 @@ import {
 	runPluginsSetEnabled,
 	runPluginsSync,
 	runPluginsUpdate,
+	runPluginsValidate,
+	runPluginsDev,
 	type PluginCommandOptions,
 } from '../plugins.ts';
 import type { PluginScope } from '@ottocode/sdk';
@@ -112,5 +114,23 @@ export function registerPluginsCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
 			await runPluginsSync({ ...opts, scope: undefined });
+		});
+
+	plugins
+		.command('validate [path]')
+		.description('Validate a local native plugin manifest and tool entries')
+		.option('--json', 'Output as JSON', false)
+		.action(async (path, opts) => {
+			await runPluginsValidate(path ?? process.cwd(), opts);
+		});
+
+	plugins
+		.command('dev <path> <tool>')
+		.description('Run a local native plugin tool with JSON input')
+		.option('--project <path>', 'Project root for the tool', process.cwd())
+		.option('--input <json>', 'Inline JSON input', '{}')
+		.option('--input-file <path>', 'Read JSON input from a file')
+		.action(async (path, tool, opts) => {
+			await runPluginsDev(path, tool, opts);
 		});
 }

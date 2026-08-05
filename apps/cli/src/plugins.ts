@@ -1,6 +1,7 @@
 import {
 	DEFAULT_PLUGIN_REGISTRY_URL,
 	fetchPluginRegistry,
+	executeNativePluginTool,
 	installPlugin,
 	removePlugin,
 	resolveEffectivePlugins,
@@ -8,6 +9,7 @@ import {
 	setPluginEnabled,
 	syncPluginSkills,
 	updatePlugin,
+	validateNativePlugin,
 	type PluginRegistryEntry,
 	type PluginScope,
 } from '@ottocode/sdk';
@@ -19,6 +21,46 @@ export type PluginCommandOptions = {
 	registry?: string;
 	json?: boolean;
 };
+
+export async function runPluginsValidate(
+	pluginDir: string,
+	opts: { json?: boolean } = {},
+): Promise<void> {
+	const result = await validateNativePlugin(pluginDir);
+	if (opts.json) {
+		console.log(JSON.stringify(result, null, 2));
+	} else if (result.ok) {
+		console.log(colors.green(`Valid native plugin: ${result.manifest?.name}`));
+	} else {
+		for (const error of result.errors) console.error(colors.red(error));
+	}
+	if (!result.ok) process.exitCode = 1;
+}
+
+export async function runPluginsDev(
+	pluginDir: string,
+	toolName: string,
+	opts: {
+		project: string;
+		input?: string;
+		inputFile?: string;
+	},
+): Promise<void> {
+	const rawInput = opts.inputFile
+		? await Bun.file(opts.inputFile).text()
+		: (opts.input ?? '{}');
+	const input = JSON.parse(rawInput) as Record<string, unknown>;
+	const stream = await executeNativePluginTool({
+		pluginDir,
+		projectRoot: opts.project,
+		toolName,
+		input,
+	});
+	for await (const chunk of stream) {
+		if ('result' in chunk) console.log(JSON.stringify(chunk.result, null, 2));
+		else console.error(`[${chunk.channel}] ${chunk.delta}`);
+	}
+}
 
 export async function runPluginsList(
 	opts: PluginCommandOptions,

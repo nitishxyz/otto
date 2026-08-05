@@ -106,4 +106,35 @@ export function registerPluginsCommand(program: Command) {
 			);
 			await dispatchRegisteredCommand(register, argv);
 		});
+
+	plugins
+		.command('validate [path]')
+		.description('Validate a local native plugin manifest and tool entries')
+		.option('--json', 'Output as JSON', false)
+		.action(async (path, opts) => {
+			const argv = ['plugins', 'validate'];
+			if (path) argv.push(path);
+			pushFlag(argv, '--json', opts.json);
+			const { registerPluginsCommand: register } = await import(
+				'../plugins.ts'
+			);
+			await dispatchRegisteredCommand(register, argv);
+		});
+
+	plugins
+		.command('dev <path> <tool>')
+		.description('Run a local native plugin tool with JSON input')
+		.option('--project <path>', 'Project root for the tool', process.cwd())
+		.option('--input <json>', 'Inline JSON input', '{}')
+		.option('--input-file <path>', 'Read JSON input from a file')
+		.action(async (path, tool, opts) => {
+			const argv = ['plugins', 'dev', path, tool];
+			pushOption(argv, '--project', opts.project);
+			pushOption(argv, '--input', opts.input);
+			pushOption(argv, '--input-file', opts.inputFile);
+			const { registerPluginsCommand: register } = await import(
+				'../plugins.ts'
+			);
+			await dispatchRegisteredCommand(register, argv);
+		});
 }

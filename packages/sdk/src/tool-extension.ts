@@ -14,6 +14,21 @@ export type NativeToolProcessResult = {
 	stderr: string;
 };
 
+export type NativeToolProgress = {
+	message: string;
+	channel?: string;
+};
+
+export type NativeToolContentPart =
+	| { type: 'text'; text: string }
+	| { type: 'json'; value: unknown }
+	| { type: 'image'; data: string; mediaType: string };
+
+export type NativeToolRichResult = {
+	content: NativeToolContentPart[];
+	structuredContent?: unknown;
+};
+
 export type NativeToolContext = {
 	protocolVersion: 1;
 	projectRoot: string;
@@ -27,6 +42,18 @@ export type NativeToolContext = {
 	};
 	process: {
 		run(options: NativeToolProcessOptions): Promise<NativeToolProcessResult>;
+	};
+	progress(update: string | NativeToolProgress): void;
+	secrets: {
+		get(name: string): string | null;
+	};
+	storage: {
+		get<T = unknown>(key: string): Promise<T | null>;
+		set(key: string, value: unknown): Promise<void>;
+		delete(key: string): Promise<boolean>;
+	};
+	output: {
+		image(path: string, mediaType?: string): Promise<NativeToolContentPart>;
 	};
 };
 

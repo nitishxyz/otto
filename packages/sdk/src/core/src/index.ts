@@ -35,9 +35,19 @@ export { getToolMetadata, setToolMetadata } from './tools/metadata';
 export type { ToolMetadata, ToolSourceKind } from './tools/metadata';
 export { runNativeExtensionHost } from './tools/extensions/host';
 export {
+	disposeNativeExtensionHosts,
+	executeNativeExtension,
+} from './tools/extensions/client';
+export {
+	executeNativePluginTool,
+	validateNativePlugin,
+} from './tools/extensions/development';
+export type { NativePluginValidation } from './tools/extensions/development';
+export {
 	setTerminalManager,
 	unsetTerminalManager,
 	getTerminalManager,
+	clearProjectToolDiscoveryCache,
 } from './tools/loader';
 export { shellExecutorContext } from './tools/builtin/shell';
 export type { ShellExecutor } from './tools/builtin/shell';

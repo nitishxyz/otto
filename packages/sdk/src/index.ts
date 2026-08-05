@@ -365,6 +365,7 @@ export {
 	pluginRegistryEntrySchema,
 	pluginRegistrySchema,
 	pluginToolEffectSchema,
+	pluginToolSecretSchema,
 	pluginToolSchema,
 	pluginsConfigSchema,
 	removePlugin,
@@ -394,6 +395,7 @@ export type {
 	PluginStatus,
 	PluginTool,
 	PluginToolEffect,
+	PluginToolSecret,
 	ResolveRegistryPluginOptions,
 } from './plugins/index.ts';
 export {
@@ -438,9 +440,15 @@ export {
 export type { ModelMessage, Tool } from './core/src/index.ts';
 export {
 	getToolMetadata,
+	clearProjectToolDiscoveryCache,
 	setToolMetadata,
+	disposeNativeExtensionHosts,
+	executeNativeExtension,
+	executeNativePluginTool,
 	runNativeExtensionHost,
+	validateNativePlugin,
 } from './core/src/index.ts';
+export type { NativePluginValidation } from './core/src/index.ts';
 export type { ToolMetadata, ToolSourceKind } from './core/src/index.ts';
 // Re-export from AI SDK
 export type { ToolCallPart } from 'ai';

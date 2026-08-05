@@ -119,6 +119,16 @@ export const pluginToolEffectSchema = z.enum([
 	'external-write',
 ]);
 
+export const pluginToolSecretSchema = z.object({
+	name: pluginNameSchema,
+	env: z
+		.string()
+		.min(1)
+		.regex(/^[A-Z_][A-Z0-9_]*$/),
+	description: z.string().optional(),
+	required: z.boolean().default(true),
+});
+
 const pluginToolEntrySchema = z
 	.string()
 	.min(1)
@@ -132,15 +142,29 @@ const pluginToolEntrySchema = z
 
 const jsonObjectSchema = z.record(z.unknown());
 
-export const pluginToolSchema = z.object({
-	name: pluginNameSchema,
-	entry: pluginToolEntrySchema,
-	description: z.string().min(1),
-	inputSchema: jsonObjectSchema,
-	outputSchema: jsonObjectSchema.optional(),
-	effects: z.array(pluginToolEffectSchema).default([]),
-	timeoutMs: z.number().int().min(100).max(900_000).default(120_000),
-});
+export const pluginToolSchema = z
+	.object({
+		name: pluginNameSchema,
+		entry: pluginToolEntrySchema,
+		description: z.string().min(1),
+		inputSchema: jsonObjectSchema,
+		outputSchema: jsonObjectSchema.optional(),
+		effects: z.array(pluginToolEffectSchema).default([]),
+		secrets: z.array(pluginToolSecretSchema).default([]),
+		timeoutMs: z.number().int().min(100).max(900_000).default(120_000),
+	})
+	.superRefine((definition, context) => {
+		if (
+			definition.secrets.length > 0 &&
+			!definition.effects.includes('secrets')
+		) {
+			context.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['effects'],
+				message: 'Tools declaring secrets must include the secrets effect',
+			});
+		}
+	});
 
 export const pluginManifestSchema = z.object({
 	$schema: z.string().optional(),
@@ -262,6 +286,7 @@ export type PluginCommand = {
 };
 export type PluginTool = z.infer<typeof pluginToolSchema>;
 export type PluginToolEffect = z.infer<typeof pluginToolEffectSchema>;
+export type PluginToolSecret = z.infer<typeof pluginToolSecretSchema>;
 export type PluginSource = z.infer<typeof pluginSourceSchema>;
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 export type PluginConfigEntry = z.infer<typeof pluginConfigEntrySchema>;

@@ -124,7 +124,8 @@ Supported manifest fields:
 
 Plugins can contribute TypeScript or JavaScript tools through `otto.plugin.json`.
 Native tools run in an isolated child process using the Bun runtime bundled with
-the Otto CLI. Their code is imported only when the tool is called.
+the Otto CLI. Their code is imported only when the tool is called, and one host
+is reused per project/plugin pair until it exits or is restarted.
 
 ```json
 {
@@ -154,6 +155,9 @@ Native plugin tools are always loadable and never enter the first-class tool set
 The model-facing name is namespaced as `project-info__summary`. Supported effects
 are `workspace-read`, `workspace-write`, `process`, `network`, `secrets`, and
 `external-write`. Effects participate in dangerous-mode approval decisions.
+Tools can also declare `outputSchema` and scoped secrets such as
+`{"name":"token","env":"SERVICE_TOKEN"}`. A tool declaring secrets must include
+the `secrets` effect.
 
 An entry exports a function or an object with an `execute` function:
 
@@ -161,9 +165,20 @@ An entry exports a function or an object with an `execute` function:
 import type { NativeToolHandler } from '@ottocode/sdk/tool-extension';
 
 export default (async (input, context) => {
+  context.progress('Reading project metadata');
   const content = await context.workspace.readText(String(input.path));
-  return { characters: content.length };
+  const calls = (await context.storage.get<number>('calls')) ?? 0;
+  await context.storage.set('calls', calls + 1);
+  return { characters: content.length, calls: calls + 1 };
 }) satisfies NativeToolHandler;
+```
+
+Useful context APIs include `workspace`, `process`, `progress`, `secrets`,
+`storage`, and `output.image()`. Validate and run a local plugin with:
+
+```bash
+otto plugins validate ./my-plugin
+otto plugins dev ./my-plugin summary --input '{"path":"README.md"}'
 ```
 
 See [Native Tool Extension Architecture](./plans/native-tool-extension-architecture.md)

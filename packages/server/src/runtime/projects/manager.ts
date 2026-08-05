@@ -5,6 +5,7 @@ import {
 	getGlobalSkillsConfigPath,
 	getProjectConfigPath,
 	getProjectId,
+	disposeNativeExtensionHosts,
 	loadConfig,
 	shutdownMCP,
 	setTerminalManager,
@@ -94,6 +95,7 @@ export class ProjectManager {
 				try {
 					await terminalManager.killAll();
 				} finally {
+					disposeNativeExtensionHosts(cfg.projectRoot);
 					unsetTerminalManager(cfg.projectRoot);
 					await shutdownMCP(cfg.projectRoot);
 				}
