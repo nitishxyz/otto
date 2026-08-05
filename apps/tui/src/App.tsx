@@ -533,7 +533,7 @@ export function App({
 		2 -
 		(showDetail ? detailWidth + 1 : 0) -
 		(showActivity ? activityWidth + 1 : 0);
-	const emptyStateInputWidth = chatPaneWidth < 80 ? '100%' : '80%';
+	const emptyStateInputWidth = chatPaneWidth < 80 ? '100%' : '64%';
 	const isNewSession = !messages.some(
 		(message) =>
 			message.role === 'user' ||

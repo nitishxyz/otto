@@ -14,7 +14,7 @@ interface ChatViewProps {
 	onDeny: (callId: string) => void;
 	recipeNames?: ReadonlySet<string>;
 	emptyStateInput?: ReactNode;
-	emptyStateInputWidth?: '80%' | '100%';
+	emptyStateInputWidth?: '64%' | '100%';
 }
 
 export const ChatView = memo(function ChatView({
@@ -27,7 +27,7 @@ export const ChatView = memo(function ChatView({
 	onDeny,
 	recipeNames = EMPTY_RECIPE_NAMES,
 	emptyStateInput,
-	emptyStateInputWidth = '80%',
+	emptyStateInputWidth = '64%',
 }: ChatViewProps) {
 	const { colors } = useTheme();
 
@@ -96,23 +96,6 @@ export const ChatView = memo(function ChatView({
 			>
 				<OttoWordmark />
 				<text fg={colors.fgDark}>Type a message to start a conversation</text>
-				<box style={{ flexDirection: 'row', gap: 3 }}>
-					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>/help</span> commands
-					</text>
-					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>Ctrl+S</span> sessions
-					</text>
-					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>Ctrl+P</span> models
-					</text>
-					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>Ctrl+B</span> activity
-					</text>
-					<text fg={colors.fgDimmed}>
-						<span fg={colors.fgDark}>Tab</span> plan mode
-					</text>
-				</box>
 				{emptyStateInput && (
 					<box
 						style={{
