@@ -70,6 +70,7 @@ export const OnboardingModal = memo(function OnboardingModal({
 
 	return (
 		<div
+			data-native-overlay-root="true"
 			className="fixed inset-0 z-[9999] bg-background text-foreground overflow-y-auto"
 			style={style}
 		>

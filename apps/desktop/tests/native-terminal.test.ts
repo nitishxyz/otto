@@ -233,23 +233,40 @@ describe('native desktop terminal', () => {
 	});
 
 	test('desktop injects the native viewer without changing the web default', async () => {
-		const [desktopLayout, viewerTabs, terminalPane, nativeViewer] =
-			await Promise.all([
-				readFile('src/components/workspace/DesktopAppLayout.tsx', 'utf8'),
-				readFile(
-					'../../packages/web-sdk/src/components/workspace/ViewerTabs.tsx',
-					'utf8',
-				),
-				readFile(
-					'../../packages/web-sdk/src/components/terminals/TerminalViewerPane.tsx',
-					'utf8',
-				),
-				readFile('src/components/terminal/NativeTerminalViewer.tsx', 'utf8'),
-			]);
+		const [
+			desktopLayout,
+			viewerTabs,
+			terminalPane,
+			nativeViewer,
+			usageDashboard,
+			onboardingModal,
+		] = await Promise.all([
+			readFile('src/components/workspace/DesktopAppLayout.tsx', 'utf8'),
+			readFile(
+				'../../packages/web-sdk/src/components/workspace/ViewerTabs.tsx',
+				'utf8',
+			),
+			readFile(
+				'../../packages/web-sdk/src/components/terminals/TerminalViewerPane.tsx',
+				'utf8',
+			),
+			readFile('src/components/terminal/NativeTerminalViewer.tsx', 'utf8'),
+			readFile(
+				'../../packages/web-sdk/src/components/dashboard/UsageDashboard.tsx',
+				'utf8',
+			),
+			readFile(
+				'../../packages/web-sdk/src/components/onboarding/OnboardingModal.tsx',
+				'utf8',
+			),
+		]);
 		expect(desktopLayout).toContain('terminalViewer={NativeTerminalViewer}');
 		expect(viewerTabs).toContain('TerminalPaneStrip');
+		expect(viewerTabs).toContain('data-native-overlay-root="true"');
 		expect(terminalPane).toContain('Viewer = TerminalViewer');
 		expect(nativeViewer).toContain("NATIVE_FONT_FAMILY = 'JetBrainsMono NF'");
 		expect(nativeViewer).not.toContain('usePreferences');
+		expect(usageDashboard).toContain('data-native-overlay-root="true"');
+		expect(onboardingModal).toContain('data-native-overlay-root="true"');
 	});
 });

@@ -859,7 +859,7 @@ const ActiveWorkPane = memo(function ActiveWorkPane() {
 	if (activeMode !== 'work' || !tab) return null;
 
 	return (
-		<div className="absolute inset-0">
+		<div data-native-overlay-root="true" className="absolute inset-0">
 			{renderTabContent(tab, closeTab, updateSessionFileOperationIndex)}
 		</div>
 	);

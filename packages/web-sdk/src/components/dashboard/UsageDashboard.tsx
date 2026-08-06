@@ -170,6 +170,7 @@ export function UsageDashboard({ onBack }: UsageDashboardProps) {
 
 	return (
 		<div
+			data-native-overlay-root="true"
 			className={cn(
 				'fixed inset-0 z-50 flex flex-col bg-background text-foreground',
 				NEO_SCOPE,
