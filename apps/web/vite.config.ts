@@ -16,6 +16,11 @@ export default defineConfig({
 		// EXCLUDE web-sdk from pre-bundling so changes are picked up immediately
 		exclude: ['@ottocode/web-sdk'],
 	},
+	worker: {
+		// The Pierre highlighting worker is an ES module and is instantiated with
+		// `{ type: 'module' }`; the default `iife` format cannot code-split it.
+		format: 'es',
+	},
 	resolve: {
 		alias: {
 			// Some transitive deps still import the pre-v2 noble/ciphers subpath.

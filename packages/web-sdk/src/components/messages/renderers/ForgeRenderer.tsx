@@ -112,13 +112,17 @@ function InventoryDetails({ inventory }: { inventory: UnknownRecord }) {
 	const skills = getRecords(inventory.skills);
 	const agents = getRecords(inventory.agents);
 	const mcpServers = getRecords(inventory.mcpServers);
+	const providers = getRecords(inventory.providers);
+	const auth = getRecords(inventory.auth);
 	const plugins = getRecords(inventory.plugins);
 	return (
-		<div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+		<div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
 			<CountBadge label="recipes" count={recipes.length} />
 			<CountBadge label="skills" count={skills.length} />
 			<CountBadge label="agents" count={agents.length} />
 			<CountBadge label="MCP servers" count={mcpServers.length} />
+			<CountBadge label="providers" count={providers.length} />
+			<CountBadge label="authenticated" count={auth.length} />
 			<CountBadge label="plugins" count={plugins.length} />
 		</div>
 	);
@@ -309,6 +313,8 @@ export function ForgeRenderer({
 				getRecords(inventory.skills).length,
 				getRecords(inventory.agents).length,
 				getRecords(inventory.mcpServers).length,
+				getRecords(inventory.providers).length,
+				getRecords(inventory.auth).length,
 				getRecords(inventory.plugins).length,
 			].reduce((sum, count) => sum + count, 0)
 		: null;
@@ -335,16 +341,12 @@ export function ForgeRenderer({
 				canExpand={hasContent}
 			>
 				<Hammer className="h-3 w-3 flex-shrink-0" />
-				{!compact && (
-					<>
-						<ToolHeaderSeparator />
-						<span className="flex-shrink-0 text-foreground/70">
-							{inventory
-								? 'inventory'
-								: getActionLabel(effectiveAction, effectiveKind)}
-						</span>
-					</>
-				)}
+				<span className="flex-shrink-0 text-muted-foreground/70">&gt;</span>
+				<span className="flex-shrink-0 text-foreground/70">
+					{inventory
+						? 'inventory'
+						: getActionLabel(effectiveAction, effectiveKind)}
+				</span>
 				{detail && !compact && (
 					<>
 						<ToolHeaderSeparator />

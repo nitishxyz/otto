@@ -48,6 +48,8 @@ export interface ToolCallArgs {
 	terminalId?: string;
 	purpose?: string;
 	path?: string;
+	/** Full file contents supplied to the `write` tool. */
+	content?: string;
 	sourcePath?: string;
 	targetPath?: string;
 	startLine?: number;
@@ -81,6 +83,9 @@ export interface ToolResultData {
 	linesCopied?: number;
 	lineRange?: string;
 	content?: string;
+	/** True when the `write` tool created the file instead of overwriting it. */
+	created?: boolean;
+	changed?: boolean;
 	bytes?: number;
 	mediaType?: string;
 	data?: string;

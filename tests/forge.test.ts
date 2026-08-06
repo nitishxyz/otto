@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { getProjectPluginsDir, writePluginsConfig } from '@ottocode/sdk';
 import {
 	getForgeDocs,
 	getForgeInventory,
@@ -21,6 +22,25 @@ describe('forge', () => {
 	afterEach(async () => {
 		await rm(projectRoot, { recursive: true, force: true });
 	});
+
+	async function installProjectPlugin(name: string) {
+		const pluginDir = join(getProjectPluginsDir(projectRoot), name);
+		await mkdir(pluginDir, { recursive: true });
+		await writeFile(
+			join(pluginDir, 'otto.plugin.json'),
+			`${JSON.stringify({ name, version: '1.0.0' }, null, 2)}\n`,
+		);
+		await writePluginsConfig(
+			'project',
+			{
+				version: 1,
+				registries: [],
+				plugins: { [name]: { enabled: true } },
+			},
+			projectRoot,
+		);
+		return join(pluginDir, 'otto.plugin.json');
+	}
 
 	it('lists bounded documentation topics and returns an exact document', () => {
 		const topics = getForgeDocs('skill');
@@ -279,6 +299,289 @@ describe('forge', () => {
 		});
 		expect(result).toMatchObject({ ok: true, applied: false });
 		expect(JSON.stringify(result)).toContain('https://example.com/mcp');
+	});
+
+	it('creates, updates, and removes terminal-backed slash commands', async () => {
+		const manifestPath = await installProjectPlugin('project-tools');
+		const created = await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'plugin-command',
+			plugin: 'project-tools',
+			commandName: 'check',
+			command: 'bun',
+			args: ['test'],
+			description: 'Run project tests',
+		});
+		expect(created).toMatchObject({
+			ok: true,
+			applied: true,
+			slashCommand: '/project-tools check',
+		});
+		expect(await readFile(manifestPath, 'utf8')).toContain('Run project tests');
+
+		await runForgeAction(projectRoot, {
+			action: 'update',
+			kind: 'plugin-command',
+			plugin: 'project-tools',
+			commandName: 'check',
+			args: ['test', '--watch=false'],
+		});
+		expect(await readFile(manifestPath, 'utf8')).toContain('--watch=false');
+
+		await runForgeAction(projectRoot, {
+			action: 'remove',
+			kind: 'plugin-command',
+			plugin: 'project-tools',
+			commandName: 'check',
+		});
+		expect(await readFile(manifestPath, 'utf8')).not.toContain(
+			'Run project tests',
+		);
+	});
+
+	it('creates and manages an unpublished local plugin', async () => {
+		const created = await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+			version: '0.1.0',
+			description: 'Unpublished local automation',
+		});
+		expect(created).toMatchObject({
+			ok: true,
+			applied: true,
+			plugin: {
+				name: 'local-automation',
+				scope: 'project',
+				enabled: true,
+			},
+		});
+
+		await runForgeAction(projectRoot, {
+			action: 'update',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+			version: '0.2.0',
+			displayName: 'Local Automation',
+		});
+		const status = await runForgeAction(projectRoot, {
+			action: 'status',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+		});
+		expect(status).toMatchObject({
+			ok: true,
+			plugin: { version: '0.2.0' },
+		});
+
+		await runForgeAction(projectRoot, {
+			action: 'disable',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+		});
+		expect(
+			(
+				await runForgeAction(projectRoot, {
+					action: 'status',
+					kind: 'plugin',
+					scope: 'project',
+					name: 'local-automation',
+				})
+			).plugin.enabled,
+		).toBe(false);
+
+		const removal = await runForgeAction(projectRoot, {
+			action: 'plan',
+			targetAction: 'remove',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+		});
+		expect(removal).toMatchObject({ ok: true, applied: false });
+		await runForgeAction(projectRoot, {
+			action: 'remove',
+			kind: 'plugin',
+			scope: 'project',
+			name: 'local-automation',
+		});
+		expect(
+			await Bun.file(
+				join(getProjectPluginsDir(projectRoot), 'local-automation'),
+			).exists(),
+		).toBe(false);
+	});
+
+	it('installs a custom plugin from a local directory', async () => {
+		const sourceDir = join(projectRoot, 'plugin-fixtures', 'local-install');
+		await mkdir(sourceDir, { recursive: true });
+		await writeFile(
+			join(sourceDir, 'otto.plugin.json'),
+			`${JSON.stringify(
+				{
+					name: 'installed-local',
+					version: '1.0.0',
+					description: 'Installed from a local directory',
+				},
+				null,
+				2,
+			)}\n`,
+		);
+
+		const result = await runForgeAction(projectRoot, {
+			action: 'install',
+			kind: 'plugin',
+			scope: 'project',
+			source: './plugin-fixtures/local-install',
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			applied: true,
+			plugin: { name: 'installed-local', scope: 'project' },
+		});
+		expect(
+			await Bun.file(
+				join(
+					getProjectPluginsDir(projectRoot),
+					'installed-local',
+					'otto.plugin.json',
+				),
+			).exists(),
+		).toBe(true);
+	});
+
+	it('creates native tools and plugin-owned capabilities', async () => {
+		await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'plugin',
+			name: 'local-tools',
+			description: 'Local tools',
+		});
+		const toolSource = `import type { NativeToolHandler } from '@ottocode/sdk/tool-extension';
+
+export default (async (input) => ({ value: String(input.text) })) satisfies NativeToolHandler;
+`;
+		const tool = await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'plugin-tool',
+			plugin: 'local-tools',
+			toolName: 'echo',
+			description: 'Echo text',
+			content: toolSource,
+			inputSchema: {
+				type: 'object',
+				properties: { text: { type: 'string' } },
+				required: ['text'],
+				additionalProperties: false,
+			},
+			effects: [],
+		});
+		expect(tool).toMatchObject({
+			ok: true,
+			applied: true,
+			tool: { name: 'echo', entry: 'tools/echo.ts' },
+		});
+		await runForgeAction(projectRoot, {
+			action: 'update',
+			kind: 'plugin-tool',
+			plugin: 'local-tools',
+			toolName: 'echo',
+			description: 'Echo provided text',
+		});
+
+		await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'recipe',
+			plugin: 'local-tools',
+			name: 'local-release',
+			description: 'Release locally',
+			content: 'Run the local release checks.',
+		});
+		await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'agent',
+			plugin: 'local-tools',
+			name: 'local-reviewer',
+			description: 'Review local changes',
+			content: 'Review the requested changes.',
+		});
+		await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'skill',
+			plugin: 'local-tools',
+			name: 'local-testing',
+			description: 'Test local tools',
+			content: '# Local testing\n\nRun focused tests.',
+		});
+		await runForgeAction(projectRoot, {
+			action: 'update',
+			kind: 'recipe',
+			plugin: 'local-tools',
+			name: 'local-release',
+			content: 'Run the updated local release checks.',
+		});
+
+		const inventory = await getForgeInventory(projectRoot);
+		expect(
+			inventory.plugins.find((plugin) => plugin.name === 'local-tools'),
+		).toMatchObject({
+			mutable: true,
+			capabilities: { recipes: 1, skills: 1, agents: 1, tools: 1 },
+			tools: [expect.objectContaining({ fullName: 'local-tools__echo' })],
+		});
+		expect(
+			inventory.recipes.find((recipe) => recipe.name === 'local-release'),
+		).toMatchObject({ source: 'plugin', plugin: 'local-tools', mutable: true });
+
+		const validation = await runForgeAction(projectRoot, {
+			action: 'validate',
+			kind: 'plugin-tool',
+			plugin: 'local-tools',
+			toolName: 'echo',
+		});
+		expect(validation).toMatchObject({ ok: true });
+		const removalPlan = await runForgeAction(projectRoot, {
+			action: 'plan',
+			targetAction: 'remove',
+			kind: 'plugin',
+			name: 'local-tools',
+		});
+		expect(JSON.stringify(removalPlan)).toContain('1 native tool(s)');
+		expect(JSON.stringify(removalPlan)).toContain('1 recipe contribution(s)');
+		expect(JSON.stringify(removalPlan)).toContain('1 skill contribution(s)');
+
+		await runForgeAction(projectRoot, {
+			action: 'remove',
+			kind: 'agent',
+			plugin: 'local-tools',
+			name: 'local-reviewer',
+		});
+		await runForgeAction(projectRoot, {
+			action: 'remove',
+			kind: 'skill',
+			plugin: 'local-tools',
+			name: 'local-testing',
+		});
+
+		await runForgeAction(projectRoot, {
+			action: 'remove',
+			kind: 'plugin-tool',
+			plugin: 'local-tools',
+			toolName: 'echo',
+		});
+		expect(
+			await Bun.file(
+				join(
+					getProjectPluginsDir(projectRoot),
+					'local-tools',
+					'tools',
+					'echo.ts',
+				),
+			).exists(),
+		).toBe(false);
 	});
 
 	it('previews custom provider creation without exposing credentials', async () => {

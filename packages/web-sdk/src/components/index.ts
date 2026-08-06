@@ -46,6 +46,26 @@ export * from './messages/MessagePartItem';
 export * from './messages/renderers';
 export { DiffView } from './messages/renderers/DiffView';
 
+// Shared Diff Surface
+export {
+	INLINE_DIFF_VIEWPORT_CLASS,
+	InlineFileWriteDiff,
+	InlinePatchDiff,
+} from './diff/InlineDiff';
+export { PierreFileComparison, PierrePatchDiff } from './diff/PierreDiff';
+export {
+	contentHash,
+	normalizeGitDiffFile,
+	normalizeGitPatch,
+	normalizeToolPatch,
+	summarizePatchFiles,
+} from './diff/patchNormalize';
+export {
+	PierreDiffProvider,
+	resolvePoolSize,
+	type PierreWorkerFactory,
+} from './diff/PierreWorkerProvider';
+
 // Session Components
 export * from './sessions/SessionItem';
 export * from './sessions/SessionListContainer';

@@ -1,181 +1,133 @@
 import { client } from '@ottocode/api';
-import { useCallback, useMemo } from 'react';
+import type { CSSProperties } from 'react';
+import { useMemo } from 'react';
 import type { GitDiffResponse } from '../../types/api';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
+import { PierreFileComparison, PierreFileDiff } from '../diff/PierreDiff';
+import { contentHash, normalizeGitDiffFile } from '../diff/patchNormalize';
+import { CodeMirrorViewer } from '../ui/CodeMirrorViewer';
 import {
-	CodeMirrorViewer,
-	type CodeMirrorLineTone,
-} from '../ui/CodeMirrorViewer';
+	LARGE_DIFF_LIMITED_PREVIEW_CHARS,
+	getFileName,
+	getLimitedPreview,
+	isImageFile,
+} from './gitDiffPatch';
 
-const IMAGE_EXTENSIONS = new Set([
-	'png',
-	'jpg',
-	'jpeg',
-	'gif',
-	'svg',
-	'webp',
-	'ico',
-	'bmp',
-	'avif',
-]);
-
-const LARGE_DIFF_LIMITED_PREVIEW_CHARS = 200_000;
-const LARGE_DIFF_NOTICE_CHARS = 500_000;
-const LARGE_DIFF_TAIL_CHARS = 120_000;
-
-function isImageFile(filePath: string): boolean {
-	const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
-	return IMAGE_EXTENSIONS.has(ext);
-}
+const FULL_HEIGHT_SURFACE_STYLE: CSSProperties = { height: '100%' };
 
 interface GitDiffViewerProps {
 	diff: GitDiffResponse;
 }
 
-/**
- * Get just the filename from a path
- */
-function getFileName(path: string): string {
-	const parts = path.split('/');
-	return parts[parts.length - 1];
-}
-
-function getLimitedPreview(content: string): {
-	content: string;
-	notice?: string;
-} {
-	if (content.length <= LARGE_DIFF_LIMITED_PREVIEW_CHARS) return { content };
-	const notice =
-		content.length >= LARGE_DIFF_NOTICE_CHARS
-			? 'Very large diff/file: showing the tail only to keep the viewer responsive.'
-			: 'Large diff/file: showing the tail only to keep the viewer responsive.';
-	return {
-		content: `… showing the latest ${LARGE_DIFF_TAIL_CHARS.toLocaleString()} characters only …\n${content.slice(
-			-LARGE_DIFF_TAIL_CHARS,
-		)}`,
-		notice,
-	};
-}
-
-interface DiffDisplay {
-	content: string;
-	lineNumbers: Map<number, string>;
-	lineTones: Map<number, CodeMirrorLineTone>;
-}
-
-function isDiffMetadataLine(line: string): boolean {
+function LargePreviewNotice({ notice }: { notice?: string }) {
+	if (!notice) return null;
 	return (
-		line.startsWith('diff --git ') ||
-		line.startsWith('index ') ||
-		line.startsWith('--- ') ||
-		line.startsWith('+++ ') ||
-		line.startsWith('new file mode ') ||
-		line.startsWith('deleted file mode ') ||
-		line.startsWith('old mode ') ||
-		line.startsWith('new mode ') ||
-		line.startsWith('similarity index ') ||
-		line.startsWith('dissimilarity index ') ||
-		line.startsWith('rename from ') ||
-		line.startsWith('rename to ') ||
-		line.startsWith('copy from ') ||
-		line.startsWith('copy to ')
+		<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
+			{notice}
+		</div>
 	);
 }
 
-function parseHunkHeader(
-	line: string,
-): { oldStart: number; newStart: number } | null {
-	const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-	if (!match) return null;
-	return {
-		oldStart: Number.parseInt(match[1], 10),
-		newStart: Number.parseInt(match[2], 10),
-	};
+function PlainDiffFallback({
+	content,
+	path,
+}: {
+	content: string;
+	path: string;
+}) {
+	return (
+		<div className="flex-1 min-h-0">
+			<CodeMirrorViewer content={content} path={path} disableMarkdownSyntax />
+		</div>
+	);
 }
 
-function buildDiffDisplay(diffText: string): DiffDisplay {
-	const contentLines: string[] = [];
-	const lineNumbers = new Map<number, string>();
-	const tones = new Map<number, CodeMirrorLineTone>();
-	const lines = diffText.split('\n');
-	let oldLine: number | null = null;
-	let newLine: number | null = null;
-
-	for (const line of lines) {
-		if (isDiffMetadataLine(line)) continue;
-
-		const lineNumber = contentLines.length + 1;
-		const hunk = parseHunkHeader(line);
-		if (hunk) {
-			oldLine = hunk.oldStart;
-			newLine = hunk.newStart;
-			contentLines.push(line);
-			lineNumbers.set(lineNumber, '');
-			tones.set(lineNumber, 'primary');
-			continue;
-		}
-
-		contentLines.push(line);
-		if (line.startsWith('@@')) {
-			lineNumbers.set(lineNumber, '');
-			tones.set(lineNumber, 'primary');
-		} else if (line.startsWith('+') && !line.startsWith('+++')) {
-			if (newLine !== null) {
-				lineNumbers.set(lineNumber, String(newLine));
-				newLine += 1;
-			}
-			tones.set(lineNumber, 'add');
-		} else if (line.startsWith('-') && !line.startsWith('---')) {
-			if (oldLine !== null) {
-				lineNumbers.set(lineNumber, String(oldLine));
-				oldLine += 1;
-			}
-			tones.set(lineNumber, 'remove');
-		} else if (oldLine !== null && newLine !== null) {
-			lineNumbers.set(lineNumber, String(newLine));
-			oldLine += 1;
-			newLine += 1;
-		}
-	}
-
-	return {
-		content: contentLines.join('\n'),
-		lineNumbers,
-		lineTones: tones,
-	};
-}
-
-function NormalGitDiffViewer({ diff }: GitDiffViewerProps) {
-	const display = useMemo(() => buildDiffDisplay(diff.diff), [diff.diff]);
-	const lineNumberFormatter = useCallback(
-		(lineNumber: number) => display.lineNumbers.get(lineNumber) ?? '',
-		[display.lineNumbers],
+function PatchGitDiffViewer({ diff }: GitDiffViewerProps) {
+	// Normalized once; the metadata carries a stable cacheKey so the shared
+	// worker AST cache survives reselecting the same file.
+	const file = useMemo(
+		() => normalizeGitDiffFile(diff.diff, diff.file),
+		[diff.diff, diff.file],
 	);
 
-	return (
-		<div className="flex flex-col h-full bg-transparent">
-			<div className="flex-1 min-h-0">
-				{display.content.trim() === '' ? (
+	if (!file?.fileDiff) {
+		return (
+			<div className="flex flex-col h-full bg-transparent">
+				{diff.diff.trim() === '' ? (
 					<div className="p-4 text-[12px] text-muted-foreground">
 						No changes to display
 					</div>
 				) : (
-					<CodeMirrorViewer
-						content={display.content}
-						path={diff.file}
-						lineTones={display.lineTones}
-						lineNumberFormatter={lineNumberFormatter}
-						disableMarkdownSyntax
-					/>
+					<PlainDiffFallback content={diff.diff} path="preview.diff" />
 				)}
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex flex-col h-full min-w-0 bg-transparent">
+			<div className="flex-1 min-h-0 min-w-0">
+				<PierreFileDiff
+					fileDiff={file.fileDiff}
+					className="h-full w-full"
+					style={FULL_HEIGHT_SURFACE_STYLE}
+					fallback={
+						<PlainDiffFallback content={diff.diff} path="preview.diff" />
+					}
+				/>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * A new/untracked file has no old side in the index, so it renders as a direct
+ * comparison against `oldFile: null`: every line becomes an addition with the
+ * language inferred from the filename.
+ */
+function NewFileGitDiffViewer({ diff }: GitDiffViewerProps) {
+	const preview = getLimitedPreview(diff.content ?? '');
+	const newFile = useMemo(
+		() => ({
+			name: diff.file,
+			contents: preview.content,
+			cacheKey: `g:${contentHash(diff.file)}:${contentHash(preview.content)}`,
+		}),
+		[diff.file, preview.content],
+	);
+
+	return (
+		<div className="flex flex-col h-full min-w-0 bg-transparent">
+			<div className="px-4 py-3 bg-green-500/10 border-b border-green-500/20">
+				<p className="text-[13px] text-green-600 dark:text-green-400 font-medium">
+					New file: {diff.insertions} lines
+				</p>
+			</div>
+			<LargePreviewNotice notice={preview.notice} />
+
+			<div className="flex-1 min-h-0 min-w-0">
+				<PierreFileComparison
+					oldFile={null}
+					newFile={newFile}
+					className="h-full w-full"
+					style={FULL_HEIGHT_SURFACE_STYLE}
+					fallback={
+						<PlainDiffFallback content={preview.content} path={diff.file} />
+					}
+				/>
 			</div>
 		</div>
 	);
 }
 
 export function GitDiffViewer({ diff }: GitDiffViewerProps) {
-	// Handle new files - show full content instead of diff
-	if (diff.isNewFile && diff.content) {
+	// New/untracked text files render as an added file rather than a preview.
+	if (diff.isNewFile && diff.content && !diff.isBinary) {
+		return <NewFileGitDiffViewer diff={diff} />;
+	}
+
+	// Binary new files still fall through to the image/binary handling below.
+	if (diff.isNewFile && diff.content && diff.isBinary) {
 		const preview = getLimitedPreview(diff.content);
 		return (
 			<div className="flex flex-col h-full bg-transparent">
@@ -184,11 +136,7 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 						New file: {diff.insertions} lines
 					</p>
 				</div>
-				{preview.notice ? (
-					<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
-						{preview.notice}
-					</div>
-				) : null}
+				<LargePreviewNotice notice={preview.notice} />
 
 				<div className="flex-1 min-h-0">
 					<CodeMirrorViewer
@@ -239,21 +187,11 @@ export function GitDiffViewer({ diff }: GitDiffViewerProps) {
 		const preview = getLimitedPreview(diff.diff);
 		return (
 			<div className="flex flex-col h-full bg-transparent">
-				{preview.notice ? (
-					<div className="shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
-						{preview.notice}
-					</div>
-				) : null}
-				<div className="flex-1 min-h-0">
-					<CodeMirrorViewer
-						content={preview.content}
-						path="preview.diff"
-						disableMarkdownSyntax
-					/>
-				</div>
+				<LargePreviewNotice notice={preview.notice} />
+				<PlainDiffFallback content={preview.content} path="preview.diff" />
 			</div>
 		);
 	}
 
-	return <NormalGitDiffViewer diff={diff} />;
+	return <PatchGitDiffViewer diff={diff} />;
 }

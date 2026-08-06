@@ -236,8 +236,12 @@ export function CopyIntoRenderer({
 			)}
 
 			{isExpanded && !hasError && patch && (
-				<div className="mt-2 ml-5">
-					<DiffView patch={patch} />
+				<div className="mt-2 ml-5 min-w-0">
+					<DiffView
+						patch={patch}
+						filePath={targetPath || undefined}
+						hidePathHeader={Boolean(targetPath)}
+					/>
 				</div>
 			)}
 		</div>

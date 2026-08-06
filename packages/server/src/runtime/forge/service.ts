@@ -7,7 +7,7 @@ import {
 	validateSkillName,
 } from '@ottocode/sdk';
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
 	deleteAgentConfig,
 	getAllAgentDetails,
@@ -40,6 +40,10 @@ import { listForgeMCPServers, runForgeMCPAction } from './mcp.ts';
 import { listForgeAuth, runForgeAuthAction } from './auth.ts';
 import { listForgeProviders, runForgeProviderAction } from './provider.ts';
 import { runForgeTunnelAction } from './tunnel.ts';
+import { runForgePluginCommandAction } from './plugin-command.ts';
+import { runForgePluginAction } from './plugin.ts';
+import { runForgePluginToolAction } from './plugin-tool.ts';
+import { runForgePluginCapabilityAction } from './plugin-capability.ts';
 
 function normalizeName(name: string | undefined): string {
 	return name?.trim().toLowerCase() ?? '';
@@ -51,10 +55,15 @@ function assertTargetInput(input: ForgeInput): {
 	name: string;
 } {
 	if (!input.kind) throw new Error('kind is required');
-	if (input.kind === 'plugin' || input.kind === 'app') {
+	if (input.kind === 'app') {
 		throw new Error(`kind '${input.kind}' only supports the Forge docs action`);
 	}
-	if (input.kind === 'mcp-server' || input.kind === 'plugin-command') {
+	if (
+		input.kind === 'mcp-server' ||
+		input.kind === 'plugin' ||
+		input.kind === 'plugin-command' ||
+		input.kind === 'plugin-tool'
+	) {
 		throw new Error(`kind '${input.kind}' uses a dedicated Forge operation`);
 	}
 	const scope = input.scope ?? 'project';
@@ -426,6 +435,14 @@ export async function runForgeAction(projectRoot: string, input: ForgeInput) {
 			docs: getForgeDocs(input.kind, input.topic, input.query),
 		};
 	}
+	if (
+		input.plugin &&
+		(input.kind === 'recipe' ||
+			input.kind === 'skill' ||
+			input.kind === 'agent')
+	) {
+		return runForgePluginCapabilityAction(projectRoot, input);
+	}
 	if (input.action === 'capabilities') {
 		return {
 			ok: true,
@@ -453,6 +470,15 @@ export async function runForgeAction(projectRoot: string, input: ForgeInput) {
 	}
 	if (input.kind === 'tunnel') {
 		return runForgeTunnelAction(input);
+	}
+	if (input.kind === 'plugin-command') {
+		return runForgePluginCommandAction(projectRoot, input);
+	}
+	if (input.kind === 'plugin') {
+		return runForgePluginAction(projectRoot, input);
+	}
+	if (input.kind === 'plugin-tool') {
+		return runForgePluginToolAction(projectRoot, input);
 	}
 	return runForgeMutation(projectRoot, input);
 }
@@ -502,6 +528,23 @@ export async function getForgeInventory(projectRoot: string) {
 		listForgeAuth(projectRoot),
 		runForgeTunnelAction({ action: 'status', kind: 'tunnel' }),
 	]);
+	const installedPlugins = effectivePlugins.plugins.filter(
+		(plugin) => plugin.status === 'installed' && plugin.manifest,
+	);
+	const recipeOwners = new Map<string, string>();
+	const skillOwners = new Map<string, string>();
+	const agentOwners = new Map<string, string>();
+	for (const plugin of installedPlugins) {
+		for (const recipe of plugin.manifest?.recipes ?? []) {
+			recipeOwners.set(resolve(plugin.dir, recipe.path), plugin.name);
+		}
+		for (const skill of plugin.manifest?.skills ?? []) {
+			skillOwners.set(skill.name.toLowerCase(), plugin.name);
+		}
+		for (const agent of plugin.manifest?.agents ?? []) {
+			agentOwners.set(agent.name.toLowerCase(), plugin.name);
+		}
+	}
 
 	return {
 		projectRoot,
@@ -510,12 +553,18 @@ export async function getForgeInventory(projectRoot: string) {
 			scope: recipe.scope,
 			description: recipe.description,
 			path: recipe.path,
+			source: recipeOwners.has(resolve(recipe.path)) ? 'plugin' : 'standalone',
+			plugin: recipeOwners.get(resolve(recipe.path)),
+			mutable: true,
 		})),
 		skills: skills.map((skill) => ({
 			name: skill.name,
 			scope: skill.scope,
 			description: skill.description,
 			path: skill.path,
+			source: skillOwners.has(skill.name) ? 'plugin' : 'standalone',
+			plugin: skillOwners.get(skill.name),
+			mutable: true,
 		})),
 		agents: agentDetails.agents.map((agent) => ({
 			name: agent.name,
@@ -525,6 +574,8 @@ export async function getForgeInventory(projectRoot: string) {
 			model: agent.model,
 			hasProjectOverride: agent.hasLocalOverride,
 			hasGlobalOverride: agent.hasGlobalOverride,
+			plugin: agentOwners.get(agent.name),
+			mutable: true,
 		})),
 		mcpServers,
 		providers,
@@ -533,8 +584,15 @@ export async function getForgeInventory(projectRoot: string) {
 		plugins: effectivePlugins.plugins.map((plugin) => ({
 			name: plugin.name,
 			scope: plugin.scope,
+			dir: plugin.dir,
+			manifestPath: plugin.manifestPath,
 			enabled: plugin.enabled,
+			installed: plugin.installed,
 			status: plugin.status,
+			source: plugin.configEntry?.source,
+			mutable:
+				!plugin.configEntry?.source?.startsWith('official:') &&
+				!plugin.configEntry?.source?.startsWith('registry:'),
 			version: plugin.manifest?.version,
 			description: plugin.manifest?.description,
 			capabilities: {
@@ -542,6 +600,7 @@ export async function getForgeInventory(projectRoot: string) {
 				skills: plugin.manifest?.skills?.length ?? 0,
 				agents: plugin.manifest?.agents?.length ?? 0,
 				commands: Object.keys(plugin.manifest?.commands ?? {}).length,
+				tools: plugin.manifest?.tools?.length ?? 0,
 				mcpServers: Object.keys(plugin.manifest?.mcpServers ?? {}).length,
 			},
 			commands: Object.entries(plugin.manifest?.commands ?? {}).map(
@@ -552,6 +611,29 @@ export async function getForgeInventory(projectRoot: string) {
 					parameters: command.parameters,
 				}),
 			),
+			recipes: (plugin.manifest?.recipes ?? []).map((recipe) => ({
+				name: recipe.name,
+				path: recipe.path,
+				description: recipe.description,
+			})),
+			skills: (plugin.manifest?.skills ?? []).map((skill) => ({
+				name: skill.name,
+				path: skill.path,
+				description: skill.description,
+			})),
+			agents: (plugin.manifest?.agents ?? []).map((agent) => ({
+				name: agent.name,
+				path: agent.path,
+				description: agent.description,
+			})),
+			tools: (plugin.manifest?.tools ?? []).map((tool) => ({
+				name: tool.name,
+				fullName: `${plugin.name}__${tool.name}`,
+				description: tool.description,
+				entry: tool.entry,
+				effects: tool.effects,
+				timeoutMs: tool.timeoutMs,
+			})),
 		})),
 	};
 }

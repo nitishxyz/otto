@@ -1,5 +1,6 @@
 import { messages } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
+import { stringifyWithoutInlineImageData } from '../../../tools/adapter/browser-artifact.ts';
 import type { RunOpts } from '../queue.ts';
 import type { ProviderMetadata, RuntimeDb } from './types.ts';
 
@@ -51,7 +52,7 @@ function buildFinishDetails(input: {
 	if (input.response) details.response = input.response;
 	if (Object.keys(details).length === 0) return undefined;
 	try {
-		return JSON.stringify(details);
+		return stringifyWithoutInlineImageData(details);
 	} catch {
 		return JSON.stringify({ serializationError: true });
 	}

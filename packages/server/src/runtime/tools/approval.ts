@@ -82,6 +82,7 @@ export function requiresApproval(
 				input.action !== 'capabilities' &&
 				input.action !== 'inventory' &&
 				input.action !== 'status' &&
+				input.action !== 'validate' &&
 				input.action !== 'plan'
 			);
 		}

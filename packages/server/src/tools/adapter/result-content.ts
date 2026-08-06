@@ -23,7 +23,12 @@ export function buildToolResultContent(args: {
 	) {
 		try {
 			const maybeArtifact = (args.result as { artifact?: unknown }).artifact;
-			if (maybeArtifact !== undefined) {
+			const isInlineBrowserScreenshot =
+				args.name === 'browser' &&
+				maybeArtifact !== null &&
+				typeof maybeArtifact === 'object' &&
+				(maybeArtifact as { kind?: unknown }).kind === 'browser_screenshot';
+			if (maybeArtifact !== undefined && !isInlineBrowserScreenshot) {
 				content.artifact = maybeArtifact;
 			}
 		} catch {}

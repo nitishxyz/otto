@@ -3,9 +3,89 @@ import { tool } from 'ai';
 import { z } from 'zod/v3';
 import { adaptTools } from '../packages/server/src/tools/adapter.ts';
 import type { ToolAdapterContext } from '../packages/server/src/tools/adapter.ts';
-import { stripToolResultArtifactsForModel } from '../packages/server/src/tools/adapter/results.ts';
+import {
+	buildToolResultContent,
+	stripToolResultArtifactsForModel,
+} from '../packages/server/src/tools/adapter/results.ts';
+import {
+	extractBrowserScreenshot,
+	referenceBrowserScreenshot,
+	sanitizeInlineImageDataJson,
+	stringifyWithoutInlineImageData,
+} from '../packages/server/src/tools/adapter/browser-artifact.ts';
 
 describe('tool result model sanitization', () => {
+	it('keeps browser screenshot bytes once in persisted tool content', () => {
+		const artifact = {
+			kind: 'browser_screenshot',
+			mediaType: 'image/png',
+			data: 'aGVsbG8=',
+		};
+		const content = buildToolResultContent({
+			name: 'browser',
+			result: { ok: true, artifact },
+			callId: 'call/1',
+		});
+
+		expect(content.result).toEqual({ ok: true, artifact });
+		expect(content.artifact).toBeUndefined();
+	});
+
+	it('replaces inline browser screenshot bytes with an artifact URL', () => {
+		const data = 'a'.repeat(1_000_000);
+		const artifact = {
+			kind: 'browser_screenshot',
+			mediaType: 'image/png',
+			data,
+		};
+		const content = {
+			name: 'browser',
+			result: { ok: true, artifact },
+			artifact,
+			callId: 'call/1',
+		};
+
+		expect(extractBrowserScreenshot(content)).toEqual({
+			data,
+			mediaType: 'image/png',
+		});
+		const referenced = referenceBrowserScreenshot(
+			content,
+			'session 1',
+			'call/1',
+		);
+		const serialized = JSON.stringify(referenced);
+
+		expect(serialized).not.toContain(data);
+		expect(serialized.length).toBeLessThan(1_000);
+		expect(serialized).toContain(
+			'/v1/sessions/session%201/tool-results/call%2F1/artifact',
+		);
+	});
+
+	it('omits inline images from finish diagnostics', () => {
+		const data = 'a'.repeat(1_000_000);
+		const details = {
+			response: {
+				messages: [
+					{
+						content: [
+							{ type: 'text', text: 'screenshot' },
+							{ type: 'image-data', data, mediaType: 'image/png' },
+						],
+					},
+				],
+			},
+		};
+		const sanitized = stringifyWithoutInlineImageData(details);
+
+		expect(sanitized).not.toContain(data);
+		expect(sanitized).toContain('image-data');
+		expect(sanitizeInlineImageDataJson(JSON.stringify(details))).toBe(
+			sanitized,
+		);
+	});
+
 	it('removes UI artifacts from model-visible tool output', () => {
 		const result = {
 			ok: true,

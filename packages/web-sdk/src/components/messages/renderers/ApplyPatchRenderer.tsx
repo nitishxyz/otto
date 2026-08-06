@@ -1,24 +1,20 @@
 import { ChevronRight } from 'lucide-react';
+import { useMemo } from 'react';
 import type { GenericRendererProps } from './types';
 import { DiffView } from './DiffView';
+import { InlinePatchDiff } from '../../diff/InlineDiff';
+import {
+	normalizeToolPatch,
+	summarizePatchFiles,
+} from '../../diff/patchNormalize';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
 import { InlineChangeCount } from '../../workspace/ViewerStatusBar';
 
-interface ApplyPatchChangeHunk {
-	oldStart: number;
-	oldLines: number;
-	newStart: number;
-	newLines: number;
-	additions: number;
-	deletions: number;
-	context?: string;
-}
-
 interface ApplyPatchChange {
 	filePath: string;
 	kind: string;
-	hunks: ApplyPatchChangeHunk[];
+	hunks: unknown[];
 }
 
 export function ApplyPatchRenderer({
@@ -31,41 +27,39 @@ export function ApplyPatchRenderer({
 	const artifact = contentJson.artifact;
 	const timeStr = formatDuration(toolDurationMs);
 
-	const formatSpan = (start: number, count: number) => {
-		if (count <= 1) return `${start}`;
-		return `${start}-${start + count - 1}`;
-	};
-
-	const formatHunkLabel = (hunk: ApplyPatchChangeHunk) => {
-		const left = `-${formatSpan(hunk.oldStart, hunk.oldLines)}`;
-		const right = `+${formatSpan(hunk.newStart, hunk.newLines)}`;
-		const deltaParts: string[] = [];
-		if (hunk.additions > 0) deltaParts.push(`+${hunk.additions}`);
-		if (hunk.deletions > 0) deltaParts.push(`-${hunk.deletions}`);
-		const delta = deltaParts.length > 0 ? ` (${deltaParts.join(', ')})` : '';
-		return `${left} ${right}${delta}`;
-	};
 	const summary = artifact?.summary || {};
-	const files = Number(summary.files || 0);
-	const additions = Number(summary.additions || 0);
-	const deletions = Number(summary.deletions || 0);
 	const patch = artifact?.patch ? String(artifact.patch) : '';
 
 	const changes = Array.isArray(contentJson.result?.changes)
 		? (contentJson.result?.changes as ApplyPatchChange[])
 		: [];
+
+	// One apply_patch call may touch several files; parse them all so the
+	// summary counts and the rendered sections come from the same model.
+	const parsedFiles = useMemo(() => normalizeToolPatch(patch), [patch]);
+	const parsedTotals = useMemo(
+		() => summarizePatchFiles(parsedFiles),
+		[parsedFiles],
+	);
+
+	const files = Number(summary.files || 0) || parsedTotals.files;
+	const additions = Number(summary.additions ?? parsedTotals.additions);
+	const deletions = Number(summary.deletions ?? parsedTotals.deletions);
+
 	const rendererToolName = toolName || contentJson.name || 'apply_patch';
 	const titleLabel = rendererToolName.replace(/_/g, ' ');
 
-	const singleFilePath =
-		files === 1
-			? changes[0]?.filePath ||
-				(typeof contentJson.result?.path === 'string'
-					? contentJson.result.path
-					: typeof contentJson.args?.path === 'string'
-						? contentJson.args.path
-						: null)
-			: null;
+	const firstPath =
+		parsedFiles[0]?.path ||
+		changes[0]?.filePath ||
+		(typeof contentJson.result?.path === 'string'
+			? contentJson.result.path
+			: typeof contentJson.args?.path === 'string'
+				? contentJson.args.path
+				: null);
+	const singleFilePath = files === 1 ? firstPath : null;
+	// Multi-file calls show the first path plus a remaining-file count.
+	const extraFileCount = Math.max(0, files - 1);
 
 	const hasError =
 		contentJson.error ||
@@ -107,14 +101,21 @@ export function ApplyPatchRenderer({
 					{hasError ? ' error' : ''}
 				</span>
 				<span className="text-muted-foreground/70 flex-shrink-0">·</span>
-				{singleFilePath ? (
-					<span
-						className="text-foreground/70 min-w-0 flex-shrink overflow-hidden text-ellipsis whitespace-nowrap"
-						dir="rtl"
-						title={singleFilePath}
-					>
-						{`\u2066${singleFilePath}\u2069`}
-					</span>
+				{firstPath ? (
+					<>
+						<span
+							className="text-foreground/70 min-w-0 flex-shrink overflow-hidden text-ellipsis whitespace-nowrap"
+							dir="rtl"
+							title={firstPath}
+						>
+							{`\u2066${firstPath}\u2069`}
+						</span>
+						{extraFileCount > 0 && (
+							<span className="text-muted-foreground/80 flex-shrink-0 whitespace-nowrap">
+								+{extraFileCount} file{extraFileCount === 1 ? '' : 's'}
+							</span>
+						)}
+					</>
 				) : (
 					<span className="text-foreground/70 flex-shrink-0">
 						{files} {files === 1 ? 'file' : 'files'}
@@ -137,42 +138,28 @@ export function ApplyPatchRenderer({
 								<summary className="cursor-pointer text-xs text-red-700 dark:text-red-300 hover:text-red-600 dark:hover:text-red-200">
 									Show patch that failed
 								</summary>
-								<div className="mt-2">
-									<DiffView patch={patch} />
+								<div className="mt-2 min-w-0">
+									<DiffView
+										patch={patch}
+										filePath={singleFilePath ?? undefined}
+									/>
 								</div>
 							</details>
 						</div>
 					)}
 				</div>
 			)}
-			{isExpanded && !hasError && changes.length > 0 && (
-				<div className="mt-2 ml-5 space-y-2">
-					{changes.map((change) => (
-						<div
-							key={`apply-patch-${change.filePath}-${change.kind}`}
-							className="space-y-1"
-						>
-							<div className="font-mono text-foreground/80">
-								{change.filePath}
-							</div>
-							<div className="flex flex-wrap gap-2">
-								{change.hunks.map((hunk, index) => (
-									<span
-										key={`apply-patch-${change.filePath}-hunk-${index}`}
-										className="rounded bg-muted px-2 py-0.5 text-[0.65rem] font-mono text-muted-foreground"
-									>
-										{formatHunkLabel(hunk)}
-									</span>
-								))}
-							</div>
-						</div>
-					))}
-				</div>
-			)}
-
+			{/*
+			 * Each file's path row, hunk chips and diff render together as one
+			 * section, so a file can never show chips with no code beneath them.
+			 */}
 			{isExpanded && !hasError && patch && (
-				<div className="mt-2 ml-5">
-					<DiffView patch={patch} />
+				<div className="mt-2 ml-5 min-w-0">
+					<InlinePatchDiff
+						patch={patch}
+						fallbackPath={singleFilePath ?? undefined}
+						hidePathHeader={Boolean(singleFilePath)}
+					/>
 				</div>
 			)}
 		</div>

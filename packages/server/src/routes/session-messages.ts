@@ -9,13 +9,18 @@ import {
 	type ReasoningLevel,
 	validateProviderModel,
 } from '@ottocode/sdk';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
 import { tryExecutePluginSlashMessage } from '../runtime/commands/plugin-slash.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
+import {
+	extractBrowserScreenshot,
+	referenceBrowserScreenshot,
+	sanitizeInlineImageDataJson,
+} from '../tools/adapter/browser-artifact.ts';
 import { pluginCommandRunResponseSchema } from './plugins/schemas.ts';
 import {
 	projectQuerySchema,
@@ -161,6 +166,21 @@ const messageParamsSchema = z.object({
 	}),
 });
 
+const toolResultArtifactParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+	callId: z.string().openapi({
+		param: { name: 'callId', in: 'path' },
+	}),
+});
+
+const binaryToolResultArtifactSchema = z.unknown().openapi({
+	type: 'string',
+	format: 'binary',
+	description: 'Raw browser screenshot bytes',
+});
+
 const listMessagesQuerySchema = projectQuerySchema.extend({
 	without: z
 		.enum(['parts'])
@@ -277,6 +297,10 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					.from(messages)
 					.where(eq(messages.sessionId, id))
 					.orderBy(messages.createdAt);
+				const responseRows = rows.map((message) => ({
+					...message,
+					finishDetails: sanitizeInlineImageDataJson(message.finishDetails),
+				}));
 				const without = c.req.query('without');
 				if (without !== 'parts') {
 					const ids = rows.map((m) => m.id);
@@ -304,13 +328,20 @@ export function registerSessionMessagesRoutes(app: Hono) {
 						} catch {}
 						return raw;
 					}
-					const enriched = rows.map((m) => {
+					const enriched = responseRows.map((m) => {
 						const parts = (partsByMsg.get(m.id) ?? []).sort(
 							(a, b) => a.index - b.index,
 						);
 						const mapped = parts.map((p) => {
 							const parsed = parseContent(p.content);
-							const stripped = stripHeavyAttachmentFields(p.type, parsed);
+							const referenced =
+								p.type === 'tool_result' &&
+								p.toolName === 'browser' &&
+								p.toolCallId &&
+								typeof parsed === 'object'
+									? referenceBrowserScreenshot(parsed, id, p.toolCallId)
+									: parsed;
+							const stripped = stripHeavyAttachmentFields(p.type, referenced);
 							const content =
 								stripped === parsed ? p.content : JSON.stringify(stripped);
 							return wantParsed
@@ -321,12 +352,79 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					});
 					return c.json(enriched);
 				}
-				return c.json(rows);
+				return c.json(responseRows);
 			} catch (error) {
 				logger.error('Failed to list session messages', error);
 				const errorResponse = serializeError(error);
 				return c.json(errorResponse, errorResponse.error.status || 500);
 			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/sessions/{id}/tool-results/{callId}/artifact',
+			tags: ['messages'],
+			operationId: 'getToolResultArtifact',
+			summary: 'Get raw browser screenshot bytes for a tool result',
+			request: {
+				params: toolResultArtifactParamsSchema,
+				query: projectQuerySchema,
+			},
+			responses: {
+				'200': {
+					description: 'Raw browser screenshot bytes',
+					content: {
+						'application/octet-stream': {
+							schema: binaryToolResultArtifactSchema,
+						},
+					},
+				},
+				'404': {
+					description: 'Browser screenshot not found',
+					content: {
+						'application/json': { schema: messageErrorSchema },
+					},
+				},
+			},
+		},
+		async (c) => {
+			const { db } = await resolveRequestProject(c);
+			const sessionId = c.req.param('id');
+			const callId = c.req.param('callId');
+			const [part] = await db
+				.select({ content: messageParts.content })
+				.from(messageParts)
+				.innerJoin(messages, eq(messageParts.messageId, messages.id))
+				.where(
+					and(
+						eq(messages.sessionId, sessionId),
+						eq(messageParts.type, 'tool_result'),
+						eq(messageParts.toolName, 'browser'),
+						eq(messageParts.toolCallId, callId),
+					),
+				)
+				.limit(1);
+			if (!part) return c.json({ error: 'Browser screenshot not found' }, 404);
+
+			let screenshot = null;
+			try {
+				screenshot = extractBrowserScreenshot(JSON.parse(part.content));
+			} catch {}
+			if (!screenshot) {
+				return c.json({ error: 'Browser screenshot not found' }, 404);
+			}
+
+			const bytes = Buffer.from(screenshot.data, 'base64');
+			return new Response(bytes, {
+				headers: {
+					'Content-Type': screenshot.mediaType,
+					'Content-Length': String(bytes.byteLength),
+					'Cache-Control': 'private, max-age=31536000, immutable',
+				},
+			});
 		},
 	);
 

@@ -33,6 +33,7 @@ import {
 	type ToolFailureState,
 } from './results.ts';
 import { unwrapDoubleWrappedArgs } from './model-output.ts';
+import { referenceBrowserScreenshot } from './browser-artifact.ts';
 
 type ToolExecuteSignature = Tool['execute'] extends (
 	input: infer Input,
@@ -218,7 +219,11 @@ export async function handleAdaptedToolExecute(args: {
 				durationMs,
 				endTs,
 			});
-			publishToolResult(args.ctx, contentObj, stepIndexForEvent);
+			const eventContent =
+				args.name === 'browser' && callId
+					? referenceBrowserScreenshot(contentObj, args.ctx.sessionId, callId)
+					: contentObj;
+			publishToolResult(args.ctx, eventContent, stepIndexForEvent);
 			logToolResult(args.ctx, {
 				name: args.name,
 				callId,

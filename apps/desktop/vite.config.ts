@@ -10,6 +10,12 @@ export default defineConfig(async () => ({
 	plugins: [react()],
 	base: './',
 
+	worker: {
+		// The Pierre highlighting worker is an ES module and is instantiated with
+		// `{ type: 'module' }`; the default `iife` format cannot code-split it.
+		format: 'es',
+	},
+
 	resolve: {
 		alias: {
 			'@ottocode/web-sdk/lib': path.resolve(

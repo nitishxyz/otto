@@ -17,6 +17,8 @@ import {
 	ToolHeaderSeparator,
 	ToolHeaderSuccess,
 } from './shared';
+import { AuthenticatedImage } from '../../AuthenticatedImage';
+import { getBaseUrl, getProjectQuery } from '../../../lib/api-client/utils';
 
 const INSPECTION_ACTIONS = new Set([
 	'snapshot',
@@ -277,6 +279,14 @@ function InspectionContent({
 	return null;
 }
 
+function browserScreenshotSrc(contentUrl: string): string {
+	const url = new URL(contentUrl, `${getBaseUrl().replace(/\/$/, '')}/`);
+	for (const [name, value] of Object.entries(getProjectQuery())) {
+		url.searchParams.set(name, value);
+	}
+	return url.toString();
+}
+
 function fallbackResult(
 	result: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -308,10 +318,13 @@ export function BrowserRenderer({
 	const pageUrl = safeExternalUrl(result.url);
 	const mediaType = getString(artifact?.mediaType);
 	const imageData = getString(artifact?.data);
+	const imageContentUrl = getString(artifact?.contentUrl);
 	const imageSrc =
 		imageData && mediaType && /^image\/[a-z0-9.+-]+$/i.test(mediaType)
 			? `data:${mediaType};base64,${imageData}`
-			: null;
+			: imageContentUrl
+				? browserScreenshotSrc(imageContentUrl)
+				: null;
 	const hasInspectionContent = action ? INSPECTION_ACTIONS.has(action) : false;
 	const hasContent = hasError || Object.keys(result).length > 0;
 	const message = getString(result.message);
@@ -365,7 +378,7 @@ export function BrowserRenderer({
 							maxHeight="max-h-[36rem]"
 						>
 							<div className="bg-muted/10 p-3">
-								<img
+								<AuthenticatedImage
 									alt={`Browser screenshot${pageUrl ? ` of ${pageUrl}` : ''}`}
 									className="max-h-[32rem] max-w-full rounded-md border border-border bg-background object-contain"
 									src={imageSrc}

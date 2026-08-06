@@ -63,6 +63,23 @@ describe('ForgeRenderer', () => {
 		expect(markup).toContain('plugins');
 	});
 
+	it('shows forge > action in compact headers', () => {
+		const markup = renderToStaticMarkup(
+			<ForgeRenderer
+				contentJson={{
+					args: { action: 'enable', kind: 'tunnel' },
+					result: { ok: true, applied: true },
+				}}
+				compact
+				onToggle={() => {}}
+			/>,
+		);
+
+		expect(markup).toContain('forge');
+		expect(markup).toContain('&gt;');
+		expect(markup).toContain('enable');
+	});
+
 	it('routes Forge calls through the dedicated renderer', () => {
 		const markup = renderToStaticMarkup(
 			<ToolResultRenderer

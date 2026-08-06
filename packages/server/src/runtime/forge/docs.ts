@@ -164,14 +164,54 @@ Example:
   }
 }
 
-Use otto plugins validate <plugin-directory> to validate a local package. Forge does not currently create or mutate plugin packages.`,
+Forge treats local plugins as first-class editable packages. action create builds an unpublished project or global plugin locally. action install installs a registry plugin or a local directory. status, update, remove, enable, disable, search, and validate manage the full lifecycle. Registry-managed plugins are not edited in place; install or create a local fork first.
+
+Example:
+forge({
+	action: "create",
+	kind: "plugin",
+	scope: "project",
+	name: "project-tools",
+	version: "0.1.0",
+	description: "Local project automation"
+})`,
+		},
+		capabilities: {
+			title: 'Plugin-owned capabilities',
+			summary:
+				'Create and edit recipes, skills, and agents inside local plugins.',
+			content: `Set plugin when creating, updating, or removing a recipe, skill, or agent contribution. Forge writes the capability source inside the plugin, updates otto.plugin.json, validates the result, and refreshes skill/tool discovery.
+
+Example:
+forge({
+	action: "create",
+	kind: "recipe",
+	plugin: "project-tools",
+	name: "release-check",
+	description: "Check release readiness",
+	content: "Run focused tests and summarize blockers."
+})
+
+Inventory reports source, plugin ownership, mutability, manifest paths, and contributed recipes, skills, agents, commands, tools, and MCP servers.`,
 		},
 		commands: {
 			title: 'Plugin commands',
-			summary: 'Declare and execute visible host commands.',
-			content: `A plugin command requires command and may include label, description, args, env, cwd, typed parameters, allowExtraArgs, and fallback. Commands from enabled plugins run in visible terminals.
+			summary: 'Create slash commands backed by visible terminals.',
+			content: `A plugin command is Otto's terminal-backed slash-command primitive. Commands from enabled plugins are exposed as /<plugin> <command> and run in visible terminals. A command requires command and may include label, description, args, env, cwd, typed parameters, and allowExtraArgs. Forge can plan/create/update/remove commands in installed plugin manifests and execute enabled commands.
 
-Example:
+Create a slash command:
+forge({
+	action: "create",
+	kind: "plugin-command",
+	plugin: "project-tools",
+	commandName: "check",
+	command: "bun",
+	args: ["test"],
+	description: "Run project tests",
+	dryRun: true
+})
+
+Execute it directly:
 forge({
   action: "execute",
   kind: "plugin-command",
@@ -184,6 +224,15 @@ forge({
 			title: 'Native plugin tools',
 			summary: 'Declare isolated TypeScript or JavaScript tools.',
 			content: `Each native tool declares name, entry, description, inputSchema, optional outputSchema, effects, optional secrets, and timeoutMs. Entries must remain inside the plugin directory. Supported effects are workspace-read, workspace-write, process, network, secrets, and external-write. A tool declaring secrets must include the secrets effect.`,
+		},
+	},
+	'plugin-tool': {
+		management: {
+			title: 'Native plugin tool lifecycle',
+			summary: 'Create, edit, validate, execute, and delete native tools.',
+			content: `Native tools live inside local Otto plugins. Use kind "plugin-tool" with plugin and toolName. create/update accepts content for the TypeScript implementation, entry, description, inputSchema, optional outputSchema, effects, secret declarations, and timeoutMs. validate checks the complete plugin and execute accepts toolInput. remove deletes the manifest contribution and its unshared source file.
+
+Secrets are declarations that map a logical name to an environment variable; never put secret values in content, env, or toolInput. Registry-managed plugins must be forked or installed locally before their tools can be edited.`,
 		},
 	},
 	app: {

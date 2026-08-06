@@ -6,6 +6,7 @@ import {
 	vscDarkPlus,
 } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { PendingToolApproval } from '../../stores/toolApprovalStore';
+import { InlineFileWriteDiff } from '../diff/InlineDiff';
 import { DiffView } from './renderers/DiffView';
 
 interface ToolApprovalCardProps {
@@ -14,42 +15,6 @@ interface ToolApprovalCardProps {
 	pendingApproval: PendingToolApproval;
 	onApprove: (callId: string) => void | Promise<void>;
 	onReject: (callId: string) => void | Promise<void>;
-}
-
-function getLanguageFromPath(path: string): string {
-	const ext = path.split('.').pop()?.toLowerCase();
-	const langMap: Record<string, string> = {
-		js: 'javascript',
-		jsx: 'jsx',
-		ts: 'typescript',
-		tsx: 'tsx',
-		py: 'python',
-		rb: 'ruby',
-		go: 'go',
-		rs: 'rust',
-		java: 'java',
-		c: 'c',
-		cpp: 'cpp',
-		h: 'c',
-		hpp: 'cpp',
-		cs: 'csharp',
-		php: 'php',
-		sh: 'bash',
-		bash: 'bash',
-		zsh: 'bash',
-		sql: 'sql',
-		json: 'json',
-		yaml: 'yaml',
-		yml: 'yaml',
-		xml: 'xml',
-		html: 'html',
-		css: 'css',
-		scss: 'scss',
-		md: 'markdown',
-		txt: 'text',
-		svelte: 'svelte',
-	};
-	return langMap[ext || ''] || 'javascript';
 }
 
 function normalizeToolName(toolName: string): string {
@@ -132,7 +97,6 @@ export const ToolApprovalCard = memo(function ToolApprovalCard({
 	const approvalTarget = command || primary?.value;
 
 	const filePath = typeof args?.path === 'string' ? args.path : '';
-	const language = getLanguageFromPath(filePath);
 	const syntaxTheme = document?.documentElement.classList.contains('dark')
 		? vscDarkPlus
 		: prism;
@@ -154,40 +118,26 @@ export const ToolApprovalCard = memo(function ToolApprovalCard({
 	const renderContent = () => {
 		if (toolName === 'apply_patch' && args?.patch) {
 			return (
-				<div className="ml-6 max-w-full overflow-hidden">
-					<DiffView patch={String(args.patch)} />
+				<div className="ml-6 max-w-full min-w-0 overflow-hidden">
+					<DiffView
+						patch={String(args.patch)}
+						filePath={filePath || undefined}
+					/>
 				</div>
 			);
 		}
 
 		if (toolName === 'write' && args?.content) {
 			const content = String(args.content);
+			// The file has not been written yet, so there is no old side to compare
+			// against: preview the pending write as an added file.
 			return (
-				<div className="ml-6 max-w-full overflow-hidden">
-					<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg overflow-hidden max-h-96">
-						<div className="overflow-x-auto overflow-y-auto max-h-96 text-xs">
-							<SyntaxHighlighter
-								language={language}
-								style={syntaxTheme}
-								customStyle={{
-									margin: 0,
-									padding: '0.75rem',
-									background: 'transparent',
-									fontSize: 'inherit',
-								}}
-								showLineNumbers
-								lineNumberStyle={{
-									minWidth: '2.5em',
-									paddingRight: '1em',
-									color: 'var(--muted-foreground)',
-									opacity: 0.4,
-									userSelect: 'none',
-								}}
-							>
-								{content}
-							</SyntaxHighlighter>
-						</div>
-					</div>
+				<div className="ml-6 max-w-full min-w-0 overflow-hidden">
+					<InlineFileWriteDiff
+						path={filePath || 'file'}
+						content={content}
+						previousContent={null}
+					/>
 				</div>
 			);
 		}

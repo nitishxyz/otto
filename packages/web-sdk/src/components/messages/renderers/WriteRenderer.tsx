@@ -1,6 +1,7 @@
 import { ChevronRight, AlertCircle } from 'lucide-react';
 import type { RendererProps } from './types';
 import { DiffView } from './DiffView';
+import { InlineFileWriteDiff } from '../../diff/InlineDiff';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
 import { InlineChangeCount } from '../../workspace/ViewerStatusBar';
@@ -30,6 +31,13 @@ export function WriteRenderer({
 	const path = String(result.path || args.path || '');
 	const bytes = Number(result.bytes || 0);
 	const patch = artifact?.patch ? String(artifact.patch) : '';
+	// A created file has no old side at all, which renders as a true added file
+	// rather than a patch against an empty document.
+	const writtenContent =
+		typeof args.content === 'string' ? args.content : undefined;
+	const isCreatedFile = result.created === true;
+	const showCreatedFile =
+		isCreatedFile && writtenContent !== undefined && path.length > 0;
 	const timeStr = formatDuration(toolDurationMs);
 	const summary =
 		artifact?.summary && typeof artifact.summary === 'object'
@@ -41,7 +49,7 @@ export function WriteRenderer({
 		typeof summary?.deletions === 'number' ? summary.deletions : 0;
 	const hasChangeCount = !hasToolError && (additions > 0 || deletions > 0);
 
-	const canExpand = patch.length > 0 || hasToolError;
+	const canExpand = patch.length > 0 || showCreatedFile || hasToolError;
 
 	return (
 		<div className="text-[12px]">
@@ -106,9 +114,19 @@ export function WriteRenderer({
 			{isExpanded && hasToolError && errorMessage && (
 				<ToolErrorDisplay error={errorMessage} stack={errorStack} showStack />
 			)}
-			{isExpanded && !hasToolError && patch && (
-				<div className="mt-2 ml-5">
-					<DiffView patch={patch} />
+			{isExpanded && !hasToolError && showCreatedFile && (
+				<div className="mt-2 ml-5 min-w-0">
+					<InlineFileWriteDiff
+						path={path}
+						content={writtenContent as string}
+						previousContent={null}
+						hidePathHeader={!compact}
+					/>
+				</div>
+			)}
+			{isExpanded && !hasToolError && !showCreatedFile && patch && (
+				<div className="mt-2 ml-5 min-w-0">
+					<DiffView patch={patch} filePath={path} hidePathHeader={!compact} />
 				</div>
 			)}
 		</div>

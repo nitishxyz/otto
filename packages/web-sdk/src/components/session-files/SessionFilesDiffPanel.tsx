@@ -1,8 +1,11 @@
 import { useEffect, useMemo, memo } from 'react';
+import type { CSSProperties } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSessionFilesStore } from '../../stores/sessionFilesStore';
 import type { SessionFileOperation } from '../../types/api';
 import { Button } from '../ui/Button';
+import { PierreFileComparison, PierreFileDiff } from '../diff/PierreDiff';
+import { contentHash, normalizeGitDiffFile } from '../diff/patchNormalize';
 import {
 	CodeMirrorViewer,
 	type CodeMirrorLineTone,
@@ -12,6 +15,8 @@ import {
 	countPatchTextChanges,
 	normalizeChangeCount,
 } from '../workspace/ViewerStatusBar';
+
+const FULL_HEIGHT_SURFACE_STYLE: CSSProperties = { height: '100%' };
 
 function isSessionPatchSeparatorLine(line: string): boolean {
 	const trimmed = line.trim();
@@ -253,6 +258,12 @@ function buildSessionPatchDisplayForFile(patch: string, filePath: string) {
 	return buildSessionPatchDisplay(patch);
 }
 
+/**
+ * Renders the operation's patch on the shared Pierre surface when it resolves
+ * to a real unified diff for the selected file, and falls back to the
+ * annotated CodeMirror display for envelope forms Pierre cannot parse
+ * (`*** Replace in:` with `*** Find:` / `*** With:`, line directives).
+ */
 function FullHeightDiffView({
 	patch,
 	filePath,
@@ -260,12 +271,16 @@ function FullHeightDiffView({
 	patch: string;
 	filePath: string;
 }) {
+	const pierrePatch = useMemo(
+		() => normalizeGitDiffFile(patch, filePath),
+		[patch, filePath],
+	);
 	const display = useMemo(
 		() => buildSessionPatchDisplayForFile(patch, filePath),
 		[patch, filePath],
 	);
 
-	return (
+	const fallback = (
 		<CodeMirrorViewer
 			content={display.content}
 			path={filePath}
@@ -274,6 +289,51 @@ function FullHeightDiffView({
 				display.lineNumbers.get(lineNumber) ?? ''
 			}
 			disableMarkdownSyntax
+		/>
+	);
+
+	if (!pierrePatch?.fileDiff) return fallback;
+
+	return (
+		<PierreFileDiff
+			fileDiff={pierrePatch.fileDiff}
+			className="h-full w-full"
+			style={FULL_HEIGHT_SURFACE_STYLE}
+			fallback={fallback}
+		/>
+	);
+}
+
+/** Renders a whole-file capture as an added file (no old side to compare). */
+function FullHeightFileView({
+	content,
+	filePath,
+}: {
+	content: string;
+	filePath: string;
+}) {
+	const newFile = useMemo(
+		() => ({
+			name: filePath,
+			contents: content,
+			cacheKey: `s:${contentHash(filePath)}:${contentHash(content)}`,
+		}),
+		[filePath, content],
+	);
+
+	return (
+		<PierreFileComparison
+			oldFile={null}
+			newFile={newFile}
+			className="h-full w-full"
+			style={FULL_HEIGHT_SURFACE_STYLE}
+			fallback={
+				<CodeMirrorViewer
+					content={content}
+					path={filePath}
+					disableMarkdownSyntax
+				/>
+			}
 		/>
 	);
 }
@@ -341,6 +401,15 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 
 		return rawPatch;
 	}, [selectedOperation, selectedFile]);
+
+	// Whole-file captures have no patch of their own; render the missing old
+	// side as an added file instead of synthesizing one.
+	const fullFileContent =
+		!selectedOperation?.artifact?.patch &&
+		!selectedOperation?.patch &&
+		selectedOperation?.content
+			? selectedOperation.content
+			: null;
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -490,7 +559,12 @@ export const SessionFilesDiffPanel = memo(function SessionFilesDiffPanel({
 			)}
 
 			<div className="flex-1 overflow-auto min-h-0">
-				{patchContent ? (
+				{fullFileContent ? (
+					<FullHeightFileView
+						content={fullFileContent}
+						filePath={selectedFile}
+					/>
+				) : patchContent ? (
 					<FullHeightDiffView patch={patchContent} filePath={selectedFile} />
 				) : (
 					<div className="h-full flex items-center justify-center text-muted-foreground">
