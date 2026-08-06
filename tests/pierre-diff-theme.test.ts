@@ -101,6 +101,7 @@ describe('shared pierre diff surface options', () => {
 		expect(options.diffStyle).toBe('unified');
 		expect(options.unsafeCSS).toContain('rgb(16 185 129 / 0.12)');
 		expect(options.unsafeCSS).toContain('rgb(239 68 68 / 0.11)');
+		expect(options.unsafeCSS).not.toContain('data-column-number');
 	});
 
 	test('hides the Pierre header by default and can show it on request', () => {
@@ -122,6 +123,7 @@ describe('shared pierre diff surface options', () => {
 		expect(style['--diffs-font-family']).toContain('--otto-font-family');
 		expect(style['--diffs-font-size']).toBeTruthy();
 		expect(style['--diffs-tab-size']).toBeTruthy();
+		expect(style['--diffs-min-number-column-width']).toBeUndefined();
 	});
 
 	test('matches full diff surfaces to the active viewer tab background', () => {

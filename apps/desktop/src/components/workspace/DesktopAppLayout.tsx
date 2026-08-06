@@ -325,7 +325,7 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 								style={rightPanelStyle}
 								aria-hidden={!shouldRenderRightPanel}
 							>
-								<div className="h-full w-full">
+								<div className="h-full w-full [&>*]:min-w-full">
 									<GitSidebar onFixWithAI={onFixWithAI} sessionId={sessionId} />
 									<SessionFilesSidebar sessionId={sessionId} />
 									<SettingsSidebar onOpenDashboard={onOpenDashboard} />

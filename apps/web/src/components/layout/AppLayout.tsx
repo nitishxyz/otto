@@ -586,7 +586,7 @@ const RightPanelArea = memo(function RightPanelArea({
 						<X className="h-4 w-4" />
 					</Button>
 				)}
-				<div className="h-full w-full">
+				<div className="h-full w-full [&>*]:min-w-full">
 					<GitSidebar onFixWithAI={onFixWithAI} sessionId={sessionId} />
 					<SessionFilesSidebar sessionId={sessionId} />
 					<SettingsSidebar

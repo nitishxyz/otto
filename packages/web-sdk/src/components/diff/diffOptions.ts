@@ -53,10 +53,9 @@ const MONO_FONT_STACK =
 const VIEWER_SURFACE_BACKGROUND = 'hsl(var(--sidebar-background))';
 
 /**
- * Preserve Otto's previous diff treatment: quiet emerald/red fills, neutral
- * line numbers, and stronger bars. Pierre's default dark-mode mix is notably
- * heavier, so these direct, stable data-attribute selectors restore the old
- * visual hierarchy without replacing Pierre's syntax or layout rendering.
+ * Preserve Otto's quiet emerald/red line and word fills while leaving gutter
+ * colors to Pierre. Its changed-line gutter treatment keeps the number column
+ * visually connected to the diff and matches the rest of Pierre's UI.
  */
 export const OTTO_DIFF_COLORS_CSS = `
 [data-background] [data-line][data-line-type="change-addition"] {
@@ -64,11 +63,6 @@ export const OTTO_DIFF_COLORS_CSS = `
 }
 [data-background] [data-line][data-line-type="change-deletion"] {
 	--diffs-computed-diff-line-bg: rgb(239 68 68 / 0.11);
-}
-[data-background] [data-column-number][data-line-type="change-addition"],
-[data-background] [data-column-number][data-line-type="change-deletion"] {
-	--diffs-computed-diff-line-bg: var(--diffs-bg);
-	color: var(--diffs-fg-number);
 }
 [data-line-type="change-addition"] [data-diff-span] {
 	background-color: rgb(16 185 129 / 0.18);
@@ -91,7 +85,6 @@ const VARIANT_STYLE: Record<PierreDiffVariant, Record<string, string>> = {
 		'--diffs-font-size': '13px',
 		'--diffs-line-height': '1.3125rem',
 		'--diffs-tab-size': '2',
-		'--diffs-min-number-column-width': '2.25rem',
 	},
 	inline: {
 		'--diffs-font-family': MONO_FONT_STACK,
@@ -99,7 +92,6 @@ const VARIANT_STYLE: Record<PierreDiffVariant, Record<string, string>> = {
 		'--diffs-font-size': '12px',
 		'--diffs-line-height': '1.25rem',
 		'--diffs-tab-size': '2',
-		'--diffs-min-number-column-width': '1.75rem',
 	},
 };
 
