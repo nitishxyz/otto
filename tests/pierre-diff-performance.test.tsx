@@ -194,12 +194,13 @@ describe('worker pool configuration', () => {
 
 	test('apps mount the provider above the router so it is never unmounted', async () => {
 		const web = await Bun.file('apps/web/src/App.tsx').text();
-		const desktop = await Bun.file('apps/desktop/src/main.tsx').text();
+		const desktop = await Bun.file('apps/desktop/src/App.tsx').text();
 
 		for (const source of [web, desktop]) {
 			expect(source).toContain('PierreDiffProvider');
 			expect(source).toContain('createPierreWorker');
 		}
+		expect(desktop).toContain('configEnabled={daemon !== null}');
 	});
 
 	test('both apps use the documented Vite worker import', async () => {

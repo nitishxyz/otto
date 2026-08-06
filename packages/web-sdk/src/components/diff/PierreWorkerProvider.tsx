@@ -43,6 +43,8 @@ const AST_CACHE_SIZE = 200;
 
 interface PierreDiffProviderProps {
 	children: ReactNode;
+	/** Defer config reads until the host has configured its API client. */
+	configEnabled?: boolean;
 	/**
 	 * Omit to keep main-thread highlighting (used by tests/SSR and by any
 	 * consumer whose bundler cannot emit a worker chunk).
@@ -58,9 +60,9 @@ interface PierreDiffProviderProps {
  * and override the per-component options, so they have to be mirrored here or
  * diffs would silently fall back to Pierre's default palette.
  */
-function WorkerThemeSync() {
+function WorkerThemeSync({ configEnabled }: { configEnabled: boolean }) {
 	const pool = useWorkerPool();
-	const { theme } = useTheme();
+	const { theme } = useTheme({ enabled: configEnabled });
 	const appliedThemeRef = useRef<string | null>(null);
 
 	const themeId: ThemeId = useMemo(() => {
@@ -101,9 +103,10 @@ function WorkerThemeSync() {
  */
 export function PierreDiffProvider({
 	children,
+	configEnabled = true,
 	workerFactory,
 }: PierreDiffProviderProps) {
-	const { theme } = useTheme();
+	const { theme } = useTheme({ enabled: configEnabled });
 
 	// Resolved once: the pool is created on first render and must not be
 	// recreated when the theme changes (WorkerThemeSync handles updates).
@@ -148,7 +151,7 @@ export function PierreDiffProvider({
 			poolOptions={poolOptions}
 			highlighterOptions={highlighterOptions}
 		>
-			<WorkerThemeSync />
+			<WorkerThemeSync configEnabled={configEnabled} />
 			{children}
 		</WorkerPoolContextProvider>
 	);

@@ -1,11 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PierreDiffProvider } from '@ottocode/web-sdk/components';
 import App from './App';
 import './index.css';
 import { initAutoHideScrollbar } from './lib/auto-hide-scrollbar';
-import { createPierreWorker } from './lib/pierre-worker';
 
 initAutoHideScrollbar();
 
@@ -21,10 +19,7 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 	<React.StrictMode>
 		<QueryClientProvider client={queryClient}>
-			{/* Offloads Shiki highlighting for every diff surface in the app. */}
-			<PierreDiffProvider workerFactory={createPierreWorker}>
-				<App />
-			</PierreDiffProvider>
+			<App />
 		</QueryClientProvider>
 	</React.StrictMode>,
 );

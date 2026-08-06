@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { RouterProvider } from '@tanstack/react-router';
+import { PierreDiffProvider } from '@ottocode/web-sdk/components';
 import {
 	tauriBridge,
 	type CliSelectionInfo,
@@ -23,6 +24,7 @@ import {
 } from '@ottocode/web-sdk/lib';
 import { useViewerTabsStore } from '@ottocode/web-sdk/stores';
 import { useMenuCloseWindow } from './hooks/useMenuCloseWindow';
+import { createPierreWorker } from './lib/pierre-worker';
 import './index.css';
 
 function App() {
@@ -303,25 +305,21 @@ function App() {
 		router.navigate({ to: '/projects', replace: true }).catch(() => {});
 	};
 
-	if (daemonError) {
-		return (
-			<div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-				<div className="max-w-sm text-center">
-					<p className="text-sm font-medium">Local daemon unavailable</p>
-					<p className="mt-2 text-xs text-muted-foreground">{daemonError}</p>
-					<button
-						type="button"
-						onClick={() => setStartupAttempt((attempt) => attempt + 1)}
-						className="mt-4 h-8 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-					>
-						Retry
-					</button>
-				</div>
+	const content = daemonError ? (
+		<div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+			<div className="max-w-sm text-center">
+				<p className="text-sm font-medium">Local daemon unavailable</p>
+				<p className="mt-2 text-xs text-muted-foreground">{daemonError}</p>
+				<button
+					type="button"
+					onClick={() => setStartupAttempt((attempt) => attempt + 1)}
+					className="mt-4 h-8 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+				>
+					Retry
+				</button>
 			</div>
-		);
-	}
-
-	return (
+		</div>
+	) : (
 		<RouterProvider
 			router={router}
 			context={{
@@ -344,6 +342,15 @@ function App() {
 				onUpdateInstalledCli: handleUpdateInstalledCli,
 			}}
 		/>
+	);
+
+	return (
+		<PierreDiffProvider
+			workerFactory={createPierreWorker}
+			configEnabled={daemon !== null}
+		>
+			{content}
+		</PierreDiffProvider>
 	);
 }
 

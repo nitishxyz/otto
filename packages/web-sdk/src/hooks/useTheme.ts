@@ -9,8 +9,8 @@ import { useConfig, useUpdateDefaults } from './useConfig';
 
 type Theme = ThemeId;
 
-export function useTheme() {
-	const { data: config } = useConfig();
+export function useTheme(options?: { enabled?: boolean }) {
+	const { data: config } = useConfig(options);
 	const updateDefaults = useUpdateDefaults();
 	// null until the config query resolves; applying a fallback theme before
 	// then clobbers the theme already on the document (set by the desktop
