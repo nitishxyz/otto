@@ -50,6 +50,8 @@ const SEPARATORS: Record<PierreDiffVariant, OttoHunkSeparators> = {
 const MONO_FONT_STACK =
 	'var(--otto-font-family, "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)';
 
+const VIEWER_SURFACE_BACKGROUND = 'hsl(var(--sidebar-background))';
+
 /**
  * Preserve Otto's previous diff treatment: quiet emerald/red fills, neutral
  * line numbers, and stronger bars. Pierre's default dark-mode mix is notably
@@ -84,6 +86,8 @@ const VARIANT_STYLE: Record<PierreDiffVariant, Record<string, string>> = {
 	full: {
 		'--diffs-font-family': MONO_FONT_STACK,
 		'--diffs-header-font-family': MONO_FONT_STACK,
+		'--diffs-dark-bg': VIEWER_SURFACE_BACKGROUND,
+		'--diffs-light-bg': VIEWER_SURFACE_BACKGROUND,
 		'--diffs-font-size': '13px',
 		'--diffs-line-height': '1.3125rem',
 		'--diffs-tab-size': '2',

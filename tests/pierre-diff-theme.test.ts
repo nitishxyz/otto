@@ -124,6 +124,23 @@ describe('shared pierre diff surface options', () => {
 		expect(style['--diffs-tab-size']).toBeTruthy();
 	});
 
+	test('matches full diff surfaces to the active viewer tab background', () => {
+		const fullStyle = createPierreDiffSurface('otto-dark').style as Record<
+			string,
+			string
+		>;
+		const inlineStyle = createPierreDiffSurface('otto-dark', {
+			variant: 'inline',
+		}).style as Record<string, string>;
+
+		expect(fullStyle['--diffs-dark-bg']).toBe('hsl(var(--sidebar-background))');
+		expect(fullStyle['--diffs-light-bg']).toBe(
+			'hsl(var(--sidebar-background))',
+		);
+		expect(inlineStyle['--diffs-dark-bg']).toBeUndefined();
+		expect(inlineStyle['--diffs-light-bg']).toBeUndefined();
+	});
+
 	test('changes syntax and neutral chrome while preserving diff semantics', () => {
 		const dark = createPierreDiffSurface('otto-dark');
 		const gruvbox = createPierreDiffSurface('gruvbox');
