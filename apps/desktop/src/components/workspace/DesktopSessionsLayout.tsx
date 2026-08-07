@@ -37,6 +37,7 @@ import { apiClient } from '@ottocode/web-sdk/lib';
 import {
 	useConfirmationStore,
 	useGitStore,
+	useSidebarStore,
 	useWorkspaceTabStore,
 } from '@ottocode/web-sdk/stores';
 import type { Project } from '../../lib/tauri-bridge';
@@ -90,13 +91,21 @@ export function DesktopSessionsLayout({
 		}, 100);
 	}, []);
 
+	// In compact windows the sessions sidebar is a full-screen overlay, so any
+	// navigation has to close it or the destination stays hidden behind it.
+	const closeSidebarOverlay = useCallback(() => {
+		useSidebarStore.getState().collapseForNavigation();
+	}, []);
+
 	const handleNewSession = useCallback(() => {
+		closeSidebarOverlay();
 		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
 		focusInput();
-	}, [navigate, focusInput, isLooperTab]);
+	}, [navigate, focusInput, isLooperTab, closeSidebarOverlay]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
+			closeSidebarOverlay();
 			navigate({
 				to: '/sessions/$sessionId',
 				params: { sessionId: newSessionId },
@@ -104,7 +113,7 @@ export function DesktopSessionsLayout({
 			});
 			focusInput();
 		},
-		[navigate, focusInput],
+		[navigate, focusInput, closeSidebarOverlay],
 	);
 
 	const handleDeleteSession = useCallback(() => {
@@ -116,13 +125,14 @@ export function DesktopSessionsLayout({
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
+			closeSidebarOverlay();
 			navigate({
 				to: '/sessions/$sessionId',
 				params: { sessionId: id },
 			});
 			focusInput();
 		},
-		[navigate, focusInput],
+		[navigate, focusInput, closeSidebarOverlay],
 	);
 
 	const refreshSessionForNotificationOpen = useCallback(
@@ -143,17 +153,19 @@ export function DesktopSessionsLayout({
 
 	const handleSelectLooperSession = useCallback(
 		(id: string) => {
+			closeSidebarOverlay();
 			navigate({
 				to: '/looper/$sessionId',
 				params: { sessionId: id },
 			});
 			focusInput();
 		},
-		[navigate, focusInput],
+		[navigate, focusInput, closeSidebarOverlay],
 	);
 
 	const handleLooperSessionCreated = useCallback(
 		(newSessionId: string) => {
+			closeSidebarOverlay();
 			navigate({
 				to: '/looper/$sessionId',
 				params: { sessionId: newSessionId },
@@ -161,7 +173,7 @@ export function DesktopSessionsLayout({
 			});
 			focusInput();
 		},
-		[navigate, focusInput],
+		[navigate, focusInput, closeSidebarOverlay],
 	);
 
 	const handleOpenDashboard = useCallback(() => {

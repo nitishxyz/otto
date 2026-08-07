@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
 	getProjectConnectionState,
@@ -36,13 +36,38 @@ function configureWorkspaceSdk(
 	configureDesktopSdk(config.apiUrl, config.server);
 }
 
+function workspaceSdkSignature(
+	apiUrl: string,
+	server: ServerInfo | null | undefined,
+	project: Project,
+) {
+	return [
+		apiUrl,
+		server?.url ?? '',
+		server?.projectId ?? '',
+		server?.projectPath ?? '',
+		project.path,
+		project.projectId ?? '',
+		project.remoteUrl ?? '',
+		project.machineOwnerSession ?? '',
+	].join('|');
+}
+
 export function DesktopWorkspaceProvider({
 	apiUrl,
 	server,
 	project,
 	children,
 }: DesktopWorkspaceProviderProps) {
-	configureWorkspaceSdk(apiUrl, server, project);
+	// Children read the global SDK configuration while rendering, so it has to
+	// be applied before they mount. Keying it off a signature keeps a plain
+	// re-render from re-running the whole SDK/auth reconfiguration.
+	const configuredSignatureRef = useRef<string | null>(null);
+	const sdkSignature = workspaceSdkSignature(apiUrl, server, project);
+	if (configuredSignatureRef.current !== sdkSignature) {
+		configuredSignatureRef.current = sdkSignature;
+		configureWorkspaceSdk(apiUrl, server, project);
+	}
 
 	const queryClient = useMemo(() => {
 		return new QueryClient({
@@ -58,6 +83,11 @@ export function DesktopWorkspaceProvider({
 
 	useEffect(() => {
 		configureWorkspaceSdk(apiUrl, server, project);
+		configuredSignatureRef.current = workspaceSdkSignature(
+			apiUrl,
+			server,
+			project,
+		);
 	}, [apiUrl, server, project]);
 
 	useEffect(() => {

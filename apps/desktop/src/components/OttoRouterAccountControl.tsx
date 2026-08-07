@@ -207,7 +207,14 @@ export function OttoRouterAccountControl({
 						busy ? 'opacity-100' : 'opacity-0'
 					}`}
 				>
-					<StableSpinner size="sm" title="Disconnecting" />
+					{/* `opacity: 0` does not pause a CSS animation, so an always-mounted
+					    spinner keeps ticking forever and drives a rendering update on
+					    every frame. Swap in an equally sized inert box while idle. */}
+					{busy ? (
+						<StableSpinner size="sm" title="Disconnecting" />
+					) : (
+						<span aria-hidden="true" className="block h-3.5 w-3.5" />
+					)}
 					Disconnect
 				</span>
 			</button>

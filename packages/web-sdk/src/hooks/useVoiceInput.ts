@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/api-client';
 import { resolveDictationWebSocketUrl } from '../lib/api-client/dictation';
+import { disposeVoiceSessionResources } from '../lib/voice-session-resources';
 
 const TARGET_SAMPLE_RATE = 16000;
 const PCM_FRAME_BYTES = 3200; // 100ms of 16 kHz mono pcm_s16le
@@ -140,6 +141,10 @@ export function useVoiceInput({
 	const frameBufferRef = useRef<Uint8Array<ArrayBufferLike>>(new Uint8Array(0));
 	const stoppingRef = useRef(false);
 	const sessionIdRef = useRef<string | null>(null);
+	// Bumped by every `start()`. A run whose generation is stale has been
+	// superseded (rapid re-trigger) and must release its own graph instead of
+	// overwriting the refs that the newer run now owns.
+	const startGenerationRef = useRef(0);
 
 	const onTranscriptRef = useRef(onTranscript);
 	const onErrorRef = useRef(onError);
@@ -172,22 +177,15 @@ export function useVoiceInput({
 	}, [emitError]);
 
 	const cleanupAudio = useCallback(() => {
-		if (processorRef.current) {
-			processorRef.current.onaudioprocess = null;
-			processorRef.current.disconnect();
-			processorRef.current = null;
-		}
-		if (sourceRef.current) {
-			sourceRef.current.disconnect();
-			sourceRef.current = null;
-		}
-		if (streamRef.current) {
-			for (const track of streamRef.current.getTracks()) track.stop();
-			streamRef.current = null;
-		}
-		if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-			audioContextRef.current.close().catch(() => {});
-		}
+		disposeVoiceSessionResources({
+			processor: processorRef.current,
+			source: sourceRef.current,
+			stream: streamRef.current,
+			context: audioContextRef.current,
+		});
+		processorRef.current = null;
+		sourceRef.current = null;
+		streamRef.current = null;
 		audioContextRef.current = null;
 		frameBufferRef.current = new Uint8Array(0);
 		setAnalyser(null);
@@ -207,7 +205,9 @@ export function useVoiceInput({
 			socketRef.current = null;
 		}
 		sessionIdRef.current = null;
-		stoppingRef.current = false;
+		// `stoppingRef` stays latched here on purpose: resetting it would re-arm an
+		// in-flight `start()` that is parked on an `await` and let it finish wiring
+		// an audio graph nobody owns any more.
 		setIsListening(false);
 		setIsTranscribing(false);
 	}, [cleanupAudio]);
@@ -274,6 +274,31 @@ export function useVoiceInput({
 		setError(null);
 		setIsTranscribing(false);
 		stoppingRef.current = false;
+		const generation = ++startGenerationRef.current;
+
+		// Locals mirror whatever this run has built so far. Every abort path
+		// disposes them directly, because the refs may already belong to a newer
+		// run by the time control returns from an await.
+		let localStream: MediaStream | null = null;
+		let localContext: AudioContext | null = null;
+		let localSource: MediaStreamAudioSourceNode | null = null;
+		let localProcessor: ScriptProcessorNodeLike | null = null;
+		const isStale = () =>
+			stoppingRef.current || startGenerationRef.current !== generation;
+		const abandon = () => {
+			disposeVoiceSessionResources({
+				processor: localProcessor,
+				source: localSource,
+				stream: localStream,
+				context: localContext,
+			});
+			if (processorRef.current === localProcessor) processorRef.current = null;
+			if (sourceRef.current === localSource) sourceRef.current = null;
+			if (streamRef.current === localStream) streamRef.current = null;
+			if (audioContextRef.current === localContext) {
+				audioContextRef.current = null;
+			}
+		};
 
 		try {
 			const streamPromise = navigator.mediaDevices.getUserMedia({
@@ -289,8 +314,9 @@ export function useVoiceInput({
 			);
 
 			const stream = await streamPromise;
-			if (stoppingRef.current) {
-				for (const track of stream.getTracks()) track.stop();
+			localStream = stream;
+			if (isStale()) {
+				abandon();
 				return;
 			}
 			streamRef.current = stream;
@@ -298,6 +324,7 @@ export function useVoiceInput({
 			const AudioContextCtor = getAudioContextConstructor();
 			if (!AudioContextCtor) throw new Error('AudioContext is unavailable');
 			const audioContext = new AudioContextCtor();
+			localContext = audioContext;
 			audioContextRef.current = audioContext;
 			const source = audioContext.createMediaStreamSource(stream);
 			const analyserNode = audioContext.createAnalyser();
@@ -310,8 +337,12 @@ export function useVoiceInput({
 				1,
 			) as ScriptProcessorNodeLike;
 			processor.onaudioprocess = handleAudioProcess;
+			localSource = source;
+			localProcessor = processor;
 			source.connect(analyserNode);
 			source.connect(processor);
+			// Reaching `destination` starts a real-time audio render thread that
+			// only `close()` can retire, so from here on every exit must dispose.
 			processor.connect(audioContext.destination);
 
 			sourceRef.current = source;
@@ -319,14 +350,20 @@ export function useVoiceInput({
 			if (audioContext.state === 'suspended') {
 				await audioContext.resume();
 			}
-			if (stoppingRef.current) return;
+			if (isStale()) {
+				abandon();
+				return;
+			}
 			setAnalyser(analyserNode);
 			setIsListening(true);
 
 			const statusResult = await statusPromise;
 			if ('error' in statusResult) throw statusResult.error;
 			const { status } = statusResult;
-			if (stoppingRef.current) return;
+			if (isStale()) {
+				abandon();
+				return;
+			}
 			const model = status.models.find(
 				(item) => item.id === status.defaultModel,
 			);
@@ -340,7 +377,10 @@ export function useVoiceInput({
 				model: status.defaultModel,
 				language: toLanguageCode(lang),
 			});
-			if (stoppingRef.current) return;
+			if (isStale()) {
+				abandon();
+				return;
+			}
 			if (!session.modelInstalled) {
 				cleanup();
 				handleMissingModel();
@@ -415,6 +455,12 @@ export function useVoiceInput({
 				setIsTranscribing(false);
 			};
 		} catch (err) {
+			// A superseded run must only tear down what it built; a full `cleanup()`
+			// here would close the audio graph the newer run is already using.
+			if (startGenerationRef.current !== generation) {
+				abandon();
+				return;
+			}
 			const name = err instanceof Error ? err.name : '';
 			const msg =
 				name === 'NotAllowedError'
@@ -435,7 +481,17 @@ export function useVoiceInput({
 		lang,
 	]);
 
-	useEffect(() => cleanup, [cleanup]);
+	// Unmounting must latch `stoppingRef` and invalidate the current generation,
+	// otherwise a `start()` still parked on an await would resume against a dead
+	// component and wire up an audio graph that nothing can ever close.
+	useEffect(
+		() => () => {
+			stoppingRef.current = true;
+			startGenerationRef.current += 1;
+			cleanup();
+		},
+		[cleanup],
+	);
 
 	return {
 		isListening,

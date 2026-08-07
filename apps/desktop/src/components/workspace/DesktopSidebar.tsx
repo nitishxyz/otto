@@ -26,6 +26,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 	onNewSession,
 }: DesktopSidebarProps) {
 	const isCollapsed = useSidebarStore((state) => state.isCollapsed);
+	const isCompact = useSidebarStore((state) => state.isCompact);
 	const toggleCollapse = useSidebarStore((state) => state.toggleCollapse);
 	const panelWidth = usePanelWidthStore(
 		(s) => s.widths[PANEL_KEY] ?? DEFAULT_WIDTH,
@@ -45,8 +46,10 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 		maxWidth: '100%',
 	} as CSSProperties;
 
+	// Only the compact overlay locks page scrolling; the docked wide sidebar
+	// must not freeze the workspace behind it.
 	useEffect(() => {
-		if (!isCollapsed) {
+		if (isCompact && !isCollapsed) {
 			document.body.style.overflow = 'hidden';
 		} else {
 			document.body.style.overflow = '';
@@ -54,7 +57,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({
 		return () => {
 			document.body.style.overflow = '';
 		};
-	}, [isCollapsed]);
+	}, [isCollapsed, isCompact]);
 
 	return (
 		<>

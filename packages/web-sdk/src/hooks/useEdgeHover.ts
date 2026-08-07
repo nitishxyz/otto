@@ -55,6 +55,18 @@ export function useEdgeHover({
 		};
 
 		const scheduleVisible = (visible: boolean) => {
+			const targetRef = visible ? showTimeoutRef : hideTimeoutRef;
+			const oppositeRef = visible ? hideTimeoutRef : showTimeoutRef;
+
+			// Always drop a queued transition in the other direction, including when
+			// the surface already matches the requested state. Otherwise a show
+			// timer armed while the cursor grazed the edge still fires after the
+			// cursor left, popping the surface open unprompted.
+			if (oppositeRef.current !== null) {
+				window.clearTimeout(oppositeRef.current);
+				oppositeRef.current = null;
+			}
+
 			if (isVisibleRef.current === visible) {
 				setIsHoverPending(false);
 				return;
@@ -62,13 +74,6 @@ export function useEdgeHover({
 
 			setIsHoverPending(visible);
 			const delay = visible ? HOVER_SHOW_DELAY_MS : HOVER_HIDE_DELAY_MS;
-			const targetRef = visible ? showTimeoutRef : hideTimeoutRef;
-			const oppositeRef = visible ? hideTimeoutRef : showTimeoutRef;
-
-			if (oppositeRef.current !== null) {
-				window.clearTimeout(oppositeRef.current);
-				oppositeRef.current = null;
-			}
 
 			if (targetRef.current !== null) return;
 
@@ -136,13 +141,6 @@ export function useEdgeHover({
 		};
 
 		const handleMouseMove = (event: MouseEvent) => {
-			const ignoredTargetMode = getIgnoredTargetMode(event);
-			if (ignoredTargetMode && !isVisibleRef.current) {
-				clearHoverTimeouts();
-				setIsHoverPending(false);
-				return;
-			}
-
 			const triggerWidth = window.innerWidth * hoverRatio;
 			const zoneWidth =
 				isVisibleRef.current && activeWidth
@@ -150,7 +148,25 @@ export function useEdgeHover({
 					: triggerWidth;
 			const distance =
 				side === 'left' ? event.clientX : window.innerWidth - event.clientX;
-			scheduleVisible(distance <= zoneWidth);
+			const withinZone = distance <= zoneWidth;
+
+			// Scanning ignore targets reads layout for every matching element, which
+			// is far too expensive to run on every pointer move across the window.
+			// While the surface is hidden and the cursor is nowhere near the edge the
+			// scan cannot change the outcome, so skip it.
+			if (!withinZone && !isVisibleRef.current) {
+				scheduleVisible(false);
+				return;
+			}
+
+			const ignoredTargetMode = getIgnoredTargetMode(event);
+			if (ignoredTargetMode && !isVisibleRef.current) {
+				clearHoverTimeouts();
+				setIsHoverPending(false);
+				return;
+			}
+
+			scheduleVisible(withinZone);
 		};
 		const handleMouseLeave = () => {
 			clearHoverTimeouts();

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEdgeHover, usePreferences } from '@ottocode/web-sdk/hooks';
 import {
@@ -133,6 +133,12 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 	const anyViewerOpen = viewerTabCount > 0 && !viewerCollapsed;
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const compactLayout = useMediaQuery(COMPACT_LAYOUT_QUERY);
+	// Compact windows render the sessions sidebar as a full-screen overlay, so
+	// the store has to know before paint: it starts closed there and restores
+	// the docked preference when the window grows again.
+	useLayoutEffect(() => {
+		useSidebarStore.getState().setCompactViewport(compactLayout);
+	}, [compactLayout]);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
 	const activeRightPanelWidth = gitExpanded
 		? (panelWidths.git ?? RIGHT_PANEL_DEFAULT_WIDTH)

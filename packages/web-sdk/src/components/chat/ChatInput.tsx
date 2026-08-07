@@ -2,6 +2,7 @@ import {
 	useState,
 	useRef,
 	useEffect,
+	useLayoutEffect,
 	useCallback,
 	memo,
 	forwardRef,
@@ -25,6 +26,7 @@ import {
 	Square,
 } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
+import { COMPOSER_BASE_HEIGHT, resolveComposerHeight } from './composerHeight';
 import { LiveWaveform } from './LiveWaveform';
 import { MentionPopup } from './MentionPopup';
 import { SkillMentionPopup } from './SkillMentionPopup';
@@ -399,7 +401,7 @@ export const ChatInput = memo(
 			setCurrentCommandToSelect(undefined);
 
 			if (textareaRef.current) {
-				textareaRef.current.style.height = 'auto';
+				textareaRef.current.style.height = COMPOSER_BASE_HEIGHT;
 			}
 
 			if (preferences.vimMode) {
@@ -713,13 +715,19 @@ export const ChatInput = memo(
 			const textarea = textareaRef.current;
 			if (!textarea) return;
 			textarea.style.height = 'auto';
-			textarea.style.height = `${textarea.scrollHeight}px`;
+			textarea.style.height = resolveComposerHeight({
+				value: textarea.value,
+				scrollHeight: textarea.scrollHeight,
+			});
 		}, []);
 
-		// biome-ignore lint/correctness/useExhaustiveDependencies: message and isVoiceActive intentionally trigger resizing when content changes or the textarea remounts after voice input
-		useEffect(() => {
+		// Measured before paint so a stale first measurement never reaches the
+		// screen. `footerWidth` re-runs the measurement once the composer settles
+		// at its real width (narrow windows, panel open/close, viewer resize).
+		// biome-ignore lint/correctness/useExhaustiveDependencies: message, footerWidth and isVoiceActive intentionally trigger resizing when content or layout changes, or the textarea remounts after voice input
+		useLayoutEffect(() => {
 			adjustTextareaHeight();
-		}, [adjustTextareaHeight, message, isVoiceActive]);
+		}, [adjustTextareaHeight, message, footerWidth, isVoiceActive]);
 
 		const handleMentionClose = useCallback(() => {
 			setShowFileMention(false);
@@ -1109,7 +1117,7 @@ export const ChatInput = memo(
 														? 'caret-[6px]'
 														: ''
 												}`}
-												style={{ height: '2.5rem' }}
+												style={{ height: COMPOSER_BASE_HEIGHT }}
 											/>
 										</div>
 										{message.trim() ||

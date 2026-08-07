@@ -207,6 +207,14 @@ export function LiveWaveform({
 			}
 
 			ctx.globalAlpha = 1;
+
+			// An idle waveform has nothing left to draw. Re-scheduling anyway pins
+			// the whole page to a full rendering update every display frame for as
+			// long as the panel stays mounted.
+			if (!active && !loading && historyRef.current.length === 0) {
+				rafId = 0;
+				return;
+			}
 			rafId = requestAnimationFrame(animate);
 		};
 

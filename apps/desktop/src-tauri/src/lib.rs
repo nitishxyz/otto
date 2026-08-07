@@ -1,25 +1,23 @@
 mod commands;
+mod startup_target;
 mod voice_shortcut;
 
 use commands::server::ServerState;
+use startup_target::StartupTarget;
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::Emitter;
 use tauri::Manager;
+use tauri::WebviewWindow;
 
 #[cfg(target_os = "macos")]
 pub fn run_notification_helper(args: &[String]) -> i32 {
     commands::notification::run_notification_helper(args)
 }
 
-pub struct InitialProjectState {
-    pub path: Mutex<Option<String>>,
-}
+pub struct InitialProjectState(pub StartupTarget<String>);
 
-pub struct InitialRemoteState {
-    pub url: Mutex<Option<String>>,
-    pub name: Mutex<Option<String>>,
-}
+pub struct InitialRemoteState(pub StartupTarget<(String, String)>);
 
 fn parse_project_arg() -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
@@ -51,20 +49,22 @@ fn parse_remote_args() -> (Option<String>, Option<String>) {
     (url, name)
 }
 
+/// Startup targets are claimed per window rather than consumed, so a window
+/// whose init effect runs more than once still opens the requested project.
 #[tauri::command]
-fn get_initial_project(state: tauri::State<'_, InitialProjectState>) -> Option<String> {
-    state.path.lock().unwrap().take()
+fn get_initial_project(
+    window: WebviewWindow,
+    state: tauri::State<'_, InitialProjectState>,
+) -> Option<String> {
+    state.0.claim_for(window.label())
 }
 
 #[tauri::command]
-fn get_initial_remote(state: tauri::State<'_, InitialRemoteState>) -> Option<(String, String)> {
-    let url = state.url.lock().unwrap().take();
-    let name = state.name.lock().unwrap().take();
-    match (url, name) {
-        (Some(u), Some(n)) => Some((u, n)),
-        (Some(u), None) => Some((u, "Remote".to_string())),
-        _ => None,
-    }
+fn get_initial_remote(
+    window: WebviewWindow,
+    state: tauri::State<'_, InitialRemoteState>,
+) -> Option<(String, String)> {
+    state.0.claim_for(window.label())
 }
 
 #[tauri::command]
@@ -83,6 +83,10 @@ pub fn run() {
     if let Some(ref u) = initial_remote_url {
         eprintln!("[otto] CLI requested remote: {}", u);
     }
+    // A remote needs a URL; the name is only a label, so default it here and
+    // keep the claimed value a single ready-to-use pair.
+    let initial_remote = initial_remote_url
+        .map(|url| (url, initial_remote_name.unwrap_or_else(|| "Remote".to_string())));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -94,13 +98,8 @@ pub fn run() {
         .manage(commands::native_terminal::NativeTerminalManager::new())
         .manage(commands::updater::PendingUpdate(Mutex::new(None)))
         .manage(commands::updater::ReadyUpdate(Mutex::new(None)))
-        .manage(InitialProjectState {
-            path: Mutex::new(initial_project),
-        })
-        .manage(InitialRemoteState {
-            url: Mutex::new(initial_remote_url),
-            name: Mutex::new(initial_remote_name),
-        })
+        .manage(InitialProjectState(StartupTarget::new(initial_project)))
+        .manage(InitialRemoteState(StartupTarget::new(initial_remote)))
         .setup(|app| {
             #[cfg(desktop)]
             app.handle()
