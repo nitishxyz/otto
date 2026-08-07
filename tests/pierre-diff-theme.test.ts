@@ -101,7 +101,13 @@ describe('shared pierre diff surface options', () => {
 		expect(options.diffStyle).toBe('unified');
 		expect(options.unsafeCSS).toContain('rgb(16 185 129 / 0.12)');
 		expect(options.unsafeCSS).toContain('rgb(239 68 68 / 0.11)');
-		expect(options.unsafeCSS).not.toContain('data-column-number');
+		expect(options.unsafeCSS).toContain(
+			'[data-column-number][data-line-type="change-addition"]::before',
+		);
+		expect(options.unsafeCSS).toContain(
+			'[data-column-number][data-line-type="change-deletion"]::before',
+		);
+		expect(options.unsafeCSS).toContain('width: 4px');
 	});
 
 	test('hides the Pierre header by default and can show it on request', () => {

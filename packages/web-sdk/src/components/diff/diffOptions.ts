@@ -53,9 +53,10 @@ const MONO_FONT_STACK =
 const VIEWER_SURFACE_BACKGROUND = 'hsl(var(--sidebar-background))';
 
 /**
- * Preserve Otto's quiet emerald/red line and word fills while leaving gutter
- * colors to Pierre. Its changed-line gutter treatment keeps the number column
- * visually connected to the diff and matches the rest of Pierre's UI.
+ * Preserve Otto's quiet emerald/red line and word fills. The official Pierre
+ * treatment keeps the number gutter neutral and draws a 4px solid/striped
+ * change rail at its leading edge; declare it here as well so Otto's final CSS
+ * layer cannot lose it to theme or hydration ordering.
  */
 export const OTTO_DIFF_COLORS_CSS = `
 [data-background] [data-line][data-line-type="change-addition"] {
@@ -63,6 +64,23 @@ export const OTTO_DIFF_COLORS_CSS = `
 }
 [data-background] [data-line][data-line-type="change-deletion"] {
 	--diffs-computed-diff-line-bg: rgb(239 68 68 / 0.11);
+}
+[data-background][data-indicators="bars"] [data-column-number][data-line-type="change-addition"]::before,
+[data-background][data-indicators="bars"] [data-column-number][data-line-type="change-deletion"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+}
+[data-background][data-indicators="bars"] [data-column-number][data-line-type="change-addition"]::before {
+  background-color: rgb(16 185 129);
+}
+[data-background][data-indicators="bars"] [data-column-number][data-line-type="change-deletion"]::before {
+  background-color: rgb(239 68 68 / 0.2);
+  background-image: linear-gradient(0deg, transparent 50%, rgb(239 68 68) 50%);
+  background-repeat: repeat;
+  background-size: 2px 2px;
 }
 [data-line-type="change-addition"] [data-diff-span] {
 	background-color: rgb(16 185 129 / 0.18);

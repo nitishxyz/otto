@@ -179,8 +179,8 @@ const SessionFilesSidebarContent = memo(function SessionFilesSidebarContent({
 
 	return (
 		<div
-			className="border-l border-sidebar-border sidebar-fade-in flex h-full relative"
-			style={{ width: panelWidth }}
+			className="w-full border-l border-sidebar-border sidebar-fade-in flex h-full relative"
+			style={{ minWidth: panelWidth }}
 		>
 			<ResizeHandle
 				panelKey={PANEL_KEY}
