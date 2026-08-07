@@ -1160,10 +1160,12 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	]);
 
 	const configuredProviders = Object.entries(authStatus.providers).filter(
-		([id, info]) => info.configured && id !== 'ottorouter',
+		([id, info]) =>
+			(info.configured || info.custom === true) && id !== 'ottorouter',
 	);
 	const unconfiguredProviders = Object.entries(authStatus.providers).filter(
-		([id, info]) => !info.configured && id !== 'ottorouter',
+		([id, info]) =>
+			!info.configured && info.custom !== true && id !== 'ottorouter',
 	);
 	const providerQuery = providerSearch.trim().toLowerCase();
 	const filteredProviders = providerQuery
@@ -1362,15 +1364,15 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 						</div>
 					)}
 
-					{/* Connected Providers */}
+					{/* Configured Providers */}
 					{configuredProviders.length > 0 && (
 						<div className="mb-10">
 							<div className="flex items-center justify-between mb-4">
 								<h2 className="font-semibold text-foreground">
-									Connected Providers
+									Configured Providers
 								</h2>
 								<span className="text-sm text-muted-foreground">
-									{configuredProviders.length} active
+									{configuredProviders.length} configured
 								</span>
 							</div>
 							<div className="flex flex-wrap gap-2">
@@ -1380,7 +1382,9 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 										className={`flex items-center gap-2 pl-3 pr-2 py-2 rounded-full transition-all duration-200 ${
 											confirmingDelete === id
 												? 'bg-destructive/10 border border-destructive/30'
-												: 'group bg-green-500/10 border border-green-500/20'
+												: info.configured
+													? 'group bg-green-500/10 border border-green-500/20'
+													: 'group bg-amber-500/10 border border-amber-500/20'
 										}`}
 									>
 										<ProviderLogo provider={id} size={16} />
@@ -1388,14 +1392,26 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 											className={`text-sm font-medium transition-colors ${
 												confirmingDelete === id
 													? 'text-destructive'
-													: 'text-green-600 dark:text-green-400'
+													: info.configured
+														? 'text-green-600 dark:text-green-400'
+														: 'text-amber-600 dark:text-amber-400'
 											}`}
 										>
 											{info.label}
 										</span>
 										{confirmingDelete !== id && (
-											<span className="text-xs text-green-600/60 dark:text-green-500/60">
-												{info.type === 'oauth' ? 'OAuth' : 'API'}
+											<span
+												className={`text-xs ${
+													info.configured
+														? 'text-green-600/60 dark:text-green-500/60'
+														: 'text-amber-600/70 dark:text-amber-500/70'
+												}`}
+											>
+												{info.configured
+													? info.type === 'oauth'
+														? 'OAuth'
+														: 'API'
+													: 'Needs API key'}
 											</span>
 										)}
 										{confirmingDelete === id ? (
