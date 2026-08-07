@@ -50,20 +50,20 @@
 			"types": "./src/core/src/tools/builtin/shell.ts"
 		},
 		"./tools/builtin/finish": {
-			"import": "./src/core/src/tools/builtin/finish.ts",
-			"types": "./src/core/src/tools/builtin/finish.ts"
+			"import": "./src/core/src/tools/builtin/progress.ts",
+			"types": "./src/core/src/tools/builtin/progress.ts"
 		},
 		"./tools/builtin/grep": {
-			"import": "./src/core/src/tools/builtin/grep.ts",
-			"types": "./src/core/src/tools/builtin/grep.ts"
+			"import": "./src/core/src/tools/builtin/search.ts",
+			"types": "./src/core/src/tools/builtin/search.ts"
 		},
 		"./tools/builtin/patch": {
 			"import": "./src/core/src/tools/builtin/patch.ts",
 			"types": "./src/core/src/tools/builtin/patch.ts"
 		},
 		"./tools/builtin/plan": {
-			"import": "./src/core/src/tools/builtin/plan.ts",
-			"types": "./src/core/src/tools/builtin/plan.ts"
+			"import": "./src/core/src/tools/builtin/todos.ts",
+			"types": "./src/core/src/tools/builtin/todos.ts"
 		},
 		"./tools/builtin/progress": {
 			"import": "./src/core/src/tools/builtin/progress.ts",
