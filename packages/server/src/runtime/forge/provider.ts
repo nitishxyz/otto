@@ -79,9 +79,15 @@ function buildProviderUpdates(
 			? {
 					models: modelListToMap(
 						input.models
-							.map((id) => id.trim())
-							.filter(Boolean)
-							.map((id) => ({ id, label: id })),
+							.map((model) => {
+								if (typeof model === 'string') {
+									const id = model.trim();
+									return id ? { id, label: id } : null;
+								}
+								const id = model.id.trim();
+								return id ? { ...model, id, label: model.label ?? id } : null;
+							})
+							.filter((model) => model !== null),
 					),
 				}
 			: {}),
@@ -119,6 +125,7 @@ async function summarizeProvider(projectRoot: string, name: string) {
 		baseURL: definition.baseURL,
 		apiKeyEnv: definition.apiKeyEnv,
 		models: modelMapToList(definition.models).map((model) => model.id),
+		modelDetails: modelMapToList(definition.models),
 		allowAnyModel: definition.allowAnyModel,
 		fastModels: settings?.fastModels ?? [],
 		modelDiscovery: settings?.modelDiscovery?.type,

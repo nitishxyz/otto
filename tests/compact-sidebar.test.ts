@@ -157,4 +157,18 @@ describe('desktop compact sidebar wiring', () => {
 		).text();
 		expect(source).toContain('if (isCompact && !isCollapsed) {');
 	});
+
+	test('the closed compact right panel does not leave its border visible', async () => {
+		const source = await Bun.file(
+			'apps/desktop/src/components/workspace/DesktopAppLayout.tsx',
+		).text();
+		const compactPanel = source.slice(
+			source.indexOf("? 'absolute inset-y-0 right-12"),
+			source.indexOf('style={rightPanelStyle}'),
+		);
+		expect(compactPanel).toContain('compactLayout && shouldRenderRightPanel');
+		expect(compactPanel).toContain(
+			"? 'border-l border-sidebar-border shadow-2xl'",
+		);
+	});
 });

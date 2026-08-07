@@ -1,4 +1,5 @@
 import {
+	getConfiguredModelCompatibility,
 	getConfiguredProviderFamily,
 	getProviderDefinition,
 	getModelNpmBinding,
@@ -38,11 +39,14 @@ function getReasoningProviderTarget(
 ): ReasoningProviderTarget | null {
 	const definition = cfg ? getProviderDefinition(cfg, provider) : undefined;
 	if (definition?.source === 'custom') {
-		if (definition.compatibility === 'anthropic') return 'anthropic';
-		if (definition.compatibility === 'openai') return 'openai';
-		if (definition.compatibility === 'google') return 'google';
-		if (definition.compatibility === 'ollama') return 'ollama';
-		if (definition.compatibility === 'openrouter') return 'openrouter';
+		const compatibility = cfg
+			? getConfiguredModelCompatibility(cfg, provider, model)
+			: definition.compatibility;
+		if (compatibility === 'anthropic') return 'anthropic';
+		if (compatibility === 'openai') return 'openai';
+		if (compatibility === 'google') return 'google';
+		if (compatibility === 'ollama') return 'ollama';
+		if (compatibility === 'openrouter') return 'openrouter';
 		return 'openai-compatible';
 	}
 

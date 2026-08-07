@@ -1,4 +1,4 @@
-import type { CSSProperties, SVGProps } from 'react';
+import type { SVGProps } from 'react';
 
 const SIZE_CLASS_NAMES = {
 	xs: 'h-3 w-3',
@@ -7,19 +7,6 @@ const SIZE_CLASS_NAMES = {
 	lg: 'h-5 w-5',
 	xl: 'h-8 w-8',
 } as const;
-
-/**
- * WebKit cannot run an accelerated transform animation on an element inside
- * `<svg>`, so spinning an inner `<g>` forces a main-thread style resolution,
- * layout and full compositing update on every display frame for as long as the
- * spinner is mounted. Spinning the `<svg>` box itself keeps the animation on
- * the compositor; `will-change` pins the layer and `contain` stops the
- * per-frame invalidation from escaping into the surrounding tree.
- */
-const ACCELERATED_SPIN_STYLE: CSSProperties = {
-	willChange: 'transform',
-	contain: 'layout style',
-};
 
 interface StableSpinnerProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
 	size?: keyof typeof SIZE_CLASS_NAMES;
@@ -30,21 +17,25 @@ export function StableSpinner({
 	size = 'md',
 	title = 'Loading',
 	className = '',
-	style,
 	...props
 }: StableSpinnerProps) {
 	return (
 		<svg
-			className={`block animate-spin ${SIZE_CLASS_NAMES[size]} ${className}`.trim()}
+			className={`block ${SIZE_CLASS_NAMES[size]} ${className}`.trim()}
 			viewBox="0 0 16 16"
 			fill="none"
 			role="img"
 			aria-label={title}
-			style={{ ...ACCELERATED_SPIN_STYLE, ...style }}
 			{...props}
 		>
 			<title>{title}</title>
-			<g stroke="currentColor" strokeLinecap="round" strokeWidth="1.8">
+			<g
+				className="origin-center animate-spin"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeWidth="1.8"
+				style={{ transformBox: 'view-box', transformOrigin: '8px 8px' }}
+			>
 				<path d="M8 1.75v2" />
 				<path d="M12.42 3.58 11 5" />
 				<path d="M14.25 8h-2" />

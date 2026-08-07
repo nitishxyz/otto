@@ -4,14 +4,18 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { OttoConfig } from '@ottocode/sdk';
 import {
+	getConfiguredModelCompatibility,
+	getConfiguredProviderFamily,
 	getProviderDefinition,
 	isProviderAuthorized,
+	loadConfig,
 	readCachedModelCatalog,
 	validateProviderModel,
 	writeAuth,
 	writeCachedModelCatalog,
 } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
+import { resolveCustomConfiguredModel } from '../packages/server/src/runtime/provider/custom.ts';
 import { selectProviderAndModel } from '../packages/server/src/runtime/provider/selection.ts';
 import { buildReasoningConfig } from '../packages/server/src/runtime/provider/reasoning.ts';
 
@@ -97,6 +101,62 @@ describe('custom declarative providers', () => {
 		if (previousOttoHome === undefined) delete process.env.OTTO_HOME;
 		else process.env.OTTO_HOME = previousOttoHome;
 		await rm(testOttoHome, { recursive: true, force: true });
+	});
+
+	test('resolves per-model transport, endpoint, upstream id, and family', () => {
+		const cfg = createConfig();
+		cfg.providers['mixed-gateway'] = {
+			enabled: true,
+			custom: true,
+			label: 'Mixed Gateway',
+			compatibility: 'openai-compatible',
+			family: 'default',
+			baseURL: 'https://models.example.test/v1',
+			models: {
+				'claude-sonnet': {
+					id: 'claude-sonnet',
+					ownedBy: 'anthropic',
+					provider: {
+						id: 'claude-sonnet-4-6',
+						npm: '@ai-sdk/anthropic',
+						api: 'https://models.example.test/anthropic',
+					},
+				},
+			},
+		};
+
+		const definition = getProviderDefinition(cfg, 'mixed-gateway');
+		expect(definition).toBeDefined();
+		if (!definition)
+			throw new Error('Mixed gateway definition was not resolved');
+		expect(
+			getConfiguredModelCompatibility(cfg, 'mixed-gateway', 'claude-sonnet'),
+		).toBe('anthropic');
+		expect(
+			getConfiguredProviderFamily(cfg, 'mixed-gateway', 'claude-sonnet'),
+		).toBe('anthropic');
+
+		const resolved = resolveCustomConfiguredModel(
+			definition,
+			cfg,
+			'claude-sonnet',
+		);
+		expect(resolved).toMatchObject({
+			modelId: 'claude-sonnet-4-6',
+			provider: 'anthropic.messages',
+			config: { baseURL: 'https://models.example.test/anthropic' },
+		});
+
+		const reasoning = buildReasoningConfig({
+			cfg,
+			provider: 'mixed-gateway',
+			model: 'claude-sonnet',
+			reasoningText: true,
+			reasoningLevel: 'high',
+			maxOutputTokens: 4000,
+		});
+		expect(reasoning.enabled).toBe(true);
+		expect(reasoning.providerOptions).toHaveProperty('anthropic');
 	});
 
 	test('builds a runtime definition for configured custom providers', () => {
@@ -285,7 +345,16 @@ describe('custom declarative providers', () => {
 						label: 'Local Ollama',
 						baseURL: 'http://127.0.0.1:11434/api',
 						models: {
-							'qwen2.5-coder:14b': { id: 'qwen2.5-coder:14b' },
+							'qwen2.5-coder:14b': {
+								id: 'qwen2.5-coder:14b',
+								ownedBy: 'qwen',
+								provider: {
+									id: 'qwen-upstream',
+									compatibility: 'openai-compatible',
+									baseURL: 'http://127.0.0.1:11434/v1',
+									family: 'openai-compatible',
+								},
+							},
 						},
 					}),
 				},
@@ -323,6 +392,16 @@ describe('custom declarative providers', () => {
 			expect(modelsPayload.models.map((model) => model.id)).toEqual([
 				'qwen2.5-coder:14b',
 			]);
+			const persisted = getProviderDefinition(
+				await loadConfig(projectRoot),
+				'my-ollama',
+			);
+			expect(persisted?.models['qwen2.5-coder:14b']?.provider).toEqual({
+				id: 'qwen-upstream',
+				compatibility: 'openai-compatible',
+				baseURL: 'http://127.0.0.1:11434/v1',
+				family: 'openai-compatible',
+			});
 
 			const allModelsResponse = await app.request(
 				`http://localhost/v1/config/models?project=${encodeURIComponent(projectRoot)}`,

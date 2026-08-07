@@ -4,6 +4,8 @@ import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
 import { mapConfiguredModelEntries, modelMapToList } from './model-map.ts';
 import { mergeModelMaps } from './model-merge.ts';
 import {
+	getModelPromptFamily,
+	getModelProviderCompatibility,
 	getUnderlyingProviderKey,
 	providerIds,
 	selectFastModel,
@@ -89,6 +91,18 @@ function normalizeConfiguredModels(
 	return mapConfiguredModelEntries(models);
 }
 
+function applyConfiguredModelBindings(
+	models: ModelInfoMap,
+	configuredModels: ModelInfoMap,
+): ModelInfoMap {
+	return Object.fromEntries(
+		Object.entries(models).map(([id, model]) => [
+			id,
+			{ ...configuredModels[id], ...model, id },
+		]),
+	);
+}
+
 function resolveCustomCompatibility(
 	settings: ProviderSettingsEntry,
 ): ProviderCompatibility {
@@ -168,7 +182,9 @@ export function getProviderDefinition(
 	if (!settings?.custom) return undefined;
 	const cachedEntry = getCachedProviderCatalogEntry(provider);
 	const configuredModels = normalizeConfiguredModels(settings.models);
-	const models = cachedEntry?.models ?? configuredModels;
+	const models = cachedEntry?.models
+		? applyConfiguredModelBindings(cachedEntry.models, configuredModels)
+		: configuredModels;
 	return {
 		id: provider,
 		label: settings.label ?? cachedEntry?.label ?? provider,
@@ -276,7 +292,9 @@ export function getConfiguredProviderFamily(
 ): ProviderPromptFamily | null {
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return null;
-	if (definition.source === 'custom') return definition.family;
+	if (definition.source === 'custom') {
+		return getModelPromptFamily(definition.models[model], definition.family);
+	}
 	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
 	if (catalogProvider) {
 		return (
@@ -284,6 +302,19 @@ export function getConfiguredProviderFamily(
 		);
 	}
 	return definition.family;
+}
+
+export function getConfiguredModelCompatibility(
+	cfg: OttoConfig,
+	provider: ProviderId,
+	model: string,
+): ProviderCompatibility | null {
+	const definition = getProviderDefinition(cfg, provider);
+	if (!definition) return null;
+	return getModelProviderCompatibility(
+		definition.models[model],
+		definition.compatibility,
+	);
 }
 
 export function getConfiguredProviderEnvVar(

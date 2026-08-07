@@ -15,6 +15,56 @@ const toolGroupsSchema = z.object({
 	loadable: z.array(z.string()).optional(),
 });
 
+const providerCompatibilitySchema = z.enum([
+	'ollama',
+	'openai-compatible',
+	'openai',
+	'anthropic',
+	'google',
+	'openrouter',
+]);
+
+const providerFamilySchema = z.enum([
+	'default',
+	'openai',
+	'anthropic',
+	'google',
+	'kimi',
+	'glm',
+	'minimax',
+	'openai-compatible',
+]);
+
+const providerModelSchema = z.object({
+	id: z.string(),
+	label: z.string().optional(),
+	ownedBy: z
+		.enum([
+			'openai',
+			'anthropic',
+			'google',
+			'meta',
+			'openrouter',
+			'xai',
+			'kimi',
+			'qwen',
+			'zai',
+			'deepseek',
+			'minimax',
+		])
+		.optional(),
+	provider: z
+		.object({
+			id: z.string().optional(),
+			npm: z.string().optional(),
+			compatibility: providerCompatibilitySchema.optional(),
+			api: z.string().optional(),
+			baseURL: z.string().optional(),
+			family: providerFamilySchema.optional(),
+		})
+		.optional(),
+});
+
 const inputSchema = z.object({
 	action: z.enum(FORGE_ACTIONS).describe('Forge operation to perform.'),
 	kind: z
@@ -84,30 +134,11 @@ const inputSchema = z.object({
 		.describe('Tools appended to an agent default configuration.'),
 	provider: z.string().optional(),
 	model: z.string().optional(),
-	compatibility: z
-		.enum([
-			'ollama',
-			'openai-compatible',
-			'openai',
-			'anthropic',
-			'google',
-			'openrouter',
-		])
-		.optional(),
-	family: z
-		.enum([
-			'default',
-			'openai',
-			'anthropic',
-			'google',
-			'kimi',
-			'glm',
-			'minimax',
-		])
-		.optional(),
+	compatibility: providerCompatibilitySchema.optional(),
+	family: providerFamilySchema.optional(),
 	baseURL: z.string().optional(),
 	apiKeyEnv: z.string().optional(),
-	models: z.array(z.string()).optional(),
+	models: z.array(z.union([z.string(), providerModelSchema])).optional(),
 	fastModels: z.array(z.string()).optional(),
 	allowAnyModel: z.boolean().optional(),
 	modelDiscovery: z.enum(['openai-models', 'ollama', 'none']).optional(),

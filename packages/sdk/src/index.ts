@@ -75,6 +75,8 @@ export {
 	getFastModel,
 	getFastModelForAuth,
 	getModelNpmBinding,
+	getModelPromptFamily,
+	getModelProviderCompatibility,
 	isAnthropicBasedModel,
 	getUnderlyingProviderKey,
 	getModelFamily,
@@ -105,6 +107,7 @@ export {
 	providerAllowsAnyModel,
 	hasConfiguredModel,
 	getConfiguredProviderFamily,
+	getConfiguredModelCompatibility,
 	getConfiguredProviderEnvVar,
 	getConfiguredProviderApiKey,
 } from './providers/src/index.ts';

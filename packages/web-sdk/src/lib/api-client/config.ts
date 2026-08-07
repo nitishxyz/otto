@@ -46,6 +46,18 @@ export type DiscoveredProviderModel = {
 
 export type ProviderModelSettings = {
 	id?: string;
+	ownedBy?:
+		| 'openai'
+		| 'anthropic'
+		| 'google'
+		| 'meta'
+		| 'openrouter'
+		| 'xai'
+		| 'kimi'
+		| 'qwen'
+		| 'zai'
+		| 'deepseek'
+		| 'minimax';
 	label?: string;
 	toolCall?: boolean;
 	reasoningText?: boolean;
@@ -54,6 +66,22 @@ export type ProviderModelSettings = {
 	limit?: {
 		context?: number;
 		output?: number;
+	};
+	provider?: {
+		id?: string;
+		npm?: string;
+		compatibility?: ProviderCompatibility;
+		api?: string;
+		baseURL?: string;
+		family?:
+			| 'default'
+			| 'openai'
+			| 'anthropic'
+			| 'google'
+			| 'kimi'
+			| 'glm'
+			| 'minimax'
+			| 'openai-compatible';
 	};
 };
 

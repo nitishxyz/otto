@@ -606,6 +606,36 @@ export default (async (input) => ({ value: String(input.text) })) satisfies Nati
 		expect(JSON.stringify(result)).toContain('test-model');
 	});
 
+	it('previews mixed-family custom provider model bindings', async () => {
+		const result = await runForgeAction(projectRoot, {
+			action: 'create',
+			kind: 'provider',
+			name: 'forge-mixed-provider',
+			compatibility: 'openai-compatible',
+			family: 'default',
+			baseURL: 'https://models.example.test/v1',
+			models: [
+				{
+					id: 'claude-sonnet',
+					ownedBy: 'anthropic',
+					provider: {
+						id: 'claude-sonnet-4-6',
+						compatibility: 'anthropic',
+						baseURL: 'https://models.example.test/anthropic',
+						family: 'anthropic',
+					},
+				},
+			],
+			dryRun: true,
+		});
+
+		expect(result).toMatchObject({ ok: true, applied: false });
+		expect(JSON.stringify(result)).toContain('claude-sonnet-4-6');
+		expect(JSON.stringify(result)).toContain(
+			'https://models.example.test/anthropic',
+		);
+	});
+
 	it('reports safe provider auth status and previews reauthentication', async () => {
 		const status = await runForgeAction(projectRoot, {
 			action: 'status',

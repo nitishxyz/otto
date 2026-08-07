@@ -128,7 +128,24 @@ forge({
 			summary: 'Create, edit, enable, disable, and remove providers.',
 			content: `Provider controls are global. Use status to inspect one provider, create for a custom provider, update for custom providers or built-in overrides, enable/disable for availability, and remove to delete a configured custom provider or built-in override.
 
-Custom providers require compatibility and baseURL on creation. Optional fields include label, family, apiKeyEnv, models, fastModels, allowAnyModel, and modelDiscovery. Use dryRun before mutations. Credentials belong to kind auth, not provider configuration.`,
+Custom providers require compatibility and baseURL on creation. Optional fields include label, family, apiKeyEnv, models, fastModels, allowAnyModel, and modelDiscovery. Use dryRun before mutations. Credentials belong to kind auth, not provider configuration.
+
+models accepts model ID strings or structured model objects. A structured model can override the provider-wide transport for mixed gateways with provider.id (upstream model ID), provider.compatibility, provider.baseURL (or provider.api), provider.npm, and provider.family. Known npm bindings are @ai-sdk/openai, @ai-sdk/anthropic, @ai-sdk/google, @openrouter/ai-sdk-provider, @ai-sdk/openai-compatible, and ai-sdk-ollama. Prefer explicit compatibility; npm names select only these built-in adapters and never load arbitrary packages.
+
+Example mixed gateway:
+forge({
+	action: "create",
+	kind: "provider",
+	name: "company-models",
+	compatibility: "openai-compatible",
+	family: "default",
+	baseURL: "https://models.example.com/v1",
+	models: [
+		{ id: "gpt-5", provider: { compatibility: "openai", baseURL: "https://models.example.com/openai/v1", family: "openai" } },
+		{ id: "claude-sonnet", provider: { id: "claude-sonnet-4", compatibility: "anthropic", baseURL: "https://models.example.com/anthropic", family: "anthropic" } }
+	],
+	dryRun: true
+})`,
 		},
 	},
 	auth: {

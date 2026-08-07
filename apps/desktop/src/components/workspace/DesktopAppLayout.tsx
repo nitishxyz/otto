@@ -323,10 +323,14 @@ export const DesktopAppLayout = memo(function DesktopAppLayout({
 							<div
 								className={`h-full shrink-0 overflow-hidden bg-sidebar ${
 									compactLayout
-										? 'absolute inset-y-0 right-12 z-[60] border-l border-sidebar-border shadow-2xl transition-[width] duration-300 ease-out'
+										? 'absolute inset-y-0 right-12 z-[60] transition-[width] duration-300 ease-out'
 										: isRightPanelTransitioning
 											? 'transition-[width] duration-300 ease-out'
 											: 'transition-none'
+								} ${
+									compactLayout && shouldRenderRightPanel
+										? 'border-l border-sidebar-border shadow-2xl'
+										: ''
 								}`}
 								style={rightPanelStyle}
 								aria-hidden={!shouldRenderRightPanel}

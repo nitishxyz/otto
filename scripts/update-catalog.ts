@@ -446,6 +446,17 @@ function normalizeProviderBinding(
 	if (id) binding.id = id;
 	const npm = normalizeString(record.npm);
 	if (npm) binding.npm = npm;
+	const compatibility = normalizeString(record.compatibility);
+	if (
+		compatibility === 'openai' ||
+		compatibility === 'anthropic' ||
+		compatibility === 'google' ||
+		compatibility === 'openrouter' ||
+		compatibility === 'ollama' ||
+		compatibility === 'openai-compatible'
+	) {
+		binding.compatibility = compatibility;
+	}
 	const api = normalizeString(firstDefined(record.api, record.url));
 	if (api) binding.api = api;
 	const baseURL = normalizeString(
@@ -458,7 +469,25 @@ function normalizeProviderBinding(
 	);
 	if (baseURL) binding.baseURL = baseURL;
 	if (!binding.baseURL && binding.api) binding.baseURL = binding.api;
-	return binding.id || binding.npm || binding.api || binding.baseURL
+	const family = normalizeString(record.family);
+	if (
+		family === 'default' ||
+		family === 'anthropic' ||
+		family === 'openai' ||
+		family === 'google' ||
+		family === 'kimi' ||
+		family === 'minimax' ||
+		family === 'glm' ||
+		family === 'openai-compatible'
+	) {
+		binding.family = family;
+	}
+	return binding.id ||
+		binding.npm ||
+		binding.compatibility ||
+		binding.api ||
+		binding.baseURL ||
+		binding.family
 		? binding
 		: undefined;
 }

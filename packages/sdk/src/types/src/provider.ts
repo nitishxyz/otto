@@ -81,13 +81,15 @@ export type ModelOwner =
 export type ModelProviderBinding = {
 	id?: string;
 	npm?: string;
+	/** Explicit transport override. Known npm bindings are also inferred. */
+	compatibility?: ProviderCompatibility;
 	api?: string;
 	baseURL?: string;
 	/**
 	 * The provider family for prompt selection.
 	 * Used to determine which base prompt to use for this model.
 	 */
-	family?: ProviderFamily;
+	family?: ProviderPromptFamily;
 };
 
 export type ModelAuthType = 'api' | 'oauth';

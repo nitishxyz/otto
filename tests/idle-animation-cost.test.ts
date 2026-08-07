@@ -4,10 +4,9 @@ const SPINNER = 'packages/web-sdk/src/components/ui/StableSpinner.tsx';
 const ACCOUNT_CONTROL =
 	'apps/desktop/src/components/OttoRouterAccountControl.tsx';
 
-describe('spinner animation is compositor friendly', () => {
-	test('the animation runs on the svg box, not on an svg child', async () => {
+describe('spinner animation stays visually centered', () => {
+	test('the original spiked graphic rotates around the SVG center', async () => {
 		const source = await Bun.file(SPINNER).text();
-		// Anchor on the JSX body so prose in the doc comment cannot satisfy this.
 		const jsx = source.slice(source.indexOf('return ('));
 		const svgOpen = jsx.indexOf('<svg');
 		const groupOpen = jsx.search(/<g[\s>]/);
@@ -17,22 +16,17 @@ describe('spinner animation is compositor friendly', () => {
 		const svgTag = jsx.slice(svgOpen, groupOpen);
 		const groupTag = jsx.slice(groupOpen, jsx.indexOf('>', groupOpen));
 
-		// WebKit cannot accelerate a transform animation on an element inside
-		// <svg>; spinning the <g> forced a main-thread style + layout +
-		// compositing pass on every frame for the spinner's whole lifetime.
-		expect(svgTag).toContain('animate-spin');
-		expect(groupTag).not.toContain('animate-spin');
+		expect(svgTag).not.toContain('animate-spin');
+		expect(groupTag).toContain('animate-spin');
+		expect(groupTag).toContain("transformBox: 'view-box'");
+		expect(groupTag).toContain("transformOrigin: '8px 8px'");
 	});
 
-	test('the spinner is promoted and contained so invalidation cannot escape', async () => {
+	test('all eight original spikes are preserved', async () => {
 		const source = await Bun.file(SPINNER).text();
-		expect(source).toContain("willChange: 'transform'");
-		expect(source).toContain("contain: 'layout style'");
-	});
-
-	test('caller supplied styles still win over the spin defaults', async () => {
-		const source = await Bun.file(SPINNER).text();
-		expect(source).toContain('style={{ ...ACCELERATED_SPIN_STYLE, ...style }}');
+		const jsx = source.slice(source.indexOf('return ('));
+		expect(jsx.match(/<path/g)?.length).toBe(8);
+		expect(jsx).not.toContain('<circle');
 	});
 });
 

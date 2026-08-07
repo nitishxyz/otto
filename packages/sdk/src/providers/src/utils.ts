@@ -6,6 +6,8 @@ import { mergeModelMaps } from './model-merge.ts';
 import type {
 	BuiltInProviderId,
 	ProviderId,
+	ProviderCompatibility,
+	ProviderPromptFamily,
 	ModelInfo,
 	ModelOwner,
 	ModelInfoMap,
@@ -172,7 +174,10 @@ export function isAnthropicBasedModel(
 	return false;
 }
 
-const OWNER_TO_FAMILY: Record<ModelOwner, UnderlyingProviderKey> = {
+const OWNER_TO_FAMILY: Record<
+	ModelOwner,
+	Exclude<UnderlyingProviderKey, null>
+> = {
 	openai: 'openai',
 	anthropic: 'anthropic',
 	google: 'google',
@@ -215,6 +220,48 @@ export type UnderlyingProviderKey =
 	| 'glm'
 	| 'openai-compatible'
 	| null;
+
+export function getModelProviderCompatibility(
+	info: ModelInfo | undefined,
+	fallback: ProviderCompatibility,
+): ProviderCompatibility {
+	if (info?.provider?.compatibility) return info.provider.compatibility;
+	const npm = info?.provider?.npm;
+	if (npm === '@ai-sdk/anthropic') return 'anthropic';
+	if (npm === '@ai-sdk/openai') return 'openai';
+	if (npm === '@ai-sdk/google') return 'google';
+	if (npm === '@openrouter/ai-sdk-provider') return 'openrouter';
+	if (npm === 'ai-sdk-ollama') return 'ollama';
+	if (
+		npm === '@ai-sdk/openai-compatible' ||
+		npm === '@ai-sdk/baseten' ||
+		npm === '@ai-sdk/huggingface'
+	) {
+		return 'openai-compatible';
+	}
+	return fallback;
+}
+
+export function getModelPromptFamily(
+	info: ModelInfo | undefined,
+	fallback: ProviderPromptFamily,
+): ProviderPromptFamily {
+	if (info?.provider?.family) return info.provider.family;
+	if (info?.ownedBy) return OWNER_TO_FAMILY[info.ownedBy];
+	if (!info?.provider?.npm && !info?.provider?.compatibility) return fallback;
+	const compatibility = getModelProviderCompatibility(
+		info,
+		'openai-compatible',
+	);
+	if (
+		compatibility === 'ollama' ||
+		compatibility === 'openrouter' ||
+		compatibility === 'openai-compatible'
+	) {
+		return 'openai-compatible';
+	}
+	return compatibility;
+}
 
 function inferFromModelId(model: string): UnderlyingProviderKey {
 	const lower = model.toLowerCase();

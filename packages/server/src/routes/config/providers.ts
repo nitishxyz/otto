@@ -79,8 +79,52 @@ const discoverProviderModelsResponseSchema = z.object({
 	message: z.string().optional(),
 });
 
+const providerCompatibilitySchema = z.enum([
+	'openai',
+	'anthropic',
+	'google',
+	'openrouter',
+	'ollama',
+	'openai-compatible',
+]);
+
+const providerPromptFamilySchema = z.enum([
+	'default',
+	'anthropic',
+	'openai',
+	'google',
+	'kimi',
+	'minimax',
+	'glm',
+	'openai-compatible',
+]);
+
+const modelProviderBindingSchema = z.object({
+	id: z.string().optional(),
+	npm: z.string().optional(),
+	compatibility: providerCompatibilitySchema.optional(),
+	api: z.string().optional(),
+	baseURL: z.string().optional(),
+	family: providerPromptFamilySchema.optional(),
+});
+
 const providerModelSettingsSchema = z.object({
 	id: z.string().optional(),
+	ownedBy: z
+		.enum([
+			'openai',
+			'anthropic',
+			'google',
+			'meta',
+			'openrouter',
+			'xai',
+			'kimi',
+			'qwen',
+			'zai',
+			'deepseek',
+			'minimax',
+		])
+		.optional(),
 	label: z.string().optional(),
 	toolCall: z.boolean().optional(),
 	reasoningText: z.boolean().optional(),
@@ -92,6 +136,7 @@ const providerModelSettingsSchema = z.object({
 			output: z.number().optional(),
 		})
 		.optional(),
+	provider: modelProviderBindingSchema.optional(),
 });
 
 const providerSettingsBodySchema = z.object({

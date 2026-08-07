@@ -183,6 +183,73 @@ Supported provider fields:
 | `allowAnyModel` | Accept arbitrary model IDs instead of enforcing `models` |
 | `modelDiscovery` | Optional discovery mode such as `ollama` |
 
+### Mixed-family custom providers
+
+A custom provider normally uses its provider-level `compatibility`, `family`,
+and `baseURL` for every model. A model can override those values through its
+`provider` binding when one logical gateway exposes different compatible
+endpoints for different model families:
+
+```json
+{
+  "providers": {
+    "company-models": {
+      "enabled": true,
+      "custom": true,
+      "label": "Company Models",
+      "compatibility": "openai-compatible",
+      "family": "default",
+      "baseURL": "https://models.example.com/v1",
+      "apiKeyEnv": "COMPANY_MODELS_API_KEY",
+      "models": {
+        "gpt-5": {
+          "id": "gpt-5",
+          "provider": {
+            "compatibility": "openai",
+            "baseURL": "https://models.example.com/openai/v1",
+            "family": "openai"
+          }
+        },
+        "claude-sonnet": {
+          "id": "claude-sonnet",
+          "provider": {
+            "id": "claude-sonnet-4",
+            "compatibility": "anthropic",
+            "baseURL": "https://models.example.com/anthropic",
+            "family": "anthropic"
+          }
+        },
+        "gemini-pro": {
+          "id": "gemini-pro",
+          "provider": {
+            "compatibility": "google",
+            "baseURL": "https://models.example.com/google",
+            "family": "google"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Per-model provider fields:
+
+| Field | Meaning |
+|---|---|
+| `id` | Upstream model ID when it differs from the configured/catalog ID |
+| `compatibility` | Per-model transport override |
+| `baseURL` / `api` | Per-model endpoint override |
+| `family` | Per-model prompt and behavior family |
+| `npm` | Catalog-compatible adapter hint; only known built-in adapters are mapped |
+
+Known `npm` hints are `@ai-sdk/openai`, `@ai-sdk/anthropic`,
+`@ai-sdk/google`, `@openrouter/ai-sdk-provider`,
+`@ai-sdk/openai-compatible`, and `ai-sdk-ollama`. Arbitrary packages are never
+loaded from configuration. Explicit `compatibility` is recommended for custom
+providers. All models in one custom provider currently share that provider's
+configured API key.
+
 CLI helpers:
 
 ```bash

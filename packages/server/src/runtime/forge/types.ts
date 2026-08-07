@@ -1,4 +1,5 @@
 import type { AgentToolConfig } from '../agent/registry.ts';
+import type { ModelInfo } from '@ottocode/sdk';
 
 export const FORGE_ACTIONS = [
 	'docs',
@@ -103,10 +104,11 @@ export type ForgeInput = {
 		| 'google'
 		| 'kimi'
 		| 'glm'
-		| 'minimax';
+		| 'minimax'
+		| 'openai-compatible';
 	baseURL?: string;
 	apiKeyEnv?: string;
-	models?: string[];
+	models?: Array<string | ModelInfo>;
 	fastModels?: string[];
 	allowAnyModel?: boolean;
 	modelDiscovery?: 'openai-models' | 'ollama' | 'none';
