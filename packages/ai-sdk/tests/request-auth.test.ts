@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { fetchBalance } from '../src/balance.ts';
 import { createOttoRouterFetch } from '../src/fetch.ts';
+import { createOttoRouter } from '../src/ottorouter.ts';
 import type { OttoRouterAuth } from '../src/types.ts';
 
 const originalFetch = globalThis.fetch;
@@ -9,7 +10,52 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
-describe('bearer auth request flow', () => {
+describe('request auth flow', () => {
+	test('createOttoRouter accepts an API key as a static bearer credential', async () => {
+		const requests: Array<{ url: string; headers: Headers }> = [];
+		const ottorouter = createOttoRouter({
+			auth: { apiKey: 'or_sk_test-key-1' },
+			baseURL: 'https://ottorouter.test',
+			fetch: async (input, init) => {
+				requests.push({
+					url: String(input),
+					headers: new Headers(init?.headers),
+				});
+				return Response.json({ ok: true });
+			},
+		});
+
+		const response = await ottorouter.fetch()(
+			'https://ottorouter.test/v1/messages',
+			{ method: 'POST' },
+		);
+
+		expect(response.status).toBe(200);
+		expect(requests).toHaveLength(1);
+		expect(requests[0]?.headers.get('authorization')).toBe(
+			'Bearer or_sk_test-key-1',
+		);
+	});
+
+	test('does not retry a rejected API key as an OAuth token', async () => {
+		let requestCount = 0;
+		const ottorouterFetch = createOttoRouterFetch({
+			auth: { apiKey: 'or_sk_rejected-key' },
+			baseURL: 'https://ottorouter.test',
+			fetch: async () => {
+				requestCount++;
+				return new Response('unauthorized', { status: 401 });
+			},
+		});
+
+		const response = await ottorouterFetch(
+			'https://ottorouter.test/v1/messages',
+		);
+
+		expect(response.status).toBe(401);
+		expect(requestCount).toBe(1);
+	});
+
 	test('createOttoRouterFetch attaches bearer auth and shares one token exchange', async () => {
 		const auth: OttoRouterAuth = { refreshToken: 'refresh-1' };
 		const requests: Array<{ url: string; headers: Headers }> = [];
@@ -159,5 +205,50 @@ describe('bearer auth request flow', () => {
 			'Bearer balance-token',
 		);
 		expect(balanceRequest?.headers.get('x-wallet-address')).toBeNull();
+	});
+
+	test('fetchBalance accepts an API key without an OAuth exchange', async () => {
+		const requests: Array<{ url: string; headers: Headers }> = [];
+		globalThis.fetch = (async (input, init) => {
+			requests.push({
+				url: String(input),
+				headers: new Headers(init?.headers),
+			});
+			return Response.json({
+				account_id: 'account-1',
+				balance_usd: 7.5,
+				total_spent: 1,
+				total_topups: 0,
+				request_count: 2,
+			});
+		}) as typeof fetch;
+
+		const balance = await fetchBalance(
+			{ apiKey: 'or_sk_balance-key' },
+			'https://ottorouter.test',
+		);
+
+		expect(balance?.walletAddress).toBe('account-1');
+		expect(balance?.balance).toBe(7.5);
+		expect(requests).toHaveLength(1);
+		expect(requests[0]?.headers.get('authorization')).toBe(
+			'Bearer or_sk_balance-key',
+		);
+	});
+
+	test('fetchBalance does not retry a rejected API key', async () => {
+		let requestCount = 0;
+		globalThis.fetch = (async () => {
+			requestCount++;
+			return new Response('unauthorized', { status: 401 });
+		}) as typeof fetch;
+
+		const balance = await fetchBalance(
+			{ apiKey: 'or_sk_rejected-balance-key' },
+			'https://ottorouter.test',
+		);
+
+		expect(balance).toBeNull();
+		expect(requestCount).toBe(1);
 	});
 });

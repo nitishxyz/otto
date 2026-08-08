@@ -34,25 +34,36 @@ export async function fetchBalance(
 ): Promise<BalanceResponse | null> {
 	try {
 		const url = trimTrailingSlash(baseURL ?? DEFAULT_BASE_URL);
-		if (
-			isWalletContext(walletOrAuth) ||
-			(!walletOrAuth.accessToken && !walletOrAuth.refreshToken)
-		) {
-			throw new Error('OttoRouter: OAuth token is required.');
+		if (isWalletContext(walletOrAuth)) {
+			throw new Error('OttoRouter: API key or OAuth token is required.');
 		}
-		const tokenManager = createOAuthAccessTokenManager({
-			auth: walletOrAuth,
-			baseURL: url,
-		});
+		const apiKey = walletOrAuth.apiKey;
+		const tokenManager =
+			!apiKey && (walletOrAuth.accessToken || walletOrAuth.refreshToken)
+				? createOAuthAccessTokenManager({
+						auth: walletOrAuth,
+						baseURL: url,
+					})
+				: null;
+		if (!apiKey && !tokenManager) {
+			throw new Error('OttoRouter: API key or OAuth token is required.');
+		}
+		const getCredential = async (forceRefresh = false) => {
+			if (apiKey) return apiKey;
+			if (!tokenManager) {
+				throw new Error('OttoRouter: API key or OAuth token is required.');
+			}
+			return tokenManager.getToken(forceRefresh);
+		};
 		const requestBalance = async (forceRefresh = false) => {
-			const accessToken = await tokenManager.getToken(forceRefresh);
+			const credential = await getCredential(forceRefresh);
 			return fetch(`${url}/v1/balance`, {
-				headers: { authorization: `Bearer ${accessToken}` },
+				headers: { authorization: `Bearer ${credential}` },
 			});
 		};
 
 		let response = await requestBalance();
-		if (response.status === 401) {
+		if (response.status === 401 && tokenManager) {
 			tokenManager.invalidate();
 			response = await requestBalance(true);
 		}

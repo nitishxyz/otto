@@ -1,10 +1,10 @@
 # @ottorouter/ai-sdk
 
-A drop-in SDK for accessing AI models (OpenAI, Anthropic, Google, Kimi, MiniMax, Z.AI) through the [OttoRouter](https://github.com/slashforge/ottorouter) proxy with automatic x402 payments via Solana USDC.
+A drop-in SDK for accessing AI models (OpenAI, Anthropic, Google, Kimi, MiniMax, Z.AI) through the [OttoRouter](https://github.com/slashforge/ottorouter) proxy.
 
-All you need is a Solana wallet — the SDK handles authentication, payment negotiation, and provider routing automatically.
+Authenticate with an OttoRouter API key or OAuth credentials. The SDK handles authentication and provider routing automatically.
 
-Normal API requests use bearer auth. The SDK signs a wallet nonce once to exchange for a short-lived OttoRouter token, reuses that token across requests, and refreshes it automatically when needed.
+Normal API requests use bearer auth. API keys are sent directly, while OAuth access tokens are reused and refreshed automatically when needed.
 
 ## Install
 
@@ -21,7 +21,7 @@ import { createOttoRouter } from "@ottorouter/ai-sdk";
 import { generateText } from "ai";
 
 const ottorouter = createOttoRouter({
-  auth: { privateKey: process.env.SOLANA_PRIVATE_KEY! },
+  auth: { apiKey: process.env.OTTOROUTER_API_KEY! },
 });
 
 const { text } = await generateText({
@@ -34,7 +34,9 @@ console.log(text);
 
 The SDK auto-resolves which provider to use based on the model name. It returns ai-sdk compatible model instances that work directly with `generateText()`, `streamText()`, etc.
 
-Under the hood, the first protected request exchanges wallet auth headers for a bearer token via `POST /v1/auth/wallet-token`. Subsequent requests reuse `Authorization: Bearer <token>` until refresh is needed.
+Under the hood, protected requests send `Authorization: Bearer <api-key>`. OAuth credentials use the same bearer header and refresh the access token when needed.
+
+API keys authorize inference and balance requests. OAuth-only account and tunnel operations still require OAuth credentials.
 
 ## Provider Auto-Resolution
 
@@ -71,8 +73,8 @@ const model = ottorouter
 
 ```ts
 const ottorouter = createOttoRouter({
-  // Required: Solana wallet private key (base58)
-  auth: { privateKey: "..." },
+  // Required: OttoRouter API key or OAuth credentials
+  auth: { apiKey: process.env.OTTOROUTER_API_KEY! },
 
   // Optional: OttoRouter API base URL (default: https://api.ottorouter.org)
   baseURL: "https://api.ottorouter.org",
@@ -115,7 +117,7 @@ const ottorouter = createOttoRouter({
 
 Monitor and control the payment lifecycle:
 
-Request authentication and payment signing are separate: bearer auth is used for normal OttoRouter HTTP requests, while your wallet still signs the x402 payment transaction during topups.
+Request authentication and payment signing are separate: bearer auth is used for normal OttoRouter HTTP requests, while wallet credentials are only needed for x402 payment signing during topups.
 
 ```ts
 const ottorouter = createOttoRouter({

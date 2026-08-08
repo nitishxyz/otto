@@ -38,11 +38,11 @@ export interface OttoRouterInstance {
 }
 
 function resolveAuth(auth: OttoRouterAuth): OttoRouterAuth {
-	if (auth.accessToken || auth.refreshToken) {
+	if (auth.apiKey || auth.accessToken || auth.refreshToken) {
 		return auth;
 	}
 
-	throw new Error('OttoRouter: OAuth token is required.');
+	throw new Error('OttoRouter: API key or OAuth token is required.');
 }
 
 export function createOttoRouter(config: OttoRouterConfig): OttoRouterInstance {

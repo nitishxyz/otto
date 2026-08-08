@@ -43,6 +43,8 @@ export interface OAuthTokenRefreshResult {
 }
 
 export interface OttoRouterAuth {
+	/** OttoRouter API key used as a static bearer credential. */
+	apiKey?: string;
 	accessToken?: string;
 	refreshToken?: string;
 	expiresAt?: number;

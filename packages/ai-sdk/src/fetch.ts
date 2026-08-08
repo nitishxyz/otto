@@ -189,17 +189,25 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 
 	const maxAttempts = payment?.maxRequestAttempts ?? DEFAULT_MAX_ATTEMPTS;
 	const baseFetch = customFetch ?? globalThis.fetch.bind(globalThis);
+	const apiKey = auth?.apiKey;
 	const tokenManager =
-		auth?.accessToken || auth?.refreshToken
+		!apiKey && (auth?.accessToken || auth?.refreshToken)
 			? createOAuthAccessTokenManager({
 					auth,
 					baseURL,
 					fetch: baseFetch,
 				})
 			: null;
-	if (!tokenManager) {
-		throw new Error('OttoRouter: OAuth token is required.');
+	if (!apiKey && !tokenManager) {
+		throw new Error('OttoRouter: API key or OAuth token is required.');
 	}
+	const getCredential = async (forceRefresh = false) => {
+		if (apiKey) return apiKey;
+		if (!tokenManager) {
+			throw new Error('OttoRouter: API key or OAuth token is required.');
+		}
+		return tokenManager.getToken(forceRefresh);
+	};
 
 	return async (
 		input: Parameters<typeof fetch>[0],
@@ -211,8 +219,8 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 			attempt++;
 			const performAuthenticatedRequest = async (forceRefresh = false) => {
 				const headers = new Headers(init?.headers);
-				const accessToken = await tokenManager.getToken(forceRefresh);
-				headers.set('authorization', `Bearer ${accessToken}`);
+				const credential = await getCredential(forceRefresh);
+				headers.set('authorization', `Bearer ${credential}`);
 				return baseFetch(input, { ...init, body, headers });
 			};
 
@@ -240,7 +248,7 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 			}
 
 			let response = await performAuthenticatedRequest();
-			if (response.status === 401) {
+			if (response.status === 401 && tokenManager) {
 				tokenManager.invalidate();
 				response = await performAuthenticatedRequest(true);
 			}
