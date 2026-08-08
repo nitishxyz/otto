@@ -205,6 +205,7 @@ pub fn run() {
             commands::native_terminal::native_terminal_resize,
             commands::native_terminal::native_terminal_key,
             commands::native_terminal::native_terminal_scroll,
+            commands::native_terminal::native_terminal_scroll_gpu,
             commands::native_terminal::native_terminal_select,
             commands::native_terminal::native_terminal_reset,
             commands::native_terminal::native_terminal_destroy,

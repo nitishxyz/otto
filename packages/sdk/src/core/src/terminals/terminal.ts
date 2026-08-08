@@ -2,6 +2,9 @@ import type { IPty } from './bun-pty.ts';
 import { EventEmitter } from 'node:events';
 import { CircularBuffer } from './circular-buffer.ts';
 
+const TERMINAL_HISTORY_MAX_CHUNKS = 50_000;
+const TERMINAL_HISTORY_MAX_BYTES = 16 * 1024 * 1024;
+
 export type TerminalStatus = 'running' | 'exited';
 export type TerminalCreator = 'user' | 'llm';
 
@@ -41,7 +44,10 @@ export class Terminal {
 		this.createdBy = options.createdBy;
 		this._title = options.title;
 		this.createdAt = new Date();
-		this.buffer = new CircularBuffer(500);
+		this.buffer = new CircularBuffer(
+			TERMINAL_HISTORY_MAX_CHUNKS,
+			TERMINAL_HISTORY_MAX_BYTES,
+		);
 
 		this.pty.onData((data) => {
 			// Store in buffer for history

@@ -32,6 +32,7 @@ import {
 	setNativeTerminalSurfaceCursor,
 	setNativeTerminalTheme,
 	scrollNativeTerminal,
+	scrollNativeTerminalGpu,
 	updateNativeTerminalSurface,
 	type NativeTerminalMetrics,
 	type NativeTerminalPoint,
@@ -210,6 +211,10 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 	const socketRef = useRef<WebSocket | null>(null);
 	const snapshotRef = useRef<NativeTerminalSnapshot | null>(null);
 	const updateQueueRef = useRef(Promise.resolve());
+	const scrollRemainderRef = useRef(0);
+	const pendingScrollDeltaRef = useRef(0);
+	const scrollQueuedRef = useRef(false);
+	const flushPendingScrollRef = useRef<() => void>(() => undefined);
 	const reconnectTimerRef = useRef<number | null>(null);
 	const reconnectAttemptsRef = useRef(0);
 	const exitedRef = useRef(false);
@@ -300,6 +305,32 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 		return updateQueueRef.current;
 	}, []);
 
+	const flushPendingScroll = useCallback(() => {
+		if (scrollQueuedRef.current || pendingScrollDeltaRef.current === 0) return;
+		const nativeSessionId = nativeSessionIdRef.current;
+		if (!nativeSessionId) {
+			pendingScrollDeltaRef.current = 0;
+			return;
+		}
+		const delta = pendingScrollDeltaRef.current;
+		pendingScrollDeltaRef.current = 0;
+		scrollQueuedRef.current = true;
+		const operation = gpuActiveRef.current
+			? scrollNativeTerminalGpu(nativeSessionId, delta)
+			: enqueue(async () => {
+					const update = await scrollNativeTerminal(nativeSessionId, delta);
+					if (nativeSessionIdRef.current === nativeSessionId)
+						applyUpdate(update);
+				});
+		void operation
+			.catch(() => undefined)
+			.finally(() => {
+				scrollQueuedRef.current = false;
+				flushPendingScrollRef.current();
+			});
+	}, [applyUpdate, enqueue]);
+	flushPendingScrollRef.current = flushPendingScroll;
+
 	useEffect(() => {
 		const nativeSessionId = nativeSessionIdRef.current;
 		if (
@@ -383,6 +414,8 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 		selectionFocusRef.current = null;
 		selectionTextRef.current = '';
 		selectingRef.current = false;
+		scrollRemainderRef.current = 0;
+		pendingScrollDeltaRef.current = 0;
 		appliedThemeIdRef.current = null;
 		const encoder = new TextEncoder();
 		let resizeObserver: ResizeObserver | null = null;
@@ -705,6 +738,8 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 		return () => {
 			disposed = true;
 			gpuActiveRef.current = false;
+			scrollRemainderRef.current = 0;
+			pendingScrollDeltaRef.current = 0;
 			outputBatcher.dispose();
 			outputQueue = [];
 			resizeObserver?.disconnect();
@@ -971,15 +1006,22 @@ const NativeTerminalSurface = memo(function NativeTerminalSurface({
 					event.preventDefault();
 					const nativeSessionId = nativeSessionIdRef.current;
 					if (!nativeSessionId) return;
-					const delta = nativeTerminalScrollDelta(event);
+					const snapshot = snapshotRef.current;
+					const accumulatedDelta =
+						scrollRemainderRef.current +
+						nativeTerminalScrollDelta(
+							event,
+							metricsRef.current.cellHeight,
+							snapshot?.rows ?? 1,
+						);
+					const delta = Math.trunc(accumulatedDelta);
+					scrollRemainderRef.current = accumulatedDelta - delta;
 					if (delta === 0) return;
 					selectionAnchorRef.current = null;
 					selectionFocusRef.current = null;
 					selectionTextRef.current = '';
-					void enqueue(async () => {
-						await selectNativeTerminal(nativeSessionId, null);
-						applyUpdate(await scrollNativeTerminal(nativeSessionId, delta));
-					}).catch(() => undefined);
+					pendingScrollDeltaRef.current += delta;
+					flushPendingScroll();
 				}}
 			/>
 			{!ready && !error ? (

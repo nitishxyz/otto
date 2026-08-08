@@ -21,7 +21,7 @@ use std::{
 
 const DEFAULT_COLS: u16 = 80;
 const DEFAULT_ROWS: u16 = 24;
-const MAX_SCROLLBACK: usize = 5_000;
+const MAX_SCROLLBACK: usize = 50_000;
 const TERMINAL_BACKGROUND: RgbColor = RgbColor {
     r: 18,
     g: 18,
@@ -462,6 +462,7 @@ impl NativeTerminalSession {
     }
 
     fn scroll(&mut self, delta: isize) -> Result<NativeTerminalUpdate, String> {
+        self.selection = None;
         self.terminal.scroll_viewport(ScrollViewport::Delta(delta));
         self.update()
     }
@@ -987,6 +988,22 @@ pub fn native_terminal_scroll(
     })?;
     manager.gpu.render(&render_id, &update.snapshot);
     Ok(update)
+}
+
+#[tauri::command]
+pub fn native_terminal_scroll_gpu(
+    manager: tauri::State<'_, NativeTerminalManager>,
+    session_id: String,
+    delta: isize,
+) -> Result<(), String> {
+    let render_id = session_id.clone();
+    let update = manager.request(|reply| WorkerRequest::Scroll {
+        session_id,
+        delta,
+        reply,
+    })?;
+    manager.gpu.render(&render_id, &update.snapshot);
+    Ok(())
 }
 
 #[tauri::command]

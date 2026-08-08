@@ -49,6 +49,54 @@ describe('viewer visibility', () => {
 		expect(useViewerTabsStore.getState().isCollapsed).toBe(false);
 		expect(useViewerTabsStore.getState().tabOrder).toHaveLength(2);
 	});
+
+	test('discovers daemon terminals without activating the terminal viewer', () => {
+		const store = useViewerTabsStore.getState();
+		store.openFileTab('src/example.ts');
+		store.syncTerminalTabs([{ id: 'terminal-1', title: 'Agent terminal' }]);
+
+		const state = useViewerTabsStore.getState();
+		expect(state.tabsById['terminal:terminal-1']).toEqual({
+			id: 'terminal:terminal-1',
+			type: 'terminal',
+			title: 'Agent terminal',
+			terminalId: 'terminal-1',
+		});
+		expect(state.activeMode).toBe('work');
+		expect(state.activeTabId).toBe('file:src/example.ts');
+		expect(state.activeTerminalTabId).toBeNull();
+		expect(state.isCollapsed).toBe(false);
+	});
+
+	test('discovers daemon terminals when the viewer has no tabs', () => {
+		useViewerTabsStore
+			.getState()
+			.syncTerminalTabs([{ id: 'terminal-1', title: 'Agent terminal' }]);
+
+		const state = useViewerTabsStore.getState();
+		expect(state.tabOrder).toEqual(['terminal:terminal-1']);
+		expect(state.activeMode).toBe('work');
+		expect(state.activeTabId).toBeNull();
+		expect(state.activeTerminalTabId).toBeNull();
+	});
+
+	test('shows a discovered terminal without replacing the active terminal', () => {
+		const store = useViewerTabsStore.getState();
+		store.openTerminalTab('manual-terminal', 'Manual shell');
+		store.syncTerminalTabs([
+			{ id: 'manual-terminal', title: 'Manual shell' },
+			{ id: 'agent-terminal', title: 'Agent terminal' },
+		]);
+
+		const state = useViewerTabsStore.getState();
+		expect(state.tabOrder).toEqual([
+			'terminal:manual-terminal',
+			'terminal:agent-terminal',
+		]);
+		expect(state.activeMode).toBe('terminal');
+		expect(state.activeTabId).toBe('terminal:manual-terminal');
+		expect(state.activeTerminalTabId).toBe('terminal:manual-terminal');
+	});
 });
 
 describe('viewer tab tool activity annotations', () => {

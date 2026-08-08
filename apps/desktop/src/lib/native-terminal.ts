@@ -37,29 +37,18 @@ export interface NativeTerminalSurfaceStatus {
 	cellHeight?: number;
 }
 
-/**
- * Terminal-line wheel delta matching the Canvas Ghostty implementation:
- * deltaMode-aware, capped per event so trackpad momentum stays controllable.
- */
-export function nativeTerminalScrollDelta(event: {
-	deltaY: number;
-	deltaMode: number;
-}): number {
-	const direction = Math.sign(event.deltaY);
-	if (direction === 0) return 0;
-	if (event.deltaMode === 1) {
-		return (
-			direction *
-			Math.min(3, Math.max(1, Math.round(Math.abs(event.deltaY) / 2)))
-		);
-	}
-	if (event.deltaMode === 2) {
-		return direction * 8;
-	}
-	return (
-		direction *
-		Math.min(2, Math.max(1, Math.round(Math.abs(event.deltaY) / 80)))
-	);
+/** Converts a browser wheel delta to terminal rows without adding smoothing. */
+export function nativeTerminalScrollDelta(
+	event: {
+		deltaY: number;
+		deltaMode: number;
+	},
+	cellHeight: number = DEFAULT_NATIVE_TERMINAL_METRICS.cellHeight,
+	viewportRows: number = 1,
+): number {
+	if (event.deltaMode === 1) return event.deltaY;
+	if (event.deltaMode === 2) return event.deltaY * viewportRows;
+	return event.deltaY / Math.max(1, cellHeight);
 }
 
 export interface NativeTerminalStatus {
@@ -522,6 +511,10 @@ export function scrollNativeTerminal(sessionId: string, delta: number) {
 		sessionId,
 		delta,
 	});
+}
+
+export function scrollNativeTerminalGpu(sessionId: string, delta: number) {
+	return invoke<void>('native_terminal_scroll_gpu', { sessionId, delta });
 }
 
 export function resetNativeTerminal(sessionId: string) {

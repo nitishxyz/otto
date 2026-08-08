@@ -799,7 +799,7 @@ const TerminalPaneStrip = memo(function TerminalPaneStrip({
 	for (const id of [...mountedTabIdsRef.current]) {
 		if (!terminalTabIds.includes(id)) mountedTabIdsRef.current.delete(id);
 	}
-	useSyncTerminalTabs(terminalTabIds.length > 0);
+	useSyncTerminalTabs();
 
 	return (
 		<>

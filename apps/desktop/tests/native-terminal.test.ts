@@ -25,16 +25,24 @@ function shortcutEvent(
 }
 
 describe('native desktop terminal', () => {
-	test('caps wheel deltas so trackpad momentum stays controllable', () => {
-		// Pixel mode (trackpads): small deltas scroll one line, capped at two.
-		expect(nativeTerminalScrollDelta({ deltaY: 4, deltaMode: 0 })).toBe(1);
-		expect(nativeTerminalScrollDelta({ deltaY: 120, deltaMode: 0 })).toBe(2);
-		expect(nativeTerminalScrollDelta({ deltaY: -900, deltaMode: 0 })).toBe(-2);
-		// Line mode (mice): proportional, capped at three.
-		expect(nativeTerminalScrollDelta({ deltaY: 3, deltaMode: 1 })).toBe(2);
-		expect(nativeTerminalScrollDelta({ deltaY: -40, deltaMode: 1 })).toBe(-3);
-		// Page mode.
-		expect(nativeTerminalScrollDelta({ deltaY: 1, deltaMode: 2 })).toBe(8);
+	test('preserves browser wheel distance without adding smoothing', () => {
+		// Pixel mode (trackpads) maps physical distance to fractional rows.
+		expect(nativeTerminalScrollDelta({ deltaY: 4, deltaMode: 0 }, 16)).toBe(
+			0.25,
+		);
+		expect(nativeTerminalScrollDelta({ deltaY: 120, deltaMode: 0 }, 16)).toBe(
+			7.5,
+		);
+		expect(nativeTerminalScrollDelta({ deltaY: -40, deltaMode: 0 }, 16)).toBe(
+			-2.5,
+		);
+		// Line-mode mouse wheels remain exactly proportional.
+		expect(nativeTerminalScrollDelta({ deltaY: 3, deltaMode: 1 })).toBe(3);
+		expect(nativeTerminalScrollDelta({ deltaY: -40, deltaMode: 1 })).toBe(-40);
+		// Page mode follows the current viewport height.
+		expect(nativeTerminalScrollDelta({ deltaY: 1, deltaMode: 2 }, 16, 20)).toBe(
+			20,
+		);
 		expect(nativeTerminalScrollDelta({ deltaY: 0, deltaMode: 0 })).toBe(0);
 	});
 
@@ -57,6 +65,7 @@ describe('native desktop terminal', () => {
 			'native_terminal_resize',
 			'native_terminal_key',
 			'native_terminal_scroll',
+			'native_terminal_scroll_gpu',
 			'native_terminal_select',
 			'native_terminal_reset',
 			'native_terminal_destroy',
@@ -196,6 +205,7 @@ describe('native desktop terminal', () => {
 			readFile('src/components/terminal/NativeTerminalViewer.tsx', 'utf8'),
 		]);
 		expect(commands).toContain('pub async fn native_terminal_surface_create(');
+		expect(commands).toContain('const MAX_SCROLLBACK: usize = 50_000;');
 		expect(gpu).toContain('run_on_main_thread');
 		expect(gpu).toContain('let renderer = prepared.finish(app).await?');
 		expect(gpu).toContain('if self.render_latest(&session_id)');

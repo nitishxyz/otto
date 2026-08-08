@@ -85,16 +85,16 @@ export function useToggleTerminalTabs() {
 	}, [openTerminalTabs]);
 }
 
-/** Keeps terminal viewer tabs in sync with daemon terminals (titles, removals). */
-export function useSyncTerminalTabs(enabled: boolean) {
+/** Keeps terminal viewer tabs in sync with daemon terminals. */
+export function useSyncTerminalTabs() {
 	const { data } = useTerminals();
 	useEffect(() => {
-		if (!enabled || !data) return;
+		if (!data) return;
 		useViewerTabsStore.getState().syncTerminalTabs(
 			data.terminals.map((terminal) => ({
 				id: terminal.id,
 				title: terminalTabLabel(terminal),
 			})),
 		);
-	}, [enabled, data]);
+	}, [data]);
 }

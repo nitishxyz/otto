@@ -11,12 +11,19 @@ export function useMenuCloseWindow() {
 	useEffect(() => {
 		let disposed = false;
 		let unlisten: (() => void) | null = null;
-		void listen('menu-close-request', () => {
-			const consumed = !window.dispatchEvent(
-				new CustomEvent(VIEWER_CLOSE_ACTIVE_TAB_EVENT, { cancelable: true }),
-			);
-			if (!consumed) void getCurrentWindow().close();
-		}).then((fn) => {
+		const currentWindow = getCurrentWindow();
+		void listen(
+			'menu-close-request',
+			() => {
+				const consumed = !window.dispatchEvent(
+					new CustomEvent(VIEWER_CLOSE_ACTIVE_TAB_EVENT, {
+						cancelable: true,
+					}),
+				);
+				if (!consumed) void currentWindow.close();
+			},
+			{ target: currentWindow.label },
+		).then((fn) => {
 			if (disposed) {
 				fn();
 				return;

@@ -1410,7 +1410,6 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 
 	syncTerminalTabs: (terminals) =>
 		set((state) => {
-			if (!state.tabs.some((tab) => tab.type === 'terminal')) return {};
 			const titlesByTabId = new Map(
 				terminals.map((terminal) => [
 					terminalViewerTabId(terminal.id),
@@ -1436,6 +1435,17 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				}
 				nextTabs.push(tab);
 			}
+			for (const terminal of terminals) {
+				const id = terminalViewerTabId(terminal.id);
+				if (state.tabsById[id]) continue;
+				nextTabs.push({
+					id,
+					type: 'terminal',
+					title: terminal.title || 'Terminal',
+					terminalId: terminal.id,
+				});
+				changed = true;
+			}
 			if (!changed) return {};
 
 			const removedIds = state.tabs
@@ -1447,6 +1457,10 @@ export const useViewerTabsStore = create<ViewerTabsState>((set) => ({
 				activeTerminalTabId &&
 				!nextTabs.some((tab) => tab.id === activeTerminalTabId)
 			) {
+				activeTerminalTabId =
+					nextTabs.find((tab) => modeForTab(tab) === 'terminal')?.id ?? null;
+			}
+			if (!activeTerminalTabId && activeMode === 'terminal') {
 				activeTerminalTabId =
 					nextTabs.find((tab) => modeForTab(tab) === 'terminal')?.id ?? null;
 			}
