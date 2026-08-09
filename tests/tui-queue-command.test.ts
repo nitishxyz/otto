@@ -14,6 +14,8 @@ import {
 } from '../apps/tui/src/stream/client.ts';
 import type { StatusIndicator } from '../apps/tui/src/stores/overlay.ts';
 import { parseRecipeUserMessage } from '../apps/tui/src/components/MessageItem.tsx';
+import { getQueuedMessageItems } from '../apps/tui/src/lib/queue.ts';
+import type { Message, Overlay } from '../apps/tui/src/types.ts';
 
 function commandContext(overrides: Partial<CommandContext> = {}): {
 	ctx: CommandContext;
@@ -53,6 +55,126 @@ describe('TUI queued-message command', () => {
 				(command) => command.name === 'send',
 			),
 		).toBe(true);
+	});
+
+	test('always suggests /queue and opens the queue overlay', async () => {
+		let overlay: Overlay = 'none';
+		expect(
+			getCommandSuggestions('', false).some(
+				(command) => command.name === 'queue',
+			),
+		).toBe(true);
+
+		const { ctx } = commandContext({
+			setOverlay: (nextOverlay) => {
+				overlay = nextOverlay;
+			},
+		});
+		await executeCommand('queue', '', ctx);
+		expect(overlay).toBe('queue');
+	});
+
+	test('suggests /sub-agents and opens the subagent overlay', async () => {
+		let overlay: Overlay = 'none';
+		expect(
+			getCommandSuggestions('sub-', false).some(
+				(command) => command.name === 'sub-agents',
+			),
+		).toBe(true);
+
+		const { ctx } = commandContext({
+			setOverlay: (nextOverlay) => {
+				overlay = nextOverlay;
+			},
+		});
+		await executeCommand('sub-agents', '', ctx);
+		expect(overlay).toBe('subagents');
+	});
+
+	test('maps queued assistants to compact user-message summaries', () => {
+		const messages = [
+			{
+				id: 'user-1',
+				role: 'user',
+				createdAt: 1,
+				parts: [
+					{
+						id: 'part-1',
+						index: 0,
+						type: 'text',
+						content: 'first\n message',
+					},
+				],
+			},
+			{ id: 'assistant-1', role: 'assistant', createdAt: 2 },
+			{
+				id: 'user-2',
+				role: 'user',
+				createdAt: 3,
+				attachmentNames: ['one.png', 'two.txt'],
+				parts: [
+					{
+						id: 'part-2',
+						index: 0,
+						type: 'text',
+						content: 'second message',
+					},
+				],
+			},
+			{ id: 'assistant-2', role: 'assistant', createdAt: 4 },
+		] as Message[];
+
+		expect(
+			getQueuedMessageItems(messages, new Set(['assistant-2', 'assistant-1'])),
+		).toEqual([
+			{
+				assistantMessageId: 'assistant-2',
+				userMessageId: 'user-2',
+				summary: '◳ 2 attachments · second message',
+			},
+			{
+				assistantMessageId: 'assistant-1',
+				userMessageId: 'user-1',
+				summary: 'first message',
+			},
+		]);
+	});
+
+	test('previews queued users before queued assistant records arrive', () => {
+		const messages = [
+			{
+				id: 'active-user',
+				role: 'user',
+				createdAt: 1,
+				parts: [
+					{ id: 'active-part', index: 0, type: 'text', content: 'active' },
+				],
+			},
+			{ id: 'active-assistant', role: 'assistant', createdAt: 2 },
+			{
+				id: 'queued-user-1',
+				role: 'user',
+				createdAt: 3,
+				parts: [
+					{ id: 'q1-part', index: 0, type: 'text', content: 'first queued' },
+				],
+			},
+			{
+				id: 'queued-user-2',
+				role: 'user',
+				createdAt: 4,
+				parts: [
+					{ id: 'q2-part', index: 0, type: 'text', content: 'second queued' },
+				],
+			},
+		] as Message[];
+
+		expect(
+			getQueuedMessageItems(
+				messages,
+				new Set(['queued-assistant-1', 'queued-assistant-2']),
+			).map((item) => item.summary),
+		).toEqual(['first queued', 'second queued']);
 	});
 
 	test('suggests non-conflicting project and global recipes', () => {

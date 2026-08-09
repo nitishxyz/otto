@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { ChatView } from '../ChatView.tsx';
 import { useSubagentMessages } from '../../hooks/useSubagentMessages.ts';
 import { useTheme } from '../../theme.ts';
+import { NARROW_RAIL_BORDER_CHARS } from '../rail.ts';
 import type { ActivitySubagent } from './types.ts';
 
 const EMPTY_IDS = new Set<string>();
@@ -26,42 +27,55 @@ export const SubagentDetail = memo(function SubagentDetail({
 		}
 		return null;
 	}, [detail.messages]);
+	const statusColor =
+		record.status === 'running'
+			? colors.purple
+			: record.status === 'completed'
+				? colors.green
+				: record.status === 'failed'
+					? colors.red
+					: colors.fgDark;
 
 	return (
 		<box style={{ width: '100%', height: '100%', flexDirection: 'column' }}>
 			<box
+				customBorderChars={NARROW_RAIL_BORDER_CHARS}
 				style={{
-					flexDirection: 'column',
-					paddingLeft: 1,
-					paddingRight: 1,
+					flexDirection: 'row',
+					height: 3,
+					flexShrink: 0,
+					border: ['left'],
+					borderColor: colors.purple,
+					backgroundColor: colors.bgSubtle,
+					paddingLeft: 2,
+					paddingRight: 2,
+					paddingTop: 1,
 					paddingBottom: 1,
+					gap: 1,
+					alignItems: 'center',
+					overflow: 'hidden',
 				}}
 			>
-				<box style={{ flexDirection: 'row', gap: 1, height: 1, width: '100%' }}>
-					<text fg={colors.purple}>◇</text>
-					<text fg={colors.fgBright}>
-						<b>{record.agent}</b>
-					</text>
-					<text
-						fg={
-							record.status === 'running'
-								? colors.blue
-								: record.status === 'completed'
-									? colors.green
-									: colors.red
-						}
-					>
-						{record.status}
-					</text>
-					<text
-						fg={colors.fgMuted}
-						wrapMode="none"
-						truncate
-						style={{ flexGrow: 1, overflow: 'hidden' }}
-					>
-						{record.task}
-					</text>
-				</box>
+				<text style={{ flexShrink: 0 }} fg={colors.purple}>
+					◇
+				</text>
+				<text style={{ flexShrink: 0 }} fg={colors.fgBright} wrapMode="none">
+					<b>{record.agent}</b>
+				</text>
+				<text fg={colors.fgDimmed} style={{ flexShrink: 0 }}>
+					·
+				</text>
+				<text
+					fg={colors.fgMuted}
+					wrapMode="none"
+					truncate
+					style={{ flexGrow: 1, flexShrink: 1, overflow: 'hidden' }}
+				>
+					{record.task}
+				</text>
+				<text style={{ flexShrink: 0 }} fg={statusColor} wrapMode="none">
+					● {record.status}
+				</text>
 			</box>
 
 			{detail.error ? (

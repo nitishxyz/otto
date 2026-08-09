@@ -1,6 +1,7 @@
 import { useSelectionHandler, useTerminalDimensions } from '@opentui/react';
-import { useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import {
+	removeFromQueue as apiRemoveFromQueue,
 	resolveSecureInput,
 	sendQueuedMessageNow as apiSendQueuedMessageNow,
 } from '@ottocode/api';
@@ -12,6 +13,8 @@ import {
 import { StatusBar } from './components/StatusBar.tsx';
 import { ChatView } from './components/ChatView.tsx';
 import { ChatInput } from './components/ChatInput.tsx';
+import { QueueBar } from './components/QueueBar.tsx';
+import { ActiveSubagentsBar } from './components/ActiveSubagentsBar.tsx';
 import { Overlays } from './components/Overlays.tsx';
 import { ApproveAllBar } from './components/ApproveAllBar.tsx';
 import { SecureInputBar } from './components/SecureInputBar.tsx';
@@ -30,11 +33,17 @@ import {
 } from './commands/index.ts';
 import { copyToClipboard } from './lib/clipboard.ts';
 import { moveWorkspaceFocus } from './lib/workspace-navigation.ts';
+import {
+	getQueuedMessageItems,
+	getQueuedMessageSummary,
+	type OptimisticQueuedMessage,
+} from './lib/queue.ts';
 import { getProjectContext, getProjectQuery } from './api.ts';
 import { useTheme } from './theme.ts';
 import { useOverlayStore } from './stores/overlay.ts';
 import { useWorkspaceStore } from './stores/workspace.ts';
 import type { Session } from './types.ts';
+import type { ActivitySubagent } from './components/activity/types.ts';
 
 export function App({
 	onQuit,
@@ -145,7 +154,7 @@ export function App({
 		messages,
 		isStreaming,
 		streamingMessageId,
-		queueSize,
+		queueSize: serverQueueSize,
 		queuedMessageIds,
 		pendingApprovals,
 		setPendingApprovals,
@@ -159,12 +168,86 @@ export function App({
 		handleMessageCompleted,
 		handleStepFinish,
 	);
-	const activityData = useActivityData(sessionId, messages, workspaceOpen);
+	const activityData = useActivityData(sessionId, messages, true);
+	const activeSubagents = useMemo(
+		() => activityData.subagents.filter((item) => item.status === 'running'),
+		[activityData.subagents],
+	);
+	const [optimisticQueuedMessages, setOptimisticQueuedMessages] = useState<
+		OptimisticQueuedMessage[]
+	>([]);
+	const queuedMessages = useMemo(() => {
+		const serverItems = getQueuedMessageItems(messages, queuedMessageIds);
+		const serverItemsById = new Map(
+			serverItems.map((item) => [item.assistantMessageId, item]),
+		);
+		const usedClientIds = new Set<string>();
+		const items = [...queuedMessageIds].flatMap((assistantMessageId) => {
+			const optimisticItem =
+				optimisticQueuedMessages.find(
+					(item) => item.assistantMessageId === assistantMessageId,
+				) ??
+				optimisticQueuedMessages.find(
+					(item) =>
+						!item.assistantMessageId && !usedClientIds.has(item.clientId),
+				);
+			if (optimisticItem) {
+				usedClientIds.add(optimisticItem.clientId);
+				return [
+					{
+						assistantMessageId,
+						userMessageId: optimisticItem.clientId,
+						summary: optimisticItem.summary,
+					},
+				];
+			}
+			const serverItem = serverItemsById.get(assistantMessageId);
+			return serverItem ? [serverItem] : [];
+		});
+		for (const optimisticItem of optimisticQueuedMessages) {
+			if (
+				usedClientIds.has(optimisticItem.clientId) ||
+				(optimisticItem.assistantMessageId &&
+					queuedMessageIds.has(optimisticItem.assistantMessageId))
+			) {
+				continue;
+			}
+			items.push({
+				assistantMessageId:
+					optimisticItem.assistantMessageId ?? optimisticItem.clientId,
+				userMessageId: optimisticItem.clientId,
+				summary: optimisticItem.summary,
+			});
+		}
+		return items;
+	}, [messages, queuedMessageIds, optimisticQueuedMessages]);
+	const queueSize = Math.max(serverQueueSize, queuedMessages.length);
 
 	useEffect(() => {
 		void sessionId;
 		resetWorkspaceDetail();
+		setOptimisticQueuedMessages([]);
 	}, [sessionId, resetWorkspaceDetail]);
+
+	useEffect(() => {
+		setOptimisticQueuedMessages((current) =>
+			current
+				.map((item) =>
+					item.assistantMessageId &&
+					queuedMessageIds.has(item.assistantMessageId)
+						? { ...item, confirmed: true }
+						: item,
+				)
+				.filter(
+					(item) =>
+						!item.confirmed ||
+						Boolean(
+							item.assistantMessageId &&
+								queuedMessageIds.has(item.assistantMessageId),
+						),
+				),
+		);
+	}, [queuedMessageIds]);
 
 	const contextTokens = activeSession?.currentContextTokens ?? 0;
 	const sessionProvider = activeSession?.provider ?? '';
@@ -204,11 +287,9 @@ export function App({
 		return (contextTokens / limit) * 100;
 	}, [sessionProvider, sessionModel, contextTokens]);
 
-	const handleSendQueuedNow = useCallback(
-		async (position = 1): Promise<boolean> => {
+	const handleSendQueuedMessage = useCallback(
+		async (messageId: string): Promise<boolean> => {
 			if (!sessionId) return false;
-			const messageId = [...queuedMessageIds][position - 1];
-			if (!messageId) return false;
 			try {
 				const response = await apiSendQueuedMessageNow({
 					path: { sessionId, messageId },
@@ -221,7 +302,33 @@ export function App({
 				return false;
 			}
 		},
-		[sessionId, queuedMessageIds, reload],
+		[sessionId, reload],
+	);
+
+	const handleSendQueuedNow = useCallback(
+		async (position = 1): Promise<boolean> => {
+			const messageId = [...queuedMessageIds][position - 1];
+			return messageId ? handleSendQueuedMessage(messageId) : false;
+		},
+		[queuedMessageIds, handleSendQueuedMessage],
+	);
+
+	const handleRemoveQueuedMessage = useCallback(
+		async (messageId: string): Promise<boolean> => {
+			if (!sessionId) return false;
+			try {
+				const response = await apiRemoveFromQueue({
+					path: { sessionId, messageId },
+					query: getProjectQuery(),
+				} as never);
+				if (response.error) return false;
+				setTimeout(reload, 150);
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		[sessionId, reload],
 	);
 
 	const handleCommand = useCallback(
@@ -238,7 +345,9 @@ export function App({
 				deleteSession,
 				switchSession,
 				updateSessionPrefs,
-				sendMessage,
+				sendMessage: async (nextSessionId, content) => {
+					await sendMessage(nextSessionId, content);
+				},
 				abortSession,
 				sendQueuedNow: handleSendQueuedNow,
 				updateDefaults,
@@ -294,6 +403,41 @@ export function App({
 				return;
 			}
 
+			if (isStreaming && streamingMessageId) {
+				const clientId = `optimistic-queue-${Date.now()}-${Math.random()
+					.toString(36)
+					.slice(2, 8)}`;
+				setOptimisticQueuedMessages((current) => [
+					...current,
+					{
+						clientId,
+						assistantMessageId: null,
+						summary: getQueuedMessageSummary(text, attachmentNames),
+						confirmed: false,
+					},
+				]);
+				const assistantMessageId = await sendMessage(
+					activeSession.id,
+					text,
+					images,
+					files,
+				);
+				setOptimisticQueuedMessages((current) =>
+					assistantMessageId
+						? current.map((item) =>
+								item.clientId === clientId
+									? {
+											...item,
+											assistantMessageId,
+											confirmed: queuedMessageIds.has(assistantMessageId),
+										}
+									: item,
+							)
+						: current.filter((item) => item.clientId !== clientId),
+				);
+				return;
+			}
+
 			addOptimisticUser(
 				text,
 				attachmentNames.length > 0 ? attachmentNames : undefined,
@@ -306,6 +450,9 @@ export function App({
 			handleCommand,
 			sendMessage,
 			addOptimisticUser,
+			isStreaming,
+			streamingMessageId,
+			queuedMessageIds,
 		],
 	);
 
@@ -407,14 +554,14 @@ export function App({
 
 	const handleCycleWorkspaceFocus = useCallback(() => {
 		const state = useWorkspaceStore.getState();
-		if (!state.isOpen) {
+		if (!state.isOpen && !state.detail) {
 			state.open();
 			return;
 		}
 		if (state.focus === 'chat') {
 			state.setFocus(state.detail ? 'detail' : 'activity');
 		} else if (state.focus === 'detail') {
-			state.setFocus('activity');
+			state.setFocus(state.isOpen ? 'activity' : 'chat');
 		} else {
 			state.setFocus('chat');
 		}
@@ -429,7 +576,7 @@ export function App({
 				moveWorkspaceFocus(
 					{
 						focus: state.focus,
-						showDetail: state.isOpen && !!state.detail,
+						showDetail: !!state.detail,
 						showActivity: state.isOpen && (!state.detail || threePane),
 					},
 					direction,
@@ -517,7 +664,7 @@ export function App({
 
 	const layoutWidth = terminalWidth || (process.stdout.columns ?? 120);
 	const showThreePane = layoutWidth >= 140;
-	const showDetail = workspaceOpen && !!workspaceDetail;
+	const showDetail = !!workspaceDetail;
 	const showActivity = workspaceOpen && (!workspaceDetail || showThreePane);
 	const activityWidth =
 		Math.floor(
@@ -541,6 +688,15 @@ export function App({
 				(message.status !== 'pending' ||
 					(message.parts?.length ?? 0) > 0 ||
 					message.id === streamingMessageId)),
+	);
+
+	const handleSubagentSelect = useCallback(
+		(subagent: ActivitySubagent) => {
+			setOverlay('none');
+			setWorkspaceTab('subagents');
+			openWorkspaceDetail({ kind: 'subagent', id: subagent.id });
+		},
+		[setOverlay, setWorkspaceTab, openWorkspaceDetail],
 	);
 
 	const handleAgentSelect = useCallback(
@@ -593,7 +749,6 @@ export function App({
 			<StatusBar
 				sessionTitle={activeSession?.title ?? null}
 				projectRoot={getProjectContext().projectRoot}
-				queueSize={queueSize}
 				contextTokens={contextTokens}
 				estimatedCost={estimatedCost}
 				contextUsagePercent={contextUsagePercent}
@@ -652,6 +807,12 @@ export function App({
 						/>
 					)}
 
+					<QueueBar
+						count={queueSize}
+						nextMessage={queuedMessages[0]?.summary}
+					/>
+					<ActiveSubagentsBar items={activeSubagents} />
+
 					{!isNewSession && chatInput}
 				</box>
 				{showDetail && workspaceDetail ? (
@@ -694,6 +855,8 @@ export function App({
 			<Overlays
 				sessions={sessions}
 				hasQueuedMessages={queueSize > 0}
+				queuedMessages={queuedMessages}
+				subagents={activityData.subagents}
 				hasMore={hasMore}
 				loadingMore={loadingMore}
 				onLoadMore={loadMoreSessions}
@@ -706,6 +869,9 @@ export function App({
 				onApprovalModeSave={handleApprovalModeSave}
 				currentAgent={currentAgent}
 				onAgentSelect={handleAgentSelect}
+				onSendQueuedMessage={handleSendQueuedMessage}
+				onRemoveQueuedMessage={handleRemoveQueuedMessage}
+				onSubagentSelect={handleSubagentSelect}
 			/>
 		</box>
 	);

@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { getDb } from '@ottocode/database';
+import { messages, sessions } from '@ottocode/database/schema';
 import { getProjectId } from '@ottocode/sdk';
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { ProjectManager } from '../packages/server/src/runtime/projects/manager.ts';
+import { getServerInfo, setDaemonId } from '../packages/server/src/state.ts';
 import {
 	projectQuerySchema,
 	resolveRequestProject,
@@ -45,6 +49,50 @@ afterEach(async () => {
 });
 
 describe('ProjectManager', () => {
+	it('does not recover live daemon work when opened by standalone serve', async () => {
+		const projectRoot = await createTempProject('otto-project-standalone-');
+		const restoreEnv = withIsolatedOttoHome(projectRoot);
+		const previousDaemonId = getServerInfo().daemonId;
+		const manager = new ProjectManager();
+		try {
+			await mkdir(process.env.XDG_CONFIG_HOME ?? '', { recursive: true });
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const messageId = crypto.randomUUID();
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Live daemon session',
+				agent: 'build',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: 1,
+			});
+			await db.insert(messages).values({
+				id: messageId,
+				sessionId,
+				role: 'assistant',
+				status: 'pending',
+				agent: 'build',
+				provider: 'openai',
+				model: 'test-model',
+				createdAt: 1,
+			});
+
+			setDaemonId(null);
+			await manager.openProject({ path: projectRoot });
+			const [persisted] = await db
+				.select({ status: messages.status, errorType: messages.errorType })
+				.from(messages)
+				.where(eq(messages.id, messageId));
+			expect(persisted).toEqual({ status: 'pending', errorType: null });
+		} finally {
+			await manager.closeAllProjects();
+			setDaemonId(previousDaemonId);
+			await restoreEnv();
+		}
+	});
+
 	it('opens two temp projects as distinct runtimes', async () => {
 		const projectA = await createTempProject('otto-project-a-');
 		const projectB = await createTempProject('otto-project-b-');

@@ -24,12 +24,12 @@ import { OttoTextWordmark } from '../common/OttoOIcon';
 import { apiClient } from '../../lib/api-client';
 import { formatFileSelectionsForMessage } from '../../lib/fileSelectionContext';
 import { getSessionsQueryKey } from '../../hooks/useSessions';
-import { getMessagesQueryKey } from '../../hooks/useMessages';
+import { fetchSessionMessages } from '../../hooks/useMessages';
 import {
 	captureComposerRect,
 	useSessionTransitionStore,
 } from '../../stores/sessionTransitionStore';
-import type { Message, Session } from '../../types/api';
+import type { Session } from '../../types/api';
 
 interface NewSessionLandingProps {
 	onSessionCreated: (sessionId: string) => void;
@@ -232,12 +232,9 @@ export const NewSessionLanding = memo(
 						// Warm the thread before navigating so the new route paints the
 						// sent message immediately instead of flashing a loading state,
 						// which would break the composer handoff animation.
-						await queryClient
-							.fetchQuery<Message[]>({
-								queryKey: getMessagesQueryKey(session.id),
-								queryFn: () => apiClient.getMessages(session.id),
-							})
-							.catch(() => undefined);
+						await fetchSessionMessages(queryClient, session.id).catch(
+							() => undefined,
+						);
 
 						if (composerRect) {
 							useSessionTransitionStore

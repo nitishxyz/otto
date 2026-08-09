@@ -3,6 +3,8 @@ import {
 	listSessions as apiListSessions,
 	getSession as apiGetSession,
 	listMessages as apiListMessages,
+	listMessagePage as apiListMessagePage,
+	getMessagePartContent as apiGetMessagePartContent,
 	createMessage as apiCreateMessage,
 	abortSession as apiAbortSession,
 	deleteSession as apiDeleteSession,
@@ -20,6 +22,8 @@ import {
 import type {
 	Session,
 	Message,
+	MessagePart,
+	MessagesPage,
 	CreateSessionRequest,
 	SendMessageRequest,
 	SendMessageResponse,
@@ -37,6 +41,56 @@ import {
 } from './utils';
 
 type ApiSession = Parameters<typeof convertSession>[0];
+
+/**
+ * Soft target of persisted message parts per page. The route paginates by
+ * parts (not messages) and treats this as a target: it completes the turn it
+ * is in and returns at least two complete turns when available.
+ */
+export const DEFAULT_MESSAGE_PART_TARGET = 120;
+
+/** Server-side maximum accepted for the `limit` target. */
+export const MAX_MESSAGE_PART_TARGET = 250;
+
+/**
+ * The page route returns `parsed` parts, so `content` arrives as an object and
+ * oversized tool/error parts carry `contentTruncated`/`contentBytes`/
+ * `artifactPath` passthrough fields. Normalize back into the client
+ * `MessagePart` shape (string `content` + `contentJson`) that renderers expect.
+ */
+function normalizePagedPart(raw: Record<string, unknown>): MessagePart {
+	const rawContent = raw.content;
+	const isJsonObject =
+		Boolean(rawContent) &&
+		typeof rawContent === 'object' &&
+		!Array.isArray(rawContent);
+	const contentJson = isJsonObject
+		? (rawContent as Record<string, unknown>)
+		: raw.contentJson && typeof raw.contentJson === 'object'
+			? (raw.contentJson as Record<string, unknown>)
+			: undefined;
+	return {
+		...(raw as unknown as MessagePart),
+		content: isJsonObject
+			? JSON.stringify(rawContent)
+			: typeof rawContent === 'string'
+				? rawContent
+				: '',
+		...(contentJson ? { contentJson } : {}),
+	};
+}
+
+function normalizePagedMessage(raw: Record<string, unknown>): Message {
+	const message = convertMessage(raw);
+	const parts = raw.parts;
+	if (!Array.isArray(parts)) return message;
+	return {
+		...message,
+		parts: parts.map((part) =>
+			normalizePagedPart(part as Record<string, unknown>),
+		),
+	};
+}
 
 export const sessionsMixin = {
 	async getSessions(): Promise<Session[]> {
@@ -226,6 +280,58 @@ export const sessionsMixin = {
 		} as never);
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		return (response.data || []).map(convertMessage);
+	},
+
+	/**
+	 * Fetches one newest-first page sized by a soft part target. `items` are
+	 * chronological within the page and a single parent message can appear in
+	 * several pages carrying a disjoint slice of its parts; `nextCursor` walks
+	 * further back in time. `partCount` is the authoritative number of
+	 * persisted parts the server placed in this page.
+	 */
+	async getMessagePage(
+		sessionId: string,
+		params: { limit?: number; cursor?: string | null } = {},
+	): Promise<MessagesPage> {
+		const { limit = DEFAULT_MESSAGE_PART_TARGET, cursor } = params;
+		const response = await apiListMessagePage({
+			path: { id: sessionId },
+			query: {
+				...getProjectQuery(),
+				parsed: 'true',
+				limit: Math.min(MAX_MESSAGE_PART_TARGET, Math.max(1, limit)),
+				...(cursor ? { cursor } : {}),
+			},
+		} as never);
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		const data = response.data;
+		const items = (data?.items ?? []).map((message) =>
+			normalizePagedMessage(message as Record<string, unknown>),
+		);
+		return {
+			items,
+			partCount:
+				typeof data?.partCount === 'number'
+					? data.partCount
+					: items.reduce((total, item) => total + (item.parts?.length ?? 0), 0),
+			hasMore: data?.hasMore ?? false,
+			nextCursor: data?.nextCursor ?? null,
+		};
+	},
+
+	/** Fetches the full persisted content of a part the page route truncated. */
+	async getMessagePartContent(
+		sessionId: string,
+		partId: string,
+	): Promise<string> {
+		const response = (await apiGetMessagePartContent({
+			path: { id: sessionId, partId },
+			query: getProjectQuery(),
+		} as never)) as { data?: unknown; error?: unknown };
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		return typeof response.data === 'string'
+			? response.data
+			: JSON.stringify(response.data ?? '');
 	},
 
 	async sendMessage(

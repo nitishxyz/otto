@@ -560,7 +560,10 @@ export function buildCompactActivityEntries(
 			continue;
 		}
 
-		const entry = getCompactActivityEntry(part);
+		// Cached per part: entry objects then keep their identity across
+		// rebuilds, so a grouped activity row only changes when one of its own
+		// parts changed.
+		const entry = getCachedCompactActivityEntry(part);
 		if (entry) {
 			entries.push(entry);
 		}
@@ -747,6 +750,28 @@ export function summarizeCompactActivities(
 	}
 
 	return { title, details };
+}
+
+/**
+ * Per-part entry cache. The compact thread derives entries on every row
+ * rebuild; memoizing on the part object keeps entry identity (and therefore
+ * LegendList measurements) stable, because parts are replaced rather than
+ * mutated on every stream update.
+ */
+const compactActivityEntryCache = new WeakMap<
+	MessagePart,
+	CompactActivityEntry | null
+>();
+
+/** Memoized {@link getCompactActivityEntry} keyed on part identity. */
+export function getCachedCompactActivityEntry(
+	part: MessagePart,
+): CompactActivityEntry | null {
+	const cached = compactActivityEntryCache.get(part);
+	if (cached !== undefined) return cached;
+	const entry = getCompactActivityEntry(part);
+	compactActivityEntryCache.set(part, entry);
+	return entry;
 }
 
 export type { CompactActivityEntry, CompactActivitySummary };

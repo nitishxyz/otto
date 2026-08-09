@@ -187,3 +187,279 @@ describe('message attachment list payloads', () => {
 		});
 	});
 });
+
+describe('message page payloads', () => {
+	it('extends a soft part target to include two complete turns', async () => {
+		await withProject('otto-message-turn-page-', async (projectRoot) => {
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const messageIds = Array.from({ length: 6 }, () => crypto.randomUUID());
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Adaptive pagination test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: 1_000,
+			});
+			for (const [index, id] of messageIds.entries()) {
+				const role = index % 2 === 0 ? 'user' : 'assistant';
+				await db.insert(messages).values({
+					id,
+					sessionId,
+					role,
+					status: 'complete',
+					agent: 'general',
+					provider: 'openai',
+					model: 'test-model',
+					createdAt: 1_000 + index,
+				});
+				await db.insert(messageParts).values({
+					id: crypto.randomUUID(),
+					messageId: id,
+					index: 0,
+					type: 'text',
+					content: JSON.stringify({ text: `${role}-${index}` }),
+					agent: 'general',
+					provider: 'openai',
+					model: 'test-model',
+				});
+			}
+
+			const pageUrl = `/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+				projectRoot,
+			)}&limit=2&parsed=true`;
+			const firstResponse = await createEmbeddedApp().request(pageUrl);
+			const first = (await firstResponse.json()) as {
+				items: Array<{ id: string }>;
+				partCount: number;
+				hasMore: boolean;
+				nextCursor: string | null;
+			};
+			expect(first.items.map((message) => message.id)).toEqual(
+				messageIds.slice(2),
+			);
+			expect(first.partCount).toBe(4);
+			expect(first.hasMore).toBe(true);
+
+			const secondResponse = await createEmbeddedApp().request(
+				`${pageUrl}&cursor=${encodeURIComponent(first.nextCursor ?? '')}`,
+			);
+			const second = (await secondResponse.json()) as {
+				items: Array<{ id: string }>;
+				partCount: number;
+				hasMore: boolean;
+			};
+			expect(second.items.map((message) => message.id)).toEqual(
+				messageIds.slice(0, 2),
+			);
+			expect(second.partCount).toBe(2);
+			expect(second.hasMore).toBe(false);
+
+			const softTargetResponse = await createEmbeddedApp().request(
+				pageUrl.replace('limit=2', 'limit=6'),
+			);
+			const softTargetPage = (await softTargetResponse.json()) as {
+				items: Array<{ id: string }>;
+				partCount: number;
+				hasMore: boolean;
+			};
+			expect(softTargetPage.items.map((message) => message.id)).toEqual(
+				messageIds,
+			);
+			expect(softTargetPage.partCount).toBe(6);
+			expect(softTargetPage.hasMore).toBe(false);
+		});
+	});
+
+	it('returns every part when a complete turn exceeds the soft target', async () => {
+		await withProject('otto-message-large-turn-', async (projectRoot) => {
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const userMessageId = crypto.randomUUID();
+			const assistantMessageId = crypto.randomUUID();
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Large turn pagination test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: 1_000,
+			});
+			for (const [id, role, createdAt] of [
+				[userMessageId, 'user', 1_000],
+				[assistantMessageId, 'assistant', 1_001],
+			] as const) {
+				await db.insert(messages).values({
+					id,
+					sessionId,
+					role,
+					status: 'complete',
+					agent: 'general',
+					provider: 'openai',
+					model: 'test-model',
+					createdAt,
+				});
+			}
+			await db.insert(messageParts).values({
+				id: crypto.randomUUID(),
+				messageId: userMessageId,
+				index: 0,
+				type: 'text',
+				content: JSON.stringify({ text: 'user' }),
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+			});
+			for (let index = 0; index < 510; index++) {
+				await db.insert(messageParts).values({
+					id: crypto.randomUUID(),
+					messageId: assistantMessageId,
+					index,
+					type: 'text',
+					content: JSON.stringify({ text: `part-${index}` }),
+					agent: 'general',
+					provider: 'openai',
+					model: 'test-model',
+				});
+			}
+
+			const pageUrl = `/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+				projectRoot,
+			)}&limit=120&parsed=true`;
+			const first = (await (
+				await createEmbeddedApp().request(pageUrl)
+			).json()) as {
+				items: Array<{ id: string; parts: Array<{ index: number }> }>;
+				partCount: number;
+				hasMore: boolean;
+				nextCursor: string | null;
+			};
+			expect(first.partCount).toBe(511);
+			expect(first.items.map((message) => message.id)).toEqual([
+				userMessageId,
+				assistantMessageId,
+			]);
+			expect(first.items[1]?.parts).toHaveLength(510);
+			expect(first.hasMore).toBe(false);
+			expect(first.nextCursor).toBeNull();
+		});
+	});
+
+	it('includes a pending assistant that has not emitted a part yet', async () => {
+		await withProject('otto-message-pending-page-', async (projectRoot) => {
+			const app = createEmbeddedApp();
+			await app.request(
+				`/v1/sessions?project=${encodeURIComponent(projectRoot)}`,
+			);
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const messageId = crypto.randomUUID();
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Pending page test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: 1_000,
+			});
+			await db.insert(messages).values({
+				id: messageId,
+				sessionId,
+				role: 'assistant',
+				status: 'pending',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				createdAt: 1_000,
+			});
+
+			const response = await app.request(
+				`/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+					projectRoot,
+				)}&parsed=true`,
+			);
+			const page = (await response.json()) as {
+				items: Array<{ id: string; status: string; parts: unknown[] }>;
+				partCount: number;
+				hasMore: boolean;
+			};
+			expect(page.items).toHaveLength(1);
+			expect(page.items[0]).toMatchObject({
+				id: messageId,
+				status: 'pending',
+				parts: [],
+			});
+			expect(page.partCount).toBe(0);
+			expect(page.hasMore).toBe(false);
+		});
+	});
+
+	it('replaces oversized tool results with an artifact reference', async () => {
+		await withProject('otto-message-artifact-', async (projectRoot) => {
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const messageId = crypto.randomUUID();
+			const partId = crypto.randomUUID();
+			const largeContent = JSON.stringify({
+				name: 'read',
+				result: { content: 'x'.repeat(300 * 1024) },
+			});
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Artifact test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: Date.now(),
+			});
+			await db.insert(messages).values({
+				id: messageId,
+				sessionId,
+				role: 'assistant',
+				status: 'complete',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				createdAt: Date.now(),
+			});
+			await db.insert(messageParts).values({
+				id: partId,
+				messageId,
+				index: 0,
+				type: 'tool_result',
+				content: largeContent,
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+			});
+
+			const response = await createEmbeddedApp().request(
+				`/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+					projectRoot,
+				)}&parsed=true`,
+			);
+			const page = (await response.json()) as {
+				items: Array<{
+					parts: Array<{
+						contentTruncated?: boolean;
+						artifactPath?: string;
+					}>;
+				}>;
+			};
+			const part = page.items[0]?.parts[0];
+			expect(part?.contentTruncated).toBe(true);
+			expect(part?.artifactPath).toContain(partId);
+
+			const artifactResponse = await createEmbeddedApp().request(
+				`${part?.artifactPath}?project=${encodeURIComponent(projectRoot)}`,
+			);
+			expect(artifactResponse.status).toBe(200);
+			expect(await artifactResponse.text()).toBe(largeContent);
+		});
+	});
+});

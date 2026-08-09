@@ -463,7 +463,6 @@ const ResearchSidebarContent = memo(function ResearchSidebarContent({
 													key={msg.id}
 													sessionId={activeResearchSessionId}
 													message={msg}
-													isFirst={index === 0}
 													nextAssistantMessageId={
 														nextMsg?.role === 'assistant'
 															? nextMsg.id

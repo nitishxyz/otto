@@ -15,6 +15,7 @@ import { getSessionQueryKey, getSessionsQueryKey } from './useSessions';
 import {
 	getMessagesQueryKey,
 	optimisticMessageMatchesText,
+	updateMessagesCache,
 } from './useMessages';
 import { getProjectKey } from '../lib/api-client/utils';
 import { extractStreamingMultiEditPreviewEdits } from './tool-preview-helpers';
@@ -73,6 +74,12 @@ export function startSessionStreamEngine({
 	const projectScopedKey = <T extends readonly unknown[]>(key: T) =>
 		['project', projectKey, ...key] as const;
 	const messagesQueryKey = getMessagesQueryKey(sessionId);
+	/** Applies a flat-array update to the cursor-paged messages cache. */
+	const updateThreadMessages = (
+		updater: (messages: Message[]) => Message[],
+	) => {
+		updateMessagesCache(queryClient, sessionId, updater);
+	};
 	const queueStateQueryKey = getQueueStateQueryKey(sessionId);
 	const sessionQueryKey = getSessionQueryKey(sessionId);
 	const sessionsQueryKey = getSessionsQueryKey();
@@ -1162,7 +1169,7 @@ export function startSessionStreamEngine({
 		if (pendingDeltas.size === 0) return;
 		const batch = [...pendingDeltas.values()];
 		pendingDeltas.clear();
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			let nextMessages: Message[] | null = null;
 			for (const entry of batch) {
@@ -1297,7 +1304,7 @@ export function startSessionStreamEngine({
 				? payload.partId
 				: `error-${messageId}`;
 
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const nextMessages = [...oldMessages];
 			const messageIndex = nextMessages.findIndex(
@@ -1368,7 +1375,7 @@ export function startSessionStreamEngine({
 			}
 		}
 
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const nextMessages = [...oldMessages];
 			let targetIndex = resolveAssistantTargetIndex(nextMessages);
@@ -1454,7 +1461,7 @@ export function startSessionStreamEngine({
 		const callId = getToolEventCallId(payload);
 		const name = getToolEventName(payload);
 		if (!name) return;
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const nextMessages = [...oldMessages];
 			let targetIndex = resolveAssistantTargetIndex(nextMessages);
@@ -1542,7 +1549,7 @@ export function startSessionStreamEngine({
 		const callId = getToolEventCallId(payload);
 		const name = getToolEventName(payload);
 		if (!name) return;
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const nextMessages = [...oldMessages];
 			let targetIndex = resolveAssistantTargetIndex(nextMessages);
@@ -1635,7 +1642,7 @@ export function startSessionStreamEngine({
 		const payloadResult = payload?.result;
 		const payloadArtifact = payload?.artifact;
 		const payloadArgs = getToolEventArgs(payload);
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			let changed = false;
 			const now = Date.now();
@@ -1692,7 +1699,7 @@ export function startSessionStreamEngine({
 	) => {
 		const callId = getToolEventCallId(payload);
 		if (!callId) return;
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			let changed = false;
 			const nextMessages = oldMessages.map((message) => {
@@ -1710,7 +1717,7 @@ export function startSessionStreamEngine({
 
 	const clearEphemeralForMessage = (messageId: string | null) => {
 		if (!messageId) return;
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const targetIndex = oldMessages.findIndex(
 				(message) => message.id === messageId,
@@ -1740,7 +1747,7 @@ export function startSessionStreamEngine({
 	) => {
 		const id = typeof payload?.id === 'string' ? payload.id : null;
 		if (!id) return;
-		queryClient.setQueryData<Message[]>(messagesQueryKey, (oldMessages) => {
+		updateThreadMessages((oldMessages) => {
 			if (!oldMessages) return oldMessages;
 			const nextMessages = [...oldMessages];
 			const messageIndex = nextMessages.findIndex(
@@ -1809,40 +1816,45 @@ export function startSessionStreamEngine({
 									},
 								]
 							: [];
-					queryClient.setQueryData<Message[]>(
-						messagesQueryKey,
-						(oldMessages) => {
-							if (!oldMessages) return oldMessages;
-							if (oldMessages.some((m) => m.id === id)) return oldMessages;
-							const baseMessages =
-								role === 'user' && content
-									? oldMessages.filter(
-											(message) =>
-												!optimisticMessageMatchesText(message, content),
-										)
-									: oldMessages;
-							const newMessage: Message = {
-								id,
-								sessionId,
-								role: role as Message['role'],
-								status: role === 'user' ? 'complete' : 'pending',
-								agent,
-								provider,
-								model,
-								createdAt: Date.now(),
-								completedAt: null,
-								latencyMs: null,
-								promptTokens: null,
-								completionTokens: null,
-								totalTokens: null,
-								error: null,
-								parts: userParts,
-							};
-							const next = [...baseMessages, newMessage];
+					updateThreadMessages((oldMessages) => {
+						if (!oldMessages) return oldMessages;
+						if (oldMessages.some((m) => m.id === id)) return oldMessages;
+						const baseMessages =
+							role === 'user' && content
+								? oldMessages.filter(
+										(message) =>
+											!optimisticMessageMatchesText(message, content),
+									)
+								: oldMessages;
+						const newMessage: Message = {
+							id,
+							sessionId,
+							role: role as Message['role'],
+							status: role === 'user' ? 'complete' : 'pending',
+							agent,
+							provider,
+							model,
+							createdAt: Date.now(),
+							completedAt: null,
+							latencyMs: null,
+							promptTokens: null,
+							completionTokens: null,
+							totalTokens: null,
+							error: null,
+							parts: userParts,
+						};
+						// Stream events describe the live edge, so a created message
+						// belongs at the tail. Keeping the insertion append-only
+						// means no already-rendered row can change position while a
+						// turn streams; only a clock-skewed event falls back to a
+						// (stable) sort.
+						const next = [...baseMessages, newMessage];
+						const previous = baseMessages[baseMessages.length - 1];
+						if (previous && previous.createdAt > newMessage.createdAt) {
 							next.sort((a, b) => a.createdAt - b.createdAt);
-							return next;
-						},
-					);
+						}
+						return next;
+					});
 				}
 				break;
 			}
@@ -2041,25 +2053,22 @@ export function startSessionStreamEngine({
 					}
 					const error =
 						typeof payload?.error === 'string' ? payload.error : undefined;
-					queryClient.setQueryData<Message[]>(
-						messagesQueryKey,
-						(oldMessages) => {
-							if (!oldMessages) return oldMessages;
-							const idx = oldMessages.findIndex((m) => m.id === id);
-							if (idx === -1) return oldMessages;
-							const next = [...oldMessages];
-							next[idx] = {
-								...next[idx],
-								status: status as Message['status'],
-								completedAt:
-									status === 'pending'
-										? next[idx].completedAt
-										: (next[idx].completedAt ?? Date.now()),
-								error: error ?? next[idx].error,
-							};
-							return next;
-						},
-					);
+					updateThreadMessages((oldMessages) => {
+						if (!oldMessages) return oldMessages;
+						const idx = oldMessages.findIndex((m) => m.id === id);
+						if (idx === -1) return oldMessages;
+						const next = [...oldMessages];
+						next[idx] = {
+							...next[idx],
+							status: status as Message['status'],
+							completedAt:
+								status === 'pending'
+									? next[idx].completedAt
+									: (next[idx].completedAt ?? Date.now()),
+							error: error ?? next[idx].error,
+						};
+						return next;
+					});
 				}
 				break;
 			}

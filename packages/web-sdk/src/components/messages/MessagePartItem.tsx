@@ -37,7 +37,12 @@ import {
 	type ContentJson,
 } from './renderers';
 import { CopyButton } from './renderers/shared';
+import { TruncatedPartNotice } from './TruncatedPartNotice';
 import { useIsCompactThread } from './threadDensity';
+// Single source of truth for "this part has no timeline content". The thread
+// consults the same rules up-front and gives such parts a measurable
+// placeholder row instead of reaching the `null` returns below.
+import { isTodoTool } from './partVisibility';
 
 function getToolCallPayload(part: MessagePart): Record<string, unknown> | null {
 	const fromJson = part.contentJson;
@@ -96,15 +101,6 @@ function normalizeToolName(toolName: string): string {
 
 function isShellTool(toolName: string): boolean {
 	return normalizeToolName(toolName) === 'shell';
-}
-
-function isTodoTool(toolName: string | null | undefined): boolean {
-	return (
-		toolName === 'update_todos' ||
-		toolName === 'update_plan' ||
-		toolName === 'UpdateTodos' ||
-		toolName === 'UpdatePlan'
-	);
 }
 
 function normalizeToolTarget(
@@ -665,7 +661,12 @@ export const MessagePartItem = memo(
 					)}
 				</div>
 
-				<div className={contentClassName}>{renderContent()}</div>
+				<div className={contentClassName}>
+					{renderContent()}
+					{part.contentTruncated && (
+						<TruncatedPartNotice part={part} sessionId={sessionId} />
+					)}
+				</div>
 			</div>
 		);
 	},
@@ -673,6 +674,7 @@ export const MessagePartItem = memo(
 		return (
 			prevProps.part.id === nextProps.part.id &&
 			prevProps.part.content === nextProps.part.content &&
+			prevProps.part.contentTruncated === nextProps.part.contentTruncated &&
 			prevProps.part.ephemeral === nextProps.part.ephemeral &&
 			prevProps.part.completedAt === nextProps.part.completedAt &&
 			prevProps.showLine === nextProps.showLine &&

@@ -171,6 +171,8 @@ const OVERLAY_COMMANDS: Partial<Record<string, Overlay>> = {
 	theme: 'theme',
 	approvals: 'approvals',
 	usage: 'usage',
+	queue: 'queue',
+	'sub-agents': 'subagents',
 };
 
 async function sendServerCommand(

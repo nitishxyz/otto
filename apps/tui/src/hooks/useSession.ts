@@ -189,7 +189,7 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 			content: string,
 			images?: unknown[],
 			files?: unknown[],
-		) => {
+		): Promise<string | null> => {
 			try {
 				setSessionError(null);
 				const response = await createMessage({
@@ -210,8 +210,12 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 						getApiErrorMessage(response.error, 'failed to send message'),
 					);
 				}
+				return typeof response.data?.messageId === 'string'
+					? response.data.messageId
+					: null;
 			} catch (error) {
 				setSessionError(getApiErrorMessage(error, 'failed to send message'));
+				return null;
 			}
 		},
 		[defaultCreateSession?.allowUnknownModel, projectQuery],

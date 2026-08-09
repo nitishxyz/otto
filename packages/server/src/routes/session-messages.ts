@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import type { DB } from '@ottocode/database';
 import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
 	ensureProviderEnv,
@@ -9,7 +10,7 @@ import {
 	type ReasoningLevel,
 	validateProviderModel,
 } from '@ottocode/sdk';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
@@ -34,6 +35,11 @@ const MAX_MESSAGE_ATTACHMENTS = 10;
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_MESSAGE_REQUEST_BYTES = 64 * 1024 * 1024;
+const DEFAULT_MESSAGE_PART_TARGET = 120;
+const MAX_MESSAGE_PART_TARGET = 250;
+const MIN_COMPLETE_TURNS_PER_PAGE = 2;
+const MAX_INLINE_PART_BYTES = 256 * 1024;
+const LARGE_PART_PREVIEW_CHARS = 16 * 1024;
 
 function attachmentPayloadBytes(attachment: unknown): number {
 	if (!attachment || typeof attachment !== 'object') return 0;
@@ -166,6 +172,15 @@ const messageParamsSchema = z.object({
 	}),
 });
 
+const partContentParamsSchema = z.object({
+	id: z.string().openapi({
+		param: { name: 'id', in: 'path' },
+	}),
+	partId: z.string().openapi({
+		param: { name: 'partId', in: 'path' },
+	}),
+});
+
 const toolResultArtifactParamsSchema = z.object({
 	id: z.string().openapi({
 		param: { name: 'id', in: 'path' },
@@ -197,6 +212,213 @@ const listMessagesQuerySchema = projectQuerySchema.extend({
 			param: { name: 'parsed', in: 'query' },
 		}),
 });
+
+const listMessagePageQuerySchema = listMessagesQuerySchema.extend({
+	limit: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(MAX_MESSAGE_PART_TARGET)
+		.default(DEFAULT_MESSAGE_PART_TARGET)
+		.openapi({
+			param: { name: 'limit', in: 'query' },
+			description:
+				'Soft message-part target. Pages always contain complete turns and include at least two turns when available.',
+		}),
+	cursor: z
+		.string()
+		.optional()
+		.openapi({
+			param: { name: 'cursor', in: 'query' },
+			description: 'Opaque cursor returned by the previous page.',
+		}),
+});
+
+const messagePageSchema = z.object({
+	items: z.array(messageSchema),
+	partCount: z.number().int(),
+	hasMore: z.boolean(),
+	nextCursor: z.string().nullable(),
+});
+
+interface MessageCursor {
+	createdAt: number;
+	messageId: string;
+}
+
+function encodeMessageCursor(cursor: MessageCursor) {
+	return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function parseMessageCursor(value: string | undefined): MessageCursor | null {
+	if (!value) return null;
+	try {
+		const parsed = JSON.parse(
+			Buffer.from(value, 'base64url').toString('utf8'),
+		) as Partial<MessageCursor>;
+		return typeof parsed.createdAt === 'number' &&
+			Number.isSafeInteger(parsed.createdAt) &&
+			typeof parsed.messageId === 'string' &&
+			parsed.messageId
+			? (parsed as MessageCursor)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+interface MessageSummary {
+	message: typeof messages.$inferSelect;
+	partCount: number;
+}
+
+function selectCompleteTurnPage(
+	summaries: MessageSummary[],
+	partTarget: number,
+): MessageSummary[] {
+	const turns: MessageSummary[][] = [];
+	let currentTurn: MessageSummary[] = [];
+	for (const summary of summaries) {
+		currentTurn.push(summary);
+		if (summary.message.role === 'user') {
+			turns.push(currentTurn);
+			currentTurn = [];
+		}
+	}
+	if (currentTurn.length > 0) turns.push(currentTurn);
+
+	const selected: MessageSummary[] = [];
+	let selectedParts = 0;
+	let selectedTurns = 0;
+	for (const turn of turns) {
+		const turnParts = turn.reduce(
+			(total, summary) => total + summary.partCount,
+			0,
+		);
+		if (
+			selectedTurns >= MIN_COMPLETE_TURNS_PER_PAGE &&
+			selectedParts + turnParts > partTarget
+		) {
+			break;
+		}
+		selected.push(...turn);
+		selectedParts += turnParts;
+		selectedTurns++;
+	}
+	return selected;
+}
+
+function wantsParsedParts(value: string | undefined): boolean {
+	const normalized = (value || '').toLowerCase();
+	return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+async function serializeMessages(
+	db: DB,
+	rows: Array<typeof messages.$inferSelect>,
+	options: {
+		includeParts: boolean;
+		parsed: boolean;
+		maxInlinePartBytes?: number;
+		parts?: MessagePartRow[];
+	},
+) {
+	const responseRows = rows.map((message) => ({
+		...message,
+		finishDetails: sanitizeInlineImageDataJson(message.finishDetails),
+	}));
+	if (!options.includeParts) return responseRows;
+
+	const ids = rows.map((message) => message.id);
+	const parts =
+		options.parts ??
+		(ids.length
+			? await db
+					.select()
+					.from(messageParts)
+					.where(inArray(messageParts.messageId, ids))
+			: []);
+	const partsByMessage = new Map<string, MessagePartRow[]>();
+	for (const part of parts) {
+		const existing = partsByMessage.get(part.messageId);
+		if (existing) existing.push(part);
+		else partsByMessage.set(part.messageId, [part]);
+	}
+
+	function parseContent(raw: string): Record<string, unknown> | string {
+		try {
+			const value = JSON.parse(String(raw ?? ''));
+			if (value && typeof value === 'object' && !Array.isArray(value)) {
+				return value as Record<string, unknown>;
+			}
+		} catch {}
+		return raw;
+	}
+
+	return responseRows.map((message) => {
+		const messagePartRows = (partsByMessage.get(message.id) ?? []).sort(
+			(left, right) => left.index - right.index,
+		);
+		const mapped = messagePartRows.map((part) => {
+			const parsed = parseContent(part.content);
+			const referenced =
+				part.type === 'tool_result' &&
+				part.toolName === 'browser' &&
+				part.toolCallId &&
+				typeof parsed === 'object'
+					? referenceBrowserScreenshot(
+							parsed,
+							message.sessionId,
+							part.toolCallId,
+						)
+					: parsed;
+			const stripped = stripHeavyAttachmentFields(part.type, referenced);
+			const contentBytes = Buffer.byteLength(part.content, 'utf8');
+			const shouldTruncate =
+				options.maxInlinePartBytes !== undefined &&
+				contentBytes > options.maxInlinePartBytes &&
+				(part.type === 'tool_result' || part.type === 'error');
+			const artifactPath = `/v1/sessions/${encodeURIComponent(
+				message.sessionId,
+			)}/parts/${encodeURIComponent(part.id)}/content`;
+			const responseContent = shouldTruncate
+				? {
+						...(typeof stripped === 'object' &&
+						typeof stripped.name === 'string'
+							? { name: stripped.name }
+							: {}),
+						result: {
+							truncated: true,
+							preview: part.content.slice(0, LARGE_PART_PREVIEW_CHARS),
+							originalBytes: contentBytes,
+							artifactPath,
+						},
+					}
+				: stripped;
+			const content =
+				responseContent === parsed
+					? part.content
+					: JSON.stringify(responseContent);
+			return options.parsed
+				? {
+						...part,
+						content: responseContent,
+						...(shouldTruncate
+							? { contentTruncated: true, contentBytes, artifactPath }
+							: {}),
+					}
+				: {
+						...part,
+						content,
+						contentJson: responseContent,
+						...(shouldTruncate
+							? { contentTruncated: true, contentBytes, artifactPath }
+							: {}),
+					};
+		});
+		return { ...message, parts: mapped };
+	});
+}
 
 const createMessageQuerySchema = projectQuerySchema;
 
@@ -297,67 +519,155 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					.from(messages)
 					.where(eq(messages.sessionId, id))
 					.orderBy(messages.createdAt);
-				const responseRows = rows.map((message) => ({
-					...message,
-					finishDetails: sanitizeInlineImageDataJson(message.finishDetails),
-				}));
-				const without = c.req.query('without');
-				if (without !== 'parts') {
-					const ids = rows.map((m) => m.id);
-					const parts = ids.length
-						? await db
-								.select()
-								.from(messageParts)
-								.where(inArray(messageParts.messageId, ids))
-						: [];
-					const partsByMsg = new Map<string, MessagePartRow[]>();
-					for (const p of parts) {
-						const existing = partsByMsg.get(p.messageId);
-						if (existing) existing.push(p);
-						else partsByMsg.set(p.messageId, [p]);
-					}
-					const wantParsed = (() => {
-						const q = (c.req.query('parsed') || '').toLowerCase();
-						return q === '1' || q === 'true' || q === 'yes';
-					})();
-					function parseContent(raw: string): Record<string, unknown> | string {
-						try {
-							const v = JSON.parse(String(raw ?? ''));
-							if (v && typeof v === 'object' && !Array.isArray(v))
-								return v as Record<string, unknown>;
-						} catch {}
-						return raw;
-					}
-					const enriched = responseRows.map((m) => {
-						const parts = (partsByMsg.get(m.id) ?? []).sort(
-							(a, b) => a.index - b.index,
-						);
-						const mapped = parts.map((p) => {
-							const parsed = parseContent(p.content);
-							const referenced =
-								p.type === 'tool_result' &&
-								p.toolName === 'browser' &&
-								p.toolCallId &&
-								typeof parsed === 'object'
-									? referenceBrowserScreenshot(parsed, id, p.toolCallId)
-									: parsed;
-							const stripped = stripHeavyAttachmentFields(p.type, referenced);
-							const content =
-								stripped === parsed ? p.content : JSON.stringify(stripped);
-							return wantParsed
-								? { ...p, content: stripped }
-								: { ...p, content, contentJson: stripped };
-						});
-						return { ...m, parts: mapped };
-					});
-					return c.json(enriched);
-				}
-				return c.json(responseRows);
+				return c.json(
+					await serializeMessages(db, rows, {
+						includeParts: c.req.query('without') !== 'parts',
+						parsed: wantsParsedParts(c.req.query('parsed')),
+					}),
+				);
 			} catch (error) {
 				logger.error('Failed to list session messages', error);
 				const errorResponse = serializeError(error);
 				return c.json(errorResponse, errorResponse.error.status || 500);
 			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/sessions/{id}/messages/page',
+			tags: ['messages'],
+			operationId: 'listMessagePage',
+			summary: 'List an adaptive newest-first page of message turns and parts',
+			request: {
+				params: messageParamsSchema,
+				query: listMessagePageQuerySchema,
+			},
+			responses: {
+				'200': {
+					description:
+						'A chronological page sized by a soft part target and complete turn boundaries',
+					content: { 'application/json': { schema: messagePageSchema } },
+				},
+				'400': {
+					description: 'Invalid cursor',
+					content: { 'application/json': { schema: messageErrorSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const { db } = await resolveRequestProject(c);
+				const query = listMessagePageQuerySchema.parse({
+					...c.req.query(),
+					limit: c.req.query('limit'),
+					cursor: c.req.query('cursor'),
+				});
+				const cursor = parseMessageCursor(query.cursor);
+				if (query.cursor && !cursor) {
+					return c.json({ error: 'Invalid message cursor' }, 400);
+				}
+				const sessionId = c.req.param('id');
+				const cursorFilter = cursor
+					? or(
+							lt(messages.createdAt, cursor.createdAt),
+							and(
+								eq(messages.createdAt, cursor.createdAt),
+								lt(messages.id, cursor.messageId),
+							),
+						)
+					: undefined;
+				const summaryRows = await db
+					.select({
+						message: messages,
+						partCount: count(messageParts.id),
+					})
+					.from(messages)
+					.leftJoin(messageParts, eq(messageParts.messageId, messages.id))
+					.where(
+						cursorFilter
+							? and(eq(messages.sessionId, sessionId), cursorFilter)
+							: eq(messages.sessionId, sessionId),
+					)
+					.groupBy(messages.id)
+					.orderBy(desc(messages.createdAt), desc(messages.id));
+				const summaries = summaryRows.map((row) => ({
+					message: row.message,
+					partCount: Number(row.partCount),
+				}));
+				const selected = selectCompleteTurnPage(summaries, query.limit);
+				const hasMore = selected.length < summaries.length;
+				const oldest = selected.at(-1)?.message;
+				const rows = selected.map((summary) => summary.message).reverse();
+				const selectedPartCount = selected.reduce(
+					(total, summary) => total + summary.partCount,
+					0,
+				);
+				const items = await serializeMessages(db, rows, {
+					includeParts: query.without !== 'parts',
+					parsed: wantsParsedParts(query.parsed),
+					maxInlinePartBytes: MAX_INLINE_PART_BYTES,
+				});
+				return c.json({
+					items,
+					partCount: selectedPartCount,
+					hasMore,
+					nextCursor:
+						hasMore && oldest
+							? encodeMessageCursor({
+									createdAt: oldest.createdAt,
+									messageId: oldest.id,
+								})
+							: null,
+				});
+			} catch (error) {
+				logger.error('Failed to list session message page', error);
+				const errorResponse = serializeError(error);
+				return c.json(errorResponse, errorResponse.error.status || 500);
+			}
+		},
+	);
+
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'get',
+			path: '/v1/sessions/{id}/parts/{partId}/content',
+			tags: ['messages'],
+			operationId: 'getMessagePartContent',
+			summary: 'Get the complete stored content for a truncated message part',
+			request: {
+				params: partContentParamsSchema,
+				query: projectQuerySchema,
+			},
+			responses: {
+				'200': {
+					description: 'Complete persisted part content',
+					content: { 'text/plain': { schema: z.string() } },
+				},
+				'404': {
+					description: 'Message part not found',
+					content: { 'application/json': { schema: messageErrorSchema } },
+				},
+			},
+		},
+		async (c) => {
+			const { db } = await resolveRequestProject(c);
+			const [part] = await db
+				.select({ content: messageParts.content })
+				.from(messageParts)
+				.innerJoin(messages, eq(messageParts.messageId, messages.id))
+				.where(
+					and(
+						eq(messages.sessionId, c.req.param('id')),
+						eq(messageParts.id, c.req.param('partId')),
+					),
+				)
+				.limit(1);
+			if (!part) return c.json({ error: 'Message part not found' }, 404);
+			return c.text(part.content);
 		},
 	);
 

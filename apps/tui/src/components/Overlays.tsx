@@ -11,11 +11,17 @@ import { SkillsOverlay } from './SkillsOverlay.tsx';
 import { UsageOverlay } from './UsageOverlay.tsx';
 import { AgentsOverlay } from './AgentsOverlay.tsx';
 import { DictationInstallOverlay } from './DictationInstallOverlay.tsx';
+import { QueueOverlay } from './QueueOverlay.tsx';
+import { SubagentsOverlay } from './SubagentsOverlay.tsx';
 import type { Session } from '../types.ts';
+import type { QueuedMessageItem } from '../lib/queue.ts';
+import type { ActivitySubagent } from './activity/types.ts';
 
 interface OverlaysProps {
 	sessions: Session[];
 	hasQueuedMessages: boolean;
+	queuedMessages: QueuedMessageItem[];
+	subagents: ActivitySubagent[];
 	hasMore: boolean;
 	loadingMore: boolean;
 	onLoadMore: () => void;
@@ -30,11 +36,16 @@ interface OverlaysProps {
 	) => void | Promise<void>;
 	currentAgent: string;
 	onAgentSelect: (agent: string) => void | Promise<void>;
+	onSendQueuedMessage: (assistantMessageId: string) => Promise<boolean>;
+	onRemoveQueuedMessage: (assistantMessageId: string) => Promise<boolean>;
+	onSubagentSelect: (subagent: ActivitySubagent) => void;
 }
 
 export const Overlays = memo(function Overlays({
 	sessions,
 	hasQueuedMessages,
+	queuedMessages,
+	subagents,
 	hasMore,
 	loadingMore,
 	onLoadMore,
@@ -47,6 +58,9 @@ export const Overlays = memo(function Overlays({
 	onApprovalModeSave,
 	currentAgent,
 	onAgentSelect,
+	onSendQueuedMessage,
+	onRemoveQueuedMessage,
+	onSubagentSelect,
 }: OverlaysProps) {
 	const overlay = useOverlayStore((s) => s.overlay);
 	const setOverlay = useOverlayStore((s) => s.setOverlay);
@@ -123,6 +137,23 @@ export const Overlays = memo(function Overlays({
 			);
 		case 'usage':
 			return <UsageOverlay currentProvider={provider} onClose={handleClose} />;
+		case 'queue':
+			return (
+				<QueueOverlay
+					items={queuedMessages}
+					onSend={onSendQueuedMessage}
+					onRemove={onRemoveQueuedMessage}
+					onClose={handleClose}
+				/>
+			);
+		case 'subagents':
+			return (
+				<SubagentsOverlay
+					items={subagents}
+					onSelect={onSubagentSelect}
+					onClose={handleClose}
+				/>
+			);
 		case 'dictation':
 			return (
 				<DictationInstallOverlay

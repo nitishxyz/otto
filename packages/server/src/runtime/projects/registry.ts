@@ -48,7 +48,12 @@ interface RegistryStorage {
 }
 
 const TOUCH_DEBOUNCE_MS = 60_000;
+const STATE_DISCOVERY_CACHE_TTL_MS = 5 * 60_000;
 const touchedThisSession = new Map<string, number>();
+const stateDiscoveryCache = new Map<
+	string,
+	{ expiresAt: number; projects: RegisteredProject[] }
+>();
 
 function joinPath(...parts: string[]): string {
 	return parts
@@ -106,10 +111,10 @@ async function discoverStateProjects(
 		if (!entry.isDirectory()) continue;
 		const stateDir = joinPath(storage.projectsRoot, entry.name);
 		try {
-			const dbPathOnDisk = joinPath(stateDir, 'otto.sqlite');
-			if (!(await Bun.file(dbPathOnDisk).exists())) continue;
 			const metadataPath = joinPath(stateDir, 'project.json');
 			if (!(await Bun.file(metadataPath).exists())) continue;
+			const dbPathOnDisk = joinPath(stateDir, 'otto.sqlite');
+			if (!(await Bun.file(dbPathOnDisk).exists())) continue;
 
 			const metadata = (await Bun.file(
 				metadataPath,
@@ -143,6 +148,34 @@ async function discoverStateProjects(
 	}
 
 	return discovered;
+}
+
+async function discoverStateProjectsCached(
+	storage: RegistryStorage,
+	registered: RegisteredProject[],
+	forgottenRoots: string[],
+): Promise<RegisteredProject[]> {
+	const now = Date.now();
+	const cached = stateDiscoveryCache.get(storage.projectsRoot);
+	if (cached && cached.expiresAt > now) {
+		const excludedRoots = new Set([
+			...registered.map((project) => project.path),
+			...forgottenRoots,
+		]);
+		return cached.projects.filter(
+			(project) => !excludedRoots.has(project.path),
+		);
+	}
+	const projects = await discoverStateProjects(
+		storage,
+		registered,
+		forgottenRoots,
+	);
+	stateDiscoveryCache.set(storage.projectsRoot, {
+		expiresAt: now + STATE_DISCOVERY_CACHE_TTL_MS,
+		projects,
+	});
+	return projects;
 }
 
 async function loadRegistry(storage: RegistryStorage): Promise<RegistryFile> {
@@ -267,7 +300,7 @@ export async function touchProject(
 export async function listProjects(): Promise<RegisteredProject[]> {
 	const storage = resolveRegistryStorage();
 	const reg = await loadRegistry(storage);
-	const discovered = await discoverStateProjects(
+	const discovered = await discoverStateProjectsCached(
 		storage,
 		reg.projects,
 		reg.forgottenRoots,

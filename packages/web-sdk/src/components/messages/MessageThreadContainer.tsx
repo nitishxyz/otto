@@ -1,11 +1,12 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMessages } from '../../hooks/useMessages';
+import { getOlderMessagesCursor, useMessages } from '../../hooks/useMessages';
 import { useSessionStream } from '../../hooks/useSessionStream';
 import { getSessionsQueryKey, useSession } from '../../hooks/useSessions';
 import { getQueueStateQueryKey } from '../../hooks/useQueueState';
 import { usePreferences } from '../../hooks/usePreferences';
 import { MessageThread } from './MessageThread';
+import { resolveThreadCompactMode } from './threadCompactMode';
 import { useToolApprovalShortcuts } from '../../hooks/useToolApprovalShortcuts';
 import { OttoRouterTopupModal } from '../settings/OttoRouterTopupModal';
 
@@ -72,13 +73,37 @@ const MessageThreadData = memo(function MessageThreadData({
 	footerBottomPaddingClass,
 	forceCompact,
 }: MessageThreadContainerProps) {
-	const { data: messages = [], isLoading } = useMessages(sessionId);
+	const {
+		data: messages = [],
+		isLoading,
+		fetchNextPage,
+		hasNextPage,
+		isFetchingNextPage,
+	} = useMessages(sessionId);
+	const queryClient = useQueryClient();
 	const session = useSession(sessionId);
 	const { preferences } = usePreferences();
 
-	// Looper orchestrator threads always use the compact renderer so looper's
-	// verify/complete/dispatch tool activity collapses into activity events.
-	const isLooperThread = forceCompact || session?.sessionType === 'looper';
+	const loadOlderMessages = useCallback(() => {
+		if (!hasNextPage || isFetchingNextPage) return;
+		void fetchNextPage();
+	}, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+	// Recomputed whenever the pages change (`messages` identity tracks that), so
+	// the thread always knows which page a prepend would request next.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `messages` is the reactive proxy for the paged cache
+	const olderMessagesCursor = useMemo(
+		() => getOlderMessagesCursor(queryClient, sessionId),
+		[queryClient, sessionId, messages],
+	);
+
+	// Single derivation of the compact-thread flags, so the preference reaches
+	// the row model through exactly one path.
+	const { compact, responsiveCompact } = resolveThreadCompactMode({
+		forceCompact,
+		sessionType: session?.sessionType,
+		compactThreadPreference: preferences.compactThread,
+	});
 
 	const isGenerating = useMemo(
 		() =>
@@ -100,10 +125,14 @@ const MessageThreadData = memo(function MessageThreadData({
 			sessionId={sessionId}
 			session={session}
 			isGenerating={isGenerating}
-			compact={isLooperThread || preferences.compactThread}
-			responsiveCompact={preferences.compactThread}
+			compact={compact}
+			responsiveCompact={responsiveCompact}
 			onSelectSession={onSelectSession}
 			footerBottomPaddingClass={footerBottomPaddingClass}
+			hasOlderMessages={hasNextPage}
+			isLoadingOlderMessages={isFetchingNextPage}
+			onLoadOlderMessages={loadOlderMessages}
+			olderMessagesCursor={olderMessagesCursor}
 		/>
 	);
 });

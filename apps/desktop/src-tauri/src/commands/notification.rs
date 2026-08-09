@@ -185,6 +185,61 @@ fn start_notification_helper_watchdog(owner_pid: Option<u32>) {
 }
 
 #[cfg(target_os = "macos")]
+fn parse_process_elapsed(value: &str) -> Option<Duration> {
+    let (days, clock) = match value.split_once('-') {
+        Some((days, clock)) => (days.parse::<u64>().ok()?, clock),
+        None => (0_u64, value),
+    };
+    let fields = clock
+        .split(':')
+        .map(str::parse::<u64>)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    let seconds = match fields.as_slice() {
+        [minutes, seconds] => minutes.checked_mul(60)?.checked_add(*seconds)?,
+        [hours, minutes, seconds] => hours
+            .checked_mul(60 * 60)?
+            .checked_add(minutes.checked_mul(60)?)?
+            .checked_add(*seconds)?,
+        _ => return None,
+    };
+    Some(Duration::from_secs(
+        days.checked_mul(24 * 60 * 60)?.checked_add(seconds)?,
+    ))
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn cleanup_stale_notification_helpers() {
+    let Ok(output) = Command::new("/bin/ps")
+        .args(["-x", "-o", "pid=", "-o", "etime=", "-o", "command="])
+        .output()
+    else {
+        return;
+    };
+    let Ok(processes) = String::from_utf8(output.stdout) else {
+        return;
+    };
+    for line in processes.lines() {
+        let mut fields = line.split_whitespace();
+        let Some(pid) = fields.next().and_then(|value| value.parse::<u32>().ok()) else {
+            continue;
+        };
+        let Some(elapsed) = fields.next().and_then(parse_process_elapsed) else {
+            continue;
+        };
+        let command = fields.collect::<Vec<_>>().join(" ");
+        if command.contains("--otto-notification-helper")
+            && elapsed >= NOTIFICATION_DEDUP_TTL
+            && pid <= i32::MAX as u32
+        {
+            unsafe {
+                libc::kill(pid as libc::pid_t, libc::SIGTERM);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
 pub fn run_notification_helper(args: &[String]) -> i32 {
     if args.len() < 5 {
         return 2;
@@ -386,7 +441,8 @@ pub fn show_native_notification(
 mod tests {
     #[cfg(target_os = "macos")]
     use super::{
-        notification_helper_owner_pid, notification_helper_should_exit, NOTIFICATION_DEDUP_TTL,
+        notification_helper_owner_pid, notification_helper_should_exit, parse_process_elapsed,
+        NOTIFICATION_DEDUP_TTL,
     };
     use super::{
         notification_target, register_notification, NotificationTarget, PendingNotification,
@@ -481,5 +537,23 @@ mod tests {
         .map(str::to_string);
 
         assert_eq!(notification_helper_owner_pid(&args), Some(4242));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn parses_macos_process_elapsed_times() {
+        assert_eq!(
+            parse_process_elapsed("12:34"),
+            Some(Duration::from_secs(754))
+        );
+        assert_eq!(
+            parse_process_elapsed("02:03:04"),
+            Some(Duration::from_secs(7_384))
+        );
+        assert_eq!(
+            parse_process_elapsed("9-20:11:30"),
+            Some(Duration::from_secs(850_290))
+        );
+        assert_eq!(parse_process_elapsed("bad"), None);
     }
 }

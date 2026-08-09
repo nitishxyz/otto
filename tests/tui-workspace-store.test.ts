@@ -50,4 +50,43 @@ describe('TUI workspace focus', () => {
 			detail: null,
 		});
 	});
+
+	test('opens a detail viewer without opening the activity sidebar', () => {
+		useWorkspaceStore
+			.getState()
+			.openDetail({ kind: 'subagent', id: 'subagent-1' });
+
+		expect(useWorkspaceStore.getState()).toMatchObject({
+			isOpen: false,
+			focus: 'detail',
+			detail: { kind: 'subagent', id: 'subagent-1' },
+		});
+	});
+
+	test('closing the activity sidebar preserves an open detail viewer', () => {
+		useWorkspaceStore.getState().open();
+		useWorkspaceStore
+			.getState()
+			.openDetail({ kind: 'subagent', id: 'subagent-1' });
+		useWorkspaceStore.getState().toggle();
+
+		expect(useWorkspaceStore.getState()).toMatchObject({
+			isOpen: false,
+			focus: 'detail',
+			detail: { kind: 'subagent', id: 'subagent-1' },
+		});
+	});
+
+	test('escape closes a standalone detail viewer back to chat', () => {
+		useWorkspaceStore
+			.getState()
+			.openDetail({ kind: 'subagent', id: 'subagent-1' });
+		useWorkspaceStore.getState().back();
+
+		expect(useWorkspaceStore.getState()).toMatchObject({
+			isOpen: false,
+			focus: 'chat',
+			detail: null,
+		});
+	});
 });

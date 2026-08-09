@@ -84,6 +84,26 @@ export interface MessagePart {
 	toolCallId: string | null;
 	toolDurationMs: number | null;
 	ephemeral?: boolean;
+	/** Set by the paged message route when oversized content was capped. */
+	contentTruncated?: boolean;
+	/** Byte size of the full persisted content when truncated. */
+	contentBytes?: number;
+	/** Route serving the full persisted content of a truncated part. */
+	artifactPath?: string;
+}
+
+/**
+ * One cursor page of session messages, chronological within the page. Pages are
+ * selected as complete user→assistant turns using a soft persisted-part budget.
+ * A message and its parts never split across pages.
+ */
+export interface MessagesPage {
+	items: Message[];
+	/** Authoritative number of persisted parts the server put in this page. */
+	partCount: number;
+	hasMore: boolean;
+	/** Cursor for the next (older) page, or null when the thread starts here. */
+	nextCursor: string | null;
 }
 
 export interface SSEEvent {

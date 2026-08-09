@@ -3,6 +3,7 @@ import { MessageItem } from './MessageItem.tsx';
 import { OttoWordmark } from './OttoWordmark.tsx';
 import { useTheme } from '../theme.ts';
 import type { Message, PendingApproval } from '../types.ts';
+import { getQueuedMessageItems } from '../lib/queue.ts';
 
 interface ChatViewProps {
 	messages: Message[];
@@ -38,25 +39,16 @@ export const ChatView = memo(function ChatView({
 	}, [messages]);
 
 	const queuedUserIds = useMemo(() => {
-		const ids = new Set<string>();
-		for (let i = 0; i < sorted.length; i++) {
-			const msg = sorted[i];
-			if (msg.role === 'user') {
-				const next = sorted[i + 1];
-				if (
-					next &&
-					next.role === 'assistant' &&
-					queuedMessageIds.has(next.id)
-				) {
-					ids.add(msg.id);
-				}
-			}
-		}
-		return ids;
+		return new Set(
+			getQueuedMessageItems(sorted, queuedMessageIds).map(
+				(item) => item.userMessageId,
+			),
+		);
 	}, [sorted, queuedMessageIds]);
 
 	const visibleMessages = useMemo(() => {
 		return sorted.filter((m) => {
+			if (queuedMessageIds.has(m.id) || queuedUserIds.has(m.id)) return false;
 			if (
 				m.role === 'assistant' &&
 				m.status === 'pending' &&
@@ -67,7 +59,7 @@ export const ChatView = memo(function ChatView({
 			}
 			return true;
 		});
-	}, [sorted, streamingMessageId]);
+	}, [sorted, streamingMessageId, queuedMessageIds, queuedUserIds]);
 
 	const approvalsByMessage = useMemo(() => {
 		const map = new Map<string, PendingApproval[]>();
@@ -132,7 +124,6 @@ export const ChatView = memo(function ChatView({
 						key={msg.id}
 						message={msg}
 						isStreaming={msg.id === streamingMessageId}
-						isQueued={queuedUserIds.has(msg.id)}
 						showHeader={showHeader}
 						isFirstMessage={i === 0}
 						pendingApprovals={approvalsByMessage.get(msg.id) ?? EMPTY_APPROVALS}

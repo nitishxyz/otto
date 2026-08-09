@@ -62,6 +62,8 @@ export const COMMANDS: SlashCommand[] = [
 		description: 'Switch agent (build, plan, general, …)',
 	},
 	{ name: 'new', alias: '', description: 'Create a new session' },
+	{ name: 'queue', alias: '', description: 'Manage queued messages' },
+	{ name: 'sub-agents', alias: '', description: 'Open sub-agent list' },
 	{
 		name: 'send',
 		alias: '',

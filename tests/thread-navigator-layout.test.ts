@@ -83,15 +83,25 @@ describe('thread navigator overhang-safe row spacing', () => {
 	// left-edge rail rather than only nudging text.
 	const PL_14_PX = 56; // tailwind pl-14 / pr-14 = 3.5rem = 56px
 
+	// Rows are now flattened (one row per logical block), so the horizontal
+	// inset applies to every row while the turn's bottom padding only lands on
+	// the row that closes the turn.
+	function rowHorizontalClass(density: 'normal' | 'compact'): string {
+		return density === 'compact' ? 'px-2' : 'pl-14 pr-14';
+	}
+
+	function rowBottomClass(
+		density: 'normal' | 'compact',
+		compact: boolean,
+	): string {
+		return density === 'compact' ? 'pb-3' : compact ? 'pb-4' : 'pb-6';
+	}
+
 	function rowOuterClass(
 		density: 'normal' | 'compact',
 		compact: boolean,
 	): string {
-		return density === 'compact'
-			? 'px-2 pb-3'
-			: compact
-				? 'pl-14 pr-14 pb-4'
-				: 'pl-14 pr-14 pb-6';
+		return `${rowHorizontalClass(density)} ${rowBottomClass(density, compact)}`;
 	}
 
 	it('applies symmetric inset to every roomy row (full-width and centered)', () => {

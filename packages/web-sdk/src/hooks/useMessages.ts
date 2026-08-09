@@ -1,11 +1,17 @@
 import {
+	useInfiniteQuery,
 	useMutation,
-	useQuery,
 	useQueryClient,
+	type InfiniteData,
 	type QueryClient,
 } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
-import type { Message, MessagePart, SendMessageRequest } from '../types/api';
+import type {
+	Message,
+	MessagePart,
+	MessagesPage,
+	SendMessageRequest,
+} from '../types/api';
 import {
 	getQueueStateQueryKey,
 	normalizeQueueState,
@@ -17,6 +23,12 @@ import {
 } from './useQueueState';
 import { getSessionsQueryKey } from './useSessions';
 import { projectScopedKey } from '../lib/api-client/utils';
+import {
+	distributeMessagesToPages,
+	mergeMessagePages,
+	reconcileRefetchedPage,
+	sameMessageList,
+} from './messagePageMerge';
 
 interface UseMessagesOptions {
 	enabled?: boolean;
@@ -26,6 +38,18 @@ interface UseMessagesOptions {
 /** Messages stay cached well past the default gcTime so switching back to a
  * recently viewed session renders instantly from cache. */
 const MESSAGES_GC_TIME_MS = 30 * 60_000;
+
+/**
+ * Soft target of persisted message *parts* per cursor page. The route counts
+ * parts but pages by whole user→assistant turns: it returns at least two
+ * complete turns and keeps adding older complete turns while the total stays
+ * under this target, so a page never splits a message and consecutive pages
+ * never overlap.
+ */
+export const MESSAGE_PARTS_PAGE_TARGET = 120;
+
+/** Server-side maximum accepted for the `limit` target. */
+const MAX_MESSAGE_PARTS_PAGE_TARGET = 250;
 
 const OPTIMISTIC_MESSAGE_PREFIX = 'optimistic-user-';
 
@@ -97,6 +121,175 @@ function mergeOptimisticMessages(
 	return [...fresh, ...pending];
 }
 
+export type MessagesInfiniteData = InfiniteData<MessagesPage, string | null>;
+
+function countMessageParts(items: Message[]): number {
+	return items.reduce(
+		(total, message) => total + (message.parts?.length ?? 0),
+		0,
+	);
+}
+
+/**
+ * Migrates the legacy flat-array cache shape used before message pagination.
+ * This is intentionally kept at the cache boundary because a newly-created
+ * session may still be warmed by older application code during an upgrade.
+ */
+export function normalizeMessagesInfiniteData(
+	data: MessagesInfiniteData | Message[] | undefined,
+): MessagesInfiniteData | undefined {
+	if (!data) return undefined;
+	if (!Array.isArray(data)) return data;
+	return {
+		pages: [
+			{
+				items: data,
+				partCount: countMessageParts(data),
+				hasMore: false,
+				nextCursor: null,
+			},
+		],
+		pageParams: [null],
+	};
+}
+
+/** Memoized per pages array so repeated merges keep object identity stable. */
+const flattenedPagesCache = new WeakMap<
+	readonly MessagesPage[],
+	readonly Message[]
+>();
+
+/**
+ * Flattens cursor pages into one chronological thread. Pages are stored
+ * newest-first and hold whole turns, so this is a concatenation that keeps
+ * every already-loaded message object identical; ids that still manage to
+ * repeat (a widened refetch of the newest page) are collapsed defensively into
+ * one message with the newest metadata and the union of every loaded part.
+ */
+export function flattenMessagePages(
+	data: MessagesInfiniteData | Message[] | undefined,
+): Message[] {
+	const normalized = normalizeMessagesInfiniteData(data);
+	if (!normalized?.pages.length) return [];
+	const cached = flattenedPagesCache.get(normalized.pages);
+	if (cached) return cached as Message[];
+	const merged = mergeMessagePages(normalized.pages);
+	flattenedPagesCache.set(normalized.pages, merged);
+	return merged;
+}
+
+/**
+ * Cursor the next (older) page would be fetched with. Used to dedupe repeated
+ * prepend requests for the same page while the user sits at the top.
+ */
+export function getOlderMessagesCursor(
+	queryClient: QueryClient,
+	sessionId: string | undefined,
+): string | null {
+	if (!sessionId) return null;
+	const data = normalizeMessagesInfiniteData(
+		queryClient.getQueryData<MessagesInfiniteData | Message[]>(
+			getMessagesQueryKey(sessionId),
+		),
+	);
+	const oldest = data?.pages.at(-1);
+	return oldest?.hasMore ? (oldest.nextCursor ?? null) : null;
+}
+
+/** Reads the current thread as one chronological array, or undefined when the
+ * session has never been fetched. */
+export function getMessagesFromCache(
+	queryClient: QueryClient,
+	sessionId: string,
+): Message[] | undefined {
+	const data = normalizeMessagesInfiniteData(
+		queryClient.getQueryData<MessagesInfiniteData | Message[]>(
+			getMessagesQueryKey(sessionId),
+		),
+	);
+	if (!data?.pages.length) return undefined;
+	return flattenMessagePages(data);
+}
+
+/**
+ * Updates the paged messages cache through a flat-array updater so callers
+ * (stream engine, optimistic sends, retry) stay page-shape agnostic. Each
+ * message is written back to the page it was loaded from, and untouched pages
+ * are returned by identity so an edit at the live edge cannot invalidate the
+ * older pages above it.
+ */
+export function updateMessagesCache(
+	queryClient: QueryClient,
+	sessionId: string,
+	updater: (messages: Message[]) => Message[],
+) {
+	queryClient.setQueryData<MessagesInfiniteData | Message[]>(
+		getMessagesQueryKey(sessionId),
+		(data) => {
+			const normalized = normalizeMessagesInfiniteData(data);
+			if (!normalized?.pages.length) return normalized;
+			const current = flattenMessagePages(normalized);
+			const next = updater(current);
+			if (next === current || sameMessageList(current, next)) return normalized;
+			const pages = distributeMessagesToPages(normalized.pages, next);
+			return pages ? { ...normalized, pages } : normalized;
+		},
+	);
+}
+
+function createMessagePageQueryOptions(
+	queryClient: QueryClient,
+	sessionId: string,
+) {
+	return {
+		queryKey: getMessagesQueryKey(sessionId),
+		queryFn: async ({ pageParam }: { pageParam: string | null }) => {
+			if (pageParam) {
+				return apiClient.getMessagePage(sessionId, {
+					limit: MESSAGE_PARTS_PAGE_TARGET,
+					cursor: pageParam,
+				});
+			}
+			const cachedData = normalizeMessagesInfiniteData(
+				queryClient.getQueryData<MessagesInfiniteData | Message[]>(
+					getMessagesQueryKey(sessionId),
+				),
+			);
+			// Refetching the newest page must still cover every part it already
+			// holds, otherwise turns that grew since the first fetch would push
+			// older ones past the page window and leave a gap above the next
+			// cursor page. `partCount` is the page's authoritative part total and
+			// stays a soft target: the route still returns whole turns.
+			const limit = Math.min(
+				MAX_MESSAGE_PARTS_PAGE_TARGET,
+				Math.max(
+					MESSAGE_PARTS_PAGE_TARGET,
+					cachedData?.pages[0]?.partCount ?? 0,
+				),
+			);
+			const fresh = await apiClient.getMessagePage(sessionId, { limit });
+			const page = reconcileRefetchedPage(cachedData?.pages[0], fresh);
+			// Only the newest page can hold optimistic sends.
+			const cached = flattenMessagePages(cachedData);
+			return { ...page, items: mergeOptimisticMessages(cached, page.items) };
+		},
+		initialPageParam: null as string | null,
+		getNextPageParam: (lastPage: MessagesPage) =>
+			lastPage.hasMore ? lastPage.nextCursor : null,
+	};
+}
+
+/** Fetches the initial paged thread cache and waits until it is ready. */
+export function fetchSessionMessages(
+	queryClient: QueryClient,
+	sessionId: string,
+) {
+	return queryClient.fetchInfiniteQuery({
+		...createMessagePageQueryOptions(queryClient, sessionId),
+		staleTime: 15_000,
+	});
+}
+
 export function useMessages(
 	sessionId: string | undefined,
 	options: UseMessagesOptions = {},
@@ -104,22 +297,14 @@ export function useMessages(
 	const { enabled = true, staleTime = 15_000 } = options;
 	const queryClient = useQueryClient();
 
-	return useQuery({
+	return useInfiniteQuery({
+		...createMessagePageQueryOptions(queryClient, sessionId ?? ''),
 		queryKey: getMessagesQueryKey(sessionId),
-		queryFn: async () => {
-			if (!sessionId) {
-				throw new Error('Session ID is required');
-			}
-			const fresh = await apiClient.getMessages(sessionId);
-			const cached = queryClient.getQueryData<Message[]>(
-				getMessagesQueryKey(sessionId),
-			);
-			return mergeOptimisticMessages(cached, fresh);
-		},
 		enabled: !!sessionId && enabled,
 		staleTime,
 		gcTime: MESSAGES_GC_TIME_MS,
 		refetchOnWindowFocus: false,
+		select: flattenMessagePages,
 	});
 }
 
@@ -129,9 +314,8 @@ export function prefetchSessionMessages(
 	queryClient: QueryClient,
 	sessionId: string,
 ) {
-	void queryClient.prefetchQuery({
-		queryKey: getMessagesQueryKey(sessionId),
-		queryFn: () => apiClient.getMessages(sessionId),
+	void queryClient.prefetchInfiniteQuery({
+		...createMessagePageQueryOptions(queryClient, sessionId),
 		staleTime: 15_000,
 	});
 	void queryClient.prefetchQuery({
@@ -200,8 +384,7 @@ function insertOptimisticUserMessage(
 	sessionId: string,
 	data: SendMessageRequest,
 ): OptimisticSendContext {
-	const messagesQueryKey = getMessagesQueryKey(sessionId);
-	if (!queryClient.getQueryData<Message[]>(messagesQueryKey)) {
+	if (!getMessagesFromCache(queryClient, sessionId)) {
 		return { optimisticId: null, queued: false };
 	}
 
@@ -234,9 +417,7 @@ function insertOptimisticUserMessage(
 		optimistic: queued ? 'queued' : 'sending',
 	};
 
-	queryClient.setQueryData<Message[]>(messagesQueryKey, (old) =>
-		old ? [...old, message] : old,
-	);
+	updateMessagesCache(queryClient, sessionId, (old) => [...old, message]);
 	if (queued) {
 		queueMessageIdInCache(
 			queryClient,
@@ -254,8 +435,8 @@ function removeOptimisticUserMessage(
 ) {
 	if (!context?.optimisticId) return;
 	const { optimisticId } = context;
-	queryClient.setQueryData<Message[]>(getMessagesQueryKey(sessionId), (old) =>
-		old ? old.filter((message) => message.id !== optimisticId) : old,
+	updateMessagesCache(queryClient, sessionId, (old) =>
+		old.filter((message) => message.id !== optimisticId),
 	);
 	removeQueuedMessageFromCache(queryClient, sessionId, optimisticId);
 }
@@ -270,14 +451,12 @@ function settleOptimisticUserMessage(
 	const { optimisticId } = context;
 	// The send is confirmed: stop showing the sending spinner. The optimistic
 	// row is dropped once the server copy arrives (stream event or refetch).
-	queryClient.setQueryData<Message[]>(getMessagesQueryKey(sessionId), (old) =>
-		old
-			? old.map((message) =>
-					message.id === optimisticId
-						? { ...message, status: 'complete' as const }
-						: message,
-				)
-			: old,
+	updateMessagesCache(queryClient, sessionId, (old) =>
+		old.map((message) =>
+			message.id === optimisticId
+				? { ...message, status: 'complete' as const }
+				: message,
+		),
 	);
 	if (context.queued) {
 		replaceQueuedMessageIdInCache(
@@ -293,8 +472,9 @@ export function useSendMessage(sessionId: string) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: SendMessageRequest) => {
-			await apiClient.markSessionViewed(sessionId).catch(() => undefined);
+		mutationFn: (data: SendMessageRequest) => {
+			// Fire-and-forget: the viewed marker must never delay the send.
+			void apiClient.markSessionViewed(sessionId).catch(() => undefined);
 			return apiClient.sendMessage(sessionId, data);
 		},
 		onMutate: (data: SendMessageRequest): OptimisticSendContext =>

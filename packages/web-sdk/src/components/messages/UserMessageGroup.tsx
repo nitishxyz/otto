@@ -59,7 +59,6 @@ import { StableSpinner } from '../ui/StableSpinner';
 interface UserMessageGroupProps {
 	sessionId?: string;
 	message: Message;
-	isFirst: boolean;
 	nextAssistantMessageId?: string;
 }
 

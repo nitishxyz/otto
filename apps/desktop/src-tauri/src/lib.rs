@@ -74,6 +74,9 @@ fn get_platform() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    commands::notification::cleanup_stale_notification_helpers();
+
     let initial_project = parse_project_arg();
     if let Some(ref p) = initial_project {
         eprintln!("[otto] CLI requested project: {}", p);

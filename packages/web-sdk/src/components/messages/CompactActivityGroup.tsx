@@ -9,6 +9,7 @@ import { useIsCompactThread } from './threadDensity';
 const ANIM_MS = 320;
 const EASING = 'cubic-bezier(0.25, 1, 0.5, 1)';
 const MAX_SCROLL_H = 140;
+const MIN_LIVE_H = 28;
 
 interface CompactActivityGroupProps {
 	entries: CompactActivityEntry[];
@@ -29,13 +30,16 @@ export function CompactActivityGroup({
 	const isCompact = Boolean(compact || isCompactThread);
 	const mountedCollapsed = collapsed && entries.length > 0;
 	const [showSummary, setShowSummary] = useState(mountedCollapsed);
+	const [renderLiveEntries, setRenderLiveEntries] = useState(!mountedCollapsed);
 	const [latched, setLatched] = useState(mountedCollapsed);
 	const contentMeasureRef = useRef<HTMLDivElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const scrollAnimationRef = useRef<number | null>(null);
 	const hoveredRef = useRef(false);
 	const prevCountRef = useRef(entries.length);
-	const [contentHeight, setContentHeight] = useState(0);
+	const [contentHeight, setContentHeight] = useState(
+		mountedCollapsed ? 0 : MIN_LIVE_H,
+	);
 
 	const summary = useMemo(() => summarizeCompactActivities(entries), [entries]);
 	const summaryTitle = titleOverride || summary.title;
@@ -43,11 +47,17 @@ export function CompactActivityGroup({
 	const hasReasoning = entries.some((e) => e.toolName === 'reasoning');
 
 	const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
-	const shouldRenderLiveEntries = !showSummary;
+	const collapseTimerRef = useRef<number | null>(null);
+	const unmountTimerRef = useRef<number | null>(null);
 
 	useEffect(() => {
+		if (collapseTimerRef.current !== null) {
+			window.clearTimeout(collapseTimerRef.current);
+			collapseTimerRef.current = null;
+		}
 		if (!collapsed) {
 			setLatched(false);
+			setRenderLiveEntries(true);
 			setShowSummary(false);
 			return;
 		}
@@ -56,28 +66,63 @@ export function CompactActivityGroup({
 		}
 		if (showSummary) return;
 		if (entries.length === 0) return;
-		const t = window.setTimeout(() => setShowSummary(true), 500);
-		return () => window.clearTimeout(t);
+		collapseTimerRef.current = window.setTimeout(() => {
+			setShowSummary(true);
+			collapseTimerRef.current = null;
+		}, 500);
 	}, [collapsed, showSummary, latched, entries.length]);
+
+	useEffect(() => {
+		if (unmountTimerRef.current !== null) {
+			window.clearTimeout(unmountTimerRef.current);
+			unmountTimerRef.current = null;
+		}
+		if (!showSummary) {
+			setRenderLiveEntries(true);
+			return;
+		}
+		// Keep the measured live content mounted while max-height collapses.
+		// Removing it in the same render makes the box snap to a single line
+		// before the transition can run, which is especially visible in Safari.
+		unmountTimerRef.current = window.setTimeout(() => {
+			setRenderLiveEntries(false);
+			unmountTimerRef.current = null;
+		}, ANIM_MS);
+		return () => {
+			if (unmountTimerRef.current !== null) {
+				window.clearTimeout(unmountTimerRef.current);
+				unmountTimerRef.current = null;
+			}
+		};
+	}, [showSummary]);
 
 	useLayoutEffect(() => {
 		if (showSummary) return;
 		const el = contentMeasureRef.current;
 		if (!el) return;
 		const updateHeight = () => {
-			const nextHeight = Math.min(el.scrollHeight, MAX_SCROLL_H);
+			const nextHeight = Math.min(
+				Math.max(el.scrollHeight, entries.length > 0 ? MIN_LIVE_H : 0),
+				MAX_SCROLL_H,
+			);
 			setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight));
 		};
 		updateHeight();
 		const observer = new ResizeObserver(() => updateHeight());
 		observer.observe(el);
 		return () => observer.disconnect();
-	}, [showSummary]);
+	}, [showSummary, entries.length]);
 
 	useEffect(() => {
 		return () => {
 			if (scrollAnimationRef.current !== null) {
 				window.cancelAnimationFrame(scrollAnimationRef.current);
+			}
+			if (collapseTimerRef.current !== null) {
+				window.clearTimeout(collapseTimerRef.current);
+			}
+			if (unmountTimerRef.current !== null) {
+				window.clearTimeout(unmountTimerRef.current);
 			}
 		};
 	}, []);
@@ -184,6 +229,7 @@ export function CompactActivityGroup({
 							style={{
 								height: `${contentHeight}px`,
 								transition: `height ${ANIM_MS}ms ${EASING}`,
+								willChange: 'height',
 								maskImage:
 									'linear-gradient(to bottom, transparent 0px, black 20px)',
 								WebkitMaskImage:
@@ -197,7 +243,7 @@ export function CompactActivityGroup({
 								hoveredRef.current = false;
 							}}
 						>
-							{shouldRenderLiveEntries && (
+							{renderLiveEntries && (
 								<div ref={contentMeasureRef} className="pt-2.5">
 									{entries.map((entry, i) => {
 										const isLast = i === entries.length - 1;

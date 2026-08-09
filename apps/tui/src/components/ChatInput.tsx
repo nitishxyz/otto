@@ -817,14 +817,6 @@ export function ChatInput({
 								)}
 							</box>
 						)}
-						{queueSize > 0 && (
-							<box style={{ flexDirection: 'row', gap: 1, flexShrink: 0 }}>
-								<text fg={colors.fgDark}>·</text>
-								<text fg={colors.yellow} wrapMode="none">
-									{queueSize} queued
-								</text>
-							</box>
-						)}
 					</box>
 					{hasModelLabel && (
 						<box

@@ -15,7 +15,7 @@ import {
 	Shield,
 	CheckCheck,
 } from 'lucide-react';
-import type { Message, MessagePart } from '../../types/api';
+import type { Message } from '../../types/api';
 import { MessagePartItem } from './MessagePartItem';
 import { CompactActivityGroup } from './CompactActivityGroup';
 import { CompactionSummaryBox } from './CompactionSummaryBox';
@@ -29,10 +29,14 @@ import { StableSpinner } from '../ui/StableSpinner';
 import { useToolApprovalStore } from '../../stores/toolApprovalStore';
 import { apiClient } from '../../lib/api-client';
 import {
-	type CompactActivityEntry,
-	buildCompactActivityEntries,
-	isCompactActivityPart,
-} from './compactActivity';
+	type AssistantRenderItem,
+	PART_WINDOW_HEAD_COUNT,
+	deriveAssistantTurn,
+	getLoadingMessage,
+	getRenderItemKey,
+	isActionToolPart,
+} from './assistantTurnModel';
+import { HiddenAssistantStepsRow } from './HiddenAssistantStepsRow';
 import { useIsCompactThread } from './threadDensity';
 
 interface AssistantMessageGroupProps {
@@ -48,170 +52,6 @@ interface AssistantMessageGroupProps {
 	onRetry?: () => void;
 	onCompact?: () => void;
 	previousUserMessage?: Message;
-}
-
-const loadingMessages = [
-	'Generating...',
-	'Cooking up something...',
-	'Thinking...',
-	'Processing...',
-	'Working on it...',
-	'Crafting response...',
-	'Brewing magic...',
-	'Computing...',
-];
-
-function getLoadingMessage(messageId: string) {
-	const hash = messageId
-		.split('')
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0);
-	return loadingMessages[hash % loadingMessages.length];
-}
-
-const STATUS_LINE_TOOL_NAMES = new Set([
-	'progress_update',
-	'update_status',
-	'update_todos',
-]);
-
-const AUTO_COMPACT_COMPLETED_PART_THRESHOLD = 60;
-const PART_WINDOW_RENDER_THRESHOLD = 90;
-const PART_WINDOW_HEAD_COUNT = 20;
-const PART_WINDOW_TAIL_COUNT = 48;
-
-function isStatusLineTool(toolName: string | null | undefined) {
-	return STATUS_LINE_TOOL_NAMES.has(toolName || '');
-}
-
-function compareMessageParts(a: MessagePart, b: MessagePart) {
-	const indexDiff = (a.index ?? 0) - (b.index ?? 0);
-	if (indexDiff !== 0) return indexDiff;
-	const stepDiff = (a.stepIndex ?? 0) - (b.stepIndex ?? 0);
-	if (stepDiff !== 0) return stepDiff;
-	return (a.startedAt ?? 0) - (b.startedAt ?? 0);
-}
-
-function areMessagePartsOrdered(parts: MessagePart[]) {
-	for (let index = 1; index < parts.length; index++) {
-		if (compareMessageParts(parts[index - 1], parts[index]) > 0) {
-			return false;
-		}
-	}
-	return true;
-}
-
-type AssistantRenderItem =
-	| {
-			kind: 'part';
-			index: number;
-			part: MessagePart;
-	  }
-	| {
-			kind: 'group';
-			id: string;
-			entries: CompactActivityEntry[];
-			titleOverride?: string;
-	  };
-
-interface VisibleAssistantRenderItem {
-	item: AssistantRenderItem;
-	renderIndex: number;
-}
-
-function getVisibleRenderItems(
-	renderItems: AssistantRenderItem[],
-	showAllParts: boolean,
-	messageStatus: Message['status'],
-) {
-	if (
-		showAllParts ||
-		messageStatus === 'pending' ||
-		renderItems.length <= PART_WINDOW_RENDER_THRESHOLD
-	) {
-		return {
-			visibleRenderItems: renderItems.map((item, renderIndex) => ({
-				item,
-				renderIndex,
-			})),
-			omittedRenderItemCount: 0,
-		};
-	}
-
-	const tailStart = Math.max(
-		PART_WINDOW_HEAD_COUNT,
-		renderItems.length - PART_WINDOW_TAIL_COUNT,
-	);
-	const visibleRenderItems: VisibleAssistantRenderItem[] = [];
-	for (
-		let renderIndex = 0;
-		renderIndex < PART_WINDOW_HEAD_COUNT;
-		renderIndex++
-	) {
-		const item = renderItems[renderIndex];
-		if (item) visibleRenderItems.push({ item, renderIndex });
-	}
-	for (
-		let renderIndex = tailStart;
-		renderIndex < renderItems.length;
-		renderIndex++
-	) {
-		const item = renderItems[renderIndex];
-		if (item) visibleRenderItems.push({ item, renderIndex });
-	}
-
-	return {
-		visibleRenderItems,
-		omittedRenderItemCount: Math.max(0, tailStart - PART_WINDOW_HEAD_COUNT),
-	};
-}
-
-function getRenderItemKey(item: AssistantRenderItem) {
-	return item.kind === 'group' ? item.id : item.part.id;
-}
-
-function HiddenAssistantStepsRow({
-	count,
-	onShowAll,
-	compact,
-}: {
-	count: number;
-	onShowAll: () => void;
-	compact?: boolean;
-}) {
-	const isCompactThread = useIsCompactThread();
-	const isCompact = Boolean(compact || isCompactThread);
-
-	return (
-		<div
-			className={`flex ${isCompact ? 'gap-1.5' : 'gap-3'} pb-1.5 relative max-w-full overflow-hidden`}
-		>
-			<div
-				className={`flex-shrink-0 ${isCompact ? 'w-4' : 'w-6'} flex items-start justify-center relative`}
-			>
-				<div
-					className="absolute left-1/2 top-0 bottom-[-0.375rem] -translate-x-1/2 w-[2px] bg-border z-0"
-					aria-hidden="true"
-				/>
-			</div>
-
-			<div className="flex-1 min-w-0">
-				<button
-					type="button"
-					onClick={onShowAll}
-					className="inline-flex max-w-full items-center gap-1.5 py-0.5 text-xs text-muted-foreground/75 transition-colors hover:text-foreground"
-					title={`Show ${count} hidden assistant steps`}
-				>
-					<span className="text-muted-foreground/45">⋯</span>
-					<span className="truncate leading-5">
-						{count} earlier assistant steps collapsed
-					</span>
-					<span className="text-foreground/80 underline decoration-border underline-offset-2">
-						Show
-					</span>
-				</button>
-			</div>
-		</div>
-	);
 }
 
 export const AssistantMessageGroup = memo(
@@ -291,178 +131,25 @@ export const AssistantMessageGroup = memo(
 			}
 		}, [sessionId, messagePendingApprovals, removePendingApproval]);
 
-		// Sort parts by index to maintain correct order when tool results come in
-		const parts = useMemo(() => {
-			const rawParts = message.parts || [];
-			return areMessagePartsOrdered(rawParts)
-				? rawParts
-				: [...rawParts].sort(compareMessageParts);
-		}, [message.parts]);
-		const autoCompactActivity =
-			message.status !== 'pending' &&
-			parts.length >= AUTO_COMPACT_COMPLETED_PART_THRESHOLD;
-		const shouldCompactActivity = Boolean(compact || autoCompactActivity);
-
-		const hasFinish = parts.some((part) => part.toolName === 'finish');
-		const latestProgressUpdateIndex = parts.reduce(
-			(lastIndex, part, index) =>
-				part.type === 'tool_result' && part.toolName === 'progress_update'
-					? index
-					: lastIndex,
-			-1,
+		const {
+			parts,
+			renderItems,
+			visibleRenderItems,
+			omittedRenderItemCount,
+			autoCompactActivity,
+			liveActionToolCallIds,
+			firstVisiblePartIndex,
+			hasVisibleNonProgressParts,
+			latestProgressUpdatePart,
+			latestStatusLineToolCallPart,
+			shouldShowStatusLineToolCall,
+			shouldShowProgressUpdate,
+			shouldShowLoadingFallback,
+			shouldShowErrorFallback,
+		} = useMemo(
+			() => deriveAssistantTurn(message, { compact, isQueued, showAllParts }),
+			[message, compact, isQueued, showAllParts],
 		);
-		const latestProgressUpdatePart =
-			latestProgressUpdateIndex >= 0 ? parts[latestProgressUpdateIndex] : null;
-		const completedToolCallIds = new Set(
-			parts
-				.filter((part) => part.type === 'tool_result' && part.toolCallId)
-				.map((part) => part.toolCallId)
-				.filter((callId): callId is string => Boolean(callId)),
-		);
-		const latestStatusLineToolCallIndex = parts.reduce(
-			(lastIndex, part, index) =>
-				part.type === 'tool_call' &&
-				isStatusLineTool(part.toolName) &&
-				(!part.toolCallId || !completedToolCallIds.has(part.toolCallId))
-					? index
-					: lastIndex,
-			-1,
-		);
-		const latestStatusLineToolCallPart =
-			latestStatusLineToolCallIndex >= 0
-				? parts[latestStatusLineToolCallIndex]
-				: null;
-		const liveActionToolCallIds = new Set(
-			parts
-				.filter(
-					(part) =>
-						part.ephemeral &&
-						[
-							'shell',
-							'bash',
-							'edit',
-							'multiedit',
-							'write',
-							'copy_into',
-							'apply_patch',
-							'terminal',
-						].includes(part.toolName || ''),
-				)
-				.map((part) => part.toolCallId)
-				.filter((callId): callId is string => Boolean(callId)),
-		);
-		const renderItems = useMemo(() => {
-			const items: AssistantRenderItem[] = [];
-			let compactBuffer: MessagePart[] = [];
-			let bufferStartIndex = -1;
-			let pendingTitle: string | undefined;
-
-			const flushCompactBuffer = (nextTitle?: string) => {
-				if (compactBuffer.length === 0) {
-					if (nextTitle) {
-						pendingTitle = nextTitle;
-					}
-					return;
-				}
-
-				const entries = buildCompactActivityEntries(compactBuffer);
-				if (entries.length > 0) {
-					items.push({
-						kind: 'group',
-						id: `compact-${compactBuffer[0].id}`,
-						entries,
-						titleOverride: pendingTitle,
-					});
-				} else {
-					for (const [offset, part] of compactBuffer.entries()) {
-						items.push({
-							kind: 'part',
-							index: bufferStartIndex + offset,
-							part,
-						});
-					}
-				}
-
-				compactBuffer = [];
-				bufferStartIndex = -1;
-				pendingTitle = nextTitle;
-			};
-
-			for (const [index, part] of parts.entries()) {
-				const isProgressUpdate =
-					(part.type === 'tool_result' || part.type === 'tool_call') &&
-					part.toolName === 'progress_update';
-
-				if (isProgressUpdate) {
-					let msg: string | undefined;
-					const payload =
-						part.contentJson && typeof part.contentJson === 'object'
-							? part.contentJson
-							: null;
-					if (payload) {
-						const bucket =
-							(payload as Record<string, unknown>).args ??
-							(payload as Record<string, unknown>).result;
-						if (bucket && typeof bucket === 'object') {
-							const m = (bucket as Record<string, unknown>).message;
-							if (typeof m === 'string' && m.trim()) {
-								msg = m.trim();
-							}
-						}
-					}
-					if (msg) {
-						flushCompactBuffer(msg);
-					}
-					continue;
-				}
-
-				if (isStatusLineTool(part.toolName)) {
-					flushCompactBuffer();
-					continue;
-				}
-
-				if (shouldCompactActivity && isCompactActivityPart(part)) {
-					if (compactBuffer.length === 0) {
-						bufferStartIndex = index;
-					}
-					compactBuffer.push(part);
-					continue;
-				}
-
-				flushCompactBuffer();
-				items.push({ kind: 'part', index, part });
-			}
-
-			flushCompactBuffer();
-			return items;
-		}, [parts, shouldCompactActivity]);
-		const { visibleRenderItems, omittedRenderItemCount } = useMemo(
-			() => getVisibleRenderItems(renderItems, showAllParts, message.status),
-			[renderItems, showAllParts, message.status],
-		);
-		const hasVisibleNonProgressParts = renderItems.length > 0;
-		const firstVisiblePartIndex = parts.findIndex(
-			(part) => !isStatusLineTool(part.toolName),
-		);
-		const shouldShowStatusLineToolCall =
-			message.status === 'pending' &&
-			!hasFinish &&
-			Boolean(latestStatusLineToolCallPart);
-		const shouldShowProgressUpdate =
-			message.status === 'pending' &&
-			!hasFinish &&
-			!latestStatusLineToolCallPart &&
-			Boolean(latestProgressUpdatePart);
-		const shouldShowLoadingFallback =
-			message.status === 'pending' &&
-			!hasFinish &&
-			!latestStatusLineToolCallPart &&
-			!latestProgressUpdatePart &&
-			!isQueued;
-		const shouldShowErrorFallback =
-			message.status === 'error' &&
-			!hasVisibleNonProgressParts &&
-			message.error;
 		const formatTime = (ts?: number) => {
 			if (!ts) return '';
 			const date = new Date(ts);
@@ -548,19 +235,7 @@ export const AssistantMessageGroup = memo(
 				);
 			}
 
-			const isActionTool =
-				part.ephemeral &&
-				(part.type === 'tool_call' || part.type === 'tool_result') &&
-				[
-					'shell',
-					'bash',
-					'edit',
-					'multiedit',
-					'write',
-					'copy_into',
-					'apply_patch',
-					'terminal',
-				].includes(part.toolName || '');
+			const isActionTool = isActionToolPart(part);
 
 			if (isActionTool) {
 				return (

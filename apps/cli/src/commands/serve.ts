@@ -256,7 +256,10 @@ export interface ServeOptions {
 export async function handleServe(opts: ServeOptions, version: string) {
 	await activateProject(opts.project);
 	setServerVersion(version);
-	setDaemonId(process.env.OTTO_DAEMON_ID || null);
+	const daemonId = opts.daemonRegister
+		? process.env.OTTO_DAEMON_ID || crypto.randomUUID()
+		: null;
+	setDaemonId(daemonId);
 	setDefaultProjectRoot(opts.daemonRegister ? null : opts.project);
 	setDaemonRestartHandler(null);
 
@@ -287,7 +290,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	if (opts.daemonRegister) {
 		const { writeDaemonRegistrationFromServer } = await import('../daemon.ts');
 		await writeDaemonRegistrationFromServer({
-			id: process.env.OTTO_DAEMON_ID || crypto.randomUUID(),
+			id: daemonId as string,
 			version,
 			url: `http://127.0.0.1:${serverPort}`,
 			pid: process.pid,

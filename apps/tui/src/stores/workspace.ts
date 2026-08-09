@@ -27,23 +27,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 	detail: null,
 
 	toggle: () => {
-		const { isOpen } = get();
+		const { isOpen, detail } = get();
 		set(
 			isOpen
-				? { isOpen: false, focus: 'chat', detail: null }
+				? { isOpen: false, focus: detail ? 'detail' : 'chat' }
 				: { isOpen: true, focus: 'activity' },
 		);
 	},
 	open: (tab) =>
 		set({ isOpen: true, focus: 'activity', ...(tab ? { tab } : {}) }),
-	close: () => set({ isOpen: false, focus: 'chat', detail: null }),
+	close: () =>
+		set((state) => ({
+			isOpen: false,
+			focus: state.detail ? 'detail' : 'chat',
+		})),
 	setTab: (tab) => set({ tab, focus: 'activity' }),
 	setFocus: (focus) => set({ focus }),
-	openDetail: (detail) => set({ detail, isOpen: true, focus: 'detail' }),
+	openDetail: (detail) => set({ detail, focus: 'detail' }),
 	back: () => {
-		const { focus } = get();
-		if (focus === 'detail') set({ detail: null, focus: 'activity' });
-		else if (focus === 'activity') set({ focus: 'chat' });
+		const { focus, isOpen } = get();
+		if (focus === 'detail') {
+			set({ detail: null, focus: isOpen ? 'activity' : 'chat' });
+		} else if (focus === 'activity') set({ focus: 'chat' });
 	},
 	resetDetail: () => set({ detail: null, focus: 'chat' }),
 }));

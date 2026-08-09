@@ -6,13 +6,16 @@ import {
 	memo,
 	useCallback,
 	useLayoutEffect,
-	type RefObject,
+	type ReactNode,
 } from 'react';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Virtuoso, type Components, type VirtuosoHandle } from 'react-virtuoso';
-import type { Message, MessagePart, Session } from '../../types/api';
-import { AssistantMessageGroup } from './AssistantMessageGroup';
+import {
+	LegendList,
+	type LegendListRef,
+	type LegendListRenderItemProps,
+} from '@legendapp/list/react';
+import type { Message, Session } from '../../types/api';
 import { UserMessageGroup } from './UserMessageGroup';
 import { ThreadNavigatorRail } from './ThreadNavigatorRail';
 import { SessionHeader } from '../sessions/SessionHeader';
@@ -20,19 +23,49 @@ import { LeanHeader } from '../sessions/LeanHeader';
 import { TopupApprovalCard } from './TopupApprovalCard';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useQueueState } from '../../hooks/useQueueState';
-import { getMessagesQueryKey } from '../../hooks/useMessages';
+import { updateMessagesCache } from '../../hooks/useMessages';
 import { useTopupApprovalStore } from '../../stores/topupApprovalStore';
-import {
-	useTodoStore,
-	type TodoItem,
-	type TodoSnapshot,
-} from '../../stores/todoStore';
+import { useTodoStore } from '../../stores/todoStore';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import { useThreadHandoff } from '../../hooks/useSessionHandoff';
 import { ThreadDensityProvider } from './threadDensity';
 import { apiClient } from '../../lib/api-client';
 import { toast } from '../../stores/toastStore';
-import { getUserMessageText, isCompactSlashCommand } from './compactionSummary';
+import {
+	TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT,
+	filterThreadMessages,
+	findLatestTodoSnapshot,
+	getTodoSnapshotScanWindow,
+} from './threadMessageFilters';
+import {
+	buildThreadRows,
+	createThreadRowCache,
+	getThreadRowType,
+	type ThreadRow,
+} from './threadRowModel';
+import {
+	AssistantApprovalsRow,
+	AssistantCompactGroupRow,
+	AssistantErrorRow,
+	AssistantFooterRow,
+	AssistantHeaderRow,
+	AssistantItemRow,
+	AssistantStatusRow,
+} from './ThreadRows';
+import { useMessageHoverHandlers } from './messageHoverStore';
+import {
+	createPrependRequestState,
+	markPrependRequested,
+	markPrependSettled,
+	resetPrependRequests,
+	resolveEndFollow,
+	shouldRequestPrepend,
+} from './threadPrepend';
+import {
+	createThreadFollowState,
+	reduceThreadFollow,
+	type ThreadFollowEvent,
+} from './threadFollowState';
 
 interface MessageThreadProps {
 	messages: Message[];
@@ -44,414 +77,206 @@ interface MessageThreadProps {
 	disableAutoScroll?: boolean;
 	onSelectSession?: (sessionId: string) => void;
 	footerBottomPaddingClass?: string;
+	/** True while older cursor pages remain unfetched. */
+	hasOlderMessages?: boolean;
+	isLoadingOlderMessages?: boolean;
+	onLoadOlderMessages?: () => void;
+	/** Cursor of the next older page; dedupes repeated prepend requests. */
+	olderMessagesCursor?: string | null;
 }
 
-const TODO_TOOL_NAMES = new Set([
-	'update_todos',
-	'update_plan',
-	'UpdateTodos',
-	'UpdatePlan',
-]);
-
-// True bottom tolerance. Auto-follow only resumes when the user is essentially
-// pinned to the bottom, not merely "near" it. Resuming inside a large band is
-// what made the thread yank the user back down mid-stream.
-const BOTTOM_RESUME_THRESHOLD_PX = 8;
 const LEAN_HEADER_HEIGHT_PX = 48;
 const CHAT_INPUT_BOUNDARY_SELECTOR = '[data-chat-input-boundary]';
+/**
+ * First-frame guess only: once rows are measured the list uses a running
+ * average per row *type* (see `getThreadRowType`). It is deliberately closer to
+ * a real part row than to a bare line so the initial layout lands near the
+ * bottom instead of far above it.
+ */
+const ESTIMATED_ROW_SIZE_PX = 88;
+/**
+ * First-frame guess for the list header (session header + the fixed
+ * "load earlier" slot + the top spacer). The measured size replaces it, and the
+ * header's *structure* never changes afterwards.
+ */
+const ESTIMATED_HEADER_SIZE_PX = 96;
+/**
+ * Pre-render buffer around the viewport. Large enough that a fast flick cannot
+ * outrun rendering, small enough that a single frame never has to lay out a
+ * screenful of markdown at once.
+ */
+const DRAW_DISTANCE_PX = 1000;
+/** Fixed height for the "load earlier" slot so a fetch cannot resize the header. */
+const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
+/** Safety net for a prepend whose fetch never reports a loading state. */
+const PREPEND_RELEASE_FALLBACK_MS = 500;
+/** Floor applied to every row so none can measure as a zero-height item. */
+const ROW_MIN_HEIGHT_STYLE = { minHeight: 1 } as const;
+/**
+ * Single, lifetime-stable anchoring config. LegendList is the *only* owner of
+ * the scroll offset: `data` anchors the visible content across a prepend and
+ * `size` across late measurements of rows above the viewport. Toggling this
+ * (or correcting the offset by hand) would put two mechanisms on the same
+ * insertion, which is exactly what the reader saw as a jump.
+ */
+const MAINTAIN_VISIBLE_CONTENT_POSITION = { data: true, size: true } as const;
 
-const TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT = 12;
-const TODO_SNAPSHOT_SCAN_PART_LIMIT = 500;
+type ScrollViewLike = HTMLElement | { getScrollableNode?: () => HTMLElement };
 
-function parseToolResultContent(
-	part: MessagePart,
-): Record<string, unknown> | null {
-	if (part.contentJson && typeof part.contentJson === 'object') {
-		return part.contentJson;
-	}
-	try {
-		const parsed = JSON.parse(part.content);
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {}
-	return null;
+function resolveScrollElement(node: ScrollViewLike | null): HTMLElement | null {
+	if (!node) return null;
+	if (node instanceof HTMLElement) return node;
+	const scrollable = node.getScrollableNode?.();
+	return scrollable instanceof HTMLElement ? scrollable : null;
 }
 
-function isTodoStatus(status: unknown): status is TodoItem['status'] {
-	return (
-		status === 'pending' ||
-		status === 'in_progress' ||
-		status === 'completed' ||
-		status === 'cancelled'
-	);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-	return value && typeof value === 'object' && !Array.isArray(value)
-		? (value as Record<string, unknown>)
-		: null;
-}
-
-function normalizeTodoItems(rawItems: unknown): TodoItem[] | null {
-	if (!Array.isArray(rawItems)) return null;
-	const items = rawItems.flatMap((item): TodoItem[] => {
-		if (typeof item === 'string') {
-			const step = item.trim();
-			return step ? [{ step, status: 'pending' }] : [];
-		}
-		const record = asRecord(item);
-		if (!record) return [];
-		const rawStep =
-			typeof record.step === 'string'
-				? record.step
-				: typeof record.description === 'string'
-					? record.description
-					: '';
-		const step = rawStep.trim();
-		if (!step) return [];
-		return [
-			{
-				step,
-				status: isTodoStatus(record.status) ? record.status : 'pending',
-			},
-		];
-	});
-	return items.length > 0 ? items : null;
-}
-
-function getTodoToolName(
-	part: MessagePart,
-	content: Record<string, unknown> | null,
-) {
-	const name = part.toolName ?? content?.name;
-	return typeof name === 'string' ? name : null;
-}
-
-function parseTodoSnapshot(
-	content: Record<string, unknown>,
-): Omit<TodoSnapshot, 'updatedAt'> | null {
-	const result = asRecord(content.result) ?? content;
-	const args = asRecord(content.args);
-	const sources = [
-		{ rawItems: result.items, note: result.note },
-		{ rawItems: content.items, note: content.note },
-		{ rawItems: args?.todos, note: args?.note },
-	];
-
-	for (const source of sources) {
-		const items = normalizeTodoItems(source.rawItems);
-		if (items) {
-			return {
-				items,
-				note: typeof source.note === 'string' ? source.note : undefined,
-			};
-		}
-	}
-
-	return null;
-}
-
-function isTodoSnapshotDone(snapshot: Omit<TodoSnapshot, 'updatedAt'>) {
-	return (
-		snapshot.items.length > 0 &&
-		snapshot.items.every(
-			(item) => item.status === 'completed' || item.status === 'cancelled',
-		)
-	);
-}
-
-function isQueuedUserMessage(
-	messages: Message[],
-	messageIndex: number,
-	queuedMessageIds: Set<string>,
-) {
-	const nextAssistant = messages
-		.slice(messageIndex + 1)
-		.find((message) => message.role === 'assistant');
-	return Boolean(nextAssistant && queuedMessageIds.has(nextAssistant.id));
-}
-
-function findLatestTodoSnapshot(
-	messages: Message[],
-	queuedMessageIds: Set<string>,
-): Omit<TodoSnapshot, 'updatedAt'> | null {
-	let hasNewerUserMessage = false;
-
-	for (
-		let messageIndex = messages.length - 1;
-		messageIndex >= 0;
-		messageIndex--
-	) {
-		const message = messages[messageIndex];
-		if (
-			message?.role === 'user' &&
-			!isQueuedUserMessage(messages, messageIndex, queuedMessageIds)
-		) {
-			hasNewerUserMessage = true;
-		}
-
-		const parts = message?.parts ?? [];
-		const firstPartIndex = Math.max(
-			0,
-			parts.length - TODO_SNAPSHOT_SCAN_PART_LIMIT,
-		);
-		for (
-			let partIndex = parts.length - 1;
-			partIndex >= firstPartIndex;
-			partIndex--
-		) {
-			const part = parts[partIndex];
-			if (part.type !== 'tool_result') continue;
-			const content = parseToolResultContent(part);
-			const toolName = getTodoToolName(part, content);
-			if (!toolName || !TODO_TOOL_NAMES.has(toolName)) continue;
-			if (!content) return null;
-			const snapshot = parseTodoSnapshot(content);
-			if (!snapshot) return null;
-			if (hasNewerUserMessage && isTodoSnapshotDone(snapshot)) return null;
-			return snapshot;
-		}
-	}
-	return null;
-}
-
-function getTodoSnapshotScanWindow(messages: Message[]) {
-	if (messages.length <= TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT) return messages;
-	return messages.slice(-TODO_SNAPSHOT_SCAN_MESSAGE_LIMIT);
-}
-
-function isVisibleThreadMessage(message: Message) {
-	return (
-		message.role !== 'system' &&
-		!(
-			message.role === 'assistant' &&
-			message.status === 'complete' &&
-			(message.parts?.length ?? 0) === 0
-		)
-	);
-}
-
-function isPendingEmptyAssistant(
-	message: Message,
-	currentMessageId: string | null,
-) {
-	return (
-		message.role === 'assistant' &&
-		message.status === 'pending' &&
-		(message.parts?.length ?? 0) === 0 &&
-		message.id !== currentMessageId
-	);
-}
-
-function isActiveAssistantMessage(
-	message: Message,
-	currentMessageId: string | null,
-	queuedMessageIds: Set<string>,
-) {
-	return (
-		message.role === 'assistant' &&
-		(message.id === currentMessageId ||
-			(message.status === 'pending' && !queuedMessageIds.has(message.id)))
-	);
-}
-
-function filterThreadMessages(
-	messages: Message[],
-	currentMessageId: string | null,
-	queueLength: number,
-	queuedMessageIds: Set<string>,
-) {
-	const visibleMessages = messages.filter(isVisibleThreadMessage);
-	const queueBusy = Boolean(currentMessageId) || queueLength > 0;
-
-	if (!queueBusy) return visibleMessages;
-
-	const nextAssistantByIndex = new Array<Message | undefined>(
-		visibleMessages.length,
-	);
-	let nextAssistant: Message | undefined;
-	for (let index = visibleMessages.length - 1; index >= 0; index--) {
-		nextAssistantByIndex[index] = nextAssistant;
-		const message = visibleMessages[index];
-		if (message?.role === 'assistant') {
-			nextAssistant = message;
-		}
-	}
-
-	const hasEarlierActiveAssistantByIndex = new Array<boolean>(
-		visibleMessages.length,
-	);
-	let hasEarlierActiveAssistant = false;
-	for (let index = 0; index < visibleMessages.length; index++) {
-		hasEarlierActiveAssistantByIndex[index] = hasEarlierActiveAssistant;
-		const message = visibleMessages[index];
-		if (
-			message &&
-			isActiveAssistantMessage(message, currentMessageId, queuedMessageIds)
-		) {
-			hasEarlierActiveAssistant = true;
-		}
-	}
-
-	return visibleMessages.filter((message, index) => {
-		if (message.role === 'assistant') {
-			return !isPendingEmptyAssistant(message, currentMessageId);
-		}
-
-		if (message.role !== 'user') return true;
-
-		const nextAssistant = nextAssistantByIndex[index];
-		if (nextAssistant) {
-			const nextAssistantIsQueued =
-				queuedMessageIds.has(nextAssistant.id) ||
-				isPendingEmptyAssistant(nextAssistant, currentMessageId);
-			return !nextAssistantIsQueued;
-		}
-
-		return !hasEarlierActiveAssistantByIndex[index];
-	});
-}
-
-interface ThreadMessageRowProps {
+interface ThreadRowRendererProps {
+	row: ThreadRow;
 	sessionId?: string;
-	message: Message;
-	previousMessage?: Message;
-	nextMessage?: Message;
-	isFirst: boolean;
-	isLastMessage: boolean;
-	currentMessageId: string | null;
-	queueLength: number;
 	compact: boolean;
-	onSelectSession?: (sessionId: string) => void;
-	createRetryHandler: (messageId: string) => () => Promise<void>;
-	onCompact: () => Promise<void>;
-}
-
-const ThreadMessageRow = memo(function ThreadMessageRow({
-	sessionId,
-	message,
-	previousMessage,
-	nextMessage,
-	isFirst,
-	isLastMessage,
-	currentMessageId,
-	queueLength,
-	compact,
-	onSelectSession,
-	createRetryHandler,
-	onCompact,
-}: ThreadMessageRowProps) {
-	const nextAssistantMessage =
-		nextMessage && nextMessage.role === 'assistant' ? nextMessage : undefined;
-	const hasQueuedOrRunningLaterTurn = Boolean(
-		currentMessageId && currentMessageId !== message.id,
-	);
-	const canRetryTurn =
-		message.role === 'assistant' &&
-		isLastMessage &&
-		!hasQueuedOrRunningLaterTurn &&
-		queueLength === 0;
-	const retryHandler = useMemo(
-		() => (canRetryTurn ? createRetryHandler(message.id) : undefined),
-		[canRetryTurn, createRetryHandler, message.id],
-	);
-
-	if (message.role === 'user') {
-		return (
-			<UserMessageGroup
-				sessionId={sessionId}
-				message={message}
-				isFirst={isFirst}
-				nextAssistantMessageId={nextAssistantMessage?.id}
-			/>
-		);
-	}
-
-	if (message.role === 'assistant') {
-		const previousUserMessage =
-			previousMessage?.role === 'user' ? previousMessage : undefined;
-		const isCompactCommandResult = isCompactSlashCommand(
-			getUserMessageText(previousUserMessage),
-		);
-		const showHeader =
-			!isCompactCommandResult &&
-			(!previousMessage || previousMessage.role !== 'assistant');
-		const nextIsAssistant = Boolean(nextAssistantMessage);
-
-		return (
-			<AssistantMessageGroup
-				sessionId={sessionId}
-				message={message}
-				showHeader={showHeader}
-				hasNextAssistantMessage={nextIsAssistant}
-				isLastMessage={isLastMessage}
-				onBranchCreated={onSelectSession}
-				onNavigateToSession={onSelectSession}
-				onRetry={retryHandler}
-				compact={compact}
-				onCompact={isLastMessage ? onCompact : undefined}
-				previousUserMessage={previousUserMessage}
-			/>
-		);
-	}
-
-	return null;
-});
-
-interface ThreadVirtuosoContext {
-	session?: Session;
-	isGenerating?: boolean;
-	onSelectSession?: (sessionId: string) => void;
-	sessionHeaderRef: RefObject<HTMLDivElement | null>;
-	footerBottomPaddingClass: string;
-	showTopupApproval: boolean;
-	pendingTopup: ReturnType<
-		typeof useTopupApprovalStore.getState
-	>['pendingTopup'];
-	clearPendingTopup: () => void;
-	rowOuterClass: string;
+	rowHorizontalClass: string;
+	rowBottomClass: string;
 	contentWidthClass: string;
+	onSelectSession?: (sessionId: string) => void;
+	onRetryMessage: (messageId: string) => void;
+	onCompact: () => void;
 }
 
-function ThreadVirtuosoHeader({ context }: { context: ThreadVirtuosoContext }) {
-	return (
-		<div ref={context.sessionHeaderRef}>
-			{context.session && (
-				<SessionHeader
-					session={context.session}
-					isGenerating={context.isGenerating}
-					onNavigateToSession={context.onSelectSession}
+/**
+ * Thin wrapper around one row. Nothing here depends on the row's index, so
+ * inserting older pages above the viewport cannot invalidate a single already
+ * rendered row.
+ */
+const ThreadRowRenderer = memo(function ThreadRowRenderer({
+	row,
+	sessionId,
+	compact,
+	rowHorizontalClass,
+	rowBottomClass,
+	contentWidthClass,
+	onSelectSession,
+	onRetryMessage,
+	onCompact,
+}: ThreadRowRendererProps) {
+	const hoverHandlers = useMessageHoverHandlers(row.messageId);
+
+	let content: ReactNode = null;
+	let indented = true;
+
+	switch (row.kind) {
+		case 'user':
+			indented = false;
+			content = (
+				<UserMessageGroup
+					sessionId={sessionId}
+					message={row.message}
+					nextAssistantMessageId={row.nextAssistantMessageId}
 				/>
-			)}
-		</div>
-	);
-}
+			);
+			break;
+		case 'assistant-header':
+			indented = false;
+			content = (
+				<AssistantHeaderRow
+					sessionId={sessionId}
+					message={row.message}
+					onBranchCreated={onSelectSession}
+				/>
+			);
+			break;
+		case 'assistant-item':
+			content = (
+				<AssistantItemRow
+					messageId={row.messageId}
+					part={row.part}
+					variant={row.variant}
+					showLine={row.showLine}
+					isFirstPart={row.isFirstPart}
+					isLiveToolCall={row.isLiveToolCall}
+					isLastMessage={row.isLastMessage}
+					canRetry={row.canRetry}
+					sessionId={sessionId}
+					compact={compact}
+					onNavigateToSession={onSelectSession}
+					onRetryMessage={onRetryMessage}
+					onCompact={onCompact}
+				/>
+			);
+			break;
+		case 'assistant-compact-group':
+			content = (
+				<AssistantCompactGroupRow
+					entries={row.entries}
+					titleOverride={row.titleOverride}
+					collapsed={row.collapsed}
+					showLine={row.showLine}
+				/>
+			);
+			break;
+		case 'assistant-approvals':
+			content = (
+				<AssistantApprovalsRow
+					sessionId={sessionId}
+					messageId={row.messageId}
+				/>
+			);
+			break;
+		case 'assistant-status':
+			content = (
+				<AssistantStatusRow
+					messageId={row.messageId}
+					variant={row.variant}
+					part={row.part}
+					showLine={row.showLine}
+					isFirstPart={row.isFirstPart}
+					compact={compact}
+				/>
+			);
+			break;
+		case 'assistant-error':
+			content = <AssistantErrorRow error={row.error} />;
+			break;
+		case 'assistant-footer':
+			indented = false;
+			content = (
+				<AssistantFooterRow
+					sessionId={sessionId}
+					message={row.message}
+					onBranchCreated={onSelectSession}
+				/>
+			);
+			break;
+		default: {
+			// Compile-time exhaustiveness. A row kind added to the model without
+			// a case here would otherwise render an empty box, which the list
+			// would happily measure as a near-zero item.
+			const unhandled: never = row;
+			throw new Error(`Unhandled thread row: ${(unhandled as ThreadRow).kind}`);
+		}
+	}
 
-function ThreadVirtuosoFooter({ context }: { context: ThreadVirtuosoContext }) {
 	return (
-		<div className={context.footerBottomPaddingClass}>
-			{context.showTopupApproval && context.pendingTopup && (
-				<div className={context.rowOuterClass}>
-					<div className={context.contentWidthClass}>
-						<div className="py-4">
-							<TopupApprovalCard
-								pendingTopup={context.pendingTopup}
-								onMethodSelected={() => context.clearPendingTopup()}
-								onCancel={() => context.clearPendingTopup()}
-							/>
-						</div>
-					</div>
-				</div>
-			)}
+		// biome-ignore lint/a11y/noStaticElementInteractions: hover state for turn actions
+		<div
+			data-thread-row-key={row.key}
+			className={`group ${rowHorizontalClass} ${row.endsTurn ? rowBottomClass : ''}`}
+			// Belt and braces: whatever a row renders, its box stays measurable.
+			// A row that measured zero would let the list average its item sizes
+			// towards zero and mispredict offsets during a fast scroll.
+			style={ROW_MIN_HEIGHT_STYLE}
+			onMouseEnter={hoverHandlers.onMouseEnter}
+			onMouseLeave={hoverHandlers.onMouseLeave}
+		>
+			<div
+				data-smart-edge-ignore="left"
+				data-smart-edge-ignore-mode="content"
+				className={contentWidthClass}
+			>
+				{indented ? <div className="relative ml-1">{content}</div> : content}
+			</div>
 		</div>
 	);
-}
-
-const THREAD_VIRTUOSO_COMPONENTS: Components<Message, ThreadVirtuosoContext> = {
-	Header: ThreadVirtuosoHeader,
-	Footer: ThreadVirtuosoFooter,
-};
+});
 
 export const MessageThread = memo(function MessageThread({
 	messages,
@@ -463,11 +288,15 @@ export const MessageThread = memo(function MessageThread({
 	disableAutoScroll = false,
 	onSelectSession,
 	footerBottomPaddingClass: footerBottomPaddingClassOverride,
+	hasOlderMessages = false,
+	isLoadingOlderMessages = false,
+	onLoadOlderMessages,
+	olderMessagesCursor = null,
 }: MessageThreadProps) {
 	const queryClient = useQueryClient();
 	const { preferences } = usePreferences();
-	const virtuosoRef = useRef<VirtuosoHandle>(null);
-	const scrollContainerRef = useRef<HTMLElement>(null);
+	const listRef = useRef<LegendListRef>(null);
+	const scrollContainerRef = useRef<HTMLElement | null>(null);
 	const sessionHeaderRef = useRef<HTMLDivElement>(null);
 	const threadRootRef = useRef<HTMLDivElement>(null);
 	const threadWidth = useContainerWidth(threadRootRef);
@@ -476,22 +305,30 @@ export const MessageThread = memo(function MessageThread({
 		compact || (responsiveCompact && threadWidth > 0 && threadWidth < 640)
 			? 'compact'
 			: 'normal';
-	const [autoScroll, setAutoScroll] = useState(true);
-	const autoScrollRef = useRef(true);
+	// Follow (end-pin) latch. The ref is the source of truth on the scroll hot
+	// path; only its `following` flag is mirrored into React state, because that
+	// is the single input LegendList's `maintainScrollAtEnd` derives from.
+	const followStateRef = useRef(createThreadFollowState());
+	const [following, setFollowing] = useState(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
 	const [railInsets, setRailInsets] = useState({ top: 0, bottom: 0 });
-	const userScrollingRef = useRef(false);
-	const userScrollTimeoutRef = useRef<
-		ReturnType<typeof setTimeout> | undefined
-	>(undefined);
-	const animationFrameRef = useRef<number | undefined>(undefined);
+	// Row identity is cached per thread instance. A shared cache would let a
+	// second mounted thread (subagent viewer, canvas block, desktop pane) evict
+	// these rows on every rebuild and force LegendList to re-measure everything.
+	const rowCacheRef = useRef(createThreadRowCache());
+	// Prepend bookkeeping: dedupes older-page requests by cursor and suspends
+	// end-following while a page is in flight. It never touches the scroll
+	// offset — LegendList's `maintainVisibleContentPosition` owns that.
+	const prependStateRef = useRef(createPrependRequestState());
+	const prependFetchStartedRef = useRef(false);
+	const [isPrepending, setIsPrepending] = useState(false);
 	const chromeFrameRef = useRef<number | undefined>(undefined);
-	const initialScrollDoneRef = useRef(false);
 	const lastSessionIdRef = useRef<string | undefined>(sessionId);
-	const prevMessagesLengthRef = useRef(messages.length);
-	const prevIsGeneratingRef = useRef(isGenerating);
-	const lastScrollHeightRef = useRef(0);
-	const lastScrollTopRef = useRef(0);
+	// Ids of the optimistic user messages already seen. A *new* one can only
+	// come from this reader pressing send, which is the one non-scroll signal
+	// allowed to re-arm following.
+	const seenOptimisticIdsRef = useRef<Set<string>>(new Set());
+	const optimisticSendsInitializedRef = useRef(false);
 
 	const pendingTopup = useTopupApprovalStore((s) => s.pendingTopup);
 	const clearPendingTopup = useTopupApprovalStore((s) => s.clearPendingTopup);
@@ -536,23 +373,22 @@ export const MessageThread = memo(function MessageThread({
 		}
 	}, [latestTodoSnapshot, messages.length, sessionId, setSessionTodos]);
 
-	const disableAutoFollow = useCallback(() => {
-		autoScrollRef.current = false;
-		userScrollingRef.current = true;
-		setAutoScroll(false);
-		// Kill any queued programmatic scroll frames immediately so a pending
-		// multi-frame scroll burst cannot fight the user's scroll.
-		if (animationFrameRef.current) {
-			cancelAnimationFrame(animationFrameRef.current);
-			animationFrameRef.current = undefined;
-		}
-		if (userScrollTimeoutRef.current) {
-			clearTimeout(userScrollTimeoutRef.current);
-		}
-		userScrollTimeoutRef.current = setTimeout(() => {
-			userScrollingRef.current = false;
-		}, 150);
+	/**
+	 * Single entry point for every follow transition. The latch lives in a ref
+	 * so the scroll hot path stays render-free; only a flip of `following`
+	 * reaches React, because that is the only thing the list reads.
+	 */
+	const dispatchFollow = useCallback((event: ThreadFollowEvent) => {
+		const previous = followStateRef.current;
+		const next = reduceThreadFollow(previous, event);
+		if (next === previous) return;
+		followStateRef.current = next;
+		if (next.following !== previous.following) setFollowing(next.following);
 	}, []);
+
+	const disableAutoFollow = useCallback(() => {
+		dispatchFollow({ type: 'scrolled-up' });
+	}, [dispatchFollow]);
 
 	// Wheel / touch give us an unambiguous "user wants to scroll up" signal that
 	// is impossible to confuse with programmatic follow scrolls. The moment the
@@ -575,31 +411,6 @@ export const MessageThread = memo(function MessageThread({
 			lastTouchYRef.current = y;
 		},
 		[disableAutoFollow],
-	);
-
-	const detachScrollIntentRef = useRef<(() => void) | undefined>(undefined);
-	const attachScrollIntentListeners = useCallback(
-		(element: HTMLElement | null) => {
-			if (detachScrollIntentRef.current) {
-				detachScrollIntentRef.current();
-				detachScrollIntentRef.current = undefined;
-			}
-			scrollContainerRef.current = element;
-			if (!element) return;
-			element.addEventListener('wheel', handleWheelIntent, { passive: true });
-			element.addEventListener('touchstart', handleTouchStartIntent, {
-				passive: true,
-			});
-			element.addEventListener('touchmove', handleTouchMoveIntent, {
-				passive: true,
-			});
-			detachScrollIntentRef.current = () => {
-				element.removeEventListener('wheel', handleWheelIntent);
-				element.removeEventListener('touchstart', handleTouchStartIntent);
-				element.removeEventListener('touchmove', handleTouchMoveIntent);
-			};
-		},
-		[handleWheelIntent, handleTouchStartIntent, handleTouchMoveIntent],
 	);
 
 	const updateRailInsets = useCallback(
@@ -658,27 +469,15 @@ export const MessageThread = memo(function MessageThread({
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-		// Programmatic follow scrolls only ever move downward, so a decrease in
-		// scrollTop is always user-initiated. Use a small tolerance so trackpad
-		// nudges still count.
-		const userScrolledUp = scrollTop < lastScrollTopRef.current - 2;
-
-		lastScrollHeightRef.current = scrollHeight;
-		lastScrollTopRef.current = scrollTop;
-
-		if (userScrolledUp && distanceFromBottom > BOTTOM_RESUME_THRESHOLD_PX) {
-			disableAutoFollow();
-		} else if (distanceFromBottom <= BOTTOM_RESUME_THRESHOLD_PX) {
-			// Back at the true bottom → resume following.
-			autoScrollRef.current = true;
-			userScrollingRef.current = false;
-			setAutoScroll(true);
-		}
+		// Read-only sampling: this listener never writes the scroll offset, and
+		// the latch decides on its own whether the sample counts as reader
+		// intent. Crucially, a sample can only *resume* following when the
+		// offset itself moved downward onto the true bottom, so the content-size
+		// churn of a streaming turn can never re-arm it.
+		dispatchFollow({ type: 'scrolled', scrollTop, distanceFromBottom });
 
 		// The lean header + rail insets need getBoundingClientRect reads, which
-		// force synchronous layout. Running them on every scroll event while
-		// Virtuoso is also writing scroll offsets causes layout thrash and the
-		// "bouncy" feel mid-stream. Coalesce to at most one update per frame.
+		// force synchronous layout. Coalesce to at most one update per frame.
 		if (chromeFrameRef.current !== undefined) return;
 		chromeFrameRef.current = requestAnimationFrame(() => {
 			chromeFrameRef.current = undefined;
@@ -690,11 +489,47 @@ export const MessageThread = memo(function MessageThread({
 				const headerRect = headerElement.getBoundingClientRect();
 				const containerRect = scroller.getBoundingClientRect();
 				nextShowLeanHeader = headerRect.bottom < containerRect.top;
-				setShowLeanHeader(nextShowLeanHeader);
+			} else {
+				// No session (embedded thread): fall back to a scroll offset check.
+				nextShowLeanHeader = scroller.scrollTop > LEAN_HEADER_HEIGHT_PX;
 			}
+			setShowLeanHeader(nextShowLeanHeader);
 			updateRailInsets(nextShowLeanHeader);
 		});
-	}, [disableAutoFollow, showLeanHeader, updateRailInsets]);
+	}, [dispatchFollow, showLeanHeader, updateRailInsets]);
+
+	const detachScrollIntentRef = useRef<(() => void) | undefined>(undefined);
+	const attachScrollIntentListeners = useCallback(
+		(node: ScrollViewLike | null) => {
+			if (detachScrollIntentRef.current) {
+				detachScrollIntentRef.current();
+				detachScrollIntentRef.current = undefined;
+			}
+			const element = resolveScrollElement(node);
+			scrollContainerRef.current = element;
+			if (!element) return;
+			element.addEventListener('wheel', handleWheelIntent, { passive: true });
+			element.addEventListener('touchstart', handleTouchStartIntent, {
+				passive: true,
+			});
+			element.addEventListener('touchmove', handleTouchMoveIntent, {
+				passive: true,
+			});
+			element.addEventListener('scroll', handleScroll, { passive: true });
+			detachScrollIntentRef.current = () => {
+				element.removeEventListener('wheel', handleWheelIntent);
+				element.removeEventListener('touchstart', handleTouchStartIntent);
+				element.removeEventListener('touchmove', handleTouchMoveIntent);
+				element.removeEventListener('scroll', handleScroll);
+			};
+		},
+		[
+			handleWheelIntent,
+			handleTouchStartIntent,
+			handleTouchMoveIntent,
+			handleScroll,
+		],
+	);
 
 	useLayoutEffect(() => {
 		updateRailInsets(showLeanHeader);
@@ -723,124 +558,65 @@ export const MessageThread = memo(function MessageThread({
 		};
 	}, [showLeanHeader, updateRailInsets]);
 
-	const scrollToThreadBottom = useCallback(
-		(behavior: ScrollBehavior = 'auto') => {
-			virtuosoRef.current?.scrollTo({
-				top: Number.MAX_SAFE_INTEGER,
-				behavior,
-			});
-		},
-		[],
-	);
-
-	const scheduleScrollToThreadBottom = useCallback(
-		(behavior: ScrollBehavior = 'auto', frames = 2) => {
-			if (animationFrameRef.current) {
-				cancelAnimationFrame(animationFrameRef.current);
-			}
-
-			let remainingFrames = Math.max(1, frames);
-			const tick = () => {
-				// The user may have scrolled away between frames; stop the burst
-				// instead of yanking them back to the bottom.
-				if (!autoScrollRef.current) {
-					animationFrameRef.current = undefined;
-					return;
-				}
-				scrollToThreadBottom(behavior);
-				remainingFrames -= 1;
-				if (remainingFrames > 0) {
-					animationFrameRef.current = requestAnimationFrame(tick);
-					return;
-				}
-				animationFrameRef.current = undefined;
-			};
-
-			animationFrameRef.current = requestAnimationFrame(tick);
-		},
-		[scrollToThreadBottom],
-	);
-
-	// Immediate scroll to bottom on initial load or session change
+	// The list mounts per session (`key={sessionId}`) and lands at the bottom
+	// through its own `initialScrollAtEnd`. This effect only resets the
+	// per-session bookkeeping — it never scrolls. A competing imperative
+	// scroll burst races the list's first layout, and that race is what showed
+	// up as blank rows on session open.
 	useLayoutEffect(() => {
-		if (disableAutoScroll) return;
-
-		const sessionChanged = sessionId !== lastSessionIdRef.current;
+		if (sessionId === lastSessionIdRef.current) return;
 		lastSessionIdRef.current = sessionId;
+		dispatchFollow({ type: 'reset' });
+		seenOptimisticIdsRef.current = new Set();
+		optimisticSendsInitializedRef.current = false;
+		setIsPrepending(false);
+		prependFetchStartedRef.current = false;
+		resetPrependRequests(prependStateRef.current);
+		setShowLeanHeader(false);
+		setRailInsets({ top: 0, bottom: 0 });
+	}, [sessionId, dispatchFollow]);
 
-		if (sessionChanged) {
-			initialScrollDoneRef.current = false;
-			userScrollingRef.current = false;
-			lastScrollHeightRef.current = 0;
-			lastScrollTopRef.current = 0;
-			setShowLeanHeader(false);
-			setRailInsets({ top: 0, bottom: 0 });
-		}
-
-		if (!initialScrollDoneRef.current && filteredMessages.length > 0) {
-			initialScrollDoneRef.current = true;
-			autoScrollRef.current = true;
-			setAutoScroll(true);
-			scheduleScrollToThreadBottom('auto', 6);
-		}
-	}, [
-		filteredMessages.length,
-		sessionId,
-		disableAutoScroll,
-		scheduleScrollToThreadBottom,
-	]);
-
+	// The *only* content-driven re-arm: this reader pressing send. An optimistic
+	// user message appears exactly once per send from this client, which makes
+	// it a real intent signal — unlike "a turn started generating", which also
+	// fires for queued turns and for work this reader never asked to watch.
+	// One imperative scroll, never a loop, and never while a prepend is in
+	// flight.
 	useEffect(() => {
-		if (disableAutoScroll) return;
-
-		const justStartedGenerating = isGenerating && !prevIsGeneratingRef.current;
-		const messagesAdded = messages.length > prevMessagesLengthRef.current;
-
-		prevIsGeneratingRef.current = isGenerating;
-		prevMessagesLengthRef.current = messages.length;
-
-		// Scroll to bottom when generation starts (user just sent a message)
-		if (justStartedGenerating) {
-			userScrollingRef.current = false;
-			autoScrollRef.current = true;
-			setAutoScroll(true);
-			scheduleScrollToThreadBottom('auto', 4);
-		} else if (
-			messagesAdded &&
-			!userScrollingRef.current &&
-			!isGenerating &&
-			autoScrollRef.current
-		) {
-			// Only follow new messages if the user is still in follow mode; never
-			// force-resume and yank a reader who scrolled up.
-			scheduleScrollToThreadBottom('auto', 2);
+		const seen = seenOptimisticIdsRef.current;
+		const live = new Set<string>();
+		let didSend = false;
+		// Optimistic sends are always appended, so they form a contiguous run at
+		// the tail. Scanning backwards keeps this O(sends) instead of O(thread)
+		// on every streamed delta.
+		for (let index = messages.length - 1; index >= 0; index--) {
+			const message = messages[index];
+			if (!message.optimistic) break;
+			if (message.role !== 'user') continue;
+			live.add(message.id);
+			if (!seen.has(message.id)) didSend = true;
 		}
+		seenOptimisticIdsRef.current = live;
+		// The first pass only records what was already in the cache: mounting a
+		// thread that happens to hold an in-flight send is not a send.
+		if (!optimisticSendsInitializedRef.current) {
+			optimisticSendsInitializedRef.current = true;
+			return;
+		}
+		if (!didSend || disableAutoScroll) return;
+		if (isPrepending || isLoadingOlderMessages) return;
+		dispatchFollow({ type: 'bottom-requested' });
+		void listRef.current?.scrollToEnd({ animated: false });
 	}, [
-		messages.length,
-		isGenerating,
+		messages,
 		disableAutoScroll,
-		scheduleScrollToThreadBottom,
+		isPrepending,
+		isLoadingOlderMessages,
+		dispatchFollow,
 	]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: messages dep needed for streaming content updates
-	useLayoutEffect(() => {
-		if (disableAutoScroll) return;
-		// `autoScrollRef` is the single source of truth for "should follow". It is
-		// flipped off the instant the user scrolls up (wheel/touch/scrollbar) and
-		// back on only when they return to the true bottom, so this no longer
-		// fights the user mid-stream.
-		if (!autoScrollRef.current || userScrollingRef.current) return;
-		scheduleScrollToThreadBottom('auto', 1);
-	}, [messages, disableAutoScroll, scheduleScrollToThreadBottom]);
 
 	useEffect(() => {
 		return () => {
-			if (userScrollTimeoutRef.current) {
-				clearTimeout(userScrollTimeoutRef.current);
-			}
-			if (animationFrameRef.current) {
-				cancelAnimationFrame(animationFrameRef.current);
-			}
 			if (chromeFrameRef.current !== undefined) {
 				cancelAnimationFrame(chromeFrameRef.current);
 				chromeFrameRef.current = undefined;
@@ -852,24 +628,10 @@ export const MessageThread = memo(function MessageThread({
 		};
 	}, []);
 
-	const scrollToBottom = () => {
-		userScrollingRef.current = false;
-		autoScrollRef.current = true;
-		setAutoScroll(true);
-		scheduleScrollToThreadBottom('auto', 3);
-	};
-
-	const handleNavigateToIndex = useCallback(
-		(index: number) => {
-			disableAutoFollow();
-			virtuosoRef.current?.scrollToIndex({
-				index,
-				align: 'start',
-				behavior: 'smooth',
-			});
-		},
-		[disableAutoFollow],
-	);
+	const scrollToBottom = useCallback(() => {
+		dispatchFollow({ type: 'bottom-requested' });
+		void listRef.current?.scrollToEnd({ animated: true });
+	}, [dispatchFollow]);
 
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
@@ -882,89 +644,45 @@ export const MessageThread = memo(function MessageThread({
 	// mode. The whole assistant turn (avatar/header pill, timeline, text) starts
 	// at the row's left padding edge, so reserve a symmetric horizontal inset on
 	// the row wrapper wide enough to clear the rail on the left and mirror it on
-	// the right. This shifts the ENTIRE group, not just text, and works for both
-	// full-width and near-full centered layouts (where auto margins can collapse
-	// to ~0 and otherwise let the rail overlap the avatar). Use explicit
-	// pl-*/pr-* only (never px-* + pl-*) to avoid Tailwind padding-left
-	// conflicts. Compact density keeps the thin far-left dots, so it stays on the
-	// tight px-2 spacing.
-	const rowOuterClass =
-		density === 'compact'
-			? 'px-2 pb-3'
-			: compact
-				? 'pl-14 pr-14 pb-4'
-				: 'pl-14 pr-14 pb-6';
+	// the right. Use explicit pl-*/pr-* only (never px-* + pl-*) to avoid
+	// Tailwind padding-left conflicts. Compact density keeps the thin far-left
+	// dots, so it stays on the tight px-2 spacing.
+	const rowHorizontalClass = density === 'compact' ? 'px-2' : 'pl-14 pr-14';
+	const rowBottomClass =
+		density === 'compact' ? 'pb-3' : compact ? 'pb-4' : 'pb-6';
 	const firstRowTopClass =
 		density === 'compact' ? 'pt-3' : compact ? 'pt-4' : 'pt-6';
 	const footerBottomPaddingClass =
 		footerBottomPaddingClassOverride ??
 		(density === 'compact' || compact ? 'pb-80' : 'pb-96');
-	const virtuosoContext = useMemo<ThreadVirtuosoContext>(
-		() => ({
-			session,
-			isGenerating,
-			onSelectSession,
-			sessionHeaderRef,
-			footerBottomPaddingClass,
-			showTopupApproval: Boolean(showTopupApproval),
-			pendingTopup,
-			clearPendingTopup,
-			rowOuterClass,
-			contentWidthClass,
-		}),
-		[
-			session,
-			isGenerating,
-			onSelectSession,
-			footerBottomPaddingClass,
-			showTopupApproval,
-			pendingTopup,
-			clearPendingTopup,
-			rowOuterClass,
-			contentWidthClass,
-		],
-	);
 
 	// Create a retry handler for error messages
-	const createRetryHandler = useCallback(
+	const handleRetryMessage = useCallback(
 		(messageId: string) => {
-			return async () => {
-				if (!sessionId) return;
-				if (!messageId) return;
+			if (!sessionId || !messageId) return;
 
-				queryClient.setQueryData<Message[]>(
-					getMessagesQueryKey(sessionId),
-					(oldMessages) => {
-						if (!oldMessages) return oldMessages;
-						return oldMessages.map((msg) => {
-							if (msg.id !== messageId) return msg;
-							const partsToKeep =
-								msg.parts?.filter(
-									(part: { type: string; toolName?: string }) => {
-										if (part.type === 'error') return false;
-										if (part.type === 'tool_call' && part.toolName === 'finish')
-											return false;
-										return true;
-									},
-								) ?? [];
-							return {
-								...msg,
-								status: 'pending',
-								parts: partsToKeep,
-								error: null,
-							};
-						});
-					},
-				);
+			updateMessagesCache(queryClient, sessionId, (oldMessages) =>
+				oldMessages.map((msg) => {
+					if (msg.id !== messageId) return msg;
+					const partsToKeep =
+						msg.parts?.filter((part) => {
+							if (part.type === 'error') return false;
+							if (part.type === 'tool_call' && part.toolName === 'finish')
+								return false;
+							return true;
+						}) ?? [];
+					return {
+						...msg,
+						status: 'pending' as const,
+						parts: partsToKeep,
+						error: null,
+					};
+				}),
+			);
 
-				try {
-					await apiClient.retryMessage(sessionId, messageId);
-				} catch (error) {
-					toast.error(
-						error instanceof Error ? error.message : 'Failed to retry',
-					);
-				}
-			};
+			void apiClient.retryMessage(sessionId, messageId).catch((error) => {
+				toast.error(error instanceof Error ? error.message : 'Failed to retry');
+			});
 		},
 		[sessionId, queryClient],
 	);
@@ -977,6 +695,233 @@ export const MessageThread = memo(function MessageThread({
 			toast.error(error instanceof Error ? error.message : 'Failed to compact');
 		}
 	}, [sessionId]);
+
+	const { rows, rowIndexByMessageIndex } = useMemo(
+		() =>
+			buildThreadRows({
+				messages: filteredMessages,
+				sessionId,
+				compact,
+				currentMessageId: queueState.currentMessageId,
+				queueLength: queueState.queueLength,
+				queuedMessageIds,
+				cache: rowCacheRef.current,
+			}),
+		[
+			filteredMessages,
+			sessionId,
+			compact,
+			queueState.currentMessageId,
+			queueState.queueLength,
+			queuedMessageIds,
+		],
+	);
+
+	// A settled fetch releases the latch. The cursor stays recorded so a burst
+	// of `onStartReached` cannot re-request the same page; a *new* page
+	// advances the cursor, which unlatches naturally. Releasing never scrolls:
+	// the inserted rows were already anchored by the list itself.
+	useEffect(() => {
+		if (isLoadingOlderMessages) {
+			prependFetchStartedRef.current = true;
+			return;
+		}
+		if (!isPrepending) {
+			markPrependSettled(prependStateRef.current);
+			return;
+		}
+		if (prependFetchStartedRef.current) {
+			prependFetchStartedRef.current = false;
+			markPrependSettled(prependStateRef.current);
+			setIsPrepending(false);
+			return;
+		}
+		// Safety net: a page answered straight from cache may never flip the
+		// loading flag, and a stuck suspension would leave end-following off for
+		// good. Release late rather than never — still without scrolling.
+		const handle = setTimeout(() => {
+			markPrependSettled(prependStateRef.current);
+			setIsPrepending(false);
+		}, PREPEND_RELEASE_FALLBACK_MS);
+		return () => clearTimeout(handle);
+	}, [isLoadingOlderMessages, isPrepending]);
+
+	const handleNavigateToIndex = useCallback(
+		(messageIndex: number) => {
+			disableAutoFollow();
+			const rowIndex = rowIndexByMessageIndex[messageIndex] ?? 0;
+			void listRef.current?.scrollToIndex({
+				index: rowIndex,
+				viewPosition: 0,
+				animated: true,
+			});
+		},
+		[disableAutoFollow, rowIndexByMessageIndex],
+	);
+
+	/**
+	 * Asks for the next older page. `onStartReached` fires repeatedly while the
+	 * reader sits inside the start threshold — the list owns that hysteresis,
+	 * this owns the cursor latch, so exactly one fetch per page goes out.
+	 *
+	 * Nothing here measures or writes the scroll offset: the page is inserted
+	 * above the viewport and LegendList's `maintainVisibleContentPosition`
+	 * keeps the visible content exactly where it was.
+	 */
+	const requestOlderMessages = useCallback(() => {
+		if (
+			!shouldRequestPrepend(prependStateRef.current, {
+				token: olderMessagesCursor,
+				hasOlder: hasOlderMessages,
+				isLoading: isLoadingOlderMessages,
+			})
+		) {
+			return;
+		}
+		markPrependRequested(prependStateRef.current, olderMessagesCursor);
+		// Rows arriving above the viewport must never be mistaken for "new
+		// content at the bottom", so end-following stands down until the fetch
+		// settles. It is released without scrolling.
+		setIsPrepending(true);
+		onLoadOlderMessages?.();
+	}, [
+		olderMessagesCursor,
+		hasOlderMessages,
+		isLoadingOlderMessages,
+		onLoadOlderMessages,
+	]);
+
+	// End-following is native and only enabled while the reader is genuinely
+	// pinned to the bottom; a prepend forces it off for its whole window.
+	const maintainScrollAtEnd = resolveEndFollow({
+		disabled: disableAutoScroll,
+		atEnd: following,
+		prepending: isPrepending || isLoadingOlderMessages,
+	});
+
+	const keyExtractor = useCallback((row: ThreadRow) => row.key, []);
+	const rowsAreEqual = useCallback(
+		(previous: ThreadRow, next: ThreadRow) => previous === next,
+		[],
+	);
+	// Rows differ in height by an order of magnitude (a one-line suppressed
+	// placeholder vs. a long markdown answer vs. a collapsed activity summary).
+	// Typing them by *presentation* lets the list keep a size average per
+	// class, so the offsets it predicts for not-yet-measured rows during a fast
+	// flick stay close to reality instead of collapsing to one global average —
+	// which is what shows up as a blank row.
+	const getItemType = useCallback(
+		(row: ThreadRow) => getThreadRowType(row),
+		[],
+	);
+
+	const renderRow = useCallback(
+		({ item }: LegendListRenderItemProps<ThreadRow>) => (
+			<ThreadRowRenderer
+				row={item}
+				sessionId={sessionId}
+				compact={compact}
+				rowHorizontalClass={rowHorizontalClass}
+				rowBottomClass={rowBottomClass}
+				contentWidthClass={contentWidthClass}
+				onSelectSession={onSelectSession}
+				onRetryMessage={handleRetryMessage}
+				onCompact={handleCompact}
+			/>
+		),
+		[
+			sessionId,
+			compact,
+			rowHorizontalClass,
+			rowBottomClass,
+			contentWidthClass,
+			onSelectSession,
+			handleRetryMessage,
+			handleCompact,
+		],
+	);
+
+	// The header's *structure* is invariant for the whole session: the session
+	// header, a fixed-height "load earlier" slot and the top spacer are always
+	// mounted, in that order. Only the slot's contents change (button ↔ spinner
+	// ↔ nothing), never its height and never the composition — so a page
+	// landing, or `hasOlderMessages` flipping to false, cannot shift every row
+	// below the header.
+	const listHeader = useMemo(
+		() => (
+			<>
+				{session && (
+					<div ref={sessionHeaderRef}>
+						<SessionHeader
+							session={session}
+							isGenerating={isGenerating}
+							onNavigateToSession={onSelectSession}
+						/>
+					</div>
+				)}
+				<div
+					className={`flex items-center justify-center ${PREPEND_SLOT_HEIGHT_CLASS}`}
+				>
+					{hasOlderMessages ? (
+						<button
+							type="button"
+							onClick={requestOlderMessages}
+							disabled={isLoadingOlderMessages}
+							className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-70"
+						>
+							<Loader2
+								className={`h-3 w-3 ${
+									isLoadingOlderMessages ? 'animate-spin' : 'opacity-0'
+								}`}
+							/>
+							{isLoadingOlderMessages
+								? 'Loading earlier messages…'
+								: 'Load earlier messages'}
+						</button>
+					) : null}
+				</div>
+				<div className={firstRowTopClass} />
+			</>
+		),
+		[
+			hasOlderMessages,
+			isLoadingOlderMessages,
+			requestOlderMessages,
+			session,
+			isGenerating,
+			onSelectSession,
+			firstRowTopClass,
+		],
+	);
+
+	const listFooter = useMemo(
+		() => (
+			<div className={footerBottomPaddingClass}>
+				{showTopupApproval && pendingTopup && (
+					<div className={`${rowHorizontalClass} ${rowBottomClass}`}>
+						<div className={contentWidthClass}>
+							<div className="py-4">
+								<TopupApprovalCard
+									pendingTopup={pendingTopup}
+									onMethodSelected={() => clearPendingTopup()}
+									onCancel={() => clearPendingTopup()}
+								/>
+							</div>
+						</div>
+					</div>
+				)}
+			</div>
+		),
+		[
+			footerBottomPaddingClass,
+			showTopupApproval,
+			pendingTopup,
+			clearPendingTopup,
+			rowHorizontalClass,
+			rowBottomClass,
+			contentWidthClass,
+		],
+	);
 
 	if (messages.length === 0) {
 		return (
@@ -999,55 +944,32 @@ export const MessageThread = memo(function MessageThread({
 					/>
 				)}
 
-				<Virtuoso
-					ref={virtuosoRef}
-					className="flex-1 scrollbar-hide"
-					data={filteredMessages}
-					atBottomThreshold={100}
-					increaseViewportBy={{ top: 2400, bottom: 1600 }}
-					minOverscanItemCount={{ top: 4, bottom: 3 }}
-					initialTopMostItemIndex={{
-						index: Math.max(0, filteredMessages.length - 1),
-						align: 'end',
-					}}
-					followOutput={(isAtBottom) =>
-						autoScrollRef.current && isAtBottom ? 'auto' : false
-					}
-					scrollerRef={(ref) => {
-						attachScrollIntentListeners(
-							ref instanceof HTMLElement ? ref : null,
-						);
-					}}
-					onScroll={handleScroll}
-					computeItemKey={(_, message) => message.id}
-					components={THREAD_VIRTUOSO_COMPONENTS}
-					context={virtuosoContext}
-					itemContent={(idx, message) => (
-						<div
-							className={`${rowOuterClass} ${idx === 0 ? firstRowTopClass : ''}`}
-						>
-							<div
-								data-smart-edge-ignore="left"
-								data-smart-edge-ignore-mode="content"
-								className={contentWidthClass}
-							>
-								<ThreadMessageRow
-									sessionId={sessionId}
-									message={message}
-									previousMessage={filteredMessages[idx - 1]}
-									nextMessage={filteredMessages[idx + 1]}
-									isFirst={idx === 0}
-									isLastMessage={idx === filteredMessages.length - 1}
-									currentMessageId={queueState.currentMessageId}
-									queueLength={queueState.queueLength}
-									compact={compact}
-									onSelectSession={onSelectSession}
-									createRetryHandler={createRetryHandler}
-									onCompact={handleCompact}
-								/>
-							</div>
-						</div>
-					)}
+				<LegendList
+					// Remounting per session is what scopes `initialScrollAtEnd` to the
+					// initial load: prepends reuse the same mount and never re-apply it.
+					key={sessionId ?? 'thread'}
+					ref={listRef}
+					className="scrollbar-hide"
+					style={{ flex: 1, minHeight: 0, height: '100%' }}
+					data={rows}
+					keyExtractor={keyExtractor}
+					itemsAreEqual={rowsAreEqual}
+					getItemType={getItemType}
+					renderItem={renderRow}
+					estimatedItemSize={ESTIMATED_ROW_SIZE_PX}
+					estimatedHeaderSize={ESTIMATED_HEADER_SIZE_PX}
+					drawDistance={DRAW_DISTANCE_PX}
+					recycleItems={false}
+					// Sole owner of the initial position; no imperative burst races it.
+					initialScrollAtEnd
+					maintainScrollAtEnd={maintainScrollAtEnd}
+					// Never toggled: one anchoring owner for the list's whole lifetime.
+					maintainVisibleContentPosition={MAINTAIN_VISIBLE_CONTENT_POSITION}
+					onStartReached={requestOlderMessages}
+					onStartReachedThreshold={0.4}
+					ListHeaderComponent={listHeader}
+					ListFooterComponent={listFooter}
+					refScrollView={attachScrollIntentListeners}
 				/>
 
 				{preferences.threadNavigatorRail && (
@@ -1061,7 +983,7 @@ export const MessageThread = memo(function MessageThread({
 				)}
 
 				{/* Scroll to bottom button - only shown when user has scrolled up */}
-				{!autoScroll && (
+				{!following && (
 					<button
 						type="button"
 						onClick={scrollToBottom}

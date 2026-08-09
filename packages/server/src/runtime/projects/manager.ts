@@ -77,7 +77,10 @@ export class ProjectManager {
 
 		const cfg = await loadConfig(root);
 		const db = await getDb(cfg.projectRoot);
-		recoverInterruptedRuns(db, getServerInfo().startedAt);
+		const serverInfo = getServerInfo();
+		if (serverInfo.daemonId) {
+			recoverInterruptedRuns(db, serverInfo.startedAt);
+		}
 		await touchProject(cfg.projectRoot, cfg.paths.dbPath);
 		const terminalManager = new TerminalManager();
 

@@ -99,6 +99,8 @@ export type Overlay =
 	| 'skills'
 	| 'agents'
 	| 'usage'
+	| 'queue'
+	| 'subagents'
 	| 'dictation';
 
 export interface AppState {

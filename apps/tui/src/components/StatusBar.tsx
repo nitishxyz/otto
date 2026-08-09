@@ -3,7 +3,6 @@ import { useTheme } from '../theme.ts';
 interface StatusBarProps {
 	sessionTitle: string | null;
 	projectRoot?: string | null;
-	queueSize?: number;
 	contextTokens?: number;
 	estimatedCost?: number;
 	contextUsagePercent?: number;
@@ -28,7 +27,6 @@ export function formatContextUsage(
 export function StatusBar({
 	sessionTitle,
 	projectRoot,
-	queueSize = 0,
 	contextTokens = 0,
 	estimatedCost = 0,
 	contextUsagePercent = 0,
@@ -82,12 +80,6 @@ export function StatusBar({
 					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
 						<text fg={colors.fgDimmed}> </text>
 						<text fg={colors.blue}>{projectName}</text>
-					</box>
-				)}
-				{queueSize > 0 && (
-					<box style={{ flexDirection: 'row', flexShrink: 0 }}>
-						<text fg={colors.fgDimmed}> │ </text>
-						<text fg={colors.yellow}>{queueSize} queued</text>
 					</box>
 				)}
 				{contextTokens > 0 && (

@@ -82,6 +82,8 @@ class ApiClient {
 	removeFromQueue = sessionsMixin.removeFromQueue;
 	sendQueuedMessageNow = sessionsMixin.sendQueuedMessageNow;
 	getMessages = sessionsMixin.getMessages;
+	getMessagePage = sessionsMixin.getMessagePage;
+	getMessagePartContent = sessionsMixin.getMessagePartContent;
 	sendMessage = sessionsMixin.sendMessage;
 	getStreamUrl = sessionsMixin.getStreamUrl;
 	retryMessage = sessionsMixin.retryMessage;
