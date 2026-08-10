@@ -64,11 +64,6 @@ export const COMMANDS: SlashCommand[] = [
 	{ name: 'new', alias: '', description: 'Create a new session' },
 	{ name: 'queue', alias: '', description: 'Manage queued messages' },
 	{ name: 'sub-agents', alias: '', description: 'Open sub-agent list' },
-	{
-		name: 'send',
-		alias: '',
-		description: 'Send a queued message now (/send [position])',
-	},
 	{ name: 'stop', alias: '/x', description: 'Stop current generation' },
 	{ name: 'help', alias: '/?', description: 'Show this help' },
 	{ name: 'reasoning', alias: '', description: 'Toggle extended thinking' },
@@ -140,15 +135,13 @@ export function recipeSlashCommands(
 	});
 }
 
-/** Returns slash commands available for the current queue state. */
+/** Returns slash commands matching the current query. */
 export function getCommandSuggestions(
 	query: string,
-	hasQueuedMessages: boolean,
 	extraCommands: SlashCommand[] = [],
 ): SlashCommand[] {
 	const normalizedQuery = query.toLowerCase();
 	return [...COMMANDS, ...extraCommands].filter((command) => {
-		if (command.name === 'send' && !hasQueuedMessages) return false;
 		return (
 			!normalizedQuery ||
 			command.name.startsWith(normalizedQuery) ||

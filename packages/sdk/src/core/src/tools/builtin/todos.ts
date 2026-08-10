@@ -10,14 +10,14 @@ const STATUS_ENUM = z.enum([
 ]);
 
 const TODO_SCHEMA = z
-	.union([
-		z.string().min(1, 'Todo steps must be non-empty'),
-		z.object({
-			step: z.string().min(1, 'Todo steps must be non-empty'),
-			status: STATUS_ENUM.optional(),
-		}),
-	])
-	.describe('Todo item');
+	.object({
+		step: z
+			.string()
+			.min(1, 'Todo steps must be non-empty')
+			.describe('Plain-text task description'),
+		status: STATUS_ENUM.optional(),
+	})
+	.describe('Structured todo item');
 
 type TodoItemInput = z.infer<typeof TODO_SCHEMA>;
 
@@ -25,9 +25,6 @@ function normalizeItems(
 	raw: TodoItemInput[],
 ): Array<{ step: string; status: z.infer<typeof STATUS_ENUM> }> {
 	const normalized = raw.map((item) => {
-		if (typeof item === 'string') {
-			return { step: item.trim(), status: 'pending' as const };
-		}
 		const step = item.step.trim();
 		const status = item.status ?? 'pending';
 		return { step, status };

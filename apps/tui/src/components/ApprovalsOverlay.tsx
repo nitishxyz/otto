@@ -1,7 +1,13 @@
 import { useKeyboard } from '@opentui/react';
 import { useCallback, useState } from 'react';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
-import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 const APPROVAL_OPTIONS = [
 	{
@@ -52,11 +58,11 @@ export function ApprovalsOverlay({
 	}, []);
 
 	useKeyboard((key) => {
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			const next =
 				selectedIdx <= 0 ? APPROVAL_OPTIONS.length - 1 : selectedIdx - 1;
 			navigate(next);
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			const next =
 				selectedIdx >= APPROVAL_OPTIONS.length - 1 ? 0 : selectedIdx + 1;
 			navigate(next);
@@ -68,18 +74,27 @@ export function ApprovalsOverlay({
 			onClose();
 		}
 	});
+	const visibleWindow = useListModalWindow(
+		APPROVAL_OPTIONS.length,
+		selectedIdx,
+	);
+	const visibleOptions = APPROVAL_OPTIONS.slice(
+		visibleWindow.start,
+		visibleWindow.end,
+	);
 
 	return (
 		<ModalFrame
 			title="Tool approvals"
 			size="md"
-			footer="Up/Down move · Enter save · Esc close"
+			footer="↑/k · ↓/j move · Enter save · Esc close"
 		>
 			<text fg={colors.fgMuted}>
 				YOLO skips prompts but still blocks catastrophic commands like rm -rf /
 			</text>
-			<box style={{ flexDirection: 'column', gap: 0 }}>
-				{APPROVAL_OPTIONS.map((option, index) => {
+			<ModalListViewport rowCount={visibleOptions.length}>
+				{visibleOptions.map((option, offset) => {
+					const index = visibleWindow.start + offset;
 					const isSelected = index === selectedIdx;
 					const isCurrent = option.id === currentMode;
 					return (
@@ -93,7 +108,7 @@ export function ApprovalsOverlay({
 						/>
 					);
 				})}
-			</box>
+			</ModalListViewport>
 		</ModalFrame>
 	);
 }

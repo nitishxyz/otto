@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { useTerminalDimensions } from '@opentui/react';
 import { TinySpinner } from './TinySpinner.tsx';
 import { useTheme } from '../theme.ts';
 import { ToolCallItem } from './ToolCallItem.tsx';
@@ -13,6 +14,7 @@ import {
 import { NARROW_RAIL_BORDER_CHARS } from './rail.ts';
 import {
 	buildMessageBlocks,
+	estimateWrappedLineCount,
 	extractPartText,
 	messagePartKey,
 } from '../lib/message-blocks.ts';
@@ -146,21 +148,60 @@ const PartRenderer = memo(function PartRenderer({
 
 const ReasoningBlockRenderer = memo(function ReasoningBlockRenderer({
 	parts,
+	expanded,
 }: {
 	parts: MessagePart[];
+	expanded: boolean;
 }) {
 	const { colors } = useTheme();
+	const { width: terminalWidth } = useTerminalDimensions();
 	const text = parts
 		.map(extractPartText)
 		.filter(Boolean)
-		.join(' ')
-		.replace(/\s+/g, ' ')
+		.join('\n')
+		.replace(/\r/g, '')
 		.trim();
 	if (!text) return null;
+	const summary = text.replace(/\s+/g, ' ');
+	const contentWidth = Math.max(
+		20,
+		Math.floor((terminalWidth || (process.stdout.columns ?? 120)) * 0.65) - 8,
+	);
+	const contentRows = estimateWrappedLineCount(text, contentWidth, 5);
+	const panelHeight = 1 + contentRows;
+
+	if (expanded) {
+		return (
+			<box
+				style={{
+					width: '100%',
+					height: panelHeight,
+					flexDirection: 'column',
+					backgroundColor: colors.bgSubtle,
+					paddingLeft: 1,
+					paddingRight: 1,
+				}}
+			>
+				<text fg={colors.fgMuted}>
+					<b>Thinking…</b>
+				</text>
+				<scrollbox
+					style={{ width: '100%', flexGrow: 1 }}
+					stickyScroll
+					stickyStart="bottom"
+					viewportCulling
+				>
+					<text fg={colors.fgDark} wrapMode="word">
+						{text}
+					</text>
+				</scrollbox>
+			</box>
+		);
+	}
 
 	return (
 		<text fg={colors.fgDark} wrapMode="none" truncate>
-			Thought: {text}
+			Thought: {summary}
 		</text>
 	);
 });
@@ -551,7 +592,10 @@ const AssistantMessage = memo(function AssistantMessage({
 						) : block.kind === 'todos' ? (
 							<TodoListCard part={block.part} />
 						) : block.kind === 'reasoning' ? (
-							<ReasoningBlockRenderer parts={block.parts} />
+							<ReasoningBlockRenderer
+								parts={block.parts}
+								expanded={isActive && block.key === lastBlock?.key}
+							/>
 						) : (
 							<PartRenderer
 								part={block.part}

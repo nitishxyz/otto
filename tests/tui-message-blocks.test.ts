@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
 	buildMessageBlocks,
+	estimateWrappedLineCount,
 	extractPartText,
 } from '../apps/tui/src/lib/message-blocks.ts';
 import type { MessagePart } from '../apps/tui/src/types.ts';
@@ -21,6 +22,12 @@ function part(
 }
 
 describe('TUI message blocks', () => {
+	test('estimates reasoning panel height from content with a cap', () => {
+		expect(estimateWrappedLineCount('short thought', 40, 5)).toBe(1);
+		expect(estimateWrappedLineCount('1234567890', 4, 5)).toBe(3);
+		expect(estimateWrappedLineCount('a\nb\nc\nd\ne\nf', 40, 5)).toBe(5);
+	});
+
 	test('groups adjacent reasoning parts into one block', () => {
 		const blocks = buildMessageBlocks([
 			part('reason-1', 'reasoning', 'First thought'),

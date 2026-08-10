@@ -5,8 +5,14 @@ import {
 	updateSkillsConfig as updateSkillsConfigApi,
 } from '@ottocode/api';
 import { getProjectQuery } from '../api.ts';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
-import { getVisibleWindow, ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 type SkillSummary = {
 	name: string;
@@ -146,6 +152,12 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 		);
 	}, [rows.length]);
 
+	useEffect(() => {
+		if (!status) return;
+		const timeout = setTimeout(() => setStatus(null), 1500);
+		return () => clearTimeout(timeout);
+	}, [status]);
+
 	const mutate = useCallback(
 		async (input: {
 			enabled?: boolean;
@@ -190,11 +202,11 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 			onClose();
 			return;
 		}
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			setSelectedIdx((current) => Math.max(0, current - 1));
 			return;
 		}
-		if (key.name === 'down') {
+		if (isListDownKey(key)) {
 			setSelectedIdx((current) =>
 				Math.min(rowsRef.current.length - 1, current + 1),
 			);
@@ -212,7 +224,7 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 	const footerText =
 		error ??
 		status ??
-		'Up/Down navigate · Space toggle · R refresh · Esc close';
+		'↑/k · ↓/j navigate · Space toggle · R refresh · Esc close';
 
 	type DisplayRow =
 		| { type: 'global'; rowIndex: 0 }
@@ -244,10 +256,9 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 			(row) => row.type !== 'header' && row.rowIndex === selectedIdx,
 		),
 	);
-	const visibleWindow = getVisibleWindow(
+	const visibleWindow = useListModalWindow(
 		displayRows.length,
 		selectedDisplayIndex,
-		20,
 	);
 	const visibleRows = displayRows.slice(visibleWindow.start, visibleWindow.end);
 
@@ -255,17 +266,16 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 		<ModalFrame
 			title={`Skills ${enabledCount}/${totalCount}`}
 			size="lg"
-			fill
 			footer={footerText}
 		>
-			<box flexDirection="column" flexGrow={1} overflow="hidden">
+			<box flexDirection="column" overflow="hidden">
 				{loading ? (
-					<box flexGrow={1} alignItems="center" justifyContent="center">
+					<box height={3} alignItems="center" justifyContent="center">
 						<text fg={colors.fgMuted}>Loading skills…</text>
 					</box>
 				) : error ? (
 					<box
-						flexGrow={1}
+						height={3}
 						alignItems="center"
 						justifyContent="center"
 						flexDirection="column"
@@ -274,7 +284,7 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 					</box>
 				) : totalCount === 0 ? (
 					<box
-						flexGrow={1}
+						height={3}
 						alignItems="center"
 						justifyContent="center"
 						flexDirection="column"
@@ -285,14 +295,11 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 						</text>
 					</box>
 				) : (
-					<box flexDirection="column" flexGrow={1}>
-						{visibleWindow.start > 0 && (
-							<text fg={colors.fgMuted}>↑ {visibleWindow.start} more</text>
-						)}
+					<ModalListViewport rowCount={visibleRows.length}>
 						{visibleRows.map((row) => {
 							if (row.type === 'header') {
 								return (
-									<box key={`h-${row.scope}`} height={1} paddingLeft={3}>
+									<box key={`h-${row.scope}`} height={1} paddingLeft={2}>
 										<text fg={colors.fgMuted}>
 											<b>{row.label}</b>
 										</text>
@@ -307,7 +314,13 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 										active={isSelected}
 										title="All skills"
 										footer={
-											saving && isSelected ? '…' : globalEnabled ? 'ON' : 'OFF'
+											<text fg={globalEnabled ? colors.green : colors.fgDark}>
+												{saving && isSelected
+													? '…'
+													: globalEnabled
+														? 'ON'
+														: 'OFF'}
+											</text>
 										}
 									/>
 								);
@@ -315,25 +328,20 @@ export function SkillsOverlay({ onClose }: SkillsOverlayProps) {
 
 							const isSelected = selectedIdx === row.rowIndex;
 							const enabled = row.skill.enabled !== false;
-							const description = row.skill.description
-								? row.skill.description.slice(0, 72)
-								: undefined;
 							return (
 								<SelectRow
 									key={`${row.skill.scope}-${row.skill.name}`}
 									active={isSelected}
 									title={row.skill.name}
-									description={description}
-									footer={saving && isSelected ? '…' : enabled ? 'ON' : 'OFF'}
+									footer={
+										<text fg={enabled ? colors.green : colors.fgDark}>
+											{saving && isSelected ? '…' : enabled ? 'ON' : 'OFF'}
+										</text>
+									}
 								/>
 							);
 						})}
-						{visibleWindow.end < displayRows.length && (
-							<text fg={colors.fgMuted}>
-								↓ {displayRows.length - visibleWindow.end} more
-							</text>
-						)}
-					</box>
+					</ModalListViewport>
 				)}
 			</box>
 		</ModalFrame>

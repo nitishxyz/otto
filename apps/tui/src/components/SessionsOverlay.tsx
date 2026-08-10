@@ -1,8 +1,14 @@
-import { useKeyboard, useRenderer } from '@opentui/react';
-import { useState, useEffect, useRef } from 'react';
+import { useKeyboard } from '@opentui/react';
+import { useEffect, useState } from 'react';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
 import type { Session } from '../types.ts';
-import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 interface SessionsOverlayProps {
 	sessions: Session[];
@@ -25,7 +31,6 @@ function timeAgo(ts: number | null): string {
 	return `${days}d ago`;
 }
 
-const ITEM_HEIGHT = 1;
 const LOAD_MORE_THRESHOLD = 5;
 
 export function SessionsOverlay({
@@ -38,13 +43,17 @@ export function SessionsOverlay({
 }: SessionsOverlayProps) {
 	const { colors } = useTheme();
 	const [selectedIdx, setSelectedIdx] = useState(0);
-	const renderer = useRenderer();
-	const scrollboxIdRef = useRef(`sessions-scrollbox-${Date.now()}`);
+
+	useEffect(() => {
+		setSelectedIdx((current) =>
+			Math.max(0, Math.min(current, sessions.length - 1)),
+		);
+	}, [sessions.length]);
 
 	useKeyboard((key) => {
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			setSelectedIdx((prev) => (prev <= 0 ? sessions.length - 1 : prev - 1));
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			setSelectedIdx((prev) => {
 				const next = prev >= sessions.length - 1 ? 0 : prev + 1;
 				if (
@@ -69,21 +78,22 @@ export function SessionsOverlay({
 		}
 	});
 
-	useEffect(() => {
-		const scrollbox = renderer.root.findDescendantById(scrollboxIdRef.current);
-		if (scrollbox && 'scrollTo' in scrollbox) {
-			(scrollbox as { scrollTo: (pos: number) => void }).scrollTo(
-				selectedIdx * ITEM_HEIGHT,
-			);
-		}
-	}, [selectedIdx, renderer]);
+	const statusRows = loadingMore || hasMore ? 1 : 0;
+	const visibleWindow = useListModalWindow(
+		sessions.length,
+		selectedIdx,
+		statusRows,
+	);
+	const visibleSessions = sessions.slice(
+		visibleWindow.start,
+		visibleWindow.end,
+	);
 
 	return (
 		<ModalFrame
 			title="Sessions"
 			size="lg"
-			fill
-			footer="Up/Down navigate · Enter select · Esc close"
+			footer="↑/k · ↓/j navigate · Enter select · Esc close"
 		>
 			{sessions.length === 0 ? (
 				<box style={{ padding: 1, flexGrow: 1, alignItems: 'center' }}>
@@ -92,42 +102,32 @@ export function SessionsOverlay({
 					</text>
 				</box>
 			) : (
-				<box style={{ flexGrow: 1, flexShrink: 1, overflow: 'hidden' }}>
-					<scrollbox
-						id={scrollboxIdRef.current}
-						style={{
-							width: '100%',
-							height: '100%',
-						}}
-						stickyScroll
-						stickyStart="top"
-						viewportCulling
-					>
-						{sessions.map((s, i) => {
-							const isSelected = i === selectedIdx;
-							const title = s.title || 'untitled';
-							const meta = `${s.provider || 'unknown'}/${s.model || ''} · ${timeAgo(s.lastActiveAt)}`;
-							return (
-								<SelectRow
-									key={s.id}
-									active={isSelected}
-									title={title}
-									footer={meta}
-								/>
-							);
-						})}
-						{loadingMore && (
-							<box style={{ height: 1, paddingLeft: 1 }}>
-								<text fg={colors.fgDimmed}>loading more…</text>
-							</box>
-						)}
-						{hasMore && !loadingMore && (
-							<box style={{ height: 1, paddingLeft: 1 }}>
-								<text fg={colors.fgDark}>↓ scroll for more</text>
-							</box>
-						)}
-					</scrollbox>
-				</box>
+				<ModalListViewport rowCount={visibleSessions.length + statusRows}>
+					{visibleSessions.map((s, offset) => {
+						const i = visibleWindow.start + offset;
+						const isSelected = i === selectedIdx;
+						const title = s.title || 'untitled';
+						const meta = `${s.provider || 'unknown'}/${s.model || ''} · ${timeAgo(s.lastActiveAt)}`;
+						return (
+							<SelectRow
+								key={s.id}
+								active={isSelected}
+								title={title}
+								footer={meta}
+							/>
+						);
+					})}
+					{loadingMore && (
+						<box style={{ height: 1, paddingLeft: 1 }}>
+							<text fg={colors.fgDimmed}>loading more…</text>
+						</box>
+					)}
+					{hasMore && !loadingMore && (
+						<box style={{ height: 1, paddingLeft: 1 }}>
+							<text fg={colors.fgDark}>↓ more sessions load as you move</text>
+						</box>
+					)}
+				</ModalListViewport>
 			)}
 		</ModalFrame>
 	);

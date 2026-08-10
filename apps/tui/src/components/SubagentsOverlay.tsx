@@ -1,16 +1,19 @@
 import { useKeyboard } from '@opentui/react';
 import { useEffect, useState } from 'react';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
 import type { ActivitySubagent } from './activity/types.ts';
-import { getVisibleWindow, ModalFrame } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 interface SubagentsOverlayProps {
 	items: ActivitySubagent[];
 	onSelect: (item: ActivitySubagent) => void;
 	onClose: () => void;
 }
-
-const MAX_VISIBLE_ROWS = 12;
 
 function statusColor(
 	status: ActivitySubagent['status'],
@@ -41,11 +44,11 @@ export function SubagentsOverlay({
 			onClose();
 		} else if (items.length === 0) {
 			return;
-		} else if (key.name === 'up') {
+		} else if (isListUpKey(key)) {
 			setSelectedIdx((current) =>
 				current <= 0 ? items.length - 1 : current - 1,
 			);
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			setSelectedIdx((current) =>
 				current >= items.length - 1 ? 0 : current + 1,
 			);
@@ -55,13 +58,13 @@ export function SubagentsOverlay({
 		}
 	});
 
-	const window = getVisibleWindow(items.length, selectedIdx, MAX_VISIBLE_ROWS);
+	const window = useListModalWindow(items.length, selectedIdx);
 
 	return (
 		<ModalFrame
 			title={`Sub-agents (${items.length})`}
 			size="lg"
-			footer="Up/Down navigate · Enter open split view · Esc close"
+			footer="↑/k · ↓/j navigate · Enter open split view · Esc close"
 		>
 			{items.length === 0 ? (
 				<box
@@ -70,7 +73,7 @@ export function SubagentsOverlay({
 					<text fg={colors.fgDark}>No sub-agents</text>
 				</box>
 			) : (
-				<box style={{ flexDirection: 'column' }}>
+				<ModalListViewport rowCount={window.end - window.start}>
 					{items.slice(window.start, window.end).map((item, offset) => {
 						const index = window.start + offset;
 						const active = index === selectedIdx;
@@ -112,7 +115,7 @@ export function SubagentsOverlay({
 							</box>
 						);
 					})}
-				</box>
+				</ModalListViewport>
 			)}
 		</ModalFrame>
 	);

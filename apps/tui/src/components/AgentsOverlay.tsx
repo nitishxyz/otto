@@ -1,11 +1,15 @@
 import { useKeyboard } from '@opentui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { getAgents } from '@ottocode/api';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
-import { getVisibleWindow, ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 import { getProjectQuery } from '../api.ts';
-
-const MAX_VISIBLE_AGENTS = 12;
 
 interface AgentsOverlayProps {
 	currentAgent: string;
@@ -54,9 +58,9 @@ export function AgentsOverlay({
 			if (key.name === 'escape') onClose();
 			return;
 		}
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			navigate(selectedIdx <= 0 ? agents.length - 1 : selectedIdx - 1);
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			navigate(selectedIdx >= agents.length - 1 ? 0 : selectedIdx + 1);
 		} else if (key.name === 'return') {
 			const choice = agents[selectedIdx];
@@ -66,29 +70,21 @@ export function AgentsOverlay({
 		}
 	});
 
-	const visibleWindow = getVisibleWindow(
-		agents.length,
-		selectedIdx,
-		MAX_VISIBLE_AGENTS,
-	);
+	const visibleWindow = useListModalWindow(agents.length, selectedIdx);
 	const visibleAgents = agents.slice(visibleWindow.start, visibleWindow.end);
-	const needsWindow = agents.length > visibleAgents.length;
 
 	return (
 		<ModalFrame
 			title="Agents"
 			size="md"
-			footer="Up/Down move · Enter select · Esc close"
+			footer="↑/k · ↓/j move · Enter select · Esc close"
 		>
 			{loading && <text fg={colors.fgDimmed}>loading…</text>}
 			{error && <text fg={colors.red}>{error}</text>}
 			{!loading && !error && agents.length === 0 && (
 				<text fg={colors.fgDimmed}>no agents available</text>
 			)}
-			{needsWindow && visibleWindow.start > 0 && (
-				<text fg={colors.fgDark}>↑ {visibleWindow.start} more</text>
-			)}
-			<box style={{ flexDirection: 'column', gap: 0 }}>
+			<ModalListViewport rowCount={visibleAgents.length}>
 				{visibleAgents.map((agent, offset) => {
 					const index = visibleWindow.start + offset;
 					const isSelected = index === selectedIdx;
@@ -99,16 +95,10 @@ export function AgentsOverlay({
 							active={isSelected}
 							current={isCurrent}
 							title={agent}
-							description={isCurrent ? 'current' : undefined}
 						/>
 					);
 				})}
-			</box>
-			{needsWindow && visibleWindow.end < agents.length && (
-				<text fg={colors.fgDark}>
-					↓ {agents.length - visibleWindow.end} more
-				</text>
-			)}
+			</ModalListViewport>
 		</ModalFrame>
 	);
 }

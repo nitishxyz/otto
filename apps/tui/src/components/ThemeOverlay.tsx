@@ -1,7 +1,13 @@
 import { useKeyboard } from '@opentui/react';
 import { useState, useRef, useCallback } from 'react';
 import { useTheme, themeList } from '../theme.ts';
-import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 interface ThemeOverlayProps {
 	onClose: () => void;
@@ -27,10 +33,10 @@ export function ThemeOverlay({ onClose, onSave }: ThemeOverlayProps) {
 	);
 
 	useKeyboard((key) => {
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			const next = selectedIdx <= 0 ? themeList.length - 1 : selectedIdx - 1;
 			navigate(next);
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			const next = selectedIdx >= themeList.length - 1 ? 0 : selectedIdx + 1;
 			navigate(next);
 		} else if (key.name === 'return') {
@@ -41,22 +47,24 @@ export function ThemeOverlay({ onClose, onSave }: ThemeOverlayProps) {
 			onClose();
 		}
 	});
+	const visibleWindow = useListModalWindow(themeList.length, selectedIdx);
+	const visibleThemes = themeList.slice(visibleWindow.start, visibleWindow.end);
 
 	return (
 		<ModalFrame
 			title="Theme"
 			size="sm"
-			footer="Up/Down preview · Enter confirm · Esc cancel"
+			footer="↑/k · ↓/j preview · Enter confirm · Esc cancel"
 		>
-			<box style={{ flexDirection: 'column', gap: 0 }}>
-				{themeList.map((t, i) => {
+			<ModalListViewport rowCount={visibleThemes.length}>
+				{visibleThemes.map((t, offset) => {
+					const i = visibleWindow.start + offset;
 					const isSelected = i === selectedIdx;
 					const isCurrent = t.name === themeName;
 					return (
 						<SelectRow
 							key={t.name}
 							active={isSelected}
-							current={isCurrent}
 							title={t.displayName}
 							description={isCurrent ? 'current' : undefined}
 							footer={
@@ -71,7 +79,7 @@ export function ThemeOverlay({ onClose, onSave }: ThemeOverlayProps) {
 						/>
 					);
 				})}
-			</box>
+			</ModalListViewport>
 		</ModalFrame>
 	);
 }

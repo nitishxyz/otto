@@ -305,14 +305,6 @@ export function App({
 		[sessionId, reload],
 	);
 
-	const handleSendQueuedNow = useCallback(
-		async (position = 1): Promise<boolean> => {
-			const messageId = [...queuedMessageIds][position - 1];
-			return messageId ? handleSendQueuedMessage(messageId) : false;
-		},
-		[queuedMessageIds, handleSendQueuedMessage],
-	);
-
 	const handleRemoveQueuedMessage = useCallback(
 		async (messageId: string): Promise<boolean> => {
 			if (!sessionId) return false;
@@ -349,7 +341,6 @@ export function App({
 					await sendMessage(nextSessionId, content);
 				},
 				abortSession,
-				sendQueuedNow: handleSendQueuedNow,
 				updateDefaults,
 				reload,
 			}),
@@ -367,7 +358,6 @@ export function App({
 			updateSessionPrefs,
 			sendMessage,
 			abortSession,
-			handleSendQueuedNow,
 			updateDefaults,
 			reload,
 		],
@@ -727,7 +717,6 @@ export function App({
 			provider={provider}
 			model={model}
 			escHint={escHint}
-			queueSize={queueSize}
 			isPlanMode={currentAgent === 'plan'}
 			paneActive={workspaceFocus === 'chat'}
 			releaseToSend={config.defaults.releaseToSend}
@@ -854,7 +843,6 @@ export function App({
 
 			<Overlays
 				sessions={sessions}
-				hasQueuedMessages={queueSize > 0}
 				queuedMessages={queuedMessages}
 				subagents={activityData.subagents}
 				hasMore={hasMore}

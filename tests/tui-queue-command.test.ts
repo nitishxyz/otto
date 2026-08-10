@@ -35,7 +35,6 @@ function commandContext(overrides: Partial<CommandContext> = {}): {
 		updateSessionPrefs: async () => {},
 		sendMessage: async () => {},
 		abortSession: async () => {},
-		sendQueuedNow: async () => true,
 		updateDefaults: async () => {},
 		reload: () => {},
 		...overrides,
@@ -44,25 +43,10 @@ function commandContext(overrides: Partial<CommandContext> = {}): {
 }
 
 describe('TUI queued-message command', () => {
-	test('only suggests /send when a message is queued', () => {
-		expect(
-			getCommandSuggestions('', false).some(
-				(command) => command.name === 'send',
-			),
-		).toBe(false);
-		expect(
-			getCommandSuggestions('', true).some(
-				(command) => command.name === 'send',
-			),
-		).toBe(true);
-	});
-
 	test('always suggests /queue and opens the queue overlay', async () => {
 		let overlay: Overlay = 'none';
 		expect(
-			getCommandSuggestions('', false).some(
-				(command) => command.name === 'queue',
-			),
+			getCommandSuggestions('').some((command) => command.name === 'queue'),
 		).toBe(true);
 
 		const { ctx } = commandContext({
@@ -77,7 +61,7 @@ describe('TUI queued-message command', () => {
 	test('suggests /sub-agents and opens the subagent overlay', async () => {
 		let overlay: Overlay = 'none';
 		expect(
-			getCommandSuggestions('sub-', false).some(
+			getCommandSuggestions('sub-').some(
 				(command) => command.name === 'sub-agents',
 			),
 		).toBe(true);
@@ -197,17 +181,17 @@ describe('TUI queued-message command', () => {
 			},
 		]);
 
-		expect(getCommandSuggestions('publish', false, recipes)).toEqual([
+		expect(getCommandSuggestions('publish', recipes)).toEqual([
 			{
 				name: 'publish-ready',
 				alias: '',
 				description: 'Prepare a release (project)',
 			},
 		]);
-		expect(getCommandSuggestions('daily', false, recipes)[0]?.description).toBe(
+		expect(getCommandSuggestions('daily', recipes)[0]?.description).toBe(
 			'global recipe',
 		);
-		expect(getCommandSuggestions('blocked', false, recipes)).toEqual([]);
+		expect(getCommandSuggestions('blocked', recipes)).toEqual([]);
 	});
 
 	test('does not let recipes shadow TUI commands or duplicate scopes', () => {
@@ -286,53 +270,5 @@ describe('TUI queued-message command', () => {
 		const current = new Set(['first', 'second']);
 		expect(hasSameQueuedMessageOrder(current, ['first', 'second'])).toBe(true);
 		expect(hasSameQueuedMessageOrder(current, ['second', 'first'])).toBe(false);
-	});
-
-	test('sends the first queued message by default', async () => {
-		let position: number | undefined;
-		const { ctx, statuses } = commandContext({
-			sendQueuedNow: async (nextPosition) => {
-				position = nextPosition;
-				return true;
-			},
-		});
-
-		await executeCommand('send', '', ctx);
-
-		expect(position).toBe(1);
-		expect(statuses.at(-1)).toEqual({
-			type: 'success',
-			label: 'sent queued message 1',
-		});
-	});
-
-	test('accepts a one-based queue position', async () => {
-		let position: number | undefined;
-		const { ctx } = commandContext({
-			sendQueuedNow: async (nextPosition) => {
-				position = nextPosition;
-				return true;
-			},
-		});
-
-		await executeCommand('send', '3', ctx);
-		expect(position).toBe(3);
-	});
-
-	test('rejects invalid queue positions without dispatching', async () => {
-		let called = false;
-		const { ctx, statuses } = commandContext({
-			sendQueuedNow: async () => {
-				called = true;
-				return true;
-			},
-		});
-
-		await executeCommand('send', '0', ctx);
-		expect(called).toBe(false);
-		expect(statuses.at(-1)).toEqual({
-			type: 'error',
-			label: 'usage: /send [queue position]',
-		});
 	});
 });

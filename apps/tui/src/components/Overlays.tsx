@@ -19,7 +19,6 @@ import type { ActivitySubagent } from './activity/types.ts';
 
 interface OverlaysProps {
 	sessions: Session[];
-	hasQueuedMessages: boolean;
 	queuedMessages: QueuedMessageItem[];
 	subagents: ActivitySubagent[];
 	hasMore: boolean;
@@ -43,7 +42,6 @@ interface OverlaysProps {
 
 export const Overlays = memo(function Overlays({
 	sessions,
-	hasQueuedMessages,
 	queuedMessages,
 	subagents,
 	hasMore,
@@ -107,12 +105,7 @@ export const Overlays = memo(function Overlays({
 				/>
 			);
 		case 'help':
-			return (
-				<HelpOverlay
-					hasQueuedMessages={hasQueuedMessages}
-					onClose={handleClose}
-				/>
-			);
+			return <HelpOverlay onClose={handleClose} />;
 		case 'theme':
 			return <ThemeOverlay onClose={handleClose} onSave={onThemeSave} />;
 		case 'approvals':

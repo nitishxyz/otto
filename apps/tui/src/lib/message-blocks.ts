@@ -27,6 +27,21 @@ export function extractPartText(part: MessagePart): string {
 	return '';
 }
 
+/** Estimates terminal rows used by wrapped text, capped for bounded panels. */
+export function estimateWrappedLineCount(
+	text: string,
+	width: number,
+	maxLines = Number.POSITIVE_INFINITY,
+): number {
+	const safeWidth = Math.max(1, width);
+	let lines = 0;
+	for (const line of text.replace(/\r/g, '').split('\n')) {
+		lines += Math.max(1, Math.ceil(line.length / safeWidth));
+		if (lines >= maxLines) return maxLines;
+	}
+	return Math.max(1, lines);
+}
+
 function isToolPart(part: MessagePart): boolean {
 	return part.type === 'tool_call' || part.type === 'tool_result';
 }

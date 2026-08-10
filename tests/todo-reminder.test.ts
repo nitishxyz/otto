@@ -28,7 +28,7 @@ describe('update_todos tool result', () => {
 				todos: [
 					{ step: 'One', status: 'completed' },
 					{ step: 'Two', status: 'in_progress' },
-					'Three',
+					{ step: 'Three' },
 				],
 			},
 			{},
@@ -41,6 +41,20 @@ describe('update_todos tool result', () => {
 			{ step: 'Three', status: 'pending' },
 		]);
 		expect(typeof result.reminder).toBe('string');
+	});
+
+	test('requires structured todo items', () => {
+		const inputSchema = (
+			updateTodosTool as {
+				inputSchema: { safeParse: (value: unknown) => { success: boolean } };
+			}
+		).inputSchema;
+		expect(inputSchema.safeParse({ todos: ['{"step":"One"}'] }).success).toBe(
+			false,
+		);
+		expect(inputSchema.safeParse({ todos: [{ step: 'One' }] }).success).toBe(
+			true,
+		);
 	});
 
 	test('omits reminder when all todos are closed', async () => {

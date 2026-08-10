@@ -1,8 +1,13 @@
 import { useKeyboard } from '@opentui/react';
 import { useEffect, useMemo, useState } from 'react';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
 import type { QueuedMessageItem } from '../lib/queue.ts';
-import { getVisibleWindow, ModalFrame } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 
 interface QueueOverlayProps {
 	items: QueuedMessageItem[];
@@ -10,8 +15,6 @@ interface QueueOverlayProps {
 	onRemove: (assistantMessageId: string) => Promise<boolean>;
 	onClose: () => void;
 }
-
-const MAX_VISIBLE_ROWS = 12;
 
 export function QueueOverlay({
 	items,
@@ -41,11 +44,11 @@ export function QueueOverlay({
 		}
 		if (busy || visibleItems.length === 0) return;
 
-		if (key.name === 'up') {
+		if (isListUpKey(key)) {
 			setSelectedIdx((current) =>
 				current <= 0 ? visibleItems.length - 1 : current - 1,
 			);
-		} else if (key.name === 'down') {
+		} else if (isListDownKey(key)) {
 			setSelectedIdx((current) =>
 				current >= visibleItems.length - 1 ? 0 : current + 1,
 			);
@@ -71,17 +74,13 @@ export function QueueOverlay({
 		}
 	});
 
-	const window = getVisibleWindow(
-		visibleItems.length,
-		selectedIdx,
-		MAX_VISIBLE_ROWS,
-	);
+	const window = useListModalWindow(visibleItems.length, selectedIdx);
 
 	return (
 		<ModalFrame
 			title={`Queue (${visibleItems.length})`}
 			size="lg"
-			footer="Up/Down navigate · Enter send · D remove · Esc close"
+			footer="↑/k · ↓/j navigate · Enter send · D remove · Esc close"
 		>
 			{visibleItems.length === 0 ? (
 				<box
@@ -90,7 +89,7 @@ export function QueueOverlay({
 					<text fg={colors.fgDark}>No queued messages</text>
 				</box>
 			) : (
-				<box style={{ flexDirection: 'column' }}>
+				<ModalListViewport rowCount={window.end - window.start}>
 					{visibleItems.slice(window.start, window.end).map((item, offset) => {
 						const index = window.start + offset;
 						const active = index === selectedIdx;
@@ -123,7 +122,7 @@ export function QueueOverlay({
 							</box>
 						);
 					})}
-				</box>
+				</ModalListViewport>
 			)}
 		</ModalFrame>
 	);

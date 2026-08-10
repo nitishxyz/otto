@@ -1,6 +1,10 @@
+import { RGBA } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/react';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTheme } from '../theme.ts';
+import { getListModalWindow } from '../lib/list-navigation.ts';
+
+export { getVisibleWindow } from '../lib/list-navigation.ts';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'full';
 
@@ -16,27 +20,59 @@ interface ModalFrameProps {
 	footer?: ReactNode;
 	/** Width preset. Defaults to 'lg'. */
 	size?: ModalSize;
-	/** Grow to max height (for scrollable lists). Default fits content. */
-	fill?: boolean;
 	maxHeightRatio?: number;
 	padding?: number;
 	gap?: number;
+}
+
+/** Shared terminal-aware window for naturally sized selectable list modals. */
+export function useListModalWindow(
+	total: number,
+	selectedIndex: number,
+	reservedRows = 0,
+) {
+	const { height } = useTerminalDimensions();
+	return getListModalWindow(
+		total,
+		selectedIndex,
+		height || (process.stdout.rows ?? 40),
+		reservedRows,
+	);
+}
+
+/** Reserves the exact physical height of a windowed modal list body. */
+export function ModalListViewport({
+	rowCount,
+	children,
+}: {
+	rowCount: number;
+	children: ReactNode;
+}) {
+	return (
+		<box
+			style={{
+				width: '100%',
+				height: Math.max(1, rowCount),
+				flexDirection: 'column',
+				flexShrink: 0,
+				overflow: 'hidden',
+			}}
+		>
+			{children}
+		</box>
+	);
 }
 
 function clamp(value: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, value));
 }
 
-/**
- * Centered modal panel with a rounded border, embedded title, and a compact
- * footer hint row. Fits its content by default; pass `fill` for scroll lists.
- */
+/** Centered modal panel with a fixed title and compact footer hint row. */
 export function ModalFrame({
 	title,
 	children,
 	footer,
 	size = 'lg',
-	fill = false,
 	maxHeightRatio = 0.78,
 	padding = 1,
 	gap = 1,
@@ -55,6 +91,11 @@ export function ModalFrame({
 		8,
 		Math.floor(safeHeight * (safeHeight < 24 ? 0.9 : maxHeightRatio)),
 	);
+	const backdropColor = useMemo(() => {
+		const color = RGBA.fromHex(colors.bgDark);
+		color.a = 0.72;
+		return color;
+	}, [colors.bgDark]);
 
 	return (
 		<box
@@ -65,34 +106,31 @@ export function ModalFrame({
 				width: safeWidth,
 				height: safeHeight,
 				zIndex: 3000,
-				backgroundColor: colors.bgDark,
+				backgroundColor: backdropColor,
 				alignItems: 'center',
 				justifyContent: 'center',
 			}}
 		>
 			<box
-				title={` ${title} `}
 				style={{
 					width,
 					maxHeight,
-					height: fill ? maxHeight : undefined,
 					backgroundColor: colors.bg,
-					border: true,
-					borderStyle: 'rounded',
-					borderColor: colors.border,
-					titleColor: colors.fgBright,
 					flexDirection: 'column',
 					paddingTop: padding,
-					paddingBottom: footer ? 0 : padding,
+					paddingBottom: padding,
 					paddingLeft: padding + 1,
 					paddingRight: padding + 1,
 					gap,
 				}}
 			>
+				<text fg={colors.fgBright}>
+					<b>{title}</b>
+				</text>
 				<box
 					style={{
 						flexDirection: 'column',
-						flexGrow: fill ? 1 : 0,
+						flexGrow: 0,
 						flexShrink: 1,
 						overflow: 'hidden',
 					}}
@@ -153,13 +191,28 @@ export function SelectRow({
 					paddingLeft: 1,
 				}}
 			>
-				{current && <text fg={colors.blue}>●</text>}
-				{!current && gutter}
-				<text fg={active ? colors.fgBright : current ? colors.blue : colors.fg}>
+				{gutter}
+				<text
+					style={{
+						flexShrink: 1,
+						overflow: 'hidden',
+					}}
+					fg={active ? colors.fgBright : current ? colors.blue : colors.fg}
+					wrapMode="none"
+					truncate
+				>
 					{active ? <b>{title}</b> : title}
 				</text>
+				{current && (
+					<text fg={active ? colors.fgMuted : colors.blue}>(current)</text>
+				)}
 				{description && (
-					<text fg={active ? colors.fgMuted : colors.fgDark}>
+					<text
+						style={{ flexGrow: 1, flexShrink: 1, overflow: 'hidden' }}
+						fg={active ? colors.fgMuted : colors.fgDark}
+						wrapMode="none"
+						truncate
+					>
 						{description}
 					</text>
 				)}
@@ -175,15 +228,4 @@ export function SelectRow({
 			)}
 		</box>
 	);
-}
-
-export function getVisibleWindow(
-	total: number,
-	selectedIndex: number,
-	maxVisible: number,
-): { start: number; end: number } {
-	if (total <= maxVisible) return { start: 0, end: total };
-	const half = Math.floor(maxVisible / 2);
-	const start = clamp(selectedIndex - half, 0, total - maxVisible);
-	return { start, end: start + maxVisible };
 }

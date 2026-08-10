@@ -9,8 +9,14 @@ import {
 	initiateMcpAuth,
 	completeMcpAuth,
 } from '@ottocode/api';
+import { isListDownKey, isListUpKey } from '../lib/list-navigation.ts';
 import { useTheme } from '../theme.ts';
-import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 import { TinySpinner } from './TinySpinner.tsx';
 import { getProjectQuery } from '../api.ts';
 import { startLocalOAuthCallbackProxy } from '../oauth-callback-proxy.ts';
@@ -383,20 +389,6 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		return a.name.localeCompare(b.name);
 	});
 
-	const termRows = process.stdout.rows ?? 40;
-	const VISIBLE_ROWS = Math.max(5, termRows - 10);
-	const [scrollOffset, setScrollOffset] = useState(0);
-
-	const ensureVisible = useCallback(
-		(idx: number) => {
-			let offset = scrollOffset;
-			if (idx < offset) offset = idx;
-			else if (idx >= offset + VISIBLE_ROWS) offset = idx - VISIBLE_ROWS + 1;
-			setScrollOffset(offset);
-		},
-		[scrollOffset, VISIBLE_ROWS],
-	);
-
 	useKeyboard((key) => {
 		if (viewRef.current === 'add') {
 			const totalFields = addMode === 'local' ? 4 : 4;
@@ -464,14 +456,13 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		const list = serversRef.current;
 		if (key.name === 'escape') {
 			onClose();
-		} else if (key.name === 'up' || (key.ctrl && key.name === 'k')) {
+		} else if (isListUpKey(key)) {
 			const next =
 				selectedIdxRef.current <= 0
 					? list.length - 1
 					: selectedIdxRef.current - 1;
 			setSelectedIdx(next);
-			ensureVisible(next);
-		} else if (key.name === 'down' || (key.ctrl && key.name === 'j')) {
+		} else if (isListDownKey(key)) {
 			const next =
 				selectedIdxRef.current >= list.length - 1
 					? 0
@@ -504,10 +495,17 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 	});
 
 	const connectedCount = servers.filter((s) => s.connected).length;
-	const visibleServers = sortedServers.slice(
-		scrollOffset,
-		scrollOffset + VISIBLE_ROWS,
+	const reservedRows = 2 + (copilotDevice ? 9 : 0);
+	const visibleWindow = useListModalWindow(
+		sortedServers.length,
+		selectedIdx,
+		reservedRows,
 	);
+	const visibleServers = sortedServers.slice(
+		visibleWindow.start,
+		visibleWindow.end,
+	);
+	const toolsWindow = useListModalWindow(toolsServer?.tools.length ?? 0, 0);
 
 	if (view === 'add') {
 		return (
@@ -617,11 +615,17 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 			<ModalFrame
 				title={`${toolsServer.name} — Tools (${toolsServer.tools.length})`}
 				size="md"
-				fill
 				footer="Esc/Enter back"
 			>
-				<box
-					style={{ flexDirection: 'column', overflow: 'hidden', flexGrow: 1 }}
+				<scrollbox
+					style={{
+						width: '100%',
+						height: Math.max(
+							1,
+							Math.min(toolsServer.tools.length, toolsWindow.maxVisible),
+						),
+					}}
+					viewportCulling
 				>
 					{toolsServer.tools.map((tool) => (
 						<box key={tool} style={{ flexDirection: 'row', height: 1 }}>
@@ -630,7 +634,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 							<text fg={colors.fgDark}> ({tool})</text>
 						</box>
 					))}
-				</box>
+				</scrollbox>
 			</ModalFrame>
 		);
 	}
@@ -639,8 +643,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		<ModalFrame
 			title="MCP Servers"
 			size="lg"
-			fill
-			footer="Up/Down navigate · Enter toggle · A add · D delete · T tools · Esc close"
+			footer="↑/k · ↓/j navigate · Enter toggle · A add · D delete · T tools · Esc close"
 		>
 			<box style={{ flexDirection: 'row', gap: 2, marginBottom: 1 }}>
 				<text fg={colors.fgMuted}>
@@ -699,11 +702,9 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 			)}
 
 			{sortedServers.length > 0 && (
-				<box
-					style={{ flexDirection: 'column', overflow: 'hidden', flexGrow: 1 }}
-				>
+				<ModalListViewport rowCount={visibleServers.length}>
 					{visibleServers.map((server, vi) => {
-						const idx = scrollOffset + vi;
+						const idx = visibleWindow.start + vi;
 						const isSelected = idx === selectedIdx;
 						const isBusy = busyServers.has(server.name);
 						const isRemote =
@@ -740,7 +741,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 							/>
 						);
 					})}
-				</box>
+				</ModalListViewport>
 			)}
 		</ModalFrame>
 	);

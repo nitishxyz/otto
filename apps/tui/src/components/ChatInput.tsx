@@ -33,7 +33,6 @@ interface ChatInputProps {
 	provider: string;
 	model: string;
 	escHint: boolean;
-	queueSize?: number;
 	isPlanMode?: boolean;
 	paneActive?: boolean;
 	releaseToSend?: boolean;
@@ -60,7 +59,6 @@ export function ChatInput({
 	provider,
 	model,
 	escHint,
-	queueSize = 0,
 	isPlanMode: externalIsPlanMode,
 	paneActive = true,
 	releaseToSend = false,
@@ -270,18 +268,14 @@ export function ChatInput({
 		if (text.startsWith('/') && !text.includes(' ')) {
 			setShowFileMention(false);
 			const query = text.slice(1).toLowerCase();
-			const matches = getCommandSuggestions(
-				query,
-				queueSize > 0,
-				recipeCommands,
-			);
+			const matches = getCommandSuggestions(query, recipeCommands);
 			setCommandMatches(matches);
 			setSelectedIdx(0);
 		} else {
 			setCommandMatches([]);
 			checkForMention(text, cursor.offset);
 		}
-	}, [checkForMention, queueSize, recipeCommands]);
+	}, [checkForMention, recipeCommands]);
 
 	useEffect(() => {
 		const textarea = textareaRef.current;
@@ -289,14 +283,10 @@ export function ChatInput({
 		const text = textarea.plainText;
 		if (!text.startsWith('/') || text.includes(' ')) return;
 		setCommandMatches(
-			getCommandSuggestions(
-				text.slice(1).toLowerCase(),
-				queueSize > 0,
-				recipeCommands,
-			),
+			getCommandSuggestions(text.slice(1).toLowerCase(), recipeCommands),
 		);
 		setSelectedIdx(0);
-	}, [queueSize, recipeCommands]);
+	}, [recipeCommands]);
 
 	const handleToggleDictation = useCallback(() => {
 		setCommandMatches([]);

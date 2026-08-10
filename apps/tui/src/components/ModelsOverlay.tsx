@@ -1,10 +1,15 @@
-import { useKeyboard, useTerminalDimensions } from '@opentui/react';
+import { useKeyboard } from '@opentui/react';
 import type { TextareaOptions, TextareaRenderable } from '@opentui/core';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Fuse from 'fuse.js';
 import { getAllModels } from '@ottocode/api';
 import { useTheme } from '../theme.ts';
-import { ModalFrame, SelectRow } from './ModalFrame.tsx';
+import {
+	ModalFrame,
+	ModalListViewport,
+	SelectRow,
+	useListModalWindow,
+} from './ModalFrame.tsx';
 import { getProjectQuery } from '../api.ts';
 
 interface ModelItem {
@@ -58,8 +63,6 @@ export function ModelsOverlay({
 	const selectedIdxRef = useRef(selectedIdx);
 	selectedIdxRef.current = selectedIdx;
 	const textareaRef = useRef<TextareaRenderable | null>(null);
-	const scrollOffsetRef = useRef(0);
-	const [scrollOffset, setScrollOffset] = useState(0);
 
 	useEffect(() => {
 		getAllModels({ query: getProjectQuery() } as never).then((res) => {
@@ -163,29 +166,7 @@ export function ModelsOverlay({
 	useEffect(() => {
 		void searchQuery;
 		setSelectedIdx(0);
-		scrollOffsetRef.current = 0;
-		setScrollOffset(0);
 	}, [searchQuery]);
-
-	const { height: terminalHeight } = useTerminalDimensions();
-	const VISIBLE_ROWS = Math.max(
-		5,
-		Math.floor((terminalHeight || 40) * 0.78) - 10,
-	);
-
-	const ensureVisible = useCallback(
-		(idx: number) => {
-			let offset = scrollOffsetRef.current;
-			if (idx < offset) {
-				offset = idx;
-			} else if (idx >= offset + VISIBLE_ROWS) {
-				offset = idx - VISIBLE_ROWS + 1;
-			}
-			scrollOffsetRef.current = offset;
-			setScrollOffset(offset);
-		},
-		[VISIBLE_ROWS],
-	);
 
 	const handleContentChange = useCallback(() => {
 		if (!textareaRef.current) return;
@@ -197,19 +178,19 @@ export function ModelsOverlay({
 		if (list.length === 0) return;
 
 		if (key.name === 'up' || (key.ctrl && key.name === 'k')) {
+			key.preventDefault();
 			const next =
 				selectedIdxRef.current <= 0
 					? list.length - 1
 					: selectedIdxRef.current - 1;
 			setSelectedIdx(next);
-			ensureVisible(next);
 		} else if (key.name === 'down' || (key.ctrl && key.name === 'j')) {
+			key.preventDefault();
 			const next =
 				selectedIdxRef.current >= list.length - 1
 					? 0
 					: selectedIdxRef.current + 1;
 			setSelectedIdx(next);
-			ensureVisible(next);
 		} else if (key.name === 'return') {
 			const item = list[selectedIdxRef.current];
 			if (item && item.available !== false) {
@@ -242,41 +223,24 @@ export function ModelsOverlay({
 		return rows;
 	}, [flatList]);
 
-	const visibleDisplayRows = useMemo(() => {
-		let modelCount = 0;
-		let startRowIdx = 0;
-		for (let i = 0; i < displayRows.length; i++) {
-			if (displayRows[i].type === 'model') {
-				if (modelCount === scrollOffset) {
-					startRowIdx = i;
-					if (i > 0 && displayRows[i - 1].type === 'header') {
-						startRowIdx = i - 1;
-					}
-					break;
-				}
-				modelCount++;
-			}
-		}
-
-		const result: DisplayRow[] = [];
-		let visibleModels = 0;
-		for (
-			let i = startRowIdx;
-			i < displayRows.length && visibleModels < VISIBLE_ROWS;
-			i++
-		) {
-			result.push(displayRows[i]);
-			if (displayRows[i].type === 'model') visibleModels++;
-		}
-		return result;
-	}, [displayRows, scrollOffset, VISIBLE_ROWS]);
+	const selectedDisplayRow = displayRows.findIndex(
+		(row) => row.type === 'model' && row.flatIndex === selectedIdx,
+	);
+	const visibleWindow = useListModalWindow(
+		displayRows.length,
+		Math.max(0, selectedDisplayRow),
+		4,
+	);
+	const visibleDisplayRows = displayRows.slice(
+		visibleWindow.start,
+		visibleWindow.end,
+	);
 
 	return (
 		<ModalFrame
 			title="Models"
 			size="lg"
-			fill
-			footer="Up/Down navigate · Enter select · Esc close"
+			footer="↑/Ctrl+k · ↓/Ctrl+j navigate · Enter select · Esc close"
 		>
 			<box
 				style={{
@@ -318,9 +282,7 @@ export function ModelsOverlay({
 			)}
 
 			{flatList.length > 0 && (
-				<box
-					style={{ flexDirection: 'column', overflow: 'hidden', flexGrow: 1 }}
-				>
+				<ModalListViewport rowCount={visibleDisplayRows.length}>
 					{visibleDisplayRows.map((row) => {
 						if (row.type === 'header') {
 							return (
@@ -352,7 +314,7 @@ export function ModelsOverlay({
 							/>
 						);
 					})}
-				</box>
+				</ModalListViewport>
 			)}
 		</ModalFrame>
 	);
