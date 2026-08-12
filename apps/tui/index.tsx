@@ -4,6 +4,7 @@ import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
 import { configureApi, configureProjectContext } from './src/api.ts';
 import { discoverLocalDaemon } from './src/daemon.ts';
+import { enableLinuxShiftEnterReporting } from './src/lib/terminal-keyboard.ts';
 
 // Standalone entry: prefer a running local daemon unless the server is
 // explicitly configured via env.
@@ -24,6 +25,7 @@ const renderer = await createCliRenderer({
 	screenMode: 'alternate-screen',
 	targetFps: 30,
 });
+enableLinuxShiftEnterReporting(renderer.capabilities);
 const root = createRoot(renderer);
 
 let exiting = false;

@@ -7,6 +7,7 @@ import treeSitterWorkerPath from '../../node_modules/@opentui/core/parser.worker
 import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
 import { setPort, configureApi, configureProjectContext } from './src/api.ts';
+import { enableLinuxShiftEnterReporting } from './src/lib/terminal-keyboard.ts';
 
 export async function startTui(
 	port: number,
@@ -37,6 +38,7 @@ export async function startTui(
 		screenMode: 'alternate-screen',
 		targetFps: 30,
 	});
+	enableLinuxShiftEnterReporting(renderer.capabilities);
 	const root = createRoot(renderer);
 
 	let exiting = false;
