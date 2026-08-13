@@ -109,22 +109,9 @@ export async function handleAdaptedToolInputAvailable(
 		}
 	}
 
-	publishToolCall(args.ctx, {
-		name: args.name,
-		input,
-		callId,
-		stepIndex: args.ctx.stepIndex,
-	});
-	if (args.name === 'progress_update') {
-		logToolCall(args.ctx, {
-			name: args.name,
-			callId,
-			stepIndex: args.ctx.stepIndex,
-		});
-	}
-
+	let index: number | undefined;
 	try {
-		await persistToolCall(args.ctx, {
+		index = await persistToolCall(args.ctx, {
 			partId: callPartId,
 			name: args.name,
 			input,
@@ -145,6 +132,20 @@ export async function handleAdaptedToolInputAvailable(
 				error: error instanceof Error ? error.message : String(error),
 			},
 		);
+	}
+	publishToolCall(args.ctx, {
+		name: args.name,
+		input,
+		callId,
+		stepIndex: args.ctx.stepIndex,
+		index,
+	});
+	if (args.name === 'progress_update') {
+		logToolCall(args.ctx, {
+			name: args.name,
+			callId,
+			stepIndex: args.ctx.stepIndex,
+		});
 	}
 
 	if (args.name !== 'progress_update') {

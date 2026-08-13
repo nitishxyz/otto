@@ -27,7 +27,7 @@ export async function persistToolCall(
 		startTs?: number;
 		stepIndex?: number;
 	},
-): Promise<void> {
+): Promise<number> {
 	const index = await ctx.nextIndex();
 	await ctx.db.insert(messageParts).values({
 		id: args.partId,
@@ -47,6 +47,7 @@ export async function persistToolCall(
 		toolName: args.name,
 		toolCallId: args.callId,
 	});
+	return index;
 }
 
 export async function persistToolResultWithIndex(

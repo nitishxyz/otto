@@ -89,11 +89,19 @@ export async function createUserMessage(args: {
 		sessionId: args.sessionId,
 		payload: {
 			id: userMessageId,
+			sessionId: args.sessionId,
 			role: 'user',
+			status: 'complete',
 			agent: args.agent,
 			provider: args.provider,
 			model: args.model,
+			createdAt: args.createdAt,
+			completedAt: args.createdAt,
 			content: String(args.content),
+			attachmentNames: [
+				...(args.images ?? []).map((image) => image.name || 'image'),
+				...(args.files ?? []).map((file) => file.name),
+			],
 		},
 	});
 
@@ -108,6 +116,7 @@ export async function createPendingAssistantMessage(args: {
 	model: string;
 }): Promise<{ assistantMessageId: string }> {
 	const assistantMessageId = crypto.randomUUID();
+	const createdAt = Date.now();
 	await args.db.insert(messages).values({
 		id: assistantMessageId,
 		sessionId: args.sessionId,
@@ -116,17 +125,20 @@ export async function createPendingAssistantMessage(args: {
 		agent: args.agent,
 		provider: args.provider,
 		model: args.model,
-		createdAt: Date.now(),
+		createdAt,
 	});
 	publish({
 		type: 'message.created',
 		sessionId: args.sessionId,
 		payload: {
 			id: assistantMessageId,
+			sessionId: args.sessionId,
 			role: 'assistant',
+			status: 'pending',
 			agent: args.agent,
 			provider: args.provider,
 			model: args.model,
+			createdAt,
 		},
 	});
 

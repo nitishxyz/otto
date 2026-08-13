@@ -13,8 +13,8 @@ import {
 } from './useQueueState';
 import { getSessionQueryKey, getSessionsQueryKey } from './useSessions';
 import {
+	appendServerCreatedMessage,
 	getMessagesQueryKey,
-	optimisticMessageMatchesText,
 	updateMessagesCache,
 } from './useMessages';
 import { getProjectKey } from '../lib/api-client/utils';
@@ -1403,6 +1403,8 @@ export function startSessionStreamEngine({
 			const args = getToolEventArgs(payload);
 			const stepIndex =
 				typeof payload.stepIndex === 'number' ? payload.stepIndex : null;
+			const persistedIndex =
+				typeof payload.index === 'number' ? payload.index : null;
 			const contentJsonBase: Record<string, unknown> = { name };
 			if (callId) contentJsonBase.callId = callId;
 			if (args !== undefined) contentJsonBase.args = args;
@@ -1412,7 +1414,7 @@ export function startSessionStreamEngine({
 						? `ephemeral-tool-call-${callId}`
 						: `ephemeral-tool-call-${name}-${Date.now()}`,
 					messageId: targetMessage.id,
-					index: getOptimisticPartIndex(parts, stepIndex),
+					index: persistedIndex ?? getOptimisticPartIndex(parts, stepIndex),
 					stepIndex,
 					type: 'tool_call',
 					content: JSON.stringify(contentJsonBase),
@@ -1444,6 +1446,7 @@ export function startSessionStreamEngine({
 					content: JSON.stringify(nextContentJson),
 					contentJson: nextContentJson,
 					stepIndex: stepIndex ?? existing.stepIndex ?? null,
+					index: persistedIndex ?? existing.index,
 					toolCallId: callId ?? existing.toolCallId,
 					toolName: name,
 				};
@@ -1818,24 +1821,25 @@ export function startSessionStreamEngine({
 							: [];
 					updateThreadMessages((oldMessages) => {
 						if (!oldMessages) return oldMessages;
-						if (oldMessages.some((m) => m.id === id)) return oldMessages;
-						const baseMessages =
-							role === 'user' && content
-								? oldMessages.filter(
-										(message) =>
-											!optimisticMessageMatchesText(message, content),
-									)
-								: oldMessages;
 						const newMessage: Message = {
 							id,
-							sessionId,
+							sessionId:
+								typeof payload?.sessionId === 'string'
+									? payload.sessionId
+									: sessionId,
 							role: role as Message['role'],
 							status: role === 'user' ? 'complete' : 'pending',
 							agent,
 							provider,
 							model,
-							createdAt: Date.now(),
-							completedAt: null,
+							createdAt:
+								typeof payload?.createdAt === 'number'
+									? payload.createdAt
+									: Date.now(),
+							completedAt:
+								typeof payload?.completedAt === 'number'
+									? payload.completedAt
+									: null,
 							latencyMs: null,
 							promptTokens: null,
 							completionTokens: null,
@@ -1843,17 +1847,7 @@ export function startSessionStreamEngine({
 							error: null,
 							parts: userParts,
 						};
-						// Stream events describe the live edge, so a created message
-						// belongs at the tail. Keeping the insertion append-only
-						// means no already-rendered row can change position while a
-						// turn streams; only a clock-skewed event falls back to a
-						// (stable) sort.
-						const next = [...baseMessages, newMessage];
-						const previous = baseMessages[baseMessages.length - 1];
-						if (previous && previous.createdAt > newMessage.createdAt) {
-							next.sort((a, b) => a.createdAt - b.createdAt);
-						}
-						return next;
+						return appendServerCreatedMessage(oldMessages, newMessage, content);
 					});
 				}
 				break;

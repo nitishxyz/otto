@@ -98,25 +98,60 @@ export function optimisticMessageMatchesText(
 	);
 }
 
+/** Appends one server-created message and consumes at most one optimistic copy. */
+export function appendServerCreatedMessage(
+	messages: Message[],
+	message: Message,
+	content: string | null,
+): Message[] {
+	if (messages.some((item) => item.id === message.id)) return messages;
+	let baseMessages = messages;
+	if (message.role === 'user' && content !== null) {
+		const optimisticIndex = messages.findIndex((item) =>
+			optimisticMessageMatchesText(item, content),
+		);
+		if (optimisticIndex !== -1) {
+			baseMessages = messages.filter(
+				(_item, index) => index !== optimisticIndex,
+			);
+		}
+	}
+	const next = [...baseMessages, message];
+	const previous = baseMessages[baseMessages.length - 1];
+	if (previous && previous.createdAt > message.createdAt) {
+		next.sort((a, b) => a.createdAt - b.createdAt);
+	}
+	return next;
+}
+
 /**
  * Preserves in-flight optimistic user messages across a full refetch: entries
  * the server does not know about yet are re-appended so a background
  * invalidation cannot make a just-sent message vanish from the thread.
  */
-function mergeOptimisticMessages(
+export function mergeOptimisticMessages(
 	cached: Message[] | undefined,
 	fresh: Message[],
 ): Message[] {
-	const pending = cached?.filter(
-		(message) =>
-			message.optimistic &&
-			Date.now() - message.createdAt < OPTIMISTIC_MESSAGE_TTL_MS &&
-			!fresh.some((freshMessage) => {
-				if (freshMessage.role !== 'user') return false;
-				const text = getMessageText(freshMessage);
-				return text !== null && optimisticMessageMatchesText(message, text);
-			}),
-	);
+	const unmatchedFreshUserTexts = fresh.flatMap((message) => {
+		if (message.role !== 'user') return [];
+		const text = getMessageText(message);
+		return text === null ? [] : [text];
+	});
+	const pending = cached?.filter((message) => {
+		if (
+			!message.optimistic ||
+			Date.now() - message.createdAt >= OPTIMISTIC_MESSAGE_TTL_MS
+		) {
+			return false;
+		}
+		const text = getMessageText(message);
+		if (message.role !== 'user' || text === null) return true;
+		const matchIndex = unmatchedFreshUserTexts.indexOf(text);
+		if (matchIndex === -1) return true;
+		unmatchedFreshUserTexts.splice(matchIndex, 1);
+		return false;
+	});
 	if (!pending?.length) return fresh;
 	return [...fresh, ...pending];
 }

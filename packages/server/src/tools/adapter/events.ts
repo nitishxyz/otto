@@ -17,6 +17,7 @@ export function publishToolCall(
 		input: unknown;
 		callId: string;
 		stepIndex?: number;
+		index?: number;
 	},
 ): void {
 	publish({
@@ -28,6 +29,7 @@ export function publishToolCall(
 			args: args.input,
 			callId: args.callId,
 			stepIndex: args.stepIndex,
+			index: args.index,
 			messageId: ctx.messageId,
 		},
 	});
