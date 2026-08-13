@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { toConnectedProject } from '../src/lib/machine-project';
+import {
+	resolveRemoteHostLabel,
+	toConnectedProject,
+} from '../src/lib/machine-project';
 
 describe('connected machine project context', () => {
 	test('keeps owner session in runtime project state without putting it in the URL', () => {
@@ -26,5 +29,33 @@ describe('connected machine project context', () => {
 		expect(project.path).toBe('/work/agi');
 		expect(project.pinned).toBe(true);
 		expect(project.lastOpened).toBe(new Date(1).toISOString());
+	});
+});
+
+describe('resolveRemoteHostLabel', () => {
+	test('prefers machine display name over hostname and remote URL host', () => {
+		expect(
+			resolveRemoteHostLabel({
+				name: ' studio-mac ',
+				hostname: 'device.ottorouter.org',
+				remoteUrl: 'https://other.example/api',
+			}),
+		).toBe('studio-mac');
+	});
+
+	test('falls back to tunnel hostname, then remote URL host, then Remote', () => {
+		expect(
+			resolveRemoteHostLabel({
+				hostname: ' device.ottorouter.org ',
+				remoteUrl: 'https://other.example/api',
+			}),
+		).toBe('device.ottorouter.org');
+		expect(
+			resolveRemoteHostLabel({
+				remoteUrl: 'https://box.example:8787/v1',
+			}),
+		).toBe('box.example');
+		expect(resolveRemoteHostLabel({})).toBe('Remote');
+		expect(resolveRemoteHostLabel({ remoteUrl: 'not-a-url' })).toBe('Remote');
 	});
 });

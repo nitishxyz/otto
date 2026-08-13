@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useServer } from '../hooks/useServer';
-import type { Project } from '../lib/tauri-bridge';
+import { resolveRemoteHostLabel } from '../lib/machine-project';
+import type { MachineBootstrap, Project } from '../lib/tauri-bridge';
 import { OttoRouterLoader } from './OttoRouterLoader';
 import { DesktopTitleBar } from './workspace/DesktopTitleBar';
 import { DesktopWorkspaceApp } from './workspace/DesktopWorkspaceApp';
@@ -16,6 +17,7 @@ function closeActiveWorkspaceOverlay() {
 
 export function Workspace({
 	project,
+	machine,
 	onBack,
 	sessionId,
 	view,
@@ -23,6 +25,8 @@ export function Workspace({
 	onCloseDashboard,
 }: {
 	project: Project;
+	/** Connected machine identity when the workspace is opened via machine share. */
+	machine?: MachineBootstrap | null;
 	onBack: () => void | Promise<void>;
 	sessionId?: string;
 	view?: 'agents' | 'looper';
@@ -32,6 +36,13 @@ export function Workspace({
 	const { server, loading, error, startServer, stopServer } = useServer();
 	const startedRef = useRef(false);
 	const isRemote = !!project.remoteUrl;
+	const remoteLabel = isRemote
+		? resolveRemoteHostLabel({
+				name: machine?.name,
+				hostname: machine?.hostname,
+				remoteUrl: project.remoteUrl,
+			})
+		: undefined;
 	const workspaceApiUrl = isRemote
 		? project.remoteUrl
 		: server
@@ -63,6 +74,7 @@ export function Workspace({
 					projectName={project.name}
 					onBack={handleBack}
 					isRemote={isRemote}
+					remoteLabel={remoteLabel}
 					showTabs={false}
 				/>
 			)}
@@ -107,6 +119,7 @@ export function Workspace({
 								projectName={project.name}
 								onBack={handleBack}
 								isRemote={isRemote}
+								remoteLabel={remoteLabel}
 							/>
 						}
 					/>

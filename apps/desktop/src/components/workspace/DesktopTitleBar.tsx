@@ -69,6 +69,8 @@ interface DesktopTitleBarProps {
 	projectName: string;
 	onBack: () => void | Promise<void>;
 	isRemote: boolean;
+	/** Machine/host name for the remote badge; falls back to "Remote". */
+	remoteLabel?: string;
 	/** Hide the workspace tabs (e.g. while the server is still starting). */
 	showTabs?: boolean;
 }
@@ -83,6 +85,7 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 	projectName,
 	onBack,
 	isRemote,
+	remoteLabel,
 	showTabs = true,
 }: DesktopTitleBarProps) {
 	const platform = usePlatform();
@@ -133,7 +136,9 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 					{isRemote && (
 						<div className="flex items-center gap-1.5 text-sm">
 							<span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-							<span className="text-muted-foreground">Remote</span>
+							<span className="text-muted-foreground truncate max-w-[12rem]">
+								{remoteLabel?.trim() || 'Remote'}
+							</span>
 						</div>
 					)}
 					<TitleBarRightRailToggle />

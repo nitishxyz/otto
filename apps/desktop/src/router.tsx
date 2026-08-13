@@ -249,7 +249,8 @@ function SettingsRouteComponent() {
 }
 
 function WorkspaceRouteComponent() {
-	const { selectedProject, onBackToProjects } = rootRoute.useRouteContext();
+	const { selectedProject, machine, onBackToProjects } =
+		rootRoute.useRouteContext();
 	const navigate = useNavigate();
 	const matches = useMatches();
 	const lastSessionIdRef = useRef<string | undefined>(undefined);
@@ -306,6 +307,7 @@ function WorkspaceRouteComponent() {
 		<Workspace
 			key={selectedProject.path}
 			project={selectedProject}
+			machine={machine}
 			onBack={onBackToProjects}
 			sessionId={sessionId}
 			view={isLooperView ? 'looper' : 'agents'}
