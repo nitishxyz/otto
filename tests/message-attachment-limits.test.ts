@@ -189,6 +189,53 @@ describe('message attachment list payloads', () => {
 });
 
 describe('message page payloads', () => {
+	it('keeps insertion order when a user and assistant share a timestamp', async () => {
+		await withProject('otto-message-tie-order-', async (projectRoot) => {
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const userId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+			const assistantId = '00000000-0000-4000-8000-000000000000';
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Equal timestamp ordering test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: 1_000,
+			});
+			for (const [role, id] of [
+				['user', userId],
+				['assistant', assistantId],
+			] as const) {
+				await db.insert(messages).values({
+					id,
+					sessionId,
+					role,
+					status: 'complete',
+					agent: 'general',
+					provider: 'openai',
+					model: 'test-model',
+					createdAt: 2_000,
+				});
+			}
+
+			const response = await createEmbeddedApp().request(
+				`/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+					projectRoot,
+				)}`,
+			);
+			const payload = (await response.json()) as {
+				items: Array<{ id: string }>;
+			};
+			expect(response.status).toBe(200);
+			expect(payload.items.map((message) => message.id)).toEqual([
+				userId,
+				assistantId,
+			]);
+		});
+	});
+
 	it('extends a soft part target to include two complete turns', async () => {
 		await withProject('otto-message-turn-page-', async (projectRoot) => {
 			const db = await getDb(projectRoot);

@@ -10,7 +10,7 @@ import {
 	type ReasoningLevel,
 	validateProviderModel,
 } from '@ottocode/sdk';
-import { and, count, desc, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
@@ -243,8 +243,11 @@ const messagePageSchema = z.object({
 
 interface MessageCursor {
 	createdAt: number;
-	messageId: string;
+	sequence?: number;
+	messageId?: string;
 }
+
+const messageSequence = sql<number>`${messages}.rowid`;
 
 function encodeMessageCursor(cursor: MessageCursor) {
 	return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
@@ -256,10 +259,14 @@ function parseMessageCursor(value: string | undefined): MessageCursor | null {
 		const parsed = JSON.parse(
 			Buffer.from(value, 'base64url').toString('utf8'),
 		) as Partial<MessageCursor>;
+		const hasSequence =
+			typeof parsed.sequence === 'number' &&
+			Number.isSafeInteger(parsed.sequence);
+		const hasMessageId =
+			typeof parsed.messageId === 'string' && Boolean(parsed.messageId);
 		return typeof parsed.createdAt === 'number' &&
 			Number.isSafeInteger(parsed.createdAt) &&
-			typeof parsed.messageId === 'string' &&
-			parsed.messageId
+			(hasSequence || hasMessageId)
 			? (parsed as MessageCursor)
 			: null;
 	} catch {
@@ -270,6 +277,7 @@ function parseMessageCursor(value: string | undefined): MessageCursor | null {
 interface MessageSummary {
 	message: typeof messages.$inferSelect;
 	partCount: number;
+	sequence: number;
 }
 
 function selectCompleteTurnPage(
@@ -518,7 +526,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					.select()
 					.from(messages)
 					.where(eq(messages.sessionId, id))
-					.orderBy(messages.createdAt);
+					.orderBy(messages.createdAt, messageSequence);
 				return c.json(
 					await serializeMessages(db, rows, {
 						includeParts: c.req.query('without') !== 'parts',
@@ -570,12 +578,26 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					return c.json({ error: 'Invalid message cursor' }, 400);
 				}
 				const sessionId = c.req.param('id');
+				const legacyCursorSequence =
+					cursor && cursor.sequence === undefined && cursor.messageId
+						? await db
+								.select({ sequence: messageSequence })
+								.from(messages)
+								.where(
+									and(
+										eq(messages.sessionId, sessionId),
+										eq(messages.id, cursor.messageId),
+									),
+								)
+								.then((rows) => rows[0]?.sequence)
+						: undefined;
+				const cursorSequence = cursor?.sequence ?? legacyCursorSequence;
 				const cursorFilter = cursor
 					? or(
 							lt(messages.createdAt, cursor.createdAt),
 							and(
 								eq(messages.createdAt, cursor.createdAt),
-								lt(messages.id, cursor.messageId),
+								lt(messageSequence, cursorSequence ?? -1),
 							),
 						)
 					: undefined;
@@ -583,6 +605,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					.select({
 						message: messages,
 						partCount: count(messageParts.id),
+						sequence: messageSequence,
 					})
 					.from(messages)
 					.leftJoin(messageParts, eq(messageParts.messageId, messages.id))
@@ -592,14 +615,15 @@ export function registerSessionMessagesRoutes(app: Hono) {
 							: eq(messages.sessionId, sessionId),
 					)
 					.groupBy(messages.id)
-					.orderBy(desc(messages.createdAt), desc(messages.id));
+					.orderBy(desc(messages.createdAt), desc(messageSequence));
 				const summaries = summaryRows.map((row) => ({
 					message: row.message,
 					partCount: Number(row.partCount),
+					sequence: Number(row.sequence),
 				}));
 				const selected = selectCompleteTurnPage(summaries, query.limit);
 				const hasMore = selected.length < summaries.length;
-				const oldest = selected.at(-1)?.message;
+				const oldest = selected.at(-1);
 				const rows = selected.map((summary) => summary.message).reverse();
 				const selectedPartCount = selected.reduce(
 					(total, summary) => total + summary.partCount,
@@ -617,8 +641,9 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					nextCursor:
 						hasMore && oldest
 							? encodeMessageCursor({
-									createdAt: oldest.createdAt,
-									messageId: oldest.id,
+									createdAt: oldest.message.createdAt,
+									sequence: oldest.sequence,
+									messageId: oldest.message.id,
 								})
 							: null,
 				});

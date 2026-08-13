@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import {
+	appendServerCreatedMessage,
 	MESSAGE_PARTS_PAGE_TARGET,
 	flattenMessagePages,
 	getMessagesFromCache,
 	getMessagesQueryKey,
 	getOlderMessagesCursor,
+	mergeOptimisticMessages,
 	normalizeMessagesInfiniteData,
 	updateMessagesCache,
 	type MessagesInfiniteData,
@@ -569,6 +571,65 @@ describe('legacy split pages are still merged defensively', () => {
 			'optimistic-user-1',
 			'assistant-2',
 		]);
+	});
+
+	it('reconciles identical optimistic sends one-for-one after refetch', () => {
+		const textPart = (messageId: string, id: string, text: string) =>
+			part(id, 0, {
+				messageId,
+				content: JSON.stringify({ text }),
+				contentJson: { text },
+			});
+		const cached = [
+			message('optimistic-user-1', Date.now(), {
+				status: 'pending',
+				optimistic: 'sending',
+				parts: [textPart('optimistic-user-1', 'o1', 'same')],
+			}),
+			message('optimistic-user-2', Date.now() + 1, {
+				status: 'pending',
+				optimistic: 'sending',
+				parts: [textPart('optimistic-user-2', 'o2', 'same')],
+			}),
+		];
+		const fresh = [
+			message('real-user-1', Date.now(), {
+				parts: [textPart('real-user-1', 'r1', 'same')],
+			}),
+		];
+
+		expect(mergeOptimisticMessages(cached, fresh).map((m) => m.id)).toEqual([
+			'real-user-1',
+			'optimistic-user-2',
+		]);
+	});
+
+	it('upserts a streamed user message and consumes one matching optimistic row', () => {
+		const textPart = (messageId: string, id: string, text: string) =>
+			part(id, 0, {
+				messageId,
+				content: JSON.stringify({ text }),
+				contentJson: { text },
+			});
+		const cached = [
+			message('optimistic-user-1', 1, {
+				status: 'pending',
+				optimistic: 'sending',
+				parts: [textPart('optimistic-user-1', 'o1', 'same')],
+			}),
+			message('optimistic-user-2', 2, {
+				status: 'pending',
+				optimistic: 'sending',
+				parts: [textPart('optimistic-user-2', 'o2', 'same')],
+			}),
+		];
+		const confirmed = message('real-user-1', 1, {
+			parts: [textPart('real-user-1', 'r1', 'same')],
+		});
+
+		expect(
+			appendServerCreatedMessage(cached, confirmed, 'same').map((m) => m.id),
+		).toEqual(['real-user-1', 'optimistic-user-2']);
 	});
 });
 
