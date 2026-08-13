@@ -777,10 +777,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 1,
-						output: 6,
-						cacheRead: 0.1,
-						cacheWrite: 1.25,
+						input: 0.2,
+						output: 1.2,
+						cacheRead: 0.02,
+						cacheWrite: 0.25,
 					},
 					limit: {
 						context: 1050000,
@@ -833,10 +833,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 2.5,
-						output: 15,
-						cacheRead: 0.25,
-						cacheWrite: 3.125,
+						input: 2,
+						output: 12,
+						cacheRead: 0.2,
+						cacheWrite: 2.5,
 					},
 					limit: {
 						context: 1050000,
@@ -1122,62 +1122,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 					auth: ['api', 'oauth'],
-				},
-				'claude-opus-4-1': {
-					id: 'claude-opus-4-1',
-					ownedBy: 'anthropic',
-					label: 'Claude Opus 4.1 (latest)',
-					modalities: {
-						input: ['text', 'image', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-08-05',
-					lastUpdated: '2025-08-05',
-					openWeights: false,
-					cost: {
-						input: 15,
-						output: 75,
-						cacheRead: 1.5,
-						cacheWrite: 18.75,
-					},
-					limit: {
-						context: 200000,
-						output: 32000,
-					},
-					auth: ['api'],
-				},
-				'claude-opus-4-1-20250805': {
-					id: 'claude-opus-4-1-20250805',
-					ownedBy: 'anthropic',
-					label: 'Claude Opus 4.1',
-					modalities: {
-						input: ['text', 'image', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-03-31',
-					releaseDate: '2025-08-05',
-					lastUpdated: '2025-08-05',
-					openWeights: false,
-					cost: {
-						input: 15,
-						output: 75,
-						cacheRead: 1.5,
-						cacheWrite: 18.75,
-					},
-					limit: {
-						context: 200000,
-						output: 32000,
-					},
-					auth: ['api'],
 				},
 				'claude-opus-4-5': {
 					id: 'claude-opus-4-5',
@@ -1520,57 +1464,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
-				'gemini-2.0-flash': {
-					id: 'gemini-2.0-flash',
-					ownedBy: 'google',
-					label: 'Gemini 2.0 Flash',
-					modalities: {
-						input: ['text', 'image', 'audio', 'video', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: true,
-					temperature: true,
-					knowledge: '2024-06',
-					releaseDate: '2024-12-11',
-					lastUpdated: '2024-12-11',
-					openWeights: false,
-					cost: {
-						input: 0.1,
-						output: 0.4,
-						cacheRead: 0.025,
-					},
-					limit: {
-						context: 1048576,
-						output: 8192,
-					},
-				},
-				'gemini-2.0-flash-lite': {
-					id: 'gemini-2.0-flash-lite',
-					ownedBy: 'google',
-					label: 'Gemini 2.0 Flash-Lite',
-					modalities: {
-						input: ['text', 'image', 'audio', 'video', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: true,
-					temperature: true,
-					knowledge: '2024-06',
-					releaseDate: '2024-12-11',
-					lastUpdated: '2024-12-11',
-					openWeights: false,
-					cost: {
-						input: 0.075,
-						output: 0.3,
-					},
-					limit: {
-						context: 1048576,
-						output: 8192,
-					},
-				},
 				'gemini-2.5-computer-use-preview-10-2025': {
 					id: 'gemini-2.5-computer-use-preview-10-2025',
 					ownedBy: 'google',
@@ -1694,32 +1587,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						input: 0.5,
 						output: 3,
 						cacheRead: 0.05,
-					},
-					limit: {
-						context: 1048576,
-						output: 65536,
-					},
-				},
-				'gemini-3-pro-preview': {
-					id: 'gemini-3-pro-preview',
-					ownedBy: 'google',
-					label: 'Gemini 3 Pro Preview',
-					modalities: {
-						input: ['text', 'image', 'video', 'audio', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-01',
-					releaseDate: '2025-11-18',
-					lastUpdated: '2025-11-18',
-					openWeights: false,
-					cost: {
-						input: 2,
-						output: 12,
-						cacheRead: 0.2,
 					},
 					limit: {
 						context: 1048576,
@@ -2109,6 +1976,56 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
+				'muse-spark-1.2': {
+					id: 'muse-spark-1.2',
+					ownedBy: 'meta',
+					label: 'Muse Spark 1.2',
+					modalities: {
+						input: ['text', 'image', 'video', 'pdf', 'audio'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-05',
+					lastUpdated: '2026-08-05',
+					openWeights: false,
+					cost: {
+						input: 1.25,
+						output: 4.25,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1048576,
+						output: 131072,
+					},
+				},
+				'muse-spark-1.2-contributor': {
+					id: 'muse-spark-1.2-contributor',
+					ownedBy: 'meta',
+					label: 'Muse Spark 1.2 Contributor',
+					modalities: {
+						input: ['text', 'image', 'video', 'pdf', 'audio'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-05',
+					lastUpdated: '2026-08-05',
+					openWeights: false,
+					cost: {
+						input: 0.1,
+						output: 0.2,
+						cacheRead: 0.002,
+					},
+					limit: {
+						context: 1048576,
+						output: 131072,
+					},
+				},
 			},
 			label: 'Meta',
 			env: ['META_MODEL_API_KEY'],
@@ -2141,6 +2058,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 164000,
 						output: 131000,
+					},
+				},
+				'deepseek-ai/DeepSeek-V4-Flash-0731': {
+					id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+					ownedBy: 'deepseek',
+					label: 'Deepseek V4 Flash 0731',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
+					openWeights: true,
+					cost: {
+						input: 0.13,
+						output: 0.26,
+						cacheRead: 0.028,
+					},
+					limit: {
+						context: 1048576,
+						output: 1048576,
 					},
 				},
 				'deepseek-ai/DeepSeek-V4-Pro': {
@@ -2393,6 +2336,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
+				'thinkingmachines/inkling-small': {
+					id: 'thinkingmachines/inkling-small',
+					label: 'Inkling Small',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-07-30',
+					lastUpdated: '2026-07-30',
+					openWeights: true,
+					cost: {
+						input: 0.5,
+						output: 1.2,
+						cacheRead: 0.1,
+					},
+					limit: {
+						context: 1048576,
+						output: 32768,
+					},
+				},
 				'zai-org/GLM-4.7': {
 					id: 'zai-org/GLM-4.7',
 					ownedBy: 'zai',
@@ -2516,7 +2483,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.21,
 					},
 					limit: {
-						context: 524288,
+						context: 1048576,
 						output: 262144,
 					},
 				},
@@ -2580,6 +2547,54 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 163840,
 					},
 				},
+				'deepseek-ai/DeepSeek-V3': {
+					id: 'deepseek-ai/DeepSeek-V3',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek-V3',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2024-12-26',
+					lastUpdated: '2024-12-26',
+					openWeights: true,
+					cost: {
+						input: 0.4,
+						output: 1.3,
+					},
+					limit: {
+						context: 64000,
+						output: 8192,
+					},
+				},
+				'deepseek-ai/DeepSeek-V3.1': {
+					id: 'deepseek-ai/DeepSeek-V3.1',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek-V3.1',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2025-08-21',
+					lastUpdated: '2025-08-21',
+					openWeights: true,
+					cost: {
+						input: 0.27,
+						output: 1,
+					},
+					limit: {
+						context: 131072,
+						output: 8192,
+					},
+				},
 				'deepseek-ai/DeepSeek-V3.2': {
 					id: 'deepseek-ai/DeepSeek-V3.2',
 					ownedBy: 'deepseek',
@@ -2620,6 +2635,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					knowledge: '2025-05',
 					releaseDate: '2026-04-24',
 					lastUpdated: '2026-04-24',
+					openWeights: true,
+					cost: {
+						input: 0.14,
+						output: 0.28,
+					},
+					limit: {
+						context: 1048576,
+						output: 384000,
+					},
+				},
+				'deepseek-ai/DeepSeek-V4-Flash-0731': {
+					id: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Flash 0731',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
 					openWeights: true,
 					cost: {
 						input: 0.14,
@@ -3102,6 +3142,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
+				'Qwen/Qwen3-235B-A22B-Instruct-2507': {
+					id: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+					ownedBy: 'qwen',
+					label: 'Qwen3 235B-A22B Instruct 2507',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2025-07-21',
+					lastUpdated: '2025-07-21',
+					openWeights: true,
+					cost: {
+						input: 0.855,
+						output: 2.565,
+					},
+					limit: {
+						context: 262144,
+						output: 16384,
+					},
+				},
 				'Qwen/Qwen3-235B-A22B-Thinking-2507': {
 					id: 'Qwen/Qwen3-235B-A22B-Thinking-2507',
 					ownedBy: 'qwen',
@@ -3492,6 +3556,75 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 262144,
 						output: 256000,
+					},
+				},
+				'tencent/Hy3': {
+					id: 'tencent/Hy3',
+					label: 'Hy3',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-07-06',
+					lastUpdated: '2026-07-06',
+					openWeights: true,
+					cost: {
+						input: 0.14,
+						output: 0.58,
+					},
+					limit: {
+						context: 262144,
+						output: 64000,
+					},
+				},
+				'thinkingmachines/Inkling': {
+					id: 'thinkingmachines/Inkling',
+					label: 'Inkling',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-07-15',
+					lastUpdated: '2026-07-15',
+					openWeights: true,
+					cost: {
+						input: 1,
+						output: 4.05,
+					},
+					limit: {
+						context: 1048576,
+						output: 1048576,
+					},
+				},
+				'thinkingmachines/Inkling-Small': {
+					id: 'thinkingmachines/Inkling-Small',
+					label: 'Inkling Small',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-07-30',
+					lastUpdated: '2026-07-30',
+					openWeights: true,
+					cost: {
+						input: 0.5,
+						output: 1.2,
+					},
+					limit: {
+						context: 524288,
+						output: 1048576,
 					},
 				},
 				'XiaomiMiMo/MiMo-V2-Flash': {
@@ -3906,6 +4039,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
+				'~deepseek/deepseek-v4-flash-latest': {
+					id: '~deepseek/deepseek-v4-flash-latest',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Flash Latest',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-01',
+					lastUpdated: '2026-08-01',
+					openWeights: false,
+					cost: {
+						input: 0.079996,
+						output: 0.252,
+						cacheRead: 0.0252,
+					},
+					limit: {
+						context: 1048576,
+						output: 262144,
+					},
+				},
 				'~google/gemini-flash-latest': {
 					id: '~google/gemini-flash-latest',
 					ownedBy: 'google',
@@ -3965,7 +4123,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					ownedBy: 'kimi',
 					label: 'MoonshotAI Kimi Latest',
 					modalities: {
-						input: ['text', 'image'],
+						input: ['text', 'image', 'video'],
 						output: ['text'],
 					},
 					toolCall: true,
@@ -3976,8 +4134,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 2.9,
-						output: 15,
+						input: 2.8,
+						output: 14,
 						cacheRead: 0.29,
 					},
 					limit: {
@@ -4056,7 +4214,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 2,
 						output: 6,
-						cacheRead: 0.3,
+						cacheRead: 0.5,
 					},
 					limit: {
 						context: 500000,
@@ -4831,6 +4989,52 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
+				'bytedance-seed/seed-2-1-turbo': {
+					id: 'bytedance-seed/seed-2-1-turbo',
+					label: 'Seed 2.1 Turbo',
+					modalities: {
+						input: ['text', 'image', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
+					cost: {
+						input: 0.5,
+						output: 2.5,
+					},
+					limit: {
+						context: 262144,
+						output: 262144,
+					},
+				},
+				'bytedance-seed/seed-2.0-code': {
+					id: 'bytedance-seed/seed-2.0-code',
+					label: 'Seed 2.0 Code',
+					modalities: {
+						input: ['text', 'image', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-02-14',
+					lastUpdated: '2026-02-14',
+					openWeights: false,
+					cost: {
+						input: 0.5,
+						output: 3,
+					},
+					limit: {
+						context: 262144,
+						output: 131072,
+					},
+				},
 				'bytedance-seed/seed-2.0-lite': {
 					id: 'bytedance-seed/seed-2.0-lite',
 					label: 'Seed-2.0-Lite',
@@ -5094,8 +5298,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.27,
-						output: 1,
-						cacheRead: 0.135,
+						output: 0.95,
+						cacheRead: 0.13,
 					},
 					limit: {
 						context: 163840,
@@ -5179,6 +5383,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 393216,
 					},
 				},
+				'deepseek/deepseek-v4-flash-0731': {
+					id: 'deepseek/deepseek-v4-flash-0731',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Flash 0731',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
+					openWeights: true,
+					cost: {
+						input: 0.08,
+						output: 0.18,
+						cacheRead: 0.016,
+					},
+					limit: {
+						context: 1048576,
+						output: 384000,
+					},
+				},
 				'deepseek/deepseek-v4-pro': {
 					id: 'deepseek/deepseek-v4-pro',
 					ownedBy: 'deepseek',
@@ -5195,6 +5425,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					releaseDate: '2026-04-24',
 					lastUpdated: '2026-04-24',
 					openWeights: true,
+					cost: {
+						input: 1.168,
+						output: 2.336,
+						cacheRead: 0.09855,
+					},
+					limit: {
+						context: 1048576,
+						output: 393216,
+					},
+				},
+				'deepseek/deepseek-v4-pro-0813': {
+					id: 'deepseek/deepseek-v4-pro-0813',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Pro 0813',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
 					cost: {
 						input: 0.435,
 						output: 0.87,
@@ -5364,7 +5619,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 1048576,
-						output: 65535,
+						output: 65536,
 					},
 				},
 				'google/gemini-3-pro-image': {
@@ -5650,12 +5905,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-02',
 					openWeights: true,
 					cost: {
-						input: 0.07,
-						output: 0.34,
+						input: 0.12,
+						output: 0.4,
+						cacheRead: 0.05,
 					},
 					limit: {
 						context: 262144,
-						output: 16384,
+						output: 262144,
 					},
 				},
 				'google/gemma-4-26b-a4b-it:free': {
@@ -5827,9 +6083,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				'inclusionai/ling-3.0-flash:free': {
-					id: 'inclusionai/ling-3.0-flash:free',
-					label: 'Ling-3.0-flash (free)',
+				'inclusionai/ling-3.0-flash': {
+					id: 'inclusionai/ling-3.0-flash',
+					label: 'Ling-3.0-flash',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -5840,7 +6096,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-07-23',
 					lastUpdated: '2026-07-23',
-					openWeights: false,
+					openWeights: true,
+					cost: {
+						input: 0.021,
+						output: 0.063,
+						cacheRead: 0.0042,
+					},
+					limit: {
+						context: 262144,
+						output: 32768,
+					},
+				},
+				'inclusionai/ling-3.0-tiny:free': {
+					id: 'inclusionai/ling-3.0-tiny:free',
+					label: 'Ling 3.0 Tiny (free)',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-06',
+					lastUpdated: '2026-08-06',
+					openWeights: true,
 					cost: {
 						input: 0,
 						output: 0,
@@ -5946,6 +6226,29 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 80000,
 					},
 				},
+				'liquid/lfm-2.5-2.6b:free': {
+					id: 'liquid/lfm-2.5-2.6b:free',
+					label: 'LFM2.5-2.6B (free)',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
+					openWeights: true,
+					cost: {
+						input: 0,
+						output: 0,
+					},
+					limit: {
+						context: 128000,
+						output: 32768,
+					},
+				},
 				'meituan/longcat-2.0': {
 					id: 'meituan/longcat-2.0',
 					label: 'LongCat 2.0',
@@ -6038,12 +6341,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2024-12-06',
 					openWeights: true,
 					cost: {
-						input: 0.13,
-						output: 0.4,
+						input: 0.1,
+						output: 0.32,
 					},
 					limit: {
 						context: 131072,
-						output: 128000,
+						output: 16384,
 					},
 				},
 				'meta-llama/llama-4-maverick': {
@@ -6064,7 +6367,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.2,
-						output: 0.8,
+						output: 0.696,
 					},
 					limit: {
 						context: 1048576,
@@ -6096,6 +6399,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 16384,
 					},
 				},
+				'meta/muse-glimmer-30b': {
+					id: 'meta/muse-glimmer-30b',
+					ownedBy: 'meta',
+					label: 'Muse Glimmer 30B',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-01-04',
+					releaseDate: '2026-08-10',
+					lastUpdated: '2026-08-10',
+					openWeights: true,
+					cost: {
+						input: 0.35,
+						output: 1.5,
+						cacheRead: 0.04,
+					},
+					limit: {
+						context: 131072,
+						output: 131072,
+					},
+				},
 				'meta/muse-spark-1.1': {
 					id: 'meta/muse-spark-1.1',
 					ownedBy: 'meta',
@@ -6110,6 +6439,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-04-08',
 					lastUpdated: '2026-07-09',
+					openWeights: false,
+					cost: {
+						input: 1.25,
+						output: 4.25,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1048576,
+						output: 1048576,
+					},
+				},
+				'meta/muse-spark-1.2': {
+					id: 'meta/muse-spark-1.2',
+					ownedBy: 'meta',
+					label: 'Muse Spark 1.2',
+					modalities: {
+						input: ['text', 'image', 'video', 'pdf', 'audio'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-05',
+					lastUpdated: '2026-08-05',
 					openWeights: false,
 					cost: {
 						input: 1.25,
@@ -6211,7 +6565,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-12',
 					openWeights: true,
 					cost: {
-						input: 0.15,
+						input: 0.22,
 						output: 0.9,
 						cacheRead: 0.05,
 					},
@@ -6236,9 +6590,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-03-18',
 					openWeights: true,
 					cost: {
-						input: 0.25,
-						output: 1,
-						cacheRead: 0.05,
+						input: 0.3,
+						output: 1.2,
+						cacheRead: 0.06,
 					},
 					limit: {
 						context: 204800,
@@ -6293,31 +6647,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 256000,
 						output: 256000,
-					},
-				},
-				'mistralai/devstral-2512': {
-					id: 'mistralai/devstral-2512',
-					label: 'Devstral 2',
-					modalities: {
-						input: ['text', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-12',
-					releaseDate: '2025-12-09',
-					lastUpdated: '2025-12-09',
-					openWeights: true,
-					cost: {
-						input: 0.4,
-						output: 2,
-						cacheRead: 0.04,
-					},
-					limit: {
-						context: 262144,
-						output: 262144,
 					},
 				},
 				'mistralai/ministral-14b-2512': {
@@ -6630,9 +6959,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-06-20',
 					openWeights: true,
 					cost: {
-						input: 0.1,
-						output: 0.3,
-						cacheRead: 0.01,
+						input: 0.09375,
+						output: 0.25,
 					},
 					limit: {
 						context: 256000,
@@ -6807,9 +7135,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.646,
-						output: 2.72,
-						cacheRead: 0.1088,
+						input: 0.95,
+						output: 4,
+						cacheRead: 0.16,
 					},
 					limit: {
 						context: 262144,
@@ -6833,8 +7161,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-12',
 					openWeights: true,
 					cost: {
-						input: 0.73,
-						output: 3.5,
+						input: 0.67,
+						output: 3.4,
 						cacheRead: 0.15,
 					},
 					limit: {
@@ -6847,7 +7175,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					ownedBy: 'kimi',
 					label: 'Kimi K3',
 					modalities: {
-						input: ['text', 'image'],
+						input: ['text', 'image', 'video'],
 						output: ['text'],
 					},
 					toolCall: true,
@@ -7068,6 +7396,53 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-06-04',
 					lastUpdated: '2026-06-04',
+					openWeights: true,
+					cost: {
+						input: 0,
+						output: 0,
+					},
+					limit: {
+						context: 1000000,
+						output: 65536,
+					},
+				},
+				'nvidia/nemotron-3.5-lightning': {
+					id: 'nvidia/nemotron-3.5-lightning',
+					label: 'Nemotron 3.5 Lightning 30B A3B',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
+					openWeights: true,
+					cost: {
+						input: 0.1,
+						output: 0.25,
+						cacheRead: 0.05,
+					},
+					limit: {
+						context: 1000000,
+						output: 262144,
+					},
+				},
+				'nvidia/nemotron-3.5-lightning:free': {
+					id: 'nvidia/nemotron-3.5-lightning:free',
+					label: 'Nemotron 3.5 Lightning (free)',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -7533,32 +7908,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				'openai/gpt-5-codex': {
-					id: 'openai/gpt-5-codex',
-					ownedBy: 'openai',
-					label: 'GPT-5-Codex',
-					modalities: {
-						input: ['text', 'image'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: false,
-					knowledge: '2024-09-30',
-					releaseDate: '2025-09-15',
-					lastUpdated: '2025-09-15',
-					openWeights: false,
-					cost: {
-						input: 1.25,
-						output: 10,
-						cacheRead: 0.125,
-					},
-					limit: {
-						context: 400000,
-						output: 128000,
-					},
-				},
 				'openai/gpt-5-mini': {
 					id: 'openai/gpt-5-mini',
 					ownedBy: 'openai',
@@ -7660,32 +8009,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 400000,
 						output: 128000,
-					},
-				},
-				'openai/gpt-5.1-chat': {
-					id: 'openai/gpt-5.1-chat',
-					ownedBy: 'openai',
-					label: 'GPT-5.1 Chat',
-					modalities: {
-						input: ['pdf', 'image', 'text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: true,
-					temperature: false,
-					knowledge: '2024-09-30',
-					releaseDate: '2025-11-13',
-					lastUpdated: '2025-11-13',
-					openWeights: false,
-					cost: {
-						input: 1.25,
-						output: 10,
-						cacheRead: 0.13,
-					},
-					limit: {
-						context: 128000,
-						output: 32000,
 					},
 				},
 				'openai/gpt-5.1-codex': {
@@ -7815,7 +8138,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 128000,
-						output: 16384,
+						output: 32000,
 					},
 				},
 				'openai/gpt-5.2-codex': {
@@ -7867,31 +8190,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 400000,
 						output: 128000,
-					},
-				},
-				'openai/gpt-5.3-chat': {
-					id: 'openai/gpt-5.3-chat',
-					ownedBy: 'openai',
-					label: 'GPT-5.3 Chat',
-					modalities: {
-						input: ['text', 'image', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: false,
-					attachment: true,
-					temperature: false,
-					releaseDate: '2026-03-03',
-					lastUpdated: '2026-03-03',
-					openWeights: false,
-					cost: {
-						input: 1.75,
-						output: 14,
-						cacheRead: 0.175,
-					},
-					limit: {
-						context: 128000,
-						output: 16384,
 					},
 				},
 				'openai/gpt-5.3-codex': {
@@ -8091,10 +8389,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 0.5,
-						output: 3,
-						cacheRead: 0.05,
-						cacheWrite: 0.625,
+						input: 0.1,
+						output: 0.6,
+						cacheRead: 0.01,
+						cacheWrite: 0.125,
 					},
 					limit: {
 						context: 1050000,
@@ -8118,10 +8416,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 0.5,
-						output: 3,
-						cacheRead: 0.05,
-						cacheWrite: 0.625,
+						input: 0.1,
+						output: 0.6,
+						cacheRead: 0.01,
+						cacheWrite: 0.125,
 					},
 					limit: {
 						context: 1050000,
@@ -8199,10 +8497,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 1.25,
-						output: 7.5,
-						cacheRead: 0.125,
-						cacheWrite: 1.5625,
+						input: 1,
+						output: 6,
+						cacheRead: 0.1,
+						cacheWrite: 1.25,
 					},
 					limit: {
 						context: 1050000,
@@ -8226,10 +8524,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 1.25,
-						output: 7.5,
-						cacheRead: 0.125,
-						cacheWrite: 1.5625,
+						input: 1,
+						output: 6,
+						cacheRead: 0.1,
+						cacheWrite: 1.25,
 					},
 					limit: {
 						context: 1050000,
@@ -8325,8 +8623,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-08-05',
 					openWeights: true,
 					cost: {
-						input: 0.037,
+						input: 0.03,
 						output: 0.17,
+						cacheRead: 0.03,
 					},
 					limit: {
 						context: 131072,
@@ -8459,32 +8758,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				'openai/o3-deep-research': {
-					id: 'openai/o3-deep-research',
-					ownedBy: 'openai',
-					label: 'o3-deep-research',
-					modalities: {
-						input: ['image', 'text', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2024-05',
-					releaseDate: '2024-06-26',
-					lastUpdated: '2024-06-26',
-					openWeights: false,
-					cost: {
-						input: 10,
-						output: 40,
-						cacheRead: 2.5,
-					},
-					limit: {
-						context: 200000,
-						output: 100000,
-					},
-				},
 				'openai/o3-mini': {
 					id: 'openai/o3-mini',
 					ownedBy: 'openai',
@@ -8588,32 +8861,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 100000,
 					},
 				},
-				'openai/o4-mini-deep-research': {
-					id: 'openai/o4-mini-deep-research',
-					ownedBy: 'openai',
-					label: 'o4-mini-deep-research',
-					modalities: {
-						input: ['pdf', 'image', 'text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2024-05',
-					releaseDate: '2024-06-26',
-					lastUpdated: '2024-06-26',
-					openWeights: false,
-					cost: {
-						input: 2,
-						output: 8,
-						cacheRead: 0.5,
-					},
-					limit: {
-						context: 200000,
-						output: 100000,
-					},
-				},
 				'openai/o4-mini-high': {
 					id: 'openai/o4-mini-high',
 					ownedBy: 'openai',
@@ -8697,9 +8944,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-21',
 					openWeights: true,
 					cost: {
-						input: 0.1,
-						output: 0.2,
-						cacheRead: 0.01,
+						input: 0.09,
+						output: 0.18,
+						cacheRead: 0.009,
 					},
 					limit: {
 						context: 1048576,
@@ -8921,12 +9168,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-04-28',
 					openWeights: true,
 					cost: {
-						input: 0.2275,
-						output: 0.91,
+						input: 0.12,
+						output: 0.24,
 					},
 					limit: {
 						context: 131072,
-						output: 8192,
+						output: 16384,
 					},
 				},
 				'qwen/qwen3-235b-a22b': {
@@ -8996,8 +9243,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-07-25',
 					openWeights: true,
 					cost: {
-						input: 0.3,
-						output: 3,
+						input: 0.23,
+						output: 2.3,
 					},
 					limit: {
 						context: 262144,
@@ -9173,11 +9420,11 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.07,
-						output: 0.27,
+						output: 0.28,
 					},
 					limit: {
 						context: 262144,
-						output: 32768,
+						output: 262144,
 					},
 				},
 				'qwen/qwen3-coder-flash': {
@@ -9219,8 +9466,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					releaseDate: '2026-02-04',
-					lastUpdated: '2026-02-04',
+					knowledge: '2025-09',
+					releaseDate: '2026-02-03',
+					lastUpdated: '2026-02-03',
 					openWeights: true,
 					cost: {
 						input: 0.12,
@@ -9327,13 +9575,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-09',
 					openWeights: true,
 					cost: {
-						input: 0.1,
+						input: 0.09,
 						output: 1.1,
-						cacheRead: 0.07,
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 16384,
 					},
 				},
 				'qwen/qwen3-next-80b-a3b-thinking': {
@@ -9358,7 +9605,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 262144,
-						output: 32768,
+						output: 262144,
 					},
 				},
 				'qwen/qwen3-vl-235b-a22b-instruct': {
@@ -9378,9 +9625,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-09-23',
 					openWeights: true,
 					cost: {
-						input: 0.21,
-						output: 1.9,
-						cacheRead: 0.1,
+						input: 0.26,
+						output: 1.04,
 					},
 					limit: {
 						context: 262144,
@@ -9550,12 +9796,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
-						input: 0.26,
-						output: 2.08,
+						input: 0.29,
+						output: 2.4,
 					},
 					limit: {
 						context: 262144,
-						output: 65536,
+						output: 81920,
 					},
 				},
 				'qwen/qwen3.5-27b': {
@@ -9598,8 +9844,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
-						input: 0.14,
-						output: 1,
+						input: 0.25,
+						output: 1.25,
+						cacheRead: 0.25,
 					},
 					limit: {
 						context: 262144,
@@ -9622,8 +9869,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-15',
 					openWeights: true,
 					cost: {
-						input: 0.39,
-						output: 2.34,
+						input: 0.45,
+						output: 3,
+						cacheRead: 0.045,
 					},
 					limit: {
 						context: 262144,
@@ -9744,13 +9992,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-22',
 					openWeights: true,
 					cost: {
-						input: 0.3,
-						output: 2,
-						cacheRead: 0.15,
+						input: 0.6,
+						output: 3.6,
+						cacheRead: 0.12,
 					},
 					limit: {
 						context: 262144,
-						output: 65536,
+						output: 262144,
 					},
 				},
 				'qwen/qwen3.6-35b-a3b': {
@@ -9769,8 +10017,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-17',
 					openWeights: true,
 					cost: {
-						input: 0.14,
+						input: 0.15,
 						output: 1,
+						cacheRead: 0.05,
 					},
 					limit: {
 						context: 262144,
@@ -9866,8 +10115,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-07-27',
-					lastUpdated: '2026-07-27',
+					releaseDate: '2026-07-15',
+					lastUpdated: '2026-07-15',
 					openWeights: false,
 					cost: {
 						input: 0.03,
@@ -9903,7 +10152,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 1000000,
-						output: 65536,
+						output: 131072,
 					},
 				},
 				'qwen/qwen3.7-plus': {
@@ -9930,7 +10179,58 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 1000000,
-						output: 65536,
+						output: 131072,
+					},
+				},
+				'qwen/qwen3.8-2.4t-a95b': {
+					id: 'qwen/qwen3.8-2.4t-a95b',
+					ownedBy: 'qwen',
+					label: 'Qwen3.8 2.4T A95B',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: true,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.2,
+					},
+					limit: {
+						context: 262144,
+						output: 52429,
+					},
+				},
+				'qwen/qwen3.8-max': {
+					id: 'qwen/qwen3.8-max',
+					ownedBy: 'qwen',
+					label: 'Qwen3.8 Max',
+					modalities: {
+						input: ['text', 'image', 'video'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-03',
+					lastUpdated: '2026-08-03',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.25,
+						cacheWrite: 2.5,
+					},
+					limit: {
+						context: 1000000,
+						output: 131072,
 					},
 				},
 				'rekaai/reka-edge': {
@@ -10001,6 +10301,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 1000000,
 						output: 128000,
+					},
+				},
+				'sakana/sakana-namazu': {
+					id: 'sakana/sakana-namazu',
+					label: 'Sakana Namazu',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
+					openWeights: false,
+					cost: {
+						input: 0.95,
+						output: 4,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 262144,
+						output: 65536,
 					},
 				},
 				'sao10k/l3.1-euryale-70b': {
@@ -10145,8 +10469,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 0.4,
 					},
 					limit: {
-						context: 32768,
-						output: 32768,
+						context: 1024000,
+						output: 1024000,
 					},
 				},
 				'thinkingmachines/inkling': {
@@ -10164,13 +10488,37 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-15',
 					openWeights: true,
 					cost: {
-						input: 1,
+						input: 0.95,
 						output: 4.05,
-						cacheRead: 0.17,
+						cacheRead: 0.16,
 					},
 					limit: {
 						context: 1048576,
-						output: 1048576,
+						output: 262144,
+					},
+				},
+				'thinkingmachines/inkling-small': {
+					id: 'thinkingmachines/inkling-small',
+					label: 'Inkling Small',
+					modalities: {
+						input: ['text', 'image', 'audio'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-07-30',
+					lastUpdated: '2026-07-30',
+					openWeights: true,
+					cost: {
+						input: 0.45,
+						output: 1.2,
+						cacheRead: 0.1,
+					},
+					limit: {
+						context: 524288,
+						output: 262144,
 					},
 				},
 				'upstage/solar-pro-3': {
@@ -10193,8 +10541,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheRead: 0.015,
 					},
 					limit: {
-						context: 128000,
-						output: 128000,
+						context: 131072,
+						output: 131072,
+					},
+				},
+				'upstage/solar-pro4': {
+					id: 'upstage/solar-pro4',
+					label: 'Solar Pro 4',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-10',
+					lastUpdated: '2026-08-10',
+					openWeights: false,
+					cost: {
+						input: 0.03,
+						output: 0.12,
+						cacheRead: 0.006,
+					},
+					limit: {
+						context: 524288,
+						output: 131072,
 					},
 				},
 				'x-ai/grok-4.20': {
@@ -10267,6 +10639,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						input: 2,
 						output: 6,
 						cacheRead: 0.3,
+					},
+					limit: {
+						context: 500000,
+						output: 500000,
+					},
+				},
+				'x-ai/grok-4.6': {
+					id: 'x-ai/grok-4.6',
+					ownedBy: 'xai',
+					label: 'Grok 4.6',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-02-01',
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.5,
 					},
 					limit: {
 						context: 500000,
@@ -10596,13 +10994,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-07',
 					openWeights: true,
 					cost: {
-						input: 0.966,
-						output: 3.036,
-						cacheRead: 0.1794,
+						input: 1.4,
+						output: 4.4,
+						cacheRead: 0.26,
 					},
 					limit: {
 						context: 204800,
-						output: 128000,
+						output: 131072,
 					},
 				},
 				'z-ai/glm-5.2': {
@@ -10621,13 +11019,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-13',
 					openWeights: true,
 					cost: {
-						input: 0.966,
-						output: 3.036,
-						cacheRead: 0.1794,
+						input: 0.5,
+						output: 3.15,
+						cacheRead: 0.1,
 					},
 					limit: {
 						context: 1048576,
-						output: 128000,
+						output: 131072,
 					},
 				},
 				'z-ai/glm-5v-turbo': {
@@ -11094,8 +11492,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					temperature: true,
 					knowledge: '2025-05',
-					releaseDate: '2026-04-24',
-					lastUpdated: '2026-04-24',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
 					openWeights: true,
 					cost: {
 						input: 0.14,
@@ -11120,8 +11518,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					temperature: true,
 					knowledge: '2025-05',
-					releaseDate: '2026-04-24',
-					lastUpdated: '2026-04-24',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -12024,10 +12422,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 1,
-						output: 6,
-						cacheRead: 0.1,
-						cacheWrite: 1.25,
+						input: 0.2,
+						output: 1.2,
+						cacheRead: 0.02,
+						cacheWrite: 0.25,
 					},
 					limit: {
 						context: 1050000,
@@ -12125,10 +12523,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/openai',
 					},
 				},
-				'grok-build-0.1': {
-					id: 'grok-build-0.1',
+				'grok-4.6': {
+					id: 'grok-4.6',
 					ownedBy: 'xai',
-					label: 'Grok Build 0.1',
+					label: 'Grok 4.6',
 					modalities: {
 						input: ['text', 'image'],
 						output: ['text'],
@@ -12137,8 +12535,37 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-05-20',
-					lastUpdated: '2026-05-20',
+					knowledge: '2026-02-01',
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.5,
+					},
+					limit: {
+						context: 500000,
+						output: 500000,
+					},
+					provider: {
+						npm: '@ai-sdk/openai',
+					},
+				},
+				'grok-build-0.1': {
+					id: 'grok-build-0.1',
+					ownedBy: 'xai',
+					label: 'Grok Build 0.1',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-04-16',
+					lastUpdated: '2026-04-16',
 					openWeights: false,
 					cost: {
 						input: 1,
@@ -12148,6 +12575,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 256000,
 						output: 256000,
+					},
+					provider: {
+						npm: '@ai-sdk/openai',
 					},
 				},
 				'grok-code': {
@@ -12187,8 +12617,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					releaseDate: '2026-06-26',
-					lastUpdated: '2026-06-26',
+					releaseDate: '2026-07-06',
+					lastUpdated: '2026-07-06',
 					openWeights: true,
 					cost: {
 						input: 0,
@@ -12476,6 +12906,53 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 262144,
 						output: 32768,
+					},
+				},
+				'ling-3.0-tiny-free': {
+					id: 'ling-3.0-tiny-free',
+					label: 'Ling-3.0-tiny Free',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-06',
+					lastUpdated: '2026-08-06',
+					openWeights: false,
+					cost: {
+						input: 0,
+						output: 0,
+					},
+					limit: {
+						context: 262144,
+						output: 32768,
+					},
+				},
+				'longcat-2.0-free': {
+					id: 'longcat-2.0-free',
+					label: 'LongCat-2.0 Free',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-06-30',
+					lastUpdated: '2026-06-30',
+					openWeights: false,
+					cost: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+					},
+					limit: {
+						context: 1000000,
+						output: 131072,
 					},
 				},
 				'mimo-v2-flash-free': {
@@ -12818,6 +13295,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
+				'nemotron-3.5-lightning-free': {
+					id: 'nemotron-3.5-lightning-free',
+					label: 'Nemotron 3.5 Lightning Free',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
+					openWeights: true,
+					cost: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+					},
+					limit: {
+						context: 262144,
+						output: 262144,
+					},
+				},
 				'north-mini-code-free': {
 					id: 'north-mini-code-free',
 					label: 'North Mini Code Free',
@@ -13117,6 +13618,33 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 500000,
 					},
 					auth: ['api', 'oauth'],
+				},
+				'grok-4.6': {
+					id: 'grok-4.6',
+					ownedBy: 'xai',
+					label: 'Grok 4.6',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-02-01',
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.5,
+					},
+					limit: {
+						context: 500000,
+						output: 500000,
+					},
+					auth: ['api'],
 				},
 				'grok-build-0.1': {
 					id: 'grok-build-0.1',
@@ -13532,33 +14060,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 		'zai-coding': {
 			id: 'zai-coding',
 			models: {
-				'glm-4.5-air': {
-					id: 'glm-4.5-air',
-					ownedBy: 'zai',
-					label: 'GLM-4.5-Air',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: false,
-					temperature: true,
-					knowledge: '2025-04',
-					releaseDate: '2025-07-28',
-					lastUpdated: '2025-07-28',
-					openWeights: true,
-					cost: {
-						input: 0,
-						output: 0,
-						cacheRead: 0,
-						cacheWrite: 0,
-					},
-					limit: {
-						context: 131072,
-						output: 98304,
-					},
-				},
 				'glm-4.7': {
 					id: 'glm-4.7',
 					ownedBy: 'zai',
@@ -13612,32 +14113,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				'glm-5.1': {
-					id: 'glm-5.1',
-					ownedBy: 'zai',
-					label: 'GLM-5.1',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: false,
-					temperature: true,
-					releaseDate: '2026-03-27',
-					lastUpdated: '2026-03-27',
-					openWeights: false,
-					cost: {
-						input: 0,
-						output: 0,
-						cacheRead: 0,
-						cacheWrite: 0,
-					},
-					limit: {
-						context: 200000,
-						output: 131072,
-					},
-				},
 				'glm-5.2': {
 					id: 'glm-5.2',
 					ownedBy: 'zai',
@@ -13664,21 +14139,21 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 131072,
 					},
 				},
-				'glm-5v-turbo': {
-					id: 'glm-5v-turbo',
+				'glm-5.2-highspeed': {
+					id: 'glm-5.2-highspeed',
 					ownedBy: 'zai',
-					label: 'GLM-5V-Turbo',
+					label: 'GLM-5.2 Highspeed',
 					modalities: {
-						input: ['text', 'image', 'video', 'pdf'],
+						input: ['text'],
 						output: ['text'],
 					},
 					toolCall: true,
 					reasoningText: true,
-					attachment: true,
+					attachment: false,
 					temperature: true,
-					releaseDate: '2026-04-01',
-					lastUpdated: '2026-04-01',
-					openWeights: false,
+					releaseDate: '2026-06-13',
+					lastUpdated: '2026-06-13',
+					openWeights: true,
 					cost: {
 						input: 0,
 						output: 0,
@@ -13686,7 +14161,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						cacheWrite: 0,
 					},
 					limit: {
-						context: 200000,
+						context: 1000000,
 						output: 131072,
 					},
 				},
@@ -13765,8 +14240,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					temperature: true,
 					knowledge: '2025-05',
-					releaseDate: '2026-04-24',
-					lastUpdated: '2026-04-24',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
 					openWeights: true,
 					cost: {
 						input: 0.14,
@@ -13790,10 +14265,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-05',
-					releaseDate: '2026-04-24',
-					lastUpdated: '2026-04-24',
-					openWeights: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
 					cost: {
 						input: 0.435,
 						output: 0.87,
@@ -14125,6 +14599,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 0.3,
 						output: 1.2,
+						cacheRead: 0.03,
+						cacheWrite: 0.375,
 					},
 					limit: {
 						context: 204800,
@@ -14567,58 +15043,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 128000,
 					},
 				},
-				'gemini-2.5-pro': {
-					id: 'gemini-2.5-pro',
-					ownedBy: 'google',
-					label: 'Gemini 2.5 Pro',
-					modalities: {
-						input: ['text', 'image', 'audio', 'video', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-01',
-					releaseDate: '2025-06-17',
-					lastUpdated: '2025-06-17',
-					openWeights: false,
-					cost: {
-						input: 1.25,
-						output: 10,
-						cacheRead: 0.125,
-					},
-					limit: {
-						context: 128000,
-						output: 64000,
-					},
-				},
-				'gemini-3-flash-preview': {
-					id: 'gemini-3-flash-preview',
-					ownedBy: 'google',
-					label: 'Gemini 3 Flash Preview',
-					modalities: {
-						input: ['text', 'image', 'video', 'audio', 'pdf'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: true,
-					temperature: true,
-					knowledge: '2025-01',
-					releaseDate: '2025-12-17',
-					lastUpdated: '2025-12-17',
-					openWeights: false,
-					cost: {
-						input: 0.5,
-						output: 3,
-						cacheRead: 0.05,
-					},
-					limit: {
-						context: 128000,
-						output: 64000,
-					},
-				},
 				'gemini-3.1-pro-preview': {
 					id: 'gemini-3.1-pro-preview',
 					ownedBy: 'google',
@@ -14668,6 +15092,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 200000,
+						output: 64000,
+					},
+				},
+				'gemini-3.6-flash': {
+					id: 'gemini-3.6-flash',
+					ownedBy: 'google',
+					label: 'Gemini 3.6 Flash',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-03',
+					releaseDate: '2026-07-21',
+					lastUpdated: '2026-07-21',
+					openWeights: false,
+					cost: {
+						input: 1.5,
+						output: 7.5,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1000000,
 						output: 64000,
 					},
 				},
@@ -14922,10 +15372,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 1,
-						output: 6,
-						cacheRead: 0.1,
-						cacheWrite: 1.25,
+						input: 0.2,
+						output: 1.2,
+						cacheRead: 0.02,
 					},
 					limit: {
 						context: 1050000,
@@ -14976,13 +15425,37 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-09',
 					openWeights: false,
 					cost: {
-						input: 2.5,
-						output: 15,
-						cacheRead: 0.25,
-						cacheWrite: 3.125,
+						input: 2,
+						output: 12,
+						cacheRead: 0.2,
 					},
 					limit: {
 						context: 1050000,
+						output: 128000,
+					},
+				},
+				'grok-4.5': {
+					id: 'grok-4.5',
+					ownedBy: 'xai',
+					label: 'Grok 4.5',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-07-08',
+					lastUpdated: '2026-07-08',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.5,
+					},
+					limit: {
+						context: 500000,
 						output: 128000,
 					},
 				},
@@ -15012,6 +15485,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32000,
 					},
 				},
+				'kimi-k3': {
+					id: 'kimi-k3',
+					ownedBy: 'kimi',
+					label: 'Kimi K3',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: false,
+					releaseDate: '2026-07-16',
+					lastUpdated: '2026-07-16',
+					openWeights: true,
+					cost: {
+						input: 3,
+						output: 15,
+						cacheRead: 0.3,
+					},
+					limit: {
+						context: 1048576,
+						output: 131072,
+					},
+				},
 				'mai-code-1-flash-picker': {
 					id: 'mai-code-1-flash-picker',
 					label: 'MAI-Code-1-Flash',
@@ -15031,6 +15529,29 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						input: 0.75,
 						output: 4.5,
 						cacheRead: 0.075,
+					},
+					limit: {
+						context: 256000,
+						output: 128000,
+					},
+				},
+				'mai-code-1.1-flash': {
+					id: 'mai-code-1.1-flash',
+					label: 'MAI-Code-1.1-Flash',
+					modalities: {
+						input: ['text', 'image', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					releaseDate: '2026-08-11',
+					lastUpdated: '2026-08-11',
+					openWeights: false,
+					cost: {
+						input: 0.2,
+						output: 1.2,
+						cacheRead: 0.02,
 					},
 					limit: {
 						context: 256000,
@@ -15060,6 +15581,27 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					releaseDate: '2026-04-24',
 					lastUpdated: '2026-04-24',
+					openWeights: true,
+					limit: {
+						context: 1048576,
+						output: 1048576,
+					},
+				},
+				'deepseek-v4-flash:0731': {
+					id: 'deepseek-v4-flash:0731',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Flash 0731',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					knowledge: '2025-05',
+					releaseDate: '2026-07-31',
+					lastUpdated: '2026-07-31',
 					openWeights: true,
 					limit: {
 						context: 1048576,
