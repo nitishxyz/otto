@@ -1,5 +1,9 @@
 import { and, eq } from 'drizzle-orm';
-import { hasConfiguredProvider, logger } from '@ottocode/sdk';
+import {
+	hasConfiguredProvider,
+	isDelegatableAgent,
+	logger,
+} from '@ottocode/sdk';
 import { subagents } from '@ottocode/database/schema';
 import { publish } from '../../events/bus.ts';
 import { discoverAllAgents, resolveAgentConfig } from '../agent/registry.ts';
@@ -148,14 +152,11 @@ async function validateSpawnTarget(args: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
 	if (!args.targetAgent)
 		return { ok: false, error: 'Target agent is required.' };
-	if (args.targetAgent === args.parentAgent) {
+	if (!isDelegatableAgent(args.targetAgent)) {
 		return {
 			ok: false,
-			error: 'Cannot delegate to the same agent that is delegating.',
+			error: `Cannot delegate to the ${args.targetAgent} agent.`,
 		};
-	}
-	if (args.targetAgent === 'looper') {
-		return { ok: false, error: 'Cannot delegate to the looper agent.' };
 	}
 
 	const knownAgents = await discoverAllAgents(args.cfg.projectRoot);

@@ -10,7 +10,10 @@ import {
 	type ServerInfo,
 	type TunnelDevice,
 } from './lib/tauri-bridge';
-import { loadAuthorizedMachineProjects } from './lib/machine-api';
+import {
+	loadAuthorizedMachineProjects,
+	loadMachineDevices,
+} from './lib/machine-api';
 import { ensureDesktopDaemonReady } from './lib/daemon-startup';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
 import { router } from './router';
@@ -66,11 +69,26 @@ function App() {
 				.getCliSelection()
 				.then(setCliSelection)
 				.catch(() => {});
-			const [machineBootstrap, initialPath, initialRemote] = await Promise.all([
+			let [machineBootstrap, initialPath, initialRemote] = await Promise.all([
 				tauriBridge.getMachineBootstrap(),
 				tauriBridge.getInitialProject(),
 				tauriBridge.getInitialRemote(),
 			]);
+			if (machineBootstrap) {
+				try {
+					const { devices } = await loadMachineDevices();
+					const currentDevice = devices.find(
+						(device) => device.deviceId === machineBootstrap?.deviceId,
+					);
+					if (currentDevice) {
+						machineBootstrap =
+							(await tauriBridge.setCurrentMachine(currentDevice)) ??
+							machineBootstrap;
+					}
+				} catch {
+					// Keep the window bootstrap when the account device list is unavailable.
+				}
+			}
 			let nextRoute: '/onboarding' | '/projects' | '/sessions' = '/projects';
 
 			if (!machineBootstrap) {

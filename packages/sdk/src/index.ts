@@ -42,6 +42,7 @@ export type {
 	DictationKeyword,
 } from './types/src/index.ts';
 export { isSupportedGitReferenceUrl } from './references.ts';
+export { isDelegatableAgent } from './agent/delegation.ts';
 
 // =======================
 // Providers (from internal providers module)

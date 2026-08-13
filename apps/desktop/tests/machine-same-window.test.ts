@@ -34,4 +34,14 @@ describe('same-window machine navigation', () => {
 		expect(app).toContain('setCurrentMachine(null)');
 		expect(app).toContain('setMachine(null)');
 	});
+
+	test('refreshes machine metadata before rendering a restored window', async () => {
+		const app = await readFile('src/App.tsx', 'utf8');
+
+		expect(app).toContain('const { devices } = await loadMachineDevices()');
+		expect(app).toContain('device.deviceId === machineBootstrap?.deviceId');
+		expect(app).toContain(
+			'(await tauriBridge.setCurrentMachine(currentDevice))',
+		);
+	});
 });

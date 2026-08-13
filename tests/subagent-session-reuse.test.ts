@@ -107,7 +107,7 @@ describe('delegate_task session reuse validation', () => {
 			cfg,
 			parentSessionId: PARENT_SESSION_ID,
 			parentAgent: 'looper',
-			agent: 'general',
+			agent: 'build',
 			task: 'follow-up task',
 			reuseSessionId: CHILD_SESSION_ID,
 		});

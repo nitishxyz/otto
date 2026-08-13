@@ -10,6 +10,7 @@ import {
 	useMemo,
 } from 'react';
 import type { ChangeEvent, ClipboardEvent, UIEvent } from 'react';
+import { isDelegatableAgent } from '@ottocode/sdk';
 
 import {
 	ArrowUp,
@@ -310,9 +311,9 @@ export const ChatInput = memo(
 		const mentionAgents = useMemo(
 			() =>
 				(mentionAgentsData?.agents ?? [])
-					.filter((a) => a.name !== 'looper' && a.name !== agent)
+					.filter((a) => isDelegatableAgent(a.name))
 					.map((a) => ({ name: a.name, description: a.description })),
-			[mentionAgentsData, agent],
+			[mentionAgentsData],
 		);
 		const mentionAgentNames = useMemo(
 			() => mentionAgents.map((a) => a.name),

@@ -3,6 +3,7 @@ import {
 	discoverProjectTools,
 	getLazyToolDefinitions,
 	getToolMetadata,
+	isDelegatableAgent,
 	loadConfig,
 	logger,
 } from '@ottocode/sdk';
@@ -174,9 +175,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		try {
 			const { listAgentDescriptions } = await import('../registry.ts');
 			const agentList = await listAgentDescriptions(cfg.projectRoot);
-			const delegatable = agentList.filter(
-				(a) => a.name !== opts.agent && a.name !== 'looper',
-			);
+			const delegatable = agentList.filter((a) => isDelegatableAgent(a.name));
 			const lines = delegatable.map((a) =>
 				a.description ? `- ${a.name}: ${a.description}` : `- ${a.name}`,
 			);
