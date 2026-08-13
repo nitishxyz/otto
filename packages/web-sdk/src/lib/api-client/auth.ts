@@ -7,6 +7,8 @@ import {
 	exchangeOAuthCode as apiExchangeOAuthCode,
 	startOpenAiDeviceFlow as apiStartOpenAiDeviceFlow,
 	pollOpenAiDeviceFlow as apiPollOpenAiDeviceFlow,
+	startXaiDeviceFlow as apiStartXaiDeviceFlow,
+	pollXaiDeviceFlow as apiPollXaiDeviceFlow,
 	startCopilotDeviceFlow as apiStartCopilotDeviceFlow,
 	pollCopilotDeviceFlow as apiPollCopilotDeviceFlow,
 	startKimiDeviceFlow as apiStartKimiDeviceFlow,
@@ -132,6 +134,29 @@ export const authMixin = {
 		sessionId: string,
 	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
 		const response = await apiPollOpenAiDeviceFlow({
+			body: { sessionId },
+		});
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async startXaiDeviceFlow(): Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}> {
+		const response = await apiStartXaiDeviceFlow();
+		if (response.error) throw new Error(extractErrorMessage(response.error));
+		// biome-ignore lint/suspicious/noExplicitAny: API response structure
+		return response.data as any;
+	},
+
+	async pollXaiDeviceFlow(
+		sessionId: string,
+	): Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }> {
+		const response = await apiPollXaiDeviceFlow({
 			body: { sessionId },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));

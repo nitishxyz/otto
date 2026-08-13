@@ -154,7 +154,7 @@ forge({
 			summary: 'Manage API keys, OAuth, reauthentication, and logout.',
 			content: `Use kind auth with the provider id in name. status returns only safe metadata and never tokens. authenticate and reauthenticate accept authMethod api-key or oauth. API-key authentication requires apiKey and never returns it. OAuth returns authUrl and, for device flows, userCode while Forge polls securely in the daemon. Use logout or remove to delete credentials.
 
-OpenAI supports browser or device OAuth. Anthropic and xAI support browser OAuth. Copilot, Kimi, and OttoRouter use device OAuth. Logging out of OttoRouter also disables the managed remote-control tunnel.`,
+OpenAI supports browser or device OAuth. Anthropic supports browser OAuth. xAI, Copilot, Kimi, and OttoRouter use device OAuth. Logging out of OttoRouter also disables the managed remote-control tunnel.`,
 		},
 	},
 	tunnel: {

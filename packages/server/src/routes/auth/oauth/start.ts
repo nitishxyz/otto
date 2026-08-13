@@ -1,9 +1,8 @@
 import {
 	authorizeOpenAI,
 	authorizeWeb,
-	authorizeXai,
+	authorizeXaiDevice,
 	exchangeOpenAI,
-	exchangeXai,
 	logger,
 	setAuth,
 } from '@ottocode/sdk';
@@ -81,12 +80,10 @@ export function registerOAuthStartRoute(app: Hono) {
 
 					return c.redirect(oauthResult.url);
 				} else if (provider === 'xai') {
-					const oauthResult = await authorizeXai();
+					const oauthResult = await authorizeXaiDevice();
 					void (async () => {
 						try {
-							const code = await oauthResult.waitForCallback();
-							oauthResult.close();
-							const tokens = await exchangeXai(code, oauthResult.verifier);
+							const tokens = await oauthResult.waitForTokens();
 							await setAuth(
 								'xai',
 								{
@@ -101,12 +98,13 @@ export function registerOAuthStartRoute(app: Hono) {
 								'global',
 							);
 						} catch (error) {
-							logger.error('xAI OAuth callback failed', error);
-							oauthResult.close();
+							logger.error('xAI device authorization failed', error);
 						}
 					})();
 
-					return c.redirect(oauthResult.url);
+					return c.redirect(
+						oauthResult.verificationUriComplete || oauthResult.verificationUri,
+					);
 				} else {
 					return c.json(
 						{ error: 'OAuth not supported for this provider' },

@@ -1,4 +1,5 @@
 import {
+	authorizeXaiDevice,
 	exchangeOpenAIDeviceCode,
 	logger,
 	pollOttoRouterDeviceCodeOnce,
@@ -9,7 +10,11 @@ import {
 } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
-import { openAIDeviceSessions, ottorouterDeviceSessions } from '../state.ts';
+import {
+	openAIDeviceSessions,
+	ottorouterDeviceSessions,
+	xaiDeviceSessions,
+} from '../state.ts';
 import {
 	devicePollBodySchema,
 	devicePollResponseSchema,
@@ -20,6 +25,11 @@ import {
 export function registerOpenAIDeviceRoutes(app: Hono) {
 	registerOpenAIDeviceStartRoute(app);
 	registerOpenAIDevicePollRoute(app);
+}
+
+export function registerXaiDeviceRoutes(app: Hono) {
+	registerXaiDeviceStartRoute(app);
+	registerXaiDevicePollRoute(app);
 }
 
 export function registerOttoRouterDeviceRoutes(app: Hono) {
@@ -149,6 +159,133 @@ function registerOpenAIDevicePollRoute(app: Hono) {
 				logger.error('OpenAI device poll failed', error);
 				return c.json({ error: message }, 500);
 			}
+		},
+	);
+}
+
+function registerXaiDeviceStartRoute(app: Hono) {
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/auth/xai/device/start',
+			tags: ['auth'],
+			operationId: 'startXaiDeviceFlow',
+			summary: 'Start xAI device flow authentication',
+			responses: {
+				'200': {
+					description: 'OK',
+					content: {
+						'application/json': { schema: deviceStartResponseSchema },
+					},
+				},
+				'500': {
+					description: 'Server Error',
+					content: { 'application/json': { schema: errorResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			try {
+				const authorization = await authorizeXaiDevice();
+				const sessionId = crypto.randomUUID();
+				xaiDeviceSessions.set(sessionId, {
+					status: 'pending',
+					createdAt: Date.now(),
+				});
+				void authorization
+					.waitForTokens()
+					.then(async (tokens) => {
+						await setAuth(
+							'xai',
+							{
+								type: 'oauth',
+								refresh: tokens.refresh,
+								access: tokens.access,
+								expires: tokens.expires,
+								idToken: tokens.idToken,
+								scopes: tokens.scopes,
+							},
+							undefined,
+							'global',
+						);
+						const session = xaiDeviceSessions.get(sessionId);
+						if (session) session.status = 'complete';
+					})
+					.catch((error: unknown) => {
+						const message =
+							error instanceof Error ? error.message : 'Authorization failed';
+						const session = xaiDeviceSessions.get(sessionId);
+						if (session) {
+							session.status = 'error';
+							session.error = message;
+						}
+						logger.error('xAI device authorization failed', error);
+					});
+
+				return c.json({
+					sessionId,
+					userCode: authorization.userCode,
+					verificationUri:
+						authorization.verificationUriComplete ??
+						authorization.verificationUri,
+					interval: 5,
+				});
+			} catch (error) {
+				const message =
+					error instanceof Error
+						? error.message
+						: 'Failed to start xAI device flow';
+				logger.error('xAI device flow start failed', error);
+				return c.json({ error: message }, 500);
+			}
+		},
+	);
+}
+
+function registerXaiDevicePollRoute(app: Hono) {
+	zodOpenApiRoute(
+		app,
+		{
+			method: 'post',
+			path: '/v1/auth/xai/device/poll',
+			tags: ['auth'],
+			operationId: 'pollXaiDeviceFlow',
+			summary: 'Poll xAI device flow for completion',
+			request: {
+				body: {
+					required: true,
+					content: { 'application/json': { schema: devicePollBodySchema } },
+				},
+			},
+			responses: {
+				'200': {
+					description: 'OK',
+					content: { 'application/json': { schema: devicePollResponseSchema } },
+				},
+				'400': {
+					description: 'Bad Request',
+					content: { 'application/json': { schema: errorResponseSchema } },
+				},
+			},
+		},
+		async (c) => {
+			const { sessionId } = await c.req.json<{ sessionId: string }>();
+			const session = sessionId ? xaiDeviceSessions.get(sessionId) : undefined;
+			if (!session) {
+				return c.json({ error: 'Session expired or invalid' }, 400);
+			}
+			if (session.status === 'pending') {
+				return c.json({ status: 'pending' });
+			}
+			xaiDeviceSessions.delete(sessionId);
+			if (session.status === 'error') {
+				return c.json({
+					status: 'error',
+					error: session.error ?? 'Authorization failed',
+				});
+			}
+			return c.json({ status: 'complete' });
 		},
 	);
 }

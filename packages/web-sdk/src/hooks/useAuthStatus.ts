@@ -310,6 +310,17 @@ export function useAuthStatus() {
 		[fetchAuthStatus],
 	);
 
+	const pollXaiDeviceFlow = useCallback(
+		async (sessionId: string) => {
+			const result = await apiClient.pollXaiDeviceFlow(sessionId);
+			if (result.status === 'complete') {
+				await fetchAuthStatus();
+			}
+			return result;
+		},
+		[fetchAuthStatus],
+	);
+
 	const pollKimiDeviceFlow = useCallback(
 		async (sessionId: string) => {
 			const result = await apiClient.pollKimiDeviceFlow(sessionId);
@@ -386,6 +397,8 @@ export function useAuthStatus() {
 		exchangeOAuthCode,
 		startOpenAIDeviceFlow: apiClient.startOpenAIDeviceFlow.bind(apiClient),
 		pollOpenAIDeviceFlow,
+		startXaiDeviceFlow: apiClient.startXaiDeviceFlow.bind(apiClient),
+		pollXaiDeviceFlow,
 		startCopilotDeviceFlow: apiClient.startCopilotDeviceFlow.bind(apiClient),
 		pollCopilotDeviceFlow,
 		startKimiDeviceFlow: apiClient.startKimiDeviceFlow.bind(apiClient),

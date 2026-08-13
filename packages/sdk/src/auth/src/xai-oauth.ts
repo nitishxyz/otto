@@ -9,7 +9,12 @@ const XAI_OAUTH_ISSUER = 'https://auth.x.ai';
 const XAI_OAUTH_DISCOVERY_URL = `${XAI_OAUTH_ISSUER}/.well-known/openid-configuration`;
 const XAI_OAUTH_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
 const XAI_OAUTH_SCOPE =
-	'openid profile email offline_access grok-cli:access api:access';
+	'openid profile email offline_access grok-cli:access api:access conversations:read conversations:write workspaces:read workspaces:write';
+const XAI_DEVICE_CODE_URL = `${XAI_OAUTH_ISSUER}/oauth2/device/code`;
+const XAI_DEVICE_TOKEN_URL = `${XAI_OAUTH_ISSUER}/oauth2/token`;
+const XAI_DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
+const XAI_GROK_CLIENT_VERSION = '1.0.3';
+const XAI_DEVICE_POLL_INTERVAL_MS = 5_000;
 const XAI_CALLBACK_HOST = '127.0.0.1';
 const XAI_CALLBACK_PORT = 56121;
 const XAI_CALLBACK_PATH = '/callback';
@@ -37,6 +42,27 @@ export type XaiOAuthTokens = {
 	expires: number;
 	idToken?: string;
 	scopes?: string;
+};
+
+export type XaiDeviceAuthorization = {
+	verificationUri: string;
+	verificationUriComplete?: string;
+	userCode: string;
+	waitForTokens: () => Promise<XaiOAuthTokens>;
+};
+
+type XaiDeviceCodePayload = {
+	device_code?: string;
+	user_code?: string;
+	verification_uri?: string;
+	verification_uri_complete?: string;
+	expires_in?: number;
+	interval?: number;
+};
+
+type XaiDeviceTokenError = {
+	error?: string;
+	error_description?: string;
 };
 
 export type XaiOAuthResult = {
@@ -156,6 +182,120 @@ function tokensFromPayload(
 			Date.now() + (data.expires_in ?? 3600) * 1000 - XAI_REFRESH_SKEW_MS,
 		idToken: data.id_token,
 		scopes: data.scope,
+	};
+}
+
+function getDeviceHeaders(): Record<string, string> {
+	return {
+		Accept: 'application/json',
+		'Content-Type': 'application/x-www-form-urlencoded',
+		'x-grok-client-surface': 'ui',
+		'x-grok-client-version': XAI_GROK_CLIENT_VERSION,
+	};
+}
+
+function validateVerificationUri(value: string): string {
+	const parsed = new URL(value);
+	const host = parsed.hostname.toLowerCase();
+	if (
+		parsed.protocol !== 'https:' ||
+		(host !== 'x.ai' && !host.endsWith('.x.ai'))
+	) {
+		throw new Error(
+			`xAI device authorization returned unexpected verification URL: ${value}`,
+		);
+	}
+	return value;
+}
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollXaiDeviceTokens(args: {
+	deviceCode: string;
+	expiresIn: number;
+	interval: number;
+}): Promise<XaiOAuthTokens> {
+	const deadline = Date.now() + args.expiresIn * 1000;
+	let intervalMs = Math.max(1, args.interval) * 1000;
+
+	while (Date.now() < deadline) {
+		await delay(intervalMs);
+		const response = await fetch(XAI_DEVICE_TOKEN_URL, {
+			method: 'POST',
+			headers: getDeviceHeaders(),
+			body: new URLSearchParams({
+				grant_type: XAI_DEVICE_GRANT_TYPE,
+				device_code: args.deviceCode,
+				client_id: XAI_OAUTH_CLIENT_ID,
+			}).toString(),
+		});
+
+		if (response.ok) {
+			return tokensFromPayload((await response.json()) as XaiTokenPayload);
+		}
+
+		const payload = (await response
+			.json()
+			.catch(() => ({}))) as XaiDeviceTokenError;
+		const detail = payload.error_description || payload.error;
+		switch (payload.error) {
+			case 'authorization_pending':
+				continue;
+			case 'slow_down':
+				intervalMs += XAI_DEVICE_POLL_INTERVAL_MS;
+				continue;
+			case 'access_denied':
+				throw new Error('xAI device authorization was denied');
+			case 'expired_token':
+				throw new Error('xAI device authorization code expired');
+			default:
+				throw new Error(
+					`xAI device token request failed: ${response.status}${detail ? ` ${detail}` : ''}`,
+				);
+		}
+	}
+
+	throw new Error('xAI device authorization code expired');
+}
+
+/** Start the xAI RFC 8628 device authorization flow used by Grok Build. */
+export async function authorizeXaiDevice(): Promise<XaiDeviceAuthorization> {
+	const response = await fetch(XAI_DEVICE_CODE_URL, {
+		method: 'POST',
+		headers: getDeviceHeaders(),
+		body: new URLSearchParams({
+			client_id: XAI_OAUTH_CLIENT_ID,
+			scope: XAI_OAUTH_SCOPE,
+			referrer: 'grok-build',
+		}).toString(),
+	});
+	if (!response.ok) {
+		throw new Error(
+			`xAI device authorization failed: ${response.status} ${await response.text()}`,
+		);
+	}
+
+	const payload = (await response.json()) as XaiDeviceCodePayload;
+	if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
+		throw new Error('xAI device authorization response was incomplete');
+	}
+	const verificationUri = validateVerificationUri(payload.verification_uri);
+	const verificationUriComplete = payload.verification_uri_complete
+		? validateVerificationUri(payload.verification_uri_complete)
+		: `${verificationUri}${verificationUri.includes('?') ? '&' : '?'}user_code=${encodeURIComponent(payload.user_code)}`;
+
+	return {
+		verificationUri,
+		verificationUriComplete,
+		userCode: payload.user_code,
+		waitForTokens: () =>
+			pollXaiDeviceTokens({
+				deviceCode: payload.device_code as string,
+				expiresIn: payload.expires_in ?? 10 * 60,
+				interval: payload.interval ?? XAI_DEVICE_POLL_INTERVAL_MS / 1000,
+			}),
 	};
 }
 

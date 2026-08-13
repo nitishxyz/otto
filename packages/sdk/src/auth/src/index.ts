@@ -102,12 +102,14 @@ export {
 
 export {
 	authorizeXai,
+	authorizeXaiDevice,
 	exchangeXai,
 	refreshXaiToken,
 	openXaiAuthUrl,
 	readGrokCliAuth,
 	type XaiOAuthResult,
 	type XaiOAuthTokens,
+	type XaiDeviceAuthorization,
 } from './xai-oauth.ts';
 
 export {

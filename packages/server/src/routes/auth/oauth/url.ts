@@ -1,10 +1,4 @@
-import {
-	authorize,
-	authorizeXai,
-	exchangeXai,
-	logger,
-	setAuth,
-} from '@ottocode/sdk';
+import { authorize, authorizeXaiDevice, logger, setAuth } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import { oauthVerifiers } from '../state.ts';
@@ -14,7 +8,6 @@ import {
 	oauthUrlResponseSchema,
 	providerParamsSchema,
 } from './schemas.ts';
-import { closeOAuthCallback } from './utils.ts';
 
 export function registerOAuthUrlRoute(app: Hono) {
 	zodOpenApiRoute(
@@ -62,15 +55,14 @@ export function registerOAuthUrlRoute(app: Hono) {
 					url = result.url;
 					verifier = result.verifier;
 				} else if (provider === 'xai') {
-					const oauthResult = await authorizeXai();
-					url = oauthResult.url;
-					verifier = oauthResult.verifier;
-					close = oauthResult.close;
+					const oauthResult = await authorizeXaiDevice();
+					url =
+						oauthResult.verificationUriComplete || oauthResult.verificationUri;
+					verifier = oauthResult.userCode;
 					waitForXaiCallback = (sessionId) => {
 						void (async () => {
 							try {
-								const code = await oauthResult.waitForCallback();
-								const tokens = await exchangeXai(code, oauthResult.verifier);
+								const tokens = await oauthResult.waitForTokens();
 								await setAuth(
 									'xai',
 									{
@@ -86,10 +78,9 @@ export function registerOAuthUrlRoute(app: Hono) {
 								);
 							} catch (error) {
 								if (oauthVerifiers.has(sessionId)) {
-									logger.error('xAI OAuth callback failed', error);
+									logger.error('xAI device authorization failed', error);
 								}
 							} finally {
-								closeOAuthCallback(oauthResult.close);
 								oauthVerifiers.delete(sessionId);
 							}
 						})();

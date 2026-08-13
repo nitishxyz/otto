@@ -131,6 +131,15 @@ interface ProviderSetupStepProps {
 	onPollOpenAIDeviceFlow?: (
 		sessionId: string,
 	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
+	onStartXaiDeviceFlow?: () => Promise<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	}>;
+	onPollXaiDeviceFlow?: (
+		sessionId: string,
+	) => Promise<{ status: 'complete' | 'pending' | 'error'; error?: string }>;
 	onOpenTopup: () => void;
 	onNext: () => void;
 	manageMode?: boolean;
@@ -212,6 +221,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	onExchangeOAuthCode,
 	onStartOpenAIDeviceFlow,
 	onPollOpenAIDeviceFlow,
+	onStartXaiDeviceFlow,
+	onPollXaiDeviceFlow,
 	onOpenTopup,
 	onNext,
 	manageMode = false,
@@ -287,6 +298,17 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 		'choice',
 	);
 	const [openAILoading, setOpenAILoading] = useState(false);
+	const [xaiDevice, setXaiDevice] = useState<{
+		sessionId: string;
+		userCode: string;
+		verificationUri: string;
+		interval: number;
+	} | null>(null);
+	const [xaiPolling, setXaiPolling] = useState(false);
+	const [xaiError, setXaiError] = useState<string | null>(null);
+	const [xaiCodeCopied, setXaiCodeCopied] = useState(false);
+	const [xaiModalOpen, setXaiModalOpen] = useState(false);
+	const [xaiLoading, setXaiLoading] = useState(false);
 	const [copilotDevice, setCopilotDevice] = useState<{
 		sessionId: string;
 		userCode: string;
@@ -339,6 +361,10 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const openAICancelledRef = useRef(false);
 	const openAIPollFnRef = useRef(onPollOpenAIDeviceFlow);
 	openAIPollFnRef.current = onPollOpenAIDeviceFlow;
+	const xaiPollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+	const xaiCancelledRef = useRef(false);
+	const xaiPollFnRef = useRef(onPollXaiDeviceFlow);
+	xaiPollFnRef.current = onPollXaiDeviceFlow;
 	const kimiPollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const kimiCancelledRef = useRef(false);
 	const kimiPollFnRef = useRef(onPollKimiDeviceFlow);
@@ -482,6 +508,49 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			clearTimeout(timeout);
 		};
 	}, [openAIPolling, openAIDevice]);
+
+	useEffect(() => {
+		if (!xaiPolling || !xaiDevice || !xaiPollFnRef.current) return;
+		xaiCancelledRef.current = false;
+		const pollIntervalMs = Math.max((xaiDevice.interval || 5) * 1000, 5000);
+		const schedulePoll = () => {
+			xaiPollRef.current = setTimeout(async () => {
+				if (xaiCancelledRef.current) return;
+				try {
+					const pollFn = xaiPollFnRef.current;
+					if (!pollFn) return;
+					const result = await pollFn(xaiDevice.sessionId);
+					if (xaiCancelledRef.current) return;
+					if (result.status === 'complete') {
+						setXaiDevice(null);
+						setXaiPolling(false);
+						setXaiError(null);
+						setXaiModalOpen(false);
+					} else if (result.status === 'error') {
+						setXaiError(result.error || 'Authorization failed');
+						setXaiPolling(false);
+					} else {
+						schedulePoll();
+					}
+				} catch {
+					if (!xaiCancelledRef.current) schedulePoll();
+				}
+			}, pollIntervalMs);
+		};
+		schedulePoll();
+		const timeout = setTimeout(
+			() => {
+				setXaiPolling(false);
+				setXaiError('Authorization timed out. Please try again.');
+			},
+			15 * 60 * 1000,
+		);
+		return () => {
+			xaiCancelledRef.current = true;
+			if (xaiPollRef.current) clearTimeout(xaiPollRef.current);
+			clearTimeout(timeout);
+		};
+	}, [xaiPolling, xaiDevice]);
 
 	useEffect(() => {
 		if (!kimiPolling || !kimiDevice || !kimiPollFnRef.current) return;
@@ -786,6 +855,23 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 			});
 	};
 
+	const startXaiDeviceAuthorization = () => {
+		if (!onStartXaiDeviceFlow) return;
+		setXaiLoading(true);
+		setXaiError(null);
+		onStartXaiDeviceFlow()
+			.then((data) => {
+				setXaiDevice(data);
+				setXaiLoading(false);
+			})
+			.catch((err) => {
+				setXaiError(
+					err instanceof Error ? err.message : 'Failed to start device flow',
+				);
+				setXaiLoading(false);
+			});
+	};
+
 	const startOpenAIDeviceAuthorization = () => {
 		if (!onStartOpenAIDeviceFlow) return;
 		setOpenAILoading(true);
@@ -821,13 +907,20 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	};
 
 	const handleStartOAuth = async (providerId: string, mode?: string) => {
-		if (providerId === 'anthropic' || providerId === 'xai') {
+		if (providerId === 'anthropic') {
 			setOauthSession({
 				provider: providerId,
 				sessionId: null,
 				mode,
 				wasConfigured: !!authStatus.providers[providerId]?.configured,
 			});
+		} else if (providerId === 'xai' && onStartXaiDeviceFlow) {
+			setXaiPolling(false);
+			setXaiDevice(null);
+			setXaiError(null);
+			setXaiCodeCopied(false);
+			setXaiModalOpen(true);
+			startXaiDeviceAuthorization();
 		} else if (providerId === 'openai' && onStartOpenAIDeviceFlow) {
 			setOpenAIPolling(false);
 			setOpenAIDevice(null);
@@ -920,6 +1013,33 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 	const handleOpenAILocalCallbackChoice = () => {
 		handleCancelOpenAI();
 		onStartOAuth('openai');
+	};
+
+	const handleXaiOpenAuth = () => {
+		if (!xaiDevice) return;
+		openUrl(xaiDevice.verificationUri);
+		setXaiPolling(true);
+	};
+
+	const handleXaiCopyCode = async () => {
+		if (!xaiDevice) return;
+		await navigator.clipboard.writeText(xaiDevice.userCode);
+		setXaiCodeCopied(true);
+		setTimeout(() => setXaiCodeCopied(false), 2000);
+	};
+
+	const handleCancelXai = () => {
+		setXaiDevice(null);
+		setXaiPolling(false);
+		setXaiError(null);
+		setXaiCodeCopied(false);
+		setXaiModalOpen(false);
+		setXaiLoading(false);
+		xaiCancelledRef.current = true;
+		if (xaiPollRef.current) {
+			clearTimeout(xaiPollRef.current);
+			xaiPollRef.current = undefined;
+		}
 	};
 
 	const handleOpenAICopyCode = async () => {
@@ -2070,6 +2190,87 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 								</div>
 							</div>
 						)}
+					</div>
+				</div>
+			)}
+
+			{/* OpenAI Device Flow Modal */}
+			{xaiModalOpen && (
+				<div
+					data-otto-nested-modal="true"
+					className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+				>
+					<div className="bg-background border border-border rounded-xl w-full max-w-lg mx-6 shadow-2xl">
+						<div className="flex items-center gap-3 p-6 border-b border-border">
+							<ProviderLogo provider="xai" size={24} />
+							<h3 className="text-lg font-semibold">Connect xAI</h3>
+						</div>
+						<div className="p-6 space-y-4">
+							<p className="text-sm text-muted-foreground">
+								Open the xAI sign-in page, then confirm this one-time code. This
+								works from remote browsers, tunnels, and SSH sessions.
+							</p>
+							<div className="flex items-center justify-center gap-3">
+								{xaiLoading ? (
+									<div className="bg-muted px-6 py-3 rounded-lg animate-pulse">
+										<div className="h-9 w-48 bg-muted-foreground/20 rounded" />
+									</div>
+								) : xaiDevice ? (
+									<>
+										<code className="text-3xl font-mono font-bold tracking-widest text-foreground bg-muted px-6 py-3 rounded-lg select-all">
+											{xaiDevice.userCode}
+										</code>
+										<button
+											type="button"
+											onClick={handleXaiCopyCode}
+											className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+										>
+											{xaiCodeCopied ? (
+												<Check className="w-5 h-5 text-green-500" />
+											) : (
+												<Copy className="w-5 h-5" />
+											)}
+										</button>
+									</>
+								) : null}
+							</div>
+
+							{xaiError && (
+								<p className="text-sm text-red-500 text-center">{xaiError}</p>
+							)}
+
+							{xaiPolling && (
+								<div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+									<StableSpinner title="Waiting for xAI authorization" />
+									Waiting for authorization...
+								</div>
+							)}
+
+							<div className="flex gap-3">
+								<button
+									type="button"
+									onClick={handleCancelXai}
+									className="flex-1 h-11 px-4 bg-transparent border border-border text-foreground rounded-lg font-medium hover:bg-muted/50 transition-colors"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={handleXaiOpenAuth}
+									disabled={xaiPolling || xaiLoading || !xaiDevice}
+									className="flex-1 h-11 px-4 bg-foreground text-background rounded-lg font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{xaiPolling || xaiLoading ? (
+										<StableSpinner title="Opening xAI" />
+									) : (
+										<>
+											Open xAI
+											<ExternalLink className="w-4 h-4" />
+										</>
+									)}
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 			)}

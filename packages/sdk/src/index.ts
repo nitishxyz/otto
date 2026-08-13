@@ -257,12 +257,17 @@ export type {
 } from './auth/src/index.ts';
 export {
 	authorizeXai,
+	authorizeXaiDevice,
 	exchangeXai,
 	refreshXaiToken,
 	openXaiAuthUrl,
 	readGrokCliAuth,
 } from './auth/src/index.ts';
-export type { XaiOAuthResult, XaiOAuthTokens } from './auth/src/index.ts';
+export type {
+	XaiDeviceAuthorization,
+	XaiOAuthResult,
+	XaiOAuthTokens,
+} from './auth/src/index.ts';
 export {
 	refreshKimiToken,
 	requestKimiDeviceCode,

@@ -176,6 +176,8 @@ class ApiClient {
 	exchangeOAuthCode = authMixin.exchangeOAuthCode;
 	startOpenAIDeviceFlow = authMixin.startOpenAIDeviceFlow;
 	pollOpenAIDeviceFlow = authMixin.pollOpenAIDeviceFlow;
+	startXaiDeviceFlow = authMixin.startXaiDeviceFlow;
+	pollXaiDeviceFlow = authMixin.pollXaiDeviceFlow;
 	startCopilotDeviceFlow = authMixin.startCopilotDeviceFlow;
 	pollCopilotDeviceFlow = authMixin.pollCopilotDeviceFlow;
 	startKimiDeviceFlow = authMixin.startKimiDeviceFlow;

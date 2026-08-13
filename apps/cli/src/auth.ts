@@ -9,7 +9,6 @@ import {
 	text,
 } from '@clack/prompts';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createInterface } from 'node:readline/promises';
 import { box, table, colors } from './ui.ts';
 import {
 	getAllAuth,
@@ -31,8 +30,7 @@ import {
 	obtainOpenAIApiKey,
 	pollOpenAIDeviceCodeOnce,
 	requestOpenAIDeviceCode,
-	authorizeXai,
-	exchangeXai,
+	authorizeXaiDevice,
 	openXaiAuthUrl,
 	readGrokCliAuth,
 	pollOttoRouterDeviceCodeOnce,
@@ -905,54 +903,6 @@ async function runAuthLoginOpenAI(
 	}
 }
 
-function parseXaiAuthorizationCode(input: string): string {
-	const trimmed = input.trim().replace(/^['"]|['"]$/g, '');
-	try {
-		const url = new URL(trimmed);
-		return url.searchParams.get('code') || trimmed;
-	} catch {}
-
-	try {
-		const params = new URLSearchParams(
-			trimmed.startsWith('?') ? trimmed.slice(1) : trimmed,
-		);
-		return params.get('code') || trimmed;
-	} catch {}
-
-	return trimmed;
-}
-
-async function waitForXaiAuthorizationCode(
-	callbackPromise: Promise<string>,
-): Promise<string> {
-	const controller = new AbortController();
-	const rl = createInterface({ input: process.stdin, output: process.stdout });
-	const promptPromise = (async () => {
-		try {
-			while (true) {
-				const pasted = await rl.question('Paste xAI authorization code: ', {
-					signal: controller.signal,
-				});
-				const code = parseXaiAuthorizationCode(pasted);
-				if (code) return code;
-				console.log('Required');
-			}
-		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
-				return new Promise<string>(() => {});
-			}
-			throw error;
-		}
-	})();
-
-	try {
-		return await Promise.race([callbackPromise, promptPromise]);
-	} finally {
-		controller.abort();
-		rl.close();
-	}
-}
-
 async function runAuthLoginXai(
 	cfg: Awaited<ReturnType<typeof loadConfig>>,
 	wantLocal: boolean,
@@ -1040,34 +990,27 @@ async function runAuthLoginXai(
 			return true;
 		}
 
-		log.info('Starting xAI OAuth flow...');
-		log.info(
-			'⚠️  If the official Grok CLI is logging in, stop it first (both use port 56121).\n',
-		);
-
-		const oauthResult = await authorizeXai();
+		log.info('Starting xAI device authorization...');
+		const oauthResult = await authorizeXaiDevice();
+		const authorizationUrl =
+			oauthResult.verificationUriComplete || oauthResult.verificationUri;
 
 		log.info('Opening browser for xAI authorization...');
-		log.info(`URL: ${oauthResult.url}\n`);
+		log.info(`URL: ${authorizationUrl}`);
+		log.info(`Confirm code: ${oauthResult.userCode}\n`);
 
-		const opened = await openXaiAuthUrl(oauthResult.url);
+		const opened = await openXaiAuthUrl(authorizationUrl);
 		if (!opened) {
 			log.warn(
 				'⚠️  Could not open browser automatically. Please visit the URL above manually.\n',
 			);
 		}
 
-		log.info('Waiting for xAI authorization callback...');
+		log.info('Waiting for xAI device authorization...');
 		log.info('(Complete the login in your browser)\n');
 
 		try {
-			const callbackPromise = oauthResult.waitForCallback();
-			const code = await waitForXaiAuthorizationCode(callbackPromise);
-
-			oauthResult.close();
-
-			log.info('🔄 Exchanging xAI authorization code for tokens...');
-			const tokens = await exchangeXai(code, oauthResult.verifier);
+			const tokens = await oauthResult.waitForTokens();
 
 			await setAuth(
 				'xai',
@@ -1096,7 +1039,6 @@ async function runAuthLoginXai(
 			outro('Done');
 			return true;
 		} catch (error: unknown) {
-			oauthResult.close();
 			const message =
 				error instanceof Error ? error.message : 'Unknown error occurred';
 			log.error(`Authentication failed: ${message}`);

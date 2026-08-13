@@ -14,6 +14,15 @@ export const copilotDeviceSessions = new Map<
 	{ deviceCode: string; interval: number; provider: string; createdAt: number }
 >();
 
+export const xaiDeviceSessions = new Map<
+	string,
+	{
+		status: 'pending' | 'complete' | 'error';
+		error?: string;
+		createdAt: number;
+	}
+>();
+
 export const openAIDeviceSessions = new Map<
 	string,
 	{
@@ -57,6 +66,11 @@ setInterval(() => {
 	for (const [key, value] of openAIDeviceSessions.entries()) {
 		if (now - value.createdAt > 15 * 60 * 1000) {
 			openAIDeviceSessions.delete(key);
+		}
+	}
+	for (const [key, value] of xaiDeviceSessions.entries()) {
+		if (now - value.createdAt > 15 * 60 * 1000) {
+			xaiDeviceSessions.delete(key);
 		}
 	}
 	for (const [key, value] of kimiDeviceSessions.entries()) {
