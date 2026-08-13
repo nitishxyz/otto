@@ -12,6 +12,7 @@ export interface Session {
 	totalCachedTokens: number | null;
 	totalCacheCreationTokens: number | null;
 	currentContextTokens: number | null;
+	isRunning?: boolean;
 	ownCostUsd?: number;
 	subagentCostUsd?: number;
 	totalCostUsd?: number;

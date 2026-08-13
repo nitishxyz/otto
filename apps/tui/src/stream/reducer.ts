@@ -38,6 +38,11 @@ function extractText(part: MessagePart): string {
 	return '';
 }
 
+function getMessageText(message: Message): string | null {
+	const textPart = message.parts?.find((part) => part.type === 'text');
+	return textPart ? extractText(textPart) : null;
+}
+
 function applyDelta(
 	messages: Message[],
 	payload: Record<string, unknown>,
@@ -199,9 +204,20 @@ export function messageReducer(
 				return m;
 			});
 			if (optimistic.length === 0) return loaded;
-			const hasUserMsg = loaded.some((m) => m.role === 'user');
-			if (hasUserMsg) return loaded;
-			return [...optimistic, ...loaded];
+			const unmatchedLoadedUserTexts = loaded.flatMap((message) => {
+				if (message.role !== 'user') return [];
+				const text = getMessageText(message);
+				return text === null ? [] : [text];
+			});
+			const pending = optimistic.filter((message) => {
+				const text = getMessageText(message);
+				if (text === null) return true;
+				const matchIndex = unmatchedLoadedUserTexts.indexOf(text);
+				if (matchIndex === -1) return true;
+				unmatchedLoadedUserTexts.splice(matchIndex, 1);
+				return false;
+			});
+			return pending.length > 0 ? [...loaded, ...pending] : loaded;
 		}
 		case 'CLEAR':
 			return [];
@@ -252,20 +268,48 @@ export function messageReducer(
 			const role = typeof payload.role === 'string' ? payload.role : null;
 			if (!id || !role) return state;
 			if (state.some((m) => m.id === id)) return state;
+			const content =
+				typeof payload.content === 'string' ? payload.content : null;
 			const optimisticIdx = state.findIndex(
 				(m) =>
 					m.id.startsWith('optimistic-') &&
 					m.role === 'user' &&
-					role === 'user',
+					role === 'user' &&
+					(content === null || getMessageText(m) === content),
 			);
 			let next = state;
 			if (optimisticIdx !== -1 && role === 'user') {
 				next = [...state];
+				const optimistic = next[optimisticIdx];
 				next[optimisticIdx] = {
-					...next[optimisticIdx],
+					...optimistic,
 					id,
+					sessionId:
+						typeof payload.sessionId === 'string'
+							? payload.sessionId
+							: optimistic.sessionId,
+					agent:
+						typeof payload.agent === 'string'
+							? payload.agent
+							: optimistic.agent,
+					provider:
+						typeof payload.provider === 'string'
+							? payload.provider
+							: optimistic.provider,
+					model:
+						typeof payload.model === 'string'
+							? payload.model
+							: optimistic.model,
+					createdAt:
+						typeof payload.createdAt === 'number'
+							? payload.createdAt
+							: optimistic.createdAt,
+					completedAt:
+						typeof payload.completedAt === 'number'
+							? payload.completedAt
+							: optimistic.completedAt,
 					parts:
-						next[optimisticIdx].parts?.map((p) => ({
+						optimistic.parts?.map((p) => ({
 							...p,
 							id: p.id.startsWith('optimistic-') ? `${id}-text` : p.id,
 							messageId: id,
@@ -275,19 +319,59 @@ export function messageReducer(
 			}
 			const newMsg: Message = {
 				id,
-				sessionId: '',
+				sessionId:
+					typeof payload.sessionId === 'string' ? payload.sessionId : '',
 				role: role as Message['role'],
-				status: 'pending',
+				status: role === 'user' ? 'complete' : 'pending',
 				agent: typeof payload.agent === 'string' ? payload.agent : '',
 				provider: typeof payload.provider === 'string' ? payload.provider : '',
 				model: typeof payload.model === 'string' ? payload.model : '',
-				createdAt: Date.now(),
-				completedAt: null,
+				createdAt:
+					typeof payload.createdAt === 'number'
+						? payload.createdAt
+						: Date.now(),
+				completedAt:
+					typeof payload.completedAt === 'number' ? payload.completedAt : null,
 				promptTokens: null,
 				completionTokens: null,
 				totalTokens: null,
 				error: null,
-				parts: [],
+				attachmentNames: Array.isArray(payload.attachmentNames)
+					? payload.attachmentNames.filter(
+							(name): name is string => typeof name === 'string',
+						)
+					: undefined,
+				parts:
+					role === 'user' && content !== null
+						? [
+								{
+									id: `${id}-text`,
+									messageId: id,
+									index: 0,
+									stepIndex: null,
+									type: 'text',
+									content: JSON.stringify({ text: content }),
+									contentJson: { text: content },
+									agent: typeof payload.agent === 'string' ? payload.agent : '',
+									provider:
+										typeof payload.provider === 'string'
+											? payload.provider
+											: '',
+									model: typeof payload.model === 'string' ? payload.model : '',
+									startedAt:
+										typeof payload.createdAt === 'number'
+											? payload.createdAt
+											: Date.now(),
+									completedAt:
+										typeof payload.completedAt === 'number'
+											? payload.completedAt
+											: Date.now(),
+									toolName: null,
+									toolCallId: null,
+									toolDurationMs: null,
+								},
+							]
+						: [],
 			};
 			return [...state, newMsg];
 		}

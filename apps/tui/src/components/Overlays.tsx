@@ -19,6 +19,7 @@ import type { ActivitySubagent } from './activity/types.ts';
 
 interface OverlaysProps {
 	sessions: Session[];
+	currentSessionId?: string | null;
 	queuedMessages: QueuedMessageItem[];
 	subagents: ActivitySubagent[];
 	hasMore: boolean;
@@ -42,6 +43,7 @@ interface OverlaysProps {
 
 export const Overlays = memo(function Overlays({
 	sessions,
+	currentSessionId,
 	queuedMessages,
 	subagents,
 	hasMore,
@@ -76,6 +78,7 @@ export const Overlays = memo(function Overlays({
 			return (
 				<SessionsOverlay
 					sessions={sessions}
+					currentSessionId={currentSessionId}
 					hasMore={hasMore}
 					loadingMore={loadingMore}
 					onLoadMore={onLoadMore}

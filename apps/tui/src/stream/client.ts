@@ -32,6 +32,32 @@ export async function loadPendingSecureInputs(
 		: [];
 }
 
+/** Preserves state identity when a pending-input snapshot has not changed. */
+export function reconcilePendingSecureInputs(
+	current: PendingSecureInput[],
+	next: PendingSecureInput[],
+): PendingSecureInput[] {
+	if (current.length !== next.length) return next;
+	for (let index = 0; index < current.length; index += 1) {
+		const currentInput = current[index];
+		const nextInput = next[index];
+		if (
+			currentInput.promptId !== nextInput.promptId ||
+			currentInput.prompt !== nextInput.prompt ||
+			(currentInput.messageId ?? undefined) !==
+				(nextInput.messageId ?? undefined) ||
+			currentInput.callId !== nextInput.callId ||
+			currentInput.inputKind !== nextInput.inputKind ||
+			currentInput.allowRemember !== nextInput.allowRemember ||
+			currentInput.allowEmpty !== nextInput.allowEmpty ||
+			currentInput.createdAt !== nextInput.createdAt
+		) {
+			return next;
+		}
+	}
+	return current;
+}
+
 /** Fetches the session queue snapshot (current + queued message ids). */
 export async function loadSessionQueueState(
 	sessionId: string,

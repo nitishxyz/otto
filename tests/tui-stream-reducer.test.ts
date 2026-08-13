@@ -61,11 +61,72 @@ describe('TUI stream reducer', () => {
 		const state = reduce(
 			[],
 			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-1', content: 'hi' },
-			{ type: 'MESSAGE_CREATED', payload: { id: 'real-1', role: 'user' } },
+			{
+				type: 'MESSAGE_CREATED',
+				payload: { id: 'real-1', role: 'user', content: 'hi' },
+			},
 		);
 		expect(state).toHaveLength(1);
 		expect(state[0].id).toBe('real-1');
 		expect(state[0].parts?.[0]?.messageId).toBe('real-1');
+	});
+
+	test('MESSAGE_CREATED immediately renders a remote user message text', () => {
+		const state = reduce([], {
+			type: 'MESSAGE_CREATED',
+			payload: {
+				id: 'remote-user-1',
+				sessionId: 's-1',
+				role: 'user',
+				status: 'complete',
+				content: 'sent from another client',
+				createdAt: 1234,
+				completedAt: 1234,
+			},
+		});
+
+		expect(state).toHaveLength(1);
+		expect(state[0].status).toBe('complete');
+		expect(state[0].createdAt).toBe(1234);
+		expect(state[0].parts?.[0]?.contentJson).toEqual({
+			text: 'sent from another client',
+		});
+	});
+
+	test('MESSAGE_CREATED reconciles only the optimistic message with matching text', () => {
+		const state = reduce(
+			[],
+			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-1', content: 'first' },
+			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-2', content: 'second' },
+			{
+				type: 'MESSAGE_CREATED',
+				payload: { id: 'real-2', role: 'user', content: 'second' },
+			},
+		);
+
+		expect(state).toHaveLength(2);
+		expect(state.map((message) => message.id)).toEqual([
+			'optimistic-1',
+			'real-2',
+		]);
+		expect(state[1].parts?.[0]?.contentJson).toEqual({ text: 'second' });
+	});
+
+	test('MESSAGE_CREATED consumes one optimistic copy for identical sends', () => {
+		const state = reduce(
+			[],
+			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-1', content: 'same' },
+			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-2', content: 'same' },
+			{
+				type: 'MESSAGE_CREATED',
+				payload: { id: 'real-1', role: 'user', content: 'same' },
+			},
+		);
+
+		expect(state.map((message) => message.id)).toEqual([
+			'real-1',
+			'optimistic-2',
+		]);
 	});
 
 	test('MESSAGE_CREATED appends assistant message', () => {
@@ -305,17 +366,53 @@ describe('TUI stream reducer', () => {
 		expect(state[0]).toBe(local);
 	});
 
-	test('LOAD drops optimistic messages once server has user messages', () => {
+	test('LOAD drops an optimistic message matched by server text', () => {
 		const state = reduce(
 			[],
 			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-1', content: 'hi' },
 			{
 				type: 'LOAD',
-				messages: [makeMessage({ id: 'u-1', role: 'user' })],
+				messages: [
+					makeMessage({
+						id: 'u-1',
+						role: 'user',
+						parts: [
+							{
+								id: 'u-1-text',
+								messageId: 'u-1',
+								index: 0,
+								stepIndex: null,
+								type: 'text',
+								content: JSON.stringify({ text: 'hi' }),
+								contentJson: { text: 'hi' },
+								agent: '',
+								provider: '',
+								model: '',
+								startedAt: 1,
+								completedAt: 1,
+								toolName: null,
+								toolCallId: null,
+								toolDurationMs: null,
+							},
+						],
+					}),
+				],
 			},
 		);
 		expect(state).toHaveLength(1);
 		expect(state[0].id).toBe('u-1');
+	});
+
+	test('LOAD keeps optimistic messages not represented by server text', () => {
+		const state = reduce(
+			[],
+			{ type: 'ADD_OPTIMISTIC_USER', id: 'optimistic-1', content: 'pending' },
+			{
+				type: 'LOAD',
+				messages: [makeMessage({ id: 'u-1', role: 'user' })],
+			},
+		);
+		expect(state.map((message) => message.id)).toEqual(['u-1', 'optimistic-1']);
 	});
 
 	test('LOAD keeps optimistic messages when server has no user messages yet', () => {

@@ -788,14 +788,6 @@ export function App({
 						/>
 					)}
 
-					{pendingSecureInputs.length > 0 && (
-						<SecureInputBar
-							pendingInput={pendingSecureInputs[0]}
-							onSubmit={handleSecureInputSubmit}
-							onCancel={handleSecureInputCancel}
-						/>
-					)}
-
 					<QueueBar
 						count={queueSize}
 						nextMessage={queuedMessages[0]?.summary}
@@ -843,6 +835,7 @@ export function App({
 
 			<Overlays
 				sessions={sessions}
+				currentSessionId={activeSession?.id}
 				queuedMessages={queuedMessages}
 				subagents={activityData.subagents}
 				hasMore={hasMore}
@@ -861,6 +854,14 @@ export function App({
 				onRemoveQueuedMessage={handleRemoveQueuedMessage}
 				onSubagentSelect={handleSubagentSelect}
 			/>
+			{pendingSecureInputs.length > 0 && (
+				<SecureInputBar
+					key={pendingSecureInputs[0].promptId}
+					pendingInput={pendingSecureInputs[0]}
+					onSubmit={handleSecureInputSubmit}
+					onCancel={handleSecureInputCancel}
+				/>
+			)}
 		</box>
 	);
 }

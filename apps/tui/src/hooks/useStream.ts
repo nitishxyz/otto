@@ -10,6 +10,7 @@ import {
 	loadPendingSecureInputs,
 	loadSessionMessages,
 	loadSessionQueueState,
+	reconcilePendingSecureInputs,
 } from '../stream/client.ts';
 import type { PendingApproval, PendingSecureInput } from '../types.ts';
 
@@ -272,6 +273,36 @@ export function useStream(
 			abortRef.current = null;
 		};
 	}, [sessionId, projectKey]);
+
+	useEffect(() => {
+		if (!sessionId) return;
+
+		let cancelled = false;
+		let refreshInFlight = false;
+		const refreshPendingSecureInputs = async () => {
+			if (refreshInFlight) return;
+			refreshInFlight = true;
+			try {
+				const inputs = await loadPendingSecureInputs(sessionId);
+				if (!cancelled) {
+					setPendingSecureInputs((current) =>
+						reconcilePendingSecureInputs(current, inputs),
+					);
+				}
+			} catch {
+				// Keep the current prompt visible until the server can be reached again.
+			} finally {
+				refreshInFlight = false;
+			}
+		};
+
+		void refreshPendingSecureInputs();
+		const interval = setInterval(refreshPendingSecureInputs, 1000);
+		return () => {
+			cancelled = true;
+			clearInterval(interval);
+		};
+	}, [sessionId]);
 
 	const reload = () => {
 		if (!sessionId) return;

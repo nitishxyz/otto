@@ -9,9 +9,11 @@ import {
 	SelectRow,
 	useListModalWindow,
 } from './ModalFrame.tsx';
+import { TinySpinner } from './TinySpinner.tsx';
 
 interface SessionsOverlayProps {
 	sessions: Session[];
+	currentSessionId?: string | null;
 	hasMore?: boolean;
 	loadingMore?: boolean;
 	onLoadMore?: () => void;
@@ -35,6 +37,7 @@ const LOAD_MORE_THRESHOLD = 5;
 
 export function SessionsOverlay({
 	sessions,
+	currentSessionId,
 	hasMore,
 	loadingMore,
 	onLoadMore,
@@ -42,13 +45,18 @@ export function SessionsOverlay({
 	onClose,
 }: SessionsOverlayProps) {
 	const { colors } = useTheme();
-	const [selectedIdx, setSelectedIdx] = useState(0);
+	const [selectedIdx, setSelectedIdx] = useState(() => {
+		const currentIndex = sessions.findIndex((s) => s.id === currentSessionId);
+		return currentIndex >= 0 ? currentIndex : 0;
+	});
 
 	useEffect(() => {
-		setSelectedIdx((current) =>
-			Math.max(0, Math.min(current, sessions.length - 1)),
-		);
-	}, [sessions.length]);
+		setSelectedIdx((selected) => {
+			const currentIndex = sessions.findIndex((s) => s.id === currentSessionId);
+			if (currentIndex >= 0) return currentIndex;
+			return Math.max(0, Math.min(selected, sessions.length - 1));
+		});
+	}, [sessions, currentSessionId]);
 
 	useKeyboard((key) => {
 		if (isListUpKey(key)) {
@@ -106,14 +114,19 @@ export function SessionsOverlay({
 					{visibleSessions.map((s, offset) => {
 						const i = visibleWindow.start + offset;
 						const isSelected = i === selectedIdx;
+						const isCurrent = s.id === currentSessionId;
 						const title = s.title || 'untitled';
 						const meta = `${s.provider || 'unknown'}/${s.model || ''} · ${timeAgo(s.lastActiveAt)}`;
 						return (
 							<SelectRow
 								key={s.id}
 								active={isSelected}
+								current={isCurrent}
 								title={title}
 								footer={meta}
+								gutter={
+									s.isRunning ? <TinySpinner fg={colors.blue} /> : undefined
+								}
 							/>
 						);
 					})}
