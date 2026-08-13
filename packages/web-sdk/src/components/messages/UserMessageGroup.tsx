@@ -55,6 +55,7 @@ import {
 import { AuthenticatedImage } from '../AuthenticatedImage';
 import { getMessageChatDraftAttachments } from '../../lib/chatAttachments';
 import { StableSpinner } from '../ui/StableSpinner';
+import { OverlayPortal } from '../ui/OverlayPortal';
 
 interface UserMessageGroupProps {
 	sessionId?: string;
@@ -602,29 +603,31 @@ export const UserMessageGroup = memo(
 				</div>
 
 				{expandedImage && (
-					<div
-						role="dialog"
-						aria-modal="true"
-						className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-						onClick={() => setExpandedImage(null)}
-						onKeyDown={(e) => e.key === 'Escape' && setExpandedImage(null)}
-						tabIndex={-1}
-					>
-						<button
-							type="button"
+					<OverlayPortal>
+						<div
+							role="dialog"
+							aria-modal="true"
+							className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
 							onClick={() => setExpandedImage(null)}
-							className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+							onKeyDown={(e) => e.key === 'Escape' && setExpandedImage(null)}
+							tabIndex={-1}
 						>
-							<X className="w-6 h-6 text-white" />
-						</button>
-						<AuthenticatedImage
-							src={expandedImage}
-							alt="Expanded attachment"
-							className="max-w-full max-h-full object-contain rounded-lg"
-							onClick={(e) => e.stopPropagation()}
-							onKeyDown={(e) => e.key === 'Enter' && e.stopPropagation()}
-						/>
-					</div>
+							<button
+								type="button"
+								onClick={() => setExpandedImage(null)}
+								className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+							>
+								<X className="w-6 h-6 text-white" />
+							</button>
+							<AuthenticatedImage
+								src={expandedImage}
+								alt="Expanded attachment"
+								className="max-w-full max-h-full object-contain rounded-lg"
+								onClick={(e) => e.stopPropagation()}
+								onKeyDown={(e) => e.key === 'Enter' && e.stopPropagation()}
+							/>
+						</div>
+					</OverlayPortal>
 				)}
 			</>
 		);

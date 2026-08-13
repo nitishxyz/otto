@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { OverlayPortal } from './OverlayPortal';
 
 interface ModalProps {
 	isOpen: boolean;
@@ -91,7 +92,7 @@ export function Modal({
 
 	const overlayPositionClass = position === 'absolute' ? 'absolute' : 'fixed';
 
-	return (
+	const overlay = (
 		<>
 			{/* Backdrop */}
 			<button
@@ -142,4 +143,12 @@ export function Modal({
 			</div>
 		</>
 	);
+
+	// `absolute` positioning is opt-in and scoped to the caller's container, so it
+	// must stay in place. Viewport overlays are portalled out of the tree to keep
+	// them clear of ancestors that establish a containing block (`contain`,
+	// `transform`, `filter`, container queries).
+	if (position === 'absolute') return overlay;
+
+	return <OverlayPortal>{overlay}</OverlayPortal>;
 }
