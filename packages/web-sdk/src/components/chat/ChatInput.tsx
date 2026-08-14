@@ -10,7 +10,7 @@ import {
 	useMemo,
 } from 'react';
 import type { ChangeEvent, ClipboardEvent, UIEvent } from 'react';
-import { isDelegatableAgent } from '@ottocode/sdk';
+import { isDelegatableAgent } from '@ottocode/sdk/agent/delegation';
 
 import {
 	ArrowUp,

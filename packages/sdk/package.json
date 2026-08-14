@@ -33,6 +33,10 @@
 			"import": "./src/references.ts",
 			"types": "./src/references.ts"
 		},
+		"./agent/delegation": {
+			"import": "./src/agent/delegation.ts",
+			"types": "./src/agent/delegation.ts"
+		},
 		"./tools/builtin/fs": {
 			"import": "./src/core/src/tools/builtin/fs/index.ts",
 			"types": "./src/core/src/tools/builtin/fs/index.ts"
