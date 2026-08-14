@@ -97,6 +97,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .manage(ServerState::default())
+        .manage(commands::desktop_events::DesktopEventBroker::default())
         .manage(commands::machine::MachineWindowState::default())
         .manage(commands::native_terminal::NativeTerminalManager::new())
         .manage(commands::updater::PendingUpdate(Mutex::new(None)))
@@ -194,6 +195,8 @@ pub fn run() {
             commands::server::stop_desktop_daemon,
             commands::server::get_cli_selection,
             commands::server::update_installed_cli,
+            commands::desktop_events::subscribe_desktop_events,
+            commands::desktop_events::unsubscribe_desktop_events,
             commands::native_browser::native_browser_mount,
             commands::native_browser::native_browser_control,
             commands::native_browser::native_browser_execute,

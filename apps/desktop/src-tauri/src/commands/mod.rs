@@ -1,4 +1,5 @@
 pub mod clipboard;
+pub mod desktop_events;
 pub mod fonts;
 pub mod machine;
 pub mod native_browser;

@@ -99,6 +99,7 @@ describe('multiplexed project events stream', () => {
 			(evt) => evt.event === 'message.created',
 		);
 		expect(received.data.sessionId).toBe('proj-events-session-1');
+		expect(received.data.projectRoot).toBe(process.cwd());
 		expect((received.data.payload as Record<string, unknown>).id).toBe('msg-1');
 
 		await stream.close();

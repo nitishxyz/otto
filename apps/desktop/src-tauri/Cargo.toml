@@ -28,7 +28,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # HTTP client (for GitHub API) - base features only, TLS backend added per-platform below
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # Utils
 anyhow = "1"
@@ -38,6 +38,7 @@ url = "2"
 semver = "1"
 fontdb = "0.23"
 base64 = "0.22"
+futures-util = "0.3"
 libghostty-vt = { version = "0.2.1", default-features = false }
 bytemuck = { version = "1", features = ["derive"] }
 glyphon = "0.12.0"
@@ -47,7 +48,7 @@ rand = "0.8"
 
 # macOS/Linux: vendored OpenSSL for TLS
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-reqwest = { version = "0.12", features = ["native-tls-vendored"] }
+reqwest = { version = "0.12", features = ["native-tls-vendored", "stream"] }
 openssl = { version = "0.10", features = ["vendored"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -66,5 +67,5 @@ wgpu = { version = "30.0.0", default-features = false, features = ["metal"] }
 
 # Windows: use native SChannel TLS (no OpenSSL/Perl needed)
 [target.'cfg(target_os = "windows")'.dependencies]
-reqwest = { version = "0.12", features = ["native-tls"] }
+reqwest = { version = "0.12", features = ["native-tls", "stream"] }
 wgpu = { version = "30.0.0", default-features = false, features = ["dx12"] }

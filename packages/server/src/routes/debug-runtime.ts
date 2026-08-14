@@ -37,6 +37,7 @@ const debugRuntimeResponseSchema = z.object({
 		sessionSubscribers: z.number().int(),
 		projectSubscribers: z.number().int(),
 		clientSubscribers: z.number().int(),
+		desktopSubscribers: z.number().int(),
 		topSessionKeys: z.array(
 			z.object({ key: z.string(), subscribers: z.number().int() }),
 		),

@@ -20,6 +20,18 @@ export interface SSEConnectOptions {
 	onUnauthorized?: () => Promise<void>;
 }
 
+export type SSETransport = (
+	url: string,
+	init: RequestInit,
+) => Promise<Response | undefined>;
+
+let sseTransport: SSETransport | undefined;
+
+/** Installs a host-provided SSE transport, such as the native desktop broker. */
+export function setSSETransport(transport: SSETransport | undefined): void {
+	sseTransport = transport;
+}
+
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
 // Server sends `: hb` comments every 5s; if nothing arrives for this long the
@@ -90,11 +102,14 @@ export class SSEClient {
 			if (this.lastEventId) {
 				requestHeaders.set('Last-Event-ID', this.lastEventId);
 			}
-			const response = await fetch(url, {
+			const requestInit: RequestInit = {
 				method: isTunnel ? 'POST' : 'GET',
 				headers: requestHeaders,
 				signal: attempt.signal,
-			});
+			};
+			const response =
+				(await sseTransport?.(url, requestInit)) ??
+				(await fetch(url, requestInit));
 
 			if (!response.ok) {
 				console.error('[SSE] Connection failed:', response.status);

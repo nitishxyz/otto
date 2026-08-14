@@ -5,7 +5,9 @@ import {
 	activateShareMode,
 	clearShareMode,
 	configureApiClient,
+	setSSETransport,
 } from '@ottocode/web-sdk/lib';
+import { createDesktopEventTransport } from './desktop-event-stream';
 import { registerNativeBrowserBridge } from './native-browser';
 import { normalizeDesktopRemoteUrl } from './remote-url';
 import { tauriBridge, type ServerInfo } from './tauri-bridge';
@@ -149,7 +151,20 @@ export function configureDesktopSdk(
 			clientApiBaseUrl: apiUrl,
 			clientServerToken: server.token ?? undefined,
 		};
+		if (server.token) {
+			setSSETransport(
+				createDesktopEventTransport({
+					baseUrl: apiUrl,
+					token: server.token,
+					projectId: server.projectId,
+					projectRoot: server.projectPath,
+				}),
+			);
+		} else {
+			setSSETransport(undefined);
+		}
 	} else {
+		setSSETransport(undefined);
 		const remote = normalizeDesktopRemoteUrl(apiUrl);
 		win.OTTO_SERVER_URL = remote.apiUrl;
 		delete win.OTTO_RUNTIME_CONTEXT;
@@ -171,6 +186,7 @@ export function configureMachineSdk(
 ) {
 	const win = window as OttoWindow;
 	clearShareMode();
+	setSSETransport(undefined);
 	win.OTTO_SERVER_URL = apiUrl;
 	win.OTTO_RUNTIME_CONTEXT = {
 		projectId,

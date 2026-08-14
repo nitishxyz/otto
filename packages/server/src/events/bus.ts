@@ -14,6 +14,7 @@ type ClientSubscriber = (evt: ClientEvent, replay: ProjectReplayRecord) => void;
 
 const subscribers = new Map<string, Set<Subscriber>>(); // project/session -> subs
 const projectSubscribers = new Map<string, Set<Subscriber>>(); // project -> subs
+const desktopSubscribers = new Set<Subscriber>();
 const clientSubscribers = new Set<ClientSubscriber>();
 
 /**
@@ -63,10 +64,19 @@ export function publish(event: OttoEvent) {
 			}
 		}
 	};
+	dispatch(desktopSubscribers, 'Desktop subscriber');
 	for (const projectKey of eventProjectKeys(event)) {
 		dispatch(projectSubscribers.get(projectKey), 'Project subscriber');
 		dispatch(subscribers.get(`${projectKey}:${event.sessionId}`), 'Subscriber');
 	}
+}
+
+/** Subscribes to every session event across all daemon projects. */
+export function subscribeDesktopEvents(handler: Subscriber) {
+	desktopSubscribers.add(handler);
+	return () => {
+		desktopSubscribers.delete(handler);
+	};
 }
 
 export function publishClientEvent(event: ClientEvent) {
@@ -140,6 +150,7 @@ export interface BusStats {
 	sessionSubscribers: number;
 	projectSubscribers: number;
 	clientSubscribers: number;
+	desktopSubscribers: number;
 	topSessionKeys: Array<{ key: string; subscribers: number }>;
 }
 
@@ -158,6 +169,7 @@ export function getBusStats(): BusStats {
 		sessionSubscribers: total,
 		projectSubscribers: projectSubs,
 		clientSubscribers: clientSubscribers.size,
+		desktopSubscribers: desktopSubscribers.size,
 		topSessionKeys: perKey.slice(0, 10),
 	};
 }

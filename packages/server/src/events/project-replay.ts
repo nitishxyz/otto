@@ -4,6 +4,7 @@ import type { ClientEvent, OttoEvent } from './types.ts';
 
 export const MAX_REPLAY_EVENTS_PER_KEY = 512;
 export const MAX_REPLAY_BYTES_PER_KEY = 4 * 1024 * 1024;
+const DESKTOP_REPLAY_KEY = '__desktop__';
 
 export interface ProjectReplayRecord {
 	id: string;
@@ -84,6 +85,8 @@ function createRecord(
 				sessionEvent.type,
 				{
 					sessionId: sessionEvent.sessionId,
+					projectId: sessionEvent.projectId,
+					projectRoot: sessionEvent.projectRoot,
 					payload: sessionEvent.payload ?? {},
 				},
 				id,
@@ -104,7 +107,11 @@ function createRecord(
 		projectRoot: payload.projectRoot,
 		chunk: encodeSSEEvent(
 			clientEvent.type,
-			{ payload: clientEvent.payload ?? {} },
+			{
+				projectId: payload.projectId,
+				projectRoot: payload.projectRoot,
+				payload: clientEvent.payload ?? {},
+			},
 			id,
 		),
 	};
@@ -114,6 +121,7 @@ export function recordProjectSessionEvent(
 	event: OttoEvent,
 ): ProjectReplayRecord {
 	const record = createRecord('session', event);
+	appendRecord(DESKTOP_REPLAY_KEY, record);
 	for (const key of eventProjectKeys(event)) appendRecord(key, record);
 	return record;
 }
@@ -122,8 +130,28 @@ export function recordProjectClientEvent(
 	event: ClientEvent,
 ): ProjectReplayRecord {
 	const record = createRecord('client', event);
+	appendRecord(DESKTOP_REPLAY_KEY, record);
 	for (const key of clientProjectKeys(event)) appendRecord(key, record);
 	return record;
+}
+
+/** Returns daemon-wide replay records for the native desktop event broker. */
+export function getDesktopReplay(lastEventId: string): {
+	records: ProjectReplayRecord[];
+	missed: boolean;
+} {
+	const sequence = Number.parseInt(lastEventId, 10);
+	const ring = rings.get(DESKTOP_REPLAY_KEY);
+	if (!Number.isSafeInteger(sequence) || sequence < 0) {
+		replayMisses += 1;
+		return { records: [], missed: true };
+	}
+	if (!ring) return { records: [], missed: false };
+	const missed = ring.evictedThroughSequence > sequence;
+	const records = ring.records.filter((record) => record.sequence > sequence);
+	replayedEvents += records.length;
+	if (missed) replayMisses += 1;
+	return { records, missed };
 }
 
 export function getProjectReplay(
