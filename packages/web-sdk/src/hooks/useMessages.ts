@@ -338,6 +338,7 @@ export function useMessages(
 		enabled: !!sessionId && enabled,
 		staleTime,
 		gcTime: MESSAGES_GC_TIME_MS,
+		refetchOnMount: 'always',
 		refetchOnWindowFocus: false,
 		select: flattenMessagePages,
 	});

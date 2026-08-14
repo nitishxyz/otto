@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import {
+	memo,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import type { CSSProperties, ReactNode, TouchEvent } from 'react';
 import {
 	useEdgeHover,
@@ -157,6 +164,12 @@ export const AppLayout = memo(function AppLayout({
 	const viewerFocused = useFocusStore((s) => s.currentFocus === 'viewer');
 	const anyViewerOpen = viewerTabCount > 0 && !viewerCollapsed;
 	const isMobile = useMediaQuery(MOBILE_QUERY);
+	// The sessions sidebar covers the workspace at this breakpoint. Update the
+	// shared state before paint so compact windows open on the chat, not the
+	// persisted docked sidebar preference.
+	useLayoutEffect(() => {
+		useSidebarStore.getState().setCompactViewport(isMobile);
+	}, [isMobile]);
 	const viewerSideBySide = useMediaQuery(VIEWER_SIDE_BY_SIDE_QUERY);
 	const showChatBesideViewer = !anyViewerOpen || viewerSideBySide;
 	const chatPanelWidth = usePanelWidthStore((s) => s.widths[CHAT_PANEL_KEY]);

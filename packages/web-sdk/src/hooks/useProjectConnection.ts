@@ -62,22 +62,25 @@ export function useProjectConnection() {
 		getProjectConnectionState,
 	);
 	const interruptedRef = useRef(false);
+	const connectedRef = useRef(state.status === 'connected');
 	const [retryPending, setRetryPending] = useState(false);
 
 	useEffect(() => {
-		if (state.status === 'retrying') {
-			interruptedRef.current = true;
-			setRetryPending(false);
-			return;
-		}
 		if (state.status === 'connected') {
 			setRetryPending(false);
+			connectedRef.current = true;
 			if (!interruptedRef.current) return;
 			interruptedRef.current = false;
 			void queryClient.invalidateQueries({
 				queryKey: ['project', getProjectKey()],
 			});
+			return;
 		}
+		if (connectedRef.current || state.status === 'retrying') {
+			interruptedRef.current = true;
+		}
+		connectedRef.current = false;
+		if (state.status === 'retrying') setRetryPending(false);
 	}, [state, queryClient]);
 
 	const retry = useCallback(() => {

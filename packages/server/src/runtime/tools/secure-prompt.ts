@@ -23,7 +23,7 @@ const PASSWORD_PROMPT_PATTERNS = [
 ];
 
 const AUTHENTICATION_FAILURE_PATTERN =
-	/(?:permission denied|authentication failed|sorry, try again|incorrect (?:password|passphrase)|invalid (?:password|passphrase|credentials))/i;
+	/(?:permission denied|authentication failed|sorry, try again|bad passphrase|incorrect (?:password|passphrase)|invalid (?:password|passphrase|credentials))/i;
 
 const TEXT_PROMPT_PATTERNS = [
 	/(?:^|[\r\n])(?:username|user name|login)(?:\s+for\s+[^\r\n]+)?:\s*$/i,

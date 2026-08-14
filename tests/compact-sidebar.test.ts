@@ -172,3 +172,15 @@ describe('desktop compact sidebar wiring', () => {
 		);
 	});
 });
+
+describe('web compact sidebar wiring', () => {
+	test('the layout closes the compact sidebar before paint', async () => {
+		const source = await Bun.file(
+			'apps/web/src/components/layout/AppLayout.tsx',
+		).text();
+		expect(source).toContain(
+			'useSidebarStore.getState().setCompactViewport(isMobile)',
+		);
+		expect(source).toContain('useLayoutEffect(() => {');
+	});
+});

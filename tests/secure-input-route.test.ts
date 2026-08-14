@@ -68,6 +68,24 @@ describe('session secure input routes', () => {
 		);
 		expect(cancelRes.status).toBe(200);
 		expect(await pendingValue).toBeNull();
+
+		const repeatedCancelRes = await app.request(
+			projectUrl('/v1/sessions/session-1/secure-input'),
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					promptId: list.pending[0].promptId,
+					cancelled: true,
+				}),
+			},
+		);
+		expect(repeatedCancelRes.status).toBe(200);
+		expect(await repeatedCancelRes.json()).toEqual({
+			ok: true,
+			promptId: list.pending[0].promptId,
+			cancelled: true,
+		});
 	});
 
 	test('resolves submitted secure input values', async () => {

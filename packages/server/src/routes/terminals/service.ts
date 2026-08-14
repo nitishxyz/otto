@@ -7,6 +7,93 @@ async function getRequestTerminalManager(c: Context) {
 	return (await resolveRequestProject(c)).runtime.terminalManager;
 }
 
+const TERMINAL_SSE_MAX_ENTRY_BYTES = 64 * 1024;
+const TERMINAL_SSE_MAX_LINE_BYTES = 8 * 1024;
+const TERMINAL_SSE_MAX_PENDING_BYTES = 256 * 1024;
+const TERMINAL_SSE_MAX_PENDING_ENTRIES = 64;
+
+function retainUtf8Tail(value: string, limitBytes: number): string {
+	const bytes = Buffer.from(value);
+	if (bytes.byteLength <= limitBytes) return value;
+	let start = bytes.byteLength - limitBytes;
+	while (start < bytes.byteLength && (bytes[start] & 0xc0) === 0x80) start++;
+	return bytes.subarray(start).toString();
+}
+
+export class BoundedTerminalSseWriter {
+	private readonly pending: Array<{ data: string; bytes: number }> = [];
+	private readonly drainWaiters: Array<(written: boolean) => void> = [];
+	private pendingBytes = 0;
+	private writing = false;
+	private stopped = false;
+
+	constructor(
+		private readonly writeFn: (data: string) => Promise<unknown>,
+		private readonly onWriteFailure: (error: unknown) => void,
+	) {}
+
+	enqueue(data: string): boolean {
+		if (this.stopped) return false;
+		const bytes = Buffer.byteLength(data);
+		if (bytes > TERMINAL_SSE_MAX_ENTRY_BYTES) return false;
+		const entry = { data, bytes };
+		while (
+			this.pending.length > 0 &&
+			(this.pending.length >= TERMINAL_SSE_MAX_PENDING_ENTRIES ||
+				this.pendingBytes + entry.bytes > TERMINAL_SSE_MAX_PENDING_BYTES)
+		) {
+			const removed = this.pending.shift();
+			if (removed) this.pendingBytes -= removed.bytes;
+		}
+		this.pending.push(entry);
+		this.pendingBytes += entry.bytes;
+		void this.pump();
+		return true;
+	}
+
+	drain(): Promise<boolean> {
+		if (this.stopped) return Promise.resolve(false);
+		if (!this.writing && this.pending.length === 0)
+			return Promise.resolve(true);
+		return new Promise((resolve) => this.drainWaiters.push(resolve));
+	}
+
+	stop(): void {
+		if (this.stopped) return;
+		this.stopped = true;
+		this.pending.length = 0;
+		this.pendingBytes = 0;
+		this.resolveDrains(false);
+	}
+
+	private async pump(): Promise<void> {
+		if (this.writing || this.stopped) return;
+		this.writing = true;
+		try {
+			while (!this.stopped) {
+				const entry = this.pending.shift();
+				if (!entry) break;
+				this.pendingBytes -= entry.bytes;
+				await this.writeFn(entry.data);
+			}
+		} catch (error) {
+			this.stop();
+			this.onWriteFailure(error);
+		} finally {
+			this.writing = false;
+			if (!this.stopped && this.pending.length > 0) {
+				void this.pump();
+			} else if (!this.stopped) {
+				this.resolveDrains(true);
+			}
+		}
+	}
+
+	private resolveDrains(written: boolean): void {
+		for (const resolve of this.drainWaiters.splice(0)) resolve(written);
+	}
+}
+
 export async function listTerminals(c: Context) {
 	const terminalManager = await getRequestTerminalManager(c);
 	const terminals = terminalManager.list();
@@ -224,62 +311,59 @@ export async function handleTerminalOutput(c: Context) {
 	const activeTerminal = terminal;
 
 	return streamSSE(c, async (stream) => {
-		const skipHistory = c.req.query('skipHistory') === 'true';
-		if (!skipHistory) {
-			const history = activeTerminal.read();
-			for (const line of history) {
-				await stream.write(
-					`data: ${JSON.stringify({ type: 'data', line })}\n\n`,
-				);
-			}
-		}
+		let resolveStream: (() => void) | null = null;
+		let finished = false;
+		let exiting = false;
+		let writer: BoundedTerminalSseWriter | null = null;
+		let hb: ReturnType<typeof setInterval> | null = null;
 
-		const sendEvent = async (payload: Record<string, unknown>) => {
-			try {
-				await stream.write(`data: ${JSON.stringify(payload)}\n\n`);
-			} catch (error) {
-				logger.error('SSE error writing event', error, { id });
-			}
+		const serializeEvent = (payload: Record<string, unknown>) => {
+			const boundedPayload =
+				typeof payload.line === 'string'
+					? {
+							...payload,
+							line: retainUtf8Tail(payload.line, TERMINAL_SSE_MAX_LINE_BYTES),
+						}
+					: payload;
+			return `data: ${JSON.stringify(boundedPayload)}\n\n`;
 		};
 
 		const onData = (line: string) => {
-			void sendEvent({ type: 'data', line });
+			writer?.enqueue(serializeEvent({ type: 'data', line }));
 		};
-
-		let resolveStream: (() => void) | null = null;
-		let finished = false;
-
-		const hb = setInterval(async () => {
-			try {
-				await stream.write(`: hb ${Date.now()}\n\n`);
-			} catch {
-				clearInterval(hb);
-			}
-		}, 15000);
 
 		function cleanup() {
 			activeTerminal.removeDataListener(onData);
 			activeTerminal.removeExitListener(onExit);
 			c.req.raw.signal.removeEventListener('abort', onAbort);
-			clearInterval(hb);
+			if (hb) clearInterval(hb);
+			hb = null;
 		}
 
 		function finish() {
-			if (finished) {
-				return;
-			}
+			if (finished) return;
 			finished = true;
 			cleanup();
+			writer?.stop();
 			resolveStream?.();
 		}
 
-		async function onExit(exitCode: number) {
-			try {
-				await sendEvent({ type: 'exit', exitCode });
-			} finally {
+		writer = new BoundedTerminalSseWriter(
+			(data) => stream.write(data),
+			(error) => {
+				logger.error('SSE error writing terminal event', error, { id });
 				stream.close();
 				finish();
-			}
+			},
+		);
+
+		async function onExit(exitCode: number) {
+			if (finished || exiting) return;
+			exiting = true;
+			writer?.enqueue(serializeEvent({ type: 'exit', exitCode }));
+			await writer?.drain();
+			stream.close();
+			finish();
 		}
 
 		function onAbort() {
@@ -287,20 +371,35 @@ export async function handleTerminalOutput(c: Context) {
 			finish();
 		}
 
-		terminal.onData(onData);
-		terminal.onExit(onExit);
+		try {
+			const waitForClose = new Promise<void>((resolve) => {
+				resolveStream = resolve;
+			});
+			const skipHistory = c.req.query('skipHistory') === 'true';
+			if (!skipHistory) {
+				for (const line of activeTerminal.read()) {
+					if (!writer.enqueue(serializeEvent({ type: 'data', line }))) break;
+				}
+			}
 
-		c.req.raw.signal.addEventListener('abort', onAbort, { once: true });
+			activeTerminal.onData(onData);
+			activeTerminal.onExit(onExit);
+			if (c.req.raw.signal.aborted) {
+				onAbort();
+			} else {
+				c.req.raw.signal.addEventListener('abort', onAbort, { once: true });
+				hb = setInterval(() => {
+					writer?.enqueue(`: hb ${Date.now()}\n\n`);
+				}, 15000);
+				if (terminal.status === 'exited') {
+					void onExit(terminal.exitCode ?? 0);
+				}
+			}
 
-		const waitForClose = new Promise<void>((resolve) => {
-			resolveStream = resolve;
-		});
-
-		if (terminal.status === 'exited') {
-			void onExit(terminal.exitCode ?? 0);
+			await waitForClose;
+		} finally {
+			finish();
 		}
-
-		await waitForClose;
 	});
 }
 

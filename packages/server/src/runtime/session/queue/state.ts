@@ -39,6 +39,19 @@ export interface QueueStats {
 	messageAbortControllers: number;
 }
 
+export function hasActiveProjectQueue(
+	projectId: string,
+	projectRoot: string,
+): boolean {
+	for (const state of runners.values()) {
+		if (!state.running && state.queue.length === 0) continue;
+		if (state.projectId === projectId || state.projectRoot === projectRoot) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export function getQueueStats(): QueueStats {
 	let running = 0;
 	let queued = 0;

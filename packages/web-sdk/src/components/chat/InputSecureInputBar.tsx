@@ -100,14 +100,20 @@ const SecureInputDialog = memo(function SecureInputDialog({
 		if (submitting) return;
 		setSubmitting(true);
 		setError(null);
+		removePendingInput(promptId);
+		setValue('');
 		try {
 			await apiClient.cancelSecureInput(sessionId, promptId);
-			removePendingInput(promptId);
-			setValue('');
 		} catch (err) {
 			console.error('Failed to cancel secure input:', err);
-			setError(err instanceof Error ? err.message : 'Failed to cancel');
-			setSubmitting(false);
+			try {
+				const current = await apiClient.getPendingSecureInputs(sessionId);
+				if (current.ok) {
+					useSecureInputStore.getState().setPendingInputs(current.pending);
+				}
+			} catch (refreshError) {
+				console.error('Failed to refresh secure input state:', refreshError);
+			}
 		}
 	}, [promptId, removePendingInput, sessionId, submitting]);
 

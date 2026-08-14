@@ -107,6 +107,7 @@ export interface MessagesPage {
 }
 
 export interface SSEEvent {
+	id?: string;
 	type: string;
 	payload: Record<string, unknown>;
 }

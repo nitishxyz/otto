@@ -47,11 +47,11 @@ export async function consumeToolStream(
 		callId?: string;
 	},
 ): Promise<unknown> {
-	const chunks: unknown[] = [];
+	let lastChunk: unknown = null;
 	let streamedResult: unknown = null;
 
 	for await (const chunk of args.stream) {
-		chunks.push(chunk);
+		lastChunk = chunk;
 		if (chunk && typeof chunk === 'object' && 'result' in chunk) {
 			streamedResult = (chunk as { result: unknown }).result;
 			continue;
@@ -81,7 +81,5 @@ export async function consumeToolStream(
 		});
 	}
 
-	return (
-		streamedResult ?? (chunks.length > 0 ? chunks[chunks.length - 1] : null)
-	);
+	return streamedResult ?? lastChunk;
 }

@@ -1,6 +1,8 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { getBusStats } from '../events/bus.ts';
+import { getProjectReplayStats } from '../events/project-replay.ts';
+import { getSSEStats } from '../events/sse.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { getProjectManager } from '../runtime/projects/manager.ts';
 import { getQueueStats } from '../runtime/session/queue/state.ts';
@@ -16,6 +18,19 @@ const debugRuntimeResponseSchema = z.object({
 		heapTotalMb: z.number(),
 		externalMb: z.number(),
 		arrayBuffersMb: z.number(),
+	}),
+	sse: z.object({
+		activeProjectStreams: z.number().int(),
+		droppedProjectStreams: z.number().int(),
+		bytesQueued: z.number().int(),
+		oversizedEvents: z.number().int(),
+		replay: z.object({
+			keys: z.number().int(),
+			events: z.number().int(),
+			bytes: z.number().int(),
+			replayedEvents: z.number().int(),
+			replayMisses: z.number().int(),
+		}),
 	}),
 	bus: z.object({
 		sessionKeys: z.number().int(),
@@ -82,6 +97,7 @@ export function registerDebugRuntimeRoute(app: Hono) {
 					arrayBuffersMb: toMb(memory.arrayBuffers ?? 0),
 				},
 				bus: getBusStats(),
+				sse: { ...getSSEStats(), replay: getProjectReplayStats() },
 				queue: getQueueStats(),
 				projects: {
 					open: openProjects.length,

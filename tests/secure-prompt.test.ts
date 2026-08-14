@@ -13,6 +13,8 @@ describe('secure command prompt detection', () => {
 		["Password for 'https://alice@example.com': ", 'password'],
 		['Password (alice@example.com): ', 'password'],
 		['Enter passphrase for key "/home/alice/.ssh/id_ed25519": ', 'password'],
+		['Enter passphrase for /home/alice/.ssh/id_ed25519: ', 'password'],
+		["Enter passphrase for key '/home/alice/.ssh/id_ed25519': ", 'password'],
 		['Verification code: ', 'password'],
 		["Username for 'https://example.com': ", 'text'],
 		['Do you want to continue? [Y/n] ', 'text'],
@@ -56,6 +58,11 @@ describe('secure command prompt detection', () => {
 	test('recognizes authentication failures before repeated prompts', () => {
 		expect(
 			hasAuthenticationFailure('Permission denied, please try again.'),
+		).toBe(true);
+		expect(
+			hasAuthenticationFailure(
+				'Bad passphrase, try again for /home/alice/.ssh/id_ed25519:',
+			),
 		).toBe(true);
 		expect(hasAuthenticationFailure('Authenticated successfully')).toBe(false);
 	});

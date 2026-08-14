@@ -59,6 +59,7 @@ import {
 	markPrependSettled,
 	resetPrependRequests,
 	resolveEndFollow,
+	schedulePrependAfterViewportPaint,
 	shouldRequestPrepend,
 } from './threadPrepend';
 import {
@@ -112,6 +113,12 @@ const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
 const PREPEND_RELEASE_FALLBACK_MS = 500;
 /** Floor applied to every row so none can measure as a zero-height item. */
 const ROW_MIN_HEIGHT_STYLE = { minHeight: 1 } as const;
+/** Stable viewport style; changing object identity is needless list-level churn. */
+const LIST_STYLE = { flex: 1, minHeight: 0, height: '100%' } as const;
+const PREPEND_FRAME_SCHEDULER = {
+	request: (callback: () => void) => requestAnimationFrame(callback),
+	cancel: (frame: number) => cancelAnimationFrame(frame),
+} as const;
 /**
  * Single, lifetime-stable anchoring config. LegendList is the *only* owner of
  * the scroll offset: `data` anchors the visible content across a prepend and
@@ -321,7 +328,9 @@ export const MessageThread = memo(function MessageThread({
 	// offset — LegendList's `maintainVisibleContentPosition` owns that.
 	const prependStateRef = useRef(createPrependRequestState());
 	const prependFetchStartedRef = useRef(false);
+	const cancelPrependDispatchRef = useRef<() => void>(() => {});
 	const [isPrepending, setIsPrepending] = useState(false);
+	const [showHistoryEdgeCover, setShowHistoryEdgeCover] = useState(false);
 	const chromeFrameRef = useRef<number | undefined>(undefined);
 	const lastSessionIdRef = useRef<string | undefined>(sessionId);
 	// Ids of the optimistic user messages already seen. A *new* one can only
@@ -389,6 +398,11 @@ export const MessageThread = memo(function MessageThread({
 	const disableAutoFollow = useCallback(() => {
 		dispatchFollow({ type: 'scrolled-up' });
 	}, [dispatchFollow]);
+
+	const cancelPendingPrependDispatch = useCallback(() => {
+		cancelPrependDispatchRef.current();
+		cancelPrependDispatchRef.current = () => {};
+	}, []);
 
 	// Wheel / touch give us an unambiguous "user wants to scroll up" signal that
 	// is impossible to confuse with programmatic follow scrolls. The moment the
@@ -558,23 +572,25 @@ export const MessageThread = memo(function MessageThread({
 		};
 	}, [showLeanHeader, updateRailInsets]);
 
-	// The list mounts per session (`key={sessionId}`) and lands at the bottom
-	// through its own `initialScrollAtEnd`. This effect only resets the
-	// per-session bookkeeping — it never scrolls. A competing imperative
-	// scroll burst races the list's first layout, and that race is what showed
-	// up as blank rows on session open.
+	// LegendList stays mounted across session switches and resets its internal
+	// dataset through `dataKey`. This effect only resets Otto's per-session
+	// bookkeeping — it never scrolls. A React key remount would throw away the
+	// list's viewport/container state and can expose a blank frame while the new
+	// conversation is measured.
 	useLayoutEffect(() => {
 		if (sessionId === lastSessionIdRef.current) return;
 		lastSessionIdRef.current = sessionId;
+		cancelPendingPrependDispatch();
 		dispatchFollow({ type: 'reset' });
 		seenOptimisticIdsRef.current = new Set();
 		optimisticSendsInitializedRef.current = false;
 		setIsPrepending(false);
+		setShowHistoryEdgeCover(false);
 		prependFetchStartedRef.current = false;
 		resetPrependRequests(prependStateRef.current);
 		setShowLeanHeader(false);
 		setRailInsets({ top: 0, bottom: 0 });
-	}, [sessionId, dispatchFollow]);
+	}, [sessionId, dispatchFollow, cancelPendingPrependDispatch]);
 
 	// The *only* content-driven re-arm: this reader pressing send. An optimistic
 	// user message appears exactly once per send from this client, which makes
@@ -617,6 +633,7 @@ export const MessageThread = memo(function MessageThread({
 
 	useEffect(() => {
 		return () => {
+			cancelPendingPrependDispatch();
 			if (chromeFrameRef.current !== undefined) {
 				cancelAnimationFrame(chromeFrameRef.current);
 				chromeFrameRef.current = undefined;
@@ -626,7 +643,7 @@ export const MessageThread = memo(function MessageThread({
 				detachScrollIntentRef.current = undefined;
 			}
 		};
-	}, []);
+	}, [cancelPendingPrependDispatch]);
 
 	const scrollToBottom = useCallback(() => {
 		dispatchFollow({ type: 'bottom-requested' });
@@ -779,16 +796,28 @@ export const MessageThread = memo(function MessageThread({
 			return;
 		}
 		markPrependRequested(prependStateRef.current, olderMessagesCursor);
-		// Rows arriving above the viewport must never be mistaken for "new
-		// content at the bottom", so end-following stands down until the fetch
-		// settles. It is released without scrolling.
-		setIsPrepending(true);
-		onLoadOlderMessages?.();
+		// A scrollbar drag can jump farther than the mounted range. Legend List
+		// fills that new visible range on the next frame. Starting a cached/fast
+		// page fetch in the same scroll turn can commit the prepend before that
+		// paint and leave the viewport blank while the large page renders. Give
+		// the list one full paint first, then suspend end-following and fetch.
+		cancelPendingPrependDispatch();
+		setShowHistoryEdgeCover(true);
+		cancelPrependDispatchRef.current = schedulePrependAfterViewportPaint(() => {
+			cancelPrependDispatchRef.current = () => {};
+			setShowHistoryEdgeCover(false);
+			// Rows arriving above the viewport must never be mistaken for "new
+			// content at the bottom", so end-following stands down until the
+			// fetch settles. It is released without scrolling.
+			setIsPrepending(true);
+			onLoadOlderMessages?.();
+		}, PREPEND_FRAME_SCHEDULER);
 	}, [
 		olderMessagesCursor,
 		hasOlderMessages,
 		isLoadingOlderMessages,
 		onLoadOlderMessages,
+		cancelPendingPrependDispatch,
 	]);
 
 	// End-following is native and only enabled while the reader is genuinely
@@ -945,13 +974,14 @@ export const MessageThread = memo(function MessageThread({
 				)}
 
 				<LegendList
-					// Remounting per session is what scopes `initialScrollAtEnd` to the
-					// initial load: prepends reuse the same mount and never re-apply it.
-					key={sessionId ?? 'thread'}
 					ref={listRef}
 					className="scrollbar-hide"
-					style={{ flex: 1, minHeight: 0, height: '100%' }}
+					style={LIST_STYLE}
 					data={rows}
+					// Reset list layout state for a different conversation without
+					// remounting the DOM subtree. v3.3.5 fixes stale/invisible rows when
+					// switching non-empty datasets through this supported path.
+					dataKey={sessionId ?? 'thread'}
 					keyExtractor={keyExtractor}
 					itemsAreEqual={rowsAreEqual}
 					getItemType={getItemType}
@@ -971,6 +1001,18 @@ export const MessageThread = memo(function MessageThread({
 					ListFooterComponent={listFooter}
 					refScrollView={attachScrollIntentListeners}
 				/>
+
+				{showHistoryEdgeCover && (
+					<div
+						data-history-edge-cover
+						className="pointer-events-none absolute inset-0 z-[5] flex items-start justify-center bg-background pt-24"
+					>
+						<div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
+							<Loader2 className="h-3 w-3 animate-spin" />
+							Loading earlier messages…
+						</div>
+					</div>
+				)}
 
 				{preferences.threadNavigatorRail && (
 					<ThreadNavigatorRail

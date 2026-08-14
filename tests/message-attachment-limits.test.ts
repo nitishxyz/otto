@@ -509,4 +509,84 @@ describe('message page payloads', () => {
 			expect(await artifactResponse.text()).toBe(largeContent);
 		});
 	});
+
+	it('keeps oversized tool call args useful but bounded', async () => {
+		await withProject('otto-message-tool-call-', async (projectRoot) => {
+			const db = await getDb(projectRoot);
+			const sessionId = crypto.randomUUID();
+			const messageId = crypto.randomUUID();
+			const partId = crypto.randomUUID();
+			const largeContent = JSON.stringify({
+				name: 'write',
+				callId: 'large-write',
+				args: {
+					path: 'src/large.ts',
+					content: `HEAD:${'x'.repeat(300 * 1024)}:TAIL`,
+				},
+			});
+			await db.insert(sessions).values({
+				id: sessionId,
+				title: 'Large tool call test',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				projectPath: projectRoot,
+				createdAt: Date.now(),
+			});
+			await db.insert(messages).values({
+				id: messageId,
+				sessionId,
+				role: 'assistant',
+				status: 'complete',
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				createdAt: Date.now(),
+			});
+			await db.insert(messageParts).values({
+				id: partId,
+				messageId,
+				index: 0,
+				type: 'tool_call',
+				content: largeContent,
+				agent: 'general',
+				provider: 'openai',
+				model: 'test-model',
+				toolName: 'write',
+				toolCallId: 'large-write',
+			});
+
+			const response = await createEmbeddedApp().request(
+				`/v1/sessions/${sessionId}/messages/page?project=${encodeURIComponent(
+					projectRoot,
+				)}&parsed=true`,
+			);
+			const page = (await response.json()) as {
+				items: Array<{
+					parts: Array<{
+						content: {
+							args: { path: string; content: string };
+							argsTruncated?: boolean;
+						};
+						contentTruncated?: boolean;
+						artifactPath?: string;
+					}>;
+				}>;
+			};
+			const part = page.items[0]?.parts[0];
+			expect(part?.contentTruncated).toBe(true);
+			expect(part?.content.argsTruncated).toBe(true);
+			expect(part?.content.args.path).toBe('src/large.ts');
+			expect(part?.content.args.content.startsWith('HEAD:')).toBe(true);
+			expect(part?.content.args.content.endsWith(':TAIL')).toBe(true);
+			expect(part?.content.args.content).toContain('truncated for live stream');
+			expect(part?.artifactPath).toContain(partId);
+
+			const artifactResponse = await createEmbeddedApp().request(
+				`${part?.artifactPath}?project=${encodeURIComponent(projectRoot)}`,
+			);
+			expect(artifactResponse.status).toBe(200);
+			expect(await artifactResponse.text()).toBe(largeContent);
+		});
+	});
 });

@@ -12,6 +12,7 @@ import {
 } from '@ottocode/sdk';
 import { and, count, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import { boundToolEventValue } from '../events/tool-payload.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
@@ -38,6 +39,7 @@ const MAX_MESSAGE_REQUEST_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MESSAGE_PART_TARGET = 120;
 const MAX_MESSAGE_PART_TARGET = 250;
 const MIN_COMPLETE_TURNS_PER_PAGE = 2;
+const MESSAGE_SUMMARY_BATCH_SIZE = 128;
 const MAX_INLINE_PART_BYTES = 256 * 1024;
 const LARGE_PART_PREVIEW_CHARS = 16 * 1024;
 
@@ -385,23 +387,35 @@ async function serializeMessages(
 			const shouldTruncate =
 				options.maxInlinePartBytes !== undefined &&
 				contentBytes > options.maxInlinePartBytes &&
-				(part.type === 'tool_result' || part.type === 'error');
+				(part.type === 'tool_call' ||
+					part.type === 'tool_result' ||
+					part.type === 'error');
 			const artifactPath = `/v1/sessions/${encodeURIComponent(
 				message.sessionId,
 			)}/parts/${encodeURIComponent(part.id)}/content`;
 			const responseContent = shouldTruncate
-				? {
-						...(typeof stripped === 'object' &&
-						typeof stripped.name === 'string'
-							? { name: stripped.name }
-							: {}),
-						result: {
-							truncated: true,
-							preview: part.content.slice(0, LARGE_PART_PREVIEW_CHARS),
-							originalBytes: contentBytes,
+				? part.type === 'tool_call'
+					? {
+							...(boundToolEventValue(stripped).value as Record<
+								string,
+								unknown
+							>),
+							argsTruncated: true,
+							argsOriginalBytes: contentBytes,
 							artifactPath,
-						},
-					}
+						}
+					: {
+							...(typeof stripped === 'object' &&
+							typeof stripped.name === 'string'
+								? { name: stripped.name }
+								: {}),
+							result: {
+								truncated: true,
+								preview: part.content.slice(0, LARGE_PART_PREVIEW_CHARS),
+								originalBytes: contentBytes,
+								artifactPath,
+							},
+						}
 				: stripped;
 			const content =
 				responseContent === parsed
@@ -601,28 +615,60 @@ export function registerSessionMessagesRoutes(app: Hono) {
 							),
 						)
 					: undefined;
-				const summaryRows = await db
-					.select({
-						message: messages,
-						partCount: count(messageParts.id),
-						sequence: messageSequence,
-					})
-					.from(messages)
-					.leftJoin(messageParts, eq(messageParts.messageId, messages.id))
-					.where(
-						cursorFilter
-							? and(eq(messages.sessionId, sessionId), cursorFilter)
-							: eq(messages.sessionId, sessionId),
-					)
-					.groupBy(messages.id)
-					.orderBy(desc(messages.createdAt), desc(messageSequence));
-				const summaries = summaryRows.map((row) => ({
-					message: row.message,
-					partCount: Number(row.partCount),
-					sequence: Number(row.sequence),
-				}));
-				const selected = selectCompleteTurnPage(summaries, query.limit);
-				const hasMore = selected.length < summaries.length;
+				const summaries: MessageSummary[] = [];
+				let selected: MessageSummary[] = [];
+				let exhausted = false;
+				let batchFilter = cursorFilter;
+				while (!exhausted) {
+					const messageRows = await db
+						.select({
+							message: messages,
+							sequence: messageSequence,
+						})
+						.from(messages)
+						.where(
+							batchFilter
+								? and(eq(messages.sessionId, sessionId), batchFilter)
+								: eq(messages.sessionId, sessionId),
+						)
+						.orderBy(desc(messages.createdAt), desc(messageSequence))
+						.limit(MESSAGE_SUMMARY_BATCH_SIZE);
+					const messageIds = messageRows.map((row) => row.message.id);
+					const partCountRows = messageIds.length
+						? await db
+								.select({
+									messageId: messageParts.messageId,
+									partCount: count(messageParts.id),
+								})
+								.from(messageParts)
+								.where(inArray(messageParts.messageId, messageIds))
+								.groupBy(messageParts.messageId)
+						: [];
+					const partCounts = new Map(
+						partCountRows.map((row) => [row.messageId, Number(row.partCount)]),
+					);
+					summaries.push(
+						...messageRows.map((row) => ({
+							message: row.message,
+							partCount: partCounts.get(row.message.id) ?? 0,
+							sequence: Number(row.sequence),
+						})),
+					);
+					selected = selectCompleteTurnPage(summaries, query.limit);
+					exhausted = messageRows.length < MESSAGE_SUMMARY_BATCH_SIZE;
+					if (selected.length < summaries.length) break;
+					const oldestBatchMessage = messageRows.at(-1);
+					if (oldestBatchMessage) {
+						batchFilter = or(
+							lt(messages.createdAt, oldestBatchMessage.message.createdAt),
+							and(
+								eq(messages.createdAt, oldestBatchMessage.message.createdAt),
+								lt(messageSequence, Number(oldestBatchMessage.sequence)),
+							),
+						);
+					}
+				}
+				const hasMore = selected.length < summaries.length || !exhausted;
 				const oldest = selected.at(-1);
 				const rows = selected.map((summary) => summary.message).reverse();
 				const selectedPartCount = selected.reduce(

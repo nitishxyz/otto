@@ -8,6 +8,7 @@ import {
 const app = createApp();
 
 interface ParsedEvent {
+	id?: string;
 	event: string;
 	data: Record<string, unknown>;
 }
@@ -16,10 +17,18 @@ interface ParsedEvent {
 // global fetch: several suites stub globalThis.fetch (oauth clients) and
 // bun's pattern-discovery mode interleaves module loading, which poisoned
 // network-based reads when the whole tests/ directory ran together.
-async function openStream(path: string, method: 'GET' | 'POST' = 'GET') {
+async function openStream(
+	path: string,
+	method: 'GET' | 'POST' = 'GET',
+	headers?: HeadersInit,
+) {
 	const abort = new AbortController();
 	const response = await app.fetch(
-		new Request(`http://localhost${path}`, { method, signal: abort.signal }),
+		new Request(`http://localhost${path}`, {
+			method,
+			headers,
+			signal: abort.signal,
+		}),
 	);
 	expect(response.ok).toBe(true);
 	const reader = response.body?.getReader();
@@ -38,13 +47,15 @@ async function openStream(path: string, method: 'GET' | 'POST' = 'GET') {
 				const raw = buffer.slice(0, idx);
 				buffer = buffer.slice(idx + 2);
 				let event = 'message';
+				let id: string | undefined;
 				let data = '';
 				for (const line of raw.split('\n')) {
 					if (line.startsWith('event: ')) event = line.slice(7).trim();
+					else if (line.startsWith('id:')) id = line.slice(3).trim();
 					else if (line.startsWith('data: ')) data += line.slice(6);
 				}
 				if (data) {
-					const parsed: ParsedEvent = { event, data: JSON.parse(data) };
+					const parsed: ParsedEvent = { id, event, data: JSON.parse(data) };
 					if (match(parsed)) return parsed;
 				}
 				idx = buffer.indexOf('\n\n');
@@ -307,6 +318,68 @@ describe('multiplexed project events stream', () => {
 		await stream.close();
 	});
 
+	it('filters session events to the requested active sessions', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(
+				process.cwd(),
+			)}&sessions=session-visible`,
+		);
+
+		publish({
+			type: 'message.created',
+			sessionId: 'session-background',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-background' },
+		});
+		publish({
+			type: 'message.created',
+			sessionId: 'session-visible',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-visible' },
+		});
+
+		const received = await stream.next(
+			(evt) => evt.event === 'message.created',
+		);
+		expect(received.data.sessionId).toBe('session-visible');
+		expect((received.data.payload as Record<string, unknown>).id).toBe(
+			'msg-visible',
+		);
+
+		await stream.close();
+	});
+
+	it('supports a client-events-only project stream', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}&sessions=`,
+		);
+
+		publish({
+			type: 'message.created',
+			sessionId: 'session-not-requested',
+			projectRoot: process.cwd(),
+			payload: { id: 'msg-not-requested' },
+		});
+		publishClientEvent({
+			type: 'notification',
+			payload: {
+				id: 'client-only-notification',
+				title: 'client only',
+				level: 'info',
+				projectRoot: process.cwd(),
+				createdAt: new Date().toISOString(),
+			},
+		});
+
+		const received = await stream.next((evt) => evt.event === 'notification');
+		expect(received.data.sessionId).toBeUndefined();
+		expect((received.data.payload as Record<string, unknown>).id).toBe(
+			'client-only-notification',
+		);
+
+		await stream.close();
+	});
+
 	it('does not double-deliver when a subscriber matches multiple keys', async () => {
 		const stream = await openStream(
 			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
@@ -332,6 +405,83 @@ describe('multiplexed project events stream', () => {
 		});
 		expect(createdCount).toBe(1);
 
+		await stream.close();
+	});
+
+	it('replays events after Last-Event-ID without duplicating the last event', async () => {
+		const path = `/v1/events/project?project=${encodeURIComponent(
+			process.cwd(),
+		)}&sessions=session-replay`;
+		const first = await openStream(path);
+		publish({
+			type: 'message.created',
+			sessionId: 'session-replay',
+			projectRoot: process.cwd(),
+			payload: { id: 'replay-first' },
+		});
+		const receivedFirst = await first.next(
+			(event) => event.event === 'message.created',
+		);
+		expect(receivedFirst.id).toBeTruthy();
+		await first.close();
+
+		publish({
+			type: 'message.created',
+			sessionId: 'session-replay',
+			projectRoot: process.cwd(),
+			payload: { id: 'replay-second' },
+		});
+		publish({
+			type: 'message.completed',
+			sessionId: 'session-replay',
+			projectRoot: process.cwd(),
+			payload: { id: 'replay-second' },
+		});
+
+		const reconnected = await openStream(path, 'GET', {
+			'Last-Event-ID': receivedFirst.id ?? '',
+		});
+		const created = await reconnected.next(
+			(event) => event.event === 'message.created',
+		);
+		expect((created.data.payload as Record<string, unknown>).id).toBe(
+			'replay-second',
+		);
+		expect(Number(created.id)).toBeGreaterThan(Number(receivedFirst.id));
+		const completed = await reconnected.next(
+			(event) => event.event === 'message.completed',
+		);
+		expect(Number(completed.id)).toBeGreaterThan(Number(created.id));
+		await reconnected.close();
+	});
+
+	it('reports active project stream and replay diagnostics', async () => {
+		const stream = await openStream(
+			`/v1/events/project?project=${encodeURIComponent(process.cwd())}`,
+		);
+		const response = await app.fetch(
+			new Request(
+				`http://localhost/v1/debug/runtime?project=${encodeURIComponent(
+					process.cwd(),
+				)}`,
+			),
+		);
+		expect(response.ok).toBe(true);
+		const runtime = (await response.json()) as {
+			sse: {
+				activeProjectStreams: number;
+				droppedProjectStreams: number;
+				bytesQueued: number;
+				oversizedEvents: number;
+				replay: { events: number; bytes: number };
+			};
+		};
+		expect(runtime.sse.activeProjectStreams).toBeGreaterThanOrEqual(1);
+		expect(runtime.sse.droppedProjectStreams).toBeGreaterThanOrEqual(0);
+		expect(runtime.sse.bytesQueued).toBeGreaterThanOrEqual(0);
+		expect(runtime.sse.oversizedEvents).toBeGreaterThanOrEqual(0);
+		expect(runtime.sse.replay.events).toBeGreaterThan(0);
+		expect(runtime.sse.replay.bytes).toBeGreaterThan(0);
 		await stream.close();
 	});
 });

@@ -34,11 +34,16 @@ type ShellResult = ToolResponse<{
 	envHint?: string;
 }>;
 
-type SecureShellStreamChunk =
-	| { channel: 'output'; delta: string }
-	| { result: ShellResult };
-
 const SHELL_OUTPUT_LIMIT_BYTES = 1024 * 1024;
+const SHELL_PENDING_DELTA_LIMIT_BYTES = 64 * 1024;
+
+function retainUtf8Tail(value: string, limitBytes: number): string {
+	const bytes = Buffer.from(value);
+	if (bytes.byteLength <= limitBytes) return value;
+	let start = bytes.byteLength - limitBytes;
+	while (start < bytes.byteLength && (bytes[start] & 0xc0) === 0x80) start++;
+	return bytes.subarray(start).toString();
+}
 
 interface ShellProcess {
 	pid?: number;
@@ -155,6 +160,12 @@ export function createSecureShellExecutor(args: {
 		const timeout = input.timeout ?? 300000;
 		const outputMode = input.outputMode ?? 'full';
 		const tailLines = input.tailLines ?? 100;
+		const outputLimitBytes = Math.min(
+			input.maxOutputBytes && input.maxOutputBytes > 0
+				? input.maxOutputBytes
+				: SHELL_OUTPUT_LIMIT_BYTES,
+			SHELL_OUTPUT_LIMIT_BYTES,
+		);
 		const envMode = input.envMode ?? 'login-cache';
 		const shellConfig = getShellExecutionConfig(cmd, { envMode });
 		const proc = createShellProcess({
@@ -181,7 +192,8 @@ export function createSecureShellExecutor(args: {
 		let killEscalationId: ReturnType<typeof setTimeout> | null = null;
 		let fallbackSettleId: ReturnType<typeof setTimeout> | null = null;
 		let activeShell: ActiveShellRegistration | null = null;
-		const queue: SecureShellStreamChunk[] = [];
+		let pendingDelta = '';
+		let pendingResult: ShellResult | null = null;
 		let notify: (() => void) | null = null;
 
 		const wake = () => {
@@ -192,7 +204,10 @@ export function createSecureShellExecutor(args: {
 
 		const pushDelta = (text: string) => {
 			if (!text || streamSettled) return;
-			queue.push({ channel: 'output', delta: text });
+			pendingDelta = retainUtf8Tail(
+				`${pendingDelta}${text}`,
+				SHELL_PENDING_DELTA_LIMIT_BYTES,
+			);
 			wake();
 		};
 
@@ -224,7 +239,7 @@ export function createSecureShellExecutor(args: {
 			proc.cleanup();
 			if (!streamSettled) {
 				streamSettled = true;
-				queue.push({ result });
+				pendingResult = result;
 				done = true;
 				wake();
 			}
@@ -235,17 +250,15 @@ export function createSecureShellExecutor(args: {
 			detached = true;
 			streamSettled = true;
 			options?.abortSignal?.removeEventListener('abort', onAbort);
-			queue.push({
-				result: {
-					ok: true,
-					detached: true,
-					jobId,
-					status: 'running',
-					stdout,
-					stderr,
-					envMode,
-				},
-			});
+			pendingResult = {
+				ok: true,
+				detached: true,
+				jobId,
+				status: 'running',
+				stdout,
+				stderr,
+				envMode,
+			};
 			done = true;
 			wake();
 		};
@@ -278,8 +291,11 @@ export function createSecureShellExecutor(args: {
 			if (terminating) return;
 			terminating = true;
 			if (proc.usesPty) {
-				proc.kill('SIGTERM');
-				killEscalationId = setTimeout(() => proc.kill('SIGKILL'), 1000);
+				proc.write('\x03');
+				killEscalationId = setTimeout(() => {
+					proc.kill('SIGTERM');
+					killEscalationId = setTimeout(() => proc.kill('SIGKILL'), 1000);
+				}, 250);
 			} else if (proc.pid) {
 				killProcessTree(proc.pid);
 				killEscalationId = setTimeout(() => {
@@ -318,7 +334,7 @@ export function createSecureShellExecutor(args: {
 
 		const maybeRequestSecureInput = (text: string) => {
 			recentOutput = `${recentOutput}${text}`.slice(-1000);
-			if (securePromptPending) return;
+			if (securePromptPending || terminating || processSettled) return;
 			const detected = detectSecurePrompt(recentOutput);
 			if (!detected) return;
 
@@ -344,7 +360,7 @@ export function createSecureShellExecutor(args: {
 					terminate(abortResult);
 					return;
 				}
-				proc.write(`${value}\n`);
+				proc.write(`${value}${proc.usesPty ? '\r' : '\n'}`);
 			});
 		};
 
@@ -369,9 +385,7 @@ export function createSecureShellExecutor(args: {
 				outputMode === 'tail'
 					? appendTailLines(stdout, text, tailLines)
 					: `${stdout}${text}`;
-			if (outputMode === 'full' && stdout.length > SHELL_OUTPUT_LIMIT_BYTES) {
-				stdout = stdout.slice(-SHELL_OUTPUT_LIMIT_BYTES);
-			}
+			stdout = retainUtf8Tail(stdout, outputLimitBytes);
 			pushDelta(text);
 			maybeRequestSecureInput(text);
 		});
@@ -382,9 +396,7 @@ export function createSecureShellExecutor(args: {
 				outputMode === 'tail'
 					? appendTailLines(stderr, text, tailLines)
 					: `${stderr}${text}`;
-			if (outputMode === 'full' && stderr.length > SHELL_OUTPUT_LIMIT_BYTES) {
-				stderr = stderr.slice(-SHELL_OUTPUT_LIMIT_BYTES);
-			}
+			stderr = retainUtf8Tail(stderr, outputLimitBytes);
 			pushDelta(text);
 			maybeRequestSecureInput(text);
 		});
@@ -415,7 +427,9 @@ export function createSecureShellExecutor(args: {
 
 			if (resolvedExitCode !== 0 && !input.allowNonZeroExit) {
 				const errorDetail = stderr.trim() || stdout.trim() || '';
-				const errorMsg = `Command failed with exit code ${resolvedExitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
+				const errorMsg = `Command failed with exit code ${resolvedExitCode}${
+					errorDetail ? `\n\n${errorDetail}` : ''
+				}`;
 				settle(
 					createToolError(errorMsg, 'execution', {
 						exitCode: resolvedExitCode,
@@ -455,15 +469,22 @@ export function createSecureShellExecutor(args: {
 			);
 		});
 
-		while (!done || queue.length > 0) {
-			if (queue.length === 0) {
+		while (!done || pendingDelta || pendingResult) {
+			if (!pendingDelta && !pendingResult) {
 				await new Promise<void>((resolve) => {
 					notify = resolve;
 				});
 			}
-			while (queue.length > 0) {
-				const chunk = queue.shift();
-				if (chunk) yield chunk;
+			if (pendingDelta) {
+				const delta = pendingDelta;
+				pendingDelta = '';
+				yield { channel: 'output', delta };
+				continue;
+			}
+			if (pendingResult) {
+				const result = pendingResult;
+				pendingResult = null;
+				yield { result };
 			}
 		}
 	};

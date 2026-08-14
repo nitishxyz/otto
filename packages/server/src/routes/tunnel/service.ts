@@ -1,5 +1,5 @@
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { createServer, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo, Socket } from 'node:net';
 import type { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import {
@@ -34,6 +34,7 @@ export type TunnelMode = 'managed' | 'quick';
 type TunnelStatus = 'idle' | 'starting' | 'connected' | 'error';
 
 type TunnelFactory = () => OttoTunnel;
+type ProxyFetch = typeof fetch;
 type ManagedAuthProvider = () => Promise<{
 	accessToken: string;
 	refreshAccessToken?: (options?: {
@@ -53,11 +54,16 @@ const defaultManagedRestartDelay: ManagedRestartDelay = (attempt) =>
 	Math.min(1000 * 2 ** attempt, 30_000);
 const defaultManagedDisconnectDelay: ManagedDisconnectDelay = () => 30_000;
 
+interface ProjectScopeProxy {
+	server: Server;
+	abortActive(): void;
+}
+
 interface TunnelSlot {
 	scope: TunnelScope;
 	projectId: string | null;
 	activeTunnel: OttoTunnel | null;
-	proxyServer: Server | null;
+	proxyServer: ProjectScopeProxy | null;
 	url: string | null;
 	status: TunnelStatus;
 	error: string | null;
@@ -74,6 +80,7 @@ export interface TunnelScopeOptions {
 const tunnelSlots = new Map<string, TunnelSlot>();
 const managedShareIds = new Map<string, string>();
 let tunnelFactory: TunnelFactory = () => new OttoTunnel();
+let proxyFetch: ProxyFetch = fetch;
 let managedAuthProvider: ManagedAuthProvider = getOttoRouterOAuthAuth;
 let managedProvisioner: ManagedProvisioner = provisionManagedTunnel;
 let managedStateReader: ManagedStateReader = readManagedTunnelDesiredState;
@@ -196,6 +203,11 @@ function getExistingTunnelSlot(options: TunnelScopeOptions = {}) {
 	return tunnelSlots.get(getTunnelKey(options)) ?? createTunnelSlot(options);
 }
 
+function evictTunnelSlot(options: TunnelScopeOptions, slot: TunnelSlot): void {
+	const key = getTunnelKey(options);
+	if (tunnelSlots.get(key) === slot) tunnelSlots.delete(key);
+}
+
 function validateScope(options: TunnelScopeOptions = {}) {
 	const scope = options.scope ?? 'remote-control';
 	if (scope === 'project-share' && !options.projectId) {
@@ -253,11 +265,57 @@ function getCurrentTunnelState(options: TunnelScopeOptions = {}) {
 	};
 }
 
+function waitForResponseDrain(
+	res: ServerResponse,
+	signal: AbortSignal,
+): Promise<void> {
+	if (signal.aborted || res.destroyed) {
+		return Promise.reject(signal.reason ?? new Error('Proxy response closed'));
+	}
+	return new Promise((resolve, reject) => {
+		const cleanup = () => {
+			res.off('drain', onDrain);
+			res.off('close', onClose);
+			res.off('error', onError);
+			signal.removeEventListener('abort', onAbort);
+		};
+		const finish = (error?: unknown) => {
+			cleanup();
+			if (error) reject(error);
+			else resolve();
+		};
+		const onDrain = () => finish();
+		const onClose = () => finish(new Error('Proxy response closed'));
+		const onError = (error: Error) => finish(error);
+		const onAbort = () => finish(signal.reason ?? new Error('Proxy aborted'));
+		res.once('drain', onDrain);
+		res.once('close', onClose);
+		res.once('error', onError);
+		signal.addEventListener('abort', onAbort, { once: true });
+		if (signal.aborted) onAbort();
+		else if (res.destroyed) onClose();
+	});
+}
+
 function startProjectScopeProxy(
 	projectId: string,
 	targetPort: number,
-): Promise<{ server: Server; port: number }> {
+): Promise<{ proxy: ProjectScopeProxy; port: number }> {
+	const activeAborts = new Set<() => void>();
+	const activeSockets = new Set<Socket>();
 	const server = createServer(async (req, res) => {
+		const controller = new AbortController();
+		let upstreamReader: {
+			cancel(): Promise<void>;
+			releaseLock(): void;
+		} | null = null;
+		const abortUpstream = () => {
+			controller.abort();
+			void upstreamReader?.cancel().catch(() => {});
+		};
+		activeAborts.add(abortUpstream);
+		req.once('aborted', abortUpstream);
+		res.once('close', abortUpstream);
 		try {
 			const requestUrl = new URL(
 				req.url ?? '/',
@@ -307,10 +365,11 @@ function startProjectScopeProxy(
 				}
 				body = Buffer.concat(chunks);
 			}
-			const upstream = await fetch(requestUrl, {
+			const upstream = await proxyFetch(requestUrl, {
 				method,
 				headers,
 				body,
+				signal: controller.signal,
 			});
 
 			res.writeHead(
@@ -318,30 +377,56 @@ function startProjectScopeProxy(
 				Object.fromEntries(upstream.headers.entries()),
 			);
 			if (upstream.body) {
-				for await (const chunk of upstream.body) {
-					res.write(chunk);
+				const reader = upstream.body.getReader();
+				upstreamReader = reader;
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					if (!res.write(value)) {
+						await waitForResponseDrain(res, controller.signal);
+					}
 				}
 			}
 			res.end();
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			res.writeHead(502, { 'content-type': 'application/json' });
-			res.end(JSON.stringify({ error: message }));
+			if (!controller.signal.aborted && !res.destroyed) {
+				const message = error instanceof Error ? error.message : String(error);
+				res.writeHead(502, { 'content-type': 'application/json' });
+				res.end(JSON.stringify({ error: message }));
+			}
+		} finally {
+			req.off('aborted', abortUpstream);
+			res.off('close', abortUpstream);
+			activeAborts.delete(abortUpstream);
+			upstreamReader?.releaseLock();
 		}
 	});
+	server.on('connection', (socket) => {
+		activeSockets.add(socket);
+		socket.once('close', () => activeSockets.delete(socket));
+	});
+
+	const proxy: ProjectScopeProxy = {
+		server,
+		abortActive() {
+			for (const abort of activeAborts) abort();
+			for (const socket of activeSockets) socket.destroy();
+		},
+	};
 
 	return new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(0, '127.0.0.1', () => {
 			server.off('error', reject);
-			resolve({ server, port: (server.address() as AddressInfo).port });
+			resolve({ proxy, port: (server.address() as AddressInfo).port });
 		});
 	});
 }
 
 function stopProxyServer(slot: TunnelSlot) {
 	if (!slot.proxyServer) return;
-	slot.proxyServer.close();
+	slot.proxyServer.abortActive();
+	slot.proxyServer.server.close();
 	slot.proxyServer = null;
 }
 
@@ -613,7 +698,7 @@ export async function startTunnel(
 				slot.projectId ?? '',
 				serverPort,
 			);
-			slot.proxyServer = proxy.server;
+			slot.proxyServer = proxy.proxy;
 			tunnelPort = proxy.port;
 		}
 
@@ -643,6 +728,7 @@ export async function startTunnel(
 			slot.url = null;
 			slot.activeTunnel = null;
 			stopProxyServer(slot);
+			evictTunnelSlot(options, slot);
 		});
 
 		return {
@@ -744,8 +830,13 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 		};
 	}
 
-	const slot = getTunnelSlot(options);
+	const slot = getExistingTunnelSlot(options);
 	if (!slot.activeTunnel) {
+		slot.url = null;
+		slot.status = 'idle';
+		slot.error = null;
+		stopProxyServer(slot);
+		evictTunnelSlot(options, slot);
 		return {
 			ok: true,
 			mode: 'quick' as const,
@@ -762,6 +853,7 @@ export async function stopTunnel(options: TunnelScopeOptions = {}) {
 		slot.status = 'idle';
 		slot.error = null;
 		stopProxyServer(slot);
+		evictTunnelSlot(options, slot);
 
 		return {
 			ok: true,
@@ -818,34 +910,63 @@ export async function getTunnelQRCode(options: TunnelScopeOptions = {}) {
 export async function handleTunnelStream(c: Context) {
 	const options = getTunnelScopeOptionsFromContext(c);
 	return streamSSE(c as Context, async (stream) => {
+		const signal = c.req.raw.signal;
+		let stopped = signal.aborted;
+		let closed = false;
+		let wakeDelay: (() => void) | null = null;
+		let delayTimer: ReturnType<typeof setTimeout> | null = null;
+		const stop = () => {
+			if (!stopped) {
+				stopped = true;
+				if (delayTimer) clearTimeout(delayTimer);
+				delayTimer = null;
+				wakeDelay?.();
+				wakeDelay = null;
+			}
+			if (!closed) {
+				closed = true;
+				stream.close();
+			}
+		};
 		const sendEvent = async (data: Record<string, unknown>) => {
 			try {
 				await stream.write(`data: ${JSON.stringify(data)}\n\n`);
+				return true;
 			} catch (error) {
 				logger.error('SSE error writing event', error);
+				stop();
+				return false;
 			}
 		};
-
-		await sendEvent({ type: 'status', ...getCurrentTunnelState(options) });
-
-		const interval = setInterval(async () => {
-			await sendEvent({ type: 'status', ...getCurrentTunnelState(options) });
-		}, 1000);
-
-		const onAbort = () => {
-			clearInterval(interval);
-			stream.close();
+		const waitForNextEvent = () => {
+			if (stopped) return Promise.resolve();
+			return new Promise<void>((resolve) => {
+				wakeDelay = resolve;
+				delayTimer = setTimeout(() => {
+					delayTimer = null;
+					wakeDelay = null;
+					resolve();
+				}, 1000);
+			});
 		};
 
-		c.req.raw.signal.addEventListener('abort', onAbort, { once: true });
-
-		await new Promise<void>((resolve) => {
-			c.req.raw.signal.addEventListener('abort', () => resolve(), {
-				once: true,
-			});
-		});
-
-		clearInterval(interval);
+		signal.addEventListener('abort', stop, { once: true });
+		try {
+			while (!stopped) {
+				if (
+					!(await sendEvent({
+						type: 'status',
+						...getCurrentTunnelState(options),
+					}))
+				) {
+					break;
+				}
+				await waitForNextEvent();
+			}
+		} finally {
+			signal.removeEventListener('abort', stop);
+			stop();
+		}
 	});
 }
 
@@ -880,6 +1001,7 @@ export function stopActiveTunnel() {
 		}
 		stopProxyServer(slot);
 	}
+	tunnelSlots.clear();
 }
 
 export function stopProjectTunnel(projectId: string) {
@@ -903,6 +1025,7 @@ export function setExternalTunnel(tunnel: OttoTunnel, url: string) {
 		slot.status = 'idle';
 		slot.url = null;
 		slot.activeTunnel = null;
+		evictTunnelSlot({ scope: 'remote-control' }, slot);
 	});
 }
 
@@ -929,8 +1052,14 @@ export function getTunnelScopeOptionsFromContext(
 }
 
 export const tunnelTesting = {
+	getQuickSlotCount() {
+		return tunnelSlots.size;
+	},
 	setTunnelFactory(factory: TunnelFactory) {
 		tunnelFactory = factory;
+	},
+	setProxyFetch(fetchImpl: ProxyFetch) {
+		proxyFetch = fetchImpl;
 	},
 	setManagedAuthProvider(provider: ManagedAuthProvider) {
 		managedAuthProvider = provider;
@@ -954,6 +1083,7 @@ export const tunnelTesting = {
 		stopActiveTunnel();
 		tunnelSlots.clear();
 		tunnelFactory = () => new OttoTunnel();
+		proxyFetch = fetch;
 		managedAuthProvider = getOttoRouterOAuthAuth;
 		managedProvisioner = provisionManagedTunnel;
 		managedStateReader = readManagedTunnelDesiredState;

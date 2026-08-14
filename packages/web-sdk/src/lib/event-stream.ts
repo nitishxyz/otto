@@ -78,6 +78,9 @@ class EventStreamMultiplexer {
 	private clientStateOff: Release | null = null;
 	private connectionState: ProjectConnectionState = IDLE_CONNECTION_STATE;
 	private fallback = false;
+	private lastEventId: string | undefined;
+	private subscriptionReconnectHandle: ReturnType<typeof setTimeout> | null =
+		null;
 	private readonly entries = new Map<string, SubscriptionEntry>();
 
 	constructor(baseUrl: string, onEmpty: () => void) {
@@ -92,6 +95,8 @@ class EventStreamMultiplexer {
 			this.entries.set(key, entry);
 			if (this.fallback) {
 				this.startFallbackEntry(key, entry);
+			} else if (this.client && key !== CLIENT_EVENTS_KEY) {
+				this.scheduleSubscriptionReconnect();
 			} else {
 				this.ensureConnection();
 			}
@@ -117,6 +122,12 @@ class EventStreamMultiplexer {
 					if (this.entries.size === 0) {
 						this.teardownConnection();
 						this.onEmpty();
+					} else if (
+						!this.fallback &&
+						this.client &&
+						key !== CLIENT_EVENTS_KEY
+					) {
+						this.scheduleSubscriptionReconnect();
 					}
 				}
 			},
@@ -155,25 +166,39 @@ class EventStreamMultiplexer {
 
 	private ensureConnection() {
 		if (this.client || this.fallback) return;
+		const sessionIds = [...this.entries.keys()].filter(
+			(key) => key !== CLIENT_EVENTS_KEY,
+		);
 		const url = buildProjectEventsStreamUrl({
 			baseUrl: this.baseUrl,
 			projectId: getProjectId(),
 			projectPath: getProjectRoot(),
+			sessionIds,
 		});
 		const client = new SSEClient();
+		client.setLastEventId(this.lastEventId);
 		this.client = client;
 		this.clientStateOff = client.onConnectionState((state) =>
 			this.setConnectionState(state),
 		);
 		this.clientOff = client.on('*', (event) => {
+			if (event.id) this.lastEventId = event.id;
 			const data = event.payload as
 				| { sessionId?: string; payload?: unknown }
 				| undefined;
 			const payload = (data?.payload ?? {}) as Record<string, unknown>;
 			if (data && typeof data.sessionId === 'string') {
-				this.emit(data.sessionId, { type: event.type, payload });
+				this.emit(data.sessionId, {
+					id: event.id,
+					type: event.type,
+					payload,
+				});
 			} else {
-				this.emit(CLIENT_EVENTS_KEY, { type: event.type, payload });
+				this.emit(CLIENT_EVENTS_KEY, {
+					id: event.id,
+					type: event.type,
+					payload,
+				});
 			}
 		});
 		void client.connect(url, undefined, {
@@ -193,6 +218,11 @@ class EventStreamMultiplexer {
 	}
 
 	private teardownConnection() {
+		if (this.subscriptionReconnectHandle !== null) {
+			clearTimeout(this.subscriptionReconnectHandle);
+			this.subscriptionReconnectHandle = null;
+		}
+		this.lastEventId = this.client?.getLastEventId() ?? this.lastEventId;
 		this.clientOff?.();
 		this.clientOff = null;
 		this.clientStateOff?.();
@@ -200,6 +230,16 @@ class EventStreamMultiplexer {
 		this.client?.disconnect();
 		this.client = null;
 		this.setConnectionState(IDLE_CONNECTION_STATE);
+	}
+
+	private scheduleSubscriptionReconnect() {
+		if (this.subscriptionReconnectHandle !== null) return;
+		this.subscriptionReconnectHandle = setTimeout(() => {
+			this.subscriptionReconnectHandle = null;
+			if (this.fallback || this.entries.size === 0) return;
+			this.teardownConnection();
+			this.ensureConnection();
+		}, 50);
 	}
 
 	private enterFallback() {

@@ -1,6 +1,18 @@
 import { logger } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
+import { boundToolEventValue } from '../../events/tool-payload.ts';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
+
+const MAX_STREAMED_INPUT_CHARS = 48_000;
+const MAX_TOOL_DELTA_CHARS = 24_000;
+const MAX_TRACKED_STREAM_INPUTS = 1024;
+
+interface StreamedInputState {
+	chars: number;
+	omissionPublished: boolean;
+}
+
+const streamedInputs = new Map<string, StreamedInputState>();
 
 export type ToolResultContent = {
 	name: string;
@@ -9,6 +21,54 @@ export type ToolResultContent = {
 	artifact?: unknown;
 	args?: unknown;
 };
+
+function streamedInputKey(
+	ctx: ToolAdapterContext,
+	name: string,
+	callId?: string,
+): string {
+	return `${ctx.projectRoot}\u0000${ctx.sessionId}\u0000${ctx.messageId}\u0000${
+		callId ?? name
+	}`;
+}
+
+function clearStreamedInput(
+	ctx: ToolAdapterContext,
+	name: string,
+	callId?: string,
+): void {
+	streamedInputs.delete(streamedInputKey(ctx, name, callId));
+}
+
+function boundPayloadField(
+	payload: Record<string, unknown>,
+	field: 'args' | 'result' | 'artifact',
+	value: unknown,
+): void {
+	const bounded = boundToolEventValue(value);
+	payload[field] = bounded.value;
+	if (bounded.truncated) {
+		payload[`${field}Truncated`] = true;
+		payload[`${field}OriginalBytes`] = bounded.originalBytes;
+	}
+}
+
+function withoutDuplicatedArtifact(
+	result: unknown,
+	artifact: unknown,
+): unknown {
+	if (
+		artifact === undefined ||
+		!result ||
+		typeof result !== 'object' ||
+		Array.isArray(result) ||
+		!('artifact' in result)
+	) {
+		return result;
+	}
+	const { artifact: _artifact, ...rest } = result as Record<string, unknown>;
+	return rest;
+}
 
 export function publishToolCall(
 	ctx: ToolAdapterContext,
@@ -20,18 +80,20 @@ export function publishToolCall(
 		index?: number;
 	},
 ): void {
+	clearStreamedInput(ctx, args.name, args.callId);
+	const payload: Record<string, unknown> = {
+		name: args.name,
+		callId: args.callId,
+		stepIndex: args.stepIndex,
+		index: args.index,
+		messageId: ctx.messageId,
+	};
+	boundPayloadField(payload, 'args', args.input);
 	publish({
 		type: 'tool.call',
 		sessionId: ctx.sessionId,
 		projectRoot: ctx.projectRoot,
-		payload: {
-			name: args.name,
-			args: args.input,
-			callId: args.callId,
-			stepIndex: args.stepIndex,
-			index: args.index,
-			messageId: ctx.messageId,
-		},
+		payload,
 	});
 }
 
@@ -58,18 +120,58 @@ export function publishToolDelta(
 		callId?: string;
 	},
 ): void {
+	let delta = args.delta;
+	let deltaTruncated = false;
+	let deltaOriginalBytes: number | undefined;
+	if (typeof args.delta === 'string') {
+		const originalDelta = args.delta;
+		deltaOriginalBytes = Buffer.byteLength(originalDelta, 'utf8');
+		if (args.channel === 'input') {
+			const key = streamedInputKey(ctx, args.name, args.callId);
+			let state = streamedInputs.get(key);
+			if (!state) {
+				if (streamedInputs.size >= MAX_TRACKED_STREAM_INPUTS) {
+					const oldestKey = streamedInputs.keys().next().value;
+					if (typeof oldestKey === 'string') streamedInputs.delete(oldestKey);
+				}
+				state = { chars: 0, omissionPublished: false };
+				streamedInputs.set(key, state);
+			}
+			const remaining = Math.max(0, MAX_STREAMED_INPUT_CHARS - state.chars);
+			const allowed = Math.min(remaining, MAX_TOOL_DELTA_CHARS);
+			if (originalDelta.length > allowed) deltaTruncated = true;
+			const boundedDelta = allowed > 0 ? originalDelta.slice(0, allowed) : '';
+			delta = boundedDelta;
+			state.chars += boundedDelta.length;
+			if (!boundedDelta && state.omissionPublished) return;
+			if (deltaTruncated) state.omissionPublished = true;
+		} else if (originalDelta.length > MAX_TOOL_DELTA_CHARS) {
+			delta = originalDelta.slice(0, MAX_TOOL_DELTA_CHARS);
+			deltaTruncated = true;
+		}
+	} else {
+		const bounded = boundToolEventValue(delta);
+		delta = bounded.value;
+		deltaTruncated = bounded.truncated;
+		deltaOriginalBytes = bounded.originalBytes;
+	}
+	const payload: Record<string, unknown> = {
+		name: args.name,
+		channel: args.channel,
+		delta,
+		stepIndex: args.stepIndex,
+		callId: args.callId,
+		messageId: ctx.messageId,
+	};
+	if (deltaTruncated) {
+		payload.deltaTruncated = true;
+		payload.deltaOriginalBytes = deltaOriginalBytes;
+	}
 	publish({
 		type: 'tool.delta',
 		sessionId: ctx.sessionId,
 		projectRoot: ctx.projectRoot,
-		payload: {
-			name: args.name,
-			channel: args.channel,
-			delta: args.delta,
-			stepIndex: args.stepIndex,
-			callId: args.callId,
-			messageId: ctx.messageId,
-		},
+		payload,
 	});
 }
 
@@ -78,11 +180,29 @@ export function publishToolResult(
 	content: ToolResultContent,
 	stepIndex?: number,
 ): void {
+	clearStreamedInput(ctx, content.name, content.callId);
+	const payload: Record<string, unknown> = {
+		name: content.name,
+		callId: content.callId,
+		stepIndex,
+		messageId: ctx.messageId,
+	};
+	boundPayloadField(
+		payload,
+		'result',
+		withoutDuplicatedArtifact(content.result, content.artifact),
+	);
+	if (content.args !== undefined) {
+		boundPayloadField(payload, 'args', content.args);
+	}
+	if (content.artifact !== undefined) {
+		boundPayloadField(payload, 'artifact', content.artifact);
+	}
 	publish({
 		type: 'tool.result',
 		sessionId: ctx.sessionId,
 		projectRoot: ctx.projectRoot,
-		payload: { ...content, stepIndex, messageId: ctx.messageId },
+		payload,
 	});
 }
 

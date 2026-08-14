@@ -33,6 +33,7 @@ export class SSEClient {
 	private stateHandlers = new Set<(state: SSEConnectionState) => void>();
 	private running = false;
 	private state: SSEConnectionState = { status: 'idle' };
+	private lastEventId: string | undefined;
 
 	async connect(url: string, headers?: HeadersInit, opts?: SSEConnectOptions) {
 		if (this.abortController) {
@@ -80,13 +81,18 @@ export class SSEClient {
 		}, STALL_CHECK_INTERVAL_MS);
 
 		try {
+			const requestHeaders = new Headers(headers);
+			const refreshedHeaders = new Headers(opts?.getHeaders?.());
+			for (const [name, value] of refreshedHeaders) {
+				requestHeaders.set(name, value);
+			}
+			requestHeaders.set('Accept', 'text/event-stream');
+			if (this.lastEventId) {
+				requestHeaders.set('Last-Event-ID', this.lastEventId);
+			}
 			const response = await fetch(url, {
 				method: isTunnel ? 'POST' : 'GET',
-				headers: {
-					...headers,
-					...opts?.getHeaders?.(),
-					Accept: 'text/event-stream',
-				},
+				headers: requestHeaders,
 				signal: attempt.signal,
 			});
 
@@ -127,10 +133,13 @@ export class SSEClient {
 
 					let eventType = 'message';
 					let data = '';
+					let eventId: string | undefined;
 
 					for (const line of lines) {
 						if (line.startsWith('event: ')) {
 							eventType = line.slice(7).trim();
+						} else if (line.startsWith('id:')) {
+							eventId = line.slice(3).trim();
 						} else if (line.startsWith('data: ')) {
 							data += (data ? '\n' : '') + line.slice(6);
 						} else if (line.startsWith(':')) {
@@ -140,7 +149,8 @@ export class SSEClient {
 					if (data) {
 						try {
 							const payload = JSON.parse(data);
-							this.emit({ type: eventType, payload });
+							if (eventId) this.lastEventId = eventId;
+							this.emit({ id: eventId, type: eventType, payload });
 						} catch (error) {
 							console.error(`[SSE] Failed to parse ${eventType}:`, error);
 						}
@@ -177,6 +187,14 @@ export class SSEClient {
 	/** Returns the current connection state for external-store consumers. */
 	getConnectionState(): SSEConnectionState {
 		return this.state;
+	}
+
+	getLastEventId(): string | undefined {
+		return this.lastEventId;
+	}
+
+	setLastEventId(lastEventId: string | undefined): void {
+		this.lastEventId = lastEventId;
 	}
 
 	/** Subscribes to connection/retry state changes. */

@@ -20,6 +20,7 @@ import { abortAllActiveShellJobs } from '../tools/active-shells.ts';
 import { getServerInfo } from '../../state.ts';
 import { recoverInterruptedRuns } from './recovery.ts';
 import { validateProjectDirectory } from './filesystem.ts';
+import { hasActiveProjectQueue } from '../session/queue/state.ts';
 import {
 	forgetProject,
 	listProjects,
@@ -41,6 +42,7 @@ export interface ProjectRuntime {
 	terminalManager: TerminalManager;
 	openedAt: number;
 	lastUsedAt: number;
+	retain(): () => void;
 	stopIdleResources(): Promise<void>;
 }
 
@@ -57,6 +59,8 @@ export interface ProjectRuntimeSummary {
 }
 
 const CONFIG_STALENESS_CHECK_INTERVAL_MS = 2000;
+export const PROJECT_RUNTIME_IDLE_TTL_MS = 30 * 60_000;
+const PROJECT_RUNTIME_EVICTION_INTERVAL_MS = 60_000;
 
 interface ConfigCacheState {
 	fingerprint: string;
@@ -67,6 +71,8 @@ export class ProjectManager {
 	private readonly runtimesById = new Map<string, ProjectRuntime>();
 	private readonly idsByRoot = new Map<string, string>();
 	private readonly cfgCacheById = new Map<string, ConfigCacheState>();
+	private readonly retainCountsById = new Map<string, number>();
+	private evictionTimer: ReturnType<typeof setInterval> | null = null;
 
 	async openProject(input: { path: string }): Promise<ProjectRuntime> {
 		const root = await validateProjectDirectory(input.path);
@@ -85,8 +91,9 @@ export class ProjectManager {
 		const terminalManager = new TerminalManager();
 
 		const now = Date.now();
+		const id = await getProjectId(cfg.projectRoot);
 		const runtime: ProjectRuntime = {
-			id: await getProjectId(cfg.projectRoot),
+			id,
 			name: projectName(cfg.projectRoot),
 			root: cfg.projectRoot,
 			cfg,
@@ -94,6 +101,7 @@ export class ProjectManager {
 			terminalManager,
 			openedAt: now,
 			lastUsedAt: now,
+			retain: () => this.retainProject(id),
 			async stopIdleResources() {
 				try {
 					await terminalManager.killAll();
@@ -112,6 +120,7 @@ export class ProjectManager {
 			fingerprint: await configFingerprint(runtime.root),
 			checkedAt: Date.now(),
 		});
+		this.ensureEvictionTimer();
 		return runtime;
 	}
 
@@ -186,9 +195,18 @@ export class ProjectManager {
 		this.runtimesById.delete(id);
 		this.idsByRoot.delete(runtime.root);
 		this.cfgCacheById.delete(id);
+		this.retainCountsById.delete(id);
+		if (this.runtimesById.size === 0 && this.evictionTimer !== null) {
+			clearInterval(this.evictionTimer);
+			this.evictionTimer = null;
+		}
 	}
 
 	async closeAllProjects(): Promise<void> {
+		if (this.evictionTimer !== null) {
+			clearInterval(this.evictionTimer);
+			this.evictionTimer = null;
+		}
 		await Promise.all(
 			Array.from(this.runtimesById.keys()).map((id) => this.closeProject(id)),
 		);
@@ -212,6 +230,28 @@ export class ProjectManager {
 		if (!project) return false;
 		await touchProject(project.path, project.dbPath);
 		return setProjectPinned(project.path, pinned);
+	}
+
+	async evictIdleProjects(
+		now = Date.now(),
+		idleTtlMs = PROJECT_RUNTIME_IDLE_TTL_MS,
+	): Promise<string[]> {
+		const evicted: string[] = [];
+		for (const runtime of [...this.runtimesById.values()]) {
+			if (now - runtime.lastUsedAt < idleTtlMs) continue;
+			if ((this.retainCountsById.get(runtime.id) ?? 0) > 0) continue;
+			if (hasActiveProjectQueue(runtime.id, runtime.root)) continue;
+			if (
+				runtime.terminalManager
+					.list()
+					.some((terminal) => terminal.status !== 'exited')
+			) {
+				continue;
+			}
+			await this.closeProject(runtime.id);
+			evicted.push(runtime.id);
+		}
+		return evicted;
 	}
 
 	touchProject(id: string): void {
@@ -244,6 +284,28 @@ export class ProjectManager {
 			runtime.cfg = await loadConfig(runtime.root);
 		}
 		this.cfgCacheById.set(runtime.id, { fingerprint, checkedAt: now });
+	}
+
+	private retainProject(id: string): () => void {
+		this.touchProject(id);
+		this.retainCountsById.set(id, (this.retainCountsById.get(id) ?? 0) + 1);
+		let released = false;
+		return () => {
+			if (released) return;
+			released = true;
+			const next = (this.retainCountsById.get(id) ?? 1) - 1;
+			if (next > 0) this.retainCountsById.set(id, next);
+			else this.retainCountsById.delete(id);
+			this.touchProject(id);
+		};
+	}
+
+	private ensureEvictionTimer(): void {
+		if (this.evictionTimer !== null) return;
+		this.evictionTimer = setInterval(() => {
+			void this.evictIdleProjects();
+		}, PROJECT_RUNTIME_EVICTION_INTERVAL_MS);
+		this.evictionTimer.unref?.();
 	}
 }
 

@@ -3,9 +3,14 @@ import {
 	projectScopeKey,
 	scopedSessionKey,
 } from '../runtime/projects/scope.ts';
+import {
+	recordProjectClientEvent,
+	recordProjectSessionEvent,
+	type ProjectReplayRecord,
+} from './project-replay.ts';
 
-type Subscriber = (evt: OttoEvent) => void;
-type ClientSubscriber = (evt: ClientEvent) => void;
+type Subscriber = (evt: OttoEvent, replay: ProjectReplayRecord) => void;
+type ClientSubscriber = (evt: ClientEvent, replay: ProjectReplayRecord) => void;
 
 const subscribers = new Map<string, Set<Subscriber>>(); // project/session -> subs
 const projectSubscribers = new Map<string, Set<Subscriber>>(); // project -> subs
@@ -41,6 +46,7 @@ function sanitizeBigInt<T>(obj: T): T {
 
 export function publish(event: OttoEvent) {
 	const sanitizedEvent = sanitizeBigInt(event);
+	const replay = recordProjectSessionEvent(sanitizedEvent);
 	const notified = new Set<Subscriber>();
 	const dispatch = (subs: Set<Subscriber> | undefined, label: string) => {
 		if (!subs) return;
@@ -48,7 +54,7 @@ export function publish(event: OttoEvent) {
 			if (notified.has(sub)) continue;
 			notified.add(sub);
 			try {
-				sub(sanitizedEvent);
+				sub(sanitizedEvent, replay);
 			} catch (err) {
 				console.error(
 					`[bus] ${label} threw on event ${event.type}:`,
@@ -65,9 +71,10 @@ export function publish(event: OttoEvent) {
 
 export function publishClientEvent(event: ClientEvent) {
 	const sanitizedEvent = sanitizeBigInt(event);
+	const replay = recordProjectClientEvent(sanitizedEvent);
 	for (const sub of clientSubscribers) {
 		try {
-			sub(sanitizedEvent);
+			sub(sanitizedEvent, replay);
 		} catch (err) {
 			console.error(
 				`[bus] Client subscriber threw on event ${event.type}:`,

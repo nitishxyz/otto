@@ -8,7 +8,7 @@ import {
 	test,
 } from 'bun:test';
 import { EventEmitter } from 'node:events';
-import { createServer, type Server } from 'node:http';
+import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import * as sdkActual from '@ottocode/sdk';
@@ -456,6 +456,7 @@ describe('tunnel scoped service', () => {
 			url: null,
 			isRunning: false,
 		});
+		expect(service.tunnelTesting.getQuickSlotCount()).toBe(0);
 	});
 
 	test('keeps remote-control running when a project-share starts and stops', async () => {
@@ -518,6 +519,89 @@ describe('tunnel scoped service', () => {
 			projectId: 'project-a',
 			status: 'connected',
 		});
+	});
+
+	test('aborts the upstream stream when a project-share client disconnects', async () => {
+		let cancelStream: (() => void) | undefined;
+		const streamCancelled = new Promise<void>((resolve) => {
+			cancelStream = resolve;
+		});
+		service.tunnelTesting.setProxyFetch(
+			(async () =>
+				new Response(
+					new ReadableStream({
+						start(controller) {
+							controller.enqueue(new TextEncoder().encode('data: ready\n\n'));
+						},
+						cancel() {
+							cancelStream?.();
+						},
+					}),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)) as typeof fetch,
+		);
+		await service.startTunnel(9100, {
+			scope: 'project-share',
+			projectId: 'project-a',
+		});
+		const proxyPort = MockTunnel.starts.at(-1);
+		expect(proxyPort).toBeNumber();
+
+		await new Promise<void>((resolve, reject) => {
+			const request = httpRequest(
+				`http://127.0.0.1:${proxyPort}/v1/events`,
+				(response) => {
+					response.once('data', () => {
+						response.destroy();
+						resolve();
+					});
+				},
+			);
+			request.once('error', reject);
+			request.end();
+		});
+		await streamCancelled;
+	});
+
+	test('aborts active project-share streams when the tunnel stops', async () => {
+		let cancelStream: (() => void) | undefined;
+		const streamCancelled = new Promise<void>((resolve) => {
+			cancelStream = resolve;
+		});
+		service.tunnelTesting.setProxyFetch(
+			(async () =>
+				new Response(
+					new ReadableStream({
+						start(controller) {
+							controller.enqueue(new TextEncoder().encode('data: ready\n\n'));
+						},
+						cancel() {
+							cancelStream?.();
+						},
+					}),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)) as typeof fetch,
+		);
+		await service.startTunnel(9100, {
+			scope: 'project-share',
+			projectId: 'project-a',
+		});
+		const proxyPort = MockTunnel.starts.at(-1);
+		expect(proxyPort).toBeNumber();
+
+		await new Promise<void>((resolve, reject) => {
+			const request = httpRequest(
+				`http://127.0.0.1:${proxyPort}/v1/events`,
+				(response) => response.once('data', () => resolve()),
+			);
+			request.once('error', reject);
+			request.end();
+		});
+		await service.stopTunnel({
+			scope: 'project-share',
+			projectId: 'project-a',
+		});
+		await streamCancelled;
 	});
 
 	test('project-share proxy blocks global routes and forces selected projectId', async () => {

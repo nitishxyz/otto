@@ -114,13 +114,11 @@ export function registerSessionSecureInputRoute(app: Hono) {
 				project.runtime.root,
 			);
 			if (!pending) {
-				return c.json(
-					{
-						ok: false,
-						error: 'No pending secure input found for this promptId',
-					},
-					404,
-				);
+				return c.json({
+					ok: true,
+					promptId: body.promptId,
+					cancelled: body.cancelled === true,
+				});
 			}
 
 			if (pending.sessionId !== sessionId) {

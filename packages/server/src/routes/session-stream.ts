@@ -1,7 +1,13 @@
 import { z } from '@hono/zod-openapi';
+import { logger } from '@ottocode/sdk';
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribe } from '../events/bus.ts';
+import {
+	createSSEByteStrategy,
+	encodeSSEComment,
+	encodeSSEEvent,
+} from '../events/sse.ts';
 import type { OttoEvent } from '../events/types.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
@@ -11,11 +17,6 @@ import {
 
 const STREAM_DESCRIPTION =
 	'SSE event stream. Events include session.created, message.created, message.part.delta, tool.call, tool.delta, tool.result, message.completed, error.';
-
-// desiredSize = highWaterMark - queued chunks; a large negative value means
-// the consumer stopped reading. Treat the connection as stalled and drop it
-// instead of buffering event data unboundedly (native memory growth).
-const MAX_BACKPRESSURE_DEFICIT = -256;
 
 const sessionStreamParamsSchema = z.object({
 	id: z.string().openapi({
@@ -29,10 +30,14 @@ const sessionStreamResponseSchema = z.string().openapi({
 	description: STREAM_DESCRIPTION,
 });
 
-function safeStringify(obj: unknown): string {
-	return JSON.stringify(obj, (_key, value) =>
-		typeof value === 'bigint' ? Number(value) : value,
-	);
+const eventChunks = new WeakMap<OttoEvent, Uint8Array>();
+
+function encodeEvent(evt: OttoEvent): Uint8Array {
+	const cached = eventChunks.get(evt);
+	if (cached) return cached;
+	const chunk = encodeSSEEvent(evt.type, evt.payload ?? {});
+	eventChunks.set(evt, chunk);
+	return chunk;
 }
 
 async function handleSessionStream(c: Context) {
@@ -42,66 +47,66 @@ async function handleSessionStream(c: Context) {
 		'Content-Type': 'text/event-stream',
 		'Cache-Control': 'no-cache, no-transform',
 		Connection: 'keep-alive',
+		'X-Accel-Buffering': 'no',
 	});
-
-	const encoder = new TextEncoder();
 
 	let cleanedUp = false;
 	let cleanup = () => {};
 
-	const stream = new ReadableStream<Uint8Array>({
-		start(controller) {
-			let unsubscribeProject = () => {};
-			let unsubscribeLegacy = () => {};
-			let hb: ReturnType<typeof setInterval> | null = null;
+	const stream = new ReadableStream<Uint8Array>(
+		{
+			start(controller) {
+				let unsubscribeProject = () => {};
+				let unsubscribeLegacy = () => {};
+				let hb: ReturnType<typeof setInterval> | null = null;
 
-			cleanup = () => {
-				if (cleanedUp) return;
-				cleanedUp = true;
-				if (hb !== null) clearInterval(hb);
-				unsubscribeProject();
-				unsubscribeLegacy();
-				try {
-					controller.close();
-				} catch {}
-			};
+				cleanup = () => {
+					if (cleanedUp) return;
+					cleanedUp = true;
+					if (hb !== null) clearInterval(hb);
+					unsubscribeProject();
+					unsubscribeLegacy();
+					try {
+						controller.close();
+					} catch {}
+				};
 
-			const write = (evt: OttoEvent) => {
-				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
-				let line: string;
-				try {
-					line =
-						`event: ${evt.type}\n` +
-						`data: ${safeStringify(evt.payload ?? {})}\n\n`;
-				} catch {
-					line = `event: ${evt.type}\ndata: {}\n\n`;
-				}
-				send(line);
-			};
-			const send = (chunk: string) => {
-				try {
-					controller.enqueue(encoder.encode(chunk));
-					if ((controller.desiredSize ?? 0) < MAX_BACKPRESSURE_DEFICIT) {
+				const write = (evt: OttoEvent) => {
+					if (evt.projectRoot && evt.projectRoot !== project.runtime.root)
+						return;
+					send(encodeEvent(evt));
+				};
+				const send = (chunk: Uint8Array) => {
+					try {
+						controller.enqueue(chunk);
+						if ((controller.desiredSize ?? 0) < 0) {
+							logger.warn('[sse] dropping backpressured session stream', {
+								sessionId,
+								projectId: project.projectId,
+								chunkBytes: chunk.byteLength,
+							});
+							cleanup();
+						}
+					} catch {
 						cleanup();
 					}
-				} catch {
-					cleanup();
-				}
-			};
-			unsubscribeProject = subscribe(sessionId, write, project.runtime.root);
-			unsubscribeLegacy = subscribe(sessionId, write);
-			controller.enqueue(encoder.encode(`: connected ${sessionId}\n\n`));
-			hb = setInterval(() => {
-				send(`: hb ${Date.now()}\n\n`);
-			}, 5000);
+				};
+				unsubscribeProject = subscribe(sessionId, write, project.runtime.root);
+				unsubscribeLegacy = subscribe(sessionId, write);
+				send(encodeSSEComment(`connected ${sessionId}`));
+				hb = setInterval(() => {
+					send(encodeSSEComment(`hb ${Date.now()}`));
+				}, 5000);
 
-			const signal = c.req.raw?.signal as AbortSignal | undefined;
-			signal?.addEventListener('abort', cleanup, { once: true });
+				const signal = c.req.raw?.signal as AbortSignal | undefined;
+				signal?.addEventListener('abort', cleanup, { once: true });
+			},
+			cancel() {
+				cleanup();
+			},
 		},
-		cancel() {
-			cleanup();
-		},
-	});
+		createSSEByteStrategy(),
+	);
 
 	return new Response(stream, { headers });
 }

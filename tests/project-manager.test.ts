@@ -49,6 +49,30 @@ afterEach(async () => {
 });
 
 describe('ProjectManager', () => {
+	it('evicts idle runtimes only after active consumers release them', async () => {
+		const projectRoot = await createTempProject('otto-project-eviction-');
+		const restoreEnv = withIsolatedOttoHome(projectRoot);
+		const manager = new ProjectManager();
+		try {
+			await mkdir(process.env.XDG_CONFIG_HOME ?? '', { recursive: true });
+			const runtime = await manager.openProject({ path: projectRoot });
+			const release = runtime.retain();
+			runtime.lastUsedAt = 1;
+			expect(await manager.evictIdleProjects(Date.now(), 0)).toEqual([]);
+			expect(manager.listOpenProjects()).toHaveLength(1);
+
+			release();
+			runtime.lastUsedAt = 1;
+			expect(await manager.evictIdleProjects(Date.now(), 0)).toEqual([
+				runtime.id,
+			]);
+			expect(manager.listOpenProjects()).toHaveLength(0);
+		} finally {
+			await manager.closeAllProjects();
+			await restoreEnv();
+		}
+	});
+
 	it('does not recover live daemon work when opened by standalone serve', async () => {
 		const projectRoot = await createTempProject('otto-project-standalone-');
 		const restoreEnv = withIsolatedOttoHome(projectRoot);

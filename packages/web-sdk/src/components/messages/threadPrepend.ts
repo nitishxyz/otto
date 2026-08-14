@@ -97,6 +97,35 @@ export function markPrependSettled(state: PrependRequestState) {
 	state.inFlightToken = null;
 }
 
+export interface PrependFrameScheduler {
+	request(callback: () => void): number;
+	cancel(frame: number): void;
+}
+
+/**
+ * Runs a history request only after the browser has had one complete paint.
+ * This lets a virtual list fill a newly jumped-to top range before a fast page
+ * response starts the much heavier prepend render.
+ */
+export function schedulePrependAfterViewportPaint(
+	dispatch: () => void,
+	scheduler: PrependFrameScheduler,
+): () => void {
+	let cancelled = false;
+	let frame: number | null = scheduler.request(() => {
+		if (cancelled) return;
+		frame = scheduler.request(() => {
+			frame = null;
+			if (!cancelled) dispatch();
+		});
+	});
+	return () => {
+		cancelled = true;
+		if (frame !== null) scheduler.cancel(frame);
+		frame = null;
+	};
+}
+
 /**
  * True while end-following must stay suspended: from the request until the
  * fetch has settled and its rows have been committed.

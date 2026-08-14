@@ -138,11 +138,15 @@ export function buildProjectEventsStreamUrl(options: {
 	baseUrl: string;
 	projectPath?: string;
 	projectId?: string;
+	sessionIds?: string[];
 }) {
 	const url = new URL('/v1/events/project', options.baseUrl);
 	if (options.projectId) url.searchParams.set('projectId', options.projectId);
 	else if (options.projectPath)
 		url.searchParams.set('project', options.projectPath);
+	if (options.sessionIds) {
+		url.searchParams.set('sessions', options.sessionIds.join(','));
+	}
 	return url.toString();
 }
 

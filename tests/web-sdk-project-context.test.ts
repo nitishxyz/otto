@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
 	buildClientEventsStreamUrl,
+	buildProjectEventsStreamUrl,
 	buildSessionStreamUrl,
 } from '../packages/api/src/streaming.ts';
 
@@ -73,6 +74,15 @@ describe('web-sdk project context helpers', () => {
 				projectPath: '/tmp/project-web',
 			}),
 		).toBe('http://127.0.0.1:4321/v1/events/stream?projectId=project-web');
+		expect(
+			buildProjectEventsStreamUrl({
+				baseUrl: 'http://127.0.0.1:4321',
+				projectId: 'project-web',
+				sessionIds: ['session-main', 'session-child'],
+			}),
+		).toBe(
+			'http://127.0.0.1:4321/v1/events/project?projectId=project-web&sessions=session-main%2Csession-child',
+		);
 	});
 
 	it('calls project route client with runtime auth headers', async () => {

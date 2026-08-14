@@ -7,6 +7,7 @@ import {
 	markPrependSettled,
 	resetPrependRequests,
 	resolveEndFollow,
+	schedulePrependAfterViewportPaint,
 	shouldRequestPrepend,
 } from '../packages/web-sdk/src/components/messages/threadPrepend';
 
@@ -218,5 +219,62 @@ describe('end-follow during a prepend', () => {
 			'requestCount',
 			'requestedTokens',
 		]);
+	});
+});
+
+describe('history fetch paint boundary', () => {
+	function createFrameScheduler() {
+		let nextId = 1;
+		const callbacks = new Map<number, () => void>();
+		return {
+			scheduler: {
+				request(callback: () => void) {
+					const id = nextId++;
+					callbacks.set(id, callback);
+					return id;
+				},
+				cancel(id: number) {
+					callbacks.delete(id);
+				},
+			},
+			runNext() {
+				const entry = callbacks.entries().next().value as
+					| [number, () => void]
+					| undefined;
+				if (!entry) return;
+				callbacks.delete(entry[0]);
+				entry[1]();
+			},
+			pending: () => callbacks.size,
+		};
+	}
+
+	it('waits through one complete paint before dispatching the fetch', () => {
+		const frames = createFrameScheduler();
+		let dispatched = 0;
+		schedulePrependAfterViewportPaint(() => {
+			dispatched += 1;
+		}, frames.scheduler);
+
+		expect(dispatched).toBe(0);
+		frames.runNext();
+		expect(dispatched).toBe(0);
+		expect(frames.pending()).toBe(1);
+		frames.runNext();
+		expect(dispatched).toBe(1);
+	});
+
+	it('cancels a pending fetch when the thread changes', () => {
+		const frames = createFrameScheduler();
+		let dispatched = 0;
+		const cancel = schedulePrependAfterViewportPaint(() => {
+			dispatched += 1;
+		}, frames.scheduler);
+		frames.runNext();
+		cancel();
+		frames.runNext();
+
+		expect(dispatched).toBe(0);
+		expect(frames.pending()).toBe(0);
 	});
 });

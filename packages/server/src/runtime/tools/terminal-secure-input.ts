@@ -27,6 +27,7 @@ export function attachTerminalSecureInput(args: {
 	const terminalManager = getTerminalManager(args.ctx.projectRoot);
 	const terminal = terminalManager?.get(args.terminalId);
 	if (!terminal) return null;
+	const activeTerminal = terminal;
 
 	const watchKey = `${args.ctx.projectRoot}:${args.ctx.sessionId}:${args.terminalId}`;
 	const existing = watchedTerminals.get(watchKey);
@@ -36,6 +37,9 @@ export function attachTerminalSecureInput(args: {
 	let securePromptPending = false;
 	let currentPromptPromise: Promise<void> | null = null;
 	let lastSecureInputCacheKey: string | null = null;
+	let suppressedPrompt: string | null = null;
+	let suppressionTimeout: ReturnType<typeof setTimeout> | null = null;
+	let cancelKillTimeout: ReturnType<typeof setTimeout> | null = null;
 	const promptWaiters = new Set<() => void>();
 
 	const notifyPromptWaiters = () => {
@@ -79,9 +83,10 @@ export function attachTerminalSecureInput(args: {
 
 		const detected = detectSecurePrompt(recentOutput);
 		if (!detected) return;
+		if (detected.prompt === suppressedPrompt) return;
 
 		securePromptPending = true;
-		const cacheKey = `terminal:${terminal.command}\0${terminal.args.join('\0')}\0${detected.prompt}`;
+		const cacheKey = `terminal:${activeTerminal.command}\0${activeTerminal.args.join('\0')}\0${detected.prompt}`;
 		lastSecureInputCacheKey = cacheKey;
 		currentPromptPromise = requestSecureInput({
 			projectRoot: args.ctx.projectRoot,
@@ -105,11 +110,27 @@ export function attachTerminalSecureInput(args: {
 				}
 
 				if (value === null) {
+					suppressedPrompt = detected.prompt;
+					if (suppressionTimeout) clearTimeout(suppressionTimeout);
+					suppressionTimeout = setTimeout(() => {
+						suppressedPrompt = null;
+						suppressionTimeout = null;
+					}, 2000);
 					current.write('\x03');
+					if (
+						current.createdBy === 'llm' ||
+						current.purpose.startsWith('git ')
+					) {
+						cancelKillTimeout = setTimeout(() => {
+							if (current.status === 'running') current.kill('SIGTERM');
+							cancelKillTimeout = null;
+						}, 500);
+					}
 					await delay(250);
 					return;
 				}
 
+				suppressedPrompt = null;
 				current.write(`${value}\r`);
 				await delay(250);
 			})
@@ -120,8 +141,10 @@ export function attachTerminalSecureInput(args: {
 	};
 
 	const cleanup = () => {
-		terminal.removeDataListener(onData);
-		terminal.removeExitListener(onExit);
+		if (suppressionTimeout) clearTimeout(suppressionTimeout);
+		if (cancelKillTimeout) clearTimeout(cancelKillTimeout);
+		activeTerminal.removeDataListener(onData);
+		activeTerminal.removeExitListener(onExit);
 		watchedTerminals.delete(watchKey);
 		notifyPromptWaiters();
 	};
@@ -129,7 +152,7 @@ export function attachTerminalSecureInput(args: {
 	function onExit() {
 		if (
 			lastSecureInputCacheKey &&
-			hasAuthenticationFailure(terminal.read().join(''))
+			hasAuthenticationFailure(activeTerminal.read().join(''))
 		) {
 			invalidateCachedSecureInput(
 				args.ctx.projectRoot,
@@ -139,13 +162,13 @@ export function attachTerminalSecureInput(args: {
 		cleanup();
 	}
 
-	terminal.onData(onData);
-	terminal.onExit(onExit);
-	for (const chunk of terminal.read()) {
+	activeTerminal.onData(onData);
+	activeTerminal.onExit(onExit);
+	for (const chunk of activeTerminal.read()) {
 		onData(chunk);
 	}
 
-	if (terminal.status === 'exited') {
+	if (activeTerminal.status === 'exited') {
 		cleanup();
 	}
 
