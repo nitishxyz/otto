@@ -1,5 +1,7 @@
 import { getSecureAuthPath, ensureDir } from '../../config/src/paths.ts';
 import type { ProviderId, AuthInfo, AuthFile } from '../../types/src/index.ts';
+import { isDeepStrictEqual } from 'node:util';
+import { acquireFileLock } from './file-lock.ts';
 
 export type {
 	ProviderId,
@@ -14,28 +16,37 @@ function globalAuthPath(): string {
 
 let authMutation = Promise.resolve();
 
-function mutateAuthFile(mutator: (auth: AuthFile) => void): Promise<void> {
+function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
 	const mutation = authMutation.then(async () => {
 		const path = globalAuthPath();
-		const existing = ((await Bun.file(path)
-			.json()
-			.catch(() => ({}))) || {}) as AuthFile;
-		mutator(existing);
-		const base = path.slice(0, path.lastIndexOf('/')) || '.';
-		await ensureDir(base);
-		const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
-		const { promises: fs } = await import('node:fs');
+		const release = await acquireFileLock(`${path}.lock`);
 		try {
-			await fs.writeFile(tempPath, JSON.stringify(existing, null, 2), {
-				mode: 0o600,
-			});
-			await fs.rename(tempPath, path);
-			await fs.chmod(path, 0o600).catch(() => {});
+			const existing = ((await Bun.file(path)
+				.json()
+				.catch(() => ({}))) || {}) as AuthFile;
+			const result = mutator(existing);
+			const base = path.slice(0, path.lastIndexOf('/')) || '.';
+			await ensureDir(base);
+			const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+			const { promises: fs } = await import('node:fs');
+			try {
+				await fs.writeFile(tempPath, JSON.stringify(existing, null, 2), {
+					mode: 0o600,
+				});
+				await fs.rename(tempPath, path);
+				await fs.chmod(path, 0o600).catch(() => {});
+			} finally {
+				await fs.rm(tempPath, { force: true }).catch(() => {});
+			}
+			return result;
 		} finally {
-			await fs.rm(tempPath, { force: true }).catch(() => {});
+			await release();
 		}
 	});
-	authMutation = mutation.catch(() => {});
+	authMutation = mutation.then(
+		() => {},
+		() => {},
+	);
 	return mutation;
 }
 
@@ -61,6 +72,21 @@ export async function setAuth(
 ) {
 	await mutateAuthFile((auth) => {
 		auth[provider] = info;
+	});
+}
+
+/** Persist auth only when the provider entry still matches the caller's read. */
+export async function setAuthIfUnchanged(
+	provider: ProviderId,
+	expected: AuthInfo | undefined,
+	info: AuthInfo,
+	_projectRoot?: string,
+	_scope: 'global' | 'local' = 'global',
+): Promise<boolean> {
+	return mutateAuthFile((auth) => {
+		if (!isDeepStrictEqual(auth[provider], expected)) return false;
+		auth[provider] = info;
+		return true;
 	});
 }
 

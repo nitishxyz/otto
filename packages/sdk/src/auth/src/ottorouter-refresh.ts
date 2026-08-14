@@ -1,6 +1,7 @@
 import { getSecureAuthPath } from '../../config/src/paths.ts';
 import type { OAuth } from '../../types/src/index.ts';
-import { getAuth, setAuth } from './index.ts';
+import { acquireFileLock } from './file-lock.ts';
+import { getAuth, setAuthIfUnchanged } from './index.ts';
 import {
 	refreshOttoRouterToken,
 	type OttoRouterOAuthTokens,
@@ -11,12 +12,6 @@ import {
  * never race the expiry boundary.
  */
 const DEFAULT_REFRESH_WINDOW_MS = 5 * 60_000;
-/** A crashed process' lock is considered stale after this long. */
-const LOCK_STALE_MS = 30_000;
-/** Maximum time to wait for another process' refresh before taking over. */
-const LOCK_WAIT_MS = 20_000;
-const LOCK_POLL_MS = 100;
-
 export interface FreshOttoRouterOAuthOptions {
 	projectRoot?: string;
 	/** Override the pre-expiry refresh window (defaults to 5 minutes). */
@@ -37,32 +32,6 @@ const inflightByLock = new Map<string, Promise<OAuth | null>>();
 function isSessionRevokedError(error: unknown): boolean {
 	const message = error instanceof Error ? error.message : String(error);
 	return /session not found|rejected|invalid_grant/i.test(message);
-}
-
-async function loadFs(): Promise<typeof import('node:fs/promises')> {
-	return import('node:fs/promises');
-}
-
-async function acquireLock(lockPath: string): Promise<() => Promise<void>> {
-	const fs = await loadFs();
-	const deadline = Date.now() + LOCK_WAIT_MS;
-	for (;;) {
-		try {
-			await fs.mkdir(lockPath, { recursive: false });
-			break;
-		} catch {
-			if (Date.now() >= deadline) return async () => {};
-			const stat = await fs.stat(lockPath).catch(() => null);
-			if (!stat || stat.mtimeMs < Date.now() - LOCK_STALE_MS) {
-				await fs.rm(lockPath, { recursive: true, force: true }).catch(() => {});
-				continue;
-			}
-			await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
-		}
-	}
-	return async () => {
-		await fs.rm(lockPath, { recursive: true, force: true }).catch(() => {});
-	};
 }
 
 function readOttoRouterOAuth(
@@ -131,7 +100,7 @@ async function refreshUnderLock(
 	options: FreshOttoRouterOAuthOptions,
 ): Promise<OAuth | null> {
 	const refreshFn = options.refreshFn ?? refreshOttoRouterToken;
-	const release = await acquireLock(lockPath);
+	const release = await acquireFileLock(lockPath);
 	try {
 		const current = readOttoRouterOAuth(
 			await getAuth('ottorouter', options.projectRoot),
@@ -140,6 +109,7 @@ async function refreshUnderLock(
 		if (isFresh(current, windowMs, options.staleAccess)) return current;
 		if (!current.refresh) return current;
 
+		let refreshSource = current;
 		let tokens: OttoRouterOAuthTokens;
 		try {
 			tokens = await refreshFn(current.refresh);
@@ -155,12 +125,22 @@ async function refreshUnderLock(
 				throw error;
 			}
 			if (isFresh(latest, windowMs, options.staleAccess)) return latest;
+			refreshSource = latest;
 			tokens = await refreshFn(latest.refresh);
 		}
 
-		const next = toOAuth(tokens, current);
-		await setAuth('ottorouter', next, options.projectRoot, 'global');
-		return next;
+		const next = toOAuth(tokens, refreshSource);
+		const persisted = await setAuthIfUnchanged(
+			'ottorouter',
+			refreshSource,
+			next,
+			options.projectRoot,
+			'global',
+		);
+		if (persisted) return next;
+		return readOttoRouterOAuth(
+			await getAuth('ottorouter', options.projectRoot),
+		);
 	} finally {
 		await release();
 	}

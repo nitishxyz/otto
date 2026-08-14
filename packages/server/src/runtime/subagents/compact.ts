@@ -3,7 +3,7 @@ import { subagents } from '@ottocode/database/schema';
 import type { OttoConfig } from '@ottocode/sdk';
 import { and, eq } from 'drizzle-orm';
 import { getSessionById } from '../session/manager.ts';
-import { getQueueState } from '../session/queue.ts';
+import { sendQueuedMessageNow } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
 
 export type CompactSubagentResult =
@@ -14,16 +14,20 @@ export type CompactSubagentResult =
 			agent: string;
 			messageId: string;
 			status: 'queued';
+			delivery: 'queue' | 'interrupt';
+			preemptedMessageId: string | null;
 	  }
 	| { ok: false; error: string };
 
-/** Queues the built-in /compact command in an owned sub-agent session. */
+/** Delivers the built-in /compact command to an owned sub-agent session. */
 export async function compactSubagent(args: {
 	db: DB;
 	cfg: OttoConfig;
 	parentSessionId: string;
 	subagentId: string;
+	delivery?: 'queue' | 'interrupt';
 }): Promise<CompactSubagentResult> {
+	const delivery = args.delivery ?? 'queue';
 	const rows = await args.db
 		.select()
 		.from(subagents)
@@ -41,20 +45,6 @@ export async function compactSubagent(args: {
 			error: `No sub-agent with id "${args.subagentId}" for this session. Use subagent action=list to find ids.`,
 		};
 	}
-	if (record.status === 'running') {
-		return {
-			ok: false,
-			error:
-				'Sub-agent is still running. Wait for its delegated work to finish before compacting its session.',
-		};
-	}
-	if (record.status === 'cancelled') {
-		return {
-			ok: false,
-			error:
-				'Sub-agent was cancelled; its session may be incomplete and cannot be compacted.',
-		};
-	}
 
 	const childSession = await getSessionById({
 		db: args.db,
@@ -62,13 +52,6 @@ export async function compactSubagent(args: {
 	});
 	if (!childSession) {
 		return { ok: false, error: 'Sub-agent session no longer exists.' };
-	}
-	const queue = getQueueState(record.childSessionId);
-	if (queue?.isRunning || queue?.queuedMessages.length) {
-		return {
-			ok: false,
-			error: 'Sub-agent session already has active or queued work.',
-		};
 	}
 
 	// Keep the lifecycle record unchanged: compaction is session maintenance,
@@ -80,6 +63,18 @@ export async function compactSubagent(args: {
 		agent: childSession.agent,
 		content: '/compact',
 	});
+	let preemptedMessageId: string | null = null;
+	if (delivery === 'interrupt') {
+		const { runSessionLoop } = await import('../agent/runner.ts');
+		const sendNowResult = sendQueuedMessageNow(
+			record.childSessionId,
+			assistantMessageId,
+			runSessionLoop,
+		);
+		if (sendNowResult.success) {
+			preemptedMessageId = sendNowResult.preemptedMessageId;
+		}
+	}
 	return {
 		ok: true,
 		subagentId: record.id,
@@ -87,5 +82,7 @@ export async function compactSubagent(args: {
 		agent: record.agent,
 		messageId: assistantMessageId,
 		status: 'queued',
+		delivery,
+		preemptedMessageId,
 	};
 }

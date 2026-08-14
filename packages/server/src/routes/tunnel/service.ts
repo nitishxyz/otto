@@ -5,7 +5,6 @@ import { streamSSE } from 'hono/streaming';
 import {
 	generateQRCode,
 	isTunnelBinaryInstalled,
-	killStaleTunnels,
 	logger,
 	ManagedTunnelProvisionError,
 	OttoTunnel,
@@ -410,7 +409,6 @@ async function startManagedTunnelUnlocked(
 				throw new Error('Daemon server port is not available');
 			}
 
-			await killStaleTunnels();
 			managedTunnel.status = 'starting';
 			managedTunnel.error = null;
 			managedTunnel.progress = 'Provisioning managed tunnel...';
@@ -609,12 +607,6 @@ export async function startTunnel(
 	try {
 		const serverPort = requestedPort || getServerPort() || 9100;
 		let tunnelPort = serverPort;
-
-		if (
-			![...tunnelSlots.values()].some((item) => item.activeTunnel?.isRunning)
-		) {
-			await killStaleTunnels();
-		}
 
 		if (slot.scope === 'project-share') {
 			const proxy = await startProjectScopeProxy(

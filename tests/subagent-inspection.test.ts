@@ -15,6 +15,14 @@ import {
 	getSubagentStatus,
 	readSubagentActivity,
 } from '../packages/server/src/runtime/subagents/service.ts';
+import {
+	abortSession,
+	cleanupSession,
+	dequeueJob,
+	enqueueAssistantRun,
+	getQueueState,
+	setRunning,
+} from '../packages/server/src/runtime/session/queue.ts';
 import { loadConfig } from '@ottocode/sdk';
 
 let projectRoot = '';
@@ -158,19 +166,94 @@ describe('subagent inspection', () => {
 		expect(result.ok).toBe(false);
 	});
 
-	test('does not compact over active delegated work', async () => {
+	test('queues compaction regardless of subagent lifecycle status', async () => {
 		const db = await getDb(projectRoot);
 		const cfg = await loadConfig(projectRoot);
+
+		for (const status of [
+			'running',
+			'completed',
+			'failed',
+			'cancelled',
+		] as const) {
+			await db
+				.update(subagents)
+				.set({ status })
+				.where(eq(subagents.id, subagentId));
+			createBlockedChildQueue(`active-${status}`);
+
+			const result = await compactSubagent({
+				db,
+				cfg,
+				parentSessionId,
+				subagentId,
+			});
+
+			expect(result.ok).toBe(true);
+			if (!result.ok) continue;
+			expect(result.delivery).toBe('queue');
+			expect(getQueueState(childSessionId)?.queuedMessages).toContainEqual({
+				messageId: result.messageId,
+				position: 0,
+			});
+			const rows = await db
+				.select({ status: subagents.status })
+				.from(subagents)
+				.where(eq(subagents.id, subagentId));
+			expect(rows[0]?.status).toBe(status);
+			cleanupBlockedChildQueue();
+		}
+	});
+
+	test('interrupt delivery promotes compaction over active work', async () => {
+		const db = await getDb(projectRoot);
+		const cfg = await loadConfig(projectRoot);
+		await db
+			.update(subagents)
+			.set({ status: 'cancelled' })
+			.where(eq(subagents.id, subagentId));
+		createBlockedChildQueue('active-before-compact');
+
 		const result = await compactSubagent({
 			db,
 			cfg,
 			parentSessionId,
 			subagentId,
+			delivery: 'interrupt',
 		});
-		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.error).toContain('still running');
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.delivery).toBe('interrupt');
+		expect(result.preemptedMessageId).toBe('active-before-compact');
+		expect(getQueueState(childSessionId)?.queuedMessages[0]?.messageId).toBe(
+			result.messageId,
+		);
+		cleanupBlockedChildQueue();
 	});
 });
+
+function createBlockedChildQueue(messageId: string): void {
+	enqueueAssistantRun(
+		{
+			sessionId: childSessionId,
+			assistantMessageId: messageId,
+			agent: 'plan',
+			provider: 'test-provider',
+			model: 'model-with-no-catalog-entry',
+			projectRoot,
+		},
+		async () => {},
+	);
+	setRunning(childSessionId, true);
+	dequeueJob(childSessionId);
+}
+
+function cleanupBlockedChildQueue(): void {
+	abortSession(childSessionId, true);
+	setRunning(childSessionId, false);
+	cleanupSession(childSessionId);
+}
 
 function toolCall(
 	callId: string,

@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setAuth, getAuth } from '../packages/sdk/src/auth/src/index.ts';
+import {
+	getAuth,
+	removeAuth,
+	setAuth,
+} from '../packages/sdk/src/auth/src/index.ts';
 import { getFreshOttoRouterOAuth } from '../packages/sdk/src/auth/src/ottorouter-refresh.ts';
 import type { OttoRouterOAuthTokens } from '../packages/sdk/src/auth/src/ottorouter-oauth.ts';
 
@@ -122,6 +126,55 @@ describe('getFreshOttoRouterOAuth', () => {
 		});
 		expect(refreshCalls).toBe(1);
 		expect(result?.access).toBe('access-from-other-process');
+	});
+
+	test('does not overwrite a newer login that completes during refresh', async () => {
+		await setAuth('ottorouter', {
+			type: 'oauth',
+			access: 'access-old',
+			refresh: 'refresh-old',
+			expires: Date.now() + 30_000,
+		});
+		const result = await getFreshOttoRouterOAuth({
+			lockPath,
+			refreshFn: async () => {
+				await setAuth('ottorouter', {
+					type: 'oauth',
+					access: 'access-new-login',
+					refresh: 'refresh-new-login',
+					expires: Date.now() + 60 * 60 * 1000,
+				});
+				return tokens({
+					access: 'access-from-old-refresh',
+					refresh: 'refresh-from-old-refresh',
+				});
+			},
+		});
+
+		expect(result?.access).toBe('access-new-login');
+		expect(await getAuth('ottorouter')).toMatchObject({
+			access: 'access-new-login',
+			refresh: 'refresh-new-login',
+		});
+	});
+
+	test('does not restore credentials removed during an in-flight refresh', async () => {
+		await setAuth('ottorouter', {
+			type: 'oauth',
+			access: 'access-old',
+			refresh: 'refresh-old',
+			expires: Date.now() + 30_000,
+		});
+		const result = await getFreshOttoRouterOAuth({
+			lockPath,
+			refreshFn: async () => {
+				await removeAuth('ottorouter');
+				return tokens();
+			},
+		});
+
+		expect(result).toBeNull();
+		expect(await getAuth('ottorouter')).toBeUndefined();
 	});
 
 	test('retries with the rotated refresh token when it is also near expiry', async () => {

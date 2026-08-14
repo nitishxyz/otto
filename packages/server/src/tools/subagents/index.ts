@@ -47,7 +47,7 @@ const subagentInputSchema = z.object({
 		.enum(['queue', 'interrupt'])
 		.optional()
 		.describe(
-			'Follow-up delivery; defaults to queue. Use interrupt only for an urgent correction that invalidates current work, never for status checks.',
+			'Message or compact delivery; defaults to queue. Use interrupt only when the active child run must be preempted.',
 		),
 	confirmCancel: z
 		.boolean()
@@ -80,7 +80,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 		name: 'subagent',
 		tool: tool({
 			description:
-				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows lifecycle results; status inspects one agent including context-window usage and read returns recent tool calls, but both are one-time diagnostics only when explicitly needed, never progress polling; message sends a queued or interrupting follow-up only for an urgent correction that invalidates current work; compact queues /compact after the child is idle; stop cancels only with explicit user cancellation confirmation; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child: after delegation, do not inspect its files, check Git, rerun its verification, or send suggestions. Results return automatically. Continue only genuinely independent work or end the turn. A request to stop polling/checking/waiting means end the turn, not stop the child.',
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows lifecycle results; status inspects one agent including context-window usage and read returns recent tool calls, but both are one-time diagnostics only when explicitly needed, never progress polling; message sends a queued or interrupting follow-up only for an urgent correction that invalidates current work; compact sends /compact regardless of lifecycle status, queued by default or interrupting when requested; stop cancels only with explicit user cancellation confirmation; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child: after delegation, do not inspect its files, check Git, rerun its verification, or send suggestions. Results return automatically. Continue only genuinely independent work or end the turn. A request to stop polling/checking/waiting means end the turn, not stop the child.',
 			inputSchema: subagentInputSchema,
 			async execute(input) {
 				switch (input.action) {
@@ -233,11 +233,15 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							cfg,
 							parentSessionId: sessionId,
 							subagentId,
+							delivery: input.delivery ?? 'queue',
 						});
 						if (!result.ok) return result;
 						return {
 							...result,
-							note: 'Compaction queued in the idle child session.',
+							note:
+								result.delivery === 'interrupt'
+									? 'Compaction sent now; any active child run was preempted.'
+									: 'Compaction queued in the child session.',
 						};
 					}
 					case 'stop': {

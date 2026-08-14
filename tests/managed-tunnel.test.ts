@@ -194,4 +194,58 @@ describe('OttoTunnel managed startup', () => {
 			'https://temporary.trycloudflare.com',
 		);
 	});
+
+	test('emits disconnects from cloudflared unregistration output', async () => {
+		let child: ChildProcess | undefined;
+		const tunnel = new OttoTunnel({
+			ensureBinary: async () => '/tmp/tunnel',
+			spawn: (() => {
+				child = fakeTunnelProcess(
+					'Registered tunnel connection connIndex=0 connection=abcdef12 ip=198.51.100.2 location=sjc01\n',
+				);
+				return child;
+			}) as typeof import('node:child_process').spawn,
+		});
+		await tunnel.startManaged(
+			'secret-tunnel-token',
+			'https://stable123.ottorouter.org',
+		);
+		const disconnected = new Promise((resolve) =>
+			tunnel.once('disconnected', resolve),
+		);
+		child?.stderr?.emit(
+			'data',
+			Buffer.from('Unregistered tunnel connection connIndex=0'),
+		);
+
+		expect(await disconnected).toMatchObject({ id: 'abcdef12' });
+	});
+
+	test('force kills a child that does not exit after SIGINT', async () => {
+		const signals: Array<NodeJS.Signals | number | undefined> = [];
+		const tunnel = new OttoTunnel({
+			ensureBinary: async () => '/tmp/tunnel',
+			forceKillDelayMs: 0,
+			spawn: (() => {
+				const child = fakeTunnelProcess(
+					'Registered tunnel connection connIndex=0 connection=abcdef12',
+				);
+				child.kill = (signal) => {
+					signals.push(signal);
+					Object.defineProperty(child, 'killed', { value: true });
+					return true;
+				};
+				return child;
+			}) as typeof import('node:child_process').spawn,
+		});
+		await tunnel.startManaged(
+			'secret-tunnel-token',
+			'https://stable123.ottorouter.org',
+		);
+
+		tunnel.stop();
+		await Bun.sleep(10);
+
+		expect(signals).toEqual(['SIGINT', 'SIGKILL']);
+	});
 });

@@ -22,11 +22,14 @@ export interface TunnelEvents {
 export interface OttoTunnelDependencies {
 	ensureBinary: typeof ensureTunnelBinary;
 	spawn: typeof spawn;
+	forceKillDelayMs: number;
 }
 
 const URL_REGEX = /https:\/\/([a-z0-9-]+)\.trycloudflare\.com/;
 const REGISTERED_CONNECTION_REGEX = /Registered tunnel connection/i;
-const CONN_REGEX = /\bconnection(?:=|\s+)([^\s]+)/i;
+const UNREGISTERED_CONNECTION_REGEX =
+	/Unregistered tunnel connection|connection .*terminated/i;
+const CONN_REGEX = /\bconnection=([^\s]+)/i;
 const IP_REGEX = /\bip=([^\s]+)/i;
 const LOCATION_REGEX = /\blocation=([^\s]+)/i;
 const INDEX_REGEX = /connIndex=(\d+)/;
@@ -41,12 +44,14 @@ export class OttoTunnel extends EventEmitter {
 	private outputBuffers = { stdout: '', stderr: '' };
 	private _url: string | null = null;
 	private _stopped = false;
+	private forceKillTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(dependencies: Partial<OttoTunnelDependencies> = {}) {
 		super();
 		this.dependencies = {
 			ensureBinary: dependencies.ensureBinary ?? ensureTunnelBinary,
 			spawn: dependencies.spawn ?? spawn,
+			forceKillDelayMs: dependencies.forceKillDelayMs ?? 5000,
 		};
 	}
 
@@ -83,7 +88,7 @@ export class OttoTunnel extends EventEmitter {
 			}
 		}
 
-		if (output.includes('terminated') && indexMatch) {
+		if (UNREGISTERED_CONNECTION_REGEX.test(output) && indexMatch) {
 			const index = Number(indexMatch[1]);
 			const conn = this.connections[index];
 			if (conn) {
@@ -170,6 +175,8 @@ export class OttoTunnel extends EventEmitter {
 			});
 
 			this.process.on('exit', (code, signal) => {
+				if (this.forceKillTimer) clearTimeout(this.forceKillTimer);
+				this.forceKillTimer = null;
 				this._stopped = true;
 				this.process = null;
 				this.emit('exit', code, signal);
@@ -227,13 +234,17 @@ export class OttoTunnel extends EventEmitter {
 		}
 
 		this._stopped = true;
-		const killed = this.process.kill('SIGINT');
+		const child = this.process;
+		const killed = child.kill('SIGINT');
 
-		setTimeout(() => {
-			if (this.process && !this.process.killed) {
-				this.process.kill('SIGKILL');
+		if (this.forceKillTimer) clearTimeout(this.forceKillTimer);
+		this.forceKillTimer = setTimeout(() => {
+			this.forceKillTimer = null;
+			if (this.process === child) {
+				child.kill('SIGKILL');
 			}
-		}, 5000);
+		}, this.dependencies.forceKillDelayMs);
+		this.forceKillTimer.unref?.();
 
 		return killed;
 	}
@@ -284,9 +295,6 @@ export async function createTunnel(
 	port: number,
 	onProgress?: (message: string) => void,
 ): Promise<{ url: string; tunnel: OttoTunnel }> {
-	// Kill any stale tunnel processes first
-	await killStaleTunnels();
-
 	const tunnel = new OttoTunnel();
 	const url = await tunnel.start(port, onProgress);
 	return { url, tunnel };
