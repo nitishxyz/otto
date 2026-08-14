@@ -925,7 +925,7 @@ function PreferencesModal({
 										})
 									}
 									placeholder="Tokens"
-									hint="Summarize the thread once it grows past this many tokens."
+									hint="Summarize the thread at this limit when it is below the model's context window."
 									disabled={updateDefaults.isPending}
 								/>
 							</div>

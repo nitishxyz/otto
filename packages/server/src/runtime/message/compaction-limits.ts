@@ -12,6 +12,29 @@ export interface ModelLimits {
 	output: number;
 }
 
+export function resolveAutoCompactThresholdTokens(args: {
+	configuredThresholdTokens?: number | null;
+	modelContextWindow?: number | null;
+}): number | null {
+	const configuredThreshold = Math.floor(
+		Number(args.configuredThresholdTokens ?? 0),
+	);
+	if (!Number.isFinite(configuredThreshold) || configuredThreshold <= 0) {
+		return null;
+	}
+
+	const modelContextWindow = Math.floor(Number(args.modelContextWindow ?? 0));
+	if (
+		Number.isFinite(modelContextWindow) &&
+		modelContextWindow > 0 &&
+		configuredThreshold >= modelContextWindow
+	) {
+		return null;
+	}
+
+	return configuredThreshold;
+}
+
 export function shouldAutoCompactBeforeOverflow(args: {
 	autoCompactThresholdTokens?: number | null;
 	currentContextTokens?: number | null;
@@ -79,6 +102,35 @@ export function shouldStopTurnForAutoCompact(args: {
 	);
 
 	return inputTokens + outputTokens >= threshold;
+}
+
+export function shouldAutoCompactAfterTurn(args: {
+	autoCompactThresholdTokens?: number | null;
+	currentContextTokens?: number | null;
+	isCompactCommand?: boolean;
+	compactionRetries?: number;
+	turnStoppedForCompaction?: boolean;
+}): boolean {
+	if (args.isCompactCommand || (args.compactionRetries ?? 0) > 0) {
+		return false;
+	}
+
+	const threshold = Number(args.autoCompactThresholdTokens ?? 0);
+	if (!Number.isFinite(threshold) || threshold <= 0) {
+		return false;
+	}
+
+	if (args.turnStoppedForCompaction) {
+		return true;
+	}
+
+	return shouldAutoCompactBeforeOverflow({
+		autoCompactThresholdTokens: threshold,
+		currentContextTokens: args.currentContextTokens,
+		estimatedInputTokens: 0,
+		isCompactCommand: args.isCompactCommand,
+		compactionRetries: args.compactionRetries,
+	});
 }
 
 export function getModelLimits(

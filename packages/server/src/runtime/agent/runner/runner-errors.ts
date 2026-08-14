@@ -7,6 +7,7 @@ import { isContextOverflowError } from '../../errors/context-overflow.ts';
 import { toErrorPayload } from '../../errors/handling.ts';
 import {
 	runAutoCompactionFlow,
+	shouldAutoCompactAfterTurn,
 	shouldAutoCompactBeforeOverflow,
 	shouldStopTurnForAutoCompact,
 } from '../../message/compaction.ts';
@@ -93,12 +94,12 @@ export async function autoCompactSessionAfterTurn(args: {
 		.where(eq(sessions.id, opts.sessionId))
 		.limit(1);
 
-	const shouldCompact = shouldAutoCompactBeforeOverflow({
+	const shouldCompact = shouldAutoCompactAfterTurn({
 		autoCompactThresholdTokens: args.threshold,
 		currentContextTokens: sessionRows[0]?.currentContextTokens ?? 0,
-		estimatedInputTokens: 0,
 		isCompactCommand: opts.isCompactCommand,
 		compactionRetries: opts.compactionRetries,
+		turnStoppedForCompaction: args.turnStoppedForCompaction,
 	});
 	if (!shouldCompact) return false;
 

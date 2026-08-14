@@ -52,6 +52,10 @@ import { createRunnerStreamHandlers } from './runner/runner-handlers.ts';
 import { invokeRunnerStreamText } from './runner/runner-invoke.ts';
 import { markEmptyResponseAfterFinalAttempt } from './runner/runner-empty-response.ts';
 import { ensureUserTurnBeforeAssistantRun } from './runner/runner-messages.ts';
+import {
+	getModelLimits,
+	resolveAutoCompactThresholdTokens,
+} from '../message/compaction.ts';
 
 export {
 	enqueueAssistantRun,
@@ -196,13 +200,18 @@ async function runAssistant(opts: RunOpts) {
 	const unsubscribeFinish = toolObserver.unsubscribe;
 
 	const reasoningStates = new Map<string, ReasoningState>();
+	const configuredModelContextWindow =
+		cfg.providers[opts.provider]?.models?.[opts.model]?.limit?.context;
+	const modelContextWindow =
+		configuredModelContextWindow ??
+		getModelLimits(opts.provider, opts.model)?.context;
+	const autoCompactThresholdTokens = resolveAutoCompactThresholdTokens({
+		configuredThresholdTokens: cfg.defaults.autoCompactThresholdTokens,
+		modelContextWindow,
+	});
 
 	if (
-		await shouldPreemptivelyAutoCompact(
-			db,
-			opts,
-			cfg.defaults.autoCompactThresholdTokens,
-		)
+		await shouldPreemptivelyAutoCompact(db, opts, autoCompactThresholdTokens)
 	) {
 		const autoCompactError = Object.assign(
 			new Error('Configured auto-compaction threshold reached'),
@@ -218,7 +227,7 @@ async function runAssistant(opts: RunOpts) {
 	let turnStoppedForAutoCompact = false;
 	const autoCompactStop = createAutoCompactStopCondition(
 		opts,
-		cfg.defaults.autoCompactThresholdTokens,
+		autoCompactThresholdTokens,
 		() => {
 			turnStoppedForAutoCompact = true;
 		},
@@ -317,7 +326,7 @@ async function runAssistant(opts: RunOpts) {
 		await autoCompactSessionAfterTurn({
 			db,
 			opts,
-			threshold: cfg.defaults.autoCompactThresholdTokens,
+			threshold: autoCompactThresholdTokens,
 			turnStoppedForCompaction: turnStoppedForAutoCompact,
 			runSessionLoop,
 		});
