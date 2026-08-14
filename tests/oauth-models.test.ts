@@ -85,11 +85,13 @@ describe('oauth model filtering', () => {
 
 		expect(oauthModelIds).toContain('grok-composer-2.5-fast');
 		expect(oauthModelIds).toContain('grok-4.5');
+		expect(oauthModelIds).toContain('grok-4.6');
 		expect(oauthModelIds).not.toContain('grok-build');
 		expect(oauthModelIds).not.toContain('grok-4.3');
 		expect(apiModelIds).not.toContain('grok-build');
 		expect(apiModelIds).not.toContain('grok-composer-2.5-fast');
 		expect(isModelAllowedForOAuth('xai', 'grok-composer-2.5-fast')).toBe(true);
+		expect(isModelAllowedForOAuth('xai', 'grok-4.6')).toBe(true);
 		expect(isModelAllowedForOAuth('xai', 'grok-4.3')).toBe(false);
 
 		const composer = catalog.xai.models['grok-composer-2.5-fast'];

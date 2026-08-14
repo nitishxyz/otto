@@ -1825,6 +1825,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 65536,
 					},
 				},
+				'gemini-3.7-flash': {
+					id: 'gemini-3.7-flash',
+					ownedBy: 'google',
+					label: 'Gemini 3.7 Flash',
+					modalities: {
+						input: ['text', 'image', 'video', 'audio', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-03',
+					releaseDate: '2026-08-13',
+					lastUpdated: '2026-08-13',
+					openWeights: false,
+					cost: {
+						input: 0.75,
+						output: 3.75,
+						cacheRead: 0.075,
+					},
+					limit: {
+						context: 1048576,
+						output: 65536,
+					},
+				},
 				'gemini-flash-latest': {
 					id: 'gemini-flash-latest',
 					ownedBy: 'google',
@@ -2109,6 +2135,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 262144,
+						output: 262144,
+					},
+				},
+				'deepseek-ai/DeepSeek-V4-Pro-0813': {
+					id: 'deepseek-ai/DeepSeek-V4-Pro-0813',
+					ownedBy: 'deepseek',
+					label: 'Deepseek V4 Pro 0813',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: false,
+					cost: {
+						input: 1.32,
+						output: 3.96,
+					},
+					limit: {
+						context: 1048576,
 						output: 262144,
 					},
 				},
@@ -2571,6 +2621,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 8192,
 					},
 				},
+				'deepseek-ai/DeepSeek-V3-0324': {
+					id: 'deepseek-ai/DeepSeek-V3-0324',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V3 0324',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2025-03-24',
+					lastUpdated: '2025-03-24',
+					openWeights: true,
+					cost: {
+						input: 0.27,
+						output: 1.12,
+					},
+					limit: {
+						context: 163840,
+						output: 163840,
+					},
+				},
 				'deepseek-ai/DeepSeek-V3.1': {
 					id: 'deepseek-ai/DeepSeek-V3.1',
 					ownedBy: 'deepseek',
@@ -2696,6 +2770,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 393216,
 					},
 				},
+				'deepseek-ai/DeepSeek-V4-Pro-0813': {
+					id: 'deepseek-ai/DeepSeek-V4-Pro-0813',
+					ownedBy: 'deepseek',
+					label: 'DeepSeek V4 Pro 0813',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
+					openWeights: true,
+					cost: {
+						input: 1.32,
+						output: 3.96,
+					},
+					limit: {
+						context: 1000000,
+						output: 384000,
+					},
+				},
 				'google/gemma-4-26B-A4B-it': {
 					id: 'google/gemma-4-26B-A4B-it',
 					ownedBy: 'google',
@@ -2742,6 +2840,31 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 262144,
 						output: 32768,
+					},
+				},
+				'meta-llama/Llama-3.1-8B-Instruct': {
+					id: 'meta-llama/Llama-3.1-8B-Instruct',
+					ownedBy: 'meta',
+					label: 'Llama-3.1-8B-Instruct',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: false,
+					temperature: true,
+					knowledge: '2023-12',
+					releaseDate: '2024-07-23',
+					lastUpdated: '2024-07-23',
+					openWeights: true,
+					cost: {
+						input: 0.06,
+						output: 0.06,
+					},
+					limit: {
+						context: 131072,
+						output: 4096,
 					},
 				},
 				'meta-llama/Llama-3.3-70B-Instruct': {
@@ -3117,6 +3240,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
+				'Qwen/Qwen2.5-Coder-32B-Instruct': {
+					id: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+					ownedBy: 'qwen',
+					label: 'Qwen2.5-Coder-32B-Instruct',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: false,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2024-11-12',
+					lastUpdated: '2024-11-12',
+					openWeights: true,
+					cost: {
+						input: 0.06,
+						output: 0.2,
+					},
+					limit: {
+						context: 131072,
+						output: 8192,
+					},
+				},
 				'Qwen/Qwen3-235B-A22B': {
 					id: 'Qwen/Qwen3-235B-A22B',
 					ownedBy: 'qwen',
@@ -3189,6 +3336,30 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					limit: {
 						context: 262144,
 						output: 131072,
+					},
+				},
+				'Qwen/Qwen3-30B-A3B': {
+					id: 'Qwen/Qwen3-30B-A3B',
+					ownedBy: 'qwen',
+					label: 'Qwen3 30B A3B',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2025-04-28',
+					lastUpdated: '2025-04-28',
+					openWeights: true,
+					cost: {
+						input: 0.12,
+						output: 0.5,
+					},
+					limit: {
+						context: 40960,
+						output: 16384,
 					},
 				},
 				'Qwen/Qwen3-32B': {
@@ -4055,13 +4226,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-08-01',
 					openWeights: false,
 					cost: {
-						input: 0.079996,
-						output: 0.252,
-						cacheRead: 0.0252,
+						input: 0.0798,
+						output: 0.1596,
+						cacheRead: 0.01596,
 					},
 					limit: {
 						context: 1048576,
-						output: 262144,
+						output: 131072,
 					},
 				},
 				'~google/gemini-flash-latest': {
@@ -4081,10 +4252,10 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-27',
 					openWeights: false,
 					cost: {
-						input: 1.5,
-						output: 7.5,
-						cacheRead: 0.15,
-						cacheWrite: 0.083333,
+						input: 0.375,
+						output: 1.875,
+						cacheRead: 0.0375,
+						cacheWrite: 0.020833,
 					},
 					limit: {
 						context: 1048576,
@@ -4907,7 +5078,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					temperature: true,
 					releaseDate: '2026-04-01',
-					lastUpdated: '2026-04-01',
+					lastUpdated: '2026-05-28',
 					openWeights: true,
 					cost: {
 						input: 0.22,
@@ -5037,7 +5208,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'bytedance-seed/seed-2.0-lite': {
 					id: 'bytedance-seed/seed-2.0-lite',
-					label: 'Seed-2.0-Lite',
+					label: 'Seed 2.0 Lite',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -5046,8 +5217,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-03-10',
-					lastUpdated: '2026-03-10',
+					releaseDate: '2026-02-14',
+					lastUpdated: '2026-02-14',
 					openWeights: false,
 					cost: {
 						input: 0.25,
@@ -5060,7 +5231,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				},
 				'bytedance-seed/seed-2.0-mini': {
 					id: 'bytedance-seed/seed-2.0-mini',
-					label: 'Seed-2.0-Mini',
+					label: 'Seed 2.0 Mini',
 					modalities: {
 						input: ['text', 'image', 'video'],
 						output: ['text'],
@@ -5069,8 +5240,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: true,
 					temperature: true,
-					releaseDate: '2026-02-26',
-					lastUpdated: '2026-02-26',
+					releaseDate: '2026-02-14',
+					lastUpdated: '2026-02-14',
 					openWeights: false,
 					cost: {
 						input: 0.1,
@@ -5250,7 +5421,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 2.5,
 					},
 					limit: {
-						context: 163840,
+						context: 64000,
 						output: 16000,
 					},
 				},
@@ -5400,13 +5571,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-31',
 					openWeights: true,
 					cost: {
-						input: 0.08,
-						output: 0.18,
-						cacheRead: 0.016,
+						input: 0.14,
+						output: 0.28,
+						cacheRead: 0.028,
 					},
 					limit: {
 						context: 1048576,
-						output: 384000,
+						output: 393216,
 					},
 				},
 				'deepseek/deepseek-v4-pro': {
@@ -5828,10 +5999,37 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-07-21',
 					openWeights: false,
 					cost: {
-						input: 1.5,
-						output: 7.5,
-						cacheRead: 0.15,
-						cacheWrite: 0.083333,
+						input: 0.75,
+						output: 3.75,
+						cacheRead: 0.075,
+						cacheWrite: 0.041667,
+					},
+					limit: {
+						context: 1048576,
+						output: 65536,
+					},
+				},
+				'google/gemini-3.7-flash': {
+					id: 'google/gemini-3.7-flash',
+					ownedBy: 'google',
+					label: 'Gemini 3.7 Flash',
+					modalities: {
+						input: ['text', 'image', 'video', 'audio', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-03',
+					releaseDate: '2026-08-13',
+					lastUpdated: '2026-08-13',
+					openWeights: false,
+					cost: {
+						input: 0.375,
+						output: 1.875,
+						cacheRead: 0.0375,
+						cacheWrite: 0.020833,
 					},
 					limit: {
 						context: 1048576,
@@ -6107,29 +6305,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 32768,
 					},
 				},
-				'inclusionai/ling-3.0-tiny:free': {
-					id: 'inclusionai/ling-3.0-tiny:free',
-					label: 'Ling 3.0 Tiny (free)',
-					modalities: {
-						input: ['text'],
-						output: ['text'],
-					},
-					toolCall: true,
-					reasoningText: true,
-					attachment: false,
-					temperature: true,
-					releaseDate: '2026-08-06',
-					lastUpdated: '2026-08-06',
-					openWeights: true,
-					cost: {
-						input: 0,
-						output: 0,
-					},
-					limit: {
-						context: 262144,
-						output: 32768,
-					},
-				},
 				'inclusionai/ring-2.6-1t': {
 					id: 'inclusionai/ring-2.6-1t',
 					label: 'Ring-2.6-1T',
@@ -6246,7 +6421,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 128000,
-						output: 32768,
+						output: 8192,
 					},
 				},
 				'meituan/longcat-2.0': {
@@ -6301,7 +6476,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 				'meta-llama/llama-3.1-8b-instruct': {
 					id: 'meta-llama/llama-3.1-8b-instruct',
 					ownedBy: 'meta',
-					label: 'Llama 3.1 8B Instruct',
+					label: 'Llama-3.1-8B-Instruct',
 					modalities: {
 						input: ['text'],
 						output: ['text'],
@@ -6310,7 +6485,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: false,
 					attachment: false,
 					temperature: true,
-					knowledge: '2023-12-31',
+					knowledge: '2023-12',
 					releaseDate: '2024-07-23',
 					lastUpdated: '2024-07-23',
 					openWeights: true,
@@ -6367,7 +6542,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					openWeights: true,
 					cost: {
 						input: 0.2,
-						output: 0.696,
+						output: 0.8,
 					},
 					limit: {
 						context: 1048576,
@@ -7135,9 +7310,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-04-21',
 					openWeights: true,
 					cost: {
-						input: 0.95,
-						output: 4,
-						cacheRead: 0.16,
+						input: 0.5605,
+						output: 2.36,
+						cacheRead: 0.0944,
 					},
 					limit: {
 						context: 262144,
@@ -7161,8 +7336,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-12',
 					openWeights: true,
 					cost: {
-						input: 0.67,
-						output: 3.4,
+						input: 0.71,
+						output: 3.5,
 						cacheRead: 0.15,
 					},
 					limit: {
@@ -9263,7 +9438,6 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					reasoningText: true,
 					attachment: false,
 					temperature: true,
-					knowledge: '2025-03-31',
 					releaseDate: '2025-04-28',
 					lastUpdated: '2025-04-28',
 					openWeights: true,
@@ -9575,12 +9749,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-09',
 					openWeights: true,
 					cost: {
-						input: 0.09,
+						input: 0.1,
 						output: 1.1,
+						cacheRead: 0.07,
 					},
 					limit: {
 						context: 262144,
-						output: 16384,
+						output: 262144,
 					},
 				},
 				'qwen/qwen3-next-80b-a3b-thinking': {
@@ -9605,7 +9780,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 32768,
 					},
 				},
 				'qwen/qwen3-vl-235b-a22b-instruct': {
@@ -9675,12 +9850,12 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-10-06',
 					openWeights: true,
 					cost: {
-						input: 0.15,
-						output: 0.6,
+						input: 0.13,
+						output: 0.52,
 					},
 					limit: {
 						context: 262144,
-						output: 16384,
+						output: 32768,
 					},
 				},
 				'qwen/qwen3-vl-30b-a3b-thinking': {
@@ -9844,13 +10019,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-23',
 					openWeights: true,
 					cost: {
-						input: 0.25,
-						output: 1.25,
-						cacheRead: 0.25,
+						input: 0.225,
+						output: 1.8,
+						cacheRead: 0.225,
 					},
 					limit: {
 						context: 262144,
-						output: 262144,
+						output: 65536,
 					},
 				},
 				'qwen/qwen3.5-397b-a17b': {
@@ -9869,9 +10044,8 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-02-15',
 					openWeights: true,
 					cost: {
-						input: 0.45,
-						output: 3,
-						cacheRead: 0.045,
+						input: 0.39,
+						output: 2.34,
 					},
 					limit: {
 						context: 262144,
@@ -10200,11 +10374,11 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					cost: {
 						input: 2,
 						output: 6,
-						cacheRead: 0.2,
+						cacheRead: 0.25,
 					},
 					limit: {
-						context: 262144,
-						output: 52429,
+						context: 1048576,
+						output: 262144,
 					},
 				},
 				'qwen/qwen3.8-max': {
@@ -10841,9 +11015,9 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2025-09-30',
 					openWeights: true,
 					cost: {
-						input: 0.5,
-						output: 2,
-						cacheRead: 0.1,
+						input: 0.55,
+						output: 2.2,
+						cacheRead: 0.11,
 					},
 					limit: {
 						context: 204800,
@@ -11019,13 +11193,13 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					lastUpdated: '2026-06-13',
 					openWeights: true,
 					cost: {
-						input: 0.5,
-						output: 3.15,
-						cacheRead: 0.1,
+						input: 1.19,
+						output: 3.74,
+						cacheRead: 0.221,
 					},
 					limit: {
 						context: 1048576,
-						output: 131072,
+						output: 262144,
 					},
 				},
 				'z-ai/glm-5v-turbo': {
@@ -11717,6 +11891,35 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					knowledge: '2026-03',
 					releaseDate: '2026-07-21',
 					lastUpdated: '2026-07-21',
+					openWeights: false,
+					cost: {
+						input: 1.5,
+						output: 7.5,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1048576,
+						output: 65536,
+					},
+					provider: {
+						npm: '@ai-sdk/google',
+					},
+				},
+				'gemini-3.7-flash': {
+					id: 'gemini-3.7-flash',
+					ownedBy: 'google',
+					label: 'Gemini 3.7 Flash',
+					modalities: {
+						input: ['text', 'image', 'video', 'audio', 'pdf'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-03',
+					releaseDate: '2026-08-13',
+					lastUpdated: '2026-08-13',
 					openWeights: false,
 					cost: {
 						input: 1.5,
@@ -13245,6 +13448,34 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						npm: '@ai-sdk/anthropic',
 					},
 				},
+				'muse-spark-1.2': {
+					id: 'muse-spark-1.2',
+					ownedBy: 'meta',
+					label: 'Muse Spark 1.2',
+					modalities: {
+						input: ['text', 'image', 'video', 'pdf', 'audio'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					releaseDate: '2026-08-05',
+					lastUpdated: '2026-08-05',
+					openWeights: false,
+					cost: {
+						input: 1.25,
+						output: 4.25,
+						cacheRead: 0.15,
+					},
+					limit: {
+						context: 1048576,
+						output: 131072,
+					},
+					provider: {
+						npm: '@ai-sdk/openai',
+					},
+				},
 				'nemotron-3-super-free': {
 					id: 'nemotron-3-super-free',
 					label: 'Nemotron 3 Super Free',
@@ -13493,7 +13724,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					attachment: false,
 					temperature: true,
 					knowledge: '2025-06',
-					releaseDate: '2026-01-28',
+					releaseDate: '2026-01-27',
 					lastUpdated: '2026-01-28',
 					openWeights: true,
 					cost: {
@@ -13644,7 +13875,7 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						context: 500000,
 						output: 500000,
 					},
-					auth: ['api'],
+					auth: ['api', 'oauth'],
 				},
 				'grok-build-0.1': {
 					id: 'grok-build-0.1',
@@ -14154,6 +14385,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					releaseDate: '2026-06-13',
 					lastUpdated: '2026-06-13',
 					openWeights: true,
+					cost: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+						cacheWrite: 0,
+					},
+					limit: {
+						context: 1000000,
+						output: 131072,
+					},
+				},
+				'glm-5.3': {
+					id: 'glm-5.3',
+					ownedBy: 'zai',
+					label: 'GLM-5.3',
+					modalities: {
+						input: ['text'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: false,
+					temperature: true,
+					releaseDate: '2026-08-14',
+					lastUpdated: '2026-08-14',
+					openWeights: false,
 					cost: {
 						input: 0,
 						output: 0,
@@ -15121,6 +15378,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 						output: 64000,
 					},
 				},
+				'gemini-3.7-flash': {
+					id: 'gemini-3.7-flash',
+					ownedBy: 'google',
+					label: 'Gemini 3.7 Flash',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-03',
+					releaseDate: '2026-08-13',
+					lastUpdated: '2026-08-13',
+					openWeights: false,
+					cost: {
+						input: 0.75,
+						output: 3.75,
+						cacheRead: 0.075,
+					},
+					limit: {
+						context: 1000000,
+						output: 64000,
+					},
+				},
 				'gpt-4.1': {
 					id: 'gpt-4.1',
 					ownedBy: 'openai',
@@ -15448,6 +15731,32 @@ export const catalog: Partial<Record<BuiltInProviderId, ProviderCatalogEntry>> =
 					temperature: true,
 					releaseDate: '2026-07-08',
 					lastUpdated: '2026-07-08',
+					openWeights: false,
+					cost: {
+						input: 2,
+						output: 6,
+						cacheRead: 0.5,
+					},
+					limit: {
+						context: 500000,
+						output: 128000,
+					},
+				},
+				'grok-4.6': {
+					id: 'grok-4.6',
+					ownedBy: 'xai',
+					label: 'Grok 4.6',
+					modalities: {
+						input: ['text', 'image'],
+						output: ['text'],
+					},
+					toolCall: true,
+					reasoningText: true,
+					attachment: true,
+					temperature: true,
+					knowledge: '2026-02-01',
+					releaseDate: '2026-08-12',
+					lastUpdated: '2026-08-12',
 					openWeights: false,
 					cost: {
 						input: 2,
