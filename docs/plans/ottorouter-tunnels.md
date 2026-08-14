@@ -61,19 +61,20 @@ browser ──► <slug>.ottorouter.org ──► Cloudflare edge ──► clou
   started lazily when the user enables the tunnel, kept alive while enabled.
 - The tunnel token and hostname come from OttoRouter
   (`POST /v1/tunnels/device`), authenticated with the stored OttoRouter OAuth
-  token. The call is idempotent per device — agi does not persist the tunnel
-  token, it re-requests it on each start.
+  token. The call is idempotent per device and machine — agi does not persist
+  the tunnel token, it re-requests it on each start.
 - Project shares no longer need the local proxy or their own tunnel process in
   managed mode: sharing a project = minting a share token locally. Start/stop
   is instant, no Cloudflare interaction.
 
 ## Device identity
 
-- Persist a generated device UUID under the otto home dir (e.g.
-  `~/.otto/device-id`), created on first use. This is the stable identity sent
-  to setu as `device_id`.
-- setu maps `device_id` → short random slug (8–10 chars, not the UUID; slug is
-  rotatable server-side without changing device identity).
+- Persist a generated Otto instance UUID under the Otto home dir as
+  `device-id` and a separate connector UUID as `machine-id`. Provisioning
+  sends both as `device_id` and `machine_id`, allowing multiple machines for
+  one account or Otto instance to remain independently listable and usable.
+- setu maps `(device_id, machine_id)` → short random slug (8–10 chars, not the
+  UUIDs; the slug is rotatable server-side without changing either identity).
 
 ## Workstreams
 

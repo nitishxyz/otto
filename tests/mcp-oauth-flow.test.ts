@@ -49,6 +49,19 @@ describe('MCP OAuth flows', () => {
 });
 
 describe('OttoOAuthProvider callback ownership', () => {
+	test('generates state for authorization requests', () => {
+		const provider = new OttoOAuthProvider(
+			'test-server',
+			new OAuthCredentialStore(),
+		);
+
+		const first = provider.state();
+		const second = provider.state();
+
+		expect(first).toBeTruthy();
+		expect(second).not.toBe(first);
+	});
+
 	test('records the authorization URL without binding the callback port', async () => {
 		const probe = createServer();
 		await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));

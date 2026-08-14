@@ -614,6 +614,7 @@ export {
 	createTunnel,
 	killStaleTunnels,
 	getManagedTunnelDeviceId,
+	getManagedTunnelMachineId,
 	isManagedTunnelDeviceId,
 	ManagedTunnelProvisionError,
 	provisionManagedTunnel,

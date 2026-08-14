@@ -15,6 +15,8 @@ import { tunnelAuthMiddleware } from '../packages/server/src/tunnel-auth.ts';
 
 const DEVICE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const OTHER_DEVICE_ID = '550e8400-e29b-41d4-a716-446655440001';
+const MACHINE_ID = '660e8400-e29b-41d4-a716-446655440000';
+const OTHER_MACHINE_ID = '660e8400-e29b-41d4-a716-446655440001';
 const nowSeconds = 1_800_000_000;
 let now = nowSeconds * 1000;
 let server: Server | undefined;
@@ -54,6 +56,7 @@ interface AssertionOverrides {
 	issuer?: string;
 	audience?: string;
 	deviceId?: string;
+	machineId?: string;
 	challenge?: string;
 	jti?: string;
 	iat?: number;
@@ -76,6 +79,7 @@ async function assertion(
 		scope: overrides.scope ?? 'tunnel:owner',
 		token_use: overrides.tokenUse ?? 'tunnel_owner_assertion',
 		device_id: overrides.deviceId ?? DEVICE_ID,
+		machine_id: overrides.machineId ?? MACHINE_ID,
 		tunnel_device_id: overrides.tunnelDeviceId ?? 'setu-device-row',
 		org_id: 'org-1',
 		challenge: overrides.challenge ?? challenge,
@@ -83,7 +87,9 @@ async function assertion(
 	})
 		.setProtectedHeader({ alg: 'EdDSA', kid: overrides.kid ?? 'owner-key' })
 		.setIssuer(overrides.issuer ?? `${issuer}/api/auth`)
-		.setAudience(overrides.audience ?? `urn:otto:daemon:${DEVICE_ID}`)
+		.setAudience(
+			overrides.audience ?? `urn:otto:daemon:${DEVICE_ID}:${MACHINE_ID}`,
+		)
 		.setSubject(overrides.sub ?? 'owner-user')
 		.setJti(overrides.jti ?? crypto.randomUUID())
 		.setIssuedAt(iat)
@@ -99,6 +105,7 @@ beforeEach(async () => {
 	ownerAuthorizationTesting.setDependencies({
 		now: () => now,
 		deviceId: async () => DEVICE_ID,
+		machineId: async () => MACHINE_ID,
 		discoveryUrl: () => discoveryUrl,
 		allowInsecureLocalhost: () => true,
 	});
@@ -116,6 +123,7 @@ describe('daemon owner assertion exchange', () => {
 	test('verifies Better Auth JWKS and exact claims, then creates a 15-minute session', async () => {
 		const created = await createOwnerChallenge('source-1');
 		expect(created.device_id).toBe(DEVICE_ID);
+		expect(created.machine_id).toBe(MACHINE_ID);
 		expect(created.challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
 		const session = await exchangeOwnerAssertion(
@@ -193,6 +201,7 @@ describe('daemon owner assertion exchange', () => {
 		['issuer', { issuer: 'https://attacker.example/api/auth' }],
 		['audience', { audience: `urn:otto:daemon:${OTHER_DEVICE_ID}` }],
 		['device', { deviceId: OTHER_DEVICE_ID }],
+		['machine', { machineId: OTHER_MACHINE_ID }],
 		['challenge', { challenge: 'A'.repeat(43) }],
 		['scope', { scope: 'inference' }],
 		['purpose', { tokenUse: 'access_token' }],

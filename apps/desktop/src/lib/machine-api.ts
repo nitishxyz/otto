@@ -29,6 +29,7 @@ export interface MachineDirectoryListing {
 
 export interface MachineDevice {
 	deviceId: string;
+	machineId: string;
 	hostname?: string | null;
 	name?: string | null;
 	status?: string | null;
@@ -55,9 +56,15 @@ export async function loadAuthorizedMachineProjects(
 		baseURL: localDaemonUrl,
 		body: {
 			deviceId: machine.deviceId,
+			machineId: machine.machineId,
 			hostname: machine.hostname,
 			forceOwnerSession,
-		} as { deviceId: string; hostname: string; forceOwnerSession?: boolean },
+		} as {
+			deviceId: string;
+			machineId: string;
+			hostname: string;
+			forceOwnerSession?: boolean;
+		},
 	});
 	if (response.error) throw new Error('Machine projects unavailable.');
 	return response.data as MachineProjectAccess;

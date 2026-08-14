@@ -47,13 +47,12 @@ const ZAI_MANUAL_MODELS: ModelInfo[] = [
 ];
 
 const ZAI_CODING_MODEL_ORDER = [
+	'glm-5.3',
 	'glm-5.2',
-	'glm-5.1',
+	'glm-5.2-highspeed',
 	'glm-5-turbo',
 	'glm-5',
 	'glm-4.7',
-	'glm-4.5-air',
-	'glm-5v-turbo',
 ];
 
 const ZAI_CODING_MANUAL_MODELS: ModelInfo[] = [

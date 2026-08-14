@@ -7,6 +7,7 @@ use tauri::WebviewWindow;
 #[serde(rename_all = "camelCase")]
 pub struct TunnelDevice {
     pub device_id: String,
+    pub machine_id: String,
     #[serde(default)]
     pub hostname: Option<String>,
     #[serde(default)]
@@ -21,6 +22,7 @@ pub struct TunnelDevice {
 #[serde(rename_all = "camelCase")]
 pub struct MachineBootstrap {
     pub device_id: String,
+    pub machine_id: String,
     pub hostname: Option<String>,
     pub name: Option<String>,
 }
@@ -61,6 +63,7 @@ pub fn set_current_machine(
     };
     let bootstrap = MachineBootstrap {
         device_id: device.device_id,
+        machine_id: device.machine_id,
         hostname: device.hostname,
         name: device.name,
     };
@@ -98,6 +101,7 @@ mod tests {
     fn renderer_device_metadata_contains_no_credentials() {
         let device = TunnelDevice {
             device_id: "device-1".to_string(),
+            machine_id: "machine-1".to_string(),
             hostname: Some("device.ottorouter.org".to_string()),
             name: Some("Studio".to_string()),
             status: Some("online".to_string()),
@@ -112,6 +116,7 @@ mod tests {
     fn machine_bootstrap_contains_only_routing_metadata() {
         let bootstrap = MachineBootstrap {
             device_id: "device-1".to_string(),
+            machine_id: "machine-1".to_string(),
             hostname: Some("device.ottorouter.org".to_string()),
             name: Some("Studio".to_string()),
         };

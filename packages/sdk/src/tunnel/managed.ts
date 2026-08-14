@@ -5,6 +5,7 @@ import { getOttoHomeDir } from '../config/src/paths.ts';
 
 const DEFAULT_OTTOROUTER_BASE_URL = 'https://api.ottorouter.org';
 const DEVICE_ID_FILE = 'device-id';
+const MACHINE_ID_FILE = 'machine-id';
 const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -47,11 +48,11 @@ export function isManagedTunnelDeviceId(value: string): boolean {
 	return UUID_PATTERN.test(value);
 }
 
-/** Read or generate the persistent UUID that identifies this Otto daemon. */
-export async function getManagedTunnelDeviceId(
-	ottoHome = getOttoHomeDir(),
+async function getPersistentId(
+	ottoHome: string,
+	filename: string,
 ): Promise<string> {
-	const path = join(ottoHome, DEVICE_ID_FILE);
+	const path = join(ottoHome, filename);
 	let replaceInvalid = false;
 	try {
 		const existing = (await readFile(path, 'utf8')).trim();
@@ -82,6 +83,20 @@ export async function getManagedTunnelDeviceId(
 	}
 }
 
+/** Read or generate the persistent UUID that identifies this Otto instance. */
+export function getManagedTunnelDeviceId(
+	ottoHome = getOttoHomeDir(),
+): Promise<string> {
+	return getPersistentId(ottoHome, DEVICE_ID_FILE);
+}
+
+/** Read or generate the persistent UUID for this machine's tunnel connector. */
+export function getManagedTunnelMachineId(
+	ottoHome = getOttoHomeDir(),
+): Promise<string> {
+	return getPersistentId(ottoHome, MACHINE_ID_FILE);
+}
+
 /** Provision the named Cloudflare tunnel assigned to this Otto daemon. */
 export async function provisionManagedTunnel(
 	auth: ManagedTunnelAuth,
@@ -100,7 +115,10 @@ export async function provisionManagedTunnel(
 		);
 	}
 
-	const deviceId = await getManagedTunnelDeviceId(options.ottoHome);
+	const [deviceId, machineId] = await Promise.all([
+		getManagedTunnelDeviceId(options.ottoHome),
+		getManagedTunnelMachineId(options.ottoHome),
+	]);
 	const baseUrl = (
 		options.baseUrl ??
 		process.env.OTTOROUTER_BASE_URL ??
@@ -116,6 +134,7 @@ export async function provisionManagedTunnel(
 		},
 		body: JSON.stringify({
 			device_id: deviceId,
+			machine_id: machineId,
 			daemon_version: options.daemonVersion,
 			local_port: options.localPort,
 			...(options.name === undefined ? {} : { name: options.name }),

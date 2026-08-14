@@ -53,6 +53,10 @@ export class OttoOAuthProvider implements OAuthClientProvider {
 		return this._pendingAuthUrl;
 	}
 
+	state(): string {
+		return crypto.randomUUID();
+	}
+
 	async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
 		if (this.presetClientId) {
 			return { client_id: this.presetClientId } as OAuthClientInformationMixed;

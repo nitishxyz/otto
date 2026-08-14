@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import {
 	getManagedTunnelDeviceId,
+	getManagedTunnelMachineId,
 	provisionManagedTunnel,
 } from '../packages/sdk/src/tunnel/managed.ts';
 import { OttoTunnel } from '../packages/sdk/src/tunnel/tunnel.ts';
@@ -38,6 +39,19 @@ describe('managed tunnel identity', () => {
 			first,
 		);
 		expect(first).toMatch(/^[0-9a-f-]{36}$/);
+	});
+
+	test('persists a distinct stable machine connector UUID', async () => {
+		const ottoHome = await temporaryOttoHome();
+		const deviceId = await getManagedTunnelDeviceId(ottoHome);
+		const first = await getManagedTunnelMachineId(ottoHome);
+		const second = await getManagedTunnelMachineId(ottoHome);
+
+		expect(second).toBe(first);
+		expect(first).not.toBe(deviceId);
+		expect((await readFile(join(ottoHome, 'machine-id'), 'utf8')).trim()).toBe(
+			first,
+		);
 	});
 
 	test('replaces an invalid stored identity', async () => {
@@ -88,6 +102,7 @@ test('provisionManagedTunnel sends runtime metadata and parses the deployed resp
 	);
 	expect(await request?.json()).toEqual({
 		device_id: await getManagedTunnelDeviceId(ottoHome),
+		machine_id: await getManagedTunnelMachineId(ottoHome),
 		daemon_version: '1.2.3',
 		local_port: 47_477,
 	});

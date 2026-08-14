@@ -31,26 +31,26 @@ pub async fn create_new_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn machine_window_label(device_id: &str) -> String {
+fn machine_window_label(machine_id: &str) -> String {
     let mut hasher = DefaultHasher::new();
-    device_id.hash(&mut hasher);
+    machine_id.hash(&mut hasher);
     format!("machine-{:016x}", hasher.finish())
 }
 
-/// Picks the window to focus for a repeated open request on `device_id`:
+/// Picks the window to focus for a repeated open request on `machine_id`:
 /// only an idle picker window (no project open) is reusable, so windows
 /// that already show a project keep running and a fresh picker can open
 /// alongside them. Also returns labels whose windows no longer exist so
 /// the caller can prune stale state.
 fn reusable_picker_label<'a>(
     entries: impl Iterator<Item = (&'a String, &'a MachineWindowContext)>,
-    device_id: &str,
+    machine_id: &str,
     window_exists: impl Fn(&str) -> bool,
 ) -> (Option<String>, Vec<String>) {
     let mut focus = None;
     let mut stale = Vec::new();
     for (label, context) in entries {
-        if context.bootstrap.device_id != device_id {
+        if context.bootstrap.machine_id != machine_id {
             continue;
         }
         if !window_exists(label) {
@@ -69,7 +69,7 @@ pub async fn open_machine_window(app: AppHandle, device: TunnelDevice) -> Result
     let focus_label = {
         let state = app.state::<MachineWindowState>();
         let mut windows = state.0.lock().map_err(|error| error.to_string())?;
-        let (focus, stale) = reusable_picker_label(windows.iter(), &device.device_id, |label| {
+        let (focus, stale) = reusable_picker_label(windows.iter(), &device.machine_id, |label| {
             app.get_webview_window(label).is_some()
         });
         for label in stale {
@@ -87,10 +87,11 @@ pub async fn open_machine_window(app: AppHandle, device: TunnelDevice) -> Result
     }
 
     let count = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
-    let label = format!("{}-{}", machine_window_label(&device.device_id), count);
+    let label = format!("{}-{}", machine_window_label(&device.machine_id), count);
 
     let bootstrap = MachineBootstrap {
         device_id: device.device_id,
+        machine_id: device.machine_id,
         hostname: device.hostname,
         name: device.name,
     };
@@ -133,10 +134,11 @@ mod tests {
     use crate::commands::machine::{MachineBootstrap, MachineWindowContext};
     use std::collections::HashMap;
 
-    fn context(device_id: &str, project_id: Option<&str>) -> MachineWindowContext {
+    fn context(machine_id: &str, project_id: Option<&str>) -> MachineWindowContext {
         MachineWindowContext {
             bootstrap: MachineBootstrap {
-                device_id: device_id.to_string(),
+                device_id: "shared-device".to_string(),
+                machine_id: machine_id.to_string(),
                 hostname: None,
                 name: None,
             },

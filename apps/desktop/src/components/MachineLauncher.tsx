@@ -79,7 +79,7 @@ export function MachineLauncher({
 	const initialLoading = loading && state === null;
 
 	const openDevice = async (device: MachineDeviceState['devices'][number]) => {
-		setOpening(device.deviceId);
+		setOpening(device.machineId);
 		setOpenError(null);
 		try {
 			await onSelectMachine(device);
@@ -207,9 +207,9 @@ export function MachineLauncher({
 						return (
 							<button
 								type="button"
-								key={device.deviceId}
+								key={device.machineId}
 								onClick={() => openDevice(device)}
-								disabled={offline || opening === device.deviceId}
+								disabled={offline || opening === device.machineId}
 								title={
 									offline
 										? 'Machine offline. Start otto and its managed tunnel on that machine, then refresh.'
@@ -231,7 +231,7 @@ export function MachineLauncher({
 								<PresenceBadge presence={presence} />
 								{!offline && (
 									<span className="text-xs text-muted-foreground/50">
-										{opening === device.deviceId ? 'Opening...' : 'Open'}
+										{opening === device.machineId ? 'Opening...' : 'Open'}
 									</span>
 								)}
 							</button>

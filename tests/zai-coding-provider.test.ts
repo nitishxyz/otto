@@ -75,20 +75,19 @@ describe('Z.AI Coding Plan provider', () => {
 			baseURL: ZAI_CODING_BASE_URL,
 			apiKeyEnv: 'ZAI_CODING_API_KEY',
 		});
-		expect(modelMapToList(definition?.models ?? {})[0]?.id).toBe('glm-5.2');
+		expect(modelMapToList(definition?.models ?? {})[0]?.id).toBe('glm-5.3');
 	});
 
 	test('contains documented GLM Coding Plan models', () => {
 		const models = new Set(Object.keys(catalog['zai-coding'].models));
 
 		for (const model of [
+			'glm-5.3',
 			'glm-5.2',
-			'glm-5.1',
+			'glm-5.2-highspeed',
 			'glm-5',
 			'glm-5-turbo',
 			'glm-4.7',
-			'glm-4.5-air',
-			'glm-5v-turbo',
 		]) {
 			expect(models.has(model)).toBe(true);
 			expect(() =>

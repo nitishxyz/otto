@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"updatedAt": "2026-08-14T21:22:40.871Z",
+	"updatedAt": "2026-08-14T21:26:00.549Z",
 	"providers": {
 		"openai": {
 			"id": "openai",
@@ -14499,10 +14499,62 @@
 		"zai-coding": {
 			"id": "zai-coding",
 			"models": {
+				"glm-5.3": {
+					"id": "glm-5.3",
+					"ownedBy": "zai",
+					"label": "GLM-5.3",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-08-14",
+					"lastUpdated": "2026-08-14",
+					"openWeights": false,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 131072
+					}
+				},
 				"glm-5.2": {
 					"id": "glm-5.2",
 					"ownedBy": "zai",
 					"label": "GLM-5.2",
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"toolCall": true,
+					"reasoningText": true,
+					"attachment": false,
+					"temperature": true,
+					"releaseDate": "2026-06-13",
+					"lastUpdated": "2026-06-13",
+					"openWeights": true,
+					"cost": {
+						"input": 0,
+						"output": 0,
+						"cacheRead": 0,
+						"cacheWrite": 0
+					},
+					"limit": {
+						"context": 1000000,
+						"output": 131072
+					}
+				},
+				"glm-5.2-highspeed": {
+					"id": "glm-5.2-highspeed",
+					"ownedBy": "zai",
+					"label": "GLM-5.2 Highspeed",
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -14601,58 +14653,6 @@
 					},
 					"limit": {
 						"context": 204800,
-						"output": 131072
-					}
-				},
-				"glm-5.2-highspeed": {
-					"id": "glm-5.2-highspeed",
-					"ownedBy": "zai",
-					"label": "GLM-5.2 Highspeed",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"releaseDate": "2026-06-13",
-					"lastUpdated": "2026-06-13",
-					"openWeights": true,
-					"cost": {
-						"input": 0,
-						"output": 0,
-						"cacheRead": 0,
-						"cacheWrite": 0
-					},
-					"limit": {
-						"context": 1000000,
-						"output": 131072
-					}
-				},
-				"glm-5.3": {
-					"id": "glm-5.3",
-					"ownedBy": "zai",
-					"label": "GLM-5.3",
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"toolCall": true,
-					"reasoningText": true,
-					"attachment": false,
-					"temperature": true,
-					"releaseDate": "2026-08-14",
-					"lastUpdated": "2026-08-14",
-					"openWeights": false,
-					"cost": {
-						"input": 0,
-						"output": 0,
-						"cacheRead": 0,
-						"cacheWrite": 0
-					},
-					"limit": {
-						"context": 1000000,
 						"output": 131072
 					}
 				}

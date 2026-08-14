@@ -134,6 +134,7 @@ const ownerChallengeBodySchema = z.object({}).strict();
 const ownerChallengeResponseSchema = z.object({
 	challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 	device_id: z.string().uuid(),
+	machine_id: z.string().uuid(),
 	expires_in: z.literal(120),
 });
 const ownerSessionBodySchema = z

@@ -46,6 +46,7 @@ export interface NativeNotificationPayload {
 
 export interface TunnelDevice {
 	deviceId: string;
+	machineId: string;
 	hostname?: string | null;
 	name?: string | null;
 	lastSeenAt?: string | null;
@@ -54,6 +55,7 @@ export interface TunnelDevice {
 
 export interface MachineBootstrap {
 	deviceId: string;
+	machineId: string;
 	hostname?: string | null;
 	name?: string | null;
 }

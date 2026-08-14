@@ -78,7 +78,9 @@ function App() {
 				try {
 					const { devices } = await loadMachineDevices();
 					const currentDevice = devices.find(
-						(device) => device.deviceId === machineBootstrap?.deviceId,
+						(device) =>
+							device.deviceId === machineBootstrap?.deviceId &&
+							device.machineId === machineBootstrap?.machineId,
 					);
 					if (currentDevice) {
 						machineBootstrap =

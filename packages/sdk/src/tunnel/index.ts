@@ -17,6 +17,7 @@ export {
 
 export {
 	getManagedTunnelDeviceId,
+	getManagedTunnelMachineId,
 	isManagedTunnelDeviceId,
 	ManagedTunnelProvisionError,
 	provisionManagedTunnel,

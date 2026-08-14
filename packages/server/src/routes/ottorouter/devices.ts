@@ -1,5 +1,8 @@
 import { z } from '@hono/zod-openapi';
-import { getManagedTunnelDeviceId } from '@ottocode/sdk';
+import {
+	getManagedTunnelDeviceId,
+	getManagedTunnelMachineId,
+} from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { getProtocolInfo } from '../../protocol.ts';
@@ -8,16 +11,19 @@ import { fetchWithOttoRouterAuth, getOttoRouterBaseUrl } from './service.ts';
 
 const tunnelDeviceSchema = z.object({
 	deviceId: z.string(),
+	machineId: z.string(),
 	hostname: z.string().nullable().optional(),
 	name: z.string().nullable().optional(),
 	status: z.string().nullable().optional(),
 });
 const authorizeBodySchema = z.object({
 	device_id: z.string().uuid(),
+	machine_id: z.string().uuid(),
 	challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 const machineProjectsBodySchema = z.object({
 	deviceId: z.string().uuid(),
+	machineId: z.string().uuid(),
 	hostname: z.string().min(1),
 	forceOwnerSession: z.boolean().optional(),
 });
@@ -54,6 +60,7 @@ const machineProjectsResponseSchema = z.object({
 const authorizeResponseSchema = z.object({
 	assertion: z.string(),
 	device_id: z.string().uuid(),
+	machine_id: z.string().uuid(),
 });
 
 const deviceListSchema = z.object({
@@ -64,6 +71,7 @@ const deviceListSchema = z.object({
 
 interface SetuDevice {
 	device_id?: unknown;
+	machine_id?: unknown;
 	hostname?: unknown;
 	name?: unknown;
 	status?: unknown;
@@ -96,11 +104,13 @@ function machineRequestHeaders(ownerSession?: string): Record<string, string> {
 
 async function loadAuthorizedMachineProjects(
 	deviceId: string,
+	machineId: string,
 	hostname: string,
 	forceOwnerSession = false,
 ) {
 	const apiUrl = machineUrl(hostname);
-	let session = machineSessions.get(deviceId);
+	const machineKey = `${deviceId}:${machineId}`;
+	let session = machineSessions.get(machineKey);
 	if (
 		forceOwnerSession ||
 		!session ||
@@ -127,8 +137,12 @@ async function loadAuthorizedMachineProjects(
 		const challenge = (await challengeResponse.json()) as {
 			challenge: string;
 			device_id: string;
+			machine_id: string;
 		};
-		if (challenge.device_id !== deviceId) {
+		if (
+			challenge.device_id !== deviceId ||
+			challenge.machine_id !== machineId
+		) {
 			return {
 				status: 'unavailable' as const,
 				message: 'Tunnel device identity mismatch.',
@@ -144,6 +158,7 @@ async function loadAuthorizedMachineProjects(
 				},
 				body: JSON.stringify({
 					device_id: deviceId,
+					machine_id: machineId,
 					challenge: challenge.challenge,
 				}),
 			},
@@ -160,13 +175,24 @@ async function loadAuthorizedMachineProjects(
 				message: `OttoRouter authorization failed (HTTP ${assertionResponse.status}).`,
 			};
 		}
-		const { assertion } = (await assertionResponse.json()) as {
+		const assertionPayload = (await assertionResponse.json()) as {
 			assertion: string;
+			device_id: string;
+			machine_id: string;
 		};
+		if (
+			assertionPayload.device_id !== deviceId ||
+			assertionPayload.machine_id !== machineId
+		) {
+			return {
+				status: 'unavailable' as const,
+				message: 'OttoRouter machine identity mismatch.',
+			};
+		}
 		const sessionResponse = await fetch(`${apiUrl}/v1/tunnel/owner/session`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ assertion }),
+			body: JSON.stringify({ assertion: assertionPayload.assertion }),
 			signal: AbortSignal.timeout(5_000),
 		});
 		if (!sessionResponse.ok) {
@@ -184,7 +210,7 @@ async function loadAuthorizedMachineProjects(
 			expiresAt: Date.now() + exchanged.expires_in * 1000,
 			apiUrl,
 		};
-		machineSessions.set(deviceId, session);
+		machineSessions.set(machineKey, session);
 	}
 	const headers = machineRequestHeaders(session.token);
 	const [projectsResponse, infoResponse] = await Promise.all([
@@ -276,15 +302,24 @@ async function probeDevices(
 export function remoteDevicesOnly(
 	devices: SetuDevice[],
 	localDeviceId: string,
+	localMachineId: string,
 ) {
 	return devices
 		.filter(
-			(device): device is SetuDevice & { device_id: string } =>
+			(
+				device,
+			): device is SetuDevice & {
+				device_id: string;
+				machine_id: string;
+			} =>
 				typeof device.device_id === 'string' &&
-				device.device_id !== localDeviceId,
+				typeof device.machine_id === 'string' &&
+				(device.device_id !== localDeviceId ||
+					device.machine_id !== localMachineId),
 		)
 		.map((device) => ({
 			deviceId: device.device_id,
+			machineId: device.machine_id,
 			hostname: typeof device.hostname === 'string' ? device.hostname : null,
 			name: typeof device.name === 'string' ? device.name : null,
 			status: typeof device.status === 'string' ? device.status : null,
@@ -323,9 +358,12 @@ export async function listRemoteOttoRouterDevices(
 		};
 	}
 	const payload = (await response.json()) as { devices?: SetuDevice[] };
-	const localDeviceId = await getManagedTunnelDeviceId();
+	const [localDeviceId, localMachineId] = await Promise.all([
+		getManagedTunnelDeviceId(),
+		getManagedTunnelMachineId(),
+	]);
 	const devices = await probeDevices(
-		remoteDevicesOnly(payload.devices ?? [], localDeviceId),
+		remoteDevicesOnly(payload.devices ?? [], localDeviceId, localMachineId),
 		fetcher,
 	);
 	return { configured: true, devices };
@@ -362,6 +400,7 @@ export function registerOttoRouterDeviceRoutes(app: Hono) {
 			return c.json(
 				await loadAuthorizedMachineProjects(
 					body.deviceId,
+					body.machineId,
 					body.hostname,
 					body.forceOwnerSession,
 				),

@@ -15,7 +15,9 @@ function deferred<T>() {
 
 const CONNECTED: MachineDeviceState = {
 	configured: true,
-	devices: [{ deviceId: 'remote-1', hostname: 'studio' }],
+	devices: [
+		{ deviceId: 'shared-device', machineId: 'remote-1', hostname: 'studio' },
+	],
 };
 
 describe('shared machine account store', () => {

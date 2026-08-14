@@ -8,6 +8,7 @@ import {
 } from 'jose';
 import {
 	getManagedTunnelDeviceId,
+	getManagedTunnelMachineId,
 	isManagedTunnelDeviceId,
 } from '@ottocode/sdk';
 
@@ -35,6 +36,7 @@ interface ChallengeRecord {
 interface OwnerSessionRecord {
 	sub: string;
 	deviceId: string;
+	machineId: string;
 	jti: string;
 	createdAt: number;
 	expiresAt: number;
@@ -54,6 +56,7 @@ export interface OwnerAssertionDependencies {
 	now: () => number;
 	fetch: typeof globalThis.fetch;
 	deviceId: () => Promise<string>;
+	machineId: () => Promise<string>;
 	discoveryUrl: () => string;
 	allowInsecureLocalhost: () => boolean;
 	verifyAssertion?: (
@@ -83,6 +86,7 @@ const defaultDependencies: OwnerAssertionDependencies = {
 	now: () => Date.now(),
 	fetch: globalThis.fetch,
 	deviceId: () => getManagedTunnelDeviceId(),
+	machineId: () => getManagedTunnelMachineId(),
 	discoveryUrl: () =>
 		process.env.OTTOROUTER_OAUTH_DISCOVERY_URL ??
 		`${(process.env.OTTOROUTER_BASE_URL ?? 'https://api.ottorouter.org').replace(/\/$/, '')}/.well-known/oauth-authorization-server`,
@@ -254,9 +258,16 @@ export async function createOwnerChallenge(source: string) {
 		);
 	}
 
-	const deviceId = await dependencies.deviceId();
-	if (!isManagedTunnelDeviceId(deviceId)) {
-		throw new Error('Local tunnel device identity is invalid');
+	const [deviceId, machineId] = await Promise.all([
+		dependencies.deviceId(),
+		dependencies.machineId(),
+	]);
+	if (
+		!isManagedTunnelDeviceId(deviceId) ||
+		!isManagedTunnelDeviceId(machineId) ||
+		deviceId === machineId
+	) {
+		throw new Error('Local tunnel machine identity is invalid');
 	}
 	const challenge = opaqueToken();
 	challenges.set(digest(challenge), {
@@ -267,6 +278,7 @@ export async function createOwnerChallenge(source: string) {
 	return {
 		challenge,
 		device_id: deviceId,
+		machine_id: machineId,
 		expires_in: CHALLENGE_TTL_SECONDS as 120,
 	};
 }
@@ -277,6 +289,7 @@ function validateClaims(
 		issuer: string;
 		audience: string;
 		deviceId: string;
+		machineId: string;
 		challenge: string;
 	},
 	nowSeconds: number,
@@ -296,6 +309,7 @@ function validateClaims(
 		payload.token_use !== 'tunnel_owner_assertion' ||
 		payload.scope !== 'tunnel:owner' ||
 		payload.device_id !== expected.deviceId ||
+		payload.machine_id !== expected.machineId ||
 		payload.challenge !== expected.challenge ||
 		typeof payload.sub !== 'string' ||
 		!payload.sub ||
@@ -374,12 +388,19 @@ export async function exchangeOwnerAssertion(
 		);
 	}
 
-	const deviceId = await dependencies.deviceId();
-	if (!isManagedTunnelDeviceId(deviceId)) {
+	const [deviceId, machineId] = await Promise.all([
+		dependencies.deviceId(),
+		dependencies.machineId(),
+	]);
+	if (
+		!isManagedTunnelDeviceId(deviceId) ||
+		!isManagedTunnelDeviceId(machineId) ||
+		deviceId === machineId
+	) {
 		throw new OwnerAuthorizationError(
 			401,
 			'invalid_assertion',
-			'Local tunnel device identity is invalid',
+			'Local tunnel machine identity is invalid',
 		);
 	}
 	const metadata = dependencies.verifyAssertion
@@ -391,8 +412,9 @@ export async function exchangeOwnerAssertion(
 		: await getVerificationMetadata();
 	const expected = {
 		issuer: metadata.issuer,
-		audience: `urn:otto:daemon:${deviceId}`,
+		audience: `urn:otto:daemon:${deviceId}:${machineId}`,
 		deviceId,
+		machineId,
 		challenge: unverifiedChallenge,
 	};
 
@@ -433,6 +455,7 @@ export async function exchangeOwnerAssertion(
 	ownerSessions.set(digest(accessToken), {
 		sub: payload.sub,
 		deviceId,
+		machineId,
 		jti: payload.jti,
 		createdAt: now,
 		expiresAt: now + SESSION_TTL_SECONDS * 1000,
