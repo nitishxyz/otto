@@ -2,7 +2,7 @@ import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { publish, publishClientEvent } from '../../events/bus.ts';
-import { estimateModelCostUsd } from '@ottocode/sdk';
+import { estimateModelCostUsd, loadConfig } from '@ottocode/sdk';
 import type { RunOpts } from '../session/queue.ts';
 import {
 	markSessionCompacted,
@@ -63,6 +63,7 @@ export function createFinishHandler(
 			.from(messageParts)
 			.where(eq(messageParts.messageId, opts.assistantMessageId));
 
+		let compactionCompleted = false;
 		if (opts.isCompactCommand && fin.finishReason !== 'error') {
 			const hasTextContent = assistantParts.some(
 				(p) => p.type === 'text' && p.content && p.content !== '{"text":""}',
@@ -97,8 +98,18 @@ export function createFinishHandler(
 						compactionMessageId: opts.assistantMessageId,
 						summary,
 					});
+					compactionCompleted = true;
 				} catch {}
 			}
+		}
+		if (compactionCompleted) {
+			try {
+				const { reportSubagentCompactionComplete } = await import(
+					'../subagents/service.ts'
+				);
+				const cfg = await loadConfig(opts.projectRoot);
+				await reportSubagentCompactionComplete(db, cfg, opts.sessionId);
+			} catch {}
 		}
 
 		const sessRows = await db

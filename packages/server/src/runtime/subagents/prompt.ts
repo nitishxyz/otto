@@ -76,3 +76,17 @@ export function buildSubagentResultsPrompt(
 		"The delegated work is complete and the report above is the source of truth. Accept the child's ownership and verification: do not inspect its files, check Git, or rerun commands merely to verify it again. Update any parent task state and respond to the user with the outcome. If the report identifies a concrete unresolved issue inside the delegated scope, send a focused follow-up to the same child (or delegate another child) rather than silently taking over. Handle work yourself only when it is outside the delegated scope.",
 	].join('\n');
 }
+
+export function buildSubagentCompactionCompletePrompt(args: {
+	subagentId: string;
+	agent: string;
+	childSessionId: string;
+}): string {
+	return [
+		`<subagent_compaction subagent_id="${args.subagentId}" agent="${args.agent}" child_session_id="${args.childSessionId}" status="completed">`,
+		'The sub-agent context was compacted successfully.',
+		'</subagent_compaction>',
+		'',
+		'Compaction is complete. Continue with the pending parent work now. The child session remains available for related follow-up messages.',
+	].join('\n');
+}

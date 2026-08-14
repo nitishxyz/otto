@@ -9,12 +9,13 @@ import {
 	sessions,
 	subagents,
 } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import {
 	compactSubagent,
 	getSubagentStatus,
 	readSubagentActivity,
 } from '../packages/server/src/runtime/subagents/service.ts';
+import { createFinishHandler } from '../packages/server/src/runtime/stream/finish-handler.ts';
 import {
 	abortSession,
 	cleanupSession,
@@ -180,7 +181,7 @@ describe('subagent inspection', () => {
 				.update(subagents)
 				.set({ status })
 				.where(eq(subagents.id, subagentId));
-			createBlockedChildQueue(`active-${status}`);
+			createBlockedQueue(childSessionId, `active-${status}`);
 
 			const result = await compactSubagent({
 				db,
@@ -201,7 +202,7 @@ describe('subagent inspection', () => {
 				.from(subagents)
 				.where(eq(subagents.id, subagentId));
 			expect(rows[0]?.status).toBe(status);
-			cleanupBlockedChildQueue();
+			cleanupBlockedQueue(childSessionId);
 		}
 	});
 
@@ -212,7 +213,7 @@ describe('subagent inspection', () => {
 			.update(subagents)
 			.set({ status: 'cancelled' })
 			.where(eq(subagents.id, subagentId));
-		createBlockedChildQueue('active-before-compact');
+		createBlockedQueue(childSessionId, 'active-before-compact');
 
 		const result = await compactSubagent({
 			db,
@@ -229,14 +230,80 @@ describe('subagent inspection', () => {
 		expect(getQueueState(childSessionId)?.queuedMessages[0]?.messageId).toBe(
 			result.messageId,
 		);
-		cleanupBlockedChildQueue();
+		cleanupBlockedQueue(childSessionId);
+	});
+
+	test('queues a parent continuation when compaction completes', async () => {
+		const db = await getDb(projectRoot);
+		createBlockedQueue(parentSessionId, 'active-parent-message');
+		const compactMessageId = 'completed-compact-message';
+		const createdAt = Date.now();
+		await db.insert(messages).values({
+			id: compactMessageId,
+			sessionId: childSessionId,
+			role: 'assistant',
+			status: 'complete',
+			agent: 'plan',
+			provider: 'test-provider',
+			model: 'model-with-no-catalog-entry',
+			createdAt,
+			completedAt: createdAt,
+		});
+		await db.insert(messageParts).values({
+			id: 'completed-compact-text',
+			messageId: compactMessageId,
+			index: 0,
+			type: 'text',
+			content: JSON.stringify({ text: 'Compacted child context.' }),
+			agent: 'plan',
+			provider: 'test-provider',
+			model: 'model-with-no-catalog-entry',
+		});
+
+		const finish = createFinishHandler(
+			{
+				sessionId: childSessionId,
+				assistantMessageId: compactMessageId,
+				agent: 'plan',
+				provider: 'test-provider',
+				model: 'model-with-no-catalog-entry',
+				projectRoot,
+				isCompactCommand: true,
+			},
+			db,
+			async () => {},
+		);
+		await finish({ finishReason: 'stop' });
+
+		const queued = getQueueState(parentSessionId)?.queuedMessages;
+		expect(queued).toHaveLength(1);
+		const continuationMessageId = queued?.[0]?.messageId;
+		expect(continuationMessageId).toBeTruthy();
+
+		const userRows = await db
+			.select({ id: messages.id })
+			.from(messages)
+			.where(
+				and(eq(messages.sessionId, parentSessionId), eq(messages.role, 'user')),
+			)
+			.orderBy(desc(messages.createdAt))
+			.limit(1);
+		const parts = await db
+			.select({ content: messageParts.content })
+			.from(messageParts)
+			.where(eq(messageParts.messageId, userRows[0]?.id ?? ''));
+		const content = JSON.parse(parts[0]?.content ?? '{}') as { text?: string };
+		expect(content.text).toContain('<subagent_compaction');
+		expect(content.text).toContain('Compaction is complete');
+		expect(content.text).toContain('Continue with the pending parent work now');
+		cleanupBlockedQueue(parentSessionId);
 	});
 });
 
-function createBlockedChildQueue(messageId: string): void {
+function createBlockedQueue(sessionId: string, messageId: string): void {
 	enqueueAssistantRun(
 		{
-			sessionId: childSessionId,
+			sessionId,
 			assistantMessageId: messageId,
 			agent: 'plan',
 			provider: 'test-provider',
@@ -245,14 +312,14 @@ function createBlockedChildQueue(messageId: string): void {
 		},
 		async () => {},
 	);
-	setRunning(childSessionId, true);
-	dequeueJob(childSessionId);
+	setRunning(sessionId, true);
+	dequeueJob(sessionId);
 }
 
-function cleanupBlockedChildQueue(): void {
-	abortSession(childSessionId, true);
-	setRunning(childSessionId, false);
-	cleanupSession(childSessionId);
+function cleanupBlockedQueue(sessionId: string): void {
+	abortSession(sessionId, true);
+	setRunning(sessionId, false);
+	cleanupSession(sessionId);
 }
 
 function toolCall(

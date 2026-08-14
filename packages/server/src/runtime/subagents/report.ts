@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { subagents } from '@ottocode/database/schema';
 import { logger, type OttoConfig } from '@ottocode/sdk';
@@ -6,7 +6,51 @@ import { publish } from '../../events/bus.ts';
 import { getSessionById } from '../session/manager.ts';
 import { getRunnerState } from '../session/queue.ts';
 import { dispatchSubagentMessage } from './dispatch.ts';
-import { buildSubagentResultsPrompt } from './prompt.ts';
+import {
+	buildSubagentCompactionCompletePrompt,
+	buildSubagentResultsPrompt,
+} from './prompt.ts';
+
+/** Queues a parent continuation after a child session compacts successfully. */
+export async function reportSubagentCompactionComplete(
+	db: DB,
+	cfg: OttoConfig,
+	childSessionId: string,
+): Promise<boolean> {
+	const records = await db
+		.select()
+		.from(subagents)
+		.where(eq(subagents.childSessionId, childSessionId))
+		.orderBy(desc(subagents.createdAt))
+		.limit(1);
+	const record = records[0];
+	if (!record) return false;
+
+	const parentSession = await getSessionById({
+		db,
+		sessionId: record.parentSessionId,
+	});
+	if (!parentSession) return false;
+
+	await dispatchSubagentMessage({
+		cfg,
+		db,
+		session: parentSession,
+		agent: parentSession.agent,
+		content: buildSubagentCompactionCompletePrompt({
+			subagentId: record.id,
+			agent: record.agent,
+			childSessionId,
+		}),
+	});
+
+	logger.info('[subagent] reported compaction to parent', {
+		subagentId: record.id,
+		parentSessionId: record.parentSessionId,
+		childSessionId,
+	});
+	return true;
+}
 
 /** Atomically claims an unchanged terminal result for parent delivery. */
 export function claimFinishedSubagentForReport(
