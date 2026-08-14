@@ -31,6 +31,7 @@ interface MessageItemProps {
 	onApprove?: (callId: string) => void;
 	onDeny?: (callId: string) => void;
 	recipeNames?: ReadonlySet<string>;
+	canRetry?: boolean;
 }
 
 export interface RecipeUserMessage {
@@ -496,6 +497,7 @@ const AssistantMessage = memo(function AssistantMessage({
 	pendingApprovals,
 	onApprove,
 	onDeny,
+	canRetry = false,
 }: MessageItemProps) {
 	const { colors } = useTheme();
 	const sortedParts = useMemo(() => getSortedParts(message), [message]);
@@ -506,6 +508,17 @@ const AssistantMessage = memo(function AssistantMessage({
 	const isActive = isStreaming && message.status !== 'complete';
 	const hasError = message.status === 'error';
 	const hasFinish = sortedParts.some((p) => p.toolName === 'finish');
+	const errorText = useMemo(() => {
+		if (!hasError) return '';
+		const errorPart = [...sortedParts]
+			.reverse()
+			.find((part) => part.type === 'error');
+		return (
+			formatError(message.error) ||
+			formatError(errorPart ? extractPartText(errorPart) : '') ||
+			'Unknown error'
+		);
+	}, [hasError, message.error, sortedParts]);
 
 	const latestProgressPart = useMemo(() => {
 		for (let i = sortedParts.length - 1; i >= 0; i--) {
@@ -521,8 +534,13 @@ const AssistantMessage = memo(function AssistantMessage({
 	}, [sortedParts]);
 
 	const blocks = useMemo(
-		() => buildMessageBlocks(dedupedParts),
-		[dedupedParts],
+		() =>
+			buildMessageBlocks(
+				hasError
+					? dedupedParts.filter((part) => part.type !== 'error')
+					: dedupedParts,
+			),
+		[dedupedParts, hasError],
 	);
 	const lastBlock = blocks[blocks.length - 1];
 	const lastPartId = lastBlock?.kind === 'part' ? lastBlock.part.id : null;
@@ -611,14 +629,17 @@ const AssistantMessage = memo(function AssistantMessage({
 				<StreamingIndicator progressPart={latestProgressPart} />
 			)}
 
-			{hasError && !sortedParts.some((p) => p.type === 'error') && (
-				<box style={{ flexDirection: 'row', gap: 1, marginTop: 1 }}>
-					<text style={{ flexShrink: 0 }} fg={colors.red}>
-						✗
-					</text>
-					<text fg={colors.red} wrapMode="word">
-						{formatError(message.error) || 'Unknown error'}
-					</text>
+			{hasError && (
+				<box style={{ flexDirection: 'column', marginTop: 1 }}>
+					<box style={{ flexDirection: 'row', gap: 1 }}>
+						<text style={{ flexShrink: 0 }} fg={colors.red}>
+							✗
+						</text>
+						<text fg={colors.red} wrapMode="word">
+							{errorText}
+						</text>
+					</box>
+					{canRetry && <text fg={colors.fgDimmed}>Ctrl+R retry request</text>}
 				</box>
 			)}
 
@@ -639,6 +660,7 @@ export const MessageItem = memo(function MessageItem({
 	onApprove,
 	onDeny,
 	recipeNames = EMPTY_RECIPE_NAMES,
+	canRetry,
 }: MessageItemProps) {
 	if (message.role === 'user') {
 		return (
@@ -662,6 +684,7 @@ export const MessageItem = memo(function MessageItem({
 				pendingApprovals={pendingApprovals}
 				onApprove={onApprove}
 				onDeny={onDeny}
+				canRetry={canRetry}
 			/>
 		);
 	}

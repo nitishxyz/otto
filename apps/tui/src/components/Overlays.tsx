@@ -38,6 +38,7 @@ interface OverlaysProps {
 	onAgentSelect: (agent: string) => void | Promise<void>;
 	onSendQueuedMessage: (assistantMessageId: string) => Promise<boolean>;
 	onRemoveQueuedMessage: (assistantMessageId: string) => Promise<boolean>;
+	onRestoreQueuedMessage: (item: QueuedMessageItem) => Promise<boolean>;
 	onSubagentSelect: (subagent: ActivitySubagent) => void;
 }
 
@@ -60,6 +61,7 @@ export const Overlays = memo(function Overlays({
 	onAgentSelect,
 	onSendQueuedMessage,
 	onRemoveQueuedMessage,
+	onRestoreQueuedMessage,
 	onSubagentSelect,
 }: OverlaysProps) {
 	const overlay = useOverlayStore((s) => s.overlay);
@@ -139,6 +141,7 @@ export const Overlays = memo(function Overlays({
 					items={queuedMessages}
 					onSend={onSendQueuedMessage}
 					onRemove={onRemoveQueuedMessage}
+					onRestore={onRestoreQueuedMessage}
 					onClose={handleClose}
 				/>
 			);

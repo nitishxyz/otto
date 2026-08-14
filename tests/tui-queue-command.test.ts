@@ -115,11 +115,13 @@ describe('TUI queued-message command', () => {
 				assistantMessageId: 'assistant-2',
 				userMessageId: 'user-2',
 				summary: '◳ 2 attachments · second message',
+				content: 'second message',
 			},
 			{
 				assistantMessageId: 'assistant-1',
 				userMessageId: 'user-1',
 				summary: 'first message',
+				content: 'first\n message',
 			},
 		]);
 	});

@@ -8,7 +8,7 @@ import {
 	getStreamingMessageIdAfterTerminalEvent,
 	hasSameQueuedMessageOrder,
 	loadPendingSecureInputs,
-	loadSessionMessages,
+	loadSessionMessagePage,
 	loadSessionQueueState,
 	reconcilePendingSecureInputs,
 } from '../stream/client.ts';
@@ -33,6 +33,8 @@ export function useStream(
 	const [queuedMessageIds, setQueuedMessageIds] = useState<Set<string>>(
 		new Set(),
 	);
+	const [hasOlderMessages, setHasOlderMessages] = useState(false);
+	const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
 	const projectKey = getProjectKey();
 	const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(
 		[],
@@ -41,6 +43,10 @@ export function useStream(
 		PendingSecureInput[]
 	>([]);
 	const abortRef = useRef<AbortController | null>(null);
+	const olderMessagesCursorRef = useRef<string | null>(null);
+	const olderMessagesRequestRef = useRef(false);
+	const currentSessionIdRef = useRef(sessionId);
+	currentSessionIdRef.current = sessionId;
 	const onSessionUpdateRef = useRef(onSessionUpdate);
 	onSessionUpdateRef.current = onSessionUpdate;
 	const onMessageCompletedRef = useRef(onMessageCompleted);
@@ -56,6 +62,36 @@ export function useStream(
 		[],
 	);
 
+	const loadOlderMessages = useCallback(async () => {
+		if (
+			!sessionId ||
+			olderMessagesRequestRef.current ||
+			!olderMessagesCursorRef.current
+		) {
+			return false;
+		}
+		olderMessagesRequestRef.current = true;
+		setIsLoadingOlderMessages(true);
+		try {
+			const page = await loadSessionMessagePage(
+				sessionId,
+				olderMessagesCursorRef.current,
+			);
+			if (currentSessionIdRef.current !== sessionId) return false;
+			dispatch({ type: 'PREPEND', messages: page.items });
+			olderMessagesCursorRef.current = page.nextCursor;
+			setHasOlderMessages(page.hasMore && Boolean(page.nextCursor));
+			return page.items.length > 0;
+		} catch {
+			return false;
+		} finally {
+			olderMessagesRequestRef.current = false;
+			if (currentSessionIdRef.current === sessionId) {
+				setIsLoadingOlderMessages(false);
+			}
+		}
+	}, [sessionId]);
+
 	useEffect(() => {
 		void projectKey;
 		if (!sessionId) {
@@ -63,6 +99,10 @@ export function useStream(
 			setStreamingMessageId(null);
 			setQueueSize(0);
 			setQueuedMessageIds(new Set());
+			setHasOlderMessages(false);
+			setIsLoadingOlderMessages(false);
+			olderMessagesRequestRef.current = false;
+			olderMessagesCursorRef.current = null;
 			setPendingApprovals([]);
 			setPendingSecureInputs([]);
 			return;
@@ -72,15 +112,23 @@ export function useStream(
 		abortRef.current = controller;
 		const baseUrl = getBaseUrl();
 
+		dispatch({ type: 'CLEAR' });
 		setStreamingMessageId(null);
 		setQueueSize(0);
 		setQueuedMessageIds(new Set());
+		setHasOlderMessages(false);
+		setIsLoadingOlderMessages(false);
+		olderMessagesCursorRef.current = null;
 		setPendingApprovals([]);
 		setPendingSecureInputs([]);
 
-		loadSessionMessages(sessionId)
-			.then((messages) => {
-				if (!controller.signal.aborted) dispatch({ type: 'LOAD', messages });
+		loadSessionMessagePage(sessionId)
+			.then((page) => {
+				if (!controller.signal.aborted) {
+					dispatch({ type: 'LOAD', messages: page.items });
+					olderMessagesCursorRef.current = page.nextCursor;
+					setHasOlderMessages(page.hasMore && Boolean(page.nextCursor));
+				}
 			})
 			.catch(() => {});
 		loadPendingSecureInputs(sessionId)
@@ -219,10 +267,13 @@ export function useStream(
 					onMessageCompletedRef.current?.();
 					setTimeout(() => {
 						if (controller.signal.aborted) return;
-						loadSessionMessages(sessionId)
-							.then((messages) => {
+						loadSessionMessagePage(sessionId)
+							.then((page) => {
 								if (!controller.signal.aborted) {
-									dispatch({ type: 'LOAD', messages });
+									dispatch({
+										type: 'REFRESH_LATEST',
+										messages: page.items,
+									});
 								}
 							})
 							.catch(() => {});
@@ -306,8 +357,10 @@ export function useStream(
 
 	const reload = () => {
 		if (!sessionId) return;
-		loadSessionMessages(sessionId)
-			.then((messages) => dispatch({ type: 'LOAD', messages }))
+		loadSessionMessagePage(sessionId)
+			.then((page) =>
+				dispatch({ type: 'REFRESH_LATEST', messages: page.items }),
+			)
 			.catch(() => {});
 	};
 
@@ -316,6 +369,9 @@ export function useStream(
 		messages,
 		isStreaming,
 		streamingMessageId,
+		hasOlderMessages,
+		isLoadingOlderMessages,
+		loadOlderMessages,
 		queueSize,
 		queuedMessageIds,
 		pendingApprovals,

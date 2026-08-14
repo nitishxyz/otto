@@ -2,6 +2,9 @@ import type { Message, MessagePart } from '../types.ts';
 
 export type StreamAction =
 	| { type: 'LOAD'; messages: Message[] }
+	| { type: 'REFRESH_LATEST'; messages: Message[] }
+	| { type: 'PREPEND'; messages: Message[] }
+	| { type: 'RETRY_MESSAGE'; messageId: string }
 	| {
 			type: 'ADD_OPTIMISTIC_USER';
 			id: string;
@@ -221,6 +224,51 @@ export function messageReducer(
 		}
 		case 'CLEAR':
 			return [];
+		case 'REFRESH_LATEST': {
+			const latestById = new Map(
+				action.messages.map((message) => [message.id, message]),
+			);
+			const refreshed = state.map((message) => {
+				const latest = latestById.get(message.id);
+				if (!latest) return message;
+				latestById.delete(message.id);
+				if (
+					message.role === 'assistant' &&
+					message.status === 'pending' &&
+					latest.status === 'pending'
+				) {
+					return message;
+				}
+				return latest;
+			});
+			if (latestById.size === 0) return refreshed;
+			return [...refreshed, ...latestById.values()].sort(
+				(left, right) => left.createdAt - right.createdAt,
+			);
+		}
+		case 'PREPEND': {
+			if (action.messages.length === 0) return state;
+			const currentIds = new Set(state.map((message) => message.id));
+			const older = action.messages.filter(
+				(message) => !currentIds.has(message.id),
+			);
+			return older.length > 0 ? [...older, ...state] : state;
+		}
+		case 'RETRY_MESSAGE':
+			return state.map((message) => {
+				if (message.id !== action.messageId) return message;
+				return {
+					...message,
+					status: 'pending',
+					error: null,
+					completedAt: null,
+					parts: (message.parts ?? []).filter(
+						(part) =>
+							part.type !== 'error' &&
+							!(part.type === 'tool_call' && part.toolName === 'finish'),
+					),
+				};
+			});
 
 		case 'ADD_OPTIMISTIC_USER': {
 			if (state.some((m) => m.id === action.id)) return state;

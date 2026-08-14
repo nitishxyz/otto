@@ -1,4 +1,12 @@
-import { memo, useMemo, type ReactNode } from 'react';
+import {
+	memo,
+	useCallback,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	type ReactNode,
+} from 'react';
+import type { ScrollBoxRenderable } from '@opentui/core';
 import { MessageItem } from './MessageItem.tsx';
 import { OttoWordmark } from './OttoWordmark.tsx';
 import { useTheme } from '../theme.ts';
@@ -16,6 +24,10 @@ interface ChatViewProps {
 	recipeNames?: ReadonlySet<string>;
 	emptyStateInput?: ReactNode;
 	emptyStateInputWidth?: '64%' | '100%';
+	hasOlderMessages?: boolean;
+	isLoadingOlderMessages?: boolean;
+	onLoadOlderMessages?: () => Promise<boolean>;
+	retryMessageId?: string | null;
 }
 
 export const ChatView = memo(function ChatView({
@@ -29,8 +41,47 @@ export const ChatView = memo(function ChatView({
 	recipeNames = EMPTY_RECIPE_NAMES,
 	emptyStateInput,
 	emptyStateInputWidth = '64%',
+	hasOlderMessages = false,
+	isLoadingOlderMessages = false,
+	onLoadOlderMessages,
+	retryMessageId,
 }: ChatViewProps) {
 	const { colors } = useTheme();
+	const scrollRef = useRef<ScrollBoxRenderable | null>(null);
+	const prependHeightRef = useRef<number | null>(null);
+	const loadedOldestMessageIdRef = useRef(messages[0]?.id);
+
+	const loadOlderMessages = useCallback(() => {
+		const scrollbox = scrollRef.current;
+		if (
+			!scrollbox ||
+			scrollbox.scrollTop > 0 ||
+			!hasOlderMessages ||
+			isLoadingOlderMessages ||
+			!onLoadOlderMessages
+		) {
+			return;
+		}
+		prependHeightRef.current = scrollbox.scrollHeight;
+		loadedOldestMessageIdRef.current = messages[0]?.id;
+		void onLoadOlderMessages().then((loaded) => {
+			if (!loaded) prependHeightRef.current = null;
+		});
+	}, [hasOlderMessages, isLoadingOlderMessages, messages, onLoadOlderMessages]);
+
+	useLayoutEffect(() => {
+		const previousHeight = prependHeightRef.current;
+		const scrollbox = scrollRef.current;
+		if (
+			previousHeight === null ||
+			!scrollbox ||
+			messages[0]?.id === loadedOldestMessageIdRef.current
+		) {
+			return;
+		}
+		scrollbox.scrollTop = Math.max(0, scrollbox.scrollHeight - previousHeight);
+		prependHeightRef.current = null;
+	}, [messages]);
 
 	const sorted = useMemo(() => {
 		return messages
@@ -103,7 +154,9 @@ export const ChatView = memo(function ChatView({
 	}
 
 	return (
+		// biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI scrollboxes handle terminal mouse and key scrolling
 		<scrollbox
+			ref={scrollRef}
 			style={{
 				width: '100%',
 				flexGrow: 1,
@@ -114,7 +167,20 @@ export const ChatView = memo(function ChatView({
 			}}
 			stickyScroll
 			stickyStart="bottom"
+			onMouseScroll={(event) => {
+				if (event.scroll?.direction === 'up') loadOlderMessages();
+			}}
+			onKeyDown={(key) => {
+				if (key.name === 'pageup' || key.name === 'home') loadOlderMessages();
+			}}
 		>
+			{hasOlderMessages || isLoadingOlderMessages ? (
+				<text fg={colors.fgDimmed}>
+					{isLoadingOlderMessages
+						? 'Loading older messages…'
+						: 'Scroll up for older messages'}
+				</text>
+			) : null}
 			{visibleMessages.map((msg, i) => {
 				const previousMessage = visibleMessages[i - 1];
 				const showHeader =
@@ -130,6 +196,7 @@ export const ChatView = memo(function ChatView({
 						onApprove={onApprove}
 						onDeny={onDeny}
 						recipeNames={recipeNames}
+						canRetry={msg.id === retryMessageId}
 					/>
 				);
 			})}

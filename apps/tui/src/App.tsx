@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import {
 	removeFromQueue as apiRemoveFromQueue,
 	resolveSecureInput,
+	retryMessage as apiRetryMessage,
 	sendQueuedMessageNow as apiSendQueuedMessageNow,
 } from '@ottocode/api';
 import {
@@ -34,9 +35,14 @@ import {
 import { copyToClipboard } from './lib/clipboard.ts';
 import { moveWorkspaceFocus } from './lib/workspace-navigation.ts';
 import {
+	getLastFailedAssistantMessage,
+	getRetryErrorMessage,
+} from './lib/retry.ts';
+import {
 	getQueuedMessageItems,
 	getQueuedMessageSummary,
 	type OptimisticQueuedMessage,
+	type QueuedMessageItem,
 } from './lib/queue.ts';
 import { getProjectContext, getProjectQuery } from './api.ts';
 import { useTheme } from './theme.ts';
@@ -154,6 +160,9 @@ export function App({
 		messages,
 		isStreaming,
 		streamingMessageId,
+		hasOlderMessages,
+		isLoadingOlderMessages,
+		loadOlderMessages,
 		queueSize: serverQueueSize,
 		queuedMessageIds,
 		pendingApprovals,
@@ -161,6 +170,7 @@ export function App({
 		pendingSecureInputs,
 		setPendingSecureInputs,
 		reload,
+		dispatch: dispatchStream,
 		addOptimisticUser,
 	} = useStream(
 		sessionId,
@@ -176,6 +186,10 @@ export function App({
 	const [optimisticQueuedMessages, setOptimisticQueuedMessages] = useState<
 		OptimisticQueuedMessage[]
 	>([]);
+	const [composerDraft, setComposerDraft] = useState<{
+		id: number;
+		text: string;
+	} | null>(null);
 	const queuedMessages = useMemo(() => {
 		const serverItems = getQueuedMessageItems(messages, queuedMessageIds);
 		const serverItemsById = new Map(
@@ -198,6 +212,7 @@ export function App({
 						assistantMessageId,
 						userMessageId: optimisticItem.clientId,
 						summary: optimisticItem.summary,
+						content: optimisticItem.content,
 					},
 				];
 			}
@@ -217,6 +232,7 @@ export function App({
 					optimisticItem.assistantMessageId ?? optimisticItem.clientId,
 				userMessageId: optimisticItem.clientId,
 				summary: optimisticItem.summary,
+				content: optimisticItem.content,
 			});
 		}
 		return items;
@@ -323,6 +339,16 @@ export function App({
 		[sessionId, reload],
 	);
 
+	const handleRestoreQueuedMessage = useCallback(
+		async (item: QueuedMessageItem): Promise<boolean> => {
+			const removed = await handleRemoveQueuedMessage(item.assistantMessageId);
+			if (!removed) return false;
+			setComposerDraft({ id: Date.now(), text: item.content });
+			return true;
+		},
+		[handleRemoveQueuedMessage],
+	);
+
 	const handleCommand = useCallback(
 		(name: string, args: string) =>
 			executeCommand(name, args, {
@@ -403,6 +429,7 @@ export function App({
 						clientId,
 						assistantMessageId: null,
 						summary: getQueuedMessageSummary(text, attachmentNames),
+						content: text,
 						confirmed: false,
 					},
 				]);
@@ -576,6 +603,39 @@ export function App({
 		[terminalWidth],
 	);
 
+	const lastFailedMessage = useMemo(
+		() => getLastFailedAssistantMessage(messages),
+		[messages],
+	);
+
+	const handleRetryLastFailedMessage = useCallback(async () => {
+		if (!activeSession || isStreaming) return;
+		const failedMessage = getLastFailedAssistantMessage(messages);
+		if (!failedMessage) {
+			showStatus({ type: 'error', label: 'no failed request to retry' }, 2500);
+			return;
+		}
+
+		showStatus({ type: 'loading', label: 'retrying request' });
+		try {
+			const response = await apiRetryMessage({
+				path: {
+					sessionId: activeSession.id,
+					messageId: failedMessage.id,
+				},
+				query: getProjectQuery(),
+			} as never);
+			if (response.error) throw new Error(getRetryErrorMessage(response.error));
+			dispatchStream({
+				type: 'RETRY_MESSAGE',
+				messageId: failedMessage.id,
+			});
+			showStatus({ type: 'success', label: 'request retried' }, 2000);
+		} catch (error) {
+			showStatus({ type: 'error', label: getRetryErrorMessage(error) }, 5000);
+		}
+	}, [activeSession, isStreaming, messages, showStatus, dispatchStream]);
+
 	useGlobalKeymap({
 		overlay,
 		isStreaming,
@@ -588,6 +648,7 @@ export function App({
 		setOverlay,
 		createSession,
 		openSessions,
+		retryLastFailedMessage: handleRetryLastFailedMessage,
 		abortActiveSession,
 		toggleWorkspace: handleToggleWorkspace,
 		focusWorkspace: handleCycleWorkspaceFocus,
@@ -722,6 +783,7 @@ export function App({
 			releaseToSend={config.defaults.releaseToSend}
 			onPlanModeToggle={handlePlanModeToggle}
 			recipeCommands={recipeCommands}
+			draftToRestore={composerDraft}
 		/>
 	);
 
@@ -777,6 +839,10 @@ export function App({
 						recipeNames={recipeNames}
 						emptyStateInput={isNewSession ? chatInput : undefined}
 						emptyStateInputWidth={emptyStateInputWidth}
+						hasOlderMessages={hasOlderMessages}
+						isLoadingOlderMessages={isLoadingOlderMessages}
+						onLoadOlderMessages={loadOlderMessages}
+						retryMessageId={isStreaming ? null : lastFailedMessage?.id}
 					/>
 
 					{pendingApprovals.length > 0 && (
@@ -852,6 +918,7 @@ export function App({
 				onAgentSelect={handleAgentSelect}
 				onSendQueuedMessage={handleSendQueuedMessage}
 				onRemoveQueuedMessage={handleRemoveQueuedMessage}
+				onRestoreQueuedMessage={handleRestoreQueuedMessage}
 				onSubagentSelect={handleSubagentSelect}
 			/>
 			{pendingSecureInputs.length > 0 && (

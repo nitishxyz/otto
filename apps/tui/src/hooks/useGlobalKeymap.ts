@@ -13,6 +13,7 @@ interface GlobalKeymapOptions {
 	setOverlay: (overlay: Overlay) => void;
 	createSession: () => void;
 	openSessions: () => void;
+	retryLastFailedMessage: () => void;
 	abortActiveSession: () => void;
 	toggleWorkspace: () => void;
 	focusWorkspace: () => void;
@@ -37,6 +38,7 @@ export function useGlobalKeymap({
 	setOverlay,
 	createSession,
 	openSessions,
+	retryLastFailedMessage,
 	abortActiveSession,
 	toggleWorkspace,
 	focusWorkspace,
@@ -66,6 +68,12 @@ export function useGlobalKeymap({
 				}
 				return;
 			}
+		}
+		if (key.ctrl && key.name === 'r' && overlay === 'none') {
+			key.preventDefault();
+			key.stopPropagation();
+			retryLastFailedMessage();
+			return;
 		}
 		if (key.ctrl && key.name === 'b' && overlay === 'none') {
 			toggleWorkspace();

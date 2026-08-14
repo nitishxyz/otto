@@ -38,6 +38,7 @@ interface ChatInputProps {
 	releaseToSend?: boolean;
 	onPlanModeToggle?: (isPlanMode: boolean) => void;
 	recipeCommands?: SlashCommand[];
+	draftToRestore?: { id: number; text: string } | null;
 }
 
 const MAX_PROMPT_HISTORY = 50;
@@ -64,6 +65,7 @@ export function ChatInput({
 	releaseToSend = false,
 	onPlanModeToggle,
 	recipeCommands = [],
+	draftToRestore,
 }: ChatInputProps) {
 	const { colors } = useTheme();
 	const textareaRef = useRef<TextareaRenderable | null>(null);
@@ -130,6 +132,14 @@ export function ChatInput({
 	useEffect(() => {
 		if (!disabled && !dictation.isActive) textareaRef.current?.focus();
 	}, [dictation.isActive, disabled]);
+
+	useEffect(() => {
+		if (!draftToRestore) return;
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+		textarea.editBuffer.setText(draftToRestore.text);
+		textarea.editBuffer.setCursorByOffset(draftToRestore.text.length);
+	}, [draftToRestore]);
 
 	const [commandMatches, setCommandMatches] = useState<SlashCommand[]>([]);
 	const [selectedIdx, setSelectedIdx] = useState(0);

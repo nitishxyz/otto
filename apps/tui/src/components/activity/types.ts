@@ -79,4 +79,7 @@ export interface SubagentDetailData {
 	messages: Message[];
 	loading: boolean;
 	error: string | null;
+	hasOlderMessages: boolean;
+	isLoadingOlderMessages: boolean;
+	loadOlderMessages: () => Promise<boolean>;
 }

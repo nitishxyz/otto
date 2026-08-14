@@ -13,6 +13,7 @@ interface QueueOverlayProps {
 	items: QueuedMessageItem[];
 	onSend: (assistantMessageId: string) => Promise<boolean>;
 	onRemove: (assistantMessageId: string) => Promise<boolean>;
+	onRestore: (item: QueuedMessageItem) => Promise<boolean>;
 	onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export function QueueOverlay({
 	items,
 	onSend,
 	onRemove,
+	onRestore,
 	onClose,
 }: QueueOverlayProps) {
 	const { colors } = useTheme();
@@ -71,6 +73,14 @@ export function QueueOverlay({
 					new Set(current).add(item.assistantMessageId),
 				);
 			});
+		} else if (key.name.toLowerCase() === 'r') {
+			const item = visibleItems[selectedIdx];
+			if (!item) return;
+			setBusy(true);
+			void onRestore(item).then((restored) => {
+				setBusy(false);
+				if (restored) onClose();
+			});
 		}
 	});
 
@@ -80,7 +90,7 @@ export function QueueOverlay({
 		<ModalFrame
 			title={`Queue (${visibleItems.length})`}
 			size="lg"
-			footer="↑/k · ↓/j navigate · Enter send · D remove · Esc close"
+			footer="↑/k · ↓/j navigate · Enter send · D remove · R edit · Esc close"
 		>
 			{visibleItems.length === 0 ? (
 				<box

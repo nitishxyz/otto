@@ -1,21 +1,77 @@
 import {
 	createSSEStream,
-	listMessages,
+	listMessagePage,
 	listPendingSecureInputs,
 } from '@ottocode/api';
 import { getProjectQuery } from '../api.ts';
 import type { Message, PendingSecureInput, SSEEvent } from '../types.ts';
 
-/** Fetches the full message list for a session. */
-export async function loadSessionMessages(
+export const MESSAGE_PARTS_PAGE_TARGET = 120;
+
+export interface SessionMessagePage {
+	items: Message[];
+	partCount: number;
+	hasMore: boolean;
+	nextCursor: string | null;
+}
+
+function normalizePagedMessage(message: Record<string, unknown>): Message {
+	const parts = Array.isArray(message.parts)
+		? message.parts.map((rawPart) => {
+				const part = rawPart as Record<string, unknown>;
+				const content = part.content;
+				const contentJson =
+					content && typeof content === 'object' && !Array.isArray(content)
+						? (content as Record<string, unknown>)
+						: part.contentJson && typeof part.contentJson === 'object'
+							? (part.contentJson as Record<string, unknown>)
+							: undefined;
+				return {
+					...part,
+					content:
+						typeof content === 'string'
+							? content
+							: contentJson
+								? JSON.stringify(contentJson)
+								: '',
+					...(contentJson ? { contentJson } : {}),
+				};
+			})
+		: undefined;
+	return { ...message, ...(parts ? { parts } : {}) } as unknown as Message;
+}
+
+/** Fetches one chronological message page sized by a soft persisted-part target. */
+export async function loadSessionMessagePage(
 	sessionId: string,
-): Promise<Message[]> {
-	const response = await listMessages({
+	cursor?: string | null,
+): Promise<SessionMessagePage> {
+	const response = await listMessagePage({
 		path: { id: sessionId },
-		query: getProjectQuery(),
+		query: {
+			...getProjectQuery(),
+			parsed: 'true',
+			limit: MESSAGE_PARTS_PAGE_TARGET,
+			...(cursor ? { cursor } : {}),
+		},
 	} as never);
 	if (response.error) throw new Error(JSON.stringify(response.error));
-	return (response.data ?? []) as unknown as Message[];
+	const data = response.data;
+	const items = (data?.items ?? []).map((message) =>
+		normalizePagedMessage(message as Record<string, unknown>),
+	);
+	return {
+		items,
+		partCount:
+			typeof data?.partCount === 'number'
+				? data.partCount
+				: items.reduce(
+						(total, message) => total + (message.parts?.length ?? 0),
+						0,
+					),
+		hasMore: data?.hasMore ?? false,
+		nextCursor: data?.nextCursor ?? null,
+	};
 }
 
 /** Fetches secure-input prompts still awaiting a response. */

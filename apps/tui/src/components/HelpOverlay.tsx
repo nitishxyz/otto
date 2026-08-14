@@ -10,7 +10,7 @@ interface HelpOverlayProps {
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
 	const { colors } = useTheme();
 	const commands = getCommandSuggestions('');
-	const rowCount = commands.length + 17;
+	const rowCount = commands.length + 18;
 	const viewport = useListModalWindow(rowCount, 0);
 
 	useKeyboard((key) => {
@@ -90,6 +90,11 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 						<text fg={colors.fgMuted}>Ctrl+S</text>
 						<text fg={colors.fgDimmed}>—</text>
 						<text fg={colors.fgDark}>Sessions list</text>
+					</box>
+					<box style={{ flexDirection: 'row', gap: 1 }}>
+						<text fg={colors.fgMuted}>Ctrl+R</text>
+						<text fg={colors.fgDimmed}>—</text>
+						<text fg={colors.fgDark}>Retry last failed request</text>
 					</box>
 					<box style={{ flexDirection: 'row', gap: 1 }}>
 						<text fg={colors.fgMuted}>Ctrl+B</text>

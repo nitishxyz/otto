@@ -118,6 +118,9 @@ export const SubagentDetail = memo(function SubagentDetail({
 					pendingApprovals={[]}
 					onApprove={NOOP}
 					onDeny={NOOP}
+					hasOlderMessages={detail.hasOlderMessages}
+					isLoadingOlderMessages={detail.isLoadingOlderMessages}
+					onLoadOlderMessages={detail.loadOlderMessages}
 				/>
 			)}
 		</box>

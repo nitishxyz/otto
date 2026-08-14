@@ -5,12 +5,14 @@ export interface QueuedMessageItem {
 	assistantMessageId: string;
 	userMessageId: string;
 	summary: string;
+	content: string;
 }
 
 export interface OptimisticQueuedMessage {
 	clientId: string;
 	assistantMessageId: string | null;
 	summary: string;
+	content: string;
 	confirmed: boolean;
 }
 
@@ -28,16 +30,22 @@ export function getQueuedMessageSummary(
 	return [attachmentLabel, text].filter(Boolean).join(' · ') || 'Message';
 }
 
+function getMessageText(message: Message): string {
+	const parts = [...(message.parts ?? [])].sort(
+		(a, b) => (a.index ?? 0) - (b.index ?? 0),
+	);
+	return parts
+		.filter((part) => part.type === 'text')
+		.map(extractPartText)
+		.join('\n')
+		.trim();
+}
+
 function getMessageSummary(message: Message): string {
 	const parts = [...(message.parts ?? [])].sort(
 		(a, b) => (a.index ?? 0) - (b.index ?? 0),
 	);
-	const text = parts
-		.filter((part) => part.type === 'text')
-		.map(extractPartText)
-		.join(' ')
-		.replace(/\s+/g, ' ')
-		.trim();
+	const text = getMessageText(message).replace(/\s+/g, ' ').trim();
 	const attachmentCount =
 		message.attachmentNames?.length ??
 		parts.filter((part) => part.type === 'image' || part.type === 'file')
@@ -93,6 +101,7 @@ export function getQueuedMessageItems(
 			assistantMessageId,
 			userMessageId: userMessage.id,
 			summary: getMessageSummary(userMessage),
+			content: getMessageText(userMessage),
 		});
 	}
 
@@ -113,6 +122,7 @@ export function getQueuedMessageItems(
 			assistantMessageId,
 			userMessageId: userMessage.id,
 			summary: getMessageSummary(userMessage),
+			content: getMessageText(userMessage),
 		});
 	}
 

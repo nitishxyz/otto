@@ -34,6 +34,67 @@ describe('TUI stream reducer', () => {
 		expect(reduce([makeMessage()], { type: 'CLEAR' })).toEqual([]);
 	});
 
+	test('PREPEND adds older messages without duplicating loaded ids', () => {
+		const current = makeMessage({ id: 'new', createdAt: 2000 });
+		const older = makeMessage({ id: 'old', createdAt: 1000 });
+		const state = reduce([current], {
+			type: 'PREPEND',
+			messages: [older, structuredClone(current)],
+		});
+		expect(state.map((message) => message.id)).toEqual(['old', 'new']);
+		expect(state[1]).toBe(current);
+	});
+
+	test('RETRY_MESSAGE clears stale error state and terminal parts', () => {
+		const failed = makeMessage({
+			status: 'error',
+			error: 'provider failed',
+			completedAt: 2000,
+			parts: [
+				{ id: 'text', type: 'text', content: 'partial response' },
+				{ id: 'error', type: 'error', content: 'provider failed' },
+				{ id: 'finish', type: 'tool_call', toolName: 'finish' },
+			] as Message['parts'],
+		});
+		const state = reduce([failed], {
+			type: 'RETRY_MESSAGE',
+			messageId: failed.id,
+		});
+		expect(state[0]).toMatchObject({
+			status: 'pending',
+			error: null,
+			completedAt: null,
+		});
+		expect(state[0].parts?.map((part) => part.id)).toEqual(['text']);
+	});
+
+	test('REFRESH_LATEST updates the live edge without dropping older pages', () => {
+		const older = makeMessage({ id: 'old', createdAt: 1000 });
+		const latest = makeMessage({
+			id: 'latest',
+			createdAt: 2000,
+			status: 'complete',
+		});
+		const refreshed = makeMessage({
+			id: 'latest',
+			createdAt: 2000,
+			status: 'error',
+			error: 'failed',
+		});
+		const appended = makeMessage({ id: 'newest', createdAt: 3000 });
+		const state = reduce([older, latest], {
+			type: 'REFRESH_LATEST',
+			messages: [refreshed, appended],
+		});
+		expect(state.map((message) => message.id)).toEqual([
+			'old',
+			'latest',
+			'newest',
+		]);
+		expect(state[0]).toBe(older);
+		expect(state[1]).toBe(refreshed);
+	});
+
 	test('ADD_OPTIMISTIC_USER appends a complete user message with text part', () => {
 		const state = reduce([], {
 			type: 'ADD_OPTIMISTIC_USER',
