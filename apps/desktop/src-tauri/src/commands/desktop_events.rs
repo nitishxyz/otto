@@ -83,12 +83,14 @@ pub struct DesktopEventBrokerStatus {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum BrokerMessage {
     State {
+        #[serde(rename = "subscriptionId")]
         subscription_id: String,
         status: String,
         attempt: u32,
         delay: u64,
     },
     Chunk {
+        #[serde(rename = "subscriptionId")]
         subscription_id: String,
         chunk: String,
     },
@@ -663,6 +665,28 @@ pub fn unsubscribe_desktop_events(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serializes_subscription_ids_for_the_webview() {
+        let messages = [
+            BrokerMessage::State {
+                subscription_id: "state-subscription".to_string(),
+                status: "connected".to_string(),
+                attempt: 0,
+                delay: 0,
+            },
+            BrokerMessage::Chunk {
+                subscription_id: "chunk-subscription".to_string(),
+                chunk: ": hb\n\n".to_string(),
+            },
+        ];
+
+        for message in messages {
+            let serialized = serde_json::to_value(message).expect("serialize broker message");
+            assert!(serialized.get("subscriptionId").is_some());
+            assert!(serialized.get("subscription_id").is_none());
+        }
+    }
 
     #[test]
     fn parses_fragmented_frames_and_project_routing() {

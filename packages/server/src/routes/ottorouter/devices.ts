@@ -77,6 +77,14 @@ interface SetuDevice {
 	status?: unknown;
 }
 
+interface MachineProjectLoadDependencies {
+	fetcher: typeof globalThis.fetch;
+	authorizeDevice: (
+		input: string,
+		init: RequestInit,
+	) => Promise<Response | null>;
+}
+
 const machineSessions = new Map<
 	string,
 	{ token: string; expiresAt: number; apiUrl: string }
@@ -102,21 +110,31 @@ function machineRequestHeaders(ownerSession?: string): Record<string, string> {
 	};
 }
 
-async function loadAuthorizedMachineProjects(
+export async function loadAuthorizedMachineProjects(
 	deviceId: string,
 	machineId: string,
 	hostname: string,
 	forceOwnerSession = false,
+	dependencies: Partial<MachineProjectLoadDependencies> = {},
 ) {
+	const fetcher = dependencies.fetcher ?? globalThis.fetch;
+	const authorizeDevice =
+		dependencies.authorizeDevice ??
+		((input: string, init: RequestInit) =>
+			fetchWithOttoRouterAuth(input, init, fetcher));
 	const apiUrl = machineUrl(hostname);
 	const machineKey = `${deviceId}:${machineId}`;
 	let session = machineSessions.get(machineKey);
+	const reusedCachedSession =
+		!forceOwnerSession &&
+		session !== undefined &&
+		session.expiresAt > Date.now() + 60_000;
 	if (
 		forceOwnerSession ||
 		!session ||
 		session.expiresAt <= Date.now() + 60_000
 	) {
-		const challengeResponse = await fetch(
+		const challengeResponse = await fetcher(
 			`${apiUrl}/v1/tunnel/owner/challenge`,
 			{
 				method: 'POST',
@@ -148,7 +166,7 @@ async function loadAuthorizedMachineProjects(
 				message: 'Tunnel device identity mismatch.',
 			};
 		}
-		const assertionResponse = await fetchWithOttoRouterAuth(
+		const assertionResponse = await authorizeDevice(
 			`${getOttoRouterBaseUrl()}/v1/tunnels/device/authorize`,
 			{
 				method: 'POST',
@@ -189,7 +207,7 @@ async function loadAuthorizedMachineProjects(
 				message: 'OttoRouter machine identity mismatch.',
 			};
 		}
-		const sessionResponse = await fetch(`${apiUrl}/v1/tunnel/owner/session`, {
+		const sessionResponse = await fetcher(`${apiUrl}/v1/tunnel/owner/session`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ assertion: assertionPayload.assertion }),
@@ -214,15 +232,27 @@ async function loadAuthorizedMachineProjects(
 	}
 	const headers = machineRequestHeaders(session.token);
 	const [projectsResponse, infoResponse] = await Promise.all([
-		fetch(`${apiUrl}/v1/projects`, {
+		fetcher(`${apiUrl}/v1/projects`, {
 			headers,
 			signal: AbortSignal.timeout(5_000),
 		}),
-		fetch(`${apiUrl}/v1/server/info`, {
+		fetcher(`${apiUrl}/v1/server/info`, {
 			headers,
 			signal: AbortSignal.timeout(5_000),
 		}).catch(() => null),
 	]);
+	if (projectsResponse.status === 401 && reusedCachedSession) {
+		if (machineSessions.get(machineKey)?.token === session.token) {
+			machineSessions.delete(machineKey);
+		}
+		return loadAuthorizedMachineProjects(
+			deviceId,
+			machineId,
+			hostname,
+			true,
+			dependencies,
+		);
+	}
 	if (!projectsResponse.ok)
 		throw new Error(
 			`Machine projects failed (HTTP ${projectsResponse.status})`,
