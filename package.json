@@ -1,6 +1,6 @@
 {
 	"name": "otto-monorepo",
-	"version": "0.1.401",
+	"version": "0.1.402",
 	"private": true,
 	"description": "AI-powered development assistant CLI - monorepo",
 	"author": "nitishxyz",

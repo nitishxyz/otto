@@ -84,7 +84,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.237",
+      "version": "0.1.238",
       "dependencies": {
         "@ottocode/themes": "workspace:*",
         "@ottocode/web-sdk": "workspace:*",
