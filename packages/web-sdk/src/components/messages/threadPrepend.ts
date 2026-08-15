@@ -155,20 +155,18 @@ export const END_FOLLOW_OPTIONS = {
 export interface EndFollowInput {
 	/** Caller disabled auto-scroll entirely (embedded/preview threads). */
 	disabled: boolean;
-	/** The reader is genuinely pinned to the bottom. */
-	atEnd: boolean;
 	/** An older page is being fetched or its rows are being committed. */
 	prepending: boolean;
 }
 
 /**
- * `maintainScrollAtEnd` for the current frame: the options object only while
- * the reader is genuinely following, `false` otherwise. Prepending forces it
- * off so inserting rows above the viewport can never pull the reader down.
+ * `maintainScrollAtEnd` configuration for the current frame. Legend List owns
+ * the pinned/detached decision through `maintainScrollAtEndThreshold`; this
+ * only suspends the feature while prepending or when auto-scroll is disabled.
  */
 export function resolveEndFollow(
 	input: EndFollowInput,
 ): typeof END_FOLLOW_OPTIONS | false {
-	if (input.disabled || input.prepending || !input.atEnd) return false;
+	if (input.disabled || input.prepending) return false;
 	return END_FOLLOW_OPTIONS;
 }

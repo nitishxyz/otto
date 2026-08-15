@@ -170,27 +170,16 @@ describe('end-follow during a prepend', () => {
 	});
 
 	it('never re-enables following while a page is being fetched or committed', () => {
-		// The reader is pinned to the bottom, which normally follows; a prepend
-		// must still switch following off for its whole window so rows inserted
-		// above the viewport cannot pull the view down.
-		expect(
-			resolveEndFollow({ disabled: false, atEnd: true, prepending: true }),
-		).toBe(false);
-		expect(
-			resolveEndFollow({ disabled: false, atEnd: false, prepending: true }),
-		).toBe(false);
+		// A prepend must switch following off for its whole window so rows
+		// inserted above the viewport cannot pull the view down.
+		expect(resolveEndFollow({ disabled: false, prepending: true })).toBe(false);
 	});
 
-	it('follows only while genuinely pinned to the end', () => {
-		expect(
-			resolveEndFollow({ disabled: false, atEnd: true, prepending: false }),
-		).toBe(END_FOLLOW_OPTIONS);
-		expect(
-			resolveEndFollow({ disabled: false, atEnd: false, prepending: false }),
-		).toBe(false);
-		expect(
-			resolveEndFollow({ disabled: true, atEnd: true, prepending: false }),
-		).toBe(false);
+	it('delegates the pinned decision to Legend List', () => {
+		expect(resolveEndFollow({ disabled: false, prepending: false })).toBe(
+			END_FOLLOW_OPTIONS,
+		);
+		expect(resolveEndFollow({ disabled: true, prepending: false })).toBe(false);
 	});
 
 	it('uses a non-animated, explicitly triggered follow', () => {

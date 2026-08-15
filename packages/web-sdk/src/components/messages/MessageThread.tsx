@@ -62,12 +62,6 @@ import {
 	schedulePrependAfterViewportPaint,
 	shouldRequestPrepend,
 } from './threadPrepend';
-import {
-	createThreadFollowState,
-	reduceThreadFollow,
-	type ThreadFollowEvent,
-} from './threadFollowState';
-
 interface MessageThreadProps {
 	messages: Message[];
 	session?: Session;
@@ -107,6 +101,8 @@ const ESTIMATED_HEADER_SIZE_PX = 96;
  * screenful of markdown at once.
  */
 const DRAW_DISTANCE_PX = 1000;
+/** Any movement away from the live edge must stop streaming auto-follow. */
+const END_FOLLOW_THRESHOLD = 0;
 /** Fixed height for the "load earlier" slot so a fetch cannot resize the header. */
 const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
 /** Safety net for a prepend whose fetch never reports a loading state. */
@@ -312,10 +308,8 @@ export const MessageThread = memo(function MessageThread({
 		compact || (responsiveCompact && threadWidth > 0 && threadWidth < 640)
 			? 'compact'
 			: 'normal';
-	// Follow (end-pin) latch. The ref is the source of truth on the scroll hot
-	// path; only its `following` flag is mirrored into React state, because that
-	// is the single input LegendList's `maintainScrollAtEnd` derives from.
-	const followStateRef = useRef(createThreadFollowState());
+	// Legend List owns the end-follow latch. This mirror only controls the
+	// "scroll to bottom" button; it never enables or disables auto-follow.
 	const [following, setFollowing] = useState(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
 	const [railInsets, setRailInsets] = useState({ top: 0, bottom: 0 });
@@ -334,8 +328,7 @@ export const MessageThread = memo(function MessageThread({
 	const chromeFrameRef = useRef<number | undefined>(undefined);
 	const lastSessionIdRef = useRef<string | undefined>(sessionId);
 	// Ids of the optimistic user messages already seen. A *new* one can only
-	// come from this reader pressing send, which is the one non-scroll signal
-	// allowed to re-arm following.
+	// come from this reader pressing send, which explicitly returns to the end.
 	const seenOptimisticIdsRef = useRef<Set<string>>(new Set());
 	const optimisticSendsInitializedRef = useRef(false);
 
@@ -371,6 +364,19 @@ export const MessageThread = memo(function MessageThread({
 		queueState.queueLength,
 		queuedMessageIds,
 	]);
+	const hasMessages = messages.length > 0;
+
+	useEffect(() => {
+		if (!hasMessages) return;
+		const listState = listRef.current?.getState();
+		if (!listState) return;
+
+		setFollowing(listState.isWithinMaintainScrollAtEndThreshold);
+		return listState.listen(
+			'isWithinMaintainScrollAtEndThreshold',
+			setFollowing,
+		);
+	}, [hasMessages]);
 
 	useEffect(() => {
 		if (!sessionId) return;
@@ -382,50 +388,10 @@ export const MessageThread = memo(function MessageThread({
 		}
 	}, [latestTodoSnapshot, messages.length, sessionId, setSessionTodos]);
 
-	/**
-	 * Single entry point for every follow transition. The latch lives in a ref
-	 * so the scroll hot path stays render-free; only a flip of `following`
-	 * reaches React, because that is the only thing the list reads.
-	 */
-	const dispatchFollow = useCallback((event: ThreadFollowEvent) => {
-		const previous = followStateRef.current;
-		const next = reduceThreadFollow(previous, event);
-		if (next === previous) return;
-		followStateRef.current = next;
-		if (next.following !== previous.following) setFollowing(next.following);
-	}, []);
-
-	const disableAutoFollow = useCallback(() => {
-		dispatchFollow({ type: 'scrolled-up' });
-	}, [dispatchFollow]);
-
 	const cancelPendingPrependDispatch = useCallback(() => {
 		cancelPrependDispatchRef.current();
 		cancelPrependDispatchRef.current = () => {};
 	}, []);
-
-	// Wheel / touch give us an unambiguous "user wants to scroll up" signal that
-	// is impossible to confuse with programmatic follow scrolls. The moment the
-	// user scrolls up we stop following, even within the bottom band.
-	const lastTouchYRef = useRef(0);
-	const handleWheelIntent = useCallback(
-		(event: WheelEvent) => {
-			if (event.deltaY < 0) disableAutoFollow();
-		},
-		[disableAutoFollow],
-	);
-	const handleTouchStartIntent = useCallback((event: TouchEvent) => {
-		lastTouchYRef.current = event.touches[0]?.clientY ?? 0;
-	}, []);
-	const handleTouchMoveIntent = useCallback(
-		(event: TouchEvent) => {
-			const y = event.touches[0]?.clientY ?? 0;
-			// Finger dragging downward scrolls content up.
-			if (y > lastTouchYRef.current + 2) disableAutoFollow();
-			lastTouchYRef.current = y;
-		},
-		[disableAutoFollow],
-	);
 
 	const updateRailInsets = useCallback(
 		(leanHeaderVisible = showLeanHeader) => {
@@ -480,16 +446,6 @@ export const MessageThread = memo(function MessageThread({
 		const container = scrollContainerRef.current;
 		if (!container) return;
 
-		const { scrollTop, scrollHeight, clientHeight } = container;
-		const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-
-		// Read-only sampling: this listener never writes the scroll offset, and
-		// the latch decides on its own whether the sample counts as reader
-		// intent. Crucially, a sample can only *resume* following when the
-		// offset itself moved downward onto the true bottom, so the content-size
-		// churn of a streaming turn can never re-arm it.
-		dispatchFollow({ type: 'scrolled', scrollTop, distanceFromBottom });
-
 		// The lean header + rail insets need getBoundingClientRect reads, which
 		// force synchronous layout. Coalesce to at most one update per frame.
 		if (chromeFrameRef.current !== undefined) return;
@@ -510,39 +466,24 @@ export const MessageThread = memo(function MessageThread({
 			setShowLeanHeader(nextShowLeanHeader);
 			updateRailInsets(nextShowLeanHeader);
 		});
-	}, [dispatchFollow, showLeanHeader, updateRailInsets]);
+	}, [showLeanHeader, updateRailInsets]);
 
-	const detachScrollIntentRef = useRef<(() => void) | undefined>(undefined);
-	const attachScrollIntentListeners = useCallback(
+	const detachScrollListenerRef = useRef<(() => void) | undefined>(undefined);
+	const attachScrollListener = useCallback(
 		(node: ScrollViewLike | null) => {
-			if (detachScrollIntentRef.current) {
-				detachScrollIntentRef.current();
-				detachScrollIntentRef.current = undefined;
+			if (detachScrollListenerRef.current) {
+				detachScrollListenerRef.current();
+				detachScrollListenerRef.current = undefined;
 			}
 			const element = resolveScrollElement(node);
 			scrollContainerRef.current = element;
 			if (!element) return;
-			element.addEventListener('wheel', handleWheelIntent, { passive: true });
-			element.addEventListener('touchstart', handleTouchStartIntent, {
-				passive: true,
-			});
-			element.addEventListener('touchmove', handleTouchMoveIntent, {
-				passive: true,
-			});
 			element.addEventListener('scroll', handleScroll, { passive: true });
-			detachScrollIntentRef.current = () => {
-				element.removeEventListener('wheel', handleWheelIntent);
-				element.removeEventListener('touchstart', handleTouchStartIntent);
-				element.removeEventListener('touchmove', handleTouchMoveIntent);
+			detachScrollListenerRef.current = () => {
 				element.removeEventListener('scroll', handleScroll);
 			};
 		},
-		[
-			handleWheelIntent,
-			handleTouchStartIntent,
-			handleTouchMoveIntent,
-			handleScroll,
-		],
+		[handleScroll],
 	);
 
 	useLayoutEffect(() => {
@@ -581,7 +522,7 @@ export const MessageThread = memo(function MessageThread({
 		if (sessionId === lastSessionIdRef.current) return;
 		lastSessionIdRef.current = sessionId;
 		cancelPendingPrependDispatch();
-		dispatchFollow({ type: 'reset' });
+		setFollowing(true);
 		seenOptimisticIdsRef.current = new Set();
 		optimisticSendsInitializedRef.current = false;
 		setIsPrepending(false);
@@ -590,7 +531,7 @@ export const MessageThread = memo(function MessageThread({
 		resetPrependRequests(prependStateRef.current);
 		setShowLeanHeader(false);
 		setRailInsets({ top: 0, bottom: 0 });
-	}, [sessionId, dispatchFollow, cancelPendingPrependDispatch]);
+	}, [sessionId, cancelPendingPrependDispatch]);
 
 	// The *only* content-driven re-arm: this reader pressing send. An optimistic
 	// user message appears exactly once per send from this client, which makes
@@ -621,15 +562,8 @@ export const MessageThread = memo(function MessageThread({
 		}
 		if (!didSend || disableAutoScroll) return;
 		if (isPrepending || isLoadingOlderMessages) return;
-		dispatchFollow({ type: 'bottom-requested' });
 		void listRef.current?.scrollToEnd({ animated: false });
-	}, [
-		messages,
-		disableAutoScroll,
-		isPrepending,
-		isLoadingOlderMessages,
-		dispatchFollow,
-	]);
+	}, [messages, disableAutoScroll, isPrepending, isLoadingOlderMessages]);
 
 	useEffect(() => {
 		return () => {
@@ -638,17 +572,16 @@ export const MessageThread = memo(function MessageThread({
 				cancelAnimationFrame(chromeFrameRef.current);
 				chromeFrameRef.current = undefined;
 			}
-			if (detachScrollIntentRef.current) {
-				detachScrollIntentRef.current();
-				detachScrollIntentRef.current = undefined;
+			if (detachScrollListenerRef.current) {
+				detachScrollListenerRef.current();
+				detachScrollListenerRef.current = undefined;
 			}
 		};
 	}, [cancelPendingPrependDispatch]);
 
 	const scrollToBottom = useCallback(() => {
-		dispatchFollow({ type: 'bottom-requested' });
 		void listRef.current?.scrollToEnd({ animated: true });
-	}, [dispatchFollow]);
+	}, []);
 
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
@@ -765,7 +698,6 @@ export const MessageThread = memo(function MessageThread({
 
 	const handleNavigateToIndex = useCallback(
 		(messageIndex: number) => {
-			disableAutoFollow();
 			const rowIndex = rowIndexByMessageIndex[messageIndex] ?? 0;
 			void listRef.current?.scrollToIndex({
 				index: rowIndex,
@@ -773,7 +705,7 @@ export const MessageThread = memo(function MessageThread({
 				animated: true,
 			});
 		},
-		[disableAutoFollow, rowIndexByMessageIndex],
+		[rowIndexByMessageIndex],
 	);
 
 	/**
@@ -820,11 +752,10 @@ export const MessageThread = memo(function MessageThread({
 		cancelPendingPrependDispatch,
 	]);
 
-	// End-following is native and only enabled while the reader is genuinely
-	// pinned to the bottom; a prepend forces it off for its whole window.
+	// Keep native end-following enabled and let Legend List's threshold decide
+	// synchronously whether the reader is still pinned. A prepend forces it off.
 	const maintainScrollAtEnd = resolveEndFollow({
 		disabled: disableAutoScroll,
-		atEnd: following,
 		prepending: isPrepending || isLoadingOlderMessages,
 	});
 
@@ -952,7 +883,7 @@ export const MessageThread = memo(function MessageThread({
 		],
 	);
 
-	if (messages.length === 0) {
+	if (!hasMessages) {
 		return (
 			<div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
 				No messages yet. Start a conversation below.
@@ -993,13 +924,14 @@ export const MessageThread = memo(function MessageThread({
 					// Sole owner of the initial position; no imperative burst races it.
 					initialScrollAtEnd
 					maintainScrollAtEnd={maintainScrollAtEnd}
+					maintainScrollAtEndThreshold={END_FOLLOW_THRESHOLD}
 					// Never toggled: one anchoring owner for the list's whole lifetime.
 					maintainVisibleContentPosition={MAINTAIN_VISIBLE_CONTENT_POSITION}
 					onStartReached={requestOlderMessages}
 					onStartReachedThreshold={0.4}
 					ListHeaderComponent={listHeader}
 					ListFooterComponent={listFooter}
-					refScrollView={attachScrollIntentListeners}
+					refScrollView={attachScrollListener}
 				/>
 
 				{showHistoryEdgeCover && (
