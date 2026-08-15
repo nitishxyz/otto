@@ -27,6 +27,7 @@ import {
 } from './commands/index.ts';
 import { runDiscoveredCommand } from './custom-commands.ts';
 import { ensureProjectOttoIgnored } from './gitignore.ts';
+import { installProcessErrorHandlers } from './process-errors.ts';
 
 const SKIP_SERVER_COMMANDS = new Set([
 	'serve',
@@ -274,12 +275,4 @@ export async function runCli(argv: string[], version: string): Promise<void> {
 	}
 }
 
-process.on('unhandledRejection', (reason) => {
-	logger.error('Unhandled Promise Rejection', reason);
-	process.exit(1);
-});
-
-process.on('uncaughtException', (error) => {
-	logger.error('Uncaught Exception', error);
-	process.exit(1);
-});
+installProcessErrorHandlers();

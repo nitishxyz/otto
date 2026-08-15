@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getOttoHomeDir } from '../config/src/paths.ts';
+import { getOttoHomeDir, getSecureBaseDir } from '../config/src/paths.ts';
 
 const DEFAULT_OTTOROUTER_BASE_URL = 'https://api.ottorouter.org';
 const DEVICE_ID_FILE = 'device-id';
@@ -21,6 +21,7 @@ export interface ManagedTunnelProvisionOptions {
 	name?: string;
 	baseUrl?: string;
 	ottoHome?: string;
+	machineHome?: string;
 	fetch?: typeof globalThis.fetch;
 }
 
@@ -51,6 +52,7 @@ export function isManagedTunnelDeviceId(value: string): boolean {
 async function getPersistentId(
 	ottoHome: string,
 	filename: string,
+	preferredId?: string,
 ): Promise<string> {
 	const path = join(ottoHome, filename);
 	let replaceInvalid = false;
@@ -61,7 +63,10 @@ async function getPersistentId(
 	} catch {}
 
 	await mkdir(ottoHome, { recursive: true, mode: 0o700 });
-	const deviceId = randomUUID();
+	const deviceId =
+		preferredId && isManagedTunnelDeviceId(preferredId)
+			? preferredId
+			: randomUUID();
 	if (replaceInvalid) {
 		await writeFile(path, `${deviceId}\n`, { encoding: 'utf8', mode: 0o600 });
 		return deviceId;
@@ -90,11 +95,26 @@ export function getManagedTunnelDeviceId(
 	return getPersistentId(ottoHome, DEVICE_ID_FILE);
 }
 
-/** Read or generate the persistent UUID for this machine's tunnel connector. */
-export function getManagedTunnelMachineId(
-	ottoHome = getOttoHomeDir(),
+/**
+ * Read or generate the machine-global tunnel connector UUID. Existing IDs
+ * stored under the historical Otto home are migrated so upgrades never
+ * create a second tunnel for the same machine.
+ */
+export async function getManagedTunnelMachineId(
+	machineHome?: string,
+	legacyOttoHome?: string,
 ): Promise<string> {
-	return getPersistentId(ottoHome, MACHINE_ID_FILE);
+	const targetHome = machineHome ?? getSecureBaseDir();
+	const legacyHome =
+		legacyOttoHome ??
+		(machineHome === undefined ? getOttoHomeDir() : undefined);
+	let legacyId: string | undefined;
+	if (legacyHome && legacyHome !== targetHome) {
+		legacyId = (
+			await readFile(join(legacyHome, MACHINE_ID_FILE), 'utf8').catch(() => '')
+		).trim();
+	}
+	return getPersistentId(targetHome, MACHINE_ID_FILE, legacyId);
 }
 
 /** Provision the named Cloudflare tunnel assigned to this Otto daemon. */
@@ -117,7 +137,10 @@ export async function provisionManagedTunnel(
 
 	const [deviceId, machineId] = await Promise.all([
 		getManagedTunnelDeviceId(options.ottoHome),
-		getManagedTunnelMachineId(options.ottoHome),
+		getManagedTunnelMachineId(
+			options.machineHome ?? options.ottoHome,
+			options.ottoHome,
+		),
 	]);
 	const baseUrl = (
 		options.baseUrl ??

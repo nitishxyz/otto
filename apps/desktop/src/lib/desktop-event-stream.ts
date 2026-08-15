@@ -9,6 +9,7 @@ interface DesktopEventSource {
 	token: string;
 	projectId: string;
 	projectRoot: string;
+	authMode?: 'server' | 'owner';
 }
 
 type BrokerState =
@@ -18,14 +19,21 @@ type BrokerState =
 	| 'retrying'
 	| 'unsupported';
 
-type BrokerMessage =
-	| {
-			kind: 'state';
-			status: BrokerState;
-			attempt: number;
-			delay: number;
-	  }
-	| { kind: 'chunk'; chunk: string };
+interface BrokerStateMessage {
+	kind: 'state';
+	subscriptionId: string;
+	status: BrokerState;
+	attempt: number;
+	delay: number;
+}
+
+interface BrokerChunkMessage {
+	kind: 'chunk';
+	subscriptionId: string;
+	chunk: string;
+}
+
+type BrokerMessage = BrokerStateMessage | BrokerChunkMessage;
 
 interface BrokerStatus {
 	status: BrokerState;
@@ -113,6 +121,7 @@ export function createDesktopEventTransport(
 		};
 
 		unlisten = await listen<BrokerMessage>(BROKER_EVENT, ({ payload }) => {
+			if (payload.subscriptionId !== subscriptionId) return;
 			if (payload.kind === 'state') {
 				onState(payload.status);
 				return;
@@ -139,7 +148,11 @@ export function createDesktopEventTransport(
 			return response;
 		}
 		try {
-			const status = await invoke<BrokerStatus>('subscribe_desktop_events', {
+			const command =
+				source.authMode === 'owner'
+					? 'subscribe_remote_project_events'
+					: 'subscribe_desktop_events';
+			const status = await invoke<BrokerStatus>(command, {
 				baseUrl: source.baseUrl,
 				token: source.token,
 				projectId: source.projectId,

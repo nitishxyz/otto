@@ -196,6 +196,7 @@ pub fn run() {
             commands::server::get_cli_selection,
             commands::server::update_installed_cli,
             commands::desktop_events::subscribe_desktop_events,
+            commands::desktop_events::subscribe_remote_project_events,
             commands::desktop_events::unsubscribe_desktop_events,
             commands::native_browser::native_browser_mount,
             commands::native_browser::native_browser_control,

@@ -320,8 +320,14 @@ export function onProjectConnectionState(
  * re-establishes the multiplexed SSE connection.
  */
 export async function retryProjectConnection(): Promise<void> {
+	let renewalError: unknown;
 	if (hasOwnerRenewalHandler()) {
-		await renewOwnerSession();
+		try {
+			await renewOwnerSession();
+		} catch (error) {
+			renewalError = error;
+		}
 	}
 	multiplexers.get(getMultiplexerKey())?.reconnect();
+	if (renewalError) throw renewalError;
 }

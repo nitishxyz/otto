@@ -186,7 +186,15 @@ export function configureMachineSdk(
 ) {
 	const win = window as OttoWindow;
 	clearShareMode();
-	setSSETransport(undefined);
+	setSSETransport(
+		createDesktopEventTransport({
+			baseUrl: apiUrl,
+			token: ownerSession,
+			projectId,
+			projectRoot,
+			authMode: 'owner',
+		}),
+	);
 	win.OTTO_SERVER_URL = apiUrl;
 	win.OTTO_RUNTIME_CONTEXT = {
 		projectId,

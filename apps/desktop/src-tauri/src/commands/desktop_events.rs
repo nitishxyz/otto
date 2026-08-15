@@ -49,6 +49,7 @@ impl Default for BrokerInner {
 #[derive(Clone, Default)]
 pub struct DesktopEventBroker {
     inner: Arc<Mutex<BrokerInner>>,
+    remote_cancels: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -82,11 +83,13 @@ pub struct DesktopEventBrokerStatus {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum BrokerMessage {
     State {
+        subscription_id: String,
         status: String,
         attempt: u32,
         delay: u64,
     },
     Chunk {
+        subscription_id: String,
         chunk: String,
     },
 }
@@ -160,7 +163,7 @@ fn matching_windows(
     inner: &BrokerInner,
     project_id: Option<&str>,
     project_root: Option<&str>,
-) -> Vec<String> {
+) -> Vec<(String, String)> {
     inner
         .subscriptions
         .iter()
@@ -173,7 +176,7 @@ fn matching_windows(
                 (None, Some(root)) => subscription.project_root == root,
                 (None, None) => true,
             };
-            matches.then(|| label.clone())
+            matches.then(|| (label.clone(), subscription.subscription_id.clone()))
         })
         .collect()
 }
@@ -186,20 +189,25 @@ fn emit_state(
     attempt: u32,
     delay: u64,
 ) {
-    let labels = {
+    let subscriptions = {
         let mut guard = inner.lock().unwrap_or_else(|error| error.into_inner());
         if guard.generation != generation {
             return;
         }
         guard.status = status;
-        guard.subscriptions.keys().cloned().collect::<Vec<_>>()
+        guard
+            .subscriptions
+            .iter()
+            .map(|(label, subscription)| (label.clone(), subscription.subscription_id.clone()))
+            .collect::<Vec<_>>()
     };
-    let payload = BrokerMessage::State {
-        status: status.as_str().to_string(),
-        attempt,
-        delay,
-    };
-    for label in labels {
+    for (label, subscription_id) in subscriptions {
+        let payload = BrokerMessage::State {
+            subscription_id,
+            status: status.as_str().to_string(),
+            attempt,
+            delay,
+        };
         let _ = app.emit_to(label, BROKER_EVENT, payload.clone());
     }
 }
@@ -210,7 +218,7 @@ fn emit_frame(
     generation: u64,
     frame: &ParsedFrame,
 ) {
-    let labels = {
+    let subscriptions = {
         let guard = inner.lock().unwrap_or_else(|error| error.into_inner());
         if guard.generation != generation {
             return;
@@ -221,11 +229,166 @@ fn emit_frame(
             frame.project_root.as_deref(),
         )
     };
-    let payload = BrokerMessage::Chunk {
-        chunk: frame.raw.clone(),
-    };
-    for label in labels {
+    for (label, subscription_id) in subscriptions {
+        let payload = BrokerMessage::Chunk {
+            subscription_id,
+            chunk: frame.raw.clone(),
+        };
         let _ = app.emit_to(label, BROKER_EVENT, payload.clone());
+    }
+}
+
+fn emit_remote_state(
+    app: &AppHandle,
+    window_label: &str,
+    subscription_id: &str,
+    status: BrokerStatus,
+    attempt: u32,
+    delay: u64,
+) {
+    let _ = app.emit_to(
+        window_label,
+        BROKER_EVENT,
+        BrokerMessage::State {
+            subscription_id: subscription_id.to_string(),
+            status: status.as_str().to_string(),
+            attempt,
+            delay,
+        },
+    );
+}
+
+async fn run_remote_project_stream(
+    app: AppHandle,
+    window_label: String,
+    subscription_id: String,
+    base_url: String,
+    owner_session: String,
+    project_id: String,
+    project_root: String,
+    mut cancel: watch::Receiver<bool>,
+) {
+    let client = match reqwest::Client::builder().build() {
+        Ok(client) => client,
+        Err(_) => {
+            emit_remote_state(
+                &app,
+                &window_label,
+                &subscription_id,
+                BrokerStatus::Unsupported,
+                0,
+                0,
+            );
+            return;
+        }
+    };
+    let mut url = match url::Url::parse(&format!("{base_url}/v1/events/project")) {
+        Ok(url) => url,
+        Err(_) => return,
+    };
+    url.query_pairs_mut()
+        .append_pair("projectId", &project_id)
+        .append_pair("project", &project_root);
+    let mut attempt = 0_u32;
+
+    loop {
+        emit_remote_state(
+            &app,
+            &window_label,
+            &subscription_id,
+            BrokerStatus::Connecting,
+            attempt,
+            0,
+        );
+        let response = tokio::select! {
+            response = client
+                .post(url.clone())
+                .header("accept", "text/event-stream")
+                .header("x-otto-owner-session", &owner_session)
+                .send() => response,
+            _ = cancel.changed() => return,
+        };
+        let response = match response {
+            Ok(response) if response.status().is_success() => response,
+            Ok(response)
+                if response.status() == reqwest::StatusCode::NOT_FOUND
+                    || response.status() == reqwest::StatusCode::METHOD_NOT_ALLOWED =>
+            {
+                emit_remote_state(
+                    &app,
+                    &window_label,
+                    &subscription_id,
+                    BrokerStatus::Unsupported,
+                    attempt,
+                    0,
+                );
+                return;
+            }
+            _ => {
+                attempt = attempt.saturating_add(1);
+                let delay = (RECONNECT_BASE_DELAY_MS.saturating_mul(2_u64.pow(attempt.min(4))))
+                    .min(RECONNECT_MAX_DELAY_MS);
+                emit_remote_state(
+                    &app,
+                    &window_label,
+                    &subscription_id,
+                    BrokerStatus::Retrying,
+                    attempt,
+                    delay,
+                );
+                if wait_or_cancel(Duration::from_millis(delay), &mut cancel).await {
+                    return;
+                }
+                continue;
+            }
+        };
+
+        emit_remote_state(
+            &app,
+            &window_label,
+            &subscription_id,
+            BrokerStatus::Connected,
+            0,
+            0,
+        );
+        let mut stream = response.bytes_stream();
+        let mut received = false;
+        loop {
+            let next = tokio::select! {
+                next = stream.next() => next,
+                _ = cancel.changed() => return,
+            };
+            let Some(result) = next else { break };
+            let Ok(bytes) = result else { break };
+            received = true;
+            let _ = app.emit_to(
+                &window_label,
+                BROKER_EVENT,
+                BrokerMessage::Chunk {
+                    subscription_id: subscription_id.clone(),
+                    chunk: String::from_utf8_lossy(&bytes).into_owned(),
+                },
+            );
+        }
+
+        attempt = if received {
+            0
+        } else {
+            attempt.saturating_add(1)
+        };
+        let delay = (RECONNECT_BASE_DELAY_MS.saturating_mul(2_u64.pow(attempt.min(4))))
+            .min(RECONNECT_MAX_DELAY_MS);
+        emit_remote_state(
+            &app,
+            &window_label,
+            &subscription_id,
+            BrokerStatus::Retrying,
+            attempt,
+            delay,
+        );
+        if wait_or_cancel(Duration::from_millis(delay), &mut cancel).await {
+            return;
+        }
     }
 }
 
@@ -425,11 +588,56 @@ pub async fn subscribe_desktop_events(
 }
 
 #[tauri::command]
+pub async fn subscribe_remote_project_events(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, DesktopEventBroker>,
+    base_url: String,
+    token: String,
+    project_id: String,
+    project_root: String,
+    subscription_id: String,
+) -> Result<DesktopEventBrokerStatus, String> {
+    let base_url = normalized_base_url(&base_url)?;
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    {
+        let mut cancels = state
+            .remote_cancels
+            .lock()
+            .map_err(|_| "Remote event broker state is unavailable".to_string())?;
+        if let Some(previous) = cancels.insert(subscription_id.clone(), cancel_tx) {
+            let _ = previous.send(true);
+        }
+    }
+    tauri::async_runtime::spawn(run_remote_project_stream(
+        app,
+        window.label().to_string(),
+        subscription_id,
+        base_url,
+        token,
+        project_id,
+        project_root,
+        cancel_rx,
+    ));
+    Ok(DesktopEventBrokerStatus {
+        status: BrokerStatus::Connecting.as_str().to_string(),
+    })
+}
+
+#[tauri::command]
 pub fn unsubscribe_desktop_events(
     window: WebviewWindow,
     state: State<'_, DesktopEventBroker>,
     subscription_id: String,
 ) -> Result<(), String> {
+    if let Some(cancel) = state
+        .remote_cancels
+        .lock()
+        .map_err(|_| "Remote event broker state is unavailable".to_string())?
+        .remove(&subscription_id)
+    {
+        let _ = cancel.send(true);
+    }
     let mut inner = state
         .inner
         .lock()

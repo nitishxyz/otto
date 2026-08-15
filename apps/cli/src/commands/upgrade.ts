@@ -1,9 +1,9 @@
 import type { Command } from 'commander';
 import { confirm, isCancel } from '@clack/prompts';
-import { createWriteStream, chmodSync, renameSync, unlinkSync } from 'node:fs';
+import { createWriteStream, chmodSync, mkdirSync, renameSync } from 'node:fs';
 import { get } from 'node:https';
-import { homedir, platform, arch, tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
+import { homedir, platform, arch } from 'node:os';
+import { resolve } from 'node:path';
 import { colors } from '../ui.ts';
 import type { DaemonVersionMismatchError } from '../daemon.ts';
 
@@ -151,7 +151,8 @@ export async function upgradeOttoToVersion(version: string): Promise<void> {
 	const ext = platform() === 'win32' ? '.exe' : '';
 	const userBin = resolve(homedir(), '.local', 'bin');
 	const binPath = resolve(userBin, `${BIN_NAME}${ext}`);
-	const tmpPath = join(tmpdir(), `${BIN_NAME}-upgrade-${Date.now()}${ext}`);
+	const tmpPath = resolve(userBin, `.${BIN_NAME}-upgrade-${Date.now()}${ext}`);
+	mkdirSync(userBin, { recursive: true });
 
 	console.log(
 		`\n  Downloading ${colors.bold(`v${version}`)} for ${platform()}/${arch()}\n`,
@@ -163,15 +164,7 @@ export async function upgradeOttoToVersion(version: string): Promise<void> {
 		chmodSync(tmpPath, 0o755);
 	}
 
-	try {
-		renameSync(tmpPath, binPath);
-	} catch {
-		const { copyFileSync } = await import('node:fs');
-		copyFileSync(tmpPath, binPath);
-		try {
-			unlinkSync(tmpPath);
-		} catch {}
-	}
+	renameSync(tmpPath, binPath);
 
 	console.log(`\n  ${colors.green('✓')} Downloaded to ${colors.dim(binPath)}`);
 }

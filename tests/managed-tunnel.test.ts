@@ -41,6 +41,23 @@ describe('managed tunnel identity', () => {
 		expect(first).toMatch(/^[0-9a-f-]{36}$/);
 	});
 
+	test('migrates the historical machine UUID into machine-global storage', async () => {
+		const legacyHome = await temporaryOttoHome();
+		const machineHome = await temporaryOttoHome();
+		const existing = crypto.randomUUID();
+		await writeFile(join(legacyHome, 'machine-id'), `${existing}\n`);
+
+		const first = await getManagedTunnelMachineId(machineHome, legacyHome);
+		await rm(legacyHome, { recursive: true, force: true });
+		const second = await getManagedTunnelMachineId(machineHome, legacyHome);
+
+		expect(first).toBe(existing);
+		expect(second).toBe(existing);
+		expect(
+			(await readFile(join(machineHome, 'machine-id'), 'utf8')).trim(),
+		).toBe(existing);
+	});
+
 	test('persists a distinct stable machine connector UUID', async () => {
 		const ottoHome = await temporaryOttoHome();
 		const deviceId = await getManagedTunnelDeviceId(ottoHome);
