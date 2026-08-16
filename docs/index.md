@@ -23,6 +23,7 @@
 - [Architecture](architecture.md)
 - [Development](development.md)
 - [Development Guide](development-guide.md)
+- [Official Ghostty VT WebAssembly](ghostty-vt-wasm.md)
 - [Publishing](publishing.md)
 - [Release changelogs](release-changelog.md)
 - [Contributing](../AGENTS.md)

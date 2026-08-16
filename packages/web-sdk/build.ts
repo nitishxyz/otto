@@ -14,6 +14,8 @@ const packageDir = import.meta.dir;
 const distDir = join(packageDir, 'dist');
 const fontsSrcDir = join(packageDir, 'src', 'assets', 'fonts');
 const fontsDistDir = join(distDir, 'assets', 'fonts');
+const ghosttySrcDir = join(packageDir, 'src', 'assets', 'ghostty');
+const ghosttyDistDir = join(distDir, 'assets', 'ghostty');
 const entrypoints = [
 	join(packageDir, 'src', 'index.ts'),
 	join(packageDir, 'src', 'components', 'index.ts'),
@@ -87,6 +89,13 @@ for (const file of readdirSync(fontsSrcDir)) {
 	if (!file.endsWith('.woff2')) continue;
 	copyFileSync(join(fontsSrcDir, file), join(fontsDistDir, file));
 }
+
+console.log('👻 Copying official Ghostty VT WebAssembly...');
+mkdirSync(ghosttyDistDir, { recursive: true });
+copyFileSync(
+	join(ghosttySrcDir, 'ghostty-vt.wasm'),
+	join(ghosttyDistDir, 'ghostty-vt.wasm'),
+);
 
 console.log('\n✅ Build complete!');
 console.log(`   Package: ${distDir}`);

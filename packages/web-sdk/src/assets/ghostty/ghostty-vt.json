@@ -1,0 +1,9 @@
+{
+	"repository": "ghostty-org/ghostty",
+	"ref": "tip",
+	"upstreamCommit": "9009122953f59d4900143aad587202a70c2136f4",
+	"sourceUrl": "https://github.com/ghostty-org/ghostty/releases/download/tip/ghostty-vt.wasm",
+	"retrieved": "2026-08-15",
+	"size": 876132,
+	"sha256": "87258cdadb1e7101dd26fbc669fea5482ccba709aa6b261275851edd36d298e8"
+}

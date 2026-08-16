@@ -158,6 +158,28 @@ function focusChatInputElement(): boolean {
 	return true;
 }
 
+/**
+ * Whether Escape/q should leave the current pane and focus the chat composer.
+ * Terminal keystrokes must never trigger this — Ghostty often focuses a
+ * tabindexed container (not a textarea), so tagName checks alone are insufficient.
+ */
+export function shouldReturnFocusToInputOnKey(options: {
+	key: string;
+	isInInput: boolean;
+	isInTerminal: boolean;
+	currentFocus: string | null;
+}): boolean {
+	const { key, isInInput, isInTerminal, currentFocus } = options;
+	if (key === 'Escape') return !isInTerminal;
+	if (key !== 'q' || isInInput || isInTerminal) return false;
+	return (
+		currentFocus === 'sessions' ||
+		currentFocus === 'git' ||
+		currentFocus === 'rightPanel' ||
+		currentFocus === 'viewer'
+	);
+}
+
 interface UseKeyboardShortcutsOptions {
 	sessionIds?: string[];
 	getSessionIds?: () => string[];
@@ -534,15 +556,16 @@ export function useKeyboardShortcuts({
 				return;
 			}
 
-			// Only handle q when not in input and a side pane is focused
+			// Escape/q return to chat when a side pane is focused. Terminal
+			// keystrokes are excluded even when focus is a non-input host node
+			// (official Ghostty uses a tabindexed container, not only a textarea).
 			if (
-				(e.key === 'Escape' && !isInTerminal) ||
-				(e.key === 'q' &&
-					!isInInput &&
-					(currentFocus === 'sessions' ||
-						currentFocus === 'git' ||
-						currentFocus === 'rightPanel' ||
-						currentFocus === 'viewer'))
+				shouldReturnFocusToInputOnKey({
+					key: e.key,
+					isInInput,
+					isInTerminal,
+					currentFocus,
+				})
 			) {
 				e.preventDefault();
 				// Close sidebar if focused on one (the viewer stays open)

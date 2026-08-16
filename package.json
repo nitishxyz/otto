@@ -44,6 +44,7 @@
 		"prompt:audit": "bun run scripts/prompt-audit.ts",
 		"catalog:update": "bun run scripts/update-catalog.ts",
 		"catalog:ottorouter": "bun run scripts/update-catalog.ts --ottorouter",
+		"ghostty-vt:update": "bun run scripts/update-ghostty-vt.ts",
 		"compile": "bun run scripts/compile.ts",
 		"compile:verbose": "bun run scripts/compile.ts --verbose",
 		"build:bin:darwin-arm64": "bun run scripts/compile.ts --target=bun-darwin-arm64",

@@ -1,14 +1,7 @@
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
-import {
-	init,
-	Terminal,
-	FitAddon,
-	OSC8LinkProvider,
-	UrlRegexProvider,
-	type ILinkProvider,
-} from 'ghostty-web';
+import { InlineGhosttyTerminal } from '../../lib/inline-ghostty-terminal';
+import { loadGhosttyVt } from '../../lib/ghostty-vt';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
-import { openUrl } from '../../lib/open-url';
 import {
 	authenticatedFetch,
 	getProjectQuery,
@@ -19,7 +12,6 @@ import { StableSpinner } from '../ui/StableSpinner';
 const FONT_FAMILY = '"JetBrainsMono NFM", monospace';
 const WS_RECONNECT_DELAY = 1500;
 const WS_MAX_RETRIES = 5;
-const CURSOR_BLINK_RESUME_DELAY = 600;
 const RESIZE_SETTLE_DELAY = 120;
 
 export function resolveTerminalBackgroundColor(): string {
@@ -141,67 +133,34 @@ export async function requestTerminalWebSocketTicket(
 	return body.ticket;
 }
 
-function shouldOpenTerminalLink(event: MouseEvent): boolean {
-	return event.ctrlKey || event.metaKey;
-}
-
-function withPlatformLinkActivation(provider: ILinkProvider): ILinkProvider {
-	return {
-		provideLinks(y, callback) {
-			provider.provideLinks(y, (links) => {
-				callback(
-					links?.map((link) => ({
-						...link,
-						activate(event) {
-							if (shouldOpenTerminalLink(event)) {
-								openUrl(link.text);
-								event.preventDefault();
-								return;
-							}
-							link.activate(event);
-						},
-					})),
-				);
-			});
-		},
-		dispose() {
-			provider.dispose?.();
-		},
-	};
-}
-
-function registerPlatformLinkProviders(term: Terminal) {
-	term.registerLinkProvider(
-		withPlatformLinkActivation(new OSC8LinkProvider(term)),
-	);
-	term.registerLinkProvider(
-		withPlatformLinkActivation(new UrlRegexProvider(term)),
-	);
-}
-
 export interface TerminalViewerProps {
 	terminalId: string;
 	isActive: boolean;
 	onExit?: (terminalId: string) => void;
+	onInitializationError?: (error: Error) => void;
 }
 
 export const TerminalViewer = memo(function TerminalViewer({
 	terminalId,
 	isActive,
 	onExit,
+	onInitializationError,
 }: TerminalViewerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
-	const termRef = useRef<Terminal | null>(null);
-	const fitAddonRef = useRef<FitAddon | null>(null);
+	const termRef = useRef<InlineGhosttyTerminal | null>(null);
+	const fitAddonRef = useRef<{ fit(): void } | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const retryCountRef = useRef(0);
 	const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [ready, setReady] = useState(false);
+	const [initializationError, setInitializationError] = useState<Error | null>(
+		null,
+	);
 	const onExitRef = useRef(onExit);
 	onExitRef.current = onExit;
-	const blinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const onInitializationErrorRef = useRef(onInitializationError);
+	onInitializationErrorRef.current = onInitializationError;
 	const userScrolledRef = useRef(false);
-	const bgColorRef = useRef('#121216');
 	const disposedRef = useRef(false);
 	const focusHandlersRef = useRef<{
 		focusin: () => void;
@@ -219,7 +178,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 	}, []);
 
 	const connectWebSocket = useCallback(
-		async (term: Terminal, baseUrl: string) => {
+		async (term: InlineGhosttyTerminal, baseUrl: string) => {
 			const scheduleReconnect = () => {
 				if (disposedRef.current || retryCountRef.current >= WS_MAX_RETRIES) {
 					return;
@@ -251,6 +210,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 			if (disposedRef.current) return;
 			const wsUrl = terminalWebSocketUrl(baseUrl, terminalId, ticket);
 			const ws = new WebSocket(wsUrl);
+			ws.binaryType = 'arraybuffer';
 			wsRef.current = ws;
 
 			ws.onopen = () => {
@@ -278,9 +238,14 @@ export const TerminalViewer = memo(function TerminalViewer({
 			ws.onmessage = (event) => {
 				retryCountRef.current = 0;
 				setReady(true);
-				const message = typeof event.data === 'string' ? event.data : '';
+				const message =
+					typeof event.data === 'string'
+						? event.data
+						: event.data instanceof ArrayBuffer
+							? new Uint8Array(event.data)
+							: '';
 
-				if (message.startsWith('{')) {
+				if (typeof message === 'string' && message.startsWith('{')) {
 					try {
 						const data = JSON.parse(message);
 						if (data.type === 'exit') {
@@ -323,12 +288,13 @@ export const TerminalViewer = memo(function TerminalViewer({
 
 		let disposed = false;
 		disposedRef.current = false;
-		let term: Terminal | null = null;
-		let fitAddon: FitAddon | null = null;
+		let term: InlineGhosttyTerminal | null = null;
+		let fitAddon: { fit(): void } | null = null;
 		let resizeObserver: ResizeObserver | null = null;
 		let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
 		setReady(false);
+		setInitializationError(null);
 		retryCountRef.current = 0;
 
 		if (wsRef.current) {
@@ -341,83 +307,32 @@ export const TerminalViewer = memo(function TerminalViewer({
 		}
 
 		const setup = async () => {
-			await init();
+			const ghosttyVt = await loadGhosttyVt();
 			if (disposed || !containerRef.current) return;
 
 			await loadEmbeddedTerminalFont();
 			await document.fonts.ready;
 
-			const bg = resolveTerminalBackgroundColor();
-
-			term = new Terminal({
-				theme: {
-					background: bg,
-					foreground: '#d4d4d4',
-					cursor: '#ffffff',
-					cursorAccent: '#000000',
-					selectionBackground: '#264f78',
-					black: '#000000',
-					red: '#cd3131',
-					green: '#0dbc79',
-					yellow: '#e5e510',
-					blue: '#2472c8',
-					magenta: '#bc3fbc',
-					cyan: '#11a8cd',
-					white: '#e5e5e5',
-					brightBlack: '#666666',
-					brightRed: '#f14c4c',
-					brightGreen: '#23d18b',
-					brightYellow: '#f5f543',
-					brightBlue: '#3b8eea',
-					brightMagenta: '#d670d6',
-					brightCyan: '#29b8db',
-					brightWhite: '#e5e5e5',
-				},
+			term = new InlineGhosttyTerminal(ghosttyVt, {
 				fontSize: 13,
 				fontFamily: FONT_FAMILY,
-				cursorBlink: true,
-				convertEol: true,
-				scrollback: 5000,
 			});
 
-			fitAddon = new FitAddon();
-			term.loadAddon(fitAddon);
+			fitAddon = { fit: () => term?.fit() };
 			term.open(containerRef.current);
-			registerPlatformLinkProviders(term);
 
+			// Typing should keep the cursor solid; blink ownership lives on the
+			// terminal so the phase never gets stuck invisible without a repaint.
 			term.onData(() => {
-				if (!termRef.current?.renderer) return;
-				termRef.current.renderer.setCursorBlink(false);
-				if (blinkTimerRef.current) clearTimeout(blinkTimerRef.current);
-				blinkTimerRef.current = setTimeout(() => {
-					if (
-						termRef.current?.renderer &&
-						document.activeElement &&
-						containerRef.current?.contains(document.activeElement)
-					) {
-						termRef.current.renderer.setCursorBlink(true);
-					}
-				}, CURSOR_BLINK_RESUME_DELAY);
+				termRef.current?.resetCursorBlink();
 			});
-
-			bgColorRef.current = bg;
 
 			const handleFocusIn = () => {
-				if (!termRef.current?.renderer) return;
-				termRef.current.renderer.setCursorBlink(true);
-				termRef.current.renderer.setTheme({
-					cursor: '#ffffff',
-					cursorAccent: '#000000',
-				});
+				termRef.current?.setFocused(true);
 			};
 
 			const handleFocusOut = () => {
-				if (!termRef.current?.renderer) return;
-				termRef.current.renderer.setCursorBlink(false);
-				termRef.current.renderer.setTheme({
-					cursor: bgColorRef.current,
-					cursorAccent: bgColorRef.current,
-				});
+				termRef.current?.setFocused(false);
 			};
 
 			containerRef.current.addEventListener('focusin', handleFocusIn);
@@ -480,7 +395,14 @@ export const TerminalViewer = memo(function TerminalViewer({
 		};
 
 		setup().catch((error) => {
-			console.error('[TerminalViewer] Failed to initialize:', error);
+			const terminalError =
+				error instanceof Error
+					? error
+					: new Error('Unknown terminal initialization error');
+			console.error('[TerminalViewer] Failed to initialize:', terminalError);
+			if (disposed) return;
+			setInitializationError(terminalError);
+			onInitializationErrorRef.current?.(terminalError);
 		});
 
 		return () => {
@@ -496,10 +418,6 @@ export const TerminalViewer = memo(function TerminalViewer({
 					focusHandlersRef.current.focusout,
 				);
 				focusHandlersRef.current = null;
-			}
-			if (blinkTimerRef.current) {
-				clearTimeout(blinkTimerRef.current);
-				blinkTimerRef.current = null;
 			}
 			if (retryTimerRef.current) {
 				clearTimeout(retryTimerRef.current);
@@ -531,13 +449,6 @@ export const TerminalViewer = memo(function TerminalViewer({
 			term.focus();
 		} else {
 			term.blur();
-			if (term.renderer) {
-				term.renderer.setCursorBlink(false);
-				term.renderer.setTheme({
-					cursor: bgColorRef.current,
-					cursorAccent: bgColorRef.current,
-				});
-			}
 		}
 	}, [isActive, fitTerminal]);
 
@@ -555,7 +466,22 @@ export const TerminalViewer = memo(function TerminalViewer({
 		>
 			<div className="relative flex-1 min-h-0 overflow-hidden">
 				<div ref={containerRef} className="absolute inset-0 bg-background" />
-				{isActive ? (
+				{isActive && initializationError ? (
+					<div
+						className="absolute inset-0 bg-background flex items-center justify-center p-6"
+						role="alert"
+						data-terminal-initialization-error
+					>
+						<div className="max-w-md text-center">
+							<p className="text-sm font-medium text-foreground">
+								Terminal failed to initialize
+							</p>
+							<p className="mt-1 text-xs text-muted-foreground">
+								{initializationError.message}
+							</p>
+						</div>
+					</div>
+				) : isActive ? (
 					<div
 						className="absolute inset-0 bg-background flex items-center justify-center pointer-events-none transition-opacity duration-300"
 						style={{ opacity: ready ? 0 : 1 }}

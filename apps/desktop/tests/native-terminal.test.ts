@@ -9,6 +9,7 @@ import {
 	resolveNativeTerminalTheme,
 	type NativeTerminalShortcutEvent,
 } from '../src/lib/native-terminal';
+import { selectDesktopTerminalBackend } from '../src/lib/desktop-terminal-backend';
 
 function shortcutEvent(
 	overrides: Partial<NativeTerminalShortcutEvent>,
@@ -25,6 +26,11 @@ function shortcutEvent(
 }
 
 describe('native desktop terminal', () => {
+	test('selects official WASM by default and native only after initialization failure', () => {
+		expect(selectDesktopTerminalBackend(false)).toBe('wasm');
+		expect(selectDesktopTerminalBackend(true)).toBe('native');
+	});
+
 	test('preserves browser wheel distance without adding smoothing', () => {
 		// Pixel mode (trackpads) maps physical distance to fractional rows.
 		expect(nativeTerminalScrollDelta({ deltaY: 4, deltaMode: 0 }, 16)).toBe(
@@ -242,9 +248,10 @@ describe('native desktop terminal', () => {
 		expect(tauriConfig).toContain('"resources/fonts/*"');
 	});
 
-	test('desktop injects the native viewer without changing the web default', async () => {
+	test('desktop uses the shared inline WASM viewer and retains native fallback code', async () => {
 		const [
 			desktopLayout,
+			desktopTerminalViewer,
 			viewerTabs,
 			terminalPane,
 			nativeViewer,
@@ -252,6 +259,7 @@ describe('native desktop terminal', () => {
 			onboardingModal,
 		] = await Promise.all([
 			readFile('src/components/workspace/DesktopAppLayout.tsx', 'utf8'),
+			readFile('src/components/terminal/DesktopTerminalViewer.tsx', 'utf8'),
 			readFile(
 				'../../packages/web-sdk/src/components/workspace/ViewerTabs.tsx',
 				'utf8',
@@ -270,7 +278,15 @@ describe('native desktop terminal', () => {
 				'utf8',
 			),
 		]);
-		expect(desktopLayout).toContain('terminalViewer={NativeTerminalViewer}');
+		expect(desktopLayout).toContain('terminalViewer={DesktopTerminalViewer}');
+		expect(desktopLayout).not.toContain(
+			'terminalViewer={NativeTerminalViewer}',
+		);
+		expect(desktopTerminalViewer).toContain("backend === 'native'");
+		expect(desktopTerminalViewer).toContain(
+			'<NativeTerminalViewer {...props} />',
+		);
+		expect(desktopTerminalViewer).toContain('onInitializationError');
 		expect(viewerTabs).toContain('TerminalPaneStrip');
 		expect(viewerTabs).toContain('data-native-overlay-root="true"');
 		expect(terminalPane).toContain('Viewer = TerminalViewer');
