@@ -20,6 +20,13 @@ import {
 	shouldRenderCompactionSummaryBox,
 } from './compactionSummary';
 import { shouldRenderTurnFooter } from './turnFooter';
+import {
+	getTrailingAnswerStartIndex,
+	hasCollapsibleWork,
+	shouldHidePartWhenWorkCollapsed,
+} from './turnWork';
+
+const EMPTY_EXPANDED_WORK: ReadonlySet<string> = new Set();
 
 /**
  * The thread renders one list row per *persisted message part*, plus separate
@@ -132,6 +139,17 @@ export type ThreadRow =
 			messageId: string;
 			endsTurn: boolean;
 			message: Message;
+	  }
+	| {
+			/**
+			 * Divider that hides an older turn's tool work. The latest turn never
+			 * emits this row — its tool calls stay visible.
+			 */
+			kind: 'assistant-show-work';
+			key: string;
+			messageId: string;
+			endsTurn: boolean;
+			expanded: boolean;
 	  };
 
 export interface ThreadRowsResult {
@@ -185,6 +203,8 @@ export function getThreadRowType(row: ThreadRow): string {
 			return 'error';
 		case 'assistant-footer':
 			return 'footer';
+		case 'assistant-show-work':
+			return 'show-work';
 	}
 }
 
@@ -203,6 +223,11 @@ interface BuildThreadRowsOptions {
 	 * rebuild and force LegendList to re-measure its whole viewport.
 	 */
 	cache?: ThreadRowCache;
+	/**
+	 * Older turns whose tool work the reader has expanded. The latest turn is
+	 * always expanded and is not looked up here.
+	 */
+	expandedWorkMessageIds?: ReadonlySet<string>;
 }
 
 /**
@@ -321,6 +346,10 @@ function sameRow(left: ThreadRow, right: ThreadRow): boolean {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-error' }>;
 			return left.error === next.error;
 		}
+		case 'assistant-show-work': {
+			const next = right as Extract<ThreadRow, { kind: 'assistant-show-work' }>;
+			return left.expanded === next.expanded;
+		}
 	}
 }
 
@@ -350,7 +379,9 @@ export function buildThreadRows({
 	queueLength,
 	queuedMessageIds,
 	cache,
+	expandedWorkMessageIds,
 }: BuildThreadRowsOptions): ThreadRowsResult {
+	const expandedWork = expandedWorkMessageIds ?? EMPTY_EXPANDED_WORK;
 	const rowIdentityCache = cache ?? defaultRowIdentityCache;
 	const rows: ThreadRow[] = [];
 	const rowIndexByMessageIndex: number[] = [];
@@ -424,6 +455,20 @@ export function buildThreadRows({
 		const hasNextAssistantMessage = Boolean(nextAssistantMessage);
 
 		const turn = getAssistantTurn(message, { compact });
+		const workContext = {
+			resolvedToolCallIds: turn.resolvedToolCallIds,
+			completedActionToolCallIds: turn.completedActionToolCallIds,
+		};
+		const hasWork = hasCollapsibleWork(turn.parts, workContext);
+		const workExpanded = expandedWork.has(message.id);
+		// Pending turns stay expanded so live tool boxes never disappear
+		// mid-stream. Completed older turns collapse behind Show Work.
+		const showWorkToggle =
+			!isLastMessage && message.status !== 'pending' && hasWork;
+		const collapseWork = showWorkToggle && !workExpanded;
+		const answerStart = collapseWork
+			? getTrailingAnswerStartIndex(turn.parts, workContext)
+			: 0;
 
 		if (showHeader) {
 			push({
@@ -432,6 +477,16 @@ export function buildThreadRows({
 				messageId: message.id,
 				endsTurn: false,
 				message,
+			});
+		}
+
+		if (showWorkToggle) {
+			push({
+				kind: 'assistant-show-work',
+				key: `sw:${message.id}`,
+				messageId: message.id,
+				endsTurn: false,
+				expanded: workExpanded,
 			});
 		}
 
@@ -458,6 +513,12 @@ export function buildThreadRows({
 		let lastVisiblePartIndex = -1;
 		parts.forEach((part, index) => {
 			if (isRedundantPlaceholder(part)) return;
+			if (
+				collapseWork &&
+				shouldHidePartWhenWorkCollapsed(part, index, answerStart, workContext)
+			) {
+				return;
+			}
 			if (getPartPresentation(part, turn) === 'visible') {
 				lastVisiblePartIndex = index;
 			}
@@ -551,6 +612,12 @@ export function buildThreadRows({
 
 		parts.forEach((part, index) => {
 			if (isRedundantPlaceholder(part)) return;
+			if (
+				collapseWork &&
+				shouldHidePartWhenWorkCollapsed(part, index, answerStart, workContext)
+			) {
+				return;
+			}
 
 			// Membership is decided before visibility: a resolved tool *call* is
 			// suppressed on its own, but inside a run it is part of the same

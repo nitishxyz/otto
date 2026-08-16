@@ -155,18 +155,25 @@ export const END_FOLLOW_OPTIONS = {
 export interface EndFollowInput {
 	/** Caller disabled auto-scroll entirely (embedded/preview threads). */
 	disabled: boolean;
-	/** An older page is being fetched or its rows are being committed. */
-	prepending: boolean;
+	/**
+	 * The reader has scrolled away from the live edge. Follow must stay off
+	 * for the whole detached window — flipping it back on after a prepend is
+	 * what snaps the viewport back to the bottom.
+	 */
+	detached: boolean;
 }
 
 /**
  * `maintainScrollAtEnd` configuration for the current frame. Legend List owns
- * the pinned/detached decision through `maintainScrollAtEndThreshold`; this
- * only suspends the feature while prepending or when auto-scroll is disabled.
+ * the near-end threshold; this only suspends the feature while the reader is
+ * away from the tail or when auto-scroll is disabled. A prepend of older
+ * history must not toggle this: at the tail, follow should keep the live
+ * edge on screen; away from it, follow must stay off so the insert cannot
+ * be mistaken for new content at the bottom.
  */
 export function resolveEndFollow(
 	input: EndFollowInput,
 ): typeof END_FOLLOW_OPTIONS | false {
-	if (input.disabled || input.prepending) return false;
+	if (input.disabled || input.detached) return false;
 	return END_FOLLOW_OPTIONS;
 }

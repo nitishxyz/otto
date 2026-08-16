@@ -50,9 +50,11 @@ import {
 	AssistantFooterRow,
 	AssistantHeaderRow,
 	AssistantItemRow,
+	AssistantShowWorkRow,
 	AssistantStatusRow,
 } from './ThreadRows';
 import { useMessageHoverHandlers } from './messageHoverStore';
+import { useTurnWorkStore } from './turnWorkStore';
 import {
 	createPrependRequestState,
 	markPrependRequested,
@@ -107,6 +109,13 @@ const END_FOLLOW_THRESHOLD = 0;
 const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
 /** Safety net for a prepend whose fetch never reports a loading state. */
 const PREPEND_RELEASE_FALLBACK_MS = 500;
+/**
+ * How close to the start (as a fraction of the viewport) before the next
+ * older page is requested. Small enough that a casual scroll does not load
+ * every page at once, large enough that the page is in flight before the
+ * reader hits the top.
+ */
+const START_REACHED_THRESHOLD = 0.15;
 /** Floor applied to every row so none can measure as a zero-height item. */
 const ROW_MIN_HEIGHT_STYLE = { minHeight: 1 } as const;
 /** Stable viewport style; changing object identity is needless list-level churn. */
@@ -249,6 +258,16 @@ const ThreadRowRenderer = memo(function ThreadRowRenderer({
 				/>
 			);
 			break;
+		case 'assistant-show-work':
+			indented = false;
+			content = (
+				<AssistantShowWorkRow
+					messageId={row.messageId}
+					expanded={row.expanded}
+					compact={compact}
+				/>
+			);
+			break;
 		default: {
 			// Compile-time exhaustiveness. A row kind added to the model without
 			// a case here would otherwise render an empty box, which the list
@@ -323,8 +342,8 @@ export const MessageThread = memo(function MessageThread({
 	const prependStateRef = useRef(createPrependRequestState());
 	const prependFetchStartedRef = useRef(false);
 	const cancelPrependDispatchRef = useRef<() => void>(() => {});
+	const didPrefetchOnDetachRef = useRef(false);
 	const [isPrepending, setIsPrepending] = useState(false);
-	const [showHistoryEdgeCover, setShowHistoryEdgeCover] = useState(false);
 	const chromeFrameRef = useRef<number | undefined>(undefined);
 	const lastSessionIdRef = useRef<string | undefined>(sessionId);
 	// Ids of the optimistic user messages already seen. A *new* one can only
@@ -332,6 +351,10 @@ export const MessageThread = memo(function MessageThread({
 	const seenOptimisticIdsRef = useRef<Set<string>>(new Set());
 	const optimisticSendsInitializedRef = useRef(false);
 
+	const expandedWorkMessageIds = useTurnWorkStore(
+		(state) => state.expandedMessageIds,
+	);
+	const clearExpandedWork = useTurnWorkStore((state) => state.clearExpanded);
 	const pendingTopup = useTopupApprovalStore((s) => s.pendingTopup);
 	const clearPendingTopup = useTopupApprovalStore((s) => s.clearPendingTopup);
 	const setSessionTodos = useTodoStore((s) => s.setSessionTodos);
@@ -526,12 +549,13 @@ export const MessageThread = memo(function MessageThread({
 		seenOptimisticIdsRef.current = new Set();
 		optimisticSendsInitializedRef.current = false;
 		setIsPrepending(false);
-		setShowHistoryEdgeCover(false);
+		didPrefetchOnDetachRef.current = false;
 		prependFetchStartedRef.current = false;
 		resetPrependRequests(prependStateRef.current);
 		setShowLeanHeader(false);
 		setRailInsets({ top: 0, bottom: 0 });
-	}, [sessionId, cancelPendingPrependDispatch]);
+		clearExpandedWork();
+	}, [sessionId, cancelPendingPrependDispatch, clearExpandedWork]);
 
 	// The *only* content-driven re-arm: this reader pressing send. An optimistic
 	// user message appears exactly once per send from this client, which makes
@@ -656,6 +680,7 @@ export const MessageThread = memo(function MessageThread({
 				queueLength: queueState.queueLength,
 				queuedMessageIds,
 				cache: rowCacheRef.current,
+				expandedWorkMessageIds,
 			}),
 		[
 			filteredMessages,
@@ -664,6 +689,7 @@ export const MessageThread = memo(function MessageThread({
 			queueState.currentMessageId,
 			queueState.queueLength,
 			queuedMessageIds,
+			expandedWorkMessageIds,
 		],
 	);
 
@@ -732,15 +758,10 @@ export const MessageThread = memo(function MessageThread({
 		// fills that new visible range on the next frame. Starting a cached/fast
 		// page fetch in the same scroll turn can commit the prepend before that
 		// paint and leave the viewport blank while the large page renders. Give
-		// the list one full paint first, then suspend end-following and fetch.
+		// the list one full paint first, then fetch — never cover the thread.
 		cancelPendingPrependDispatch();
-		setShowHistoryEdgeCover(true);
 		cancelPrependDispatchRef.current = schedulePrependAfterViewportPaint(() => {
 			cancelPrependDispatchRef.current = () => {};
-			setShowHistoryEdgeCover(false);
-			// Rows arriving above the viewport must never be mistaken for "new
-			// content at the bottom", so end-following stands down until the
-			// fetch settles. It is released without scrolling.
 			setIsPrepending(true);
 			onLoadOlderMessages?.();
 		}, PREPEND_FRAME_SCHEDULER);
@@ -752,11 +773,26 @@ export const MessageThread = memo(function MessageThread({
 		cancelPendingPrependDispatch,
 	]);
 
-	// Keep native end-following enabled and let Legend List's threshold decide
-	// synchronously whether the reader is still pinned. A prepend forces it off.
+	// Warm the next older page as soon as the reader leaves the live edge so
+	// the first scroll-up does not stall on a fetch. Only one page is
+	// prefetched per detach; further pages wait for `onStartReached`.
+	useEffect(() => {
+		if (following || disableAutoScroll) {
+			didPrefetchOnDetachRef.current = false;
+			return;
+		}
+		if (didPrefetchOnDetachRef.current) return;
+		if (!hasOlderMessages) return;
+		didPrefetchOnDetachRef.current = true;
+		requestOlderMessages();
+	}, [following, disableAutoScroll, hasOlderMessages, requestOlderMessages]);
+
+	// Follow only while the reader is still on the live edge. A prepend must
+	// not flip this: turning it back on after older rows land is what snaps
+	// the viewport back to the bottom.
 	const maintainScrollAtEnd = resolveEndFollow({
 		disabled: disableAutoScroll,
-		prepending: isPrepending || isLoadingOlderMessages,
+		detached: !following,
 	});
 
 	const keyExtractor = useCallback((row: ThreadRow) => row.key, []);
@@ -928,23 +964,11 @@ export const MessageThread = memo(function MessageThread({
 					// Never toggled: one anchoring owner for the list's whole lifetime.
 					maintainVisibleContentPosition={MAINTAIN_VISIBLE_CONTENT_POSITION}
 					onStartReached={requestOlderMessages}
-					onStartReachedThreshold={0.4}
+					onStartReachedThreshold={START_REACHED_THRESHOLD}
 					ListHeaderComponent={listHeader}
 					ListFooterComponent={listFooter}
 					refScrollView={attachScrollListener}
 				/>
-
-				{showHistoryEdgeCover && (
-					<div
-						data-history-edge-cover
-						className="pointer-events-none absolute inset-0 z-[5] flex items-start justify-center bg-background pt-24"
-					>
-						<div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-							<Loader2 className="h-3 w-3 animate-spin" />
-							Loading earlier messages…
-						</div>
-					</div>
-				)}
 
 				{preferences.threadNavigatorRail && (
 					<ThreadNavigatorRail

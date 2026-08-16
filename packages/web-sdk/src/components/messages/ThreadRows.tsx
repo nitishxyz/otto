@@ -23,6 +23,8 @@ import { apiClient } from '../../lib/api-client';
 import { getLoadingMessage } from './assistantTurnModel';
 import { useIsCompactThread } from './threadDensity';
 import { useIsMessageHovered } from './messageHoverStore';
+import { ShowWorkToggle } from './ShowWorkToggle';
+import { useTurnWorkStore } from './turnWorkStore';
 
 const STATUS_LINE_MOTION = {
 	initial: { opacity: 0, y: 6, filter: 'blur(2px)' },
@@ -469,6 +471,28 @@ interface AssistantFooterRowProps {
 	message: Message;
 	onBranchCreated?: (sessionId: string) => void;
 }
+
+interface AssistantShowWorkRowProps {
+	messageId: string;
+	expanded: boolean;
+	compact: boolean;
+}
+
+/** Horizontal-rule toggle that reveals an older turn's tool work. */
+export const AssistantShowWorkRow = memo(function AssistantShowWorkRow({
+	messageId,
+	expanded,
+	compact,
+}: AssistantShowWorkRowProps) {
+	const toggleExpanded = useTurnWorkStore((state) => state.toggleExpanded);
+	return (
+		<ShowWorkToggle
+			expanded={expanded}
+			onToggle={() => toggleExpanded(messageId)}
+			compact={compact}
+		/>
+	);
+});
 
 /** Hover-revealed branch/copy actions that close out an assistant turn. */
 export const AssistantFooterRow = memo(function AssistantFooterRow({

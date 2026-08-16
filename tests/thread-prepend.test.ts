@@ -169,17 +169,23 @@ describe('end-follow during a prepend', () => {
 		expect(isEndFollowSuspended(state)).toBe(false);
 	});
 
-	it('never re-enables following while a page is being fetched or committed', () => {
-		// A prepend must switch following off for its whole window so rows
-		// inserted above the viewport cannot pull the view down.
-		expect(resolveEndFollow({ disabled: false, prepending: true })).toBe(false);
+	it('keeps following on during a prepend if the reader is still at the tail', () => {
+		// Older rows insert *above* the viewport. Turning follow off (and then
+		// back on when the fetch settles) is what snaps the view to the bottom.
+		expect(resolveEndFollow({ disabled: false, detached: false })).toBe(
+			END_FOLLOW_OPTIONS,
+		);
+	});
+
+	it('keeps following off for the whole time the reader is away from the tail', () => {
+		expect(resolveEndFollow({ disabled: false, detached: true })).toBe(false);
 	});
 
 	it('delegates the pinned decision to Legend List', () => {
-		expect(resolveEndFollow({ disabled: false, prepending: false })).toBe(
+		expect(resolveEndFollow({ disabled: false, detached: false })).toBe(
 			END_FOLLOW_OPTIONS,
 		);
-		expect(resolveEndFollow({ disabled: true, prepending: false })).toBe(false);
+		expect(resolveEndFollow({ disabled: true, detached: false })).toBe(false);
 	});
 
 	it('uses a non-animated, explicitly triggered follow', () => {

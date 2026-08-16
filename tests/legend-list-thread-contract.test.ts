@@ -33,10 +33,10 @@ describe('Legend List message thread contract', () => {
 		expect(source).not.toContain('createThreadFollowState');
 	});
 
-	test('covers an absolute top jump without pinning expensive history rows', async () => {
+	test('loads older history without covering the viewport', async () => {
 		const source = await readFile(messageThreadPath, 'utf8');
-		expect(source).toContain('data-history-edge-cover');
 		expect(source).toContain('schedulePrependAfterViewportPaint(');
+		expect(source).not.toContain('data-history-edge-cover');
 		expect(source).not.toContain('alwaysRender=');
 	});
 

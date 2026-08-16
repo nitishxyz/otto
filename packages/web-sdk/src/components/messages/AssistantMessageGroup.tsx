@@ -37,7 +37,13 @@ import {
 	isActionToolPart,
 } from './assistantTurnModel';
 import { HiddenAssistantStepsRow } from './HiddenAssistantStepsRow';
+import { ShowWorkToggle } from './ShowWorkToggle';
 import { useIsCompactThread } from './threadDensity';
+import {
+	getTrailingAnswerRenderStart,
+	isWorkRenderItem,
+	type TurnWorkContext,
+} from './turnWork';
 
 interface AssistantMessageGroupProps {
 	sessionId?: string;
@@ -60,6 +66,7 @@ export const AssistantMessageGroup = memo(
 		message,
 		showHeader,
 		hasNextAssistantMessage,
+		isLastMessage,
 		onBranchCreated,
 		compact,
 		showBranchButton = true,
@@ -75,10 +82,12 @@ export const AssistantMessageGroup = memo(
 		const [showBranchModal, setShowBranchModal] = useState(false);
 		const [copied, setCopied] = useState(false);
 		const [showAllParts, setShowAllParts] = useState(false);
+		const [workExpanded, setWorkExpanded] = useState(false);
 
 		useEffect(() => {
 			if (!message.id) return;
 			setShowAllParts(false);
+			setWorkExpanded(false);
 		}, [message.id]);
 
 		// Tool approval handling
@@ -138,6 +147,8 @@ export const AssistantMessageGroup = memo(
 			omittedRenderItemCount,
 			autoCompactActivity,
 			liveActionToolCallIds,
+			completedActionToolCallIds,
+			resolvedToolCallIds,
 			firstVisiblePartIndex,
 			hasVisibleNonProgressParts,
 			latestProgressUpdatePart,
@@ -150,6 +161,35 @@ export const AssistantMessageGroup = memo(
 			() => deriveAssistantTurn(message, { compact, isQueued, showAllParts }),
 			[message, compact, isQueued, showAllParts],
 		);
+		const workContext = useMemo<TurnWorkContext>(
+			() => ({ resolvedToolCallIds, completedActionToolCallIds }),
+			[resolvedToolCallIds, completedActionToolCallIds],
+		);
+		const hasWork = useMemo(
+			() => renderItems.some((item) => isWorkRenderItem(item, workContext)),
+			[renderItems, workContext],
+		);
+		const showWorkToggle =
+			!isLastMessage && message.status !== 'pending' && hasWork;
+		const collapseWork = showWorkToggle && !workExpanded;
+		const displayedRenderItems = useMemo(() => {
+			if (!collapseWork) return visibleRenderItems;
+			const answerStart = getTrailingAnswerRenderStart(
+				renderItems,
+				workContext,
+			);
+			return renderItems.flatMap((item, renderIndex) => {
+				if (isWorkRenderItem(item, workContext)) return [];
+				if (
+					item.kind === 'part' &&
+					(item.part.type === 'text' || item.part.type === 'reasoning') &&
+					renderIndex < answerStart
+				) {
+					return [];
+				}
+				return [{ item, renderIndex }];
+			});
+		}, [collapseWork, visibleRenderItems, renderItems, workContext]);
 		const formatTime = (ts?: number) => {
 			if (!ts) return '';
 			const date = new Date(ts);
@@ -368,9 +408,18 @@ export const AssistantMessageGroup = memo(
 					</div>
 				)}
 
+				{showWorkToggle && (
+					<ShowWorkToggle
+						expanded={workExpanded}
+						onToggle={() => setWorkExpanded((current) => !current)}
+						compact={compact}
+					/>
+				)}
+
 				<div className="relative ml-1">
-					{visibleRenderItems.map(({ item, renderIndex }, visibleIndex) => {
+					{displayedRenderItems.map(({ item, renderIndex }, visibleIndex) => {
 						const showPartWindowGap =
+							!collapseWork &&
 							omittedRenderItemCount > 0 &&
 							visibleIndex === PART_WINDOW_HEAD_COUNT;
 						return (
