@@ -12,6 +12,7 @@ import {
 } from 'node:path';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import { prepareImageBytes } from '../runtime/message/image-compression.ts';
 import { resolveRequestProjectRoot } from './project-context.ts';
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
@@ -93,7 +94,7 @@ const attachmentErrorResponseSchema = z.object({
 const binaryAttachmentResponseSchema = z.unknown().openapi({
 	type: 'string',
 	format: 'binary',
-	description: 'Raw attachment file bytes',
+	description: 'Stored attachment file bytes',
 });
 
 function sanitizeFilename(filename: string): string {
@@ -193,21 +194,24 @@ export async function storeAttachmentBytes(args: {
 
 	const id = `att_${crypto.randomUUID()}`;
 	const filename = sanitizeFilename(args.filename);
-	const mimeType = args.mimeType || 'application/octet-stream';
+	const sourceMimeType = args.mimeType || 'application/octet-stream';
+	const prepared = await prepareImageBytes(args.bytes, sourceMimeType);
+	const storedBytes = Buffer.from(prepared.bytes);
+	const mimeType = prepared.mediaType;
 	const cfg = await loadConfig(args.projectRoot);
 	const dir = attachmentDir(cfg.paths.attachmentsDir, id);
 	await mkdir(dir, { recursive: true });
 
-	const sha256 = createHash('sha256').update(args.bytes).digest('hex');
+	const sha256 = createHash('sha256').update(storedBytes).digest('hex');
 	const originalStorageName = getOriginalStorageName(mimeType, filename);
 	const relativePath = join(ATTACHMENTS_DIR, id, originalStorageName);
-	await writeFile(join(dir, originalStorageName), args.bytes);
+	await writeFile(join(dir, originalStorageName), storedBytes);
 
 	const metadata: StoredAttachmentMetadata = {
 		id,
 		filename,
 		mimeType,
-		size: args.bytes.byteLength,
+		size: storedBytes.byteLength,
 		sha256,
 		kind: getAttachmentKind(mimeType),
 		...(args.sessionId ? { sessionId: args.sessionId } : {}),
@@ -233,7 +237,7 @@ export function registerAttachmentRoutes(app: Hono) {
 			operationId: 'uploadAttachment',
 			summary: 'Upload an attachment',
 			description:
-				'Store an attachment file under the configured project state directory. Multipart uploads are represented in OpenAPI with a binary Zod schema so generated clients can expose the endpoint.',
+				'Store an attachment file under the configured project state directory. Supported raster images are re-encoded before storage, and the source image bytes are not retained. Multipart uploads are represented in OpenAPI with a binary Zod schema so generated clients can expose the endpoint.',
 			request: {
 				query: projectQuerySchema,
 				body: {
@@ -376,9 +380,9 @@ export function registerAttachmentRoutes(app: Hono) {
 			path: '/v1/attachments/{id}',
 			tags: ['attachments'],
 			operationId: 'getAttachment',
-			summary: 'Get raw attachment bytes',
+			summary: 'Get stored attachment bytes',
 			description:
-				'Returns the original attachment file. This binary response is represented in OpenAPI with a binary Zod schema; consumers may still prefer URL-based rendering for images/PDFs.',
+				'Returns the stored attachment representation. Raster images may be re-encoded and downscaled from the uploaded source. This binary response is represented in OpenAPI with a binary Zod schema; consumers may still prefer URL-based rendering for images/PDFs.',
 			request: {
 				params: attachmentParamsSchema,
 				query: projectQuerySchema,

@@ -12,7 +12,7 @@ import {
 	waitForTimeoutMs,
 	type BrowserInput,
 } from './browser-command.ts';
-import { prepareScreenshotForModel } from './screenshot-image.ts';
+import { prepareImageForModel } from '../image.ts';
 
 type JsonValue =
 	| null
@@ -115,7 +115,7 @@ async function buildScreenshotResult(
 			'Browser screenshot is empty or exceeds the 24 MB size limit',
 		);
 	}
-	const prepared = await prepareScreenshotForModel(new Uint8Array(raw), {
+	const prepared = await prepareImageForModel(new Uint8Array(raw), {
 		mediaType,
 	});
 	return {

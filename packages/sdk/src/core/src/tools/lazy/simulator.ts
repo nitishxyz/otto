@@ -7,7 +7,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { getProjectTmpDir } from '../../../../config/src/paths.ts';
 import { createToolError } from '../error.ts';
-import { prepareScreenshotForModel } from './screenshot-image.ts';
+import { prepareImageForModel } from '../image.ts';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const FETCH_TIMEOUT_MS = 5_000;
@@ -1056,7 +1056,7 @@ export function buildSimulatorTool(projectRoot: string): {
 							const bytes = await fetchFirstMjpegFrame(
 								`${getStreamUrl(stream)}/stream.mjpeg?raw=1`,
 							);
-							const screenshot = await prepareScreenshotForModel(bytes);
+							const screenshot = await prepareImageForModel(bytes);
 							const storedScreenshot = input.storeScreenshot
 								? await buildScreenshotArtifactPath(
 										projectRoot,
@@ -1067,7 +1067,7 @@ export function buildSimulatorTool(projectRoot: string): {
 								await mkdir(dirname(storedScreenshot.absPath), {
 									recursive: true,
 								});
-								await writeFile(storedScreenshot.absPath, bytes);
+								await writeFile(storedScreenshot.absPath, screenshot.data);
 							}
 							const storedScreenshotMetadata = storedScreenshot
 								? {

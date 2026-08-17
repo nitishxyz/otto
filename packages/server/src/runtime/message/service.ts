@@ -34,14 +34,12 @@ export async function dispatchAssistantMessage(
 
 	const sessionId = session.id;
 	const now = Date.now();
+	const compressedImages = await compressImageAttachments(images);
 	const imagesWithAttachments = await attachDirectImages({
 		projectRoot: cfg.projectRoot,
 		sessionId,
-		images,
+		images: compressedImages,
 	});
-	const compressedImages = await compressImageAttachments(
-		imagesWithAttachments,
-	);
 	const compressedFiles = await compressFileImageAttachments(files);
 	const builtinCommand = await prepareBuiltinCommand({
 		cfg,
@@ -73,7 +71,7 @@ export async function dispatchAssistantMessage(
 		model: effectiveModel,
 		content,
 		createdAt: now,
-		images: compressedImages,
+		images: imagesWithAttachments,
 		files: compressedFiles,
 	});
 

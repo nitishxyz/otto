@@ -18,6 +18,7 @@ import {
 	type NativeExtensionOutputFrame,
 	type NativeExtensionResponse,
 } from './protocol.ts';
+import { prepareImageForModel } from '../image.ts';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const handlers = new Map<string, Promise<NativeToolHandler>>();
@@ -195,10 +196,13 @@ function createOutputContext(projectRoot: string): NativeToolContext['output'] {
 			if (data.byteLength > MAX_IMAGE_BYTES) {
 				throw new Error(`Image output exceeds ${MAX_IMAGE_BYTES} bytes`);
 			}
+			const prepared = await prepareImageForModel(data, {
+				mediaType: mediaType ?? inferMediaType(path),
+			});
 			return {
 				type: 'image',
-				data: data.toString('base64'),
-				mediaType: mediaType ?? inferMediaType(path),
+				data: Buffer.from(prepared.data).toString('base64'),
+				mediaType: prepared.mediaType,
 			};
 		},
 	};

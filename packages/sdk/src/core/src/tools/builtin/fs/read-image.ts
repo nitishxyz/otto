@@ -4,32 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
 import { createToolError, type ToolResponse } from '../../error.ts';
+import { prepareImageForModel } from '../../image.ts';
 import { expandTilde, isAbsoluteLike, resolveSafePath } from './util.ts';
 import DESCRIPTION from './read-image.txt' with { type: 'text' };
-
-type BunImageMetadata = {
-	width?: number;
-	height?: number;
-	format?: string;
-};
-
-type BunImagePipeline = {
-	metadata(): Promise<BunImageMetadata>;
-	resize(
-		width: number,
-		height?: number,
-		options?: {
-			fit?: 'inside';
-			withoutEnlargement?: boolean;
-		},
-	): BunImagePipeline;
-	jpeg(options?: { quality?: number }): BunImagePipeline;
-	bytes(): Promise<Uint8Array>;
-};
-
-type BunImageConstructor = new (
-	input: string | ArrayBuffer | Uint8Array | Blob,
-) => BunImagePipeline;
 
 type JsonValue =
 	| null
@@ -52,14 +29,6 @@ type ReadImageResult = {
 	height?: number;
 };
 
-type PreparedImage = {
-	data: Uint8Array;
-	mediaType: string;
-	width?: number;
-	height?: number;
-	compressed: boolean;
-};
-
 type ReadImageInput = {
 	path: string;
 	maxEdge?: number;
@@ -78,12 +47,6 @@ const SUPPORTED_IMAGE_TYPES = new Set([
 	'image/png',
 	'image/webp',
 ]);
-const COMPRESSIBLE_IMAGE_TYPES = new Set([
-	'image/bmp',
-	'image/jpeg',
-	'image/png',
-	'image/webp',
-]);
 const MEDIA_TYPE_BY_EXTENSION: Record<string, string> = {
 	'.bmp': 'image/bmp',
 	'.gif': 'image/gif',
@@ -92,10 +55,6 @@ const MEDIA_TYPE_BY_EXTENSION: Record<string, string> = {
 	'.png': 'image/png',
 	'.webp': 'image/webp',
 };
-
-function getBunImageConstructor(): BunImageConstructor | undefined {
-	return (Bun as typeof Bun & { Image?: BunImageConstructor }).Image;
-}
 
 function toJsonValue(value: unknown): JsonValue {
 	if (value === undefined) return null;
@@ -154,50 +113,6 @@ function detectMediaType(
 	return normalizeMediaType(
 		MEDIA_TYPE_BY_EXTENSION[extname(filePath).toLowerCase()],
 	);
-}
-
-async function prepareImage(
-	input: Uint8Array,
-	mediaType: string,
-	options: Required<Pick<ReadImageInput, 'maxEdge' | 'quality'>>,
-): Promise<PreparedImage> {
-	const ImageConstructor = getBunImageConstructor();
-	if (!ImageConstructor || !COMPRESSIBLE_IMAGE_TYPES.has(mediaType)) {
-		return { data: input, mediaType, compressed: false };
-	}
-
-	try {
-		const image = new ImageConstructor(input);
-		const metadata = await image.metadata();
-		const width = metadata.width ?? 0;
-		const height = metadata.height ?? 0;
-		if (width <= 0 || height <= 0) {
-			return { data: input, mediaType, compressed: false };
-		}
-
-		const pipeline =
-			width > options.maxEdge || height > options.maxEdge
-				? image.resize(options.maxEdge, options.maxEdge, {
-						fit: 'inside',
-						withoutEnlargement: true,
-					})
-				: image;
-		const output = await pipeline.jpeg({ quality: options.quality }).bytes();
-
-		if (output.byteLength >= input.byteLength) {
-			return { data: input, mediaType, width, height, compressed: false };
-		}
-
-		return {
-			data: output,
-			mediaType: JPEG_MEDIA_TYPE,
-			width,
-			height,
-			compressed: true,
-		};
-	} catch {
-		return { data: input, mediaType, compressed: false };
-	}
 }
 
 /**
@@ -295,7 +210,8 @@ export function buildReadImageTool(projectRoot: string): {
 					);
 				}
 
-				const prepared = await prepareImage(input, mediaType, {
+				const prepared = await prepareImageForModel(input, {
+					mediaType,
 					maxEdge,
 					quality,
 				});

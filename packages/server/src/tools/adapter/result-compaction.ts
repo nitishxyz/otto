@@ -189,6 +189,34 @@ function compactTerminalResultForModel(
 	return compacted;
 }
 
+function isInlineImageRecord(record: Record<string, unknown>): boolean {
+	const mediaType = record.mediaType;
+	const type = record.type;
+	const kind = record.kind;
+	return (
+		(typeof mediaType === 'string' && mediaType.startsWith('image/')) ||
+		type === 'image' ||
+		type === 'image-data' ||
+		(typeof kind === 'string' && kind.endsWith('_screenshot'))
+	);
+}
+
+function stripInlineImageData(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(stripInlineImageData);
+	if (!value || typeof value !== 'object') return value;
+
+	const record = value as Record<string, unknown>;
+	const stripped: Record<string, unknown> = {};
+	const omitData =
+		typeof record.data === 'string' && isInlineImageRecord(record);
+	for (const [key, fieldValue] of Object.entries(record)) {
+		if (omitData && key === 'data') continue;
+		stripped[key] = stripInlineImageData(fieldValue);
+	}
+	if (omitData) stripped.dataOmitted = true;
+	return stripped;
+}
+
 export function stripToolResultArtifactsForModel(
 	result: unknown,
 	options: ToolResultModelOptions = {},
@@ -199,21 +227,27 @@ export function stripToolResultArtifactsForModel(
 	const { artifact: _artifact, ...rest } = result as Record<string, unknown>;
 	if (rest.operation === 'apply_patch' && 'changes' in rest) {
 		const { changes: _changes, ...compact } = rest;
-		return compact;
+		return stripInlineImageData(compact);
 	}
 
+	let compacted: Record<string, unknown>;
 	switch (options.toolName) {
 		case 'shell':
-			return compactShellResultForModel(rest);
+			compacted = compactShellResultForModel(rest);
+			break;
 		case 'read':
-			return compactReadResultForModel(rest, options);
+			compacted = compactReadResultForModel(rest, options);
+			break;
 		case 'search':
-			return compactSearchResultForModel(rest);
+			compacted = compactSearchResultForModel(rest);
+			break;
 		case 'terminal':
-			return compactTerminalResultForModel(rest);
+			compacted = compactTerminalResultForModel(rest);
+			break;
 		default:
+			compacted = rest;
 			break;
 	}
 
-	return rest;
+	return stripInlineImageData(compacted);
 }

@@ -106,6 +106,53 @@ describe('tool result model sanitization', () => {
 		});
 	});
 
+	it('omits persisted read_image bytes from later model turns', () => {
+		const data = 'a'.repeat(2_000_000);
+		const sanitized = stripToolResultArtifactsForModel(
+			{
+				ok: true,
+				path: '/tmp/screenshot.png',
+				mediaType: 'image/jpeg',
+				data,
+				transmittedSize: 1_500_000,
+				compressed: true,
+			},
+			{ toolName: 'read_image' },
+		);
+
+		expect(sanitized).toEqual({
+			ok: true,
+			path: '/tmp/screenshot.png',
+			mediaType: 'image/jpeg',
+			transmittedSize: 1_500_000,
+			compressed: true,
+			dataOmitted: true,
+		});
+		expect(JSON.stringify(sanitized)).not.toContain(data);
+	});
+
+	it('omits nested native extension image bytes from later model turns', () => {
+		const data = 'b'.repeat(1_000_000);
+		const sanitized = stripToolResultArtifactsForModel({
+			content: [
+				{ type: 'text', text: 'inspection result' },
+				{ type: 'image', mediaType: 'image/webp', data },
+			],
+		});
+
+		expect(sanitized).toEqual({
+			content: [
+				{ type: 'text', text: 'inspection result' },
+				{
+					type: 'image',
+					mediaType: 'image/webp',
+					dataOmitted: true,
+				},
+			],
+		});
+		expect(JSON.stringify(sanitized)).not.toContain(data);
+	});
+
 	it('removes apply_patch hunk details from model-visible output', () => {
 		const result = {
 			ok: true,

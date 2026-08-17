@@ -7,6 +7,19 @@ import { createEmbeddedApp } from '../packages/server/src/index.js';
 import { storeAttachmentBytes } from '../packages/server/src/routes/attachments.ts';
 import { buildCopyAttachmentTool } from '../packages/sdk/src/core/src/tools/builtin/fs/copy-attachment.ts';
 
+const appIconUrl = new URL(
+	'../apps/mac/otto/otto/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png',
+	import.meta.url,
+);
+
+type TestImagePipeline = {
+	resize(width: number, height: number): TestImagePipeline;
+	png(): TestImagePipeline;
+	bytes(): Promise<Uint8Array>;
+};
+
+type TestImageConstructor = new (input: Uint8Array) => TestImagePipeline;
+
 async function withProject(
 	prefix: string,
 	fn: (projectRoot: string, ottoHome: string) => Promise<void>,
@@ -102,6 +115,45 @@ describe('attachment project state storage', () => {
 						metadata.id,
 						'original.txt',
 					),
+				).exists(),
+			).toBe(false);
+		});
+	});
+
+	it('stores only the compressed representation of large raster images', async () => {
+		await withProject('otto-attachments-image-', async (projectRoot) => {
+			const icon = await readFile(appIconUrl);
+			const ImageConstructor = (
+				Bun as typeof Bun & { Image?: TestImageConstructor }
+			).Image;
+			if (!ImageConstructor)
+				throw new Error('Bun.Image is required for this test');
+			const input = Buffer.from(
+				await new ImageConstructor(icon).resize(2048, 2048).png().bytes(),
+			);
+			const metadata = await storeAttachmentBytes({
+				projectRoot,
+				bytes: input,
+				filename: 'icon.png',
+				mimeType: 'image/png',
+			});
+			const cfg = await loadConfig(projectRoot);
+			const storedPath = join(
+				cfg.paths.projectStateDir,
+				metadata.relativePath as string,
+			);
+			const stored = await readFile(storedPath);
+
+			expect(metadata.mimeType).toBe('image/jpeg');
+			expect(metadata.relativePath).toBe(
+				join('attachments', metadata.id, 'original.jpg'),
+			);
+			expect(metadata.size).toBe(stored.byteLength);
+			expect(stored.byteLength).toBeLessThan(input.byteLength);
+			expect(Buffer.compare(stored, input)).not.toBe(0);
+			expect(
+				await Bun.file(
+					join(cfg.paths.attachmentsDir, metadata.id, 'original.png'),
 				).exists(),
 			).toBe(false);
 		});

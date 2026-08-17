@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'bun:test';
+import { prepareImageForModel } from '@ottocode/sdk/image';
 import {
 	compressFileImageAttachments,
 	compressImageAttachments,
@@ -11,6 +12,19 @@ const appIconUrl = new URL(
 );
 
 describe('image compression', () => {
+	test('uses the shared SDK image preparation primitive', async () => {
+		const input = await readFile(appIconUrl);
+		const prepared = await prepareImageForModel(input, {
+			mediaType: 'image/png',
+			maxEdge: 128,
+			quality: 80,
+		});
+
+		expect(prepared.mediaType).toBe('image/jpeg');
+		expect(prepared.compressed).toBe(true);
+		expect(prepared.data.byteLength).toBeLessThan(input.byteLength);
+	});
+
 	test('compresses image attachments with Bun.Image', async () => {
 		const input = await readFile(appIconUrl);
 		const [compressed] = await compressImageAttachments(

@@ -25,11 +25,11 @@ export async function attachDirectImages(args: {
 					...image,
 					attachmentId: metadata.id,
 					name: metadata.filename,
-					original: {
+					original: image.original ?? {
 						filename: metadata.filename,
-						size: metadata.size,
-						sha256: metadata.sha256,
-						mimeType: metadata.mimeType,
+						size: image.compression?.originalBytes ?? metadata.size,
+						...(image.compression ? {} : { sha256: metadata.sha256 }),
+						mimeType: image.compression?.originalMediaType ?? metadata.mimeType,
 					},
 				};
 			} catch (error) {
