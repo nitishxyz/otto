@@ -636,6 +636,41 @@ export function App({
 		}
 	}, [activeSession, isStreaming, messages, showStatus, dispatchStream]);
 
+	const handleAgentSelect = useCallback(
+		async (agent: string) => {
+			if (activeSession) {
+				await updateSessionPrefs(activeSession.id, { agent });
+			} else {
+				const s = await createSession();
+				if (s) await updateSessionPrefs(s.id, { agent });
+			}
+			showStatus({ type: 'success', label: `agent: ${agent}` }, 2000);
+		},
+		[activeSession, updateSessionPrefs, createSession, showStatus],
+	);
+
+	const handleCycleAgent = useCallback(() => {
+		const agents = config.agents;
+		if (agents.length === 0) return;
+		const current =
+			activeSession?.agent ||
+			initialSessionDefaults?.agent ||
+			(isConfigLoaded ? config.defaults.agent : 'build');
+		const currentIndex = agents.indexOf(current);
+		const nextIndex =
+			currentIndex >= 0 ? (currentIndex + 1) % agents.length : 0;
+		const nextAgent = agents[nextIndex];
+		if (!nextAgent || nextAgent === current) return;
+		void handleAgentSelect(nextAgent);
+	}, [
+		config.agents,
+		config.defaults.agent,
+		activeSession?.agent,
+		initialSessionDefaults?.agent,
+		isConfigLoaded,
+		handleAgentSelect,
+	]);
+
 	useGlobalKeymap({
 		overlay,
 		isStreaming,
@@ -654,6 +689,7 @@ export function App({
 		focusWorkspace: handleCycleWorkspaceFocus,
 		moveWorkspaceFocus: handleMoveWorkspaceFocus,
 		backWorkspace,
+		cycleAgent: handleCycleAgent,
 		onQuit,
 	});
 
@@ -748,19 +784,6 @@ export function App({
 			openWorkspaceDetail({ kind: 'subagent', id: subagent.id });
 		},
 		[setOverlay, setWorkspaceTab, openWorkspaceDetail],
-	);
-
-	const handleAgentSelect = useCallback(
-		async (agent: string) => {
-			if (activeSession) {
-				await updateSessionPrefs(activeSession.id, { agent });
-			} else {
-				const s = await createSession();
-				if (s) await updateSessionPrefs(s.id, { agent });
-			}
-			showStatus({ type: 'success', label: `agent: ${agent}` }, 2000);
-		},
-		[activeSession, updateSessionPrefs, createSession, showStatus],
 	);
 
 	const chatInput = (

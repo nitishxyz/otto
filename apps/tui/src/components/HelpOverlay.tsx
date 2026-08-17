@@ -10,7 +10,7 @@ interface HelpOverlayProps {
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
 	const { colors } = useTheme();
 	const commands = getCommandSuggestions('');
-	const rowCount = commands.length + 18;
+	const rowCount = commands.length + 19;
 	const viewport = useListModalWindow(rowCount, 0);
 
 	useKeyboard((key) => {
@@ -115,6 +115,11 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 						<text fg={colors.fgMuted}>H / L</text>
 						<text fg={colors.fgDimmed}>—</text>
 						<text fg={colors.fgDark}>Switch activity tabs</text>
+					</box>
+					<box style={{ flexDirection: 'row', gap: 1 }}>
+						<text fg={colors.fgMuted}>Ctrl+G</text>
+						<text fg={colors.fgDimmed}>—</text>
+						<text fg={colors.fgDark}>Cycle agent</text>
 					</box>
 					<box style={{ flexDirection: 'row', gap: 1 }}>
 						<text fg={colors.fgMuted}>Ctrl+P</text>

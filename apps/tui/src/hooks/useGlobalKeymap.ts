@@ -19,6 +19,8 @@ interface GlobalKeymapOptions {
 	focusWorkspace: () => void;
 	moveWorkspaceFocus: (direction: 'left' | 'right') => void;
 	backWorkspace: () => void;
+	/** Cycle the active session agent (Ctrl+G). Skipped while commit is open. */
+	cycleAgent: () => void;
 	onQuit: () => void;
 }
 
@@ -44,6 +46,7 @@ export function useGlobalKeymap({
 	focusWorkspace,
 	moveWorkspaceFocus,
 	backWorkspace,
+	cycleAgent,
 	onQuit,
 }: GlobalKeymapOptions) {
 	useKeyboard((key) => {
@@ -111,6 +114,13 @@ export function useGlobalKeymap({
 		}
 		if (key.ctrl && key.name === 'm') {
 			setOverlay('mcp');
+			return;
+		}
+		// Ctrl+G cycles agents; commit overlay owns the same chord for generate.
+		if (key.ctrl && key.name === 'g' && overlay !== 'commit') {
+			key.preventDefault();
+			key.stopPropagation();
+			cycleAgent();
 			return;
 		}
 		if (key.ctrl && key.name === 'c') {
