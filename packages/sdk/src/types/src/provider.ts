@@ -1,54 +1,19 @@
-/**
- * Built-in provider identifiers supported directly by otto.
- */
-export type BuiltInProviderId =
-	| 'openai'
-	| 'anthropic'
-	| 'google'
-	| 'meta'
-	| 'ollama-cloud'
-	| 'baseten'
-	| 'huggingface'
-	| 'wafer'
-	| 'openrouter'
-	| 'opencode'
-	| 'copilot'
-	| 'ottorouter'
-	| 'xai'
-	| 'zai'
-	| 'zai-coding'
-	| 'deepseek'
-	| 'kimi'
-	| 'minimax';
+import type {
+	BuiltInProviderId,
+	ProviderCompatibility,
+	ProviderPromptFamily,
+} from './provider-descriptors.ts';
+
+export type {
+	BuiltInProviderId,
+	ProviderCompatibility,
+	ProviderPromptFamily,
+} from './provider-descriptors.ts';
 
 /**
  * Provider identifiers may be built-in or custom/config-defined.
  */
 export type ProviderId = BuiltInProviderId | (string & {});
-
-/**
- * Compatibility protocol used to instantiate a provider client.
- */
-export type ProviderCompatibility =
-	| 'openai'
-	| 'anthropic'
-	| 'google'
-	| 'openrouter'
-	| 'ollama'
-	| 'openai-compatible';
-
-/**
- * Prompt/behavior family used for prompts and provider-specific behavior.
- */
-export type ProviderPromptFamily =
-	| 'default'
-	| 'anthropic'
-	| 'openai'
-	| 'google'
-	| 'kimi'
-	| 'minimax'
-	| 'glm'
-	| 'openai-compatible';
 
 /**
  * Provider family for prompt selection

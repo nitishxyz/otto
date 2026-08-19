@@ -41,7 +41,7 @@ export function registerSessionFilesRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				return c.json(await getSessionFiles(sessionId, projectRoot));
 			} catch (error) {

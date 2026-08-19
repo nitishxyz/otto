@@ -6,7 +6,6 @@ import {
 	readReferenceSettings,
 	removeReferenceSettings,
 	writeReferenceSettings,
-	type ReferenceConfig,
 } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { readdir, stat } from 'node:fs/promises';
@@ -104,7 +103,7 @@ export function registerReferencesRoutes(app: Hono) {
 		},
 		async (c) => {
 			const projectRoot = await resolveRequestProjectRoot(c);
-			const requestedScope = c.req.query('scope');
+			const { scope: requestedScope } = c.req.valid('query');
 			const scope =
 				requestedScope === 'global' || requestedScope === 'local'
 					? requestedScope
@@ -144,7 +143,7 @@ export function registerReferencesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const requestedPath = c.req.query('path')?.trim();
+				const requestedPath = c.req.valid('query').path?.trim();
 				const expandedPath = requestedPath?.startsWith('~/')
 					? join(homedir(), requestedPath.slice(2))
 					: requestedPath;
@@ -200,9 +199,9 @@ export function registerReferencesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const { name } = c.req.param();
-				const scope = c.req.query('scope') === 'local' ? 'local' : 'global';
-				const reference = (await c.req.json()) as ReferenceConfig;
+				const { name } = c.req.valid('param');
+				const { scope } = c.req.valid('query');
+				const reference = c.req.valid('json');
 				await writeReferenceSettings(scope, name, reference, projectRoot);
 				const cfg =
 					(await getProjectManager().refreshProjectConfig(projectRoot)) ??
@@ -240,7 +239,7 @@ export function registerReferencesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const { name } = c.req.param();
+				const { name } = c.req.valid('param');
 				const cfg = await loadConfig(projectRoot);
 				const reference = cfg.references?.[name];
 				if (!reference) return c.json({ error: 'Reference not found' }, 404);
@@ -280,8 +279,8 @@ export function registerReferencesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const { name } = c.req.param();
-				const scope = c.req.query('scope') === 'local' ? 'local' : 'global';
+				const { name } = c.req.valid('param');
+				const { scope } = c.req.valid('query');
 				const scopedReferences = await readReferenceSettings(
 					scope,
 					projectRoot,

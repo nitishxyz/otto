@@ -64,6 +64,11 @@ import {
 	schedulePrependAfterViewportPaint,
 	shouldRequestPrepend,
 } from './threadPrepend';
+import {
+	createThreadFollowState,
+	reduceThreadFollow,
+	type ThreadFollowEvent,
+} from './threadFollowState';
 interface MessageThreadProps {
 	messages: Message[];
 	session?: Session;
@@ -103,8 +108,11 @@ const ESTIMATED_HEADER_SIZE_PX = 96;
  * screenful of markdown at once.
  */
 const DRAW_DISTANCE_PX = 1000;
-/** Any movement away from the live edge must stop streaming auto-follow. */
-const END_FOLLOW_THRESHOLD = 0;
+/**
+ * Gives LegendList enough room to absorb streamed measurements. Reader intent,
+ * rather than this measurement threshold, owns detaching end-follow.
+ */
+const END_FOLLOW_THRESHOLD = 1;
 /** Fixed height for the "load earlier" slot so a fetch cannot resize the header. */
 const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
 /** Safety net for a prepend whose fetch never reports a loading state. */
@@ -327,8 +335,10 @@ export const MessageThread = memo(function MessageThread({
 		compact || (responsiveCompact && threadWidth > 0 && threadWidth < 640)
 			? 'compact'
 			: 'normal';
-	// Legend List owns the end-follow latch. This mirror only controls the
-	// "scroll to bottom" button; it never enables or disables auto-follow.
+	// The intent latch decides whether LegendList may follow. Streamed height
+	// changes never mutate it; only reader scrolling and explicit bottom
+	// requests do.
+	const followStateRef = useRef(createThreadFollowState());
 	const [following, setFollowing] = useState(true);
 	const [showLeanHeader, setShowLeanHeader] = useState(false);
 	const [railInsets, setRailInsets] = useState({ top: 0, bottom: 0 });
@@ -389,17 +399,17 @@ export const MessageThread = memo(function MessageThread({
 	]);
 	const hasMessages = messages.length > 0;
 
-	useEffect(() => {
-		if (!hasMessages) return;
-		const listState = listRef.current?.getState();
-		if (!listState) return;
+	const dispatchFollow = useCallback((event: ThreadFollowEvent) => {
+		const previous = followStateRef.current;
+		const next = reduceThreadFollow(previous, event);
+		if (next === previous) return;
+		followStateRef.current = next;
+		if (next.following !== previous.following) setFollowing(next.following);
+	}, []);
 
-		setFollowing(listState.isWithinMaintainScrollAtEndThreshold);
-		return listState.listen(
-			'isWithinMaintainScrollAtEndThreshold',
-			setFollowing,
-		);
-	}, [hasMessages]);
+	const disableAutoFollow = useCallback(() => {
+		dispatchFollow({ type: 'scrolled-up' });
+	}, [dispatchFollow]);
 
 	useEffect(() => {
 		if (!sessionId) return;
@@ -468,6 +478,12 @@ export const MessageThread = memo(function MessageThread({
 	const handleScroll = useCallback(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
+		const { scrollTop, scrollHeight, clientHeight } = container;
+		dispatchFollow({
+			type: 'scrolled',
+			scrollTop,
+			distanceFromBottom: scrollHeight - scrollTop - clientHeight,
+		});
 
 		// The lean header + rail insets need getBoundingClientRect reads, which
 		// force synchronous layout. Coalesce to at most one update per frame.
@@ -489,7 +505,38 @@ export const MessageThread = memo(function MessageThread({
 			setShowLeanHeader(nextShowLeanHeader);
 			updateRailInsets(nextShowLeanHeader);
 		});
-	}, [showLeanHeader, updateRailInsets]);
+	}, [dispatchFollow, showLeanHeader, updateRailInsets]);
+
+	// Wheel and touch direction are immediate user-intent signals. The scroll
+	// sample above remains the fallback for keyboard and scrollbar movement.
+	const lastTouchYRef = useRef(0);
+	const handleWheelIntent = useCallback(
+		(event: WheelEvent) => {
+			if (
+				event.deltaY < 0 &&
+				(scrollContainerRef.current?.scrollTop ?? 0) > 0
+			) {
+				disableAutoFollow();
+			}
+		},
+		[disableAutoFollow],
+	);
+	const handleTouchStartIntent = useCallback((event: TouchEvent) => {
+		lastTouchYRef.current = event.touches[0]?.clientY ?? 0;
+	}, []);
+	const handleTouchMoveIntent = useCallback(
+		(event: TouchEvent) => {
+			const y = event.touches[0]?.clientY ?? 0;
+			if (
+				y > lastTouchYRef.current + 2 &&
+				(scrollContainerRef.current?.scrollTop ?? 0) > 0
+			) {
+				disableAutoFollow();
+			}
+			lastTouchYRef.current = y;
+		},
+		[disableAutoFollow],
+	);
 
 	const detachScrollListenerRef = useRef<(() => void) | undefined>(undefined);
 	const attachScrollListener = useCallback(
@@ -502,11 +549,26 @@ export const MessageThread = memo(function MessageThread({
 			scrollContainerRef.current = element;
 			if (!element) return;
 			element.addEventListener('scroll', handleScroll, { passive: true });
+			element.addEventListener('wheel', handleWheelIntent, { passive: true });
+			element.addEventListener('touchstart', handleTouchStartIntent, {
+				passive: true,
+			});
+			element.addEventListener('touchmove', handleTouchMoveIntent, {
+				passive: true,
+			});
 			detachScrollListenerRef.current = () => {
 				element.removeEventListener('scroll', handleScroll);
+				element.removeEventListener('wheel', handleWheelIntent);
+				element.removeEventListener('touchstart', handleTouchStartIntent);
+				element.removeEventListener('touchmove', handleTouchMoveIntent);
 			};
 		},
-		[handleScroll],
+		[
+			handleScroll,
+			handleTouchMoveIntent,
+			handleTouchStartIntent,
+			handleWheelIntent,
+		],
 	);
 
 	useLayoutEffect(() => {
@@ -545,7 +607,7 @@ export const MessageThread = memo(function MessageThread({
 		if (sessionId === lastSessionIdRef.current) return;
 		lastSessionIdRef.current = sessionId;
 		cancelPendingPrependDispatch();
-		setFollowing(true);
+		dispatchFollow({ type: 'reset' });
 		seenOptimisticIdsRef.current = new Set();
 		optimisticSendsInitializedRef.current = false;
 		setIsPrepending(false);
@@ -555,7 +617,12 @@ export const MessageThread = memo(function MessageThread({
 		setShowLeanHeader(false);
 		setRailInsets({ top: 0, bottom: 0 });
 		clearExpandedWork();
-	}, [sessionId, cancelPendingPrependDispatch, clearExpandedWork]);
+	}, [
+		sessionId,
+		cancelPendingPrependDispatch,
+		clearExpandedWork,
+		dispatchFollow,
+	]);
 
 	// The *only* content-driven re-arm: this reader pressing send. An optimistic
 	// user message appears exactly once per send from this client, which makes
@@ -586,8 +653,15 @@ export const MessageThread = memo(function MessageThread({
 		}
 		if (!didSend || disableAutoScroll) return;
 		if (isPrepending || isLoadingOlderMessages) return;
+		dispatchFollow({ type: 'bottom-requested' });
 		void listRef.current?.scrollToEnd({ animated: false });
-	}, [messages, disableAutoScroll, isPrepending, isLoadingOlderMessages]);
+	}, [
+		messages,
+		disableAutoScroll,
+		isPrepending,
+		isLoadingOlderMessages,
+		dispatchFollow,
+	]);
 
 	useEffect(() => {
 		return () => {
@@ -604,8 +678,9 @@ export const MessageThread = memo(function MessageThread({
 	}, [cancelPendingPrependDispatch]);
 
 	const scrollToBottom = useCallback(() => {
+		dispatchFollow({ type: 'bottom-requested' });
 		void listRef.current?.scrollToEnd({ animated: true });
-	}, []);
+	}, [dispatchFollow]);
 
 	const contentWidthClass = preferences.fullWidthContent
 		? compact
@@ -724,6 +799,7 @@ export const MessageThread = memo(function MessageThread({
 
 	const handleNavigateToIndex = useCallback(
 		(messageIndex: number) => {
+			disableAutoFollow();
 			const rowIndex = rowIndexByMessageIndex[messageIndex] ?? 0;
 			void listRef.current?.scrollToIndex({
 				index: rowIndex,
@@ -731,7 +807,7 @@ export const MessageThread = memo(function MessageThread({
 				animated: true,
 			});
 		},
-		[rowIndexByMessageIndex],
+		[disableAutoFollow, rowIndexByMessageIndex],
 	);
 
 	/**

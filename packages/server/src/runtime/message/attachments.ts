@@ -1,5 +1,5 @@
 import { logger } from '@ottocode/sdk';
-import { storeAttachmentBytes } from '../../routes/attachments.ts';
+import { storeAttachmentBytes } from '../attachments/service.ts';
 import type { DispatchOptions } from './types.ts';
 
 export async function attachDirectImages(args: {

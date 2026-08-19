@@ -1,13 +1,6 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushOption } from './helpers.ts';
-
-async function dispatch(argv: string[], version: string) {
-	const { registerServiceCommand } = await import('../service.ts');
-	await dispatchRegisteredCommand(
-		(program) => registerServiceCommand(program, version),
-		argv,
-	);
-}
+import { parseCliPort } from '../../runtime/network.ts';
+import type { ServiceOptions } from '../service.ts';
 
 export function registerServiceCommand(program: Command, version: string) {
 	const service = program
@@ -22,28 +15,28 @@ export function registerServiceCommand(program: Command, version: string) {
 			'Initial project for daemon startup',
 			process.cwd(),
 		)
-		.option('--port <port>', 'Preferred daemon port', (v) =>
-			Number.parseInt(v, 10),
+		.option('--port <port>', 'Preferred daemon port', (value) =>
+			parseCliPort(value, { allowZero: false, name: 'daemon port' }),
 		)
-		.action(async (opts) => {
-			const argv = ['service', 'start'];
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--port', opts.port);
-			await dispatch(argv, version);
+		.action(async (opts: ServiceOptions) => {
+			const { startService } = await import('../service.ts');
+			await startService(opts, version);
 		});
 
 	service
 		.command('status')
 		.description('Show local daemon status')
 		.action(async () => {
-			await dispatch(['service', 'status'], version);
+			const { showServiceStatus } = await import('../service.ts');
+			await showServiceStatus(version);
 		});
 
 	service
 		.command('stop')
 		.description('Stop the local daemon if running')
 		.action(async () => {
-			await dispatch(['service', 'stop'], version);
+			const { stopService } = await import('../service.ts');
+			await stopService();
 		});
 
 	service
@@ -54,27 +47,43 @@ export function registerServiceCommand(program: Command, version: string) {
 			'Initial project for daemon startup',
 			process.cwd(),
 		)
-		.option('--port <port>', 'Preferred daemon port', (v) =>
-			Number.parseInt(v, 10),
+		.option('--port <port>', 'Preferred daemon port', (value) =>
+			parseCliPort(value, { allowZero: false, name: 'daemon port' }),
 		)
-		.action(async (opts) => {
-			const argv = ['service', 'restart'];
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--port', opts.port);
-			await dispatch(argv, version);
+		.action(async (opts: ServiceOptions) => {
+			const { restartService } = await import('../service.ts');
+			await restartService(opts, version);
 		});
 
 	service
 		.command('password')
 		.description('Rotate and print the local daemon token')
 		.action(async () => {
-			await dispatch(['service', 'password'], version);
+			const { rotateServicePassword } = await import('../service.ts');
+			await rotateServicePassword();
 		});
 
 	service
 		.command('token')
 		.description('Print the current local daemon token')
 		.action(async () => {
-			await dispatch(['service', 'token'], version);
+			const { printServiceToken } = await import('../service.ts');
+			await printServiceToken();
+		});
+
+	service
+		.command('force-start')
+		.description('Start a new daemon without reusing an existing registration')
+		.option(
+			'--project <path>',
+			'Initial project for daemon startup',
+			process.cwd(),
+		)
+		.option('--port <port>', 'Preferred daemon port', (value) =>
+			parseCliPort(value, { allowZero: false, name: 'daemon port' }),
+		)
+		.action(async (opts: ServiceOptions) => {
+			const { forceStartService } = await import('../service.ts');
+			await forceStartService(opts, version);
 		});
 }

@@ -509,6 +509,9 @@ export function ChatInput({
 	const railColor = disabled ? colors.border : accent;
 	const inputBg = paneActive ? colors.bgSubtle : colors.bgDark;
 	const inputTextColor = paneActive ? colors.fgBright : colors.fgMuted;
+	const focusTextarea = useCallback(() => {
+		if (!disabled && !dictation.isActive) textareaRef.current?.focus();
+	}, [disabled, dictation.isActive]);
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,
@@ -673,8 +676,10 @@ export function ChatInput({
 					)}
 				</box>
 			)}
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI composer uses mouse focus without DOM roles */}
 			<box
 				customBorderChars={NARROW_RAIL_BORDER_CHARS}
+				onMouseDown={focusTextarea}
 				style={{
 					width: '100%',
 					border: ['left'],

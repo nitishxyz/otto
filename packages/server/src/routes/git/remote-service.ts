@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Context } from 'hono';
-import { gitRemoteAddSchema, gitRemoteRemoveSchema } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -58,8 +57,10 @@ export async function handleGetGitRemotes(c: Context) {
 
 export async function handleAddGitRemote(c: Context) {
 	try {
-		const body = await c.req.json().catch(() => ({}));
-		const { name, url } = gitRemoteAddSchema.parse(body);
+		const { name, url } = c.req.valid('json' as never) as {
+			name: string;
+			url: string;
+		};
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
@@ -88,8 +89,7 @@ export async function handleAddGitRemote(c: Context) {
 
 export async function handleRemoveGitRemote(c: Context) {
 	try {
-		const body = await c.req.json().catch(() => ({}));
-		const { name } = gitRemoteRemoveSchema.parse(body);
+		const { name } = c.req.valid('json' as never) as { name: string };
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);

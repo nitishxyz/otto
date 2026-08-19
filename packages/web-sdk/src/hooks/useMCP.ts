@@ -41,6 +41,7 @@ export function useMCPServers() {
 
 export function useStartMCPServer() {
 	const queryClient = useQueryClient();
+	const updateServer = useMCPStore((s) => s.updateServer);
 
 	return useMutation({
 		mutationFn: async (name: string) => {
@@ -73,6 +74,18 @@ export function useStartMCPServer() {
 				callbackProxyOpened: proxy.opened,
 			};
 		},
+		onMutate: (name) => {
+			const previous = useMCPStore
+				.getState()
+				.servers.find((server) => server.name === name)?.disabled;
+			updateServer(name, { disabled: false });
+			return { previous };
+		},
+		onError: (_error, name, context) => {
+			if (context?.previous !== undefined) {
+				updateServer(name, { disabled: context.previous });
+			}
+		},
 		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: ['mcp', 'servers'] });
 		},
@@ -82,6 +95,7 @@ export function useStartMCPServer() {
 export function useStopMCPServer() {
 	const queryClient = useQueryClient();
 	const setLoading = useMCPStore((s) => s.setLoading);
+	const updateServer = useMCPStore((s) => s.updateServer);
 
 	return useMutation({
 		mutationFn: async (name: string) => {
@@ -93,6 +107,18 @@ export function useStopMCPServer() {
 			const result = data as { ok: boolean; error?: string };
 			if (!result.ok) throw new Error(result.error || 'Failed to stop server');
 			return result;
+		},
+		onMutate: (name) => {
+			const previous = useMCPStore
+				.getState()
+				.servers.find((server) => server.name === name)?.disabled;
+			updateServer(name, { disabled: true });
+			return { previous };
+		},
+		onError: (_error, name, context) => {
+			if (context?.previous !== undefined) {
+				updateServer(name, { disabled: context.previous });
+			}
 		},
 		onSettled: (_data, _error, name) => {
 			setLoading(name, false);

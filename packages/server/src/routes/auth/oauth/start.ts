@@ -38,8 +38,8 @@ export function registerOAuthStartRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider');
-				const mode = c.req.query('mode') || 'max';
+				const { provider } = c.req.valid('param');
+				const { mode } = c.req.valid('query');
 				const host = c.req.header('host') || 'localhost:3000';
 				const protocol = c.req.header('x-forwarded-proto') || 'http';
 
@@ -49,7 +49,7 @@ export function registerOAuthStartRoute(app: Hono) {
 
 				if (provider === 'anthropic') {
 					callbackUrl = `${protocol}://${host}/v1/auth/${provider}/oauth/callback`;
-					const result = authorizeWeb(mode as 'max' | 'console', callbackUrl);
+					const result = authorizeWeb(mode, callbackUrl);
 					url = result.url;
 					verifier = result.verifier;
 				} else if (provider === 'openai') {
@@ -113,7 +113,7 @@ export function registerOAuthStartRoute(app: Hono) {
 				}
 
 				const sessionId = crypto.randomUUID();
-				oauthVerifiers.set(sessionId, {
+				oauthVerifiers.create(sessionId, {
 					verifier,
 					provider,
 					createdAt: Date.now(),

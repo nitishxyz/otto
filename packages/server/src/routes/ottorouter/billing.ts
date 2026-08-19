@@ -96,7 +96,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const amount = c.req.query('amount');
+				const { amount } = c.req.valid('query');
 				if (!amount) {
 					return c.json({ error: 'Missing amount parameter' }, 400);
 				}
@@ -153,7 +153,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
+				const body = c.req.valid('json');
 				const { amount, successUrl } = body as {
 					amount: number;
 					successUrl: string;
@@ -215,7 +215,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const checkoutId = c.req.query('checkoutId');
+				const { checkoutId } = c.req.valid('query');
 				if (!checkoutId) {
 					return c.json({ error: 'Missing checkoutId parameter' }, 400);
 				}
@@ -261,7 +261,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const amount = c.req.query('amount');
+				const { amount } = c.req.valid('query');
 				if (!amount) {
 					return c.json({ error: 'Missing amount parameter' }, 400);
 				}
@@ -318,7 +318,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
+				const body = c.req.valid('json');
 				const { amount } = body as { amount: number };
 
 				if (!amount || typeof amount !== 'number') {
@@ -384,7 +384,7 @@ export function registerOttoRouterBillingRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
+				const body = c.req.valid('json');
 				const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
 					body as {
 						razorpay_order_id: string;

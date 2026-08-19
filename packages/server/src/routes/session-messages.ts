@@ -1,6 +1,10 @@
 import { z } from '@hono/zod-openapi';
 import type { DB } from '@ottocode/database';
-import { messages, messageParts, sessions } from '@ottocode/database/schema';
+import {
+	messages,
+	messageParts,
+	type sessions,
+} from '@ottocode/database/schema';
 import {
 	ensureProviderEnv,
 	getProviderDefinition,
@@ -18,6 +22,8 @@ import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
 import { tryExecutePluginSlashMessage } from '../runtime/commands/plugin-slash.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
+import type { DispatchOptions } from '../runtime/message/types.ts';
+import { sessionRepository } from '../runtime/session/repository.ts';
 import {
 	extractBrowserScreenshot,
 	referenceBrowserScreenshot,
@@ -535,7 +541,8 @@ export function registerSessionMessagesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const { db } = await resolveRequestProject(c);
-				const id = c.req.param('id');
+				const { id } = c.req.valid('param');
+				const query = c.req.valid('query');
 				const rows = await db
 					.select()
 					.from(messages)
@@ -543,8 +550,8 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					.orderBy(messages.createdAt, messageSequence);
 				return c.json(
 					await serializeMessages(db, rows, {
-						includeParts: c.req.query('without') !== 'parts',
-						parsed: wantsParsedParts(c.req.query('parsed')),
+						includeParts: query.without !== 'parts',
+						parsed: wantsParsedParts(query.parsed),
 					}),
 				);
 			} catch (error) {
@@ -582,16 +589,12 @@ export function registerSessionMessagesRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const { db } = await resolveRequestProject(c);
-				const query = listMessagePageQuerySchema.parse({
-					...c.req.query(),
-					limit: c.req.query('limit'),
-					cursor: c.req.query('cursor'),
-				});
+				const query = c.req.valid('query');
 				const cursor = parseMessageCursor(query.cursor);
 				if (query.cursor && !cursor) {
 					return c.json({ error: 'Invalid message cursor' }, 400);
 				}
-				const sessionId = c.req.param('id');
+				const { id: sessionId } = c.req.valid('param');
 				const legacyCursorSequence =
 					cursor && cursor.sequence === undefined && cursor.messageId
 						? await db
@@ -856,9 +859,11 @@ export function registerSessionMessagesRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { cfg, db, runtime } = await resolveRequestProject(c);
-				const sessionId = c.req.param('id');
-				const body = await c.req.json().catch(() => ({}));
+				const { cfg, db, runtime, projectRoot } =
+					await resolveRequestProject(c);
+				const { id: sessionId } = c.req.valid('param');
+				c.req.valid('query');
+				const body = c.req.valid('json');
 				const attachmentError = validateMessageAttachments(body);
 				if (attachmentError) {
 					return c.json({ error: attachmentError }, 413);
@@ -873,15 +878,10 @@ export function registerSessionMessagesRoutes(app: Hono) {
 						: 'NONE',
 				});
 
-				const sessionRows = await db
-					.select()
-					.from(sessions)
-					.where(eq(sessions.id, sessionId));
-				if (!sessionRows.length) {
-					logger.warn('Session not found', { sessionId });
-					return c.json({ error: 'Session not found' }, 404);
-				}
-				const sess: SessionRow = sessionRows[0];
+				const sess: SessionRow = await sessionRepository(
+					db,
+					projectRoot,
+				).require(sessionId);
 				const requestedAgent =
 					typeof body?.agent === 'string' ? body.agent : undefined;
 				const agent = requestedAgent ?? sess.agent ?? cfg.defaults.agent;
@@ -900,8 +900,12 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					body?.model ?? agentCfg?.model ?? sess.model ?? cfg.defaults.model;
 				const content = body?.content ?? '';
 				const userContext = body?.userContext ?? undefined;
-				const images = Array.isArray(body?.images) ? body.images : undefined;
-				const files = Array.isArray(body?.files) ? body.files : undefined;
+				const images = Array.isArray(body.images)
+					? (body.images as NonNullable<DispatchOptions['images']>)
+					: undefined;
+				const files = Array.isArray(body.files)
+					? (body.files as NonNullable<DispatchOptions['files']>)
+					: undefined;
 
 				logger.info('[API] Extracted userContext', {
 					userContext: userContext

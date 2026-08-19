@@ -4,6 +4,12 @@ export const SSE_QUEUE_HIGH_WATER_MARK_BYTES = 1024 * 1024;
 export const SSE_MAX_EVENT_BYTES = 256 * 1024;
 
 const encoder = new TextEncoder();
+const SSE_HEADERS = {
+	'Content-Type': 'text/event-stream',
+	'Cache-Control': 'no-cache, no-transform',
+	Connection: 'keep-alive',
+	'X-Accel-Buffering': 'no',
+} as const;
 let activeProjectStreams = 0;
 let droppedProjectStreams = 0;
 let projectStreamBytesQueued = 0;
@@ -66,6 +72,122 @@ export function encodeSSEEvent(
 
 export function encodeSSEComment(comment: string): Uint8Array {
 	return encoder.encode(`: ${comment}\n\n`);
+}
+
+export function createSSEEncodingCache<T extends object>(
+	encode: (value: T) => Uint8Array,
+): (value: T) => Uint8Array {
+	const chunks = new WeakMap<T, Uint8Array>();
+	return (value) => {
+		const cached = chunks.get(value);
+		if (cached) return cached;
+		const chunk = encode(value);
+		chunks.set(value, chunk);
+		return chunk;
+	};
+}
+
+export interface SSEStreamControls {
+	send(chunk: Uint8Array): boolean;
+	onCleanup(cleanup: () => void): void;
+}
+
+export interface SSEResponseOptions {
+	signal?: AbortSignal;
+	initialChunk?: Uint8Array;
+	heartbeat?: {
+		intervalMs: number;
+		createChunk: () => Uint8Array;
+	};
+	start?: (controls: SSEStreamControls) => void;
+	onEnqueue?: (chunk: Uint8Array, desiredSize: number | null) => void;
+	onBackpressure?: (chunk: Uint8Array) => void;
+	strategy?: QueuingStrategy<Uint8Array>;
+}
+
+/** Owns the transport lifecycle while callers retain event filtering and replay. */
+export function createSSEResponse(options: SSEResponseOptions): Response {
+	let cleanup = () => {};
+	const stream = new ReadableStream<Uint8Array>(
+		{
+			start(controller) {
+				let closed = false;
+				let heartbeat: ReturnType<typeof setInterval> | undefined;
+				const cleanups: Array<() => void> = [];
+
+				cleanup = () => {
+					if (closed) return;
+					closed = true;
+					if (heartbeat !== undefined) clearInterval(heartbeat);
+					options.signal?.removeEventListener('abort', cleanup);
+					for (const callback of cleanups.splice(0)) {
+						try {
+							callback();
+						} catch {}
+					}
+					try {
+						controller.close();
+					} catch {}
+				};
+
+				const controls: SSEStreamControls = {
+					send(chunk) {
+						if (closed) return false;
+						try {
+							controller.enqueue(chunk);
+							options.onEnqueue?.(chunk, controller.desiredSize);
+							if ((controller.desiredSize ?? 0) < 0) {
+								try {
+									options.onBackpressure?.(chunk);
+								} finally {
+									cleanup();
+								}
+								return false;
+							}
+							return true;
+						} catch {
+							cleanup();
+							return false;
+						}
+					},
+					onCleanup(callback) {
+						if (closed) callback();
+						else cleanups.push(callback);
+					},
+				};
+
+				options.signal?.addEventListener('abort', cleanup, { once: true });
+				if (options.signal?.aborted) {
+					cleanup();
+					return;
+				}
+				try {
+					options.start?.(controls);
+				} catch {
+					cleanup();
+					return;
+				}
+				if (options.initialChunk && !controls.send(options.initialChunk))
+					return;
+				if (options.heartbeat && !closed) {
+					const heartbeatOptions = options.heartbeat;
+					heartbeat = setInterval(() => {
+						try {
+							controls.send(heartbeatOptions.createChunk());
+						} catch {
+							cleanup();
+						}
+					}, heartbeatOptions.intervalMs);
+				}
+			},
+			cancel() {
+				cleanup();
+			},
+		},
+		options.strategy ?? createSSEByteStrategy(),
+	);
+
+	return new Response(stream, { headers: SSE_HEADERS });
 }
 
 export interface ProjectSSEStreamMetricsHandle {

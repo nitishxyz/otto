@@ -120,7 +120,7 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await addMCPServer(
-				await c.req.json(),
+				c.req.valid('json'),
 				await resolveRequestProjectRoot(c),
 			);
 			return result.ok
@@ -157,7 +157,7 @@ export function registerMCPServerConfigRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await removeMCPServer(
-				c.req.param('name'),
+				c.req.valid('param').name,
 				await resolveRequestProjectRoot(c),
 			);
 			return result.ok

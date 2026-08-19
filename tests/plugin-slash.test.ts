@@ -12,8 +12,8 @@ import { tryExecutePluginSlashMessage } from '../packages/server/src/runtime/com
 import { prepareBuiltinCommand } from '../packages/server/src/runtime/commands/builtins.ts';
 import { prepareRecipeCommand } from '../packages/server/src/runtime/commands/recipes.ts';
 import { registerSessionMessagesRoutes } from '../packages/server/src/routes/session-messages.ts';
-import { getDb } from '@ottocode/database';
-import { sessions } from '@ottocode/database/schema';
+import { getProjectManager } from '../packages/server/src/runtime/projects/manager.ts';
+import { createSession } from '../packages/server/src/runtime/session/manager.ts';
 
 describe('plugin slash parsing and precedence', () => {
 	async function setupProject() {
@@ -168,10 +168,10 @@ describe('plugin slash parsing and precedence', () => {
 
 describe('session message plugin slash execution', () => {
 	it('returns pluginCommand payload instead of enqueueing assistant work', async () => {
-		const projectRoot = await mkdtemp(
-			join(tmpdir(), 'otto-plugin-slash-route-'),
-		);
+		let projectRoot = await mkdtemp(join(tmpdir(), 'otto-plugin-slash-route-'));
 		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
+		const previousOpenAIKey = process.env.OPENAI_API_KEY;
+		process.env.OPENAI_API_KEY = 'test-key';
 		try {
 			const pluginDir = join(getProjectPluginsDir(projectRoot), 'serve-sim');
 			await mkdir(pluginDir, { recursive: true });
@@ -199,18 +199,19 @@ describe('session message plugin slash execution', () => {
 				projectRoot,
 			);
 
-			const db = await getDb(projectRoot);
-			const now = Date.now();
-			const sessionId = 'plugin-slash-session';
-			await db.insert(sessions).values({
-				id: sessionId,
+			const runtime = await getProjectManager().openProject({
+				path: projectRoot,
+			});
+			projectRoot = runtime.root;
+			const db = runtime.db;
+			const session = await createSession({
+				db,
+				cfg: runtime.cfg,
 				agent: 'build',
 				provider: 'openai',
 				model: 'gpt-4.1',
-				projectPath: projectRoot,
-				createdAt: now,
-				lastActiveAt: now,
 			});
+			const sessionId = session.id;
 
 			const app = new OpenAPIHono();
 			registerSessionMessagesRoutes(app, new TerminalManager());
@@ -243,6 +244,8 @@ describe('session message plugin slash execution', () => {
 			});
 			expect(builtin).toBeNull();
 		} finally {
+			if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+			else process.env.OPENAI_API_KEY = previousOpenAIKey;
 			await rm(projectRoot, { recursive: true, force: true });
 		}
 	});

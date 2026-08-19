@@ -7,10 +7,12 @@ import {
 	isGitHubCopilotUrl,
 	loadMCPConfig,
 	MCPClientWrapper,
+	setMCPServerDisabled,
 } from '@ottocode/sdk';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
 import { createMCPAuthFlow } from '../oauth-flows.ts';
 import type { MCPAuthSessionOptions } from './types.ts';
+import { reconcileMCPServerManagers } from './reconcile.ts';
 
 export async function startMCPServer(options: MCPAuthSessionOptions) {
 	const { name, oAuthStore, sessions } = options;
@@ -34,14 +36,21 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 	}
 
 	try {
+		const scope = serverConfig.scope ?? 'global';
+		const persisted = await setMCPServerDisabled(
+			projectRoot,
+			name,
+			scope,
+			false,
+			getGlobalConfigDir(),
+		);
+		if (persisted) await reconcileMCPServerManagers(projectRoot, scope, name);
 		let manager = getMCPManager(projectRoot);
-		if (!manager) {
-			manager = await initializeMCP({ servers: [] }, projectRoot);
-		}
+		if (!manager) manager = await initializeMCP({ servers: [] }, projectRoot);
 		if (!manager.started) {
 			manager.setProjectRoot(projectRoot);
 		}
-		await manager.restartServer(serverConfig);
+		if (!persisted) await manager.restartServer(serverConfig);
 		const status = (await manager.getStatusAsync()).find(
 			(server) => server.name === name,
 		);
@@ -114,17 +123,27 @@ export async function startMCPServer(options: MCPAuthSessionOptions) {
 }
 
 export async function stopMCPServer(name: string, projectRoot: string) {
-	const manager = getMCPManager(projectRoot);
-	if (!manager) {
+	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
+	const serverConfig = config.servers.find((server) => server.name === name);
+	if (!serverConfig) {
 		return {
 			ok: false as const,
-			body: { ok: false, error: 'No MCP manager active' },
-			status: 400 as const,
+			body: { ok: false, error: `Server "${name}" not found` },
+			status: 404 as const,
 		};
 	}
 
 	try {
-		await manager.stopServer(name);
+		const scope = serverConfig.scope ?? 'global';
+		const persisted = await setMCPServerDisabled(
+			projectRoot,
+			name,
+			scope,
+			true,
+			getGlobalConfigDir(),
+		);
+		if (persisted) await reconcileMCPServerManagers(projectRoot, scope, name);
+		else await getMCPManager(projectRoot)?.stopServer(name);
 		return { ok: true as const, body: { ok: true, name, connected: false } };
 	} catch (error) {
 		return {

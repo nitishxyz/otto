@@ -96,7 +96,7 @@ function registerSimulatorGestureRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = await c.req.json<z.infer<typeof gestureBodySchema>>();
+			const body = c.req.valid('json');
 			const result = await sendSimulatorGesture(body.gesture, body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},
@@ -136,7 +136,7 @@ function registerSimulatorRotateRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = await c.req.json<z.infer<typeof rotateBodySchema>>();
+			const body = c.req.valid('json');
 			const result = await rotateSimulator(body.orientation, body.device);
 			return c.json(result, result.ok ? 200 : 500);
 		},

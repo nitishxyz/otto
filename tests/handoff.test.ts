@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { COMMANDS as TUI_COMMANDS } from '../apps/tui/src/commands.ts';
+import { COMMANDS as TUI_COMMANDS } from '../apps/tui/src/commands/index.ts';
 import {
 	buildHandoffContext,
 	buildHandoffUserPrompt,

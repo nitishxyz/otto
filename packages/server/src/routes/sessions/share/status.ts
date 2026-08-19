@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { sessionRepository } from '../../../runtime/session/repository.ts';
 import { resolveRequestProjectRoot } from '../../project-context.ts';
 import { getShareStatus, loadProjectDb } from '../service.ts';
 import {
@@ -31,9 +32,10 @@ export function registerShareStatusRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const sessionId = c.req.param('sessionId');
+			const { sessionId } = c.req.valid('param');
 			const projectRoot = await resolveRequestProjectRoot(c);
-			const { db } = await loadProjectDb(projectRoot);
+			const { cfg, db } = await loadProjectDb(projectRoot);
+			await sessionRepository(db, cfg.projectRoot).require(sessionId);
 			return c.json(await getShareStatus(db, sessionId));
 		},
 	);

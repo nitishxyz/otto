@@ -40,9 +40,13 @@ export function registerMarkSessionViewedRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const { cfg, db } = await resolveRequestProject(c);
-				const existingSession = await findSessionById(db, sessionId);
+				const existingSession = await findSessionById(
+					db,
+					sessionId,
+					cfg.projectRoot,
+				);
 				if (
 					!existingSession ||
 					existingSession.projectPath !== cfg.projectRoot
@@ -55,7 +59,11 @@ export function registerMarkSessionViewedRoute(app: Hono) {
 					.set({ lastViewedAt: Date.now() })
 					.where(eq(sessions.id, sessionId));
 
-				const updatedSession = await findSessionById(db, sessionId);
+				const updatedSession = await findSessionById(
+					db,
+					sessionId,
+					cfg.projectRoot,
+				);
 				const sessionForResponse = updatedSession ?? existingSession;
 				const costSummaries = await getSessionCostSummaries(db, [
 					sessionForResponse,

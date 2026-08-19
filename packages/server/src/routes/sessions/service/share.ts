@@ -138,6 +138,7 @@ export async function getShareStatus(
 export async function createShare(
 	db: ProjectDbContext['db'],
 	sessionId: string,
+	projectRoot: string,
 ): Promise<
 	| { ok: true; body: { shared: true; shareId: string; url: string } }
 	| { ok: false; body: { error: string }; status: 400 | 404 | 500 }
@@ -146,7 +147,7 @@ export async function createShare(
 			body: { shared: true; shareId: string; url: string; message: string };
 	  }
 > {
-	const session = await findSessionById(db, sessionId);
+	const session = await findSessionById(db, sessionId, projectRoot);
 	if (!session) {
 		return { ok: false, body: { error: 'Session not found' }, status: 404 };
 	}
@@ -238,6 +239,7 @@ export async function createShare(
 export async function syncShare(
 	db: ProjectDbContext['db'],
 	sessionId: string,
+	projectRoot: string,
 ): Promise<
 	| { ok: true; body: { synced: true; url: string; newMessages: number } }
 	| {
@@ -259,7 +261,7 @@ export async function syncShare(
 		};
 	}
 
-	const session = await findSessionById(db, sessionId);
+	const session = await findSessionById(db, sessionId, projectRoot);
 	if (!session) {
 		return { ok: false, body: { error: 'Session not found' }, status: 404 };
 	}

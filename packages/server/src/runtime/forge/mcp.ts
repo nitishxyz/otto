@@ -23,6 +23,7 @@ import {
 	copilotMCPOAuthStore,
 	copilotMCPSessions,
 } from '../../routes/mcp/state.ts';
+import { reconcileMCPServerManagers } from '../../routes/mcp/service/reconcile.ts';
 
 type MCPAction =
 	| 'create'
@@ -227,9 +228,21 @@ export async function runForgeMCPAction(
 		if (input.dryRun) return { ok: true, applied: false, plan };
 
 		if (existing && existing.scope !== server.scope) {
-			await removeMCPServerFromConfig(projectRoot, name, globalConfigDir);
+			const previousScope = existing.scope ?? 'global';
+			await removeMCPServerFromConfig(
+				projectRoot,
+				name,
+				globalConfigDir,
+				previousScope,
+			);
+			await reconcileMCPServerManagers(projectRoot, previousScope, name);
 		}
 		await addMCPServerToConfig(projectRoot, server, globalConfigDir);
+		await reconcileMCPServerManagers(
+			projectRoot,
+			server.scope ?? 'project',
+			name,
+		);
 		if (!input.start) {
 			return {
 				ok: true,
@@ -325,23 +338,36 @@ export async function runForgeMCPAction(
 			projectRoot,
 			name,
 			globalConfigDir,
+			existing.scope ?? 'global',
 		);
 		if (!removed) throw new Error(`MCP server '${name}' not found in config`);
+		await reconcileMCPServerManagers(
+			projectRoot,
+			existing.scope ?? 'global',
+			name,
+		);
 		return { ok: true, applied: true, plan };
 	}
 
 	if (action === 'disable') {
 		const server = { ...existing, disabled: true };
 		await addMCPServerToConfig(projectRoot, server, globalConfigDir);
-		try {
-			await stopServer(projectRoot, name);
-		} catch {}
+		await reconcileMCPServerManagers(
+			projectRoot,
+			server.scope ?? 'global',
+			name,
+		);
 		return { ok: true, applied: true, plan, server: summarizeServer(server) };
 	}
 
 	if (action === 'enable') {
 		const server = { ...existing, disabled: false };
 		await addMCPServerToConfig(projectRoot, server, globalConfigDir);
+		await reconcileMCPServerManagers(
+			projectRoot,
+			server.scope ?? 'global',
+			name,
+		);
 		try {
 			const status = await startServer(projectRoot, server);
 			return {

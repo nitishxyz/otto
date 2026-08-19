@@ -9,6 +9,7 @@ import { getProjectStateDir } from '../../../../config/src/paths.ts';
 import { logger } from '../../utils/logger.ts';
 import { setToolMetadata, type ToolMetadata } from '../metadata.ts';
 import { executeNativeExtension } from './client.ts';
+import { collectNativeExtensionSecrets } from './secrets.ts';
 
 export type NativeExtensionTool = {
 	name: string;
@@ -77,16 +78,10 @@ function buildTool(args: {
 			return toNativeToolModelOutput(output);
 		},
 		execute(input, options) {
-			const secrets: Record<string, string> = {};
-			for (const secret of args.definition.secrets) {
-				const value = process.env[secret.env];
-				if (!value && secret.required) {
-					throw new Error(
-						`Native tool ${name} requires secret ${secret.name} from ${secret.env}`,
-					);
-				}
-				if (value) secrets[secret.name] = value;
-			}
+			const secrets = collectNativeExtensionSecrets(args.definition.secrets, {
+				environment: process.env,
+				toolName: name,
+			});
 			return executeNativeExtension({
 				entryPath: args.definition.entry,
 				pluginDir: args.pluginDir,

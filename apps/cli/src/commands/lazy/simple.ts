@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
 
 export function registerModelsCommand(program: Command) {
 	program
@@ -9,11 +8,8 @@ export function registerModelsCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--local', 'Store selection locally', false)
 		.action(async (opts) => {
-			const argv = ['models'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--local', opts.local);
-			const { registerModelsCommand: register } = await import('../models.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runModels } = await import('../../models.ts');
+			await runModels({ project: opts.project, local: opts.local });
 		});
 }
 
@@ -24,11 +20,8 @@ export function registerAgentsCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--local', 'Edit local project agents', false)
 		.action(async (opts) => {
-			const argv = ['agents'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--local', opts.local);
-			const { registerAgentsCommand: register } = await import('../agents.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runAgents } = await import('../../agents.ts');
+			await runAgents({ project: opts.project, local: opts.local });
 		});
 }
 
@@ -38,10 +31,8 @@ export function registerToolsCommand(program: Command) {
 		.description('List discovered tools and agent access')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
-			const argv = ['tools'];
-			pushOption(argv, '--project', opts.project);
-			const { registerToolsCommand: register } = await import('../tools.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runToolsList } = await import('../../tools.ts');
+			await runToolsList({ project: opts.project });
 		});
 }
 
@@ -53,13 +44,8 @@ export function registerScaffoldCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--local', 'Create in local project directory', false)
 		.action(async (opts) => {
-			const argv = ['scaffold'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--local', opts.local);
-			const { registerScaffoldCommand: register } = await import(
-				'../scaffold.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runScaffold } = await import('../../scaffold.ts');
+			await runScaffold({ project: opts.project, local: opts.local });
 		});
 }
 
@@ -69,9 +55,7 @@ export function registerDoctorCommand(program: Command) {
 		.description('Diagnose auth, defaults, and agent/tool issues')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
-			const argv = ['doctor'];
-			pushOption(argv, '--project', opts.project);
-			const { registerDoctorCommand: register } = await import('../doctor.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runDoctorCommand } = await import('../../doctor.ts');
+			await runDoctorCommand({ project: opts.project });
 		});
 }

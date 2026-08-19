@@ -423,6 +423,7 @@
       "name": "@ottocode/api",
       "version": "0.1.402",
       "dependencies": {
+        "@ottocode/sdk": "workspace:*",
         "axios": "1.13.5",
         "eventsource-parser": "2.0.1",
       },

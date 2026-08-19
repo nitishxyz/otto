@@ -1,7 +1,7 @@
 import type { SkillDefinition, SkillMetadata, SkillScope } from './types.ts';
 import { validateMetadata } from './validator.ts';
+import { extractSkillFrontmatter } from './frontmatter.ts';
 
-const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
 const MAX_DERIVED_DESCRIPTION_LENGTH = 100;
 
 export function parseSkillFile(
@@ -9,12 +9,12 @@ export function parseSkillFile(
 	path: string,
 	scope: SkillScope,
 ): SkillDefinition {
-	const match = content.match(FRONTMATTER_REGEX);
-	if (!match) {
+	const extracted = extractSkillFrontmatter(content);
+	if (!extracted) {
 		throw new Error(`Invalid SKILL.md format: missing frontmatter in ${path}`);
 	}
 
-	const [, yamlStr, body] = match;
+	const { frontmatter: yamlStr, body } = extracted;
 	if (!yamlStr) {
 		throw new Error(`Empty frontmatter in ${path}`);
 	}
@@ -310,13 +310,4 @@ function parseYamlValue(value: string): unknown {
 	return value;
 }
 
-export function extractFrontmatter(
-	content: string,
-): { frontmatter: string; body: string } | null {
-	const match = content.match(FRONTMATTER_REGEX);
-	if (!match) return null;
-	return {
-		frontmatter: match[1] ?? '',
-		body: match[2] ?? '',
-	};
-}
+export { extractSkillFrontmatter as extractFrontmatter } from './frontmatter.ts';

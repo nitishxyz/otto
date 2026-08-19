@@ -135,35 +135,7 @@ export function registerDefaultsRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json<{
-					agent?: string;
-					provider?: string;
-					model?: string;
-					toolApproval?: 'auto' | 'dangerous' | 'all' | 'yolo';
-					guidedMode?: boolean;
-					reasoningText?: boolean;
-					reasoningLevel?: ReasoningLevel;
-					theme?: ThemeId | 'light' | 'dark';
-					tuiTheme?: string;
-					vimMode?: boolean;
-					compactThread?: boolean;
-					fontFamily?: string;
-					smartEdges?: boolean;
-					threadNavigatorRail?: boolean;
-					releaseToSend?: boolean;
-					fullWidthContent?: boolean;
-					notificationsEnabled?: boolean;
-					dictationKeywords?: Array<{
-						keyword: string;
-						aliases?: string[];
-					}>;
-					dictationExcludedProjectKeywords?: string[];
-					dictationSmartFormatting?: boolean;
-					autoCompactThresholdTokens?: number | null;
-					coAuthorCommits?: boolean;
-					scope?: 'global' | 'local';
-				}>();
-
+				const body = c.req.valid('json');
 				const scope = body.scope || 'global';
 				const hasProjectContext = hasRequestProjectContext(c);
 				if (scope === 'local' && !hasProjectContext) {

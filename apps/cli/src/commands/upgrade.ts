@@ -1,5 +1,10 @@
-import type { Command } from 'commander';
 import { confirm, isCancel } from '@clack/prompts';
+import {
+	compareReleaseVersions,
+	getOfficialReleaseUrl,
+	OTTO_RELEASE_REPOSITORY,
+	parseReleaseVersion,
+} from '@ottocode/sdk/release';
 import { createWriteStream, chmodSync, mkdirSync, renameSync } from 'node:fs';
 import { get } from 'node:https';
 import { homedir, platform, arch } from 'node:os';
@@ -7,13 +12,12 @@ import { resolve } from 'node:path';
 import { colors } from '../ui.ts';
 import type { DaemonVersionMismatchError } from '../daemon.ts';
 
-const GITHUB_REPO = 'nitishxyz/otto';
 const BIN_NAME = 'otto';
 
 async function fetchLatestVersion(): Promise<string | null> {
 	try {
 		const res = await fetch(
-			`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`,
+			`https://api.github.com/repos/${OTTO_RELEASE_REPOSITORY}/releases?per_page=20`,
 		);
 		if (!res.ok) return null;
 		const releases = (await res.json()) as {
@@ -23,60 +27,29 @@ async function fetchLatestVersion(): Promise<string | null> {
 			prerelease?: boolean;
 		}[];
 
-		const cliReleases = releases.filter((r) => {
-			if (r.draft || r.prerelease) return false;
-			if (!r.tag_name?.match(/^v\d/)) return false;
-			return r.assets?.some((a) => a.name.startsWith('otto-'));
+		const cliReleases = releases.filter((release) => {
+			if (release.draft || release.prerelease || !release.tag_name)
+				return false;
+			try {
+				if (parseReleaseVersion(release.tag_name).tag !== release.tag_name)
+					return false;
+			} catch {
+				return false;
+			}
+			return release.assets?.some((asset) => asset.name.startsWith('otto-'));
 		});
 
 		if (cliReleases.length === 0) return null;
 
-		cliReleases.sort((a, b) => {
-			const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
-			const va = parse(a.tag_name ?? '0.0.0');
-			const vb = parse(b.tag_name ?? '0.0.0');
-			for (let i = 0; i < Math.max(va.length, vb.length); i++) {
-				const diff = (vb[i] ?? 0) - (va[i] ?? 0);
-				if (diff !== 0) return diff;
-			}
-			return 0;
-		});
+		cliReleases.sort((a, b) =>
+			compareReleaseVersions(b.tag_name ?? '0.0.0', a.tag_name ?? '0.0.0'),
+		);
 
-		return cliReleases[0]?.tag_name?.replace(/^v/, '') ?? null;
+		const latest = cliReleases[0]?.tag_name;
+		return latest ? parseReleaseVersion(latest).version : null;
 	} catch {
 		return null;
 	}
-}
-
-function compareVersions(current: string, latest: string): number {
-	const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
-	const [c, l] = [parse(current), parse(latest)];
-	for (let i = 0; i < Math.max(c.length, l.length); i++) {
-		const diff = (l[i] ?? 0) - (c[i] ?? 0);
-		if (diff !== 0) return diff;
-	}
-	return 0;
-}
-
-function getPlatformAsset(): string {
-	const platformMap: Record<string, string> = {
-		darwin: 'darwin',
-		linux: 'linux',
-		win32: 'windows',
-	};
-	const archMap: Record<string, string> = {
-		x64: 'x64',
-		arm64: 'arm64',
-	};
-	const os = platformMap[platform()];
-	const architecture = archMap[arch()];
-	const ext = platform() === 'win32' ? '.exe' : '';
-
-	if (!os || !architecture) {
-		throw new Error(`Unsupported platform: ${platform()}-${arch()}`);
-	}
-
-	return `${BIN_NAME}-${os}-${architecture}${ext}`;
 }
 
 function renderProgressBar(percent: number, width = 30): string {
@@ -145,28 +118,53 @@ function downloadBinary(url: string, dest: string): Promise<void> {
 	});
 }
 
-export async function upgradeOttoToVersion(version: string): Promise<void> {
-	const asset = getPlatformAsset();
-	const url = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${asset}`;
-	const ext = platform() === 'win32' ? '.exe' : '';
-	const userBin = resolve(homedir(), '.local', 'bin');
-	const binPath = resolve(userBin, `${BIN_NAME}${ext}`);
-	const tmpPath = resolve(userBin, `.${BIN_NAME}-upgrade-${Date.now()}${ext}`);
-	mkdirSync(userBin, { recursive: true });
+export interface UpgradeOttoOptions {
+	platform?: string;
+	architecture?: string;
+	homeDirectory?: string;
+	now?: () => number;
+	download?: (url: string, destination: string) => Promise<void>;
+	makeDirectory?: typeof mkdirSync;
+	makeExecutable?: typeof chmodSync;
+	install?: typeof renameSync;
+	print?: (message: string) => void;
+}
 
-	console.log(
-		`\n  Downloading ${colors.bold(`v${version}`)} for ${platform()}/${arch()}\n`,
+export async function upgradeOttoToVersion(
+	version: string,
+	options: UpgradeOttoOptions = {},
+): Promise<void> {
+	const targetPlatform = options.platform ?? platform();
+	const targetArchitecture = options.architecture ?? arch();
+	const release = parseReleaseVersion(version);
+	const url = getOfficialReleaseUrl(
+		release.version,
+		targetPlatform,
+		targetArchitecture,
+	);
+	const ext = targetPlatform === 'win32' ? '.exe' : '';
+	const userBin = resolve(options.homeDirectory ?? homedir(), '.local', 'bin');
+	const binPath = resolve(userBin, `${BIN_NAME}${ext}`);
+	const tmpPath = resolve(
+		userBin,
+		`.${BIN_NAME}-upgrade-${(options.now ?? Date.now)()}${ext}`,
+	);
+	(options.makeDirectory ?? mkdirSync)(userBin, { recursive: true });
+	const print = options.print ?? console.log;
+
+	print(
+		`\n  Downloading ${colors.bold(release.tag)} for ${targetPlatform}/${targetArchitecture}\n`,
 	);
 
-	await downloadBinary(url, tmpPath);
+	await (options.download ?? downloadBinary)(url, tmpPath);
 
-	if (platform() !== 'win32') {
-		chmodSync(tmpPath, 0o755);
+	if (targetPlatform !== 'win32') {
+		(options.makeExecutable ?? chmodSync)(tmpPath, 0o755);
 	}
 
-	renameSync(tmpPath, binPath);
+	(options.install ?? renameSync)(tmpPath, binPath);
 
-	console.log(`\n  ${colors.green('✓')} Downloaded to ${colors.dim(binPath)}`);
+	print(`\n  ${colors.green('✓')} Downloaded to ${colors.dim(binPath)}`);
 }
 
 interface DaemonMismatchUpgradeOptions {
@@ -214,39 +212,38 @@ export async function offerDaemonMismatchUpgrade(
 	return true;
 }
 
-export function registerUpgradeCommand(program: Command, version: string) {
-	program
-		.command('upgrade')
-		.description('Check for updates and upgrade otto')
-		.option('-c, --check', 'Only check for updates, do not install')
-		.action(async (opts) => {
-			console.log(`Current version: ${version}`);
+export { registerUpgradeCommand } from './lazy/upgrade.ts';
 
-			const latest = await fetchLatestVersion();
-			if (!latest) {
-				console.log('Could not fetch latest version');
-				process.exit(1);
-			}
+export async function handleUpgrade(
+	opts: { check?: boolean },
+	version: string,
+) {
+	console.log(`Current version: ${version}`);
 
-			console.log(`Latest version:  ${latest}`);
+	const latest = await fetchLatestVersion();
+	if (!latest) {
+		console.log('Could not fetch latest version');
+		process.exit(1);
+	}
 
-			const cmp = compareVersions(version, latest);
-			if (cmp <= 0) {
-				console.log('\n✓ You are on the latest version');
-				return;
-			}
+	console.log(`Latest version:  ${latest}`);
 
-			console.log(`\nUpdate available: ${version} → ${latest}`);
+	const cmp = compareReleaseVersions(version, latest);
+	if (cmp >= 0) {
+		console.log('\n✓ You are on the latest version');
+		return;
+	}
 
-			if (opts.check) {
-				console.log(`\nRun 'otto upgrade' to install`);
-				return;
-			}
+	console.log(`\nUpdate available: ${version} → ${latest}`);
 
-			await upgradeOttoToVersion(latest);
+	if (opts.check) {
+		console.log(`\nRun 'otto upgrade' to install`);
+		return;
+	}
 
-			console.log(`  ${colors.green('✓')} Upgrade complete!`);
-			console.log(`  Run ${colors.bold('otto')} to use the new version.`);
-			process.exit(0);
-		});
+	await upgradeOttoToVersion(latest);
+
+	console.log(`  ${colors.green('✓')} Upgrade complete!`);
+	console.log(`  Run ${colors.bold('otto')} to use the new version.`);
+	process.exit(0);
 }

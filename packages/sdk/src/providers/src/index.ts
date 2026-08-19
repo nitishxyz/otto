@@ -26,6 +26,17 @@ export type {
 	ProviderCatalogEntry,
 } from '../../types/src/index.ts';
 export {
+	BUILT_IN_PROVIDER_DESCRIPTORS,
+	builtInProviderIds,
+	getBuiltInProviderDescriptor,
+} from '../../types/src/provider-descriptors.ts';
+export type {
+	BuiltInProviderDescriptor,
+	ProviderRuntimeKind,
+} from '../../types/src/provider-descriptors.ts';
+export { createBuiltInProviderModel } from './model-factory.ts';
+export type { BuiltInModelFactoryConfig } from './model-factory.ts';
+export {
 	getModelFromMap,
 	hasModelInMap,
 	mapConfiguredModelEntries,

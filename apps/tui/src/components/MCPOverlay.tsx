@@ -1,5 +1,5 @@
 import { useKeyboard } from '@opentui/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	listMcpServers,
 	startMcpServer,
@@ -211,8 +211,15 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		async (server: MCPServerInfo) => {
 			setError(null);
 			setBusy(server.name, true);
+			setServers((current) =>
+				current.map((entry) =>
+					entry.name === server.name
+						? { ...entry, disabled: !server.disabled }
+						: entry,
+				),
+			);
 			try {
-				if (server.connected) {
+				if (!server.disabled) {
 					const { data, error: err } = await stopMcpServer({
 						path: { name: server.name },
 						query: getProjectQuery(),
@@ -293,6 +300,13 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 					showStatus(`${server.name} started`);
 				}
 			} catch (e) {
+				setServers((current) =>
+					current.map((entry) =>
+						entry.name === server.name
+							? { ...entry, disabled: server.disabled }
+							: entry,
+					),
+				);
 				setError(e instanceof Error ? e.message : 'Operation failed');
 			} finally {
 				setBusy(server.name, false);
@@ -383,11 +397,10 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 		fetchServers,
 	]);
 
-	const sortedServers = [...servers].sort((a, b) => {
-		if (a.connected && !b.connected) return -1;
-		if (!a.connected && b.connected) return 1;
-		return a.name.localeCompare(b.name);
-	});
+	const sortedServers = useMemo(
+		() => [...servers].sort((a, b) => a.name.localeCompare(b.name)),
+		[servers],
+	);
 
 	useKeyboard((key) => {
 		if (viewRef.current === 'add') {
@@ -468,7 +481,6 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 					? 0
 					: selectedIdxRef.current + 1;
 			setSelectedIdx(next);
-			ensureVisible(next);
 		} else if (key.name === 'return' || key.name === 'space') {
 			const server = sortedServers[selectedIdxRef.current];
 			if (server) handleToggle(server);
@@ -711,11 +723,13 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 							server.transport === 'http' || server.transport === 'sse';
 						const toolCount = server.tools.length;
 
-						const state = server.connected
-							? 'connected'
-							: server.authRequired && !server.authenticated
-								? 'auth required'
-								: 'disconnected';
+						const state = server.disabled
+							? 'disabled'
+							: server.connected
+								? 'connected'
+								: server.authRequired && !server.authenticated
+									? 'auth required'
+									: 'disconnected';
 						const footer = `${isRemote ? server.transport : 'stdio'}${
 							server.scope === 'project' ? ' project' : ''
 						}${server.connected && toolCount > 0 ? ` ${toolCount} tools` : ''}`;
@@ -730,7 +744,7 @@ export function MCPOverlay({ onClose }: MCPOverlayProps) {
 								gutter={
 									isBusy ? (
 										<TinySpinner fg={colors.yellow} />
-									) : server.connected ? (
+									) : !server.disabled ? (
 										<text fg={colors.green}>●</text>
 									) : server.authRequired && !server.authenticated ? (
 										<text fg={colors.yellow}>◎</text>

@@ -53,7 +53,7 @@ async function buildResearchContext(
 }
 
 export async function listResearchSessions(c: Context) {
-	const parentId = c.req.param('parentId');
+	const { parentId } = c.req.valid('param' as never) as { parentId: string };
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 
@@ -103,13 +103,14 @@ export async function listResearchSessions(c: Context) {
 }
 
 export async function createResearchSession(c: Context) {
-	const parentId = c.req.param('parentId');
+	const { parentId } = c.req.valid('param' as never) as { parentId: string };
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
-	const body = (await c.req.json().catch(() => ({}))) as Record<
-		string,
-		unknown
-	>;
+	const body = c.req.valid('json' as never) as {
+		provider?: string;
+		model?: string;
+		title?: string;
+	};
 
 	const parentRows = await db
 		.select()
@@ -168,7 +169,9 @@ export async function createResearchSession(c: Context) {
 }
 
 export async function deleteResearchSession(c: Context) {
-	const researchId = c.req.param('researchId');
+	const { researchId } = c.req.valid('param' as never) as {
+		researchId: string;
+	};
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
 
@@ -198,13 +201,13 @@ export async function deleteResearchSession(c: Context) {
 }
 
 export async function injectResearchContext(c: Context) {
-	const parentId = c.req.param('parentId');
+	const { parentId } = c.req.valid('param' as never) as { parentId: string };
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
-	const body = (await c.req.json().catch(() => ({}))) as Record<
-		string,
-		unknown
-	>;
+	const body = c.req.valid('json' as never) as {
+		researchSessionId: string;
+		label?: string;
+	};
 	const researchSessionId =
 		typeof body.researchSessionId === 'string' ? body.researchSessionId : '';
 	const label =
@@ -242,13 +245,16 @@ export async function injectResearchContext(c: Context) {
 }
 
 export async function exportResearchSession(c: Context) {
-	const researchId = c.req.param('researchId');
+	const { researchId } = c.req.valid('param' as never) as {
+		researchId: string;
+	};
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const { cfg, db } = await loadProjectDb(projectRoot);
-	const body = (await c.req.json().catch(() => ({}))) as Record<
-		string,
-		unknown
-	>;
+	const body = c.req.valid('json' as never) as {
+		provider?: string;
+		model?: string;
+		agent?: string;
+	};
 
 	const researchRows = await db
 		.select()

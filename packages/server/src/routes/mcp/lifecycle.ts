@@ -76,7 +76,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await startMCPServer({
-				name: c.req.param('name'),
+				name: c.req.valid('param').name,
 				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
@@ -116,7 +116,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await stopMCPServer(
-				c.req.param('name'),
+				c.req.valid('param').name,
 				await resolveRequestProjectRoot(c),
 			);
 			return result.ok
@@ -153,7 +153,7 @@ export function registerMCPLifecycleRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await testMCPServer(
-				c.req.param('name'),
+				c.req.valid('param').name,
 				await resolveRequestProjectRoot(c),
 			);
 			return result.ok

@@ -23,14 +23,15 @@ describe('Legend List message thread contract', () => {
 		expect(source).toContain('recycleItems={false}');
 	});
 
-	test('lets Legend List detach end-follow on any upward scroll', async () => {
+	test('keeps follow armed across layout growth until the reader scrolls up', async () => {
 		const source = await readFile(messageThreadPath, 'utf8');
 		expect(source).toContain(
 			'maintainScrollAtEndThreshold={END_FOLLOW_THRESHOLD}',
 		);
-		expect(source).toContain('const END_FOLLOW_THRESHOLD = 0;');
-		expect(source).toContain("'isWithinMaintainScrollAtEndThreshold'");
-		expect(source).not.toContain('createThreadFollowState');
+		expect(source).toContain('const END_FOLLOW_THRESHOLD = 1;');
+		expect(source).toContain('createThreadFollowState');
+		expect(source).toContain("type: 'scrolled-up'");
+		expect(source).not.toContain("'isWithinMaintainScrollAtEndThreshold'");
 	});
 
 	test('loads older history without covering the viewport', async () => {

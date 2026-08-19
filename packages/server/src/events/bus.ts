@@ -1,4 +1,9 @@
-import type { ClientEvent, NotificationEvent, OttoEvent } from './types.ts';
+import type {
+	ClientEvent,
+	NotificationEvent,
+	OttoEvent,
+	ServerEventType,
+} from './types.ts';
 import {
 	projectScopeKey,
 	scopedSessionKey,
@@ -45,7 +50,7 @@ function sanitizeBigInt<T>(obj: T): T {
 	return obj;
 }
 
-export function publish(event: OttoEvent) {
+export function publish<T extends ServerEventType>(event: OttoEvent<T>) {
 	const sanitizedEvent = sanitizeBigInt(event);
 	const replay = recordProjectSessionEvent(sanitizedEvent);
 	const notified = new Set<Subscriber>();

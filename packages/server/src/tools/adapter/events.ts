@@ -1,4 +1,9 @@
 import { logger } from '@ottocode/sdk';
+import type {
+	ToolCallPayload,
+	ToolDeltaPayload,
+	ToolResultPayload,
+} from '@ottocode/sdk/events/protocol';
 import { publish } from '../../events/bus.ts';
 import { boundToolEventValue } from '../../events/tool-payload.ts';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
@@ -41,15 +46,16 @@ function clearStreamedInput(
 }
 
 function boundPayloadField(
-	payload: Record<string, unknown>,
+	payload: object,
 	field: 'args' | 'result' | 'artifact',
 	value: unknown,
 ): void {
 	const bounded = boundToolEventValue(value);
-	payload[field] = bounded.value;
+	const target = payload as Record<string, unknown>;
+	target[field] = bounded.value;
 	if (bounded.truncated) {
-		payload[`${field}Truncated`] = true;
-		payload[`${field}OriginalBytes`] = bounded.originalBytes;
+		target[`${field}Truncated`] = true;
+		target[`${field}OriginalBytes`] = bounded.originalBytes;
 	}
 }
 
@@ -81,12 +87,13 @@ export function publishToolCall(
 	},
 ): void {
 	clearStreamedInput(ctx, args.name, args.callId);
-	const payload: Record<string, unknown> = {
+	const payload: ToolCallPayload = {
 		name: args.name,
 		callId: args.callId,
 		stepIndex: args.stepIndex,
 		index: args.index,
 		messageId: ctx.messageId,
+		args: undefined,
 	};
 	boundPayloadField(payload, 'args', args.input);
 	publish({
@@ -155,7 +162,7 @@ export function publishToolDelta(
 		deltaTruncated = bounded.truncated;
 		deltaOriginalBytes = bounded.originalBytes;
 	}
-	const payload: Record<string, unknown> = {
+	const payload: ToolDeltaPayload = {
 		name: args.name,
 		channel: args.channel,
 		delta,
@@ -181,11 +188,12 @@ export function publishToolResult(
 	stepIndex?: number,
 ): void {
 	clearStreamedInput(ctx, content.name, content.callId);
-	const payload: Record<string, unknown> = {
+	const payload: ToolResultPayload = {
 		name: content.name,
 		callId: content.callId,
 		stepIndex,
 		messageId: ctx.messageId,
+		result: undefined,
 	};
 	boundPayloadField(
 		payload,

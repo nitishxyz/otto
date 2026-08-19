@@ -69,9 +69,14 @@ build_host_whisper_cli() {
     | tar -xz -C "$tmp_dir"
 
   local src_dir="$tmp_dir/whisper.cpp-${WHISPER_CPP_VERSION#v}"
+  local cpu_args=(-DGGML_NATIVE=OFF)
+  if [[ "$platform" == "linux-arm64" ]]; then
+    cpu_args+=(-DGGML_CPU_ARM_ARCH=armv8-a)
+  fi
   cmake -S "$src_dir" -B "$tmp_dir/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
+    "${cpu_args[@]}" \
     -DWHISPER_BUILD_TESTS=OFF \
     -DWHISPER_BUILD_EXAMPLES=ON \
     -DWHISPER_BUILD_SERVER=OFF \

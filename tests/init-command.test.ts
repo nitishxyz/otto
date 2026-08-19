@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DB } from '@ottocode/database';
-import { COMMANDS as TUI_COMMANDS } from '../apps/tui/src/commands.ts';
+import { COMMANDS as TUI_COMMANDS } from '../apps/tui/src/commands/index.ts';
 import { BUILTIN_AGENTS } from '../packages/server/src/presets.ts';
 import { prepareBuiltinCommand } from '../packages/server/src/runtime/commands/builtins.ts';
 import {

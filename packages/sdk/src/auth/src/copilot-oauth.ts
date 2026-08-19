@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { openBrowser } from './open-browser';
 
 const CLIENT_ID = 'Ov23lip6QjVYxHUAeW4d';
 const POLLING_SAFETY_MARGIN_MS = 3000;
@@ -20,30 +20,6 @@ export type CopilotDeviceCodeResponse = {
 export type CopilotOAuthResult = {
 	access_token: string;
 };
-
-async function openBrowser(url: string) {
-	const platform = process.platform;
-	let command: string;
-	switch (platform) {
-		case 'darwin':
-			command = `open "${url}"`;
-			break;
-		case 'win32':
-			command = `start "${url}"`;
-			break;
-		default:
-			command = `xdg-open "${url}"`;
-			break;
-	}
-	return new Promise<void>((resolve, reject) => {
-		const child = spawn(command, [], { shell: true });
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(`Failed to open browser (exit code ${code})`));
-		});
-	});
-}
 
 export async function requestDeviceCode(
 	scope?: string,

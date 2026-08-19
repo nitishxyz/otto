@@ -1,12 +1,35 @@
 import type { Command } from 'commander';
-import { dispatchVersionedCommand, pushFlag, pushOption } from './helpers.ts';
+import { parseCliPort } from '../../runtime/network.ts';
+import type { ServeOptions } from '../serve.ts';
+
+export interface ServeCommandOptions {
+	project: string;
+	port?: number;
+	network: boolean;
+	open: boolean;
+	tunnel: boolean;
+	apiOnly: boolean;
+	daemonRegister?: boolean;
+}
+
+export function toServeOptions(opts: ServeCommandOptions): ServeOptions {
+	return {
+		project: opts.project,
+		port: opts.port,
+		network: opts.network,
+		tunnel: opts.tunnel,
+		noOpen: !opts.open,
+		apiOnly: opts.apiOnly,
+		daemonRegister: opts.daemonRegister,
+	};
+}
 
 export function registerServeCommand(program: Command, version: string) {
 	program
 		.command('serve')
 		.description('Advanced: run a standalone foreground API/Web server')
-		.option('-p, --port <port>', 'Port to listen on', (v) =>
-			Number.parseInt(v, 10),
+		.option('-p, --port <port>', 'Port to listen on', (value) =>
+			parseCliPort(value, { allowZero: true }),
 		)
 		.option('--network', 'Bind to 0.0.0.0 for network access', false)
 		.option('--tunnel', 'Enable Cloudflare tunnel for remote access', false)
@@ -18,16 +41,8 @@ export function registerServeCommand(program: Command, version: string) {
 		)
 		.option('--no-open', 'Do not open browser automatically')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (opts) => {
-			const argv = ['serve'];
-			pushOption(argv, '--port', opts.port);
-			pushFlag(argv, '--network', opts.network);
-			pushFlag(argv, '--tunnel', opts.tunnel);
-			pushFlag(argv, '--api-only', opts.apiOnly);
-			pushFlag(argv, '--daemon-register', opts.daemonRegister);
-			pushFlag(argv, '--no-open', !opts.open);
-			pushOption(argv, '--project', opts.project);
-			const { registerServeCommand: register } = await import('../serve.ts');
-			await dispatchVersionedCommand(register, version, argv);
+		.action(async (opts: ServeCommandOptions) => {
+			const { handleServe } = await import('../serve.ts');
+			await handleServe(toServeOptions(opts), version);
 		});
 }

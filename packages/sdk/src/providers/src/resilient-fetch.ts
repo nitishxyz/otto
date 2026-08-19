@@ -12,6 +12,8 @@
  *   race our explicit controllers.
  */
 
+import { parseIntegerSetting, retry } from '../../runtime/retry.ts';
+
 export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 15_000;
 export const DEFAULT_PROVIDER_REQUEST_MAX_RETRIES = 2;
 export const DEFAULT_PROVIDER_REQUEST_RETRY_DELAY_MS = 500;
@@ -116,10 +118,7 @@ function parseIntegerEnv(
 	fallback: number,
 	opts: { min: number },
 ): number {
-	const raw = process.env[name];
-	if (!raw) return fallback;
-	const parsed = Number.parseInt(raw, 10);
-	return Number.isFinite(parsed) && parsed >= opts.min ? parsed : fallback;
+	return parseIntegerSetting(process.env[name], fallback, opts);
 }
 
 /** Resolve request header timeout from options / env / default. */
@@ -199,40 +198,6 @@ export function isNonReplayableRequestBody(
 function isEventStreamContentType(contentType: string | null): boolean {
 	if (!contentType) return false;
 	return contentType.toLowerCase().includes('text/event-stream');
-}
-
-function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
-	if (ms <= 0) {
-		if (signal?.aborted) {
-			return Promise.reject(
-				signal.reason ?? new DOMException('Aborted', 'AbortError'),
-			);
-		}
-		return Promise.resolve();
-	}
-
-	return new Promise((resolve, reject) => {
-		if (signal?.aborted) {
-			reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-			return;
-		}
-
-		const timer = setTimeout(() => {
-			if (signal) {
-				signal.removeEventListener('abort', onAbort);
-			}
-			resolve();
-		}, ms);
-
-		const onAbort = () => {
-			clearTimeout(timer);
-			reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
-		};
-
-		if (signal) {
-			signal.addEventListener('abort', onAbort, { once: true });
-		}
-	});
 }
 
 /**
@@ -412,14 +377,8 @@ export async function resilientFetch(
 	const maxRetries = nonReplayable ? 0 : configuredMaxRetries;
 	const parentSignal = init?.signal ?? undefined;
 
-	let lastError: unknown;
-
-	for (let attempt = 0; attempt <= maxRetries; attempt++) {
-		if (parentSignal?.aborted) {
-			throw parentSignal.reason ?? new DOMException('Aborted', 'AbortError');
-		}
-
-		try {
+	return retry(
+		async () => {
 			const attemptInput = prepareAttemptInput(input);
 			const response = await fetchWithHeaderTimeout(
 				fetchImpl,
@@ -428,24 +387,13 @@ export async function resilientFetch(
 				requestTimeoutMs,
 			);
 			return withStreamIdleTimeout(response, streamIdleTimeoutMs);
-		} catch (error) {
-			lastError = error;
-
-			// Parent abort: never retry.
-			if (parentSignal?.aborted) {
-				throw parentSignal.reason ?? error;
-			}
-
-			if (attempt >= maxRetries) {
-				throw error;
-			}
-
-			const delay = retryDelayMs * (attempt + 1);
-			await sleep(delay, parentSignal);
-		}
-	}
-
-	throw lastError;
+		},
+		{
+			maxRetries,
+			delayMs: ({ attempt }) => retryDelayMs * (attempt + 1),
+			signal: parentSignal,
+		},
+	);
 }
 
 /**

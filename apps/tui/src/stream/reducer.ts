@@ -5,6 +5,7 @@ export type StreamAction =
 	| { type: 'REFRESH_LATEST'; messages: Message[] }
 	| { type: 'PREPEND'; messages: Message[] }
 	| { type: 'RETRY_MESSAGE'; messageId: string }
+	| { type: 'REMOVE_MESSAGES'; messageIds: string[] }
 	| {
 			type: 'ADD_OPTIMISTIC_USER';
 			id: string;
@@ -224,6 +225,10 @@ export function messageReducer(
 		}
 		case 'CLEAR':
 			return [];
+		case 'REMOVE_MESSAGES': {
+			const removedIds = new Set(action.messageIds);
+			return state.filter((message) => !removedIds.has(message.id));
+		}
 		case 'REFRESH_LATEST': {
 			const latestById = new Map(
 				action.messages.map((message) => [message.id, message]),

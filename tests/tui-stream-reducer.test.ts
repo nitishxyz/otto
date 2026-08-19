@@ -34,6 +34,25 @@ describe('TUI stream reducer', () => {
 		expect(reduce([makeMessage()], { type: 'CLEAR' })).toEqual([]);
 	});
 
+	test('REMOVE_MESSAGES removes a deleted queued user and assistant pair', () => {
+		const completed = makeMessage({ id: 'completed', createdAt: 1000 });
+		const queuedUser = makeMessage({
+			id: 'queued-user',
+			role: 'user',
+			createdAt: 2000,
+		});
+		const queuedAssistant = makeMessage({
+			id: 'queued-assistant',
+			createdAt: 3000,
+		});
+		const state = reduce([completed, queuedUser, queuedAssistant], {
+			type: 'REMOVE_MESSAGES',
+			messageIds: [queuedUser.id, queuedAssistant.id],
+		});
+
+		expect(state).toEqual([completed]);
+	});
+
 	test('PREPEND adds older messages without duplicating loaded ids', () => {
 		const current = makeMessage({ id: 'new', createdAt: 2000 });
 		const older = makeMessage({ id: 'old', createdAt: 1000 });

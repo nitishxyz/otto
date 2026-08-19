@@ -1,13 +1,5 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushOption } from './helpers.ts';
-
-async function dispatch(argv: string[], version: string) {
-	const { registerProjectsCommand } = await import('../projects.ts');
-	await dispatchRegisteredCommand(
-		(program) => registerProjectsCommand(program, version),
-		argv,
-	);
-}
+import type { ProjectsOptions } from '../projects.ts';
 
 export function registerProjectsCommand(program: Command, version: string) {
 	const projects = program
@@ -22,10 +14,9 @@ export function registerProjectsCommand(program: Command, version: string) {
 			'Project used to start the daemon',
 			process.cwd(),
 		)
-		.action(async (opts) => {
-			const argv = ['projects', 'list'];
-			pushOption(argv, '--project', opts.project);
-			await dispatch(argv, version);
+		.action(async (opts: ProjectsOptions) => {
+			const { listProjects } = await import('../projects.ts');
+			await listProjects(opts, version);
 		});
 
 	projects
@@ -33,7 +24,8 @@ export function registerProjectsCommand(program: Command, version: string) {
 		.argument('<path>', 'Project path to open')
 		.description('Open a project in the shared daemon')
 		.action(async (projectPath: string) => {
-			await dispatch(['projects', 'open', projectPath], version);
+			const { openProject } = await import('../projects.ts');
+			await openProject(projectPath, version);
 		});
 
 	projects
@@ -45,10 +37,9 @@ export function registerProjectsCommand(program: Command, version: string) {
 			'Project used to start the daemon',
 			process.cwd(),
 		)
-		.action(async (projectId: string, opts) => {
-			const argv = ['projects', 'close', projectId];
-			pushOption(argv, '--project', opts.project);
-			await dispatch(argv, version);
+		.action(async (projectId: string, opts: ProjectsOptions) => {
+			const { closeProject } = await import('../projects.ts');
+			await closeProject(projectId, opts, version);
 		});
 
 	projects
@@ -60,9 +51,8 @@ export function registerProjectsCommand(program: Command, version: string) {
 			'Project used to start the daemon',
 			process.cwd(),
 		)
-		.action(async (projectIdOrPath: string, opts) => {
-			const argv = ['projects', 'forget', projectIdOrPath];
-			pushOption(argv, '--project', opts.project);
-			await dispatch(argv, version);
+		.action(async (projectIdOrPath: string, opts: ProjectsOptions) => {
+			const { forgetProject } = await import('../projects.ts');
+			await forgetProject(projectIdOrPath, opts, version);
 		});
 }

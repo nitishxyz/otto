@@ -1,5 +1,14 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
+import type { PluginScope } from '@ottocode/sdk';
+
+function normalizeOptions<T extends { scope?: string }>(
+	opts: T,
+): T & { scope: PluginScope } {
+	if (opts.scope && opts.scope !== 'global' && opts.scope !== 'project') {
+		throw new Error(`Invalid plugin scope: ${opts.scope}`);
+	}
+	return { ...opts, scope: (opts.scope ?? 'global') as PluginScope };
+}
 
 export function registerPluginsCommand(program: Command) {
 	const plugins = program.command('plugins').description('Manage Otto plugins');
@@ -10,13 +19,8 @@ export function registerPluginsCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--json', 'Output as JSON', false)
 		.action(async (opts) => {
-			const argv = ['plugins', 'list'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsList } = await import('../../plugins.ts');
+			await runPluginsList(opts);
 		});
 
 	plugins
@@ -25,14 +29,8 @@ export function registerPluginsCommand(program: Command) {
 		.option('--registry <url>', 'Registry URL')
 		.option('--json', 'Output as JSON', false)
 		.action(async (query, opts) => {
-			const argv = ['plugins', 'search'];
-			if (query) argv.push(query);
-			pushOption(argv, '--registry', opts.registry);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsSearch } = await import('../../plugins.ts');
+			await runPluginsSearch(query, { ...opts, project: process.cwd() });
 		});
 
 	plugins
@@ -41,13 +39,8 @@ export function registerPluginsCommand(program: Command) {
 		.option('--registry <url>', 'Registry URL')
 		.option('--json', 'Output as JSON', false)
 		.action(async (name, opts) => {
-			const argv = ['plugins', 'info', name];
-			pushOption(argv, '--registry', opts.registry);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsInfo } = await import('../../plugins.ts');
+			await runPluginsInfo(name, { ...opts, project: process.cwd() });
 		});
 
 	plugins
@@ -58,15 +51,8 @@ export function registerPluginsCommand(program: Command) {
 		.option('--registry <url>', 'Registry URL')
 		.option('--json', 'Output as JSON', false)
 		.action(async (source, opts) => {
-			const argv = ['plugins', 'install', source];
-			pushOption(argv, '--scope', opts.scope);
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--registry', opts.registry);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsInstall } = await import('../../plugins.ts');
+			await runPluginsInstall(source, normalizeOptions(opts));
 		});
 
 	for (const commandName of ['remove', 'enable', 'disable'] as const) {
@@ -78,13 +64,16 @@ export function registerPluginsCommand(program: Command) {
 			.option('--scope <scope>', 'Scope: global or project', 'global')
 			.option('--project <path>', 'Use project at <path>', process.cwd())
 			.action(async (name, opts) => {
-				const argv = ['plugins', commandName, name];
-				pushOption(argv, '--scope', opts.scope);
-				pushOption(argv, '--project', opts.project);
-				const { registerPluginsCommand: register } = await import(
-					'../plugins.ts'
-				);
-				await dispatchRegisteredCommand(register, argv);
+				const handlers = await import('../../plugins.ts');
+				if (commandName === 'remove') {
+					await handlers.runPluginsRemove(name, normalizeOptions(opts));
+				} else {
+					await handlers.runPluginsSetEnabled(
+						name,
+						commandName === 'enable',
+						normalizeOptions(opts),
+					);
+				}
 			});
 	}
 
@@ -96,15 +85,8 @@ export function registerPluginsCommand(program: Command) {
 		.option('--registry <url>', 'Registry URL')
 		.option('--json', 'Output as JSON', false)
 		.action(async (name, opts) => {
-			const argv = ['plugins', 'update', name];
-			pushOption(argv, '--scope', opts.scope);
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--registry', opts.registry);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsUpdate } = await import('../../plugins.ts');
+			await runPluginsUpdate(name, normalizeOptions(opts));
 		});
 
 	plugins
@@ -112,13 +94,8 @@ export function registerPluginsCommand(program: Command) {
 		.description('Validate a local native plugin manifest and tool entries')
 		.option('--json', 'Output as JSON', false)
 		.action(async (path, opts) => {
-			const argv = ['plugins', 'validate'];
-			if (path) argv.push(path);
-			pushFlag(argv, '--json', opts.json);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsValidate } = await import('../../plugins.ts');
+			await runPluginsValidate(path ?? process.cwd(), opts);
 		});
 
 	plugins
@@ -128,13 +105,7 @@ export function registerPluginsCommand(program: Command) {
 		.option('--input <json>', 'Inline JSON input', '{}')
 		.option('--input-file <path>', 'Read JSON input from a file')
 		.action(async (path, tool, opts) => {
-			const argv = ['plugins', 'dev', path, tool];
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--input', opts.input);
-			pushOption(argv, '--input-file', opts.inputFile);
-			const { registerPluginsCommand: register } = await import(
-				'../plugins.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runPluginsDev } = await import('../../plugins.ts');
+			await runPluginsDev(path, tool, opts);
 		});
 }

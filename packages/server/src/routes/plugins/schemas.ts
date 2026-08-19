@@ -291,14 +291,3 @@ export const pluginCommandRunResponseSchema = z.object({
 	previewUrl: z.string().optional(),
 	execution: z.literal('started'),
 });
-
-export const apiErrorResponseSchema = z.object({
-	error: z.object({
-		message: z.string(),
-		type: z.string(),
-		code: z.string().optional(),
-		status: z.number().optional(),
-		details: z.record(z.string(), z.unknown()).optional(),
-		stack: z.string().optional(),
-	}),
-});

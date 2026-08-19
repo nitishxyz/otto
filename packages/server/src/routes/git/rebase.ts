@@ -3,7 +3,6 @@ import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
-import { gitRebaseSchema } from './schemas.ts';
 import { getGitOperationState, validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -84,8 +83,7 @@ export function registerRebaseRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json().catch(() => ({}));
-				const { action } = gitRebaseSchema.parse(body);
+				const { action } = c.req.valid('json');
 				const requestedPath = await resolveRequestProjectRoot(c);
 
 				const validation = await validateAndGetGitRoot(requestedPath);

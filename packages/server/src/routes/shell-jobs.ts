@@ -80,7 +80,7 @@ export function registerShellJobsRoutes(app: Hono) {
 				const root = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(root);
 				const jobs = listShellJobsForSession(
-					c.req.param('sessionId'),
+					c.req.valid('param').sessionId,
 					cfg.projectRoot,
 				);
 				return c.json({ jobs: jobs.map(serializeJob) });
@@ -123,8 +123,7 @@ export function registerShellJobsRoutes(app: Hono) {
 				try {
 					const root = await resolveRequestProjectRoot(c);
 					const cfg = await loadConfig(root);
-					const sessionId = c.req.param('sessionId');
-					const jobId = c.req.param('jobId');
+					const { sessionId, jobId } = c.req.valid('param');
 					const job =
 						action === 'detach'
 							? detachActiveShellJob(jobId, sessionId, cfg.projectRoot)

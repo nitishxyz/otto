@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import { sessionRepository } from '../runtime/session/repository.ts';
 import {
 	getPendingSecureInput,
 	getPendingSecureInputsForSession,
@@ -106,8 +107,11 @@ export function registerSessionSecureInputRoute(app: Hono) {
 		},
 		async (c) => {
 			const project = await resolveRequestProject(c);
-			const sessionId = c.req.param('id');
-			const body = secureInputResolveBodySchema.parse(await c.req.json());
+			const { id: sessionId } = c.req.valid('param');
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
+			const body = c.req.valid('json');
 
 			const pending = getPendingSecureInput(
 				body.promptId,
@@ -171,7 +175,10 @@ export function registerSessionSecureInputRoute(app: Hono) {
 		},
 		async (c) => {
 			const project = await resolveRequestProject(c);
-			const sessionId = c.req.param('id');
+			const { id: sessionId } = c.req.valid('param');
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
 			const pending = getPendingSecureInputsForSession(
 				sessionId,
 				project.runtime.root,

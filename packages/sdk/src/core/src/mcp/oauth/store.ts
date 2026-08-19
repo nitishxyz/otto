@@ -98,6 +98,24 @@ export class OAuthCredentialStore {
 		await this.write(serverName, data);
 	}
 
+	async clearTokens(serverName: string): Promise<void> {
+		const data = await this.read(serverName);
+		delete data.tokens;
+		await this.write(serverName, data);
+	}
+
+	async clearClientInfo(serverName: string): Promise<void> {
+		const data = await this.read(serverName);
+		delete data.clientInfo;
+		await this.write(serverName, data);
+	}
+
+	async clearCodeVerifier(serverName: string): Promise<void> {
+		const data = await this.read(serverName);
+		delete data.codeVerifier;
+		await this.write(serverName, data);
+	}
+
 	async clearServer(serverName: string): Promise<void> {
 		try {
 			await fs.unlink(this.filePath(serverName));

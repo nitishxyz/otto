@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
 
 export function registerStorageCommand(program: Command) {
 	const storage = program
@@ -11,12 +10,8 @@ export function registerStorageCommand(program: Command) {
 		.description('Show project storage paths and migration status')
 		.option('--project <path>', 'Use project at <path>')
 		.action(async (opts) => {
-			const argv = ['storage', 'doctor'];
-			pushOption(argv, '--project', opts.project);
-			const { registerStorageCommand: register } = await import(
-				'../storage.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runStorageDoctor } = await import('../storage.ts');
+			await runStorageDoctor(opts);
 		});
 
 	storage
@@ -27,12 +22,7 @@ export function registerStorageCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>')
 		.option('--force', 'Plan overwriting existing target SQLite files', false)
 		.action(async (opts) => {
-			const argv = ['storage', 'plan'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--force', opts.force);
-			const { registerStorageCommand: register } = await import(
-				'../storage.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runStoragePlan } = await import('../storage.ts');
+			await runStoragePlan(opts);
 		});
 }

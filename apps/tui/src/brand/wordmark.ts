@@ -46,7 +46,7 @@ export const OTTO_TUI_WORDMARK_WIDTH =
 	OTTO_TUI_GLYPHS.reduce(
 		(width, glyph) => width + glyph.lines[0].length - glyph.trimLeft,
 		0,
-	) + OTTO_TUI_WORDMARK_GAPS.reduce((width, gap) => width + gap, 0);
+	) + OTTO_TUI_WORDMARK_GAPS.reduce<number>((width, gap) => width + gap, 0);
 export const OTTO_TUI_FULL_MIN_WIDTH = OTTO_TUI_WORDMARK_WIDTH + 4;
 
 export type OttoTuiWordmarkVariant = 'auto' | 'full' | 'compact';

@@ -55,8 +55,8 @@ export function registerUpdateGoalRoute(app: Hono) {
 				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const goalId = c.req.param('goalId');
-				const body = updateGoalBodySchema.parse(await c.req.json());
+				const { goalId } = c.req.valid('param');
+				const body = c.req.valid('json');
 				const rows = await db
 					.select()
 					.from(goals)

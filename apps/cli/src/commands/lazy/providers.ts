@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
 
 export function registerProvidersCommand(program: Command) {
 	const providers = program
@@ -15,14 +14,11 @@ export function registerProvidersCommand(program: Command) {
 		.option('--verbose', 'Show detailed provider metadata', false)
 		.option('--models', 'Preview model ids instead of only counts', false)
 		.action(async (opts) => {
-			const argv = ['providers', 'list'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--verbose', opts.verbose);
-			pushFlag(argv, '--models', opts.models);
-			const { registerProvidersCommand: register } = await import(
-				'../providers.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runProvidersList } = await import('../../providers.ts');
+			await runProvidersList(opts.project, {
+				verbose: opts.verbose,
+				showModels: opts.models,
+			});
 		});
 
 	providers
@@ -30,12 +26,8 @@ export function registerProvidersCommand(program: Command) {
 		.description('Add a custom provider')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (opts) => {
-			const argv = ['providers', 'add'];
-			pushOption(argv, '--project', opts.project);
-			const { registerProvidersCommand: register } = await import(
-				'../providers.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runProvidersAdd } = await import('../../providers.ts');
+			await runProvidersAdd(opts.project);
 		});
 
 	providers
@@ -45,12 +37,7 @@ export function registerProvidersCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--scope <scope>', 'Config scope (local|global)')
 		.action(async (provider, opts) => {
-			const argv = ['providers', 'remove', provider];
-			pushOption(argv, '--project', opts.project);
-			pushOption(argv, '--scope', opts.scope);
-			const { registerProvidersCommand: register } = await import(
-				'../providers.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { runProvidersRemove } = await import('../../providers.ts');
+			await runProvidersRemove(provider, opts.project, opts.scope);
 		});
 }

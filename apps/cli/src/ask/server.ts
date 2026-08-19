@@ -1,8 +1,3 @@
-import {
-	createApp,
-	bunWebSocket,
-	setDefaultProjectRoot,
-} from '@ottocode/server';
 import { client } from '@ottocode/api';
 import PKG from '../../package.json' with { type: 'json' };
 import {
@@ -11,20 +6,19 @@ import {
 	readDaemonToken,
 	type OpenProjectContext,
 } from '../daemon.ts';
+import { createServerRuntime, type ServerRuntime } from '../runtime/server.ts';
 
-let currentServer: ReturnType<typeof Bun.serve> | null = null;
+let currentServer: ServerRuntime | null = null;
 
 export async function startEphemeralServer(): Promise<string> {
-	if (currentServer) return `http://localhost:${currentServer.port}`;
-	setDefaultProjectRoot(process.cwd());
-	const app = createApp();
-	currentServer = Bun.serve({
+	if (currentServer) return currentServer.loopbackApiUrl;
+	currentServer = await createServerRuntime({
+		projectRoot: process.cwd(),
+		mode: 'embedded',
+		webMode: 'disabled',
 		port: 0,
-		fetch: app.fetch,
-		idleTimeout: 240,
-		websocket: bunWebSocket,
 	});
-	const url = `http://localhost:${currentServer.port}`;
+	const url = currentServer.loopbackApiUrl;
 	configureClient(url);
 	return url;
 }
@@ -62,9 +56,7 @@ export async function ensureServer(
 
 export async function stopEphemeralServer(): Promise<void> {
 	if (currentServer) {
-		try {
-			currentServer.stop();
-		} catch {}
+		await currentServer.stop();
 		currentServer = null;
 	}
 }

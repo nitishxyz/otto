@@ -10,29 +10,25 @@ import {
 	joinPath,
 } from './paths.ts';
 import type { OttoConfig } from '../../types/src/index.ts';
+import { BUILT_IN_PROVIDER_DESCRIPTORS } from '../../types/src/provider-descriptors.ts';
+import {
+	readOptionalJsonObject,
+	type JsonObject,
+} from '../../runtime/json-object-file.ts';
 
 export type { OttoConfig } from '../../types/src/index.ts';
 
-const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = {
-	openai: { enabled: false },
-	anthropic: { enabled: false },
-	google: { enabled: false },
-	meta: { enabled: false },
-	'ollama-cloud': { enabled: false, baseURL: 'https://ollama.com' },
-	baseten: { enabled: false },
-	huggingface: { enabled: false },
-	wafer: { enabled: false },
-	openrouter: { enabled: false },
-	opencode: { enabled: false },
-	copilot: { enabled: false },
-	ottorouter: { enabled: true },
-	xai: { enabled: false },
-	zai: { enabled: false },
-	'zai-coding': { enabled: false },
-	deepseek: { enabled: false },
-	kimi: { enabled: false },
-	minimax: { enabled: false },
-};
+const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = Object.fromEntries(
+	Object.values(BUILT_IN_PROVIDER_DESCRIPTORS).map((descriptor) => [
+		descriptor.id,
+		{
+			enabled: descriptor.defaultEnabled,
+			...(descriptor.id === 'ollama-cloud' && descriptor.defaultBaseURL
+				? { baseURL: descriptor.defaultBaseURL }
+				: {}),
+		},
+	]),
+);
 
 const DEFAULTS: {
 	defaults: OttoConfig['defaults'];
@@ -108,10 +104,10 @@ async function loadResolvedConfig(
 	const globalSkillsConfigPath = getGlobalSkillsConfigPath();
 
 	const projectCfg = includeProjectConfig
-		? await readJsonOptional(projectConfigPath)
+		? await readOptionalJsonObject(projectConfigPath)
 		: undefined;
-	const globalCfg = await readJsonOptional(globalConfigPath);
-	const globalSkillsCfg = await readJsonOptional(globalSkillsConfigPath);
+	const globalCfg = await readOptionalJsonObject(globalConfigPath);
+	const globalSkillsCfg = await readOptionalJsonObject(globalSkillsConfigPath);
 
 	const merged = deepMerge(
 		DEFAULTS,
@@ -154,8 +150,6 @@ async function loadResolvedConfig(
 	} satisfies OttoConfig;
 }
 
-type JsonObject = Record<string, unknown>;
-
 function filterProjectConfig(
 	config: JsonObject | undefined,
 ): JsonObject | undefined {
@@ -180,21 +174,6 @@ function pickLocalDefaults(defaults: unknown): JsonObject | undefined {
 		}
 	}
 	return Object.keys(picked).length > 0 ? picked : undefined;
-}
-
-async function readJsonOptional(file: string): Promise<JsonObject | undefined> {
-	const f = Bun.file(file);
-	if (!(await f.exists())) return undefined;
-	try {
-		const buf = await f.text();
-		const parsed = JSON.parse(buf);
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-			return parsed as JsonObject;
-		}
-		return undefined;
-	} catch {
-		return undefined;
-	}
 }
 
 function deepMerge<T extends JsonObject>(

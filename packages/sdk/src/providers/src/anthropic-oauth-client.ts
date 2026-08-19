@@ -4,6 +4,7 @@ import { getAuth, setAuth } from '../../auth/src/index.ts';
 import { refreshToken } from '../../auth/src/oauth.ts';
 import { warn as loggerWarn } from '../../core/src/utils/logger.ts';
 import { addAnthropicCacheControl } from './anthropic-caching.ts';
+import { retry } from '../../runtime/retry.ts';
 
 const CLAUDE_CLI_VERSION = '1.0.61';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -26,10 +27,6 @@ export type AnthropicOAuthConfig = {
 	projectRoot?: string;
 	toolNameTransformer?: (name: string) => string;
 };
-
-function sleep(ms: number) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function refreshKey(projectRoot?: string) {
 	return projectRoot ?? 'global';
@@ -68,10 +65,8 @@ async function refreshAndPersist(
 
 		const refreshFrom =
 			diskAuth?.type === 'oauth' ? diskAuth.refresh : oauth.refresh;
-		let lastError: Error | undefined;
-
-		for (let attempt = 0; attempt <= TOKEN_REFRESH_MAX_RETRIES; attempt++) {
-			try {
+		return retry(
+			async () => {
 				const tokens = await refreshToken(refreshFrom);
 				const updated: OAuth = {
 					type: 'oauth',
@@ -81,18 +76,18 @@ async function refreshAndPersist(
 				};
 				await setAuth('anthropic', updated, projectRoot, 'global');
 				return updated;
-			} catch (err) {
-				lastError = err instanceof Error ? err : new Error(String(err));
-				if (lastError.message.includes('refresh token rejected')) {
-					throw lastError;
-				}
-				if (attempt < TOKEN_REFRESH_MAX_RETRIES) {
-					await sleep(TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1));
-				}
-			}
-		}
-
-		throw lastError ?? new Error('Claude OAuth token refresh failed');
+			},
+			{
+				maxRetries: TOKEN_REFRESH_MAX_RETRIES,
+				delayMs: ({ attempt }) => TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1),
+				shouldRetry: (error) =>
+					!(error instanceof Error ? error.message : String(error)).includes(
+						'refresh token rejected',
+					),
+			},
+		).catch((error) => {
+			throw error instanceof Error ? error : new Error(String(error));
+		});
 	})().finally(() => {
 		refreshPromises.delete(key);
 	});

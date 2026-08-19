@@ -106,8 +106,15 @@ export async function listTerminals(c: Context) {
 export async function createTerminal(c: Context) {
 	try {
 		const { projectRoot, runtime } = await resolveRequestProject(c);
-		const body = await c.req.json();
-		const { command, args, purpose, cwd, title } = body;
+		const { command, args, purpose, cwd, title } = c.req.valid(
+			'json' as never,
+		) as {
+			command: string;
+			args?: string[];
+			purpose: string;
+			cwd?: string;
+			title?: string;
+		};
 
 		if (!command || !purpose) {
 			return c.json({ error: 'command and purpose are required' }, 400);
@@ -150,7 +157,7 @@ export async function createTerminal(c: Context) {
 
 export async function getTerminal(c: Context) {
 	const terminalManager = await getRequestTerminalManager(c);
-	const id = c.req.param('id');
+	const { id } = c.req.valid('param' as never) as { id: string };
 	const terminal = terminalManager.get(id);
 
 	if (!terminal) {
@@ -405,7 +412,7 @@ export async function handleTerminalOutput(c: Context) {
 
 export async function sendTerminalInput(c: Context) {
 	const terminalManager = await getRequestTerminalManager(c);
-	const id = c.req.param('id');
+	const { id } = c.req.valid('param' as never) as { id: string };
 	const terminal = terminalManager.get(id);
 
 	if (!terminal) {
@@ -413,8 +420,7 @@ export async function sendTerminalInput(c: Context) {
 	}
 
 	try {
-		const body = await c.req.json();
-		const { input } = body;
+		const { input } = c.req.valid('json' as never) as { input: string };
 
 		if (!input) {
 			return c.json({ error: 'input is required' }, 400);
@@ -430,7 +436,7 @@ export async function sendTerminalInput(c: Context) {
 
 export async function killTerminal(c: Context) {
 	const terminalManager = await getRequestTerminalManager(c);
-	const id = c.req.param('id');
+	const { id } = c.req.valid('param' as never) as { id: string };
 
 	try {
 		await terminalManager.kill(id);
@@ -443,7 +449,7 @@ export async function killTerminal(c: Context) {
 
 export async function resizeTerminal(c: Context) {
 	const terminalManager = await getRequestTerminalManager(c);
-	const id = c.req.param('id');
+	const { id } = c.req.valid('param' as never) as { id: string };
 	const terminal = terminalManager.get(id);
 
 	if (!terminal) {
@@ -451,8 +457,10 @@ export async function resizeTerminal(c: Context) {
 	}
 
 	try {
-		const body = await c.req.json();
-		const { cols, rows } = body;
+		const { cols, rows } = c.req.valid('json' as never) as {
+			cols: number;
+			rows: number;
+		};
 
 		if (!cols || !rows || cols < 1 || rows < 1) {
 			return c.json({ error: 'valid cols and rows are required' }, 400);

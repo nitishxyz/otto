@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
-import { gitDiffSchema } from './schemas.ts';
 import {
 	checkIfNewFile,
 	inferLanguage,
@@ -32,6 +31,7 @@ const gitDiffQuerySchema = z.object({
 	staged: z
 		.enum(['true', 'false'])
 		.optional()
+		.transform((value) => value === 'true')
 		.openapi({
 			param: { name: 'staged', in: 'query' },
 			description: 'Show staged diff (default: unstaged)',
@@ -39,6 +39,7 @@ const gitDiffQuerySchema = z.object({
 	fullFile: z
 		.enum(['true', 'false'])
 		.optional()
+		.transform((value) => value === 'true')
 		.openapi({
 			param: { name: 'fullFile', in: 'query' },
 			description: 'Include full file content in diff',
@@ -103,11 +104,7 @@ export function registerDiffRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const query = gitDiffSchema.parse({
-					project: undefined,
-					file: c.req.query('file'),
-					staged: c.req.query('staged'),
-				});
+				const query = c.req.valid('query');
 
 				const requestedPath = await resolveRequestProjectRoot(c);
 
@@ -163,8 +160,7 @@ export function registerDiffRoute(app: Hono) {
 					? ['diff', '--cached', '--', query.file]
 					: ['diff', '--', query.file];
 
-				const fullFile = c.req.query('fullFile') === 'true';
-				if (fullFile) {
+				if (query.fullFile) {
 					diffArgs.splice(1, 0, '-U99999');
 				}
 
@@ -211,7 +207,7 @@ export function registerDiffRoute(app: Hono) {
 						file: query.file,
 						absPath,
 						diff: diffText,
-						fullFile,
+						fullFile: query.fullFile,
 						isNewFile: false,
 						isBinary: binary,
 						insertions,

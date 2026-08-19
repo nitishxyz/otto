@@ -41,11 +41,8 @@ export function registerOAuthExchangeRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider');
-				const { code, sessionId } = await c.req.json<{
-					code: string;
-					sessionId: string;
-				}>();
+				const { provider } = c.req.valid('param');
+				const { code, sessionId } = c.req.valid('json');
 
 				if (!code || !sessionId) {
 					return c.json({ error: 'Code and sessionId required' }, 400);

@@ -11,6 +11,10 @@ import {
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
 import {
+	APIError,
+	apiErrorResponseSchema,
+} from '../../../runtime/errors/api-error.ts';
+import {
 	openAIDeviceSessions,
 	ottorouterDeviceSessions,
 	xaiDeviceSessions,
@@ -19,8 +23,110 @@ import {
 	devicePollBodySchema,
 	devicePollResponseSchema,
 	deviceStartResponseSchema,
-	errorResponseSchema,
 } from './schemas.ts';
+import {
+	pollDeviceFlow,
+	startDeviceFlow,
+	type DeviceFlowAdapter,
+} from './device-flow.ts';
+
+type OpenAISession = NonNullable<ReturnType<typeof openAIDeviceSessions.get>>;
+type OpenAIComplete = Extract<
+	Awaited<ReturnType<typeof pollOpenAIDeviceCodeOnce>>,
+	{ status: 'complete' }
+>;
+type OttoRouterSession = NonNullable<
+	ReturnType<typeof ottorouterDeviceSessions.get>
+>;
+type OttoRouterComplete = Extract<
+	Awaited<ReturnType<typeof pollOttoRouterDeviceCodeOnce>>,
+	{ status: 'complete' }
+>;
+
+const openAIDeviceFlow: DeviceFlowAdapter<OpenAISession, OpenAIComplete> = {
+	async start() {
+		const data = await requestOpenAIDeviceCode();
+		return {
+			session: {
+				deviceAuthId: data.deviceAuthId,
+				userCode: data.userCode,
+				interval: data.interval,
+				createdAt: Date.now(),
+			},
+			userCode: data.userCode,
+			verificationUri: data.verificationUri,
+			interval: data.interval,
+		};
+	},
+	async poll(session) {
+		const result = await pollOpenAIDeviceCodeOnce(
+			session.deviceAuthId,
+			session.userCode,
+		);
+		return result.status === 'complete'
+			? { status: 'complete', value: result }
+			: result;
+	},
+	async complete(result) {
+		const tokens = await exchangeOpenAIDeviceCode(
+			result.code,
+			result.codeVerifier,
+		);
+		await setAuth(
+			'openai',
+			{
+				type: 'oauth',
+				refresh: tokens.refresh,
+				access: tokens.access,
+				expires: tokens.expires,
+				accountId: tokens.accountId,
+				idToken: tokens.idToken,
+			},
+			undefined,
+			'global',
+		);
+	},
+};
+
+const ottoRouterDeviceFlow: DeviceFlowAdapter<
+	OttoRouterSession,
+	OttoRouterComplete
+> = {
+	async start() {
+		const data = await requestOttoRouterDeviceCode();
+		return {
+			session: {
+				deviceCode: data.deviceCode,
+				interval: data.interval,
+				createdAt: Date.now(),
+			},
+			userCode: data.userCode,
+			verificationUri: data.verificationUriComplete ?? data.verificationUri,
+			interval: data.interval,
+		};
+	},
+	async poll(session) {
+		const result = await pollOttoRouterDeviceCodeOnce(session.deviceCode);
+		return result.status === 'complete'
+			? { status: 'complete', value: result }
+			: result;
+	},
+	async complete(result) {
+		await setAuth(
+			'ottorouter',
+			{
+				type: 'oauth',
+				refresh: result.tokens.refresh,
+				access: result.tokens.access,
+				expires: result.tokens.expires,
+				idToken: result.tokens.idToken,
+				scopes: result.tokens.scopes,
+			},
+			undefined,
+			'global',
+		);
+	},
+};
 
 export function registerOpenAIDeviceRoutes(app: Hono) {
 	registerOpenAIDeviceStartRoute(app);
@@ -55,33 +161,18 @@ function registerOpenAIDeviceStartRoute(app: Hono) {
 				},
 				'500': {
 					description: 'Server Error',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const deviceData = await requestOpenAIDeviceCode();
-				const sessionId = crypto.randomUUID();
-				openAIDeviceSessions.set(sessionId, {
-					deviceAuthId: deviceData.deviceAuthId,
-					userCode: deviceData.userCode,
-					interval: deviceData.interval,
-					createdAt: Date.now(),
-				});
-				return c.json({
-					sessionId,
-					userCode: deviceData.userCode,
-					verificationUri: deviceData.verificationUri,
-					interval: deviceData.interval,
-				});
+				return c.json(
+					await startDeviceFlow(openAIDeviceSessions, openAIDeviceFlow),
+				);
 			} catch (error) {
-				const message =
-					error instanceof Error
-						? error.message
-						: 'Failed to start OpenAI device flow';
 				logger.error('OpenAI device flow start failed', error);
-				return c.json({ error: message }, 500);
+				throw error;
 			}
 		},
 	);
@@ -109,55 +200,27 @@ function registerOpenAIDevicePollRoute(app: Hono) {
 				},
 				'400': {
 					description: 'Bad Request',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+				'500': {
+					description: 'Server Error',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const { sessionId } = await c.req.json<{ sessionId: string }>();
-				if (!sessionId || !openAIDeviceSessions.has(sessionId)) {
-					return c.json({ error: 'Session expired or invalid' }, 400);
-				}
-				const session = openAIDeviceSessions.get(sessionId);
-				if (!session) {
-					return c.json({ error: 'Session expired or invalid' }, 400);
-				}
-				const result = await pollOpenAIDeviceCodeOnce(
-					session.deviceAuthId,
-					session.userCode,
+				const { sessionId } = c.req.valid('json');
+				return c.json(
+					await pollDeviceFlow(
+						openAIDeviceSessions,
+						openAIDeviceFlow,
+						sessionId,
+					),
 				);
-				if (result.status === 'pending') {
-					return c.json({ status: 'pending' });
-				}
-				if (result.status === 'error') {
-					openAIDeviceSessions.delete(sessionId);
-					return c.json({ status: 'error', error: result.error });
-				}
-
-				const tokens = await exchangeOpenAIDeviceCode(
-					result.code,
-					result.codeVerifier,
-				);
-				await setAuth(
-					'openai',
-					{
-						type: 'oauth',
-						refresh: tokens.refresh,
-						access: tokens.access,
-						expires: tokens.expires,
-						accountId: tokens.accountId,
-						idToken: tokens.idToken,
-					},
-					undefined,
-					'global',
-				);
-				openAIDeviceSessions.delete(sessionId);
-				return c.json({ status: 'complete' });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : 'Poll failed';
 				logger.error('OpenAI device poll failed', error);
-				return c.json({ error: message }, 500);
+				throw error;
 			}
 		},
 	);
@@ -181,7 +244,7 @@ function registerXaiDeviceStartRoute(app: Hono) {
 				},
 				'500': {
 					description: 'Server Error',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
@@ -189,7 +252,7 @@ function registerXaiDeviceStartRoute(app: Hono) {
 			try {
 				const authorization = await authorizeXaiDevice();
 				const sessionId = crypto.randomUUID();
-				xaiDeviceSessions.set(sessionId, {
+				xaiDeviceSessions.create(sessionId, {
 					status: 'pending',
 					createdAt: Date.now(),
 				});
@@ -232,12 +295,8 @@ function registerXaiDeviceStartRoute(app: Hono) {
 					interval: 5,
 				});
 			} catch (error) {
-				const message =
-					error instanceof Error
-						? error.message
-						: 'Failed to start xAI device flow';
 				logger.error('xAI device flow start failed', error);
-				return c.json({ error: message }, 500);
+				throw error;
 			}
 		},
 	);
@@ -265,16 +324,14 @@ function registerXaiDevicePollRoute(app: Hono) {
 				},
 				'400': {
 					description: 'Bad Request',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
-			const { sessionId } = await c.req.json<{ sessionId: string }>();
+			const { sessionId } = c.req.valid('json');
 			const session = sessionId ? xaiDeviceSessions.get(sessionId) : undefined;
-			if (!session) {
-				return c.json({ error: 'Session expired or invalid' }, 400);
-			}
+			if (!session) throw new APIError('Session expired or invalid', 400);
 			if (session.status === 'pending') {
 				return c.json({ status: 'pending' });
 			}
@@ -308,33 +365,18 @@ function registerOttoRouterDeviceStartRoute(app: Hono) {
 				},
 				'500': {
 					description: 'Server Error',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const deviceData = await requestOttoRouterDeviceCode();
-				const sessionId = crypto.randomUUID();
-				ottorouterDeviceSessions.set(sessionId, {
-					deviceCode: deviceData.deviceCode,
-					interval: deviceData.interval,
-					createdAt: Date.now(),
-				});
-				return c.json({
-					sessionId,
-					userCode: deviceData.userCode,
-					verificationUri:
-						deviceData.verificationUriComplete ?? deviceData.verificationUri,
-					interval: deviceData.interval,
-				});
+				return c.json(
+					await startDeviceFlow(ottorouterDeviceSessions, ottoRouterDeviceFlow),
+				);
 			} catch (error) {
-				const message =
-					error instanceof Error
-						? error.message
-						: 'Failed to start OttoRouter device flow';
 				logger.error('OttoRouter device flow start failed', error);
-				return c.json({ error: message }, 500);
+				throw error;
 			}
 		},
 	);
@@ -362,47 +404,27 @@ function registerOttoRouterDevicePollRoute(app: Hono) {
 				},
 				'400': {
 					description: 'Bad Request',
-					content: { 'application/json': { schema: errorResponseSchema } },
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
+				},
+				'500': {
+					description: 'Server Error',
+					content: { 'application/json': { schema: apiErrorResponseSchema } },
 				},
 			},
 		},
 		async (c) => {
 			try {
-				const { sessionId } = await c.req.json<{ sessionId: string }>();
-				const session = sessionId
-					? ottorouterDeviceSessions.get(sessionId)
-					: undefined;
-				if (!session) {
-					return c.json({ error: 'Session expired or invalid' }, 400);
-				}
-				const result = await pollOttoRouterDeviceCodeOnce(session.deviceCode);
-				if (result.status === 'pending') {
-					return c.json({ status: 'pending' });
-				}
-				if (result.status === 'error') {
-					ottorouterDeviceSessions.delete(sessionId);
-					return c.json({ status: 'error', error: result.error });
-				}
-
-				await setAuth(
-					'ottorouter',
-					{
-						type: 'oauth',
-						refresh: result.tokens.refresh,
-						access: result.tokens.access,
-						expires: result.tokens.expires,
-						idToken: result.tokens.idToken,
-						scopes: result.tokens.scopes,
-					},
-					undefined,
-					'global',
+				const { sessionId } = c.req.valid('json');
+				return c.json(
+					await pollDeviceFlow(
+						ottorouterDeviceSessions,
+						ottoRouterDeviceFlow,
+						sessionId,
+					),
 				);
-				ottorouterDeviceSessions.delete(sessionId);
-				return c.json({ status: 'complete' });
 			} catch (error) {
-				const message = error instanceof Error ? error.message : 'Poll failed';
 				logger.error('OttoRouter device poll failed', error);
-				return c.json({ error: message }, 500);
+				throw error;
 			}
 		},
 	);

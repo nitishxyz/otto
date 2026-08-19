@@ -137,8 +137,8 @@ function registerInstallDictationModelRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json().catch(() => ({}));
-				const model = await installDictationModel(c.req.param('model'), {
+				const body = c.req.valid('json') ?? {};
+				const model = await installDictationModel(c.req.valid('param').model, {
 					force: body.force === true,
 				});
 				return c.json({ model }, model.installing ? 202 : 200);
@@ -201,7 +201,7 @@ function registerRemoveDictationModelRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				return c.json(await removeDictationModel(c.req.param('model')));
+				return c.json(await removeDictationModel(c.req.valid('param').model));
 			} catch (error) {
 				return modelErrorResponse(c, error);
 			}

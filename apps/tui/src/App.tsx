@@ -330,13 +330,30 @@ export function App({
 					query: getProjectQuery(),
 				} as never);
 				if (response.error) return false;
+				const queuedItem = getQueuedMessageItems(
+					messages,
+					new Set([messageId]),
+				)[0];
+				dispatchStream({
+					type: 'REMOVE_MESSAGES',
+					messageIds: queuedItem
+						? [messageId, queuedItem.userMessageId]
+						: [messageId],
+				});
+				setOptimisticQueuedMessages((current) =>
+					current.filter(
+						(item) =>
+							item.assistantMessageId !== messageId &&
+							item.clientId !== messageId,
+					),
+				);
 				setTimeout(reload, 150);
 				return true;
 			} catch {
 				return false;
 			}
 		},
-		[sessionId, reload],
+		[sessionId, reload, messages, dispatchStream],
 	);
 
 	const handleRestoreQueuedMessage = useCallback(

@@ -294,7 +294,7 @@ export function registerAgentsRoute(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const agent = c.req.param('agent');
+				const { agent } = c.req.valid('param');
 				return c.json({ agent: await getAgentDetail(projectRoot, agent) });
 			} catch (error) {
 				logger.error('Failed to get agent', error);
@@ -332,12 +332,10 @@ export function registerAgentsRoute(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const body = upsertAgentBodySchema.parse(
-					await c.req.json().catch(() => ({})),
-				);
+				const body = c.req.valid('json');
 				const agent = await upsertAgentConfig({
 					projectRoot,
-					name: c.req.param('agent'),
+					name: c.req.valid('param').agent,
 					input: body,
 				});
 				return c.json({ agent });
@@ -370,11 +368,11 @@ export function registerAgentsRoute(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const scope = c.req.query('scope') === 'global' ? 'global' : 'local';
+				const { scope } = c.req.valid('query');
 				return c.json(
 					await deleteAgentConfig({
 						projectRoot,
-						name: c.req.param('agent'),
+						name: c.req.valid('param').agent,
 						scope,
 					}),
 				);

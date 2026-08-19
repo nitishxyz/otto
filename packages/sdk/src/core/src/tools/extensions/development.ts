@@ -4,10 +4,11 @@ import Ajv from 'ajv';
 import {
 	pluginManifestSchema,
 	type PluginManifest,
-} from '../../../../plugins/index.ts';
+} from '../../../../plugins/schema.ts';
 import { getProjectStateDir } from '../../../../config/src/paths.ts';
 import { executeNativeExtension } from './client.ts';
 import { getNativeExtensionToolName } from './index.ts';
+import { collectNativeExtensionSecrets } from './secrets.ts';
 
 export type NativePluginValidation = {
 	ok: boolean;
@@ -105,16 +106,14 @@ export async function executeNativePluginTool(args: {
 				.join('; ')}`,
 		);
 	}
-	const secrets: Record<string, string> = {};
-	for (const secret of definition.secrets) {
-		const value = process.env[secret.env];
-		if (!value && secret.required) {
-			throw new Error(
-				`Native tool requires secret ${secret.name} from ${secret.env}`,
-			);
-		}
-		if (value) secrets[secret.name] = value;
-	}
+	const nativeToolName = getNativeExtensionToolName(
+		validation.manifest.name,
+		definition.name,
+	);
+	const secrets = collectNativeExtensionSecrets(definition.secrets, {
+		environment: process.env,
+		toolName: nativeToolName,
+	});
 	const projectStateDir = await getProjectStateDir(args.projectRoot);
 	return executeNativeExtension({
 		entryPath: definition.entry,
@@ -126,10 +125,7 @@ export async function executeNativePluginTool(args: {
 			validation.manifest.name,
 			'storage',
 		),
-		toolName: getNativeExtensionToolName(
-			validation.manifest.name,
-			definition.name,
-		),
+		toolName: nativeToolName,
 		input: args.input,
 		secrets,
 		outputSchema: definition.outputSchema,

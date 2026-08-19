@@ -41,7 +41,7 @@ export function registerCopilotTokenRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { token } = await c.req.json<{ token: string }>();
+				const { token } = c.req.valid('json');
 				const sanitized = token?.trim();
 				if (!sanitized) {
 					return c.json({ error: 'Copilot token is required' }, 400);

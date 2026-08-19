@@ -34,10 +34,14 @@ export {
 
 export {
 	getMCPManager,
+	getActiveMCPProjectRoots,
 	initializeMCP,
+	ensureMCPManager,
+	reloadMCPManager,
 	shutdownMCP,
 	loadMCPConfig,
 	addMCPServerToConfig,
+	setMCPServerDisabled,
 	removeMCPServerFromConfig,
 } from './lifecycle.ts';
 export {

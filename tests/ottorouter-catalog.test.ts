@@ -6,12 +6,12 @@ describe('ottorouter catalog entry', () => {
 		expect(providerIds).toContain('ottorouter');
 	});
 
-	it('sources models from ottorouterCatalog with gpt-5-codex default', () => {
+	it('sources models from the generated OttoRouter catalog', () => {
 		const entry = catalog.ottorouter;
 		const models = modelMapToList(entry.models);
 		expect(entry).toBeDefined();
 		expect(models.length).toBeGreaterThan(0);
-		expect(models[0]?.id).toBe('gpt-5-codex');
+		expect(models[0]?.id).toBe('gpt-5');
 		const providers = new Set(
 			models
 				.map((model) => model.provider?.npm)
@@ -45,9 +45,9 @@ describe('ottorouter catalog entry', () => {
 		).toBe(false);
 	});
 
-	it('has cost and limit from ottorouter API', () => {
+	it('has cost and limit from the OttoRouter API', () => {
 		const entry = catalog.ottorouter;
-		const model = entry?.models['gpt-5-codex'];
+		const model = entry?.models['gpt-5'];
 		expect(model?.cost?.input).toBeGreaterThan(0);
 		expect(model?.cost?.output).toBeGreaterThan(0);
 		expect(model?.limit?.context).toBeGreaterThan(0);

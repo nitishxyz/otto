@@ -129,7 +129,7 @@ export function registerRootRoutes(app: Hono) {
 			if (!isOwnerSessionAuthorized(c.req.header(OWNER_SESSION_HEADER))) {
 				return c.json({ error: 'Owner authorization required' }, 403);
 			}
-			const { targetVersion } = upgradeBodySchema.parse(await c.req.json());
+			const { targetVersion } = c.req.valid('json');
 			try {
 				return c.json(
 					await stageDaemonUpgrade(getServerInfo().version, targetVersion),
@@ -171,7 +171,7 @@ export function registerRootRoutes(app: Hono) {
 			if (!isDaemonRestartAvailable()) {
 				return c.json({ error: 'Supervised daemon restart unavailable' }, 409);
 			}
-			const { targetVersion } = restartBodySchema.parse(await c.req.json());
+			const { targetVersion } = c.req.valid('json');
 			try {
 				const executable = targetVersion
 					? await resolveStagedDaemonUpgrade(

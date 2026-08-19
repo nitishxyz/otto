@@ -31,9 +31,8 @@ export function registerOAuthCallbackRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider');
-				const code = c.req.query('code');
-				const fragment = c.req.query('fragment');
+				const { provider } = c.req.valid('param');
+				const { code, fragment } = c.req.valid('query');
 
 				const cookies = c.req.header('Cookie') || '';
 				const sessionMatch = cookies.match(/oauth_session=([^;]+)/);
@@ -90,7 +89,7 @@ export function registerOAuthCallbackRoute(app: Hono) {
 				const message =
 					error instanceof Error ? error.message : 'Authentication failed';
 				logger.error('OAuth callback failed', error);
-				return c.html(oauthErrorHtml(c.req.param('provider'), message));
+				return c.html(oauthErrorHtml(c.req.valid('param').provider, message));
 			}
 		},
 	);

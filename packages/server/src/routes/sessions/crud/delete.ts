@@ -39,10 +39,14 @@ export function registerDeleteSessionRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const { cfg, db } = await resolveRequestProject(c);
 
-				const existingSession = await findSessionById(db, sessionId);
+				const existingSession = await findSessionById(
+					db,
+					sessionId,
+					cfg.projectRoot,
+				);
 
 				if (!existingSession) {
 					return c.json({ error: 'Session not found' }, 404);

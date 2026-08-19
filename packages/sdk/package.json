@@ -37,6 +37,18 @@
 			"import": "./src/agent/delegation.ts",
 			"types": "./src/agent/delegation.ts"
 		},
+		"./events/protocol": {
+			"import": "./src/events/protocol.ts",
+			"types": "./src/events/protocol.ts"
+		},
+		"./dictation/protocol": {
+			"import": "./src/dictation/protocol.ts",
+			"types": "./src/dictation/protocol.ts"
+		},
+		"./release": {
+			"import": "./src/release.ts",
+			"types": "./src/release.ts"
+		},
 		"./tools/builtin/fs": {
 			"import": "./src/core/src/tools/builtin/fs/index.ts",
 			"types": "./src/core/src/tools/builtin/fs/index.ts"
@@ -53,21 +65,9 @@
 			"import": "./src/core/src/tools/builtin/shell.ts",
 			"types": "./src/core/src/tools/builtin/shell.ts"
 		},
-		"./tools/builtin/finish": {
-			"import": "./src/core/src/tools/builtin/finish.ts",
-			"types": "./src/core/src/tools/builtin/finish.ts"
-		},
-		"./tools/builtin/grep": {
-			"import": "./src/core/src/tools/builtin/grep.ts",
-			"types": "./src/core/src/tools/builtin/grep.ts"
-		},
 		"./tools/builtin/patch": {
 			"import": "./src/core/src/tools/builtin/patch.ts",
 			"types": "./src/core/src/tools/builtin/patch.ts"
-		},
-		"./tools/builtin/plan": {
-			"import": "./src/core/src/tools/builtin/plan.ts",
-			"types": "./src/core/src/tools/builtin/plan.ts"
 		},
 		"./tools/builtin/progress": {
 			"import": "./src/core/src/tools/builtin/progress.ts",
@@ -108,6 +108,10 @@
 		"./search/file-rank": {
 			"import": "./src/core/src/search/file-rank.ts",
 			"types": "./src/core/src/search/file-rank.ts"
+		},
+		"./prompts/recipes/init.md": {
+			"import": "./src/prompts/src/recipes/init.md",
+			"types": "./src/prompts/src/recipes/init.md.d.ts"
 		},
 		"./prompts/*": "./src/prompts/src/*"
 	},

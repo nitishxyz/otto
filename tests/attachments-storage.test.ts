@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'bun:test';
 import { loadConfig } from '@ottocode/sdk';
 import { createEmbeddedApp } from '../packages/server/src/index.js';
-import { storeAttachmentBytes } from '../packages/server/src/routes/attachments.ts';
+import {
+	getStoredAttachment,
+	storeAttachmentBytes,
+} from '../packages/server/src/runtime/attachments/service.ts';
 import { buildCopyAttachmentTool } from '../packages/sdk/src/core/src/tools/builtin/fs/copy-attachment.ts';
 
 const appIconUrl = new URL(
@@ -83,6 +86,34 @@ describe('attachment project state storage', () => {
 			}
 			await rm(configuredHome, { recursive: true, force: true });
 		}
+	});
+
+	it('normalizes filenames and rejects metadata paths outside the attachment directory', async () => {
+		await withProject('otto-attachments-confined-', async (projectRoot) => {
+			const metadata = await storeAttachmentBytes({
+				projectRoot,
+				bytes: Buffer.from('confined'),
+				filename: '../unsafe\u0000:name.txt',
+				mimeType: 'text/plain',
+			});
+			const cfg = await loadConfig(projectRoot);
+			expect(metadata.filename).toBe('unsafe__name.txt');
+
+			await writeFile(
+				join(cfg.paths.attachmentsDir, metadata.id, 'metadata.json'),
+				JSON.stringify({
+					...metadata,
+					relativePath: join('attachments', metadata.id, '..', 'outside.txt'),
+				}),
+			);
+
+			expect(
+				getStoredAttachment({
+					projectRoot,
+					attachmentId: metadata.id,
+				}),
+			).rejects.toThrow('outside its storage directory');
+		});
 	});
 
 	it('stores new attachments under project state with project-state metadata', async () => {

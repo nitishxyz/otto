@@ -51,7 +51,7 @@ export function registerAuthKimiRoutes(app: Hono) {
 			try {
 				const deviceData = await requestKimiDeviceCode();
 				const sessionId = crypto.randomUUID();
-				kimiDeviceSessions.set(sessionId, {
+				kimiDeviceSessions.create(sessionId, {
 					deviceCode: deviceData.deviceCode,
 					interval: deviceData.interval,
 					createdAt: Date.now(),
@@ -100,7 +100,7 @@ export function registerAuthKimiRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { sessionId } = await c.req.json<{ sessionId: string }>();
+				const { sessionId } = c.req.valid('json');
 				if (!sessionId || !kimiDeviceSessions.has(sessionId)) {
 					return c.json({ error: 'Session expired or invalid' }, 400);
 				}

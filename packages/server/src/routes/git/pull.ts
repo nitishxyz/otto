@@ -1,7 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
-import { gitPullSchema } from './schemas.ts';
 import { runInteractiveGitCommand } from './interactive.ts';
 import { validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
@@ -50,6 +49,12 @@ export function registerPullRoute(app: Hono) {
 						'application/json': { schema: gitOutputResponseSchema },
 					},
 				},
+				'401': {
+					description: 'Authentication failed',
+					content: {
+						'application/json': { schema: gitErrorResponseSchema },
+					},
+				},
 				'400': {
 					description: 'Error',
 					content: {
@@ -66,14 +71,7 @@ export function registerPullRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				let body = {};
-				try {
-					body = await c.req.json();
-				} catch {
-					body = {};
-				}
-
-				const input = gitPullSchema.parse(body);
+				const input = c.req.valid('json') ?? {};
 
 				const requestedPath = await resolveRequestProjectRoot(c);
 

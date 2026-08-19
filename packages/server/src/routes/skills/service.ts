@@ -111,10 +111,10 @@ export async function getSkillsConfig(c: Context) {
 export async function updateSkillsConfig(c: Context) {
 	try {
 		const projectRoot = await projectRootFromQuery(c);
-		const body = await c.req.json<{
+		const body = c.req.valid('json' as never) as {
 			enabled?: boolean;
 			items?: Record<string, { enabled?: boolean }>;
-		}>();
+		};
 		await writeSkillSettings(
 			'global',
 			{
@@ -139,7 +139,7 @@ export async function updateSkillsConfig(c: Context) {
 
 export async function getSkill(c: Context) {
 	try {
-		const name = c.req.param('name');
+		const { name } = c.req.valid('param' as never) as { name: string };
 		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 
 		const skill = await loadSkill(name);
@@ -165,7 +165,7 @@ export async function getSkill(c: Context) {
 
 export async function listSkillFiles(c: Context) {
 	try {
-		const name = c.req.param('name');
+		const { name } = c.req.valid('param' as never) as { name: string };
 		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 		const files = await discoverSkillFiles(name);
 		return c.json({ files });
@@ -176,10 +176,13 @@ export async function listSkillFiles(c: Context) {
 
 export async function getSkillFile(c: Context) {
 	try {
-		const name = c.req.param('name');
+		const params = c.req.valid('param' as never) as {
+			name: string;
+			filePath?: string;
+		};
+		const { name } = params;
 		const rawFilePath =
-			c.req.param('filePath') ||
-			c.req.path.replace(`/v1/skills/${name}/files/`, '');
+			params.filePath || c.req.path.replace(`/v1/skills/${name}/files/`, '');
 		const filePath = decodeURIComponent(rawFilePath);
 		await ensureSkillsDiscovered(await projectRootFromQuery(c));
 
@@ -198,7 +201,10 @@ export async function getSkillFile(c: Context) {
 
 export async function validateSkill(c: Context) {
 	try {
-		const body = await c.req.json<{ content: string; path?: string }>();
+		const body = c.req.valid('json' as never) as {
+			content: string;
+			path?: string;
+		};
 		if (!body.content) {
 			return c.json({ error: 'content is required' }, 400);
 		}
@@ -220,6 +226,6 @@ export async function validateSkill(c: Context) {
 }
 
 export function validateSkillNameRoute(c: Context) {
-	const name = c.req.param('name');
+	const { name } = c.req.valid('param' as never) as { name: string };
 	return c.json({ valid: validateSkillName(name) });
 }

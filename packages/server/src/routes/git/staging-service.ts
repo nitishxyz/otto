@@ -55,8 +55,7 @@ const actionConfig: Record<
 async function handleStagingAction(c: Context, action: StagingAction) {
 	const config = actionConfig[action];
 	try {
-		const body = await c.req.json();
-		const { files } = config.schema.parse(body);
+		const { files } = c.req.valid('json' as never) as { files: string[] };
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);

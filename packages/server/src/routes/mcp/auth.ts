@@ -127,10 +127,9 @@ export function registerMCPAuthRoutes(app: Hono) {
 			) {
 				return c.json({ error: 'Unauthorized' }, 401);
 			}
-			const body =
-				await c.req.json<z.infer<typeof completeMCPAuthFlowBodySchema>>();
+			const body = c.req.valid('json');
 			const result = await completeMCPAuthFlow({
-				flowId: c.req.param('flowId'),
+				flowId: c.req.valid('param').flowId,
 				code: body.code,
 				state: body.state,
 				error: body.error,
@@ -170,7 +169,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await initiateMCPAuth({
-				name: c.req.param('name'),
+				name: c.req.valid('param').name,
 				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
@@ -216,9 +215,9 @@ export function registerMCPAuthRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await completeMCPAuth({
-				name: c.req.param('name'),
+				name: c.req.valid('param').name,
 				projectRoot: await resolveRequestProjectRoot(c),
-				body: await c.req.json(),
+				body: c.req.valid('json'),
 				oAuthStore: copilotMCPOAuthStore,
 				sessions: copilotMCPSessions,
 			});
@@ -251,7 +250,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		async (c) => {
 			return c.json(
 				await getMCPAuthStatus({
-					name: c.req.param('name'),
+					name: c.req.valid('param').name,
 					projectRoot: await resolveRequestProjectRoot(c),
 					oAuthStore: copilotMCPOAuthStore,
 				}),
@@ -287,7 +286,7 @@ export function registerMCPAuthRoutes(app: Hono) {
 		},
 		async (c) => {
 			const result = await revokeMCPAuth({
-				name: c.req.param('name'),
+				name: c.req.valid('param').name,
 				projectRoot: await resolveRequestProjectRoot(c),
 				oAuthStore: copilotMCPOAuthStore,
 			});

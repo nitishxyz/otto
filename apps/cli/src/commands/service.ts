@@ -1,8 +1,6 @@
-import type { Command } from 'commander';
 import {
 	ensureDaemon,
 	getDaemonStatus,
-	parseDaemonPort,
 	readDaemonToken,
 	restartDaemon,
 	rotateDaemonPassword,
@@ -10,10 +8,10 @@ import {
 	stopDaemon,
 } from '../daemon.ts';
 
-type ServiceOptions = {
+export interface ServiceOptions {
 	project?: string;
 	port?: number;
-};
+}
 
 function printStatus(status: Awaited<ReturnType<typeof getDaemonStatus>>) {
 	if (status.state === 'running') {
@@ -31,98 +29,49 @@ function printStatus(status: Awaited<ReturnType<typeof getDaemonStatus>>) {
 	console.log('otto daemon not running');
 }
 
-export function registerServiceCommand(program: Command, version: string) {
-	const service = program
-		.command('service')
-		.description('Manage the shared local otto daemon');
+export async function startService(opts: ServiceOptions, version: string) {
+	const registration = await ensureDaemon({
+		version,
+		projectRoot: opts.project,
+		port: opts.port,
+	});
+	console.log(`otto daemon running at ${registration.url}`);
+}
 
-	service
-		.command('start')
-		.description('Start or reuse the local daemon')
-		.option(
-			'--project <path>',
-			'Initial project for daemon startup',
-			process.cwd(),
-		)
-		.option('--port <port>', 'Preferred daemon port', parseDaemonPort)
-		.action(async (opts: ServiceOptions) => {
-			const registration = await ensureDaemon({
-				version,
-				projectRoot: opts.project,
-				port: opts.port,
-			});
-			console.log(`otto daemon running at ${registration.url}`);
-		});
+export async function showServiceStatus(version: string) {
+	printStatus(await getDaemonStatus({ version }));
+}
 
-	service
-		.command('status')
-		.description('Show local daemon status')
-		.action(async () => {
-			printStatus(await getDaemonStatus({ version }));
-		});
+export async function stopService() {
+	const stopped = await stopDaemon({});
+	console.log(stopped ? 'otto daemon stopped' : 'otto daemon not running');
+}
 
-	service
-		.command('stop')
-		.description('Stop the local daemon if running')
-		.action(async () => {
-			const stopped = await stopDaemon({});
-			console.log(stopped ? 'otto daemon stopped' : 'otto daemon not running');
-		});
+export async function restartService(opts: ServiceOptions, version: string) {
+	const registration = await restartDaemon({
+		version,
+		projectRoot: opts.project,
+		port: opts.port,
+	});
+	console.log(`otto daemon restarted at ${registration.url}`);
+}
 
-	service
-		.command('restart')
-		.description('Restart the local daemon')
-		.option(
-			'--project <path>',
-			'Initial project for daemon startup',
-			process.cwd(),
-		)
-		.option('--port <port>', 'Preferred daemon port', parseDaemonPort)
-		.action(async (opts: ServiceOptions) => {
-			const registration = await restartDaemon({
-				version,
-				projectRoot: opts.project,
-				port: opts.port,
-			});
-			console.log(`otto daemon restarted at ${registration.url}`);
-		});
+export async function rotateServicePassword() {
+	const token = await rotateDaemonPassword();
+	console.log(token);
+}
 
-	service
-		.command('password')
-		.description('Rotate and print the local daemon token')
-		.action(async () => {
-			const status = await getDaemonStatus({ version });
-			if (status.state === 'running') {
-				throw new Error('Stop the daemon before rotating its token.');
-			}
-			const token = await rotateDaemonPassword();
-			console.log(token);
-		});
+export async function printServiceToken() {
+	const token = await readDaemonToken();
+	if (!token) throw new Error('No daemon token exists.');
+	console.log(token);
+}
 
-	service
-		.command('token')
-		.description('Print the current local daemon token')
-		.action(async () => {
-			const token = await readDaemonToken();
-			if (!token) throw new Error('No daemon token exists.');
-			console.log(token);
-		});
-
-	service
-		.command('force-start')
-		.description('Start a new daemon without reusing an existing registration')
-		.option(
-			'--project <path>',
-			'Initial project for daemon startup',
-			process.cwd(),
-		)
-		.option('--port <port>', 'Preferred daemon port', parseDaemonPort)
-		.action(async (opts: ServiceOptions) => {
-			const registration = await startDaemon({
-				version,
-				projectRoot: opts.project,
-				port: opts.port,
-			});
-			console.log(`otto daemon started at ${registration.url}`);
-		});
+export async function forceStartService(opts: ServiceOptions, version: string) {
+	const registration = await startDaemon({
+		version,
+		projectRoot: opts.project,
+		port: opts.port,
+	});
+	console.log(`otto daemon started at ${registration.url}`);
 }

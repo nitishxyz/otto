@@ -14,7 +14,7 @@ import {
 	buildSkillTool,
 	setSkillSettings,
 } from '../../../skills/index.ts';
-import { getMCPManager } from '../mcp/index.ts';
+import { ensureMCPManager } from '../mcp/index.ts';
 import {
 	getMCPToolBriefs,
 	buildLoadMCPToolsTool,
@@ -200,7 +200,7 @@ export async function discoverProjectTools(
 	);
 	tools.set(loadFirstPartyTools.name, loadFirstPartyTools.tool);
 
-	const mcpManager = getMCPManager(projectRoot);
+	const mcpManager = await ensureMCPManager(projectRoot);
 	let mcpToolsRecord: Record<string, Tool> = {};
 	let mcpBriefs: MCPToolBrief[] = [];
 	if (mcpManager?.started) {

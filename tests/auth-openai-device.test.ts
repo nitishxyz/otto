@@ -176,7 +176,16 @@ describe('OpenAI device auth flow', () => {
 
 		expect(response.status).toBe(400);
 		expect(await response.json()).toEqual({
-			error: 'Session expired or invalid',
+			error: {
+				message: 'Session expired or invalid',
+				type: 'api_error',
+				status: 400,
+				details: {
+					name: 'APIError',
+					type: 'api_error',
+					status: 400,
+				},
+			},
 		});
 	});
 });

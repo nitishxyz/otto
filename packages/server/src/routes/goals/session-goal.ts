@@ -54,7 +54,7 @@ function registerGetSessionGoalRoute(app: Hono) {
 				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const activeRows = await db
 					.select()
 					.from(goals)
@@ -123,8 +123,8 @@ function registerCreateSessionGoalRoute(app: Hono) {
 				const { cfg, db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const sessionId = c.req.param('sessionId');
-				const body = createGoalBodySchema.parse(await c.req.json());
+				const { sessionId } = c.req.valid('param');
+				const body = c.req.valid('json');
 
 				const existing = await db
 					.select({ id: goals.id })

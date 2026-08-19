@@ -13,7 +13,6 @@ import type {
 	SkillSettings,
 } from '../../types/src/index.ts';
 import {
-	getGlobalConfigDir,
 	getGlobalConfigPath,
 	getGlobalSkillsConfigPath,
 	getGlobalDebugDir,
@@ -27,6 +26,10 @@ import {
 	setEnvKey,
 	isBuiltInProviderId,
 } from '../../providers/src/index.ts';
+import {
+	atomicWriteJsonObject,
+	readOptionalJsonObject,
+} from '../../runtime/json-object-file.ts';
 
 export type Scope = 'global' | 'local';
 
@@ -196,7 +199,9 @@ export async function readReferenceSettings(
 	scope: Scope,
 	projectRoot?: string,
 ): Promise<ReferenceSettings> {
-	const config = await readJsonFile(getConfigFilePath(scope, projectRoot));
+	const config = await readOptionalJsonObject(
+		getConfigFilePath(scope, projectRoot),
+	);
 	if (!config || typeof config.references !== 'object') return {};
 	return config.references as ReferenceSettings;
 }
@@ -287,7 +292,7 @@ async function updateConfigFile(
 	const currentUpdate = previousUpdate
 		.catch(() => {})
 		.then(async () => {
-			const existing = await readJsonFile(filePath);
+			const existing = await readOptionalJsonObject(filePath);
 			const next = update(existing);
 			if (next) await writeConfigFile(filePath, next);
 		});
@@ -298,22 +303,6 @@ async function updateConfigFile(
 		if (configFileUpdateQueues.get(filePath) === currentUpdate) {
 			configFileUpdateQueues.delete(filePath);
 		}
-	}
-}
-
-async function readJsonFile(
-	filePath: string,
-): Promise<Record<string, unknown> | undefined> {
-	const f = Bun.file(filePath);
-	if (!(await f.exists())) return undefined;
-	try {
-		const parsed = await f.json();
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>;
-		}
-		return undefined;
-	} catch {
-		return undefined;
 	}
 }
 
@@ -330,19 +319,7 @@ async function writeConfigFile(
 	filePath: string,
 	value: Record<string, unknown>,
 ) {
-	const base =
-		filePath === getGlobalConfigPath()
-			? getGlobalConfigDir()
-			: filePath.slice(0, Math.max(0, filePath.lastIndexOf('/')));
-	const { promises: fs } = await import('node:fs');
-	await fs.mkdir(base, { recursive: true }).catch(() => {});
-	const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-	try {
-		await Bun.write(temporaryPath, JSON.stringify(value, null, 2));
-		await fs.rename(temporaryPath, filePath);
-	} finally {
-		await fs.rm(temporaryPath, { force: true }).catch(() => {});
-	}
+	await atomicWriteJsonObject(filePath, value);
 }
 
 export async function writeAuth(

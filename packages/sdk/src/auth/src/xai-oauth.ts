@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { openBrowser } from './open-browser';
+import { createOAuthState, createPkcePair } from './oauth-primitives';
 
 const XAI_OAUTH_ISSUER = 'https://auth.x.ai';
 const XAI_OAUTH_DISCOVERY_URL = `${XAI_OAUTH_ISSUER}/.well-known/openid-configuration`;
@@ -73,31 +73,6 @@ export type XaiOAuthResult = {
 	close: () => void;
 };
 
-function generatePKCE() {
-	const verifier = randomBytes(32)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	const challenge = createHash('sha256')
-		.update(verifier)
-		.digest('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	return { verifier, challenge };
-}
-
-function generateState() {
-	return randomBytes(32)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-}
-
 function validateXaiEndpoint(url: string): string {
 	const parsed = new URL(url);
 	const host = parsed.hostname.toLowerCase();
@@ -127,32 +102,6 @@ async function discoverXaiOAuth(): Promise<XaiDiscovery> {
 		authorization_endpoint: validateXaiEndpoint(data.authorization_endpoint),
 		token_endpoint: validateXaiEndpoint(data.token_endpoint),
 	};
-}
-
-async function openBrowser(url: string) {
-	const platform = process.platform;
-	let command: string;
-
-	switch (platform) {
-		case 'darwin':
-			command = `open "${url}"`;
-			break;
-		case 'win32':
-			command = `start "${url}"`;
-			break;
-		default:
-			command = `xdg-open "${url}"`;
-			break;
-	}
-
-	return new Promise<void>((resolve, reject) => {
-		const child = spawn(command, [], { shell: true });
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(`Failed to open browser (exit code ${code})`));
-		});
-	});
 }
 
 function parseExpiry(value: unknown): number | undefined {
@@ -322,9 +271,9 @@ async function exchangeXaiToken(
 /** Start the xAI OAuth PKCE browser flow using a localhost callback. */
 export async function authorizeXai(): Promise<XaiOAuthResult> {
 	const discovery = await discoverXaiOAuth();
-	const pkce = generatePKCE();
-	const state = generateState();
-	const nonce = generateState();
+	const pkce = createPkcePair();
+	const state = createOAuthState();
+	const nonce = createOAuthState();
 	const redirectUri = `http://${XAI_CALLBACK_HOST}:${XAI_CALLBACK_PORT}${XAI_CALLBACK_PATH}`;
 
 	const params = new URLSearchParams({

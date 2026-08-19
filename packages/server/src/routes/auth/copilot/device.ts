@@ -42,7 +42,7 @@ function registerStartCopilotDeviceFlowRoute(app: Hono) {
 			try {
 				const deviceData = await authorizeCopilot();
 				const sessionId = crypto.randomUUID();
-				copilotDeviceSessions.set(sessionId, {
+				copilotDeviceSessions.create(sessionId, {
 					deviceCode: deviceData.deviceCode,
 					interval: deviceData.interval,
 					provider: 'copilot',
@@ -95,7 +95,7 @@ function registerPollCopilotDeviceFlowRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const { sessionId } = await c.req.json<{ sessionId: string }>();
+				const { sessionId } = c.req.valid('json');
 				if (!sessionId || !copilotDeviceSessions.has(sessionId)) {
 					return c.json({ error: 'Session expired or invalid' }, 400);
 				}

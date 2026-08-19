@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { sessionRepository } from '../../../runtime/session/repository.ts';
 import { resolveRequestProject } from '../../project-context.ts';
 import {
 	abortBodySchema,
@@ -39,14 +40,12 @@ export function registerAbortSessionRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const sessionId = c.req.param('sessionId');
-			const body = (await c.req.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			const messageId =
-				typeof body.messageId === 'string' ? body.messageId : undefined;
-			const clearQueue = body.clearQueue === true;
+			const { sessionId } = c.req.valid('param');
+			const { messageId, clearQueue = false } = c.req.valid('json') ?? {};
+			const project = await resolveRequestProject(c);
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
 
 			const { abortSession, abortMessage } = await import(
 				'../../../runtime/agent/runner.ts'
@@ -63,7 +62,7 @@ export function registerAbortSessionRoute(app: Hono) {
 
 			abortSession(sessionId, clearQueue);
 			try {
-				const { db } = await resolveRequestProject(c);
+				const { db } = project;
 				const { abortChildSubagents } = await import(
 					'../../../runtime/subagents/service.ts'
 				);

@@ -42,9 +42,9 @@ export function registerGetSessionRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
-				const { db } = await resolveRequestProject(c);
-				const session = await findSessionById(db, sessionId);
+				const { sessionId } = c.req.valid('param');
+				const { db, projectRoot } = await resolveRequestProject(c);
+				const session = await findSessionById(db, sessionId, projectRoot);
 				if (!session) {
 					return c.json(
 						{ error: { message: 'Session not found', status: 404 } },

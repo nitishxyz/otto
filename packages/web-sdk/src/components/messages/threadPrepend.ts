@@ -164,12 +164,11 @@ export interface EndFollowInput {
 }
 
 /**
- * `maintainScrollAtEnd` configuration for the current frame. Legend List owns
- * the near-end threshold; this only suspends the feature while the reader is
- * away from the tail or when auto-scroll is disabled. A prepend of older
- * history must not toggle this: at the tail, follow should keep the live
- * edge on screen; away from it, follow must stay off so the insert cannot
- * be mistaken for new content at the bottom.
+ * `maintainScrollAtEnd` configuration for the current frame. The caller owns
+ * the reader-intent latch; this maps that latch to Legend List's native follow
+ * feature. A prepend of older history must not toggle it: at the tail, follow
+ * should keep the live edge on screen; away from it, follow must stay off so
+ * the insert cannot be mistaken for new content at the bottom.
  */
 export function resolveEndFollow(
 	input: EndFollowInput,

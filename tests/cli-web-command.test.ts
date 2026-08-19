@@ -34,6 +34,7 @@ const ensureDaemonProjectMock = mock(async () => ({
 	authHeaders: { Authorization: 'Bearer server-token' },
 }));
 const fetchMock = mock(async () => new Response('ok'));
+const originalFetch = globalThis.fetch;
 
 mock.module('@ottocode/sdk', () => ({
 	...realSdk,
@@ -97,6 +98,7 @@ mock.module('@ottocode/api', () => ({
 }));
 
 afterAll(() => {
+	globalThis.fetch = originalFetch;
 	mock.module('@ottocode/sdk', () => realSdk);
 	mock.module('@ottocode/server', () => realServer);
 	mock.module('@ottocode/database', () => realDatabase);
@@ -109,6 +111,7 @@ afterAll(() => {
 });
 
 const webModulePromise = import('@ottocode/cli/src/commands/web.ts');
+const lazyWebModulePromise = import('@ottocode/cli/src/commands/lazy/web.ts');
 const serveModulePromise = import('@ottocode/cli/src/commands/lazy/serve.ts');
 const cliModulePromise = import('@ottocode/cli/src/cli.ts');
 
@@ -128,11 +131,11 @@ describe('CLI web command UX', () => {
 		}));
 		fetchMock.mockClear();
 		fetchMock.mockImplementation(async () => new Response('ok'));
-		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		globalThis.fetch = originalFetch;
 	});
 
 	it('registers web as the preferred command without showing the legacy --api alias', async () => {
-		const { registerWebCommand } = await webModulePromise;
+		const { registerWebCommand } = await lazyWebModulePromise;
 		const program = new Command();
 		program.name('otto');
 		registerWebCommand(program, 'test');
@@ -227,6 +230,8 @@ describe('CLI web command UX', () => {
 				projectId: 'project-id',
 				projectRoot: '/tmp/project',
 				serverToken: 'server-token',
+				clientApiBaseUrl: 'http://127.0.0.1:4317',
+				clientServerToken: 'server-token',
 			},
 		);
 		expect(openAuthUrlMock).toHaveBeenCalledTimes(0);

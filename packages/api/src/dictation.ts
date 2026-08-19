@@ -1,50 +1,29 @@
-import { createParser } from 'eventsource-parser';
+import {
+	DEFAULT_AUDIO_FORMAT,
+	dictationServerEventSchema,
+	type DictationFinalEvent,
+	type DictationServerEvent,
+} from '@ottocode/sdk/dictation/protocol';
 import type {
 	CreateDictationSessionResponse,
 	GetDictationStatusResponse,
 	InstallDictationModelResponse,
 } from './generated/types.gen';
+import {
+	consumeSSE,
+	type SSERequestMethod,
+	type SSETransportMode,
+} from './streaming';
 
-export const DICTATION_AUDIO_FORMAT = {
-	encoding: 'pcm_s16le',
-	sampleRate: 16_000,
-	channels: 1,
-} as const;
+/** @deprecated Import DEFAULT_AUDIO_FORMAT from @ottocode/sdk/dictation/protocol. */
+export const DICTATION_AUDIO_FORMAT = DEFAULT_AUDIO_FORMAT;
 
 export type DictationStatus = GetDictationStatusResponse;
 export type DictationModelState = DictationStatus['models'][number];
 export type DictationSession = CreateDictationSessionResponse;
 export type DictationModelInstallResponse = InstallDictationModelResponse;
 
-export type DictationServerEvent =
-	| {
-			type: 'ready';
-			sessionId: string;
-			model: string;
-			format: typeof DICTATION_AUDIO_FORMAT;
-	  }
-	| {
-			type: 'recording';
-			receivedMs: number;
-			receivedBytes: number;
-	  }
-	| {
-			type: 'final';
-			text: string;
-			language: string;
-			model: string;
-			durationMs: number;
-	  }
-	| {
-			type: 'error';
-			code: string;
-			message: string;
-	  };
-
-export type DictationFinalEvent = Extract<
-	DictationServerEvent,
-	{ type: 'final' }
->;
+export type { DictationFinalEvent, DictationServerEvent };
 
 export interface DictationWebSocketLike {
 	readonly readyState: number;
@@ -84,6 +63,8 @@ export interface StreamDictationModelInstallOptions {
 	headers?: HeadersInit;
 	signal?: AbortSignal;
 	fetch?: typeof fetch;
+	method?: SSERequestMethod;
+	transportMode?: SSETransportMode;
 	onModel: (model: DictationModelState) => void;
 }
 
@@ -229,56 +210,28 @@ export async function connectDictationSession(
 export async function streamDictationModelInstall(
 	options: StreamDictationModelInstallOptions,
 ): Promise<void> {
-	const fetchImpl = options.fetch ?? fetch;
 	const baseUrl = options.baseUrl.replace(/\/+$/, '');
 	const url = `${baseUrl}/v1/dictation/models/${encodeURIComponent(options.model)}/install/events`;
-	const response = await fetchImpl(url, {
-		headers: {
-			...options.headers,
-			Accept: 'text/event-stream',
-		},
+	await consumeSSE({
+		url,
+		fetch: options.fetch,
+		headers: options.headers,
 		signal: options.signal,
+		method: options.method,
+		transportMode: options.transportMode,
+		onEvent(event) {
+			const model = parseDictationModelInstallEvent(event.data);
+			if (model) options.onModel(model);
+		},
 	});
-
-	if (!response.ok) {
-		throw new Error(`Failed to stream model install: ${response.statusText}`);
-	}
-	if (!response.body) throw new Error('Model install stream has no body');
-
-	const parser = createParser((event) => {
-		if (event.type !== 'event') return;
-		const model = parseDictationModelInstallEvent(event.data);
-		if (model) options.onModel(model);
-	});
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			parser.feed(decoder.decode(value, { stream: true }));
-		}
-		parser.feed(decoder.decode());
-	} finally {
-		reader.releaseLock();
-	}
 }
 
 export function parseDictationServerEvent(
 	raw: string,
 ): DictationServerEvent | null {
 	try {
-		const value = JSON.parse(raw) as Partial<DictationServerEvent>;
-		if (!value || typeof value.type !== 'string') return null;
-		if (
-			value.type !== 'ready' &&
-			value.type !== 'recording' &&
-			value.type !== 'final' &&
-			value.type !== 'error'
-		) {
-			return null;
-		}
-		return value as DictationServerEvent;
+		const result = dictationServerEventSchema.safeParse(JSON.parse(raw));
+		return result.success ? result.data : null;
 	} catch {
 		return null;
 	}

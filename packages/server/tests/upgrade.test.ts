@@ -31,15 +31,12 @@ describe('remote upgrade policy', () => {
 		);
 	});
 
-	test('rejects unknown versions, tags, prereleases, and URLs', () => {
+	test('accepts release tags but rejects unknown versions, prereleases, and URLs', () => {
 		expect(() => assertUpgradeTarget(null, '1.2.3')).toThrow('unknown');
-		for (const target of [
-			'v1.2.4',
-			'1.2.4-beta',
-			'https://attacker.test/bin',
-		]) {
+		expect(() => assertUpgradeTarget('v1.2.3', 'v1.2.4')).not.toThrow();
+		for (const target of ['1.2.4-beta', 'https://attacker.test/bin']) {
 			expect(() => assertUpgradeTarget('1.2.3', target)).toThrow(
-				'numeric major.minor.patch',
+				'major.minor.patch',
 			);
 		}
 	});
@@ -62,6 +59,32 @@ describe('remote upgrade policy', () => {
 			).rejects.toThrow();
 		}
 		expect(requests).toBe(0);
+	});
+
+	test('downloads the canonical official asset through the injected fetcher', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'otto-upgrade-test-'));
+		tempRoots.push(root);
+		process.env.OTTO_HOME = root;
+		const requests: string[] = [];
+		const fetcher = ((input: string | URL | Request) => {
+			requests.push(String(input));
+			return Promise.resolve(new Response('official-binary'));
+		}) as typeof fetch;
+
+		const staged = await stageDaemonUpgrade('1.2.3', 'v1.2.4', fetcher);
+		const os = { darwin: 'darwin', linux: 'linux', win32: 'windows' }[
+			platform()
+		];
+		const cpu = { x64: 'x64', arm64: 'arm64' }[arch()];
+		if (!os || !cpu) throw new Error('Unsupported test platform');
+		const asset = `otto-${os}-${cpu}${platform() === 'win32' ? '.exe' : ''}`;
+
+		expect(requests).toEqual([
+			`https://github.com/nitishxyz/otto/releases/download/v1.2.4/${asset}`,
+		]);
+		expect(staged.targetVersion).toBe('1.2.4');
+		expect(staged.stagedPath).toBe(join(root, 'upgrades', '1.2.4', asset));
+		expect(await Bun.file(staged.stagedPath).text()).toBe('official-binary');
 	});
 
 	test('activates only a previously staged official release binary', async () => {

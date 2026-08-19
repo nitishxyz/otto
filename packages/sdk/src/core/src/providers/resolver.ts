@@ -1,51 +1,16 @@
-import { openai, createOpenAI } from '@ai-sdk/openai';
-import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
-import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOllama } from 'ai-sdk-ollama';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
-	catalog,
-	createBasetenModel,
-	createDeepSeekModel,
-	createHuggingFaceModel,
-	createWaferModel,
-	createMetaModel,
-	createMinimaxModel,
+	createBuiltInProviderModel,
 	createKimiModel,
-	createOttoRouterModel,
 	createOpenAIOAuthModel,
+	createOttoRouterModel,
 	createXaiModel,
-	createZaiCodingModel,
-	createZaiModel,
 	isXaiGrokCliModel,
-	normalizeOllamaBaseURL,
-	resolveOpenAIResponsesModel,
-	shouldUseOpenAIResponsesApi,
 } from '../../../providers/src/index.ts';
 import { createCopilotModel } from '../../../providers/src/copilot-client.ts';
 import { getFreshOttoRouterOAuth } from '../../../auth/src/ottorouter-refresh.ts';
-import type { OAuth } from '../../../types/src/index.ts';
+import type { BuiltInProviderId, OAuth } from '../../../types/src/index.ts';
 
-export type ProviderName =
-	| 'openai'
-	| 'anthropic'
-	| 'google'
-	| 'meta'
-	| 'ollama-cloud'
-	| 'baseten'
-	| 'huggingface'
-	| 'wafer'
-	| 'openrouter'
-	| 'opencode'
-	| 'copilot'
-	| 'ottorouter'
-	| 'xai'
-	| 'zai'
-	| 'zai-coding'
-	| 'deepseek'
-	| 'kimi'
-	| 'minimax';
+export type ProviderName = BuiltInProviderId;
 
 export type ModelConfig = {
 	apiKey?: string;
@@ -60,151 +25,11 @@ export async function resolveModel(
 	model: string,
 	config: ModelConfig = {},
 ) {
-	if (provider === 'openai') {
-		if (config.oauth) {
-			return createOpenAIOAuthModel(model, {
-				oauth: config.oauth,
-				projectRoot: config.projectRoot,
-			});
-		}
-		if (config.customFetch) {
-			const instance = createOpenAI({
-				apiKey: config.apiKey || 'oauth-token',
-				fetch: config.customFetch,
-			});
-			return resolveOpenAIResponsesModel(instance, model);
-		}
-		if (config.apiKey) {
-			const instance = createOpenAI({ apiKey: config.apiKey });
-			return resolveOpenAIResponsesModel(instance, model);
-		}
-		return shouldUseOpenAIResponsesApi(model)
-			? openai.responses(model)
-			: openai(model);
-	}
-
-	if (provider === 'anthropic') {
-		if (config.customFetch) {
-			return createAnthropic({
-				apiKey: config.apiKey || '',
-				fetch: config.customFetch as typeof fetch,
-			});
-		}
-		if (config.apiKey) {
-			const instance = createAnthropic({ apiKey: config.apiKey });
-			return instance(model);
-		}
-		return anthropic(model);
-	}
-
-	if (provider === 'google') {
-		if (config.apiKey) {
-			const instance = createGoogleGenerativeAI({ apiKey: config.apiKey });
-			return instance(model);
-		}
-		return google(model);
-	}
-
-	if (provider === 'meta') {
-		return createMetaModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
+	if (provider === 'openai' && config.oauth) {
+		return createOpenAIOAuthModel(model, {
+			oauth: config.oauth,
+			projectRoot: config.projectRoot,
 		});
-	}
-
-	if (provider === 'ollama-cloud') {
-		const entry = catalog[provider];
-		const apiKey = config.apiKey || process.env.OLLAMA_API_KEY || '';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		const baseURL = normalizeOllamaBaseURL(
-			config.baseURL || entry?.api || 'https://ollama.com',
-		);
-		const instance = createOllama({
-			baseURL,
-			headers,
-		});
-		return instance(model);
-	}
-
-	if (provider === 'baseten') {
-		return createBasetenModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
-	if (provider === 'huggingface') {
-		return createHuggingFaceModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
-	if (provider === 'wafer') {
-		return createWaferModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
-	if (provider === 'openrouter') {
-		const apiKey = config.apiKey || process.env.OPENROUTER_API_KEY || '';
-		const openrouter = createOpenRouter({ apiKey });
-		return openrouter.chat(model);
-	}
-
-	if (provider === 'opencode') {
-		const entry = catalog[provider];
-		const normalizedModel = normalizeModelIdentifier(provider, model);
-		const modelInfo = entry?.models[normalizedModel] ?? entry?.models[model];
-		const resolvedModelId = modelInfo?.id ?? normalizedModel ?? model;
-		const binding = modelInfo?.provider?.npm ?? entry?.npm;
-		const apiKey = config.apiKey || process.env.OPENCODE_API_KEY || '';
-		const baseURL =
-			config.baseURL ||
-			modelInfo?.provider?.baseURL ||
-			modelInfo?.provider?.api ||
-			entry?.api ||
-			'https://opencode.ai/zen/v1';
-		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-		if (binding === '@ai-sdk/openai') {
-			const instance = createOpenAI({ apiKey, baseURL });
-			return instance(resolvedModelId);
-		}
-		if (binding === '@ai-sdk/anthropic') {
-			const instance = createAnthropic({ apiKey, baseURL });
-			return instance(resolvedModelId);
-		}
-		if (binding === '@ai-sdk/openai-compatible') {
-			const instance = createOpenAICompatible({
-				name: entry?.label ?? 'opencode',
-				baseURL,
-				headers,
-			});
-			return instance(resolvedModelId);
-		}
-
-		const ocOpenAI = createOpenAI({ apiKey, baseURL });
-		const ocAnthropic = createAnthropic({ apiKey, baseURL });
-		const ocCompat = createOpenAICompatible({
-			name: entry?.label ?? 'opencode',
-			baseURL,
-			headers,
-		});
-
-		const id = resolvedModelId.toLowerCase();
-		if (id.includes('claude')) return ocAnthropic(resolvedModelId);
-		if (
-			id.includes('qwen3-coder') ||
-			id.includes('grok-code') ||
-			id.includes('kimi-k2')
-		)
-			return ocCompat(resolvedModelId);
-		return ocOpenAI(resolvedModelId);
 	}
 
 	if (provider === 'copilot') {
@@ -244,9 +69,7 @@ export async function resolveModel(
 					};
 				},
 			},
-			{
-				baseURL,
-			},
+			{ baseURL },
 		);
 	}
 
@@ -262,30 +85,6 @@ export async function resolveModel(
 		});
 	}
 
-	if (provider === 'zai') {
-		return createZaiModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
-	if (provider === 'zai-coding') {
-		return createZaiCodingModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
-	if (provider === 'deepseek') {
-		return createDeepSeekModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-			fetch: config.customFetch,
-		});
-	}
-
 	if (provider === 'kimi') {
 		return createKimiModel(model, {
 			apiKey: config.apiKey,
@@ -294,20 +93,5 @@ export async function resolveModel(
 		});
 	}
 
-	if (provider === 'minimax') {
-		return createMinimaxModel(model, {
-			apiKey: config.apiKey,
-			baseURL: config.baseURL,
-		});
-	}
-
-	throw new Error(`Unsupported provider: ${provider}`);
-}
-
-function normalizeModelIdentifier(
-	provider: ProviderName,
-	model: string,
-): string {
-	const prefix = `${provider}/`;
-	return model.startsWith(prefix) ? model.slice(prefix.length) : model;
+	return createBuiltInProviderModel(provider, model, config);
 }

@@ -69,7 +69,7 @@ export function registerBrowserRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const tabId = c.req.query('tabId');
+			const { tabId } = c.req.valid('query');
 			if (!tabId) return c.json({ command: null }, 200);
 			const projectRoot = await resolveRequestProjectRoot(c);
 			const command = await waitForBrowserControlCommand(
@@ -77,9 +77,7 @@ export function registerBrowserRoutes(app: Hono) {
 				tabId,
 				undefined,
 				{
-					url: c.req.query('url'),
-					title: c.req.query('title'),
-					kind: c.req.query('kind') as 'browser' | 'simulator' | undefined,
+					...c.req.valid('query'),
 				},
 			);
 			const wireCommand = command
@@ -127,9 +125,8 @@ export function registerBrowserRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const commandId = c.req.param('commandId');
-			const { result } =
-				await c.req.json<z.infer<typeof browserCommandResultBodySchema>>();
+			const { commandId } = c.req.valid('param');
+			const { result } = c.req.valid('json');
 			const projectRoot = await resolveRequestProjectRoot(c);
 			let parsedResult: { ok: boolean; [key: string]: unknown } | null = null;
 			try {

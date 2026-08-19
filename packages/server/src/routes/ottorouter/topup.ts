@@ -85,7 +85,7 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
+				const body = c.req.valid('json');
 				const { sessionId, method } = body as {
 					sessionId: string;
 					method: TopupMethod;
@@ -158,7 +158,7 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
+				const body = c.req.valid('json');
 				const { sessionId, reason } = body as {
 					sessionId: string;
 					reason?: string;
@@ -216,7 +216,7 @@ export function registerOttoRouterTopupRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.query('sessionId');
+				const { sessionId } = c.req.valid('query');
 				if (!sessionId) {
 					return c.json({ error: 'Missing sessionId parameter' }, 400);
 				}

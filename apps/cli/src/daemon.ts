@@ -1,6 +1,13 @@
 import { getOttoHomeDir } from '@ottocode/sdk';
+import { compareReleaseVersions } from '@ottocode/sdk/release';
+import type { ListProjectsResponse } from '@ottocode/api';
 import { chmod, mkdir, rename, rm, stat } from 'node:fs/promises';
+import { createServer } from 'node:net';
+import { parseOptionalCliPort } from './runtime/network.ts';
 import { basename, join, resolve } from 'node:path';
+import { createDaemonApi, type DaemonApi } from './runtime/daemon-api.ts';
+
+export { daemonAuthHeaders } from './runtime/daemon-api.ts';
 
 export interface DaemonRegistration {
 	id: string;
@@ -61,6 +68,11 @@ export interface DaemonServiceOptions {
 	fetch?: typeof fetch;
 	spawn?: typeof Bun.spawn;
 	signal?: (pid: number, signal?: NodeJS.Signals | number) => boolean;
+	isProcessAlive?: (pid: number) => boolean;
+	isPortAvailable?: (port: number) => Promise<boolean>;
+	sleep?: (ms: number) => Promise<void>;
+	shutdownTimeoutMs?: number;
+	startupTimeoutMs?: number;
 }
 
 export interface OpenProjectContext {
@@ -71,29 +83,21 @@ export interface OpenProjectContext {
 	authHeaders: Record<string, string>;
 }
 
-export interface DaemonProjectSummary {
-	id: string;
-	name: string;
-	path: string;
-	stateDir: string;
-	dbPath: string;
-	openedAt?: number;
-	lastUsedAt: number;
-	open: boolean;
-}
+export type DaemonProjectSummary = ListProjectsResponse['projects'][number];
 
 export const DEFAULT_DAEMON_PORT = 47_477;
 
 const HEALTH_TIMEOUT_MS = 1_500;
+const PROCESS_POLL_INTERVAL_MS = 100;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+const STARTUP_TIMEOUT_MS = 10_000;
 const SOURCE_CLI_ENTRY = resolve(import.meta.dir, '..', 'index.ts');
 
 export function parseDaemonPort(value: string | undefined): number | undefined {
-	if (!value) return undefined;
-	const port = Number.parseInt(value, 10);
-	if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-		throw new Error(`Invalid daemon port: ${value}`);
-	}
-	return port;
+	return parseOptionalCliPort(value, {
+		allowZero: false,
+		name: 'daemon port',
+	});
 }
 
 export function getPreferredDaemonPort(
@@ -101,6 +105,68 @@ export function getPreferredDaemonPort(
 	env: NodeJS.ProcessEnv = process.env,
 ): number {
 	return port ?? parseDaemonPort(env.OTTO_DAEMON_PORT) ?? DEFAULT_DAEMON_PORT;
+}
+
+/** Spawns a detached daemon with a caller-provided handoff identity. */
+export function spawnDaemonProcess(options: {
+	projectRoot: string;
+	executable: string;
+	port: number;
+	daemonId: string;
+	spawn?: typeof Bun.spawn;
+	cwd?: string;
+	env?: NodeJS.ProcessEnv;
+}): ReturnType<typeof Bun.spawn> {
+	const spawn = options.spawn ?? Bun.spawn;
+	const proc = spawn({
+		cmd: getDaemonSpawnCommand(
+			options.projectRoot,
+			options.executable,
+			options.port,
+		),
+		cwd: options.cwd ?? process.cwd(),
+		env: {
+			...(options.env ?? process.env),
+			OTTO_DAEMON_ID: options.daemonId,
+			OTTO_DAEMON_PORT: String(options.port),
+		},
+		stdin: 'ignore',
+		stdout: 'ignore',
+		stderr: 'ignore',
+	});
+	proc.unref();
+	return proc;
+}
+
+export async function isDaemonPortAvailable(port: number): Promise<boolean> {
+	return new Promise((resolveAvailable) => {
+		const server = createServer();
+		server.unref();
+		server.once('error', () => resolveAvailable(false));
+		server.listen(port, '127.0.0.1', () => {
+			server.close(() => resolveAvailable(true));
+		});
+	});
+}
+
+/** Waits until a loopback port can be bound by a replacement daemon. */
+export async function waitForDaemonPortRelease(options: {
+	port: number;
+	timeoutMs?: number;
+	isPortAvailable?: (port: number) => Promise<boolean>;
+	sleep?: (ms: number) => Promise<void>;
+}): Promise<void> {
+	const deadline = Date.now() + (options.timeoutMs ?? SHUTDOWN_TIMEOUT_MS);
+	const available = options.isPortAvailable ?? isDaemonPortAvailable;
+	const sleep = options.sleep ?? Bun.sleep;
+	while (!(await available(options.port))) {
+		if (Date.now() >= deadline) {
+			throw new Error(
+				`Timed out waiting for daemon port ${options.port} to be released`,
+			);
+		}
+		await sleep(PROCESS_POLL_INTERVAL_MS);
+	}
 }
 
 export function getDaemonSpawnCommand(
@@ -139,17 +205,16 @@ function activeDaemonPath(
 	return join(pathsFromOptions(options).dir, 'active-daemon.json');
 }
 
-function compareVersions(left: string, right: string): number | null {
-	if (!/^\d+\.\d+\.\d+$/.test(left) || !/^\d+\.\d+\.\d+$/.test(right)) {
+function compareDaemonVersions(left: string, right: string): number | null {
+	try {
+		return compareReleaseVersions(left, right);
+	} catch {
 		return null;
 	}
-	const leftParts = left.split('.').map(Number);
-	const rightParts = right.split('.').map(Number);
-	for (let index = 0; index < 3; index++) {
-		const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-		if (difference !== 0) return difference;
-	}
-	return 0;
+}
+
+function daemonVersionsEqual(left: string | null, right: string): boolean {
+	return left !== null && compareDaemonVersions(left, right) === 0;
 }
 
 /** Reads a valid activated daemon binary that is at least as new as the CLI. */
@@ -164,7 +229,7 @@ export async function readActiveDaemonSelection(
 		if (
 			typeof parsed.path !== 'string' ||
 			typeof parsed.version !== 'string' ||
-			(compareVersions(parsed.version, installedVersion) ?? -1) < 0
+			(compareDaemonVersions(parsed.version, installedVersion) ?? -1) < 0
 		) {
 			return null;
 		}
@@ -273,24 +338,6 @@ export async function readDaemonToken(
 	}
 }
 
-function authHeaders(token: string): Record<string, string> {
-	return {
-		Authorization: `Bearer ${token}`,
-		'X-Otto-Server-Token': token,
-	};
-}
-
-export function daemonAuthHeaders(
-	token: string | null,
-): Record<string, string> {
-	return token
-		? {
-				Authorization: `Bearer ${token}`,
-				'X-Otto-Server-Token': token,
-			}
-		: {};
-}
-
 export async function fetchDaemonHealth(
 	registration: DaemonRegistration,
 	options: Pick<DaemonServiceOptions, 'paths' | 'fetch'> = {},
@@ -300,26 +347,16 @@ export async function fetchDaemonHealth(
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 	try {
-		const fetchImpl = options.fetch ?? fetch;
-		const response = await fetchImpl(`${registration.url}/v1/server/info`, {
-			headers: authHeaders(token),
-			signal: controller.signal,
-		});
-		if (!response.ok) return null;
-		const body = (await response.json()) as Partial<DaemonHealth>;
-		if (
-			typeof body.pid !== 'number' ||
-			typeof body.startedAt !== 'number' ||
-			(body.version !== null && typeof body.version !== 'string') ||
-			(body.daemonId !== null && typeof body.daemonId !== 'string')
-		) {
-			return null;
-		}
+		const body = await createDaemonApi({
+			baseUrl: registration.url,
+			token,
+			fetch: options.fetch,
+		}).getServerInfo(controller.signal);
 		return {
-			port: typeof body.port === 'number' ? body.port : null,
-			version: body.version ?? null,
+			port: body.port,
+			version: body.version,
 			pid: body.pid,
-			daemonId: body.daemonId ?? null,
+			daemonId: body.daemonId,
 			startedAt: body.startedAt,
 		};
 	} catch {
@@ -329,8 +366,45 @@ export async function fetchDaemonHealth(
 	}
 }
 
+function daemonIdentityMatches(
+	registration: DaemonRegistration,
+	health: DaemonHealth,
+): boolean {
+	return health.pid === registration.pid && health.daemonId === registration.id;
+}
+
+function processIsAlive(pid: number): boolean {
+	try {
+		return process.kill(pid, 0);
+	} catch (error) {
+		return !(
+			error &&
+			typeof error === 'object' &&
+			'code' in error &&
+			error.code === 'ESRCH'
+		);
+	}
+}
+
+async function removeRegistrationIfCurrent(
+	registration: DaemonRegistration,
+	options: Pick<DaemonServiceOptions, 'paths'>,
+): Promise<void> {
+	const current = await readDaemonRegistration(options);
+	if (
+		current?.id === registration.id &&
+		current.pid === registration.pid &&
+		current.startedAt === registration.startedAt
+	) {
+		await removeDaemonRegistration(options);
+	}
+}
+
 export async function getDaemonStatus(
-	options: Pick<DaemonServiceOptions, 'version' | 'paths' | 'fetch'>,
+	options: Pick<
+		DaemonServiceOptions,
+		'version' | 'paths' | 'fetch' | 'isProcessAlive'
+	>,
 ): Promise<DaemonStatus> {
 	const active = await readActiveDaemonSelection(options.version, options);
 	const expectedVersion = active?.version ?? options.version;
@@ -338,20 +412,20 @@ export async function getDaemonStatus(
 	if (!registration) return { state: 'missing' };
 	const health = await fetchDaemonHealth(registration, options);
 	if (!health) {
-		await removeDaemonRegistration(options);
+		if (!(options.isProcessAlive ?? processIsAlive)(registration.pid)) {
+			await removeRegistrationIfCurrent(registration, options);
+		}
 		return { state: 'stale', registration, reason: 'health check failed' };
 	}
-	if (health.daemonId && health.daemonId !== registration.id) {
-		await removeDaemonRegistration(options);
+	if (health.daemonId !== registration.id) {
 		return { state: 'stale', registration, reason: 'daemon id mismatch' };
 	}
 	if (health.pid !== registration.pid) {
-		await removeDaemonRegistration(options);
 		return { state: 'stale', registration, reason: 'pid mismatch' };
 	}
 	if (
-		registration.version !== expectedVersion ||
-		health.version !== expectedVersion
+		!daemonVersionsEqual(registration.version, expectedVersion) ||
+		!daemonVersionsEqual(health.version, expectedVersion)
 	) {
 		return {
 			state: 'stale',
@@ -369,7 +443,8 @@ export async function ensureDaemon(
 	const current = await getDaemonStatus(options);
 	if (current.state === 'running') {
 		if (
-			(compareVersions(current.registration.version, options.version) ?? 0) > 0
+			(compareDaemonVersions(current.registration.version, options.version) ??
+				0) > 0
 		) {
 			throw new DaemonVersionMismatchError(
 				options.version,
@@ -382,12 +457,15 @@ export async function ensureDaemon(
 		if (current.reason === 'version mismatch') {
 			const daemonVersion =
 				current.health?.version ?? current.registration.version;
-			if ((compareVersions(daemonVersion, options.version) ?? 0) > 0) {
+			if ((compareDaemonVersions(daemonVersion, options.version) ?? 0) > 0) {
 				throw new DaemonVersionMismatchError(options.version, daemonVersion);
 			}
 			await stopDaemon(options);
 		} else {
-			await removeDaemonRegistration(options);
+			const remaining = await readDaemonRegistration(options);
+			if (remaining) {
+				throw new Error(`Cannot replace daemon: ${current.reason}`);
+			}
 		}
 	}
 	return startDaemon(options);
@@ -399,30 +477,19 @@ export async function openProjectOnServer(options: {
 	token?: string | null;
 	fetch?: typeof fetch;
 }): Promise<OpenProjectContext> {
-	const fetchImpl = options.fetch ?? fetch;
 	const token = options.token ?? (await readDaemonToken());
-	const auth = daemonAuthHeaders(token);
-	const response = await fetchImpl(`${options.baseUrl}/v1/projects/open`, {
-		method: 'POST',
-		headers: {
-			...auth,
-			'content-type': 'application/json',
-		},
-		body: JSON.stringify({ path: options.projectRoot }),
+	const api = createDaemonApi({
+		baseUrl: options.baseUrl,
+		token,
+		fetch: options.fetch,
 	});
-	if (!response.ok) {
-		throw new Error(`Failed to open project on daemon: ${response.status}`);
-	}
-	const body = (await response.json()) as { id?: unknown; path?: unknown };
-	if (typeof body.id !== 'string' || typeof body.path !== 'string') {
-		throw new Error('Invalid project open response from daemon');
-	}
+	const body = await api.openProject(options.projectRoot);
 	return {
 		baseUrl: options.baseUrl,
 		projectId: body.id,
 		projectRoot: body.path,
 		token,
-		authHeaders: auth,
+		authHeaders: api.headers,
 	};
 }
 
@@ -431,19 +498,12 @@ export async function listProjectsOnServer(options: {
 	token?: string | null;
 	fetch?: typeof fetch;
 }): Promise<DaemonProjectSummary[]> {
-	const fetchImpl = options.fetch ?? fetch;
 	const token = options.token ?? (await readDaemonToken());
-	const response = await fetchImpl(`${options.baseUrl}/v1/projects`, {
-		headers: daemonAuthHeaders(token),
-	});
-	if (!response.ok) {
-		throw new Error(`Failed to list projects: ${response.status}`);
-	}
-	const body = (await response.json()) as { projects?: unknown };
-	if (!Array.isArray(body.projects)) {
-		throw new Error('Invalid projects response from daemon');
-	}
-	return body.projects as DaemonProjectSummary[];
+	return createDaemonApi({
+		baseUrl: options.baseUrl,
+		token,
+		fetch: options.fetch,
+	}).listProjects();
 }
 
 export async function closeProjectOnServer(options: {
@@ -452,18 +512,12 @@ export async function closeProjectOnServer(options: {
 	token?: string | null;
 	fetch?: typeof fetch;
 }): Promise<void> {
-	const fetchImpl = options.fetch ?? fetch;
 	const token = options.token ?? (await readDaemonToken());
-	const response = await fetchImpl(
-		`${options.baseUrl}/v1/projects/${encodeURIComponent(options.projectId)}/close`,
-		{
-			method: 'DELETE',
-			headers: daemonAuthHeaders(token),
-		},
-	);
-	if (!response.ok) {
-		throw new Error(`Failed to close project: ${response.status}`);
-	}
+	await createDaemonApi({
+		baseUrl: options.baseUrl,
+		token,
+		fetch: options.fetch,
+	}).closeProject(options.projectId);
 }
 
 export async function forgetProjectOnServer(options: {
@@ -472,18 +526,24 @@ export async function forgetProjectOnServer(options: {
 	token?: string | null;
 	fetch?: typeof fetch;
 }): Promise<void> {
-	const fetchImpl = options.fetch ?? fetch;
 	const token = options.token ?? (await readDaemonToken());
-	const response = await fetchImpl(
-		`${options.baseUrl}/v1/projects/${encodeURIComponent(options.projectIdOrPath)}`,
-		{
-			method: 'DELETE',
-			headers: daemonAuthHeaders(token),
-		},
-	);
-	if (!response.ok) {
-		throw new Error(`Failed to forget project: ${response.status}`);
-	}
+	await createDaemonApi({
+		baseUrl: options.baseUrl,
+		token,
+		fetch: options.fetch,
+	}).forgetProject(options.projectIdOrPath);
+}
+
+/** Starts or reuses the daemon and returns its canonical generated API client. */
+export async function connectDaemonApi(
+	options: DaemonServiceOptions,
+): Promise<DaemonApi> {
+	const registration = await ensureDaemon(options);
+	return createDaemonApi({
+		baseUrl: registration.url,
+		token: await readDaemonToken(options),
+		fetch: options.fetch,
+	});
 }
 
 export async function ensureDaemonProject(
@@ -509,26 +569,27 @@ export async function startDaemon(
 	const port = getPreferredDaemonPort(options.port);
 	const active = await readActiveDaemonSelection(options.version, options);
 	const executable = active?.path ?? process.execPath;
-	const spawnImpl = options.spawn ?? Bun.spawn;
-	const proc = spawnImpl({
-		cmd: getDaemonSpawnCommand(projectRoot, executable, port),
-		cwd: process.cwd(),
-		env: {
-			...process.env,
-			OTTO_DAEMON_ID: id,
-			OTTO_DAEMON_PORT: String(port),
-		},
-		stdin: 'ignore',
-		stdout: 'ignore',
-		stderr: 'ignore',
+	await waitForDaemonPortRelease({
+		port,
+		timeoutMs: options.startupTimeoutMs,
+		isPortAvailable: options.isPortAvailable,
+		sleep: options.sleep,
 	});
-	proc.unref();
+	const proc = spawnDaemonProcess({
+		projectRoot,
+		executable,
+		port,
+		daemonId: id,
+		spawn: options.spawn,
+	});
 	let exited = false;
 	void proc.exited.then(() => {
 		exited = true;
 	});
 
-	const deadline = Date.now() + 10_000;
+	const deadline =
+		Date.now() + (options.startupTimeoutMs ?? STARTUP_TIMEOUT_MS);
+	const sleep = options.sleep ?? Bun.sleep;
 	while (Date.now() < deadline) {
 		if (exited) {
 			throw new Error(`otto daemon failed to start on port ${port}`);
@@ -538,40 +599,106 @@ export async function startDaemon(
 			const status = await getDaemonStatus({ ...options, paths });
 			if (status.state === 'running') return status.registration;
 		}
-		await Bun.sleep(100);
+		await sleep(PROCESS_POLL_INTERVAL_MS);
 	}
 	throw new Error('Timed out waiting for otto daemon to start');
 }
 
 export async function stopDaemon(
-	options: Pick<DaemonServiceOptions, 'paths' | 'fetch' | 'signal'>,
+	options: Pick<
+		DaemonServiceOptions,
+		| 'paths'
+		| 'fetch'
+		| 'signal'
+		| 'isProcessAlive'
+		| 'sleep'
+		| 'shutdownTimeoutMs'
+	>,
 ): Promise<boolean> {
 	const registration = await readDaemonRegistration(options);
 	if (!registration) return false;
 	const health = await fetchDaemonHealth(registration, options);
 	if (!health) {
-		await removeDaemonRegistration(options);
+		const alive = (options.isProcessAlive ?? processIsAlive)(registration.pid);
+		if (alive) {
+			throw new Error(
+				'Daemon is still running but authenticated health failed',
+			);
+		}
+		await removeRegistrationIfCurrent(registration, options);
 		return false;
 	}
-	if (health.daemonId && health.daemonId !== registration.id) return false;
-	if (health.pid !== registration.pid) return false;
+	if (!daemonIdentityMatches(registration, health)) return false;
 	const signalImpl = options.signal ?? process.kill;
-	const stopped = signalImpl(registration.pid, 'SIGTERM');
-	await removeDaemonRegistration(options);
-	return stopped;
+	let signaled = false;
+	try {
+		signaled = signalImpl(registration.pid, 'SIGTERM');
+	} catch (error) {
+		if (
+			!(
+				error &&
+				typeof error === 'object' &&
+				'code' in error &&
+				error.code === 'ESRCH'
+			)
+		) {
+			throw error;
+		}
+	}
+
+	const isAlive = options.isProcessAlive ?? processIsAlive;
+	const sleep = options.sleep ?? Bun.sleep;
+	const deadline =
+		Date.now() + (options.shutdownTimeoutMs ?? SHUTDOWN_TIMEOUT_MS);
+	while (true) {
+		const [alive, currentHealth] = await Promise.all([
+			Promise.resolve(isAlive(registration.pid)),
+			fetchDaemonHealth(registration, options),
+		]);
+		if (!alive && !currentHealth) {
+			await removeRegistrationIfCurrent(registration, options);
+			return signaled;
+		}
+		if (Date.now() >= deadline) {
+			throw new Error(
+				`Timed out waiting for daemon process ${registration.pid} to stop`,
+			);
+		}
+		await sleep(PROCESS_POLL_INTERVAL_MS);
+	}
 }
 
 export async function restartDaemon(
 	options: DaemonServiceOptions,
 ): Promise<DaemonRegistration> {
+	const registration = await readDaemonRegistration(options);
 	await stopDaemon(options);
+	let previousPort: number | null = null;
+	if (registration) {
+		try {
+			previousPort = Number(new URL(registration.url).port) || null;
+		} catch {}
+	}
+	await waitForDaemonPortRelease({
+		port: previousPort ?? getPreferredDaemonPort(options.port),
+		timeoutMs: options.shutdownTimeoutMs,
+		isPortAvailable: options.isPortAvailable,
+		sleep: options.sleep,
+	});
 	return startDaemon(options);
 }
 
 export async function rotateDaemonPassword(
-	options?: Pick<DaemonServiceOptions, 'paths'>,
+	options: Pick<DaemonServiceOptions, 'paths' | 'fetch'> = {},
 ): Promise<string> {
 	const paths = pathsFromOptions(options);
+	const registration = await readDaemonRegistration(options);
+	if (registration) {
+		const health = await fetchDaemonHealth(registration, options);
+		if (health && daemonIdentityMatches(registration, health)) {
+			throw new Error('Stop the daemon before rotating its token.');
+		}
+	}
 	await mkdir(paths.dir, { recursive: true });
 	const token =
 		crypto.randomUUID().replace(/-/g, '') +

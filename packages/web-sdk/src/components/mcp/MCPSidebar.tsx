@@ -127,14 +127,21 @@ const MCPServerCard = memo(function MCPServerCard({
 	const sourceLabel = getMcpSourceLabel(server);
 
 	const handleToggle = useCallback(() => {
-		if (server.authRequired && !server.connected) {
-			onAuth();
-		} else if (server.connected) {
+		if (!server.disabled) {
 			onStop();
+		} else if (server.authRequired && !server.connected) {
+			onAuth();
 		} else {
 			onStart();
 		}
-	}, [server.connected, server.authRequired, onAuth, onStop, onStart]);
+	}, [
+		server.disabled,
+		server.connected,
+		server.authRequired,
+		onAuth,
+		onStop,
+		onStart,
+	]);
 
 	const toggleTools = useCallback(() => {
 		if (hasTools) setShowTools((prev) => !prev);
@@ -152,7 +159,7 @@ const MCPServerCard = memo(function MCPServerCard({
 		>
 			<div className="flex items-center gap-3 px-3 py-2">
 				<ToggleSwitch
-					checked={server.connected}
+					checked={!server.disabled}
 					loading={isLoading || isAwaitingAuth}
 					onChange={handleToggle}
 				/>
@@ -450,11 +457,7 @@ const MCPSidebarContent = memo(function MCPSidebarContent() {
 					);
 				})
 			: servers;
-		return [...filtered].sort((a, b) => {
-			if (a.connected && !b.connected) return -1;
-			if (!a.connected && b.connected) return 1;
-			return a.name.localeCompare(b.name);
-		});
+		return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 	}, [servers, searchQuery]);
 
 	const connectedCount = servers.filter((s) => s.connected).length;

@@ -257,7 +257,7 @@ export function registerOAuthCallbackProxyRoutes(app: Hono) {
 				return c.json({ error: 'Unauthorized' }, 401);
 			}
 			try {
-				return c.json(await startOAuthCallbackProxy(await c.req.json()), 200);
+				return c.json(await startOAuthCallbackProxy(c.req.valid('json')), 200);
 			} catch (error) {
 				return c.json(
 					{ error: error instanceof Error ? error.message : String(error) },

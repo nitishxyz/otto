@@ -56,15 +56,16 @@ export function registerUpdateSessionRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
+				c.req.valid('query');
 				const { cfg, db } = await resolveRequestProject(c);
+				const body = c.req.valid('json');
 
-				const body = (await c.req.json().catch(() => ({}))) as Record<
-					string,
-					unknown
-				>;
-
-				const existingSession = await findSessionById(db, sessionId);
+				const existingSession = await findSessionById(
+					db,
+					sessionId,
+					cfg.projectRoot,
+				);
 
 				if (!existingSession) {
 					return c.json({ error: 'Session not found' }, 404);

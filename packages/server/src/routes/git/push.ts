@@ -3,7 +3,6 @@ import type { Hono } from 'hono';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
-import { gitPushSchema } from './schemas.ts';
 import { runInteractiveGitCommand } from './interactive.ts';
 import { getCurrentBranch, validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
@@ -70,17 +69,7 @@ export function registerPushRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				let body = {};
-				try {
-					body = await c.req.json();
-				} catch (jsonError) {
-					console.warn(
-						'Failed to parse JSON body for git push, using empty object:',
-						jsonError,
-					);
-				}
-
-				const input = gitPushSchema.parse(body);
+				const input = c.req.valid('json') ?? {};
 
 				const requestedPath = await resolveRequestProjectRoot(c);
 

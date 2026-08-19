@@ -46,7 +46,7 @@ export function registerProviderUsageRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider') as ProviderId;
+				const { provider } = c.req.valid('param');
 
 				if (!isUsageProvider(provider)) {
 					return c.json(

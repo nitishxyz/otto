@@ -125,7 +125,7 @@ export async function handleDiscoverProviderModels(c: Context) {
 			return c.json({ error: 'Embedded config cannot be modified' }, 400);
 		}
 
-		const body = await c.req.json<ProviderDiscoveryBody>();
+		const body = c.req.valid('json' as never) as ProviderDiscoveryBody;
 		const compatibility = body.compatibility || 'openai-compatible';
 		const baseURL = body.baseURL?.trim();
 		const apiKey = body.apiKey?.trim() || undefined;
@@ -195,8 +195,10 @@ export async function handleUpdateProviderSettings(c: Context) {
 		}
 
 		const projectRoot = await resolveRequestProjectRoot(c);
-		const provider = c.req.param('provider').trim();
-		const body = await c.req.json<ProviderMutationBody>();
+		const provider = (
+			c.req.valid('param' as never) as { provider: string }
+		).provider.trim();
+		const body = c.req.valid('json' as never) as ProviderMutationBody;
 		if (!provider) return c.json({ error: 'Provider is required' }, 400);
 
 		const updates = buildProviderUpdates(provider, body);
@@ -228,7 +230,9 @@ export async function handleDeleteProviderSettings(c: Context) {
 		}
 
 		const projectRoot = await resolveRequestProjectRoot(c);
-		const provider = c.req.param('provider').trim();
+		const provider = (
+			c.req.valid('param' as never) as { provider: string }
+		).provider.trim();
 		if (!provider) return c.json({ error: 'Provider is required' }, 400);
 
 		await removeProviderSettings('global', provider, projectRoot);

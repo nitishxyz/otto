@@ -301,7 +301,9 @@ async function getAuthorizedCopilotModels(
 export async function handleGetProviderModels(c: Context) {
 	try {
 		const embeddedConfig = getEmbeddedConfig(c);
-		const provider = c.req.param('provider') as ProviderId;
+		const { provider } = c.req.valid('param' as never) as {
+			provider: ProviderId;
+		};
 		const projectRoot = await resolveRequestProjectRoot(c);
 		const cfg = await loadConfig(projectRoot);
 		const cachedCatalog = await readCachedModelCatalog();

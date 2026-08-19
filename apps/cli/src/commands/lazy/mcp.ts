@@ -1,10 +1,4 @@
 import type { Command } from 'commander';
-import {
-	dispatchRegisteredCommand,
-	pushFlag,
-	pushOption,
-	pushVariadicOption,
-} from './helpers.ts';
 
 export function registerMCPCommand(program: Command) {
 	const mcp = program
@@ -15,27 +9,27 @@ export function registerMCPCommand(program: Command) {
 		.command('list', { isDefault: true })
 		.description('List configured MCP servers')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async () => {
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, ['mcp', 'list']);
+		.action(async (opts) => {
+			const { runMCPList } = await import('../mcp.ts');
+			await runMCPList(opts.project);
 		});
 
 	mcp
 		.command('status')
 		.description('Show running MCP servers and their tools')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async () => {
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, ['mcp', 'status']);
+		.action(async (opts) => {
+			const { runMCPStatus } = await import('../mcp.ts');
+			await runMCPStatus(opts.project);
 		});
 
 	mcp
 		.command('test <name>')
 		.description('Test connection to an MCP server')
 		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (name) => {
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, ['mcp', 'test', name]);
+		.action(async (name, opts) => {
+			const { runMCPTest } = await import('../mcp.ts');
+			await runMCPTest(name, opts.project);
 		});
 
 	mcp
@@ -49,16 +43,15 @@ export function registerMCPCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--global', 'Add to global config instead of project', false)
 		.action(async (name, opts) => {
-			const argv = ['mcp', 'add', name];
-			pushOption(argv, '--command', opts.command);
-			pushVariadicOption(argv, '--args', opts.args);
-			pushOption(argv, '--transport', opts.transport);
-			pushOption(argv, '--url', opts.url);
-			pushVariadicOption(argv, '--header', opts.header);
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--global', opts.global);
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runMCPAdd } = await import('../mcp.ts');
+			await runMCPAdd(name, {
+				transport: opts.transport,
+				command: opts.command,
+				args: opts.args,
+				url: opts.url,
+				headers: opts.header,
+				global: opts.global,
+			});
 		});
 
 	mcp
@@ -67,11 +60,8 @@ export function registerMCPCommand(program: Command) {
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.option('--global', 'Remove from global config', false)
 		.action(async (name, opts) => {
-			const argv = ['mcp', 'remove', name];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--global', opts.global);
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runMCPRemove } = await import('../mcp.ts');
+			await runMCPRemove(name, opts.project, opts.global);
 		});
 
 	mcp
@@ -81,11 +71,7 @@ export function registerMCPCommand(program: Command) {
 		.option('--status', 'Show auth status', false)
 		.option('--project <path>', 'Use project at <path>', process.cwd())
 		.action(async (name, opts) => {
-			const argv = ['mcp', 'auth', name];
-			pushFlag(argv, '--revoke', opts.revoke);
-			pushFlag(argv, '--status', opts.status);
-			pushOption(argv, '--project', opts.project);
-			const { registerMCPCommand: register } = await import('../mcp.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { runMCPAuth } = await import('../mcp.ts');
+			await runMCPAuth(name, opts);
 		});
 }

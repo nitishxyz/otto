@@ -4,7 +4,8 @@ import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribeClientEvents } from '../events/bus.ts';
 import {
-	createSSEByteStrategy,
+	createSSEEncodingCache,
+	createSSEResponse,
 	encodeSSEComment,
 	encodeSSEEvent,
 } from '../events/sse.ts';
@@ -29,78 +30,31 @@ const clientEventsStreamSchema = z.string().openapi({
 	description: STREAM_DESCRIPTION,
 });
 
-const eventChunks = new WeakMap<ClientEvent, Uint8Array>();
-
-function encodeEvent(evt: ClientEvent): Uint8Array {
-	const cached = eventChunks.get(evt);
-	if (cached) return cached;
-	const chunk = encodeSSEEvent(evt.type, evt.payload ?? {});
-	eventChunks.set(evt, chunk);
-	return chunk;
-}
+const encodeEvent = createSSEEncodingCache((evt: ClientEvent) =>
+	encodeSSEEvent(evt.type, evt.payload ?? {}),
+);
 
 function handleClientEventsStream(c: Context) {
-	const headers = new Headers({
-		'Content-Type': 'text/event-stream',
-		'Cache-Control': 'no-cache, no-transform',
-		Connection: 'keep-alive',
-		'X-Accel-Buffering': 'no',
-	});
-
-	let cleanedUp = false;
-	let cleanup = () => {};
-
-	const stream = new ReadableStream<Uint8Array>(
-		{
-			start(controller) {
-				let unsubscribe = () => {};
-				let hb: ReturnType<typeof setInterval> | null = null;
-
-				cleanup = () => {
-					if (cleanedUp) return;
-					cleanedUp = true;
-					if (hb !== null) clearInterval(hb);
-					unsubscribe();
-					try {
-						controller.close();
-					} catch {}
-				};
-
-				const write = (evt: ClientEvent) => {
-					try {
-						const chunk = encodeEvent(evt);
-						controller.enqueue(chunk);
-						if ((controller.desiredSize ?? 0) < 0) {
-							logger.warn('[sse] dropping backpressured client event stream', {
-								chunkBytes: chunk.byteLength,
-							});
-							cleanup();
-						}
-					} catch {
-						cleanup();
-					}
-				};
-
-				unsubscribe = subscribeClientEvents(write);
-				controller.enqueue(encodeSSEComment('connected client-events'));
-				hb = setInterval(() => {
-					write({
-						type: 'heartbeat',
-						payload: { createdAt: new Date().toISOString() },
-					});
-				}, 5000);
-
-				const signal = c.req.raw?.signal as AbortSignal | undefined;
-				signal?.addEventListener('abort', cleanup, { once: true });
-			},
-			cancel() {
-				cleanup();
-			},
+	return createSSEResponse({
+		signal: c.req.raw?.signal,
+		initialChunk: encodeSSEComment('connected client-events'),
+		heartbeat: {
+			intervalMs: 5000,
+			createChunk: () =>
+				encodeEvent({
+					type: 'heartbeat',
+					payload: { createdAt: new Date().toISOString() },
+				}),
 		},
-		createSSEByteStrategy(),
-	);
-
-	return new Response(stream, { headers });
+		onBackpressure(chunk) {
+			logger.warn('[sse] dropping backpressured client event stream', {
+				chunkBytes: chunk.byteLength,
+			});
+		},
+		start({ send, onCleanup }) {
+			onCleanup(subscribeClientEvents((evt) => send(encodeEvent(evt))));
+		},
+	});
 }
 
 export function registerClientEventsRoute(app: Hono) {

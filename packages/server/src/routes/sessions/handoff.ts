@@ -94,10 +94,14 @@ export function registerSessionHandoffRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const { cfg, db } = await loadProjectDb(projectRoot);
-				const sourceSession = await findSessionById(db, sessionId);
+				const sourceSession = await findSessionById(
+					db,
+					sessionId,
+					cfg.projectRoot,
+				);
 				if (!sourceSession || sourceSession.projectPath !== cfg.projectRoot) {
 					return c.json({ error: 'Session not found' }, 404);
 				}

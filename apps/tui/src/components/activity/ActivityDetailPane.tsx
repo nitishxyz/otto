@@ -14,7 +14,6 @@ export const ActivityDetailPane = memo(function ActivityDetailPane({
 	data: ActivityData;
 	focused: boolean;
 	onFocusRequest: () => void;
-	onBack: () => void;
 }) {
 	const { colors } = useTheme();
 	const content = (() => {

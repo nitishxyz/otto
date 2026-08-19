@@ -1,58 +1,41 @@
-import type { BuiltInProviderId, ProviderId } from '../../types/src/index.ts';
-import { readKimiApiKeyFromEnv } from './kimi-env.ts';
+import type {
+	BuiltInProviderDescriptor,
+	BuiltInProviderId,
+	ProviderId,
+} from '../../types/src/index.ts';
+import { BUILT_IN_PROVIDER_DESCRIPTORS } from '../../types/src/provider-descriptors.ts';
 
-const ENV_VARS: Record<BuiltInProviderId, string> = {
-	openai: 'OPENAI_API_KEY',
-	anthropic: 'ANTHROPIC_API_KEY',
-	google: 'GOOGLE_GENERATIVE_AI_API_KEY',
-	meta: 'META_MODEL_API_KEY',
-	'ollama-cloud': 'OLLAMA_API_KEY',
-	baseten: 'BASETEN_API_KEY',
-	huggingface: 'HF_TOKEN',
-	wafer: 'WAFER_API_KEY',
-	openrouter: 'OPENROUTER_API_KEY',
-	opencode: 'OPENCODE_API_KEY',
-	copilot: 'GITHUB_TOKEN',
-	ottorouter: 'OTTOROUTER_OAUTH',
-	xai: 'XAI_API_KEY',
-	zai: 'ZAI_API_KEY',
-	'zai-coding': 'ZAI_CODING_API_KEY',
-	deepseek: 'DEEPSEEK_API_KEY',
-	kimi: 'KIMI_API_KEY',
-	minimax: 'MINIMAX_API_KEY',
-};
+function getDescriptor(
+	provider: ProviderId,
+): BuiltInProviderDescriptor | undefined {
+	return BUILT_IN_PROVIDER_DESCRIPTORS[provider as BuiltInProviderId];
+}
 
 export function providerEnvVar(provider: ProviderId): string | undefined {
-	return ENV_VARS[provider as BuiltInProviderId];
+	return getDescriptor(provider)?.environment.primary;
 }
 
 export function readEnvKey(provider: ProviderId): string | undefined {
 	if (provider === 'ottorouter') {
 		return undefined;
 	}
-	if (provider === 'kimi') {
-		const value = readKimiApiKeyFromEnv();
-		return value.length ? value : undefined;
+	const descriptor = getDescriptor(provider);
+	if (!descriptor) return undefined;
+	const keys =
+		provider === 'copilot'
+			? [
+					...(descriptor.environment.aliases ?? []),
+					descriptor.environment.primary,
+				]
+			: [
+					descriptor.environment.primary,
+					...(descriptor.environment.aliases ?? []),
+				];
+	for (const key of keys) {
+		const value = typeof process !== 'undefined' ? process.env[key] : undefined;
+		if (value?.length) return value;
 	}
-	if (provider === 'huggingface') {
-		const value = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_API_KEY;
-		return value?.length ? value : undefined;
-	}
-	if (!(provider in ENV_VARS) && provider !== 'copilot') {
-		return undefined;
-	}
-	if (provider === 'copilot') {
-		const copilotToken =
-			process.env.COPILOT_GITHUB_TOKEN ??
-			process.env.GH_TOKEN ??
-			process.env.GITHUB_TOKEN;
-		return copilotToken?.length ? copilotToken : undefined;
-	}
-
-	const key = providerEnvVar(provider);
-	if (!key) return undefined;
-	const value = process.env[key];
-	return value?.length ? value : undefined;
+	return undefined;
 }
 
 export function setEnvKey(provider: ProviderId, value: string | undefined) {

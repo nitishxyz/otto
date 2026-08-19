@@ -15,7 +15,11 @@ import {
 } from '@ottocode/sdk';
 import type { Context, Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
-import { APIError, serializeError } from '../../runtime/errors/api-error.ts';
+import {
+	APIError,
+	apiErrorResponseSchema,
+	createErrorResponse,
+} from '../../runtime/errors/api-error.ts';
 import { getProjectManager } from '../../runtime/projects/manager.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 import {
@@ -32,7 +36,6 @@ function resetNativePluginRuntime(
 	clearProjectToolDiscoveryCache(scope === 'project' ? projectRoot : undefined);
 }
 import {
-	apiErrorResponseSchema,
 	pluginCommandParamsSchema,
 	pluginCommandRunBodySchema,
 	pluginCommandRunResponseSchema,
@@ -110,8 +113,8 @@ function errorJson(
 	c: Parameters<Parameters<typeof zodOpenApiRoute>[2]>[0],
 	error: unknown,
 ) {
-	const errorResponse = serializeError(error);
-	return c.json(errorResponse, errorResponse.error.status || 500);
+	const [body, status] = createErrorResponse(error);
+	return c.json(body, status);
 }
 
 export function registerPluginsRoutes(app: Hono) {
@@ -224,7 +227,8 @@ export function registerPluginsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const parsed = pluginCommandRunBodySchema.parse(await c.req.json());
+				const parsed = c.req.valid('json');
+				const params = c.req.valid('param');
 				const projectRoot = await getProjectRoot(c, parsed.project);
 				const runtime = await getProjectManager().getProject({
 					path: projectRoot,
@@ -232,8 +236,8 @@ export function registerPluginsRoutes(app: Hono) {
 				const result = await runPluginCommand(
 					{
 						projectRoot,
-						plugin: c.req.param('plugin'),
-						command: c.req.param('command'),
+						plugin: params.plugin,
+						command: params.command,
 						argsText: parsed.argsText,
 						args: parsed.args,
 						extraArgs: parsed.extraArgs,
@@ -272,9 +276,8 @@ export function registerPluginsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				return c.json(
-					await fetchRegistries(await getProjectRoot(c), c.req.query('url')),
-				);
+				const { url } = c.req.valid('query');
+				return c.json(await fetchRegistries(await getProjectRoot(c), url));
 			} catch (error) {
 				logger.error('Failed to list plugin registry', error);
 				return errorJson(c, error);
@@ -309,7 +312,8 @@ export function registerPluginsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const name = c.req.param('name');
+				const { name } = c.req.valid('param');
+				const { url } = c.req.valid('query');
 				const projectRoot = await getProjectRoot(c);
 				const effective = await resolveEffectivePlugins(projectRoot);
 				const plugin = effective.plugins.find((item) => item.name === name);
@@ -318,9 +322,9 @@ export function registerPluginsRoutes(app: Hono) {
 					| undefined;
 
 				try {
-					registry = (
-						await fetchRegistries(projectRoot, c.req.query('url'))
-					).plugins.find((item) => item.name === name);
+					registry = (await fetchRegistries(projectRoot, url)).plugins.find(
+						(item) => item.name === name,
+					);
 				} catch {
 					registry = undefined;
 				}
@@ -366,8 +370,7 @@ export function registerPluginsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json();
-				const parsed = pluginInstallBodySchema.parse(body);
+				const parsed = c.req.valid('json');
 				const projectRoot = await getProjectRoot(c, parsed.project);
 				const plugin = await installPlugin(parsed.source, {
 					scope: parsed.scope,
@@ -450,7 +453,7 @@ export function registerPluginsRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const parsed = pluginUpdateBodySchema.parse(await c.req.json());
+				const parsed = c.req.valid('json');
 				const scope = parsed.scope ?? 'global';
 				const projectRoot = await getProjectRoot(c, parsed.project);
 				const options = {
@@ -523,7 +526,7 @@ function registerPluginMutation(
 		},
 		async (c) => {
 			try {
-				const parsed = pluginMutationBodySchema.parse(await c.req.json());
+				const parsed = c.req.valid('json');
 				const plugin = await options.handler({
 					...parsed,
 					projectRoot: await getProjectRoot(c, parsed.project),

@@ -20,9 +20,10 @@ Object.defineProperty(globalThis, 'window', {
 	value: { localStorage: memoryStorage },
 });
 
-const { useSidebarStore } = await import(
+const { createSidebarStore } = await import(
 	'../packages/web-sdk/src/stores/sidebarStore'
 );
+const useSidebarStore = createSidebarStore();
 const storage = createJSONStorage(() => memoryStorage);
 
 function resetStore() {

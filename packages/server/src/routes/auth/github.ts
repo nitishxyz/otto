@@ -101,7 +101,7 @@ export function registerAuthGitHubRoutes(app: Hono) {
 					expires_in: number;
 				};
 				const sessionId = crypto.randomUUID();
-				githubDeviceSessions.set(sessionId, {
+				githubDeviceSessions.create(sessionId, {
 					deviceCode: data.device_code,
 					interval: data.interval,
 					createdAt: Date.now(),
@@ -154,9 +154,7 @@ export function registerAuthGitHubRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const { sessionId } = githubDevicePollBodySchema.parse(
-				await c.req.json(),
-			);
+			const { sessionId } = c.req.valid('json');
 			const session = githubDeviceSessions.get(sessionId);
 			if (!session) return c.json({ error: 'Session expired or invalid' }, 400);
 			try {
@@ -262,7 +260,7 @@ export function registerAuthGitHubRoutes(app: Hono) {
 		async (c) => {
 			const token = await getGitHubToken();
 			if (!token) return c.json({ error: 'GitHub is not connected' }, 401);
-			const { page, search } = githubReposQuerySchema.parse(c.req.query());
+			const { page, search } = c.req.valid('query');
 			try {
 				let repos: GitHubRepoResponse[];
 				if (search?.trim()) {
@@ -320,7 +318,7 @@ export function registerAuthGitHubRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const { url, path } = githubCloneBodySchema.parse(await c.req.json());
+			const { url, path } = c.req.valid('json');
 			const cloneUrl = new URL(url);
 			if (
 				cloneUrl.protocol !== 'https:' ||

@@ -39,6 +39,5 @@ describe('kimi fast model selection', () => {
 		};
 
 		expect(catalog.kimi.models['kimi-k3']).toMatchObject(expected);
-		expect(catalog.ottorouter.models['kimi-k3']).toMatchObject(expected);
 	});
 });

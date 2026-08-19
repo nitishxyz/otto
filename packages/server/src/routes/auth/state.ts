@@ -1,91 +1,72 @@
-export const oauthVerifiers = new Map<
-	string,
-	{
-		verifier: string;
-		provider: string;
-		createdAt: number;
-		callbackUrl: string;
-		close?: () => void;
-	}
->();
+import { ExpiringSessionStore } from './expiring-session-store.ts';
 
-export const copilotDeviceSessions = new Map<
-	string,
-	{ deviceCode: string; interval: number; provider: string; createdAt: number }
->();
+const TEN_MINUTES = 10 * 60_000;
+const FIFTEEN_MINUTES = 15 * 60_000;
 
-export const xaiDeviceSessions = new Map<
-	string,
-	{
-		status: 'pending' | 'complete' | 'error';
-		error?: string;
-		createdAt: number;
-	}
->();
+export const oauthVerifiers = new ExpiringSessionStore<{
+	verifier: string;
+	provider: string;
+	createdAt: number;
+	callbackUrl: string;
+	close?: () => void;
+}>({
+	ttlMs: TEN_MINUTES,
+	onDelete: (value) => {
+		try {
+			value.close?.();
+		} catch {}
+	},
+});
 
-export const openAIDeviceSessions = new Map<
-	string,
-	{
-		deviceAuthId: string;
-		userCode: string;
-		interval: number;
-		createdAt: number;
-	}
->();
+export const copilotDeviceSessions = new ExpiringSessionStore<{
+	deviceCode: string;
+	interval: number;
+	provider: string;
+	createdAt: number;
+}>({ ttlMs: TEN_MINUTES });
 
-export const kimiDeviceSessions = new Map<
-	string,
-	{ deviceCode: string; interval: number; createdAt: number }
->();
+export const xaiDeviceSessions = new ExpiringSessionStore<{
+	status: 'pending' | 'complete' | 'error';
+	error?: string;
+	createdAt: number;
+}>({ ttlMs: FIFTEEN_MINUTES });
 
-export const githubDeviceSessions = new Map<
-	string,
-	{ deviceCode: string; interval: number; createdAt: number }
->();
+export const openAIDeviceSessions = new ExpiringSessionStore<{
+	deviceAuthId: string;
+	userCode: string;
+	interval: number;
+	createdAt: number;
+}>({ ttlMs: FIFTEEN_MINUTES });
 
-export const ottorouterDeviceSessions = new Map<
-	string,
-	{ deviceCode: string; interval: number; createdAt: number }
->();
+export const kimiDeviceSessions = new ExpiringSessionStore<{
+	deviceCode: string;
+	interval: number;
+	createdAt: number;
+}>({ ttlMs: FIFTEEN_MINUTES });
 
-setInterval(() => {
-	const now = Date.now();
-	for (const [key, value] of oauthVerifiers.entries()) {
-		if (now - value.createdAt > 10 * 60 * 1000) {
-			try {
-				value.close?.();
-			} catch {}
-			oauthVerifiers.delete(key);
-		}
-	}
-	for (const [key, value] of copilotDeviceSessions.entries()) {
-		if (now - value.createdAt > 10 * 60 * 1000) {
-			copilotDeviceSessions.delete(key);
-		}
-	}
-	for (const [key, value] of openAIDeviceSessions.entries()) {
-		if (now - value.createdAt > 15 * 60 * 1000) {
-			openAIDeviceSessions.delete(key);
-		}
-	}
-	for (const [key, value] of xaiDeviceSessions.entries()) {
-		if (now - value.createdAt > 15 * 60 * 1000) {
-			xaiDeviceSessions.delete(key);
-		}
-	}
-	for (const [key, value] of kimiDeviceSessions.entries()) {
-		if (now - value.createdAt > 15 * 60 * 1000) {
-			kimiDeviceSessions.delete(key);
-		}
-	}
-	for (const [key, value] of githubDeviceSessions.entries()) {
-		if (now - value.createdAt > 15 * 60 * 1000) {
-			githubDeviceSessions.delete(key);
-		}
-	}
-	for (const [key, value] of ottorouterDeviceSessions.entries()) {
-		if (now - value.createdAt > 15 * 60 * 1000) {
-			ottorouterDeviceSessions.delete(key);
-		}
-	}
-}, 60 * 1000);
+export const githubDeviceSessions = new ExpiringSessionStore<{
+	deviceCode: string;
+	interval: number;
+	createdAt: number;
+}>({ ttlMs: FIFTEEN_MINUTES });
+
+export const ottorouterDeviceSessions = new ExpiringSessionStore<{
+	deviceCode: string;
+	interval: number;
+	createdAt: number;
+}>({ ttlMs: FIFTEEN_MINUTES });
+
+const stores = [
+	oauthVerifiers,
+	copilotDeviceSessions,
+	xaiDeviceSessions,
+	openAIDeviceSessions,
+	kimiDeviceSessions,
+	githubDeviceSessions,
+	ottorouterDeviceSessions,
+] as const;
+
+const sweepTimer = setInterval(() => {
+	for (const store of stores) store.sweep();
+}, 60_000);
+sweepTimer.unref?.();

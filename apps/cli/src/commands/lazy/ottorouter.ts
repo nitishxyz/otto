@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag } from './helpers.ts';
 
 export function registerOttoRouterCommand(program: Command) {
 	program
@@ -7,11 +6,7 @@ export function registerOttoRouterCommand(program: Command) {
 		.description('Manage OttoRouter wallet and view balance')
 		.option('--login', 'Login/setup OttoRouter wallet')
 		.action(async (options) => {
-			const argv = ['ottorouter'];
-			pushFlag(argv, '--login', options.login);
-			const { registerOttoRouterCommand: register } = await import(
-				'../ottorouter.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { handleOttoRouter } = await import('../ottorouter.ts');
+			await handleOttoRouter(options);
 		});
 }

@@ -480,7 +480,7 @@ describe('agent config merging', () => {
 					body: JSON.stringify({
 						agent: 'general',
 						provider: 'anthropic',
-						model: 'claude-3-sonnet-20240229',
+						model: 'claude-haiku-4-5',
 					}),
 				},
 			);

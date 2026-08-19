@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../openapi/route.ts';
+import { sessionRepository } from '../runtime/session/repository.ts';
 import {
 	getPendingApproval,
 	getPendingApprovalsForSession,
@@ -90,8 +91,11 @@ export function registerSessionApprovalRoute(app: Hono) {
 		},
 		async (c) => {
 			const project = await resolveRequestProject(c);
-			const sessionId = c.req.param('id');
-			const body = resolveApprovalBodySchema.parse(await c.req.json());
+			const { id: sessionId } = c.req.valid('param');
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
+			const body = c.req.valid('json');
 
 			if (!body.callId) {
 				return c.json({ ok: false, error: 'callId is required' }, 400);
@@ -152,7 +156,10 @@ export function registerSessionApprovalRoute(app: Hono) {
 		},
 		async (c) => {
 			const project = await resolveRequestProject(c);
-			const sessionId = c.req.param('id');
+			const { id: sessionId } = c.req.valid('param');
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
 			const pending = getPendingApprovalsForSession(
 				sessionId,
 				project.runtime.root,

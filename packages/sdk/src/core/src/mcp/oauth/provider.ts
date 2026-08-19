@@ -119,6 +119,27 @@ export class OttoOAuthProvider implements OAuthClientProvider {
 		return stored;
 	}
 
+	async invalidateCredentials(
+		scope: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery',
+	): Promise<void> {
+		switch (scope) {
+			case 'all':
+				await this.store.clearServer(this.serverName);
+				break;
+			case 'client':
+				await this.store.clearClientInfo(this.serverName);
+				break;
+			case 'tokens':
+				await this.store.clearTokens(this.serverName);
+				break;
+			case 'verifier':
+				await this.store.clearCodeVerifier(this.serverName);
+				break;
+			case 'discovery':
+				break;
+		}
+	}
+
 	cleanup(): void {
 		this._pendingAuthUrl = null;
 	}

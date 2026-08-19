@@ -38,12 +38,8 @@ export function registerOAuthUrlRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider');
-				const body = await c.req
-					.json<{ mode?: string }>()
-					.catch(() => undefined);
-				const mode: 'max' | 'console' =
-					body?.mode === 'console' ? 'console' : 'max';
+				const { provider } = c.req.valid('param');
+				const { mode } = c.req.valid('json') ?? { mode: 'max' as const };
 
 				let url: string;
 				let verifier: string;
@@ -103,7 +99,7 @@ export function registerOAuthUrlRoute(app: Hono) {
 				}
 
 				const sessionId = crypto.randomUUID();
-				oauthVerifiers.set(sessionId, {
+				oauthVerifiers.create(sessionId, {
 					verifier,
 					provider,
 					createdAt: Date.now(),

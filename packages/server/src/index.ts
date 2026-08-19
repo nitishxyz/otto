@@ -46,7 +46,10 @@ import type {
 	AgentToolConfig,
 } from './runtime/agent/registry.ts';
 import { installAiSdkWarningHandler } from './runtime/ai-sdk-warnings.ts';
-import { createErrorResponse } from './runtime/errors/api-error.ts';
+import {
+	createRequestValidationError,
+	createErrorResponse,
+} from './runtime/errors/api-error.ts';
 import { tunnelAuthMiddleware } from './tunnel-auth.ts';
 
 // Suppress noisy AI SDK provider warnings unless debug mode is enabled.
@@ -148,8 +151,18 @@ function applyErrorHandler(app: OpenAPIHono<BlankEnv>) {
 	});
 }
 
+function createOpenAPIApp() {
+	return new OpenAPIHono<BlankEnv>({
+		defaultHook: (result) => {
+			if (!result.success) {
+				throw createRequestValidationError(result.target, result.error);
+			}
+		},
+	});
+}
+
 function initApp() {
-	const app = new OpenAPIHono<BlankEnv>();
+	const app = createOpenAPIApp();
 	applyPrivateNetworkAccessHeaders(app);
 	app.use('*', cors(buildCorsOptions()));
 	app.use('*', tunnelAuthMiddleware);
@@ -176,7 +189,7 @@ export type StandaloneAppConfig = {
 };
 
 export function createStandaloneApp(_config?: StandaloneAppConfig) {
-	const honoApp = new OpenAPIHono<BlankEnv>();
+	const honoApp = createOpenAPIApp();
 	applyPrivateNetworkAccessHeaders(honoApp);
 	honoApp.use('*', cors(buildCorsOptions()));
 	honoApp.use('*', tunnelAuthMiddleware);
@@ -236,7 +249,7 @@ export type EmbeddedAppConfig = {
 };
 
 export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
-	const honoApp = new OpenAPIHono<BlankEnv>();
+	const honoApp = createOpenAPIApp();
 	applyPrivateNetworkAccessHeaders(honoApp);
 
 	// Store injected config in Hono context for routes to access
@@ -288,6 +301,14 @@ export {
 	type CapabilitySummaryResult,
 	type CapabilitySummaryMCPTool,
 } from './runtime/prompt/capabilities.ts';
+export {
+	APIError,
+	apiErrorResponseSchema,
+	createErrorResponse,
+	createRequestValidationError,
+	serializeError,
+	type APIErrorResponse,
+} from './runtime/errors/api-error.ts';
 export {
 	AskServiceError,
 	handleAskRequest,

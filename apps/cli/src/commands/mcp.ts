@@ -1,4 +1,3 @@
-import type { Command } from 'commander';
 import {
 	listMcpServers,
 	testMcpServer,
@@ -13,79 +12,7 @@ import {
 import { exec } from 'node:child_process';
 import { readDaemonRegistration, readDaemonToken } from '../daemon.ts';
 
-export function registerMCPCommand(program: Command) {
-	const mcp = program
-		.command('mcp')
-		.description('Manage MCP (Model Context Protocol) servers');
-
-	mcp
-		.command('list', { isDefault: true })
-		.description('List configured MCP servers')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async () => {
-			await runMCPList();
-		});
-
-	mcp
-		.command('status')
-		.description('Show running MCP servers and their tools')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async () => {
-			await runMCPStatus();
-		});
-
-	mcp
-		.command('test <name>')
-		.description('Test connection to an MCP server')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (name) => {
-			await runMCPTest(name);
-		});
-
-	mcp
-		.command('add <name>')
-		.description('Add an MCP server to project config')
-		.option('--command <cmd>', 'Command to run (for stdio)')
-		.option('--args <args...>', 'Command arguments')
-		.option('--transport <type>', 'Transport type: stdio, http, sse', 'stdio')
-		.option('--url <url>', 'Server URL (for http/sse)')
-		.option('--header <headers...>', 'Headers (Key: Value)')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.option('--global', 'Add to global config instead of project', false)
-		.action(async (name, opts) => {
-			await runMCPAdd(name, {
-				transport: opts.transport,
-				command: opts.command,
-				args: opts.args,
-				url: opts.url,
-				headers: opts.header,
-				global: opts.global,
-			});
-		});
-
-	mcp
-		.command('remove <name>')
-		.description('Remove an MCP server from config')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.option('--global', 'Remove from global config', false)
-		.action(async (name) => {
-			await runMCPRemove(name);
-		});
-
-	mcp
-		.command('auth <name>')
-		.description('Authenticate with an OAuth MCP server')
-		.option('--revoke', 'Revoke stored credentials', false)
-		.option('--status', 'Show auth status', false)
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (name, opts) => {
-			await runMCPAuth(name, {
-				revoke: opts.revoke,
-				status: opts.status,
-			});
-		});
-}
-
+export { registerMCPCommand } from './lazy/mcp.ts';
 type ServerInfo = {
 	name: string;
 	transport: string;
@@ -101,7 +28,7 @@ type ServerInfo = {
 	env?: Record<string, string>;
 };
 
-async function runMCPList() {
+export async function runMCPList(_project = process.cwd()) {
 	const { data, error } = await listMcpServers();
 
 	if (error || !data) {
@@ -131,7 +58,7 @@ async function runMCPList() {
 	}
 }
 
-async function runMCPStatus() {
+export async function runMCPStatus(_project = process.cwd()) {
 	const { data, error } = await listMcpServers();
 
 	if (error || !data) {
@@ -158,7 +85,7 @@ async function runMCPStatus() {
 	}
 }
 
-async function runMCPTest(name: string) {
+export async function runMCPTest(name: string, _project = process.cwd()) {
 	console.log(`Testing connection to "${name}"...`);
 
 	const { data, error } = await testMcpServer({
@@ -194,7 +121,7 @@ async function runMCPTest(name: string) {
 	console.log('\nServer test passed ✓');
 }
 
-async function runMCPAdd(
+export async function runMCPAdd(
 	name: string,
 	opts: {
 		transport: string;
@@ -250,7 +177,11 @@ async function runMCPAdd(
 	console.log(`Added MCP server "${name}"`);
 }
 
-async function runMCPRemove(name: string) {
+export async function runMCPRemove(
+	name: string,
+	_project = process.cwd(),
+	_global = false,
+) {
 	const { data, error } = await removeMcpServer({
 		path: { name },
 	});
@@ -263,7 +194,7 @@ async function runMCPRemove(name: string) {
 	console.log(`Removed MCP server "${name}"`);
 }
 
-async function runMCPAuth(
+export async function runMCPAuth(
 	name: string,
 	opts: { revoke: boolean; status: boolean },
 ) {

@@ -65,6 +65,9 @@ const askBodySchema = z.object({
 		description:
 			'Inline agent tool configuration split into first-class and loadable tools.',
 	}),
+	skipFileConfig: z.boolean().optional(),
+	config: z.record(z.string(), z.unknown()).optional(),
+	credentials: z.record(z.string(), z.unknown()).optional(),
 });
 
 const askResponseSchema = z.object({
@@ -133,10 +136,7 @@ export function registerAskRoutes(app: Hono) {
 		},
 		async (c) => {
 			const { projectRoot } = await resolveRequestProject(c);
-			const body = (await c.req.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
+			const body = c.req.valid('json') ?? {};
 			const prompt = typeof body.prompt === 'string' ? body.prompt : '';
 			if (!prompt.trim().length) {
 				return c.json({ error: 'Prompt is required.' }, 400);

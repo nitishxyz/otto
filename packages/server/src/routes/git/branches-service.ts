@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Context } from 'hono';
-import { gitCheckoutBranchSchema, gitCreateBranchSchema } from './schemas.ts';
 import { validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
 
@@ -144,8 +143,7 @@ export async function handleListBranches(c: Context) {
 
 export async function handleCheckoutBranch(c: Context) {
 	try {
-		const body = await c.req.json().catch(() => ({}));
-		const { branch } = gitCheckoutBranchSchema.parse(body);
+		const { branch } = c.req.valid('json' as never) as { branch: string };
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
@@ -197,8 +195,11 @@ export async function handleCheckoutBranch(c: Context) {
 
 export async function handleCreateBranch(c: Context) {
 	try {
-		const body = await c.req.json().catch(() => ({}));
-		const { name, startPoint, checkout } = gitCreateBranchSchema.parse(body);
+		const { name, startPoint, checkout } = c.req.valid('json' as never) as {
+			name: string;
+			startPoint?: string;
+			checkout: boolean;
+		};
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);

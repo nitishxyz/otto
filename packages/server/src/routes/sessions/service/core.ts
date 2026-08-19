@@ -3,6 +3,7 @@ import { messageParts, messages, sessions } from '@ottocode/database/schema';
 import { loadConfig } from '@ottocode/sdk';
 import { eq, inArray } from 'drizzle-orm';
 import { touchProject } from '../../../runtime/projects/registry.ts';
+import { sessionRepository } from '../../../runtime/session/repository.ts';
 import type { ProjectDbContext } from './types.ts';
 
 export async function loadProjectDb(
@@ -19,7 +20,9 @@ export async function loadProjectDb(
 export async function findSessionById(
 	db: ProjectDbContext['db'],
 	sessionId: string,
+	projectRoot?: string,
 ) {
+	if (projectRoot) return sessionRepository(db, projectRoot).find(sessionId);
 	const rows = await db
 		.select()
 		.from(sessions)

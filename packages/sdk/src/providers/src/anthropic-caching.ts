@@ -111,8 +111,8 @@ export function createConditionalCachingFetch(
 	shouldCache: (model: string) => boolean,
 	model: string,
 	baseFetch: typeof fetch = fetch,
-): FetchLike {
-	return async (input, init) => {
+): typeof fetch {
+	const cachingFetch: FetchLike = async (input, init) => {
 		if (!shouldCache(model)) {
 			return baseFetch(input, init);
 		}
@@ -207,4 +207,6 @@ export function createConditionalCachingFetch(
 
 		return baseFetch(input, { ...init, body });
 	};
+
+	return Object.assign(cachingFetch, { preconnect: baseFetch.preconnect });
 }

@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process';
-import { randomBytes, createHash } from 'node:crypto';
 import { createServer } from 'node:http';
+import { openBrowser } from './open-browser';
+import { createOAuthState, createPkcePair } from './oauth-primitives';
 
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const OPENAI_ISSUER = 'https://auth.openai.com';
@@ -8,57 +8,6 @@ const OPENAI_CALLBACK_PORT = 1455;
 const OPENAI_DEVICE_CALLBACK_URI = `${OPENAI_ISSUER}/deviceauth/callback`;
 const OPENAI_DEVICE_AUTH_URL = `${OPENAI_ISSUER}/api/accounts/deviceauth`;
 const OPENAI_DEVICE_VERIFICATION_URI = `${OPENAI_ISSUER}/codex/device`;
-
-function generatePKCE() {
-	const verifier = randomBytes(32)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	const challenge = createHash('sha256')
-		.update(verifier)
-		.digest('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	return { verifier, challenge };
-}
-
-function generateState() {
-	return randomBytes(32)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-}
-
-async function openBrowser(url: string) {
-	const platform = process.platform;
-	let command: string;
-
-	switch (platform) {
-		case 'darwin':
-			command = `open "${url}"`;
-			break;
-		case 'win32':
-			command = `start "${url}"`;
-			break;
-		default:
-			command = `xdg-open "${url}"`;
-			break;
-	}
-
-	return new Promise<void>((resolve, reject) => {
-		const child = spawn(command, [], { shell: true });
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(`Failed to open browser (exit code ${code})`));
-		});
-	});
-}
 
 export type OpenAIOAuthResult = {
 	url: string;
@@ -242,8 +191,8 @@ async function exchangeOpenAIWithRedirect(
 }
 
 export async function authorizeOpenAI(): Promise<OpenAIOAuthResult> {
-	const pkce = generatePKCE();
-	const state = generateState();
+	const pkce = createPkcePair();
+	const state = createOAuthState();
 	const redirectUri = `http://localhost:${OPENAI_CALLBACK_PORT}/auth/callback`;
 
 	const params = new URLSearchParams({
@@ -475,8 +424,8 @@ export function authorizeOpenAIWeb(redirectUri: string): {
 	verifier: string;
 	state: string;
 } {
-	const pkce = generatePKCE();
-	const state = generateState();
+	const pkce = createPkcePair();
+	const state = createOAuthState();
 
 	const params = new URLSearchParams({
 		response_type: 'code',

@@ -17,6 +17,10 @@ export {
 } from './validator.ts';
 
 export { parseSkillFile, extractFrontmatter } from './parser.ts';
+export {
+	extractSkillFrontmatter,
+	normalizeSkillFrontmatter,
+} from './frontmatter.ts';
 
 export {
 	discoverSkills,

@@ -7,7 +7,7 @@ import {
 	subscribeProjectEvents,
 } from '../events/bus.ts';
 import {
-	createSSEByteStrategy,
+	createSSEResponse,
 	encodeSSEComment,
 	encodeSSEEvent,
 	SSE_QUEUE_HIGH_WATER_MARK_BYTES,
@@ -46,160 +46,109 @@ async function handleProjectEventsStream(c: Context) {
 		sessionsParam === undefined
 			? null
 			: new Set(sessionsParam.split(',').filter(Boolean));
-	const headers = new Headers({
-		'Content-Type': 'text/event-stream',
-		'Cache-Control': 'no-cache, no-transform',
-		Connection: 'keep-alive',
-		'X-Accel-Buffering': 'no',
-	});
-
-	let cleanedUp = false;
-	let cleanup = () => {};
 	const metrics = trackProjectSSEStream();
+	return createSSEResponse({
+		signal: c.req.raw?.signal,
+		heartbeat: {
+			intervalMs: 5000,
+			createChunk: () => encodeSSEComment(`hb ${Date.now()}`),
+		},
+		onBackpressure(chunk) {
+			metrics.markDropped();
+			logger.warn('[sse] dropping backpressured project stream', {
+				projectId: project.projectId,
+				projectRoot: project.projectRoot,
+				chunkBytes: chunk.byteLength,
+			});
+		},
+		onEnqueue(_chunk, desiredSize) {
+			metrics.updateQueued(
+				SSE_QUEUE_HIGH_WATER_MARK_BYTES -
+					(desiredSize ?? SSE_QUEUE_HIGH_WATER_MARK_BYTES),
+			);
+		},
+		start({ send: lifecycleSend, onCleanup }) {
+			onCleanup(metrics.close);
+			onCleanup(releaseProject);
+			const send = lifecycleSend;
+			const acceptsSession = (evt: {
+				projectId?: string;
+				projectRoot?: string;
+				sessionId: string;
+			}) => {
+				if (evt.projectId && evt.projectId !== project.projectId) return;
+				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
+				if (sessionFilter && !sessionFilter.has(evt.sessionId)) return;
+				return true;
+			};
 
-	const stream = new ReadableStream<Uint8Array>(
-		{
-			start(controller) {
-				let unsubscribeProjectRoot = () => {};
-				let unsubscribeProjectId = () => {};
-				let unsubscribeLegacy = () => {};
-				let unsubscribeClient = () => {};
-				let hb: ReturnType<typeof setInterval> | null = null;
+			const writeSession = (evt: OttoEvent, replay: ProjectReplayRecord) => {
+				if (!acceptsSession(evt)) return;
+				send(replay.chunk);
+			};
 
-				cleanup = () => {
-					if (cleanedUp) return;
-					cleanedUp = true;
-					if (hb !== null) clearInterval(hb);
-					unsubscribeProjectRoot();
-					unsubscribeProjectId();
-					unsubscribeLegacy();
-					unsubscribeClient();
-					metrics.close();
-					releaseProject();
-					try {
-						controller.close();
-					} catch {}
-				};
+			const acceptsClient = (evt: ClientEvent) => {
+				const payload = evt.payload;
+				if (
+					'projectId' in payload &&
+					payload.projectId &&
+					payload.projectId !== project.projectId
+				) {
+					return false;
+				}
+				if (
+					'projectRoot' in payload &&
+					payload.projectRoot &&
+					payload.projectRoot !== project.projectRoot
+				) {
+					return false;
+				}
+				return true;
+			};
 
-				const send = (chunk: Uint8Array) => {
-					try {
-						controller.enqueue(chunk);
-						metrics.updateQueued(
-							SSE_QUEUE_HIGH_WATER_MARK_BYTES -
-								(controller.desiredSize ?? SSE_QUEUE_HIGH_WATER_MARK_BYTES),
-						);
-						if ((controller.desiredSize ?? 0) < 0) {
-							metrics.markDropped();
-							logger.warn('[sse] dropping backpressured project stream', {
-								projectId: project.projectId,
-								projectRoot: project.projectRoot,
-								chunkBytes: chunk.byteLength,
-							});
-							cleanup();
-						}
-					} catch {
-						cleanup();
-					}
-				};
+			const writeClient = (evt: ClientEvent, replay: ProjectReplayRecord) => {
+				if (!acceptsClient(evt)) return;
+				send(replay.chunk);
+			};
 
-				const acceptsSession = (evt: {
-					projectId?: string;
-					projectRoot?: string;
-					sessionId: string;
-				}) => {
-					if (evt.projectId && evt.projectId !== project.projectId) return;
-					if (evt.projectRoot && evt.projectRoot !== project.runtime.root)
-						return;
-					if (sessionFilter && !sessionFilter.has(evt.sessionId)) return;
-					return true;
-				};
-
-				const writeSession = (evt: OttoEvent, replay: ProjectReplayRecord) => {
-					if (!acceptsSession(evt)) return;
-					send(replay.chunk);
-				};
-
-				const acceptsClient = (evt: ClientEvent) => {
-					const payload = evt.payload;
-					if (
-						'projectId' in payload &&
-						payload.projectId &&
-						payload.projectId !== project.projectId
-					) {
-						return false;
-					}
-					if (
-						'projectRoot' in payload &&
-						payload.projectRoot &&
-						payload.projectRoot !== project.projectRoot
-					) {
-						return false;
-					}
-					return true;
-				};
-
-				const writeClient = (evt: ClientEvent, replay: ProjectReplayRecord) => {
-					if (!acceptsClient(evt)) return;
-					send(replay.chunk);
-				};
-
-				unsubscribeProjectRoot = subscribeProjectEvents(
-					project.runtime.root,
-					writeSession,
+			onCleanup(subscribeProjectEvents(project.runtime.root, writeSession));
+			onCleanup(subscribeProjectEvents(project.projectId, writeSession));
+			onCleanup(subscribeProjectEvents(undefined, writeSession));
+			onCleanup(subscribeClientEvents(writeClient));
+			if (lastEventId) {
+				const replay = getProjectReplay(
+					[project.runtime.root, project.projectId, undefined],
+					lastEventId,
 				);
-				unsubscribeProjectId = subscribeProjectEvents(
-					project.projectId,
-					writeSession,
-				);
-				unsubscribeLegacy = subscribeProjectEvents(undefined, writeSession);
-				unsubscribeClient = subscribeClientEvents(writeClient);
-				if (lastEventId) {
-					const replay = getProjectReplay(
-						[project.runtime.root, project.projectId, undefined],
-						lastEventId,
-					);
-					for (const record of replay.records) {
-						if (
-							record.kind === 'session' &&
-							acceptsSession({
-								projectId: record.projectId,
-								projectRoot: record.projectRoot,
-								sessionId: record.sessionId ?? '',
-							})
-						) {
-							send(record.chunk);
-						} else if (record.kind === 'client') {
-							const projectMatches =
-								(!record.projectId || record.projectId === project.projectId) &&
-								(!record.projectRoot ||
-									record.projectRoot === project.projectRoot);
-							if (projectMatches) send(record.chunk);
-						}
-					}
-					if (replay.missed) {
-						send(
-							encodeSSEEvent('stream.replay.missed', {
-								payload: { lastEventId },
-							}),
-						);
+				for (const record of replay.records) {
+					if (
+						record.kind === 'session' &&
+						acceptsSession({
+							projectId: record.projectId,
+							projectRoot: record.projectRoot,
+							sessionId: record.sessionId ?? '',
+						})
+					) {
+						send(record.chunk);
+					} else if (record.kind === 'client') {
+						const projectMatches =
+							(!record.projectId || record.projectId === project.projectId) &&
+							(!record.projectRoot ||
+								record.projectRoot === project.projectRoot);
+						if (projectMatches) send(record.chunk);
 					}
 				}
-				send(encodeSSEComment('connected project-events'));
-				hb = setInterval(() => {
-					send(encodeSSEComment(`hb ${Date.now()}`));
-				}, 5000);
-
-				const signal = c.req.raw?.signal as AbortSignal | undefined;
-				signal?.addEventListener('abort', cleanup, { once: true });
-			},
-			cancel() {
-				cleanup();
-			},
+				if (replay.missed) {
+					send(
+						encodeSSEEvent('stream.replay.missed', {
+							payload: { lastEventId },
+						}),
+					);
+				}
+			}
+			send(encodeSSEComment('connected project-events'));
 		},
-		createSSEByteStrategy(),
-	);
-
-	return new Response(stream, { headers });
+	});
 }
 
 export function registerProjectEventsRoute(app: Hono) {

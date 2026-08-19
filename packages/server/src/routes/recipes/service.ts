@@ -22,13 +22,13 @@ async function projectRootFromQuery(c: Context): Promise<string> {
 }
 
 function listScopeFromQuery(c: Context): ListRecipesScope {
-	const scope = c.req.query('scope');
+	const { scope } = c.req.valid('query' as never) as { scope?: string };
 	if (scope === 'project' || scope === 'global') return scope;
 	return 'all';
 }
 
 function recipeScopeFromQuery(c: Context): RecipeScope {
-	const scope = c.req.query('scope');
+	const { scope } = c.req.valid('query' as never) as { scope?: string };
 	return scope === 'global' ? 'global' : 'project';
 }
 
@@ -40,7 +40,9 @@ function jsonError(c: Context, message: string, error: unknown) {
 }
 
 function validateRecipeNameRoute(c: Context): string | null {
-	const name = c.req.param('name')?.toLowerCase();
+	const name = (
+		c.req.valid('param' as never) as { name: string }
+	).name.toLowerCase();
 	if (!name || !isValidRecipeName(name)) {
 		return null;
 	}
@@ -109,7 +111,7 @@ export async function upsertRecipe(c: Context) {
 		const name = validateRecipeNameRoute(c);
 		if (!name) return c.json({ error: 'Invalid recipe name' }, 400);
 
-		const body = await c.req.json<{ content?: string }>();
+		const body = c.req.valid('json' as never) as { content?: string };
 		const content = body.content;
 		if (typeof content !== 'string' || !content.trim()) {
 			return c.json({ error: 'Recipe content is required' }, 400);

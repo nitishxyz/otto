@@ -73,10 +73,10 @@ export function registerSubagentsRoutes(app: Hono) {
 		async (c) => {
 			try {
 				const projectRoot = await resolveRequestProjectRoot(c);
-				const status = c.req.query('status');
+				const { status } = c.req.valid('query');
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const records = await listSubagentsForSession(db, sessionId);
 				const filtered = status
 					? records.filter((record) => record.status === status)

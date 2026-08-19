@@ -46,7 +46,7 @@ export class MCPServerManager {
 		await this.stopAll();
 
 		for (const config of configs) {
-			if (config.disabled) continue;
+			if (config.disabled !== false) continue;
 			this.serverScopes.set(config.name, config.scope ?? 'global');
 			await this.startSingleServer(config);
 		}

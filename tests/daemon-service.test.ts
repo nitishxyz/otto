@@ -17,6 +17,7 @@ import {
 	readDaemonRegistration,
 	readActiveDaemonSelection,
 	removeDaemonRegistration,
+	restartDaemon,
 	rotateDaemonPassword,
 	startDaemon,
 	stopDaemon,
@@ -264,6 +265,23 @@ describe('daemon service', () => {
 		expect(await readActiveDaemonSelection('1.2.5', { paths })).toBeNull();
 	});
 
+	it('uses canonical release parsing for active daemon selection', async () => {
+		const paths = await createDaemonPaths();
+		const activePath = join(paths.dir, 'upgrades', '1.2.4', 'otto');
+		await mkdir(join(paths.dir, 'upgrades', '1.2.4'), { recursive: true });
+		await Bun.write(activePath, 'binary');
+		await writeActiveDaemonSelection(
+			{ path: activePath, version: 'v1.2.4' },
+			{ paths },
+		);
+
+		expect(await readActiveDaemonSelection('1.2.4', { paths })).toEqual({
+			path: activePath,
+			version: 'v1.2.4',
+		});
+		expect(await readActiveDaemonSelection('invalid', { paths })).toBeNull();
+	});
+
 	it('stores default daemon files under global state', () => {
 		const originalOttoHome = process.env.OTTO_HOME;
 		process.env.OTTO_HOME = '/tmp/otto-state-home';
@@ -386,21 +404,26 @@ describe('daemon service', () => {
 		const signaled: Array<[number, NodeJS.Signals | number | undefined]> = [];
 		await ensureDaemonToken({ paths });
 		await writeDaemonRegistration(reg, { paths });
+		let shuttingDown = false;
 
 		const stopped = await stopDaemon({
 			paths,
 			fetch: async () =>
-				jsonResponse({
-					port: 12345,
-					version: '1.2.2',
-					pid: reg.pid,
-					daemonId: reg.id,
-					startedAt: 2000,
-				}),
+				shuttingDown
+					? jsonResponse({ error: 'stopped' }, 503)
+					: jsonResponse({
+							port: 12345,
+							version: '1.2.2',
+							pid: reg.pid,
+							daemonId: reg.id,
+							startedAt: 2000,
+						}),
 			signal: (pid, signal) => {
 				signaled.push([pid, signal]);
+				shuttingDown = true;
 				return true;
 			},
+			isProcessAlive: () => !shuttingDown,
 		});
 
 		expect(stopped).toBe(true);
@@ -412,6 +435,7 @@ describe('daemon service', () => {
 		const paths = await createDaemonPaths();
 		const oldReg = registration({ version: '1.2.2' });
 		const signaled: Array<[number, NodeJS.Signals | number | undefined]> = [];
+		let oldDaemonRunning = true;
 		await ensureDaemonToken({ paths });
 		await writeDaemonRegistration(oldReg, { paths });
 
@@ -422,6 +446,18 @@ describe('daemon service', () => {
 			port: 49_124,
 			fetch: async (url) => {
 				const registered = await readDaemonRegistration({ paths });
+				if (oldDaemonRunning && registered?.id === oldReg.id) {
+					return jsonResponse({
+						port: Number(new URL(String(url)).port),
+						version: oldReg.version,
+						pid: oldReg.pid,
+						daemonId: oldReg.id,
+						startedAt: oldReg.startedAt,
+					});
+				}
+				if (!registered || registered.id === oldReg.id) {
+					return jsonResponse({ error: 'stopped' }, 503);
+				}
 				return jsonResponse({
 					port: Number(new URL(String(url)).port),
 					version: registered?.version ?? oldReg.version,
@@ -432,8 +468,10 @@ describe('daemon service', () => {
 			},
 			signal: (pid, signal) => {
 				signaled.push([pid, signal]);
+				oldDaemonRunning = false;
 				return true;
 			},
+			isProcessAlive: () => oldDaemonRunning,
 			spawn: ((options) => {
 				const id = options.env?.OTTO_DAEMON_ID;
 				expect(typeof id).toBe('string');
@@ -457,6 +495,225 @@ describe('daemon service', () => {
 		expect(signaled).toEqual([[oldReg.pid, 'SIGTERM']]);
 		expect(ensured.version).toBe('1.2.3');
 		expect(ensured.url).toBe('http://127.0.0.1:49124');
+	});
+
+	it('keeps registration while delayed SIGTERM shutdown is in progress', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+		let signaled = false;
+		let polls = 0;
+
+		await stopDaemon({
+			paths,
+			fetch: async () =>
+				signaled && polls >= 2
+					? jsonResponse({ error: 'stopped' }, 503)
+					: jsonResponse({
+							port: 12345,
+							version: reg.version,
+							pid: reg.pid,
+							daemonId: reg.id,
+							startedAt: reg.startedAt,
+						}),
+			signal: () => {
+				signaled = true;
+				return true;
+			},
+			isProcessAlive: () => !signaled || polls < 2,
+			sleep: async () => {
+				expect(await readDaemonRegistration({ paths })).toEqual(reg);
+				polls++;
+			},
+		});
+
+		expect(polls).toBe(2);
+		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('preserves registration when shutdown confirmation times out', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+		const healthy = () =>
+			jsonResponse({
+				port: 12345,
+				version: reg.version,
+				pid: reg.pid,
+				daemonId: reg.id,
+				startedAt: reg.startedAt,
+			});
+
+		await expect(
+			stopDaemon({
+				paths,
+				fetch: async () => healthy(),
+				signal: () => true,
+				isProcessAlive: () => true,
+				shutdownTimeoutMs: 0,
+			}),
+		).rejects.toThrow(
+			`Timed out waiting for daemon process ${reg.pid} to stop`,
+		);
+		expect(await readDaemonRegistration({ paths })).toEqual(reg);
+	});
+
+	it('waits for the same port to be released before restart spawn', async () => {
+		const paths = await createDaemonPaths();
+		const oldReg = registration({ url: 'http://127.0.0.1:49125' });
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(oldReg, { paths });
+		let oldRunning = true;
+		let portChecks = 0;
+		let spawnedAfterRelease = false;
+
+		const restarted = await restartDaemon({
+			version: oldReg.version,
+			paths,
+			projectRoot: '/tmp/project',
+			port: 49_125,
+			fetch: async () => {
+				const current = await readDaemonRegistration({ paths });
+				if (oldRunning || current?.id === oldReg.id) {
+					return oldRunning
+						? jsonResponse({
+								port: 49_125,
+								version: oldReg.version,
+								pid: oldReg.pid,
+								daemonId: oldReg.id,
+								startedAt: oldReg.startedAt,
+							})
+						: jsonResponse({ error: 'stopped' }, 503);
+				}
+				return jsonResponse({
+					port: 49_125,
+					version: current?.version,
+					pid: current?.pid,
+					daemonId: current?.id,
+					startedAt: current?.startedAt,
+				});
+			},
+			signal: () => {
+				oldRunning = false;
+				return true;
+			},
+			isProcessAlive: () => oldRunning,
+			isPortAvailable: async () => {
+				portChecks++;
+				return portChecks >= 2;
+			},
+			sleep: async () => {},
+			spawn: ((options) => {
+				spawnedAfterRelease = portChecks >= 2;
+				const id = String(options.env?.OTTO_DAEMON_ID);
+				void writeDaemonRegistration(
+					registration({
+						id,
+						url: oldReg.url,
+						pid: 49_125,
+						startedAt: 3000,
+					}),
+					{ paths },
+				);
+				return {
+					unref: () => {},
+					exited: new Promise(() => {}),
+				} as ReturnType<typeof Bun.spawn>;
+			}) as typeof Bun.spawn,
+		});
+
+		expect(spawnedAfterRelease).toBe(true);
+		expect(restarted.pid).toBe(49_125);
+	});
+
+	it('blocks token rotation for an authenticated version-stale daemon', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration({ version: '1.2.2' });
+		const token = await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+
+		await expect(
+			rotateDaemonPassword({
+				paths,
+				fetch: async () =>
+					jsonResponse({
+						port: 12345,
+						version: reg.version,
+						pid: reg.pid,
+						daemonId: reg.id,
+						startedAt: reg.startedAt,
+					}),
+			}),
+		).rejects.toThrow('Stop the daemon before rotating its token.');
+		expect((await Bun.file(paths.tokenPath).text()).trim()).toBe(token);
+	});
+
+	it('handles ESRCH and already-dead daemon registrations', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+		let healthCalls = 0;
+
+		const stopped = await stopDaemon({
+			paths,
+			fetch: async () =>
+				++healthCalls === 1
+					? jsonResponse({
+							port: 12345,
+							version: reg.version,
+							pid: reg.pid,
+							daemonId: reg.id,
+							startedAt: reg.startedAt,
+						})
+					: jsonResponse({ error: 'stopped' }, 503),
+			signal: () => {
+				throw Object.assign(new Error('no such process'), { code: 'ESRCH' });
+			},
+			isProcessAlive: () => false,
+		});
+		expect(stopped).toBe(false);
+		expect(await readDaemonRegistration({ paths })).toBeNull();
+
+		await writeDaemonRegistration(reg, { paths });
+		expect(
+			await stopDaemon({
+				paths,
+				fetch: async () => jsonResponse({ error: 'stopped' }, 503),
+				isProcessAlive: () => false,
+			}),
+		).toBe(false);
+		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('does not signal or remove a daemon with mismatched authenticated identity', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+		let signals = 0;
+
+		expect(
+			await stopDaemon({
+				paths,
+				fetch: async () =>
+					jsonResponse({
+						port: 12345,
+						version: reg.version,
+						pid: reg.pid,
+						daemonId: 'replacement-id',
+						startedAt: reg.startedAt,
+					}),
+				signal: () => {
+					signals++;
+					return true;
+				},
+			}),
+		).toBe(false);
+		expect(signals).toBe(0);
+		expect(await readDaemonRegistration({ paths })).toEqual(reg);
 	});
 
 	it('does not replace a healthy daemon with an older CLI version', async () => {

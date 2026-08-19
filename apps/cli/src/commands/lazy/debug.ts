@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand } from './helpers.ts';
 
 export function registerDebugCommand(program: Command) {
 	const debug = program
@@ -10,31 +9,31 @@ export function registerDebugCommand(program: Command) {
 		.command('on [scopes...]')
 		.description('Enable debug logging globally, optionally limited to scopes')
 		.action(async (scopes: string[] = []) => {
-			const { registerDebugCommand: register } = await import('../debug.ts');
-			await dispatchRegisteredCommand(register, ['debug', 'on', ...scopes]);
+			const { enableDebug } = await import('../debug.ts');
+			await enableDebug(scopes);
 		});
 
 	debug
 		.command('off')
 		.description('Disable debug logging globally')
 		.action(async () => {
-			const { registerDebugCommand: register } = await import('../debug.ts');
-			await dispatchRegisteredCommand(register, ['debug', 'off']);
+			const { disableDebug } = await import('../debug.ts');
+			await disableDebug();
 		});
 
 	debug
 		.command('status')
 		.description('Show current debug logging status')
 		.action(async () => {
-			const { registerDebugCommand: register } = await import('../debug.ts');
-			await dispatchRegisteredCommand(register, ['debug', 'status']);
+			const { showDebugStatus } = await import('../debug.ts');
+			await showDebugStatus();
 		});
 
 	debug
 		.command('path')
 		.description('Print the main debug log path')
 		.action(async () => {
-			const { registerDebugCommand: register } = await import('../debug.ts');
-			await dispatchRegisteredCommand(register, ['debug', 'path']);
+			const { printDebugPath } = await import('../debug.ts');
+			printDebugPath();
 		});
 }

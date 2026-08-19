@@ -192,11 +192,24 @@ async function runWhisperCli(
 	if (exitCode !== 0) {
 		throw new DictationTranscriptionError(
 			'DICTATION_TRANSCRIBE_FAILED',
-			stderr.trim() || stdout.trim() || `whisper.cpp exited with ${exitCode}`,
+			formatWhisperCliFailure(exitCode, stdout, stderr),
 		);
 	}
 
 	return { stdout, stderr };
+}
+
+function formatWhisperCliFailure(
+	exitCode: number,
+	stdout: string,
+	stderr: string,
+): string {
+	const output = stderr.trim() || stdout.trim();
+	if (process.platform === 'linux' && exitCode === 132) {
+		return `whisper.cpp stopped on an unsupported CPU instruction (exit code 132). Upgrade Otto or set OTTO_WHISPER_CLI to a locally built whisper-cli.${output ? ` ${output}` : ''}`;
+	}
+	if (output) return output;
+	return `whisper.cpp exited with ${exitCode}`;
 }
 
 async function resolveWhisperBinary(): Promise<string | null> {

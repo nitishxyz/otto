@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { registerSessionSecureInputRoute } from '../packages/server/src/routes/session-secure-input.ts';
 import { getProjectManager } from '../packages/server/src/runtime/projects/manager.ts';
+import { createSession } from '../packages/server/src/runtime/session/manager.ts';
 import { requestSecureInput } from '../packages/server/src/runtime/tools/secure-input.ts';
 
 function createSecureInputApp() {
@@ -16,6 +17,12 @@ function createSecureInputApp() {
 describe('session secure input routes', () => {
 	let projectDir: string;
 	let projectRoot: string;
+	let sessionOne: string;
+	let sessionTwo: string;
+	let cacheSession: string;
+	let expirySession: string;
+	let retrySession: string;
+	let previousOpenAIKey: string | undefined;
 
 	beforeAll(async () => {
 		projectDir = await mkdtemp(join(tmpdir(), 'otto-secure-input-'));
@@ -23,9 +30,30 @@ describe('session secure input routes', () => {
 			path: projectDir,
 		});
 		projectRoot = runtime.root;
+		previousOpenAIKey = process.env.OPENAI_API_KEY;
+		process.env.OPENAI_API_KEY = 'test-key';
+		const createOwnedSession = async () =>
+			createSession({
+				db: runtime.db,
+				cfg: runtime.cfg,
+				agent: 'build',
+				provider: 'openai',
+				model: 'gpt-4.1',
+			});
+		[sessionOne, sessionTwo, cacheSession, expirySession, retrySession] = (
+			await Promise.all([
+				createOwnedSession(),
+				createOwnedSession(),
+				createOwnedSession(),
+				createOwnedSession(),
+				createOwnedSession(),
+			])
+		).map((session) => session.id);
 	});
 
 	afterAll(async () => {
+		if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+		else process.env.OPENAI_API_KEY = previousOpenAIKey;
 		await rm(projectDir, { recursive: true, force: true });
 	});
 
@@ -37,14 +65,14 @@ describe('session secure input routes', () => {
 		const app = createSecureInputApp();
 		const pendingValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-1',
+			sessionId: sessionOne,
 			messageId: 'message-1',
 			prompt: 'Password:',
 			timeoutMs: 10_000,
 		});
 
 		const listRes = await app.request(
-			projectUrl('/v1/sessions/session-1/secure-input/pending'),
+			projectUrl(`/v1/sessions/${sessionOne}/secure-input/pending`),
 		);
 		expect(listRes.status).toBe(200);
 		const list = await listRes.json();
@@ -56,7 +84,7 @@ describe('session secure input routes', () => {
 		expect(list.pending[0].allowEmpty).toBe(false);
 
 		const cancelRes = await app.request(
-			projectUrl('/v1/sessions/session-1/secure-input'),
+			projectUrl(`/v1/sessions/${sessionOne}/secure-input`),
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -70,7 +98,7 @@ describe('session secure input routes', () => {
 		expect(await pendingValue).toBeNull();
 
 		const repeatedCancelRes = await app.request(
-			projectUrl('/v1/sessions/session-1/secure-input'),
+			projectUrl(`/v1/sessions/${sessionOne}/secure-input`),
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -92,7 +120,7 @@ describe('session secure input routes', () => {
 		const app = createSecureInputApp();
 		const pendingValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-2',
+			sessionId: sessionTwo,
 			messageId: 'message-2',
 			callId: 'call-2',
 			prompt: '[sudo] password for user:',
@@ -100,13 +128,13 @@ describe('session secure input routes', () => {
 		});
 
 		const listRes = await app.request(
-			projectUrl('/v1/sessions/session-2/secure-input/pending'),
+			projectUrl(`/v1/sessions/${sessionTwo}/secure-input/pending`),
 		);
 		const list = await listRes.json();
 		const promptId = list.pending[0].promptId;
 
 		const resolveRes = await app.request(
-			projectUrl('/v1/sessions/session-2/secure-input'),
+			projectUrl(`/v1/sessions/${sessionTwo}/secure-input`),
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -128,7 +156,7 @@ describe('session secure input routes', () => {
 		const cacheKey = `test-cache-${crypto.randomUUID()}`;
 		const firstValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-cache',
+			sessionId: cacheSession,
 			messageId: 'message-cache-1',
 			prompt: 'Password for cache test:',
 			cacheKey,
@@ -136,12 +164,12 @@ describe('session secure input routes', () => {
 		});
 
 		const listRes = await app.request(
-			projectUrl('/v1/sessions/session-cache/secure-input/pending'),
+			projectUrl(`/v1/sessions/${cacheSession}/secure-input/pending`),
 		);
 		const list = await listRes.json();
 		const promptId = list.pending[0].promptId;
 		const resolveRes = await app.request(
-			projectUrl('/v1/sessions/session-cache/secure-input'),
+			projectUrl(`/v1/sessions/${cacheSession}/secure-input`),
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -158,7 +186,7 @@ describe('session secure input routes', () => {
 		expect(
 			await requestSecureInput({
 				projectRoot,
-				sessionId: 'session-cache',
+				sessionId: cacheSession,
 				messageId: 'message-cache-2',
 				prompt: 'Password for cache test:',
 				cacheKey,
@@ -166,7 +194,7 @@ describe('session secure input routes', () => {
 		).toBe('remembered-secret');
 
 		const pendingRes = await app.request(
-			projectUrl('/v1/sessions/session-cache/secure-input/pending'),
+			projectUrl(`/v1/sessions/${cacheSession}/secure-input/pending`),
 		);
 		expect((await pendingRes.json()).pending).toHaveLength(0);
 	});
@@ -176,7 +204,7 @@ describe('session secure input routes', () => {
 		const cacheKey = `test-expiry-${crypto.randomUUID()}`;
 		const firstValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-expiry',
+			sessionId: expirySession,
 			messageId: 'message-expiry-1',
 			prompt: 'Password for expiry test:',
 			cacheKey,
@@ -185,24 +213,27 @@ describe('session secure input routes', () => {
 		});
 		const firstList = await (
 			await app.request(
-				projectUrl('/v1/sessions/session-expiry/secure-input/pending'),
+				projectUrl(`/v1/sessions/${expirySession}/secure-input/pending`),
 			)
 		).json();
-		await app.request(projectUrl('/v1/sessions/session-expiry/secure-input'), {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				promptId: firstList.pending[0].promptId,
-				value: 'short-lived-secret',
-				remember: true,
-			}),
-		});
+		await app.request(
+			projectUrl(`/v1/sessions/${expirySession}/secure-input`),
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					promptId: firstList.pending[0].promptId,
+					value: 'short-lived-secret',
+					remember: true,
+				}),
+			},
+		);
 		expect(await firstValue).toBe('short-lived-secret');
 
 		await Bun.sleep(10);
 		const secondValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-expiry',
+			sessionId: expirySession,
 			messageId: 'message-expiry-2',
 			prompt: 'Password for expiry test:',
 			cacheKey,
@@ -210,18 +241,21 @@ describe('session secure input routes', () => {
 		});
 		const secondList = await (
 			await app.request(
-				projectUrl('/v1/sessions/session-expiry/secure-input/pending'),
+				projectUrl(`/v1/sessions/${expirySession}/secure-input/pending`),
 			)
 		).json();
 		expect(secondList.pending).toHaveLength(1);
-		await app.request(projectUrl('/v1/sessions/session-expiry/secure-input'), {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				promptId: secondList.pending[0].promptId,
-				cancelled: true,
-			}),
-		});
+		await app.request(
+			projectUrl(`/v1/sessions/${expirySession}/secure-input`),
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					promptId: secondList.pending[0].promptId,
+					cancelled: true,
+				}),
+			},
+		);
 		expect(await secondValue).toBeNull();
 	});
 
@@ -230,7 +264,7 @@ describe('session secure input routes', () => {
 		const cacheKey = `test-retry-${crypto.randomUUID()}`;
 		const firstValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-retry',
+			sessionId: retrySession,
 			messageId: 'message-retry-1',
 			prompt: 'Password for retry test:',
 			cacheKey,
@@ -238,10 +272,10 @@ describe('session secure input routes', () => {
 		});
 		const firstList = await (
 			await app.request(
-				projectUrl('/v1/sessions/session-retry/secure-input/pending'),
+				projectUrl(`/v1/sessions/${retrySession}/secure-input/pending`),
 			)
 		).json();
-		await app.request(projectUrl('/v1/sessions/session-retry/secure-input'), {
+		await app.request(projectUrl(`/v1/sessions/${retrySession}/secure-input`), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -254,7 +288,7 @@ describe('session secure input routes', () => {
 
 		const retryValue = requestSecureInput({
 			projectRoot,
-			sessionId: 'session-retry',
+			sessionId: retrySession,
 			messageId: 'message-retry-2',
 			prompt: 'Password for retry test:',
 			cacheKey,
@@ -263,11 +297,11 @@ describe('session secure input routes', () => {
 		});
 		const retryList = await (
 			await app.request(
-				projectUrl('/v1/sessions/session-retry/secure-input/pending'),
+				projectUrl(`/v1/sessions/${retrySession}/secure-input/pending`),
 			)
 		).json();
 		expect(retryList.pending).toHaveLength(1);
-		await app.request(projectUrl('/v1/sessions/session-retry/secure-input'), {
+		await app.request(projectUrl(`/v1/sessions/${retrySession}/secure-input`), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({

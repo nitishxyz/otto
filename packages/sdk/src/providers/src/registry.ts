@@ -13,6 +13,7 @@ import {
 } from './utils.ts';
 import type {
 	BuiltInProviderId,
+	BuiltInProviderDescriptor,
 	OttoConfig,
 	ProviderCompatibility,
 	ProviderId,
@@ -20,6 +21,7 @@ import type {
 	ProviderSettingsEntry,
 	ModelInfoMap,
 } from '../../types/src/index.ts';
+import { BUILT_IN_PROVIDER_DESCRIPTORS } from '../../types/src/provider-descriptors.ts';
 
 export type ResolvedProviderDefinition = {
 	id: ProviderId;
@@ -34,48 +36,6 @@ export type ResolvedProviderDefinition = {
 	allowAnyModel: boolean;
 };
 
-const BUILTIN_COMPATIBILITY: Record<BuiltInProviderId, ProviderCompatibility> =
-	{
-		openai: 'openai',
-		anthropic: 'anthropic',
-		google: 'google',
-		meta: 'openai',
-		'ollama-cloud': 'ollama',
-		baseten: 'openai-compatible',
-		huggingface: 'openai-compatible',
-		wafer: 'openai-compatible',
-		openrouter: 'openrouter',
-		opencode: 'openai-compatible',
-		copilot: 'openai',
-		ottorouter: 'openrouter',
-		xai: 'openai',
-		zai: 'openai-compatible',
-		'zai-coding': 'openai-compatible',
-		deepseek: 'openai-compatible',
-		kimi: 'openai-compatible',
-		minimax: 'anthropic',
-	};
-
-const BUILTIN_FAMILY: Record<BuiltInProviderId, ProviderPromptFamily> = {
-	openai: 'openai',
-	anthropic: 'anthropic',
-	google: 'google',
-	meta: 'openai',
-	'ollama-cloud': 'openai-compatible',
-	baseten: 'openai-compatible',
-	huggingface: 'openai-compatible',
-	wafer: 'openai-compatible',
-	openrouter: 'openai-compatible',
-	opencode: 'openai-compatible',
-	copilot: 'openai',
-	ottorouter: 'openai-compatible',
-	xai: 'openai',
-	zai: 'glm',
-	'zai-coding': 'glm',
-	deepseek: 'openai-compatible',
-	kimi: 'kimi',
-	minimax: 'minimax',
-};
 function normalizeOptionalText(value: string | undefined): string | undefined {
 	if (!value) return undefined;
 	const trimmed = value.trim();
@@ -151,6 +111,8 @@ export function getProviderDefinition(
 	const settings = getProviderSettings(cfg, provider);
 	const catalogProvider = resolveBuiltInProviderCatalogId(provider);
 	if (catalogProvider) {
+		const descriptor: BuiltInProviderDescriptor =
+			BUILT_IN_PROVIDER_DESCRIPTORS[catalogProvider];
 		const entry = catalog[catalogProvider];
 		if (!entry) return undefined;
 		const cachedEntry = getCachedProviderCatalogEntry(catalogProvider);
@@ -164,18 +126,17 @@ export function getProviderDefinition(
 				entry.label ??
 				provider,
 			source: 'built-in',
-			compatibility: BUILTIN_COMPATIBILITY[catalogProvider],
-			family: BUILTIN_FAMILY[catalogProvider],
-			baseURL: normalizeOptionalText(resolvedSettings?.baseURL) ?? entry.api,
+			compatibility: descriptor.compatibility,
+			family: descriptor.promptFamily,
+			baseURL:
+				normalizeOptionalText(resolvedSettings?.baseURL) ??
+				descriptor.defaultBaseURL,
 			apiKey: normalizeOptionalText(resolvedSettings?.apiKey),
 			apiKeyEnv:
 				normalizeOptionalText(resolvedSettings?.apiKeyEnv) ??
 				providerEnvVar(provider),
 			models,
-			allowAnyModel:
-				catalogProvider === 'ollama-cloud' ||
-				catalogProvider === 'baseten' ||
-				catalogProvider === 'huggingface',
+			allowAnyModel: descriptor.allowAnyModel,
 		};
 	}
 
@@ -332,7 +293,14 @@ export function getConfiguredProviderApiKey(
 	const definition = getProviderDefinition(cfg, provider);
 	if (!definition) return undefined;
 	if (definition.apiKey?.length) return definition.apiKey;
-	if (provider === 'kimi') {
+	const configuredApiKeyEnv = normalizeOptionalText(
+		getProviderSettings(cfg, provider)?.apiKeyEnv,
+	);
+	if (configuredApiKeyEnv) {
+		const value = process.env[configuredApiKeyEnv];
+		return value?.length ? value : undefined;
+	}
+	if (definition.source === 'built-in') {
 		const envValue = readEnvKey(provider);
 		if (envValue?.length) return envValue;
 	}

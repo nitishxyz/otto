@@ -1,7 +1,11 @@
-import { getSecureAuthPath, ensureDir } from '../../config/src/paths.ts';
+import { getSecureAuthPath } from '../../config/src/paths.ts';
 import type { ProviderId, AuthInfo, AuthFile } from '../../types/src/index.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { acquireFileLock } from './file-lock.ts';
+import {
+	atomicWriteJsonObject,
+	readOptionalJsonObject,
+} from '../../runtime/json-object-file.ts';
 
 export type {
 	ProviderId,
@@ -21,23 +25,9 @@ function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
 		const path = globalAuthPath();
 		const release = await acquireFileLock(`${path}.lock`);
 		try {
-			const existing = ((await Bun.file(path)
-				.json()
-				.catch(() => ({}))) || {}) as AuthFile;
+			const existing = ((await readOptionalJsonObject(path)) ?? {}) as AuthFile;
 			const result = mutator(existing);
-			const base = path.slice(0, path.lastIndexOf('/')) || '.';
-			await ensureDir(base);
-			const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
-			const { promises: fs } = await import('node:fs');
-			try {
-				await fs.writeFile(tempPath, JSON.stringify(existing, null, 2), {
-					mode: 0o600,
-				});
-				await fs.rename(tempPath, path);
-				await fs.chmod(path, 0o600).catch(() => {});
-			} finally {
-				await fs.rm(tempPath, { force: true }).catch(() => {});
-			}
+			await atomicWriteJsonObject(path, existing, { mode: 0o600 });
 			return result;
 		} finally {
 			await release();
@@ -51,8 +41,8 @@ function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
 }
 
 export async function getAllAuth(_projectRoot?: string): Promise<AuthFile> {
-	const globalFile = Bun.file(globalAuthPath());
-	const globalData = (await globalFile.json().catch(() => ({}))) as AuthFile;
+	const globalData = ((await readOptionalJsonObject(globalAuthPath())) ??
+		{}) as AuthFile;
 	return { ...globalData };
 }
 

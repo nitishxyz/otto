@@ -72,8 +72,7 @@ export function registerSessionRetryRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
-				const messageId = c.req.param('messageId');
+				const { sessionId, messageId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const { cfg, db } = await loadProjectDb(projectRoot);
 				const result = await retryAssistantMessage(

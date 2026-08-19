@@ -15,15 +15,22 @@
 // Provider types
 export type {
 	BuiltInProviderId,
+	BuiltInProviderDescriptor,
 	ProviderId,
 	ProviderCompatibility,
 	ProviderPromptFamily,
+	ProviderRuntimeKind,
 	ModelOwner,
 	ModelAuthType,
 	ModelInfo,
 	ModelInfoMap,
 	ModelProviderBinding,
 	ProviderCatalogEntry,
+} from './types/src/index.ts';
+export {
+	BUILT_IN_PROVIDER_DESCRIPTORS,
+	builtInProviderIds,
+	getBuiltInProviderDescriptor,
 } from './types/src/index.ts';
 
 // Auth types
@@ -642,8 +649,11 @@ export {
 	getCopilotMCPOAuthKey,
 	getStoredCopilotMCPToken,
 	getMCPManager,
+	getActiveMCPProjectRoots,
 	hasCopilotMCPScopes,
 	initializeMCP,
+	ensureMCPManager,
+	reloadMCPManager,
 	isGitHubCopilotUrl,
 	isStoredCopilotMCPAuthenticated,
 	shutdownMCP,
@@ -652,6 +662,7 @@ export {
 	formatMcpServerSourceLabel,
 	isPluginManagedMcpServer,
 	addMCPServerToConfig,
+	setMCPServerDisabled,
 	removeMCPServerFromConfig,
 	OAuthCredentialStore,
 	OttoOAuthProvider,

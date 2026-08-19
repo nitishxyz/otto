@@ -3,6 +3,7 @@ import type { DB } from '@ottocode/database';
 import { messageParts } from '@ottocode/database/schema';
 import type { ToolApprovalMode } from './approval.ts';
 import { publish } from '../../events/bus.ts';
+import type { MessagePartDeltaPayload } from '@ottocode/sdk/events/protocol';
 import { flushPartContentWrites } from '../persistence/part-content-writer.ts';
 
 export type StepExecutionState = {
@@ -66,7 +67,7 @@ export async function appendAssistantText(
 			? text.slice(previous.length)
 			: text;
 		if (addition.length) {
-			const payload: Record<string, unknown> = {
+			const payload: MessagePartDeltaPayload = {
 				messageId: ctx.messageId,
 				partId: ctx.assistantPartId,
 				delta: addition,

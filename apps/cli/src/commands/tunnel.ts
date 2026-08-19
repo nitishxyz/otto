@@ -1,16 +1,10 @@
-import { getTunnelStatus, startTunnel, stopTunnel } from '@ottocode/api';
 import { confirm, isCancel } from '@clack/prompts';
-import type { Command } from 'commander';
-import { daemonAuthHeaders, ensureDaemon, readDaemonToken } from '../daemon.ts';
+import { connectDaemonApi } from '../daemon.ts';
 
 const TUNNEL_QUERY = {
 	mode: 'managed' as const,
 	scope: 'remote-control' as const,
 };
-
-interface TunnelOptions {
-	project?: string;
-}
 
 export interface MachineTunnelStatus {
 	status: 'idle' | 'starting' | 'connected' | 'error';
@@ -27,21 +21,6 @@ interface TunnelActionResult {
 	message?: string;
 	code?: string;
 	error?: string;
-}
-
-function errorMessage(error: unknown): string {
-	if (error instanceof Error) return error.message;
-	if (typeof error === 'string') return error;
-	return JSON.stringify(error);
-}
-
-async function daemonConnection(version: string, projectRoot?: string) {
-	const registration = await ensureDaemon({ version, projectRoot });
-	const token = await readDaemonToken();
-	return {
-		baseURL: registration.url,
-		headers: daemonAuthHeaders(token),
-	};
 }
 
 /** Formats global machine tunnel status for terminal output. */
@@ -85,95 +64,38 @@ async function offerOttoRouterLogin(): Promise<boolean> {
 	return Boolean(await runAuth(['login', 'ottorouter']));
 }
 
-async function enableTunnel(
+export async function enableTunnel(
 	version: string,
 	projectRoot?: string,
 	loginOffered = false,
 ) {
 	console.log('Enabling managed machine tunnel...');
-	const connection = await daemonConnection(version, projectRoot);
-	const response = await startTunnel({
-		...connection,
-		body: TUNNEL_QUERY,
-	});
-	const result = response.data as TunnelActionResult | undefined;
-	if (response.error || !result?.ok) {
+	const api = await connectDaemonApi({ version, projectRoot });
+	const result = await api.startTunnel(TUNNEL_QUERY);
+	if (!result.ok) {
 		if (!loginOffered && requiresOttoRouterLogin(result)) {
 			const loggedIn = await offerOttoRouterLogin();
 			if (loggedIn) await enableTunnel(version, projectRoot, true);
 			return;
 		}
-		throw new Error(
-			result?.error ??
-				`Failed to enable machine tunnel: ${errorMessage(response.error)}`,
-		);
+		throw new Error(result.error ?? 'Failed to enable machine tunnel');
 	}
 	console.log(result.message ?? 'Managed machine tunnel enabled');
 	if (result.url) console.log(`  url: ${result.url}`);
 }
 
-async function showTunnelStatus(version: string, projectRoot?: string) {
-	const connection = await daemonConnection(version, projectRoot);
-	const response = await getTunnelStatus({
-		...connection,
-		query: TUNNEL_QUERY,
-	});
-	if (response.error || !response.data) {
-		throw new Error(
-			`Failed to get machine tunnel status: ${errorMessage(response.error)}`,
-		);
-	}
-	console.log(formatMachineTunnelStatus(response.data as MachineTunnelStatus));
+export async function showTunnelStatus(version: string, projectRoot?: string) {
+	const api = await connectDaemonApi({ version, projectRoot });
+	console.log(
+		formatMachineTunnelStatus(await api.getTunnelStatus(TUNNEL_QUERY)),
+	);
 }
 
-async function disableTunnel(version: string, projectRoot?: string) {
-	const connection = await daemonConnection(version, projectRoot);
-	const response = await stopTunnel({
-		...connection,
-		query: TUNNEL_QUERY,
-	});
-	const result = response.data as TunnelActionResult | undefined;
-	if (response.error || !result?.ok) {
-		throw new Error(
-			result?.error ??
-				`Failed to disable machine tunnel: ${errorMessage(response.error)}`,
-		);
+export async function disableTunnel(version: string, projectRoot?: string) {
+	const api = await connectDaemonApi({ version, projectRoot });
+	const result = await api.stopTunnel(TUNNEL_QUERY);
+	if (!result.ok) {
+		throw new Error(result.error ?? 'Failed to disable machine tunnel');
 	}
 	console.log(result.message ?? 'Managed machine tunnel disabled');
-}
-
-/** Registers persistent machine-sharing tunnel controls. */
-export function registerTunnelCommand(program: Command, version: string) {
-	const tunnel = program
-		.command('tunnel')
-		.description('Manage global machine-sharing access');
-
-	const withProject = (command: Command) =>
-		command.option(
-			'--project <path>',
-			'Project used to start the daemon',
-			process.cwd(),
-		);
-
-	withProject(
-		tunnel
-			.command('enable')
-			.description('Enable persistent machine-sharing access'),
-	).action(async (opts: TunnelOptions) => {
-		await enableTunnel(version, opts.project);
-	});
-
-	withProject(
-		tunnel.command('status').description('Show machine-sharing tunnel status'),
-	).action(async (opts: TunnelOptions) => {
-		await showTunnelStatus(version, opts.project);
-	});
-
-	withProject(
-		tunnel
-			.command('disable')
-			.description('Disable persistent machine-sharing access'),
-	).action(async (opts: TunnelOptions) => {
-		await disableTunnel(version, opts.project);
-	});
 }

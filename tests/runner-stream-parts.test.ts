@@ -102,9 +102,13 @@ describe('consumeRunnerStreamParts', () => {
 			{ type: 'reasoning-end', id: 'reasoning-1' },
 		]);
 		const events: OttoEvent[] = [];
-		const unsubscribe = subscribe(args.opts.sessionId, (event) => {
-			events.push(event);
-		});
+		const unsubscribe = subscribe(
+			args.opts.sessionId,
+			(event) => {
+				events.push(event);
+			},
+			args.opts.projectRoot,
+		);
 
 		try {
 			await consumeRunnerStreamParts(args);
@@ -125,9 +129,13 @@ describe('consumeRunnerStreamParts', () => {
 			{ type: 'text-delta', id: 'text-1', delta: 'hello' },
 		]);
 		const events: OttoEvent[] = [];
-		const unsubscribe = subscribe(args.opts.sessionId, (event) => {
-			events.push(event);
-		});
+		const unsubscribe = subscribe(
+			args.opts.sessionId,
+			(event) => {
+				events.push(event);
+			},
+			args.opts.projectRoot,
+		);
 
 		try {
 			await consumeRunnerStreamParts(args);
@@ -174,9 +182,13 @@ describe('consumeRunnerStreamParts', () => {
 		]);
 		args.oauthTextGuard = createOauthCodexTextGuardState() as never;
 		const events: OttoEvent[] = [];
-		const unsubscribe = subscribe(args.opts.sessionId, (event) => {
-			events.push(event);
-		});
+		const unsubscribe = subscribe(
+			args.opts.sessionId,
+			(event) => {
+				events.push(event);
+			},
+			args.opts.projectRoot,
+		);
 
 		try {
 			await consumeRunnerStreamParts(args);

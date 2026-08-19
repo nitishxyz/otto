@@ -66,8 +66,8 @@ function registerAddGoalTasksRoute(app: Hono) {
 				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const goalId = c.req.param('goalId');
-				const body = addTasksBodySchema.parse(await c.req.json());
+				const { goalId } = c.req.valid('param');
+				const body = c.req.valid('json');
 				const rows = await db
 					.select()
 					.from(goals)
@@ -150,9 +150,8 @@ function registerUpdateGoalTaskRoute(app: Hono) {
 				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const goalId = c.req.param('goalId');
-				const taskId = c.req.param('taskId');
-				const body = updateTaskBodySchema.parse(await c.req.json());
+				const { goalId, taskId } = c.req.valid('param');
+				const body = c.req.valid('json');
 				const rows = await db
 					.select()
 					.from(goalTasks)
@@ -221,8 +220,7 @@ function registerDeleteGoalTaskRoute(app: Hono) {
 				const { db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const goalId = c.req.param('goalId');
-				const taskId = c.req.param('taskId');
+				const { goalId, taskId } = c.req.valid('param');
 				const goalRows = await db
 					.select()
 					.from(goals)

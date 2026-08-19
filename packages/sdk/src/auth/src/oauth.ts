@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { randomBytes, createHash } from 'node:crypto';
+import { openBrowser } from './open-browser';
+import { createOAuthState, createPkcePair } from './oauth-primitives';
 
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const CLAUDE_CLI_VERSION = '1.0.61';
@@ -8,54 +8,9 @@ const OAUTH_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback';
 
 type Mode = 'max' | 'console';
 
-// Custom PKCE implementation using synchronous crypto
-function generatePKCE() {
-	// Generate random verifier (43-128 characters, base64url encoded)
-	const verifier = randomBytes(32)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	// Generate challenge from verifier (SHA-256 hash, base64url encoded)
-	const challenge = createHash('sha256')
-		.update(verifier)
-		.digest('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=/g, '');
-
-	return { verifier, challenge };
-}
-
-async function openBrowser(url: string) {
-	const platform = process.platform;
-	let command: string;
-
-	switch (platform) {
-		case 'darwin':
-			command = `open "${url}"`;
-			break;
-		case 'win32':
-			command = `start "${url}"`;
-			break;
-		default:
-			command = `xdg-open "${url}"`;
-			break;
-	}
-
-	return new Promise<void>((resolve, reject) => {
-		const child = spawn(command, [], { shell: true });
-		child.on('error', reject);
-		child.on('exit', (code) => {
-			if (code === 0) resolve();
-			else reject(new Error(`Failed to open browser (exit code ${code})`));
-		});
-	});
-}
-
 export async function authorize(mode: Mode) {
-	const pkce = generatePKCE();
+	const pkce = createPkcePair();
+	const state = createOAuthState();
 
 	const url = new URL(
 		`https://${mode === 'console' ? 'platform.claude.com' : 'claude.ai'}/oauth/authorize`,
@@ -70,7 +25,7 @@ export async function authorize(mode: Mode) {
 	);
 	url.searchParams.set('code_challenge', pkce.challenge);
 	url.searchParams.set('code_challenge_method', 'S256');
-	url.searchParams.set('state', pkce.verifier);
+	url.searchParams.set('state', state);
 
 	return {
 		url: url.toString(),
@@ -318,7 +273,8 @@ export async function createApiKey(accessToken: string) {
 }
 
 export function authorizeWeb(mode: Mode, redirectUri: string) {
-	const pkce = generatePKCE();
+	const pkce = createPkcePair();
+	const state = createOAuthState();
 
 	const url = new URL(
 		`https://${mode === 'console' ? 'platform.claude.com' : 'claude.ai'}/oauth/authorize`,
@@ -333,7 +289,7 @@ export function authorizeWeb(mode: Mode, redirectUri: string) {
 	);
 	url.searchParams.set('code_challenge', pkce.challenge);
 	url.searchParams.set('code_challenge_method', 'S256');
-	url.searchParams.set('state', pkce.verifier);
+	url.searchParams.set('state', state);
 
 	return {
 		url: url.toString(),

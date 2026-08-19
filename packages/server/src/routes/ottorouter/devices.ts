@@ -426,7 +426,7 @@ export function registerOttoRouterDeviceRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = machineProjectsBodySchema.parse(await c.req.json());
+			const body = c.req.valid('json');
 			return c.json(
 				await loadAuthorizedMachineProjects(
 					body.deviceId,
@@ -478,7 +478,7 @@ export function registerOttoRouterDeviceRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = authorizeBodySchema.parse(await c.req.json());
+			const body = c.req.valid('json');
 			const response = await fetchWithOttoRouterAuth(
 				`${getOttoRouterBaseUrl()}/v1/tunnels/device/authorize`,
 				{

@@ -38,10 +38,10 @@ export function registerSyncShareRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const sessionId = c.req.param('sessionId');
+			const { sessionId } = c.req.valid('param');
 			const projectRoot = await resolveRequestProjectRoot(c);
 			const { db } = await loadProjectDb(projectRoot);
-			const result = await syncShare(db, sessionId);
+			const result = await syncShare(db, sessionId, projectRoot);
 			return result.ok
 				? c.json(result.body)
 				: c.json(result.body, result.status);

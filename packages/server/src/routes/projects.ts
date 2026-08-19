@@ -108,7 +108,7 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = openProjectBodySchema.parse(await c.req.json());
+			const body = c.req.valid('json');
 			return c.json(await openProjectSummary(body.path));
 		},
 	);
@@ -132,9 +132,7 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const query = projectDirectoriesQuerySchema.parse({
-				path: c.req.query('path'),
-			});
+			const query = c.req.valid('query');
 			return c.json(await listProjectDirectories(query.path));
 		},
 	);
@@ -188,7 +186,7 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectId = c.req.param('projectId');
+			const { projectId } = c.req.valid('param');
 			const project = (await getProjectManager().listProjects()).find(
 				(item) => item.id === projectId,
 			);
@@ -231,9 +229,10 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const body = projectPinnedBodySchema.parse(await c.req.json());
+			const body = c.req.valid('json');
+			const { projectId } = c.req.valid('param');
 			const updated = await getProjectManager().setProjectPinned(
-				c.req.param('projectId'),
+				projectId,
 				body.pinned,
 			);
 			return updated
@@ -267,9 +266,8 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const project = await getProjectManager().forgetProject(
-				c.req.param('projectId'),
-			);
+			const { projectId } = c.req.valid('param');
+			const project = await getProjectManager().forgetProject(projectId);
 			return project
 				? c.json({ ok: true })
 				: c.json({ error: 'Project not found' }, 404);
@@ -295,7 +293,7 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			const projectId = c.req.param('projectId');
+			const { projectId } = c.req.valid('param');
 			stopProjectTunnel(projectId);
 			await getProjectManager().closeProject(projectId);
 			return c.json({ ok: true });
@@ -321,7 +319,8 @@ export function registerProjectsRoutes(app: Hono) {
 			},
 		},
 		async (c) => {
-			getProjectManager().touchProject(c.req.param('projectId'));
+			const { projectId } = c.req.valid('param');
+			getProjectManager().touchProject(projectId);
 			return c.json({ ok: true });
 		},
 	);

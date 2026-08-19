@@ -11,6 +11,7 @@ import {
 	type MCPTransport,
 } from '@ottocode/sdk';
 import { toErrorMessage } from '../../../runtime/errors/handling.ts';
+import { reconcileMCPServerManagers } from './reconcile.ts';
 
 export async function listMCPServers(projectRoot: string) {
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
@@ -27,7 +28,7 @@ export async function listMCPServers(projectRoot: string) {
 			url: server.url,
 			env: server.env,
 			headers: server.headers,
-			disabled: server.disabled ?? false,
+			disabled: server.disabled ?? true,
 			connected: status?.connected ?? false,
 			tools: status?.tools ?? [],
 			error: status?.error,
@@ -101,6 +102,7 @@ export function buildMCPServerConfig(body: Record<string, unknown>) {
 		name: String(name),
 		transport: selectedTransport,
 		scope: serverScope,
+		disabled: true,
 		...(command ? { command: String(command) } : {}),
 		...(Array.isArray(args) ? { args: args.map(String) } : {}),
 		...(env && typeof env === 'object'
@@ -130,10 +132,19 @@ export async function addMCPServer(
 		return { ok: false as const, body: built, status: built.status };
 
 	try {
+		const existing = (
+			await loadMCPConfig(projectRoot, getGlobalConfigDir())
+		).servers.find((server) => server.name === built.serverConfig.name);
+		built.serverConfig.disabled = existing?.disabled ?? true;
 		await addMCPServerToConfig(
 			projectRoot,
 			built.serverConfig,
 			getGlobalConfigDir(),
+		);
+		await reconcileMCPServerManagers(
+			projectRoot,
+			built.serverConfig.scope ?? 'global',
+			built.serverConfig.name,
 		);
 		return {
 			ok: true as const,
@@ -150,13 +161,11 @@ export async function addMCPServer(
 
 export async function removeMCPServer(name: string, projectRoot: string) {
 	try {
+		const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
+		const serverConfig = config.servers.find((server) => server.name === name);
+		const scope = serverConfig?.scope ?? 'global';
 		const manager = getMCPManager(projectRoot);
 		if (manager) {
-			const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
-			const serverConfig = config.servers.find(
-				(server) => server.name === name,
-			);
-			const scope = serverConfig?.scope ?? 'global';
 			await manager.clearAuthData(name, scope, projectRoot);
 			await manager.stopServer(name);
 		}
@@ -165,6 +174,7 @@ export async function removeMCPServer(name: string, projectRoot: string) {
 			projectRoot,
 			name,
 			getGlobalConfigDir(),
+			scope,
 		);
 		if (!removed) {
 			const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
@@ -190,6 +200,7 @@ export async function removeMCPServer(name: string, projectRoot: string) {
 				status: 404 as const,
 			};
 		}
+		await reconcileMCPServerManagers(projectRoot, scope, name);
 		return { ok: true as const, body: { ok: true, name } };
 	} catch (error) {
 		return {

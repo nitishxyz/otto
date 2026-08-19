@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
+import type { ProviderId } from '@ottocode/sdk';
 
 export function registerAskCommand(program: Command) {
 	program
@@ -21,17 +21,17 @@ export function registerAskCommand(program: Command) {
 		.option('-y, --yes', 'Auto-approve all tool executions')
 		.action(async (prompt, opts, command) => {
 			const parentOpts = command.parent?.opts() ?? {};
-			const argv = ['ask'];
-			if (prompt) argv.push(prompt);
-			pushOption(argv, '--agent', opts.agent ?? parentOpts.agent);
-			pushOption(argv, '--provider', opts.provider ?? parentOpts.provider);
-			pushOption(argv, '--model', opts.model ?? parentOpts.model);
-			pushFlag(argv, '--wild', opts.wild);
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--last', opts.last);
-			pushOption(argv, '--session', opts.session);
-			pushFlag(argv, '--yes', opts.yes);
-			const { registerAskCommand: register } = await import('../ask.ts');
-			await dispatchRegisteredCommand(register, argv);
+			const { handleAsk } = await import('../ask.ts');
+			await handleAsk(prompt, {
+				agent: opts.agent ?? parentOpts.agent,
+				provider: (opts.provider ?? parentOpts.provider) as
+					| ProviderId
+					| undefined,
+				model: opts.model ?? parentOpts.model,
+				wild: opts.wild,
+				project: opts.project,
+				last: opts.last,
+				session: opts.session,
+			});
 		});
 }

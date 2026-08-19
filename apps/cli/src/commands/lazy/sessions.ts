@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
 
 export function registerSessionsCommand(program: Command) {
 	program
@@ -13,15 +12,7 @@ export function registerSessionsCommand(program: Command) {
 			Number.parseInt(v, 10),
 		)
 		.action(async (opts) => {
-			const argv = ['sessions'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--json', opts.json);
-			pushFlag(argv, '--list', opts.list);
-			pushFlag(argv, '--pick', opts.pick);
-			pushOption(argv, '--limit', opts.limit);
-			const { registerSessionsCommand: register } = await import(
-				'../sessions.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { handleSessions } = await import('../sessions.ts');
+			await handleSessions(opts);
 		});
 }

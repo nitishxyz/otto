@@ -2,9 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import { Command } from 'commander';
 import {
 	formatMachineTunnelStatus,
-	registerTunnelCommand,
 	requiresOttoRouterLogin,
 } from '../apps/cli/src/commands/tunnel.ts';
+import { registerTunnelCommand } from '../apps/cli/src/commands/lazy/tunnel.ts';
 
 describe('CLI tunnel command', () => {
 	it('registers enable, status, and disable actions', () => {

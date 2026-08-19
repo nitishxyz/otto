@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushFlag, pushOption } from './helpers.ts';
 
 export function registerMigrateCommand(program: Command) {
 	const migrate = program
@@ -14,12 +13,7 @@ export function registerMigrateCommand(program: Command) {
 		.option('--project <path>', 'Only migrate the project at <path>')
 		.option('--all', 'Migrate every project database in otto state storage')
 		.action(async (opts) => {
-			const argv = ['migrate', 'looper'];
-			pushOption(argv, '--project', opts.project);
-			pushFlag(argv, '--all', opts.all);
-			const { registerMigrateCommand: register } = await import(
-				'../migrate.ts'
-			);
-			await dispatchRegisteredCommand(register, argv);
+			const { migrateLooper } = await import('../migrate.ts');
+			await migrateLooper(opts);
 		});
 }

@@ -12,10 +12,11 @@ import type {
 	ModelOwner,
 	ModelInfoMap,
 } from '../../types/src/index.ts';
+import { builtInProviderIds } from '../../types/src/provider-descriptors.ts';
 import { filterModelsForAuthType } from './oauth-models.ts';
 import { resolveBuiltInProviderCatalogId } from './registry.ts';
 
-export const providerIds = Object.keys(catalog) as BuiltInProviderId[];
+export const providerIds: BuiltInProviderId[] = [...builtInProviderIds];
 
 export function isProviderId(value: unknown): value is BuiltInProviderId {
 	return (

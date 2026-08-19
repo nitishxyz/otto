@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../../openapi/route.ts';
+import { sessionRepository } from '../../../runtime/session/repository.ts';
 import { resolveRequestProject } from '../../project-context.ts';
 import { getSessionQueueState } from '../service.ts';
 import {
@@ -31,8 +32,11 @@ export function registerSessionQueueStatusRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			await resolveRequestProject(c);
-			const sessionId = c.req.param('sessionId');
+			const project = await resolveRequestProject(c);
+			const { sessionId } = c.req.valid('param');
+			await sessionRepository(project.db, project.projectRoot).require(
+				sessionId,
+			);
 			return c.json(getSessionQueueState(sessionId));
 		},
 	);

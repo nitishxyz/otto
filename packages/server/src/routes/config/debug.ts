@@ -85,7 +85,7 @@ export function registerDebugConfigRoute(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = updateDebugConfigBodySchema.parse(await c.req.json());
+				const body = c.req.valid('json');
 
 				await writeDebugConfig({
 					enabled: body.enabled,

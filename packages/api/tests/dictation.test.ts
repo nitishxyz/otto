@@ -88,11 +88,14 @@ describe('dictation transport', () => {
 
 	test('parses model install SSE events', async () => {
 		const models: string[] = [];
+		let requestMethod: string | undefined;
 		await streamDictationModelInstall({
 			baseUrl: 'http://127.0.0.1:9100',
 			model: 'small.en-q5_1',
-			fetch: async () =>
-				new Response(
+			transportMode: 'tunnel',
+			fetch: async (_input, init) => {
+				requestMethod = init?.method;
+				return new Response(
 					`data: ${JSON.stringify({
 						type: 'model',
 						model: {
@@ -111,10 +114,12 @@ describe('dictation transport', () => {
 						},
 					})}\n\n`,
 					{ headers: { 'Content-Type': 'text/event-stream' } },
-				),
+				);
+			},
 			onModel: (model) => models.push(model.id),
 		});
 		expect(models).toEqual(['small.en-q5_1']);
+		expect(requestMethod).toBe('POST');
 	});
 
 	test('rejects malformed server events', () => {

@@ -17,7 +17,6 @@ import {
 	adaptSimpleCall,
 } from '../../runtime/provider/oauth-adapter.ts';
 import { resolveModel } from '../../runtime/provider/index.ts';
-import { gitCommitSchema, gitGenerateCommitMessageSchema } from './schemas.ts';
 import { runInteractiveGitCommand } from './interactive.ts';
 import { parseGitStatus, validateAndGetGitRoot } from './utils.ts';
 import { resolveRequestProjectRoot } from '../project-context.ts';
@@ -26,8 +25,10 @@ const execFileAsync = promisify(execFile);
 
 export async function handleCommitChanges(c: Context) {
 	try {
-		const body = await c.req.json();
-		const { message, sessionId } = gitCommitSchema.parse(body);
+		const { message, sessionId } = c.req.valid('json' as never) as {
+			message: string;
+			sessionId?: string;
+		};
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);
@@ -116,8 +117,9 @@ Commit message:`;
 
 export async function handleGenerateCommitMessage(c: Context) {
 	try {
-		const body = await c.req.json();
-		const { sessionId } = gitGenerateCommitMessageSchema.parse(body);
+		const { sessionId } = (c.req.valid('json' as never) ?? {}) as {
+			sessionId?: string;
+		};
 		const requestedPath = await resolveRequestProjectRoot(c);
 
 		const validation = await validateAndGetGitRoot(requestedPath);

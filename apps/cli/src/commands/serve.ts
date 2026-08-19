@@ -1,30 +1,23 @@
-import type { Command } from 'commander';
-import { loadConfig, openAuthUrl, logger, printQRCode } from '@ottocode/sdk';
+import { openAuthUrl, logger, printQRCode } from '@ottocode/sdk';
 import {
-	createApp as createServer,
-	setDaemonId,
-	setDefaultProjectRoot,
-	setServerPort,
-	setServerVersion,
 	setDaemonRestartHandler,
 	restoreManagedTunnel,
-	shutdownActiveTunnels,
-	shutdownProjectManager,
 	bunWebSocket,
 	type DaemonRestartRequest,
 } from '@ottocode/server';
-import { getDb } from '@ottocode/database';
 import { startTunnel } from '@ottocode/api';
 import {
-	DEFAULT_DAEMON_PORT,
 	fetchDaemonHealth,
-	getDaemonSpawnCommand,
-	parseDaemonPort,
+	spawnDaemonProcess,
+	waitForDaemonPortRelease,
 	readDaemonRegistration,
 	writeActiveDaemonSelection,
 } from '../daemon.ts';
-import { createWebServer, createWebUIFetch } from '../web-server.ts';
+import { validateCliPort } from '../runtime/network.ts';
+import { createServerRuntime } from '../runtime/server.ts';
 import { colors } from '../ui.ts';
+
+export { createSameOriginFetch } from '../runtime/server.ts';
 
 export interface StartServerResult {
 	port: number;
@@ -32,68 +25,7 @@ export interface StartServerResult {
 	stop: () => Promise<void>;
 }
 
-type ApiFetch = NonNullable<Parameters<typeof Bun.serve>[0]['fetch']>;
 type ApiWebSocket = NonNullable<Parameters<typeof Bun.serve>[0]['websocket']>;
-
-function isApiRequest(request: Request): boolean {
-	const pathname = new URL(request.url).pathname;
-	return (
-		pathname === '/v1' ||
-		pathname.startsWith('/v1/') ||
-		pathname === '/openapi.json'
-	);
-}
-
-/** Routes API requests to Hono and browser requests to the embedded web UI. */
-export function createSameOriginFetch(
-	apiFetch: ApiFetch,
-	webFetch: (request: Request) => Response | Promise<Response>,
-): ApiFetch {
-	const fetchApi = apiFetch as (
-		request: Request,
-		server: Bun.Server<undefined>,
-	) => Response | Promise<Response>;
-	return ((request: Request, server: Bun.Server<undefined>) =>
-		isApiRequest(request)
-			? fetchApi(request, server)
-			: webFetch(request)) as ApiFetch;
-}
-
-function createProjectStorageError(
-	projectRoot: string,
-	dataDir: string,
-	dbPath: string,
-	error: unknown,
-): Error {
-	const reason = error instanceof Error ? error.message : String(error);
-	return new Error(
-		[
-			`Otto could not open its local project database at ${dbPath}.`,
-			`The current project needs a writable .otto directory under ${projectRoot}.`,
-			`Make sure ${dataDir} is writable, or rerun otto from a writable directory (or pass --project <path>).`,
-			`Original error: ${reason}`,
-		].join(' '),
-	);
-}
-
-async function ensureProjectStorage(projectRoot: string) {
-	const cfg = await loadConfig(projectRoot);
-	try {
-		await getDb(cfg.projectRoot);
-	} catch (error) {
-		throw createProjectStorageError(
-			cfg.projectRoot,
-			cfg.paths.dataDir,
-			cfg.paths.dbPath,
-			error,
-		);
-	}
-	return cfg;
-}
-
-async function activateProject(projectRoot: string): Promise<void> {
-	await ensureProjectStorage(projectRoot);
-}
 
 /** Spawns the detached successor after the current daemon releases its port. */
 export function spawnDaemonReplacement(options: {
@@ -105,25 +37,7 @@ export function spawnDaemonReplacement(options: {
 	cwd?: string;
 	env?: NodeJS.ProcessEnv;
 }): ReturnType<typeof Bun.spawn> {
-	const spawn = options.spawn ?? Bun.spawn;
-	const proc = spawn({
-		cmd: getDaemonSpawnCommand(
-			options.projectRoot,
-			options.executable,
-			options.port,
-		),
-		cwd: options.cwd ?? process.cwd(),
-		env: {
-			...(options.env ?? process.env),
-			OTTO_DAEMON_ID: options.daemonId,
-			OTTO_DAEMON_PORT: String(options.port),
-		},
-		stdin: 'ignore',
-		stdout: 'ignore',
-		stderr: 'ignore',
-	});
-	proc.unref();
-	return proc;
+	return spawnDaemonProcess(options);
 }
 
 /** Waits until the successor owns registration and answers authenticated health. */
@@ -165,7 +79,7 @@ export async function waitForDaemonReplacement(options: {
 export function serveApi(options: {
 	port: number;
 	hostname: string;
-	fetch: ApiFetch;
+	fetch: NonNullable<Parameters<typeof Bun.serve>[0]['fetch']>;
 	serve?: typeof Bun.serve;
 }) {
 	const serve = options.serve ?? Bun.serve;
@@ -182,65 +96,17 @@ export async function startApiServer(opts: {
 	project: string;
 	port?: number;
 }): Promise<StartServerResult> {
-	await activateProject(opts.project);
-	setDefaultProjectRoot(opts.project);
-
-	const app = createServer();
-	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
-	const requestedPort = opts.port ?? portEnv ?? 0;
-
-	const agiServer = serveApi({
-		port: requestedPort,
-		hostname: '127.0.0.1',
-		fetch: app.fetch,
+	const runtime = await createServerRuntime({
+		projectRoot: opts.project,
+		mode: 'embedded',
+		webMode: 'separate',
+		port: opts.port,
 	});
-
-	const serverPort = agiServer.port ?? requestedPort;
-	const apiUrl = `http://127.0.0.1:${serverPort}`;
-	setServerPort(serverPort);
-
-	let webServer: ReturnType<typeof createWebServer>['server'] | null = null;
-	let webUrl: string | undefined;
-	try {
-		const { port: actualWebPort, server } = createWebServer(
-			serverPort + 1,
-			apiUrl,
-			false,
-		);
-		webServer = server;
-		webUrl = `http://127.0.0.1:${actualWebPort}`;
-	} catch (error) {
-		logger.error('Failed to start Web UI server', error);
-	}
-
-	const stop = async () => {
-		try {
-			await shutdownProjectManager();
-		} catch {}
-		try {
-			webServer?.stop(true);
-		} catch {}
-		try {
-			agiServer.stop(true);
-		} catch {}
+	return {
+		port: runtime.port,
+		webUrl: runtime.web.url ?? undefined,
+		stop: runtime.stop,
 	};
-
-	return { port: serverPort, webUrl, stop };
-}
-
-function getLocalIP(): string {
-	try {
-		const { networkInterfaces } = require('node:os');
-		const nets = networkInterfaces();
-		for (const name of Object.keys(nets)) {
-			for (const net of nets[name]) {
-				if (net.family === 'IPv4' && !net.internal) {
-					return net.address;
-				}
-			}
-		}
-	} catch {}
-	return '0.0.0.0';
 }
 
 export interface ServeOptions {
@@ -254,68 +120,41 @@ export interface ServeOptions {
 }
 
 export async function handleServe(opts: ServeOptions, version: string) {
-	await activateProject(opts.project);
-	setServerVersion(version);
+	if (opts.daemonRegister && opts.port !== undefined) {
+		validateCliPort(opts.port, { allowZero: false, name: 'daemon port' });
+	}
 	const daemonId = opts.daemonRegister
 		? process.env.OTTO_DAEMON_ID || crypto.randomUUID()
 		: null;
-	setDaemonId(daemonId);
-	setDefaultProjectRoot(opts.daemonRegister ? null : opts.project);
-	setDaemonRestartHandler(null);
-
-	const app = createServer();
-	const portEnv = process.env.PORT ? Number(process.env.PORT) : undefined;
-	const daemonPort = parseDaemonPort(process.env.OTTO_DAEMON_PORT);
-	const requestedPort = opts.daemonRegister
-		? (opts.port ?? daemonPort ?? DEFAULT_DAEMON_PORT)
-		: (opts.port ?? portEnv ?? 0);
-	const hostname = opts.network ? '0.0.0.0' : '127.0.0.1';
-	const fetch = opts.daemonRegister
-		? createSameOriginFetch(app.fetch, createWebUIFetch(null))
-		: app.fetch;
-
-	const agiServer = serveApi({
-		port: requestedPort,
-		hostname,
-		fetch,
+	const runtime = await createServerRuntime({
+		projectRoot: opts.project,
+		version,
+		mode: opts.daemonRegister ? 'daemon' : 'foreground',
+		webMode: opts.daemonRegister
+			? 'same-origin'
+			: opts.apiOnly
+				? 'disabled'
+				: 'separate',
+		port: opts.port,
+		network: opts.network,
+		daemonId,
 	});
-
-	const displayHost = opts.network ? getLocalIP() : '127.0.0.1';
-	const serverPort = agiServer.port ?? requestedPort;
-	const apiUrl = `http://${displayHost}:${serverPort}`;
-
-	// Register server port so tunnel routes can use it
-	setServerPort(serverPort);
+	const serverPort = runtime.port;
+	const apiUrl = runtime.apiUrl;
+	const webUrl = opts.daemonRegister ? null : runtime.web.url;
 
 	if (opts.daemonRegister) {
 		const { writeDaemonRegistrationFromServer } = await import('../daemon.ts');
 		await writeDaemonRegistrationFromServer({
 			id: daemonId as string,
 			version,
-			url: `http://127.0.0.1:${serverPort}`,
+			url: runtime.loopbackApiUrl,
 			pid: process.pid,
 			startedAt: Date.now(),
 		});
 		void restoreManagedTunnel().catch((error) => {
 			logger.error('Managed tunnel restore failed', error);
 		});
-	}
-
-	let webServer: ReturnType<typeof createWebServer>['server'] | null = null;
-	let webUrl: string | null = null;
-	if (!opts.apiOnly) {
-		try {
-			const { port: actualWebPort, server } = createWebServer(
-				serverPort + 1,
-				opts.network ? serverPort : apiUrl,
-				opts.network,
-			);
-			webServer = server;
-			webUrl = `http://${displayHost}:${actualWebPort}`;
-		} catch (error) {
-			logger.error('Failed to start Web UI server', error);
-			console.log('   otto server is still running without Web UI');
-		}
 	}
 
 	let tunnelUrl: string | null = null;
@@ -390,32 +229,7 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	}
 
 	let shuttingDown = false;
-	const cleanup = async () => {
-		setDaemonRestartHandler(null);
-		try {
-			shutdownActiveTunnels();
-		} catch (error) {
-			logger.error('Error stopping tunnel processes', error);
-		}
-
-		try {
-			await shutdownProjectManager();
-		} catch (error) {
-			logger.error('Error cleaning up project resources', error);
-		}
-
-		try {
-			webServer?.stop(true);
-		} catch (error) {
-			logger.error('Error stopping web server', error);
-		}
-
-		try {
-			agiServer.stop(true);
-		} catch (error) {
-			logger.error('Error stopping API server', error);
-		}
-	};
+	const cleanup = runtime.stop;
 
 	const shutdown = async (signal: NodeJS.Signals) => {
 		if (shuttingDown) return;
@@ -434,8 +248,9 @@ export async function handleServe(opts: ServeOptions, version: string) {
 		const daemonId = crypto.randomUUID();
 		let replacement: ReturnType<typeof Bun.spawn> | null = null;
 		try {
+			await waitForDaemonPortRelease({ port: serverPort });
 			replacement = spawnDaemonReplacement({
-				projectRoot: opts.project,
+				projectRoot: runtime.cfg.projectRoot,
 				executable,
 				port: serverPort,
 				daemonId,
@@ -460,9 +275,10 @@ export async function handleServe(opts: ServeOptions, version: string) {
 						replacement.kill('SIGTERM');
 						await Promise.race([replacement.exited, Bun.sleep(2000)]);
 					}
+					await waitForDaemonPortRelease({ port: serverPort });
 					const rollbackId = crypto.randomUUID();
 					const rollback = spawnDaemonReplacement({
-						projectRoot: opts.project,
+						projectRoot: runtime.cfg.projectRoot,
 						executable: process.execPath,
 						port: serverPort,
 						daemonId: rollbackId,
@@ -493,37 +309,4 @@ export async function handleServe(opts: ServeOptions, version: string) {
 	process.once('SIGTERM', shutdown);
 
 	await new Promise(() => {});
-}
-
-export function registerServeCommand(program: Command, version: string) {
-	program
-		.command('serve')
-		.description('Advanced: run a standalone foreground API/Web server')
-		.option('-p, --port <port>', 'Port to listen on', (v) =>
-			Number.parseInt(v, 10),
-		)
-		.option('--network', 'Bind to 0.0.0.0 for network access', false)
-		.option('--tunnel', 'Enable Cloudflare tunnel for remote access', false)
-		.option('--api-only', 'Start only the API server without Web UI', false)
-		.option(
-			'--daemon-register',
-			'Register this server as the local daemon',
-			false,
-		)
-		.option('--no-open', 'Do not open browser automatically')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (opts) => {
-			await handleServe(
-				{
-					project: opts.project,
-					port: opts.port,
-					network: opts.network,
-					tunnel: opts.tunnel,
-					noOpen: !opts.open,
-					apiOnly: opts.apiOnly,
-					daemonRegister: opts.daemonRegister,
-				},
-				version,
-			);
-		});
 }

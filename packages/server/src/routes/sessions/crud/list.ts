@@ -40,15 +40,11 @@ export function registerListSessionsRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const limit = Math.min(
-				Math.max(parseInt(c.req.query('limit') || '50', 10) || 50, 1),
-				200,
-			);
-			const offset = Math.max(
-				parseInt(c.req.query('offset') || '0', 10) || 0,
-				0,
-			);
-			const sessionTypeFilter = c.req.query('sessionType');
+			const {
+				limit,
+				offset,
+				sessionType: sessionTypeFilter,
+			} = c.req.valid('query');
 			const { cfg, db } = await resolveRequestProject(c);
 			const rows = await db
 				.select()

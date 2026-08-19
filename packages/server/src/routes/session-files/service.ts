@@ -1,7 +1,8 @@
 import { getDb } from '@ottocode/database';
-import { messages, messageParts, sessions } from '@ottocode/database/schema';
+import { messages, messageParts } from '@ottocode/database/schema';
 import { loadConfig } from '@ottocode/sdk';
 import { and, eq, inArray } from 'drizzle-orm';
+import { sessionRepository } from '../../runtime/session/repository.ts';
 import { FILE_EDIT_TOOLS } from './constants.ts';
 import {
 	extractContentFromToolCall,
@@ -24,15 +25,7 @@ export async function getSessionFiles(
 	const cfg = await loadConfig(projectRoot);
 	const db = await getDb(cfg.projectRoot);
 
-	const sessionRows = await db
-		.select()
-		.from(sessions)
-		.where(eq(sessions.id, sessionId))
-		.limit(1);
-
-	if (!sessionRows.length) {
-		throw Object.assign(new Error('Session not found'), { status: 404 });
-	}
+	await sessionRepository(db, cfg.projectRoot).require(sessionId);
 
 	const messageRows = await db
 		.select({ id: messages.id })

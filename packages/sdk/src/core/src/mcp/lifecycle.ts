@@ -7,6 +7,10 @@ import { join } from 'node:path';
 
 const legacyMCPManagerKey = 'legacy';
 const mcpManagersByProject = new Map<string, MCPServerManager>();
+const pendingMCPManagersByProject = new Map<
+	string,
+	Promise<MCPServerManager>
+>();
 
 function getMCPManagerKey(projectRoot?: string): string {
 	return projectRoot || legacyMCPManagerKey;
@@ -14,6 +18,56 @@ function getMCPManagerKey(projectRoot?: string): string {
 
 export function getMCPManager(projectRoot?: string): MCPServerManager | null {
 	return mcpManagersByProject.get(getMCPManagerKey(projectRoot)) ?? null;
+}
+
+/** Lists project roots with active MCP managers. */
+export function getActiveMCPProjectRoots(): string[] {
+	return Array.from(mcpManagersByProject.keys()).filter(
+		(key) => key !== legacyMCPManagerKey,
+	);
+}
+
+/** Initializes a project's manager from its effective global and project config. */
+export async function ensureMCPManager(
+	projectRoot: string,
+	globalConfigDir = getGlobalConfigDir(),
+): Promise<MCPServerManager> {
+	const existing = getMCPManager(projectRoot);
+	if (existing) return existing;
+	const managerKey = getMCPManagerKey(projectRoot);
+	const pending = pendingMCPManagersByProject.get(managerKey);
+	if (pending) return pending;
+	const initialization = (async () => {
+		const current = getMCPManager(projectRoot);
+		if (current) return current;
+		return initializeMCP(
+			await loadEffectiveMCPConfig(projectRoot, globalConfigDir),
+			projectRoot,
+		);
+	})();
+	pendingMCPManagersByProject.set(managerKey, initialization);
+	try {
+		return await initialization;
+	} finally {
+		if (pendingMCPManagersByProject.get(managerKey) === initialization) {
+			pendingMCPManagersByProject.delete(managerKey);
+		}
+	}
+}
+
+/** Reloads a project's manager from persisted effective MCP configuration. */
+export async function reloadMCPManager(
+	projectRoot: string,
+	globalConfigDir = getGlobalConfigDir(),
+): Promise<MCPServerManager> {
+	const pending = pendingMCPManagersByProject.get(
+		getMCPManagerKey(projectRoot),
+	);
+	if (pending) await pending;
+	return initializeMCP(
+		await loadEffectiveMCPConfig(projectRoot, globalConfigDir),
+		projectRoot,
+	);
 }
 
 export async function initializeMCP(
@@ -37,6 +91,7 @@ export async function initializeMCP(
 export async function shutdownMCP(projectRoot?: string): Promise<void> {
 	if (projectRoot) {
 		const managerKey = getMCPManagerKey(projectRoot);
+		await pendingMCPManagersByProject.get(managerKey)?.catch(() => {});
 		const manager = mcpManagersByProject.get(managerKey);
 		if (!manager) return;
 		await manager.stopAll();
@@ -44,6 +99,7 @@ export async function shutdownMCP(projectRoot?: string): Promise<void> {
 		return;
 	}
 
+	await Promise.allSettled(pendingMCPManagersByProject.values());
 	for (const [managerKey, manager] of mcpManagersByProject) {
 		await manager.stopAll();
 		mcpManagersByProject.delete(managerKey);
@@ -71,6 +127,32 @@ function resolveConfigPath(
 async function ensureConfigDir(configPath: string): Promise<void> {
 	const dir = configPath.replace(/[/\\][^/\\]+$/, '');
 	await fs.mkdir(dir, { recursive: true });
+}
+
+export async function setMCPServerDisabled(
+	projectRoot: string,
+	name: string,
+	scope: MCPScope,
+	disabled: boolean,
+	globalConfigDir = getGlobalConfigDir(),
+): Promise<boolean> {
+	const configPath = resolveConfigPath(projectRoot, globalConfigDir, scope);
+	let json: Record<string, unknown>;
+	try {
+		json = JSON.parse(await fs.readFile(configPath, 'utf-8'));
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+		throw error;
+	}
+	const mcp = json.mcp as Record<string, unknown> | undefined;
+	if (!mcp || !Array.isArray(mcp.servers)) return false;
+	const server = (mcp.servers as MCPServerConfig[]).find(
+		(entry) => entry.name === name,
+	);
+	if (!server) return false;
+	server.disabled = disabled;
+	await fs.writeFile(configPath, JSON.stringify(json, null, '\t'), 'utf-8');
+	return true;
 }
 
 export async function addMCPServerToConfig(
@@ -111,11 +193,14 @@ export async function removeMCPServerFromConfig(
 	projectRoot: string,
 	name: string,
 	globalConfigDir = getGlobalConfigDir(),
+	scope?: MCPScope,
 ): Promise<boolean> {
-	const paths = [
-		join(globalConfigDir, 'config.json'),
-		join(projectRoot, '.otto', 'config.json'),
-	];
+	const paths = scope
+		? [resolveConfigPath(projectRoot, globalConfigDir, scope)]
+		: [
+				join(globalConfigDir, 'config.json'),
+				join(projectRoot, '.otto', 'config.json'),
+			];
 
 	for (const configPath of paths) {
 		let json: Record<string, unknown> = {};

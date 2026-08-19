@@ -315,7 +315,7 @@ export function registerTunnelRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const body = await c.req.json<z.infer<typeof ownerSessionBodySchema>>();
+				const body = c.req.valid('json');
 				const session = await exchangeOwnerAssertion(
 					body.assertion,
 					requestSource(c),
@@ -367,8 +367,7 @@ export function registerTunnelRoutes(app: Hono) {
 			if (!tunnelUrl) {
 				return c.json({ error: 'No active tunnel URL available' }, 409);
 			}
-			const body =
-				await c.req.json<z.infer<typeof createTunnelShareBodySchema>>();
+			const body = c.req.valid('json');
 			return c.json(createTunnelShare(body.projectId, tunnelUrl), 200);
 		},
 	);
@@ -416,7 +415,7 @@ export function registerTunnelRoutes(app: Hono) {
 			},
 		},
 		(c) => {
-			if (!revokeTunnelShare(c.req.param('id'))) {
+			if (!revokeTunnelShare(c.req.valid('param').id)) {
 				return c.json({ error: 'Project share not found' }, 404);
 			}
 			return c.json({ ok: true as const }, 200);

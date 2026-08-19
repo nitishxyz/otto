@@ -5,7 +5,6 @@ import {
 	logger,
 	removeAuth,
 	setAuth,
-	type ProviderId,
 } from '@ottocode/sdk';
 import type { Hono } from 'hono';
 import { zodOpenApiRoute } from '../../openapi/route.ts';
@@ -69,10 +68,8 @@ export function registerAuthProviderRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider') as ProviderId;
-				const { apiKey } = addProviderApiKeyBodySchema.parse(
-					await c.req.json(),
-				);
+				const { provider } = c.req.valid('param');
+				const { apiKey } = c.req.valid('json');
 
 				if (!isBuiltInProviderId(provider) || !catalog[provider]) {
 					return c.json({ error: 'Unknown provider' }, 400);
@@ -126,7 +123,7 @@ export function registerAuthProviderRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const provider = c.req.param('provider') as ProviderId;
+				const { provider } = c.req.valid('param');
 
 				if (!isBuiltInProviderId(provider) || !catalog[provider]) {
 					return c.json({ error: 'Unknown provider' }, 400);

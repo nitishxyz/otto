@@ -81,16 +81,16 @@ async function getSortedFileResult(args: {
 async function getFilePolicyFromQuery(c: Context) {
 	const projectRoot = await resolveRequestProjectRoot(c);
 	const policy = getSearchPolicy(projectRoot);
+	const query = c.req.valid('query' as never) as {
+		maxDepth?: number;
+		limit?: number;
+	};
 	const maxDepth = clampNumber(
-		Number.parseInt(c.req.query('maxDepth') || String(policy.maxDepth), 10),
+		query.maxDepth ?? policy.maxDepth,
 		1,
 		policy.maxDepth,
 	);
-	const limit = clampNumber(
-		Number.parseInt(c.req.query('limit') || String(policy.limit), 10),
-		1,
-		policy.limit,
-	);
+	const limit = clampNumber(query.limit ?? policy.limit, 1, policy.limit);
 	return { projectRoot, maxDepth, limit };
 }
 
@@ -147,7 +147,7 @@ export async function handleListFiles(c: Context) {
 export async function handleSearchFiles(c: Context) {
 	try {
 		const { projectRoot, maxDepth, limit } = await getFilePolicyFromQuery(c);
-		const query = c.req.query('q') || '';
+		const { q: query = '' } = c.req.valid('query' as never) as { q?: string };
 		const { result, changedFiles, ignoredFiles } = await getSortedFileResult({
 			projectRoot,
 			maxDepth,
@@ -173,7 +173,9 @@ export async function handleSearchFiles(c: Context) {
 export async function handleFileTree(c: Context) {
 	try {
 		const projectRoot = await resolveRequestProjectRoot(c);
-		const dirPath = c.req.query('path') || '.';
+		const { path: dirPath = '.' } = c.req.valid('query' as never) as {
+			path?: string;
+		};
 		const targetDir = resolve(projectRoot, dirPath);
 		if (!targetDir.startsWith(resolve(projectRoot))) {
 			return c.json({ error: 'Path traversal not allowed' }, 403);
@@ -240,9 +242,8 @@ function isPathInsideRoot(path: string, root: string) {
 	);
 }
 
-async function getSafeFilePath(c: Context) {
+async function getSafeFilePath(c: Context, filePath: string | undefined) {
 	const projectRoot = resolve(await resolveRequestProjectRoot(c));
-	const filePath = c.req.query('path');
 	if (!filePath) {
 		return { error: 'Missing required query parameter: path' as const };
 	}
@@ -298,7 +299,8 @@ function sniffImageMimeType(data: Buffer): string | undefined {
 
 export async function handleReadFile(c: Context) {
 	try {
-		const target = await getSafeFilePath(c);
+		const { path } = c.req.valid('query' as never) as { path: string };
+		const target = await getSafeFilePath(c, path);
 		if ('error' in target)
 			return c.json({ error: target.error }, target.status ?? 400);
 		const content = await readFile(target.absPath, 'utf-8');
@@ -313,7 +315,7 @@ export async function handleReadFile(c: Context) {
 	} catch (err) {
 		if (isNotFoundError(err)) {
 			logger.debug('Files read route file not found', {
-				path: c.req.query('path'),
+				path: (c.req.valid('query' as never) as { path: string }).path,
 			});
 			return c.json({ error: 'File not found' }, 404);
 		}
@@ -324,7 +326,7 @@ export async function handleReadFile(c: Context) {
 
 export async function handleRawFile(c: Context) {
 	try {
-		const target = await getSafeFilePath(c);
+		const target = await getSafeFilePath(c, c.req.query('path'));
 		if ('error' in target)
 			return c.json({ error: target.error }, target.status ?? 400);
 		const data = await readFile(target.absPath);

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { OAuthCredentialStore } from '../packages/sdk/src/core/src/mcp/oauth/store.ts';
 import { OttoOAuthProvider } from '../packages/sdk/src/core/src/mcp/oauth/provider.ts';
 import {
@@ -87,6 +91,61 @@ describe('OttoOAuthProvider callback ownership', () => {
 		});
 		expect(provider.pendingAuthUrl).toContain('state=test');
 		await new Promise<void>((resolve) => listener.close(() => resolve()));
+	});
+
+	test('clears a rejected refresh token and starts authorization again', async () => {
+		const storePath = await mkdtemp(join(tmpdir(), 'otto-mcp-oauth-'));
+		const store = new OAuthCredentialStore(storePath);
+		const provider = new OttoOAuthProvider('test-server', store);
+		await store.saveClientInfo('test-server', { client_id: 'test-client' });
+		await store.saveTokens('test-server', {
+			access_token: 'expired-access',
+			refresh_token: 'expired-refresh',
+		});
+
+		try {
+			const result = await auth(provider, {
+				serverUrl: 'https://mcp.example/mcp',
+				fetchFn: async (input) => {
+					const url = new URL(input.toString());
+					if (url.pathname.includes('oauth-protected-resource')) {
+						return Response.json({
+							resource: 'https://mcp.example/mcp',
+							authorization_servers: ['https://auth.example'],
+						});
+					}
+					if (url.pathname.includes('oauth-authorization-server')) {
+						return Response.json({
+							issuer: 'https://auth.example',
+							authorization_endpoint: 'https://auth.example/authorize',
+							token_endpoint: 'https://auth.example/token',
+							response_types_supported: ['code'],
+						});
+					}
+					if (url.pathname === '/token') {
+						return Response.json(
+							{
+								error: 'invalid_grant',
+								error_description: 'Invalid or expired refresh token',
+							},
+							{ status: 400 },
+						);
+					}
+					return new Response(null, { status: 404 });
+				},
+			});
+
+			expect(result).toBe('REDIRECT');
+			expect(await store.loadTokens('test-server')).toBeUndefined();
+			expect(await store.loadClientInfo('test-server')).toEqual({
+				client_id: 'test-client',
+			});
+			expect(provider.pendingAuthUrl).toStartWith(
+				'https://auth.example/authorize?',
+			);
+		} finally {
+			await rm(storePath, { recursive: true, force: true });
+		}
 	});
 });
 

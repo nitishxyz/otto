@@ -108,15 +108,12 @@ export function registerBranchRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
 
-				const body = (await c.req.json().catch(() => ({}))) as Record<
-					string,
-					unknown
-				>;
+				const body = c.req.valid('json') ?? {};
 
 				const fromMessageId = body.fromMessageId;
 				if (typeof fromMessageId !== 'string' || !fromMessageId.trim()) {
@@ -187,7 +184,7 @@ export function registerBranchRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);
@@ -226,7 +223,7 @@ export function registerBranchRoutes(app: Hono) {
 		},
 		async (c) => {
 			try {
-				const sessionId = c.req.param('sessionId');
+				const { sessionId } = c.req.valid('param');
 				const projectRoot = await resolveRequestProjectRoot(c);
 				const cfg = await loadConfig(projectRoot);
 				const db = await getDb(cfg.projectRoot);

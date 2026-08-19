@@ -54,7 +54,7 @@ export function registerStartGoalRoute(app: Hono) {
 				const { cfg, db } = await loadGoalsContext(
 					await resolveRequestProjectRoot(c),
 				);
-				const goalId = c.req.param('goalId');
+				const { goalId } = c.req.valid('param');
 				const rows = await db
 					.select()
 					.from(goals)

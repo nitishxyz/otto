@@ -1,4 +1,3 @@
-import { Option, type Command } from 'commander';
 import { openAuthUrl } from '@ottocode/sdk';
 import { createWebServer, type WebServerContext } from '../web-server.ts';
 import { colors } from '../ui.ts';
@@ -69,13 +68,6 @@ export async function startWebUi(
 	if (apiUrl) {
 		validateApiUrl(apiUrl);
 		await ensureRemoteApi(apiUrl);
-		const projectRoot = opts.project ?? process.cwd();
-		const { ensureDaemonProject } = await import('../daemon.ts');
-		const local = await ensureDaemonProject({ version, projectRoot });
-		context = {
-			clientApiBaseUrl: local.baseUrl,
-			clientServerToken: local.token,
-		};
 	} else {
 		const projectRoot = opts.project ?? process.cwd();
 		const { ensureAuth } = await import('../middleware/with-auth.ts');
@@ -147,34 +139,4 @@ export async function handleWeb(opts: WebOptions, version: string) {
 	process.once('SIGTERM', shutdown);
 
 	await new Promise(() => {});
-}
-
-export function registerWebCommand(program: Command, version: string) {
-	program
-		.command('web')
-		.description('Open Web UI for this project')
-		.option(
-			'--url <api-url>',
-			'Use an existing API server instead of the local daemon',
-		)
-		.addOption(
-			new Option('--api <url>', 'Deprecated alias for --url').hideHelp(),
-		)
-		.option('-p, --port <port>', 'Web UI port', (v) => parseInt(v, 10))
-		.option('--network', 'Bind to 0.0.0.0 for network access', false)
-		.option('--no-open', 'Do not open browser automatically')
-		.option('--project <path>', 'Use project at <path>', process.cwd())
-		.action(async (opts) => {
-			await handleWeb(
-				{
-					url: opts.url,
-					api: opts.api,
-					port: opts.port,
-					network: opts.network,
-					noOpen: !opts.open,
-					project: opts.project,
-				},
-				version,
-			);
-		});
 }

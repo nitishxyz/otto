@@ -7,6 +7,11 @@ import {
 	warn as loggerWarn,
 } from '../../core/src/utils/logger.ts';
 import os from 'node:os';
+import {
+	abortableDelay,
+	parseIntegerSetting,
+	retry,
+} from '../../runtime/retry.ts';
 
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex';
 const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses';
@@ -113,10 +118,7 @@ function shouldUsePreviousResponseId() {
 }
 
 function parsePositiveIntegerEnv(name: string, fallback: number) {
-	const raw = process.env[name];
-	if (!raw) return fallback;
-	const parsed = Number.parseInt(raw, 10);
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+	return parseIntegerSetting(process.env[name], fallback, { min: 1 });
 }
 
 function getCodexRequestTimeoutMs() {
@@ -134,16 +136,18 @@ function getCodexStreamIdleTimeoutMs() {
 }
 
 function getCodexRequestMaxRetries() {
-	return parsePositiveIntegerEnv(
-		'OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES',
+	return parseIntegerSetting(
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES,
 		CODEX_REQUEST_MAX_RETRIES,
+		{ min: 0 },
 	);
 }
 
 function getCodexRequestRetryDelayMs() {
-	return parsePositiveIntegerEnv(
-		'OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS',
+	return parseIntegerSetting(
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS,
 		CODEX_REQUEST_RETRY_DELAY_MS,
+		{ min: 0 },
 	);
 }
 
@@ -160,17 +164,12 @@ export function getOpenAIOAuthSessionState(sessionId: string) {
 	return state ? { ...state } : undefined;
 }
 
-function sleep(ms: number) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function refreshAndPersist(
 	oauth: OAuth,
 	projectRoot?: string,
 ): Promise<OAuth> {
-	let lastError: Error | undefined;
-	for (let attempt = 0; attempt <= TOKEN_REFRESH_MAX_RETRIES; attempt++) {
-		try {
+	return retry(
+		async () => {
 			const newTokens = await refreshOpenAIToken(oauth.refresh);
 			const updated: OAuth = {
 				type: 'oauth',
@@ -182,14 +181,14 @@ async function refreshAndPersist(
 			};
 			await setAuth('openai', updated, projectRoot, 'global');
 			return updated;
-		} catch (err) {
-			lastError = err instanceof Error ? err : new Error(String(err));
-			if (attempt < TOKEN_REFRESH_MAX_RETRIES) {
-				await sleep(TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1));
-			}
-		}
-	}
-	throw lastError ?? new Error('Token refresh failed');
+		},
+		{
+			maxRetries: TOKEN_REFRESH_MAX_RETRIES,
+			delayMs: ({ attempt }) => TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1),
+		},
+	).catch((error) => {
+		throw error instanceof Error ? error : new Error(String(error));
+	});
 }
 
 async function ensureValidToken(
@@ -520,7 +519,7 @@ async function fetchWithCodexRequestTimeout(
 				retryDelayMs,
 				error: summarizeError(error),
 			});
-			await sleep(retryDelayMs);
+			await abortableDelay(retryDelayMs, init.signal);
 		}
 	}
 

@@ -34,8 +34,8 @@ describe('subagent tool guidance', () => {
 		expect(schema).toContain('delivery');
 		expect(schema).toContain('confirmCancel');
 		expect(schema).toContain('defaults to queue');
-		expect(schema).toContain('urgent correction');
-		expect(schema).toContain('never for status checks');
+		expect(schema).toContain('active child run must be preempted');
+		expect(schema).toContain('user explicitly asked to cancel');
 		expect(schema).toContain('stop polling');
 		expect(schema).toContain('limit');
 	});

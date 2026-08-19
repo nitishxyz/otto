@@ -1,4 +1,13 @@
 // Provider types
+export {
+	BUILT_IN_PROVIDER_DESCRIPTORS,
+	builtInProviderIds,
+	getBuiltInProviderDescriptor,
+} from './provider-descriptors.ts';
+export type {
+	BuiltInProviderDescriptor,
+	ProviderRuntimeKind,
+} from './provider-descriptors.ts';
 export type {
 	BuiltInProviderId,
 	ProviderId,

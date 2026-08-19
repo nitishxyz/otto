@@ -6,12 +6,25 @@
  */
 
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { z } from 'zod';
+import type { ZodError } from 'zod';
 import { isDebugEnabled } from '../debug/state.ts';
 import { toErrorPayload } from './handling.ts';
 
 /**
  * Standard API error response format
  */
+export const apiErrorResponseSchema = z.object({
+	error: z.object({
+		message: z.string(),
+		type: z.string(),
+		code: z.string().optional(),
+		status: z.number().int().optional(),
+		details: z.record(z.string(), z.unknown()).optional(),
+		stack: z.string().optional(),
+	}),
+});
+
 export type APIErrorResponse = {
 	error: {
 		message: string;
@@ -64,6 +77,17 @@ export class APIError extends Error {
 	}
 }
 
+export function createRequestValidationError(
+	target: string,
+	error: ZodError,
+): APIError {
+	return new APIError('Invalid request', {
+		status: 400,
+		code: 'invalid_request',
+		details: { target, issues: error.issues },
+	});
+}
+
 /**
  * Serialize any error into a consistent API error response
  *
@@ -74,10 +98,9 @@ export function serializeError(err: unknown): APIErrorResponse {
 	// Use existing error payload logic
 	const payload = toErrorPayload(err);
 
-	// Determine HTTP status code
-	// Default to 400 for generic errors (client errors)
-	// Only use 500 if explicitly set or for APIError instances without a status
-	let status: ContentfulStatusCode = 400;
+	// Unclassified exceptions are server failures. Expected HTTP failures must use
+	// APIError (or expose an explicit status/statusCode from a dependency).
+	let status: ContentfulStatusCode = 500;
 
 	// Handle APIError instances first
 	if (err instanceof APIError) {

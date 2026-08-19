@@ -1,12 +1,7 @@
 import type { Command } from 'commander';
-import { dispatchRegisteredCommand, pushOption } from './helpers.ts';
 
-async function dispatch(argv: string[], version: string) {
-	const { registerTunnelCommand } = await import('../tunnel.ts');
-	await dispatchRegisteredCommand(
-		(program) => registerTunnelCommand(program, version),
-		argv,
-	);
+interface TunnelOptions {
+	project?: string;
 }
 
 export function registerTunnelCommand(program: Command, version: string) {
@@ -29,10 +24,13 @@ export function registerTunnelCommand(program: Command, version: string) {
 				'Project used to start the daemon',
 				process.cwd(),
 			)
-			.action(async (opts) => {
-				const argv = ['tunnel', action];
-				pushOption(argv, '--project', opts.project);
-				await dispatch(argv, version);
+			.action(async (opts: TunnelOptions) => {
+				const handlers = await import('../tunnel.ts');
+				if (action === 'enable')
+					await handlers.enableTunnel(version, opts.project);
+				else if (action === 'disable')
+					await handlers.disableTunnel(version, opts.project);
+				else await handlers.showTunnelStatus(version, opts.project);
 			});
 	}
 }
