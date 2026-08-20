@@ -1,5 +1,6 @@
 import type { Message, MessagePart } from '../../types/api';
 import {
+	type PreloadedContextSummary,
 	getAssistantTurn,
 	getProgressUpdateMessage,
 	isActionToolPart,
@@ -62,6 +63,13 @@ export type ThreadRow =
 			messageId: string;
 			endsTurn: boolean;
 			message: Message;
+	  }
+	| {
+			kind: 'assistant-context';
+			key: string;
+			messageId: string;
+			endsTurn: boolean;
+			context: PreloadedContextSummary;
 	  }
 	| {
 			kind: 'assistant-item';
@@ -174,6 +182,8 @@ export function getThreadRowType(row: ThreadRow): string {
 			return 'user';
 		case 'assistant-header':
 			return 'header';
+		case 'assistant-context':
+			return 'context';
 		case 'assistant-item': {
 			if (row.variant !== 'part') return `item:${row.variant}`;
 			switch (row.part.type) {
@@ -286,6 +296,10 @@ function sameRow(left: ThreadRow, right: ThreadRow): boolean {
 				left.message === next.message &&
 				left.nextAssistantMessageId === next.nextAssistantMessageId
 			);
+		}
+		case 'assistant-context': {
+			const next = right as Extract<ThreadRow, { kind: 'assistant-context' }>;
+			return left.context === next.context;
 		}
 		case 'assistant-header': {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-header' }>;
@@ -477,6 +491,16 @@ export function buildThreadRows({
 				messageId: message.id,
 				endsTurn: false,
 				message,
+			});
+		}
+
+		if (turn.preloadedContext) {
+			push({
+				kind: 'assistant-context',
+				key: `ctx:${message.id}`,
+				messageId: message.id,
+				endsTurn: false,
+				context: turn.preloadedContext,
 			});
 		}
 

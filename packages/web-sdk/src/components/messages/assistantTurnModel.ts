@@ -101,6 +101,80 @@ export interface VisibleAssistantRenderItem {
 	renderIndex: number;
 }
 
+export interface PreloadedContextSummary {
+	files: Array<{ path: string; lineRange?: string }>;
+	totalBytes?: number;
+	preloadDurationMs?: number;
+	deduplicatedFileCount?: number;
+}
+
+function parsePartPayload(part: MessagePart): Record<string, unknown> | null {
+	if (part.contentJson && typeof part.contentJson === 'object') {
+		return part.contentJson;
+	}
+	try {
+		const parsed = JSON.parse(part.content || '{}');
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+function isPreloadedContextPart(part: MessagePart): boolean {
+	const payload = parsePartPayload(part);
+	return payload?.synthetic === true && payload.origin === 'message_context';
+}
+
+export function getPreloadedContextSummary(
+	parts: MessagePart[],
+): PreloadedContextSummary | null {
+	const resultParts = parts.filter(
+		(part) => part.type === 'tool_result' && isPreloadedContextPart(part),
+	);
+	if (resultParts.length === 0) return null;
+	const files = resultParts.flatMap((part) => {
+		const payload = parsePartPayload(part);
+		const args = payload?.args;
+		if (!args || typeof args !== 'object' || Array.isArray(args)) return [];
+		const input = args as Record<string, unknown>;
+		if (typeof input.path !== 'string') return [];
+		const startLine =
+			typeof input.startLine === 'number' ? input.startLine : undefined;
+		const endLine =
+			typeof input.endLine === 'number' ? input.endLine : undefined;
+		const maxLines =
+			typeof input.maxLines === 'number' ? input.maxLines : undefined;
+		const lineRange = startLine
+			? endLine
+				? `${startLine}-${endLine}`
+				: `${startLine}+${maxLines ?? 1}`
+			: undefined;
+		return [{ path: input.path, lineRange }];
+	});
+	const payload = parsePartPayload(resultParts[0]);
+	const context =
+		payload?.context &&
+		typeof payload.context === 'object' &&
+		!Array.isArray(payload.context)
+			? (payload.context as Record<string, unknown>)
+			: null;
+	return {
+		files,
+		totalBytes:
+			typeof context?.totalBytes === 'number' ? context.totalBytes : undefined,
+		preloadDurationMs:
+			typeof context?.preloadDurationMs === 'number'
+				? context.preloadDurationMs
+				: undefined,
+		deduplicatedFileCount:
+			typeof context?.deduplicatedFileCount === 'number'
+				? context.deduplicatedFileCount
+				: undefined,
+	};
+}
+
 export function getRenderItemKey(item: AssistantRenderItem) {
 	return item.kind === 'group' ? item.id : item.part.id;
 }
@@ -283,6 +357,7 @@ export function getAssistantTurn(
 
 export interface AssistantTurnModel {
 	parts: MessagePart[];
+	preloadedContext: PreloadedContextSummary | null;
 	renderItems: AssistantRenderItem[];
 	visibleRenderItems: VisibleAssistantRenderItem[];
 	omittedRenderItemCount: number;
@@ -321,13 +396,15 @@ export function deriveAssistantTurn(
 ): AssistantTurnModel {
 	const { compact, isQueued, showAllParts = false } = options;
 	const parts = getOrderedMessageParts(message);
+	const preloadedContext = getPreloadedContextSummary(parts);
+	const renderableParts = parts.filter((part) => !isPreloadedContextPart(part));
 	const autoCompactActivity =
 		message.status !== 'pending' &&
-		parts.length >= AUTO_COMPACT_COMPLETED_PART_THRESHOLD;
+		renderableParts.length >= AUTO_COMPACT_COMPLETED_PART_THRESHOLD;
 	const shouldCompactActivity = Boolean(compact || autoCompactActivity);
 
-	const hasFinish = parts.some((part) => part.toolName === 'finish');
-	const latestProgressUpdateIndex = parts.reduce(
+	const hasFinish = renderableParts.some((part) => part.toolName === 'finish');
+	const latestProgressUpdateIndex = renderableParts.reduce(
 		(lastIndex, part, index) =>
 			part.type === 'tool_result' && part.toolName === 'progress_update'
 				? index
@@ -335,14 +412,16 @@ export function deriveAssistantTurn(
 		-1,
 	);
 	const latestProgressUpdatePart =
-		latestProgressUpdateIndex >= 0 ? parts[latestProgressUpdateIndex] : null;
+		latestProgressUpdateIndex >= 0
+			? renderableParts[latestProgressUpdateIndex]
+			: null;
 	const resolvedToolCallIds = new Set(
-		parts
+		renderableParts
 			.filter((part) => part.type === 'tool_result' && part.toolCallId)
 			.map((part) => part.toolCallId)
 			.filter((callId): callId is string => Boolean(callId)),
 	);
-	const latestStatusLineToolCallIndex = parts.reduce(
+	const latestStatusLineToolCallIndex = renderableParts.reduce(
 		(lastIndex, part, index) =>
 			part.type === 'tool_call' &&
 			isStatusLineTool(part.toolName) &&
@@ -353,10 +432,10 @@ export function deriveAssistantTurn(
 	);
 	const latestStatusLineToolCallPart =
 		latestStatusLineToolCallIndex >= 0
-			? parts[latestStatusLineToolCallIndex]
+			? renderableParts[latestStatusLineToolCallIndex]
 			: null;
 	const liveActionToolCallIds = new Set(
-		parts
+		renderableParts
 			.filter(
 				(part) =>
 					part.ephemeral && ACTION_TOOL_NAMES.includes(part.toolName || ''),
@@ -365,7 +444,7 @@ export function deriveAssistantTurn(
 			.filter((callId): callId is string => Boolean(callId)),
 	);
 	const completedActionToolCallIds = new Set(
-		parts
+		renderableParts
 			.filter(
 				(part) =>
 					!part.ephemeral &&
@@ -376,14 +455,17 @@ export function deriveAssistantTurn(
 			.filter((callId): callId is string => Boolean(callId)),
 	);
 
-	const renderItems = buildAssistantRenderItems(parts, shouldCompactActivity);
+	const renderItems = buildAssistantRenderItems(
+		renderableParts,
+		shouldCompactActivity,
+	);
 	const { visibleRenderItems, omittedRenderItemCount } = getVisibleRenderItems(
 		renderItems,
 		showAllParts,
 		message.status,
 	);
 	const hasVisibleNonProgressParts = renderItems.length > 0;
-	const firstVisiblePartIndex = parts.findIndex(
+	const firstVisiblePartIndex = renderableParts.findIndex(
 		(part) => !isStatusLineTool(part.toolName),
 	);
 
@@ -407,7 +489,8 @@ export function deriveAssistantTurn(
 	);
 
 	return {
-		parts,
+		parts: renderableParts,
+		preloadedContext,
 		renderItems,
 		visibleRenderItems,
 		omittedRenderItemCount,

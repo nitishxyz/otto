@@ -131,6 +131,14 @@ export interface UpdateSessionRequest {
 
 export interface SendMessageRequest {
 	content: string;
+	context?: {
+		files: Array<{
+			path: string;
+			startLine?: number;
+			endLine?: number;
+			maxLines?: number;
+		}>;
+	};
 	images?: Array<{ data: string; mediaType: string }>;
 	files?: Array<{
 		type: 'image' | 'pdf' | 'text' | 'binary';

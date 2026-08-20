@@ -2,6 +2,7 @@ import { messageParts, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
 import { publishToolResult, type ToolResultContent } from './events.ts';
+import { recordMessageContextActivity } from '../../runtime/message/context-metrics.ts';
 
 export type ToolTiming = {
 	endTs: number;
@@ -28,6 +29,12 @@ export async function persistToolCall(
 		stepIndex?: number;
 	},
 ): Promise<number> {
+	recordMessageContextActivity({
+		messageId: ctx.messageId,
+		kind: 'tool',
+		toolName: args.name,
+		input: args.input,
+	});
 	const index = await ctx.nextIndex();
 	await ctx.db.insert(messageParts).values({
 		id: args.partId,

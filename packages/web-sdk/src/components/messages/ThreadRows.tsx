@@ -7,6 +7,8 @@ import {
 	GitBranch,
 	Shield,
 	Sparkles,
+	Files,
+	ChevronDown,
 } from 'lucide-react';
 import type { Message, MessagePart } from '../../types/api';
 import type { ThreadRow } from './threadRowModel';
@@ -20,7 +22,10 @@ import { ProviderLogo } from '../common/ProviderLogo';
 import { StableSpinner } from '../ui/StableSpinner';
 import { useToolApprovalStore } from '../../stores/toolApprovalStore';
 import { apiClient } from '../../lib/api-client';
-import { getLoadingMessage } from './assistantTurnModel';
+import {
+	getLoadingMessage,
+	type PreloadedContextSummary,
+} from './assistantTurnModel';
 import { useIsCompactThread } from './threadDensity';
 import { useIsMessageHovered } from './messageHoverStore';
 import { ShowWorkToggle } from './ShowWorkToggle';
@@ -126,6 +131,66 @@ export const AssistantHeaderRow = memo(function AssistantHeaderRow({
 					message={message}
 					onBranchCreated={onBranchCreated}
 				/>
+			)}
+		</div>
+	);
+});
+
+export const AssistantContextRow = memo(function AssistantContextRow({
+	context,
+}: {
+	context: PreloadedContextSummary;
+}) {
+	const [expanded, setExpanded] = useState(false);
+	return (
+		<div className="rounded-lg border border-border/60 bg-muted/30 text-xs text-muted-foreground">
+			<button
+				type="button"
+				onClick={() => setExpanded((current) => !current)}
+				className="flex w-full items-center gap-2 px-3 py-2 text-left hover:text-foreground transition-colors"
+				aria-expanded={expanded}
+			>
+				<Files className="h-3.5 w-3.5 shrink-0" />
+				<span className="font-medium text-foreground/80">
+					{context.files.length} {context.files.length === 1 ? 'file' : 'files'}{' '}
+					preloaded
+				</span>
+				{context.totalBytes !== undefined && (
+					<span>· {Math.ceil(context.totalBytes / 1024)} KB</span>
+				)}
+				{context.preloadDurationMs !== undefined && (
+					<span>· {context.preloadDurationMs} ms</span>
+				)}
+				<ChevronDown
+					className={`ml-auto h-3.5 w-3.5 transition-transform ${
+						expanded ? 'rotate-180' : ''
+					}`}
+				/>
+			</button>
+			{expanded && (
+				<div className="border-t border-border/50 px-3 py-2">
+					<ul className="space-y-1 font-mono text-[11px]">
+						{context.files.map((file, index) => (
+							<li
+								key={`${file.path}:${file.lineRange ?? 'full'}:${index}`}
+								className="truncate"
+								title={file.path}
+							>
+								{file.path}
+								{file.lineRange ? `:${file.lineRange}` : ''}
+							</li>
+						))}
+					</ul>
+					{Boolean(context.deduplicatedFileCount) && (
+						<p className="mt-2">
+							{context.deduplicatedFileCount} duplicate{' '}
+							{context.deduplicatedFileCount === 1
+								? 'reference was'
+								: 'references were'}{' '}
+							removed.
+						</p>
+					)}
+				</div>
 			)}
 		</div>
 	);

@@ -1,6 +1,7 @@
 import type { DB } from '@ottocode/database';
 import type { subagents } from '@ottocode/database/schema';
 import type { OttoConfig } from '@ottocode/sdk';
+import type { ContextFileReference } from '../message/types.ts';
 
 export const MAX_CONCURRENT_PER_PARENT = 3;
 
@@ -14,6 +15,7 @@ export type SpawnSubagentInput = {
 	agent: string;
 	task: string;
 	context?: string;
+	files?: ContextFileReference[];
 	/**
 	 * Existing subagent child session to dispatch the new task into instead of
 	 * creating a fresh session. Keeps prior context for related tasks (e.g.
@@ -33,6 +35,7 @@ export type MessageSubagentInput = {
 	parentSessionId: string;
 	subagentId: string;
 	message: string;
+	files?: ContextFileReference[];
 	delivery?: 'queue' | 'interrupt';
 };
 

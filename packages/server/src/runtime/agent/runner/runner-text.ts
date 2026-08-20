@@ -11,6 +11,7 @@ import {
 } from '../../persistence/part-content-writer.ts';
 import type { RunnerToolObserverState } from './runner-tool-observer.ts';
 import { nowMs } from './runner-telemetry.ts';
+import { recordMessageContextActivity } from '../../message/context-metrics.ts';
 
 type TurnDumpCollector = NonNullable<
 	ReturnType<typeof createTurnDumpCollector>
@@ -80,6 +81,10 @@ export async function handleRunnerTextDelta(args: {
 	}
 
 	args.logFirstOutputLatency('text');
+	recordMessageContextActivity({
+		messageId: opts.assistantMessageId,
+		kind: 'text',
+	});
 
 	if (!state.currentPartId) {
 		state.currentPartId = crypto.randomUUID();

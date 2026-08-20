@@ -43,7 +43,14 @@ function detectIndentation(content: string): string | undefined {
 	return '2 spaces';
 }
 
-type ReadResult = {
+export type ReadToolInput = {
+	path: string;
+	startLine?: number;
+	endLine?: number;
+	maxLines?: number;
+};
+
+export type ReadResult = {
 	ok: true;
 	path: string;
 	content: string;
@@ -52,6 +59,81 @@ type ReadResult = {
 	lineRange?: string;
 	totalLines?: number;
 };
+
+export async function executeReadTool(
+	projectRoot: string,
+	{ path, startLine, endLine, maxLines }: ReadToolInput,
+): Promise<ToolResponse<ReadResult>> {
+	if (!path || path.trim().length === 0) {
+		return createToolError('Missing required parameter: path', 'validation', {
+			parameter: 'path',
+			value: path,
+			suggestion: 'Provide a file path to read',
+		});
+	}
+
+	const req = expandTilde(path);
+	const abs = isAbsoluteLike(req) ? req : resolveSafePath(projectRoot, req);
+
+	try {
+		let content = await readFile(abs, 'utf-8');
+		const indent = detectIndentation(content);
+		await rememberFileRead(projectRoot, abs);
+
+		if (startLine !== undefined) {
+			const lines = content.split('\n');
+			const requestedEndLine =
+				endLine ?? startLine + Math.max(1, maxLines ?? 1) - 1;
+			const start = Math.max(1, startLine) - 1;
+			const end = Math.min(lines.length, requestedEndLine);
+			const selectedLines = lines.slice(start, end);
+			content = selectedLines.join('\n');
+			const result: ReadResult = {
+				ok: true,
+				path: req,
+				content,
+				size: content.length,
+				lineRange: `@${startLine}-${requestedEndLine}`,
+				totalLines: lines.length,
+			};
+			if (indent) result.indentation = indent;
+			return result;
+		}
+
+		const result: ReadResult = {
+			ok: true,
+			path: req,
+			content,
+			size: content.length,
+		};
+		if (indent) result.indentation = indent;
+		return result;
+	} catch (error: unknown) {
+		const embedded = embeddedTextAssets[req];
+		if (embedded) {
+			const content = await readFile(embedded, 'utf-8');
+			return { ok: true, path: req, content, size: content.length };
+		}
+		const isEnoent =
+			error &&
+			typeof error === 'object' &&
+			'code' in error &&
+			error.code === 'ENOENT';
+		return createToolError(
+			isEnoent
+				? `File not found: ${req}`
+				: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+			isEnoent ? 'not_found' : 'execution',
+			{
+				parameter: 'path',
+				value: req,
+				suggestion: isEnoent
+					? 'Use ls or tree to find available files'
+					: undefined,
+			},
+		);
+	}
+}
 
 export function buildReadTool(projectRoot: string): {
 	name: string;
@@ -90,90 +172,8 @@ export function buildReadTool(projectRoot: string): {
 					'Number of lines to read starting at startLine. Ignored when endLine is provided.',
 				),
 		}),
-		async execute({
-			path,
-			startLine,
-			endLine,
-			maxLines,
-		}: {
-			path: string;
-			startLine?: number;
-			endLine?: number;
-			maxLines?: number;
-		}): Promise<ToolResponse<ReadResult>> {
-			if (!path || path.trim().length === 0) {
-				return createToolError(
-					'Missing required parameter: path',
-					'validation',
-					{
-						parameter: 'path',
-						value: path,
-						suggestion: 'Provide a file path to read',
-					},
-				);
-			}
-
-			const req = expandTilde(path);
-			const abs = isAbsoluteLike(req) ? req : resolveSafePath(projectRoot, req);
-
-			try {
-				let content = await readFile(abs, 'utf-8');
-				const indent = detectIndentation(content);
-				await rememberFileRead(projectRoot, abs);
-
-				if (startLine !== undefined) {
-					const lines = content.split('\n');
-					const requestedEndLine =
-						endLine ?? startLine + Math.max(1, maxLines ?? 1) - 1;
-					const start = Math.max(1, startLine) - 1;
-					const end = Math.min(lines.length, requestedEndLine);
-					const selectedLines = lines.slice(start, end);
-					content = selectedLines.join('\n');
-					const result: ReadResult = {
-						ok: true,
-						path: req,
-						content,
-						size: content.length,
-						lineRange: `@${startLine}-${requestedEndLine}`,
-						totalLines: lines.length,
-					};
-					if (indent) result.indentation = indent;
-					return result;
-				}
-
-				const result: ReadResult = {
-					ok: true,
-					path: req,
-					content,
-					size: content.length,
-				};
-				if (indent) result.indentation = indent;
-				return result;
-			} catch (error: unknown) {
-				const embedded = embeddedTextAssets[req];
-				if (embedded) {
-					const content = await readFile(embedded, 'utf-8');
-					return { ok: true, path: req, content, size: content.length };
-				}
-				const isEnoent =
-					error &&
-					typeof error === 'object' &&
-					'code' in error &&
-					error.code === 'ENOENT';
-				return createToolError(
-					isEnoent
-						? `File not found: ${req}`
-						: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
-					isEnoent ? 'not_found' : 'execution',
-					{
-						parameter: 'path',
-						value: req,
-						suggestion: isEnoent
-							? 'Use ls or tree to find available files'
-							: undefined,
-					},
-				);
-			}
+		async execute(input: ReadToolInput): Promise<ToolResponse<ReadResult>> {
+			return executeReadTool(projectRoot, input);
 		},
 	});
 	return { name: 'read', tool: read };

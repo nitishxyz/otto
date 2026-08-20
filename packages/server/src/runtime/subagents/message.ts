@@ -36,14 +36,6 @@ export async function messageSubagent(
 			error: `No sub-agent with id "${subagentId}" for this session. Use subagent action=list to find ids.`,
 		};
 	}
-	if (record.status === 'cancelled') {
-		return {
-			ok: false,
-			error:
-				'Sub-agent was cancelled; its session may be incomplete. Use subagent action=delegate to start a fresh one.',
-		};
-	}
-
 	const childSession = await getSessionById({
 		db,
 		sessionId: record.childSessionId,
@@ -69,6 +61,7 @@ export async function messageSubagent(
 		session: childSession,
 		agent: childSession.agent,
 		content: buildFollowUpPrompt(message),
+		context: input.files?.length ? { files: input.files } : undefined,
 	});
 	let sendNowResult: ReturnType<typeof sendQueuedMessageNow> | undefined;
 	if (delivery === 'interrupt') {
@@ -100,6 +93,7 @@ export async function messageSubagent(
 		parentSessionId,
 		childSessionId: record.childSessionId,
 		wasRunning: record.status === 'running',
+		resumedAfterStop: record.status === 'cancelled',
 		delivery,
 		preemptedMessageId:
 			sendNowResult?.success === true

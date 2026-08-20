@@ -10,6 +10,7 @@ export async function dispatchSubagentMessage(args: {
 	session: SessionForDispatch;
 	agent: string;
 	content: string;
+	context?: DispatchOptions['context'];
 }) {
 	const { dispatchAssistantMessage } = await import('../message/service.ts');
 	return dispatchAssistantMessage({
@@ -20,5 +21,6 @@ export async function dispatchSubagentMessage(args: {
 		provider: args.session.provider as ProviderId,
 		model: args.session.model,
 		content: args.content,
+		context: args.context,
 	});
 }

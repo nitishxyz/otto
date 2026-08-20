@@ -73,6 +73,35 @@ Project summaries include `id`, `name`, `path`, `stateDir`, `dbPath`, `lastUsedA
 - `POST /v1/sessions/{sessionId}/branch`
 - `POST /v1/sessions/{sessionId}/share`
 
+`POST /v1/sessions/{id}/messages` accepts optional file context that is read
+from the target project before the assistant starts:
+
+```json
+{
+  "content": "Update the implementation using these references.",
+  "context": {
+    "files": [
+      { "path": "packages/sdk/src/example.ts" },
+      { "path": "tests/example.test.ts", "startLine": 20, "endLine": 80 }
+    ]
+  }
+}
+```
+
+The server resolves these references concurrently and appends each as a
+synthetic `read` tool call/result pair at the active conversation tail. A
+maximum of 20 files and 2 MiB of serialized read results can be preloaded per
+message. `endLine` and `maxLines` require `startLine`; when both are supplied,
+`endLine` takes precedence. Identical references in one request are read once, and normal history
+compaction keeps only the latest read of the same path and range in model
+context. Missing files are preserved as normal read errors so the agent can
+recover with its own tools.
+
+The message UI collapses these synthetic reads into a “files preloaded” row
+showing paths, bytes, preload duration, and removed duplicate references. Server
+telemetry records preload duration, time to the first assistant text/tool
+activity, and any agent-initiated reread of an identical preloaded range.
+
 ### Config
 
 - `GET /v1/config`

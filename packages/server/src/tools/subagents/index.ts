@@ -15,6 +15,36 @@ import {
 	spawnSubagent,
 	stopSubagent,
 } from '../../runtime/subagents/service.ts';
+import { MAX_CONTEXT_FILES } from '../../runtime/message/context.ts';
+
+const contextFileSchema = z
+	.object({
+		path: z.string().trim().min(1),
+		startLine: z.number().int().min(1).optional(),
+		endLine: z.number().int().min(1).optional(),
+		maxLines: z.number().int().min(1).optional(),
+	})
+	.superRefine((file, ctx) => {
+		if (
+			file.startLine === undefined &&
+			(file.endLine !== undefined || file.maxLines !== undefined)
+		) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'startLine is required with endLine or maxLines',
+			});
+		}
+		if (
+			file.startLine !== undefined &&
+			file.endLine !== undefined &&
+			file.endLine < file.startLine
+		) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'endLine must be greater than or equal to startLine',
+			});
+		}
+	});
 
 const subagentInputSchema = z.object({
 	action: z.enum([
@@ -30,6 +60,13 @@ const subagentInputSchema = z.object({
 	agent: z.string().optional().describe('Agent name; required for delegate'),
 	task: z.string().optional().describe('Task; required for delegate'),
 	context: z.string().optional().describe('Optional delegate context'),
+	files: z
+		.array(contextFileSchema)
+		.max(MAX_CONTEXT_FILES)
+		.optional()
+		.describe(
+			'Files to preload for delegate or message as synthetic read tool calls',
+		),
 	reuseSessionId: z
 		.string()
 		.optional()
@@ -80,7 +117,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 		name: 'subagent',
 		tool: tool({
 			description:
-				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows lifecycle results; status inspects one agent including context-window usage and read returns recent tool calls, but both are one-time diagnostics only when explicitly needed, never progress polling; message sends a queued or interrupting follow-up only for an urgent correction that invalidates current work; compact sends /compact regardless of lifecycle status, queued by default or interrupting when requested; stop cancels only with explicit user cancellation confirmation; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child: after delegation, do not inspect its files, check Git, rerun its verification, or send suggestions. Results return automatically. Continue only genuinely independent work or end the turn. A request to stop polling/checking/waiting means end the turn, not stop the child.',
+				'Manage sub-agents. Actions: delegate starts asynchronous work; list shows lifecycle results; status inspects one agent including context-window usage and read returns recent tool calls, but both are one-time diagnostics only when explicitly needed, never progress polling; message sends a queued or interrupting follow-up, and can resume a sub-agent previously stopped by the parent; compact sends /compact regardless of lifecycle status, queued by default or interrupting when requested; stop cancels only with explicit user cancellation confirmation; retry restarts a failed run. For delegate, omit reuseSessionId for fresh parallel work and use it only for related continuation. Delegated work is owned by the child: after delegation, do not inspect its files, check Git, rerun its verification, or send suggestions. Results return automatically. Continue only genuinely independent work or end the turn. A request to stop polling/checking/waiting means end the turn, not stop the child.',
 			inputSchema: subagentInputSchema,
 			async execute(input) {
 				switch (input.action) {
@@ -108,6 +145,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							agent,
 							task,
 							context: input.context,
+							files: input.files,
 							reuseSessionId: input.reuseSessionId,
 						});
 						if (!result.ok) return { ok: false, error: result.error };
@@ -147,7 +185,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 								status: record.status,
 								summary: record.summary ?? undefined,
 								canRetry: record.status === 'failed',
-								canMessage: record.status !== 'cancelled',
+								canMessage: true,
 								childSessionId: record.childSessionId,
 							})),
 						};
@@ -200,6 +238,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 							parentSessionId: sessionId,
 							subagentId,
 							message,
+							files: input.files,
 							delivery: input.delivery ?? 'queue',
 						});
 						if (!result.ok) return { ok: false, error: result.error };

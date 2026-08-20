@@ -46,6 +46,7 @@ import {
 import {
 	AssistantApprovalsRow,
 	AssistantCompactGroupRow,
+	AssistantContextRow,
 	AssistantErrorRow,
 	AssistantFooterRow,
 	AssistantHeaderRow,
@@ -193,6 +194,9 @@ const ThreadRowRenderer = memo(function ThreadRowRenderer({
 					nextAssistantMessageId={row.nextAssistantMessageId}
 				/>
 			);
+			break;
+		case 'assistant-context':
+			content = <AssistantContextRow context={row.context} />;
 			break;
 		case 'assistant-header':
 			indented = false;

@@ -22,6 +22,7 @@ import { serializeError } from '../runtime/errors/api-error.ts';
 import { resolveAgentConfig } from '../runtime/agent/registry.ts';
 import { tryExecutePluginSlashMessage } from '../runtime/commands/plugin-slash.ts';
 import { dispatchAssistantMessage } from '../runtime/message/service.ts';
+import { MAX_CONTEXT_FILES } from '../runtime/message/context.ts';
 import type { DispatchOptions } from '../runtime/message/types.ts';
 import { sessionRepository } from '../runtime/session/repository.ts';
 import {
@@ -450,6 +451,35 @@ async function serializeMessages(
 
 const createMessageQuerySchema = projectQuerySchema;
 
+const contextFileSchema = z
+	.object({
+		path: z.string().trim().min(1),
+		startLine: z.number().int().min(1).optional(),
+		endLine: z.number().int().min(1).optional(),
+		maxLines: z.number().int().min(1).optional(),
+	})
+	.superRefine((file, ctx) => {
+		if (
+			file.startLine === undefined &&
+			(file.endLine !== undefined || file.maxLines !== undefined)
+		) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'startLine is required with endLine or maxLines',
+			});
+		}
+		if (
+			file.startLine !== undefined &&
+			file.endLine !== undefined &&
+			file.endLine < file.startLine
+		) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'endLine must be greater than or equal to startLine',
+			});
+		}
+	});
+
 const createMessageBodySchema = z.object({
 	content: z.string(),
 	agent: z.string().optional().openapi({
@@ -485,6 +515,15 @@ const createMessageBodySchema = z.object({
 		}),
 	images: z.array(z.unknown()).optional(),
 	files: z.array(z.unknown()).optional(),
+	context: z
+		.object({
+			files: z.array(contextFileSchema).max(MAX_CONTEXT_FILES),
+		})
+		.optional()
+		.openapi({
+			description:
+				'File references to preload as synthetic read tool calls immediately before the assistant runs.',
+		}),
 	oneShot: z.boolean().optional(),
 });
 
@@ -903,6 +942,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 				const images = Array.isArray(body.images)
 					? (body.images as NonNullable<DispatchOptions['images']>)
 					: undefined;
+				const context = body.context;
 				const files = Array.isArray(body.files)
 					? (body.files as NonNullable<DispatchOptions['files']>)
 					: undefined;
@@ -973,6 +1013,7 @@ export function registerSessionMessagesRoutes(app: Hono) {
 					reasoningLevel,
 					images,
 					files,
+					context,
 				});
 				return c.json({ messageId: assistantMessageId }, 202);
 			} catch (error) {

@@ -10,6 +10,11 @@ import { buildPwdTool } from './pwd.ts';
 import { buildCdTool } from './cd.ts';
 
 export { rememberFileRead } from './read-tracker.ts';
+export {
+	executeReadTool,
+	type ReadResult,
+	type ReadToolInput,
+} from './read.ts';
 
 export function buildFsTools(
 	projectRoot: string,

@@ -3,6 +3,17 @@ import type { sessions } from '@ottocode/database/schema';
 import type { OttoConfig, ProviderId, ReasoningLevel } from '@ottocode/sdk';
 import type { ImageCompressionMetadata } from './image-compression.ts';
 
+export type ContextFileReference = {
+	path: string;
+	startLine?: number;
+	endLine?: number;
+	maxLines?: number;
+};
+
+export type MessageContext = {
+	files: ContextFileReference[];
+};
+
 export type AttachmentOriginalMetadata = {
 	filename?: string;
 	size?: number;
@@ -42,4 +53,5 @@ export type DispatchOptions = {
 		attachmentId?: string;
 		original?: AttachmentOriginalMetadata;
 	}>;
+	context?: MessageContext;
 };

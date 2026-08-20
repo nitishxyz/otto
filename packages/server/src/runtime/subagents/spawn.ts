@@ -34,6 +34,7 @@ export async function spawnSubagent(
 		agent,
 		task,
 		context,
+		files,
 		reuseSessionId,
 	} = input;
 
@@ -109,6 +110,7 @@ export async function spawnSubagent(
 			context,
 			isReuse,
 		}),
+		context: files?.length ? { files } : undefined,
 	});
 
 	publish({

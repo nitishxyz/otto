@@ -5,6 +5,7 @@ import { enqueueAssistantRun } from '../session/queue.ts';
 import { attachDirectImages } from './attachments.ts';
 import { estimateTokens } from './compaction.ts';
 import { createPendingAssistantMessage, createUserMessage } from './create.ts';
+import { injectMessageContext, prepareMessageContext } from './context.ts';
 import {
 	compressFileImageAttachments,
 	compressImageAttachments,
@@ -30,6 +31,7 @@ export async function dispatchAssistantMessage(
 		reasoningLevel,
 		images,
 		files,
+		context,
 	} = options;
 
 	const sessionId = session.id;
@@ -53,6 +55,7 @@ export async function dispatchAssistantMessage(
 	const effectiveProvider = builtinCommand?.provider ?? provider;
 	const effectiveModel = builtinCommand?.model ?? model;
 	const effectiveOneShot = builtinCommand?.oneShot ?? oneShot;
+	const preparedContext = await prepareMessageContext(cfg.projectRoot, context);
 	logger.debug('[agent] dispatching assistant message', {
 		sessionId,
 		agent: effectiveAgent,
@@ -82,6 +85,15 @@ export async function dispatchAssistantMessage(
 		provider: effectiveProvider,
 		model: effectiveModel,
 	});
+	const contextTokens = await injectMessageContext({
+		db,
+		sessionId,
+		messageId: assistantMessageId,
+		agent: effectiveAgent,
+		provider: effectiveProvider,
+		model: effectiveModel,
+		prepared: preparedContext,
+	});
 
 	const commandPromptText =
 		builtinCommand?.additionalPromptMessages
@@ -94,7 +106,6 @@ export async function dispatchAssistantMessage(
 			(total, file) => total + estimateTokens(file.textContent ?? ''),
 			0,
 		) ?? 0);
-
 	const toolApprovalMode = cfg.defaults.toolApproval ?? 'dangerous';
 
 	enqueueAssistantRun(
@@ -108,7 +119,7 @@ export async function dispatchAssistantMessage(
 			oneShot: Boolean(effectiveOneShot),
 			userContent: content,
 			userContext,
-			estimatedInputTokens,
+			estimatedInputTokens: estimatedInputTokens + contextTokens,
 			reasoningText,
 			reasoningLevel,
 			omitHistory: builtinCommand?.omitHistory,
