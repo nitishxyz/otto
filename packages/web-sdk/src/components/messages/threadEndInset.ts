@@ -10,12 +10,27 @@
  * growth (multiline input, session bars) frame-accurately.
  */
 
+export type ThreadEndDensity = 'normal' | 'compact';
+
 /**
- * Deliberate breathing room between the last row and the composer's top edge,
- * matching the roomy row gap (`pb-6`). Anything larger re-creates the dead
- * band the hard-coded `pb-80`/`pb-96` spacer produced.
+ * Deliberate breathing room between the last row and the composer's top edge
+ * in roomy density. The floating composer draws a 64px gradient fade
+ * (`pt-16`) above its boundary; matching that step keeps the last row fully
+ * clear of the fade instead of visually flush against the input. Anything
+ * much larger re-creates the dead band the old hard-coded `pb-96` spacer
+ * produced.
  */
-export const THREAD_END_BREATHING_ROOM_PX = 24;
+export const THREAD_END_BREATHING_ROOM_PX = 64;
+
+/** Compact-density breathing room: one Tailwind step tighter (`pb-12`). */
+export const THREAD_END_BREATHING_ROOM_COMPACT_PX = 48;
+
+/** Density-resolved breathing room between the last row and the composer. */
+export function getThreadEndBreathingRoom(density: ThreadEndDensity): number {
+	return density === 'compact'
+		? THREAD_END_BREATHING_ROOM_COMPACT_PX
+		: THREAD_END_BREATHING_ROOM_PX;
+}
 
 /**
  * Resolves the list's trailing end inset from the measured composer overlap.

@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { useTerminalDimensions } from '@opentui/react';
 import {
 	OTTO_TUI_GLYPHS,
 	OTTO_TUI_WORDMARK_GAPS,
@@ -7,6 +6,7 @@ import {
 	resolveOttoWordmarkVariant,
 	type OttoTuiWordmarkVariant,
 } from '../brand/wordmark.ts';
+import { useTerminalDimensions } from '../terminal-dimensions.tsx';
 
 export interface OttoWordmarkProps {
 	variant?: OttoTuiWordmarkVariant;

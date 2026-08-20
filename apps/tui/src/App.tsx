@@ -1,4 +1,4 @@
-import { useSelectionHandler, useTerminalDimensions } from '@opentui/react';
+import { useSelectionHandler } from '@opentui/react';
 import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import {
 	removeFromQueue as apiRemoveFromQueue,
@@ -50,6 +50,7 @@ import { useOverlayStore } from './stores/overlay.ts';
 import { useWorkspaceStore } from './stores/workspace.ts';
 import type { Session } from './types.ts';
 import type { ActivitySubagent } from './components/activity/types.ts';
+import { useTerminalDimensions } from './terminal-dimensions.tsx';
 
 export function App({
 	onQuit,

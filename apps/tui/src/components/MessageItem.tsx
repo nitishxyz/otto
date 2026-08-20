@@ -1,5 +1,4 @@
 import { memo, useMemo } from 'react';
-import { useTerminalDimensions } from '@opentui/react';
 import { TinySpinner } from './TinySpinner.tsx';
 import { useTheme } from '../theme.ts';
 import { ToolCallItem } from './ToolCallItem.tsx';
@@ -20,6 +19,7 @@ import {
 } from '../lib/message-blocks.ts';
 
 import type { Message, MessagePart, PendingApproval } from '../types.ts';
+import { useTerminalDimensions } from '../terminal-dimensions.tsx';
 
 interface MessageItemProps {
 	message: Message;

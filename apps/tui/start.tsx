@@ -8,6 +8,7 @@ import { App } from './src/App.tsx';
 import { ThemeProvider } from './src/theme.ts';
 import { setPort, configureApi, configureProjectContext } from './src/api.ts';
 import { enableLinuxShiftEnterReporting } from './src/lib/terminal-keyboard.ts';
+import { TerminalDimensionsProvider } from './src/terminal-dimensions.tsx';
 
 export async function startTui(
 	port: number,
@@ -87,13 +88,15 @@ export async function startTui(
 	}
 
 	root.render(
-		<ThemeProvider>
-			<App
-				onQuit={handleQuit}
-				webUrl={webUrl}
-				initialSession={initialSession}
-			/>
-		</ThemeProvider>,
+		<TerminalDimensionsProvider>
+			<ThemeProvider>
+				<App
+					onQuit={handleQuit}
+					webUrl={webUrl}
+					initialSession={initialSession}
+				/>
+			</ThemeProvider>
+		</TerminalDimensionsProvider>,
 	);
 
 	await new Promise(() => {});

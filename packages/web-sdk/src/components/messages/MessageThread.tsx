@@ -70,7 +70,10 @@ import {
 	reduceThreadFollow,
 	type ThreadFollowEvent,
 } from './threadFollowState';
-import { resolveThreadEndInset } from './threadEndInset';
+import {
+	getThreadEndBreathingRoom,
+	resolveThreadEndInset,
+} from './threadEndInset';
 interface MessageThreadProps {
 	messages: Message[];
 	session?: Session;
@@ -719,11 +722,17 @@ export const MessageThread = memo(function MessageThread({
 	// ResizeObserver above) and hands it to LegendList as
 	// `contentInsetEndAdjustment`: real trailing scroll range aligned with
 	// scrollToEnd/end pinning, instead of a hard-coded spacer that under- or
-	// overshoots the composer on different platforms.
+	// overshoots the composer on different platforms. The density-resolved
+	// breathing room keeps the last row visibly clear of the composer's
+	// gradient fade and, because it lives inside the inset, scrollToEnd still
+	// reaches the true bottom.
 	const footerBottomPaddingClass = footerBottomPaddingClassOverride ?? '';
 	const contentEndInset = footerBottomPaddingClassOverride
 		? 0
-		: resolveThreadEndInset(railInsets.bottom);
+		: resolveThreadEndInset(
+				railInsets.bottom,
+				getThreadEndBreathingRoom(density),
+			);
 
 	// Create a retry handler for error messages
 	const handleRetryMessage = useCallback(

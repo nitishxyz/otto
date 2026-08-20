@@ -5,6 +5,7 @@ import { ThemeProvider } from './src/theme.ts';
 import { configureApi, configureProjectContext } from './src/api.ts';
 import { discoverLocalDaemon } from './src/daemon.ts';
 import { enableLinuxShiftEnterReporting } from './src/lib/terminal-keyboard.ts';
+import { TerminalDimensionsProvider } from './src/terminal-dimensions.tsx';
 
 // Standalone entry: prefer a running local daemon unless the server is
 // explicitly configured via env.
@@ -71,7 +72,9 @@ function handleQuit() {
 }
 
 root.render(
-	<ThemeProvider>
-		<App onQuit={handleQuit} />
-	</ThemeProvider>,
+	<TerminalDimensionsProvider>
+		<ThemeProvider>
+			<App onQuit={handleQuit} />
+		</ThemeProvider>
+	</TerminalDimensionsProvider>,
 );

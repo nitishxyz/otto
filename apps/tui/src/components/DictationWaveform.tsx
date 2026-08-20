@@ -1,7 +1,7 @@
-import { useTerminalDimensions } from '@opentui/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import type { DictationPhase } from '../hooks/useDictation.ts';
 import { useTheme } from '../theme.ts';
+import { useTerminalDimensions } from '../terminal-dimensions.tsx';
 import { TinySpinner } from './TinySpinner.tsx';
 
 const WAVEFORM_ROWS = [

@@ -329,6 +329,22 @@ export function getVisibleRenderItems(
 	};
 }
 
+export interface AssistantTurnOptions {
+	compact?: boolean;
+	isQueued?: boolean;
+	showAllParts?: boolean;
+	/**
+	 * Keeps a turn in its expanded per-part representation even after it
+	 * completes past the auto-compact threshold. The thread sets this for
+	 * turns it already rendered expanded while they streamed: swapping the
+	 * whole turn to compact groups at the pending→complete instant would
+	 * remove every in-view row key at once, which the reader experiences as
+	 * the viewport jumping. History turns (first seen complete) still
+	 * auto-compact.
+	 */
+	suppressAutoCompact?: boolean;
+}
+
 interface CachedAssistantTurn {
 	signature: string;
 	model: AssistantTurnModel;
@@ -343,11 +359,11 @@ const assistantTurnCache = new WeakMap<Message, CachedAssistantTurn>();
  */
 export function getAssistantTurn(
 	message: Message,
-	options: { compact?: boolean; isQueued?: boolean; showAllParts?: boolean },
+	options: AssistantTurnOptions,
 ): AssistantTurnModel {
 	const signature = `${options.compact ? 1 : 0}:${options.isQueued ? 1 : 0}:${
 		options.showAllParts ? 1 : 0
-	}`;
+	}:${options.suppressAutoCompact ? 1 : 0}`;
 	const cached = assistantTurnCache.get(message);
 	if (cached && cached.signature === signature) return cached.model;
 	const model = deriveAssistantTurn(message, options);
@@ -392,13 +408,14 @@ export interface AssistantTurnModel {
  */
 export function deriveAssistantTurn(
 	message: Message,
-	options: { compact?: boolean; isQueued?: boolean; showAllParts?: boolean },
+	options: AssistantTurnOptions,
 ): AssistantTurnModel {
 	const { compact, isQueued, showAllParts = false } = options;
 	const parts = getOrderedMessageParts(message);
 	const preloadedContext = getPreloadedContextSummary(parts);
 	const renderableParts = parts.filter((part) => !isPreloadedContextPart(part));
 	const autoCompactActivity =
+		!options.suppressAutoCompact &&
 		message.status !== 'pending' &&
 		renderableParts.length >= AUTO_COMPACT_COMPLETED_PART_THRESHOLD;
 	const shouldCompactActivity = Boolean(compact || autoCompactActivity);

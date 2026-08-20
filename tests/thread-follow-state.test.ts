@@ -19,6 +19,7 @@ describe('thread follow state', () => {
 		expect(createThreadFollowState()).toEqual({
 			following: true,
 			lastScrollTop: null,
+			lastDistanceFromBottom: null,
 		});
 	});
 
@@ -95,6 +96,63 @@ describe('thread follow state', () => {
 		expect(reduceThreadFollow(detached, { type: 'reset' })).toEqual({
 			following: true,
 			lastScrollTop: null,
+			lastDistanceFromBottom: null,
 		});
+	});
+
+	test('stays following when a collapsing row clamps scrollTop at the bottom', () => {
+		// A live activity box collapsing at the tail shrinks scrollHeight; the
+		// browser clamps scrollTop down while the reader stays pinned at the
+		// bottom. That must not read as "scrolled up".
+		const state = run(createThreadFollowState(), [
+			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 0 },
+			{ type: 'scrolled', scrollTop: 3740, distanceFromBottom: 0 },
+		]);
+		expect(state.following).toBe(true);
+	});
+
+	test('stays following when layout moves scrollTop without moving the reader', () => {
+		// maintainVisibleContentPosition adjusts scrollTop when a row above the
+		// viewport re-measures smaller; the reader keeps the same distance from
+		// the bottom. A streaming follower momentarily 40px above the bottom
+		// must survive that adjustment.
+		const state = run(createThreadFollowState(), [
+			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 40 },
+			{ type: 'scrolled', scrollTop: 3700, distanceFromBottom: 40 },
+		]);
+		expect(state.following).toBe(true);
+	});
+
+	test('stays following through an animated collapse emitting many clamp samples', () => {
+		let state = reduceThreadFollow(createThreadFollowState(), {
+			type: 'scrolled',
+			scrollTop: 4000,
+			distanceFromBottom: 24,
+		});
+		// max-height transition shrinks the tail row over several frames; each
+		// frame clamps scrollTop while distance-from-bottom only shrinks.
+		for (const [scrollTop, distanceFromBottom] of [
+			[3950, 20],
+			[3890, 12],
+			[3820, 4],
+			[3740, 0],
+		] as const) {
+			state = reduceThreadFollow(state, {
+				type: 'scrolled',
+				scrollTop,
+				distanceFromBottom,
+			});
+			expect(state.following).toBe(true);
+		}
+	});
+
+	test('still detaches when an upward scroll coincides with content shrink', () => {
+		// A real scrollbar/keyboard scroll up moves the reader away from the
+		// bottom even while content is shrinking.
+		const state = run(createThreadFollowState(), [
+			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 0 },
+			{ type: 'scrolled', scrollTop: 3200, distanceFromBottom: 540 },
+		]);
+		expect(state.following).toBe(false);
 	});
 });

@@ -1,6 +1,10 @@
 import { useKeyboard } from '@opentui/react';
 import { decodePasteBytes } from '@opentui/core';
-import type { TextareaOptions, TextareaRenderable } from '@opentui/core';
+import type {
+	MouseEvent,
+	TextareaOptions,
+	TextareaRenderable,
+} from '@opentui/core';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { searchFiles } from '@ottocode/api';
 import { fuzzyMatchFilePath } from '@ottocode/sdk/search/file-rank';
@@ -509,9 +513,14 @@ export function ChatInput({
 	const railColor = disabled ? colors.border : accent;
 	const inputBg = paneActive ? colors.bgSubtle : colors.bgDark;
 	const inputTextColor = paneActive ? colors.fgBright : colors.fgMuted;
-	const focusTextarea = useCallback(() => {
-		if (!disabled && !dictation.isActive) textareaRef.current?.focus();
-	}, [disabled, dictation.isActive]);
+	const focusTextarea = useCallback(
+		(event: MouseEvent) => {
+			if (disabled || dictation.isActive) return;
+			event.preventDefault();
+			textareaRef.current?.focus();
+		},
+		[disabled, dictation.isActive],
+	);
 
 	const fileWindow = getVisibleWindow(
 		filteredFiles.length,

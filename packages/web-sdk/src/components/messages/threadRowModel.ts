@@ -247,11 +247,23 @@ interface BuildThreadRowsOptions {
  * field is unchanged is what stops a prepend (or an unrelated stream delta)
  * from invalidating the whole viewport.
  */
-export type ThreadRowCache = Map<string, ThreadRow>;
+export interface ThreadRowCache {
+	/** Previous row object per key, reused when every rendered field matches. */
+	rows: Map<string, ThreadRow>;
+	/**
+	 * Ids of assistant turns this thread has rendered while they were still
+	 * pending. Such a turn keeps its expanded per-part rows after completion:
+	 * flipping it to the auto-compacted representation at the
+	 * pending→complete instant would replace every in-view row key in one
+	 * data change and yank the viewport. Turns first seen complete (initial
+	 * load, prepends, session switches) still auto-compact.
+	 */
+	liveTurnIds: Set<string>;
+}
 
 /** Creates a row identity cache scoped to a single thread instance. */
 export function createThreadRowCache(): ThreadRowCache {
-	return new Map();
+	return { rows: new Map(), liveTurnIds: new Set() };
 }
 
 /** Fallback cache for callers that do not own one (tests, one-off renders). */
@@ -397,10 +409,13 @@ export function buildThreadRows({
 	expandedWorkMessageIds,
 }: BuildThreadRowsOptions): ThreadRowsResult {
 	const expandedWork = expandedWorkMessageIds ?? EMPTY_EXPANDED_WORK;
-	const rowIdentityCache = cache ?? defaultRowIdentityCache;
+	const threadCache = cache ?? defaultRowIdentityCache;
+	const rowIdentityCache = threadCache.rows;
+	const liveTurnIds = threadCache.liveTurnIds;
 	const rows: ThreadRow[] = [];
 	const rowIndexByMessageIndex: number[] = [];
 	const seenKeys = new Set<string>();
+	const seenAssistantIds = new Set<string>();
 
 	// Rows for the message being built. `endsTurn` is only known once the turn
 	// is complete, so rows are staged here and reconciled with the identity
@@ -469,7 +484,14 @@ export function buildThreadRows({
 			(!previousMessage || previousMessage.role !== 'assistant');
 		const hasNextAssistantMessage = Boolean(nextAssistantMessage);
 
-		const turn = getAssistantTurn(message, { compact });
+		seenAssistantIds.add(message.id);
+		// Latch turns the reader watched stream so completion cannot swap their
+		// expanded rows for compact groups mid-view.
+		if (message.status === 'pending') liveTurnIds.add(message.id);
+		const turn = getAssistantTurn(message, {
+			compact,
+			suppressAutoCompact: liveTurnIds.has(message.id),
+		});
 		const workContext = {
 			resolvedToolCallIds: turn.resolvedToolCallIds,
 			completedActionToolCallIds: turn.completedActionToolCallIds,
@@ -752,11 +774,17 @@ export function buildThreadRows({
 			if (!seenKeys.has(key)) rowIdentityCache.delete(key);
 		}
 	}
+	if (liveTurnIds.size > 0) {
+		for (const id of liveTurnIds) {
+			if (!seenAssistantIds.has(id)) liveTurnIds.delete(id);
+		}
+	}
 
 	return { rows, rowIndexByMessageIndex };
 }
 
 /** Test seam: clears the shared fallback row identity cache. */
 export function resetThreadRowCache() {
-	defaultRowIdentityCache.clear();
+	defaultRowIdentityCache.rows.clear();
+	defaultRowIdentityCache.liveTurnIds.clear();
 }

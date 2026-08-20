@@ -1,8 +1,8 @@
 import { RGBA } from '@opentui/core';
-import { useTerminalDimensions } from '@opentui/react';
 import { useMemo, type ReactNode } from 'react';
 import { useTheme } from '../theme.ts';
 import { getListModalWindow } from '../lib/list-navigation.ts';
+import { useTerminalDimensions } from '../terminal-dimensions.tsx';
 
 export { getVisibleWindow } from '../lib/list-navigation.ts';
 
