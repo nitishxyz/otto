@@ -86,6 +86,8 @@ jobs:
   github-release-from-tag:
     needs: build-binaries-from-tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout tag
         uses: actions/checkout@v4
@@ -132,6 +134,16 @@ jobs:
         with:
           bun-version: 1.3.13
 
+      - name: Setup Node for staged publishing
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Setup npm CLI
+        run: bun add --global npm@11.19.0
+
       - name: Configure npm auth
         if: ${{ env.NPM_TOKEN != '' }}
         shell: bash
@@ -140,12 +152,12 @@ jobs:
           printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > .npmrc
           echo "always-auth=true" >> .npmrc
 
-      - name: Verify token and versions match
+      - name: Verify staging token and versions match
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "${NPM_TOKEN}" ]; then
-            echo "NPM_TOKEN is not set; cannot publish" >&2
+            echo "NPM_TOKEN is not set; cannot stage packages" >&2
             exit 1
           fi
           TAG="${{ github.event.inputs.tag }}"
@@ -225,66 +237,51 @@ jobs:
           rm -f bun.lock
           bun install
 
-      - name: Publish install package to npm
+      - name: Stage install package on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/install
-          # Publish install package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish API to npm
+      - name: Stage API on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/api
-          # Publish API package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish SDK to npm
+      - name: Stage SDK on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/sdk
-          # Publish SDK package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish themes to npm
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd packages/themes
-          # Publish themes package
-          bun publish --access public --tag latest
-
-      - name: Publish web-sdk to npm
+      - name: Stage web-sdk on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/web-sdk
-          # Publish web-sdk package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish web-ui to npm
+      - name: Stage web-ui on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/web-ui
-          # Publish web-ui package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish database to npm
+      - name: Stage database on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/database
-          # Publish database package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest
 
-      - name: Publish server to npm
+      - name: Stage server on npm
         shell: bash
         run: |
           set -euo pipefail
           cd packages/server
-          # Publish server package
-          bun publish --access public --tag latest
+          npm stage publish --access public --tag latest

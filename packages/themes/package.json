@@ -24,6 +24,11 @@
 	],
 	"author": "nitishxyz",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nitishxyz/otto.git",
+		"directory": "packages/themes"
+	},
 	"devDependencies": {
 		"typescript": "5.9.3"
 	}

@@ -2,6 +2,11 @@
 	"name": "@ottorouter/ai-sdk",
 	"version": "0.2.8",
 	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nitishxyz/otto.git",
+		"directory": "packages/ai-sdk"
+	},
 	"exports": {
 		".": "./src/index.ts",
 		"./catalog": "./src/catalog.ts",
