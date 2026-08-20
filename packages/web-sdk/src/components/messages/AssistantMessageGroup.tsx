@@ -14,8 +14,6 @@ import {
 	Check,
 	Shield,
 	CheckCheck,
-	Files,
-	ChevronDown,
 } from 'lucide-react';
 import type { Message } from '../../types/api';
 import { MessagePartItem } from './MessagePartItem';
@@ -46,6 +44,7 @@ import {
 	isWorkRenderItem,
 	type TurnWorkContext,
 } from './turnWork';
+import { PreloadedContextActivity } from './PreloadedContextActivity';
 
 interface AssistantMessageGroupProps {
 	sessionId?: string;
@@ -85,14 +84,11 @@ export const AssistantMessageGroup = memo(
 		const [copied, setCopied] = useState(false);
 		const [showAllParts, setShowAllParts] = useState(false);
 		const [workExpanded, setWorkExpanded] = useState(false);
-		const [preloadedContextExpanded, setPreloadedContextExpanded] =
-			useState(false);
 
 		useEffect(() => {
 			if (!message.id) return;
 			setShowAllParts(false);
 			setWorkExpanded(false);
-			setPreloadedContextExpanded(false);
 		}, [message.id]);
 
 		// Tool approval handling
@@ -423,61 +419,11 @@ export const AssistantMessageGroup = memo(
 				)}
 
 				{preloadedContext && (
-					<div className="mb-2 rounded-lg border border-border/60 bg-muted/30 text-xs text-muted-foreground">
-						<button
-							type="button"
-							onClick={() =>
-								setPreloadedContextExpanded((expanded) => !expanded)
-							}
-							className="flex w-full items-center gap-2 px-3 py-2 text-left hover:text-foreground transition-colors"
-							aria-expanded={preloadedContextExpanded}
-						>
-							<Files className="h-3.5 w-3.5 shrink-0" />
-							<span className="font-medium text-foreground/80">
-								{preloadedContext.files.length}{' '}
-								{preloadedContext.files.length === 1 ? 'file' : 'files'}{' '}
-								preloaded
-							</span>
-							{preloadedContext.totalBytes !== undefined && (
-								<span>
-									· {Math.ceil(preloadedContext.totalBytes / 1024)} KB
-								</span>
-							)}
-							{preloadedContext.preloadDurationMs !== undefined && (
-								<span>· {preloadedContext.preloadDurationMs} ms</span>
-							)}
-							<ChevronDown
-								className={`ml-auto h-3.5 w-3.5 transition-transform ${
-									preloadedContextExpanded ? 'rotate-180' : ''
-								}`}
-							/>
-						</button>
-						{preloadedContextExpanded && (
-							<div className="border-t border-border/50 px-3 py-2">
-								<ul className="space-y-1 font-mono text-[11px]">
-									{preloadedContext.files.map((file, index) => (
-										<li
-											key={`${file.path}:${file.lineRange ?? 'full'}:${index}`}
-											className="truncate"
-											title={file.path}
-										>
-											{file.path}
-											{file.lineRange ? `:${file.lineRange}` : ''}
-										</li>
-									))}
-								</ul>
-								{Boolean(preloadedContext.deduplicatedFileCount) && (
-									<p className="mt-2">
-										{preloadedContext.deduplicatedFileCount} duplicate{' '}
-										{preloadedContext.deduplicatedFileCount === 1
-											? 'reference was'
-											: 'references were'}{' '}
-										removed.
-									</p>
-								)}
-							</div>
-						)}
-					</div>
+					<PreloadedContextActivity
+						context={preloadedContext}
+						showLine={renderItems.length > 0}
+						compact={compact}
+					/>
 				)}
 
 				<div className="relative ml-1">

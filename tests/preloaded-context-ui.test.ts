@@ -108,9 +108,15 @@ describe('preloaded context UI model', () => {
 			queueLength: 0,
 			queuedMessageIds: new Set(),
 		});
-		expect(thread.rows.some((row) => row.kind === 'assistant-context')).toBe(
-			true,
-		);
+		expect(
+			thread.rows.find((row) => row.kind === 'assistant-context'),
+		).toMatchObject({
+			kind: 'assistant-context',
+			showLine: true,
+			context: {
+				files: [{ path: 'src/example.ts', lineRange: '3-9' }],
+			},
+		});
 		expect(
 			thread.rows.some(
 				(row) =>

@@ -70,6 +70,7 @@ export type ThreadRow =
 			messageId: string;
 			endsTurn: boolean;
 			context: PreloadedContextSummary;
+			showLine: boolean;
 	  }
 	| {
 			kind: 'assistant-item';
@@ -299,7 +300,7 @@ function sameRow(left: ThreadRow, right: ThreadRow): boolean {
 		}
 		case 'assistant-context': {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-context' }>;
-			return left.context === next.context;
+			return left.context === next.context && left.showLine === next.showLine;
 		}
 		case 'assistant-header': {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-header' }>;
@@ -501,6 +502,11 @@ export function buildThreadRows({
 				messageId: message.id,
 				endsTurn: false,
 				context: turn.preloadedContext,
+				showLine:
+					turn.parts.length > 0 ||
+					turn.shouldShowStatusLineToolCall ||
+					turn.shouldShowProgressUpdate ||
+					turn.shouldShowLoadingFallback,
 			});
 		}
 

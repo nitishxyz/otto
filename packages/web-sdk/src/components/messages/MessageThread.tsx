@@ -70,6 +70,7 @@ import {
 	reduceThreadFollow,
 	type ThreadFollowEvent,
 } from './threadFollowState';
+import { resolveThreadEndInset } from './threadEndInset';
 interface MessageThreadProps {
 	messages: Message[];
 	session?: Session;
@@ -196,7 +197,13 @@ const ThreadRowRenderer = memo(function ThreadRowRenderer({
 			);
 			break;
 		case 'assistant-context':
-			content = <AssistantContextRow context={row.context} />;
+			content = (
+				<AssistantContextRow
+					context={row.context}
+					showLine={row.showLine}
+					compact={compact}
+				/>
+			);
 			break;
 		case 'assistant-header':
 			indented = false;
@@ -705,9 +712,18 @@ export const MessageThread = memo(function MessageThread({
 		density === 'compact' ? 'pb-3' : compact ? 'pb-4' : 'pb-6';
 	const firstRowTopClass =
 		density === 'compact' ? 'pt-3' : compact ? 'pt-4' : 'pt-6';
-	const footerBottomPaddingClass =
-		footerBottomPaddingClassOverride ??
-		(density === 'compact' || compact ? 'pb-80' : 'pb-96');
+	// Trailing space below the last row. Embedded threads (floating chat,
+	// subagent viewer) keep their fixed padding override because they own their
+	// composer layout. The default thread instead measures the floating
+	// composer's real overlap (railInsets.bottom, kept fresh by the
+	// ResizeObserver above) and hands it to LegendList as
+	// `contentInsetEndAdjustment`: real trailing scroll range aligned with
+	// scrollToEnd/end pinning, instead of a hard-coded spacer that under- or
+	// overshoots the composer on different platforms.
+	const footerBottomPaddingClass = footerBottomPaddingClassOverride ?? '';
+	const contentEndInset = footerBottomPaddingClassOverride
+		? 0
+		: resolveThreadEndInset(railInsets.bottom);
 
 	// Create a retry handler for error messages
 	const handleRetryMessage = useCallback(
@@ -1043,6 +1059,10 @@ export const MessageThread = memo(function MessageThread({
 					maintainScrollAtEndThreshold={END_FOLLOW_THRESHOLD}
 					// Never toggled: one anchoring owner for the list's whole lifetime.
 					maintainVisibleContentPosition={MAINTAIN_VISIBLE_CONTENT_POSITION}
+					// Web-only real trailing space for the floating composer. Growth
+					// keeps the list pinned only while the reader is at the end;
+					// detached readers just gain scroll range below, never a snap.
+					contentInsetEndAdjustment={contentEndInset}
 					onStartReached={requestOlderMessages}
 					onStartReachedThreshold={START_REACHED_THRESHOLD}
 					ListHeaderComponent={listHeader}

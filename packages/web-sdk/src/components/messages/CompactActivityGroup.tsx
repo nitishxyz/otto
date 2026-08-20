@@ -14,6 +14,7 @@ const MIN_LIVE_H = 28;
 interface CompactActivityGroupProps {
 	entries: CompactActivityEntry[];
 	titleOverride?: string;
+	detailsOverride?: string[];
 	showLine: boolean;
 	collapsed: boolean;
 	compact?: boolean;
@@ -22,6 +23,7 @@ interface CompactActivityGroupProps {
 export function CompactActivityGroup({
 	entries,
 	titleOverride,
+	detailsOverride,
 	showLine,
 	collapsed,
 	compact,
@@ -43,7 +45,10 @@ export function CompactActivityGroup({
 
 	const summary = useMemo(() => summarizeCompactActivities(entries), [entries]);
 	const summaryTitle = titleOverride || summary.title;
-	const summaryText = [summaryTitle, ...summary.details].join('\u00A0· ');
+	const summaryText = [
+		summaryTitle,
+		...(detailsOverride ?? summary.details),
+	].join('\u00A0· ');
 	const hasReasoning = entries.some((e) => e.toolName === 'reasoning');
 
 	const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;

@@ -77,7 +77,7 @@
 		"@codemirror/view": "6.43.0",
 		"@iconify-json/material-icon-theme": "1.2.65",
 		"@iconify/react": "6.0.2",
-		"@legendapp/list": "^3.3.5",
+		"@legendapp/list": "^3.3.7",
 		"@lezer/highlight": "1.2.3",
 		"@ottocode/api": "workspace:*",
 		"@ottocode/sdk": "workspace:*",
