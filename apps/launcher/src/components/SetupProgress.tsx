@@ -195,9 +195,9 @@ export function SetupProgress() {
 			);
 
 			try {
-				log(`Image: ${project?.image || 'oven/bun:1-debian'}`);
+				log(`Image: ${project?.image || 'oven/bun:1.4.0-debian'}`);
 				log(`Repo: ${project?.repo}`);
-				const imageName = project?.image || 'oven/bun:1-debian';
+				const imageName = project?.image || 'oven/bun:1.4.0-debian';
 				setSettingUp(true);
 				const hasImage = await tauri.imageExists(imageName);
 				if (!hasImage) {
@@ -220,7 +220,7 @@ export function SetupProgress() {
 					gitEmail: project?.gitEmail || 'team@otto.dev',
 					apiPort: project?.apiPort,
 					devPorts: parseDevPorts(project?.devPorts, project?.apiPort),
-					image: project?.image || 'oven/bun:1-debian',
+					image: project?.image || 'oven/bun:1.4.0-debian',
 					usePersonalSsh: isPersonal,
 					sshKeyName: project?.sshKeyName || '',
 					sshPassphrase: project?.sshPassphrase || '',

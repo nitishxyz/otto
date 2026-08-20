@@ -35,7 +35,7 @@ jobs:
         if: steps.check.outputs.publish == 'true'
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.13
+          bun-version: 1.4.0
 
       - name: Setup Node for trusted publishing
         if: steps.check.outputs.publish == 'true'

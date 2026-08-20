@@ -276,7 +276,7 @@ export const useStore = create<LauncherStore>((set, get) => ({
 					cipher: 'aes-256-cbc-pbkdf2',
 					gitName: team.gitName,
 					gitEmail: team.gitEmail,
-					image: project.image || 'oven/bun:1-debian',
+					image: project.image || 'oven/bun:1.4.0-debian',
 					devPorts: project.devPorts || 'auto',
 				};
 				const name =

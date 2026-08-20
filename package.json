@@ -25,6 +25,7 @@
 		"gpt"
 	],
 	"type": "module",
+	"packageManager": "bun@1.4.0",
 	"workspaces": [
 		"packages/*",
 		"apps/*",
@@ -82,12 +83,13 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.2.4",
 		"@changesets/cli": "2.31.0",
-		"@types/bun": "1.3.9",
+		"@types/bun": "1.3.14",
 		"drizzle-kit": "0.31.9",
 		"hono": "4.12.0",
 		"serve-sim": "0.1.41"
 	},
 	"overrides": {
+		"bun-types": "1.4.0",
 		"react": "19.2.0",
 		"react-dom": "19.2.0"
 	},

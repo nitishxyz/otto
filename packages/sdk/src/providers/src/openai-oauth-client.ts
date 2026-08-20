@@ -476,7 +476,6 @@ async function fetchWithCodexRequestTimeout(
 	if (!args.enabled) {
 		return fetch(url, {
 			...init,
-			// @ts-expect-error Bun-specific fetch option
 			timeout: false,
 		});
 	}
@@ -562,7 +561,6 @@ async function fetchCodexRequestAttemptWithTimeout(
 		return await fetch(url, {
 			...init,
 			signal: controller.signal,
-			// @ts-expect-error Bun-specific fetch option
 			timeout: false,
 		});
 	} catch (error) {

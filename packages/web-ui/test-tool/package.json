@@ -9,6 +9,6 @@
 	},
 	"devDependencies": {
 		"@ottocode/web-ui": "workspace:*",
-		"@types/bun": "latest"
+		"@types/bun": "1.3.14"
 	}
 }

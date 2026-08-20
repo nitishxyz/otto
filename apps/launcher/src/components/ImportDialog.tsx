@@ -122,7 +122,7 @@ export function ImportDialog() {
 				apiPort,
 				webPort: apiPort + 1,
 				status: 'creating',
-				image: config.image || 'oven/bun:1-debian',
+				image: config.image || 'oven/bun:1.4.0-debian',
 				devPorts: config.devPorts || 'auto',
 				gitName:
 					sshMode === 'personal'

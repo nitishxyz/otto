@@ -76,7 +76,7 @@ export function AddProject() {
 				apiPort,
 				webPort: apiPort + 1,
 				status: 'stopped',
-				image: 'oven/bun:1-debian',
+				image: 'oven/bun:1.4.0-debian',
 				devPorts,
 				gitName:
 					sshMode === 'personal' ? hostGitName || team.gitName : team.gitName,
