@@ -14,7 +14,7 @@ export const MAX_CONTEXT_FILES = 20;
 export const MAX_CONTEXT_BYTES = 2 * 1024 * 1024;
 const CONTEXT_ORIGIN = 'message_context';
 
-type PreparedContextRead = {
+export type PreparedContextRead = {
 	input: ContextFileReference;
 	callId: string;
 	startedAt: number;
@@ -28,6 +28,7 @@ export type PreparedMessageContext = {
 	reads: PreparedContextRead[];
 	requestedFileCount: number;
 	deduplicatedFileCount: number;
+	omittedFileCount: number;
 	totalBytes: number;
 	preloadDurationMs: number;
 	completedAt: number;
@@ -77,16 +78,23 @@ function readDigest(result: unknown): string | undefined {
 export async function prepareMessageContext(
 	projectRoot: string,
 	context?: MessageContext,
+	options?: { optionalFiles?: ContextFileReference[] },
 ): Promise<PreparedMessageContext | undefined> {
-	const requestedFiles = context?.files ?? [];
+	const requiredFiles = context?.files ?? [];
+	const optionalFiles = (options?.optionalFiles ?? []).slice(
+		0,
+		Math.max(0, MAX_CONTEXT_FILES - requiredFiles.length),
+	);
+	const requestedFiles = [...requiredFiles, ...optionalFiles];
 	if (requestedFiles.length === 0) return;
-	if (requestedFiles.length > MAX_CONTEXT_FILES) {
+	if (requiredFiles.length > MAX_CONTEXT_FILES) {
 		throw new APIError(
 			`Message context accepts at most ${MAX_CONTEXT_FILES} files.`,
 			{ status: 413, code: 'context_file_limit' },
 		);
 	}
 	requestedFiles.forEach(validateContextFile);
+	const requiredKeys = new Set(requiredFiles.map(contextFileKey));
 
 	const uniqueFiles = [
 		...new Map(
@@ -94,7 +102,7 @@ export async function prepareMessageContext(
 		).values(),
 	];
 	const preloadStartedAt = Date.now();
-	const reads = await Promise.all(
+	const allReads = await Promise.all(
 		uniqueFiles.map(async (input): Promise<PreparedContextRead> => {
 			const startedAt = Date.now();
 			const result = await executeReadTool(projectRoot, input);
@@ -111,22 +119,35 @@ export async function prepareMessageContext(
 		}),
 	);
 	const completedAt = Date.now();
-	const totalBytes = reads.reduce((total, read) => total + read.bytes, 0);
-	if (totalBytes > MAX_CONTEXT_BYTES) {
+	const requiredBytes = allReads.reduce(
+		(total, read) =>
+			requiredKeys.has(contextFileKey(read.input)) ? total + read.bytes : total,
+		0,
+	);
+	if (requiredBytes > MAX_CONTEXT_BYTES) {
 		throw new APIError(
-			`Preloaded context is ${totalBytes} bytes; the limit is ${MAX_CONTEXT_BYTES} bytes. Use line ranges or fewer files.`,
+			`Preloaded context is ${requiredBytes} bytes; the limit is ${MAX_CONTEXT_BYTES} bytes. Use line ranges or fewer files.`,
 			{
 				status: 413,
 				code: 'context_size_limit',
-				details: { totalBytes, maxBytes: MAX_CONTEXT_BYTES },
+				details: { totalBytes: requiredBytes, maxBytes: MAX_CONTEXT_BYTES },
 			},
 		);
+	}
+	const reads: PreparedContextRead[] = [];
+	let totalBytes = 0;
+	for (const read of allReads) {
+		const required = requiredKeys.has(contextFileKey(read.input));
+		if (!required && totalBytes + read.bytes > MAX_CONTEXT_BYTES) continue;
+		reads.push(read);
+		totalBytes += read.bytes;
 	}
 
 	return {
 		reads,
 		requestedFileCount: requestedFiles.length,
 		deduplicatedFileCount: requestedFiles.length - uniqueFiles.length,
+		omittedFileCount: uniqueFiles.length - reads.length,
 		totalBytes,
 		preloadDurationMs: Math.max(0, completedAt - preloadStartedAt),
 		completedAt,
@@ -147,11 +168,12 @@ export async function injectMessageContext(args: {
 	prepared?: PreparedMessageContext;
 }): Promise<number> {
 	const prepared = args.prepared;
-	if (!prepared) return 0;
+	if (!prepared || prepared.reads.length === 0) return 0;
 	const summary = {
 		fileCount: prepared.reads.length,
 		requestedFileCount: prepared.requestedFileCount,
 		deduplicatedFileCount: prepared.deduplicatedFileCount,
+		omittedFileCount: prepared.omittedFileCount,
 		totalBytes: prepared.totalBytes,
 		preloadDurationMs: prepared.preloadDurationMs,
 		completedAt: prepared.completedAt,

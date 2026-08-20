@@ -46,8 +46,9 @@ describe('message context injection', () => {
 			agent: 'build',
 			provider: 'anthropic',
 			model: 'claude',
-			content: 'Use the preloaded file.',
+			content: 'Use @example.ts.',
 			createdAt,
+			preloadedFileMentions: ['example.ts'],
 		});
 		const { assistantMessageId } = await createPendingAssistantMessage({
 			db,
@@ -118,6 +119,10 @@ describe('message context injection', () => {
 			'assistant',
 			'tool',
 		]);
+		expect(history[0]).toEqual({
+			role: 'user',
+			content: [{ type: 'text', text: 'Use example.ts.' }],
+		});
 		expect(history[1]).toMatchObject({
 			role: 'assistant',
 			content: [
@@ -159,6 +164,21 @@ describe('message context injection', () => {
 		expect(prepared?.reads).toHaveLength(1);
 	});
 
+	test('deduplicates an explicit context file and matching file mention', async () => {
+		const prepared = await prepareMessageContext(
+			projectRoot,
+			{ files: [{ path: 'example.ts' }] },
+			{ optionalFiles: [{ path: 'example.ts' }] },
+		);
+
+		expect(prepared).toMatchObject({
+			requestedFileCount: 2,
+			deduplicatedFileCount: 1,
+			omittedFileCount: 0,
+		});
+		expect(prepared?.reads).toHaveLength(1);
+	});
+
 	test('validates ranges and gives endLine precedence over maxLines', async () => {
 		await expect(
 			prepareMessageContext(projectRoot, {
@@ -196,5 +216,20 @@ describe('message context injection', () => {
 				files: [{ path: 'oversized.txt' }],
 			}),
 		).rejects.toMatchObject({ code: 'context_size_limit', status: 413 });
+	});
+
+	test('omits oversized optional mention context without rejecting the message', async () => {
+		await writeFile(
+			join(projectRoot, 'oversized.txt'),
+			'x'.repeat(MAX_CONTEXT_BYTES + 1),
+		);
+		const prepared = await prepareMessageContext(projectRoot, undefined, {
+			optionalFiles: [{ path: 'oversized.txt' }],
+		});
+
+		expect(prepared).toMatchObject({
+			reads: [],
+			omittedFileCount: 1,
+		});
 	});
 });

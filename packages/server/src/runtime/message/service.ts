@@ -6,6 +6,7 @@ import { attachDirectImages } from './attachments.ts';
 import { estimateTokens } from './compaction.ts';
 import { createPendingAssistantMessage, createUserMessage } from './create.ts';
 import { injectMessageContext, prepareMessageContext } from './context.ts';
+import { resolveFileMentionReferences } from './file-mentions.ts';
 import {
 	compressFileImageAttachments,
 	compressImageAttachments,
@@ -55,7 +56,23 @@ export async function dispatchAssistantMessage(
 	const effectiveProvider = builtinCommand?.provider ?? provider;
 	const effectiveModel = builtinCommand?.model ?? model;
 	const effectiveOneShot = builtinCommand?.oneShot ?? oneShot;
-	const preparedContext = await prepareMessageContext(cfg.projectRoot, context);
+	const fileMentions = await resolveFileMentionReferences({
+		text: content,
+		projectRoot: cfg.projectRoot,
+	});
+	const preparedContext = await prepareMessageContext(
+		cfg.projectRoot,
+		context,
+		{
+			optionalFiles: fileMentions.map((file) => ({ path: file.path })),
+		},
+	);
+	const mentionedPaths = new Set(fileMentions.map((file) => file.path));
+	const preloadedFileMentions = preparedContext?.reads.flatMap((read) =>
+		read.input.startLine === undefined && mentionedPaths.has(read.input.path)
+			? [read.input.path]
+			: [],
+	);
 	logger.debug('[agent] dispatching assistant message', {
 		sessionId,
 		agent: effectiveAgent,
@@ -74,6 +91,7 @@ export async function dispatchAssistantMessage(
 		model: effectiveModel,
 		content,
 		createdAt: now,
+		preloadedFileMentions,
 		images: imagesWithAttachments,
 		files: compressedFiles,
 	});

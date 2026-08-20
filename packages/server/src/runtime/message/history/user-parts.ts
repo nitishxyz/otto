@@ -65,12 +65,20 @@ async function appendTextPart(
 	projectRoot?: string,
 ) {
 	try {
-		const obj = JSON.parse(part.content ?? '{}');
+		const obj = JSON.parse(part.content ?? '{}') as {
+			text?: unknown;
+			preloadedFileMentions?: unknown;
+		};
 		const text = String(obj.text ?? '');
 		if (!text) return;
 		const preprocessed = await preprocessFileMentionsForModel({
 			text,
 			projectRoot,
+			preloadedPaths: Array.isArray(obj.preloadedFileMentions)
+				? obj.preloadedFileMentions.filter(
+						(path): path is string => typeof path === 'string',
+					)
+				: undefined,
 		});
 		userParts.push({ type: 'text', text: preprocessed.text });
 	} catch {}

@@ -18,6 +18,11 @@ export type FileMentionPreprocessResult = {
 	}>;
 };
 
+export type ResolvedFileMention = {
+	path: string;
+	size: number;
+};
+
 function isPathInsideRoot(path: string, root: string): boolean {
 	const relativePath = relative(root, path);
 	return (
@@ -36,6 +41,58 @@ function resolveMentionPath(projectRoot: string, mentionPath: string) {
 		absolutePath,
 		relativePath: relative(root, absolutePath) || '.',
 	};
+}
+
+function extractMentionTokens(text: string): Array<{
+	token: string;
+	mentionPath: string;
+	trailing: string;
+}> {
+	const mentions: Array<{
+		token: string;
+		mentionPath: string;
+		trailing: string;
+	}> = [];
+	for (const match of text.matchAll(FILE_MENTION_REGEX)) {
+		const token = match[2];
+		if (!token) continue;
+		const { mentionPath, trailing } = stripTrailingPunctuation(token);
+		if (mentionPath) mentions.push({ token, mentionPath, trailing });
+	}
+	return mentions;
+}
+
+export async function resolveFileMentionReferences(args: {
+	text: string;
+	projectRoot?: string;
+	maxFileBytes?: number;
+	maxTotalBytes?: number;
+}): Promise<ResolvedFileMention[]> {
+	const projectRoot = args.projectRoot?.trim();
+	if (!projectRoot || !args.text.includes('@')) return [];
+	const maxFileBytes = args.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
+	const maxTotalBytes = args.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
+	const candidates = await Promise.all(
+		extractMentionTokens(args.text).map(async ({ mentionPath }) => {
+			const resolved = resolveMentionPath(projectRoot, mentionPath);
+			if (!resolved) return;
+			const fileStat = await stat(resolved.absolutePath).catch(() => undefined);
+			if (!fileStat?.isFile()) return;
+			return { path: resolved.relativePath, size: fileStat.size };
+		}),
+	);
+	const seen = new Set<string>();
+	const resolved: ResolvedFileMention[] = [];
+	let totalBytes = 0;
+	for (const candidate of candidates) {
+		if (!candidate || seen.has(candidate.path)) continue;
+		seen.add(candidate.path);
+		if (candidate.size > maxFileBytes) continue;
+		if (totalBytes + candidate.size > maxTotalBytes) continue;
+		resolved.push(candidate);
+		totalBytes += candidate.size;
+	}
+	return resolved;
 }
 
 function stripTrailingPunctuation(token: string) {
@@ -92,6 +149,7 @@ export async function preprocessFileMentionsForModel(args: {
 	projectRoot?: string;
 	maxFileBytes?: number;
 	maxTotalBytes?: number;
+	preloadedPaths?: string[];
 }): Promise<FileMentionPreprocessResult> {
 	const projectRoot = args.projectRoot?.trim();
 	if (!projectRoot || !args.text.includes('@')) {
@@ -124,10 +182,19 @@ export async function preprocessFileMentionsForModel(args: {
 	const maxTotalBytes = args.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
 	const mentionedFiles: FileMentionPreprocessResult['mentionedFiles'] = [];
 	const seen = new Set<string>();
+	const preloadedPaths = new Set(args.preloadedPaths ?? []);
 	let remainingBytes = maxTotalBytes;
 	const replaceByToken = new Map<string, string>();
 
 	for (const mention of mentions) {
+		const resolved = resolveMentionPath(projectRoot, mention.mentionPath);
+		if (resolved && preloadedPaths.has(resolved.relativePath)) {
+			replaceByToken.set(
+				mention.token,
+				`${mention.mentionPath}${mention.trailing}`,
+			);
+			continue;
+		}
 		const file = await readMentionedTextFile({
 			projectRoot,
 			mentionPath: mention.mentionPath,
@@ -148,9 +215,6 @@ export async function preprocessFileMentionsForModel(args: {
 		remainingBytes -= Buffer.byteLength(file.content, 'utf8');
 	}
 
-	if (mentionedFiles.length === 0)
-		return { text: args.text, mentionedFiles: [] };
-
 	const cleanedText = args.text.replace(
 		FILE_MENTION_REGEX,
 		(match, prefix: string, token: string) => {
@@ -158,6 +222,9 @@ export async function preprocessFileMentionsForModel(args: {
 			return replacement ? `${prefix}${replacement}` : match;
 		},
 	);
+	if (mentionedFiles.length === 0) {
+		return { text: cleanedText, mentionedFiles: [] };
+	}
 	const fileBlocks = mentionedFiles.map((file) => {
 		const metadata = [
 			`path="${file.path}"`,

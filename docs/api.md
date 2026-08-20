@@ -97,10 +97,18 @@ compaction keeps only the latest read of the same path and range in model
 context. Missing files are preserved as normal read errors so the agent can
 recover with its own tools.
 
-The message UI collapses these synthetic reads into a “files preloaded” row
-showing paths, bytes, preload duration, and removed duplicate references. Server
-telemetry records preload duration, time to the first assistant text/tool
-activity, and any agent-initiated reread of an identical preloaded range.
+Existing project files mentioned in message text with `@path`, such as
+`Review @packages/server/src/index.ts`, enter the same preload pipeline. Agent,
+skill, reference, missing-file, and ordinary `@` tokens are left alone. Small
+mentioned files are available before the first model inference; mentions that
+exceed the automatic mention budget keep the bounded inline fallback rather
+than rejecting the message.
+
+The message UI collapses these synthetic reads into the normal grouped tool
+activity presentation, showing paths, bytes, preload duration, and removed
+duplicate references. Server telemetry records preload duration, time to the
+first assistant text/tool activity, and any agent-initiated reread of an
+identical preloaded range.
 
 ### Config
 

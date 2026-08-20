@@ -10,6 +10,7 @@ export async function createUserMessage(args: {
 	model: string;
 	content: string;
 	createdAt: number;
+	preloadedFileMentions?: string[];
 	images?: DispatchOptions['images'];
 	files?: DispatchOptions['files'];
 }): Promise<{ userMessageId: string }> {
@@ -29,7 +30,10 @@ export async function createUserMessage(args: {
 		messageId: userMessageId,
 		index: 0,
 		type: 'text',
-		content: JSON.stringify({ text: String(args.content) }),
+		content: JSON.stringify({
+			text: String(args.content),
+			preloadedFileMentions: args.preloadedFileMentions,
+		}),
 		agent: args.agent,
 		provider: args.provider,
 		model: args.model,

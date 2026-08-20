@@ -3,7 +3,10 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { discoverProjectTools } from '@ottocode/sdk';
-import { preprocessFileMentionsForModel } from '../packages/server/src/runtime/message/file-mentions.ts';
+import {
+	preprocessFileMentionsForModel,
+	resolveFileMentionReferences,
+} from '../packages/server/src/runtime/message/file-mentions.ts';
 
 describe('file mention preprocessing', () => {
 	let tempDir: string;
@@ -37,6 +40,36 @@ describe('file mention preprocessing', () => {
 		expect(result.text).toContain('<mentioned-file path="publish.env"');
 		expect(result.text).toContain('cli=false\ndesktop=false');
 		expect(result.mentionedFiles).toHaveLength(1);
+	});
+
+	test('resolves valid file mentions for synthetic context preloading', async () => {
+		await fs.writeFile(join(tempDir, 'small.ts'), 'export const value = 1;\n');
+
+		const result = await resolveFileMentionReferences({
+			text: 'ask @frontend to inspect @small.ts and @small.ts',
+			projectRoot: tempDir,
+		});
+
+		expect(result).toEqual([
+			{
+				path: 'small.ts',
+				size: Buffer.byteLength('export const value = 1;\n'),
+			},
+		]);
+	});
+
+	test('does not inline file content after the mention was preloaded', async () => {
+		await fs.writeFile(join(tempDir, 'small.ts'), 'export const value = 1;\n');
+
+		const result = await preprocessFileMentionsForModel({
+			text: 'inspect @small.ts',
+			projectRoot: tempDir,
+			preloadedPaths: ['small.ts'],
+		});
+
+		expect(result.text).toBe('inspect small.ts');
+		expect(result.text).not.toContain('<mentioned-file');
+		expect(result.mentionedFiles).toHaveLength(0);
 	});
 
 	test('marks explicitly mentioned files as freshly read for edits', async () => {
