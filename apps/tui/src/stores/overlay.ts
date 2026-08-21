@@ -49,6 +49,10 @@ export const useOverlayStore = create<OverlayState>((set, get) => ({
 	showStatus: (s, autoClearMs) => {
 		const prev = get()._statusTimer;
 		if (prev) clearTimeout(prev);
+		if (s.type === 'error') {
+			set({ status: { type: 'idle' }, _statusTimer: null });
+			return;
+		}
 		if (autoClearMs) {
 			const timer = setTimeout(
 				() => set({ status: { type: 'idle' }, _statusTimer: null }),

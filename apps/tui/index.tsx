@@ -45,23 +45,25 @@ function destroyRenderer() {
 	}
 }
 
-function gracefulExit(code: number) {
+function gracefulExit(
+	code: number,
+	failure?: { label: string; reason: unknown },
+) {
 	if (exiting) return;
 	exiting = true;
 	try {
 		destroyRenderer();
 	} catch {}
+	if (failure) console.error(failure.label, failure.reason);
 	setTimeout(() => process.exit(code), 100);
 }
 
 process.on('uncaughtException', (error) => {
-	console.error('Uncaught exception:', error);
-	gracefulExit(1);
+	gracefulExit(1, { label: 'Uncaught exception:', reason: error });
 });
 
 process.on('unhandledRejection', (reason) => {
-	console.error('Unhandled rejection:', reason);
-	gracefulExit(1);
+	gracefulExit(1, { label: 'Unhandled rejection:', reason });
 });
 
 process.on('SIGINT', () => gracefulExit(0));

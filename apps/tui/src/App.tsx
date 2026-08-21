@@ -122,12 +122,6 @@ export function App({
 		sessionError,
 	} = useSession(initialSessionDefaults);
 
-	useEffect(() => {
-		if (sessionError) {
-			showStatus({ type: 'error', label: sessionError }, 5000);
-		}
-	}, [sessionError, showStatus]);
-
 	const { config, isLoaded: isConfigLoaded, updateDefaults } = useConfig();
 	const recipeCommands = useRecipeCommands();
 	const recipeNames = useMemo(
@@ -179,6 +173,19 @@ export function App({
 		handleMessageCompleted,
 		handleStepFinish,
 	);
+	const handledSessionErrorIdRef = useRef(0);
+
+	useEffect(() => {
+		if (!sessionError) return;
+		if (sessionError.id <= handledSessionErrorIdRef.current) return;
+		handledSessionErrorIdRef.current = sessionError.id;
+		if (sessionError.sessionId && sessionError.sessionId !== sessionId) return;
+		dispatchStream({
+			type: 'ERROR',
+			payload: { message: sessionError.message },
+		});
+	}, [sessionError, sessionId, dispatchStream]);
+
 	const activityData = useActivityData(sessionId, messages, true);
 	const activeSubagents = useMemo(
 		() => activityData.subagents.filter((item) => item.status === 'running'),

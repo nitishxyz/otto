@@ -21,6 +21,12 @@ type SessionCreateDefaults = {
 	allowUnknownModel?: boolean;
 };
 
+interface SessionError {
+	id: number;
+	sessionId: string | null;
+	message: string;
+}
+
 function getApiErrorMessage(error: unknown, fallback: string): string {
 	if (typeof error === 'string') return error;
 	if (!error || typeof error !== 'object') return fallback;
@@ -47,7 +53,8 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 	const [activeSession, setActiveSession] = useState<Session | null>(null);
 	const [hasMore, setHasMore] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
-	const [sessionError, setSessionError] = useState<string | null>(null);
+	const [sessionError, setSessionError] = useState<SessionError | null>(null);
+	const sessionErrorIdRef = useRef(0);
 	const nextOffsetRef = useRef<number | null>(null);
 	const projectKey = getProjectKey();
 	const projectQuery = useMemo(() => {
@@ -116,7 +123,11 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 				setActiveSession(session);
 				return session;
 			} catch (error) {
-				setSessionError(getApiErrorMessage(error, 'failed to create session'));
+				setSessionError({
+					id: ++sessionErrorIdRef.current,
+					sessionId: null,
+					message: getApiErrorMessage(error, 'failed to create session'),
+				});
 				return null;
 			}
 		},
@@ -214,7 +225,11 @@ export function useSession(defaultCreateSession?: SessionCreateDefaults) {
 					? response.data.messageId
 					: null;
 			} catch (error) {
-				setSessionError(getApiErrorMessage(error, 'failed to send message'));
+				setSessionError({
+					id: ++sessionErrorIdRef.current,
+					sessionId,
+					message: getApiErrorMessage(error, 'failed to send message'),
+				});
 				return null;
 			}
 		},

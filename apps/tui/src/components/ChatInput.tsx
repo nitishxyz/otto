@@ -507,7 +507,9 @@ export function ChatInput({
 		};
 	}, []);
 
-	const hasStatus = isStreaming || status.type !== 'idle';
+	const composerStatus: StatusIndicator =
+		status.type === 'error' ? { type: 'idle' } : status;
+	const hasStatus = isStreaming || composerStatus.type !== 'idle';
 	const hasModelLabel = provider.length > 0 || model.length > 0;
 	const accent = isPlanMode ? colors.cyan : colors.blue;
 	const railColor = disabled ? colors.border : accent;
@@ -797,7 +799,7 @@ export function ChatInput({
 						</text>
 						{hasStatus && (
 							<box style={{ flexDirection: 'row', overflow: 'hidden' }}>
-								{isStreaming && status.type === 'idle' && (
+								{isStreaming && composerStatus.type === 'idle' && (
 									<box
 										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
 									>
@@ -809,24 +811,19 @@ export function ChatInput({
 										)}
 									</box>
 								)}
-								{status.type === 'loading' && (
+								{composerStatus.type === 'loading' && (
 									<box
 										style={{ flexDirection: 'row', gap: 1, overflow: 'hidden' }}
 									>
 										<TinySpinner fg={railColor} />
 										<text fg={colors.blue} wrapMode="none" truncate>
-											{status.label}
+											{composerStatus.label}
 										</text>
 									</box>
 								)}
-								{status.type === 'success' && (
+								{composerStatus.type === 'success' && (
 									<text fg={colors.green} wrapMode="none" truncate>
-										✓ {status.label}
-									</text>
-								)}
-								{status.type === 'error' && (
-									<text fg={colors.red} wrapMode="none" truncate>
-										✗ {status.label}
+										✓ {composerStatus.label}
 									</text>
 								)}
 							</box>
