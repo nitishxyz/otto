@@ -29,6 +29,8 @@ interface GhosttyExports extends WebAssembly.Exports {
 	ghostty_wasm_free_u8_array: WasmFunction;
 	ghostty_terminal_new: WasmFunction;
 	ghostty_terminal_free: WasmFunction;
+	ghostty_terminal_get: WasmFunction;
+	ghostty_terminal_set: WasmFunction;
 	ghostty_terminal_resize: WasmFunction;
 	ghostty_terminal_vt_write: WasmFunction;
 	ghostty_terminal_scroll_viewport: WasmFunction;
@@ -77,7 +79,10 @@ export async function loadGhosttyVt(
 		const required = [
 			'ghostty_type_json',
 			'ghostty_terminal_new',
+			'ghostty_terminal_get',
+			'ghostty_terminal_set',
 			'ghostty_terminal_vt_write',
+			'ghostty_terminal_scroll_viewport',
 			'ghostty_render_state_update',
 		];
 		for (const name of required) {
@@ -102,6 +107,13 @@ export async function loadGhosttyVt(
 
 const DEFAULT_FG = { r: 212, g: 212, b: 212 };
 const DEFAULT_BG = { r: 18, g: 18, b: 22 };
+const DEFAULT_SCROLLBACK_LINES = 50_000;
+
+export interface GhosttyTerminalScrollbar {
+	total: number;
+	offset: number;
+	len: number;
+}
 
 export class GhosttyVtTerminal implements IRenderable {
 	readonly module: GhosttyVtModule;
@@ -142,6 +154,7 @@ export class GhosttyVtTerminal implements IRenderable {
 		);
 		this.scratch = this.exports.ghostty_wasm_alloc_u8_array(this.scratchLength);
 		if (!this.scratch) throw new Error('ghostty-vt scratch allocation failed');
+		this.setUsizeOption(28, DEFAULT_SCROLLBACK_LINES);
 		this.refresh();
 	}
 
@@ -182,6 +195,19 @@ export class GhosttyVtTerminal implements IRenderable {
 		if (this.exports.ghostty_cell_get(cell, data, this.scratch + 256) !== 0)
 			return 0;
 		return this.view().getUint32(this.scratch + 256, true);
+	}
+	private setUsizeOption(option: number, value: number): void {
+		this.view().setUint32(this.scratch, value, true);
+		const result = this.exports.ghostty_terminal_set(
+			this.terminal,
+			option,
+			this.scratch,
+		);
+		if (result !== 0) {
+			throw new Error(
+				`ghostty-vt terminal option ${option} failed (${result})`,
+			);
+		}
 	}
 	private resolvedColor(
 		cells: number,
@@ -270,21 +296,73 @@ export class GhosttyVtTerminal implements IRenderable {
 		this.refresh();
 	}
 
-	scroll(delta: number): void {
+	private scrollViewport(tag: number, value: number): void {
 		const layout = this.module.layout.GhosttyTerminalScrollViewport;
 		if (!layout) throw new Error('ghostty-vt scroll layout is unavailable');
 		const pointer = this.exports.ghostty_wasm_alloc_u8_array(layout.size);
 		if (!pointer) throw new Error('ghostty-vt scroll allocation failed');
-		new Uint8Array(this.exports.memory.buffer, pointer, layout.size).fill(0);
-		this.view().setUint32(pointer + layout.fields.tag.offset, 2, true);
-		this.view().setInt32(
-			pointer + layout.fields.value.offset,
-			Math.trunc(delta),
-			true,
-		);
-		this.exports.ghostty_terminal_scroll_viewport(this.terminal, pointer);
-		this.exports.ghostty_wasm_free_u8_array(pointer, layout.size);
+		try {
+			new Uint8Array(this.exports.memory.buffer, pointer, layout.size).fill(0);
+			this.view().setUint32(pointer + layout.fields.tag.offset, tag, true);
+			if (tag === 2) {
+				this.view().setInt32(
+					pointer + layout.fields.value.offset,
+					Math.trunc(value),
+					true,
+				);
+			} else {
+				this.view().setUint32(
+					pointer + layout.fields.value.offset,
+					Math.max(0, Math.trunc(value)),
+					true,
+				);
+			}
+			this.exports.ghostty_terminal_scroll_viewport(this.terminal, pointer);
+		} finally {
+			this.exports.ghostty_wasm_free_u8_array(pointer, layout.size);
+		}
 		this.refresh();
+	}
+
+	scroll(delta: number): void {
+		this.scrollViewport(2, delta);
+	}
+
+	scrollToRow(row: number): void {
+		this.scrollViewport(3, row);
+	}
+
+	getScrollbar(): GhosttyTerminalScrollbar {
+		const layout = this.module.layout.GhosttyTerminalScrollbar;
+		if (!layout) throw new Error('ghostty-vt scrollbar layout is unavailable');
+		new Uint8Array(this.exports.memory.buffer, this.scratch, layout.size).fill(
+			0,
+		);
+		const result = this.exports.ghostty_terminal_get(
+			this.terminal,
+			9,
+			this.scratch,
+		);
+		if (result !== 0) {
+			throw new Error(`ghostty-vt scrollbar query failed (${result})`);
+		}
+		const read = (field: string) =>
+			Number(
+				this.view().getBigUint64(
+					this.scratch + layout.fields[field].offset,
+					true,
+				),
+			);
+		return {
+			total: read('total'),
+			offset: read('offset'),
+			len: read('len'),
+		};
+	}
+
+	isViewportAtBottom(): boolean {
+		const scrollbar = this.getScrollbar();
+		return scrollbar.offset + scrollbar.len >= scrollbar.total;
 	}
 
 	refresh(): void {

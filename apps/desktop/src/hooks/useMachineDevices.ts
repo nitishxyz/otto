@@ -5,7 +5,8 @@ import {
 	machineAccountStore,
 } from '../lib/machine-account-store';
 
-const PRESENCE_REFRESH_MS = 15_000;
+const BACKGROUND_REFRESH_MS = 15_000;
+const ACTIVE_REFRESH_MS = 3_000;
 
 export interface MachineDevices {
 	/** Last known daemon answer; null until the first load resolves. */
@@ -21,38 +22,43 @@ export interface MachineDevices {
  * focus and auth changes; all consumers share one cache and in-flight
  * request, so mounting the hook in several components never duplicates polls.
  */
-export function useMachineDevices(): MachineDevices {
+export function useMachineDevices(active = false): MachineDevices {
 	const snapshot = useSyncExternalStore(
 		machineAccountStore.subscribe,
 		machineAccountStore.getSnapshot,
 	);
 
 	useEffect(() => {
-		void machineAccountStore.refresh();
-		const refresh = () => void machineAccountStore.refresh();
+		void (active
+			? machineAccountStore.refreshFresh()
+			: machineAccountStore.refresh());
+		const refreshFresh = () => void machineAccountStore.refreshFresh();
 		const refreshAfterAuthChange = () =>
 			void machineAccountStore.refreshFresh();
 		const refreshVisible = () => {
-			if (document.visibilityState === 'visible') refresh();
+			if (document.visibilityState === 'visible') refreshFresh();
 		};
-		const interval = window.setInterval(refreshVisible, PRESENCE_REFRESH_MS);
-		window.addEventListener('focus', refresh);
+		const interval = window.setInterval(
+			refreshVisible,
+			active ? ACTIVE_REFRESH_MS : BACKGROUND_REFRESH_MS,
+		);
+		window.addEventListener('focus', refreshFresh);
 		document.addEventListener('visibilitychange', refreshVisible);
 		window.addEventListener(MACHINE_AUTH_CHANGED_EVENT, refreshAfterAuthChange);
 		return () => {
 			window.clearInterval(interval);
-			window.removeEventListener('focus', refresh);
+			window.removeEventListener('focus', refreshFresh);
 			document.removeEventListener('visibilitychange', refreshVisible);
 			window.removeEventListener(
 				MACHINE_AUTH_CHANGED_EVENT,
 				refreshAfterAuthChange,
 			);
 		};
-	}, []);
+	}, [active]);
 
 	return {
 		state: snapshot.state,
 		loading: snapshot.loading,
-		refresh: machineAccountStore.refresh,
+		refresh: machineAccountStore.refreshFresh,
 	};
 }

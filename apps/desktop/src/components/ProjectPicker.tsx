@@ -166,12 +166,12 @@ export function ProjectPicker({
 	const [cloning, setCloning] = useState(false);
 	const [cloningRepo, setCloningRepo] = useState<string | null>(null);
 	const [projectSearch, setProjectSearch] = useState('');
+	const [activeTab, setActiveTab] = useState<PickerTab>('projects');
 	const {
 		state: machineState,
 		loading: machinesLoading,
 		refresh: refreshMachines,
-	} = useMachineDevices();
-	const [activeTab, setActiveTab] = useState<PickerTab>('projects');
+	} = useMachineDevices(activeTab === 'machines');
 	const [projectVisibleCount, setProjectVisibleCount] =
 		useState(PROJECTS_PER_PAGE);
 	const platform = usePlatform();
@@ -189,15 +189,6 @@ export function ProjectPicker({
 	} = useUpdate();
 	const appVersion = useVersion();
 	const navigate = useNavigate();
-
-	useEffect(() => {
-		if (activeTab !== 'machines') return;
-		void refreshMachines();
-		const interval = window.setInterval(() => {
-			void refreshMachines();
-		}, 30_000);
-		return () => window.clearInterval(interval);
-	}, [activeTab, refreshMachines]);
 
 	const machineAccount = useOttoRouterAccount(refreshMachines);
 

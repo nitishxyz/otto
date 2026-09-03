@@ -74,4 +74,28 @@ describe('official ghostty-vt wasm', () => {
 			terminal.free();
 		}
 	});
+
+	test('preserves an absolute scrollback viewport while output continues', async () => {
+		const terminal = new GhosttyVtTerminal(await loadPinnedModule(), 20, 5);
+		try {
+			terminal.write(
+				Array.from({ length: 30 }, (_, index) => `line ${index}\r\n`).join(''),
+			);
+			expect(terminal.isViewportAtBottom()).toBe(true);
+			const bottom = terminal.getScrollbar();
+			expect(bottom.total).toBeGreaterThan(bottom.len);
+
+			terminal.scroll(-3);
+			const savedOffset = terminal.getScrollbar().offset;
+			expect(savedOffset).toBeLessThan(bottom.offset);
+			expect(terminal.isViewportAtBottom()).toBe(false);
+
+			terminal.write('new output\r\n');
+			terminal.scrollToRow(savedOffset);
+			expect(terminal.getScrollbar().offset).toBe(savedOffset);
+			expect(terminal.isViewportAtBottom()).toBe(false);
+		} finally {
+			terminal.free();
+		}
+	});
 });

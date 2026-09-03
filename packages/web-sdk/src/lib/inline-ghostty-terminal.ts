@@ -21,6 +21,31 @@ type Listener<T> = (value: T) => void;
 const CURSOR_BLINK_MS = 530;
 const DEFAULT_CURSOR_COLOR = '#ffffff';
 
+export function calculateTerminalGridSize(
+	width: number,
+	height: number,
+	cellWidth: number,
+	cellHeight: number,
+): ResizeEvent | null {
+	if (width < cellWidth * 2 || height < cellHeight) return null;
+	return {
+		cols: Math.floor(width / cellWidth),
+		rows: Math.floor(height / cellHeight),
+	};
+}
+
+export function syncInlineTerminalActivation(
+	terminal: Pick<InlineGhosttyTerminal, 'fit' | 'focus' | 'blur'>,
+	isActive: boolean,
+): void {
+	if (isActive) {
+		terminal.fit();
+		terminal.focus();
+	} else {
+		terminal.blur();
+	}
+}
+
 /**
  * Lightweight Ghostty canvas terminal used by the web viewer.
  *
@@ -144,15 +169,16 @@ export class InlineGhosttyTerminal {
 		if (!this.element) return;
 		const metrics = this.renderer.getMetrics();
 		if (!metrics.width || !metrics.height) return;
-		const cols = Math.max(
-			2,
-			Math.floor(this.element.clientWidth / metrics.width),
+		const size = calculateTerminalGridSize(
+			this.element.clientWidth,
+			this.element.clientHeight,
+			metrics.width,
+			metrics.height,
 		);
-		const rows = Math.max(
-			1,
-			Math.floor(this.element.clientHeight / metrics.height),
-		);
-		if (cols !== this.cols || rows !== this.rows) this.resize(cols, rows);
+		if (!size) return;
+		if (size.cols !== this.cols || size.rows !== this.rows) {
+			this.resize(size.cols, size.rows);
+		}
 	}
 	private scheduleRender(force = false): void {
 		if (force) this.pendingForce = true;
@@ -262,9 +288,15 @@ export class InlineGhosttyTerminal {
 		return this.listen(this.scrollListeners, listener);
 	}
 	getViewportY(): number {
-		return 0;
+		return this.model.getScrollbar().offset;
 	}
-	scrollToLine(_line?: number): void {}
+	isViewportAtBottom(): boolean {
+		return this.model.isViewportAtBottom();
+	}
+	scrollToLine(line = 0): void {
+		this.model.scrollToRow(line);
+		this.render(true);
+	}
 	getMode(_mode?: number): boolean {
 		return false;
 	}

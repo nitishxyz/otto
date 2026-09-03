@@ -1,5 +1,8 @@
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
-import { InlineGhosttyTerminal } from '../../lib/inline-ghostty-terminal';
+import {
+	InlineGhosttyTerminal,
+	syncInlineTerminalActivation,
+} from '../../lib/inline-ghostty-terminal';
 import { loadGhosttyVt } from '../../lib/ghostty-vt';
 import { getRuntimeApiBaseUrl } from '../../lib/config';
 import {
@@ -160,22 +163,14 @@ export const TerminalViewer = memo(function TerminalViewer({
 	onExitRef.current = onExit;
 	const onInitializationErrorRef = useRef(onInitializationError);
 	onInitializationErrorRef.current = onInitializationError;
+	const isActiveRef = useRef(isActive);
+	isActiveRef.current = isActive;
 	const userScrolledRef = useRef(false);
 	const disposedRef = useRef(false);
 	const focusHandlersRef = useRef<{
 		focusin: () => void;
 		focusout: () => void;
 	} | null>(null);
-
-	const fitTerminal = useCallback(() => {
-		if (fitAddonRef.current) {
-			try {
-				fitAddonRef.current.fit();
-			} catch {
-				// container might not be visible yet
-			}
-		}
-	}, []);
 
 	const connectWebSocket = useCallback(
 		async (term: InlineGhosttyTerminal, baseUrl: string) => {
@@ -264,7 +259,7 @@ export const TerminalViewer = memo(function TerminalViewer({
 
 				const savedY = userScrolledRef.current ? term.getViewportY() : 0;
 				term.write(message);
-				if (userScrolledRef.current && savedY > 0) {
+				if (userScrolledRef.current) {
 					term.scrollToLine(savedY);
 				}
 			};
@@ -345,6 +340,10 @@ export const TerminalViewer = memo(function TerminalViewer({
 			await new Promise<void>((resolve) => {
 				requestAnimationFrame(() => {
 					try {
+						if (!isActiveRef.current) {
+							resolve();
+							return;
+						}
 						fitAddon?.fit();
 					} catch {
 						// container might not be visible
@@ -372,13 +371,15 @@ export const TerminalViewer = memo(function TerminalViewer({
 			});
 
 			term.onScroll(() => {
-				userScrolledRef.current = term.getViewportY() > 0;
+				userScrolledRef.current = !term.isViewportAtBottom();
 			});
 
 			termRef.current = term;
 			fitAddonRef.current = fitAddon;
+			syncInlineTerminalActivation(term, isActiveRef.current);
 
 			resizeObserver = new ResizeObserver(() => {
+				if (!isActiveRef.current) return;
 				if (resizeTimer) clearTimeout(resizeTimer);
 				resizeTimer = setTimeout(() => {
 					resizeTimer = null;
@@ -444,19 +445,8 @@ export const TerminalViewer = memo(function TerminalViewer({
 	useEffect(() => {
 		const term = termRef.current;
 		if (!term) return;
-		if (isActive) {
-			fitTerminal();
-			term.focus();
-		} else {
-			term.blur();
-		}
-	}, [isActive, fitTerminal]);
-
-	useEffect(() => {
-		if (isActive) {
-			fitTerminal();
-		}
-	}, [fitTerminal, isActive]);
+		syncInlineTerminalActivation(term, isActive);
+	}, [isActive]);
 
 	return (
 		<div

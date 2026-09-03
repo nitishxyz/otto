@@ -137,17 +137,20 @@ describe('landing header account lifecycle wiring', () => {
 		const hook = await readFile('src/hooks/useMachineDevices.ts', 'utf8');
 		expect(hook).toContain('useSyncExternalStore');
 		expect(hook).toContain('machineAccountStore.refresh()');
+		expect(hook).toContain('machineAccountStore.refreshFresh()');
+		expect(hook).toContain('ACTIVE_REFRESH_MS = 3_000');
 		expect(hook).toContain("addEventListener('focus'");
 		expect(hook).toContain("addEventListener('visibilitychange'");
 		expect(hook).toContain('setInterval');
 		expect(hook).toContain('MACHINE_AUTH_CHANGED_EVENT');
 
 		const picker = await readFile('src/components/ProjectPicker.tsx', 'utf8');
-		expect(picker).toContain('useMachineDevices()');
+		expect(picker).toContain("useMachineDevices(activeTab === 'machines')");
 		// The header renders a checking state before the first daemon answer.
 		expect(picker).toContain('initializing={machineState === null}');
 		// No picker-local fetching or focus listeners that could duplicate polls.
 		expect(picker).not.toContain('loadMachineDevices');
 		expect(picker).not.toContain("addEventListener('focus'");
+		expect(picker).not.toContain('30_000');
 	});
 });
