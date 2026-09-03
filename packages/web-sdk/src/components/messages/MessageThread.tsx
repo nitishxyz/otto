@@ -73,6 +73,7 @@ import {
 import {
 	getThreadEndBreathingRoom,
 	resolveThreadEndInset,
+	resolveThreadScrollButtonOffset,
 } from './threadEndInset';
 interface MessageThreadProps {
 	messages: Message[];
@@ -733,6 +734,7 @@ export const MessageThread = memo(function MessageThread({
 				railInsets.bottom,
 				getThreadEndBreathingRoom(density),
 			);
+	const scrollToBottomOffset = resolveThreadScrollButtonOffset(contentEndInset);
 
 	// Create a retry handler for error messages
 	const handleRetryMessage = useCallback(
@@ -1094,7 +1096,8 @@ export const MessageThread = memo(function MessageThread({
 					<button
 						type="button"
 						onClick={scrollToBottom}
-						className="absolute bottom-36 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-full shadow-lg hover:bg-muted/50 transition-all text-sm text-foreground z-10"
+						className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-full shadow-lg hover:bg-muted/50 transition-all text-sm text-foreground z-10"
+						style={{ bottom: scrollToBottomOffset }}
 					>
 						<ArrowDown className="w-4 h-4" />
 						<span>Scroll to bottom</span>

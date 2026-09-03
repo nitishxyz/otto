@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import {
 	THREAD_END_BREATHING_ROOM_COMPACT_PX,
 	THREAD_END_BREATHING_ROOM_PX,
+	THREAD_SCROLL_BUTTON_MIN_OFFSET_PX,
 	getThreadEndBreathingRoom,
 	resolveThreadEndInset,
+	resolveThreadScrollButtonOffset,
 } from '../packages/web-sdk/src/components/messages/threadEndInset';
 
 describe('thread end inset', () => {
@@ -67,5 +69,24 @@ describe('thread end inset', () => {
 		expect(
 			resolveThreadEndInset(180, getThreadEndBreathingRoom('compact')),
 		).toBe(180 + THREAD_END_BREATHING_ROOM_COMPACT_PX);
+	});
+
+	test('keeps the scroll button at its resting position for a short composer', () => {
+		expect(resolveThreadScrollButtonOffset(120)).toBe(
+			THREAD_SCROLL_BUTTON_MIN_OFFSET_PX,
+		);
+	});
+
+	test('lifts the scroll button above expanded composer bars', () => {
+		expect(resolveThreadScrollButtonOffset(312)).toBe(312);
+	});
+
+	test('sanitizes invalid scroll button insets', () => {
+		expect(resolveThreadScrollButtonOffset(-1)).toBe(
+			THREAD_SCROLL_BUTTON_MIN_OFFSET_PX,
+		);
+		expect(resolveThreadScrollButtonOffset(Number.NaN)).toBe(
+			THREAD_SCROLL_BUTTON_MIN_OFFSET_PX,
+		);
 	});
 });

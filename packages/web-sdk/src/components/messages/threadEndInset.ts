@@ -25,6 +25,9 @@ export const THREAD_END_BREATHING_ROOM_PX = 64;
 /** Compact-density breathing room: one Tailwind step tighter (`pb-12`). */
 export const THREAD_END_BREATHING_ROOM_COMPACT_PX = 48;
 
+/** Existing resting position for the scroll-to-bottom control (`bottom-36`). */
+export const THREAD_SCROLL_BUTTON_MIN_OFFSET_PX = 144;
+
 /** Density-resolved breathing room between the last row and the composer. */
 export function getThreadEndBreathingRoom(density: ThreadEndDensity): number {
 	return density === 'compact'
@@ -53,4 +56,14 @@ export function resolveThreadEndInset(
 			? breathingRoomPx
 			: 0;
 	return Math.round(overlap + room);
+}
+
+/**
+ * Keeps the scroll-to-bottom control above the complete composer stack while
+ * preserving its established resting position when the composer is short.
+ */
+export function resolveThreadScrollButtonOffset(endInsetPx: number): number {
+	const inset =
+		Number.isFinite(endInsetPx) && endInsetPx > 0 ? Math.round(endInsetPx) : 0;
+	return Math.max(THREAD_SCROLL_BUTTON_MIN_OFFSET_PX, inset);
 }
