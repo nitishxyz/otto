@@ -31,6 +31,29 @@ GH_TOKEN=...
 GITHUB_TOKEN=...
 ```
 
+## OpenAI OAuth transport
+
+ChatGPT-authenticated OpenAI requests use the Codex Responses WebSocket by
+default and fall back to HTTP/SSE for the remainder of the session if the
+socket cannot connect or disconnects mid-stream.
+
+```bash
+OTTO_OPENAI_OAUTH_TRANSPORT=auto       # default: WebSocket with HTTP fallback
+OTTO_OPENAI_OAUTH_TRANSPORT=websocket  # require WebSocket; do not fall back
+OTTO_OPENAI_OAUTH_TRANSPORT=http       # disable WebSocket
+```
+
+The existing timeout and retry controls apply to both transports where
+relevant:
+
+```bash
+OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS=15000
+OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS=30000
+OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES=2
+OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS=500
+OTTO_PROVIDER_STREAM_IDLE_RETRY_MAX=2
+```
+
 ## Server and client ports
 
 ```bash

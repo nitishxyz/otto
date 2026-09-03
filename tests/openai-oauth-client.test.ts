@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { streamText } from 'ai';
 import type { OAuth } from '../packages/sdk/src/types/src/index.ts';
 import {
 	clearOpenAIOAuthSessionState,
 	createOpenAIOAuthFetch,
+	createOpenAIOAuthModel,
 	getOpenAIOAuthSessionState,
 } from '../packages/sdk/src/providers/src/openai-oauth-client.ts';
+import type { OpenAIOAuthWebSocketFactory } from '../packages/sdk/src/providers/src/openai-oauth-websocket.ts';
 
 const TEST_OAUTH: OAuth = {
 	type: 'oauth',
@@ -14,11 +17,68 @@ const TEST_OAUTH: OAuth = {
 	accountId: 'acct_123',
 };
 
+class FakeWebSocket extends EventTarget {
+	readyState = WebSocket.CONNECTING;
+	readonly sent: string[] = [];
+
+	constructor(readonly onSend?: (body: string, socket: FakeWebSocket) => void) {
+		super();
+	}
+
+	open() {
+		this.readyState = WebSocket.OPEN;
+		this.dispatchEvent(new Event('open'));
+	}
+
+	send(body: string) {
+		this.sent.push(body);
+		this.onSend?.(body, this);
+	}
+
+	message(payload: unknown) {
+		this.dispatchEvent(
+			new MessageEvent('message', { data: JSON.stringify(payload) }),
+		);
+	}
+
+	close(code = 1000, reason = '') {
+		if (this.readyState === WebSocket.CLOSED) return;
+		this.readyState = WebSocket.CLOSED;
+		this.dispatchEvent(new CloseEvent('close', { code, reason }));
+	}
+
+	failConnection() {
+		this.dispatchEvent(new Event('error'));
+	}
+}
+
+function websocketFactory(
+	create: () => FakeWebSocket,
+	connections: FakeWebSocket[],
+	headers?: Array<Record<string, string>>,
+): OpenAIOAuthWebSocketFactory {
+	return (_url, options) => {
+		const socket = create();
+		connections.push(socket);
+		headers?.push(options.headers);
+		queueMicrotask(() => socket.open());
+		return socket as unknown as WebSocket;
+	};
+}
+
+const WEBSOCKET_REQUEST_BODY = JSON.stringify({
+	model: 'gpt-5.6-sol',
+	store: false,
+	stream: true,
+	input: [{ role: 'user', content: 'hello' }],
+});
+
 describe('openai oauth client', () => {
 	const originalFetch = globalThis.fetch;
 
 	beforeEach(() => {
 		clearOpenAIOAuthSessionState();
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'http';
 		delete process.env.OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS;
@@ -29,6 +89,7 @@ describe('openai oauth client', () => {
 	afterEach(() => {
 		globalThis.fetch = originalFetch;
 		clearOpenAIOAuthSessionState();
+		delete process.env.OTTO_OPENAI_OAUTH_TRANSPORT;
 		delete process.env.OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS;
@@ -366,5 +427,436 @@ describe('openai oauth client', () => {
 		expect(JSON.parse(requestBodies[1] ?? '{}')).toMatchObject({
 			previous_response_id: 'resp_1',
 		});
+	});
+
+	test('streams Codex responses over one reusable websocket', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'websocket';
+		const connections: FakeWebSocket[] = [];
+		const handshakeHeaders: Array<Record<string, string>> = [];
+		let responseNumber = 0;
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					responseNumber += 1;
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.created',
+							response: {
+								id: `resp_ws_${responseNumber}`,
+								status: 'in_progress',
+								model: 'gpt-5.6-sol',
+							},
+						});
+						socket.message({
+							type: 'response.output_text.delta',
+							item_id: `item_${responseNumber}`,
+							delta: `ok-${responseNumber}`,
+						});
+						socket.message({
+							type: 'response.completed',
+							response: {
+								id: `resp_ws_${responseNumber}`,
+								status: 'completed',
+							},
+						});
+					});
+				}),
+			connections,
+			handshakeHeaders,
+		);
+		globalThis.fetch = async () => {
+			throw new Error('HTTP should not be used');
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-websocket',
+			webSocketFactory: factory,
+		});
+		const first = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+		const firstBody = await first.text();
+		const nextFetchForSameSession = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-websocket',
+			webSocketFactory: factory,
+		});
+		const second = await nextFetchForSameSession(
+			'https://api.openai.com/v1/responses',
+			{
+				method: 'POST',
+				body: WEBSOCKET_REQUEST_BODY,
+			},
+		);
+		const secondBody = await second.text();
+
+		expect(connections).toHaveLength(1);
+		expect(connections[0]?.sent).toHaveLength(2);
+		expect(first.headers.get('x-otto-openai-transport')).toBe('websocket');
+		expect(firstBody).toContain('ok-1');
+		expect(firstBody).toEndWith('data: [DONE]\n\n');
+		expect(secondBody).toContain('ok-2');
+		expect(handshakeHeaders[0]?.['openai-beta']).toBe(
+			'responses_websockets=2026-02-06',
+		);
+		const frame = JSON.parse(connections[0]?.sent[0] ?? '{}');
+		expect(frame).toMatchObject({
+			type: 'response.create',
+			model: 'gpt-5.6-sol',
+			store: false,
+			stream: true,
+			client_metadata: { session_id: 'session-websocket' },
+		});
+		expect(getOpenAIOAuthSessionState('session-websocket')).toMatchObject({
+			responseId: 'resp_ws_2',
+			status: 'completed',
+		});
+	});
+
+	test('closes a one-off websocket after the response completes', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'websocket';
+		const connections: FakeWebSocket[] = [];
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.completed',
+							response: { id: 'resp_once', status: 'completed' },
+						});
+					});
+				}),
+			connections,
+		);
+		globalThis.fetch = async () => {
+			throw new Error('HTTP should not be used');
+		};
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			webSocketFactory: factory,
+		});
+
+		const response = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+
+		expect(await response.text()).toEndWith('data: [DONE]\n\n');
+		expect(connections).toHaveLength(1);
+		expect(connections[0]?.readyState).toBe(WebSocket.CLOSED);
+	});
+
+	test('falls back to HTTP for the session when websocket setup fails', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'auto';
+		const connections: FakeWebSocket[] = [];
+		const factory: OpenAIOAuthWebSocketFactory = () => {
+			const socket = new FakeWebSocket();
+			connections.push(socket);
+			queueMicrotask(() => socket.failConnection());
+			return socket as unknown as WebSocket;
+		};
+		let httpRequests = 0;
+		globalThis.fetch = async () => {
+			httpRequests += 1;
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-auto-fallback',
+			webSocketFactory: factory,
+		});
+		const first = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+		const second = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+
+		expect(await first.text()).toBe('data: [DONE]\n\n');
+		expect(await second.text()).toBe('data: [DONE]\n\n');
+		expect(connections).toHaveLength(1);
+		expect(httpRequests).toBe(2);
+	});
+
+	test('falls back to HTTP when websocket rejects the request', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'auto';
+		const connections: FakeWebSocket[] = [];
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'error',
+							status: 404,
+							error: { code: 'not_found', message: 'Not Found' },
+						});
+					});
+				}),
+			connections,
+		);
+		let httpRequests = 0;
+		globalThis.fetch = async () => {
+			httpRequests += 1;
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-request-fallback',
+			webSocketFactory: factory,
+		});
+		const response = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+
+		expect(await response.text()).toBe('data: [DONE]\n\n');
+		expect(connections).toHaveLength(1);
+		expect(httpRequests).toBe(1);
+	});
+
+	test('feeds websocket events through the OpenAI AI SDK model', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'websocket';
+		const connections: FakeWebSocket[] = [];
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.created',
+							response: {
+								id: 'resp_sdk',
+								created_at: 1_700_000_000,
+								model: 'gpt-5.6-sol',
+							},
+						});
+						socket.message({
+							type: 'response.output_item.added',
+							output_index: 0,
+							item: { type: 'message', id: 'msg_sdk' },
+						});
+						socket.message({
+							type: 'response.output_text.delta',
+							item_id: 'msg_sdk',
+							delta: 'SDK_OK',
+						});
+						socket.message({
+							type: 'response.output_item.done',
+							output_index: 0,
+							item: { type: 'message', id: 'msg_sdk' },
+						});
+						socket.message({
+							type: 'response.completed',
+							response: {
+								id: 'resp_sdk',
+								status: 'completed',
+								usage: {
+									input_tokens: 1,
+									output_tokens: 1,
+								},
+							},
+						});
+					});
+				}),
+			connections,
+		);
+		globalThis.fetch = async () => {
+			throw new Error('HTTP should not be used');
+		};
+		const model = createOpenAIOAuthModel('gpt-5.6-sol', {
+			oauth: TEST_OAUTH,
+			sessionId: 'session-sdk-websocket',
+			webSocketFactory: factory,
+		});
+
+		const result = streamText({
+			model,
+			prompt: 'Reply with SDK_OK',
+			providerOptions: { openai: { store: false } },
+		});
+
+		expect(await result.text).toBe('SDK_OK');
+		expect(connections).toHaveLength(1);
+	});
+
+	test('uses HTTP on the next request after a websocket stream disconnects', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'auto';
+		const connections: FakeWebSocket[] = [];
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.created',
+							response: {
+								id: 'resp_disconnected',
+								status: 'in_progress',
+								model: 'gpt-5.6-sol',
+							},
+						});
+						socket.close(1006, 'connection lost');
+					});
+				}),
+			connections,
+		);
+		let httpRequests = 0;
+		globalThis.fetch = async () => {
+			httpRequests += 1;
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-stream-fallback',
+			webSocketFactory: factory,
+		});
+		const first = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+		await expect(first.text()).rejects.toThrow(
+			'WebSocket closed before response.completed',
+		);
+		const second = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+
+		expect(await second.text()).toBe('data: [DONE]\n\n');
+		expect(connections).toHaveLength(1);
+		expect(httpRequests).toBe(1);
+	});
+
+	test('does not disable websocket after a caller aborts a stream', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'auto';
+		const connections: FakeWebSocket[] = [];
+		let requestNumber = 0;
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					requestNumber += 1;
+					queueMicrotask(() => {
+						if (requestNumber === 1) {
+							socket.message({
+								type: 'response.created',
+								response: { id: 'resp_aborted', status: 'in_progress' },
+							});
+							return;
+						}
+						socket.message({
+							type: 'response.completed',
+							response: { id: 'resp_after_abort', status: 'completed' },
+						});
+					});
+				}),
+			connections,
+		);
+		globalThis.fetch = async () => {
+			throw new Error('HTTP should not be used');
+		};
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-aborted-websocket',
+			webSocketFactory: factory,
+		});
+		const abortController = new AbortController();
+		const first = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+			signal: abortController.signal,
+		});
+
+		abortController.abort();
+		await expect(first.text()).rejects.toThrow();
+		const second = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: WEBSOCKET_REQUEST_BODY,
+		});
+
+		expect(await second.text()).toEndWith('data: [DONE]\n\n');
+		expect(connections).toHaveLength(2);
+	});
+
+	test('preserves websocket disconnect details through the AI SDK stream', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'auto';
+		const connections: FakeWebSocket[] = [];
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.created',
+							response: {
+								id: 'resp_sdk_disconnected',
+								created_at: 1_700_000_000,
+								model: 'gpt-5.6-sol',
+							},
+						});
+						socket.close(1006, 'connection lost');
+					});
+				}),
+			connections,
+		);
+		const model = createOpenAIOAuthModel('gpt-5.6-sol', {
+			oauth: TEST_OAUTH,
+			sessionId: 'session-sdk-disconnect',
+			webSocketFactory: factory,
+		});
+		const result = streamText({
+			model,
+			prompt: 'hello',
+			providerOptions: { openai: { store: false } },
+		});
+
+		let streamError: unknown;
+		try {
+			for await (const _part of result.fullStream) {
+				// consume until the transport failure reaches the runner-facing stream
+			}
+		} catch (error) {
+			streamError = error;
+		}
+		expect(streamError).toBeInstanceOf(Error);
+		expect((streamError as Error).message).toContain(
+			'OpenAI OAuth Codex WebSocket closed before response.completed',
+		);
+	});
+
+	test('does not silently use HTTP in forced websocket mode', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'websocket';
+		let httpRequests = 0;
+		globalThis.fetch = async () => {
+			httpRequests += 1;
+			return new Response('data: [DONE]\n\n');
+		};
+		const factory: OpenAIOAuthWebSocketFactory = () => {
+			const socket = new FakeWebSocket();
+			queueMicrotask(() => socket.failConnection());
+			return socket as unknown as WebSocket;
+		};
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-websocket-only',
+			webSocketFactory: factory,
+		});
+
+		await expect(
+			customFetch('https://api.openai.com/v1/responses', {
+				method: 'POST',
+				body: WEBSOCKET_REQUEST_BODY,
+			}),
+		).rejects.toThrow('Failed to connect OpenAI OAuth Codex WebSocket');
+		expect(httpRequests).toBe(0);
 	});
 });

@@ -156,7 +156,11 @@ export {
 	createOpenAIOAuthFetch,
 	createOpenAIOAuthModel,
 } from './providers/src/index.ts';
-export type { OpenAIOAuthConfig } from './providers/src/index.ts';
+export type {
+	OpenAIOAuthConfig,
+	OpenAIOAuthTransport,
+	OpenAIOAuthWebSocketFactory,
+} from './providers/src/index.ts';
 export {
 	isModelAllowedForOAuth,
 	filterModelsForAuthType,

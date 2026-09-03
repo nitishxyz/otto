@@ -55,7 +55,10 @@ function isMaxOutputTokensFinish(
 function isProviderOrLegacyCodexStreamIdleTimeout(error: unknown): boolean {
 	if (isProviderStreamIdleTimeoutError(error)) return true;
 	const message = toErrorMessage(error);
-	return message.includes('OpenAI OAuth Codex stream idle timeout');
+	return (
+		message.includes('OpenAI OAuth Codex stream idle timeout') ||
+		message.includes('OpenAI OAuth Codex WebSocket')
+	);
 }
 
 export async function retryAfterProviderStreamIdleTimeout(args: {

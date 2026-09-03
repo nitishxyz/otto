@@ -116,6 +116,10 @@ export {
 	createOpenAIOAuthModel,
 } from './openai-oauth-client.ts';
 export type { OpenAIOAuthConfig } from './openai-oauth-client.ts';
+export type {
+	OpenAIOAuthTransport,
+	OpenAIOAuthWebSocketFactory,
+} from './openai-oauth-websocket.ts';
 export {
 	isModelAllowedForOAuth,
 	filterModelsForAuthType,

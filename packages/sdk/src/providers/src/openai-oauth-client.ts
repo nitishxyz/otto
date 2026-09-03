@@ -12,6 +12,13 @@ import {
 	parseIntegerSetting,
 	retry,
 } from '../../runtime/retry.ts';
+import {
+	CodexWebSocketTransport,
+	isCodexWebSocketRequest,
+	resolveOpenAIOAuthTransport,
+	type OpenAIOAuthTransport,
+	type OpenAIOAuthWebSocketFactory,
+} from './openai-oauth-websocket.ts';
 
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex';
 const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses';
@@ -35,8 +42,8 @@ const CODEX_INSTALLATION_ID = crypto.randomUUID();
 //                      doesn't respond, abort fast and let the retry recover,
 //                      instead of hanging. opencode uses 10s; we allow a little
 //                      headroom for cold starts.
-//   STREAM_IDLE      = max silence BETWEEN streamed SSE chunks after headers.
-//                      Resets on every chunk. Because we request
+//   STREAM_IDLE      = max silence BETWEEN streamed SSE chunks or WebSocket
+//                      events. Resets on every chunk/event. Because we request
 //                      `reasoningSummary: 'auto'`, Codex emits reasoning deltas
 //                      while it thinks (these render in the UI), so a live turn
 //                      keeps resetting this timer; only a genuinely dead stream
@@ -57,11 +64,18 @@ type OpenAIOAuthSessionState = {
 };
 
 const openAIOAuthSessionState = new Map<string, OpenAIOAuthSessionState>();
+const openAIOAuthWebSocketTransports = new Map<
+	string,
+	CodexWebSocketTransport
+>();
+const openAIOAuthHttpFallbackSessions = new Set<string>();
 
 export type OpenAIOAuthConfig = {
 	oauth: OAuth;
 	projectRoot?: string;
 	sessionId?: string;
+	transport?: OpenAIOAuthTransport;
+	webSocketFactory?: OpenAIOAuthWebSocketFactory;
 };
 
 function shouldDebugOpenAIOAuth() {
@@ -154,9 +168,17 @@ function getCodexRequestRetryDelayMs() {
 export function clearOpenAIOAuthSessionState(sessionId?: string) {
 	if (sessionId) {
 		openAIOAuthSessionState.delete(sessionId);
+		openAIOAuthHttpFallbackSessions.delete(sessionId);
+		openAIOAuthWebSocketTransports.get(sessionId)?.close();
+		openAIOAuthWebSocketTransports.delete(sessionId);
 		return;
 	}
 	openAIOAuthSessionState.clear();
+	openAIOAuthHttpFallbackSessions.clear();
+	for (const transport of openAIOAuthWebSocketTransports.values()) {
+		transport.close();
+	}
+	openAIOAuthWebSocketTransports.clear();
 }
 
 export function getOpenAIOAuthSessionState(sessionId: string) {
@@ -608,6 +630,36 @@ function buildHeaders(
 
 export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 	let currentOAuth = config.oauth;
+	const transportMode = resolveOpenAIOAuthTransport(config.transport);
+	const createWebSocketTransport = () =>
+		new CodexWebSocketTransport({
+			connectTimeoutMs: getCodexRequestTimeoutMs,
+			idleTimeoutMs: getCodexStreamIdleTimeoutMs,
+			persistConnection: Boolean(config.sessionId),
+			webSocketFactory: config.webSocketFactory,
+			onStreamFailure: () => {
+				if (transportMode === 'auto' && config.sessionId) {
+					openAIOAuthHttpFallbackSessions.add(config.sessionId);
+				}
+			},
+		});
+	const webSocketTransport =
+		transportMode === 'http'
+			? undefined
+			: config.sessionId
+				? (() => {
+						const existing = openAIOAuthWebSocketTransports.get(
+							config.sessionId as string,
+						);
+						if (existing) return existing;
+						const created = createWebSocketTransport();
+						openAIOAuthWebSocketTransports.set(
+							config.sessionId as string,
+							created,
+						);
+						return created;
+					})()
+				: createWebSocketTransport();
 
 	const customFetch = async (
 		input: Parameters<typeof fetch>[0],
@@ -663,20 +715,66 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 		});
 
 		let response: Response;
+		let responseTransport: 'http' | 'websocket' = 'http';
 		try {
-			response = await fetchWithCodexRequestTimeout(
-				targetUrl,
-				{
-					...requestInit,
-					headers,
-				},
-				{
-					enabled: isResponsesRequest,
-					sessionId: config.sessionId,
-					model: requestModel,
-					requestStartedAt,
-				},
-			);
+			const sessionUsesHttpFallback =
+				!!config.sessionId &&
+				openAIOAuthHttpFallbackSessions.has(config.sessionId);
+			const canUseWebSocket =
+				isResponsesRequest &&
+				!!webSocketTransport &&
+				isCodexWebSocketRequest(requestInit?.body) &&
+				(transportMode === 'websocket' || !sessionUsesHttpFallback);
+
+			if (canUseWebSocket) {
+				try {
+					responseTransport = 'websocket';
+					response = await webSocketTransport.request({
+						body: requestInit?.body as string,
+						headers,
+						signal: requestInit?.signal,
+						sessionId: config.sessionId,
+					});
+				} catch (error) {
+					if (requestInit?.signal?.aborted || transportMode === 'websocket') {
+						throw error;
+					}
+					if (config.sessionId) {
+						openAIOAuthHttpFallbackSessions.add(config.sessionId);
+					}
+					loggerWarn(
+						'[openai-oauth] websocket unavailable, falling back to HTTP',
+						{
+							sessionId: config.sessionId,
+							model: requestModel,
+							durationMs: Date.now() - requestStartedAt,
+							error: summarizeError(error),
+						},
+					);
+					responseTransport = 'http';
+					response = await fetchWithCodexRequestTimeout(
+						targetUrl,
+						{ ...requestInit, headers },
+						{
+							enabled: true,
+							sessionId: config.sessionId,
+							model: requestModel,
+							requestStartedAt,
+						},
+					);
+				}
+			} else {
+				response = await fetchWithCodexRequestTimeout(
+					targetUrl,
+					{ ...requestInit, headers },
+					{
+						enabled: isResponsesRequest,
+						sessionId: config.sessionId,
+						model: requestModel,
+						requestStartedAt,
+					},
+				);
+			}
 		} catch (error) {
 			loggerWarn('[openai-oauth] request failed before response', {
 				sessionId: config.sessionId,
@@ -684,6 +782,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 				method,
 				bodyCharsApprox: requestBodySize,
 				model: requestModel,
+				transport: responseTransport,
 				durationMs: Date.now() - requestStartedAt,
 				error: summarizeError(error),
 			});
@@ -698,6 +797,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 			durationMs: Date.now() - requestStartedAt,
 			bodyCharsApprox: requestBodySize,
 			model: requestModel,
+			transport: responseTransport,
 		});
 		if (!response.ok && response.status !== 401) {
 			loggerWarn('[openai-oauth] non-OK response', {
@@ -708,6 +808,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 				durationMs: Date.now() - requestStartedAt,
 				bodyCharsApprox: requestBodySize,
 				model: requestModel,
+				transport: responseTransport,
 				bodyPreview: await previewResponseBody(response),
 			});
 		}
