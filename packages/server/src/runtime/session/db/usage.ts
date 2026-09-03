@@ -1,44 +1,49 @@
-import { catalog, isBuiltInProviderId, type ProviderId } from '@ottocode/sdk';
+import type { ProviderId } from '@ottocode/sdk';
 import type { ProviderMetadata, UsageData } from './types.ts';
+
+export { resolveUsageProvider } from '@ottocode/sdk';
 
 export function normalizeUsage(
 	usage: UsageData,
 	providerOptions: ProviderMetadata | undefined,
-	provider: ProviderId,
+	_provider: ProviderId,
 ): UsageData {
 	const rawInputTokens = Number(usage.inputTokens ?? 0);
 	const outputTokens = Number(usage.outputTokens ?? 0);
 	const reasoningTokens = Number(usage.reasoningTokens ?? 0);
+	const inputTokenDetails = usage.inputTokenDetails;
 
 	const cachedInputTokens =
-		usage.cachedInputTokens != null
-			? Number(usage.cachedInputTokens)
-			: providerOptions?.openai?.cachedPromptTokens != null
-				? Number(providerOptions.openai.cachedPromptTokens)
-				: providerOptions?.anthropic?.cacheReadInputTokens != null
-					? Number(providerOptions.anthropic.cacheReadInputTokens)
-					: undefined;
+		inputTokenDetails?.cacheReadTokens != null
+			? Number(inputTokenDetails.cacheReadTokens)
+			: usage.cachedInputTokens != null
+				? Number(usage.cachedInputTokens)
+				: providerOptions?.openai?.cachedPromptTokens != null
+					? Number(providerOptions.openai.cachedPromptTokens)
+					: providerOptions?.anthropic?.cacheReadInputTokens != null
+						? Number(providerOptions.anthropic.cacheReadInputTokens)
+						: undefined;
 
 	const cacheCreationInputTokens =
-		usage.cacheCreationInputTokens != null
-			? Number(usage.cacheCreationInputTokens)
-			: providerOptions?.anthropic?.cacheCreationInputTokens != null
-				? Number(providerOptions.anthropic.cacheCreationInputTokens)
-				: undefined;
+		inputTokenDetails?.cacheWriteTokens != null
+			? Number(inputTokenDetails.cacheWriteTokens)
+			: usage.cacheCreationInputTokens != null
+				? Number(usage.cacheCreationInputTokens)
+				: providerOptions?.anthropic?.cacheCreationInputTokens != null
+					? Number(providerOptions.anthropic.cacheCreationInputTokens)
+					: undefined;
 
 	const cachedValue = Math.max(0, cachedInputTokens ?? 0);
 	const cacheCreationValue = Math.max(0, cacheCreationInputTokens ?? 0);
 
-	let inputTokens = rawInputTokens;
-	const includedCacheTokens =
-		provider === 'openai'
-			? cachedValue
-			: provider === 'anthropic'
-				? cachedValue + cacheCreationValue
-				: 0;
-	if (includedCacheTokens > 0 && rawInputTokens >= includedCacheTokens) {
-		inputTokens = rawInputTokens - includedCacheTokens;
-	}
+	const reportedNoCacheTokens = inputTokenDetails?.noCacheTokens;
+	const includedCacheTokens = cachedValue + cacheCreationValue;
+	const inputTokens =
+		reportedNoCacheTokens != null
+			? Math.max(0, Number(reportedNoCacheTokens))
+			: includedCacheTokens > 0 && rawInputTokens >= includedCacheTokens
+				? rawInputTokens - includedCacheTokens
+				: rawInputTokens;
 
 	return {
 		inputTokens,
@@ -47,29 +52,4 @@ export function normalizeUsage(
 		cacheCreationInputTokens,
 		reasoningTokens,
 	};
-}
-
-export function resolveUsageProvider(
-	provider: ProviderId,
-	model: string,
-): ProviderId {
-	if (
-		provider !== 'ottorouter' &&
-		provider !== 'openrouter' &&
-		provider !== 'opencode'
-	) {
-		return provider;
-	}
-	const entry = isBuiltInProviderId(provider) ? catalog[provider] : undefined;
-	const normalizedModel = model.includes('/') ? model.split('/').at(-1) : model;
-	const modelEntry = Object.values(entry?.models ?? {}).find(
-		(modelConfig: { id?: string }) =>
-			modelConfig.id?.toLowerCase() === normalizedModel?.toLowerCase(),
-	);
-	const npm = modelEntry?.provider?.npm ?? '';
-	if (npm.includes('openai')) return 'openai';
-	if (npm.includes('anthropic')) return 'anthropic';
-	if (npm.includes('google')) return 'google';
-	if (npm.includes('zai')) return 'zai';
-	return provider;
 }

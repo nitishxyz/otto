@@ -128,6 +128,10 @@ export {
 } from './anthropic-caching.ts';
 export { createPromptCacheKeyFetch } from './prompt-caching.ts';
 export {
+	CACHE_USAGE_NORMALIZATION_MARKER,
+	resolveUsageProvider,
+} from './usage-provider.ts';
+export {
 	createAnthropicOAuthFetch,
 	createAnthropicOAuthModel,
 } from './anthropic-oauth-client.ts';

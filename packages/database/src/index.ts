@@ -1,6 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { loadConfig, logger, type OttoConfig } from '@ottocode/sdk';
+import {
+	CACHE_USAGE_NORMALIZATION_MARKER,
+	loadConfig,
+	logger,
+	type OttoConfig,
+} from '@ottocode/sdk';
 import * as schema from './schema/index.ts';
 import { bundledMigrations } from './runtime/migrations-bundled.ts';
 
@@ -49,6 +54,11 @@ export async function getDbByPath(dbPath: string) {
 			sqlite.exec(
 				'CREATE TABLE IF NOT EXISTS otto_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)',
 			);
+			sqlite
+				.query(
+					'INSERT OR IGNORE INTO otto_migrations (name, applied_at) VALUES (?, ?)',
+				)
+				.run(CACHE_USAGE_NORMALIZATION_MARKER, Date.now());
 
 			// Read applied migrations
 			const appliedRows = sqlite

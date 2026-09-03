@@ -8,7 +8,11 @@ import {
 } from '@ottocode/sdk';
 import { providerFetch } from './fetch.ts';
 
-export async function getXaiInstance(cfg: OttoConfig, model: string) {
+export async function getXaiInstance(
+	cfg: OttoConfig,
+	model: string,
+	sessionId?: string,
+) {
 	const auth = await getAuth('xai', cfg.projectRoot);
 	if (auth?.type === 'oauth') {
 		let currentAuth = auth;
@@ -28,6 +32,7 @@ export async function getXaiInstance(cfg: OttoConfig, model: string) {
 			apiKey: currentAuth.access,
 			useResponses: true,
 			useGrokCliProxy: isXaiGrokCliModel(model),
+			promptCacheKey: sessionId,
 			fetch: providerFetch,
 		});
 	}
@@ -39,5 +44,9 @@ export async function getXaiInstance(cfg: OttoConfig, model: string) {
 	}
 
 	const apiKey = auth?.type === 'api' ? auth.key : undefined;
-	return createXaiModel(model, { apiKey, fetch: providerFetch });
+	return createXaiModel(model, {
+		apiKey,
+		promptCacheKey: sessionId,
+		fetch: providerFetch,
+	});
 }

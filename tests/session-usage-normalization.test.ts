@@ -47,4 +47,37 @@ describe('session usage normalization', () => {
 			).inputTokens,
 		).toBe(2_000);
 	});
+
+	test('separates cache reads for xAI and other AI SDK providers', () => {
+		expect(
+			normalizeUsage(
+				{ inputTokens: 10_000, cachedInputTokens: 8_000 },
+				undefined,
+				'xai',
+			).inputTokens,
+		).toBe(2_000);
+	});
+
+	test('prefers AI SDK input token details for cache splits', () => {
+		expect(
+			normalizeUsage(
+				{
+					inputTokens: 10_000,
+					inputTokenDetails: {
+						noCacheTokens: 1_500,
+						cacheReadTokens: 8_000,
+						cacheWriteTokens: 500,
+					},
+				},
+				undefined,
+				'xai',
+			),
+		).toEqual({
+			inputTokens: 1_500,
+			outputTokens: 0,
+			cachedInputTokens: 8_000,
+			cacheCreationInputTokens: 500,
+			reasoningTokens: 0,
+		});
+	});
 });

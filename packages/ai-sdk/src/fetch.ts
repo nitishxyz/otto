@@ -219,6 +219,9 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 			attempt++;
 			const performAuthenticatedRequest = async (forceRefresh = false) => {
 				const headers = new Headers(init?.headers);
+				if (cache?.promptCacheKey && !headers.has('x-session-id')) {
+					headers.set('x-session-id', cache.promptCacheKey);
+				}
 				const credential = await getCredential(forceRefresh);
 				headers.set('authorization', `Bearer ${credential}`);
 				return baseFetch(input, { ...init, body, headers });
@@ -228,13 +231,26 @@ export function createOttoRouterFetch(options: CreateOttoRouterFetchOptions) {
 			if (body && typeof body === 'string') {
 				try {
 					const parsed = JSON.parse(body);
-					if (cache?.promptCacheKey)
-						parsed.prompt_cache_key = cache.promptCacheKey;
-					if (cache?.promptCacheRetention)
-						parsed.prompt_cache_retention = cache.promptCacheRetention;
 					const requestUrl = getRequestUrl(input);
 					const isAnthropicRoute =
 						requestUrl?.pathname.endsWith('/messages') ?? false;
+					const supportsOpenAICacheFields =
+						requestUrl?.pathname.endsWith('/responses') ||
+						requestUrl?.pathname.endsWith('/chat/completions');
+					if (
+						supportsOpenAICacheFields &&
+						cache?.promptCacheKey &&
+						typeof parsed.prompt_cache_key !== 'string'
+					) {
+						parsed.prompt_cache_key = cache.promptCacheKey;
+					}
+					if (
+						supportsOpenAICacheFields &&
+						cache?.promptCacheRetention &&
+						typeof parsed.prompt_cache_retention !== 'string'
+					) {
+						parsed.prompt_cache_retention = cache.promptCacheRetention;
+					}
 					if (isAnthropicRoute) {
 						const cacheConfig = cache?.anthropicCaching;
 						if (cacheConfig !== false) {

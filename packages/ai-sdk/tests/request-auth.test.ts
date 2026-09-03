@@ -56,6 +56,67 @@ describe('request auth flow', () => {
 		expect(requestCount).toBe(1);
 	});
 
+	test('sends cache affinity without leaking OpenAI fields to Anthropic', async () => {
+		const requests: Array<{ headers: Headers; body: Record<string, unknown> }> =
+			[];
+		const ottorouterFetch = createOttoRouterFetch({
+			auth: { apiKey: 'or_sk_cache-key' },
+			baseURL: 'https://ottorouter.test',
+			cache: { promptCacheKey: 'session-123' },
+			fetch: async (_input, init) => {
+				requests.push({
+					headers: new Headers(init?.headers),
+					body: JSON.parse(String(init?.body)),
+				});
+				return Response.json({ ok: true });
+			},
+		});
+
+		await ottorouterFetch('https://ottorouter.test/v1/messages', {
+			method: 'POST',
+			body: JSON.stringify({
+				system: [{ type: 'text', text: 'stable prompt' }],
+			}),
+		});
+
+		expect(requests[0]?.headers.get('x-session-id')).toBe('session-123');
+		expect(requests[0]?.body.prompt_cache_key).toBeUndefined();
+		expect(requests[0]?.body.prompt_cache_retention).toBeUndefined();
+	});
+
+	test('preserves explicit cache affinity on Chat Completions', async () => {
+		const requests: Array<{ headers: Headers; body: Record<string, unknown> }> =
+			[];
+		const ottorouterFetch = createOttoRouterFetch({
+			auth: { apiKey: 'or_sk_cache-key' },
+			baseURL: 'https://ottorouter.test',
+			cache: {
+				promptCacheKey: 'configured-session',
+				promptCacheRetention: '24h',
+			},
+			fetch: async (_input, init) => {
+				requests.push({
+					headers: new Headers(init?.headers),
+					body: JSON.parse(String(init?.body)),
+				});
+				return Response.json({ ok: true });
+			},
+		});
+
+		await ottorouterFetch('https://ottorouter.test/v1/chat/completions', {
+			method: 'POST',
+			headers: { 'x-session-id': 'explicit-session' },
+			body: JSON.stringify({
+				prompt_cache_key: 'explicit-cache-key',
+				prompt_cache_retention: 'in_memory',
+			}),
+		});
+
+		expect(requests[0]?.headers.get('x-session-id')).toBe('explicit-session');
+		expect(requests[0]?.body.prompt_cache_key).toBe('explicit-cache-key');
+		expect(requests[0]?.body.prompt_cache_retention).toBe('in_memory');
+	});
+
 	test('createOttoRouterFetch attaches bearer auth and shares one token exchange', async () => {
 		const auth: OttoRouterAuth = { refreshToken: 'refresh-1' };
 		const requests: Array<{ url: string; headers: Headers }> = [];

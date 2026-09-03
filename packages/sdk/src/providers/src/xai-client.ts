@@ -6,6 +6,7 @@ import type {
 import { createXai } from '@ai-sdk/xai';
 import { wrapLanguageModel } from 'ai';
 import { catalog } from './catalog-merged.ts';
+import { createPromptCacheKeyFetch } from './prompt-caching.ts';
 
 const XAI_GROK_CLI_BASE_URL = 'https://cli-chat-proxy.grok.com/v1';
 const XAI_DEFAULT_API_BASE_URL = 'https://api.x.ai/v1';
@@ -24,6 +25,7 @@ export type XaiProviderConfig = {
 	filesBaseURL?: string;
 	useResponses?: boolean;
 	useGrokCliProxy?: boolean;
+	promptCacheKey?: string;
 	fetch?: typeof fetch;
 };
 
@@ -311,6 +313,31 @@ function createXaiResponsesFetch(
 	return Object.assign(responsesFetch, { preconnect: baseFetch.preconnect });
 }
 
+/** Adds the endpoint-specific affinity hint recommended by xAI. */
+export function createXaiCacheAffinityFetch(
+	baseFetch: typeof fetch = fetch,
+	promptCacheKey?: string,
+	useResponses = false,
+): typeof fetch {
+	if (!promptCacheKey) return baseFetch;
+	if (useResponses) {
+		return createPromptCacheKeyFetch(baseFetch, promptCacheKey);
+	}
+
+	const affinityFetch = async (
+		input: Parameters<typeof fetch>[0],
+		init?: Parameters<typeof fetch>[1],
+	): Promise<Response> => {
+		const headers = new Headers(init?.headers);
+		if (!headers.has('x-grok-conv-id')) {
+			headers.set('x-grok-conv-id', promptCacheKey);
+		}
+		return baseFetch(input, { ...init, headers });
+	};
+
+	return Object.assign(affinityFetch, { preconnect: baseFetch.preconnect });
+}
+
 export function createXaiModel(model: string, config?: XaiProviderConfig) {
 	const entry = catalog.xai;
 	const apiKey = config?.apiKey || process.env.XAI_API_KEY || '';
@@ -323,13 +350,18 @@ export function createXaiModel(model: string, config?: XaiProviderConfig) {
 	const useResponses =
 		config?.useGrokCliProxy ||
 		(config?.useResponses ?? shouldUseXaiResponsesApi(model));
+	const cacheAwareFetch = createXaiCacheAffinityFetch(
+		config?.fetch,
+		config?.promptCacheKey,
+		useResponses,
+	);
 	const instance = createXai({
 		apiKey,
 		baseURL,
 		headers: grokCliHeaders,
 		fetch: useResponses
-			? createXaiResponsesFetch(config?.fetch)
-			: config?.fetch,
+			? createXaiResponsesFetch(cacheAwareFetch)
+			: cacheAwareFetch,
 	});
 	if (useResponses) {
 		return wrapLanguageModel({

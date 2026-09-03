@@ -3,16 +3,32 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { catalog } from './catalog-merged.ts';
 import { createAnthropicCachingFetch } from './anthropic-caching.ts';
+import { createPromptCacheKeyFetch } from './prompt-caching.ts';
 import type { ProviderId } from '../../types/src/index.ts';
 
 export type OpencodeProviderConfig = {
 	apiKey?: string;
+	promptCacheKey?: string;
 	fetch?: typeof fetch;
 };
 
 function normalizeModelIdentifier(provider: ProviderId, model: string): string {
 	const prefix = `${provider}/`;
 	return model.startsWith(prefix) ? model.slice(prefix.length) : model;
+}
+
+/** Mirrors OpenCode's cache handling for each AI SDK provider binding. */
+export function createOpencodeCachingFetch(
+	binding: string | undefined,
+	config?: OpencodeProviderConfig,
+): typeof fetch | undefined {
+	if (binding === '@ai-sdk/openai') {
+		return createPromptCacheKeyFetch(config?.fetch, config?.promptCacheKey);
+	}
+	if (binding === '@ai-sdk/anthropic') {
+		return createAnthropicCachingFetch(config?.fetch) as typeof fetch;
+	}
+	return config?.fetch;
 }
 
 export function createOpencodeModel(
@@ -31,17 +47,17 @@ export function createOpencodeModel(
 		entry?.api ||
 		'https://opencode.ai/zen/v1';
 	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
+	const cachingFetch = createOpencodeCachingFetch(binding, config);
 
 	if (binding === '@ai-sdk/openai') {
-		const instance = createOpenAI({ apiKey, baseURL, fetch: config?.fetch });
+		const instance = createOpenAI({ apiKey, baseURL, fetch: cachingFetch });
 		return instance(resolvedModelId);
 	}
 	if (binding === '@ai-sdk/anthropic') {
-		const cachingFetch = createAnthropicCachingFetch(config?.fetch);
 		const instance = createAnthropic({
 			apiKey,
 			baseURL,
-			fetch: cachingFetch as typeof fetch,
+			fetch: cachingFetch,
 		});
 		return instance(resolvedModelId);
 	}
@@ -50,7 +66,7 @@ export function createOpencodeModel(
 			name: entry?.label ?? 'opencode',
 			baseURL,
 			headers,
-			fetch: config?.fetch,
+			fetch: cachingFetch,
 		});
 		return instance(resolvedModelId);
 	}

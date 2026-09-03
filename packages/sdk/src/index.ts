@@ -127,6 +127,10 @@ export {
 export { validateProviderModel } from './providers/src/index.ts';
 export { estimateModelCostUsd } from './providers/src/index.ts';
 export {
+	CACHE_USAGE_NORMALIZATION_MARKER,
+	resolveUsageProvider,
+} from './providers/src/index.ts';
+export {
 	providerEnvVar,
 	readEnvKey,
 	setEnvKey,

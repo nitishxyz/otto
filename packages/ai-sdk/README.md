@@ -251,6 +251,10 @@ createOttoRouter({
 });
 ```
 
+`promptCacheKey` is also sent as `x-session-id` for router affinity. The SDK
+only adds OpenAI-compatible body fields on Responses and Chat Completions
+routes; Anthropic and Google requests keep their provider-native payloads.
+
 ### OpenAI / Google
 
 - **OpenAI**: Automatic server-side prefix caching — no configuration needed

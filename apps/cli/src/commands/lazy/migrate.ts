@@ -16,4 +16,21 @@ export function registerMigrateCommand(program: Command) {
 			const { migrateLooper } = await import('../migrate.ts');
 			await migrateLooper(opts);
 		});
+
+	migrate
+		.command('cache-usage')
+		.description(
+			'Repair legacy cross-provider cache token totals in project databases',
+		)
+		.option('--project <path>', 'Only migrate the project at <path>')
+		.option('--all', 'Migrate every project database in otto state storage')
+		.option(
+			'--dry-run',
+			'Report repairs without changing or backing up databases',
+		)
+		.option('--no-backup', 'Skip the default SQLite backup before each repair')
+		.action(async (opts) => {
+			const { migrateCacheUsage } = await import('../migrate.ts');
+			await migrateCacheUsage(opts);
+		});
 }

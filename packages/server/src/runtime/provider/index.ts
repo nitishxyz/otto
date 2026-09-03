@@ -106,7 +106,7 @@ export async function resolveModel(
 		return resolveOpenRouterModel(model, options?.sessionId);
 	}
 	if (provider === 'opencode') {
-		return resolveOpencodeModel(model, cfg);
+		return resolveOpencodeModel(model, cfg, options?.sessionId);
 	}
 	if (provider === 'copilot') {
 		return resolveCopilotModel(model, cfg);
@@ -120,7 +120,7 @@ export async function resolveModel(
 		});
 	}
 	if (provider === 'xai') {
-		return getXaiInstance(cfg, model);
+		return getXaiInstance(cfg, model, options?.sessionId);
 	}
 	if (provider === 'zai') {
 		return getZaiInstance(cfg, model);

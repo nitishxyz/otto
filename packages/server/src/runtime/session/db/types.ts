@@ -4,6 +4,11 @@ export type RuntimeDb = Awaited<ReturnType<typeof getDb>>;
 
 export type UsageData = {
 	inputTokens?: number;
+	inputTokenDetails?: {
+		noCacheTokens?: number;
+		cacheReadTokens?: number;
+		cacheWriteTokens?: number;
+	};
 	outputTokens?: number;
 	totalTokens?: number;
 	cachedInputTokens?: number;
