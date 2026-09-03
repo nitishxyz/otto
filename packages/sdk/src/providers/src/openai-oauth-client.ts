@@ -812,10 +812,6 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 				bodyPreview: await previewResponseBody(response),
 			});
 		}
-		const trackedResponse = isResponsesRequest
-			? trackResponsesStream(response, config.sessionId)
-			: response;
-
 		if (response.status === 401) {
 			loggerWarn('[openai-oauth] 401 response, refreshing token and retrying', {
 				sessionId: config.sessionId,
@@ -898,6 +894,10 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 				return response;
 			}
 		}
+
+		const trackedResponse = isResponsesRequest
+			? trackResponsesStream(response, config.sessionId)
+			: response;
 
 		return trackedResponse;
 	};

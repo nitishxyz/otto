@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
 	buildThreadRows,
+	createThreadRowCache,
 	resetThreadRowCache,
 	type ThreadRow,
+	type ThreadRowCache,
 } from '../packages/web-sdk/src/components/messages/threadRowModel';
 import {
 	AssistantCompactGroupRow,
@@ -54,7 +56,7 @@ function message(overrides: Partial<Message> & { id: string }): Message {
 
 const EMPTY = new Set<string>();
 
-function build(messages: Message[], compact: boolean) {
+function build(messages: Message[], compact: boolean, cache?: ThreadRowCache) {
 	return buildThreadRows({
 		messages,
 		sessionId: 'session-1',
@@ -62,6 +64,7 @@ function build(messages: Message[], compact: boolean) {
 		currentMessageId: null,
 		queueLength: 0,
 		queuedMessageIds: EMPTY,
+		cache,
 	}).rows;
 }
 
@@ -381,7 +384,47 @@ describe('compact activity group boundaries', () => {
 		expect(finished.map((group) => group.collapsed)).toEqual([true, true]);
 	});
 
-	it('leaves a box expanded only while it is the turn\u2019s last drawn row', () => {
+	it('does not collapse activity the reader watched live', () => {
+		const cache = createThreadRowCache();
+		const live = message({
+			id: 'assistant-1',
+			status: 'pending',
+			completedAt: null,
+			parts: [readPart('r1', 0, 'a.ts'), reasoningPart('t1', 1, 'Thinking')],
+		});
+
+		const whileLive = groupRows(build([live], true, cache));
+		expect(whileLive[0].collapsed).toBe(false);
+
+		const withAnswer = message({
+			...live,
+			parts: [...(live.parts ?? []), textPart('answer', 2, 'Final answer')],
+		});
+		const whileAnswering = groupRows(build([withAnswer], true, cache));
+		expect(whileAnswering[0].collapsed).toBe(false);
+
+		const complete = message({
+			...withAnswer,
+			status: 'complete',
+			completedAt: 3,
+		});
+		const afterCompletion = groupRows(build([complete], true, cache));
+		expect(afterCompletion[0].collapsed).toBe(false);
+	});
+
+	it('still collapses activity first encountered after completion', () => {
+		const complete = message({
+			id: 'assistant-1',
+			status: 'complete',
+			completedAt: 3,
+			parts: [readPart('r1', 0, 'a.ts'), reasoningPart('t1', 1, 'Done')],
+		});
+
+		const groups = groupRows(build([complete], true, createThreadRowCache()));
+		expect(groups[0].collapsed).toBe(true);
+	});
+
+	it('only opens activity first seen as the pending turn\u2019s last drawn row', () => {
 		const streaming = message({
 			id: 'assistant-1',
 			status: 'pending',

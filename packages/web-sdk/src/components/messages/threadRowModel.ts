@@ -36,12 +36,13 @@ const EMPTY_EXPANDED_WORK: ReadonlySet<string> = new Set();
  *
  * The single exception is compact-thread exploratory activity. There a
  * contiguous run of reads/searches/reasoning parts is presented as *one*
- * bordered, height-constrained activity box that collapses to a one-line
- * summary when the run is finished — see {@link CompactActivityGroup}. That
- * presentation is a property of the run, not of any single part, so the run
- * owns one row (`assistant-compact-group`) keyed on its first part. Inside the
- * row every part still keeps its own keyed entry, and the row's identity only
- * changes when one of its own parts changes.
+ * bordered, height-constrained activity box. Completed history uses a one-line
+ * summary, while a box observed live stays expanded so content never collapses
+ * underneath the reader — see {@link CompactActivityGroup}. That presentation
+ * is a property of the run, not of any single part, so the run owns one row
+ * (`assistant-compact-group`) keyed on its first part. Inside the row every part
+ * still keeps its own keyed entry, and the row's identity only changes when one
+ * of its own parts changes.
  */
 export type ThreadRow =
 	| {
@@ -259,11 +260,23 @@ export interface ThreadRowCache {
 	 * load, prepends, session switches) still auto-compact.
 	 */
 	liveTurnIds: Set<string>;
+	/**
+	 * Compact activity rows that this thread rendered in their live, expanded
+	 * state. Once visible, they stay expanded for this mounted thread: silently
+	 * collapsing a measured row during streaming or completion removes up to a
+	 * viewport's worth of content and moves the reader even though they did not
+	 * scroll. Completed history first encountered after loading stays compact.
+	 */
+	liveActivityGroupKeys: Set<string>;
 }
 
 /** Creates a row identity cache scoped to a single thread instance. */
 export function createThreadRowCache(): ThreadRowCache {
-	return { rows: new Map(), liveTurnIds: new Set() };
+	return {
+		rows: new Map(),
+		liveTurnIds: new Set(),
+		liveActivityGroupKeys: new Set(),
+	};
 }
 
 /** Fallback cache for callers that do not own one (tests, one-off renders). */
@@ -412,6 +425,7 @@ export function buildThreadRows({
 	const threadCache = cache ?? defaultRowIdentityCache;
 	const rowIdentityCache = threadCache.rows;
 	const liveTurnIds = threadCache.liveTurnIds;
+	const liveActivityGroupKeys = threadCache.liveActivityGroupKeys;
 	const rows: ThreadRow[] = [];
 	const rowIndexByMessageIndex: number[] = [];
 	const seenKeys = new Set<string>();
@@ -694,15 +708,23 @@ export function buildThreadRows({
 		});
 		flushActivityRun();
 
-		// Exactly one activity box is ever expanded: the turn's last drawn row,
-		// and only while the turn is still streaming. Everything above it shows
-		// its one-line summary, which is what keeps a compact turn short.
+		// The newest activity box opens while it streams. Once the reader has seen
+		// a box open, keep that measured row open for the lifetime of this mounted
+		// thread. Collapsing it later (when an answer starts or the turn completes)
+		// would remove content underneath the viewport without any reader action.
 		if (message.status === 'pending' && lastDrawnStagedIndex >= 0) {
 			const lastDrawn = staged[lastDrawnStagedIndex];
 			if (lastDrawn.kind === 'assistant-compact-group') {
-				staged[lastDrawnStagedIndex] = { ...lastDrawn, collapsed: false };
+				liveActivityGroupKeys.add(lastDrawn.key);
 			}
 		}
+		staged = staged.map((row) =>
+			row.kind === 'assistant-compact-group' &&
+			liveActivityGroupKeys.has(row.key) &&
+			row.collapsed
+				? { ...row, collapsed: false }
+				: row,
+		);
 
 		if (message.status === 'pending') {
 			push({
@@ -779,6 +801,11 @@ export function buildThreadRows({
 			if (!seenAssistantIds.has(id)) liveTurnIds.delete(id);
 		}
 	}
+	if (liveActivityGroupKeys.size > 0) {
+		for (const key of liveActivityGroupKeys) {
+			if (!seenKeys.has(key)) liveActivityGroupKeys.delete(key);
+		}
+	}
 
 	return { rows, rowIndexByMessageIndex };
 }
@@ -787,4 +814,5 @@ export function buildThreadRows({
 export function resetThreadRowCache() {
 	defaultRowIdentityCache.rows.clear();
 	defaultRowIdentityCache.liveTurnIds.clear();
+	defaultRowIdentityCache.liveActivityGroupKeys.clear();
 }

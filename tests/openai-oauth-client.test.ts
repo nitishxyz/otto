@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { streamText } from 'ai';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { OAuth } from '../packages/sdk/src/types/src/index.ts';
 import {
 	clearOpenAIOAuthSessionState,
@@ -73,8 +76,21 @@ const WEBSOCKET_REQUEST_BODY = JSON.stringify({
 	input: [{ role: 'user', content: 'hello' }],
 });
 
+function secureAuthPathForHome(home: string) {
+	if (process.platform === 'darwin') {
+		return join(home, 'Library', 'Application Support', 'otto', 'auth.json');
+	}
+	if (process.platform === 'win32') {
+		return join(home, 'AppData', 'Roaming', 'otto', 'auth.json');
+	}
+	return join(home, '.local', 'state', 'otto', 'auth.json');
+}
+
 describe('openai oauth client', () => {
 	const originalFetch = globalThis.fetch;
+	const originalHome = process.env.HOME;
+	const originalXdgStateHome = process.env.XDG_STATE_HOME;
+	const originalAppData = process.env.APPDATA;
 
 	beforeEach(() => {
 		clearOpenAIOAuthSessionState();
@@ -88,6 +104,12 @@ describe('openai oauth client', () => {
 
 	afterEach(() => {
 		globalThis.fetch = originalFetch;
+		if (originalHome === undefined) delete process.env.HOME;
+		else process.env.HOME = originalHome;
+		if (originalXdgStateHome === undefined) delete process.env.XDG_STATE_HOME;
+		else process.env.XDG_STATE_HOME = originalXdgStateHome;
+		if (originalAppData === undefined) delete process.env.APPDATA;
+		else process.env.APPDATA = originalAppData;
 		clearOpenAIOAuthSessionState();
 		delete process.env.OTTO_OPENAI_OAUTH_TRANSPORT;
 		delete process.env.OTTO_OPENAI_OAUTH_PREVIOUS_RESPONSE_ID;
@@ -379,6 +401,59 @@ describe('openai oauth client', () => {
 			'OpenAI OAuth Codex stream idle timeout',
 		);
 		expect(callCount).toBe(1);
+	});
+
+	test('returns a readable original 401 body when auth retry fails', async () => {
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_MAX_RETRIES = '1';
+		process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS = '1';
+		const tempHome = await mkdtemp(join(tmpdir(), 'otto-openai-oauth-'));
+		delete process.env.XDG_STATE_HOME;
+		delete process.env.APPDATA;
+		process.env.HOME = tempHome;
+		const authPath = secureAuthPathForHome(tempHome);
+		await mkdir(authPath.slice(0, authPath.lastIndexOf('/')), {
+			recursive: true,
+		});
+		await writeFile(
+			authPath,
+			JSON.stringify({
+				openai: {
+					...TEST_OAUTH,
+					access: 'newer-access-token',
+				},
+			}),
+		);
+
+		let codexCalls = 0;
+		globalThis.fetch = async (input) => {
+			if (!String(input).includes('/backend-api/codex/responses')) {
+				throw new Error('Refresh should not be called');
+			}
+			codexCalls += 1;
+			if (codexCalls === 1) {
+				return Response.json(
+					{ error: { message: 'Unauthorized' } },
+					{ status: 401 },
+				);
+			}
+			throw new Error('Retry request failed');
+		};
+
+		const customFetch = createOpenAIOAuthFetch({
+			oauth: TEST_OAUTH,
+			sessionId: 'session-readable-401',
+		});
+
+		const response = await customFetch('https://api.openai.com/v1/responses', {
+			method: 'POST',
+			body: JSON.stringify({ model: 'gpt-5.3-codex', input: [] }),
+		});
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toMatchObject({
+			error: { message: 'Unauthorized' },
+		});
+		expect(codexCalls).toBe(3);
 	});
 
 	test('injects previous_response_id when explicitly enabled', async () => {
