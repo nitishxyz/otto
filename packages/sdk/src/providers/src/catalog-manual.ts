@@ -18,6 +18,7 @@ const OLLAMA_CLOUD_ID: BuiltInProviderId = 'ollama-cloud';
 const BASETEN_ID: BuiltInProviderId = 'baseten';
 const HUGGINGFACE_ID: BuiltInProviderId = 'huggingface';
 const OTTOROUTER_ID: BuiltInProviderId = 'ottorouter';
+const OPENAI_ID: BuiltInProviderId = 'openai';
 const ZAI_ID: BuiltInProviderId = 'zai';
 const ZAI_CODING_ID: BuiltInProviderId = 'zai-coding';
 const DEEPSEEK_ID: BuiltInProviderId = 'deepseek';
@@ -25,6 +26,24 @@ const DEEPSEEK_ID: BuiltInProviderId = 'deepseek';
 const OLLAMA_CLOUD_MODEL_OUTPUT_OVERRIDES: Record<string, number> = {
 	'nemotron-3-ultra': 65_536,
 };
+
+const OPENAI_OAUTH_MODELS: ModelInfo[] = [
+	{
+		id: 'gpt-6-astra',
+		auth: ['oauth'],
+		ownedBy: 'openai',
+		label: 'GPT-6 Astra',
+		modalities: { input: ['text', 'image', 'pdf'], output: ['text'] },
+		toolCall: true,
+		reasoningText: true,
+		attachment: true,
+		temperature: false,
+		releaseDate: '2026-09-04',
+		lastUpdated: '2026-09-04',
+		openWeights: false,
+		limit: { context: 1_050_000, output: 128_000 },
+	},
+];
 
 const ZAI_MODEL_ORDER = ['glm-5.2', 'glm-5.1', 'glm-5-turbo', 'glm-5'];
 
@@ -517,6 +536,19 @@ export function filterAvailableKimiModels(models: ModelInfoMap): ModelInfoMap {
 	return filtered;
 }
 
+function appendOpenAIOAuthModels(
+	entry: ProviderCatalogEntry | undefined,
+): ProviderCatalogEntry | undefined {
+	if (!entry) return undefined;
+	const models: ModelInfoMap = { ...entry.models };
+	for (const model of OPENAI_OAUTH_MODELS) {
+		models[model.id] = models[model.id]
+			? { ...models[model.id], ...model }
+			: model;
+	}
+	return { ...entry, models };
+}
+
 function appendKimiManualModels(models: ModelInfoMap): ModelInfoMap {
 	const merged: ModelInfoMap = { ...models };
 	for (const model of KIMI_MANUAL_MODELS) {
@@ -638,6 +670,10 @@ export function mergeManualCatalog(
 	merged[BASETEN_ID] = basetenEntry;
 	merged[HUGGINGFACE_ID] = huggingFaceEntry;
 	merged[DEEPSEEK_ID] = deepSeekEntry;
+	const openAIEntry = appendOpenAIOAuthModels(merged[OPENAI_ID]);
+	if (openAIEntry) {
+		merged[OPENAI_ID] = openAIEntry;
+	}
 	const xaiEntry = appendXaiGrokCliModels(merged.xai);
 	if (xaiEntry) {
 		merged.xai = xaiEntry;
