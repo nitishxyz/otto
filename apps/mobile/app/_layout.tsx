@@ -1,14 +1,18 @@
-import { RootProvider } from "@/providers/root-provider";
+import { RootProvider } from "../src/providers/root-provider";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { useUnistyles } from "react-native-unistyles";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(console.warn);
 
 function AppStack() {
   const { theme } = useUnistyles();
-  
+
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(console.warn);
+  }, []);
+
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background.default } }}>
       <Stack.Screen name="index" />
@@ -21,10 +25,6 @@ function AppStack() {
 }
 
 function RootLayout() {
-  useEffect(() => {
-      SplashScreen.hideAsync();
-  }, []);
-
   return (
     <RootProvider>
       <AppStack />

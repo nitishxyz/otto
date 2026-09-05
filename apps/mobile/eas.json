@@ -11,40 +11,35 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "dev",
-        "EXPO_PUBLIC_API_URL": "https://api.stackforge.xyz"
+        "EXPO_PUBLIC_ENV": "dev"
       }
     },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_ENV": "dev",
-        "EXPO_PUBLIC_API_URL": "https://api.stackforge.xyz"
+        "EXPO_PUBLIC_ENV": "dev"
       }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_ENV": "beta",
-        "EXPO_PUBLIC_API_URL": "https://beta.api.stackforge.xyz"
+        "EXPO_PUBLIC_ENV": "beta"
       }
     },
     "beta": {
       "autoIncrement": true,
       "channel": "beta",
       "env": {
-        "EXPO_PUBLIC_ENV": "beta",
-        "EXPO_PUBLIC_API_URL": "https://beta.api.stackforge.xyz"
+        "EXPO_PUBLIC_ENV": "beta"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_ENV": "prod",
-        "EXPO_PUBLIC_API_URL": "https://api.stackforge.xyz"
+        "EXPO_PUBLIC_ENV": "prod"
       }
     }
   },

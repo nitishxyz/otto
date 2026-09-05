@@ -1,6 +1,5 @@
 import React, { createContext, useContext } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { DevToolbar } from "../components/ui/dev-toolbar";
 
 const QueryClearContext = createContext<
   { clearQueries: () => Promise<void> } | undefined
@@ -19,17 +18,14 @@ export const QueryClearProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const queryClient = useQueryClient();
 
-
   const clearQueries = async () => {
+    await queryClient.cancelQueries();
     queryClient.clear();
-    await queryClient.invalidateQueries();
-    queryClient.removeQueries();
   };
 
   return (
     <QueryClearContext.Provider value={{ clearQueries }}>
       {children}
-      {/* {__DEV__ && <DevToolbar />} */}
     </QueryClearContext.Provider>
   );
 };

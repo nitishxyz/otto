@@ -1,4 +1,4 @@
-import * as storage from "@/utils/storage";
+import * as storage from "../utils/storage";
 import { Appearance } from "react-native";
 
 const STORAGE_KEY = {
@@ -30,10 +30,15 @@ class ThemeService {
    * Get the user's saved theme preference
    */
   async getThemePreference(): Promise<ThemeMode | null> {
-    const preference = await storage.getItemAsync(
-      STORAGE_KEY.THEME_PREFERENCE,
-    );
-    return preference as ThemeMode | null;
+    try {
+      const preference = await storage.getItemAsync(STORAGE_KEY.THEME_PREFERENCE);
+      return preference === "light" || preference === "dark" || preference === "system"
+        ? preference
+        : null;
+    } catch (error) {
+      console.warn("Unable to read theme preference; using system theme:", error);
+      return null;
+    }
   }
 
   /**

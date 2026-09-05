@@ -1,8 +1,12 @@
+import type { ExpoConfig } from "expo/config";
+
 const env = process.env.EXPO_PUBLIC_ENV;
+const projectId = process.env.EAS_PROJECT_ID;
+const owner = process.env.EXPO_OWNER;
 const bundleIdentifier = env
   ? `com.ottocode.mobile.${env}`
   : `com.ottocode.mobile`;
-const scheme = env ? `ottocode{env}` : `ottocode`;
+const scheme = env ? `ottocode${env}` : `ottocode`;
 
 const name = env ? `ottocode (${env.toUpperCase()})` : "ottocode";
 
@@ -15,22 +19,22 @@ const config = {
     icon: "./assets/images/icon.png",
     scheme: scheme,
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
-    updates: {
-      url: "https://u.expo.dev/3835c3a5-17ae-4009-b0f1-da4060cfacae",
-    },
+    updates: projectId
+      ? {
+          url: `https://u.expo.dev/${projectId}`,
+          checkAutomatically: "ON_ERROR_RECOVERY",
+        }
+      : { enabled: false },
     runtimeVersion: {
       policy: "appVersion",
     },
-   ios: {
-     supportsTablet: false,
-     bundleIdentifier: bundleIdentifier,
-     infoPlist: {
-       ITSAppUsesNonExemptEncryption: false,
-        NSLocationWhenInUseUsageDescription:
-          "This app does not use your location.",
-     },
-   },
+    ios: {
+      supportsTablet: false,
+      bundleIdentifier: bundleIdentifier,
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
+    },
     android: {
       adaptiveIcon: {
         backgroundColor: "#f7f8f6",
@@ -38,7 +42,6 @@ const config = {
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
-      edgeToEdgeEnabled: true,
       package: bundleIdentifier,
       predictiveBackGestureEnabled: false,
     },
@@ -70,17 +73,16 @@ const config = {
         },
       ],
       "expo-web-browser",
-      "expo-build-properties",
       "expo-sqlite",
       "react-native-edge-to-edge",
       [
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "16.0",
+            deploymentTarget: "16.4",
           },
           android: {
-            compileSdkVersion: 35,
+            compileSdkVersion: 36,
           },
         },
       ],
@@ -101,12 +103,10 @@ const config = {
     },
     extra: {
       router: {},
-      eas: {
-        projectId: "3835c3a5-17ae-4009-b0f1-da4060cfacae",
-      },
+      ...(projectId ? { eas: { projectId } } : {}),
     },
-    owner: "slashforge",
-  },
+    ...(owner ? { owner } : {}),
+  } satisfies ExpoConfig,
 };
 
 export default config;

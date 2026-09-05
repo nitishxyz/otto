@@ -1,8 +1,7 @@
-import haptics from "@/components/utils/haptics";
-import { Box, Icon } from "@/primitives";
+import { selection } from "../../utils/haptics";
+import { Box, Icon } from "../../ui/primitives";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
-import { router } from "expo-router";
 import React from "react";
 import { Pressable } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -23,7 +22,6 @@ const routes = [
     iconName: "circle-multiple-outline",
     iconNameFocused: "circle-multiple",
     label: "Home",
-    path: "(app)/tabs/home",
     size: 25,
   },
   {
@@ -32,7 +30,6 @@ const routes = [
     iconName: "card-outline",
     iconNameFocused: "card",
     label: "Spend",
-    path: "(app)/tabs/spend",
     size: 24,
   },
   {
@@ -41,7 +38,6 @@ const routes = [
     iconName: "time-outline",
     iconNameFocused: "time",
     label: "History",
-    path: "(app)/tabs/history",
     size: 24,
   },
 ];
@@ -51,10 +47,12 @@ const TabItem = React.memo(
     route,
     isFocused,
     onPress,
+    onLongPress,
   }: {
     route: (typeof routes)[0];
     isFocused: boolean;
     onPress: () => void;
+    onLongPress: () => void;
   }) => {
     const animatedValue = useSharedValue(isFocused ? 1 : 0);
 
@@ -86,12 +84,19 @@ const TabItem = React.memo(
     });
 
     const handlePress = React.useCallback(() => {
-      haptics.selection();
+      selection();
       onPress();
     }, [onPress]);
 
     return (
-      <Pressable onPress={handlePress} style={styles.tab}>
+      <Pressable
+        onPress={handlePress}
+        onLongPress={onLongPress}
+        accessibilityRole="tab"
+        accessibilityLabel={route.label}
+        accessibilityState={{ selected: isFocused }}
+        style={styles.tab}
+      >
         <Animated.View style={[styles.iconContainer, iconStyle]}>
           <Icon
             icon={route.icon}
@@ -106,8 +111,9 @@ const TabItem = React.memo(
 TabItem.displayName = "TabItem";
 
 const BottomTabs = React.memo(({ ...props }: BottomTabBarProps) => {
-  const { state } = props;
-  const { index } = state;
+  const { state, navigation } = props;
+  const focusedRoute = state.routes[state.index];
+  const index = routes.findIndex((route) => route.name === focusedRoute?.name);
   const thumbPosition = useSharedValue(index);
   const { theme } = useUnistyles();
 
@@ -134,9 +140,18 @@ const BottomTabs = React.memo(({ ...props }: BottomTabBarProps) => {
     };
   });
 
-  const navigateToRoute = React.useCallback((path: string) => {
-    router.navigate(path as any);
-  }, []);
+  const navigateToRoute = (name: string) => {
+    const route = state.routes.find((item) => item.name === name);
+    if (!route) return;
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (route.key !== focusedRoute?.key && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  };
 
   return (
     <Box style={styles.bottomContainer}>
@@ -170,7 +185,11 @@ const BottomTabs = React.memo(({ ...props }: BottomTabBarProps) => {
             key={route.name}
             route={route}
             isFocused={index === idx}
-            onPress={() => navigateToRoute(route.path)}
+            onPress={() => navigateToRoute(route.name)}
+            onLongPress={() => {
+              const target = state.routes.find((item) => item.name === route.name)?.key;
+              if (target) navigation.emit({ type: "tabLongPress", target });
+            }}
           />
         ))}
       </Box>

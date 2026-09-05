@@ -1,6 +1,7 @@
 # AI Agent Guidelines
 
-This document provides guidelines for AI agents working on the StackForge mobile app.
+Guidance for the Otto mobile foundation. Also follow the root `AGENTS.md` and
+read `../../docs/mobile-development.md` before changing platform configuration.
 
 ## Key Points
 
@@ -20,6 +21,16 @@ This document provides guidelines for AI agents working on the StackForge mobile
 
 Uses React Native Unistyles. Check `src/utils/unistyles.ts` for theme configuration.
 
-## Authentication
+## Integration boundaries
 
-Uses Better Auth for email OTP authentication. See `src/hooks/use-auth.ts` and `src/lib/auth-client.ts`.
+- Routes are placeholders; authentication and an Otto API connection are not implemented.
+- Use `@ottocode/api` when adding first-party API integration. Do not copy finance,
+  wallet, or authentication providers from reference apps.
+- Never copy reference credentials, EAS project IDs, or production API URLs.
+- Native modules require a development build, not Expo Go.
+
+## Checks
+
+From the repository root, use `bun run --filter ottocode-mobile typecheck`,
+`bun test tests/mobile-foundation.test.ts`, and `bun run --filter ottocode-mobile lint`.
+Run `bun lint` as well; the root Biome command does not include mobile sources.

@@ -2,9 +2,9 @@ import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider as NavigationThemeProvider,
-} from "@react-navigation/native";
+} from "expo-router/react-navigation";
 import { useTheme } from "./theme-context";
-import { lightTheme, darkTheme } from "@/config/theme";
+import { lightTheme, darkTheme } from "../config/theme";
 
 // Create navigation themes from custom themes
 const customLightNavigationTheme = {

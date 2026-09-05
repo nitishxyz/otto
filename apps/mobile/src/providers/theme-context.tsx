@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useColorScheme, Appearance } from "react-native";
-import { themeService } from "@/services/theme";
+import { themeService } from "../services/theme";
 import { UnistylesRuntime, type UnistylesThemes } from "react-native-unistyles";
 
 type ThemeContextType = {
@@ -50,7 +50,7 @@ export const ThemeContextProvider = ({
 
       if (!hasManualPreference) {
         // User hasn't manually set a theme, so follow system changes
-        const systemTheme = systemColorScheme === "light" ? "light" : "dark";
+        const systemTheme = systemColorScheme === "dark" ? "dark" : "light";
         setCurrentTheme(systemTheme);
         UnistylesRuntime.setTheme(systemTheme as keyof UnistylesThemes);
       }
@@ -73,7 +73,7 @@ export const ThemeContextProvider = ({
     });
 
     // Persist the user's choice asynchronously
-    themeService.setThemePreference(theme);
+    await themeService.setThemePreference(theme);
   };
 
   const value: ThemeContextType = {
