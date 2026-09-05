@@ -264,6 +264,17 @@ function rewriteRequestBody(
 		const parsed = JSON.parse(body) as Record<string, unknown>;
 		const model = typeof parsed.model === 'string' ? parsed.model : undefined;
 		let changed = stripStatelessResponseInputIds(parsed);
+		if (Array.isArray(parsed.tools)) {
+			for (const tool of parsed.tools as unknown[]) {
+				if (!tool || typeof tool !== 'object' || Array.isArray(tool)) continue;
+				const definition = tool as Record<string, unknown>;
+				if (definition.type === 'function' && definition.strict === undefined) {
+					// Responses otherwise normalizes optional fields into required ones.
+					definition.strict = false;
+					changed = true;
+				}
+			}
+		}
 		if (!sessionId) {
 			return { body: changed ? JSON.stringify(parsed) : body, model };
 		}

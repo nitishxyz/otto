@@ -11,6 +11,7 @@ import {
 	getOpenAIOAuthSessionState,
 } from '../packages/sdk/src/providers/src/openai-oauth-client.ts';
 import type { OpenAIOAuthWebSocketFactory } from '../packages/sdk/src/providers/src/openai-oauth-websocket.ts';
+import { updateTodosTool } from '../packages/sdk/src/core/src/tools/builtin/todos.ts';
 
 const TEST_OAUTH: OAuth = {
 	type: 'oauth',
@@ -117,6 +118,52 @@ describe('openai oauth client', () => {
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_RETRY_DELAY_MS;
 		delete process.env.OTTO_OPENAI_OAUTH_REQUEST_TIMEOUT_MS;
 		delete process.env.OTTO_OPENAI_OAUTH_STREAM_IDLE_TIMEOUT_MS;
+	});
+
+	test('defaults OAuth function tools to non-strict without changing schemas or explicit modes', async () => {
+		const tools = [
+			{
+				type: 'function',
+				name: 'update_todos',
+				parameters: {
+					type: 'object',
+					properties: { todos: { type: 'array' }, note: { type: 'string' } },
+					required: ['todos'],
+				},
+			},
+			{ type: 'function', name: 'strict_tool', strict: true },
+			{ type: 'function', name: 'non_strict_tool', strict: false },
+			{ type: 'web_search' },
+			{ type: 'custom', name: 'custom_tool' },
+		];
+		const requests: Array<{ tools: unknown[] }> = [];
+		globalThis.fetch = async (_url, init) => {
+			requests.push(JSON.parse(String(init?.body)));
+			return new Response('data: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			});
+		};
+		for (const sessionId of [undefined, 'session-tool-defaults']) {
+			const customFetch = createOpenAIOAuthFetch({
+				oauth: TEST_OAUTH,
+				sessionId,
+			});
+			const response = await customFetch(
+				'https://api.openai.com/v1/responses',
+				{
+					method: 'POST',
+					body: JSON.stringify({ model: 'gpt-6-astra', tools }),
+				},
+			);
+			await response.text();
+		}
+		expect(requests).toHaveLength(2);
+		for (const request of requests) {
+			expect(request.tools).toEqual([
+				{ ...tools[0], strict: false },
+				...tools.slice(1),
+			]);
+		}
 	});
 
 	test('tracks response ids from the Codex responses stream', async () => {
@@ -761,6 +808,96 @@ describe('openai oauth client', () => {
 
 		expect(await result.text).toBe('SDK_OK');
 		expect(connections).toHaveLength(1);
+	});
+
+	test('streams and executes the first OAuth todo call with optional note omitted', async () => {
+		process.env.OTTO_OPENAI_OAUTH_TRANSPORT = 'websocket';
+		const connections: FakeWebSocket[] = [];
+		const input = {
+			todos: [{ step: 'Inspect the project', status: 'in_progress' }],
+		};
+		const argumentsText = JSON.stringify(input);
+		const item = {
+			type: 'function_call',
+			id: 'fc_todo',
+			call_id: 'call_todo',
+			name: 'update_todos',
+		};
+		const factory = websocketFactory(
+			() =>
+				new FakeWebSocket((_body, socket) => {
+					queueMicrotask(() => {
+						socket.message({
+							type: 'response.created',
+							response: {
+								id: 'resp_todo',
+								created_at: 1_700_000_000,
+								model: 'gpt-6-astra',
+							},
+						});
+						socket.message({
+							type: 'response.output_item.added',
+							output_index: 0,
+							item: { ...item, arguments: '' },
+						});
+						for (const delta of [
+							argumentsText.slice(0, 15),
+							argumentsText.slice(15),
+						]) {
+							socket.message({
+								type: 'response.function_call_arguments.delta',
+								item_id: item.id,
+								output_index: 0,
+								delta,
+							});
+						}
+						socket.message({
+							type: 'response.function_call_arguments.done',
+							item_id: item.id,
+							output_index: 0,
+							arguments: argumentsText,
+						});
+						socket.message({
+							type: 'response.output_item.done',
+							output_index: 0,
+							item: { ...item, arguments: argumentsText, status: 'completed' },
+						});
+						socket.message({
+							type: 'response.completed',
+							response: {
+								id: 'resp_todo',
+								status: 'completed',
+								usage: { input_tokens: 1, output_tokens: 1 },
+							},
+						});
+					});
+				}),
+			connections,
+		);
+		const model = createOpenAIOAuthModel('gpt-6-astra', {
+			oauth: TEST_OAUTH,
+			sessionId: 'session-first-todo',
+			webSocketFactory: factory,
+		});
+		const result = streamText({
+			model,
+			prompt: 'Plan the task',
+			tools: { update_todos: updateTodosTool },
+			providerOptions: { openai: { store: false } },
+		});
+		const parts = [];
+		for await (const part of result.fullStream) parts.push(part);
+		expect(parts.filter((part) => part.type === 'error')).toEqual([]);
+		expect(parts.map((part) => part.type)).toContain('tool-input-start');
+		expect(parts.map((part) => part.type)).toContain('tool-input-delta');
+		expect(parts.map((part) => part.type)).toContain('tool-result');
+		expect(await result.finishReason).toBe('tool-calls');
+		const [toolResult] = await result.toolResults;
+		expect(toolResult.input).toEqual(input);
+		expect(toolResult.output).toMatchObject({ ok: true, remaining: 1 });
+		const frame = JSON.parse(connections[0].sent[0]);
+		expect(frame.tools[0].strict).toBe(false);
+		expect(frame.tools[0].parameters.required).toEqual(['todos']);
 	});
 
 	test('uses HTTP on the next request after a websocket stream disconnects', async () => {
