@@ -15,6 +15,14 @@
         "type": "local",
         "path": "/Users/bat/dev/nitishxyz/redacted"
       }
+    },
+    "riven-cash": {
+      "description": "Use apps/mobile in this project as reference for mobile app.",
+      "enabled": true,
+      "source": {
+        "type": "local",
+        "path": "/Users/bat/dev/slashforge/riven-cash"
+      }
     }
   }
 }
