@@ -27,7 +27,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-const CLAUDE_CODE_VERSION = '2.1.2';
+const CLAUDE_CODE_VERSION = '2.1.268';
 const TOKEN_ENDPOINT = 'https://platform.claude.com/v1/oauth/token';
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 
