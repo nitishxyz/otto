@@ -97,15 +97,79 @@ export const BROWSER_RECORDER_SCRIPT = `(function () {
 		});
 	});
 
+	var instrumentedAt = typeof performance !== 'undefined' ? performance.now() : 0;
+	var fetchInstalled = false;
+	var xhrInstalled = false;
+	function requestEntry(source, method, url) {
+		try { url = new URL(String(url), location.href).href; } catch (error) { url = String(url); }
+		return push(state.network, { source: source, method: String(method || 'GET').toUpperCase(), url: url, at: Date.now() });
+	}
+	function finish(entry, status, error) {
+		if (!entry) return;
+		entry.durationMs = Date.now() - entry.at;
+		if (status > 0) entry.status = status;
+		if (error) entry.error = String(error).slice(0, MAX_TEXT);
+	}
+	if (typeof window.fetch === 'function') {
+		try {
+			var originalFetch = window.fetch;
+			window.fetch = function (input, init) {
+				var entry;
+				try {
+					var request = typeof Request !== 'undefined' && input instanceof Request ? input : null;
+					entry = requestEntry('fetch', (init && init.method) || (request && request.method), request ? request.url : input);
+				} catch (error) {}
+				try {
+					return originalFetch.apply(this, arguments).then(function (response) {
+						finish(entry, response.status);
+						if (entry) entry.responseType = response.type;
+						return response;
+					}, function (error) { finish(entry, 0, error); throw error; });
+				} catch (error) { finish(entry, 0, error); throw error; }
+			};
+			fetchInstalled = window.fetch !== originalFetch;
+		} catch (error) {}
+	}
+	if (typeof XMLHttpRequest !== 'undefined') {
+		try {
+			var requests = new WeakMap();
+			var originalOpen = XMLHttpRequest.prototype.open;
+			var originalSend = XMLHttpRequest.prototype.send;
+			XMLHttpRequest.prototype.open = function (method, url) {
+				var result = originalOpen.apply(this, arguments);
+				requests.set(this, { method: method, url: url });
+				return result;
+			};
+			XMLHttpRequest.prototype.send = function () {
+				var xhr = this;
+				var metadata = requests.get(xhr);
+				var entry;
+				try { if (metadata) entry = requestEntry('xhr', metadata.method, metadata.url); } catch (error) {}
+				function failed(event) { if (entry) entry.error = event.type; }
+				function completed() {
+					finish(entry, xhr.status, entry && entry.error);
+					xhr.removeEventListener('loadend', completed);
+					['error', 'abort', 'timeout'].forEach(function (type) { xhr.removeEventListener(type, failed); });
+				}
+				xhr.addEventListener('loadend', completed);
+				['error', 'abort', 'timeout'].forEach(function (type) { xhr.addEventListener(type, failed); });
+				try { return originalSend.apply(xhr, arguments); }
+				catch (error) { if (entry) entry.error = String(error); completed(); throw error; }
+			};
+			xhrInstalled = XMLHttpRequest.prototype.send !== originalSend;
+		} catch (error) {}
+	}
+
 	if (typeof PerformanceObserver === 'function') {
 		try {
 			var observer = new PerformanceObserver(function (list) {
 				var entries = list.getEntries();
 				for (var i = 0; i < entries.length; i += 1) {
 					var entry = entries[i];
+					if (entry.startTime >= instrumentedAt && ((fetchInstalled && entry.initiatorType === 'fetch') || (xhrInstalled && entry.initiatorType === 'xmlhttprequest'))) continue;
 					push(state.network, {
 						source: 'resource',
-						method: 'GET',
+						status: entry.responseStatus > 0 ? entry.responseStatus : undefined,
 						url: String(entry.name),
 						type: entry.initiatorType,
 						durationMs: Math.round(entry.duration),

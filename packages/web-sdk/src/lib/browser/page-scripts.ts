@@ -242,6 +242,7 @@ function networkScript(args: Record<string, unknown>): string {
 			total: requests.length,
 			failed: failed,
 			installedAt: state.installedAt,
+			coverage: 'Page fetch/XHR calls since installation plus available resource timings. Workers, navigation requests, and pre-install request details are not captured. Missing method/status fields are unknown, not successful GET requests.',
 			requests: requests.slice(-${limit})
 		});
 	`);

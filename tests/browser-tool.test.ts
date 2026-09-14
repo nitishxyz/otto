@@ -264,13 +264,48 @@ describe('browser page scripts', () => {
 		expect(consoleScript.startsWith(BROWSER_RECORDER_SCRIPT)).toBe(true);
 	});
 
-	it('records network resources without replacing page request APIs', () => {
-		expect(BROWSER_RECORDER_SCRIPT).toContain('new PerformanceObserver');
-		expect(BROWSER_RECORDER_SCRIPT).not.toContain('window.fetch =');
-		expect(BROWSER_RECORDER_SCRIPT).not.toContain(
-			'XMLHttpRequest.prototype.open =',
-		);
-		expect(BROWSER_RECORDER_SCRIPT).not.toContain('XHR.prototype.open =');
+	it('records resource timings with unknown methods when request APIs are unavailable', () => {
+		type Resource = {
+			name: string;
+			initiatorType: string;
+			responseStatus?: number;
+		};
+		let record: (entries: Resource[]) => void = () => {};
+		const window: {
+			addEventListener(): void;
+			__ottoBrowserRecorder?: {
+				network: Record<string, unknown>[];
+			};
+		} = { addEventListener() {} };
+		class Observer {
+			constructor(callback: (list: { getEntries(): Resource[] }) => void) {
+				record = (entries) => callback({ getEntries: () => entries });
+			}
+			observe(options: Record<string, unknown>) {
+				expect(options).toEqual({ type: 'resource', buffered: true });
+			}
+		}
+		new Function(
+			'window',
+			'console',
+			'PerformanceObserver',
+			'XMLHttpRequest',
+			BROWSER_RECORDER_SCRIPT,
+		)(window, {}, Observer, undefined);
+		record([
+			{ name: 'https://example.com/api', initiatorType: 'fetch' },
+			{
+				name: 'https://example.com/image.png',
+				initiatorType: 'img',
+				responseStatus: 404,
+			},
+		]);
+		const entries = window.__ottoBrowserRecorder?.network;
+		expect(entries).toHaveLength(2);
+		expect(entries?.[0]).toMatchObject({ source: 'resource', type: 'fetch' });
+		expect(entries?.[0]?.method).toBeUndefined();
+		expect(entries?.[0]?.status).toBeUndefined();
+		expect(entries?.[1]?.status).toBe(404);
 	});
 
 	it('keeps snapshot references isolated from page-controlled attributes', () => {
