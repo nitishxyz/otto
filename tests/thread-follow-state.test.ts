@@ -72,6 +72,41 @@ describe('thread follow state', () => {
 		}
 	});
 
+	test('does not resume when anchoring moves a detached reader near the bottom', () => {
+		let state = run(createThreadFollowState(), [
+			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 0 },
+			{ type: 'scrolled-up' },
+			{ type: 'scrolled', scrollTop: 3994, distanceFromBottom: 6 },
+		]);
+
+		for (const scrollTop of [4050, 4200, 4500]) {
+			state = reduceThreadFollow(state, {
+				type: 'scrolled',
+				scrollTop,
+				distanceFromBottom: 6,
+			});
+			expect(state.following).toBe(false);
+		}
+
+		expect(
+			reduceThreadFollow(state, {
+				type: 'scrolled',
+				scrollTop: 4506,
+				distanceFromBottom: 0,
+			}).following,
+		).toBe(true);
+	});
+
+	test('does not resume when streamed growth increases both scroll metrics', () => {
+		const state = run(createThreadFollowState(), [
+			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 0 },
+			{ type: 'scrolled-up' },
+			{ type: 'scrolled', scrollTop: 3996, distanceFromBottom: 4 },
+			{ type: 'scrolled', scrollTop: 4096, distanceFromBottom: 8 },
+		]);
+		expect(state.following).toBe(false);
+	});
+
 	test('resumes after the reader scrolls down to the true bottom', () => {
 		const state = run(createThreadFollowState(), [
 			{ type: 'scrolled', scrollTop: 4000, distanceFromBottom: 0 },

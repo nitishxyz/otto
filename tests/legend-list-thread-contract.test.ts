@@ -23,12 +23,12 @@ describe('Legend List message thread contract', () => {
 		expect(source).toContain('recycleItems={false}');
 	});
 
-	test('keeps follow armed across layout growth until the reader scrolls up', async () => {
+	test('limits native end pinning to the bottom rather than a full viewport', async () => {
 		const source = await readFile(messageThreadPath, 'utf8');
 		expect(source).toContain(
 			'maintainScrollAtEndThreshold={END_FOLLOW_THRESHOLD}',
 		);
-		expect(source).toContain('const END_FOLLOW_THRESHOLD = 1;');
+		expect(source).toContain('const END_FOLLOW_THRESHOLD = 0.01;');
 		expect(source).toContain('createThreadFollowState');
 		expect(source).toContain("type: 'scrolled-up'");
 		expect(source).not.toContain("'isWithinMaintainScrollAtEndThreshold'");
@@ -45,6 +45,6 @@ describe('Legend List message thread contract', () => {
 		const packageJson = JSON.parse(
 			await readFile(webSdkPackagePath, 'utf8'),
 		) as { dependencies?: Record<string, string> };
-		expect(packageJson.dependencies?.['@legendapp/list']).toBe('^3.3.5');
+		expect(packageJson.dependencies?.['@legendapp/list']).toBe('^3.3.7');
 	});
 });

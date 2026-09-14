@@ -115,10 +115,10 @@ const ESTIMATED_HEADER_SIZE_PX = 96;
  */
 const DRAW_DISTANCE_PX = 1000;
 /**
- * Gives LegendList enough room to absorb streamed measurements. Reader intent,
- * rather than this measurement threshold, owns detaching end-follow.
+ * LegendList measures this in viewport lengths, not pixels. Keep it near the
+ * true bottom: inset adjustments also use this threshold when follow is off.
  */
-const END_FOLLOW_THRESHOLD = 1;
+const END_FOLLOW_THRESHOLD = 0.01;
 /** Fixed height for the "load earlier" slot so a fetch cannot resize the header. */
 const PREPEND_SLOT_HEIGHT_CLASS = 'h-14';
 /** Safety net for a prepend whose fetch never reports a loading state. */

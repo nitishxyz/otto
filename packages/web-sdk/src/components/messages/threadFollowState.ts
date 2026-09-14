@@ -76,7 +76,10 @@ export function reduceThreadFollow(
 				};
 			}
 
-			const following = state.following || (delta > 0 && atBottom);
+			// Anchoring a growing row above the viewport increases scrollTop but
+			// preserves distance from the bottom. It is not a request to follow.
+			const movedDown = delta > 0 && distanceDelta < 0;
+			const following = state.following || (movedDown && atBottom);
 			return {
 				following,
 				lastScrollTop: event.scrollTop,
