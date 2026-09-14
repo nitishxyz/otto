@@ -191,7 +191,6 @@ export function requestBrowserControl(
 			commandWaiters.delete(key);
 		}
 		if (client) {
-			clearTimeout(client.timer);
 			client.resolve(command);
 		} else {
 			const queue = commandQueues.get(key) ?? [];
@@ -207,7 +206,9 @@ export function waitForBrowserControlCommand(
 	tabId: string,
 	timeoutMs = 25_000,
 	metadata: BrowserViewerMetadata = {},
+	abortSignal?: AbortSignal,
 ): Promise<BrowserControlCommand | null> {
+	if (abortSignal?.aborted) return Promise.resolve(null);
 	markBrowserViewerSeen(projectRoot, tabId, metadata);
 	const key = targetKey(projectRoot, tabId);
 	const queue = commandQueues.get(key);
@@ -216,21 +217,26 @@ export function waitForBrowserControlCommand(
 	if (command) return Promise.resolve(command);
 
 	return new Promise((resolve) => {
+		const settle = (command: BrowserControlCommand | null) => {
+			clearTimeout(waiter.timer);
+			abortSignal?.removeEventListener('abort', onAbort);
+			const waiters = commandWaiters.get(key);
+			if (waiters) {
+				const remaining = waiters.filter((item) => item !== waiter);
+				if (remaining.length > 0) commandWaiters.set(key, remaining);
+				else commandWaiters.delete(key);
+			}
+			resolve(command);
+		};
+		const onAbort = () => settle(null);
 		const waiter: CommandWaiter = {
-			resolve,
-			timer: setTimeout(() => {
-				const waiters = commandWaiters.get(key);
-				if (waiters) {
-					const remaining = waiters.filter((item) => item !== waiter);
-					if (remaining.length > 0) commandWaiters.set(key, remaining);
-					else commandWaiters.delete(key);
-				}
-				resolve(null);
-			}, timeoutMs),
+			resolve: settle,
+			timer: setTimeout(onAbort, timeoutMs),
 		};
 		const waiters = commandWaiters.get(key) ?? [];
 		waiters.push(waiter);
 		commandWaiters.set(key, waiters);
+		abortSignal?.addEventListener('abort', onAbort, { once: true });
 	});
 }
 

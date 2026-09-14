@@ -79,6 +79,7 @@ export function registerBrowserRoutes(app: Hono) {
 				{
 					...c.req.valid('query'),
 				},
+				c.req.raw.signal,
 			);
 			const wireCommand = command
 				? {
