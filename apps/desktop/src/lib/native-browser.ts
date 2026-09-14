@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { observeNativeBrowserMetadata } from './native-browser-metadata';
+import { waitForBrowserWindow } from './native-browser-window';
 
 export interface NativeBrowserBounds {
 	x: number;
@@ -12,6 +14,11 @@ export interface NativeBrowserBounds {
 
 export interface NativeBrowserBridge {
 	isAvailable: true;
+	capabilities: {
+		nativeInput: boolean;
+		asyncEvaluation: boolean;
+		screenshot: boolean;
+	};
 	mount: (options: NativeBrowserMountOptions) => Promise<void>;
 	unmount: (id: string) => Promise<void>;
 	setVisible: (id: string, visible: boolean) => Promise<void>;
@@ -21,6 +28,10 @@ export interface NativeBrowserBridge {
 		url?: string,
 	) => Promise<void>;
 	execute: (id: string, script: string) => Promise<unknown>;
+	/** Runs a function body with native promise awaiting (macOS only). */
+	executeAsync: (id: string, functionBody: string) => Promise<unknown>;
+	/** Sends platform input to a visible tab (macOS only). Coordinates are viewport CSS pixels. */
+	input: (id: string, input: NativeBrowserInput) => Promise<void>;
 	/** Captures the webview contents and returns base64 PNG bytes. */
 	screenshot: (id: string) => Promise<string>;
 	subscribe: (
@@ -37,6 +48,12 @@ export interface NativeBrowserBridge {
 	) => () => void;
 	openWindow: (url: string) => Promise<void>;
 }
+
+export type NativeBrowserInput =
+	| { type: 'click'; x: number; y: number }
+	| { type: 'hover'; x: number; y: number }
+	| { type: 'text'; text: string }
+	| { type: 'key'; key: string };
 
 export interface NativeBrowserNewTabEvent {
 	id: string;
@@ -55,6 +72,7 @@ export interface NativeBrowserNavigationEvent {
 	id: string;
 	url: string;
 	loading: boolean;
+	title?: string;
 }
 
 export interface NativeBrowserMountOptions {
@@ -75,6 +93,7 @@ export function registerNativeBrowserBridge() {
 		string,
 		Set<(event: NativeBrowserNavigationEvent) => void>
 	>();
+	const metadataObservers = new Map<string, () => void>();
 	const newTabListeners = new Map<
 		string,
 		Set<(event: NativeBrowserNewTabEvent) => void>
@@ -121,6 +140,11 @@ export function registerNativeBrowserBridge() {
 
 	win.OTTO_NATIVE_BROWSER = {
 		isAvailable: true,
+		capabilities: {
+			nativeInput: navigator.platform.startsWith('Mac'),
+			asyncEvaluation: navigator.platform.startsWith('Mac'),
+			screenshot: navigator.platform.startsWith('Mac'),
+		},
 		async mount(options) {
 			await Promise.all([navigationReady, newTabReady, downloadReady]);
 			await invoke('native_browser_mount', {
@@ -146,16 +170,44 @@ export function registerNativeBrowserBridge() {
 		async execute(id, script) {
 			return invoke('native_browser_execute', { id, script });
 		},
+		async executeAsync(id, functionBody) {
+			return invoke('native_browser_execute', {
+				id,
+				script: functionBody,
+				functionBody: true,
+			});
+		},
 		async screenshot(id) {
 			return invoke<string>('native_browser_screenshot', { id });
+		},
+		async input(id, input) {
+			await invoke('native_browser_input', { id, input });
 		},
 		subscribe(id, listener) {
 			const listeners = navigationListeners.get(id) ?? new Set();
 			listeners.add(listener);
 			navigationListeners.set(id, listeners);
+			if (!metadataObservers.has(id)) {
+				metadataObservers.set(
+					id,
+					observeNativeBrowserMetadata(
+						id,
+						(script) => invoke('native_browser_execute', { id, script }),
+						(event) => {
+							for (const subscriber of navigationListeners.get(id) ?? []) {
+								subscriber(event);
+							}
+						},
+					),
+				);
+			}
 			return () => {
 				listeners.delete(listener);
-				if (listeners.size === 0) navigationListeners.delete(id);
+				if (listeners.size === 0) {
+					navigationListeners.delete(id);
+					metadataObservers.get(id)?.();
+					metadataObservers.delete(id);
+				}
 			};
 		},
 		subscribeNewTab(id, listener) {
@@ -189,9 +241,7 @@ export function registerNativeBrowserBridge() {
 				focus: true,
 				zoomHotkeysEnabled: true,
 			});
-			webviewWindow.once('tauri://error', (event) => {
-				console.error('[otto] Failed to open browser window:', event);
-			});
+			await waitForBrowserWindow(webviewWindow);
 		},
 	};
 }

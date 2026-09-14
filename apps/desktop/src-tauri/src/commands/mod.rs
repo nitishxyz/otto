@@ -3,6 +3,8 @@ pub mod desktop_events;
 pub mod fonts;
 pub mod machine;
 pub mod native_browser;
+mod native_browser_input;
+mod native_browser_script;
 pub mod native_terminal;
 pub mod notification;
 pub mod project;

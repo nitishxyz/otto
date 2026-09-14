@@ -208,6 +208,7 @@ describe('browser page scripts', () => {
 					title: 'Links',
 					readyState: 'complete',
 					querySelector: () => element,
+					querySelectorAll: () => [element],
 				},
 				location: { href: 'https://example.com/' },
 				HTMLElement: FakeElement,

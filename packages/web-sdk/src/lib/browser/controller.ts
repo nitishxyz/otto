@@ -1,6 +1,9 @@
 import { pollBrowserCommand, submitBrowserCommandResult } from '@ottocode/api';
 import {
 	actionScript,
+	evaluationResultScript,
+	nativeEvaluationScript,
+	nativeInputTargetScript,
 	pageStateScript,
 	scrollIntoViewScript,
 	type BrowserControlCommand,
@@ -19,6 +22,16 @@ export interface BrowserPageCapture {
 
 export interface BrowserPageExecutor {
 	execute(script: string): Promise<unknown>;
+	/** Present only when native promise execution is supported by the host. */
+	executeAsync?(functionBody: string): Promise<unknown>;
+	input?(
+		input:
+			| { type: 'click' | 'hover'; x: number; y: number }
+			| { type: 'key'; key: string }
+			| { type: 'text'; text: string },
+	): Promise<void>;
+	/** Native popups preserve their original request and opener in separate windows. */
+	nativePopups?: boolean;
 	/** Reports viewer tab metadata to browser tab discovery. */
 	metadata?(): {
 		url?: string;
@@ -101,12 +114,12 @@ async function runNavigation(
 ): Promise<PageResult> {
 	const before = await readPageState(executor);
 	const previousUrl = stringField(before, 'url');
+	const previousDocumentId = stringField(before, 'documentId');
 	const dispatched = decodeResult(
 		await executor.execute(actionScript(command, referenceChannel)),
 	);
 	if (dispatched.ok === false) return dispatched;
 
-	const requiresUrlChange = command.action !== 'reload';
 	const deadline = Date.now() + NAVIGATION_TIMEOUT_MS;
 	let last: PageResult | null = null;
 	await delay(POLL_INTERVAL_MS);
@@ -117,9 +130,13 @@ async function runNavigation(
 			last = state;
 			const url = stringField(state, 'url');
 			const urlChanged = url !== previousUrl;
+			const documentId = stringField(state, 'documentId');
+			const documentChanged = Boolean(
+				documentId && documentId !== previousDocumentId,
+			);
 			if (
 				state.readyState === 'complete' &&
-				(urlChanged || !requiresUrlChange)
+				(documentChanged || (command.action !== 'reload' && urlChanged))
 			) {
 				return {
 					ok: true,
@@ -127,6 +144,7 @@ async function runNavigation(
 					title: state.title,
 					readyState: state.readyState,
 					urlChanged,
+					documentChanged,
 				};
 			}
 		}
@@ -134,14 +152,47 @@ async function runNavigation(
 	}
 
 	return {
-		ok: true,
+		ok: false,
 		url: stringField(last, 'url') || previousUrl,
 		title: last?.title,
 		readyState: last?.readyState ?? 'unknown',
-		urlChanged: stringField(last, 'url') !== previousUrl,
-		warning:
-			'The page did not finish loading within 15s. Retry snapshot to read the settled page.',
+		urlChanged: Boolean(last && stringField(last, 'url') !== previousUrl),
+		error:
+			'Navigation did not complete within 15s (it may have been blocked or history may have no matching entry). Retry snapshot to inspect the page.',
 	};
+}
+
+async function runEvaluation(
+	command: BrowserControlCommand,
+	executor: BrowserPageExecutor,
+	referenceChannel: string,
+): Promise<PageResult> {
+	try {
+		const started = decodeResult(
+			await executor.execute(actionScript(command, referenceChannel)),
+		);
+		if (started.ok === false) return started;
+		const deadline = Date.now() + READY_TIMEOUT_MS;
+		do {
+			const result = decodeResult(
+				await executor.execute(
+					evaluationResultScript(command.id, referenceChannel),
+				),
+			);
+			if (!result.pending) return result;
+			await delay(POLL_INTERVAL_MS);
+		} while (Date.now() < deadline);
+		return {
+			ok: false,
+			error: 'Evaluation promise did not settle within 10s.',
+		};
+	} finally {
+		try {
+			await executor.execute(
+				evaluationResultScript(command.id, referenceChannel, true),
+			);
+		} catch {}
+	}
 }
 
 async function runWaitFor(
@@ -207,7 +258,8 @@ async function runScreenshot(
 	};
 }
 
-async function executeCommand(
+/** Executes one command against a mounted page, including async completion gates. */
+export async function executeCommand(
 	command: BrowserControlCommand,
 	executor: BrowserPageExecutor,
 	referenceChannel: string,
@@ -219,8 +271,56 @@ async function executeCommand(
 			);
 		}
 
-		await waitForDocumentReady(executor);
+		const ready = await waitForDocumentReady(executor);
+		if (
+			!ready ||
+			(ready.readyState !== 'interactive' && ready.readyState !== 'complete')
+		) {
+			return {
+				ok: false,
+				error: 'The browser document was not ready within 10s.',
+			};
+		}
 
+		if (command.action === 'evaluate') {
+			if (executor.executeAsync)
+				return decodeResult(
+					await executor.executeAsync(nativeEvaluationScript(command)),
+				);
+			return await runEvaluation(command, executor, referenceChannel);
+		}
+		if (
+			executor.input &&
+			['click', 'hover', 'download', 'press'].includes(command.action)
+		) {
+			const target = decodeResult(
+				await executor.execute(
+					nativeInputTargetScript(command, referenceChannel),
+				),
+			);
+			if (target.ok === false) return target;
+			if (command.action === 'press') {
+				const key = String(command.args.key ?? '');
+				await executor.input(
+					key.length === 1 ? { type: 'text', text: key } : { type: 'key', key },
+				);
+			} else {
+				await executor.input({
+					type: command.action === 'hover' ? 'hover' : 'click',
+					x: Number(target.x),
+					y: Number(target.y),
+				});
+			}
+			return {
+				ok: true,
+				action: command.action,
+				inputMode: 'native',
+				warning:
+					command.action === 'click' || command.action === 'download'
+						? 'Page popups open as separate native windows, not controllable Otto tabs. Download completion is reported by the host.'
+						: undefined,
+			};
+		}
 		if (NAVIGATION_ACTIONS.has(command.action)) {
 			return await runNavigation(command, executor, referenceChannel);
 		}
@@ -231,7 +331,14 @@ async function executeCommand(
 			return await runScreenshot(command, executor, referenceChannel);
 		}
 		const result = decodeResult(
-			await executor.execute(actionScript(command, referenceChannel)),
+			await executor.execute(
+				actionScript(
+					executor.nativePopups
+						? { ...command, args: { ...command.args, nativePopups: true } }
+						: command,
+					referenceChannel,
+				),
+			),
 		);
 		if (command.action === 'click') {
 			const newTab = result.newTab;

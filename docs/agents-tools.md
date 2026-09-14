@@ -13,8 +13,10 @@ Navigation:
 
 - `open` shows a URL in the preview (`newTab: true` creates a dedicated agent
   tab, `kind: "simulator"` targets the serve-sim preview tab).
-- `navigate`, `back`, `forward`, and `reload` wait for the next document to
-  finish loading and return the settled URL, title, and ready state.
+- `navigate`, `back`, `forward`, and `reload` wait for a completed new document
+  or an observable same-document URL change. Reload and same-URL document loads
+  are tracked by document identity, not URL alone. Unobserved or incomplete
+  navigation returns a timeout error rather than reporting success.
 - `stop` aborts an in-flight load.
 
 Inspection:
@@ -25,13 +27,14 @@ Inspection:
 | `screenshot` | The rendered page as an image attached to the tool result for vision models |
 | `html` | Live DOM markup for the document or a selector (`maxLength` caps the payload) |
 | `find` | Elements whose own text or opening tag match `query`, with refs and markup snippets |
-| `console` | Console output and page errors captured since the document loaded (`level`, `limit`) |
-| `network` | `fetch`, `XHR`, and resource requests with status and duration (`query`, `limit`) |
-| `evaluate` | The serializable value of a JavaScript snippet |
+| `console` | Console output and page errors captured since recorder installation (`level`, `limit`) |
+| `network` | Recorded page `fetch`/XHR calls and available resource timings (`query`, `limit`); missing method/status fields are unknown |
+| `evaluate` | The serialized final expression from a local async JavaScript scope, awaiting returned promises |
 
 Snapshot references are kept in an isolated per-viewer registry rather than in
 page-controlled DOM attributes, so a page cannot redirect an `@e1` action by
-duplicating or changing an attribute.
+duplicating or changing an attribute. Snapshot, selector queries, text waits, and
+find traverse nested open shadow roots; closed shadow roots remain inaccessible.
 
 Interaction:
 
@@ -41,17 +44,42 @@ Interaction:
 - `wait_for` polls until a selector becomes visible or `text` appears, up to
   `timeoutMs` (default 5000).
 
-Console and network entries come from a small recorder that the desktop webview
-injects before page scripts run, so activity from the first paint onward is
-captured. Web clients inject the same recorder on demand, so they only see
-activity from the first `console`/`network` call onward.
+On macOS desktop, click, download, and supported press actions use native input.
+Native keys include Enter, Tab, Backspace, Escape, arrow keys, and individual
+characters; unsupported shortcuts return an error. `type` keeps field-replacement
+and select-option semantics rather than appending native keystrokes. Other clients
+emulate common editing, focus, and activation defaults using untrusted events,
+respecting canceled keydown/beforeinput events and reporting unsupported targets.
+
+Native hover sends window-local mouse motion without moving the system cursor or
+changing focus. It checks CSS `:hover` at the target point for up to 250ms and
+returns an explicit error if WebKit ignores that motion. Native input is unsupported
+on non-macOS platforms; synthetic hover is never reported as native success.
+
+Native async evaluation on macOS uses a promise-aware function-body bridge without
+nested page-side eval. Other clients use script execution and bounded result
+polling, subject to their executor's CSP and same-origin restrictions. Rejections,
+serialization failures, and unsettled promises produce errors, not empty objects.
+
+Console and network recording is installed lazily on inspection, including in the
+desktop webview. It does not guarantee capture from the first paint. The recorder
+wraps page fetch/XHR calls to preserve observed methods, statuses, failures, and
+durations, and supplements them with available buffered resource timings. Resource
+methods and unavailable statuses remain unknown. Worker traffic, navigation
+requests, and pre-install request details are not captured.
+
+Desktop page popups open as separate native windows preserving their request and
+opener, not as controllable Otto tabs. Use `open` explicitly for a controllable tab.
+Downloads use the host browser; a successful click does not confirm download
+completion. See [Browser control capabilities](./browser-control.md) for limits.
 
 The desktop app renders pages in a native top-level webview, so sites that deny
 iframe embedding with `X-Frame-Options` or CSP still work, and screenshots are
 captured from the real webview (macOS today). In a normal web client, arbitrary
 cross-origin pages remain display-only because browser same-origin rules prevent
-DOM inspection, and `screenshot` is unavailable. Full cross-origin automation
-should therefore use the desktop app.
+DOM inspection, and `screenshot` is unavailable. Native input, native promise-aware
+evaluation, and screenshots are advertised only on macOS; other desktop platforms
+retain script-executor limitations. Use macOS desktop for these native capabilities.
 
 Page commands are queued until a preview tab connects. If nothing is connected,
 the tool reports that no preview is attached instead of silently timing out.

@@ -10,7 +10,10 @@ import {
 import type { ViewerTab } from '../../stores/viewerTabsStore';
 import { useViewerTabsStore } from '../../stores/viewerTabsStore';
 import { toast } from '../../stores/toastStore';
-import { connectBrowserController } from '../../lib/browser/controller';
+import {
+	connectBrowserController,
+	type BrowserPageExecutor,
+} from '../../lib/browser/controller';
 import { subscribeNativeOverlay } from '../../lib/native-overlay';
 import { Button } from '../ui/Button';
 
@@ -27,6 +30,16 @@ type BrowserViewerTab = Extract<ViewerTab, { type: 'browser' }>;
 
 interface NativeBrowserBridge {
 	isAvailable: true;
+	capabilities?: {
+		nativeInput: boolean;
+		asyncEvaluation: boolean;
+		screenshot: boolean;
+	};
+	executeAsync?(id: string, functionBody: string): Promise<unknown>;
+	input?(
+		id: string,
+		input: Parameters<NonNullable<BrowserPageExecutor['input']>>[0],
+	): Promise<void>;
 	mount(options: {
 		id: string;
 		url: string;
@@ -399,17 +412,6 @@ export function BrowserViewerPanel({
 
 	useEffect(() => {
 		if (!nativeBridge) return;
-		return nativeBridge.subscribeNewTab(tab.id, (event) => {
-			openBrowserTab(event.url, {
-				kind: 'browser',
-				title: 'Browser',
-				newTab: true,
-			});
-		});
-	}, [nativeBridge, openBrowserTab, tab.id]);
-
-	useEffect(() => {
-		if (!nativeBridge) return;
 		return nativeBridge.subscribeDownload(tab.id, (event) => {
 			if (event.status === 'requested') {
 				const name = downloadName(event.path, event.url);
@@ -488,7 +490,18 @@ export function BrowserViewerPanel({
 	}, [canRenderUrl, nativeBridge, normalizedUrl, tab.id]);
 
 	useEffect(() => {
+		const executeAsync = nativeBridge?.capabilities?.asyncEvaluation
+			? nativeBridge.executeAsync?.bind(nativeBridge)
+			: undefined;
+		const input = nativeBridge?.capabilities?.nativeInput
+			? nativeBridge.input?.bind(nativeBridge)
+			: undefined;
 		return connectBrowserController(tab.id, {
+			nativePopups: Boolean(nativeBridge),
+			executeAsync: executeAsync
+				? (body) => executeAsync(tab.id, body)
+				: undefined,
+			input: input ? (event) => input(tab.id, event) : undefined,
 			metadata: () => {
 				const current = useViewerTabsStore.getState().tabsById[tab.id];
 				if (current?.type !== 'browser') return {};
@@ -512,7 +525,7 @@ export function BrowserViewerPanel({
 					);
 				}
 			},
-			capture: nativeBridge
+			capture: nativeBridge?.capabilities?.screenshot
 				? async () => ({
 						data: await nativeBridge.screenshot(tab.id),
 						mediaType: 'image/png',

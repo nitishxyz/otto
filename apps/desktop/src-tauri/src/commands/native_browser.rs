@@ -1,5 +1,4 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
 use std::time::Duration;
 use tauri::webview::{
     DownloadEvent, NewWindowResponse, PageLoadEvent, WebviewBuilder, WebviewWindowBuilder,
@@ -8,7 +7,7 @@ use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 
 /// Screenshots re-render the page, so they only need a modest budget.
 const SCREENSHOT_TIMEOUT: Duration = Duration::from_secs(15);
-static POPUP_RELAY_ID: AtomicU64 = AtomicU64::new(1);
+static POPUP_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,13 +15,8 @@ struct NativeBrowserNavigationEvent {
     id: String,
     url: String,
     loading: bool,
-}
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeBrowserNewTabEvent {
-    id: String,
-    url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -170,9 +164,6 @@ pub async fn native_browser_mount(
     let event_window = window.clone();
     let event_target = window.label().to_string();
     let event_id = id.clone();
-    let new_tab_window = window.clone();
-    let new_tab_target = window.label().to_string();
-    let new_tab_id = id.clone();
     let popup_app = window.app_handle().clone();
     let download_window = window.clone();
     let download_target = window.label().to_string();
@@ -191,67 +182,22 @@ pub async fn native_browser_mount(
     let builder = builder
         .zoom_hotkeys_enabled(true)
         .on_new_window(move |url, features| {
-            if url.scheme() == "http" || url.scheme() == "https" {
-                let _ = new_tab_window.emit_to(
-                    new_tab_target.as_str(),
-                    "native-browser-new-tab",
-                    NativeBrowserNewTabEvent {
-                        id: new_tab_id.clone(),
-                        url: url.to_string(),
-                    },
-                );
+            if !matches!(url.scheme(), "http" | "https" | "about") {
                 return NewWindowResponse::Deny;
             }
-
-            if url.scheme() != "about" {
-                return NewWindowResponse::Deny;
-            }
-
-            // Some sites open about:blank and assign the destination through
-            // the returned window handle. Keep that popup hidden just long
-            // enough to observe its first real navigation, then turn it into
-            // an Otto browser tab.
-            let relay_window = new_tab_window.clone();
-            let relay_target = new_tab_target.clone();
-            let relay_id = new_tab_id.clone();
-            let relay_label = format!(
-                "browser_popup_relay_{}",
-                POPUP_RELAY_ID.fetch_add(1, Ordering::Relaxed)
-            );
-            let relay = WebviewWindowBuilder::new(
+            // Recreating the URL as a tab loses POST bodies and window.opener.
+            // Let the engine deliver the original request to the related webview.
+            let popup = WebviewWindowBuilder::new(
                 &popup_app,
-                relay_label,
+                format!("browser_popup_{}", POPUP_ID.fetch_add(1, Ordering::Relaxed)),
                 WebviewUrl::External(url.clone()),
             )
             .window_features(features)
-            .visible(false)
-            .skip_taskbar(true)
-            .on_page_load(move |popup, payload| {
-                let destination = payload.url();
-                if destination.scheme() != "http" && destination.scheme() != "https" {
-                    return;
-                }
-                let _ = relay_window.emit_to(
-                    relay_target.as_str(),
-                    "native-browser-new-tab",
-                    NativeBrowserNewTabEvent {
-                        id: relay_id.clone(),
-                        url: destination.to_string(),
-                    },
-                );
-                let _ = popup.close();
-            })
+            .title(url.as_str())
+            .visible(true)
             .build();
-
-            match relay {
-                Ok(window) => {
-                    let stale_relay = window.clone();
-                    tauri::async_runtime::spawn(async move {
-                        tokio::time::sleep(Duration::from_secs(15)).await;
-                        let _ = stale_relay.close();
-                    });
-                    NewWindowResponse::Create { window }
-                }
+            match popup {
+                Ok(window) => NewWindowResponse::Create { window },
                 Err(_) => NewWindowResponse::Deny,
             }
         })
@@ -291,6 +237,7 @@ pub async fn native_browser_mount(
                     id: event_id.clone(),
                     url: payload.url().to_string(),
                     loading: payload.event() == PageLoadEvent::Started,
+                    title: None,
                 },
             );
         });
@@ -375,35 +322,22 @@ pub async fn native_browser_execute(
     window: tauri::Window,
     id: String,
     script: String,
+    function_body: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    const MAX_SCRIPT_BYTES: usize = 256 * 1024;
-    if script.len() > MAX_SCRIPT_BYTES {
-        return Err("browser script exceeds the 256 KiB limit".to_string());
-    }
-
     let webview = browser_tab_webview(&window, &id)
         .ok_or_else(|| format!("browser tab is not mounted: {id}"))?;
-    let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
-    let sender = Mutex::new(Some(sender));
+    super::native_browser_script::execute(&webview, script, function_body.unwrap_or(false)).await
+}
 
-    webview
-        .eval_with_callback(script, move |value| {
-            if let Ok(mut sender) = sender.lock() {
-                if let Some(sender) = sender.take() {
-                    let _ = sender.send(value);
-                }
-            }
-        })
-        .map_err(|error| error.to_string())?;
-
-    let raw = tokio::time::timeout(Duration::from_secs(15), receiver)
-        .await
-        .map_err(|_| "browser script timed out".to_string())?
-        .map_err(|_| "browser script result channel closed".to_string())?;
-    if raw.len() > 1024 * 1024 {
-        return Err("browser script result exceeds the 1 MiB limit".to_string());
-    }
-    Ok(serde_json::from_str(&raw).unwrap_or(serde_json::Value::String(raw)))
+#[tauri::command]
+pub async fn native_browser_input(
+    window: tauri::Window,
+    id: String,
+    input: super::native_browser_input::BrowserInput,
+) -> Result<(), String> {
+    let webview = browser_tab_webview(&window, &id)
+        .ok_or_else(|| format!("browser tab is not mounted: {id}"))?;
+    super::native_browser_input::send(&webview, input).await
 }
 
 /// Captures the rendered contents of a mounted browser tab as base64 PNG bytes.
