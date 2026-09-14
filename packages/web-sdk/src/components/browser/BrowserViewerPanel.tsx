@@ -87,7 +87,6 @@ function getNativeBrowserBridge(): NativeBrowserBridge | undefined {
 function normalizeBrowserUrl(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed) return '';
-	if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
 	if (
 		/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:\/|$)/i.test(
 			trimmed,
@@ -95,6 +94,7 @@ function normalizeBrowserUrl(value: string): string {
 	) {
 		return `http://${trimmed}`;
 	}
+	if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
 	return `https://${trimmed}`;
 }
 
@@ -177,6 +177,7 @@ export function BrowserViewerPanel({
 		isEmbeddableUrl(normalizeBrowserUrl(tab.url)) ? 12 : 0,
 	);
 	const [embedError, setEmbedError] = useState<string | null>(null);
+	const [iframeLoadWarning, setIframeLoadWarning] = useState(false);
 	const [nativeOverlayOpen, setNativeOverlayOpen] = useState(false);
 	const normalizedUrl = normalizeBrowserUrl(tab.url);
 	const canRenderUrl = isEmbeddableUrl(normalizedUrl);
@@ -194,6 +195,7 @@ export function BrowserViewerPanel({
 	const completeLoading = useCallback(() => {
 		clearIframeEmbedTimeout();
 		setEmbedError(null);
+		setIframeLoadWarning(false);
 		setLoadingProgress(100);
 		if (loadingDoneTimeoutRef.current) {
 			clearTimeout(loadingDoneTimeoutRef.current);
@@ -278,23 +280,26 @@ export function BrowserViewerPanel({
 		[clearIframeEmbedTimeout],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Reloading the same URL starts a fresh iframe load.
 	useEffect(() => {
-		if (nativeBridge || !isLoading || !canRenderUrl) {
-			clearIframeEmbedTimeout();
-			return;
-		}
-
+		if (nativeBridge) return;
 		clearIframeEmbedTimeout();
+		if (loadingDoneTimeoutRef.current) {
+			clearTimeout(loadingDoneTimeoutRef.current);
+			loadingDoneTimeoutRef.current = null;
+		}
+		const loading = isEmbeddableUrl(normalizedUrl);
+		setEmbedError(null);
+		setIframeLoadWarning(false);
+		setIsLoading(loading);
+		setLoadingProgress(loading ? 12 : 0);
+		if (!loading) return;
 		iframeEmbedTimeoutRef.current = setTimeout(() => {
-			setEmbedError(
-				'This site may block embedding in Otto, or it took too long to load.',
-			);
-			setIsLoading(false);
-			setLoadingProgress(0);
+			setIframeLoadWarning(true);
 		}, IFRAME_EMBED_TIMEOUT_MS);
 
 		return clearIframeEmbedTimeout;
-	}, [canRenderUrl, clearIframeEmbedTimeout, isLoading, nativeBridge]);
+	}, [clearIframeEmbedTimeout, nativeBridge, normalizedUrl, tab.reloadKey]);
 
 	useEffect(() => {
 		if (!nativeBridge) return;
@@ -711,6 +716,19 @@ export function BrowserViewerPanel({
 				</div>
 			</div>
 
+			{!nativeBridge && iframeLoadWarning && canRenderUrl && (
+				<output className="shrink-0 border-b border-border px-3 py-2 text-xs text-muted-foreground">
+					This page is taking longer to load or may block embedding. Otto is
+					still waiting.
+					<button
+						type="button"
+						onClick={openExternally}
+						className="ml-2 underline"
+					>
+						Open externally
+					</button>
+				</output>
+			)}
 			<div className="min-h-0 flex-1 bg-muted/20">
 				{canRenderUrl && !embedError && nativeBridge ? (
 					// Native child webviews always paint above the DOM, so inset the page
