@@ -29,7 +29,9 @@ otto service status
 otto service restart
 ```
 
-The daemon registration lives in the global otto state directory as `server.json` (for example `~/.local/state/otto/server.json` on Linux/macOS). otto removes stale registrations automatically when authenticated health checks fail. Version mismatches are reported by `otto service status` and can be fixed with `otto service restart`.
+The daemon registration lives in the global otto state directory as `server.json` (for example `~/.local/state/otto/server.json` on Linux/macOS). otto removes stale registrations automatically when authenticated health checks fail and the registered process has exited, including an unreaped Unix zombie. A live process with failed health checks keeps its registration. Version mismatches are reported by `otto service status` and can be fixed with `otto service restart`.
+
+Older builds can report `Cannot replace daemon: health check failed` after a desktop-started daemon exits because the desktop app leaves a zombie PID. On macOS/Linux, inspect the registered PID with `ps -p <pid> -o pid,ppid,stat,command`. A `Z` state means the process has already exited; killing it again cannot help. If the daemon port is free, `otto service force-start` starts a replacement. Updated builds recognize zombies as stopped, and the updated desktop app reaps its daemon children after they exit.
 
 The daemon requires `127.0.0.1:47477` for stable local URLs, or the port from `OTTO_DAEMON_PORT` / `otto service start --port <port>`. If the configured port is busy, daemon startup fails; stop the process using that port or configure a different daemon port, then retry. Use `otto service status` to read the actual registered daemon URL.
 

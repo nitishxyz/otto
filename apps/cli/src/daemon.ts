@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { parseOptionalCliPort } from './runtime/network.ts';
 import { basename, join, resolve } from 'node:path';
 import { createDaemonApi, type DaemonApi } from './runtime/daemon-api.ts';
+import { isDaemonProcessAlive } from './runtime/daemon-process.ts';
 
 export { daemonAuthHeaders } from './runtime/daemon-api.ts';
 
@@ -373,19 +374,6 @@ function daemonIdentityMatches(
 	return health.pid === registration.pid && health.daemonId === registration.id;
 }
 
-function processIsAlive(pid: number): boolean {
-	try {
-		return process.kill(pid, 0);
-	} catch (error) {
-		return !(
-			error &&
-			typeof error === 'object' &&
-			'code' in error &&
-			error.code === 'ESRCH'
-		);
-	}
-}
-
 async function removeRegistrationIfCurrent(
 	registration: DaemonRegistration,
 	options: Pick<DaemonServiceOptions, 'paths'>,
@@ -412,7 +400,7 @@ export async function getDaemonStatus(
 	if (!registration) return { state: 'missing' };
 	const health = await fetchDaemonHealth(registration, options);
 	if (!health) {
-		if (!(options.isProcessAlive ?? processIsAlive)(registration.pid)) {
+		if (!(options.isProcessAlive ?? isDaemonProcessAlive)(registration.pid)) {
 			await removeRegistrationIfCurrent(registration, options);
 		}
 		return { state: 'stale', registration, reason: 'health check failed' };
@@ -619,7 +607,9 @@ export async function stopDaemon(
 	if (!registration) return false;
 	const health = await fetchDaemonHealth(registration, options);
 	if (!health) {
-		const alive = (options.isProcessAlive ?? processIsAlive)(registration.pid);
+		const alive = (options.isProcessAlive ?? isDaemonProcessAlive)(
+			registration.pid,
+		);
 		if (alive) {
 			throw new Error(
 				'Daemon is still running but authenticated health failed',
@@ -646,7 +636,7 @@ export async function stopDaemon(
 		}
 	}
 
-	const isAlive = options.isProcessAlive ?? processIsAlive;
+	const isAlive = options.isProcessAlive ?? isDaemonProcessAlive;
 	const sleep = options.sleep ?? Bun.sleep;
 	const deadline =
 		Date.now() + (options.shutdownTimeoutMs ?? SHUTDOWN_TIMEOUT_MS);

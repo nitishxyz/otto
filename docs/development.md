@@ -65,7 +65,7 @@ Daemon state is stored in the global otto state directory (for example `~/.local
 - `server.json` registers the daemon URL/PID/version/id.
 - `server-token` is the local auth secret and should have `0600` permissions.
 
-When debugging daemon reuse, first run `service status`; stale registrations are removed automatically when authenticated health checks fail. Stop the daemon before rotating the token.
+When debugging daemon reuse, first run `service status`; stale registrations are removed when authenticated health checks fail and the registered process has exited, including an unreaped Unix zombie. A live process with failed health checks keeps its registration. Stop the daemon before rotating the token.
 
 ## SST / infra
 

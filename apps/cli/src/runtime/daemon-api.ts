@@ -65,7 +65,7 @@ function createFetchAdapter(fetchImpl: typeof fetch) {
 				? config.headers.toJSON()
 				: config.headers;
 		const response = await fetchImpl(
-			new URL(config.url ?? '', config.baseURL).toString(),
+			new URL(config.url ?? '', config.baseURL || undefined).toString(),
 			{
 				method: config.method?.toUpperCase(),
 				headers: headers as Record<string, string>,

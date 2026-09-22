@@ -618,6 +618,12 @@ async fn start_daemon(
                             .unwrap_or(true)
                         && health.version.as_deref().unwrap_or(&registration.version) == cli.version
                     {
+                        // Keep a waiter after startup so daemon exits do not leave zombies.
+                        std::thread::spawn(move || {
+                            if let Err(error) = child.wait() {
+                                eprintln!("[otto] Failed to reap daemon process: {}", error);
+                            }
+                        });
                         return Ok(registration);
                     }
                 }

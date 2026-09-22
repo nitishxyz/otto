@@ -33,6 +33,7 @@ import {
 } from '../apps/cli/src/commands/serve.ts';
 import { assetPaths } from '../apps/cli/src/web-assets.ts';
 import { createWebUIFetch } from '../apps/cli/src/web-server.ts';
+import { isDaemonProcessAlive } from '../apps/cli/src/runtime/daemon-process.ts';
 
 const tempRoots: string[] = [];
 
@@ -325,6 +326,7 @@ describe('daemon service', () => {
 			version: '1.2.3',
 			paths,
 			fetch: async () => jsonResponse({ error: 'nope' }, 503),
+			isProcessAlive: () => false,
 		});
 
 		expect(status.state).toBe('stale');
@@ -332,6 +334,64 @@ describe('daemon service', () => {
 			'health check failed',
 		);
 		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('clears a zombie registration on status and stop without signaling it', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		const options = {
+			version: reg.version,
+			paths,
+			fetch: async () => jsonResponse({ error: 'stopped' }, 503),
+			isProcessAlive: (pid: number) =>
+				isDaemonProcessAlive(pid, {
+					platform: 'darwin',
+					signal: () => true,
+					spawnSync: (() => ({
+						success: true,
+						stdout: Buffer.from('Z\n'),
+					})) as typeof Bun.spawnSync,
+				}),
+			signal: () => {
+				throw new Error('must not signal a zombie');
+			},
+		};
+
+		await writeDaemonRegistration(reg, { paths });
+		expect((await getDaemonStatus(options)).state).toBe('stale');
+		expect(await readDaemonRegistration({ paths })).toBeNull();
+
+		await writeDaemonRegistration(reg, { paths });
+		expect(await stopDaemon(options)).toBe(false);
+		expect(await readDaemonRegistration({ paths })).toBeNull();
+	});
+
+	it('preserves an unresponsive live daemon without signaling or replacing it', async () => {
+		const paths = await createDaemonPaths();
+		const reg = registration();
+		await ensureDaemonToken({ paths });
+		await writeDaemonRegistration(reg, { paths });
+		const options = {
+			version: reg.version,
+			paths,
+			fetch: async () => jsonResponse({ error: 'unavailable' }, 503),
+			isProcessAlive: () => true,
+			signal: () => {
+				throw new Error('must not signal');
+			},
+			spawn: (() => {
+				throw new Error('must not spawn');
+			}) as typeof Bun.spawn,
+		};
+
+		await expect(ensureDaemon(options)).rejects.toThrow(
+			'Cannot replace daemon: health check failed',
+		);
+		await expect(stopDaemon(options)).rejects.toThrow(
+			'Daemon is still running but authenticated health failed',
+		);
+		expect(await readDaemonRegistration({ paths })).toEqual(reg);
 	});
 
 	it('reports version mismatch without removing registration', async () => {
