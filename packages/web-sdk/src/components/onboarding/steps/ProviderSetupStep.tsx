@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ProviderLogo } from '../../common/ProviderLogo';
 import { StableSpinner } from '../../ui/StableSpinner';
+import { JudgeProviderCard } from './JudgeProviderCard';
 import type { AuthStatus } from '../../../stores/onboardingStore';
 import { useOttoRouterStore } from '../../../stores/ottorouterStore';
 import { useOttoRouterBalance } from '../../../hooks/useOttoRouterBalance';
@@ -1748,6 +1749,8 @@ export const ProviderSetupStep = memo(function ProviderSetupStep({
 							</div>
 						)}
 					</div>
+
+					{manageMode && <JudgeProviderCard />}
 				</div>
 			</div>
 			<div className="fixed bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-border bg-background/70 backdrop-blur-md">
