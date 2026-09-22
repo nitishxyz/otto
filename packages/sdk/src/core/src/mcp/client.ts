@@ -8,11 +8,37 @@ import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.
 import { getShellEnvironment } from '../tools/bin-manager.ts';
 import type { MCPServerConfig } from './types.ts';
 
+/** MCP tool annotations (spec hints). All are advisory and may be absent. */
+export type MCPToolAnnotations = {
+	title?: string;
+	readOnlyHint?: boolean;
+	destructiveHint?: boolean;
+	idempotentHint?: boolean;
+	openWorldHint?: boolean;
+};
+
 export type MCPToolInfo = {
 	name: string;
 	description?: string;
 	inputSchema: Record<string, unknown>;
+	annotations?: MCPToolAnnotations;
 };
+
+function pickAnnotations(raw: unknown): MCPToolAnnotations | undefined {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+	const source = raw as Record<string, unknown>;
+	const out: MCPToolAnnotations = {};
+	if (typeof source.title === 'string') out.title = source.title;
+	for (const key of [
+		'readOnlyHint',
+		'destructiveHint',
+		'idempotentHint',
+		'openWorldHint',
+	] as const) {
+		if (typeof source[key] === 'boolean') out[key] = source[key];
+	}
+	return Object.keys(out).length > 0 ? out : undefined;
+}
 
 export class MCPClientWrapper {
 	private client: Client;
@@ -167,11 +193,15 @@ export class MCPClientWrapper {
 
 	async listTools(): Promise<MCPToolInfo[]> {
 		const result = await this.client.listTools();
-		return (result.tools ?? []).map((t) => ({
-			name: t.name,
-			description: t.description,
-			inputSchema: t.inputSchema as Record<string, unknown>,
-		}));
+		return (result.tools ?? []).map((t) => {
+			const annotations = pickAnnotations(t.annotations);
+			return {
+				name: t.name,
+				description: t.description,
+				inputSchema: t.inputSchema as Record<string, unknown>,
+				...(annotations ? { annotations } : {}),
+			};
+		});
 	}
 
 	async callTool(

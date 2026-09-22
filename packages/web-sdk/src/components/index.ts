@@ -115,6 +115,7 @@ export * from './settings/SettingsSidebarToggle';
 export * from './settings/OttoRouterTopupModal';
 export * from './settings/DirectoryBrowserModal';
 export * from './settings/DictationSettings';
+export * from './settings/JudgeSettings';
 
 // Tunnel Components
 export * from './tunnel/TunnelSidebar';

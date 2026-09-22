@@ -172,7 +172,12 @@ export async function getProjectToolCatalog(
 	projectRoot: string,
 ): Promise<ToolCatalogEntry[]> {
 	const cfg = await loadConfig(projectRoot);
-	const discovered = await discoverProjectTools(cfg.projectRoot, cfg.skills);
+	const discovered = await discoverProjectTools(
+		cfg.projectRoot,
+		cfg.skills,
+		[],
+		{ judge: cfg.judge },
+	);
 	const details = new Map<string, ToolCatalogEntry>();
 
 	for (const item of discovered.tools) {
@@ -240,7 +245,15 @@ export async function getProjectToolCatalog(
 	}
 
 	for (const [name, tool] of Object.entries(discovered.mcpToolsRecord)) {
-		details.set(name, toToolCatalogEntry({ name, tool, mcp: true }));
+		details.set(
+			name,
+			toToolCatalogEntry({
+				name,
+				tool,
+				metadata: getToolMetadata(tool),
+				mcp: true,
+			}),
+		);
 	}
 
 	return Array.from(details.values()).sort((a, b) =>

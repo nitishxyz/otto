@@ -129,6 +129,7 @@ async function loadResolvedConfig(
 		providers: merged.providers as OttoConfig['providers'],
 		skills: merged.skills as OttoConfig['skills'],
 		references: merged.references as OttoConfig['references'],
+		judge: merged.judge as OttoConfig['judge'],
 		paths: {
 			projectConfigDir,
 			projectConfigPath: (await fileExists(projectConfigPath))
@@ -214,6 +215,7 @@ export {
 	writeProviderSettings,
 	removeProviderSettings,
 	writeSkillSettings,
+	writeJudgeSettings,
 	readReferenceSettings,
 	writeReferenceSettings,
 	removeReferenceSettings,

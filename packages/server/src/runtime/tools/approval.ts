@@ -58,6 +58,19 @@ export interface PendingApproval {
 
 const pendingApprovals = new Map<string, PendingApproval>();
 
+function isMCPToolName(toolName: string): boolean {
+	return toolName.includes('__');
+}
+
+/** True when the tool's declared effects contain only reads. */
+function isReadOnlyEffects(effects: PluginToolEffect[] | undefined): boolean {
+	return (
+		Array.isArray(effects) &&
+		effects.length > 0 &&
+		effects.every((effect) => effect === 'workspace-read')
+	);
+}
+
 export function requiresApproval(
 	toolName: string,
 	mode: ToolApprovalMode,
@@ -66,7 +79,11 @@ export function requiresApproval(
 ): boolean {
 	if (SAFE_TOOLS.has(toolName)) return false;
 	if (mode === 'auto' || mode === 'yolo') return false;
-	if (mode === 'all') return true;
+	if (mode === 'all') {
+		// Classified read-only MCP tools skip the prompt even in `all` mode;
+		// unclassified tools and built-ins keep asking.
+		return !(isMCPToolName(toolName) && isReadOnlyEffects(effects));
+	}
 	if (mode === 'dangerous') {
 		if (effects) {
 			return effects.some((effect) => APPROVAL_REQUIRED_EFFECTS.has(effect));

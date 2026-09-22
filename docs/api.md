@@ -117,7 +117,10 @@ identical preloaded range.
 - `GET /v1/config/providers`
 - `GET /v1/config/models`
 - `GET /v1/config/agents`
+- `GET /v1/config/judge`, `PUT /v1/config/judge` — judge model settings and
+  credential (see [judge.md](./judge.md))
 
+Set `defaults.autoCompactThresholdTokens`
 Set `defaults.autoCompactThresholdTokens` in global configuration (or save
 **Settings > Sessions > Auto Compact**) to a positive token count. The custom
 threshold applies when it is below the model's context window, or when that

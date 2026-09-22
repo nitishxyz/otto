@@ -103,6 +103,24 @@ export type ReferenceConfig = {
 export type ReferenceSettings = Record<string, ReferenceConfig>;
 
 /**
+ * Judge settings: a System One model (TypeSafe Jev) used for typed decisions
+ * such as MCP tool safety classification and per-turn tool pre-activation.
+ * Credentials live in the auth store under `typesafe` or `TYPESAFE_API_KEY`.
+ */
+export type JudgeSettings = {
+	enabled?: boolean;
+	provider?: 'typesafe';
+	baseURL?: string;
+	model?: string;
+	timeoutMs?: number;
+	mcp?: {
+		classifyTools?: boolean;
+		preloadTools?: boolean;
+		preloadThreshold?: number;
+	};
+};
+
+/**
  * Path configuration
  */
 export type PathConfig = {
@@ -129,6 +147,7 @@ export type OttoConfig = {
 	providers: ProviderSettings;
 	skills?: SkillSettings;
 	references?: ReferenceSettings;
+	judge?: JudgeSettings;
 	paths: PathConfig;
 	debugEnabled?: boolean;
 	debugScopes?: string[];

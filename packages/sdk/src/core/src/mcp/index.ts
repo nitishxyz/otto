@@ -9,11 +9,40 @@ export type {
 	MCPScope,
 } from './types.ts';
 
-export { MCPClientWrapper, type MCPToolInfo } from './client.ts';
+export {
+	MCPClientWrapper,
+	type MCPToolAnnotations,
+	type MCPToolInfo,
+} from './client.ts';
 
 export { MCPServerManager } from './server-manager.ts';
 
 export { convertMCPToolsToAISDK } from './tools.ts';
+
+export {
+	classifyMCPTools,
+	classifyFromAnnotations,
+	classificationToEffects,
+	getMCPClassificationCachePath,
+	mcpToolClassificationKey,
+	type ClassifyMCPToolsOptions,
+	type MCPToolClassification,
+	type MCPToolClassificationInput,
+	type MCPToolEffectClass,
+} from './classify.ts';
+
+export {
+	clearMCPToolClassifications,
+	getCachedMCPToolClassifications,
+	resolveMCPToolClassifications,
+} from './classification-registry.ts';
+
+export {
+	selectMCPToolsForRequest,
+	type MCPPreloadInput,
+	type MCPPreloadOptions,
+	type MCPPreloadResult,
+} from './preload.ts';
 
 export {
 	COPILOT_MCP_SCOPE,
@@ -30,6 +59,7 @@ export {
 	getMCPToolsRecord,
 	buildMCPToolCatalogDescription,
 	type MCPToolBrief,
+	type MCPToolCatalogOptions,
 } from './lazy-tools.ts';
 
 export {

@@ -316,6 +316,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=...
 OPENROUTER_API_KEY=...
 OPENCODE_API_KEY=...
 OTTOROUTER_PRIVATE_KEY=...
+TYPESAFE_API_KEY=...        # judge model; see judge.md
 KIMI_API_KEY=...
 MINIMAX_API_KEY=...
 ZAI_API_KEY=...
@@ -364,3 +365,18 @@ Configure MCP servers in either project or global config:
 ```
 
 OAuth tokens for remote MCP servers are stored in the secure OAuth directory shown above.
+
+## Judge configuration
+
+An optional `judge` section configures the TypeSafe judge model used for MCP
+tool safety classification and pre-activation. See [judge.md](./judge.md).
+
+```json
+{
+  "judge": {
+    "enabled": true,
+    "baseURL": "https://api.typesafe.ai",
+    "mcp": { "classifyTools": true, "preloadTools": true, "preloadThreshold": 0.5 }
+  }
+}
+```

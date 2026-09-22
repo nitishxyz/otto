@@ -6,6 +6,7 @@ import {
 	isDelegatableAgent,
 	loadConfig,
 	logger,
+	type MCPToolBrief,
 } from '@ottocode/sdk';
 import { getDb } from '@ottocode/database';
 import { sessions } from '@ottocode/database/schema';
@@ -39,6 +40,10 @@ import {
 	resolveRunnerModel,
 } from './runner-setup-model.ts';
 import { nowMs, timePromise } from './runner-setup-utils.ts';
+import {
+	startMCPPreload,
+	type MCPPreloadHandle,
+} from './runner-mcp-preload.ts';
 
 export { applyModelFamilyEditToolPolicy, mergeProviderOptions };
 
@@ -88,6 +93,8 @@ export interface SetupResult {
 	isOpenAIOAuth: boolean;
 	lazyToolsRecord: Record<string, Tool>;
 	mcpToolsRecord: Record<string, Tool>;
+	mcpToolBriefs: MCPToolBrief[];
+	mcpPreload: MCPPreloadHandle;
 	timings: RunnerSetupTimings;
 }
 
@@ -120,7 +127,9 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		reference.path ? [reference.path] : [],
 	);
 	const discoveredToolsPromise = timePromise(
-		discoverProjectTools(cfg.projectRoot, cfg.skills, referenceRoots),
+		discoverProjectTools(cfg.projectRoot, cfg.skills, referenceRoots, {
+			judge: cfg.judge,
+		}),
 	);
 	const { value: agentCfg, durationMs: resolveAgentConfigMs } =
 		await agentCfgPromise;
@@ -138,7 +147,8 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		await discoveredToolsPromise;
 	let allTools = discovered.tools;
 	let { lazyToolsRecord } = discovered;
-	const { mcpToolsRecord } = discovered;
+	const { mcpToolsRecord, mcpToolBriefs } = discovered;
+	const mcpPreload = startMCPPreload({ opts, cfg, briefs: mcpToolBriefs });
 
 	const configuredToolNames = new Set(
 		flattenAgentToolConfig(agentCfg.toolConfig),
@@ -386,6 +396,8 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		isOpenAIOAuth: prompt.isOpenAIOAuth,
 		lazyToolsRecord,
 		mcpToolsRecord,
+		mcpToolBriefs,
+		mcpPreload,
 		timings,
 	};
 }

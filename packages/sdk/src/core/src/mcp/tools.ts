@@ -1,6 +1,11 @@
 import { tool, type Tool } from 'ai';
 import type { ToolResultOutput } from '@ai-sdk/provider-utils';
 import { z } from 'zod/v3';
+import { setToolMetadata } from '../tools/metadata.ts';
+import {
+	classificationToEffects,
+	type MCPToolClassification,
+} from './classify.ts';
 import type { MCPServerManager } from './server-manager.ts';
 
 type MCPToolResult = {
@@ -10,14 +15,19 @@ type MCPToolResult = {
 	images?: Array<{ data: string; mimeType: string }>;
 };
 
+/**
+ * Wrap MCP tools as AI SDK tools. When a classification is known for a tool,
+ * its effects are attached as metadata so approval gating can consult them.
+ */
 export function convertMCPToolsToAISDK(
 	manager: MCPServerManager,
+	classifications?: ReadonlyMap<string, MCPToolClassification>,
 ): Array<{ name: string; tool: Tool }> {
 	const mcpTools = manager.getTools();
 
-	return mcpTools.map(({ name, tool: mcpTool }) => ({
-		name,
-		tool: tool({
+	return mcpTools.map(({ name, tool: mcpTool }) => {
+		const classification = classifications?.get(name);
+		const wrapped = tool({
 			description: mcpTool.description ?? `MCP tool: ${mcpTool.name}`,
 			inputSchema: jsonSchemaToZod(
 				mcpTool.inputSchema,
@@ -57,8 +67,16 @@ export function convertMCPToolsToAISDK(
 					value: result as unknown as import('@ai-sdk/provider').JSONValue,
 				};
 			},
-		}),
-	}));
+		});
+		setToolMetadata(wrapped, {
+			source: 'mcp',
+			activation: 'mcp',
+			...(classification
+				? { effects: classificationToEffects(classification) }
+				: {}),
+		});
+		return { name, tool: wrapped };
+	});
 }
 
 type JSONSchema = {

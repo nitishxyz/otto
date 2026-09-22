@@ -7,6 +7,7 @@ import {
 	type AuthInfo,
 } from '../../auth/src/index.ts';
 import type {
+	JudgeSettings,
 	ProviderSettingsEntry,
 	ReferenceConfig,
 	ReferenceSettings,
@@ -189,6 +190,31 @@ export async function writeSkillSettings(
 			items: {
 				...prevItems,
 				...(updates.items ?? {}),
+			},
+		};
+	});
+}
+
+/** Persist judge settings in the global config (`judge` section). */
+export async function writeJudgeSettings(
+	updates: JudgeSettings,
+): Promise<void> {
+	const filePath = getConfigFilePath('global');
+	await updateConfigFile(filePath, (existing) => {
+		const prev =
+			existing?.judge && typeof existing.judge === 'object'
+				? (existing.judge as Record<string, unknown>)
+				: {};
+		const prevMcp =
+			prev.mcp && typeof prev.mcp === 'object'
+				? (prev.mcp as Record<string, unknown>)
+				: {};
+		return {
+			...existing,
+			judge: {
+				...prev,
+				...updates,
+				...(updates.mcp ? { mcp: { ...prevMcp, ...updates.mcp } } : {}),
 			},
 		};
 	});

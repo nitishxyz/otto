@@ -14,6 +14,7 @@ import { dictationMixin } from './dictation';
 import { secureInputMixin } from './secure-input';
 import { pluginsMixin } from './plugins';
 import { referencesMixin } from './references';
+import { judgeMixin } from './judge';
 import { shellJobsMixin } from './shell-jobs';
 
 export { configureApiClient } from './utils';
@@ -46,6 +47,13 @@ export type {
 	ListReferenceScope,
 	ReferenceScope,
 } from './references';
+export type {
+	JudgeConfigResponse,
+	JudgeConfigUpdate,
+	JudgeCredential,
+	JudgeMcpSettings,
+	JudgeConfigSettings,
+} from './judge';
 export type {
 	DiscoveredPlugin,
 	EffectivePlugin,
@@ -205,6 +213,9 @@ class ApiClient {
 	saveReference = referencesMixin.saveReference;
 	retryReference = referencesMixin.retryReference;
 	deleteReference = referencesMixin.deleteReference;
+
+	getJudgeConfig = judgeMixin.getJudgeConfig;
+	updateJudgeConfig = judgeMixin.updateJudgeConfig;
 
 	listPlugins = pluginsMixin.listPlugins;
 	listPluginRegistry = pluginsMixin.listPluginRegistry;

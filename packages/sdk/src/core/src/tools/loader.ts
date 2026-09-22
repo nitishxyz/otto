@@ -15,12 +15,14 @@ import {
 	setSkillSettings,
 } from '../../../skills/index.ts';
 import { ensureMCPManager } from '../mcp/index.ts';
+import { resolveMCPToolClassifications } from '../mcp/classification-registry.ts';
 import {
 	getMCPToolBriefs,
 	buildLoadMCPToolsTool,
 	getMCPToolsRecord,
 	type MCPToolBrief,
 } from '../mcp/lazy-tools.ts';
+import type { JudgeSettings } from '../../../judge/index.ts';
 import {
 	buildLazyToolsRecord,
 	buildLoadFirstPartyToolsTool,
@@ -39,6 +41,12 @@ export type DiscoverResult = {
 	tools: DiscoveredTool[];
 	lazyToolsRecord: Record<string, Tool>;
 	mcpToolsRecord: Record<string, Tool>;
+	mcpToolBriefs: MCPToolBrief[];
+};
+
+export type DiscoverProjectToolsOptions = {
+	/** Judge settings; when the judge is available, MCP tools are classified. */
+	judge?: JudgeSettings;
 };
 
 const legacyTerminalManagerKey = 'legacy';
@@ -161,6 +169,7 @@ export async function discoverProjectTools(
 		items?: Record<string, { enabled?: boolean }>;
 	},
 	readOnlyRoots: string[] = [],
+	options: DiscoverProjectToolsOptions = {},
 ): Promise<DiscoverResult> {
 	setSkillSettings(skillSettings);
 	const staticTools = await discoverStaticProjectTools(
@@ -206,7 +215,11 @@ export async function discoverProjectTools(
 	if (mcpManager?.started) {
 		mcpBriefs = getMCPToolBriefs(mcpManager);
 		if (mcpBriefs.length > 0) {
-			mcpToolsRecord = getMCPToolsRecord(mcpManager);
+			const classifications = await resolveMCPToolClassifications(mcpManager, {
+				projectRoot,
+				settings: options.judge,
+			});
+			mcpToolsRecord = getMCPToolsRecord(mcpManager, classifications);
 			const loadTool = buildLoadMCPToolsTool(mcpBriefs);
 			tools.set(loadTool.name, loadTool.tool);
 		}
@@ -220,5 +233,6 @@ export async function discoverProjectTools(
 		})),
 		lazyToolsRecord,
 		mcpToolsRecord,
+		mcpToolBriefs: mcpBriefs,
 	};
 }

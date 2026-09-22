@@ -19,6 +19,7 @@ import {
 	waferLogo,
 	metaLogo,
 	copilotLogo,
+	typesafeLogo,
 } from '../../assets/provider-logos';
 
 const providerLogos: Record<string, string> = {
@@ -42,6 +43,7 @@ const providerLogos: Record<string, string> = {
 	wafer: waferLogo,
 	meta: metaLogo,
 	copilot: copilotLogo,
+	typesafe: typesafeLogo,
 };
 
 interface ProviderLogoProps {

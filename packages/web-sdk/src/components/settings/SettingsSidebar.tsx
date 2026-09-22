@@ -48,6 +48,7 @@ import { DictationSettings } from './DictationSettings';
 import { RecipesSettings } from './RecipesSettings';
 import { PluginsSettings } from './PluginsSettings';
 import { ReferencesSettings } from './ReferencesSettings';
+import { JudgeSettings } from './JudgeSettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -641,7 +642,7 @@ const PREFERENCE_GROUPS: Array<{
 			{
 				id: 'automation',
 				label: 'Automation',
-				description: 'Tool approvals and auto-compaction',
+				description: 'Tool approvals, judge model, and auto-compaction',
 				icon: <Zap className="h-3.5 w-3.5" />,
 			},
 			{
@@ -912,6 +913,9 @@ function PreferencesModal({
 									})
 								}
 							/>
+						</PrefSection>
+						<PrefSection title="Judge Model">
+							<JudgeSettings />
 						</PrefSection>
 						<PrefSection title="Sessions">
 							<div className="py-2.5">

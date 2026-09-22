@@ -504,6 +504,7 @@ export async function listAvailableTools(
 		tools: [] as { name: string }[],
 		lazyToolsRecord: {} as Record<string, unknown>,
 		mcpToolsRecord: {},
+		mcpToolBriefs: [],
 	}));
 	const names = new Set<string>();
 	const curatedBuiltIns = [

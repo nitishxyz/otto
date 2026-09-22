@@ -8,6 +8,7 @@ import { registerDefaultsRoute } from './defaults.ts';
 import { registerDebugConfigRoute } from './debug.ts';
 import { registerToolsRoute } from './tools.ts';
 import { registerReferencesRoutes } from './references.ts';
+import { registerJudgeRoutes } from './judge.ts';
 
 export function registerConfigRoutes(app: Hono) {
 	registerCwdRoute(app);
@@ -19,4 +20,5 @@ export function registerConfigRoutes(app: Hono) {
 	registerDefaultsRoute(app);
 	registerDebugConfigRoute(app);
 	registerReferencesRoutes(app);
+	registerJudgeRoutes(app);
 }

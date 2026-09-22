@@ -190,6 +190,17 @@ These tools are **automatically available to all agents** alongside built-in too
 
 MCP tools bypass the per-agent tool allowlist — any started MCP server's tools are available to every agent.
 
+### Safety classification and pre-activation
+
+MCP servers seldom declare whether a tool reads or writes, so by default MCP
+tools auto-run in `toolApproval: "dangerous"` mode. When a [judge](judge.md) is
+configured, otto classifies each tool once (honoring MCP `readOnlyHint` /
+`destructiveHint` annotations first) and attaches the result as `effects`
+metadata; writes then trigger the normal approval prompt.
+
+The judge also pre-activates the MCP tools most likely needed for each user
+turn, so the model does not spend a step on `load_mcp_tools` for obvious cases.
+
 ---
 
 ## Server Config Reference

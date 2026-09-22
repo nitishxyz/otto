@@ -23,6 +23,14 @@ ZAI_CODING_API_KEY=...
 `ZAI_CODING_API_KEY` targets the GLM Coding Plan provider (`zai-coding`) and
 uses API-key bearer auth, not OAuth.
 
+The judge model (not a chat provider) reads its key from:
+
+```bash
+TYPESAFE_API_KEY=...
+```
+
+See [judge.md](./judge.md).
+
 Copilot auth can also be sourced from:
 
 ```bash

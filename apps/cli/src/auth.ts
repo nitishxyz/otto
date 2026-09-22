@@ -40,6 +40,9 @@ import {
 	openCopilotAuthUrl,
 	isBuiltInProviderId,
 	modelMapToList,
+	JUDGE_ENV_VAR,
+	JUDGE_PROVIDER_ID,
+	readJudgeEnvKey,
 } from '@ottocode/sdk';
 import { loadConfig } from '@ottocode/sdk';
 import { catalog } from '@ottocode/sdk';
@@ -138,6 +141,11 @@ const PROVIDER_LINKS: Record<
 		name: 'GitHub Copilot',
 		url: 'https://github.com/features/copilot',
 		env: 'GITHUB_TOKEN',
+	},
+	[JUDGE_PROVIDER_ID]: {
+		name: 'TypeSafe (judge model)',
+		url: 'https://typesafe.ai',
+		env: JUDGE_ENV_VAR,
 	},
 };
 
@@ -389,7 +397,9 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 		? 'ollama-cloud'
 		: _args.includes('kimi')
 			? 'kimi'
-			: undefined;
+			: _args.includes(JUDGE_PROVIDER_ID)
+				? JUDGE_PROVIDER_ID
+				: undefined;
 	const providerArg = (providerAlias ??
 		_args.find((arg) =>
 			(providerIds as readonly string[]).includes(arg as ProviderId),
@@ -423,6 +433,11 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 				{ value: 'deepseek', label: PROVIDER_LINKS.deepseek.name },
 				{ value: 'kimi', label: PROVIDER_LINKS.kimi.name },
 				{ value: 'minimax', label: PROVIDER_LINKS.minimax.name },
+				{
+					value: JUDGE_PROVIDER_ID,
+					label: PROVIDER_LINKS[JUDGE_PROVIDER_ID].name,
+					hint: 'not a chat model; powers MCP tool safety and pre-loading',
+				},
 			],
 		})) as ProviderId | symbol;
 		if (isCancel(selected)) {
@@ -430,6 +445,10 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 			return false;
 		}
 		provider = selected as ProviderId;
+	}
+
+	if (provider === JUDGE_PROVIDER_ID) {
+		return runAuthLoginJudge(cfg, wantLocal);
 	}
 
 	const envImportResult = await maybeImportEnvCredential(
@@ -491,6 +510,62 @@ export async function runAuthLogin(_args: string[]): Promise<boolean> {
 		);
 	await finalizeSuccessfulLogin(provider);
 	log.success('Saved');
+	log.info(`Tip: you can also set ${meta.env} in your environment.`);
+	outro('Done');
+	return true;
+}
+
+async function runAuthLoginJudge(
+	cfg: Awaited<ReturnType<typeof loadConfig>>,
+	wantLocal: boolean,
+): Promise<boolean> {
+	const meta = PROVIDER_LINKS[JUDGE_PROVIDER_ID];
+	log.info(
+		'TypeSafe is a judge model, not a chat model. Otto uses it to classify MCP tool safety and pre-load relevant MCP tools. It never appears in the model picker.',
+	);
+	let key: string | undefined;
+	const envValue = readJudgeEnvKey();
+	if (envValue) {
+		const choice = (await select({
+			message: `Found ${meta.env} in your environment`,
+			options: [
+				{ value: 'import', label: `Import ${meta.env} into Otto` },
+				{ value: 'continue', label: 'Paste a different key' },
+			],
+		})) as 'import' | 'continue' | symbol;
+		if (isCancel(choice)) {
+			cancel('Cancelled');
+			return false;
+		}
+		if (choice === 'import') key = envValue;
+	}
+	if (!key) {
+		log.info(`Open in browser: ${meta.url}`);
+		const entered = await password({
+			message: `Paste ${meta.env} here`,
+			validate: (v) =>
+				v && String(v).trim().length > 0 ? undefined : 'Required',
+		});
+		if (isCancel(entered)) {
+			cancel('Cancelled');
+			return false;
+		}
+		key = String(entered).trim();
+	}
+	await setAuth(
+		JUDGE_PROVIDER_ID,
+		{ type: 'api', key },
+		cfg.projectRoot,
+		'global',
+	);
+	if (wantLocal)
+		log.warn(
+			'Local credential storage is disabled; saved to secure global location.',
+		);
+	log.success('Saved');
+	log.info(
+		'Judge features are on by default. Tune them under "judge" in your global config.',
+	);
 	log.info(`Tip: you can also set ${meta.env} in your environment.`);
 	outro('Done');
 	return true;

@@ -1,4 +1,11 @@
-import { convertMCPToolsToAISDK, getAuth, getMCPManager } from '@ottocode/sdk';
+import {
+	buildLoadMCPToolsTool,
+	convertMCPToolsToAISDK,
+	getAuth,
+	getCachedMCPToolClassifications,
+	getMCPManager,
+	logger,
+} from '@ottocode/sdk';
 import type { Tool } from 'ai';
 import { adaptTools as adaptToolsFn } from '../../../tools/adapter.ts';
 import type { RunOpts } from '../../session/queue.ts';
@@ -72,9 +79,10 @@ function buildMCPToolRefresh(args: {
 			.filter((name) => !(name in args.loader.toolRecord));
 		if (freshNames.length > 0) {
 			const freshSet = new Set(freshNames);
-			const converted = convertMCPToolsToAISDK(manager).filter(({ name }) =>
-				freshSet.has(name),
-			);
+			const converted = convertMCPToolsToAISDK(
+				manager,
+				getCachedMCPToolClassifications(args.projectRoot),
+			).filter(({ name }) => freshSet.has(name));
 			const adapted = adaptToolsFn(
 				converted,
 				args.sharedCtx,
@@ -223,12 +231,43 @@ export async function setupLazyToolLoading(
 		if (hasMCPTools) {
 			toolset = { ...toolset, ...adaptedMCP };
 		}
+
+		const preload = hasMCPTools ? await setup.mcpPreload.result : null;
+		const preloaded = new Set(preload?.selected ?? []);
+		if (preloaded.size > 0) {
+			const loadToolRegName = findLoadToolRegistrationName(
+				toolset,
+				'load_mcp_tools',
+			);
+			if (loadToolRegName in toolset) {
+				const compact = buildLoadMCPToolsTool(setup.mcpToolBriefs, {
+					preloaded,
+				});
+				const adaptedLoad = adaptToolsFn(
+					[{ name: compact.name, tool: compact.tool }],
+					setup.sharedCtx,
+					opts.provider,
+					providerAuth?.type,
+				);
+				const replacement = Object.values(adaptedLoad)[0];
+				if (replacement)
+					toolset = { ...toolset, [loadToolRegName]: replacement };
+			}
+			logger.debug('[mcp] pre-activated tools for turn', {
+				sessionId: opts.sessionId,
+				tools: Array.from(preloaded),
+			});
+		}
+
 		mcpLoader = await createLoaderState({
 			record: setup.mcpToolsRecord,
 			adapted: adaptedMCP,
 			toolset,
 			preferredLoadToolName: 'load_mcp_tools',
-			collectInitialLoadedTools,
+			collectInitialLoadedTools: async (loadToolRegName) => [
+				...(await collectInitialLoadedTools(loadToolRegName)),
+				...preloaded,
+			],
 		});
 		loaders.push(mcpLoader);
 	}

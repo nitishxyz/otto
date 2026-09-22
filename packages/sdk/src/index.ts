@@ -430,6 +430,7 @@ export {
 	writeProviderSettings,
 	removeProviderSettings,
 	writeSkillSettings,
+	writeJudgeSettings,
 	readReferenceSettings,
 	writeReferenceSettings,
 	removeReferenceSettings,
@@ -617,6 +618,45 @@ export {
 export { scanContent as scanSkillContent } from './skills/index.ts';
 
 // =======================
+// Judge (typed decisions from a System One model)
+// =======================
+export type {
+	JudgeProviderId,
+	JudgeSettings,
+	JudgeQuestion,
+	NoulQuestion,
+	ChoiceQuestion,
+	ScoreQuestion,
+	NoulAnswer,
+	ChoiceAnswer,
+	ScoreAnswer,
+	JudgeAnswers,
+	JudgeResult,
+	JudgeRequest,
+	JudgeFailureReason,
+	JudgeFetch,
+	ResolvedJudgeConfig,
+} from './judge/index.ts';
+
+export {
+	JudgeClient,
+	JUDGE_DEFAULT_BASE_URL,
+	JUDGE_DEFAULT_MODEL,
+	JUDGE_DEFAULT_PRELOAD_THRESHOLD,
+	JUDGE_DEFAULT_TIMEOUT_MS,
+	JUDGE_ENV_VAR,
+	JUDGE_PROVIDER_ID,
+	createJudge,
+	createJudgeFromConfig,
+	isJudgeAvailable,
+	readJudgeEnvKey,
+	resolveJudgeConfig,
+	noul as judgeNoul,
+	choice as judgeChoice,
+	score as judgeScore,
+} from './judge/index.ts';
+
+// =======================
 // Tunnel (Cloudflare Tunnels for remote access)
 // =======================
 export {
@@ -675,6 +715,29 @@ export {
 	OAuthCredentialStore,
 	OttoOAuthProvider,
 	OAuthCallbackServer,
+	getMCPToolBriefs,
+	buildLoadMCPToolsTool,
+	buildMCPToolCatalogDescription,
+	classifyMCPTools,
+	classifyFromAnnotations,
+	classificationToEffects,
+	getMCPClassificationCachePath,
+	mcpToolClassificationKey,
+	clearMCPToolClassifications,
+	getCachedMCPToolClassifications,
+	resolveMCPToolClassifications,
+	selectMCPToolsForRequest,
+} from './core/src/index.ts';
+export type {
+	MCPToolAnnotations,
+	MCPToolBrief,
+	MCPToolCatalogOptions,
+	MCPToolClassification,
+	MCPToolClassificationInput,
+	MCPToolEffectClass,
+	MCPPreloadInput,
+	MCPPreloadOptions,
+	MCPPreloadResult,
 } from './core/src/index.ts';
 export type {
 	MCPServerConfig,

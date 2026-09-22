@@ -13,6 +13,7 @@
 
 - [Agents & Tools](agents-tools.md)
 - [MCP Servers](mcp.md)
+- [Judge (TypeSafe)](judge.md)
 - [Customization](customization.md)
 - [Local Dictation](dictation.md)
 - [API Reference](api.md)
