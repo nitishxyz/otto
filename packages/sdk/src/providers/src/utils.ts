@@ -41,30 +41,46 @@ export function hasModel(
 	return getProviderModels(provider)[model] !== undefined;
 }
 
+// Ordered by preference; the first id present in the provider's catalog wins.
+// Keep an older fallback last so a catalog refresh cannot leave a provider
+// without a fast model.
 const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
-	openai: ['gpt-6-luna', 'gpt-4.1-mini'],
-	anthropic: ['claude-3-5-haiku-latest'],
-	google: ['gemini-2.0-flash-lite'],
-	meta: ['muse-spark-1.1'],
-	baseten: ['nvidia/Nemotron-120B-A12B'],
-	huggingface: ['deepseek-ai/DeepSeek-V4-Flash:deepinfra'],
-	wafer: ['glm5.2-fast'],
-	openrouter: ['anthropic/claude-3.5-haiku'],
-	opencode: ['claude-3-5-haiku'],
-	ottorouter: ['gemini-3.5-flash'],
-	xai: ['grok-code-fast-1', 'grok-4-fast'],
-	zai: ['glm-4.5-flash'],
+	openai: ['gpt-6-luna', 'gpt-5.6-luna', 'gpt-4.1-mini'],
+	anthropic: ['claude-haiku-4-5', 'claude-3-5-haiku-latest'],
+	google: ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'],
+	meta: ['muse-spark-1.3', 'muse-spark-1.1'],
+	baseten: [
+		'deepseek-ai/DeepSeek-V4.1-Flash',
+		'zai-org/GLM-5.3-Flash',
+		'nvidia/Nemotron-120B-A12B',
+	],
+	huggingface: [
+		'deepseek-ai/DeepSeek-V4.1-Flash',
+		'deepseek-ai/DeepSeek-V4-Flash:deepinfra',
+	],
+	wafer: ['MiniMax-M3', 'glm5.2-fast'],
+	openrouter: [
+		'openai/gpt-6-luna',
+		'deepseek/deepseek-v4.1-flash',
+		'anthropic/claude-haiku-4.5',
+		'anthropic/claude-3.5-haiku',
+	],
+	opencode: ['gpt-6-luna', 'deepseek-v4.1-flash', 'claude-haiku-4-5'],
+	ottorouter: ['gpt-5.6-luna', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'],
+	xai: ['grok-4.7', 'grok-4.6', 'grok-code-fast-1', 'grok-4-fast'],
+	zai: ['glm-5.3-flash', 'glm-4.7-flash', 'glm-4.5-flash'],
 	deepseek: ['deepseek-v4-flash'],
-	copilot: ['gpt-4.1-mini'],
+	copilot: ['gpt-5.6-luna', 'gpt-5.4-mini', 'gpt-4.1-mini'],
 	kimi: ['kimi-k2.7-code'],
-	minimax: ['MiniMax-M2.7'],
+	minimax: ['MiniMax-M3', 'MiniMax-M2.7'],
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
 	openai: ['gpt-6-luna', 'gpt-5.6-luna'],
 	anthropic: ['claude-haiku-4-5'],
+	xai: ['grok-4.7', 'grok-4.6'],
 	kimi: ['kimi-k2.7-code'],
-	ottorouter: ['gemini-3.5-flash'],
+	ottorouter: ['gpt-5.6-luna', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'],
 };
 
 function preferredFastModelKey(provider: ProviderId): ProviderId {
@@ -112,11 +128,16 @@ export function selectFastModel(
 		return candidateModelList[0]?.id;
 	}
 
-	const preferredMap =
+	const key = preferredFastModelKey(provider);
+	// OAuth catalogs are often a subset of the API catalog; try the OAuth
+	// preferences first, then the general ones, before falling back to price.
+	const preferred =
 		options?.authType === 'oauth'
-			? PREFERRED_FAST_MODELS_OAUTH
-			: PREFERRED_FAST_MODELS;
-	const preferred = preferredMap[preferredFastModelKey(provider)] ?? [];
+			? [
+					...(PREFERRED_FAST_MODELS_OAUTH[key] ?? []),
+					...(PREFERRED_FAST_MODELS[key] ?? []),
+				]
+			: (PREFERRED_FAST_MODELS[key] ?? []);
 	for (const modelId of preferred) {
 		if (candidateModels[modelId] !== undefined) {
 			return modelId;

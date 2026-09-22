@@ -8,7 +8,7 @@ import {
 } from '@ottocode/sdk';
 
 const WAFER_BASE_URL = 'https://pass.wafer.ai/v1';
-const WAFER_FAST_MODEL = 'glm5.2-fast';
+const WAFER_FAST_MODEL = 'MiniMax-M3';
 
 function createConfig(): OttoConfig {
 	return {

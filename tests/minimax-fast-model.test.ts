@@ -6,12 +6,12 @@ import {
 } from '../packages/sdk/src/providers/src/utils.ts';
 
 describe('minimax fast model selection', () => {
-	test('prefers MiniMax-M2.7 for minimax', () => {
-		expect(getFastModel('minimax')).toBe('MiniMax-M2.7');
+	test('prefers MiniMax-M3 for minimax', () => {
+		expect(getFastModel('minimax')).toBe('MiniMax-M3');
 	});
 
-	test('uses MiniMax-M2.7 for API-key auth', () => {
-		expect(getFastModelForAuth('minimax', 'api')).toBe('MiniMax-M2.7');
+	test('uses MiniMax-M3 for API-key auth', () => {
+		expect(getFastModelForAuth('minimax', 'api')).toBe('MiniMax-M3');
 	});
 
 	test('MiniMax-M2.7 manual catalog metadata', () => {

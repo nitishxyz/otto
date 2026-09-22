@@ -12,7 +12,7 @@ import {
 import { createEmbeddedApp } from '../packages/server/src/index.js';
 
 const HUGGINGFACE_BASE_URL = 'https://router.huggingface.co/v1';
-const HUGGINGFACE_FAST_MODEL = 'deepseek-ai/DeepSeek-V4-Flash:deepinfra';
+const HUGGINGFACE_FAST_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash';
 
 function createConfig(): OttoConfig {
 	return {
