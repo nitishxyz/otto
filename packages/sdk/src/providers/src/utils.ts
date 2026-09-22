@@ -61,7 +61,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
-	openai: ['gpt-5.4-mini'],
+	openai: ['gpt-5.6-luna'],
 	anthropic: ['claude-haiku-4-5'],
 	kimi: ['kimi-k2.7-code'],
 	ottorouter: ['gemini-3.5-flash'],
