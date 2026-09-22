@@ -35,8 +35,10 @@ const OAUTH_MODEL_IDS: Partial<Record<BuiltInProviderId, ReadonlySet<string>>> =
 			'gpt-5.6-sol',
 			'gpt-5.6-terra',
 			'gpt-6-astra',
+			'gpt-6-luna',
+			'gpt-6-sol',
 		]),
-		xai: new Set(['grok-4.5', 'grok-4.6']),
+		xai: new Set(['grok-4.5', 'grok-4.6', 'grok-4.7']),
 	};
 
 const OAUTH_MODEL_PREFIXES: Partial<
@@ -50,6 +52,7 @@ const OAUTH_MODEL_PREFIXES: Partial<
 		'claude-opus-4-7',
 		'claude-opus-4-8',
 		'claude-opus-5',
+		'claude-opus-5-5',
 		'claude-sonnet-4-5',
 		'claude-sonnet-4-6',
 		'claude-sonnet-5',

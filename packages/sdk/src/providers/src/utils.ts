@@ -42,7 +42,7 @@ export function hasModel(
 }
 
 const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
-	openai: ['gpt-4.1-mini'],
+	openai: ['gpt-6-luna', 'gpt-4.1-mini'],
 	anthropic: ['claude-3-5-haiku-latest'],
 	google: ['gemini-2.0-flash-lite'],
 	meta: ['muse-spark-1.1'],
@@ -61,7 +61,7 @@ const PREFERRED_FAST_MODELS: Partial<Record<ProviderId, string[]>> = {
 };
 
 const PREFERRED_FAST_MODELS_OAUTH: Partial<Record<ProviderId, string[]>> = {
-	openai: ['gpt-5.6-luna'],
+	openai: ['gpt-6-luna', 'gpt-5.6-luna'],
 	anthropic: ['claude-haiku-4-5'],
 	kimi: ['kimi-k2.7-code'],
 	ottorouter: ['gemini-3.5-flash'],
