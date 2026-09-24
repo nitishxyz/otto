@@ -57,7 +57,7 @@
     },
     "apps/cli": {
       "name": "@ottocode/cli",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "bin": {
         "otto": "./dist/otto",
       },
@@ -84,7 +84,7 @@
     },
     "apps/desktop": {
       "name": "@ottocode/desktop",
-      "version": "0.1.253",
+      "version": "0.1.254",
       "dependencies": {
         "@ottocode/themes": "workspace:*",
         "@ottocode/web-sdk": "workspace:*",
@@ -440,7 +440,7 @@
     },
     "packages/api": {
       "name": "@ottocode/api",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "axios": "1.13.5",
@@ -454,7 +454,7 @@
     },
     "packages/database": {
       "name": "@ottocode/database",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "@ottocode/sdk": "workspace:*",
         "drizzle-orm": "0.44.7",
@@ -467,7 +467,7 @@
     },
     "packages/install": {
       "name": "@ottocode/install",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "bin": {
         "otto": "./start.js",
       },
@@ -478,7 +478,7 @@
     },
     "packages/sdk": {
       "name": "@ottocode/sdk",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "@ai-sdk/anthropic": "3.0.82",
         "@ai-sdk/baseten": "1.0.54",
@@ -517,7 +517,7 @@
     },
     "packages/server": {
       "name": "@ottocode/server",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "@ai-sdk/devtools": "0.0.18",
         "@ai-sdk/provider": "3.0.10",
@@ -543,14 +543,14 @@
     },
     "packages/themes": {
       "name": "@ottocode/themes",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "devDependencies": {
         "typescript": "5.9.3",
       },
     },
     "packages/web-sdk": {
       "name": "@ottocode/web-sdk",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "@codemirror/lang-css": "6.3.1",
         "@codemirror/lang-html": "6.4.11",
@@ -608,7 +608,7 @@
     },
     "packages/web-ui": {
       "name": "@ottocode/web-ui",
-      "version": "0.1.416",
+      "version": "0.1.417",
       "dependencies": {
         "express": "5.2.1",
       },
