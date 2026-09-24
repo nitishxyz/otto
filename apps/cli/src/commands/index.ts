@@ -17,6 +17,7 @@ export { registerUpgradeCommand } from './lazy/upgrade.ts';
 export { registerOttoRouterCommand } from './lazy/ottorouter.ts';
 export { registerShareCommand } from './lazy/share.ts';
 export { registerMCPCommand } from './lazy/mcp.ts';
+export { registerMemoryDashboardCommand } from './lazy/memory-dashboard.ts';
 export { registerWebCommand } from './lazy/web.ts';
 export { registerStorageCommand } from './lazy/storage.ts';
 export { registerMigrateCommand } from './lazy/migrate.ts';

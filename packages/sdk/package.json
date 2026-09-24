@@ -25,6 +25,22 @@
 			"import": "./src/browser.ts",
 			"types": "./src/browser.ts"
 		},
+		"./memory": {
+			"import": "./src/memory/index.ts",
+			"types": "./src/memory/index.ts"
+		},
+		"./memory/mcp": {
+			"import": "./src/memory/mcp.ts",
+			"types": "./src/memory/mcp.ts"
+		},
+		"./memory/capture": {
+			"import": "./src/memory/capture.ts",
+			"types": "./src/memory/capture.ts"
+		},
+		"./memory/embedder": {
+			"import": "./src/memory/embedder.ts",
+			"types": "./src/memory/embedder.ts"
+		},
 		"./browser-control": {
 			"import": "./src/browser-control.ts",
 			"types": "./src/browser-control.ts"
@@ -136,6 +152,7 @@
 		"@ai-sdk/provider-utils": "4.0.27",
 		"@ai-sdk/xai": "3.0.93",
 		"@ff-labs/fff-bun": "0.10.5",
+		"@huggingface/transformers": "3.8.1",
 		"@modelcontextprotocol/sdk": "1.27.1",
 		"@openauthjs/openauth": "0.4.3",
 		"@openrouter/ai-sdk-provider": "1.5.4",

@@ -15,6 +15,7 @@ import { secureInputMixin } from './secure-input';
 import { pluginsMixin } from './plugins';
 import { referencesMixin } from './references';
 import { judgeMixin } from './judge';
+import { memoryMixin } from './memory';
 import { shellJobsMixin } from './shell-jobs';
 
 export { configureApiClient } from './utils';
@@ -54,6 +55,11 @@ export type {
 	JudgeMcpSettings,
 	JudgeConfigSettings,
 } from './judge';
+export type {
+	MemoryConfigResponse,
+	MemoryConfigSettings,
+	MemoryConfigUpdate,
+} from './memory';
 export type {
 	DiscoveredPlugin,
 	EffectivePlugin,
@@ -216,6 +222,9 @@ class ApiClient {
 
 	getJudgeConfig = judgeMixin.getJudgeConfig;
 	updateJudgeConfig = judgeMixin.updateJudgeConfig;
+
+	getMemoryConfig = memoryMixin.getMemoryConfig;
+	updateMemoryConfig = memoryMixin.updateMemoryConfig;
 
 	listPlugins = pluginsMixin.listPlugins;
 	listPluginRegistry = pluginsMixin.listPluginRegistry;

@@ -62,6 +62,8 @@ export async function messageSubagent(
 		agent: childSession.agent,
 		content: buildFollowUpPrompt(message),
 		context: input.files?.length ? { files: input.files } : undefined,
+		messageOrigin: 'parent-agent',
+		memoryTask: message,
 	});
 	let sendNowResult: ReturnType<typeof sendQueuedMessageNow> | undefined;
 	if (delivery === 'interrupt') {

@@ -51,6 +51,7 @@ import {
 	AssistantFooterRow,
 	AssistantHeaderRow,
 	AssistantItemRow,
+	AssistantMemoryRow,
 	AssistantShowWorkRow,
 	AssistantStatusRow,
 } from './ThreadRows';
@@ -204,6 +205,15 @@ const ThreadRowRenderer = memo(function ThreadRowRenderer({
 			content = (
 				<AssistantContextRow
 					context={row.context}
+					showLine={row.showLine}
+					compact={compact}
+				/>
+			);
+			break;
+		case 'assistant-memory':
+			content = (
+				<AssistantMemoryRow
+					summary={row.summary}
 					showLine={row.showLine}
 					compact={compact}
 				/>

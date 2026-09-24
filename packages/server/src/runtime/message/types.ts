@@ -24,6 +24,8 @@ export type AttachmentOriginalMetadata = {
 export type SessionRow = typeof sessions.$inferSelect;
 
 export type DispatchOptions = {
+	messageOrigin?: 'human' | 'parent-agent' | 'agent-results' | 'system';
+	memoryTask?: string;
 	cfg: OttoConfig;
 	db: DB;
 	session: SessionRow;

@@ -18,6 +18,7 @@ import {
 	registerOttoRouterCommand,
 	registerShareCommand,
 	registerMCPCommand,
+	registerMemoryDashboardCommand,
 	registerWebCommand,
 	registerStorageCommand,
 	registerMigrateCommand,
@@ -49,6 +50,8 @@ const SKIP_SERVER_COMMANDS = new Set([
 	'service',
 	'projects',
 	'tunnel',
+	'mcp',
+	'memory',
 ]);
 
 const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
@@ -65,6 +68,7 @@ const NO_EPHEMERAL_SERVER_COMMANDS = new Set([
 	'service',
 	'projects',
 	'tunnel',
+	'mcp',
 ]);
 
 export function createCli(version: string): Command {
@@ -114,6 +118,7 @@ export function createCli(version: string): Command {
 	registerOttoRouterCommand(program);
 	registerShareCommand(program);
 	registerMCPCommand(program);
+	registerMemoryDashboardCommand(program);
 	registerWebCommand(program, version);
 	registerStorageCommand(program);
 	registerMigrateCommand(program);

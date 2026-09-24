@@ -23,6 +23,7 @@ import {
 	ChefHat,
 	Puzzle,
 	BookOpen,
+	BookMarked,
 	X,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -49,6 +50,7 @@ import { RecipesSettings } from './RecipesSettings';
 import { PluginsSettings } from './PluginsSettings';
 import { ReferencesSettings } from './ReferencesSettings';
 import { JudgeSettings } from './JudgeSettings';
+import { MemorySettings } from './MemorySettings';
 import { useOttoRouterBalance } from '../../hooks/useOttoRouterBalance';
 import { useTopupCallback } from '../../hooks/useTopupCallback';
 import { usePanelWidthStore } from '../../stores/panelWidthStore';
@@ -652,6 +654,12 @@ const PREFERENCE_GROUPS: Array<{
 				icon: <Brain className="h-3.5 w-3.5" />,
 			},
 			{
+				id: 'memory',
+				label: 'Memory',
+				description: 'Shared memory recall and capture',
+				icon: <BookMarked className="h-3.5 w-3.5" />,
+			},
+			{
 				id: 'dictation',
 				label: 'Dictation',
 				description: 'Voice input and local models',
@@ -985,6 +993,16 @@ function PreferencesModal({
 									disabled={updateDefaults.isPending}
 								/>
 							</div>
+						</PrefSection>
+					</div>
+				);
+			case 'memory':
+				return (
+					<div className="pb-2">
+						<PrefSection title="Shared Memory">
+							<MemorySettings
+								onOpenJudgeSettings={() => setActiveTab('automation')}
+							/>
 						</PrefSection>
 					</div>
 				);

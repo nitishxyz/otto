@@ -25,7 +25,14 @@ if (argv[0] === '__extension-host') {
 	bootstrapBinaries();
 	import('./src/cli.ts').then(({ runCli }) =>
 		runCli(argv, (PKG as { version: string }).version)
-			.then(() => process.exit(0))
+			.then(() => {
+				if (
+					(argv[0] === 'mcp' && argv[1] === 'memory') ||
+					(argv[0] === 'memory' && argv[1] === 'dashboard')
+				)
+					return;
+				process.exit(0);
+			})
 			.catch(async (error) => {
 				const { DaemonVersionMismatchError } = await import('./src/daemon.ts');
 				if (error instanceof DaemonVersionMismatchError) {

@@ -62,6 +62,7 @@ export async function compactSubagent(args: {
 		session: childSession,
 		agent: childSession.agent,
 		content: '/compact',
+		messageOrigin: 'system',
 	});
 	let preemptedMessageId: string | null = null;
 	if (delivery === 'interrupt') {

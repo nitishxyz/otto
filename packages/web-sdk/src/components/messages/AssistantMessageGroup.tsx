@@ -45,6 +45,7 @@ import {
 	type TurnWorkContext,
 } from './turnWork';
 import { PreloadedContextActivity } from './PreloadedContextActivity';
+import { MemoryActivity } from './MemoryActivity';
 
 interface AssistantMessageGroupProps {
 	sessionId?: string;
@@ -144,6 +145,7 @@ export const AssistantMessageGroup = memo(
 		const {
 			parts,
 			preloadedContext,
+			memoryActivity,
 			renderItems,
 			visibleRenderItems,
 			omittedRenderItemCount,
@@ -421,6 +423,14 @@ export const AssistantMessageGroup = memo(
 				{preloadedContext && (
 					<PreloadedContextActivity
 						context={preloadedContext}
+						showLine={renderItems.length > 0 || Boolean(memoryActivity)}
+						compact={compact}
+					/>
+				)}
+
+				{memoryActivity && (
+					<MemoryActivity
+						summary={memoryActivity}
 						showLine={renderItems.length > 0}
 						compact={compact}
 					/>

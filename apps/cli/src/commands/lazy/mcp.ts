@@ -4,6 +4,18 @@ export function registerMCPCommand(program: Command) {
 	const mcp = program
 		.command('mcp')
 		.description('Manage MCP (Model Context Protocol) servers');
+	mcp
+		.command('memory')
+		.description('Serve shared Otto memory over MCP stdio for external agents')
+		.option(
+			'--project <path>',
+			'Trusted project root for scope isolation',
+			process.cwd(),
+		)
+		.action(async (opts: { project: string }) => {
+			const { serveMemoryMCP } = await import('@ottocode/sdk/memory/mcp');
+			await serveMemoryMCP(opts.project);
+		});
 
 	mcp
 		.command('list', { isDefault: true })

@@ -12,6 +12,7 @@ export type PreferencesTab =
 	| 'notifications'
 	| 'automation'
 	| 'reasoning'
+	| 'memory'
 	| 'dictation'
 	| 'recipes'
 	| 'references'

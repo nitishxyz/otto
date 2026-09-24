@@ -130,6 +130,7 @@ async function loadResolvedConfig(
 		skills: merged.skills as OttoConfig['skills'],
 		references: merged.references as OttoConfig['references'],
 		judge: merged.judge as OttoConfig['judge'],
+		memory: merged.memory as OttoConfig['memory'],
 		paths: {
 			projectConfigDir,
 			projectConfigPath: (await fileExists(projectConfigPath))
@@ -155,7 +156,13 @@ function filterProjectConfig(
 	config: JsonObject | undefined,
 ): JsonObject | undefined {
 	if (!config) return undefined;
-	const { providers: _providers, skills: _skills, defaults, ...rest } = config;
+	const {
+		providers: _providers,
+		skills: _skills,
+		memory: _memory,
+		defaults,
+		...rest
+	} = config;
 	const localDefaults = pickLocalDefaults(defaults);
 	if (localDefaults) {
 		return { ...rest, defaults: localDefaults };
@@ -216,6 +223,7 @@ export {
 	removeProviderSettings,
 	writeSkillSettings,
 	writeJudgeSettings,
+	writeMemorySettings,
 	readReferenceSettings,
 	writeReferenceSettings,
 	removeReferenceSettings,

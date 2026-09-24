@@ -1,0 +1,29 @@
+{
+	"name": "memory-dashboard",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"dev:mock": "bun run scripts/mock-api.ts",
+		"build": "tsc -b && vite build",
+		"typecheck": "tsc -b --noEmit",
+		"lint": "biome lint",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"d3-force": "3.0.0",
+		"react": "19.2.0",
+		"react-dom": "19.2.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.2.4",
+		"@types/d3-force": "3.0.10",
+		"@types/node": "24.10.13",
+		"@types/react": "19.2.14",
+		"@types/react-dom": "19.2.3",
+		"@vitejs/plugin-react": "5.1.4",
+		"typescript": "5.9.3",
+		"vite": "7.3.1"
+	}
+}

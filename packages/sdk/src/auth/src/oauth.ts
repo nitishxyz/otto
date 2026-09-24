@@ -2,7 +2,7 @@ import { openBrowser } from './open-browser';
 import { createOAuthState, createPkcePair } from './oauth-primitives';
 
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const CLAUDE_CLI_VERSION = '2.1.268';
+const CLAUDE_CLI_VERSION = '2.1.280';
 const OAUTH_TOKEN_ENDPOINT = 'https://platform.claude.com/v1/oauth/token';
 const OAUTH_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback';
 

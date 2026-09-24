@@ -30,6 +30,7 @@ import { SimulatorRenderer } from './SimulatorRenderer';
 import { BrowserRenderer } from './BrowserRenderer';
 import { SkillRenderer } from './SkillRenderer';
 import { GoalToolRenderer } from './GoalToolRenderer';
+import { MemoryToolRenderer } from './MemoryToolRenderer';
 import { SubagentToolRenderer } from './SubagentToolRenderer';
 import { SubagentResultRenderer } from './SubagentResultRenderer';
 import { ShellResultRenderer } from './ShellResultRenderer';
@@ -199,6 +200,10 @@ export function ToolResultRenderer({
 		case 'goal_list':
 		case 'goal_update':
 			return <GoalToolRenderer {...props} toolName={normalizedName} />;
+		case 'remember':
+		case 'recall_memory':
+		case 'forget_memory':
+			return <MemoryToolRenderer {...props} toolName={normalizedName} />;
 		case 'subagent':
 		case 'delegate_task':
 		case 'list_subagents':

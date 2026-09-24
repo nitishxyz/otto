@@ -4,6 +4,11 @@ import {
 	buildCompactActivityEntries,
 	isCompactActivityPart,
 } from './compactActivity';
+import {
+	getMemoryTurnSummary,
+	isMemoryContextPart,
+	type MemoryTurnSummary,
+} from './memoryTurnModel';
 
 export const STATUS_LINE_TOOL_NAMES = new Set([
 	'progress_update',
@@ -374,6 +379,8 @@ export function getAssistantTurn(
 export interface AssistantTurnModel {
 	parts: MessagePart[];
 	preloadedContext: PreloadedContextSummary | null;
+	/** Memories recalled into and written from this turn, or null when none. */
+	memoryActivity: MemoryTurnSummary | null;
 	renderItems: AssistantRenderItem[];
 	visibleRenderItems: VisibleAssistantRenderItem[];
 	omittedRenderItemCount: number;
@@ -413,7 +420,10 @@ export function deriveAssistantTurn(
 	const { compact, isQueued, showAllParts = false } = options;
 	const parts = getOrderedMessageParts(message);
 	const preloadedContext = getPreloadedContextSummary(parts);
-	const renderableParts = parts.filter((part) => !isPreloadedContextPart(part));
+	const memoryActivity = getMemoryTurnSummary(parts);
+	const renderableParts = parts.filter(
+		(part) => !isPreloadedContextPart(part) && !isMemoryContextPart(part),
+	);
 	const autoCompactActivity =
 		!options.suppressAutoCompact &&
 		message.status !== 'pending' &&
@@ -508,6 +518,7 @@ export function deriveAssistantTurn(
 	return {
 		parts: renderableParts,
 		preloadedContext,
+		memoryActivity,
 		renderItems,
 		visibleRenderItems,
 		omittedRenderItemCount,

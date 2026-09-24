@@ -6,7 +6,7 @@ import { warn as loggerWarn } from '../../core/src/utils/logger.ts';
 import { addAnthropicCacheControl } from './anthropic-caching.ts';
 import { retry } from '../../runtime/retry.ts';
 
-const CLAUDE_CLI_VERSION = '2.1.268';
+const CLAUDE_CLI_VERSION = '2.1.280';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const TOKEN_REFRESH_MAX_RETRIES = 2;
 const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;

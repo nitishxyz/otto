@@ -8,6 +8,7 @@ import {
 } from '../../auth/src/index.ts';
 import type {
 	JudgeSettings,
+	MemorySettings,
 	ProviderSettingsEntry,
 	ReferenceConfig,
 	ReferenceSettings,
@@ -218,6 +219,30 @@ export async function writeJudgeSettings(
 			},
 		};
 	});
+}
+
+/** Persist user-level memory preferences; project configuration cannot override them. */
+export async function writeMemorySettings(
+	updates: MemorySettings,
+): Promise<void> {
+	await updateConfigFile(getConfigFilePath('global'), (existing) => ({
+		...existing,
+		memory: {
+			...(existing?.memory && typeof existing.memory === 'object'
+				? (existing.memory as Record<string, unknown>)
+				: {}),
+			...updates,
+			...(updates.embeddings
+				? {
+						embeddings: {
+							...((existing?.memory as { embeddings?: object } | undefined)
+								?.embeddings ?? {}),
+							...updates.embeddings,
+						},
+					}
+				: {}),
+		},
+	}));
 }
 
 /** Read references authored directly in one configuration scope. */

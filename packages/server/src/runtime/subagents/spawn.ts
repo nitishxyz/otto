@@ -111,6 +111,8 @@ export async function spawnSubagent(
 			isReuse,
 		}),
 		context: files?.length ? { files } : undefined,
+		messageOrigin: 'parent-agent',
+		memoryTask: task,
 	});
 
 	publish({

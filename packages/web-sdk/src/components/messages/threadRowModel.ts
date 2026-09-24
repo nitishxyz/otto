@@ -10,6 +10,7 @@ import {
 	buildCompactActivityEntries,
 	isCompactActivityPart,
 } from './compactActivity';
+import type { MemoryTurnSummary } from './memoryTurnModel';
 import {
 	type PartPresentation,
 	getPartPresentation,
@@ -71,6 +72,15 @@ export type ThreadRow =
 			messageId: string;
 			endsTurn: boolean;
 			context: PreloadedContextSummary;
+			showLine: boolean;
+	  }
+	| {
+			/** Memories recalled into and written from one turn. */
+			kind: 'assistant-memory';
+			key: string;
+			messageId: string;
+			endsTurn: boolean;
+			summary: MemoryTurnSummary;
 			showLine: boolean;
 	  }
 	| {
@@ -186,6 +196,8 @@ export function getThreadRowType(row: ThreadRow): string {
 			return 'header';
 		case 'assistant-context':
 			return 'context';
+		case 'assistant-memory':
+			return 'memory';
 		case 'assistant-item': {
 			if (row.variant !== 'part') return `item:${row.variant}`;
 			switch (row.part.type) {
@@ -326,6 +338,10 @@ function sameRow(left: ThreadRow, right: ThreadRow): boolean {
 		case 'assistant-context': {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-context' }>;
 			return left.context === next.context && left.showLine === next.showLine;
+		}
+		case 'assistant-memory': {
+			const next = right as Extract<ThreadRow, { kind: 'assistant-memory' }>;
+			return left.summary === next.summary && left.showLine === next.showLine;
 		}
 		case 'assistant-header': {
 			const next = right as Extract<ThreadRow, { kind: 'assistant-header' }>;
@@ -531,6 +547,12 @@ export function buildThreadRows({
 			});
 		}
 
+		const hasTurnBody =
+			turn.parts.length > 0 ||
+			turn.shouldShowStatusLineToolCall ||
+			turn.shouldShowProgressUpdate ||
+			turn.shouldShowLoadingFallback;
+
 		if (turn.preloadedContext) {
 			push({
 				kind: 'assistant-context',
@@ -538,11 +560,18 @@ export function buildThreadRows({
 				messageId: message.id,
 				endsTurn: false,
 				context: turn.preloadedContext,
-				showLine:
-					turn.parts.length > 0 ||
-					turn.shouldShowStatusLineToolCall ||
-					turn.shouldShowProgressUpdate ||
-					turn.shouldShowLoadingFallback,
+				showLine: hasTurnBody || Boolean(turn.memoryActivity),
+			});
+		}
+
+		if (turn.memoryActivity) {
+			push({
+				kind: 'assistant-memory',
+				key: `mem:${message.id}`,
+				messageId: message.id,
+				endsTurn: false,
+				summary: turn.memoryActivity,
+				showLine: hasTurnBody,
 			});
 		}
 

@@ -9,6 +9,7 @@ const ROOT = dirname(import.meta.dir);
 const API_DIR = join(ROOT, 'packages/api');
 const WEB_SDK_DIR = join(ROOT, 'packages/web-sdk');
 const WEB_DIR = join(ROOT, 'apps/web');
+const MEMORY_DASHBOARD_DIR = join(ROOT, 'apps/memory-dashboard');
 const CLI_DIR = join(ROOT, 'apps/cli');
 const WEB_DIST = join(WEB_DIR, 'dist');
 const CLI_WEB_DIST = join(CLI_DIR, 'src/web-dist');
@@ -56,6 +57,11 @@ console.log(`\n${BOLD}${CYAN}otto${RESET} ${DIM}build${RESET}\n`);
 await run('Building @ottocode/api', [bunExe, 'run', 'build'], API_DIR);
 await run('Building @ottocode/web-sdk', [bunExe, 'run', 'build'], WEB_SDK_DIR);
 await run('Building web UI', [bunExe, 'run', 'build'], WEB_DIR);
+await run(
+	'Building memory dashboard',
+	[bunExe, 'run', 'build'],
+	MEMORY_DASHBOARD_DIR,
+);
 
 spinner.begin('Copying web assets to CLI');
 rmSync(CLI_WEB_DIST, { recursive: true, force: true });

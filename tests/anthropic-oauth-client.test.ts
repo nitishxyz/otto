@@ -51,9 +51,11 @@ describe('anthropic oauth client', () => {
 	it('deduplicates concurrent refresh calls for expired OAuth tokens', async () => {
 		let refreshCalls = 0;
 		const authorizationHeaders: string[] = [];
+		const userAgentHeaders: string[] = [];
 
 		globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
 			const target = String(url);
+			userAgentHeaders.push(new Headers(init?.headers).get('user-agent') ?? '');
 			if (target.includes('/v1/oauth/token')) {
 				refreshCalls += 1;
 				await new Promise((resolve) => setTimeout(resolve, 25));
@@ -95,6 +97,11 @@ describe('anthropic oauth client', () => {
 		expect(first.status).toBe(200);
 		expect(second.status).toBe(200);
 		expect(refreshCalls).toBe(1);
+		expect(userAgentHeaders).toEqual([
+			'claude-cli/2.1.280 (external, cli)',
+			'claude-cli/2.1.280 (external, cli)',
+			'claude-cli/2.1.280 (external, cli)',
+		]);
 		expect(authorizationHeaders).toEqual([
 			'Bearer fresh-access',
 			'Bearer fresh-access',

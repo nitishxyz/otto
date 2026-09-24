@@ -42,6 +42,7 @@ export async function reportSubagentCompactionComplete(
 			agent: record.agent,
 			childSessionId,
 		}),
+		messageOrigin: 'agent-results',
 	});
 
 	logger.info('[subagent] reported compaction to parent', {
@@ -133,6 +134,7 @@ export async function reportFinishedSubagents(
 		session: parentSession,
 		agent: parentSession.agent,
 		content: buildSubagentResultsPrompt(claimed),
+		messageOrigin: 'agent-results',
 	});
 
 	logger.info('[subagent] reported results to parent', {

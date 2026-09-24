@@ -32,7 +32,7 @@
 		"examples/*"
 	],
 	"scripts": {
-		"lint": "biome check package.json biome.json apps/cli apps/desktop apps/intro-video apps/landing apps/launcher apps/preview-api apps/tui apps/web examples packages scripts tests",
+		"lint": "biome check package.json biome.json apps/cli apps/desktop apps/intro-video apps/landing apps/launcher apps/memory-dashboard apps/preview-api apps/tui apps/web examples packages scripts tests",
 		"typecheck": "bun run --filter './apps/*' --filter './packages/*' typecheck",
 		"check": "bun run lint && bun run typecheck",
 		"brand:generate": "bun run scripts/generate-brand-assets.ts",
@@ -60,6 +60,7 @@
 		"dev:cli": "bun run --filter @ottocode/cli dev",
 		"dev:server": "bun run --filter @ottocode/server dev",
 		"dev:web": "bun run --filter web dev",
+		"dev:memory-dashboard": "bun run --filter memory-dashboard dev",
 		"dev:desktop": "bun run scripts/build-desktop.ts --dev",
 		"dev:desktop:signed": "bun run scripts/build-desktop.ts --dev --sign",
 		"dev:canvas": "bun run scripts/build-canvas.ts --dev",

@@ -120,6 +120,22 @@ export type JudgeSettings = {
 	};
 };
 
+/** Global user-level memory preferences. The master switch disables all Otto memory use. */
+export type MemorySettings = {
+	enabled?: boolean;
+	autoCapture?: boolean;
+	recall?: boolean;
+	recallInSubagents?: boolean;
+	captureInSubagents?: boolean;
+	embeddings?: {
+		enabled?: boolean;
+		backend?: 'local' | 'ollama' | 'provider' | 'none';
+		provider?: 'openai' | 'google';
+		model?: string;
+		dims?: number;
+	};
+};
+
 /**
  * Path configuration
  */
@@ -148,6 +164,7 @@ export type OttoConfig = {
 	skills?: SkillSettings;
 	references?: ReferenceSettings;
 	judge?: JudgeSettings;
+	memory?: MemorySettings;
 	paths: PathConfig;
 	debugEnabled?: boolean;
 	debugScopes?: string[];

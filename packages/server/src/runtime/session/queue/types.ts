@@ -13,6 +13,8 @@ export type RunOpts = {
 	queuedAt?: number;
 	oneShot?: boolean;
 	userContent?: string;
+	messageOrigin?: 'human' | 'parent-agent' | 'agent-results' | 'system';
+	memoryTask?: string;
 	userContext?: string;
 	estimatedInputTokens?: number;
 	reasoningText?: boolean;

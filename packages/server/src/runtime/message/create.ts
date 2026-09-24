@@ -9,6 +9,7 @@ export async function createUserMessage(args: {
 	provider: DispatchOptions['provider'];
 	model: string;
 	content: string;
+	messageOrigin?: DispatchOptions['messageOrigin'];
 	createdAt: number;
 	preloadedFileMentions?: string[];
 	images?: DispatchOptions['images'];
@@ -32,6 +33,7 @@ export async function createUserMessage(args: {
 		type: 'text',
 		content: JSON.stringify({
 			text: String(args.content),
+			messageOrigin: args.messageOrigin ?? 'human',
 			preloadedFileMentions: args.preloadedFileMentions,
 		}),
 		agent: args.agent,

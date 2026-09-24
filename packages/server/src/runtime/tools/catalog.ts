@@ -8,6 +8,7 @@ import {
 import type { Tool } from 'ai';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
 import { buildGoalTools } from '../../tools/goals/index.ts';
+import { buildMemoryTools } from '../../tools/memory.ts';
 import { SERVER_LAZY_TOOL_CATALOG } from '../../tools/lazy-catalog.ts';
 import { buildSubagentTools } from '../../tools/subagents/index.ts';
 
@@ -191,7 +192,16 @@ export async function getProjectToolCatalog(
 		);
 	}
 
-	for (const item of buildDatabaseTools(cfg.projectRoot, null)) {
+	for (const item of [
+		...buildDatabaseTools(cfg.projectRoot, null),
+		...(cfg.memory?.enabled === false
+			? []
+			: buildMemoryTools(
+					{ projectRoot: cfg.projectRoot },
+					cfg.judge,
+					cfg.memory,
+				)),
+	]) {
 		details.set(
 			item.name,
 			toToolCatalogEntry({ name: item.name, tool: item.tool }),

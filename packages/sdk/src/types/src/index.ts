@@ -37,6 +37,7 @@ export type {
 	ReferenceConfig,
 	ReferenceSettings,
 	JudgeSettings,
+	MemorySettings,
 	OttoConfig,
 	ToolApprovalMode,
 	ReasoningLevel,

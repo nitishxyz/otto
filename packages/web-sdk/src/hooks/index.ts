@@ -38,6 +38,7 @@ export * from './useDictationModels';
 export * from './usePlugins';
 export * from './useReferences';
 export * from './useJudgeConfig';
+export * from './useMemoryConfig';
 export * from './usePluginCommands';
 export * from './useProjectConnection';
 export * from './useProjects';

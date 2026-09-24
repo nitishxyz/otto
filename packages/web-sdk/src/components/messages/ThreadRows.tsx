@@ -26,6 +26,7 @@ import { useIsMessageHovered } from './messageHoverStore';
 import { ShowWorkToggle } from './ShowWorkToggle';
 import { useTurnWorkStore } from './turnWorkStore';
 import { PreloadedContextActivity } from './PreloadedContextActivity';
+import { MemoryActivity } from './MemoryActivity';
 
 const STATUS_LINE_MOTION = {
 	initial: { opacity: 0, y: 6, filter: 'blur(2px)' },
@@ -147,6 +148,20 @@ export const AssistantContextRow = memo(function AssistantContextRow({
 			showLine={showLine}
 			compact={compact}
 		/>
+	);
+});
+
+export const AssistantMemoryRow = memo(function AssistantMemoryRow({
+	summary,
+	showLine,
+	compact,
+}: {
+	summary: Extract<ThreadRow, { kind: 'assistant-memory' }>['summary'];
+	showLine: boolean;
+	compact: boolean;
+}) {
+	return (
+		<MemoryActivity summary={summary} showLine={showLine} compact={compact} />
 	);
 });
 

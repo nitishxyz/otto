@@ -14,6 +14,7 @@
 - [Agents & Tools](agents-tools.md)
 - [MCP Servers](mcp.md)
 - [Judge (TypeSafe)](judge.md)
+- [Shared memory](shared-memory.md)
 - [Customization](customization.md)
 - [Local Dictation](dictation.md)
 - [API Reference](api.md)
