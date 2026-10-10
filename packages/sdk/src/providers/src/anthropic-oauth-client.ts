@@ -4,6 +4,11 @@ import { getAuth, setAuth } from '../../auth/src/index.ts';
 import { refreshToken } from '../../auth/src/oauth.ts';
 import { warn as loggerWarn } from '../../core/src/utils/logger.ts';
 import { addAnthropicCacheControl } from './anthropic-caching.ts';
+import {
+	THINKING_BINDING_BETA,
+	addThinkingBlockBinding,
+	mergeAnthropicBeta,
+} from './anthropic-thinking-binding.ts';
 import { retry } from '../../runtime/retry.ts';
 
 const CLAUDE_CLI_VERSION = '2.1.280';
@@ -238,6 +243,12 @@ function prepareAnthropicRequest(
 			}
 
 			const withCache = addAnthropicCacheControl(parsed);
+			if (addThinkingBlockBinding(withCache)) {
+				headers['anthropic-beta'] = mergeAnthropicBeta(
+					headers['anthropic-beta'],
+					THINKING_BINDING_BETA,
+				);
+			}
 			body = JSON.stringify(withCache);
 		} catch {
 			// If parsing fails, send as-is

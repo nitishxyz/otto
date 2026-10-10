@@ -110,6 +110,24 @@ if (verbose) {
 }
 spinner.succeed(outfile);
 
+// Bun can emit macOS binaries with an invalid signature, which the kernel
+// kills on launch (exit 137). Re-sign ad hoc when building for darwin on macOS.
+const isDarwinTarget =
+	targetKey?.startsWith('darwin-') ?? process.platform === 'darwin';
+if (isDarwinTarget && process.platform === 'darwin') {
+	spinner.begin('Signing binary');
+	const result = Bun.spawnSync(
+		['codesign', '--force', '--sign', '-', outfile],
+		{ cwd: ROOT, stdout: 'pipe', stderr: 'pipe' },
+	);
+	if (!result.success) {
+		spinner.fail();
+		console.error(result.stderr.toString().trim());
+		process.exit(1);
+	}
+	spinner.succeed();
+}
+
 const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
 console.log(
 	`\n${GREEN}${BOLD}  ✓${RESET} Build complete ${DIM}in ${elapsed}s${RESET}\n`,

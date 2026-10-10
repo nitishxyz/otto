@@ -75,6 +75,28 @@ describe('buildReasoningConfig', () => {
 		}
 	});
 
+	test.each(['claude-opus-5', 'claude-opus-5-5'])(
+		'uses adaptive Anthropic thinking for %s',
+		(model) => {
+			const result = buildReasoningConfig({
+				provider: 'anthropic',
+				model,
+				reasoningText: true,
+				reasoningLevel: 'high',
+				maxOutputTokens: 4000,
+			});
+
+			expect(result.enabled).toBe(true);
+			expect(result.providerOptions).toEqual({
+				anthropic: {
+					thinking: { type: 'adaptive', display: 'summarized' },
+					effort: 'high',
+				},
+			});
+			expect(result.effectiveMaxOutputTokens).toBe(4000);
+		},
+	);
+
 	test('downgrades xhigh to max on models without xhigh effort support', () => {
 		const result = buildReasoningConfig({
 			provider: 'anthropic',

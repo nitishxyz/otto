@@ -1,3 +1,9 @@
+import {
+	THINKING_BINDING_BETA,
+	addThinkingBlockBinding,
+	mergeAnthropicBeta,
+} from './anthropic-thinking-binding.ts';
+
 type MessageBlock = {
 	type: string;
 	cache_control?: { type: string };
@@ -89,21 +95,47 @@ export function addAnthropicCacheControl(parsed: ParsedBody): ParsedBody {
 	return parsed;
 }
 
+function isFirstPartyAnthropicUrl(input: Parameters<typeof fetch>[0]): boolean {
+	const url =
+		typeof input === 'string'
+			? input
+			: input instanceof URL
+				? input.href
+				: input.url;
+	return url.startsWith('https://api.anthropic.com/');
+}
+
 export function createAnthropicCachingFetch(
 	baseFetch: typeof fetch = fetch,
 ): FetchLike {
 	return async (input, init) => {
 		let body = init?.body;
+		let headers = init?.headers;
 		if (body && typeof body === 'string') {
 			try {
 				const parsed = JSON.parse(body);
 				const modified = addAnthropicCacheControl(parsed);
+				// Proxies may reject the beta, so only opt in on the first-party API.
+				if (
+					isFirstPartyAnthropicUrl(input) &&
+					addThinkingBlockBinding(modified)
+				) {
+					const merged = new Headers(headers);
+					merged.set(
+						'anthropic-beta',
+						mergeAnthropicBeta(
+							merged.get('anthropic-beta'),
+							THINKING_BINDING_BETA,
+						),
+					);
+					headers = merged;
+				}
 				body = JSON.stringify(modified);
 			} catch {
 				// If parsing fails, send as-is
 			}
 		}
-		return baseFetch(input, { ...init, body });
+		return baseFetch(input, { ...init, headers, body });
 	};
 }
 
