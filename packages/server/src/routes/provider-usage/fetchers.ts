@@ -89,7 +89,7 @@ export async function fetchOpenAIUsage(access: string, accountId?: string) {
 		};
 		credits?: {
 			has_credits: boolean;
-			balance: number | null;
+			balance?: unknown;
 		};
 	};
 
@@ -113,7 +113,12 @@ export async function fetchOpenAIUsage(access: string, accountId?: string) {
 					resetAfterSeconds: rl.secondary_window.reset_after_seconds,
 				}
 			: null,
-		credits: data.credits ?? null,
+		credits: data.credits
+			? {
+					has_credits: data.credits.has_credits,
+					balance: numericUsageValue(data.credits.balance),
+				}
+			: null,
 		limitReached: rl?.limit_reached ?? false,
 		raw: data,
 	};
@@ -181,7 +186,7 @@ export async function fetchXaiGrokUsage(access: string) {
 
 function numericUsageValue(value: unknown): number | null {
 	if (typeof value === 'number' && Number.isFinite(value)) return value;
-	if (typeof value === 'string') {
+	if (typeof value === 'string' && value.trim() !== '') {
 		const parsed = Number(value);
 		return Number.isFinite(parsed) ? parsed : null;
 	}

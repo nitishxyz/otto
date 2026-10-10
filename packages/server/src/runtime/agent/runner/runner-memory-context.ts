@@ -1,5 +1,6 @@
 import { messageParts } from '@ottocode/database/schema';
 import type { Memory, MemoryResult } from '@ottocode/sdk/memory';
+import type { BaselineSelection } from '@ottocode/sdk/memory';
 import type { getDb } from '@ottocode/database';
 import { desc, eq } from 'drizzle-orm';
 import { publish } from '../../../events/bus.ts';
@@ -12,6 +13,10 @@ export type MemoryTurnContext = {
 		retrieved: Memory[];
 		injectedIds: string[];
 		skipped: Array<{ id: string; reason: 'already-in-message' }>;
+		/** Core memories loaded regardless of the query; also listed in `retrieved` and `injectedIds`. */
+		coreIds?: string[];
+		/** Baseline selection diagnostics, including authorized core memories that were not loaded. */
+		core?: Omit<BaselineSelection, 'memories'>;
 	};
 	capture?: {
 		candidates: string[];

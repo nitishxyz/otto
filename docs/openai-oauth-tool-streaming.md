@@ -1,5 +1,12 @@
 # OpenAI OAuth tool streaming
 
+OpenAI OAuth model availability is controlled by exact model IDs in
+`packages/sdk/src/providers/src/catalog-auth.ts` and materialized by
+`bun run scripts/update-catalog.ts`. GPT-6.1 Sol, Daybreak Blue
+(`gpt-daybreak-blue-latest`), and Daybreak Red (`gpt-daybreak-red-latest`)
+are enabled for both API-key and OAuth authentication. Actual access still
+depends on the signed-in account's upstream model availability.
+
 Otto defaults function tools to `strict: false` on Codex OAuth Responses
 requests, for both HTTP and WebSocket transports. Explicit tool-level `strict`
 settings are preserved. Tool schemas and local AI SDK input validation are

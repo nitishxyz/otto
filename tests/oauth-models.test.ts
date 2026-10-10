@@ -57,6 +57,25 @@ describe('oauth model filtering', () => {
 		});
 	});
 
+	test.each([
+		'gpt-6-luna',
+		'gpt-6-sol',
+		'gpt-6.1-sol',
+		'gpt-daybreak-blue-latest',
+		'gpt-daybreak-red-latest',
+	])('allows %s for both OpenAI OAuth and API auth', (modelId) => {
+		expect(catalog.openai.models[modelId]?.auth).toEqual(['api', 'oauth']);
+		expect(isModelAllowedForOAuth('openai', modelId)).toBe(true);
+		for (const authType of ['oauth', 'api'] as const) {
+			const models = filterModelsForAuthType(
+				'openai',
+				catalog.openai.models,
+				authType,
+			);
+			expect(models[modelId]).toBeDefined();
+		}
+	});
+
 	test('overrides gpt-5.5 context limit to 264k only for OAuth', () => {
 		const oauth = filterModelsForAuthType(
 			'openai',

@@ -41,6 +41,8 @@ export function memoryTurnPolicy(
 ): {
 	recall: boolean;
 	capture: boolean;
+	/** Load bounded core memories regardless of the message text. */
+	core: boolean;
 	captureReason?: 'disabled' | 'not-human-turn';
 } {
 	const capture =
@@ -54,9 +56,17 @@ export function memoryTurnPolicy(
 		settings?.recall !== false &&
 		(kind === 'human' ||
 			(kind === 'parent-agent' && settings?.recallInSubagents !== false));
+	// Core preferences also apply when sub-agent results return, where orchestration rules matter most.
+	const core =
+		settings?.enabled !== false &&
+		settings?.recall !== false &&
+		(kind === 'human' ||
+			kind === 'agent-results' ||
+			(kind === 'parent-agent' && settings?.recallInSubagents !== false));
 	return {
 		capture,
 		recall,
+		core,
 		...(!capture
 			? {
 					captureReason:

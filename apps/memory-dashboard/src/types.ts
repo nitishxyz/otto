@@ -21,6 +21,8 @@ export interface GraphNode {
 	projectId?: string;
 	status: MemoryStatus;
 	origin: MemoryOrigin;
+	audience?: 'work' | 'orchestration' | null;
+	priority?: 'core' | 'contextual' | null;
 	createdAt: string;
 	updatedAt: string;
 	source?: { sessionId?: string; messageId?: string; agent?: string };

@@ -41,6 +41,7 @@ test('external MCP client and Otto share memory, with project isolation', async 
 			const tools = await first.listTools();
 			expect(tools.tools.map((item) => item.name)).toEqual([
 				'recall_memory',
+				'core_memory',
 				'remember',
 				'memory_history',
 				'forget_memory',

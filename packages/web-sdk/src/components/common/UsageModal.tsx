@@ -139,7 +139,8 @@ export const UsageModal = memo(function UsageModal() {
 						<div className="flex items-center justify-between text-sm">
 							<span className="text-muted-foreground">Credits</span>
 							<span className="font-medium text-foreground">
-								{usage.credits.balance !== null
+								{typeof usage.credits.balance === 'number' &&
+								Number.isFinite(usage.credits.balance)
 									? `$${usage.credits.balance.toFixed(2)}`
 									: 'Available'}
 							</span>
