@@ -8,6 +8,7 @@ import {
 	THINKING_BINDING_BETA,
 	addThinkingBlockBinding,
 	mergeAnthropicBeta,
+	retryWithoutBoundThinking,
 } from './anthropic-thinking-binding.ts';
 import { retry } from '../../runtime/retry.ts';
 
@@ -274,11 +275,14 @@ export function createAnthropicOAuthFetch(
 				accessToken,
 				toolNameTransformer,
 			);
-			return fetch(prepared.url, {
+			const response = await fetch(prepared.url, {
 				...init,
 				body: prepared.body,
 				headers: prepared.headers,
 			});
+			return retryWithoutBoundThinking(response, prepared.body, (body) =>
+				fetch(prepared.url, { ...init, body, headers: prepared.headers }),
+			);
 		};
 
 		let response = await execute(currentOAuth.access);

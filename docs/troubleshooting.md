@@ -10,6 +10,14 @@
 otto auth login
 ```
 
+### Anthropic: invalid signature in a thinking block
+
+`Invalid signature in thinking block` with `bound to a different conversation` means a replayed thinking block no longer has the conversation prefix Anthropic signed it against. Changing tools, inserting messages, or compacting earlier context can cause this; it is not an API-key authorization error. Retrying the same payload cannot repair the signature.
+
+Otto opts enabled/adaptive thinking into Anthropic's `drop_block` binding control on the first-party API. If Anthropic still returns this specific binding error, Otto retries once with replayed thinking and redacted-thinking blocks removed from that request. Text, tool calls, and tool results are retained, and stored session history is not deleted. Other API errors are not retried by this recovery path, and third-party proxy requests are left unchanged.
+
+After updating Otto, run `otto service restart` so the daemon uses the updated provider code. Restarting or clearing an error alone does not prevent a new binding mismatch if a later request changes the signed prefix again.
+
 ### Database errors
 ```bash
 # Reset local database

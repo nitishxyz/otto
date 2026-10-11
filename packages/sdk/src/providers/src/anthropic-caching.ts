@@ -2,6 +2,7 @@ import {
 	THINKING_BINDING_BETA,
 	addThinkingBlockBinding,
 	mergeAnthropicBeta,
+	retryWithoutBoundThinking,
 } from './anthropic-thinking-binding.ts';
 
 type MessageBlock = {
@@ -135,7 +136,11 @@ export function createAnthropicCachingFetch(
 				// If parsing fails, send as-is
 			}
 		}
-		return baseFetch(input, { ...init, headers, body });
+		const response = await baseFetch(input, { ...init, headers, body });
+		if (!isFirstPartyAnthropicUrl(input)) return response;
+		return retryWithoutBoundThinking(response, body, (retryBody) =>
+			baseFetch(input, { ...init, headers, body: retryBody }),
+		);
 	};
 }
 
