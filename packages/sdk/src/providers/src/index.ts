@@ -93,7 +93,12 @@ export {
 export type { ResolvedProviderDefinition } from './registry.ts';
 export { validateProviderModel } from './validate.ts';
 export { estimateModelCostUsd } from './pricing.ts';
-export { providerEnvVar, readEnvKey, setEnvKey } from './env.ts';
+export {
+	clearEnvKey,
+	providerEnvVar,
+	readEnvKey,
+	setEnvKey,
+} from './env.ts';
 export {
 	createOttoRouter,
 	createOttoRouterFetch,

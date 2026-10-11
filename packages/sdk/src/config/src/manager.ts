@@ -24,6 +24,7 @@ import {
 	joinPath,
 } from './paths.ts';
 import {
+	clearEnvKey,
 	readEnvKey,
 	setEnvKey,
 	isBuiltInProviderId,
@@ -75,6 +76,7 @@ export async function ensureEnv(
 	const stored = auth[provider];
 	const value = stored?.type === 'api' ? stored.key : undefined;
 	if (value) setEnvKey(provider, value);
+	else clearEnvKey(provider);
 }
 
 export async function writeDefaults(
@@ -388,6 +390,7 @@ export async function removeAuth(
 	projectRoot?: string,
 ) {
 	await removeAuthFile(provider, projectRoot, scope);
+	clearEnvKey(provider);
 }
 
 export async function getOnboardingComplete(

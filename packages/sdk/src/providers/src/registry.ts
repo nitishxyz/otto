@@ -1,5 +1,5 @@
 import { catalog } from './catalog-merged.ts';
-import { providerEnvVar, readEnvKey } from './env.ts';
+import { providerEnvVar, readEnvKey, readUserEnv } from './env.ts';
 import { getCachedProviderCatalogEntry } from './model-catalog-cache.ts';
 import { mapConfiguredModelEntries, modelMapToList } from './model-map.ts';
 import { mergeModelMaps } from './model-merge.ts';
@@ -297,16 +297,15 @@ export function getConfiguredProviderApiKey(
 		getProviderSettings(cfg, provider)?.apiKeyEnv,
 	);
 	if (configuredApiKeyEnv) {
-		const value = process.env[configuredApiKeyEnv];
-		return value?.length ? value : undefined;
+		return readUserEnv(configuredApiKeyEnv);
 	}
 	if (definition.source === 'built-in') {
 		const envValue = readEnvKey(provider);
 		if (envValue?.length) return envValue;
 	}
 	if (definition.apiKeyEnv?.length) {
-		const value = process.env[definition.apiKeyEnv];
-		if (value?.length) return value;
+		const value = readUserEnv(definition.apiKeyEnv);
+		if (value) return value;
 	}
 	return undefined;
 }

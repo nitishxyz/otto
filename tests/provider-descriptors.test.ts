@@ -6,13 +6,17 @@ import {
 	BUILT_IN_PROVIDER_DESCRIPTORS,
 	builtInProviderIds,
 	catalog,
+	ensureProviderEnv,
 	getConfiguredProviderIds,
 	getConfiguredProviderApiKey,
 	getProviderDefinition,
 	hasConfiguredProvider,
+	isProviderAuthorized,
 	loadGlobalConfig,
 	providerEnvVar,
 	readEnvKey,
+	removeAuth,
+	setAuth,
 } from '@ottocode/sdk';
 import { createBuiltInProviderModel } from '../packages/sdk/src/providers/src/model-factory.ts';
 
@@ -131,6 +135,31 @@ describe('built-in provider descriptors', () => {
 				delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 			else
 				process.env.GOOGLE_GENERATIVE_AI_API_KEY = previousGoogleGenerativeKey;
+		}
+	});
+
+	test('stops authorizing a provider after its stored API key is removed', async () => {
+		const previous = process.env.ANTHROPIC_API_KEY;
+		delete process.env.ANTHROPIC_API_KEY;
+		try {
+			const config = await loadGlobalConfig();
+			await setAuth('anthropic', { type: 'api', key: 'stored-key' });
+			await ensureProviderEnv(config, 'anthropic');
+			expect(process.env.ANTHROPIC_API_KEY).toBe('stored-key');
+			expect(await isProviderAuthorized(config, 'anthropic')).toBe(true);
+
+			await setAuth('anthropic', { type: 'api', key: 'rotated-key' });
+			await ensureProviderEnv(config, 'anthropic');
+			expect(process.env.ANTHROPIC_API_KEY).toBe('rotated-key');
+
+			await removeAuth('anthropic');
+			expect(readEnvKey('anthropic')).toBeUndefined();
+			expect(await isProviderAuthorized(config, 'anthropic')).toBe(false);
+			await ensureProviderEnv(config, 'anthropic');
+			expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
+		} finally {
+			if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
+			else process.env.ANTHROPIC_API_KEY = previous;
 		}
 	});
 

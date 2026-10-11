@@ -10,6 +10,7 @@ import {
 	getProviderDefinition,
 	isBuiltInProviderId,
 } from './registry.ts';
+import { injectEnv, readUserEnv } from './env.ts';
 
 export async function isProviderAuthorized(
 	cfg: OttoConfig,
@@ -23,7 +24,7 @@ export async function isProviderAuthorized(
 	)
 		return false;
 	if (getConfiguredProviderApiKey(cfg, provider)) return true;
-	if (definition.apiKeyEnv && process.env[definition.apiKeyEnv]) return true;
+	if (definition.apiKeyEnv && readUserEnv(definition.apiKeyEnv)) return true;
 	if (!isBuiltInProviderId(provider)) {
 		return !definition.apiKeyEnv && !cfg.providers[String(provider)]?.apiKey;
 	}
@@ -33,8 +34,8 @@ export async function isProviderAuthorized(
 export async function ensureProviderEnv(cfg: OttoConfig, provider: ProviderId) {
 	const envVar = getConfiguredProviderEnvVar(cfg, provider);
 	const apiKey = getConfiguredProviderApiKey(cfg, provider);
-	if (envVar && apiKey && !process.env[envVar]) {
-		process.env[envVar] = apiKey;
+	if (envVar && apiKey && !readUserEnv(envVar)) {
+		injectEnv(envVar, apiKey);
 	}
 	if (isBuiltInProviderId(provider)) {
 		await mgrEnsureEnv(provider, cfg.projectRoot);
