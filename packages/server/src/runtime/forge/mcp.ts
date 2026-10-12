@@ -24,6 +24,7 @@ import {
 	copilotMCPSessions,
 } from '../../routes/mcp/state.ts';
 import { reconcileMCPServerManagers } from '../../routes/mcp/service/reconcile.ts';
+import { configureMCPAuthCallback } from '../../routes/mcp/local-oauth-callback.ts';
 
 type MCPAction =
 	| 'create'
@@ -110,9 +111,23 @@ async function startServer(
 	if (!manager) manager = await initializeMCP({ servers: [] }, projectRoot);
 	if (!manager.started) manager.setProjectRoot(projectRoot);
 	await manager.restartServer(server);
+	if (manager.getAuthUrl(server.name)) {
+		await prepareMCPAuth(projectRoot, server.name);
+	}
 	return (await manager.getStatusAsync()).find(
 		(status) => status.name === server.name,
 	);
+}
+
+async function prepareMCPAuth(projectRoot: string, name: string) {
+	const result = await initiateMCPAuth({
+		name,
+		projectRoot,
+		oAuthStore: copilotMCPOAuthStore,
+		sessions: copilotMCPSessions,
+	});
+	if (!result.ok) throw new Error(result.body.error);
+	return configureMCPAuthCallback(result.body, false);
 }
 
 async function stopServer(projectRoot: string, name: string): Promise<void> {
@@ -169,12 +184,16 @@ function validateServerInput(
 export async function listForgeMCPServers(projectRoot: string) {
 	const config = await loadMCPConfig(projectRoot, getGlobalConfigDir());
 	const statuses = await getStatuses(projectRoot);
-	return config.servers.map((server) =>
-		summarizeServer(
-			server,
-			statuses.find((status) => status.name === server.name),
-			getPendingAuthUrl(projectRoot, server.name),
-		),
+	return Promise.all(
+		config.servers.map(async (server) => {
+			const authUrl = getPendingAuthUrl(projectRoot, server.name);
+			if (authUrl) await prepareMCPAuth(projectRoot, server.name);
+			return summarizeServer(
+				server,
+				statuses.find((status) => status.name === server.name),
+				authUrl,
+			);
+		}),
 	);
 }
 
@@ -300,26 +319,16 @@ export async function runForgeMCPAction(
 			);
 			await manager.stopServer(name);
 		}
-		const result = await initiateMCPAuth({
-			name,
-			projectRoot,
-			oAuthStore: copilotMCPOAuthStore,
-			sessions: copilotMCPSessions,
-		});
-		if (!result.ok) throw new Error(result.body.error);
-		if (
-			result.body.authType === 'copilot-device' &&
-			result.body.sessionId &&
-			result.body.interval
-		) {
+		const auth = await prepareMCPAuth(projectRoot, name);
+		if (auth.authType === 'copilot-device' && auth.sessionId && auth.interval) {
 			scheduleCopilotAuthPolling(
 				projectRoot,
 				name,
-				result.body.sessionId,
-				result.body.interval,
+				auth.sessionId,
+				auth.interval,
 			);
 		}
-		return { ok: true, applied: true, plan, auth: result.body };
+		return { ok: true, applied: true, plan, auth };
 	}
 
 	if (action === 'logout') {

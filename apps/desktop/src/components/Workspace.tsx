@@ -20,7 +20,6 @@ export function Workspace({
 	machine,
 	onBack,
 	sessionId,
-	view,
 	dashboardOpen,
 	onCloseDashboard,
 }: {
@@ -29,7 +28,6 @@ export function Workspace({
 	machine?: MachineBootstrap | null;
 	onBack: () => void | Promise<void>;
 	sessionId?: string;
-	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 }) {
@@ -75,7 +73,6 @@ export function Workspace({
 					onBack={handleBack}
 					isRemote={isRemote}
 					remoteLabel={remoteLabel}
-					showTabs={false}
 				/>
 			)}
 
@@ -111,7 +108,6 @@ export function Workspace({
 						server={server}
 						project={project}
 						sessionId={sessionId}
-						view={view}
 						dashboardOpen={dashboardOpen}
 						onCloseDashboard={onCloseDashboard}
 						titleBar={

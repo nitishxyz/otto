@@ -1,3 +1,6 @@
+/** Child context size above which the coordinator should compact before reuse. */
+export const SUBAGENT_COMPACT_THRESHOLD_TOKENS = 300_000;
+
 export function buildSubagentPrompt(args: {
 	parentSessionId: string;
 	parentAgent: string;
@@ -33,6 +36,8 @@ export function buildSubagentPrompt(args: {
 		'- Verification: what you ran to check the work (commands, tests, lint) and their results (or "none")',
 		'- Open issues: anything unresolved, follow-ups needed, or assumptions made (or "none")',
 		'',
+		'You cannot delegate; do the work yourself within the assigned scope. Implement first, then run only quick focused checks on what you touched (typecheck, lint, targeted tests). Do not run broad test suites or iterate on testing unless the task is a review/test pass; the coordinator schedules a separate review.',
+		'',
 		'Never claim verification you did not perform. Do not ask the user follow-up questions.',
 	);
 	return lines.join('\n');
@@ -55,6 +60,7 @@ export function buildSubagentResultsPrompt(
 		status: string;
 		task: string;
 		summary: string | null;
+		contextTokens?: number | null;
 	}>,
 ): string {
 	const sections = finished.map((record) => {
@@ -68,12 +74,23 @@ export function buildSubagentResultsPrompt(
 			'</subagent_result>',
 		].join('\n');
 	});
+	const usage = finished
+		.filter((record) => typeof record.contextTokens === 'number')
+		.map((record) => {
+			const tokens = record.contextTokens as number;
+			const flag =
+				tokens > SUBAGENT_COMPACT_THRESHOLD_TOKENS
+					? ' (over 300k: compact before sending more work)'
+					: '';
+			return `- ${record.id} (${record.agent}): ${Math.round(tokens / 1000)}k context tokens${flag}`;
+		});
 	return [
 		'<subagent_results>',
 		sections.join('\n\n'),
 		'</subagent_results>',
 		'',
-		"The delegated work is complete and the report above is the source of truth. Accept the child's ownership and verification: do not inspect its files, check Git, or rerun commands merely to verify it again. Update any parent task state and respond to the user with the outcome. If the report identifies a concrete unresolved issue inside the delegated scope, send a focused follow-up to the same child (or delegate another child) rather than silently taking over. Handle work yourself only when it is outside the delegated scope.",
+		...(usage.length ? ['Child context usage:', ...usage, ''] : []),
+		"The delegated work is complete and the report above is the source of truth. Accept the child's ownership and verification: do not inspect its files, check Git, or rerun commands merely to verify it again. Update the plan and continue the coordination flow: delegate the next tasks, start the separate review/test pass once the implementation set is done, or respond to the user when all work is complete. If the report identifies a concrete unresolved issue inside the delegated scope, send a focused follow-up to the same child (or delegate another child) rather than silently taking over. Handle work yourself only when it is outside the delegated scope.",
 	].join('\n');
 }
 

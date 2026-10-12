@@ -22,26 +22,21 @@ const SESSIONS_PAGE_SIZE = 50;
 
 export const sessionsQueryKey = ['sessions', 'list'] as const;
 
-export function getSessionsQueryKey(sessionType?: SessionListFilter) {
-	return sessionType
-		? projectScopedKey([...sessionsQueryKey, sessionType] as const)
-		: projectScopedKey(sessionsQueryKey);
+export function getSessionsQueryKey() {
+	return projectScopedKey(sessionsQueryKey);
 }
 
 export function getSessionQueryKey(sessionId: string) {
 	return projectScopedKey(['session', sessionId] as const);
 }
 
-export type SessionListFilter = 'looper' | undefined;
-
-export function useSessionsInfinite(sessionType?: SessionListFilter) {
+export function useSessionsInfinite() {
 	return useInfiniteQuery({
-		queryKey: getSessionsQueryKey(sessionType),
+		queryKey: getSessionsQueryKey(),
 		queryFn: ({ pageParam = 0 }) =>
 			apiClient.getSessionsPage({
 				limit: SESSIONS_PAGE_SIZE,
 				offset: pageParam,
-				sessionType,
 			}),
 		getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
 		initialPageParam: 0,
@@ -51,8 +46,8 @@ export function useSessionsInfinite(sessionType?: SessionListFilter) {
 	});
 }
 
-export function useSessions(sessionType?: SessionListFilter) {
-	const query = useSessionsInfinite(sessionType);
+export function useSessions() {
+	const query = useSessionsInfinite();
 	const data = useMemo<Session[]>(() => {
 		if (!query.data?.pages) return [];
 		return query.data.pages.flatMap((p) => p.items ?? []);

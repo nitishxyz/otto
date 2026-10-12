@@ -37,10 +37,6 @@ interface NewSessionLandingProps {
 	wordmark?: React.ReactNode;
 	compact?: boolean;
 	modalPosition?: 'fixed' | 'absolute';
-	/** Session type for the created session (e.g. 'looper' for the Looper tab). */
-	sessionType?: 'main' | 'looper';
-	/** Fixes the agent (no picker); provider/model stay user-editable. */
-	lockAgent?: boolean;
 }
 
 export interface NewSessionLandingRef {
@@ -50,20 +46,12 @@ export interface NewSessionLandingRef {
 export const NewSessionLanding = memo(
 	forwardRef<NewSessionLandingRef, NewSessionLandingProps>(
 		function NewSessionLanding(
-			{
-				onSessionCreated,
-				defaultAgent,
-				wordmark,
-				compact,
-				modalPosition,
-				sessionType,
-				lockAgent = false,
-			},
+			{ onSessionCreated, defaultAgent, wordmark, compact, modalPosition },
 			ref,
 		) {
 			const queryClient = useQueryClient();
 			const [sending, setSending] = useState(false);
-			const draftKey = getNewSessionChatDraftKey(sessionType);
+			const draftKey = getNewSessionChatDraftKey();
 			const {
 				config,
 				agent,
@@ -149,11 +137,11 @@ export const NewSessionLanding = memo(
 				(commandId: string) => {
 					if (commandId === 'models') {
 						openConfig('model');
-					} else if (commandId === 'agents' && !lockAgent) {
+					} else if (commandId === 'agents') {
 						openConfig('agent');
 					}
 				},
-				[openConfig, lockAgent],
+				[openConfig],
 			);
 
 			const handleSend = useCallback(
@@ -180,7 +168,6 @@ export const NewSessionLanding = memo(
 							agent: agent || 'general',
 							provider: provider || undefined,
 							model: model || undefined,
-							sessionType: sessionType === 'looper' ? 'looper' : undefined,
 						});
 
 						queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() });
@@ -257,7 +244,6 @@ export const NewSessionLanding = memo(
 					agent,
 					provider,
 					model,
-					sessionType,
 					images,
 					documents,
 					clearFiles,
@@ -295,7 +281,6 @@ export const NewSessionLanding = memo(
 							onModelChange={handleModelChange}
 							onModelSelectorChange={handleModelSelectorChange}
 							modalPosition={modalPosition}
-							hideAgentSelector={lockAgent}
 						/>
 					) : null}
 					<div className={`w-full ${compact ? 'max-w-xl' : 'max-w-2xl'}`}>
@@ -335,9 +320,8 @@ export const NewSessionLanding = memo(
 									(config?.defaults?.reasoningText ?? true)
 								}
 								agent={agent}
-								agents={lockAgent ? [] : agentNames}
+								agents={agentNames}
 								onAgentChange={handleAgentChange}
-								agentLocked={lockAgent}
 								onPlanModeToggle={handlePlanModeToggle}
 								isPlanMode={isPlanMode}
 								inlineLayout

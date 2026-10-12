@@ -95,18 +95,6 @@ const sessionDetailRoute = createRoute({
 	component: EmptyRouteComponent,
 });
 
-const looperRoute = createRoute({
-	getParentRoute: () => workspaceRoute,
-	path: 'looper',
-	component: EmptyRouteComponent,
-});
-
-const looperSessionDetailRoute = createRoute({
-	getParentRoute: () => workspaceRoute,
-	path: 'looper/$sessionId',
-	component: EmptyRouteComponent,
-});
-
 const dashboardRoute = createRoute({
 	getParentRoute: () => workspaceRoute,
 	path: 'dashboard',
@@ -122,8 +110,6 @@ const routeTree = rootRoute.addChildren([
 	workspaceRoute.addChildren([
 		sessionsRoute,
 		sessionDetailRoute,
-		looperRoute,
-		looperSessionDetailRoute,
 		dashboardRoute,
 	]),
 ]);
@@ -268,11 +254,6 @@ function WorkspaceRouteComponent() {
 	const dashboardOpen = matches.some(
 		(match) => match.routeId === dashboardRoute.id,
 	);
-	const isLooperView = matches.some(
-		(match) =>
-			match.routeId === looperRoute.id ||
-			match.routeId === looperSessionDetailRoute.id,
-	);
 	const sessionId = dashboardOpen
 		? (matchedSessionId ?? lastSessionIdRef.current)
 		: matchedSessionId;
@@ -310,7 +291,6 @@ function WorkspaceRouteComponent() {
 			machine={machine}
 			onBack={onBackToProjects}
 			sessionId={sessionId}
-			view={isLooperView ? 'looper' : 'agents'}
 			dashboardOpen={dashboardOpen}
 			onCloseDashboard={handleCloseDashboard}
 		/>

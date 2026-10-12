@@ -263,7 +263,7 @@ level 5  apps       cli, tui, web, desktop, launcher, landing`}
 					title="@ottocode/database"
 					accent="lime"
 					desc="SQLite + Drizzle persistence, one table per schema file, bundled migrations."
-					items={['sessions, messages, artifacts', 'goals and subagents']}
+					items={['sessions, messages, artifacts', 'subagents']}
 				/>
 				<DocCard
 					kicker="packages/web-sdk · web-ui"

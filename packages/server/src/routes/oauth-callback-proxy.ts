@@ -6,9 +6,22 @@ import { zodOpenApiRoute } from '../openapi/route.ts';
 import { isDaemonTokenAuthorized, isTunnelRequest } from '../tunnel-auth.ts';
 
 const PROXY_TTL_MS = 10 * 60 * 1000;
-const callbackListeners = new Map<
+interface CallbackRegistration {
+	listenerId: string;
+	input: OAuthLoopbackCallbackInput;
+	timer: ReturnType<typeof setTimeout>;
+}
+
+interface CallbackListener {
+	server: Server;
+	ready: Promise<void>;
+	registrations: Map<string, CallbackRegistration>;
+}
+
+const callbackListeners = new Map<string, CallbackListener>();
+const callbackRegistrations = new Map<
 	string,
-	{ server: Server; timer: ReturnType<typeof setTimeout> }
+	{ listener: CallbackListener; addressKey: string; registrationKey: string }
 >();
 
 const startCallbackProxyBodySchema = z.object({
@@ -43,6 +56,7 @@ export interface OAuthLoopbackCallbackResult {
 
 export interface OAuthLoopbackCallbackInput {
 	callbackUrl: string;
+	expectedState?: string;
 	successMessage: string;
 	complete: (result: OAuthLoopbackCallbackResult) => Promise<void>;
 }
@@ -75,12 +89,22 @@ function callbackAddress(callbackUrl: string): {
 	};
 }
 
-function stopCallbackListener(listenerId: string): void {
-	const listener = callbackListeners.get(listenerId);
-	if (!listener) return;
-	callbackListeners.delete(listenerId);
-	clearTimeout(listener.timer);
-	listener.server.close();
+/** Stops only the registration identified by a loopback listener or proxy ID. */
+export function stopOAuthCallbackProxy(listenerId: string): void {
+	const registration = callbackRegistrations.get(listenerId);
+	if (!registration) return;
+	const { listener, addressKey, registrationKey } = registration;
+	const callback = listener.registrations.get(registrationKey);
+	if (!callback || callback.listenerId !== listenerId) return;
+	callbackRegistrations.delete(listenerId);
+	listener.registrations.delete(registrationKey);
+	clearTimeout(callback.timer);
+	if (listener.registrations.size === 0) {
+		if (callbackListeners.get(addressKey) === listener) {
+			callbackListeners.delete(addressKey);
+		}
+		listener.server.close();
+	}
 }
 
 function html(title: string, message: string): string {
@@ -106,21 +130,59 @@ export async function startOAuthLoopbackCallback(
 	input: OAuthLoopbackCallbackInput,
 ): Promise<{ listenerId: string }> {
 	const address = callbackAddress(input.callbackUrl);
+	const addressKey = JSON.stringify([address.hostname, address.port]);
+	let listener = callbackListeners.get(addressKey);
+	if (!listener) {
+		listener = createCallbackListener(address, addressKey);
+		callbackListeners.set(addressKey, listener);
+	}
+	await listener.ready;
+	const registrationKey = JSON.stringify([
+		address.pathname,
+		input.expectedState ?? null,
+	]);
+	const previous = listener.registrations.get(registrationKey);
+	if (previous) {
+		clearTimeout(previous.timer);
+		callbackRegistrations.delete(previous.listenerId);
+	}
 	const listenerId = crypto.randomUUID();
-	let handled = false;
+	const timer = setTimeout(
+		() => stopOAuthCallbackProxy(listenerId),
+		PROXY_TTL_MS,
+	);
+	timer.unref();
+	listener.registrations.set(registrationKey, { listenerId, input, timer });
+	callbackRegistrations.set(listenerId, {
+		listener,
+		addressKey,
+		registrationKey,
+	});
+	return { listenerId };
+}
 
+function createCallbackListener(
+	address: ReturnType<typeof callbackAddress>,
+	addressKey: string,
+): CallbackListener {
+	const registrations = new Map<string, CallbackRegistration>();
 	const server = createServer(async (req, res) => {
 		try {
-			const url = new URL(req.url ?? '/', input.callbackUrl);
+			const url = new URL(req.url ?? '/', 'http://localhost');
 			if (req.method !== 'GET') {
 				res.writeHead(405).end();
 				return;
 			}
-			if (url.pathname !== address.pathname || handled) {
+			const state = url.searchParams.get('state');
+			const registration =
+				registrations.get(JSON.stringify([url.pathname, state])) ??
+				registrations.get(JSON.stringify([url.pathname, null]));
+			if (!registration) {
 				res.writeHead(404).end();
 				return;
 			}
-			handled = true;
+			const { input, listenerId } = registration;
+			stopOAuthCallbackProxy(listenerId);
 			await input.complete({
 				code: url.searchParams.get('code') ?? undefined,
 				state: url.searchParams.get('state') ?? undefined,
@@ -138,24 +200,21 @@ export async function startOAuthLoopbackCallback(
 					error instanceof Error ? error.message : 'OAuth callback failed',
 				),
 			);
-		} finally {
-			setTimeout(() => stopCallbackListener(listenerId), 100);
 		}
 	});
 
-	await new Promise<void>((resolve, reject) => {
-		server.once('error', reject);
+	const ready = new Promise<void>((resolve, reject) => {
+		server.once('error', (error) => {
+			if (callbackListeners.get(addressKey)?.server === server) {
+				callbackListeners.delete(addressKey);
+			}
+			reject(error);
+		});
 		server.listen(address.port, address.hostname, () => {
-			server.off('error', reject);
 			resolve();
 		});
 	});
-	const timer = setTimeout(
-		() => stopCallbackListener(listenerId),
-		PROXY_TTL_MS,
-	);
-	callbackListeners.set(listenerId, { server, timer });
-	return { listenerId };
+	return { server, ready, registrations };
 }
 
 export async function startOAuthCallbackProxy(
@@ -172,6 +231,8 @@ export async function startOAuthCallbackProxy(
 	);
 	const { listenerId } = await startOAuthLoopbackCallback({
 		callbackUrl: input.callbackUrl,
+		expectedState:
+			new URL(input.authorizationUrl).searchParams.get('state') ?? undefined,
 		successMessage:
 			'The remote machine is configured. You can close this window.',
 		complete: async (result) => {

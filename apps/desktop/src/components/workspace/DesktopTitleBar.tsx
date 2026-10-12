@@ -1,13 +1,9 @@
-import { memo, useCallback, useEffect } from 'react';
+import { memo } from 'react';
 import { ArrowDownToLine, RotateCw } from 'lucide-react';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { useWorkspaceTabStore } from '@ottocode/web-sdk/stores';
 import {
-	LooperTabBar,
 	TitleBar,
 	TitleBarButton,
 	TitleBarRightRailToggle,
-	type WorkspaceTab,
 } from '@ottocode/web-sdk/components';
 import { useUpdate } from '../../hooks/useUpdate';
 import { usePlatform } from '../../hooks/usePlatform';
@@ -17,67 +13,17 @@ import { handleTitleBarDrag } from '../../utils/title-bar';
 import { tauriBridge } from '../../lib/tauri-bridge';
 import { WindowControls } from '../WindowControls';
 
-/**
- * Agents | Looper tabs backed by the desktop router (/sessions vs /looper).
- * Must render inside the workspace QueryClientProvider. Remembers the last
- * visited session per tab so switching tabs returns to that session instead
- * of the landing.
- */
-const DesktopRoutedLooperTabs = memo(function DesktopRoutedLooperTabs() {
-	const navigate = useNavigate();
-	const pathname = useRouterState({
-		select: (state) => state.location.pathname,
-	});
-	const activeTab: WorkspaceTab = pathname.startsWith('/looper')
-		? 'looper'
-		: 'agents';
-	const setLastSession = useWorkspaceTabStore((s) => s.setLastSession);
-
-	useEffect(() => {
-		const match = pathname.match(/^\/(looper|sessions)\/([^/]+)/);
-		if (match?.[2]) {
-			setLastSession(match[1] === 'looper' ? 'looper' : 'agents', match[2]);
-		}
-	}, [pathname, setLastSession]);
-
-	const handleTabChange = useCallback(
-		(tab: WorkspaceTab) => {
-			const lastSessionId =
-				useWorkspaceTabStore.getState().lastSessionByTab[tab];
-			if (lastSessionId) {
-				navigate({
-					to: tab === 'looper' ? '/looper/$sessionId' : '/sessions/$sessionId',
-					params: { sessionId: lastSessionId },
-				});
-				return;
-			}
-			navigate({ to: tab === 'looper' ? '/looper' : '/sessions' });
-		},
-		[navigate],
-	);
-
-	return (
-		<LooperTabBar
-			variant="titlebar"
-			activeTab={activeTab}
-			onTabChange={handleTabChange}
-		/>
-	);
-});
-
 interface DesktopTitleBarProps {
 	projectName: string;
 	onBack: () => void | Promise<void>;
 	isRemote: boolean;
 	/** Machine/host name for the remote badge; falls back to "Remote". */
 	remoteLabel?: string;
-	/** Hide the workspace tabs (e.g. while the server is still starting). */
-	showTabs?: boolean;
 }
 
 /**
  * Desktop app title bar: shared TitleBar composition (sidebar toggle,
- * Agents | Looper tabs and right-rail toggle) plus desktop-specific content —
+ * right-rail toggle) plus desktop-specific content —
  * back button, update controls, and new-window button. Acts as the native
  * drag region.
  */
@@ -86,7 +32,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 	onBack,
 	isRemote,
 	remoteLabel,
-	showTabs = true,
 }: DesktopTitleBarProps) {
 	const platform = usePlatform();
 	const isFullscreen = useFullscreen();
@@ -107,7 +52,6 @@ export const DesktopTitleBar = memo(function DesktopTitleBar({
 			leadingInset={platform === 'macos' && !isFullscreen}
 			onBack={onBack}
 			title={projectName}
-			leading={showTabs ? <DesktopRoutedLooperTabs /> : undefined}
 			trailing={
 				<>
 					{available &&

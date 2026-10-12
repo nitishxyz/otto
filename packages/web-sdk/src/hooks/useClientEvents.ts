@@ -128,32 +128,30 @@ function updateSessionStatusInCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	status: SessionStatusEvent,
 ) {
-	for (const sessionType of [undefined, 'looper'] as const) {
-		queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
-			getSessionsQueryKey(sessionType),
-			(old) => {
-				if (!old) return old;
-				return {
-					...old,
-					pages: old.pages.map((page) => ({
-						...page,
-						items: page.items.map((session) =>
-							session.id === status.sessionId
-								? {
-										...session,
-										isRunning:
-											status.status === 'needs_attention'
-												? session.isRunning
-												: status.status === 'running',
-										needsAttention: status.status === 'needs_attention',
-									}
-								: session,
-						),
-					})),
-				};
-			},
-		);
-	}
+	queryClient.setQueryData<{ pages: SessionsPage[]; pageParams: number[] }>(
+		getSessionsQueryKey(),
+		(old) => {
+			if (!old) return old;
+			return {
+				...old,
+				pages: old.pages.map((page) => ({
+					...page,
+					items: page.items.map((session) =>
+						session.id === status.sessionId
+							? {
+									...session,
+									isRunning:
+										status.status === 'needs_attention'
+											? session.isRunning
+											: status.status === 'running',
+									needsAttention: status.status === 'needs_attention',
+								}
+							: session,
+					),
+				})),
+			};
+		},
+	);
 }
 
 function isLocalApiUrl(baseUrl: string) {

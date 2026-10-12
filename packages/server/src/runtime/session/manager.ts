@@ -23,14 +23,7 @@ type CreateSessionInput = {
 	allowUnknownModel?: boolean;
 	title?: string | null;
 	parentSessionId?: string | null;
-	sessionType?:
-		| 'main'
-		| 'branch'
-		| 'handoff'
-		| 'research'
-		| 'btw'
-		| 'subagent'
-		| 'looper';
+	sessionType?: 'main' | 'branch' | 'handoff' | 'research' | 'btw' | 'subagent';
 };
 
 export async function createSession({

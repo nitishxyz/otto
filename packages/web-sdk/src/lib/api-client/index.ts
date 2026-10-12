@@ -3,7 +3,7 @@ import { gitMixin } from './git';
 import { configMixin } from './config';
 import { filesMixin } from './files';
 import { branchesMixin } from './branches';
-import { goalsMixin } from './goals';
+import { subagentsMixin } from './subagents';
 import { approvalMixin } from './approval';
 import { ottorouterMixin } from './ottorouter';
 import { authMixin } from './auth';
@@ -19,14 +19,7 @@ import { memoryMixin } from './memory';
 import { shellJobsMixin } from './shell-jobs';
 
 export { configureApiClient } from './utils';
-export type {
-	Goal,
-	GoalStatus,
-	GoalTask,
-	GoalTaskStatus,
-	Subagent,
-	SubagentStatus,
-} from './goals';
+export type { Subagent, SubagentStatus } from './subagents';
 export type { ShellJob, ShellJobStatus } from './shell-jobs';
 export type { DictationKeyword } from './config';
 export type {
@@ -150,15 +143,7 @@ class ApiClient {
 	shareSession = branchesMixin.shareSession;
 	syncSession = branchesMixin.syncSession;
 
-	getSessionGoal = goalsMixin.getSessionGoal;
-	listGoals = goalsMixin.listGoals;
-	createSessionGoal = goalsMixin.createSessionGoal;
-	updateGoal = goalsMixin.updateGoal;
-	addGoalTasks = goalsMixin.addGoalTasks;
-	updateGoalTask = goalsMixin.updateGoalTask;
-	deleteGoalTask = goalsMixin.deleteGoalTask;
-	startGoal = goalsMixin.startGoal;
-	listSessionSubagents = goalsMixin.listSessionSubagents;
+	listSessionSubagents = subagentsMixin.listSessionSubagents;
 
 	listSessionShellJobs = shellJobsMixin.listSessionShellJobs;
 	detachSessionShellJob = shellJobsMixin.detachSessionShellJob;

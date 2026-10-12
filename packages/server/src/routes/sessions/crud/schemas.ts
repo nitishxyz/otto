@@ -68,14 +68,6 @@ export const listSessionsQuerySchema = projectQuerySchema.extend({
 			param: { name: 'offset', in: 'query' },
 			description: 'Offset for pagination',
 		}),
-	sessionType: z
-		.enum(['looper'])
-		.optional()
-		.openapi({
-			param: { name: 'sessionType', in: 'query' },
-			description:
-				'Filter to a specific session type. Currently only "looper" is supported; omit for the default listing (which excludes looper sessions).',
-		}),
 });
 
 export const sessionParamsSchema = z.object({
@@ -105,7 +97,7 @@ export const createSessionBodySchema = z.object({
 			'Allow a model override that is not present in the configured model catalog.',
 	}),
 	parentSessionId: z.string().nullable().optional(),
-	sessionType: z.enum(['main', 'btw', 'looper']).optional(),
+	sessionType: z.enum(['main', 'btw']).optional(),
 });
 
 export const updateSessionBodySchema = z.object({

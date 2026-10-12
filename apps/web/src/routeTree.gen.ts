@@ -12,9 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions.index'
-import { Route as LooperIndexRouteImport } from './routes/looper.index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as LooperSessionIdRouteImport } from './routes/looper.$sessionId'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -31,80 +29,43 @@ const SessionsIndexRoute = SessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LooperIndexRoute = LooperIndexRouteImport.update({
-  id: '/looper/',
-  path: '/looper/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LooperSessionIdRoute = LooperSessionIdRouteImport.update({
-  id: '/looper/$sessionId',
-  path: '/looper/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/looper/': typeof LooperIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/looper': typeof LooperIndexRoute
   '/sessions': typeof SessionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/looper/$sessionId': typeof LooperSessionIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/looper/': typeof LooperIndexRoute
   '/sessions/': typeof SessionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/dashboard'
-    | '/looper/$sessionId'
-    | '/sessions/$sessionId'
-    | '/looper/'
-    | '/sessions/'
+  fullPaths: '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/dashboard'
-    | '/looper/$sessionId'
-    | '/sessions/$sessionId'
-    | '/looper'
-    | '/sessions'
-  id:
-    | '__root__'
-    | '/'
-    | '/dashboard'
-    | '/looper/$sessionId'
-    | '/sessions/$sessionId'
-    | '/looper/'
-    | '/sessions/'
+  to: '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions'
+  id: '__root__' | '/' | '/dashboard' | '/sessions/$sessionId' | '/sessions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  LooperSessionIdRoute: typeof LooperSessionIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
-  LooperIndexRoute: typeof LooperIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
 }
 
@@ -131,25 +92,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/looper/': {
-      id: '/looper/'
-      path: '/looper'
-      fullPath: '/looper/'
-      preLoaderRoute: typeof LooperIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
       path: '/sessions/$sessionId'
       fullPath: '/sessions/$sessionId'
       preLoaderRoute: typeof SessionsSessionIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/looper/$sessionId': {
-      id: '/looper/$sessionId'
-      path: '/looper/$sessionId'
-      fullPath: '/looper/$sessionId'
-      preLoaderRoute: typeof LooperSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -158,9 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  LooperSessionIdRoute: LooperSessionIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
-  LooperIndexRoute: LooperIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
 }
 export const routeTree = rootRouteImport

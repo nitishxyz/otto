@@ -40,28 +40,19 @@ export function registerListSessionsRoute(app: Hono) {
 			},
 		},
 		async (c) => {
-			const {
-				limit,
-				offset,
-				sessionType: sessionTypeFilter,
-			} = c.req.valid('query');
+			const { limit, offset } = c.req.valid('query');
 			const { cfg, db } = await resolveRequestProject(c);
 			const rows = await db
 				.select()
 				.from(sessions)
 				.where(
-					sessionTypeFilter === 'looper'
-						? and(
-								eq(sessions.projectPath, cfg.projectRoot),
-								eq(sessions.sessionType, 'looper'),
-							)
-						: and(
-								eq(sessions.projectPath, cfg.projectRoot),
-								ne(sessions.sessionType, 'research'),
-								ne(sessions.sessionType, 'btw'),
-								ne(sessions.sessionType, 'subagent'),
-								ne(sessions.sessionType, 'looper'),
-							),
+					and(
+						eq(sessions.projectPath, cfg.projectRoot),
+						ne(sessions.sessionType, 'research'),
+						ne(sessions.sessionType, 'btw'),
+						ne(sessions.sessionType, 'subagent'),
+						ne(sessions.sessionType, 'looper'),
+					),
 				)
 				.orderBy(
 					desc(sql`${sessions.pinnedAt} IS NOT NULL`),

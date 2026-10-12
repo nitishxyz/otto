@@ -1,6 +1,6 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
-import { subagents } from '@ottocode/database/schema';
+import { sessions, subagents } from '@ottocode/database/schema';
 import { logger, type OttoConfig } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
 import { getSessionById } from '../session/manager.ts';
@@ -128,12 +128,30 @@ export async function reportFinishedSubagents(
 		},
 	});
 
+	const contextRows = await db
+		.select({ id: sessions.id, tokens: sessions.currentContextTokens })
+		.from(sessions)
+		.where(
+			inArray(
+				sessions.id,
+				claimed.map((record) => record.childSessionId),
+			),
+		);
+	const contextBySession = new Map(
+		contextRows.map((row) => [row.id, row.tokens]),
+	);
+
 	await dispatchSubagentMessage({
 		cfg,
 		db,
 		session: parentSession,
 		agent: parentSession.agent,
-		content: buildSubagentResultsPrompt(claimed),
+		content: buildSubagentResultsPrompt(
+			claimed.map((record) => ({
+				...record,
+				contextTokens: contextBySession.get(record.childSessionId) ?? null,
+			})),
+		),
 		messageOrigin: 'agent-results',
 	});
 

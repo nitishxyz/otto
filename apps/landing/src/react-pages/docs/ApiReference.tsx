@@ -111,11 +111,9 @@ GET /openapi.json  ==  packages/api/openapi.json
 					</tr>
 					<tr>
 						<td>
-							<code>goals</code>, <code>subagents</code>
+							<code>subagents</code>
 						</td>
-						<td>
-							Long-running goal orchestration and delegated child sessions
-						</td>
+						<td>Delegated child sessions and automatic result delivery</td>
 					</tr>
 					<tr>
 						<td>

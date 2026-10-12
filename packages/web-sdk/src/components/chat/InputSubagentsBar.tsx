@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { Bot, ChevronDown, ChevronUp } from 'lucide-react';
-import { useSessionSubagents } from '../../hooks/useGoals';
+import { useSessionSubagents } from '../../hooks/useSubagents';
 import type { Subagent } from '../../lib/api-client';
 import { useSubagentViewerStore } from '../../stores/subagentViewerStore';
 import { StableSpinner } from '../ui/StableSpinner';

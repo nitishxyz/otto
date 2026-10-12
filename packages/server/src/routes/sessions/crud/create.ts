@@ -76,12 +76,7 @@ export function registerCreateSessionRoute(app: Hono) {
 					allowUnknownModel: body.allowUnknownModel === true,
 					title: body.title ?? null,
 					parentSessionId: body.parentSessionId ?? null,
-					sessionType:
-						body.sessionType === 'btw'
-							? 'btw'
-							: body.sessionType === 'looper'
-								? 'looper'
-								: 'main',
+					sessionType: body.sessionType ?? 'main',
 				});
 				return c.json(
 					attachSessionCostSummary(normalizeSessionRow(row), undefined),

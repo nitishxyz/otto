@@ -271,7 +271,7 @@ const sharedStreams = new Map<string, SharedStreamEntry>();
 /**
  * Acquire a shared SSE connection for a stream URL.
  *
- * Multiple subscribers (message thread, floating viewers, looper panes) for
+ * Multiple subscribers (message thread, floating viewers) for
  * the same session reuse ONE underlying connection instead of opening their
  * own. This matters in webviews (Tauri/WKWebView) where HTTP/1.1 allows only
  * ~6 connections per host across all windows: unbounded SSE connections

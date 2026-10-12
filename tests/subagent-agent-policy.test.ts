@@ -10,6 +10,5 @@ describe('subagent agent policy', () => {
 
 	test('excludes non-worker agents from delegation', () => {
 		expect(isDelegatableAgent('general')).toBe(false);
-		expect(isDelegatableAgent('looper')).toBe(false);
 	});
 });

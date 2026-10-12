@@ -16,8 +16,11 @@ import { adaptTools } from '../../../tools/adapter.ts';
 import type { ToolAdapterContext } from '../../../tools/adapter.ts';
 import { buildDatabaseTools } from '../../../tools/database/index.ts';
 import { buildSubagentTools } from '../../../tools/subagents/index.ts';
-import { buildGoalTools } from '../../../tools/goals/index.ts';
 import { buildMemoryTools } from '../../../tools/memory.ts';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import COORDINATOR_PROMPT from '@ottocode/sdk/prompts/coordinator.txt' with {
+	type: 'text',
+};
 import { openMemory } from '@ottocode/sdk/memory';
 import type { MemoryResult } from '@ottocode/sdk/memory';
 import {
@@ -73,8 +76,7 @@ const DATABASE_TOOL_NAMES = new Set([
 	'present_action',
 ]);
 
-// Looper sessions get delegation: looper dispatches goal tasks to worker agents.
-// Subagents stay excluded (depth-1 delegation cap).
+// Subagents cannot delegate further (depth-1 delegation cap).
 const NO_DELEGATION_SESSION_TYPES = new Set(['subagent']);
 
 type RunnerSetupTimings = {
@@ -220,16 +222,17 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		injectedToolNames.push(item.name);
 	}
 
-	// Delegation tools are built-in for every agent in eligible sessions; no
-	// per-agent tool configuration is required.
+	// Delegation tools and coordinator guidance are built-in for every agent in
+	// eligible sessions; no per-agent tool configuration is required.
 	const needsSubagentTools =
 		!NO_DELEGATION_SESSION_TYPES.has(currentSessionType);
-	let availableAgentsPrompt = '';
+	let coordinatorPrompt = '';
 	if (needsSubagentTools) {
 		for (const item of buildSubagentTools(cfg.projectRoot, opts.sessionId)) {
 			discovered.tools.push(item);
 			injectedToolNames.push(item.name);
 		}
+		coordinatorPrompt = `\n\n${COORDINATOR_PROMPT.trim()}`;
 		try {
 			const { listAgentDescriptions } = await import('../registry.ts');
 			const agentList = await listAgentDescriptions(cfg.projectRoot);
@@ -238,11 +241,11 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 				a.description ? `- ${a.name}: ${a.description}` : `- ${a.name}`,
 			);
 			if (lines.length) {
-				availableAgentsPrompt = [
+				coordinatorPrompt += [
 					'',
-					'## Available agents (subagent action=delegate)',
 					'',
-					'You can delegate bounded tasks to these agents:',
+					'### Available agents (subagent action=delegate)',
+					'',
 					...lines,
 				].join('\n');
 			}
@@ -251,30 +254,9 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 				agents: delegatable,
 			});
 			if (agentMentionContext) {
-				availableAgentsPrompt += `\n\n${agentMentionContext}`;
+				coordinatorPrompt += `\n\n${agentMentionContext}`;
 			}
 		} catch {}
-	}
-
-	// Goals are single-writer: only looper carries goal tools. Workers stay
-	// goal-unaware and receive work via subagent delegation / enqueued messages.
-	const needsGoalTools = opts.agent === 'looper';
-	if (needsGoalTools) {
-		// Legacy looper sessions are children of the session they supervise and
-		// bind goals via goals.sessionId = parent. Phase 3 re-keys looper sessions
-		// per goal (goals.looperSessionId), at which point this fallback goes away.
-		const looperSessionId =
-			currentSessionType === 'looper' && currentParentSessionId
-				? currentParentSessionId
-				: opts.sessionId;
-		const goalTools = buildGoalTools({
-			projectRoot: cfg.projectRoot,
-			looperSessionId,
-		});
-		for (const item of goalTools) {
-			discovered.tools.push(item);
-			injectedToolNames.push(item.name);
-		}
 	}
 
 	const configuredLoadableNames = new Set(agentCfg.toolConfig.loadable ?? []);
@@ -346,7 +328,7 @@ export async function setupRunner(opts: RunOpts): Promise<SetupResult> {
 		opts,
 		cfg,
 		references,
-		agentPrompt: `${agentCfg.prompt || ''}${availableAgentsPrompt}`,
+		agentPrompt: `${agentCfg.prompt || ''}${coordinatorPrompt}`,
 		contextSummary,
 		historyLength: history.length,
 		isFirstMessage,

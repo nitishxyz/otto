@@ -339,13 +339,6 @@ function getToolSummary(part: MessagePart): string | null {
 				str(result?.title) ?? (links !== null ? plural(links, 'session') : null)
 			);
 		}
-		case 'goal_list':
-		case 'goal_update': {
-			const goal = result ? asRecord(result.goal) : undefined;
-			const tasks = result ? countItems(result.tasks) : null;
-			const title = goal ? str(goal.title) : null;
-			return title ?? (tasks !== null ? plural(tasks, 'task') : null);
-		}
 		case 'subagent': {
 			const action = str(src.action);
 			if (action === 'delegate') {

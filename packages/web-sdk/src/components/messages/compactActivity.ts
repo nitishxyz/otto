@@ -14,8 +14,6 @@ const EXPLORATION_TOOL_NAMES = new Set([
 	'search_history',
 	'get_session_context',
 	'get_parent_session',
-	'goal_list',
-	'goal_update',
 	'subagent',
 	'delegate_task',
 	'list_subagents',
@@ -120,85 +118,6 @@ function getStringField(
 		}
 	}
 	return undefined;
-}
-
-interface GoalUpdateTaskInput {
-	id?: unknown;
-	status?: unknown;
-	note?: unknown;
-	content?: unknown;
-	sessionId?: unknown;
-}
-
-/**
- * Builds a compact label for otto's goal_update tool. The input shape is
- * otto-only: createGoal/completeGoal/addTasks plus updateTasks entries that
- * may carry a worker sessionId (dispatch).
- */
-function buildGoalUpdateLabel(
-	args: Record<string, unknown>,
-	result: Record<string, unknown>,
-): string {
-	const changes = Array.isArray(result.changes)
-		? result.changes.filter((item): item is string => typeof item === 'string')
-		: [];
-	if (changes.length) {
-		return `Updated goal: ${truncate(changes.join(', '), 46)}`;
-	}
-
-	const createGoal = args.createGoal;
-	if (createGoal && typeof createGoal === 'object') {
-		const title = getStringField(
-			createGoal as Record<string, unknown>,
-			'title',
-		);
-		return title ? `Creating goal ${truncate(title, 36)}` : 'Creating a goal';
-	}
-	if (args.completeGoal === true) {
-		return 'Completing goal';
-	}
-
-	const segments: string[] = [];
-	const addTasks = Array.isArray(args.addTasks) ? args.addTasks : [];
-	if (addTasks.length) {
-		segments.push(
-			`adding ${addTasks.length} task${addTasks.length === 1 ? '' : 's'}`,
-		);
-	}
-
-	const updateTasks = Array.isArray(args.updateTasks)
-		? (args.updateTasks as GoalUpdateTaskInput[])
-		: [];
-	if (updateTasks.length) {
-		const statusCounts = new Map<string, number>();
-		let dispatched = 0;
-		for (const update of updateTasks) {
-			if (typeof update !== 'object' || update === null) continue;
-			if (typeof update.status === 'string') {
-				statusCounts.set(
-					update.status,
-					(statusCounts.get(update.status) ?? 0) + 1,
-				);
-			}
-			if (typeof update.sessionId === 'string' && update.sessionId) {
-				dispatched += 1;
-			}
-		}
-		for (const [status, count] of statusCounts) {
-			segments.push(
-				`${count} task${count === 1 ? '' : 's'} ${status.replace('_', ' ')}`,
-			);
-		}
-		if (dispatched > 0) {
-			segments.push(
-				`dispatched ${dispatched} task${dispatched === 1 ? '' : 's'}`,
-			);
-		}
-	}
-
-	return segments.length
-		? `Updating goal: ${truncate(segments.join(', '), 46)}`
-		: 'Updating goal';
 }
 
 /**
@@ -382,34 +301,6 @@ export function getCompactActivityEntry(
 			id: part.id,
 			toolName: part.toolName,
 			label: 'Opening linked session',
-			startedAt: part.startedAt,
-			completedAt: part.completedAt,
-		};
-	}
-
-	if (part.toolName === 'goal_list') {
-		const goal = getToolResult(part).goal as
-			| Record<string, unknown>
-			| null
-			| undefined;
-		const title =
-			goal && typeof goal === 'object'
-				? getStringField(goal, 'title')
-				: undefined;
-		return {
-			id: part.id,
-			toolName: part.toolName,
-			label: title ? `Checking goal ${truncate(title, 36)}` : 'Checking goal',
-			startedAt: part.startedAt,
-			completedAt: part.completedAt,
-		};
-	}
-
-	if (part.toolName === 'goal_update') {
-		return {
-			id: part.id,
-			toolName: part.toolName,
-			label: buildGoalUpdateLabel(args, result),
 			startedAt: part.startedAt,
 			completedAt: part.completedAt,
 		};
@@ -625,7 +516,6 @@ export function summarizeCompactActivities(
 	let webLookups = 0;
 	let reasoning = 0;
 	let historyLookups = 0;
-	let goalUpdates = 0;
 	let subagentOps = 0;
 
 	for (const entry of entries) {
@@ -655,10 +545,6 @@ export function summarizeCompactActivities(
 			case 'get_parent_session':
 				historyLookups += 1;
 				break;
-			case 'goal_list':
-			case 'goal_update':
-				goalUpdates += 1;
-				break;
 			case 'subagent':
 			case 'delegate_task':
 			case 'list_subagents':
@@ -680,34 +566,29 @@ export function summarizeCompactActivities(
 		scans === 0 &&
 		webLookups === 0 &&
 		historyLookups === 0 &&
-		goalUpdates === 0 &&
 		subagentOps === 0;
 
 	const title = isReasoningOnly
 		? durationStr
 			? `Thought for ${durationStr}`
 			: 'Thought through the approach'
-		: goalUpdates > 0 && subagentOps > 0
-			? 'Tracked goals and sub-agents'
-			: goalUpdates > 0
-				? 'Updated goal progress'
-				: subagentOps > 0
-					? 'Managed sub-agents'
-					: webLookups > 0
-						? hasProjectReview || searches > 0
-							? 'Researched and reviewed the project'
-							: 'Researched references'
-						: historyLookups > 0 && searches > 0
-							? 'Searched history and code'
-							: hasProjectReview && searches > 0
-								? 'Reviewed files and searched code'
-								: scans > 0
-									? 'Explored project structure'
-									: files.size > 0
-										? 'Reviewed project files'
-										: historyLookups > 0
-											? 'Searched session history'
-											: 'Thought through the approach';
+		: subagentOps > 0
+			? 'Managed sub-agents'
+			: webLookups > 0
+				? hasProjectReview || searches > 0
+					? 'Researched and reviewed the project'
+					: 'Researched references'
+				: historyLookups > 0 && searches > 0
+					? 'Searched history and code'
+					: hasProjectReview && searches > 0
+						? 'Reviewed files and searched code'
+						: scans > 0
+							? 'Explored project structure'
+							: files.size > 0
+								? 'Reviewed project files'
+								: historyLookups > 0
+									? 'Searched session history'
+									: 'Thought through the approach';
 
 	const details: string[] = [];
 	if (!isReasoningOnly && durationStr) {
@@ -729,11 +610,6 @@ export function summarizeCompactActivities(
 	}
 	if (historyLookups > 0 && title !== 'Searched session history') {
 		details.push('session history');
-	}
-	if (goalUpdates > 0 && !title.includes('goal')) {
-		details.push(
-			`${goalUpdates} goal ${goalUpdates === 1 ? 'update' : 'updates'}`,
-		);
 	}
 	if (subagentOps > 0 && !title.includes('sub-agent')) {
 		details.push(

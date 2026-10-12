@@ -1888,12 +1888,6 @@ export function startSessionStreamEngine({
 					queryKey: sessionQueryKey,
 				});
 				queryClient.invalidateQueries({
-					queryKey: projectScopedKey(['goal', sessionId] as const),
-				});
-				queryClient.invalidateQueries({
-					queryKey: projectScopedKey(['goals', 'project'] as const),
-				});
-				queryClient.invalidateQueries({
 					queryKey: projectScopedKey(['subagents', sessionId] as const),
 				});
 				break;
@@ -2064,18 +2058,6 @@ export function startSessionStreamEngine({
 						return next;
 					});
 				}
-				break;
-			}
-			case 'goal.updated': {
-				queryClient.invalidateQueries({
-					queryKey: projectScopedKey(['goal', sessionId] as const),
-				});
-				queryClient.invalidateQueries({
-					queryKey: projectScopedKey(['goals', 'project'] as const),
-				});
-				queryClient.invalidateQueries({
-					queryKey: projectScopedKey(['subagents', sessionId] as const),
-				});
 				break;
 			}
 			case 'session.updated': {

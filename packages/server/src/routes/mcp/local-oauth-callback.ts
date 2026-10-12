@@ -5,9 +5,11 @@ import { completeMCPAuthFlow } from './service/auth.ts';
 export async function startLocalMCPAuthCallback(options: {
 	flowId: string;
 	callbackUrl: string;
+	expectedState?: string;
 }): Promise<void> {
 	await startOAuthLoopbackCallback({
 		callbackUrl: options.callbackUrl,
+		expectedState: options.expectedState,
 		successMessage: 'This machine is configured. You can close this window.',
 		complete: async (callback) => {
 			const result = await completeMCPAuthFlow({
@@ -24,12 +26,19 @@ export async function configureMCPAuthCallback<T extends object>(
 	body: T,
 	tunneled: boolean,
 ): Promise<T & { callbackMode?: string }> {
-	const callback = body as T & { flowId?: string; callbackUrl?: string };
+	const callback = body as T & {
+		flowId?: string;
+		callbackUrl?: string;
+		authUrl?: string;
+	};
 	if (!callback.flowId || !callback.callbackUrl) return body;
 	if (tunneled) return { ...body, callbackMode: 'client-relay' };
 	await startLocalMCPAuthCallback({
 		flowId: callback.flowId,
 		callbackUrl: callback.callbackUrl,
+		expectedState: callback.authUrl
+			? (new URL(callback.authUrl).searchParams.get('state') ?? undefined)
+			: undefined,
 	});
 	return { ...body, callbackMode: 'daemon-loopback' };
 }

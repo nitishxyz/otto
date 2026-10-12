@@ -28,6 +28,5 @@ export * from './filePickerStore';
 export * from './viewerTabsStore';
 export * from './rightRailStore';
 export * from './terminalStore';
-export * from './workspaceTabStore';
 export * from './chatDraftStore';
 export * from './sessionTransitionStore';

@@ -29,7 +29,6 @@ import { ForgeRenderer } from './ForgeRenderer';
 import { SimulatorRenderer } from './SimulatorRenderer';
 import { BrowserRenderer } from './BrowserRenderer';
 import { SkillRenderer } from './SkillRenderer';
-import { GoalToolRenderer } from './GoalToolRenderer';
 import { MemoryToolRenderer } from './MemoryToolRenderer';
 import { SubagentToolRenderer } from './SubagentToolRenderer';
 import { SubagentResultRenderer } from './SubagentResultRenderer';
@@ -197,9 +196,6 @@ export function ToolResultRenderer({
 			return <BrowserRenderer {...props} />;
 		case 'skill':
 			return <SkillRenderer {...props} />;
-		case 'goal_list':
-		case 'goal_update':
-			return <GoalToolRenderer {...props} toolName={normalizedName} />;
 		case 'remember':
 		case 'recall_memory':
 		case 'forget_memory':

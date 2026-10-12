@@ -99,13 +99,11 @@ export const sessionsMixin = {
 	},
 
 	async getSessionsPage(
-		params: { limit?: number; offset?: number; sessionType?: 'looper' } = {},
+		params: { limit?: number; offset?: number } = {},
 	): Promise<SessionsPage> {
-		const { limit = 50, offset = 0, sessionType } = params;
+		const { limit = 50, offset = 0 } = params;
 		const response = await apiListSessions({
-			query: sessionType
-				? { ...getProjectQuery(), limit, offset, sessionType }
-				: { ...getProjectQuery(), limit, offset },
+			query: { ...getProjectQuery(), limit, offset },
 		});
 		if (response.error) throw new Error(extractErrorMessage(response.error));
 		const data = response.data;

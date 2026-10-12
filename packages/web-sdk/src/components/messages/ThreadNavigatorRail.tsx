@@ -226,45 +226,6 @@ function summarizeTaggedUserMessage(
 		};
 	}
 
-	if (trimmed.startsWith('<goal_start')) {
-		const title = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'title'));
-		const tasks = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'tasks'));
-		return {
-			title: title ? `Goal started: ${title}` : 'Goal started',
-			preview: tasks || title || 'Goal started',
-		};
-	}
-
-	if (
-		trimmed.startsWith('<looper_kickoff') ||
-		trimmed.startsWith('<otto_kickoff')
-	) {
-		const title = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'title'));
-		const tasks = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'tasks'));
-		return {
-			title: title ? `Looper kickoff: ${title}` : 'Looper kickoff',
-			preview:
-				tasks ||
-				cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'instructions')),
-		};
-	}
-
-	if (
-		trimmed.startsWith('<looper_wakeup') ||
-		trimmed.startsWith('<otto_wakeup')
-	) {
-		const goal = cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'goal'));
-		const transcript = cleanNavigatorPreviewText(
-			extractXmlBlock(trimmed, 'transcript'),
-		);
-		return {
-			title: goal ? `Looper update: ${firstLine(goal)}` : 'Looper update',
-			preview:
-				transcript ||
-				cleanNavigatorPreviewText(extractXmlBlock(trimmed, 'instructions')),
-		};
-	}
-
 	return null;
 }
 

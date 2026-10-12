@@ -4,7 +4,6 @@ import {
 	useMarkSessionViewed,
 	useSessions,
 	useSetSessionPinned,
-	type SessionListFilter,
 } from '../../hooks/useSessions';
 import { SessionItem } from './SessionItem';
 import { useFocusStore } from '../../stores/focusStore';
@@ -17,7 +16,6 @@ const FOCUS_RING_CLASSES = ['ring-1', 'ring-inset', 'ring-sidebar-ring/40'];
 interface SessionListContainerProps {
 	activeSessionId?: string;
 	onSelectSession: (sessionId: string) => void;
-	sessionType?: SessionListFilter;
 	emptyMessage?: string;
 	/**
 	 * Set when the host floats an absolutely-positioned h-12 header over the
@@ -126,7 +124,6 @@ function SessionFocusController({
 export const SessionListContainer = memo(function SessionListContainer({
 	activeSessionId,
 	onSelectSession,
-	sessionType,
 	emptyMessage,
 	hasOverlayHeader = false,
 }: SessionListContainerProps) {
@@ -136,7 +133,7 @@ export const SessionListContainer = memo(function SessionListContainer({
 		hasNextPage,
 		fetchNextPage,
 		isFetchingNextPage,
-	} = useSessions(sessionType);
+	} = useSessions();
 	const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const paginationSentinelRef = useRef<HTMLDivElement>(null);

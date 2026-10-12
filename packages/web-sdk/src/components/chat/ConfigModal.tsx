@@ -53,10 +53,9 @@ export function ConfigModal({
 	const reasoningLevel = config?.defaults?.reasoningLevel ?? 'high';
 	const agentNames = useMemo(
 		() =>
-			(agentDetails?.agents.length
+			agentDetails?.agents.length
 				? agentDetails.agents.map((agentDetail) => agentDetail.name)
-				: (config?.agents ?? [])
-			).filter((name) => name !== 'looper'),
+				: (config?.agents ?? []),
 		[agentDetails?.agents, config?.agents],
 	);
 	const agentSelectorRef = useRef<UnifiedAgentSelectorRef>(null);

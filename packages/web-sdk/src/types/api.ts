@@ -21,7 +21,7 @@ export interface Session {
 	toolCounts?: Record<string, number>;
 	parentSessionId?: string | null;
 	branchPointMessageId?: string | null;
-	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'looper' | 'subagent';
+	sessionType?: 'main' | 'branch' | 'handoff' | 'btw' | 'subagent';
 	isRunning?: boolean;
 	needsAttention?: boolean;
 	fileStats?: {
@@ -118,7 +118,7 @@ export interface CreateSessionRequest {
 	model?: string;
 	title?: string;
 	parentSessionId?: string | null;
-	sessionType?: 'main' | 'btw' | 'looper';
+	sessionType?: 'main' | 'btw';
 }
 
 export interface UpdateSessionRequest {

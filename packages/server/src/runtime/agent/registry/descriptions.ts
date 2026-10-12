@@ -1,10 +1,4 @@
-export const BUILTIN_AGENT_NAMES = [
-	'build',
-	'plan',
-	'general',
-	'research',
-	'looper',
-];
+export const BUILTIN_AGENT_NAMES = ['build', 'plan', 'general', 'research'];
 
 /** Built-in agents that are internal-only and hidden from agent listings. */
 export const HIDDEN_BUILTIN_AGENT_NAMES: string[] = [];
@@ -25,8 +19,6 @@ export const BUILTIN_AGENT_DESCRIPTIONS: Record<string, string> = {
 		'General-purpose assistant for broad questions, including topics unrelated to the current project.',
 	research:
 		'Searches session history and past conversations to answer questions.',
-	looper:
-		'Project orchestrator: plans goals, dispatches workers, verifies results.',
 };
 
 /** Maximum length of an agent description after normalization. */

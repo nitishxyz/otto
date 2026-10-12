@@ -18,10 +18,8 @@ export function getSessionChatDraftKey(sessionId: string): string {
 	return `session:${getProjectDraftScope()}:${sessionId}`;
 }
 
-export function getNewSessionChatDraftKey(
-	sessionType: 'main' | 'looper' = 'main',
-): string {
-	return `${NEW_SESSION_CHAT_DRAFT_KEY}:${getProjectDraftScope()}:${sessionType}`;
+export function getNewSessionChatDraftKey(): string {
+	return `${NEW_SESSION_CHAT_DRAFT_KEY}:${getProjectDraftScope()}:main`;
 }
 
 export interface ChatDraftAttachment {

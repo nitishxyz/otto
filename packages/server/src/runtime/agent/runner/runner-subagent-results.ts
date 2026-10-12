@@ -1,7 +1,7 @@
 import type { DB } from '@ottocode/database';
-import { messageParts, subagents } from '@ottocode/database/schema';
+import { messageParts, sessions, subagents } from '@ottocode/database/schema';
 import { logger } from '@ottocode/sdk';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
 import {
 	publishToolCall,
@@ -133,7 +133,25 @@ async function persistFinishedSubagentResults(args: {
 		if (!finished.length) return undefined;
 
 		const subagentIds = finished.map((record) => record.id);
-		const prompt = buildSubagentResultsPrompt(finished);
+		const contextRows = tx
+			.select({ id: sessions.id, tokens: sessions.currentContextTokens })
+			.from(sessions)
+			.where(
+				inArray(
+					sessions.id,
+					finished.map((record) => record.childSessionId),
+				),
+			)
+			.all();
+		const contextBySession = new Map(
+			contextRows.map((row) => [row.id, row.tokens]),
+		);
+		const prompt = buildSubagentResultsPrompt(
+			finished.map((record) => ({
+				...record,
+				contextTokens: contextBySession.get(record.childSessionId) ?? null,
+			})),
+		);
 		const input = { subagentIds };
 
 		tx.insert(messageParts)

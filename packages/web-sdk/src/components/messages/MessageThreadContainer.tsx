@@ -14,19 +14,12 @@ interface MessageThreadContainerProps {
 	sessionId: string;
 	onSelectSession?: (sessionId: string) => void;
 	footerBottomPaddingClass?: string;
-	/**
-	 * Force the compact thread renderer regardless of user preference. Used by
-	 * otto orchestrator threads so otto's verify/complete/dispatch tool calls
-	 * collapse into compact activity events instead of message bubbles.
-	 */
-	forceCompact?: boolean;
 }
 
 export const MessageThreadContainer = memo(function MessageThreadContainer({
 	sessionId,
 	onSelectSession,
 	footerBottomPaddingClass,
-	forceCompact,
 }: MessageThreadContainerProps) {
 	return (
 		<>
@@ -36,7 +29,6 @@ export const MessageThreadContainer = memo(function MessageThreadContainer({
 				sessionId={sessionId}
 				onSelectSession={onSelectSession}
 				footerBottomPaddingClass={footerBottomPaddingClass}
-				forceCompact={forceCompact}
 			/>
 			<TopupModalHost />
 		</>
@@ -71,7 +63,6 @@ const MessageThreadData = memo(function MessageThreadData({
 	sessionId,
 	onSelectSession,
 	footerBottomPaddingClass,
-	forceCompact,
 }: MessageThreadContainerProps) {
 	const {
 		data: messages = [],
@@ -100,8 +91,6 @@ const MessageThreadData = memo(function MessageThreadData({
 	// Single derivation of the compact-thread flags, so the preference reaches
 	// the row model through exactly one path.
 	const { compact, responsiveCompact } = resolveThreadCompactMode({
-		forceCompact,
-		sessionType: session?.sessionType,
 		compactThreadPreference: preferences.compactThread,
 	});
 

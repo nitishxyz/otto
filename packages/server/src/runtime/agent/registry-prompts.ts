@@ -15,9 +15,6 @@ import AGENT_GENERAL from '@ottocode/sdk/prompts/agents/general.txt' with {
 import AGENT_RESEARCH from '@ottocode/sdk/prompts/agents/research.txt' with {
 	type: 'text',
 };
-import AGENT_LOOPER from '@ottocode/sdk/prompts/agents/looper.txt' with {
-	type: 'text',
-};
 
 type PromptResolution = {
 	prompt: string;
@@ -29,7 +26,6 @@ const EMBEDDED_AGENT_PROMPTS: Record<string, string> = {
 	plan: AGENT_PLAN,
 	general: AGENT_GENERAL,
 	research: AGENT_RESEARCH,
-	looper: AGENT_LOOPER,
 };
 
 function normalizePath(path: string): string {

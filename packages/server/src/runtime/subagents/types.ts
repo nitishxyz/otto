@@ -3,7 +3,7 @@ import type { subagents } from '@ottocode/database/schema';
 import type { OttoConfig } from '@ottocode/sdk';
 import type { ContextFileReference } from '../message/types.ts';
 
-export const MAX_CONCURRENT_PER_PARENT = 3;
+export const MAX_CONCURRENT_PER_PARENT = 10;
 
 export type SubagentRecord = typeof subagents.$inferSelect;
 

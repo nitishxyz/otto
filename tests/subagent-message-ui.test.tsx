@@ -56,7 +56,7 @@ function toolCallPart(message: string): MessagePart {
 			name: 'subagent',
 			args: { action: 'message', subagentId: 'subagent-1', message },
 		},
-		agent: 'looper',
+		agent: 'build',
 		provider: 'test',
 		model: 'test',
 		startedAt: Date.now(),

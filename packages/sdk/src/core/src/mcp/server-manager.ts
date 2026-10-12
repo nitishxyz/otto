@@ -276,6 +276,9 @@ export class MCPServerManager {
 	async initiateAuth(config: MCPServerConfig): Promise<string | null> {
 		const transport = config.transport ?? 'stdio';
 		if (transport === 'stdio') return null;
+		const pendingUrl = this.pendingAuth.get(config.name);
+		if (pendingUrl) return pendingUrl;
+		if (this.isServerConnected(config.name)) return null;
 
 		if (isGitHubCopilotUrl(config.url)) {
 			const { token, needsReauth } = await getStoredCopilotMCPToken(
@@ -313,9 +316,9 @@ export class MCPServerManager {
 			return null;
 		}
 
+		await this.stopServer(config.name);
 		this.serverScopes.set(config.name, config.scope ?? 'global');
 		const key = this.oauthKey(config.name);
-		await this.oauthStore.clearServer(key);
 		const provider = new OttoOAuthProvider(key, this.oauthStore, {
 			clientId: config.oauth?.clientId,
 			callbackPort: config.oauth?.callbackPort,
@@ -335,14 +338,14 @@ export class MCPServerManager {
 				this.toolsMap.set(fullName, { server: config.name, tool });
 			}
 			return null;
-		} catch {
+		} catch (error) {
 			this.clients.set(config.name, client);
 
 			if (provider.pendingAuthUrl) {
 				this.pendingAuth.set(config.name, provider.pendingAuthUrl);
 				return provider.pendingAuthUrl;
 			}
-			return null;
+			throw error;
 		}
 	}
 
@@ -405,6 +408,7 @@ export class MCPServerManager {
 		if (scope) {
 			this.serverScopes.set(name, scope);
 		}
+		this.pendingAuth.delete(name);
 		if (projectRoot) {
 			this.projectRoot = projectRoot;
 		}

@@ -12,7 +12,6 @@ interface DesktopWorkspaceAppProps {
 	server?: ServerInfo | null;
 	project: Project;
 	sessionId?: string;
-	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 	titleBar?: ReactNode;
@@ -23,7 +22,6 @@ export function DesktopWorkspaceApp({
 	server,
 	project,
 	sessionId,
-	view,
 	dashboardOpen,
 	onCloseDashboard,
 	titleBar,
@@ -34,7 +32,6 @@ export function DesktopWorkspaceApp({
 				<DesktopSessionsLayout
 					project={project}
 					sessionId={sessionId}
-					view={view}
 					dashboardOpen={dashboardOpen}
 					onCloseDashboard={onCloseDashboard}
 					titleBar={titleBar}

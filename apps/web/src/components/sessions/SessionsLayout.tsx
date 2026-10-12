@@ -9,8 +9,6 @@ import {
 	NewSessionLanding,
 	type ChatInputContainerRef,
 	Toaster,
-	LooperSessionRail,
-	LooperWorkspace,
 } from '@ottocode/web-sdk/components';
 import {
 	useCreateSession,
@@ -21,11 +19,7 @@ import {
 	useClientEvents,
 	getSessionsQueryKey,
 } from '@ottocode/web-sdk/hooks';
-import {
-	useGitStore,
-	useConfirmationStore,
-	useWorkspaceTabStore,
-} from '@ottocode/web-sdk/stores';
+import { useGitStore, useConfirmationStore } from '@ottocode/web-sdk/stores';
 
 import { apiClient } from '@ottocode/web-sdk/lib';
 import {
@@ -47,21 +41,15 @@ interface SessionsCacheData {
 
 interface SessionsLayoutProps {
 	sessionId?: string;
-	/** Workspace view: 'agents' (default, /sessions) or 'looper' (/looper). */
-	view?: 'agents' | 'looper';
 }
 
-export function SessionsLayout({
-	sessionId,
-	view = 'agents',
-}: SessionsLayoutProps) {
+export function SessionsLayout({ sessionId }: SessionsLayoutProps) {
 	const chatInputRef = useRef<ChatInputContainerRef>(null);
 	const createSession = useCreateSession();
 	const { data: config } = useConfig();
 	// Applies the active theme to the document (side effect only).
 	useTheme();
 	const navigate = useNavigate();
-	const isLooperTab = view === 'looper';
 
 	const focusInput = useCallback(() => {
 		setTimeout(() => {
@@ -70,8 +58,8 @@ export function SessionsLayout({
 	}, []);
 
 	const handleNewSession = useCallback(() => {
-		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
-	}, [navigate, isLooperTab]);
+		navigate({ to: '/sessions' });
+	}, [navigate]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
@@ -85,40 +73,14 @@ export function SessionsLayout({
 		[navigate, focusInput],
 	);
 
-	const handleLooperSessionCreated = useCallback(
-		(newSessionId: string) => {
-			navigate({
-				to: '/looper/$sessionId',
-				params: { sessionId: newSessionId },
-				replace: false,
-			});
-			focusInput();
-		},
-		[navigate, focusInput],
-	);
-
 	const handleDeleteSession = useCallback(() => {
-		useWorkspaceTabStore
-			.getState()
-			.clearLastSession(isLooperTab ? 'looper' : 'agents');
-		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
-	}, [navigate, isLooperTab]);
+		navigate({ to: '/sessions' });
+	}, [navigate]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
 			navigate({
 				to: '/sessions/$sessionId',
-				params: { sessionId: id },
-			});
-			focusInput();
-		},
-		[navigate, focusInput],
-	);
-
-	const handleSelectLooperSession = useCallback(
-		(id: string) => {
-			navigate({
-				to: '/looper/$sessionId',
 				params: { sessionId: id },
 			});
 			focusInput();
@@ -258,28 +220,9 @@ export function SessionsLayout({
 				sessionId={sessionId}
 				onNavigateToSession={handleSelectSession}
 				onFixWithAI={handleFixWithAI}
-				sidebar={
-					isLooperTab ? (
-						<LooperSessionRail
-							activeSessionId={sessionId}
-							onSelectSession={handleSelectLooperSession}
-						/>
-					) : (
-						sidebarContent
-					)
-				}
+				sidebar={sidebarContent}
 			>
-				{isLooperTab ? (
-					<LooperWorkspace
-						ref={chatInputRef}
-						sessionId={sessionId}
-						onSessionCreated={handleLooperSessionCreated}
-						onNewSession={handleNewSession}
-						onDeleteSession={handleDeleteSession}
-					/>
-				) : (
-					mainContent
-				)}
+				{mainContent}
 			</AppLayout>
 			<Toaster />
 		</>

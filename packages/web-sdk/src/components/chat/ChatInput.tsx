@@ -140,7 +140,7 @@ interface ChatInputProps {
 	onAgentChange?: (agent: string) => void;
 	/** Renders the agent as a fixed label without the switch dropdown. */
 	agentLocked?: boolean;
-	/** Extra bars rendered above the input alongside InputTodosBar (e.g. otto goals bar). */
+	/** Extra bars rendered above the input alongside InputTodosBar. */
 	topBars?: React.ReactNode;
 	/** Keeps the composer in document flow so growing content pushes nearby elements. */
 	inlineLayout?: boolean;

@@ -1,6 +1,6 @@
 /**
  * Shared chrome for bars stacked directly above the chat input (sub-agents,
- * goal, todos, approvals, …).
+ * todos, approvals, …).
  *
  * Contract: every stackable bar renders an outer wrapper that is a direct
  * sibling of the other bars and carries `INPUT_BAR_GROUP_CLASS` plus the

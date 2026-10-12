@@ -61,7 +61,7 @@ import {
 	useRightRailStore,
 } from '@ottocode/web-sdk/stores';
 import { Sidebar } from './Sidebar';
-import { RoutedLooperTabs, WorkspaceTitleBar } from './WorkspaceTitleBar';
+import { WorkspaceTitleBar } from './WorkspaceTitleBar';
 import {
 	Bot,
 	FileCode2,
@@ -398,15 +398,9 @@ const MobileTopBar = memo(function MobileTopBar({
 					<Menu className="h-5 w-5" />
 				</Button>
 				<div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center justify-center">
-					{anyViewerOpen ? (
-						<span className="truncate text-sm font-medium text-foreground/80">
-							Viewer
-						</span>
-					) : (
-						<div className="pointer-events-auto w-[42vw] max-w-[13.5rem] min-w-32">
-							<RoutedLooperTabs variant="mobile" />
-						</div>
-					)}
+					<span className="truncate text-sm font-medium text-foreground/80">
+						{anyViewerOpen ? 'Viewer' : 'Chat'}
+					</span>
 				</div>
 				<div className="flex-1" />
 				{anyViewerOpen && (

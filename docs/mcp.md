@@ -136,6 +136,17 @@ Remote servers like Linear, Notion, and Sentry use OAuth for authentication. ott
 5. otto receives the authorization code, exchanges it for tokens, and reconnects
 6. The server turns green — tools are now available
 
+Forge also prepares the local callback listener before returning an OAuth link
+from create/start, enable, execute, or authenticate. If the callback port is
+occupied by another process, Forge reports the startup error instead of returning
+a link that cannot complete. Stop the conflicting process or configure a different
+`oauth.callbackPort`, then retry authentication.
+
+Repeated authentication requests reuse the pending authorization. Normal
+authentication preserves stored credentials; use Forge's `reauthenticate` action
+to explicitly clear them. Multiple pending OAuth flows can share the callback port
+and are matched by their OAuth state. Unrelated browser requests do not cancel them.
+
 ### From the CLI
 
 ```bash

@@ -31,15 +31,6 @@ import {
 	ShellResultsNotice,
 	isShellResultsMessage,
 } from './ShellResultsNotice';
-import { GoalStartNotice, isGoalStartMessage } from './GoalStartNotice';
-import {
-	LooperKickoffNotice,
-	isLooperKickoffMessage,
-} from './LooperKickoffNotice';
-import {
-	LooperWakeupNotice,
-	isLooperWakeupMessage,
-} from './LooperWakeupNotice';
 import { useSkills } from '../../hooks/useSkills';
 import { useRecipes } from '../../hooks/useRecipes';
 import { useMentionAgents } from '../../hooks/useAgents';
@@ -193,15 +184,6 @@ export const UserMessageGroup = memo(
 		}
 		if (isShellResultsMessage(rawContent)) {
 			return <ShellResultsNotice content={rawContent} />;
-		}
-		if (isLooperKickoffMessage(rawContent)) {
-			return <LooperKickoffNotice content={rawContent} />;
-		}
-		if (isLooperWakeupMessage(rawContent)) {
-			return <LooperWakeupNotice content={rawContent} />;
-		}
-		if (isGoalStartMessage(rawContent)) {
-			return <GoalStartNotice content={rawContent} />;
 		}
 		const {
 			fileSelections: parsedFileSelections,

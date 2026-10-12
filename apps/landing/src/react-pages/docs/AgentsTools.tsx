@@ -31,7 +31,7 @@ filesystem   read · write · edit · multiedit · apply_patch · ls · tree · 
 risky        shell · terminal · git_commit          (approval gated)
 git          git_status · git_diff
 research     query_sessions · query_messages · search_history · get_session_context
-orchestration subagent · goal_list · goal_update
+orchestration subagent
 external     MCP tools · project tools · plugins`}
 			>
 				<DiagramRow cols={2}>
@@ -86,7 +86,7 @@ external     MCP tools · project tools · plugins`}
 						label="coordination"
 						title="Delegation"
 						accent="yellow"
-						items={['subagent delegate/message', 'goal_list, goal_update']}
+						items={['subagent delegate/message', 'automatic result delivery']}
 					/>
 				</DiagramRow>
 			</Diagram>
@@ -212,8 +212,7 @@ otto skills validate`}</CodeBlock>
 			<p>
 				Agents can hand bounded work to child agents with the{' '}
 				<code>subagent</code> tool. Results are delivered back automatically, so
-				the parent keeps working instead of polling. Longer-running goals are
-				tracked with <code>goal_list</code> and <code>goal_update</code>.
+				the parent coordinates the work directly instead of polling.
 			</p>
 
 			<h2>External tools</h2>

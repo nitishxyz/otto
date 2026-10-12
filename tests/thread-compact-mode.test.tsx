@@ -190,21 +190,6 @@ describe('compact thread preference reaches the rows', () => {
 		).toEqual({ compact: false, responsiveCompact: false });
 	});
 
-	it('forces compact rendering for looper threads without forcing density', () => {
-		expect(
-			resolveThreadCompactMode({
-				sessionType: 'looper',
-				compactThreadPreference: false,
-			}),
-		).toEqual({ compact: true, responsiveCompact: false });
-		expect(
-			resolveThreadCompactMode({
-				forceCompact: true,
-				compactThreadPreference: false,
-			}),
-		).toEqual({ compact: true, responsiveCompact: false });
-	});
-
 	it('turns the preference into the grouped activity presentation', () => {
 		const turn = explorationTurn();
 		const rowsFor = (compactThreadPreference: boolean) => {

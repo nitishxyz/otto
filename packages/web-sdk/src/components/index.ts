@@ -32,9 +32,6 @@ export * from './btw/BtwFloatingChat';
 // Sub-agent Components
 export * from './subagents/SubagentFloatingViewer';
 
-// Looper Components
-export * from './looper';
-
 // Message Components
 export * from './messages/MessageThread';
 export * from './messages/MessageThreadContainer';

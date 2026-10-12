@@ -134,9 +134,6 @@ const defaultToolExtras: Record<string, AgentToolGroups> = {
 		],
 		loadable: ['read_image', 'copy_attachment_to_project', 'browser'],
 	},
-	looper: {
-		firstClass: ['read', 'ls', 'tree', 'search', 'goal_list', 'goal_update'],
-	},
 };
 
 export function defaultToolConfigForAgent(

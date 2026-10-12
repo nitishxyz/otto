@@ -7,7 +7,6 @@ import {
 } from '@ottocode/sdk';
 import type { Tool } from 'ai';
 import { buildDatabaseTools } from '../../tools/database/index.ts';
-import { buildGoalTools } from '../../tools/goals/index.ts';
 import { buildMemoryTools } from '../../tools/memory.ts';
 import { SERVER_LAZY_TOOL_CATALOG } from '../../tools/lazy-catalog.ts';
 import { buildSubagentTools } from '../../tools/subagents/index.ts';
@@ -56,7 +55,7 @@ const RESEARCH_TOOLS = new Set([
 	'present_action',
 ]);
 
-const ORCHESTRATION_TOOLS = new Set(['subagent', 'goal_list', 'goal_update']);
+const ORCHESTRATION_TOOLS = new Set(['subagent']);
 
 export type ToolCatalogCategory =
 	| 'first_class'
@@ -208,10 +207,7 @@ export async function getProjectToolCatalog(
 		);
 	}
 
-	for (const item of [
-		...buildSubagentTools(cfg.projectRoot, ''),
-		...buildGoalTools({ projectRoot: cfg.projectRoot, looperSessionId: '' }),
-	]) {
+	for (const item of buildSubagentTools(cfg.projectRoot, '')) {
 		details.set(
 			item.name,
 			toToolCatalogEntry({ name: item.name, tool: item.tool }),

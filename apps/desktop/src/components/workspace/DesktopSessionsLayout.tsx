@@ -8,8 +8,6 @@ import {
 	ChatInputContainer,
 	MessageThreadContainer,
 	NewSessionLanding,
-	LooperSessionRail,
-	LooperWorkspace,
 	SessionListContainer,
 	Toaster,
 	type ChatInputContainerRef,
@@ -38,7 +36,6 @@ import {
 	useConfirmationStore,
 	useGitStore,
 	useSidebarStore,
-	useWorkspaceTabStore,
 } from '@ottocode/web-sdk/stores';
 import type { Project } from '../../lib/tauri-bridge';
 import { DesktopAppLayout } from './DesktopAppLayout';
@@ -46,8 +43,6 @@ import { DesktopAppLayout } from './DesktopAppLayout';
 interface DesktopSessionsLayoutProps {
 	project: Project;
 	sessionId?: string;
-	/** Workspace view: 'agents' (default, /sessions) or 'looper' (/looper). */
-	view?: 'agents' | 'looper';
 	dashboardOpen: boolean;
 	onCloseDashboard: () => void;
 	titleBar?: ReactNode;
@@ -56,7 +51,6 @@ interface DesktopSessionsLayoutProps {
 export function DesktopSessionsLayout({
 	project,
 	sessionId,
-	view = 'agents',
 	dashboardOpen,
 	onCloseDashboard,
 	titleBar,
@@ -78,7 +72,6 @@ export function DesktopSessionsLayout({
 	);
 	const defaultAgent =
 		project.kind === 'general' ? 'general' : config?.defaults.agent;
-	const isLooperTab = view === 'looper';
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
@@ -99,9 +92,9 @@ export function DesktopSessionsLayout({
 
 	const handleNewSession = useCallback(() => {
 		closeSidebarOverlay();
-		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
+		navigate({ to: '/sessions' });
 		focusInput();
-	}, [navigate, focusInput, isLooperTab, closeSidebarOverlay]);
+	}, [navigate, focusInput, closeSidebarOverlay]);
 
 	const handleSessionCreated = useCallback(
 		(newSessionId: string) => {
@@ -117,11 +110,8 @@ export function DesktopSessionsLayout({
 	);
 
 	const handleDeleteSession = useCallback(() => {
-		useWorkspaceTabStore
-			.getState()
-			.clearLastSession(isLooperTab ? 'looper' : 'agents');
-		navigate({ to: isLooperTab ? '/looper' : '/sessions' });
-	}, [navigate, isLooperTab]);
+		navigate({ to: '/sessions' });
+	}, [navigate]);
 
 	const handleSelectSession = useCallback(
 		(id: string) => {
@@ -149,31 +139,6 @@ export function DesktopSessionsLayout({
 			]);
 		},
 		[queryClient],
-	);
-
-	const handleSelectLooperSession = useCallback(
-		(id: string) => {
-			closeSidebarOverlay();
-			navigate({
-				to: '/looper/$sessionId',
-				params: { sessionId: id },
-			});
-			focusInput();
-		},
-		[navigate, focusInput, closeSidebarOverlay],
-	);
-
-	const handleLooperSessionCreated = useCallback(
-		(newSessionId: string) => {
-			closeSidebarOverlay();
-			navigate({
-				to: '/looper/$sessionId',
-				params: { sessionId: newSessionId },
-				replace: false,
-			});
-			focusInput();
-		},
-		[navigate, focusInput, closeSidebarOverlay],
 	);
 
 	const handleOpenDashboard = useCallback(() => {
@@ -355,33 +320,16 @@ export function DesktopSessionsLayout({
 				titleBar={titleBar}
 				sidebar={
 					<div className="flex h-full min-h-0 flex-col pt-12">
-						{isLooperTab ? (
-							<LooperSessionRail
+						<div className="min-h-0 flex-1">
+							<SessionListContainer
 								activeSessionId={sessionId}
-								onSelectSession={handleSelectLooperSession}
+								onSelectSession={handleSelectSession}
 							/>
-						) : (
-							<div className="min-h-0 flex-1">
-								<SessionListContainer
-									activeSessionId={sessionId}
-									onSelectSession={handleSelectSession}
-								/>
-							</div>
-						)}
+						</div>
 					</div>
 				}
 			>
-				{isLooperTab ? (
-					<LooperWorkspace
-						ref={chatInputRef}
-						sessionId={sessionId}
-						onSessionCreated={handleLooperSessionCreated}
-						onNewSession={handleNewSession}
-						onDeleteSession={handleDeleteSession}
-					/>
-				) : (
-					mainContent
-				)}
+				{mainContent}
 			</DesktopAppLayout>
 			<Toaster />
 		</>

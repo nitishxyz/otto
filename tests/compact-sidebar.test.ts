@@ -139,9 +139,7 @@ describe('desktop compact sidebar wiring', () => {
 		);
 		for (const handler of [
 			'const handleSelectSession',
-			'const handleSelectLooperSession',
 			'const handleSessionCreated',
-			'const handleLooperSessionCreated',
 			'const handleNewSession',
 		]) {
 			const start = source.indexOf(handler);

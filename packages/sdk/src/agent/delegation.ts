@@ -1,4 +1,4 @@
-const NON_DELEGATABLE_AGENTS = new Set(['general', 'looper']);
+const NON_DELEGATABLE_AGENTS = new Set(['general']);
 
 export function isDelegatableAgent(name: string): boolean {
 	return !NON_DELEGATABLE_AGENTS.has(name);

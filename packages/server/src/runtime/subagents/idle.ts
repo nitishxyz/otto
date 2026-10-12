@@ -35,8 +35,7 @@ async function wasLastRunAbortedByUser(
 }
 
 /**
- * Runs whenever a session's run queue drains. Drives sub-agent result
- * reporting and looper wake-ups.
+ * Runs whenever a session's run queue drains. Reports sub-agent and shell-job results.
  */
 export async function handleSessionIdle(
 	sessionId: string,
@@ -58,12 +57,10 @@ export async function handleSessionIdle(
 			return;
 		}
 
-		// A user hard-stop means stop: no result reporting, no looper wake-up.
+		// A user hard-stop means stop: no result reporting.
 		// Anything pending is delivered after the next user-initiated run.
 		if (await wasLastRunAbortedByUser(db, sessionId)) {
-			const { resetLooperStallState } = await import('../looper/service.ts');
-			resetLooperStallState(sessionId);
-			logger.info('[idle] last run aborted by user; skipping looper/report', {
+			logger.info('[idle] last run aborted by user; skipping reports', {
 				sessionId,
 			});
 			return;
@@ -73,15 +70,7 @@ export async function handleSessionIdle(
 		const shellReported = await reportFinishedShellJobs(db, cfg, sessionId);
 		if (shellReported) return;
 
-		const reported = await reportFinishedSubagents(db, cfg, sessionId);
-		if (reported) return;
-
-		// Looper sessions receive sub-agent results like any parent, but never
-		// wake another looper for themselves (no self-supervision loop).
-		if (sessionType === 'looper') return;
-
-		const { maybeWakeLooper } = await import('../looper/service.ts');
-		await maybeWakeLooper({ db, cfg, session });
+		await reportFinishedSubagents(db, cfg, sessionId);
 	} catch (error) {
 		logger.warn('[idle] session idle hook failed', {
 			sessionId,

@@ -173,9 +173,7 @@ Key responsibilities:
 - agent resolution and prompt composition
 - tool execution and approvals
 - OpenAPI generation
-- looper orchestration: project-scoped goals with per-goal looper sessions
-  (`goals.looperSessionId`); looper is the sole writer of goal state and
-  dispatches tasks to worker agents via async delegation
+- direct subagent coordination by the main agent via async delegation
 
 Exports include:
 
@@ -189,7 +187,7 @@ Exports include:
 
 SQLite + Drizzle ORM local persistence.
 
-- sessions/messages/artifacts/goals/subagents schema
+- sessions/messages/artifacts/subagents schema
 - bundled migrations
 - DB bootstrap helpers
 
